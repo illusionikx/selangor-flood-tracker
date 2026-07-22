@@ -14,7 +14,7 @@
 
 import { KINDS, HOTLINES } from './config.js';
 import { state } from './state.js';
-import { el, isHot, dkey, tier } from './util.js';
+import { el, isHot, dkey, tier, isIgnored } from './util.js';
 import { flashTo } from './map.js';
 import { byId } from './stations.js';
 
@@ -30,7 +30,9 @@ const pace = n => PX_PER_SEC * Math.min(2, Math.max(1, n / FAST_FROM));
 
 /* Unfiltered by the district picker, like the toast and unlike the panel. The panel is a list you
    went looking at; this is ambient. A filter set to tidy the map is not a request to be told less
-   about rivers reaching their danger mark. */
+   about rivers reaching their danger mark.
+   An ignored sensor is the exception, and for the same reason: that one *is* a request, made about
+   that named sensor. See isIgnored() in util.js. */
 export function ticker() {
   const box = el('ticker');
   const run = box.querySelector('.tk-run');
@@ -39,7 +41,7 @@ export function ticker() {
      two alerts in the same district arrive together instead of forty minutes apart. Sorted, not
      grouped — no headers, no merging. Every item stays a station you can click, and the ordering
      does the work silently. */
-  const hot = state.data.filter(isHot).sort((a, b) =>
+  const hot = state.data.filter(s => isHot(s) && !isIgnored(s)).sort((a, b) =>
     (a.district || '').localeCompare(b.district || '')
     || dkey(a).localeCompare(dkey(b))
     || (b.kind === 'siren') - (a.kind === 'siren')

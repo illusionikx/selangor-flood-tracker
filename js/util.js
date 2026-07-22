@@ -1,8 +1,24 @@
 // Small pure helpers plus the rules for "does this station actually know anything".
 
 import { KINDS, KIND_RANK, RIVER_COLOR, RAIN_COLOR, STATUS_COLOR, NO_INFO } from './config.js';
+import { PREFS } from './state.js';
 
 export const el  = id => document.getElementById(id);
+
+/* Sensors the user has switched off one at a time, by station id.
+ *
+ * Not the same thing as the district filter, and it is applied in more places. Hiding a district is
+ * a view — "I only care about Klang tonight" — so the ticker and the toast deliberately ignore it,
+ * because tidying the map is not consent to be told less about a river reaching its danger mark.
+ * Ignoring *one named sensor* is exactly that consent, given deliberately about that sensor, so it
+ * holds everywhere: map, heat, alert panel, ticker and toast.
+ *
+ * An id that is no longer in the payload stays in the list harmlessly — the feeds drop and restore
+ * stations, and forgetting the setting the one poll a station went missing would silently un-ignore
+ * it. Nothing lists it while it is gone, because the list is drawn from state.data.
+ */
+export const ignoredIds = () => new Set(PREFS.ignored || []);
+export const isIgnored = s => (PREFS.ignored || []).includes(s.id);
 
 // Filter key for a district. State-qualified because the names collide: Kuala Lumpur has a Gombak
 // constituency and Selangor has a Gombak district, and hiding one must not hide the other.
@@ -41,6 +57,23 @@ export function scalePos(v, stops) {
   }
   return 100;
 }
+
+/* The stops themselves, shared by the popup meter and the heat weight. One definition, because they
+   are now the same scale: a blob's colour is the band the station has crossed, so the meter's 38 /
+   68 / 100 slots have to be the numbers the gradient is keyed on. Null where there is no mark at
+   all to measure against. */
+export function levelStops(s) {
+  const max = s.danger || s.warning || s.alert;
+  if (!max) return null;
+  const stops = [[0, 0]];
+  if (s.alert   && s.alert   < max) stops.push([s.alert, 38]);
+  if (s.warning && s.warning < max && s.warning > (s.alert ?? 0)) stops.push([s.warning, 68]);
+  stops.push([max, 100]);
+  return stops;
+}
+
+// A gauge has no alert mark — only warning and danger — so it sits on the same slots minus the first.
+export const gaugeStops = s => [[0, 0], [s.warning || 0.15, 68], [s.danger || 0.3, 100]];
 
 // A station with nothing to report gets grey everywhere — colour means "there is a reading here".
 export const hasInfo = s => s.online && ({

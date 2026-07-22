@@ -1,8 +1,9 @@
 // Rebuilds every marker and the heat layer from the current station set.
 
-import { KINDS, RISE_ETA, HEAT_FLOOR } from './config.js';
+import { KINDS, HEAT_FLOOR } from './config.js';
 import { state, PREFS } from './state.js';
-import { el, color, popWidth, dkey, isCritical, leads, hasInfo } from './util.js';
+import { el, color, popWidth, dkey, isCritical, leads, hasInfo, isIgnored, ignoredIds,
+         scalePos, levelStops, gaugeStops } from './util.js';
 import { map, marks, siteMark, shown, syncCluster, focusOn, openStable } from './map.js';
 import { heat, heatScale, heatOpacity } from './heat.js';
 import { sitePopup } from './popup.js';
@@ -43,6 +44,9 @@ export function render() {
     if (!s.lat || !s.lng) continue;
     const pinned = s.id === state.pinned;   // a jumped-to station outranks every filter
     if (!pinned) {
+      // Same escape hatch as a hidden district: a jump still shows the pin, so a station reached
+      // from the table or the go-to box is never a flight to an empty patch of map.
+      if (isIgnored(s)) continue;
       if (hidden.has(dkey(s))) continue;
       if (risingOnly && !s.rising) continue;
     }
@@ -52,30 +56,25 @@ export function render() {
 
     // Heat is its own layer with its own toggle, so a hidden river chip must not dim the heatmap.
     //
-    // Alertness = how close this sensor is to its *own* danger mark: a river's level over its
-    // danger level, or a flood gauge's depth over the spot it watches. Whichever sensor at a place
-    // is closer to its mark is the one that gets to speak, so a dry-looking river next to a gauge
-    // already under water can't keep the area cold. hasInfo() gates it because an offline gauge is
-    // frozen on whatever it read the day it died — often a flood.
-    const near = !hasInfo(s) ? 0
-      : s.kind === 'river' ? (s.ratio || 0)
-      : s.kind === 'gauge' && s.depth > 0 && s.danger ? s.depth / s.danger : 0;
-    // Scaled by how soon it arrives — the same two facts the alert definition is built from, so the
-    // hot spots and the alert panel can't tell different stories. `s.rising` would have been the
-    // shorter way to write this, but it is that rule with a hard edge at RISE_ETA: a station an
-    // hour out and one 2.9 hours out would glow identically, and one 3.1 hours out would drop to
-    // nothing. The ramp spends the same doubling over the countdown.
+    // The weight IS the position on the station's own threshold scale — the same piecewise 38 / 68 /
+    // 100 slots the popup meter draws, so the gradient's stops are the thresholds themselves: yellow
+    // once past alert, orange past warning, red at danger. A blob's colour is now a fact you can name
+    // ("that catchment is past its warning marks") instead of a temperature you have to interpret.
+    // Whichever sensor at a place scores higher is the one that gets to speak, so a dry-looking river
+    // next to a gauge already under water can't keep the area cold. hasInfo() gates it because an
+    // offline gauge is frozen on whatever it read the day it died — often a flood.
     //
-    // Then the bottom HEAT_FLOOR of that scale is thrown away rather than drawn faintly: below it
-    // there is nothing to act on, and a map warm from end to end is a map nobody reads.
-    // The clamp is doing real work: at or past its mark, `near` is already ≥ 1 and the point is
-    // full red with no urgency at all. A river that has arrived and is now swaying either side of
-    // the mark has no `eta`, and must not cool down for it.
-    if (near) {
-      const urgency = s.eta == null ? 0 : Math.max(0, 1 - s.eta / RISE_ETA);
-      const w = (Math.min(1, near * (1 + urgency)) - HEAT_FLOOR) / (1 - HEAT_FLOOR);
-      if (w > 0) points.push([s.lat, s.lng, w]);
-    }
+    // A tripped gauge goes straight to full red regardless of depth. Its warning mark is 15 cm: a
+    // gauge that has crossed it is reporting water standing over a spot known to flood, which is an
+    // observation, not a forecast, and it outranks anything a scale could say about the centimetres.
+    const near = !hasInfo(s) ? 0
+      : s.kind === 'river' ? (levelStops(s) ? scalePos(s.level, levelStops(s)) / 100 : 0)
+      : s.kind === 'gauge' && s.depth > 0
+        ? (s.status >= 1 ? 1 : scalePos(s.depth, gaugeStops(s)) / 100)
+      : 0;
+    // Below the alert slot nothing paints at all: there is nothing to act on down there, and a map
+    // warm from end to end is a map nobody reads.
+    if (near >= HEAT_FLOOR) points.push([s.lat, s.lng, near]);
 
     if (!pinned && !shown(s.kind)) continue;
     const key = s.site || s.id;
@@ -124,6 +123,7 @@ export function render() {
   heatOpacity();
   counts();
   districts();
+  ignoredPanel();
   // Every poll rebuilds the map; the table has to follow or it sits on readings the map has already
   // replaced. Only while it is open — no point rendering 435 rows into a closed dialog.
   if (el('dataBox').open) dataTable();
@@ -160,9 +160,33 @@ export function districts() {
       </li>`;
     }).join('') || '<li class="none">No district matches that</li>';
 
+  // On the summary, so a collapsed section still says it is holding something back.
+  el('districtN').textContent = hidden.size ? `${hidden.size} hidden` : '';
   // Disabled rather than hidden: a button that comes and goes moves the rows under the pointer.
   el('districtAll').disabled = !hidden.size;
   el('districtNone').disabled = hidden.size >= tally.size;
+}
+
+/* The sensors switched off from a popup's ⋮, listed so they can be switched back on.
+   Always drawn, never hidden when empty — an ignored sensor is a muted alarm, and a muted alarm you
+   cannot find is the failure ISA-18.2 spends a chapter on. This list plus the count on the line
+   below the layer chips are the only two places on the page that say a sensor has been silenced, so
+   neither of them gets to disappear. Row order is the order they were ignored in: it is a short
+   list, and "the one I just switched off" is at the bottom where you left it. */
+export function ignoredPanel() {
+  const ids = ignoredIds();
+  const rows = state.data.filter(s => ids.has(s.id));
+
+  el('ignoredN').textContent = rows.length || '';
+  el('ignoredList').innerHTML = rows.map(s => `<li>
+      <i class="glyph i i-${KINDS[s.kind].icon}" style="color:${KINDS[s.kind].color}"></i>
+      <span class="nm">${s.name}<br><span class="muted">${
+        [s.district, s.state].filter(Boolean).join(', ') || 'district n/a'}</span></span>
+      <button class="solo" data-unignore="${s.id}" title="Stop ignoring ${s.name}"
+              aria-label="Stop ignoring ${s.name}">restore</button>
+    </li>`).join('')
+    || '<li class="none">Nothing ignored. Use the ⋮ on any sensor in a map popup.</li>';
+  el('ignoredClear').disabled = !rows.length;
 }
 
 // What the filters actually left on the map. Counted per *station*, not per marker: several sensors
@@ -177,6 +201,12 @@ export function counts() {
     if (shown(k)) total += perKind[k] ?? 0;
   }
   const pins = Object.values(marks).reduce((n, l) => n + l.length, 0);
+  // The ignored count rides here rather than only in its own panel: this line is the one the eye
+  // lands on to ask "why is the map this empty", and a sensor you silenced last week is exactly the
+  // answer it should give.
+  const ign = ignoredIds();
+  const nIgn = state.data.filter(s => ign.has(s.id)).length;
   el('shown').textContent = `${total} of ${state.data.length} stations on the map` +
-    (pins && pins < total ? ` · ${pins} pins` : '');
+    (pins && pins < total ? ` · ${pins} pins` : '') +
+    (nIgn ? ` · ${nIgn} ignored` : '');
 }

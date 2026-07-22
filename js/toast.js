@@ -11,7 +11,7 @@
 
 import { KINDS } from './config.js';
 import { state } from './state.js';
-import { el, isHot, isStale, tier } from './util.js';
+import { el, isHot, isStale, tier, isIgnored } from './util.js';
 import { flashTo } from './map.js';
 import { byId } from './stations.js';
 
@@ -34,7 +34,8 @@ let hide;
 
 /* Deliberately *not* filtered by the district picker. The panel is filtered because it is a list you
    are reading; this is a notification, and a filter you set an hour ago to tidy the map is not
-   consent to be kept in the dark about a river reaching its danger mark. */
+   consent to be kept in the dark about a river reaching its danger mark. Ignoring one named sensor
+   is that consent, so it does apply here — see isIgnored() in util.js. */
 const rows = list => list.slice(0, LIST).map(s => {
   const t = tier(s);
   // `null` only reaches here from the all-clear list: off the alert set entirely. A cleared station
@@ -68,7 +69,7 @@ function show(kind, head, list) {
 }
 
 export function alertToast() {
-  const hot = state.data.filter(isHot);
+  const hot = state.data.filter(s => isHot(s) && !isIgnored(s));
   const now = new Set(hot.map(s => s.id));
   const nowTier = new Set(hot.filter(s => tier(s) === 'now').map(s => s.id));
 

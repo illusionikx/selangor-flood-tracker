@@ -2,16 +2,32 @@
 // status footer. The same meter/state blocks are reused by the alert panel.
 
 import { KINDS, SOURCES, SPARK_H, camSrc } from './config.js';
-import { num, ago, parseMY, distKm, hasInfo, isStale, statusColor, scalePos } from './util.js';
+import { num, ago, parseMY, distKm, hasInfo, isStale, statusColor, scalePos,
+         levelStops, gaugeStops } from './util.js';
 import { nearestOf, nearestCam, oneLiner } from './stations.js';
 
 // Spinner lives on the wrapper; the img clears it on load, or swaps itself out on failure.
 export const camImg = (c, alt) => `<div class="shotwrap">
-  <img class="shot" src="${camSrc(c)}" alt="${alt}"
+  <img class="shot" src="${camSrc(c)}" alt="${alt}" data-name="${c.name}"
        onload="this.parentNode.classList.add('done')"
        onerror="this.parentNode.classList.add('done');
                 this.replaceWith(Object.assign(document.createElement('div'),
                   {className:'muted',textContent:'image unavailable'}))"></div>`;
+
+/* The ⋮ on every sensor. A menu rather than a bare "ignore" button: one unlabelled glyph that takes
+   a station off the map on a single tap is the wrong affordance for something you scan with a thumb,
+   and this is where the next per-sensor action will go.
+   `popover` + `popovertarget` gives toggle, light dismiss and Esc for nothing; the panel lands in the
+   top layer, so the popup's own scrolling box can't clip it. Placement is ui.js's — CSS anchor
+   positioning is still Chromium-only. Ids are safe because Leaflet only builds the DOM of the popup
+   that is actually open, and there is only ever one. */
+export const dots = s => `<button class="icon dots" popovertarget="mnu-${s.id}"
+    title="More" aria-label="More actions for ${s.name}"><i class="i i-more_vert"></i></button>
+  <div id="mnu-${s.id}" class="menu surface" popover>
+    <button class="mi" data-ignore="${s.id}"><i class="i i-visibility_off"></i>
+      <span>Ignore this sensor<br><small class="muted">hides it and stops it alerting you</small></span>
+    </button>
+  </div>`;
 
 const metric = (k, v, cls = '') => `<div class="k muted">${k}</div><div class="v ${cls}">${v}</div>`;
 
@@ -41,12 +57,8 @@ const camLink = (from, cam) => cam
 
 export function meter(s) {
   const max = s.danger || s.warning || s.alert;
-  if (s.level == null || !max) return '<div class="muted">no level reading</div>';
-
-  const stops = [[0, 0]];
-  if (s.alert   && s.alert   < max) stops.push([s.alert, 38]);
-  if (s.warning && s.warning < max && s.warning > (s.alert ?? 0)) stops.push([s.warning, 68]);
-  stops.push([max, 100]);
+  const stops = levelStops(s);   // shared with the heat weight — see util.js
+  if (s.level == null || !stops) return '<div class="muted">no level reading</div>';
 
   const col = statusColor(s.status);
   const marks = stops.slice(1, -1).map(([v, p], i) =>
@@ -68,31 +80,46 @@ export function meter(s) {
   </div>`;
 }
 
+/* The gauge's answer in words, in the same block the siren and the rainfall station use. A gauge
+   carries a status like they do, and until now it was the one kind whose state you had to infer from
+   a number and a bar — "0.22 m of water" is a fact you interpret, "WARNING" is the reading.
+   Bands are the server's own thresholds (0.15 m / 0.3 m), so block and pin colour cannot disagree.
+   Water below the warning mark gets no tone at all: it is neither the green of dry ground nor a
+   warning, and painting it either way would overstate what a couple of centimetres means. */
+/* Third element is the table's short form: a pill in a scannable column cannot carry "water on
+   ground", but it must not disagree with the popup either, so both come out of here. */
+export const gaugeState = s => s.depth <= 0
+  ? ['off', 'DRY GROUND', 'dry']
+  : s.status >= 2 ? ['on', 'FLOODED', 'flooded']
+  : s.status >= 1 ? ['mid', 'WATER RISING', 'rising']
+  : ['', 'WATER ON GROUND', 'water'];
+
 // A flood gauge measures water depth OVER a flood-prone spot: negative means the ground is dry.
 // Several offline gauges are frozen on old flood readings, so staleness is stated, never implied.
 function gaugeBlock(s) {
   if (s.depth == null) return '<div class="state">NO READING</div>';
   const wet = s.depth > 0;
   const stale = isStale(s);   // same rule the alert tiers use — see util.js
-  const stops = [[0, 0], [s.warning || 0.15, 55], [s.danger || 0.3, 100]];
-  const pct = scalePos(s.depth, stops);
+  const [tone, word] = gaugeState(s);   // shared with the table, so the two views cannot disagree
+  const pct = scalePos(s.depth, gaugeStops(s));   // shared with the heat weight — see util.js
   const col = statusColor(s.status >= 2 ? 3 : s.status);   // gauges only go normal / warning / danger
 
-  return `<div class="meter">
-      <div class="mtop">
-        <b style="color:${stale ? 'var(--muted)' : wet ? col : 'inherit'}">${
-          wet ? `${s.depth} m of water` : 'Dry ground'}</b>
-      </div>
-      ${wet ? `<div class="track">
+  return `<div class="state ${stale ? '' : tone}">${stale ? 'OFFLINE' : word}</div>
+    <div class="meter">
+      ${wet ? `<div class="mtop">
+          <b style="color:${stale ? 'var(--muted)' : col}">${s.depth} m of water</b>
+        </div>
+        <div class="track">
           <span class="fill" style="width:${pct.toFixed(1)}%;background:${stale ? 'var(--muted)' : col}"></span>
-          <i class="tick" style="left:55%"></i>
+          <i class="tick" style="left:68%"></i>
         </div>
         <div class="mscale muted">
-          <span style="left:55%">warning ${s.warning}</span><span style="left:100%">danger ${s.danger}</span>
+          <span style="left:68%">warning ${s.warning}</span><span style="left:100%">danger ${s.danger}</span>
         </div>`
-        : `<div class="muted">water is ${Math.abs(s.depth)} m below the gauge marker</div>`}
+        : `<div class="muted">${s.depth < 0 ? `water is ${Math.abs(s.depth)} m below the gauge marker`
+                                            : 'water is level with the gauge marker'}</div>`}
     </div>
-    ${stale ? '<div class="state">OFFLINE</div>' : ''}`;
+    ${stale ? `<div class="muted">last reported ${s.updated || 'unknown'}</div>` : ''}`;
 }
 
 /* Same job as the siren's state block: answer the one question the pin is opened to answer, before
@@ -125,7 +152,10 @@ function sensorBody(s, withCam = true) {
   // The meter says where the level is against its own thresholds; this says how it got there. The
   // alert panel has carried it all along — the popup you reach by clicking the pin had the numbers
   // for the trend (m/h, hours to danger) but not the shape they came from.
-  const spark = s.kind === 'river' ? sparkline(s.history) : '';
+  // Gauges get one too, in their own taupe: "0.12 m of water" is a fact, "filling for three hours"
+  // is the answer. Only where there is history — offline gauges are not sampled at all.
+  const spark = s.kind === 'river' ? sparkline(s.history)
+    : s.kind === 'gauge' && s.history?.length ? sparkline(s.history, 'gauge') : '';
   const wet = s.kind === 'rainfall' ? rainState(s) : '';
   // A siren has exactly one thing to say, so it gets a centred state block instead of a metric row.
   // "No signal" is only half the story: say when it last reported, so a siren that fell off the
@@ -134,7 +164,8 @@ function sensorBody(s, withCam = true) {
     ? `<div class="state">OUT OF CONTACT</div>
        <div class="muted">last reported ${s.updated ? `${s.updated} · ${ago(parseMY(s.updated))}`
                                                     : 'never — this station has no timestamp'}</div>`
-    : `<div class="state ${s.status > 0 ? 'on' : 'off'}">${s.status > 0 ? 'TRIGGERED' : 'IDLE'}</div>`;
+    : `<div class="state ${s.status > 0 ? 'on' : 'off'}">${s.status > 0 ? 'TRIGGERED' : 'IDLE'}</div>
+       ${sirenBand(s.history)}`;
   const gauge = s.kind !== 'gauge' ? '' : gaugeBlock(s);
 
   // Only camera popups carry an image; everything else links to the closest one — but a site that
@@ -166,9 +197,12 @@ export function popup(s) {
   return `<div class="pophead">
       <div class="popname">${s.name}</div>
       ${region(s)}
-      <span class="badge" style="--c:${tone}">
-        <i class="i i-${kind.icon}"></i>${kind.one || kind.label}
-      </span>
+      <div class="popact">
+        <span class="badge" style="--c:${tone}">
+          <i class="i i-${kind.icon}"></i>${kind.one || kind.label}
+        </span>
+        ${dots(s)}
+      </div>
     </div>
     ${sensorBody(s)}
     ${footLine(s)}`;
@@ -205,6 +239,7 @@ export function sitePopup(members) {
           ></i>
         <b>${KINDS[m.kind].one || KINDS[m.kind].label}</b>
         ${m.name !== lead.name ? `<span class="muted">${m.name}</span>` : ''}
+        ${dots(m)}
       </div>
       ${sensorBody(m, false)}
       ${footLine(m)}
@@ -293,7 +328,7 @@ const spanText = secs => secs < 3600
 
    The x axis spans the readings actually held, capped at SPARK_H hours. Times are 24-hour, like
    every other clock in this app and in the JPS data behind it. */
-export function sparkline(points) {
+export function sparkline(points, kind = 'river') {
   if (!points || points.length < 2) return '<div class="muted">trend graph builds as we poll</div>';
 
   // The axis spans the readings we actually hold, up to a 12-hour cap — so two hours of history
@@ -309,7 +344,7 @@ export function sparkline(points) {
   // stated next to it as a rate with an arrow, and a traffic-light hue on a *type* is the one thing
   // the colour language here does not allow — green on a graph reads as "fine", which is not
   // something a shape over 12 hours is entitled to say.
-  const col = KINDS.river.color;
+  const col = KINDS[kind].color;
   const [id, defs] = areaFill(col);
 
   return `<div class="spark">
@@ -322,6 +357,44 @@ export function sparkline(points) {
     </svg>
     ${axisHtml(ticks)}
     <div class="muted">${lo.toFixed(2)}–${hi.toFixed(2)} m over ${spanText(secs)}</div>
+  </div>`;
+}
+
+/* A siren's last 12 hours, as a band rather than a graph. Its samples are 0 or 1, so there is no
+   shape to plot: a polyline between them would draw ramps up and down that never happened, and an
+   axis of "0–1" is not a quantity anyone reads. What the pin is opened to ask is "has this thing
+   gone off today", and a strip that is either quiet or red answers it at a glance.
+
+   Each sample owns the span up to the next one. A gap longer than an hour and a half is left blank
+   for the same reason the rain chart breaks its area there: an unbroken quiet band across a hole in
+   the record says the siren was silent, in exactly the same shape as a siren that was measured
+   silent. Quiet is drawn in the outline colour, not green — the state block above already carries
+   the green, and a 12-hour reassurance is more than a log of samples is entitled to give. */
+export function sirenBand(points) {
+  if (!points || !points.length) return '<div class="muted">siren log builds as we poll</div>';
+
+  const { t1, secs, inWin, x, ticks } = timeAxis(points);
+  if (!inWin.length) return `<div class="muted">no readings in the last ${SPARK_H} hours</div>`;
+
+  const on = statusColor(3);
+  const bars = inWin.map(([t, v], i) => {
+    const nxt = inWin[i + 1]?.[0];
+    const end = nxt && nxt - t <= 5400 ? nxt : Math.min(t + 900, t1);
+    // A lone sample at the right edge has no width of its own; give it enough to be visible.
+    const x0 = +x(t), w = Math.max(+x(end) - x0, 0.8);
+    // `style`, not a `fill` attribute: var() in a presentation attribute is not reliable everywhere.
+    return `<rect x="${x0.toFixed(2)}" y="9" width="${w.toFixed(2)}" height="10" rx="1"
+      style="fill:${v > 0 ? on : 'var(--outline)'}"/>`;
+  }).join('');
+
+  const fired = inWin.filter(([, v]) => v > 0).length;
+  return `<div class="spark">
+    <svg viewBox="0 0 100 28" preserveAspectRatio="none" aria-hidden="true">
+      ${rules(ticks)}${bars}
+    </svg>
+    ${axisHtml(ticks)}
+    <div class="muted">${fired ? `sounded in ${fired} of ${inWin.length} readings`
+      : `silent for the last ${spanText(secs)}`}</div>
   </div>`;
 }
 

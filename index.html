@@ -4,18 +4,49 @@
 <title>Klang Valley Flood Watch</title>
 <link rel="stylesheet" href="vendor/leaflet.css">
 <link rel="stylesheet" href="vendor/markercluster.css">
-<link rel="stylesheet" href="vendor/fonts.css?v=39">
-<link rel="stylesheet" href="css/icons.css?v=39">
-<link rel="stylesheet" href="css/base.css?v=39">
-<link rel="stylesheet" href="css/chrome.css?v=39">
-<link rel="stylesheet" href="css/map.css?v=39">
+<link rel="stylesheet" href="vendor/fonts.css?v=49">
+<link rel="stylesheet" href="css/icons.css?v=49">
+<link rel="stylesheet" href="css/base.css?v=49">
+<link rel="stylesheet" href="css/chrome.css?v=49">
+<link rel="stylesheet" href="css/map.css?v=49">
 
-<!-- A <dialog>, not a div: the all-stations table is itself a modal dialog, and only the top layer
-     can paint over one. Esc and the backdrop come free with it. -->
+<!-- A camera still. A <dialog>, not a div: it opens from the all-stations table, which is itself a
+     modal dialog, and only the top layer can paint over one — Esc, the backdrop and focus trapping
+     come free with it.
+     Head / body / footer rather than the full-bleed black overlay it used to be: it now carries a
+     title, a close button and a row of controls, and every one of those is a thing you click *on*,
+     which a tap-anywhere-to-dismiss surface cannot tell apart from a dismissal. Same shape as the
+     other two dialogs, so it is the same object rather than a third convention. -->
 <dialog id="lightbox">
-  <div class="spin"></div>
-  <img alt="">
-  <div class="cap muted"></div>
+  <div class="modalhead">
+    <h2 id="lbTitle"></h2>
+    <form method="dialog"><button class="icon dclose" title="Close" aria-label="Close"
+      ><i class="i i-close"></i></button></form>
+  </div>
+  <div class="lbbody">
+    <div class="spin"></div>
+    <!-- The stage sizes itself to the frame, so the A/B overlay can be laid exactly over it. Both
+         images come from the same camera and share an aspect ratio, so matching their height is
+         enough to line them up pixel for pixel. -->
+    <div class="stage">
+      <img alt="">
+      <div class="ab" hidden><img class="abimg" alt=""><span class="abtime"></span></div>
+      <span class="abgrip" hidden aria-hidden="true"></span>
+      <span class="btime"></span>
+    </div>
+  </div>
+  <!-- The footer. Hidden unless this camera actually has an archive — a scrubber over one frame is
+       furniture, and that is also what the static build gets, where nothing was ever stored. -->
+  <div id="tl" hidden>
+    <div class="tlrow">
+      <button class="icon tlplay" title="Play" aria-label="Play"><i class="i i-play_arrow"></i></button>
+      <input id="tlscrub" type="range" min="0" max="0" value="0" step="1" aria-label="Timeline position">
+      <button class="icon tlcmp" title="Compare with the oldest frame in view"
+              aria-label="Compare with the oldest frame in view" aria-pressed="false"
+      ><i class="i i-compare"></i></button>
+    </div>
+    <div class="tlrow tlranges"></div>
+  </div>
 </dialog>
 <div id="splash">
   <div class="mark"><i class="i i-water_drop"></i></div>
@@ -127,9 +158,15 @@
 <div id="map"></div>
 <div id="bar">
   <div>
+    <!-- Both filter lists are <details>: two scrolling lists stacked above the chips pushed the
+         layer switches off a phone screen, and each is a thing you set once and then stop looking
+         at. Native, so the disclosure triangle, the keyboard behaviour and `open` come free — no
+         animation is wanted here, which is the one thing <details> can't do. The summary carries the
+         count, so a collapsed panel still says what it is holding. -->
     <!-- Multi-select, so a list rather than a <select>: you can hide several districts, or solo
          one, without reopening a dropdown between each. -->
-    <div id="districts">
+    <details id="districts" class="sect" open>
+      <summary><i class="i i-near_me"></i>Districts<b id="districtN"></b></summary>
       <input id="districtFind" type="text" autocomplete="off" placeholder="Filter districts…"
              aria-label="Filter districts">
       <ul id="districtList" class="picklist"></ul>
@@ -137,7 +174,16 @@
         <button id="districtAll" class="link">Show all</button>
         <button id="districtNone" class="link">Hide all</button>
       </div>
-    </div>
+    </details>
+    <!-- Sensors switched off one at a time from a popup's ⋮. Always here, even empty: this summary
+         and the count under the layer chips are the only two places that say a sensor has been
+         silenced, and a muted alarm nobody can find is the thing every alarm standard warns about.
+         Collapsed by default — the count on the summary is the indication, not the open list. -->
+    <details id="ignored" class="sect">
+      <summary><i class="i i-visibility_off"></i>Ignored sensors<b id="ignoredN"></b></summary>
+      <ul id="ignoredList" class="picklist"></ul>
+      <div class="rowbtns"><button id="ignoredClear" class="link">Stop ignoring all</button></div>
+    </details>
     <label class="chip"><input type="checkbox" id="heat" checked>
       <i class="glyph i i-water_drop"></i>Water-level heatmap</label>
     <label class="chip"><input type="checkbox" id="risingOnly">
@@ -169,20 +215,22 @@
       <i class="i i-info"></i>
       <span class="tip">
         <p><b>How it is worked out</b></p>
-        <p>Each station scores its reading against its <i>own</i> danger mark, so a small stream at
+        <p>Each station scores its reading against its <i>own</i> thresholds, so a small stream at
            its limit is as hot as a big river at its limit. Rivers and flood gauges both count —
-           whichever is nearer its mark wins the spot.</p>
-        <p>At the mark or past it: red, climbing or not. Below it: a fast riser is pulled up the
-           ramp by how soon it arrives, an hour out counting about two-thirds more than three.</p>
-        <p>Under 90% draws nothing. A map that is warm everywhere says nothing.</p>
+           whichever is further up its scale wins the spot.</p>
+        <p>The colour is the band it has crossed: yellow past its alert mark, orange past warning,
+           red at danger. The same three marks the station's own meter draws.</p>
+        <p>A flood gauge that has tripped goes straight to red — water standing over a spot known
+           to flood is something observed, not forecast.</p>
+        <p>Below the alert mark, nothing is drawn. A map that is warm everywhere says nothing.</p>
         <p class="muted">Rainfall, sirens and offline stations are not included.</p>
       </span>
     </span>
   </div>
   <div class="ramp"></div>
-  <!-- The scale reads as the whole sentence: below 90% of danger nothing is drawn, hence the left
-       tick. The prose that used to sit under it is in the tip — the panel is a legend, not a page. -->
-  <div class="ticks muted"><span>blank &lt;90%</span><span>95%</span><span>danger</span></div>
+  <!-- The three marks themselves, in the order the ramp crosses them. The prose that used to sit
+       under it is in the tip — the panel is a legend, not a page. -->
+  <div class="ticks muted"><span>alert</span><span>warning</span><span>danger</span></div>
   <label class="slider muted">Opacity
     <input type="range" id="heatOpacity" min="15" max="100" step="5" value="100">
     <span id="heatOpacityVal">100%</span>

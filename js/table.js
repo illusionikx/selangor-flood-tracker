@@ -9,7 +9,7 @@ import { KINDS, KIND_RANK, NO_INFO, camSrc } from './config.js';
 import { state } from './state.js';
 import { el, dkey, distKm, hasInfo, color, statusColor, scalePos, leads } from './util.js';
 import { nearestOf, nearestCam } from './stations.js';
-import { sparkline, rainBars, rateHtml, etaText } from './popup.js';
+import { sparkline, rainBars, sirenBand, rateHtml, etaText, gaugeState } from './popup.js';
 import { flashTo } from './map.js';
 
 
@@ -245,7 +245,7 @@ const tipVal = m => {
     const [label, tone] = RAIN[Math.max(0, m.status)] || RAIN[0];
     return pill(label, statusColor(tone)) + val(`${m.hourly} mm/h`);
   }
-  const label = m.depth <= 0 ? 'dry' : m.status >= 2 ? 'danger' : m.status === 1 ? 'warning' : 'water';
+  const [, , label] = gaugeState(m);
   return pill(label, m.depth <= 0 ? statusColor(0) : statusColor(m.status))
     + val(`${Math.abs(m.depth)} m`);
 };
@@ -254,20 +254,27 @@ const tipVal = m => {
    itself. No info icon — the badge, the gauge and the Show image button are the things the eye is
    already on, so they are the things that answer when you point at them. An extra glyph per cell
    bought nothing except six more marks to look past in a table that is meant to be scanned. */
+/* The two kinds that have a shape over time get their trend line and their graph here, which is the
+   only place in this view with room for one. Per sensor, not per cell: a merged cell averages its
+   members, and an average has no history — two rainfall masts either end of a township can be rising
+   and falling at once, and one line drawn through the mean of them would be a reading that never
+   happened. So the cell keeps the average and the panel breaks it back apart. */
+const trend = m => (m.kind === 'river' && m.rate != null
+    ? `<div class="tipnote muted">trend ${rateHtml(m)}${
+        m.eta != null ? ` · danger ${etaText(m.eta)}` : ''}</div>`
+    : '')
+  + (m.kind === 'river' ? sparkline(m.history)
+    // Only where there is one: an offline gauge is not sampled, and "graph builds as we poll" on a
+    // sensor nobody is hearing from would promise a line that is never going to arrive. Same rule
+    // for the siren band, which is only sampled while the siren is in contact.
+    : m.kind === 'gauge' ? (m.history?.length ? sparkline(m.history, 'gauge') : '')
+    : m.kind === 'siren' ? (m.history?.length ? sirenBand(m.history) : '')
+    : m.kind === 'rainfall' ? rainBars(m.history) : '');
+
 function summary(own, lead, scope) {
   const named = own.length === 1 && own[0].name !== lead.name;
-  // The two kinds that have a shape over time get their graph here, which is the only place in this
-  // view with room for one. A cell that would otherwise have nothing to add still opens for it.
-  const chart = own.length === 1 && (own[0].kind === 'river' ? sparkline(own[0].history)
-    : own[0].kind === 'rainfall' ? rainBars(own[0].history) : '');
-  // The cell shows the level and how far it is from danger; this is the part it has no room for —
-  // which way it is going and how soon that matters. Same markup as the popup and alert panel.
-  const s = own[0];
-  const note = own.length === 1 && s.kind === 'river' && s.rate != null
-    ? `<div class="tipnote muted">trend ${rateHtml(s)}${
-        s.eta != null ? ` · danger ${etaText(s.eta)}` : ''}</div>`
-    : '';
-  if (own.length < 2 && !named && !chart && !note) return ['', ''];
+  const graphs = own.map(trend);
+  if (own.length < 2 && !named && !graphs[0]) return ['', ''];
   // Scoped, because the "my location" row shows stations that also appear in their own row further
   // down — two panels with one id and getElementById would only ever find the first.
   const id = `sum-${scope}${own[0].id}`;
@@ -275,9 +282,10 @@ function summary(own, lead, scope) {
     `<div id="${id}" class="tipbox surface" popover>
       <div class="tiphead">${own.length > 1
         ? `${own.length} sensors here, summarised` : own[0].name}</div>
-      ${own.length > 1 ? own.map(m => `<div class="tiprow"><span>${m.name}</span>
-        <span class="tv">${tipVal(m)}</span></div>`).join('') : ''}
-      ${note}${chart || ''}
+      ${own.length > 1
+        ? own.map((m, i) => `<div class="tiprow"><span>${m.name}</span>
+            <span class="tv">${tipVal(m)}</span></div>${graphs[i]}`).join('')
+        : graphs[0]}
     </div>`];
 }
 
@@ -321,7 +329,8 @@ function cell(own, lead, scope = '') {
   if (m.kind === 'camera') {
     return wrap(m.image
       ? `<button class="shotbtn" data-shot="${camSrc(m)}"${hook}
-           data-cap="Latest still from ${m.name}"><i class="i i-photo_camera"></i>Show image</button>`
+           data-cap="Latest still from ${m.name}" data-name="${m.name}"
+           ><i class="i i-photo_camera"></i>Show image</button>`
       : pill('offline', NO_INFO, hook));
   }
   if (!hasInfo(m)) return wrap(pill('offline', NO_INFO, hook));
@@ -342,7 +351,9 @@ function cell(own, lead, scope = '') {
       m.hourly} mm<span class="muted">/h</span></div>`);
   }
   // Gauge: depth over a flood-prone spot, so negative is dry ground, not a missing reading.
-  const label = m.depth <= 0 ? 'dry' : m.status >= 2 ? 'danger' : m.status === 1 ? 'warning' : 'water';
+  // Word comes from the popup's own gaugeState(), so a pin and its row can never say different
+  // things about the same status.
+  const [, , label] = gaugeState(m);
   return wrap(`${pill(label, m.depth <= 0 ? statusColor(0) : statusColor(m.status), hook)}<div class="val">${
     m.depth > 0 ? `${m.depth} m<span class="muted"> deep</span>`
                 : `<span class="muted">${Math.abs(m.depth)} m below</span>`}</div>`);

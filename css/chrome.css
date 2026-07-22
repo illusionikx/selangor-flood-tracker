@@ -343,14 +343,39 @@ table.data button[data-pop] { cursor: pointer; }
   text-transform: uppercase; color: var(--muted);
 }
 .tipbox .tiprow { display: flex; gap: 12px; align-items: baseline; padding: 3px 0; }
-.tipbox .tiprow + .tiprow { border-top: 1px solid var(--outline); }
+/* General sibling, not adjacent: a merged panel now puts each sensor's graph between its rows, so
+   `+` would only ever match the second row of a graph-less kind. */
+.tipbox .tiprow ~ .tiprow { border-top: 1px solid var(--outline); }
 .tipbox { min-width: 240px; }
 .tipbox .tipnote { margin-top: 4px; }
-.tipbox .spark { margin: 8px 0 0; }
+.tipbox .spark { margin: 8px 0 2px; }
 .tipbox .spark + .muted, .tipbox .spark .muted { font-size: 11px; }
 .tipbox .tiprow > span:first-child { flex: 1; min-width: 0; }
 .tipbox .tv { display: flex; align-items: center; gap: 6px; flex: none; }
 .tipbox .tv b { font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* The ⋮ menu on a sensor, in the top layer for the same reason the table's panels are: a Leaflet
+   popup is a small scrolling box, and a menu drawn inside one would be clipped by it. Placement is
+   ui.js's; the `display` pair doubles as the fallback where `popover` is unsupported. */
+.menu {
+  position: fixed; margin: 0; inset: auto; display: none;
+  min-width: 210px; max-width: calc(100vw - 16px);
+  padding: 4px; border: 1px solid var(--outline); border-radius: 10px; color: var(--on-surface);
+}
+.menu:popover-open { display: block; }
+.mi {
+  display: flex; align-items: flex-start; gap: 10px; width: 100%; padding: 8px 10px;
+  font: 400 13px/1.35 Roboto, sans-serif; color: inherit; text-align: left;
+  background: none; border: 0; border-radius: 6px; cursor: pointer;
+}
+.mi:hover { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.mi .i { font-size: 18px; color: var(--muted); margin-top: 1px; }
+.mi small { font-size: 11px; }
+/* Smaller than the app-bar buttons: this one sits inside a 300px popup beside a badge. */
+.dots { width: 28px; height: 28px; font-size: 18px; margin-left: auto; }
+.popact { display: flex; align-items: center; gap: 6px; margin: 6px 0 0; }
+.popact .badge { margin: 0 !important; }
+.sensorhead .dots { margin-left: auto; }
+
 /* The panel sits inside a cell in the DOM, so the cell's badge rules reach it — top layer changes
    where a thing paints, not what selectors match it. Undo the full-width cell treatment here. */
 table.data .tipbox .badge {
@@ -448,7 +473,9 @@ body.drawer #legend, body.drawer #alerts { transform: translateX(var(--drawer));
 }
 #legend .ramp {
   height: 10px; border-radius: 999px; margin: 6px 0 4px;
-  background: linear-gradient(90deg, #ffd166 0%, #ff9f1c 50%, #ff4d4d 100%);
+  /* The visible slice of the heat gradient — HEAT_ALERT to danger — so the warning stop lands at
+     (0.68 − 0.38) / (1 − 0.38). Change with heat.js's gradient and config.js's slots. */
+  background: linear-gradient(90deg, #ffd166 0%, #ff9f1c 48%, #ff4d4d 100%);
 }
 #legend .ticks { display: flex; justify-content: space-between; }
 
@@ -587,20 +614,89 @@ body.drawer #legend, body.drawer #alerts { transform: translateX(var(--drawer));
 
 /* --- overlays ------------------------------------------------------------------------------- */
 
-/* Full-view still. Tap/Esc closes; the image scales to whichever axis runs out first. */
+/* A camera still, as a dialog. It was a full-bleed black overlay you tapped anywhere to dismiss,
+   which is the right shape for "just show me the picture" and the wrong one the moment the picture
+   has a name, a close button and a row of controls under it — every one of those is a thing you
+   click *on*, and on a tap-anywhere-to-close surface each needs its own exemption. Same head / body
+   / footer as the other two dialogs, so it is the same object rather than a third convention.
+   `fit-content` so the box tracks the frame — a fixed width would gutter a portrait still — with a
+   floor so a short camera name doesn't shrink the dialog round the title. */
 #lightbox {
-  width: 100vw; max-width: none; height: 100dvh; max-height: none; margin: 0; border: 0;
-  place-content: center; gap: 10px; padding: 24px; background: #000000e6; cursor: zoom-out;
+  width: fit-content; min-width: min(460px, calc(100vw - 32px));
+  max-width: min(1000px, calc(100vw - 32px)); padding: 16px;
+  border: 1px solid var(--outline); border-radius: 12px;
+  background: var(--surface); color: var(--on-surface); box-shadow: var(--shadow);
 }
-#lightbox[open] { display: grid; }
-#lightbox::backdrop { background: #000000e6; }
-#lightbox img { max-width: 92vw; max-height: 82vh; border-radius: 8px; }
-#lightbox .cap { color: #dadce0; text-align: center; }
+#lightbox[open] { display: block; }
+#lightbox::backdrop { background: #0009; }
+#lightbox h2 {
+  flex: 1; min-width: 0; font-size: 16px; font-weight: 500;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* Grid, so the spinner and the frame occupy the same cell — the box does not jump when one
+   replaces the other. The min-height is what stops it collapsing to nothing while loading. */
+#lightbox .lbbody { display: grid; place-items: center; min-height: 140px; }
+#lightbox .lbbody > * { grid-area: 1 / 1; }
+/* The stage sizes to the frame so the A/B overlay can be laid over it exactly. `line-height: 0`
+   because an inline-block wrapped round an <img> otherwise reserves a descender's worth of space
+   under it, which the overlay does not have and so misaligns by a few pixels. */
+#lightbox .stage { position: relative; display: inline-block; line-height: 0; --ab: 50%; }
+#lightbox img { max-width: min(968px, calc(100vw - 64px)); max-height: 62vh; border-radius: 8px; }
+#lightbox.cmp .stage { cursor: ew-resize; }
+/* The older frame, clipped to the divider. `height: 100%` alone lines the two up: both frames come
+   from one camera, so they share an aspect ratio — matching one axis matches the other. */
+#lightbox .ab { position: absolute; inset: 0; width: var(--ab); overflow: hidden; }
+#lightbox .ab img { position: absolute; left: 0; top: 0; height: 100%; max-width: none;
+  border-radius: 8px 0 0 8px; }
+#lightbox .abgrip {
+  position: absolute; top: 0; bottom: 0; left: var(--ab); width: 2px; background: #fff;
+  box-shadow: 0 0 6px #000a;
+}
+#lightbox .abgrip::after {
+  content: ''; position: absolute; top: 50%; left: 50%; width: 34px; height: 34px;
+  transform: translate(-50%, -50%); border: 2px solid #fff; border-radius: 50%;
+  box-shadow: 0 0 6px #000a;
+}
+/* Which frame is which, on the frame itself — a caption under the picture would make you look away
+   from the thing you are comparing to find out what you are comparing. */
+#lightbox .abtime, #lightbox .btime {
+  position: absolute; bottom: 8px; padding: 3px 8px; border-radius: 999px;
+  font: 500 11px/1.4 Roboto, sans-serif; color: #fff; background: #000000a6; white-space: nowrap;
+}
+#lightbox .abtime { left: 8px; }
+#lightbox .btime { right: 8px; }
+#lightbox:not(.cmp) .btime:empty { display: none; }
+
+/* --- camera timeline: the dialog's footer -------------------------------------------------------
+   Under the frame, never over it — it is used continuously while the picture is being read, and a
+   bar that covers part of the picture is a bar you have to move out of the way to use it. Its own
+   rule above, because a footer that is sometimes absent needs a boundary that goes with it. */
+#tl {
+  display: grid; gap: 8px; justify-items: center; width: 100%;
+  margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--outline);
+}
+#tl[hidden] { display: none; }
+.tlrow { display: flex; align-items: center; gap: 8px; width: 100%; }
+#tl .icon.on { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); }
+#tlscrub { flex: 1; min-width: 0; accent-color: var(--accent); cursor: pointer; }
+.tlranges { justify-content: center; flex-wrap: wrap; gap: 6px; }
+.tlr {
+  padding: 4px 12px; cursor: pointer; font: 500 11px Roboto, sans-serif;
+  color: var(--muted); background: none; border: 1px solid var(--outline); border-radius: 999px;
+}
+.tlr:hover { background: var(--hover); color: var(--on-surface); }
+.tlr.on { color: #fff; background: var(--accent); border-color: var(--accent); }
+
+/* Phones: the frame gives up height to keep the footer reachable with a thumb, and the dialog
+   drops its width floor — at 360px a 460px minimum is a horizontal scrollbar. */
+@media (max-width: 600px) {
+  #lightbox { padding: 12px; min-width: 0; width: calc(100vw - 16px); }
+  #lightbox img { max-width: 100%; max-height: 46vh; }
+}
 /* A JPS still is fetched through our proxy and can take seconds. Without this the dialog opens on
-   an empty black screen, which reads as "the camera is dead" rather than "wait". */
-#lightbox .spin { justify-self: center; border-color: #ffffff40; border-top-color: #fff; }
+   an empty box, which reads as "the camera is dead" rather than "wait". */
 #lightbox:not(.loading) .spin { display: none; }
-#lightbox.loading img { display: none; }
+#lightbox.loading .stage { visibility: hidden; }
 
 /* Splash: covers the map until the first poll lands. */
 #splash {

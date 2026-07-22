@@ -3,7 +3,7 @@
 
 import { KINDS, STATUS_COLOR, NO_INFO } from './config.js';
 import { state, PREFS } from './state.js';
-import { el, distKm, dkey, isHot, tier, TIER_RANK } from './util.js';
+import { el, distKm, dkey, isHot, tier, TIER_RANK, isIgnored } from './util.js';
 import { flashTo } from './map.js';
 import { nearestCam, byId } from './stations.js';
 import { meter, sparkline, etaText, rateHtml } from './popup.js';
@@ -15,7 +15,7 @@ let wasHot = -1;
 
 export function alerts() {
   const hidden = new Set(PREFS.hidden || []);
-  const hot = state.data.filter(s => !hidden.has(dkey(s)) && isHot(s));
+  const hot = state.data.filter(s => !hidden.has(dkey(s)) && !isIgnored(s) && isHot(s));
   // Counts describe what is actually known right now, so anything stale is excluded from all three
   // and counted separately. A number that silently includes a reading from April is a lie with a
   // digit in front of it.
@@ -67,8 +67,16 @@ export function alerts() {
     const on = new Set(state.data.filter(s => !hidden.has(dkey(s))).map(s => s.district));
     const where = on.size === 1 ? ` in ${[...on][0]}`
                 : hidden.size   ? ' in the districts you are showing' : '';
+    /* An ignored sensor that is *itself* on alert is the one case where "All clear" would be a plain
+       lie, so it is stated — not listed, because listing it would undo the thing the user asked for,
+       but counted, so the all-clear is one the reader can weigh. The number they need is the ignored
+       sensors that are hot right now, not how many are ignored in total. */
+    const muted = state.data.filter(s => isIgnored(s) && isHot(s)).length;
     el('alertBody').innerHTML =
-      `<p class="empty muted">All clear${where}. Nothing rising or in danger.</p>`;
+      `<p class="empty muted">All clear${where}. Nothing rising or in danger.</p>${
+        muted ? `<p class="empty muted"><i class="i i-visibility_off"></i> ${muted} ignored sensor${
+          muted > 1 ? 's are' : ' is'} on alert — restore ${
+          muted > 1 ? 'them' : 'it'} under Ignored sensors in the filters.</p>` : ''}`;
     return;
   }
 

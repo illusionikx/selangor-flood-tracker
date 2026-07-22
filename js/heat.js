@@ -1,7 +1,7 @@
 // Water-level heatmap. Flooding is catchment-scale, so a hotspot should mean "this part of
 // Selangor", not "this gauge".
 
-import { HEAT_KM, HEAT_MAX_PX } from './config.js';
+import { HEAT_KM, HEAT_MAX_PX, HEAT_ALERT, HEAT_WARNING } from './config.js';
 import { map } from './map.js';
 import { el } from './util.js';
 
@@ -9,10 +9,12 @@ export const heat = L.heatLayer([], {
   // maxZoom is not a display limit — leaflet.heat divides every weight by 2^(maxZoom - zoom), so
   // any value inside our zoom range dims the blobs as you zoom out. 0 pins the factor at 1.
   radius: 70, blur: 55, maxZoom: 0,
-  // The whole ramp is spent on the last tenth of the way to danger (HEAT_FLOOR), so it opens at
-  // amber, not blue: anything painted at all is already near its mark.
-  // Gradient stops match the legend ramp in the panel — change both together.
-  gradient: { 0: '#ffd166', 0.5: '#ff9f1c', 1: '#ff4d4d' },
+  /* Stops are the thresholds, not arbitrary fractions: render.js weights each point by where it
+     sits on its own alert / warning / danger scale, so yellow means "past alert", orange "past
+     warning" and red "at danger" — the same reading the pin and the meter give, in the same
+     colours. Nothing is drawn below the alert slot, so the flat run under it is never seen.
+     The legend ramp in the panel is this gradient; change both together. */
+  gradient: { 0: '#ffd166', [HEAT_ALERT]: '#ffd166', [HEAT_WARNING]: '#ff9f1c', 1: '#ff4d4d' },
 });
 
 let fade = 1;   // extra dimming once the blob can no longer cover its ground distance

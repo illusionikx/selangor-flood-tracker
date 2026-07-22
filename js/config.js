@@ -35,12 +35,11 @@ export const KIND_RANK = ['river', 'siren', 'gauge', 'rainfall', 'camera'];
 export const STATUS_COLOR = ['#188038', '#f9ab00', '#e8710a', '#d93025'];
 
 export const NO_INFO = '#9aa0a6';   // grey: offline or reporting nothing
-// "rising" is decided in api.php — a station reaching its own danger mark within RISE_ETA hours at
-// the rate it is climbing now. One definition, server-side, so the panel, filter and heat weight
-// can never disagree about what counts as an alert.
-// Mirrors api.php's RISE_ETA. Only the heat ramp needs the number itself: everything else reads the
-// `rising` flag or the published `eta`. Keep the two in step.
-export const RISE_ETA = 3;         // hours to danger that count as on alert
+// "rising" is decided in api.php — a station reaching its own danger mark within its RISE_ETA at the
+// rate it is climbing now. One definition, server-side, so the panel and the filter can never
+// disagree about what counts as an alert. The client never re-derives it: it reads `s.rising`, or
+// the published `eta` where it wants to show the number. Nothing here mirrors the constant any more
+// — the heat ramp was the last thing that did, and it is keyed on thresholds now.
 
 /* APM's flood emergency line directory — every state's number, kept current by the agency that
    answers them. The one outbound link on this page that is an *action* rather than a source, which
@@ -56,9 +55,15 @@ export const TILES = { light: 'rastertiles/voyager', dark: 'dark_all' };
 export const SPARK_H     = 12;     // hours on the graph's x axis
 
 export const HEAT_KM     = 4;      // ground size of one blob
-// Nothing below this fraction of danger paints at all, and the whole gradient is spent on what is
-// left — a map that is warm everywhere says nothing, so the layer stays blank until it matters.
-export const HEAT_FLOOR  = 0.9;    // fraction of danger a station must reach to appear
+/* Heat weight is a position on the threshold scale, not a fraction of danger: the popup meter's
+   piecewise slots (alert 38%, warning 68%, danger 100%) keyed straight into the gradient, so a
+   blob's colour names the band a station has crossed. The floor is the alert slot — below its first
+   published mark a station paints nothing, because a map that is warm everywhere says nothing.
+   These three numbers, heat.js's gradient stops and the legend's ramp are one scale in four places;
+   change them together. */
+export const HEAT_ALERT   = 0.38;
+export const HEAT_WARNING = 0.68;
+export const HEAT_FLOOR   = HEAT_ALERT;
 export const HEAT_MAX_PX = 220;    // blur cost is quadratic; past this the layer fades instead
 export const FLASH_MS    = 2400;   // how long the jump-to ripple runs
 export const POLL_MS     = 300000; // matches the proxy's cache TTL

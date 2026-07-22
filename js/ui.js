@@ -2,13 +2,15 @@
 
 import { KINDS } from './config.js';
 import { state, PREFS, save } from './state.js';
-import { el, distKm, dkey } from './util.js';
+import { el, distKm, dkey, ignoredIds } from './util.js';
 import { map, setTheme, flashTo } from './map.js';
 import { heatOpacity } from './heat.js';
 import { byId } from './stations.js';
 import { render, districts } from './render.js';
 import { dataTable } from './table.js';
 import { alerts } from './alerts.js';
+import { ticker } from './ticker.js';
+import { openTimeline, reset } from './timeline.js';
 import { load } from './net.js';
 import { paintTestChrome } from './test.js';
 
@@ -145,6 +147,61 @@ el('districtList').onclick = e => {
 el('districtAll').onclick = () => setHidden(new Set(), true);
 el('districtNone').onclick = () => setHidden(new Set(state.data.map(dkey)), false);
 
+// --- collapsible filter sections ------------------------------------------------------------------
+// `open` is the element's own state, so there is nothing to sync — only to remember. Keyed by id in
+// the same prefs blob as everything else. Districts default open, ignored closed.
+
+for (const d of document.querySelectorAll('#bar .sect')) {
+  d.open = PREFS.sect?.[d.id] ?? d.open;
+  d.ontoggle = () => { (PREFS.sect ??= {})[d.id] = d.open; save(); };
+}
+
+// --- ignored sensors -------------------------------------------------------------------------------
+// The ⋮ in a map popup adds one; this panel is the only way back. render.js draws the list.
+
+function setIgnored(ids) {
+  PREFS.ignored = [...ids];
+  save();
+  // A jump-pinned station outranks every filter, including this one — so drop the pin, or ignoring
+  // the very station you just jumped to would leave it on the map.
+  state.pinned = null;
+  render(); alerts(); ticker();
+}
+
+// Delegated: the ⋮ menu is rebuilt with its popup on every poll, so there is nothing stable to bind.
+document.addEventListener('click', e => {
+  const id = e.target.closest('[data-ignore]')?.dataset.ignore;
+  if (!id) return;
+  setIgnored(ignoredIds().add(id));
+  // Close the popup, not just the menu: the pin it belongs to has just gone, and a popup floating
+  // over the spot where its own marker used to be is a ghost.
+  map.closePopup();
+});
+
+el('ignoredList').onclick = e => {
+  const id = e.target.closest('[data-unignore]')?.dataset.unignore;
+  if (!id) return;
+  const ids = ignoredIds();
+  ids.delete(id);
+  setIgnored(ids);
+};
+el('ignoredClear').onclick = () => setIgnored(new Set());
+
+/* Placement for the ⋮ menu, by hand — CSS anchor positioning is Chromium-only, exactly as in the
+   table's hover panels. `toggle` does not bubble, hence the capture phase. */
+document.addEventListener('toggle', e => {
+  const box = e.target;
+  if (e.newState !== 'open' || !box.classList?.contains('menu')) return;
+  const btn = document.querySelector(`[popovertarget="${box.id}"]`);
+  if (!btn) return;
+  const r = btn.getBoundingClientRect();
+  box.style.left = `${Math.max(8,
+    Math.min(r.right - box.offsetWidth, innerWidth - box.offsetWidth - 8))}px`;
+  // Below the button unless that runs off the bottom — popups near the foot of the map are common.
+  box.style.top = r.bottom + box.offsetHeight + 8 < innerHeight
+    ? `${r.bottom + 4}px` : `${r.top - box.offsetHeight - 4}px`;
+}, true);
+
 // --- alert panel ---------------------------------------------------------------------------------
 
 const alertPanel = el('alerts'), alertTab = el('alertTab');
@@ -274,21 +331,31 @@ document.addEventListener('click', e => {
   const btn = e.target.closest('[data-shot]');
   if (!img && !btn) return;
   e.stopPropagation();
-  const full = lightbox.querySelector('img');
+  const full = lightbox.querySelector('.stage > img');
   // Spin until it lands. `complete` covers the popup's already-cached still, which fires no load
   // event — without that check the spinner would sit there for ever over a picture that is ready.
   lightbox.classList.add('loading');
-  full.src = img ? img.src : btn.dataset.shot;   // data-shot is the resolved URL, proxied or direct
+  const src = img ? img.src : btn.dataset.shot;   // data-shot is the resolved URL, proxied or direct
+  full.src = src;
   if (full.complete) lightbox.classList.remove('loading');
-  lightbox.querySelector('.cap').textContent = img ? img.alt : btn.dataset.cap || '';
+  // The place, as the dialog's title. Both openers carry it as `data-name` rather than having this
+  // strip a prefix off the alt text — "Latest still from X" is a caption, and parsing a caption back
+  // into a name is a rule that breaks the day the caption is reworded.
+  full.alt = (img ? img.alt : btn.dataset.cap) || '';
+  el('lbTitle').textContent = (img || btn).dataset.name || full.alt;
   lightbox.showModal();
+  openTimeline(src);   // no-op unless this is a proxied camera with an archive behind it
 });
 // A dead camera stops the spinner too — the broken image and its alt text say more than a spinner
 // that never ends, which reads as "still trying".
-lightbox.querySelector('img').onload =
-lightbox.querySelector('img').onerror = () => lightbox.classList.remove('loading');
+lightbox.querySelector('.stage > img').onload =
+lightbox.querySelector('.stage > img').onerror = () => lightbox.classList.remove('loading');
 
-lightbox.onclick = () => lightbox.close();   // <dialog> gives us Esc for nothing
+// Backdrop closes, like the other two dialogs; the × and Esc do the rest. Nothing inside needs an
+// exemption any more — that was the price of the old tap-anywhere overlay, which could not tell a
+// dismissal from a scrub, a play or a drag on the compare divider.
+lightbox.onclick = e => { if (e.target === lightbox) lightbox.close(); };
+lightbox.addEventListener('close', reset);
 
 // --- splash ------------------------------------------------------------------------------------------
 
