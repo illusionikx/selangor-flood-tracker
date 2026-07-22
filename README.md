@@ -47,7 +47,8 @@ markup allows it and guards on row width where it doesn't.
 - **Stale over blank** — if upstream is unreachable, the last good payload is served with
   `upstreamOk: false` and its age, rather than an empty map.
 - **CCTV over HTTPS** — upstream advertises camera stills over plain http, which an https page
-  can't load. They're proxied server-side, and only for camera ids already in the cache.
+  can't load. They're proxied server-side, and only for camera ids already in the cache. (The static
+  build hotlinks them instead: the same files are served over TLS, they're just not advertised.)
 
 ## Running it
 
@@ -69,6 +70,23 @@ Leaflet and the fonts are vendored in `vendor/`.
 reset — but note that deleting `.history.db` discards the level history, so trends and graphs go
 blank for an hour while they rebuild.
 
+## Hosting it on GitHub Pages
+
+Pages serves files, not PHP, so [the workflow](.github/workflows/pages.yml) runs the PHP itself on a
+15-minute schedule and publishes the result as `api.json` beside the static assets. Enable it once:
+make the repo public, then set **Settings → Pages → Source** to *GitHub Actions*. It also runs on
+push, so the first deploy doesn't wait for the cron.
+
+The two builds differ by one line — `STATIC` in [js/config.js](js/config.js), flipped by the bake.
+It decides whether the page fetches `api.json` or `api.php`, and whether camera stills come from the
+proxy or straight from upstream over TLS.
+
+What that costs: cron is best-effort and often late, so the map runs 15–30 minutes behind rather
+than 5. GitHub disables the schedule after 60 days without a commit. The level history rides in the
+Actions cache, which is evicted after 7 days unused — the schedule keeps it warm, but a long quiet
+spell will cost the samples. If liveness matters more than the zero bill, run it on any host with
+PHP and cron and none of this applies.
+
 ## Layout
 
     index.html   markup only — no inline CSS or JS
@@ -78,6 +96,7 @@ blank for an hour while they rebuild.
     vendor/      Leaflet + plugins + fonts, hand-vendored so there's no build step
     lib/         Composer's vendor dir (gitignored — *not* vendor/)
     docs/        what exists and why, including what was deliberately not built
+    .github/     the Pages bake — runs the PHP on a schedule so Pages can serve it static
 
 ## Notes
 
