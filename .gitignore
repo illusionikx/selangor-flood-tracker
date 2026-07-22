@@ -4,3 +4,4 @@
 .history.db-shm
 lib/
 .refresh.lock
+shots/

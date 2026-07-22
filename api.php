@@ -3,6 +3,7 @@
 // ponytail: sqlite for level history, flat file for the payload cache (one blob, nothing to query).
 
 require_once __DIR__ . '/sources.php';   // the two scraped upstreams (national portal + KL)
+require_once __DIR__ . '/shots.php';     // the camera archive: capture, retention, lookup
 
 const API   = 'https://infobanjirjps.selangor.gov.my/JPSAPI/api/';
 const TTL   = 300;   // upstream updates hourly; 5 min is plenty
@@ -40,6 +41,7 @@ const HIST  = __DIR__ . '/.history.db';
 const READ  = 86400;         // seconds of history loaded per poll (trend + sparkline)
 const RETAIN = 30 * 86400;   // seconds kept on disk; older samples are pruned
 
+
 date_default_timezone_set('Asia/Kuala_Lumpur'); // upstream timestamps are local MYT, unlabelled
 
 const HOST = 'infobanjirjps.selangor.gov.my';
@@ -62,6 +64,29 @@ if (isset($_GET['cam'])) {
     header('Content-Type: image/jpeg');
     header('Cache-Control: max-age=60');
     echo $img;
+    exit;
+}
+
+// ?shots=<id> — which frames exist. The client asks once, when a lightbox opens.
+if (isset($_GET['shots'])) {
+    header('Content-Type: application/json');
+    header('Cache-Control: max-age=60');
+    echo json_encode(shotList((int)$_GET['shots']));
+    exit;
+}
+
+/* ?shot=<id>&t=<unix> — one stored frame. Both parameters are cast to int before they touch the
+   filesystem, so the path cannot be steered outside SHOTS: the same rule as ?cam=, which never
+   proxies a URL it was handed. A stored frame never changes, so it is immutable for a year. */
+if (isset($_GET['shot'])) {
+    $id = (int)$_GET['shot'];
+    $t  = (int)($_GET['t'] ?? 0);
+    $f  = $id > 0 && $t > 0 ? shotFile($id, $t) : null;
+    if (!$f) { http_response_code(404); exit; }
+    // A frame is stored in whichever format was smaller, so the type comes off the file we found.
+    header('Content-Type: ' . (str_ends_with($f, '.webp') ? 'image/webp' : 'image/jpeg'));
+    header('Cache-Control: public, max-age=31536000, immutable');
+    readfile($f);
     exit;
 }
 
@@ -121,12 +146,17 @@ if (is_file(CACHE)) {
  * The last SPARK_WIN of samples, one per bucket, as [ts, level]. Keeping the newest sample in each
  * bucket rather than averaging: this is a level graph, and an average would smooth away exactly the
  * short sharp rise the graph exists to show.
+ *
+ * $peak keeps the highest value in the bucket instead of the newest — for sirens, where the samples
+ * are 0/1 and a trigger that stopped inside one bucket is the single thing the graph exists to show.
  */
-function sparkPoints(array $points, int $now, int $bucket = SPARK_BUCKET): array {
+function sparkPoints(array $points, int $now, int $bucket = SPARK_BUCKET, bool $peak = false): array {
     $out = [];
     foreach ($points as [$ts, $v]) {
         if ($now - $ts > SPARK_WIN) continue;
-        $out[intdiv($ts, $bucket)] = [$ts, round($v, 3)];
+        $b = intdiv($ts, $bucket);
+        if ($peak && isset($out[$b]) && $out[$b][1] >= $v) continue;
+        $out[$b] = [$ts, round($v, 3)];
     }
     ksort($out);
     return array_values($out);
@@ -170,6 +200,7 @@ function fetchAll(array $urls, int $concurrency = 20, bool $json = true): array 
     curl_multi_close($mh);
     return $out;
 }
+
 
 $lists = fetchAll([
     'rainfall' => API . 'StationRainfalls',
@@ -416,6 +447,39 @@ foreach ($stations as &$s) {
 }
 unset($s);
 
+// --- Gauge history -----------------------------------------------------------------------------
+// Depth over a flood-prone spot is a level like any other, so it gets the same table, window and
+// bucket as a river — a line between two readings is honest here, the water really was somewhere in
+// between. No trend or ETA off it though: the thresholds are 0.15 m and 0.3 m, and a rate computed
+// against numbers that small from a sensor rounding to centimetres would be mostly noise. The graph
+// answers the question a gauge is actually asked — is this spot filling or draining.
+foreach ($stations as &$s) {
+    // Offline gauges are frozen on old flood readings — several still hold April's 3.55 m. Sampling
+    // one every poll would draw a flat line at a number from months ago, which is the one thing a
+    // graph of it must not do: a straight line reads as "steady", not as "nobody is listening".
+    if ($s['kind'] !== 'gauge' || !isset($s['depth']) || !$s['online']) continue;
+    $key = $s['id'];
+    $hist[$key] = array_merge($hist[$key] ?? [], [[$now, (float)$s['depth']]]);
+    $s['history'] = sparkPoints($hist[$key], $now);
+    $samples[$key] = (float)$s['depth'];
+}
+unset($s);
+
+// --- Siren history -------------------------------------------------------------------------------
+// A siren is 0 or 1, so this is a log, not a trend — the popup draws it as a band, never a line.
+// Worth keeping anyway: "silent for the last 12 hours" is the answer a siren pin is opened for, and
+// until now the only evidence for it was a heartbeat timestamp. Out-of-contact sirens are skipped
+// for the same reason offline gauges are — a flat IDLE band from a sensor nobody can hear is a lie.
+// ponytail: full-resolution samples like every other kind; bucket to the hour if the table bloats.
+foreach ($stations as &$s) {
+    if ($s['kind'] !== 'siren' || !$s['online']) continue;
+    $key = $s['id'];
+    $hist[$key] = array_merge($hist[$key] ?? [], [[$now, (float)$s['status']]]);
+    $s['history'] = sparkPoints($hist[$key], $now, SPARK_BUCKET, true);
+    $samples[$key] = (float)$s['status'];
+}
+unset($s);
+
 // --- Sites -------------------------------------------------------------------------------------
 // A rainfall gauge, a river gauge and sometimes a camera share one mast, and every feed publishes
 // them as separate stations at the same coordinates — 113 coordinate pairs hold two or more, and
@@ -558,3 +622,12 @@ $db->commit();
 
 file_put_contents(CACHE, $payload, LOCK_EX);
 echo $payload;
+
+/* Last, and still inside the refresh lock. The payload is already on the wire, so nothing the map
+   needs is waiting on this — but with no `fastcgi_finish_request` under Herd the connection cannot
+   actually be closed, so one poll in six takes a few seconds longer than the rest. That is the cost
+   of not having a background worker; a cron on api.php would spend it where nobody is watching.
+   `ignore_user_abort` so a client that gave up doesn't leave a half-written capture behind. */
+ignore_user_abort(true);
+flush();
+captureShots($stations);
