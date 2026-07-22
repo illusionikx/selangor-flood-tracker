@@ -5,6 +5,9 @@ import { state, PREFS } from './state.js';
 import { el, ago } from './util.js';
 import { render } from './render.js';
 import { alerts } from './alerts.js';
+import { alertToast } from './toast.js';
+import { ticker } from './ticker.js';
+import { seedTest } from './test.js';
 
 /* One word and a dot. The chip answers one question — is what I am looking at current? — and every
    extra clause was answering a question nobody had asked yet ("upstream down — showing cache" is
@@ -19,7 +22,9 @@ let last;   // the payload the chip is currently describing, so the ages can tic
 function network(j, err) {
   last = err ? null : j;
   const stale = j && j.sourceUpdated && (Date.now() - new Date(j.sourceUpdated)) / 3.6e6 > 2;
-  const [color, text] = err          ? ['#ff4d4d', 'offline']
+  // Test mode outranks every real state: whatever the feed is doing, the map is not showing it.
+  const [color, text] = state.test   ? ['#e8710a', 'test mode']
+    : err                            ? ['#ff4d4d', 'offline']
     : j.upstreamOk === false         ? ['#ff4d4d', 'cached']
     : stale                          ? ['#ffd166', 'stale']
                                      : ['#06d6a0', 'live'];
@@ -68,13 +73,19 @@ export async function load() {
     const j = await r.json();
     if (!j.stations) throw new Error(j.error || 'HTTP ' + r.status);
     state.data = j.stations;
+    // Before anything reads it, and only in the client's copy — see test.js. Nothing downstream
+    // needs to know it is looking at a drill, which is the point: the drill exercises the real code.
+    if (state.test) seedTest(state.data);
     // render() blocks for as long as it takes to build 400-odd markers and popups, so the line
     // has to be given a frame to paint in — set and then rendered in the same task, it would
     // never appear at all.
     if (first) { say(`placing ${j.stations.length} stations on the map…`); await new Promise(requestAnimationFrame); }
 
     network(j);
-    render(); alerts();
+    render(); alerts(); ticker();
+    // After alerts(), and only from here — alerts() also runs on every filter change, and hiding a
+    // district must not read as stations going on alert.
+    alertToast();
     el('splash').classList.add('gone');
   } catch (e) {
     clearTimeout(slow); clearTimeout(slower);

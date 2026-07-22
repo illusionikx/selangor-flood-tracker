@@ -2,7 +2,7 @@
 // status footer. The same meter/state blocks are reused by the alert panel.
 
 import { KINDS, SOURCES, SPARK_H, camSrc } from './config.js';
-import { num, ago, parseMY, distKm, hasInfo, statusColor, scalePos } from './util.js';
+import { num, ago, parseMY, distKm, hasInfo, isStale, statusColor, scalePos } from './util.js';
 import { nearestOf, nearestCam, oneLiner } from './stations.js';
 
 // Spinner lives on the wrapper; the img clears it on load, or swaps itself out on failure.
@@ -14,6 +14,16 @@ export const camImg = (c, alt) => `<div class="shotwrap">
                   {className:'muted',textContent:'image unavailable'}))"></div>`;
 
 const metric = (k, v, cls = '') => `<div class="k muted">${k}</div><div class="v ${cls}">${v}</div>`;
+
+/* Rate of rise, drawn the same way everywhere it appears. The arrow animates — a river climbing is
+   the one thing on this page that is *happening* rather than merely being the case, and a static
+   triangle said it in the same voice as a station name. Nudged, not spun: it has to be noticeable
+   from across a room and still be ignorable while you read the number beside it.
+   A rate of exactly zero gets no arrow at all; "steady" is not a direction. */
+export const rateHtml = s => s.rate == null ? '' : !s.rate
+  ? '<b class="rate">steady</b>'
+  : `<b class="rate ${s.rate > 0 ? 'up' : 'down'}"><i class="i i-arrow_drop_${
+      s.rate > 0 ? 'up' : 'down'}"></i>${Math.abs(s.rate)} m/h</b>`;
 
 /* Hours until this station hits its own danger mark at the rate it is climbing now. Deliberately
    coarse past a couple of hours: a straight-line projection off an hour of samples is a rough
@@ -63,8 +73,7 @@ export function meter(s) {
 function gaugeBlock(s) {
   if (s.depth == null) return '<div class="state">NO READING</div>';
   const wet = s.depth > 0;
-  const when = parseMY(s.updated);
-  const stale = !s.online || (when && Date.now() - when > 864e5);   // 24h
+  const stale = isStale(s);   // same rule the alert tiers use — see util.js
   const stops = [[0, 0], [s.warning || 0.15, 55], [s.danger || 0.3, 100]];
   const pct = scalePos(s.depth, stops);
   const col = statusColor(s.status >= 2 ? 3 : s.status);   // gauges only go normal / warning / danger
@@ -83,7 +92,7 @@ function gaugeBlock(s) {
         </div>`
         : `<div class="muted">water is ${Math.abs(s.depth)} m below the gauge marker</div>`}
     </div>
-    ${stale ? `<div class="state">NOT CURRENT · last reported ${s.updated || 'unknown'}</div>` : ''}`;
+    ${stale ? '<div class="state">OFFLINE</div>' : ''}`;
 }
 
 /* Same job as the siren's state block: answer the one question the pin is opened to answer, before
@@ -103,8 +112,7 @@ const rainState = s => !hasInfo(s)
 function sensorBody(s, withCam = true) {
   const body = [];
 
-  if (s.kind === 'river' && s.rate != null) body.push(metric('Trend',
-    `${s.rate > 0 ? '▲' : '▼'} ${Math.abs(s.rate)} m/h`, s.rate > 0 ? 'up' : 'down'));
+  if (s.kind === 'river' && s.rate != null) body.push(metric('Trend', rateHtml(s)));
   // The number the "rising" flag is actually a cutoff on. Shown whenever it is climbing, flagged or
   // not, so "not rising" can be read as "still hours away" rather than taken on trust.
   if (s.kind === 'river' && s.eta != null) body.push(metric('Reaches danger',
@@ -114,6 +122,10 @@ function sensorBody(s, withCam = true) {
     body.push(metric('Today', num(s.daily, ' mm')));
   }
   const rain = s.kind === 'rainfall' ? rainBars(s.history) : '';
+  // The meter says where the level is against its own thresholds; this says how it got there. The
+  // alert panel has carried it all along — the popup you reach by clicking the pin had the numbers
+  // for the trend (m/h, hours to danger) but not the shape they came from.
+  const spark = s.kind === 'river' ? sparkline(s.history) : '';
   const wet = s.kind === 'rainfall' ? rainState(s) : '';
   // A siren has exactly one thing to say, so it gets a centred state block instead of a metric row.
   // "No signal" is only half the story: say when it last reported, so a siren that fell off the
@@ -136,11 +148,11 @@ function sensorBody(s, withCam = true) {
   return `${still}${siren}${gauge}${wet}
     ${s.kind === 'river' ? meter(s) : ''}
     ${body.length ? `<div class="popbody">${body.join('')}</div>` : ''}
-    ${rain}${link}`;
+    ${spark}${rain}${link}`;
 }
 
 const footLine = s => `<div class="popfoot muted">${s.online ? 'online' : 'OFFLINE'}${
-  s.updated || s.shot ? ' · ' + (s.updated || s.shot) : ''}${
+  s.updated || s.shot ? `${s.online ? ' · ' : ' · last reported '}${s.updated || s.shot}` : ''}${
   SOURCES[s.source] ? ` · via ${SOURCES[s.source].short}` : ''}</div>`;
 
 const region = s => `<div class="muted">${
@@ -258,6 +270,19 @@ const axisHtml = ticks => `<div class="axis muted" aria-hidden="true">${ticks.ma
 const rules = ticks => ticks.map(t =>
   `<line x1="${t.x}" x2="${t.x}" y1="0" y2="28" vector-effect="non-scaling-stroke"/>`).join('');
 
+/* Area fill under a line. Two stops rather than a fade to nothing: at the bottom the shape has to
+   read as a mass, at the top it has to not compete with the line drawn on it. Ids are minted
+   per call because several of these can be on the page at once — a duplicate id and every chart
+   silently takes the first one's colour. */
+let fillId = 0;
+const areaFill = c => {
+  const id = `af${++fillId}`;
+  return [id, `<defs><linearGradient id="${id}" x1="0" x2="0" y1="1" y2="0">
+    <stop offset="0" stop-color="${c}" stop-opacity=".6"/>
+    <stop offset="1" stop-color="${c}" stop-opacity=".1"/>
+  </linearGradient></defs>`];
+};
+
 const spanText = secs => secs < 3600
   ? `${Math.round(secs / 60)} min` : `${(secs / 3600).toFixed(secs < 36000 ? 1 : 0)} h`;
 
@@ -280,13 +305,20 @@ export function sparkline(points) {
   const lo = Math.min(...vals), hi = Math.max(...vals), span = hi - lo || 1;
   const y = v => (26 - (v - lo) / span * 24).toFixed(2);
   const pts = inWin.map(([t, v]) => `${x(t)},${y(v)}`).join(' ');
-  const up = vals.at(-1) >= vals[0];
+  // The station's own colour, not a red-for-rising / green-for-falling line. Direction is already
+  // stated next to it as a rate with an arrow, and a traffic-light hue on a *type* is the one thing
+  // the colour language here does not allow — green on a graph reads as "fine", which is not
+  // something a shape over 12 hours is entitled to say.
+  const col = KINDS.river.color;
+  const [id, defs] = areaFill(col);
 
   return `<div class="spark">
     <svg viewBox="0 0 100 28" preserveAspectRatio="none" aria-hidden="true">
+      ${defs}
       ${rules(ticks)}
+      <polygon points="${x(inWin[0][0])},28 ${pts} ${x(inWin.at(-1)[0])},28" fill="url(#${id})"/>
       <polyline points="${pts}" fill="none" vector-effect="non-scaling-stroke"
-        stroke="${up ? '#d93025' : '#188038'}" stroke-width="2" stroke-linejoin="round"/>
+        stroke="${col}" stroke-width="2" stroke-linejoin="round"/>
     </svg>
     ${axisHtml(ticks)}
     <div class="muted">${lo.toFixed(2)}–${hi.toFixed(2)} m over ${spanText(secs)}</div>
@@ -312,18 +344,32 @@ export function rainBars(points) {
   // All zeroes is a real answer, and a row of flat bars states it worse than a sentence does.
   if (!hi) return `<div class="muted">no rain in the last ${spanText(secs)}</div>`;
 
-  // Bars are anchored at their hour and drawn one hour wide, so an hour with no reading leaves a
-  // visible gap rather than a silent zero — missing is not the same as dry.
-  const w = Math.max(1.5, Math.min(80, 3600 / (secs || 3600) * 100 * 0.8));
-  // Centred on the hour, but kept inside the box: the newest bar sits at x=100 and the SVG is
-  // overflow:visible (the line graph needs that for its stroke), so half of it would draw outside.
-  const left = t => Math.min(Math.max(0, +x(t) - w / 2), 100 - w).toFixed(2);
+  /* An area, not bars — but cut into segments wherever an hour is missing, so a gap in the record
+     still draws as a gap. That was the whole reason bars were used here: an unbroken line across a
+     six-hour hole says it did not rain, and it says it in the same shape as six hours of measured
+     zeroes. The area is what changed; the honesty is not. */
+  const y = v => (28 - v / hi * 26).toFixed(2);
+  const segs = [[]];
+  for (const p of inWin) {
+    const prev = segs.at(-1).at(-1);
+    if (prev && p[0] - prev[0] > 5400) segs.push([]);   // more than an hour and a half apart
+    segs.at(-1).push(p);
+  }
+  const [id, defs] = areaFill(KINDS.rainfall.color);
+
   return `<div class="spark">
     <svg viewBox="0 0 100 28" preserveAspectRatio="none" aria-hidden="true">
+      ${defs}
       ${rules(ticks)}
-      ${inWin.map(([t, v]) => v > 0 ? `<rect x="${left(t)}"
-        y="${(28 - v / hi * 26).toFixed(2)}" width="${w.toFixed(2)}" height="${(v / hi * 26).toFixed(2)}"
-        fill="${KINDS.rainfall.color}"/>` : '').join('')}
+      ${segs.filter(s => s.length).map(s => {
+        const pts = s.map(([t, v]) => `${x(t)},${y(v)}`).join(' ');
+        // A lone reading has no line to draw, so it gets a sliver wide enough to see.
+        if (s.length === 1) return `<rect x="${Math.min(+x(s[0][0]), 99).toFixed(2)}" y="${y(s[0][1])}"
+          width="1.6" height="${(28 - y(s[0][1])).toFixed(2)}" fill="url(#${id})"/>`;
+        return `<polygon points="${x(s[0][0])},28 ${pts} ${x(s.at(-1)[0])},28" fill="url(#${id})"/>
+          <polyline points="${pts}" fill="none" vector-effect="non-scaling-stroke"
+            stroke="${KINDS.rainfall.color}" stroke-width="1.5" stroke-linejoin="round"/>`;
+      }).join('')}
     </svg>
     ${axisHtml(ticks)}
     <div class="muted">peak ${hi} mm in an hour · last ${spanText(secs)}</div>

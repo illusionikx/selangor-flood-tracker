@@ -64,6 +64,42 @@ export function color(s) {
 export const isCritical = s =>
   (s.kind === 'river' && s.status >= 3) || (s.kind === 'siren' && s.status > 0);
 
+/* What the "On alert" panel lists — critical, plus rivers forecast to reach danger within RISE_ETA.
+   Lives here so the panel and the toast cannot drift apart: a toast announcing something the panel
+   then doesn't list would be worse than no toast. */
+export const isHot = s => isCritical(s) || (s.kind === 'river' && s.rising);
+
+/* Is the reading behind an alert still current? Offline, or stamped more than a day ago — exactly
+   the rule the popups already draw `NOT CURRENT` from, shared so the two can never disagree about
+   whether the same station is trustworthy. (`parseMY` builds the date from MYT components in local
+   time; a viewer far from MYT is off by their offset, which a 24h window absorbs.) */
+export const isStale = s => {
+  if (!s.online) return true;
+  const when = parseMY(s.updated);
+  return !!when && Date.now() - when > 864e5;
+};
+
+/* The three things we currently call "an alert", separated.
+ *
+ * CAP splits certainty from urgency, and lumping them is the failure ISA-18.2 names: when every
+ * alarm looks equally urgent, the operator learns to ignore all of them. `now` is observed and
+ * happening; `soon` is a forecast that may not come true; `stale` is a claim we can no longer stand
+ * behind.
+ *
+ * `stale` is deliberately still an alert. A river sitting at its danger mark whose telemetry dies
+ * is the last thing that should quietly vanish from the list — silence rendered as safety. So it
+ * stays visible, drops out of the counts and the heat, and says why.
+ */
+export const tier = s => !isHot(s) ? null
+  : isStale(s)   ? 'stale'
+  : isCritical(s) ? 'now'
+                  : 'soon';
+
+// Worst first. Stale sorts last everywhere: it is the one tier you cannot act on.
+// The tier *colours* live in CSS, keyed off `.t-now` / `.t-soon` / `.t-stale`, so light and dark
+// can differ without a second palette in here.
+export const TIER_RANK = { now: 0, soon: 1, stale: 2 };
+
 /* Which sensor speaks for a mast when several share one — trouble first, then the standing rank in
    config.js. Lives here rather than in render.js because the table needs the same order and a view
    importing another view would put a cycle in the graph. */

@@ -1,11 +1,11 @@
 /* Page furniture around the map: app bar, status chip, drawer, legend, alert panel, splash. */
 
-#map { position: absolute; inset: 64px 0 0; }
+#map { position: absolute; inset: var(--hdr) 0 0; }
 
 /* --- top app bar ---------------------------------------------------------------------------- */
 
 header {
-  position: absolute; z-index: 600; top: 0; left: 0; right: 0; height: 64px;
+  position: absolute; z-index: 600; top: 0; left: 0; right: 0; height: var(--hdr);
   display: flex; align-items: center; gap: 12px; padding: 0 16px 0 8px;
   background: var(--surface); border-bottom: 1px solid var(--outline);
 }
@@ -16,6 +16,79 @@ header h1 {
 header h1 span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 header h1 b { font-weight: 500; color: var(--accent); }
 header h1 .brand { font-size: 24px; color: var(--accent); flex: none; }
+/* Everything that is not the menu or the mark, kept together and pushed to the right edge. */
+header .hactions { display: flex; align-items: center; gap: 4px; margin-left: auto; flex: none; }
+
+/* --- alert ticker ----------------------------------------------------------------------------- */
+
+/* Sits hard against the status chip: `margin-left: auto` eats the slack to its left, so the two
+   read as one live-status cluster on the right rather than a strip floating in the middle. It only
+   *shrinks* (`flex: 0 1 auto`, capped) — growing to fill the bar would drag it back off towards
+   the title, which is the thing being avoided.
+
+   `min-width: 0` because a flex item defaults to min-content: without it a long station name would
+   push the buttons off the right edge instead of being clipped inside the ticker. */
+#ticker {
+  /* Fixed basis, not `auto`: sized to content, the strip grew and shrank with the number of alerts,
+     so the header re-laid itself out every poll and the bar was a different shape in a flood than on
+     a calm day. It is a window onto the news, and a window does not change size with the news. */
+  flex: 0 1 min(58vw, 656px); min-width: 0;
+  /* 10px of its own on top of the header's 12px gap: the strip is always mid-item at its right
+     edge, and an item dissolving right up against the status chip reads as the two colliding. */
+  margin-left: auto; margin-right: 10px; height: 30px; overflow: hidden;
+  flex-shrink: 1;
+  display: flex; align-items: center;
+  /* Both edges fade, so an item entering or leaving dissolves instead of appearing at a hard cut.
+     Long ramps (56px) because a marquee is *always* half-way through an item at both edges — a
+     short ramp there reads as a clipped word rather than one still coming into view. */
+  -webkit-mask: linear-gradient(90deg, transparent, #000 56px, #000 calc(100% - 56px), transparent);
+  mask: linear-gradient(90deg, transparent, #000 56px, #000 calc(100% - 56px), transparent);
+}
+/* `flex: none` so the strip keeps its natural width instead of being squeezed to the box — a
+   shrunk strip would translate by a percentage of the wrong number and the loop would jump. */
+#ticker .tk-run {
+  display: flex; align-items: center; flex: none; white-space: nowrap; will-change: transform;
+  animation: ticker var(--dur, 30s) linear infinite;
+}
+/* Hover to read, hover to click — a moving target you cannot catch is a link that isn't one. */
+#ticker:hover .tk-run { animation-play-state: paused; }
+#ticker .tk-i {
+  display: inline-flex; align-items: center; gap: 6px; padding: 4px 0;
+  background: none; border: 0; color: var(--on-surface); cursor: pointer;
+  font: 400 12px/1 Roboto, sans-serif; white-space: nowrap;
+}
+#ticker .tk-i .i { color: var(--c); font-size: 15px; flex: none; }
+#ticker .tk-i b { font-weight: 500; }
+#ticker .tk-i:hover b { color: var(--accent); text-decoration: underline; }
+/* The reason carries the tier, since the icon cannot: the kind colour is what makes a river a river,
+   and the colour language keeps the traffic-light ramp for status. Grey stays the default, so a
+   stale alert needs no rule of its own — it simply never gets one of the two below. */
+#ticker .tk-why { color: var(--muted); }
+#ticker .tk-why.t-now  { color: #d93025; }
+#ticker .tk-why.t-soon { color: #e8710a; }
+:root[data-theme="dark"] #ticker .tk-why.t-now  { color: #f28b82; }
+:root[data-theme="dark"] #ticker .tk-why.t-soon { color: #fdd663; }
+/* The advisory. Not a link and not a station — the accent colour marks it as the app talking rather
+   than another row of telemetry, and it is the only tile with no `data-go`. */
+#ticker .tk-say { cursor: default; }
+#ticker .tk-say .i { color: var(--accent); }
+#ticker .tk-say b { font-weight: 500; color: var(--accent); }
+/* Underlined, not just tinted: this is the one thing on the strip you are meant to *go to*, and on a
+   moving line "that word is a slightly different colour" is not a discoverable affordance. */
+#ticker .tk-say a { color: var(--accent); text-decoration: underline; }
+#ticker .tk-dot { color: var(--outline); margin: 0 16px; }
+/* All-clear: centred, grey, still. It is the one card that is not a link and not news, so it reads
+   as a label rather than an item that happens to be showing — and stillness is the message. */
+#ticker.quiet { justify-content: center; -webkit-mask: none; mask: none; }
+#ticker.quiet .tk-run { flex: 1; justify-content: center; animation: none; }
+#ticker .tk-none { color: var(--muted); cursor: default; letter-spacing: .2px; }
+#ticker .tk-none .i { color: var(--muted); opacity: .8; }
+/* A strip that scrolls on its own is a textbook motion-sickness trigger. The names are still there
+   and can be swiped through; the alert panel has all of it as a list. */
+@media (prefers-reduced-motion: reduce) {
+  #ticker .tk-run { animation: none; }
+  #ticker { overflow-x: auto; scrollbar-width: none; }
+}
 
 #locate.busy { pointer-events: none; }
 #locate.busy::before { animation: pulse 1s infinite; }
@@ -24,18 +97,112 @@ header h1 .brand { font-size: 24px; color: var(--accent); flex: none; }
 
 /* --- sources dialog -------------------------------------------------------------------------- */
 
+/* Wider than a plain dialog: this one carries the logo lockup, three source entries and a credits
+   block, and at 440px the source descriptions ran to four lines each. */
 #aboutBox {
-  max-width: min(440px, calc(100vw - 32px)); padding: 20px;
+  max-width: min(600px, calc(100vw - 32px)); padding: 24px;
   border: 1px solid var(--outline); border-radius: 12px;
   background: var(--surface); color: var(--on-surface); box-shadow: var(--shadow);
 }
 #aboutBox::backdrop { background: #0009; }
-#aboutBox h2 { font-size: 18px; font-weight: 500; margin-bottom: 10px; }
+#aboutBox h2 { font-size: 18px; font-weight: 500; }
+
+/* Title and close on one line, both dialogs. In the header rather than a footer button: these
+   dialogs scroll, and a close pinned below the content is one more thing to travel to from the top
+   you are always at. The negative margin pulls the button's 40px hit area back onto the title's own
+   box, so the row measures as tall as the title rather than as tall as the button. */
+.modalhead { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+
+/* The mark: drop + two-line wordmark, the same lockup as the app bar and the splash, just bigger.
+   On its own centred line — it is the dialog's identity, not a row of the header, and sharing a
+   line with a mode switch made it read as one more control.
+
+   `align-items: center` on the drop rather than baseline: it is a picture beside two lines of text,
+   and baseline-aligning it to the first line hangs it off the top. */
+.logo {
+  display: flex; align-items: center; justify-content: center; gap: 12px;
+  text-align: center; margin: 2px 0 20px; padding: 22px 0 14px;
+}
+.logo .i { font-size: 40px; color: var(--accent); flex: none; }
+/* Left-aligned inside a centred lockup: the two words stack under each other rather than pivoting
+   about a centre line, which is what makes it read as a wordmark and not as a caption. */
+.logo span { font-size: 20px; font-weight: 400; line-height: 1.15; letter-spacing: 0; text-align: left; }
+.logo b { font-weight: 500; color: var(--accent); }
+.modalhead h2 { flex: 1; min-width: 0; margin: 0; }
+.modalhead .dclose { margin: -8px -10px -8px 0; font-size: 20px; }
+.modalhead form { margin: 0; }
 #aboutBox p { margin: 10px 0; line-height: 1.5; }
+/* No title left in this row — just the mode switch and the close, pushed to the corner. */
+#aboutBox .modalhead { justify-content: flex-end; margin-bottom: 0; }
+
+/* The disclaimer, lifted out of the run of grey paragraphs. It is the one line on this page with
+   legal and safety weight, and as a third muted paragraph it was the easiest thing to skip.
+   Amber here is not a status colour standing in for a reading — no station is involved. It is the
+   same "what you are looking at is not what it appears to be" signal as the test-mode strip. */
+#aboutBox .notice {
+  display: flex; gap: 10px; align-items: flex-start;
+  margin: 16px 0; padding: 12px 14px; border-radius: 10px;
+  background: color-mix(in srgb, #e8710a 10%, transparent);
+  border-left: 3px solid #e8710a;
+  color: var(--on-surface); line-height: 1.5;
+}
+#aboutBox .notice .i { color: #e8710a; font-size: 20px; flex: none; margin-top: 1px; }
+#aboutBox .notice b { font-weight: 500; }
+#aboutBox h3 {
+  margin: 22px 0 8px; font-size: 11px; font-weight: 500; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--muted);
+}
+#aboutBox h3:first-of-type { border-top: 1px solid var(--outline); padding-top: 18px; }
+
+/* --- test mode --------------------------------------------------------------------------------- */
+
+/* A switch, not a checkbox: it changes what the whole map means, and should not look like the
+   district filters. Amber rather than the accent — this is a warning state, not a preference. */
+.testtog {
+  display: flex; align-items: center; gap: 6px; flex: none; cursor: pointer;
+  font-size: 11px; font-weight: 500; letter-spacing: .04em; text-transform: uppercase;
+  color: var(--muted); padding: 4px 10px 4px 8px; border-radius: 999px;
+  border: 1px solid var(--outline);
+}
+.testtog:hover { background: var(--hover); }
+.testtog:has(:checked) { color: #e8710a; border-color: #e8710a; background: #e8710a1a; }
+.testtog input { margin: 0; accent-color: #e8710a; }
+
+/* Three signals, because one badge is a thing you stop seeing after ten minutes, and mistaking a
+   drill for a flood is the worst failure this app could have. Striped bar, badge, and the chip. */
+body.testmode header {
+  background: repeating-linear-gradient(135deg,
+    var(--surface) 0 18px, color-mix(in srgb, #e8710a 12%, var(--surface)) 18px 36px);
+  border-bottom-color: #e8710a;
+}
+#testbadge {
+  position: fixed; z-index: 700; left: 50%; transform: translateX(-50%);
+  top: calc(var(--hdr) + 12px); display: none; align-items: center; gap: 10px;
+  padding: 8px 10px 8px 14px; border-radius: 999px;
+  background: #e8710a; color: #fff; box-shadow: var(--shadow);
+  font-size: 12px; line-height: 1;
+}
+body.testmode #testbadge { display: flex; }
+#testbadge b { font-weight: 500; letter-spacing: .06em; }
+#testbadge span { opacity: .9; }
+#testbadge .i { font-size: 18px; }
+#testbadge button {
+  padding: 5px 12px; border: 0; border-radius: 999px; cursor: pointer;
+  background: #fff3; color: #fff; font: 500 11px Roboto, sans-serif;
+}
+#testbadge button:hover { background: #ffffff4d; }
+@media (max-width: 600px) {
+  /* The sentence is the first thing to lose: the label and the way out are what matter. */
+  #testbadge span { display: none; }
+  /* The logo already has its own line, so nothing needs to wrap here — just less of everything. */
+  #aboutBox { padding: 18px; }
+  #aboutBox .logo { margin-bottom: 12px; padding: 30px 0 8px; }
+  #aboutBox .logo .i { font-size: 34px; }
+  #aboutBox .logo span { font-size: 18px; }
+}
 #aboutBox .src { margin: 14px 0; display: grid; gap: 2px; }
 #aboutBox .src a { font-weight: 500; }
 #aboutBox .src .muted { line-height: 1.45; }
-#aboutBox form { margin-top: 18px; text-align: right; }
 
 /* --- all-stations table ----------------------------------------------------------------------- */
 
@@ -50,13 +217,10 @@ header h1 .brand { font-size: 24px; color: var(--accent); flex: none; }
 /* Search stays put while the list scrolls under it — the filter is useless if you have to scroll
    back up to change it after seeing the result. */
 #dataBox .dtop {
-  position: relative; flex: none; padding: 16px 20px 12px;
+  flex: none; padding: 16px 20px 12px;
   border-bottom: 1px solid var(--outline); background: var(--surface);
 }
-/* In the header, not a footer bar: the table scrolls, and a close button below it was one more thing
-   pinned to the bottom of a dialog you are always at the top of. */
-#dataBox .dclose { position: absolute; top: 8px; right: 12px; font-size: 20px; }
-#dataBox h2 { font-size: 18px; font-weight: 500; margin-bottom: 10px; padding-right: 40px; }
+#dataBox h2 { font-size: 18px; font-weight: 500; }
 #dataBox #dataFind { margin-bottom: 6px; }
 
 /* The table's stand-in for a popup's still: no room for the image itself in a row, so it opens the
@@ -100,6 +264,12 @@ table.data .dhead th {
   background: var(--hover); border-bottom: 1px solid var(--outline);
 }
 table.data .dhead .muted { text-transform: none; letter-spacing: normal; margin-left: 6px; }
+/* Not a mast and not clickable — it is a reading of where you are, not a place you can fly to. */
+table.data tr.here > td { background: color-mix(in srgb, var(--accent) 7%, transparent); }
+table.data tr.here td.nm {
+  background: color-mix(in srgb, var(--accent) 7%, var(--surface));
+  box-shadow: inset 3px 0 var(--accent);
+}
 table.data tr[data-mast] { cursor: pointer; }
 table.data tr[data-mast]:hover { background: var(--hover); }
 /* No coordinates upstream, so nothing to fly to — say so rather than offer a jump that goes nowhere. */
@@ -120,7 +290,8 @@ table.data td.k { font-size: 12px; font-variant-numeric: tabular-nums; }
 table.data td.none { text-align: center; padding: 28px; }
 /* Compact: 120px columns can't carry popup-sized type, and the badge is the thing being scanned. */
 table.data .cv b { font-weight: 500; font-size: 13px; }
-table.data .cv .val { margin-top: 2px; font-size: 11px; line-height: 1.35; }
+table.data .cv .val { margin-top: 3px; font-size: 11px; line-height: 1.35; }
+table.data .cv .val b { font-size: 12px; font-weight: 500; }
 table.data .cv .muted { font-size: 11px; }
 /* A status badge fills its cell, so the colour band itself lines up down the column and can be read
    without reading the word. */
@@ -132,12 +303,30 @@ table.data .shotbtn { width: 100%; justify-content: center; }
 /* Marks a merged cell and carries the breakdown in its title. Pushed to the far edge of whatever it
    sits in — inside the badge for the kinds that have one, on its own line for the kinds that don't. */
 table.data .cv .line { display: flex; align-items: center; gap: 6px; }
-table.data .sum {
-  margin-left: auto; flex: none; display: grid; place-items: center;
-  padding: 0; font-size: 13px; color: inherit; opacity: .65; cursor: pointer;
-  background: none; border: 0;
+/* The popup's meter shrunk to a column: same piecewise scale, no labels — the number above it is
+   the reading, this is only its shape. */
+/* As tall as a badge, so a column of levels and a column of states scan at the same rhythm. */
+table.data .gline { display: flex; align-items: center; gap: 5px; }
+/* Fixed width on the figure, not just on the bar: the triangle is narrower than "100%", and without
+   it the bar would be a few pixels longer on exactly the rows you are comparing against the others. */
+table.data .gline .pc {
+  flex: none; width: 28px; text-align: right;
+  font-size: 11px; font-variant-numeric: tabular-nums;
 }
-table.data .sum:hover { opacity: 1; }
+table.data .gline i.pc { font-size: 14px; width: 28px; background-position: right center; }
+table.data .minibar {
+  position: relative; flex: 1; min-width: 0; height: 18px;
+  border-radius: 999px; overflow: hidden;
+  background: color-mix(in srgb, var(--on-surface) 13%, transparent);
+}
+table.data .minibar span { display: block; height: 100%; border-radius: 999px; }
+table.data .minibar i {
+  position: absolute; top: 0; width: 1px; height: 100%;
+  background: var(--surface); opacity: .8;
+}
+/* The thing the cell already draws is the thing that answers — no extra glyph to look past. */
+table.data [data-pop] { cursor: help; }
+table.data button[data-pop] { cursor: pointer; }
 
 /* Top-layer panel, so the table's own scrolling can't clip it. Placement is set by table.js; the
    `display` pair is also the fallback — a browser without popover support never matches
@@ -155,17 +344,22 @@ table.data .sum:hover { opacity: 1; }
 }
 .tipbox .tiprow { display: flex; gap: 12px; align-items: baseline; padding: 3px 0; }
 .tipbox .tiprow + .tiprow { border-top: 1px solid var(--outline); }
-.tipbox .tiprow span { flex: 1; min-width: 0; }
-.tipbox .tiprow b { font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tipbox { min-width: 240px; }
+.tipbox .tipnote { margin-top: 4px; }
+.tipbox .spark { margin: 8px 0 0; }
+.tipbox .spark + .muted, .tipbox .spark .muted { font-size: 11px; }
+.tipbox .tiprow > span:first-child { flex: 1; min-width: 0; }
+.tipbox .tv { display: flex; align-items: center; gap: 6px; flex: none; }
+.tipbox .tv b { font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* The panel sits inside a cell in the DOM, so the cell's badge rules reach it — top layer changes
+   where a thing paints, not what selectors match it. Undo the full-width cell treatment here. */
+table.data .tipbox .badge {
+  position: static; display: inline-flex; width: auto; margin: 0;
+  padding: 2px 8px; font-size: 10px; transform: none;
+}
 /* Inside a badge the marker is taken out of the flow, not pushed to the end with `margin-left: auto`
    — that stole width from the centred label and shunted it left. Absolute, with matching padding on
    both sides, so a cell with a marker and one without still read as the same badge. */
-table.data .cv .badge { position: relative; }
-table.data .cv .badge:has(.sum) { padding-inline: 14px; }
-table.data .cv .badge .sum {
-  position: absolute; right: 3px; top: 50%; transform: translateY(-50%);
-  margin: 0; opacity: .8; font-size: 12px; line-height: 1;
-}
 table.data .cv + .cv { margin-top: 8px; }   /* two of the same kind on one mast */
 table.data .dash { color: var(--outline); }
 
@@ -179,7 +373,10 @@ table.data .dash { color: var(--outline); }
 /* --- live status chip + its popover --------------------------------------------------------- */
 
 #net {
-  position: relative; margin-left: auto; cursor: help;
+  /* No `margin-left: auto` here any more — #ticker sits immediately before it and carries the auto.
+     Two auto margins in one flex row *split* the free space, which would have parked the ticker in
+     the middle of the bar with a gap between it and the chip. */
+  position: relative; cursor: help;
   font-size: 11px; font-weight: 500; letter-spacing: .6px; text-transform: uppercase;
   display: flex; align-items: center; gap: 6px;
   padding: 7px 14px 7px 12px; border-radius: 999px;
@@ -189,11 +386,14 @@ table.data .dash { color: var(--outline); }
   transition: color .3s, border-color .3s, background .3s;
 }
 #net:hover { background: color-mix(in srgb, var(--c, var(--on-surface)) 20%, transparent); }
-/* Broadcast dot: solid centre, halo pushing outwards — reads as "receiving". */
+/* Broadcast dot: solid centre, halo pushing outwards — reads as "receiving".
+   Deliberately restrained. The chip is background information sitting beside a ticker that moves;
+   two competing motions in one 64px bar is a bar you stop reading. The halo starts closer in, ends
+   at 1.6× instead of 2×, and takes 2.6s over 1.8 — a slow pulse rather than a ping. */
 #net .swatch { position: relative; background: var(--c); }
 #net .swatch::after {
-  content: ''; position: absolute; inset: -5px; border-radius: 50%;
-  border: 2px solid var(--c); animation: halo 1.8s ease-out infinite;
+  content: ''; position: absolute; inset: -3px; border-radius: 50%;
+  border: 1.5px solid var(--c); opacity: .7; animation: halo-soft 2.6s ease-out infinite;
 }
 @media (prefers-reduced-motion: reduce) { #net .swatch::after { animation: none; opacity: .7; } }
 
@@ -223,8 +423,8 @@ table.data .dash { color: var(--outline); }
 
 /* <details> can't animate its close (children go display:none), so a body class drives it. */
 #bar {
-  /* fixed, not absolute: the header is the positioned ancestor and it's only 64px tall */
-  position: fixed; z-index: 500; top: 64px; left: 0; bottom: 0; width: var(--drawer);
+  /* fixed, not absolute: the header is the positioned ancestor and it is only --hdr tall */
+  position: fixed; z-index: 500; top: var(--hdr); left: 0; bottom: 0; width: var(--drawer);
   padding: 20px; overflow: auto; background: var(--surface); box-shadow: var(--shadow);
   display: flex; flex-direction: column; gap: 24px;
   transform: translateX(-100%); visibility: hidden;
@@ -248,7 +448,7 @@ body.drawer #legend, body.drawer #alerts { transform: translateX(var(--drawer));
 }
 #legend .ramp {
   height: 10px; border-radius: 999px; margin: 6px 0 4px;
-  background: linear-gradient(90deg, #4da3ff 0%, #ffd166 50%, #ff9f1c 75%, #ff4d4d 100%);
+  background: linear-gradient(90deg, #ffd166 0%, #ff9f1c 50%, #ff4d4d 100%);
 }
 #legend .ticks { display: flex; justify-content: space-between; }
 
@@ -276,16 +476,51 @@ body.drawer #legend, body.drawer #alerts { transform: translateX(var(--drawer));
 
 /* Above the alert panel (400): on a phone both are full-width and the results list has to cover it. */
 #gotoBox {
-  position: absolute; z-index: 402; top: 76px; right: 12px;
+  position: absolute; z-index: 402; top: calc(var(--hdr) + 12px); right: 12px;
   width: min(300px, calc(100vw - 24px));
 }
 #goto { margin: 0; box-shadow: var(--shadow); }   /* the drawer's stacking margin doesn't apply here */
+
+/* --- new-alert toast -------------------------------------------------------------------------- */
+
+/* Under the "go to" box and the same width, so it reads as one right-hand column rather than a
+   third floating thing. Hidden rather than removed when closed: `visibility` keeps it out of the
+   tab order and off screen readers, and still animates. */
+#toast {
+  position: absolute; z-index: 401; top: calc(var(--hdr) + 60px); right: 12px;
+  width: min(300px, calc(100vw - 24px));
+  border-radius: 12px; padding: 12px 14px 6px; overflow: hidden;
+  border-left: 3px solid #e8710a;
+  opacity: 0; visibility: hidden; transform: translateY(-6px);
+  transition: opacity .2s ease, transform .2s ease, visibility .2s;
+}
+#toast.open { opacity: 1; visibility: visible; transform: none; }
+#toast .thead { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+/* The header icon carries the tier: red for what is happening, amber for what is forecast, green
+   for an all-clear. Same three colours as the panel's left rules, so the two agree at a glance. */
+#toast .thead .i { color: #e8710a; font-size: 18px; flex: none; }
+#toast.now .thead .i   { color: #d93025; }
+#toast.clear .thead .i { color: #188038; }
+#toast .thead b { font-weight: 500; flex: 1; min-width: 0; line-height: 1.3; }
+#toast .tclose { flex: none; font-size: 16px; color: var(--muted); }
+#toast .trow {
+  display: flex; align-items: baseline; gap: 8px; width: 100%; margin-top: 8px; padding: 6px 8px;
+  text-align: left; cursor: pointer; background: none; border: 0; border-radius: 8px;
+  color: var(--on-surface); font: 400 12px Roboto, sans-serif;
+}
+#toast .trow:hover { background: var(--hover); }
+#toast .trow .i { color: var(--c); flex: none; align-self: center; }
+#toast .tname { flex: 1; min-width: 0; font-weight: 500; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; }
+#toast .twhy { flex: none; font-size: 11px; }
+#toast .tmore { margin: 6px 0 6px 2px; font-size: 11px; }
+#toast .trow:last-child { margin-bottom: 6px; }
 
 /* --- alert panel ---------------------------------------------------------------------------- */
 
 /* Top-left, always on screen — see alerts.js for why it no longer hides itself. */
 #alerts {
-  position: absolute; z-index: 400; left: 12px; top: 76px; width: 300px;
+  position: absolute; z-index: 400; left: 12px; top: calc(var(--hdr) + 12px); width: 300px;
   display: flex; flex-direction: column; border-radius: 12px; overflow: hidden;
 }
 #alertTab {
@@ -313,9 +548,30 @@ body.drawer #legend, body.drawer #alerts { transform: translateX(var(--drawer));
 #alerts.open #alertTab::after { --i: var(--i-expand_less); }
 #alertBody { display: none; max-height: min(52vh, 460px); overflow: auto; padding: 0 14px 12px; }
 #alerts.open #alertBody { display: block; }
-.alert { padding: 14px 0; border-top: 1px solid var(--outline); }
+/* Tier, twice over: a coloured left rule for the glance and a word for the meaning. Colour alone
+   would be a code nobody was taught, and a word alone does not survive a scroll past forty of them.
+   The rule is indented rather than full-bleed so the list still reads as one list. */
+.alert { padding: 14px 0 14px 10px; border-top: 1px solid var(--outline); border-left: 3px solid transparent; }
+.alert.t-now   { border-left-color: #d93025; }
+.alert.t-soon  { border-left-color: #e8710a; }
+.alert.t-stale { border-left-color: var(--outline); opacity: .82; }
+.tg {
+  display: inline-block; margin-left: 6px; padding: 2px 7px; border-radius: 999px;
+  font-size: 10px; font-weight: 500; letter-spacing: .5px; vertical-align: 1px;
+}
+/* The tier tag sits next to the sensor-kind badge, which is a taller inline-flex with its own
+   bottom margin — baseline alignment put the two pills on different lines. Match the margin and
+   centre both boxes instead. */
+.alert .badge, .alert .tg { vertical-align: middle; }
+.alert .tg { margin-bottom: 6px; }
+.tg-now   { background: color-mix(in srgb, #d93025 16%, transparent); color: #d93025; }
+.tg-soon  { background: color-mix(in srgb, #e8710a 16%, transparent); color: #e8710a; }
+.tg-stale { background: var(--hover); color: var(--muted); }
+:root[data-theme="dark"] .tg-now  { color: #f28b82; }
+:root[data-theme="dark"] .tg-soon { color: #fdd663; }
 .alert .name { cursor: pointer; }
 .alert .name:hover { color: var(--accent); }
+
 /* sparkline sizing lives in base.css with the rest of .spark — the panel only pads it */
 .alert .state { margin: 8px 0 4px; padding: 10px; font-size: 14px; }
 .alert .link { margin-top: 8px; }
@@ -375,18 +631,56 @@ body.drawer #legend, body.drawer #alerts { transform: translateX(var(--drawer));
 /* --- phones --------------------------------------------------------------------------------- */
 
 @media (max-width: 600px) {
-  :root { --drawer: 86vw; }
-  header { gap: 4px; }
+  /* Two rows: title + buttons, then the ticker across the full width. On one line it got whatever
+     was left after six controls — about 40px, which is not a ticker, it is a keyhole. */
+  /* 6 (header pad) + 36 (controls) + 5 (gap) + 36 (ticker) = 83. Measured, not guessed: any slack
+     here is dead white space between the ticker and the map. */
+  :root { --drawer: 86vw; --hdr: 85px; }
+  header { gap: 4px; flex-wrap: wrap; align-content: flex-start; padding: 6px 8px 0 4px; }
+  header > :not(#ticker) { order: 0; }
+  /* Tighter controls so the mark, the chip and four buttons fit one line at 360px with room over. */
+  header .icon { width: 36px; height: 36px; font-size: 20px; }
+  header .hactions { gap: 0; }
+  #ticker {
+    order: 1; flex: 1 0 100%; max-width: none; justify-content: flex-start;
+    /* Margin above the rule separates the strip from the buttons; inside it, no padding at all —
+       `align-items: center` splits the height evenly, which top padding was quietly stopping it
+       from doing (15px over the words, 8px under). */
+    height: 36px; margin: 5px -8px 0 -4px; padding: 0 8px;
+    border-top: 1px solid var(--outline);
+    -webkit-mask: linear-gradient(90deg, #000 calc(100% - 18px), transparent);
+    mask: linear-gradient(90deg, #000 calc(100% - 18px), transparent);
+  }
   /* The title is the first thing worth losing: five buttons and the status chip all have to fit,
      and the drop icon carries the identity on its own once the tab title says the rest. */
   header h1 span { display: none; }
   #net span:not(.swatch) { display: none; }         /* dot only, keeps the bar on one line */
-  #legend { display: none; }                        /* no room beside the alert panel */
+  /* The legend earns its space: the heatmap is the one layer whose colours mean nothing without it,
+     and it is the layer a phone shows most of. Compacted rather than dropped — full width beside the
+     zoom buttons, and the sentence explaining the doubling goes, since the tip already says it. */
+  /* Bottom of a phone screen, in order: credit line, then the legend and the zoom buttons above it.
+     The credit is the only one of the three that has to be readable rather than usable, so it takes
+     the edge and the other two clear it by the same amount. */
+  #credit {
+    left: 12px; right: 12px; bottom: 6px; font-size: 10px; line-height: 1.4;
+  }
+  #legend {
+    left: 12px; right: 68px; width: auto; bottom: 40px; padding: 8px 12px 10px;
+  }
+  #legend .title { font-size: 11px; margin-bottom: 4px; }
+  #legend > .muted { display: none; }
+  #legend .ramp { height: 8px; margin: 4px 0 3px; }
+  #legend .slider { margin-top: 6px; padding-top: 6px; }
   body.drawer #alerts { visibility: hidden; }       /* drawer covers the map anyway */
   /* Full width with a 12px gutter each side: left+right pinned, width auto. */
   #gotoBox { left: 12px; right: 12px; width: auto; }   /* same gutters as the alert panel below it */
   body.drawer #gotoBox { visibility: hidden; }      /* as with the alert panel, the drawer covers it */
-  #alerts { left: 12px; right: 12px; width: auto; top: 128px; }   /* below the search box */
+  #alerts { left: 12px; right: 12px; width: auto; top: calc(var(--hdr) + 64px); }  /* below the search */
+  /* Desktop only. At this width the toast would land exactly on the alert panel, over the map, in
+     the band the user is already reading — and the panel springs open by itself when something
+     appears, so nothing is lost by leaving it to do that job. `display: none` rather than a JS
+     guard so it follows a rotate without anything having to notice. */
+  #toast { display: none; }
   #alertTab { padding: 12px 16px; }
   #alertBody { padding: 0 16px 14px; max-height: 50vh; }
 }

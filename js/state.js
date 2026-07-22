@@ -5,6 +5,10 @@
 export const state = {
   data: [],        // stations from the last successful poll
   hereAt: null,    // L.LatLng of the user's fix, once we have one
+  // Test mode lives here, not in PREFS: a saved fake flood is one a later visitor inherits without
+  // having asked for it, and the badge explaining why the map is on fire is easy to dismiss as
+  // decoration. A reload is the one thing everyone tries, so a reload must clear it.
+  test: false,
   pinned: null,    // id of a station a jump forced past the drawer filters, until the user pans off
   // render.js parks itself here so map.js can rebuild the markers without importing it — the two
   // already point the other way (render.js -> map.js) and a cycle would break the module graph.

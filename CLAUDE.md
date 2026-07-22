@@ -32,6 +32,9 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `js/alerts.js` | "On alert" panel |
 | `js/table.js` | the all-stations table dialog, grouped district → mast → sensor |
 | `js/locate.js` | geolocation and the "You are here" marker |
+| `js/ticker.js` | header alert marquee — measured, seamless, speed scales with the alert count |
+| `js/toast.js` | desktop-only "new alert since last poll" toast |
+| `js/test.js` | test mode: fakes a flood in the client's copy of the payload |
 | `js/net.js` | `load()` poll loop and the status chip |
 | `js/ui.js` | all DOM wiring: drawer, filters, chips, panels, lightbox, delegated jumps |
 | `vendor/` | Leaflet, leaflet.heat (patched), markercluster, subsetted fonts — no CDN, hand-managed |
@@ -201,9 +204,16 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
 - Clustering still never fully disables: sites can sit metres apart. `maxClusterRadius` tightens
   with zoom and co-located pins spiderfy on click.
 - **Offline gauges are frozen on old flood readings** (3.55m from April). Anything offline or
-  >24h old renders grey with an explicit `NOT CURRENT` block. Never show these as live.
+  >24h old renders grey with an explicit `OFFLINE` block, the date in the footer. Never show these
+  as live.
 - **41 sirens last reported months ago** (one in July 2025). They render `OUT OF CONTACT` with the
   date, never `IDLE` — a silent siren and a dead siren look identical, and only one is safe.
+- **A marquee needs three things measured, not guessed.** `js/ticker.js` renders the item set twice
+  and translates `-50%`, which is only seamless if one copy is at least as wide as the box — so it
+  repeats the set to cover the box *before* doubling. Width alone isn't enough: a single wide item
+  still pops, because the tile leaving the left edge is the whole strip leaving. `MIN_TILES` (3)
+  guarantees a follower. And `#ticker` must have a **fixed flex basis** — sized to content the
+  header re-laid itself out every poll as the alert count changed.
 - **`<details>` can't animate closed** (children go `display:none`) and hides non-`<summary>`
   children entirely — that's why the drawer is a `body.drawer` class and the credit sits outside.
 - **`border-collapse: collapse` drops padding on the table box** — `#netstats` uses `separate`.
@@ -228,6 +238,11 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
 
 ## Conventions
 
+- **Anything that alerts is checked against the alert design standard** in
+  [`docs/FEATURES.md`](docs/FEATURES.md#alert-design-standard) — CAP's separate severity / urgency /
+  certainty axes, ISA-18.2's "an alarm requires a response" and its 10-in-10-minutes flood
+  threshold, and the cry-wolf finding that false alarms cost more trust than they buy attention.
+  Four gaps are open there; raise them when alert work comes up rather than adding a fifth surface.
 - Responsive is a standing requirement (breakpoint 600px), including touch equivalents for every
   hover-only affordance.
 - All user settings live in one `prefs` blob in `localStorage` (`PREFS` + `save()`).

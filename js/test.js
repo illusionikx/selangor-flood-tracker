@@ -1,0 +1,76 @@
+/* Test mode: a pretend flood, so the alert paths can be looked at on a calm day.
+ *
+ * Most of this app only shows its real face during weather that happens a few times a year — the
+ * ticker cycling, the toast firing, the alert panel filling past its scroll, red pins clustering,
+ * the heatmap actually glowing. Waiting for a storm to find out that a panel overflows badly is not
+ * a testing strategy. This fills the map with alerts on demand.
+ *
+ * It rewrites the *client's copy* of the payload after it is fetched and before anything renders.
+ * Nothing is sent anywhere, nothing is written to the history db, and the next poll with the switch
+ * off is clean data again — the fake never reaches disk, so it cannot pollute a trend.
+ *
+ * The one real hazard is someone leaving it on and believing what they see, so it is loud about
+ * itself, and it does not survive a reload: a fixed badge over the map, a red-striped app bar, and `TEST` in the status chip. If you
+ * can see a fake alert you can see that it is fake.
+ */
+
+import { state } from './state.js';
+
+// Deterministic, not random: the same stations light up every time, so "does the panel scroll right
+// at 40 alerts" is a question you can ask twice and get the same answer to.
+const EVERY = 4;          // every Nth eligible river is pushed over its danger mark
+const RISE_EVERY = 3;     // and every Nth of the rest is made to climb towards it
+
+export function seedTest(data) {
+  let rivers = 0, sirens = 0;
+
+  for (const s of data) {
+    if (s.kind === 'river') {
+      const mark = s.danger ?? s.warning ?? s.alert;
+      if (mark == null || !s.online) continue;
+      rivers++;
+      if (rivers % EVERY === 0) {
+        // Already over: status 3 is what the popup, pin colour and alert panel all key off.
+        s.level = +(mark * 1.04).toFixed(2);
+        s.status = 3;
+        s.rate = 0.22; s.eta = 0; s.rising = true;
+      } else if (rivers % RISE_EVERY === 0) {
+        /* Climbing, not yet there — the case `rising` exists for, and the one worth eyeballing.
+           The rate is derived from a target ETA rather than fixed, because a fixed m/h means the
+           flag depends on how big the river is: 0.35 m/h reaches a 0.9 m drain in half an hour and
+           a 6 m river in seventeen, so a flat rate lit up 8 of 26 and left the rest silently
+           climbing. Spreading the target over 0.5–2.5 h also gives the ticker and the panel a range
+           of countdowns to render instead of one repeated number. */
+        s.level = +(mark * 0.82).toFixed(2);
+        s.status = Math.max(s.status || 0, 1);
+        s.eta = 0.5 + (rivers % 5) * 0.5;
+        s.rate = +((mark - s.level) / s.eta).toFixed(2);
+        s.rising = true;
+      } else continue;
+      s.ratio = mark ? Math.min(1, s.level / mark) : s.ratio;
+      // A flat line under a station claiming to climb is the sort of detail that makes a screenshot
+      // useless, so the sparkline gets a matching ramp: half a day, rising into the current reading.
+      s.history = Array.from({ length: 24 }, (_, i) => [
+        Math.floor(Date.now() / 1000) - (23 - i) * 1800,
+        +(s.level - (23 - i) * (s.rate / 2)).toFixed(2),
+      ]);
+    } else if (s.kind === 'siren' && s.online && ++sirens % 9 === 0) {
+      s.status = 1;
+    }
+  }
+}
+
+/* Everything that says "this is not real". Deliberately more than one signal: a single badge is a
+   thing you stop seeing after ten minutes, and mistaking a drill for a flood is the worst failure
+   this app could have. */
+export function paintTestChrome() {
+  document.body.classList.toggle('testmode', state.test);
+}
+
+// Rendered once and left in the DOM; CSS shows it only while `body.testmode`.
+document.body.insertAdjacentHTML('beforeend',
+  `<div id="testbadge"><i class="i i-warning"></i><b>TEST MODE</b>
+     <span>every alert on this map is fake</span>
+     <button id="testOff">Turn off</button></div>`);
+
+export const stationsFaked = () => state.data.filter(s => s.rising || s.status >= 3).length;

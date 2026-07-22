@@ -7,7 +7,9 @@
 
 import { KINDS, KIND_RANK, NO_INFO, camSrc } from './config.js';
 import { state } from './state.js';
-import { el, dkey, distKm, hasInfo, color, statusColor, leads } from './util.js';
+import { el, dkey, distKm, hasInfo, color, statusColor, scalePos, leads } from './util.js';
+import { nearestOf, nearestCam } from './stations.js';
+import { sparkline, rainBars, rateHtml, etaText } from './popup.js';
 import { flashTo } from './map.js';
 
 
@@ -149,23 +151,57 @@ export function dataTable() {
     ? `${shownStations} sensors at ${shownMasts} locations · ${districts.size} districts`
     : '';
 
-  el('dataBody').innerHTML = [...districts.values()]
-    .sort((a, b) => a.state.localeCompare(b.state) || a.district.localeCompare(b.district))
-    .map(d => `<tr class="dhead"><th colspan="${KIND_RANK.length + 1}">${d.district}
-        <span class="muted">${d.state} · ${d.masts.length} location${d.masts.length > 1 ? 's' : ''}</span>
-      </th></tr>` + d.masts
-      .sort(byCol)
-      .map(({ key, members, lead }) => `<tr${lead.lat && lead.lng ? ` data-mast="${key}"` : ''}>
+  /* Sorted by a reading, the district headings go: they would slice the ranking into 24 separate
+     little rankings, so the deepest river in Klang would sit above a deeper one in Petaling and the
+     order would be a lie. The district moves into the location cell instead, because you still have
+     to know where a row is — it just stops being the thing the table is organised by. */
+  const flat = sortCol !== 'nm';
+  const row = ({ key, members, lead }) => `<tr${lead.lat && lead.lng ? ` data-mast="${key}"` : ''}>
+    <td class="nm">
+      <div class="popname">${lead.name}</div>
+      <div class="muted">${flat ? `${lead.district}, ${lead.state} · ` : ''}${
+        lead.basin || 'basin n/a'}</div>
+      ${lead.lat && lead.lng ? '' : '<div class="muted nomap">not on the map · no coordinates</div>'}
+    </td>
+    ${KIND_RANK.map(k => {
+      const own = members.filter(m => m.kind === k);
+      return `<td class="k">${own.length ? cell(own, lead) : '<span class="dash">—</span>'}</td>`;
+    }).join('')}
+  </tr>`;
+
+  /* A pinned first row: the nearest *reporting* station of each kind to wherever you are. It only
+     exists while the table is sorted by location — under a sorted reading it would be a row claiming
+     a rank it does not have, sitting above stations that beat it. Hidden while searching too: it is
+     not a search result, and the count line underneath would contradict it.
+     Each cell names its own station and distance in the hover panel, because "nearest" is a
+     different station per kind — one location cell could not honestly carry one distance. */
+  const here = state.hereAt;
+  const hereRow = !flat && !q && here
+    ? `<tr class="here">
         <td class="nm">
-          <div class="popname">${lead.name}</div>
-          <div class="muted">${lead.basin || 'basin n/a'}</div>
-          ${lead.lat && lead.lng ? '' : '<div class="muted nomap">not on the map · no coordinates</div>'}
+          <div class="popname">My location</div>
+          <div class="muted">nearest reporting station per sensor</div>
         </td>
         ${KIND_RANK.map(k => {
-          const own = members.filter(m => m.kind === k);
-          return `<td class="k">${own.length ? cell(own, lead) : '<span class="dash">—</span>'}</td>`;
+          const s = k === 'camera' ? nearestCam(here) : nearestOf(k, here);
+          if (!s) return '<td class="k"><span class="dash">—</span></td>';
+          // Cloned with the distance in the name, so the panel that opens on the badge says which
+          // station this is and how far — the one thing this row must not leave implicit.
+          return `<td class="k">${cell([{ ...s, name: `${s.name} · ${distKm(here, s).toFixed(1)} km` }],
+            { name: 'My location' }, 'here-')}</td>`;
         }).join('')}
-      </tr>`).join('')).join('')
+      </tr>`
+    : '';
+
+  const groups = [...districts.values()]
+    .sort((a, b) => a.state.localeCompare(b.state) || a.district.localeCompare(b.district));
+
+  el('dataBody').innerHTML = hereRow + (flat
+    ? groups.flatMap(d => d.masts).sort(byCol).map(row).join('')
+    : groups.map(d => `<tr class="dhead"><th colspan="${KIND_RANK.length + 1}">${d.district}
+        <span class="muted">${d.state} · ${d.masts.length} location${
+          d.masts.length > 1 ? 's' : ''}</span>
+      </th></tr>` + d.masts.sort(byCol).map(row).join('')).join(''))
     || `<tr><td class="none muted" colspan="${KIND_RANK.length + 1}">Nothing matches that.</td></tr>`;
 }
 
@@ -177,7 +213,7 @@ export function dataTable() {
    Where the reading *is* a state — a siren, a flood gauge, rainfall intensity — the cell leads with
    a badge rather than a number, because that is the answer; the number is the evidence. Water level
    is the other way round: the level is the answer, and the status is carried in its colour. */
-const pill = (text, c, tip = '') => `<span class="badge" style="--c:${c}">${text}${tip}</span>`;
+const pill = (text, c, hook = '') => `<span class="badge" style="--c:${c}"${hook}>${text}</span>`;
 
 // Rain intensity on the server's own rainStatus() cutoffs (>0 / >10 / >30 / >60 mm an hour), short
 // enough for a column. Colour is the status ramp, not the violet rainfall hue — this is a status.
@@ -192,71 +228,132 @@ const RAIN = [['dry', 0], ['light', 1], ['moderate', 2], ['heavy', 3], ['very he
    (so touch works), light dismiss and Esc with it. Only the placement needs JS, because CSS anchor
    positioning is still Chromium-only. Browsers without popover support leave `:popover-open`
    unmatched, so the panel stays `display: none` rather than dumping its contents into the cell. */
-const shortVal = m => !hasInfo(m) ? 'no reading' : ({
-  river:    `${m.level} m`,
-  rainfall: `${m.hourly} mm/h`,
-  siren:    m.online ? (m.status > 0 ? 'triggered' : 'idle') : 'not active',
-  gauge:    m.depth > 0 ? `${m.depth} m of water` : 'dry',
-  camera:   m.image ? 'has a feed' : 'no feed',
-}[m.kind] || '—');
+// Rows in the panel read like the cells they explain — a badge where the answer is a state, a
+// coloured number where it is a measurement. Anything else and you would be translating between two
+// languages to check one figure against another.
+const tipVal = m => {
+  if (!hasInfo(m)) return pill('offline', NO_INFO);
+  const val = text => `<b style="color:${color(m)}">${text}</b>`;
+  if (m.kind === 'siren') {
+    return !m.online ? pill('offline', NO_INFO)
+      : m.status > 0 ? pill('triggered', statusColor(3)) : pill('idle', statusColor(0));
+  }
+  if (m.kind === 'camera') return pill(m.image ? 'has a feed' : 'offline',
+    m.image ? KINDS.camera.color : NO_INFO);
+  if (m.kind === 'river') return val(`${m.level} m`);
+  if (m.kind === 'rainfall') {
+    const [label, tone] = RAIN[Math.max(0, m.status)] || RAIN[0];
+    return pill(label, statusColor(tone)) + val(`${m.hourly} mm/h`);
+  }
+  const label = m.depth <= 0 ? 'dry' : m.status >= 2 ? 'danger' : m.status === 1 ? 'warning' : 'water';
+  return pill(label, m.depth <= 0 ? statusColor(0) : statusColor(m.status))
+    + val(`${Math.abs(m.depth)} m`);
+};
 
-function summary(own, lead) {
+/* Returns [hook, panel]: an attribute to hang on whatever the cell already draws, and the panel
+   itself. No info icon — the badge, the gauge and the Show image button are the things the eye is
+   already on, so they are the things that answer when you point at them. An extra glyph per cell
+   bought nothing except six more marks to look past in a table that is meant to be scanned. */
+function summary(own, lead, scope) {
   const named = own.length === 1 && own[0].name !== lead.name;
-  if (own.length < 2 && !named) return '';
-  const id = `sum-${own[0].id}`;
-  return `<button class="sum" popovertarget="${id}"
-      aria-label="What this cell covers"><i class="i i-info"></i></button>
-    <div id="${id}" class="tipbox surface" popover>
+  // The two kinds that have a shape over time get their graph here, which is the only place in this
+  // view with room for one. A cell that would otherwise have nothing to add still opens for it.
+  const chart = own.length === 1 && (own[0].kind === 'river' ? sparkline(own[0].history)
+    : own[0].kind === 'rainfall' ? rainBars(own[0].history) : '');
+  // The cell shows the level and how far it is from danger; this is the part it has no room for —
+  // which way it is going and how soon that matters. Same markup as the popup and alert panel.
+  const s = own[0];
+  const note = own.length === 1 && s.kind === 'river' && s.rate != null
+    ? `<div class="tipnote muted">trend ${rateHtml(s)}${
+        s.eta != null ? ` · danger ${etaText(s.eta)}` : ''}</div>`
+    : '';
+  if (own.length < 2 && !named && !chart && !note) return ['', ''];
+  // Scoped, because the "my location" row shows stations that also appear in their own row further
+  // down — two panels with one id and getElementById would only ever find the first.
+  const id = `sum-${scope}${own[0].id}`;
+  return [` data-pop="${id}"`,
+    `<div id="${id}" class="tipbox surface" popover>
       <div class="tiphead">${own.length > 1
-        ? `${own.length} sensors here, summarised` : 'Recorded as'}</div>
-      ${own.map(m => `<div class="tiprow"><span>${m.name}</span><b>${shortVal(m)}</b></div>`).join('')}
+        ? `${own.length} sensors here, summarised` : own[0].name}</div>
+      ${own.length > 1 ? own.map(m => `<div class="tiprow"><span>${m.name}</span>
+        <span class="tv">${tipVal(m)}</span></div>`).join('') : ''}
+      ${note}${chart || ''}
+    </div>`];
+}
+
+/* A bar under the level, on the same piecewise scale as the popup's meter — the thresholds bunch
+   above 88% of a linear bar, so a linear one would show "safe" and "at alert" as the same picture.
+   No labels at 120px wide: the number above it is the reading, this is only the shape of it. */
+function gauge(m, hook) {
+  const max = m.danger || m.warning || m.alert;
+  if (!max) return '';
+  const stops = [[0, 0]];
+  if (m.alert   && m.alert   < max) stops.push([m.alert, 38]);
+  if (m.warning && m.warning < max && m.warning > (m.alert ?? 0)) stops.push([m.warning, 68]);
+  stops.push([max, 100]);
+
+  // Bar left, figure right, so both edges line up down the column. Past the danger mark the number
+  // is replaced by a triangle: "112%" is a percentage you have to stop and reason about, and this
+  // column is scanned. The exact figure stays in the row's title for anyone who wants it.
+  const pc = m.level / max * 100;
+  return `<div class="gline" title="${pc.toFixed(0)}% of danger (${max} m)"${hook}>
+      <div class="minibar">
+        <span style="width:${scalePos(m.level, stops).toFixed(1)}%;background:${statusColor(m.status)}"></span>
+        ${stops.slice(1, -1).map(([, p]) => `<i style="left:${p}%"></i>`).join('')}
+      </div>
+      ${pc >= 100
+        ? `<i class="i i-warning pc" style="color:${statusColor(3)}"></i>`
+        : `<span class="pc muted">${pc.toFixed(0)}%</span>`}
     </div>`;
 }
 
-function cell(own, lead) {
+function cell(own, lead, scope = '') {
   const m = merge(own);
-  const tip = summary(own, lead);
-  const box = inner => `<div class="cv">${inner}</div>`;
-  // Kinds with no badge to hang the marker on get their own line for it.
-  const line = inner => `<div class="line">${inner}${tip}</div>`;
+  const [hook, panel] = summary(own, lead, scope);
+  const wrap = inner => `<div class="cv">${inner}</div>${panel}`;
+  // Kinds with no badge to hang the hook on get their own line for it.
+  const line = inner => `<div class="line"${hook}>${inner}</div>`;
 
-  // A siren always has something to say, including that it is out of contact — which is the one
-  // thing "no reading" must never be allowed to look like.
   if (m.kind === 'siren') {
-    return box(!hasInfo(m) || !m.online ? pill('not active', NO_INFO, tip)
-      : m.status > 0 ? pill('triggered', statusColor(3), tip) : pill('idle', statusColor(0), tip));
+    return wrap(!hasInfo(m) || !m.online ? pill('offline', NO_INFO, hook)
+      : m.status > 0 ? pill('triggered', statusColor(3), hook) : pill('idle', statusColor(0), hook));
   }
   if (m.kind === 'camera') {
-    return box(m.image
-      ? line(`<button class="shotbtn" data-shot="${camSrc(m)}"
-           data-cap="Latest still from ${m.name}"><i class="i i-photo_camera"></i>Show image</button>`)
-      : line('<span class="muted">no feed</span>'));
+    return wrap(m.image
+      ? `<button class="shotbtn" data-shot="${camSrc(m)}"${hook}
+           data-cap="Latest still from ${m.name}"><i class="i i-photo_camera"></i>Show image</button>`
+      : pill('offline', NO_INFO, hook));
   }
-  if (!hasInfo(m)) return box(line('<span class="muted">no reading</span>'));
+  if (!hasInfo(m)) return wrap(pill('offline', NO_INFO, hook));
 
+  // Bar on top, number under it — the same shape as every other column, where the state leads and
+  // the measurement is the line beneath it. Without a danger mark there is no bar to draw, so the
+  // number stands alone and says why.
   if (m.kind === 'river') {
-    return box(line(`<b style="color:${color(m)}">${m.level} m</b>`) + (m.danger
-      ? `<div class="val muted">${(m.level / m.danger * 100).toFixed(0)}% of danger</div>` : ''));
+    const bar = gauge(m, hook);
+    return wrap(bar
+      ? bar + `<div class="val"><b style="color:${color(m)}">${m.level} m</b></div>`
+      : line(`<b style="color:${color(m)}">${m.level} m</b>`)
+        + '<div class="val muted">no danger mark</div>');
   }
   if (m.kind === 'rainfall') {
     const [label, tone] = RAIN[Math.max(0, m.status)] || RAIN[0];
-    return box(`${pill(label, statusColor(tone), tip)}<div class="val">${
+    return wrap(`${pill(label, statusColor(tone), hook)}<div class="val">${
       m.hourly} mm<span class="muted">/h</span></div>`);
   }
   // Gauge: depth over a flood-prone spot, so negative is dry ground, not a missing reading.
   const label = m.depth <= 0 ? 'dry' : m.status >= 2 ? 'danger' : m.status === 1 ? 'warning' : 'water';
-  return box(`${pill(label, m.depth <= 0 ? statusColor(0) : statusColor(m.status), tip)}<div class="val">${
+  return wrap(`${pill(label, m.depth <= 0 ? statusColor(0) : statusColor(m.status), hook)}<div class="val">${
     m.depth > 0 ? `${m.depth} m<span class="muted"> deep</span>`
                 : `<span class="muted">${Math.abs(m.depth)} m below</span>`}</div>`);
 }
 
-// Jumping to a mast has to close the table first — it covers the map it is about to fly across.
 /* CSS anchor positioning would do this, but it is Chromium-only — so the panel is placed by hand on
    open. `toggle` does not bubble, hence the capture phase. */
 el('dataBody').addEventListener('toggle', e => {
   const box = e.target;
   if (e.newState !== 'open' || !box.matches('.tipbox')) return;
-  const r = document.querySelector(`[popovertarget="${box.id}"]`).getBoundingClientRect();
+  const r = document.querySelector(`[data-pop="${box.id}"]`).getBoundingClientRect();
   box.style.left = `${Math.max(8, Math.min(r.right - box.offsetWidth, innerWidth - box.offsetWidth - 8))}px`;
   // Below the marker, unless that would run off the bottom — then above it.
   box.style.top = r.bottom + box.offsetHeight + 8 < innerHeight
@@ -267,24 +364,32 @@ el('dataBody').addEventListener('toggle', e => {
    the panel saying something vaguer than what is already on screen. The panel lives in the top layer,
    so it is not a descendant of the button and moving onto it counts as leaving — which is fine for
    something you only read. Click still works, and is the only way in on touch. */
-const popFor = node => document.getElementById(node.getAttribute('popovertarget'));
+const popFor = node => document.getElementById(node.dataset.pop);
 // Only where hover is real. Touch fires a synthetic mouseover *before* the click, so on a phone this
 // would open the panel and the click that followed would immediately toggle it shut again.
 if (matchMedia('(hover: hover)').matches) {
   el('dataBody').addEventListener('mouseover', e => {
-    const box = e.target.closest('.sum') && popFor(e.target.closest('.sum'));
+    const box = e.target.closest('[data-pop]') && popFor(e.target.closest('[data-pop]'));
     if (box && !box.matches(':popover-open')) box.showPopover();
   });
   el('dataBody').addEventListener('mouseout', e => {
-    const b = e.target.closest('.sum');
-    if (!b || b.contains(e.relatedTarget)) return;   // moving onto its own icon is not leaving
+    const b = e.target.closest('[data-pop]');
+    if (!b || b.contains(e.relatedTarget)) return;   // moving inside it is not leaving
     const box = popFor(b);
     if (box?.matches(':popover-open')) box.hidePopover();
   });
 }
 
 el('dataBody').onclick = e => {
-  if (e.target.closest('[data-shot], .sum, .tipbox')) return;   // their own handlers; row stays put
+  if (e.target.closest('.tipbox')) return;
+  // Touch has no hover, so a tap on the same target opens the panel instead of flying the map —
+  // except on the camera button, whose tap already means "show me the picture".
+  const hook = e.target.closest('[data-pop]');
+  if (hook && !e.target.closest('[data-shot]') && !matchMedia('(hover: hover)').matches) {
+    popFor(hook)?.togglePopover();
+    return;
+  }
+  if (e.target.closest('[data-shot]')) return;   // ui.js opens the lightbox; the row stays put
   const tr = e.target.closest('[data-mast]');
   if (!tr) return;
   const s = state.data.find(x => (x.site || x.id) === tr.dataset.mast);

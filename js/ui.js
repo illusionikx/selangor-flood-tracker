@@ -10,6 +10,7 @@ import { render, districts } from './render.js';
 import { dataTable } from './table.js';
 import { alerts } from './alerts.js';
 import { load } from './net.js';
+import { paintTestChrome } from './test.js';
 
 // --- theme ---------------------------------------------------------------------------------------
 
@@ -17,13 +18,31 @@ setTheme(PREFS.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'd
 el('theme').onclick = () =>
   setTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
 
-// --- sources dialog --------------------------------------------------------------------------
+// --- about dialog ------------------------------------------------------------------------------
 // <dialog> handles the backdrop, Esc and focus; the only wiring needed is opening it and treating a
 // click on the backdrop as a close, which the element does not do on its own.
 
 const aboutBox = el('aboutBox');
 el('about').onclick = () => aboutBox.showModal();
 aboutBox.onclick = e => { if (e.target === aboutBox) aboutBox.close(); };
+
+// --- test mode ------------------------------------------------------------------------------
+// Toggling refetches rather than mutating what is on screen: turning it *off* has to undo a payload
+// that was edited in place, and the only honest undo is the real payload again.
+
+el('testMode').checked = state.test;      // always false on load — the flag is session-only
+paintTestChrome();
+el('testMode').onchange = () => {
+  state.test = el('testMode').checked;
+  paintTestChrome();
+  load();
+};
+// The badge's own escape hatch: whoever is looking at a fake flood may not be whoever switched it
+// on, and hunting through a dialog to stop it is a poor way to find that out.
+el('testOff').onclick = () => {
+  el('testMode').checked = false;
+  el('testMode').onchange();
+};
 
 // --- all-stations table ------------------------------------------------------------------------
 
@@ -47,12 +66,17 @@ function setDrawer(open, pan = true, remember = true) {
   if (remember) { PREFS.drawer = open; save(); }
 }
 menu.onclick = () => setDrawer(!document.body.classList.contains('drawer'));
-setDrawer(!!PREFS.drawer, false);
+// Landing on a phone starts with the map and nothing over it: at that width the drawer *is* the
+// screen, so restoring a saved-open one would hand the user a filter panel where they expected a
+// map. `remember: false` — this is the layout deciding, so the preference survives for the desktop
+// visit that set it.
+setDrawer(!phone.matches && !!PREFS.drawer, false, false);
 
-// Growing back past the breakpoint restores the drawer, because the reason it was shut — a filter
-// change on a screen the drawer covers — no longer applies. Shrinking leaves it alone: someone who
-// opened it deliberately shouldn't lose it to a window resize.
-phone.addEventListener('change', e => { if (!e.matches) setDrawer(!!PREFS.drawer, false); });
+// Crossing the breakpoint in either direction: shut at phone width, where the drawer *is* the whole
+// screen and an open one hides the map it is filtering; restored to the saved preference on the way
+// back out. Neither is remembered — the layout is deciding here, not the user, and overwriting the
+// preference would leave nothing to restore.
+phone.addEventListener('change', e => setDrawer(!e.matches && !!PREFS.drawer, false, false));
 
 // --- layer chips -------------------------------------------------------------------------------
 
@@ -130,7 +154,10 @@ alertTab.onclick = () => {
   PREFS.alertsOpen = open;
   save();
 };
-if (PREFS.alertsOpen !== false) alertPanel.classList.add('open');
+// Same on landing for the alert panel: expanded it covers a third of a phone screen. It still
+// springs open by itself when something *becomes* an alert (see alerts.js) — that is news, and news
+// is worth the space; a list that was already there when you arrived is not.
+if (!phone.matches && PREFS.alertsOpen !== false) alertPanel.classList.add('open');
 alertTab.setAttribute('aria-expanded', alertPanel.classList.contains('open'));
 
 // --- tap-to-open popovers (touch has no hover) -----------------------------------------------------

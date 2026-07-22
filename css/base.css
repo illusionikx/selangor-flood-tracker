@@ -7,6 +7,10 @@
   --hover: #f1f3f4; --accent: #1a73e8;
   --shadow: 0 1px 2px rgba(60,64,67,.3), 0 2px 6px 2px rgba(60,64,67,.15);
   --drawer: 288px; --slide: .25s cubic-bezier(.4, 0, .2, 1);
+  /* Header height, and everything that hangs beneath it. One number because the header grows to two
+     lines on a phone (the ticker wraps under the buttons) and the map, drawer, search box and alert
+     panel all have to follow it down — they were six hard-coded 64/76/124/128s before. */
+  --hdr: 64px;
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
@@ -46,6 +50,35 @@ td:last-child { text-align: right; padding-left: 16px; }
 .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 50%; }
 .glyph { font-size: 18px; }
 .up { color: #d93025; } .down { color: #188038; }
+/* Rate of rise. The arrow travels the way the water is going: in from one side, half a second still
+   so it can actually be read as a direction, then out the other. A back-and-forth wobble reads as
+   fidgeting; a one-way pass reads as movement. */
+/* An inline-flex box takes its baseline from its **first flex item**, and that item is a 1.7em icon
+   with negative margins — so the box's baseline was the arrow's, not the number's, and the whole
+   thing floated above the sentence it sits in. Nudging it back with a magic `vertical-align: -.14em`
+   only held at one font size, which is why it kept drifting.
+   `vertical-align: middle` sidesteps the baseline entirely: it aligns the box's *centre* to the
+   text's centre, which is what "inline with the text" actually means when the box is one line tall.
+   `line-height: 1` keeps it exactly one line tall, and the icon's negative vertical margins keep the
+   oversized glyph from growing it. No magic number, and it holds at any size. */
+.rate {
+  display: inline-flex; align-items: center; gap: 1px;
+  font-weight: 500; line-height: 1; vertical-align: middle;
+}
+.rate.up { color: #d93025; } .rate.down { color: #188038; }
+.rate .i { font-size: 1.7em; margin: -.5em 0; animation: rise 2s ease-in-out infinite; }
+.rate.down .i { animation-name: fall; }
+@keyframes rise {
+  0%        { transform: translateY(6px);  opacity: 0; }
+  25%, 50%  { transform: translateY(0);    opacity: 1; }
+  75%, 100% { transform: translateY(-6px); opacity: 0; }
+}
+@keyframes fall {
+  0%        { transform: translateY(-6px); opacity: 0; }
+  25%, 50%  { transform: translateY(0);    opacity: 1; }
+  75%, 100% { transform: translateY(6px);  opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) { .rate .i { animation: none; opacity: 1; } }
 :root[data-theme="dark"] .up { color: #f28b82; }
 :root[data-theme="dark"] .down { color: #81c995; }
 
@@ -268,7 +301,17 @@ select:focus-visible, #goto:focus-visible, #districtFind:focus-visible, #dataFin
   from { transform: scale(.85); opacity: .9; }
   to   { transform: scale(2);   opacity: 0; }
 }
+/* Same shape as `halo`, shorter reach — the status chip pulses, the danger pin pings. Kept separate
+   rather than parameterised: `halo` is the loud one and must stay loud on a station at danger. */
+@keyframes halo-soft {
+  from { transform: scale(.9); opacity: .7; }
+  to   { transform: scale(1.6); opacity: 0; }
+}
 @keyframes ripple { from { transform: scale(.4); opacity: 1; } to { transform: scale(3.4); opacity: 0; } }
+/* Marquee. The strip is rendered as two identical halves, so translating exactly -50% lands the
+   second half where the first began and the loop has no seam. ticker.js pads the halves out by
+   repetition first, or a single short alert would scroll off and leave the bar empty. */
+@keyframes ticker { to { transform: translateX(-50%); } }
 @media (prefers-reduced-motion: reduce) {
   .shotwrap::after { animation-duration: 2.4s; }
 }

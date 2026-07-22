@@ -1,8 +1,8 @@
 // Rebuilds every marker and the heat layer from the current station set.
 
-import { KINDS, RISE_ETA } from './config.js';
+import { KINDS, RISE_ETA, HEAT_FLOOR } from './config.js';
 import { state, PREFS } from './state.js';
-import { el, color, popWidth, dkey, isCritical, leads } from './util.js';
+import { el, color, popWidth, dkey, isCritical, leads, hasInfo } from './util.js';
 import { map, marks, siteMark, shown, syncCluster, focusOn, openStable } from './map.js';
 import { heat, heatScale, heatOpacity } from './heat.js';
 import { sitePopup } from './popup.js';
@@ -52,15 +52,29 @@ export function render() {
 
     // Heat is its own layer with its own toggle, so a hidden river chip must not dim the heatmap.
     //
-    // Weight = how close to danger, scaled by how soon it arrives — the same two facts the alert
-    // definition is built from, so the hot spots and the alert panel can't tell different stories.
-    // `s.rising` would have been the shorter way to write this, but it is that rule with a hard
-    // edge at RISE_ETA: a station an hour out and one 2.9 hours out would glow identically, and one
-    // 3.1 hours out would drop to nothing. The ramp spends the same doubling over the countdown.
-    if (s.kind === 'river' && s.ratio) {
+    // Alertness = how close this sensor is to its *own* danger mark: a river's level over its
+    // danger level, or a flood gauge's depth over the spot it watches. Whichever sensor at a place
+    // is closer to its mark is the one that gets to speak, so a dry-looking river next to a gauge
+    // already under water can't keep the area cold. hasInfo() gates it because an offline gauge is
+    // frozen on whatever it read the day it died — often a flood.
+    const near = !hasInfo(s) ? 0
+      : s.kind === 'river' ? (s.ratio || 0)
+      : s.kind === 'gauge' && s.depth > 0 && s.danger ? s.depth / s.danger : 0;
+    // Scaled by how soon it arrives — the same two facts the alert definition is built from, so the
+    // hot spots and the alert panel can't tell different stories. `s.rising` would have been the
+    // shorter way to write this, but it is that rule with a hard edge at RISE_ETA: a station an
+    // hour out and one 2.9 hours out would glow identically, and one 3.1 hours out would drop to
+    // nothing. The ramp spends the same doubling over the countdown.
+    //
+    // Then the bottom HEAT_FLOOR of that scale is thrown away rather than drawn faintly: below it
+    // there is nothing to act on, and a map warm from end to end is a map nobody reads.
+    // The clamp is doing real work: at or past its mark, `near` is already ≥ 1 and the point is
+    // full red with no urgency at all. A river that has arrived and is now swaying either side of
+    // the mark has no `eta`, and must not cool down for it.
+    if (near) {
       const urgency = s.eta == null ? 0 : Math.max(0, 1 - s.eta / RISE_ETA);
-      const w = Math.min(1, s.ratio * (1 + urgency));
-      if (w > 0.1) points.push([s.lat, s.lng, w]);
+      const w = (Math.min(1, near * (1 + urgency)) - HEAT_FLOOR) / (1 - HEAT_FLOOR);
+      if (w > 0) points.push([s.lat, s.lng, w]);
     }
 
     if (!pinned && !shown(s.kind)) continue;

@@ -370,7 +370,9 @@ a hotspot that silently covered less ground at each zoom would be worse than no 
 footer. Water level renders as a progress meter on a **piecewise** scale (alert 38%, warning 68%,
 danger 100%) because real thresholds bunch above 88% on a linear bar. Sirens get a single centred
 TRIGGERED / IDLE / NO SIGNAL block. Gauges state depth over the marked spot, with dry ground
-spelled out and stale readings flagged NOT CURRENT. Non-camera popups link to the nearest webcam
+spelled out and stale readings flagged OFFLINE — the state block says only that, and the footer
+carries the "last reported" date, so the same date isn't printed twice a line apart. Non-camera
+popups link to the nearest webcam
 rather than embedding it; camera stills open full-size in a lightbox.
 
 ## Panels
@@ -408,11 +410,25 @@ and the qualifier muted underneath. Six columns need room, so the dialog widened
 table scrolls sideways below ~820px rather than squeezing them — `min-width` on `thead`/`tbody`,
 because `display: table` would otherwise honour the container's 100%.
 
-*Every column sorts*, ascending or descending, **within each district** — not across them. The
-district grouping is the point of this view; a flat 450-row list sorted by water level answers a
-question the alert panel already answers better, and loses the one this table exists for ("what is
-there, and where"). Names default to A–Z, readings to worst-first. A mast that lacks the sorted
-sensor sinks to the bottom whichever way the arrow points: an absent sensor is not a low reading.
+*A pinned "My location" row* sits above the districts: the nearest **reporting** station of each
+kind, with each cell naming its own station and distance in the hover panel — "nearest" is a
+different station per kind, so one location cell could not honestly carry one distance. It appears
+only while sorted by location and only with no search term: under a sorted reading it would be a row
+claiming a rank it does not have, sitting above stations that beat it, and during a search it is not
+a result and would contradict the count line. It is not clickable — it is a reading of where you are,
+not a place to fly to.
+
+*Every column sorts.* Sorted by location it stays grouped by district; sorted by a **reading the
+grouping drops away**, because district headings would slice one ranking into 24 little ones — the
+deepest river in Klang would sit above a deeper one in Petaling and the order would be a lie. The
+district moves into the location cell instead: you still need to know where a row is, it just stops
+being what the table is organised by. Names default to A–Z, readings to worst-first. A mast that
+lacks the sorted sensor sinks to the bottom whichever way the arrow points — an absent sensor is not
+a low reading.
+
+*Water level carries a mini gauge*, the popup's meter shrunk to a column: same piecewise scale (alert
+38%, warning 68%, danger 100%), tick marks at the thresholds, no labels. A linear bar would draw
+"safe" and "at alert" as nearly the same picture, since real thresholds bunch above 88% of it.
 
 *A "location" here is looser than on the map.* The map groups sensors sharing a coordinate exactly,
 because a pin is a point. JPS scatters one site's sensors over a couple of hundred metres — river
@@ -425,9 +441,38 @@ cell has room for one answer. Numbers average, states OR together, and a camera 
 feed there actually is. **Status does not average, it takes the worst:** a status code is a category,
 not a quantity (the mean of "normal" and "danger" is not "warning"), and a merged cell rendering
 calmer than its worst member is the one failure this app cannot have. So the number is the mean and
-the colour is the worst — which is also how you would read it aloud. A merged cell is marked with an `i` at the right
-edge of its badge. The same marker also carries the case a single sensor's own name differs from the
-place it sits at — both used to cost a line under the badge, both are now one icon.
+the colour is the worst — which is also how you would read it aloud. **Water level and rainfall cells show their graph on hover** — the same 12-hour sparkline the popup
+draws, in the panel, which is the only place in this view with room for one. A cell that has nothing
+else to add still opens for it.
+
+**The rate arrow animates**, drifting the way the water is going, and comes from one `rateHtml()`
+used by every place that prints a rate — the popup's Trend row and the alert panel's trend line. A
+river climbing is the one thing on this page that is *happening* rather than merely being the case,
+and a static triangle said it in the same voice as a station name. Nudged rather than spun: it has to
+register from across a room and still be ignorable while you read the number beside it. Stopped
+entirely under `prefers-reduced-motion`. A rate of exactly zero reads `steady` with no arrow —
+"steady" is not a direction.
+
+**River popups carry the sparkline too.** The alert panel has had it all along; the popup you reach
+by clicking the pin had the *numbers* for the trend (m/h, hours to danger) but not the shape they
+came from. The meter says where the level sits against its own thresholds — the graph says how it
+got there.
+
+**Both graphs are gradient areas now**, filled 60% opaque at the baseline down to 10% at the line —
+solid enough to read as a mass, faint enough not to compete with the stroke on top. Gradient ids are
+minted per call, because several charts can be on the page at once and a duplicate id makes every
+chart take the first one's colour.
+
+*The rainfall area is cut into segments wherever an hour is missing.* Bars were used there for a
+reason: an unbroken line across a six-hour hole says it did not rain, in the same shape as six hours
+of measured zeroes. A lone reading with no neighbours gets a sliver wide enough to see. The area is
+what changed; the honesty is not.
+
+**Pointing at the badge, the gauge or the Show image button** opens a panel listing the sensors
+behind that cell and each one's own reading. It also covers the case where a single sensor's name
+differs from the place it sits at. There is no info icon: the badge and the gauge are what the eye is
+already on, so they are what answers — an extra glyph per cell bought nothing but six more marks to
+look past in a table meant to be scanned.
 
 *It opens a native `popover`, not a `title` tooltip and not the app's `.tip`.* A title can't be
 styled or laid out; `.tip` is absolutely positioned and this table is a scroll container that would
@@ -435,7 +480,20 @@ clip it. `popover` puts the panel in the **top layer** — no clipping, no z-ind
 click-to-open (so touch works), light dismiss and Esc with it. Only placement needs JS, since CSS
 anchor positioning is still Chromium-only; `toggle` doesn't bubble, so that listener is on capture.
 Browsers without popover support never match `:popover-open`, so the panel stays `display: none`
-rather than spilling its contents into the cell.
+rather than spilling its contents into the cell. It opens on hover as well as click, but only under
+`(hover: hover)` — touch fires a synthetic `mouseover` before the click, which would open the panel
+and have the click toggle it straight shut.
+
+*Rows in the panel read like the cells they explain*: a badge where the answer is a state, a coloured
+number where it is a measurement. Anything else and you would be translating between two languages to
+check one figure against another. One catch worth knowing: the panel is a *descendant of the cell* in
+the DOM, so the table's badge rules still reach it — the top layer changes where an element paints,
+not which selectors match it — and the full-width cell treatment has to be undone explicitly.
+
+*"Offline" is a status here, badge and all* — grey, same shape as `TRIGGERED` or `DRY`. A station
+that is not reporting is telling you something, and the failure to guard against is it looking like a
+calm reading, not it looking like a status. The em dash is reserved for a kind that is **absent** from
+the site, which is a different fact.
 
 *The location column freezes* while the readings scroll under it — a row of numbers with the place
 name scrolled off is unreadable. Sticky cells need their own background or the scrolling ones slide
@@ -524,6 +582,22 @@ nearest-first when a location fix exists, otherwise sirens then closest-to-dange
 to the station, ripples over it, and temporarily un-hides its layer if switched off.
 
 ## User
+
+**A fix is kept for 15 minutes** (`PREFS.fix`, in the same prefs blob as everything else) and
+restored on load instead of re-asking. Every reload used to re-ask the Geolocation API, which on a
+phone wakes the GPS for a position that has not meaningfully changed — and this map is a 4 km-radius
+question, so 50 m of drift changes none of its answers. `maximumAge` on `map.locate()` says the same
+thing to the browser's own position cache, which is the layer that can actually skip the hardware;
+the stored copy is what survives the reload that clears it. Live and restored fixes go through one
+`place()` — nothing downstream should be able to tell which it got, because there is no difference
+worth telling.
+
+**A phone lands on the map and nothing else** — drawer shut, alert panel collapsed to its tab,
+whatever the saved preferences say. At that width each of them *is* the screen, so restoring a
+saved-open one hands the user a panel where they expected a map. Neither is remembered
+(`remember: false`), so the preference survives for the desktop visit that set it. The alert panel
+still springs open by itself when something *becomes* an alert — that is news, and news is worth the
+space; a list that was already there when you arrived is not.
 
 **Location** — auto-located on landing (view untouched) purely to enable proximity sorting;
 clicking the button recentres and opens a "You are here" popup listing the nearest water level,
@@ -800,6 +874,284 @@ rule was promoted from `#splash .spin` to plain `.spin`, so this cost no new CSS
 too, because a spinner that never ends reads as "still trying". It is also cleared immediately if
 `img.complete` is already true — a still the popup has already cached fires no `load` event, and
 without that check the spinner would sit there for ever over a picture that was ready.
+
+## The header alert ticker
+
+`js/ticker.js`, `#ticker` in the header, left of the status chip. Everything currently on alert,
+scrolling right-to-left on the stock-ticker convention, rebuilt on every poll.
+
+**Why, when the alert panel already lists these:** the panel lives on the map, and the map is the
+thing you cover with a popup, a table, the drawer or the lightbox. The header is the one strip that
+is never covered, so this is the layer that keeps saying *two rivers are at danger* while you are
+reading something else. It carries **no information the panel does not** — deliberately. It is a
+reminder, not a source, and anything only available here would be information hidden in an
+animation.
+
+Decisions:
+
+- **Unfiltered by the district picker**, like the toast and unlike the panel. The panel is a list
+  you went looking at; this is ambient. A filter set to tidy the map is not a request to be told
+  less about rivers reaching their danger mark.
+- **`aria-hidden`.** The same stations are in the alert panel as a real list; a screen reader gets
+  them there rather than as an endlessly repeating strip.
+- **Ordered by place, not by severity.** District first, then `dkey()` (state|district) as the
+  tiebreak, then siren-then-ratio within a place. The panel is worst-first because you read it
+  deliberately, top down; the ticker is read a glance at a time, so what matters is that alerts in
+  the same district arrive as a run rather than scattered across the lap. Each item carries its
+  district, so the run is legible rather than merely present. **Sorted, not grouped** — no headers,
+  no merging, every item is still one clickable station.
+  District names collide across states (KL and Selangor both have a Gombak), so the `dkey()` tiebreak
+  keeps each state's stations together *within* a shared district name rather than interleaved —
+  they still read as one run, which is the accepted cost of sorting on the district rather than on
+  `state|district`.
+- **Quiet is a state, not an absence.** Nothing on alert renders a centred grey *No alerts* card
+  with the animation off. A ticker that empties itself looks broken, and on a flood map "broken" and
+  "nothing is happening" must never look the same. Stillness is the message: the strip moves when,
+  and only when, there is something to report.
+- **Seamless loop by doubling.** The strip is rendered twice and translated exactly `-50%`, so the
+  second copy lands where the first began. That only holds if one copy is at least as wide as the
+  box, so the item set is first padded out by repetition (`reps = ceil(boxWidth / oneCopyWidth)`)
+  and *then* doubled. Measured with `scrollWidth`, not guessed: one alert needs several repeats, ten
+  need none. Duration is floored at 8s — measured before the webfont lands, `scrollWidth` can come
+  back tiny, and a near-zero duration flickers rather than scrolls.
+- **`MIN_TILES = 3`.** Width alone was not enough. A single alert wide enough to cover the box still
+  *popped*, because with one tile on the belt the item leaving the left edge is the whole strip
+  leaving — nothing follows it until the loop restarts. Padding to at least three tiles guarantees a
+  neighbour behind whatever is going out.
+- **Fixed width, not content width.** `flex: 0 1 min(58vw, 656px)`. Sized to content the strip grew
+  and shrank with the number of alerts, so the header re-laid itself out on every poll and the bar
+  was a different shape in a flood than on a calm day. It is a window onto the news; a window does
+  not change size with the news.
+- **Speed scales with the count.** One lap has to show everything, so a fixed pace means waiting a
+  minute to find out whether your river is on the list when 40 stations are up. `pace()` ramps
+  `PX_PER_SEC` from 45 upward once the count passes `FAST_FROM` (5), capped at 2×: past that the
+  names stop being readable and the ticker is just motion.
+- **Fades, not hard edges.** 56px `mask` ramps on both sides, so items dissolve rather than being
+  guillotined by the box, plus 10px of its own margin before the status chip — the strip is always
+  mid-item at its right edge, and an item dissolving up against the chip reads as the two colliding.
+- **Hover pauses it** and the items are buttons that jump to the station. A moving target you cannot
+  catch is a link that isn't one. Clicks are delegated once, because the strip is rebuilt every poll
+  and holds several copies of every station.
+- **`prefers-reduced-motion`** stops the animation and makes the strip horizontally scrollable
+  instead. Continuous self-scrolling motion is a textbook nausea trigger.
+- **Mobile** pushes it to a second header row (`flex: 1 0 100%`) and `--hdr` goes 64px → 100px. On
+  one line it got whatever was left after six controls — about 40px, which is not a ticker, it is a
+  keyhole.
+
+## New-alert toast
+
+`js/toast.js`, `#toast`, under the "go to" box. Fires from `load()` only — **after** `alerts()`, and
+never from the filter path, because hiding a district must not read as stations going on alert.
+
+`seen` starts `null` and the first poll seeds it silently: landing on the page during a flood should
+not fire a toast for a situation that was already there before you arrived. After that, only
+stations that crossed into `isHot()` since the last poll are announced, at most `LIST` (3) by name
+plus a count. Twelve seconds, cleared on hover so it can be read and clicked.
+
+**Desktop only** (`display: none` under 600px). On a phone the map is small and the alert panel is
+already a full-width sheet; a toast would cover the thing it is telling you about.
+
+`isHot()` lives in `js/util.js` precisely so the panel, the toast and the ticker cannot drift apart
+on what counts as an alert.
+
+## Test mode
+
+`js/test.js`, toggled from the About dialog, held in `state.test` — **session-only, cleared by a
+reload**. It used to live in `PREFS` with every other setting, which meant a fake flood could be
+inherited by a later visitor who never asked for one; the badge explaining why the map is on fire is
+easy to read as decoration. A reload is the first thing anyone tries, so a reload has to clear it.
+
+Most of this app only shows its real face during weather that happens a few times a year — the
+ticker cycling, the toast firing, the alert panel filling past its scroll, red pins clustering, the
+heatmap actually glowing. Waiting for a storm to find out that a panel overflows badly is not a
+testing strategy.
+
+- It rewrites the **client's copy** of the payload, after the fetch and before anything renders.
+  Nothing is sent anywhere and nothing reaches `.history.db`, so a drill cannot pollute a trend; the
+  next poll with the switch off is clean data again. Nothing downstream knows it is looking at a
+  drill, which is the point — the drill exercises the real code.
+- **Deterministic, not random:** every 4th eligible river over its danger mark, every 3rd of the
+  rest made to climb, every 9th siren triggered. "Does the panel scroll right at 40 alerts" is a
+  question you can ask twice and get the same answer to.
+- The rising branch derives `rate` from a **target ETA** rather than using a fixed m/h. A flat rate
+  means the flag depends on river size — 0.35 m/h reaches a 0.9m drain in half an hour and a 6m
+  river in seventeen, so a fixed rate lit only 8 of 26 and left the rest silently climbing.
+  Spreading the target over 0.5–2.5h also gives the ticker and panel a range of countdowns instead
+  of one repeated number. Measured after the fix: 27 rising, 69 alerts across 15 districts.
+- A fake 24-point rising `history` is written too — a flat sparkline under a station claiming to
+  climb is the sort of detail that makes a screenshot useless.
+- **Loud about itself**, deliberately more than once: a red-striped app bar, a fixed `#testbadge`
+  over the map with a *Turn off* button, and the status chip reading `test mode` in amber, outranking
+  every real state. A single badge is a thing you stop seeing after ten minutes, and mistaking a
+  drill for a flood is the worst failure this app could have.
+
+## About dialog
+
+Was an "info" button showing sources. Now `About`: what the app is, why it exists, the disclaimer,
+the three feeds, and credits (author, MIT licence, tiles/data/icons/Leaflet attribution). `LICENSE`
+added at the repo root.
+
+- The **logo is the heading** — the drop and the two-line wordmark on their own centred line. "About"
+  over the top of them would be a title for a title.
+- **The disclaimer is a highlighted notice**, not a third muted paragraph: warning icon, amber left
+  rule, 10% amber tint, full-strength text. It was the third grey paragraph in a row, which made the
+  one line carrying actual safety and legal weight the easiest to skip.
+  This is a **deliberate exception to the status-colour rule.** Amber here is not standing in for a
+  reading — no station is involved. It is the same "what you are looking at is not what it appears
+  to be" signal as the test-mode strip, which uses the same `#e8710a`.
+- **Test mode sits beside the close button**, because it is a mode and not a setting: the two things
+  you want within reach of each other are "turn the pretend flood on" and "get out of here".
+
+## `--hdr`
+
+Header height as one custom property on `:root` (64px, 100px on mobile where the ticker takes a
+second row). Seven separate top offsets — drawer, legend, alerts, go-to box, toast and the rest —
+had the header height baked in as a literal, so changing it meant finding all seven. Now they read
+`var(--hdr)` and the mobile block redefines the variable once.
+
+## Heat only where it means something
+
+The heat layer used to paint every river with a reading: weight `level / danger` from 0 up, with a
+`> 0.1` cut. On a dry day that is a warm wash over the whole valley, which reads as "everywhere is
+somewhat flooding" and therefore as nothing at all. Now the bottom `HEAT_FLOOR` (0.9, `config.js`)
+of the scale is discarded — a station under 90% of the way to its own danger mark contributes no
+point — and the full gradient is spent on what is left. Blank map means blank map.
+
+Two consequences that had to move with it:
+
+- The gradient opens at amber, not blue (`heat.js` and `#legend .ramp` — change both together).
+  Blue at the floor would say "calm" about a station already at 90% of danger.
+- Legend ticks are now `90% / 95% / danger`, and the tip says what is being cut.
+
+The reading itself is now "whichever sensor here is closest to its own mark", not "the river":
+a flood gauge's `depth / danger` (spDanger, 0.3 m over the spot it watches) counts the same as a
+river's `level / danger`. A gauge already under water next to a river with headroom is exactly the
+case where the river-only version stayed cold. Both go through `hasInfo()` first — the gotcha about
+offline gauges frozen on April's 3.55 m flood reading becomes a permanent hotspot otherwise, and
+the old river-only path had no such check because rivers are less often stuck.
+
+The `eta` scaling is unchanged and still applies *before* the floor, so a station climbing fast
+crosses into view earlier than its bare level would. It cannot work the other way: the `min(1, …)`
+clamp means a station at or past its mark is full red whatever its rate is doing. Arrived-and-now-
+swaying publishes no `eta`, and a river that has already reached danger is not the safer of the two.
+On the current cache: 30 of 682 stations paint.
+
+## Alert design standard
+
+Adopted 2026-07-22 after an audit of every alert surface (panel, ticker, toast, pins, heat) against
+the three literatures that govern this. **Anything new that alerts is checked against this list
+before it ships.** The point is not compliance for its own sake: this app's failure mode is not a
+broken layout, it is becoming trained-ignorable, and every rule below exists because a real warning
+system got ignored.
+
+**[CAP 1.2](https://docs.oasis-open.org/emergency/cap/v1.2/CAP-v1.2-os.html)** — the international
+alert format. Keep the axes separate: `severity` (how bad) is not `urgency` (how soon) is not
+`certainty` (**Observed** vs Likely/forecast). Alerts carry an action (`responseType`: Monitor,
+Prepare, Avoid, **AllClear**) and can be withdrawn (`msgType: Cancel`). Headline ≤160 chars.
+
+**[ISA-18.2 / EEMUA 191](https://www.processvue.com/resources/alarm-management-guidelines/)** — the
+control-room discipline that exists because operators learned to ignore 3,000-alarm consoles. An
+alarm is only an alarm if **a response is required**; rationalizing an existing set normally deletes
+30–60% of it. Target under 6 per hour; **more than 10 in 10 minutes is a "flood"**, treated as a
+system failure rather than a busy day. Priority must be distinguishable at a glance and must not be
+flat.
+
+**[PADM](https://link.springer.com/chapter/10.1007/978-3-030-98989-7_3) and the
+[cry-wolf literature](https://hess.copernicus.org/articles/26/4265/2022/)** — a warning states who
+is at risk, where, when to act, what to do, and who says so. People **mill**: they seek confirmation
+across channels before acting, so consistency and outbound links beat loudness. Consecutive false
+alarms erode trust far enough that damage rises *despite* later accurate warnings — a threshold is
+only defensible if the false-alarm cost was priced into it.
+
+### Already compliant — do not regress
+
+- `RISE_FLOOR` was set from the measured p90 of ordinary fluctuation in our own samples, which is
+  cry-wolf cost priced in explicitly.
+- `eta` is published whenever a station climbs at all, flagged or not: the cutoff is inspectable
+  rather than asserted.
+- One `isHot()` drives panel, ticker, toast and heat — cross-channel consistency by construction.
+- Every station names and links its source, which is what milling needs.
+- Quiet is stated, never implied ("No alerts", "All clear in…") — EEMUA's distinction between *no
+  alarms* and *alarm system dead*.
+
+### Three tiers, not one bucket
+
+All four gaps found in the audit are now closed. The change that carries most of it is `tier()` in
+`js/util.js`, beside `isHot()` so nothing can drift from it:
+
+| tier | what it is | CAP | rendered |
+|---|---|---|---|
+| `now` | river at danger, siren sounding | Observed / Immediate | red rule, `HAPPENING NOW` |
+| `soon` | rising, forecast to reach danger ≤3h | Likely / Expected | amber rule, `FORECAST` |
+| `stale` | on alert, but offline or a reading over 24h old | — | grey rule, `NOT CURRENT`, dimmed |
+
+Lumping the first two is precisely the flat priority distribution ISA-18.2 names as the reason
+operators stop reading their own console. They are different on **two** axes at once — certainty
+(observed vs projected) and urgency (now vs within hours) — and rendering them identically threw
+both away.
+
+**`stale` is deliberately still an alert.** The tempting fix was `&& s.online` in `isCritical()`,
+which *drops* it — and a river sitting at its danger mark whose telemetry has just died is the last
+thing that should quietly disappear from the list. That is silence rendered as safety. So it stays
+listed, sinks below everything actionable, drops out of the counts and the tab colour, and says why
+in words. Staleness is decided by `isStale()`, which is the same rule the popups already drew
+`NOT CURRENT` from — shared, so the two can never disagree about whether a station is trustworthy.
+
+Applied to all three surfaces: the panel sorts by tier before distance (nearest-first is the better
+order *within* a tier, but across tiers it puts a forecast two streets away above a river already
+over its mark), the ticker colours the *reason* rather than the icon (the kind colour is what makes
+a river a river — the traffic-light ramp stays reserved for status), and the toast headline now
+says which kind: `1 at danger, 2 forecast to reach it`, not `3 stations have gone on alert`.
+
+### What to do, and when it's over
+
+**The action line lives on the ticker, and only there.** *In danger? Call 999* plus a link to
+[APM's flood emergency line directory](https://www.civildefence.gov.my/talian-kecemasan-bencana-banjir/)
+— every state's number, kept current by the agency that answers them. CAP's `responseType` for this
+is **Monitor**: we have no authority to tell anyone to evacuate and must not imply otherwise.
+
+The ticker rather than the alert panel, because the panel is the thing that gets scrolled, collapsed
+or covered, and the strip is the one that doesn't. In both it would read as furniture.
+
+**It appears on exactly the condition that speeds the strip up** — `hot.length > FAST_FROM`, the same
+threshold `pace()` uses. Not arbitrary twice over: the speed-up exists because the list has grown
+long enough that one lap is a wait, and a list that long is also the point where "which of these is
+about me" stops being obvious and a phone number starts being the useful thing on screen. Below it
+the strip is calm, and a standing hotline banner is the sort of permanent warning nobody reads by the
+second day. It is inserted *inside* the repeated item set, because the `-50%` loop requires every
+copy to be identical.
+
+**One at the head of the set, then one every `ADVISE_EVERY` (25) alert items.** Under twenty-five
+that is the single leading copy and nothing else. Past that it repeats, because a sixty-item lap
+would otherwise carry the number past once and bury it under a minute of telemetry — the wrong way
+round, since the longer the list runs the likelier the reader is someone who needs a phone number
+rather than a water level. Measured: 8 → 1, 24 → 1, 25 → 1, 26 → 2, 50 → 2, 69 → 3.
+
+The same directory is linked from the About dialog's disclaimer, where it is not conditional. Both
+read the URL from `HOTLINES` in `config.js`, so the two can never drift to different numbers.
+
+**All-clear.** `toast.js` already kept `seen`; it now also keeps `seenNow`, so stations leaving the
+`now` tier are announced in green. Two exclusions matter more than the feature does: a station that
+went **stale** has not cleared — its telemetry died, and "back below danger" would be an actual lie
+— and a station that has vanished from the payload entirely cannot be checked, so it is left alone
+rather than declared safe.
+
+### Alarm-flood control
+
+ISA-18.2 calls more than ten alarms in ten minutes a system failure, and its remedy is not to
+interrupt faster — it is to **stop interrupting and defer to the overview display**.
+
+- Above `FLOOD_N` (10) stations on alert the toast goes silent entirely. The panel has sprung open,
+  the ticker is running and the map is red; a popup repeating all three is only in the way. The
+  ledger is still advanced, because the news is being delivered, just not by a toast.
+- Below that, one interruption per `COOL_MS` (10 min). During a cooldown `seen` is deliberately
+  **not** advanced, so anything held back is still new next poll and lands in the following toast
+  rather than being swallowed.
+- Bad news outranks good: a poll with both fresh alerts and all-clears leads with the alerts.
+
+*Not adopted:* modelling `certainty`/`urgency`/`responseType` as actual payload fields. This is a
+viewer, not an alert originator; the two-tier observed-vs-forecast split gets the same benefit
+without the ceremony.
 
 ## Not built (and why)
 

@@ -42,6 +42,12 @@ export const NO_INFO = '#9aa0a6';   // grey: offline or reporting nothing
 // `rising` flag or the published `eta`. Keep the two in step.
 export const RISE_ETA = 3;         // hours to danger that count as on alert
 
+/* APM's flood emergency line directory — every state's number, kept current by the agency that
+   answers them. The one outbound link on this page that is an *action* rather than a source, which
+   is why it is a constant and not buried in a template: the About dialog and the ticker advisory
+   must never drift to two different numbers. */
+export const HOTLINES = 'https://www.civildefence.gov.my/talian-kecemasan-bencana-banjir/';
+
 // CARTO styles. 'auto' follows the theme; the rest are an explicit choice in the drawer.
 // One basemap per theme. ponytail: a picker existed and nobody needs three flavours of grey.
 export const TILES = { light: 'rastertiles/voyager', dark: 'dark_all' };
@@ -50,6 +56,9 @@ export const TILES = { light: 'rastertiles/voyager', dark: 'dark_all' };
 export const SPARK_H     = 12;     // hours on the graph's x axis
 
 export const HEAT_KM     = 4;      // ground size of one blob
+// Nothing below this fraction of danger paints at all, and the whole gradient is spent on what is
+// left — a map that is warm everywhere says nothing, so the layer stays blank until it matters.
+export const HEAT_FLOOR  = 0.9;    // fraction of danger a station must reach to appear
 export const HEAT_MAX_PX = 220;    // blur cost is quadratic; past this the layer fades instead
 export const FLASH_MS    = 2400;   // how long the jump-to ripple runs
 export const POLL_MS     = 300000; // matches the proxy's cache TTL

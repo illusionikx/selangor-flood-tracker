@@ -4,11 +4,11 @@
 <title>Klang Valley Flood Watch</title>
 <link rel="stylesheet" href="vendor/leaflet.css">
 <link rel="stylesheet" href="vendor/markercluster.css">
-<link rel="stylesheet" href="vendor/fonts.css?v=15">
-<link rel="stylesheet" href="css/icons.css?v=15">
-<link rel="stylesheet" href="css/base.css?v=15">
-<link rel="stylesheet" href="css/chrome.css?v=15">
-<link rel="stylesheet" href="css/map.css?v=15">
+<link rel="stylesheet" href="vendor/fonts.css?v=39">
+<link rel="stylesheet" href="css/icons.css?v=39">
+<link rel="stylesheet" href="css/base.css?v=39">
+<link rel="stylesheet" href="css/chrome.css?v=39">
+<link rel="stylesheet" href="css/map.css?v=39">
 
 <!-- A <dialog>, not a div: the all-stations table is itself a modal dialog, and only the top layer
      can paint over one. Esc and the backdrop come free with it. -->
@@ -34,19 +34,52 @@
   <button id="menu" class="icon" title="Layers &amp; filters" aria-label="Layers and filters"
           aria-expanded="false" aria-controls="bar"><i class="i i-menu"></i></button>
   <h1><i class="glyph brand i i-water_drop"></i><span>Klang Valley <b>Flood Watch</b></span></h1>
-  <div id="net" tabindex="0"><span>connecting…</span></div>
-  <button id="data" class="icon" title="All stations as a table"
-          aria-label="All stations as a table"><i class="i i-list_alt"></i></button>
-  <button id="about" class="icon" title="Data sources" aria-label="Data sources"><i class="i i-info"></i></button>
-  <button id="locate" class="icon" title="Show my location" aria-label="Show my location"></button>
-  <button id="theme" class="icon" title="Toggle theme" aria-label="Toggle theme"><i class="i"></i></button>
+  <!-- Live alert ticker. `aria-hidden`: the same stations are in the alert panel as a real list, so
+       a screen reader gets them there rather than as an endlessly repeating strip. -->
+  <div id="ticker" aria-hidden="true"><div class="tk-run"></div></div>
+  <!-- One group, so the status chip and the four controls stay a block pinned to the right edge
+       instead of five items the flex row can space out however it likes. -->
+  <div class="hactions">
+    <div id="net" tabindex="0"><span>connecting…</span></div>
+    <button id="data" class="icon" title="All stations as a table"
+            aria-label="All stations as a table"><i class="i i-list_alt"></i></button>
+    <button id="about" class="icon" title="About" aria-label="About"><i class="i i-info"></i></button>
+    <button id="locate" class="icon" title="Show my location" aria-label="Show my location"></button>
+    <button id="theme" class="icon" title="Toggle theme" aria-label="Toggle theme"><i class="i"></i></button>
+  </div>
 </header>
 <!-- Native <dialog>: modal behaviour, backdrop, Esc-to-close and focus trapping come free. -->
 <dialog id="aboutBox">
-  <h2>Where this data comes from</h2>
-  <p class="muted">Live telemetry published by the Department of Irrigation and Drainage (Jabatan
-     Pengairan dan Saliran). This site is not affiliated with JPS and is not an official warning
-     channel — in an emergency, follow JPS and NADMA directly.</p>
+  <!-- Controls first in the source, so the close button is the first thing reachable by keyboard,
+       but they read as a corner strip rather than a header row. -->
+  <div class="modalhead">
+    <!-- Beside the close button because it is a mode, not a setting: the two things you want within
+         reach of each other are "turn the pretend flood on" and "get out of here". -->
+    <label class="testtog" title="Fill the map with fake alerts to see how it behaves in a flood">
+      <input type="checkbox" id="testMode"><span>Test mode</span>
+    </label>
+    <form method="dialog"><button class="icon dclose" title="Close" aria-label="Close"
+      ><i class="i i-close"></i></button></form>
+  </div>
+  <!-- The mark doubles as the dialog's heading: the drop and the two-line wordmark are the logo,
+       and "About" over the top of them would be a title for a title. -->
+  <h2 class="logo"><i class="i i-water_drop"></i><span>Klang Valley<br><b>Flood Watch</b></span></h2>
+
+  <p>A live map of flood telemetry for Selangor, Kuala Lumpur and Putrajaya — river levels, rainfall,
+     warning sirens and flood-depth gauges, from every station the Department of Irrigation and
+     Drainage publishes, on one map that refreshes itself.</p>
+  <p class="muted">The official portals each hold a piece of it and none of them plot it together,
+     so answering "is the river near me rising" meant reading three sites and a table. This joins
+     them, works out which stations are actually climbing towards their own danger marks, and shows
+     that instead.</p>
+  <p class="notice"><i class="i i-warning"></i><span><b>Not an official warning channel.</b>
+     This site is not affiliated with JPS. It re-publishes public data and can be wrong, stale or
+     down — in an emergency, follow JPS and NADMA directly.<br>
+     <b>If you are in danger, call 999</b>, or the flood emergency line for your state:
+     <a href="https://www.civildefence.gov.my/talian-kecemasan-bencana-banjir/" target="_blank"
+        rel="noopener">civildefence.gov.my</a> (APM).</span></p>
+
+  <h3>Where this data comes from</h3>
 
   <div class="src">
     <a href="https://publicinfobanjir.water.gov.my/" target="_blank" rel="noopener">Public Infobanjir</a>
@@ -66,17 +99,25 @@
 
   <p class="muted">Each station popup names the feed its reading came from. Where the feeds disagree,
      the newest reading wins, except that Public Infobanjir's figure is preferred outright.</p>
+
+  <h3>Credits</h3>
+  <p class="muted">Built by <a href="https://github.com/illusionikx" target="_blank" rel="noopener">illusionikx</a>.
+     Released under the <a href="https://opensource.org/licenses/MIT" target="_blank" rel="noopener">MIT
+     licence</a> — free to use, copy, modify and redistribute, with no warranty of any kind.</p>
   <p class="muted">Map tiles &copy; <a href="https://carto.com/attributions" target="_blank" rel="noopener">CARTO</a>,
      data &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>
-     contributors.</p>
-  <form method="dialog"><button class="link">Close</button></form>
+     contributors. Icons are <a href="https://fonts.google.com/icons" target="_blank" rel="noopener">Material
+     Symbols</a> (Apache 2.0); mapping by <a href="https://leafletjs.com/" target="_blank" rel="noopener">Leaflet</a>.
+     Flood data remains the property of JPS Malaysia.</p>
 </dialog>
 <!-- Every station in one list. Sticky search + header so the table scrolls under them. -->
 <dialog id="dataBox">
   <div class="dtop">
-    <form method="dialog"><button class="icon dclose" title="Close" aria-label="Close"
+    <div class="modalhead">
+      <h2>All stations</h2>
+      <form method="dialog"><button class="icon dclose" title="Close" aria-label="Close"
       ><i class="i i-close"></i></button></form>
-    <h2>All stations</h2>
+    </div>
     <input id="dataFind" type="text" autocomplete="off" placeholder="Filter by name, district or basin…"
            aria-label="Filter stations">
     <p id="dataCount" class="muted"></p>
@@ -115,6 +156,9 @@
          aria-label="Go to a station">
   <ul id="gotoHits" class="surface picklist" role="listbox" hidden></ul>
 </div>
+<!-- Sits under the "go to" box. Polite: assertive would interrupt a screen reader mid-sentence, and
+     the alert panel below carries the same information without a time limit. -->
+<div id="toast" class="surface" role="status" aria-live="polite"></div>
 <div id="alerts" class="surface">
   <button id="alertTab" aria-expanded="false" aria-controls="alertBody"></button>
   <div id="alertBody"></div>
@@ -125,19 +169,20 @@
       <i class="i i-info"></i>
       <span class="tip">
         <p><b>How it is worked out</b></p>
-        <p>Each river station is weighted by its level divided by its own danger mark, so a small
-           stream near its limit glows as hot as a big river near its limit.</p>
-        <p>That is then scaled by how soon it gets there: a station three hours from its danger
-           mark at the rate it is climbing counts as it stands, one an hour out counts about
-           two-thirds more, and one already at the mark counts double.</p>
-        <p>Same two facts the alert panel uses, so what glows and what is listed always agree.</p>
-        <p class="muted">Rainfall, sirens, gauges and offline stations are not included.</p>
+        <p>Each station scores its reading against its <i>own</i> danger mark, so a small stream at
+           its limit is as hot as a big river at its limit. Rivers and flood gauges both count —
+           whichever is nearer its mark wins the spot.</p>
+        <p>At the mark or past it: red, climbing or not. Below it: a fast riser is pulled up the
+           ramp by how soon it arrives, an hour out counting about two-thirds more than three.</p>
+        <p>Under 90% draws nothing. A map that is warm everywhere says nothing.</p>
+        <p class="muted">Rainfall, sirens and offline stations are not included.</p>
       </span>
     </span>
   </div>
   <div class="ramp"></div>
-  <div class="ticks muted"><span>0</span><span>50%</span><span>75%</span><span>danger</span></div>
-  <div class="muted">Hotter the sooner it reaches danger.</div>
+  <!-- The scale reads as the whole sentence: below 90% of danger nothing is drawn, hence the left
+       tick. The prose that used to sit under it is in the tip — the panel is a legend, not a page. -->
+  <div class="ticks muted"><span>blank &lt;90%</span><span>95%</span><span>danger</span></div>
   <label class="slider muted">Opacity
     <input type="range" id="heatOpacity" min="15" max="100" step="5" value="100">
     <span id="heatOpacityVal">100%</span>

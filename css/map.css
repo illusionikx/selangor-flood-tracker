@@ -108,3 +108,12 @@
   border-radius: 50%; border: 3px solid #d93025; animation: ripple 1.2s ease-out 2;
 }
 .ping::after { content: ''; margin: -3px 0 0 -3px; animation-delay: .4s; }
+
+/* --- phones ------------------------------------------------------------------------------------ */
+
+/* Leaflet's 30px zoom buttons are a mouse target, not a thumb one — 44px is the smallest thing a
+   finger hits reliably, and this is the control you use most while holding a phone one-handed. */
+@media (max-width: 600px) {
+  .leaflet-bottom.leaflet-right { margin-bottom: 40px; }   /* clears the credit line, as the legend does */
+  .leaflet-control-zoom a { width: 44px; height: 44px; line-height: 44px; font-size: 22px; }
+}

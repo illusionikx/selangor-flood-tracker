@@ -3,10 +3,10 @@
 
 import { KINDS, STATUS_COLOR, NO_INFO } from './config.js';
 import { state, PREFS } from './state.js';
-import { el, distKm, dkey } from './util.js';
+import { el, distKm, dkey, isHot, tier, TIER_RANK } from './util.js';
 import { flashTo } from './map.js';
 import { nearestCam, byId } from './stations.js';
-import { meter, sparkline, etaText } from './popup.js';
+import { meter, sparkline, etaText, rateHtml } from './popup.js';
 
 // Last count, so the panel only auto-collapses on the *change* to zero. Starts non-zero so a first
 // load with nothing on alert still counts as a transition and collapses; a first load with alerts
@@ -15,21 +15,25 @@ let wasHot = -1;
 
 export function alerts() {
   const hidden = new Set(PREFS.hidden || []);
-  const hot = state.data.filter(s => !hidden.has(dkey(s)) && (
-    (s.kind === 'river' && (s.status >= 3 || s.rising)) ||
-    (s.kind === 'siren' && s.status > 0)));
-  const rising = hot.filter(s => s.rising).length;
-  const danger = hot.filter(s => s.kind === 'river' && s.status >= 3).length;
-  const sirens = hot.filter(s => s.kind === 'siren').length;
+  const hot = state.data.filter(s => !hidden.has(dkey(s)) && isHot(s));
+  // Counts describe what is actually known right now, so anything stale is excluded from all three
+  // and counted separately. A number that silently includes a reading from April is a lie with a
+  // digit in front of it.
+  const live   = hot.filter(s => tier(s) !== 'stale');
+  const rising = live.filter(s => s.rising).length;
+  const danger = live.filter(s => s.kind === 'river' && s.status >= 3).length;
+  const sirens = live.filter(s => s.kind === 'siren').length;
+  const stale  = hot.length - live.length;
   const hereAt = state.hereAt;
 
   // Icons rather than "(2 rising / 1 danger)": the tab is 300px wide and the words wrapped as soon
   // as all three counts were non-zero — which is exactly when the panel matters most. Each count
   // keeps its title/aria text, so nothing is conveyed by the glyph alone.
   const tally = [
-    [rising, 'expand_less', 'rising', '#e8710a'],
     [danger, 'warning',     'at danger', '#d93025'],
     [sirens, 'campaign',    'sounding', '#d93025'],
+    [rising, 'expand_less', 'rising', '#e8710a'],
+    [stale,  'wifi_off',    'not current', 'var(--muted)'],
   ].filter(([n]) => n)
    .map(([n, icon, what, c]) => `<b style="--c:${c}" title="${n} ${what}" aria-label="${n} ${what}"
         ><i class="i i-${icon}"></i>${n}</b>`).join('');
@@ -37,8 +41,10 @@ export function alerts() {
   // The warning glyph is the at-a-glance signal, so it carries the size of the problem on the usual
   // status ramp: grey nothing, amber a handful, orange a bad night, red district-wide. The steps are
   // judgement, not a JPS definition — one rising station is normal, ten at once is not.
-  const c = !hot.length ? NO_INFO
-    : STATUS_COLOR[hot.length >= 10 ? 3 : hot.length >= 5 ? 2 : 1];
+  // Counted on `live`, not `hot`: a list made entirely of stations we can no longer read is a
+  // maintenance problem, not a flood, and must not paint the glyph red.
+  const c = !live.length ? NO_INFO
+    : STATUS_COLOR[live.length >= 10 ? 3 : live.length >= 5 ? 2 : 1];
 
   el('alertTab').innerHTML =
     `<i class="lead i i-warning" style="--c:${c}"></i><span>On alert${
@@ -66,33 +72,49 @@ export function alerts() {
     return;
   }
 
-  // Nearest-first once we know where you are; otherwise sirens, then closest-to-danger.
+  /* Tier before anything else. Nearest-first is the more useful order *within* a tier, but across
+     tiers it would put a forecast two streets away above a river already over its danger mark on
+     the other side of town — and only one of those is happening. Stale sinks to the bottom whatever
+     the distance: it is the one group you cannot act on. */
   el('alertBody').innerHTML = hot
-    .sort(hereAt ? (a, b) => distKm(hereAt, a) - distKm(hereAt, b)
-                 : (a, b) => (b.kind === 'siren') - (a.kind === 'siren') || (b.ratio || 0) - (a.ratio || 0))
+    .sort((a, b) => TIER_RANK[tier(a)] - TIER_RANK[tier(b)]
+      || (hereAt ? distKm(hereAt, a) - distKm(hereAt, b)
+                 : (b.kind === 'siren') - (a.kind === 'siren') || (b.ratio || 0) - (a.ratio || 0)))
     .map(s => {
       const kind = KINDS[s.kind];
       const cam = nearestCam(s);
+      const t = tier(s);
 
       const detail = s.kind === 'siren'
         ? '<div class="state on">TRIGGERED</div>'
         : `${meter(s)}
-           ${s.rate != null ? `<div class="muted">trend <b class="${s.rate > 0 ? 'up' : 'down'}">${
-             s.rate > 0 ? '▲' : '▼'} ${Math.abs(s.rate)} m/h</b>${
+           ${s.rate != null ? `<div class="muted">trend ${rateHtml(s)}${
              s.eta != null ? ` · danger <b class="${s.rising ? 'up' : ''}">${etaText(s.eta)}</b>` : ''}</div>` : ''}
            ${sparkline(s.history)}`;
 
-      return `<div class="alert">
-        <span class="badge" style="--c:${kind.color}"><i class="i i-${kind.icon}"></i>${kind.one || kind.label}</span>
+      /* Says which of the three this is, in words, above the reading. The left rule carries the same
+         thing in colour for a glance; neither is alone, because a colour nobody has been taught is
+         a decoration. */
+      const head = t === 'now'  ? '<span class="tg tg-now">HAPPENING NOW</span>'
+                 : t === 'soon' ? '<span class="tg tg-soon">FORECAST</span>'
+                                : '<span class="tg tg-stale">NOT CURRENT</span>';
+
+      return `<div class="alert t-${t}">
+        <span class="badge" style="--c:${kind.color}"><i class="i i-${kind.icon}"></i>${kind.one || kind.label}</span>${head}
         <div class="popname name" data-go="${s.id}">${s.name}</div>
         <div class="muted">${[s.district, s.state].filter(Boolean).join(', ')} · ${s.basin || 'basin n/a'}${
           hereAt ? ` · <b>${distKm(hereAt, s).toFixed(1)} km from you</b>` : ''}</div>
         ${detail}
+        ${t === 'stale' ? `<div class="state">LAST KNOWN — NOT CURRENT</div>
+          <p class="muted">This station has stopped reporting. The reading above is the last one it
+             sent and the situation there may have changed either way.</p>` : ''}
         ${cam ? `<button class="link" data-cam="${cam.id}">
           <i class="i i-photo_camera"></i> Nearest station with a webcam · ${cam.name} (${distKm(s, cam).toFixed(1)} km)</button>` : ''}
         <div class="muted">updated ${s.updated || s.shot || 'unknown'}</div>
       </div>`;
     }).join('');
+  // No advisory here. It lives on the ticker, which is the strip that stays visible while this panel
+  // is scrolled, collapsed or covered — and repeating it in both would make it furniture.
 
   // Bound here rather than delegated, because the phone case needs to collapse the panel first.
   el('alertBody').querySelectorAll('[data-go]').forEach(node => node.onclick = () => {
