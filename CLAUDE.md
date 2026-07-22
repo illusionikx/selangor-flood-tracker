@@ -15,6 +15,8 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 |---|---|
 | `api.php` | server-side proxy + cache + source merge + poll history + camera image proxy |
 | `sources.php` | scrapers for the two HTML-only upstreams (national portal, JPS WP) |
+| `shots.php` | camera archive: capture, retention tiers, lookup. Required by `api.php` |
+| `shots-test.php` | `php shots-test.php` — the only runnable check here. Exercises `pruneShots()` |
 | `index.html` | markup only — no inline CSS or JS |
 | `css/icons.css` | every icon, as an SVG mask. Generated — see docs/FEATURES.md for the fetch |
 | `css/base.css` | tokens, reset, controls, blocks shared by popup + alert panel |
@@ -23,7 +25,7 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `js/app.js` | entry point — decides what happens on landing, nothing else |
 | `js/config.js` | constants (kinds, palettes, thresholds, tile styles). No imports. |
 | `js/state.js` | `state` (data + hereAt) and the `PREFS` blob. Breaks module cycles. |
-| `js/util.js` | pure helpers + `hasInfo()` / `color()` |
+| `js/util.js` | pure helpers + `hasInfo()` / `color()` / `isIgnored()` |
 | `js/stations.js` | queries over the station set (`nearestOf`, `nearestCam`, `byId`) |
 | `js/map.js` | map instance, basemap/theme, cluster, `focusOn` / `openStable` / `flashTo` |
 | `js/heat.js` | heat layer, ground-fixed sizing, opacity |
@@ -33,6 +35,7 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `js/table.js` | the all-stations table dialog, grouped district → mast → sensor |
 | `js/locate.js` | geolocation and the "You are here" marker |
 | `js/ticker.js` | header alert marquee — measured, seamless, speed scales with the alert count |
+| `js/timeline.js` | camera archive replay + A/B compare, inside the lightbox and nowhere else |
 | `js/toast.js` | desktop-only "new alert since last poll" toast |
 | `js/test.js` | test mode: fakes a flood in the client's copy of the payload |
 | `js/net.js` | `load()` poll loop and the status chip |
@@ -41,8 +44,10 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `lib/` | Composer's vendor dir (`symfony/dom-crawler`), gitignored — **not** `vendor/` |
 | `composer.json` | the one server-side dependency; `composer install` before first run |
 | `.github/workflows/pages.yml` | bakes the static GitHub Pages build — runs the PHP on cron, publishes `api.json` |
+| `docs/DEPLOY.md` | both targets: Pages (what it can't do) and a Debian box (spec, nginx, cron) |
 | `.cache.json` | last payload (gitignored) |
 | `.history.db` | sqlite: water-level samples per station, 30-day retention (gitignored) |
+| `shots/` | the camera archive — one dir per camera, `<unixts>.webp` per frame (gitignored) |
 
 **Composer is server-side only.** `composer install` writes to `lib/`, because `vendor/` already
 holds hand-vendored browser assets that Composer must never manage. The front end is still
@@ -131,14 +136,21 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
 - Every station carries `source` (`selangor` / `kl` / `national`) and, where known, `code`.
 - `?cam=<id>` streams a camera still. Validates the id is an integer, looks the URL up in the
   cached payload, and rejects any host that isn't JPS. Never proxies an arbitrary URL.
+- **Camera archive** (`shots.php`): `?shots=<id>` lists a camera's stored frames, `?shot=<id>&t=<ts>`
+  serves one. Both parameters are cast to `int` before touching the filesystem, so the path cannot
+  leave `shots/` — the same rule as `?cam=`. A frame is stored as **`.webp` or `.jpg`, whichever came
+  out smaller** at 720p (the two are within 2% on this footage), so nothing may assume an extension —
+  go through `shotFile()`, and take the content type off the file it found. Capture runs at the *end* of a refresh, at most once per
+  `SHOT_EVERY` (30 min) however often the payload rebuilds, and is why one poll in six is several
+  seconds slower. **Do not tie capture to the poll**: 90 cameras × 250 KB × 288 polls is 6.5 GB/day
+  aimed at JPS from one address, which is the stampede the lock exists to prevent, in slow motion.
 - Trend is **derived here**, not upstream: `.history.db` (sqlite, `level(station, ts, level)`,
   PK-deduped, 30-day retention, WAL) holds the samples; each poll loads the last 24h. `rate` = m/hour against the sample nearest an hour old (refused outside 20 min–3 h, so
   irregular polling can't produce a bogus figure). `rising` is a **forecast, not a rate**: climbing
   at `≥ RISE_FLOOR` (0.1 m/h), last three samples not dipping, and `eta` — hours to its *own* danger
   mark at that rate — within `RISE_ETA` (3 h). `eta` is published whenever a station is climbing, so
-  the UI can show what the cutoff is cutting off. The client reads `s.rising`; it never re-derives it.
-  The one exception is the heat weight, which ramps on `eta` rather than stepping on `rising` —
-  `RISE_ETA` is mirrored in `config.js` for that, and the two must be kept in step.
+  the UI can show what the cutoff is cutting off. The client reads `s.rising`; it never re-derives it,
+  and nothing mirrors `RISE_ETA` client-side any more.
 - Response also carries real diagnostics used by the status chip: `tookMs`, `details.ok/requested`,
   `offline`, `cacheAge`, `sourceUpdated`.
 
@@ -162,6 +174,9 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   and a descendant search counts the inner table's cells too, blowing the 14-cell guard.
 - **Iterating a `Crawler` yields raw `DOMNode`s**, which have no `attr()`. Use `->each(fn(Crawler
   $n) => $n->attr(…))` to stay in Crawler-land, or you get a fatal on the first attribute read.
+- **`rm -rf shots/` is a year of camera history**, and unlike `.history.db` it cannot rebuild —
+  the frames only exist because we were running when they were taken. To re-test the capture path,
+  `rm shots/.last` (the 30-minute stamp), not the directory.
 - **Never `rm .history.db` to test a cold start** — it destroys the accumulated samples, every
   `rising` flag goes false for an hour, and anything keyed off `rising` (the filter, alert panel,
   drawer counts, heat weighting) goes quiet at once. To re-test the scrape path, expire the page
@@ -203,7 +218,9 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   never take a whole mast off the map; that is why layer chips call `render()`, not `syncCluster()`.
 - Clustering still never fully disables: sites can sit metres apart. `maxClusterRadius` tightens
   with zoom and co-located pins spiderfy on click.
-- **Offline gauges are frozen on old flood readings** (3.55m from April). Anything offline or
+- **Offline gauges are frozen on old flood readings** (3.55m from April) — so they are *not sampled
+  into `.history.db`* and carry no `history`. A flat line at a number from months ago reads as
+  "steady", which is the one thing a graph of a dead sensor must not say. Anything offline or
   >24h old renders grey with an explicit `OFFLINE` block, the date in the footer. Never show these
   as live.
 - **41 sirens last reported months ago** (one in July 2025). They render `OUT OF CONTACT` with the
@@ -214,8 +231,14 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   still pops, because the tile leaving the left edge is the whole strip leaving. `MIN_TILES` (3)
   guarantees a follower. And `#ticker` must have a **fixed flex basis** — sized to content the
   header re-laid itself out every poll as the alert count changed.
+- **`.solo` is hidden until hover, globally.** The rule lives on the class, not on `#districtList`,
+  so any new list reusing that pill button gets an invisible control on a mouse. `#ignoredList`
+  overrides it back to `visible` — restoring is the whole point of that panel.
 - **`<details>` can't animate closed** (children go `display:none`) and hides non-`<summary>`
   children entirely — that's why the drawer is a `body.drawer` class and the credit sits outside.
+  The two filter sections *inside* the drawer (`#districts`, `#ignored`) are `<details>` precisely
+  because they want no animation. Their counts live on the `<summary>`, so a collapsed section still
+  reports what it is holding — do not move a count into the body.
 - **`border-collapse: collapse` drops padding on the table box** — `#netstats` uses `separate`.
 - **leaflet.heat sizes in screen pixels.** `heatScale()` converts `HEAT_KM` (4km) to pixels per
   zoom so blobs stay ground-fixed. Do **not** also call `heat.redraw()` — the plugin repaints on
@@ -246,6 +269,12 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
 - Responsive is a standing requirement (breakpoint 600px), including touch equivalents for every
   hover-only affordance.
 - All user settings live in one `prefs` blob in `localStorage` (`PREFS` + `save()`).
+- **`PREFS.ignored` is the only alarm-suppression control**, and it is applied *further* than the
+  district filter: `isIgnored()` gates pins, heat, the alert panel, the ticker **and** the toast. The
+  last two deliberately ignore the district picker; ignoring one named sensor is a request about that
+  sensor, so it holds there too. Anything that suppresses an alert must keep both always-visible
+  indications — the drawer's "Ignored sensors" panel (drawn even when empty) and the `· N ignored`
+  count in `#shown` — and the all-clear must keep saying when a silenced sensor is itself on alert.
 - **All times are 24-hour, and Malaysian.** JPS stamps readings MYT with no offset and we print them
   verbatim, so anything computed from a unix timestamp must be formatted with
   `timeZone: 'Asia/Kuala_Lumpur'` (see `MYT_HOUR` in `popup.js`) or it will disagree with the
@@ -253,7 +282,8 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
 - **Rainfall is an interval quantity, not a level.** It gets `rainBars()`, never `sparkline()` — a
   line between two rain readings claims a value in between that never existed. And `hourlyRainfall`
   is a *rolling* hour, so it buckets by `RAIN_BUCKET` (1 h): finer buckets show the same rain twice.
-- `history` is `[[unix seconds, value], …]` on both rivers (metres) and rainfall (mm/h) — the graphs
+- `history` is `[[unix seconds, value], …]` on rivers (metres), rainfall (mm/h) and gauges (metres of
+  depth, negative = dry) — the graphs
   plot against the clock, not against sample index. Windowed to `SPARK_WIN` (12h) and thinned to one point per `SPARK_BUCKET` (15 min)
   server-side; `SPARK_H` in `config.js` is a **cap**, not a fixed frame — the axis spans the points
   actually held and only starts sliding once they exceed it. It must not exceed `SPARK_WIN`.
@@ -286,5 +316,19 @@ for f in js/*.js css/*.css; do
   curl -sk -o /dev/null -w "%{content_type} $f\n" "https://flood-exp.test/$f"; done | grep -v 'javascript\|css'
 ```
 
-There is no test suite. Changes are verified by linting, syntax-checking the inline JS, querying
-`.cache.json` for the data shape being relied on, and looking at the page.
+```bash
+php shots-test.php            # the one runnable check: camera retention. Must stay green.
+curl -sk "https://flood-exp.test/api.php?shots=1"                          # frame timestamps
+curl -sk -o /dev/null -w '%{http_code} %{content_type}\n' \
+     "https://flood-exp.test/api.php?shot=1&t=$(curl -sk 'https://flood-exp.test/api.php?shots=1' \
+     | php -r 'echo json_decode(stream_get_contents(STDIN))[0];')"          # 200 image/webp
+```
+
+There is otherwise no test suite. Changes are verified by linting, syntax-checking the modules,
+querying `.cache.json` for the data shape being relied on, and looking at the page.
+
+`shots-test.php` is the exception, and deliberately narrow: retention is the only rule in this repo
+that can *quietly destroy* data. Everything else either works or visibly does not, but a prune that
+buckets a frame wrongly deletes months of camera history and looks identical to one that worked —
+and because it runs on every capture, a rule that shaves one extra frame per pass empties the
+archive over a week without ever being wrong in a single run. Hence the idempotence assertion.

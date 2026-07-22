@@ -490,6 +490,34 @@ check one figure against another. One catch worth knowing: the panel is a *desce
 the DOM, so the table's badge rules still reach it — the top layer changes where an element paints,
 not which selectors match it — and the full-width cell treatment has to be undone explicitly.
 
+*Trend and graph, per sensor, in the panel* — a river's rate arrow and its ETA to danger, then its
+sparkline; a rainfall sensor's bars; a flood gauge's depth line. The cell has no room for them and
+this panel is the only place in the view that does. **Per sensor, not per cell**: a merged cell averages its members, and an
+average has no history — two rainfall masts either end of a township can be rising and falling at
+once, and one line drawn through their mean would plot a reading that never happened. So the cell
+keeps the average and the panel breaks it back apart, each sensor's row followed by its own graph.
+Before this, a merged cell showed the rows and nothing else, which is the case where the shape over
+time is *most* worth having and was the only one without it. (Side-effect: the row separator is now
+`.tiprow ~ .tiprow`, since a graph sits between rows and `+` no longer matches.)
+
+*Flood gauges got a history to draw.* Depth over a flood-prone spot is a level like any other, so
+`api.php` now samples it into the same `level` table with the same window and bucket as a river, and
+`sparkline()` takes a `kind` so the line comes out in the gauge's taupe rather than river blue — a
+graph in another sensor's colour would be the colour language broken for no reason. It shows in the
+popup too, since the data exists everywhere the gauge does. Deliberately **no rate or ETA off it**:
+the thresholds are 0.15 m and 0.3 m, and a rate against numbers that small, from a sensor rounding to
+centimetres, would be mostly noise dressed as a forecast. The graph answers what a gauge is actually
+asked — is this spot filling or draining.
+
+*Offline gauges are not sampled at all*, so they have no `history` and draw nothing rather than the
+"builds as we poll" placeholder. Several are frozen on April's readings; a flat line at a months-old
+number reads as "steady", when what it means is that nobody is listening. This is the same instinct
+as the grey `OFFLINE` block — the failure to guard against is a dead sensor looking calm.
+
+*Sirens and cameras still get no graph*, and should not: a siren publishes a state with no history
+behind it and a camera publishes a picture. Neither has a quantity to plot, and inventing one to make
+the columns match would be decoration.
+
 *"Offline" is a status here, badge and all* — grey, same shape as `TRIGGERED` or `DRY`. A station
 that is not reporting is telling you something, and the failure to guard against is it looking like a
 calm reading, not it looking like a status. The em dash is reserved for a kind that is **absent** from
@@ -605,8 +633,75 @@ rainfall, siren and gauge with one meaningful number each, plus the nearest webc
 the real reason. *Known trade-off:* prompting on load risks Chrome auto-blocking the origin — the
 fix, if it becomes a problem, is to check `navigator.permissions` first.
 
-**Preferences** — one `prefs` blob in `localStorage`: theme, hidden districts, layer toggles,
-heatmap on/off and opacity, drawer state, alert-panel state, map centre and zoom.
+**Preferences** — one `prefs` blob in `localStorage`: theme, hidden districts, ignored sensors, layer
+toggles, heatmap on/off and opacity, drawer state, alert-panel state, map centre and zoom.
+
+### Collapsible filter sections
+
+**Districts and Ignored sensors are `<details>`.** Two scrolling lists stacked one above the other
+pushed the layer chips and the "N of M stations" line off the bottom of a phone screen — and both are
+things you set once and then stop looking at, unlike the chips, which are switched constantly. Native
+`<details>`, so the open/shut state, the keyboard behaviour and the semantics are the platform's;
+the stock marker is swapped for a chevron on the right because the count already sits there and a
+triangle on the left plus a number on the right reads as two controls.
+
+No animation, deliberately: `<details>` cannot animate closed (children go `display: none`), which is
+the reason the drawer itself is a `body.drawer` class rather than a `<details>`. Here there is
+nothing to animate around — the panel is behind a drawer that already slid.
+
+Open/shut is remembered per section in `PREFS.sect`. Districts defaults open (it is the filter people
+came for); Ignored defaults closed, because its summary count is the thing that has to be visible,
+not its list.
+
+### Ignoring a sensor
+
+**The ⋮ in a map popup ignores that one sensor.** JPS publishes stations that are broken, frozen on
+a flood reading from April, or simply not about you — a rainfall mast on the far side of a hill you
+will never care about. Until now the only way to quieten one was to hide its whole district, which
+takes the twenty stations you *do* want with it. `PREFS.ignored` is a list of station ids; the menu
+adds to it, and the "Ignored sensors" panel at the top of the drawer is the way back.
+
+**It applies further than the district filter does, and that is the point.** The ticker and the toast
+deliberately ignore the district picker — a filter you set an hour ago to tidy the map is not consent
+to be told less about a river reaching its danger mark. Ignoring one *named* sensor is exactly that
+consent, given deliberately, about that sensor. So it holds everywhere: pins, heat weighting, the
+alert panel, the ticker and the toast. This is the only setting on the page that suppresses an
+alarm, which is why the rest of this section exists.
+
+**Two always-visible indications, per ISA-18.2 on shelved alarms.** A muted alarm nobody can find is
+the failure the standard spends a chapter on, so the count is not allowed to hide: the count sits on
+the **summary** of the "Ignored sensors" section, which is present whether the section is open or
+shut and whether or not anything is ignored (open and empty, it says so and names the ⋮); and
+`#shown` — the line under the layer chips that answers "why is the map this empty" — carries
+`· N ignored`. Collapsing the section is therefore never a way to lose sight of a silenced sensor.
+
+**An ignored sensor that is itself on alert is stated in the all-clear.** "All clear. Nothing rising
+or in danger" over the top of a silenced river at its danger mark would be a plain lie. It is counted,
+not listed — listing it would undo the thing the user asked for — and the line says where to restore
+it. *Considered and not built:* ISA-18.2 shelves alarms with a **time limit** so nothing stays
+silenced by accident. Two permanent indications and a one-click restore were judged enough for a
+public map where the realistic reason to ignore a sensor ("that gauge has read 3.55 m since April")
+does not expire either. Open gap — see the alert design standard below.
+
+**Ignore loses to a jump, like a hidden district does.** `state.pinned` still overrides every filter,
+so a station reached from the table or the go-to box shows its pin rather than flying the map to an
+empty patch. Ignoring from that popup clears the pin in the same action.
+
+**Ids that leave the payload stay in the list.** The feeds drop and restore stations; forgetting the
+setting on the one poll a station went missing would silently un-ignore it. Nothing lists it while it
+is gone, because the panel is drawn from `state.data`.
+
+**The ⋮ is a menu, not a bare button**, with one item. An unlabelled glyph that takes a station off
+the map in one tap is the wrong affordance for something scanned with a thumb, and the item can carry
+the second line that says what ignoring actually does. Native `popover` + `popovertarget`: toggle,
+light dismiss and Esc for free, and the top layer means a Leaflet popup — a small scrolling box —
+cannot clip it. Placement is by hand in `ui.js`, the same as the table's hover panels, because CSS
+anchor positioning is still Chromium-only. Ids collide with nothing: Leaflet builds the DOM only for
+the popup that is open, and there is only ever one.
+
+*Not built:* ignoring a whole mast in one action (the district filter and per-sensor ignore bracket
+it), and marking ignored rows in the all-stations table — that view is deliberately "show me
+everything", and its search box is the only filter it has.
 
 **Splash** — covers the map until the first poll lands. With no connection it *holds* and warns,
 because stale flood data is worse than none; a retry button and the `online` event both resume.
@@ -875,6 +970,153 @@ too, because a spinner that never ends reads as "still trying". It is also clear
 `img.complete` is already true — a still the popup has already cached fires no `load` event, and
 without that check the spinner would sit there for ever over a picture that was ready.
 
+## Camera timeline — replaying the archive
+
+A river level has had a graph all along. A camera had only *now*, which is the wrong tense for the
+question people actually bring to a flood camera: **was it like this an hour ago?** The server keeps
+frames; the lightbox scrubs them.
+
+### What is stored, and why it is not more
+
+Every number here is a bandwidth decision, not a preference. Measured: **90 cameras, 175–390 KB per
+still (avg ~250 KB)**. Pulling all 90 on every 5-minute poll would be **~6.5 GB/day taken from one
+government server by one address** — the same shape as the stampede `.refresh.lock` exists to
+prevent, played in slow motion, and the fastest way to lose access to the feed the whole page runs
+on. So **capture is decoupled from the poll**: once per `SHOT_EVERY` (30 min), by whoever happens to
+be refreshing when the stamp expires. ~1.1 GB/day, and it is the hard ceiling on how dense the
+6-hour tier can be.
+
+Frames are stored at **720p, which is what JPS actually serves** — every camera measured came back
+1280×720, so `SHOT_W` is the native width and nothing is normally downscaled. It exists for the day
+a camera starts publishing something larger.
+
+At that size the frame is stored as **whichever of the two encodings is smaller**, not as WebP by
+policy. Re-encoding 1280×720 CCTV to WebP q60 measured *larger than the JPEG it came from* on
+several cameras (181 KB vs 165, 169 vs 153) — paying a generation loss to grow the file. Across a
+real capture round it split **58 WebP (avg 191 KB) / 32 JPEG (avg 188 KB)**: the two formats are
+within 2% of each other at this resolution, which is exactly why the rule compares them rather than
+asserting a winner. It stays right if JPS changes its encoder, and it re-derives itself for free if
+`SHOT_W` is ever lowered, where the re-encode wins by a wide margin (1024px measured 105 KB against
+the same 167 KB source).
+
+A frame is therefore `.webp` **or** `.jpg`, and the extension is not knowable from the timestamp —
+hence `shotFile()`, two stat calls rather than a manifest that could disagree with the directory.
+`?shot=` takes the content type off the file it found.
+
+**169 frames survive per camera** at steady state (the test prints it), so at 190 KB average that is
+**~2.9 GB** on disk for all 90 — against ~1.6 GB if `SHOT_W` were 1024. Download from JPS is
+unchanged either way (~1.1 GB/day): the full original is always fetched, the choice only affects what
+is kept. Lowering `SHOT_W` is a one-line change and roughly halves the archive.
+
+### Retention
+
+`SHOT_TIERS` in `shots.php`, applied on a frame's **age**, so a frame thins itself as it gets older
+rather than being filed once and forgotten:
+
+| age | kept |
+|---|---|
+| ≤ 6 h | every frame |
+| ≤ 24 h | one per 30 min |
+| ≤ 7 days | one per 6 h |
+| ≤ 30 days | one per 12 h |
+| ≤ 1 year | one per week |
+| older | deleted |
+
+The first two tiers are the same density while `SHOT_EVERY` is 30 min. Both are written out anyway:
+the tiers are the **policy**, the capture rate is a **bandwidth cap**, and conflating them would mean
+re-deriving the policy from scratch the day the cap changes.
+
+The newest frame in a bucket wins — for a 12-hour bucket that is the end of the period, which is what
+"what did it look like that evening" means. Bucket keys carry their step (`"21600:82625"`, not
+`82625`), because two tiers dividing by different numbers can land on the same integer and silently
+delete each other's frames.
+
+**Duplicate frames are dropped.** Several cameras stall for hours; storing an identical frame would
+put a point on the timeline that claims to be a new observation and is not, and would make a dead
+camera look like a still scene. Re-encoding is deterministic, so an md5 of the WebP is an exact test.
+Anything under `SHOT_MIN` (4 KB) is skipped too — JPS answers a dead camera with a ~2 KB placeholder
+rather than a 404.
+
+### Storage shape
+
+One directory per camera, one file per frame, named by the unix second it was captured. No index
+table: the filename *is* the index, so listing is a `scandir` of ~170 entries and expiring a frame is
+an `unlink`. A `shot(camera, ts)` table in `.history.db` would buy a query nobody makes.
+
+`?shots=<id>` lists a camera's frames; `?shot=<id>&t=<ts>` serves one, `immutable` for a year because
+a stored frame never changes. Both parameters are cast to `int` before they touch the filesystem, so
+the path cannot be steered outside `shots/` — the same rule as `?cam=`, which never proxies a URL it
+was handed.
+
+### The lightbox is a modal, not an overlay
+
+It used to be full-bleed black with the still centred in it, and you tapped anywhere to dismiss. That
+is the right shape for "just show me the picture" and the wrong one the moment the picture has a
+**name, a close button and a row of controls** — every one of those is a thing you click *on*, and a
+tap-anywhere surface cannot tell a dismissal from a scrub, a play, or a drag on the compare divider.
+Each needed its own exemption, and the list was going to keep growing.
+
+So: `.modalhead` with the **location as the title** and an ×, the frame as the body, the timeline as
+the **footer**. The same three-part shape as the About and All-stations dialogs, so it is the same
+object rather than a third convention — and the backdrop-closes-it handler is now one line
+(`e.target === lightbox`) with no exemptions at all.
+
+The title comes from a `data-name` on both openers rather than from stripping "Latest still from "
+off the alt text: that is a caption, and parsing a caption back into a name is a rule that breaks the
+day the caption is reworded. The alt text stays on the `<img>`, where it belongs.
+
+`width: fit-content` so the box tracks the frame — a fixed width would gutter a portrait still —
+with a floor so a short camera name doesn't shrink the dialog around its own title, and the floor
+drops on phones where a 460px minimum would be a horizontal scrollbar.
+
+### The scrubber
+
+Lightbox only, deliberately. A popup is 300px of readings you glance at; a timeline is something you
+sit with, and the lightbox is already the full-screen "look at this properly" view. A scrubber in the
+popup would be two places to learn and one of them too small to use.
+
+**Named ranges, not a free zoom** (6 h / 24 h / week / month / year). The retention tiers mean the
+archive *is* a set of fixed resolutions, so a continuous zoom would promise detail that is not on
+disk between the stops. These are the stops.
+
+The live still — the image the lightbox was opened on — sits one past the end of the scrubber. It is
+not in the archive, but on a timeline it is simply the newest thing there is. Playback skips it: it
+is a different image at a different resolution, and a full-size JPEG flashing in at the end of a run
+of WebP reads as a glitch. Playback loops, because a 12–60 frame clip is under 20 seconds and
+stopping dead means pressing play again to see it.
+
+Changing range warms the whole window with `new Image()` — at most ~60 frames off local disk, served
+`immutable`. The alternative is a scrubber that stutters on every drag, which is the one interaction
+this feature exists for.
+
+The bar is **hidden entirely** unless the archive holds at least two frames. A disabled scrubber over
+a single frame explains nothing its absence doesn't — and that is also what the static GitHub Pages
+build gets, where there is no PHP to have stored anything. The camera id is read back out of the
+image URL (`?cam=<n>`) rather than threaded through two call sites in markup: its absence is exactly
+the condition under which there is no archive to offer.
+
+### A/B compare
+
+One toggle. On, the **oldest frame in the selected range** is laid over the scrubbed one and clipped
+to a draggable divider, each side labelled with its own time — so widening the range widens what
+"before" means, which is the whole reason the ranges exist.
+
+Both frames come from one camera and share an aspect ratio, so matching `height: 100%` lines them up
+on both axes; no measuring, no resize listener. That survives the `SHOT_W` change too — frames
+captured at 1024×576 sit in the archive beside new ones at 1280×720, and both are 16:9. The drag is on the **whole stage**, not the 2px
+divider, because a 2px drag target is a target nobody hits on a phone — pointer events, so mouse and
+touch are one path. While compare is live, a click on the picture no longer closes the lightbox
+(`#lightbox.cmp`): there, a click on the picture is the start of a drag.
+
+*Trade-off accepted:* capture runs at the **end** of a refresh, inside the lock, after the payload is
+already on the wire. With no `fastcgi_finish_request` under Herd the connection cannot actually be
+closed, so **one poll in six takes several seconds longer**. That is the cost of having no background
+worker; a cron on `api.php` would spend it where nobody is watching.
+
+*Not built:* re-encoding older tiers smaller (a weekly frame from eight months ago does not need
+720p — it would roughly halve the archive, at the cost of a second encode pass on every prune);
+per-camera opt-in recording; and exporting a range as a video.
+
 ## The header alert ticker
 
 `js/ticker.js`, `#ticker` in the header, left of the status chip. Everything currently on alert,
@@ -1073,6 +1315,11 @@ only defensible if the false-alarm cost was priced into it.
 - Every station names and links its source, which is what milling needs.
 - Quiet is stated, never implied ("No alerts", "All clear in…") — EEMUA's distinction between *no
   alarms* and *alarm system dead*.
+- Per-sensor **ignore** is the one alarm-suppression control on the page, and it carries two
+  permanent indications (the drawer panel, the `· N ignored` count) plus an explicit note in the
+  all-clear when a silenced sensor is itself on alert. **Open gap:** ISA-18.2 shelves alarms with a
+  *time limit*; this one does not expire. See "Ignoring a sensor" above for why, and reopen it if a
+  fifth alert surface ever lands.
 
 ### Three tiers, not one bucket
 
@@ -1152,6 +1399,72 @@ interrupt faster — it is to **stop interrupting and defer to the overview disp
 *Not adopted:* modelling `certainty`/`urgency`/`responseType` as actual payload fields. This is a
 viewer, not an alert originator; the two-tier observed-vs-forecast split gets the same benefit
 without the ceremony.
+
+## Gauge state block, and the siren band
+
+Two gaps in the popup, both about a station carrying a status nobody printed.
+
+**A flood gauge now says its state in words**, in the same `.state` block a siren and a rainfall
+station use — `DRY GROUND` / `WATER ON GROUND` / `WATER RISING` / `FLOODED`, with `OFFLINE` taking
+the block over when the reading is stale. The gauge was the last kind whose state you had to infer
+from a number and a bar: "0.22 m of water" is a fact you interpret, and the bands are the server's
+own thresholds (0.15 m warning, 0.3 m danger) so the words, the pin colour and the status code
+cannot disagree. Water present but below the warning mark gets **no tone at all** — it is neither
+the green of dry ground nor a warning, and a couple of centimetres does not earn either.
+
+**A siren now carries its last 12 hours as a band**, not a graph. Its samples are 0 or 1, so there
+is no shape to plot — a polyline would draw ramps up and down that never happened, and a "0–1" axis
+is not a quantity anyone reads. The strip answers the question the pin is opened to ask ("has this
+gone off today") in one look. Details:
+
+- Quiet is drawn in `--outline`, not green. The state block above already carries the green, and a
+  12-hour reassurance is more than a log of samples is entitled to give.
+- Gaps over 90 minutes are left blank, the same rule the rain chart breaks its area on: an unbroken
+  quiet band across a hole in the record claims silence that was never measured.
+- Only online sirens are sampled, for the reason offline gauges aren't — a flat `IDLE` band from a
+  sensor nobody can hear is the most dangerous thing this map could draw.
+- `sparkPoints()` gained a `$peak` flag for this. Its normal rule is newest-wins per 15-minute
+  bucket, which would drop a trigger that started and stopped inside one bucket — for a siren that
+  is the single event the band exists to show, so it keeps the highest value instead.
+
+Both follow through to the all-stations table. `gaugeState()` is exported and returns a third
+element — the pill's short form (`dry` / `water` / `rising` / `flooded`) — so the cell, its tip
+panel and the popup all read from one place and a pin can never disagree with its own row. The
+siren band joins the river sparkline, the gauge sparkline and the rain chart in the tip panel,
+under the same "only where there is history" rule.
+
+*Trade-off accepted:* sirens heartbeat daily, so most bands are 48 identical zeroes and the honest
+answer they give is "silent". That is still the answer, and it was previously only inferable from a
+timestamp. Storage is full-resolution like every other kind (`ponytail:` note in `api.php` names
+hourly bucketing as the upgrade if the table bloats).
+
+## Heat weight is the threshold scale
+
+The heatmap used to be a temperature: weight was `level / danger`, everything under 90% of danger was
+thrown away, and the surviving tenth was stretched across the whole gradient and then multiplied by
+an urgency term derived from `eta`. It was defensible, and nobody could read it — "this blob is
+orange" had no answer in the units the rest of the page speaks.
+
+It now uses the **same piecewise scale as the popup meter**: alert 38%, warning 68%, danger 100%,
+via a shared `levelStops()` / `gaugeStops()` in `js/util.js`. The gradient's stops are keyed on those
+same numbers, so a blob's colour names the band the station has crossed — **yellow past alert, orange
+past warning, red at danger** — and it is the colour its pin and its meter are already showing.
+Below the alert slot nothing is drawn.
+
+**A tripped flood gauge goes straight to full red**, whatever its depth. Its warning mark is 15 cm; a
+gauge past it is reporting water standing over a spot known to flood, which is an *observation*, and
+under CAP's separate certainty axis an observation outranks anything a forecast scale can say about
+the centimetres.
+
+Four places now hold one scale and must move together: `HEAT_ALERT`/`HEAT_WARNING` in `config.js`,
+the gradient in `heat.js`, the `.ramp` gradient in `chrome.css` (which shows only the visible slice,
+so warning lands at 48%), and the meter's own slot numbers in `util.js`.
+
+*Removed, not kept:* the `eta` urgency multiplier, and with it `RISE_ETA`'s client-side mirror. Its
+whole purpose was to soften a hard cutoff at three hours, and a colour that means "past its warning
+mark" cannot also mean "arriving soon" without meaning neither. Urgency is still on the page in the
+places built for it — the alert panel, the `rising` filter, the ETA line in the popup. One fewer
+constant to keep in step across the client/server boundary.
 
 ## Not built (and why)
 
