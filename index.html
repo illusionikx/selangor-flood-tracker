@@ -1,393 +1,13 @@
 <!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Selangor Flood Watch</title>
+<title>Klang Valley Flood Watch</title>
 <link rel="stylesheet" href="vendor/leaflet.css">
 <link rel="stylesheet" href="vendor/markercluster.css">
-<link rel="stylesheet" href="vendor/fonts.css?v=5">
-<style>
-  /* Material-ish tokens. Everything below reads from these, so the theme swap is one attribute. */
-  :root {
-    color-scheme: light;
-    --surface: #fff; --on-surface: #1f1f1f; --muted: #5f6368; --outline: #dadce0;
-    --hover: #f1f3f4; --accent: #1a73e8;
-    --shadow: 0 1px 2px rgba(60,64,67,.3), 0 2px 6px 2px rgba(60,64,67,.15);
-    --drawer: 288px; --slide: .25s cubic-bezier(.4, 0, .2, 1);
-  }
-  :root[data-theme="dark"] {
-    color-scheme: dark;
-    --surface: #202124; --on-surface: #e8eaed; --muted: #9aa0a6; --outline: #3c4043;
-    --hover: #303134; --accent: #8ab4f8;
-    --shadow: 0 1px 2px rgba(0,0,0,.6), 0 2px 6px 2px rgba(0,0,0,.3);
-  }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0; font: 400 14px/1.5 Roboto, system-ui, sans-serif;
-    background: var(--surface); color: var(--on-surface);
-  }
-  #map { position: absolute; inset: 64px 0 0; }
-  /* CARTO's dark basemap is near-black; lift it so rivers and roads stay legible. Only the tile
-     pane is filtered — markers, heat and popups sit in other panes and keep their true colours. */
-  :root[data-lift="yes"] .leaflet-tile-pane { filter: brightness(1.75) contrast(.92); }
-  .surface { background: var(--surface); box-shadow: var(--shadow); }
-  /* Top app bar: 64px, title left, status + actions right. */
-  header {
-    position: absolute; z-index: 600; top: 0; left: 0; right: 0; height: 64px;
-    display: flex; align-items: center; gap: 12px; padding: 0 16px 0 8px;
-    background: var(--surface); border-bottom: 1px solid var(--outline);
-  }
-  header h1 {
-    font-size: 22px; font-weight: 400; letter-spacing: 0;
-    min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  }
-  header h1 b { font-weight: 500; color: var(--accent); }
-  #net {
-    position: relative; margin-left: auto; cursor: help;
-    font-size: 11px; font-weight: 500; letter-spacing: .6px; text-transform: uppercase;
-    display: flex; align-items: center; gap: 9px;
-    padding: 7px 14px 7px 12px; border-radius: 999px;
-    color: var(--c, var(--muted));
-    border: 1px solid color-mix(in srgb, var(--c, var(--outline)) 45%, transparent);
-    background: color-mix(in srgb, var(--c, transparent) 10%, transparent);
-    transition: color .3s, border-color .3s, background .3s;
-  }
-  #net:hover { background: color-mix(in srgb, var(--c, var(--on-surface)) 20%, transparent); }
-  /* Broadcast dot: solid centre, halo pushing outwards — reads as "receiving". */
-  #net .swatch { position: relative; background: var(--c); }
-  #net .swatch::after {
-    content: ''; position: absolute; inset: -5px; border-radius: 50%;
-    border: 2px solid var(--c); animation: halo 1.8s ease-out infinite;
-  }
-  #netstats {
-    position: absolute; z-index: 601; top: calc(100% + 10px); right: -8px; width: 236px;
-    padding: 14px 16px; border-radius: 12px; opacity: 0; visibility: hidden;
-    transition: opacity .12s ease, visibility .12s;
-    /* collapsed borders make the browser drop padding on the table box */
-    border-collapse: separate; border-spacing: 0;
-    /* the chip is uppercase + tracked; the popover inside it must not inherit that */
-    font-size: 12px; font-weight: 400; letter-spacing: normal; text-transform: none;
-    color: var(--on-surface);
-  }
-  /* callout pointer, on #net rather than the table — generated content on a table is unreliable */
-  #net::after {
-    content: ''; position: absolute; top: calc(100% + 5px); right: 18px; z-index: 602;
-    width: 11px; height: 11px; background: var(--surface); transform: rotate(45deg);
-    box-shadow: -1px -1px 2px rgba(60, 64, 67, .18);
-    opacity: 0; visibility: hidden; transition: opacity .12s ease, visibility .12s;
-  }
-  /* .open is for touch, where there is no hover to reveal the stats. */
-  #net:hover #netstats, #net:focus-within #netstats, #net.open #netstats,
-  #net:hover::after, #net:focus-within::after, #net.open::after { opacity: 1; visibility: visible; }
-  #netstats .head { font-weight: 500; font-size: 11px; letter-spacing: .8px; text-transform: uppercase; }
-  #netstats tr.gap td { padding-top: 12px; }
-  /* Drawer. <details> can't animate its close (children go display:none), so a body class drives it. */
-  #bar {
-    /* fixed, not absolute: the header is the positioned ancestor and it's only 64px tall */
-    position: fixed; z-index: 500; top: 64px; left: 0; bottom: 0; width: var(--drawer);
-    padding: 20px; overflow: auto; background: var(--surface); box-shadow: var(--shadow);
-    display: flex; flex-direction: column; gap: 24px;
-    transform: translateX(-100%); visibility: hidden;
-  }
-  #bar > div { min-width: 0; }
-  /* Map furniture slides with the drawer instead of hiding under it. */
-  #bar, #legend, #alerts { transition: transform var(--slide), visibility var(--slide); }
-  body:not(.ready) #bar, body:not(.ready) #legend, body:not(.ready) #alerts { transition: none; }
-  body.drawer #bar { transform: none; visibility: visible; }
-  body.drawer #legend, body.drawer #alerts { transform: translateX(var(--drawer)); }
-  #legend {
-    position: absolute; z-index: 400; left: 12px; bottom: 12px; width: 288px;
-    padding: 12px 14px; border-radius: 12px;
-  }
-  #legend .title { display: flex; align-items: center; gap: 6px; }
-  /* Info bubble: the formula lives in here so the legend itself stays a legend. */
-  .info { position: relative; margin-left: auto; color: var(--muted); cursor: help; }
-  .info > i { font: 16px 'Material Symbols Outlined'; font-style: normal; display: block; }
-  .info .tip {
-    position: absolute; z-index: 401; bottom: calc(100% + 8px); right: -8px; width: 244px;
-    padding: 12px 14px; border-radius: 12px; font-size: 12px; font-weight: 400;
-    background: var(--surface); color: var(--on-surface); box-shadow: var(--shadow);
-    opacity: 0; visibility: hidden; transition: opacity .12s, visibility .12s;
-  }
-  .info:hover .tip, .info:focus-visible .tip, .info.open .tip { opacity: 1; visibility: visible; }
-  .info .tip p { margin: 0 0 8px; }
-  .info .tip p:last-child { margin: 0; }
-  /* Alert panel, top-left. Hidden entirely when nothing is rising or in danger. */
-  #alerts {
-    position: absolute; z-index: 400; left: 12px; top: 76px; width: 300px;
-    display: none; flex-direction: column; border-radius: 12px; overflow: hidden;
-  }
-  #alerts.show { display: flex; }
-  #alertTab {
-    display: flex; align-items: center; gap: 8px; width: 100%; padding: 10px 14px;
-    font: 500 13px/1 Roboto, sans-serif; text-align: left; cursor: pointer;
-    background: none; border: 0; color: var(--on-surface);
-  }
-  #alertTab:hover { background: var(--hover); }
-  #alertTab::before {
-    content: 'warning'; font: 20px 'Material Symbols Outlined'; color: #ea8600;
-  }
-  #alertTab::after {
-    content: 'expand_more'; font: 20px 'Material Symbols Outlined';
-    margin-left: auto; color: var(--muted);
-  }
-  #alerts.open #alertTab::after { content: 'expand_less'; }
-  #alertBody { display: none; max-height: min(52vh, 460px); overflow: auto; padding: 0 14px 12px; }
-  #alerts.open #alertBody { display: block; }
-  .alert { padding: 14px 0; border-top: 1px solid var(--outline); }
-  .alert .name { cursor: pointer; }
-  .alert .name:hover { color: var(--accent); }
-  .alert svg { width: 100%; height: 32px; margin-top: 4px; overflow: visible; }
-  .alert .state { margin: 8px 0 4px; padding: 10px; font-size: 14px; }
-  .alert .link { margin-top: 8px; }
-  #legend .title { font-weight: 500; font-size: 12px; margin-bottom: 6px; }
-  /* Zoom sits bottom-right (Maps-style), clear of the alert panel. */
-  .leaflet-bottom.leaflet-right { margin-bottom: 26px; }
-  #locate.busy { pointer-events: none; }
-  #locate.busy::before { animation: pulse 1s infinite; }
-  #locate::before { content: 'my_location'; }
-  #locate.on::before { content: 'near_me'; color: var(--accent); }
-  @media (max-width: 600px) {
-    :root { --drawer: 86vw; }
-    #legend { display: none; }                        /* no room beside the alert panel */
-    body.drawer #alerts { visibility: hidden; }       /* drawer covers the map anyway */
-    /* Full width with a 12px gutter each side: left+right pinned, width auto. */
-    #alerts { left: 12px; right: 12px; width: auto; }
-    #alertTab { padding: 12px 16px; }
-    #alertBody { padding: 0 16px 14px; max-height: 50vh; }
-  }
-  h1 { font-size: 16px; font-weight: 500; margin: 0; letter-spacing: .1px; }
-  label { display: flex; align-items: center; gap: 8px; margin: 6px 0; cursor: pointer; }
-  /* Toggle buttons (Material filter chips). Still a real checkbox underneath, just hidden,
-     so every handler, the prefs persistence and keyboard access stay as they were. */
-  .chip {
-    display: flex; align-items: center; gap: 8px; margin: 6px 0; padding: 7px 14px 7px 10px;
-    border: 1px solid var(--outline); border-radius: 999px; cursor: pointer;
-    font-size: 13px; color: var(--muted); transition: background .15s, border-color .15s, color .15s;
-  }
-  .chip input { position: absolute; width: 1px; height: 1px; opacity: 0; margin: 0; }
-  .chip:hover { background: var(--hover); }
-  .chip:has(input:checked) {
-    color: var(--c, var(--accent)); border-color: var(--c, var(--accent));
-    background: color-mix(in srgb, var(--c, var(--accent)) 14%, transparent);
-  }
-  .chip:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
-  .chip .glyph { color: var(--c, var(--accent)); opacity: .55; }
-  .chip:has(input:checked) .glyph { opacity: 1; }
-  select {
-    width: 100%; padding: 8px 10px; margin-bottom: 10px; font: inherit; font-size: 13px;
-    background: var(--surface); color: var(--on-surface);
-    border: 1px solid var(--outline); border-radius: 8px;
-  }
-  select:focus-visible, .icon:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-  .muted { color: var(--muted); font-size: 12px; }
-  .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 50%; }
-  .glyph { font: 18px 'Material Symbols Outlined'; font-style: normal; }
-  #net { display: flex; align-items: center; gap: 6px; }
-  table { border-collapse: collapse; font-size: 12px; min-width: 178px; }
-  td { padding: 3px 0; }
-  td:last-child { text-align: right; padding-left: 16px; }
-  .up { color: #d93025; } .down { color: #188038; }
-  :root[data-theme="dark"] .up { color: #f28b82; } :root[data-theme="dark"] .down { color: #81c995; }
-  @keyframes pulse { 50% { opacity: .25; } }
-  @media (prefers-reduced-motion: reduce) { #net .swatch::after { animation: none; opacity: .7; } }
-  .icon {
-    width: 40px; height: 40px; padding: 0; flex: none;
-    display: grid; place-items: center; cursor: pointer;
-    background: none; border: 0; border-radius: 50%; color: var(--muted);
-    font-family: 'Material Symbols Outlined'; font-size: 22px;
-  }
-  .icon:hover, body.drawer #menu { background: var(--hover); }
-  /* Leaflet's own attribution box is disabled; we render the credit ourselves, out of the way. */
-  #credit {
-    position: absolute; z-index: 400; right: 10px; bottom: 8px;
-    text-shadow: 0 0 4px var(--surface), 0 0 4px var(--surface);
-  }
-  #legend { margin-top: 10px; }
-  #legend .ramp {
-    height: 10px; border-radius: 999px; margin: 6px 0 4px;
-    background: linear-gradient(90deg, #4da3ff 0%, #ffd166 50%, #ff9f1c 75%, #ff4d4d 100%);
-  }
-  #legend .ticks { display: flex; justify-content: space-between; }
-  .slider {
-    display: flex; align-items: center; gap: 10px; margin: 10px 0 0;
-    padding-top: 10px; border-top: 1px solid var(--outline); font-size: 12px;
-  }
-  .slider input[type=range] { flex: 1; min-width: 0; accent-color: var(--accent); height: 16px; }
-  .slider span { width: 34px; text-align: right; font-variant-numeric: tabular-nums; }
-  #credit a { color: var(--muted); }
-  .leaflet-control-zoom { border: 0 !important; box-shadow: var(--shadow); border-radius: 8px; overflow: hidden; }
-  .leaflet-control-zoom a {
-    background: var(--surface) !important; color: var(--on-surface) !important;
-    border-color: var(--outline) !important;
-  }
-  .leaflet-control-zoom a:hover { background: var(--hover) !important; }
-  .leaflet-popup-content-wrapper, .leaflet-popup-tip {
-    background: var(--surface); color: var(--on-surface); box-shadow: var(--shadow);
-  }
-  .leaflet-popup-content-wrapper { border-radius: 12px; }
-  .leaflet-popup-content { font: 400 13px/1.5 Roboto, system-ui, sans-serif; }
-  .leaflet-popup-content hr { border: 0; border-top: 1px solid var(--outline); margin: 8px 0; }
-  /* Standard popup: header (badge / name / region) → body metrics → still → footer. */
-  .pophead { padding-bottom: 8px; margin-bottom: 8px; border-bottom: 1px solid var(--outline); }
-  .badge {
-    display: inline-flex; align-items: center; gap: 5px; margin-bottom: 6px;
-    padding: 3px 9px 3px 6px; border-radius: 999px; font-size: 11px; font-weight: 500;
-    letter-spacing: .3px; text-transform: uppercase;
-    color: var(--c); background: color-mix(in srgb, var(--c) 16%, transparent);
-  }
-  /* Icon fonts match on the ligature text, so uppercase/letter-spacing must not reach it. */
-  .badge i, .link i, .glyph {
-    font-style: normal; text-transform: none; letter-spacing: normal; white-space: nowrap;
-  }
-  .badge i { font-family: 'Material Symbols Outlined'; font-size: 14px; }
-  .popname { font-size: 15px; font-weight: 500; line-height: 1.3; }
-  .popbody { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin-bottom: 8px; }
-  .popbody .v { text-align: right; }
-  .popfoot { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--outline); }
-  .meter { margin: 4px 0 10px; }
-  .meter .mtop { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
-  .meter .mtop b { font-size: 17px; font-weight: 500; }
-  .meter .mtop span { font-size: 11px; }
-  .meter .track {
-    position: relative; height: 10px; margin: 8px 0 4px; border-radius: 999px; overflow: hidden;
-    background: color-mix(in srgb, var(--on-surface) 13%, transparent);
-  }
-  .meter .fill { display: block; height: 100%; border-radius: 999px; transition: width .3s; }
-  .meter .tick {
-    position: absolute; top: 0; bottom: 0; width: 1px;
-    background: color-mix(in srgb, var(--on-surface) 40%, transparent);
-  }
-  /* Labels sit under their own tick, so they follow the compressed scale. Stacked (value over
-     name) because side-by-side "warning 63.6" / "danger 63.8" collide at these anchor spacings. */
-  .meter .mscale { position: relative; height: 30px; font-size: 10px; line-height: 1.35; }
-  .meter .mscale span {
-    position: absolute; transform: translateX(-50%); text-align: center;
-    display: flex; flex-direction: column;
-  }
-  .meter .mscale b { font-weight: 500; font-size: 11px; color: var(--on-surface); }
-  .meter .mscale span:last-child { transform: translateX(-100%); text-align: right; }
-  .near {
-    display: flex; align-items: flex-start; gap: 10px; padding: 7px 0;
-    border-bottom: 1px solid var(--outline);
-  }
-  .near:last-of-type { border-bottom: 0; }
-  .near[data-go] { cursor: pointer; }
-  .near[data-go]:hover { color: var(--accent); }
-  .near .glyph { font-size: 18px; line-height: 1.4; }
-  .state {
-    margin-bottom: 8px; padding: 14px 10px; border-radius: 8px; text-align: center;
-    font-size: 16px; font-weight: 500; letter-spacing: 1px;
-    color: var(--muted); background: var(--hover);            /* no signal */
-  }
-  .state.off { color: #188038; background: color-mix(in srgb, #188038 12%, transparent); }
-  .state.on  { color: #d93025; background: color-mix(in srgb, #d93025 14%, transparent); }
-  :root[data-theme="dark"] .state.off { color: #81c995; }
-  :root[data-theme="dark"] .state.on  { color: #f28b82; }
-  .link {
-    display: flex; align-items: center; gap: 6px; width: 100%; padding: 8px 10px;
-    font: 500 12px/1.3 Roboto, sans-serif; text-align: left; cursor: pointer;
-    color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent);
-    border: 0; border-radius: 8px;
-  }
-  .link:hover { background: color-mix(in srgb, var(--accent) 20%, transparent); }
-  .link i { font: 16px 'Material Symbols Outlined'; font-style: normal; flex: none; }
-  .leaflet-popup-close-button { color: var(--muted) !important; }
-  .pin {
-    position: relative; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%;
-    background: var(--surface); box-shadow: var(--shadow); color: var(--c, var(--accent));
-    font-family: 'Material Symbols Outlined'; font-size: 16px;
-  }
-  .pin.off { color: var(--muted); opacity: .6; }
-  .pin.rise { box-shadow: 0 0 0 2px #d93025, var(--shadow); }
-  /* Danger level or a sounding siren: filled red, on top, with a repeating halo. */
-  .pin.danger {
-    background: #d93025; color: #fff; border: 2px solid var(--surface); font-size: 15px;
-  }
-  .pin.danger::after {
-    content: ''; position: absolute; inset: -4px; border-radius: 50%;
-    border: 2px solid #d93025; animation: halo 1.8s ease-out infinite;
-  }
-  @keyframes halo {
-    from { transform: scale(.85); opacity: .9; }
-    to   { transform: scale(2);   opacity: 0; }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .pin.danger::after { animation: none; opacity: .8; }
-  }
-  .cluster {
-    display: grid; grid-auto-flow: column; align-items: center; gap: 3px;
-    width: 34px; height: 34px; border-radius: 999px; padding: 0 4px;
-    font-size: 12px; font-weight: 500; color: #fff; background: var(--c);
-    box-shadow: var(--shadow); border: 2px solid var(--surface);
-  }
-  .cluster i { font: 14px 'Material Symbols Outlined'; font-style: normal; opacity: .85; }
-  .cluster.mixed { border-style: dashed; }              /* more than one kind inside */
-  .cluster.danger {
-    background: #d93025;
-    box-shadow: 0 0 0 3px color-mix(in srgb, #d93025 35%, transparent), var(--shadow);
-  }
-  .pin.me { width: 30px; height: 30px; font-size: 20px; background: #1a73e8; color: #fff; border: 2px solid #fff; }
-  .ping, .ping::after {
-    position: absolute; left: 0; top: 0; width: 18px; height: 18px; margin: -9px 0 0 -9px;
-    border-radius: 50%; border: 3px solid #d93025; animation: ripple 1.2s ease-out 2;
-  }
-  .ping::after { content: ''; margin: -3px 0 0 -3px; animation-delay: .4s; }
-  @keyframes ripple { from { transform: scale(.4); opacity: 1; } to { transform: scale(3.4); opacity: 0; } }
-  .shot {
-    display: block; width: 100%; border-radius: 8px; aspect-ratio: 16 / 9; object-fit: cover;
-    opacity: 0; transition: opacity .2s;
-  }
-  .shotwrap {
-    position: relative; margin: 8px 0 6px; border-radius: 8px;
-    background: var(--hover); aspect-ratio: 16 / 9;
-  }
-  .shotwrap::after {                       /* spinner, removed once the still resolves */
-    content: ''; position: absolute; left: 50%; top: 50%; width: 22px; height: 22px; margin: -11px;
-    border: 2px solid var(--outline); border-top-color: var(--accent); border-radius: 50%;
-    animation: spin .8s linear infinite;
-  }
-  .shotwrap.done { background: none; aspect-ratio: auto; }
-  .shotwrap.done::after { content: none; }
-  .shotwrap.done .shot { opacity: 1; }
-  @keyframes spin { to { transform: rotate(360deg); } }
-  .shot { cursor: zoom-in; }
-  /* Full-view still. Tap/Esc closes; the image scales to whichever axis runs out first. */
-  #lightbox {
-    position: fixed; inset: 0; z-index: 950; display: grid; place-content: center; gap: 10px;
-    padding: 24px; background: #000000e6; cursor: zoom-out;
-  }
-  #lightbox[hidden] { display: none; }
-  #lightbox img { max-width: 92vw; max-height: 82vh; border-radius: 8px; }
-  #lightbox .cap { color: #dadce0; text-align: center; }
-  /* Splash: covers the map until the first poll lands. */
-  #splash {
-    position: fixed; inset: 0; z-index: 900; display: grid; place-content: center;
-    justify-items: center; gap: 16px; background: var(--surface); text-align: center;
-    transition: opacity .3s ease, visibility .3s;
-  }
-  #splash.gone { opacity: 0; visibility: hidden; }
-  #splash .mark { font: 48px 'Material Symbols Outlined'; color: var(--accent); }
-  #splash h1 { font-size: 22px; font-weight: 400; }
-  #splash h1 b { font-weight: 500; color: var(--accent); }
-  #splash.offline .spin, #splash.offline #splashMsg { display: none; }
-  #splashWarn { max-width: 320px; }
-  #splashWarn .state { display: flex; align-items: center; justify-content: center; gap: 8px; }
-  #splashWarn .state i { font: 20px 'Material Symbols Outlined'; font-style: normal; }
-  #splashWarn p { margin: 12px 0; font-size: 12px; line-height: 1.6; text-align: left; }
-  #splashWarn .link { justify-content: center; font-size: 13px; padding: 10px; }
-  #splash .spin {
-    width: 26px; height: 26px; border: 3px solid var(--outline); border-top-color: var(--accent);
-    border-radius: 50%; animation: spin .8s linear infinite;
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .shotwrap::after, #splash .spin { animation-duration: 2.4s; }
-  }
-  @media (max-width: 600px) {
-    header { gap: 4px; }
-    header h1 { font-size: 18px; }
-    #net span:not(.swatch) { display: none; }  /* dot only, keeps the bar on one line */
-  }
-</style>
+<link rel="stylesheet" href="vendor/fonts.css?v=6">
+<link rel="stylesheet" href="css/base.css?v=6">
+<link rel="stylesheet" href="css/chrome.css?v=6">
+<link rel="stylesheet" href="css/map.css?v=6">
 
 <div id="lightbox" hidden>
   <img alt="">
@@ -395,13 +15,13 @@
 </div>
 <div id="splash">
   <div class="mark">water_drop</div>
-  <h1>Selangor <b>Flood Watch</b></h1>
+  <h1>Klang Valley <b>Flood Watch</b></h1>
   <div class="spin"></div>
-  <div class="muted" id="splashMsg">fetching stations from JPS Selangor…</div>
+  <div class="muted" id="splashMsg">fetching stations from JPS…</div>
   <div id="splashWarn" hidden>
     <div class="state on"><i>wifi_off</i> NO INTERNET CONNECTION</div>
     <p class="muted">This page needs a connection to read live water levels, rainfall and sirens
-       from JPS Selangor. Anything shown without one would be out of date — and during a flood,
+       from JPS. Anything shown without one would be out of date — and during a flood,
        out of date is worse than nothing.</p>
     <button class="link" id="splashRetry"><i>refresh</i> Try again</button>
   </div>
@@ -409,23 +29,75 @@
 <header>
   <button id="menu" class="icon" title="Layers &amp; filters" aria-label="Layers and filters"
           aria-expanded="false" aria-controls="bar">menu</button>
-  <h1>Selangor <b>Flood Watch</b></h1>
+  <h1><i class="glyph brand">water_drop</i><span>Klang Valley <b>Flood Watch</b></span></h1>
   <div id="net" tabindex="0"><span>connecting…</span></div>
+  <button id="about" class="icon" title="Data sources" aria-label="Data sources">info</button>
   <button id="locate" class="icon" title="Show my location" aria-label="Show my location"></button>
   <button id="theme" class="icon" title="Toggle theme" aria-label="Toggle theme"></button>
 </header>
+<!-- Native <dialog>: modal behaviour, backdrop, Esc-to-close and focus trapping come free. -->
+<dialog id="aboutBox">
+  <h2>Where this data comes from</h2>
+  <p class="muted">Live telemetry published by the Department of Irrigation and Drainage (Jabatan
+     Pengairan dan Saliran). This site is not affiliated with JPS and is not an official warning
+     channel — in an emergency, follow JPS and NADMA directly.</p>
+
+  <div class="src">
+    <a href="https://publicinfobanjir.water.gov.my/" target="_blank" rel="noopener">Public Infobanjir</a>
+    <span class="muted">JPS Malaysia. Water levels and flood thresholds. Takes priority wherever it
+      carries a station, so a reading matches the national portal.</span>
+  </div>
+  <div class="src">
+    <a href="https://infobanjirjps.selangor.gov.my/" target="_blank" rel="noopener">JPS Selangor Infobanjir</a>
+    <span class="muted">Selangor stations, and the only source here for cameras, sirens and flood
+      gauges. Supplies the coordinates every pin is drawn at.</span>
+  </div>
+  <div class="src">
+    <a href="https://infobanjirjpskl.water.gov.my/" target="_blank" rel="noopener">JPS Wilayah Persekutuan (SPHTN)</a>
+    <span class="muted">Kuala Lumpur and Putrajaya — water level and rainfall stations the Selangor
+      feed does not cover, with their coordinates.</span>
+  </div>
+
+  <p class="muted">Each station popup names the feed its reading came from. Where the feeds disagree,
+     the newest reading wins, except that Public Infobanjir's figure is preferred outright.</p>
+  <p class="muted">Map tiles &copy; <a href="https://carto.com/attributions" target="_blank" rel="noopener">CARTO</a>,
+     data &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>
+     contributors.</p>
+  <!-- Text-only button: `close` is not in the subsetted icon font, and adding one glyph would mean
+       refetching the subset and busting every font cache. -->
+  <form method="dialog"><button class="link">Close</button></form>
+</dialog>
 <div id="map"></div>
 <div id="bar">
   <div>
-    <select id="district"><option value="">All districts</option></select>
-    <select id="basemap" title="Basemap"><option value="auto">Basemap: follow theme</option></select>
+    <!-- Multi-select, so a list rather than a <select>: you can hide several districts, or solo
+         one, without reopening a dropdown between each. -->
+    <div id="districts">
+      <input id="districtFind" type="text" autocomplete="off" placeholder="Filter districts…"
+             aria-label="Filter districts">
+      <ul id="districtList" class="picklist"></ul>
+      <div class="rowbtns">
+        <button id="districtAll" class="link">Show all</button>
+        <button id="districtNone" class="link">Hide all</button>
+      </div>
+    </div>
     <label class="chip"><input type="checkbox" id="heat" checked>
       <i class="glyph">water_drop</i>Water-level heatmap</label>
     <label class="chip"><input type="checkbox" id="risingOnly">
-      <i class="glyph">warning</i>Rising stations only</label>
+      <i class="glyph">warning</i>Rising stations only <span id="risingHint" class="hint"></span></label>
   </div>
-  <div id="layers"></div>
-  <table id="summary"></table>
+  <div>
+    <div id="layers"></div>
+    <p id="shown" class="muted"></p>
+  </div>
+</div>
+<!-- Map furniture, not a filter: jumping to a station is the one control you reach for while
+     looking at the map, so it sits on it rather than behind the drawer. -->
+<div id="gotoBox">
+  <input id="goto" type="text" autocomplete="off" placeholder="Go to a station…"
+         role="combobox" aria-expanded="false" aria-controls="gotoHits" aria-autocomplete="list"
+         aria-label="Go to a station">
+  <ul id="gotoHits" class="surface picklist" role="listbox" hidden></ul>
 </div>
 <div id="alerts" class="surface">
   <button id="alertTab" aria-expanded="false" aria-controls="alertBody"></button>
@@ -439,15 +111,17 @@
         <p><b>How it is worked out</b></p>
         <p>Each river station is weighted by its level divided by its own danger mark, so a small
            stream near its limit glows as hot as a big river near its limit.</p>
-        <p>A station rising more than 5&nbsp;cm since we started polling counts double, so a climbing
-           station outranks a steady one at the same level.</p>
+        <p>That is then scaled by how soon it gets there: a station three hours from its danger
+           mark at the rate it is climbing counts as it stands, one an hour out counts about
+           two-thirds more, and one already at the mark counts double.</p>
+        <p>Same two facts the alert panel uses, so what glows and what is listed always agree.</p>
         <p class="muted">Rainfall, sirens, gauges and offline stations are not included.</p>
       </span>
     </span>
   </div>
   <div class="ramp"></div>
   <div class="ticks muted"><span>0</span><span>50%</span><span>75%</span><span>danger</span></div>
-  <div class="muted">Rising stations count double.</div>
+  <div class="muted">Hotter the sooner it reaches danger.</div>
   <label class="slider muted">Opacity
     <input type="range" id="heatOpacity" min="15" max="100" step="5" value="100">
     <span id="heatOpacityVal">100%</span>
@@ -456,757 +130,14 @@
 <div id="credit" class="muted">
   &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>,
   &copy; <a href="https://carto.com/attributions">CARTO</a> ·
-  data: <a href="https://infobanjirjps.selangor.gov.my/">JPS Selangor</a>
+  data: JPS <a href="https://publicinfobanjir.water.gov.my/">Malaysia</a>,
+  <a href="https://infobanjirjps.selangor.gov.my/">Selangor</a>,
+  <a href="https://infobanjirjpskl.water.gov.my/">WP</a>
 </div>
 
+<!-- Vendored globals (L, L.heatLayer, L.markerClusterGroup) load first; the app is ES modules,
+     which defer automatically, so the DOM above always exists by the time app.js runs. -->
 <script src="vendor/leaflet.js"></script>
 <script src="vendor/leaflet-heat.js"></script>
 <script src="vendor/markercluster.js"></script>
-<script>
-const KINDS = {
-  river:    { label: 'Water level', color: '#4da3ff', icon: 'water_drop' },
-  rainfall: { label: 'Rainfall',    color: '#8f7bff', icon: 'rainy' },
-  siren:    { label: 'Sirens',      color: '#f06292', icon: 'campaign',    one: 'Siren' },
-  gauge:    { label: 'Flood gauge', color: '#a1887f', icon: 'straighten' },
-  camera:   { label: 'Cameras',     color: '#26c6da', icon: 'photo_camera', one: 'Camera' },
-};
-// Upstream status codes: river -1 offline, 0 normal, 1 alert, 2 warning, 3 danger.
-const RIVER_COLOR = { '-1': '#555', 0: '#4da3ff', 1: '#ffd166', 2: '#ff9f1c', 3: '#ff4d4d' };
-const RAIN_COLOR  = { '-1': '#555', 0: '#3a3a6a', 1: '#6f7bff', 2: '#8f7bff', 3: '#c77dff', 4: '#ff4d4d' };
-const RISING = 0.05; // metres of rise before we call it rising
-
-// One blob for every user setting. ponytail: localStorage, not a settings service.
-const PREFS = { layers: {}, ...JSON.parse(localStorage.getItem('prefs') || '{}') };
-const save = () => localStorage.setItem('prefs', JSON.stringify(PREFS));
-
-const map = L.map('map', { attributionControl: false, zoomControl: false })
-  .setView(PREFS.center || [3.2, 101.4], PREFS.zoom || 9);
-L.control.zoom({ position: 'bottomright' }).addTo(map);
-// No redraw call here: leaflet.heat repaints on the moveend that follows every zoomend, so setting
-// the options first is enough. Calling redraw() as well painted the canvas twice per zoom.
-map.on('zoomend', heatScale);
-map.on('moveend zoomend', () => {
-  const c = map.getCenter();
-  Object.assign(PREFS, { center: [+c.lat.toFixed(5), +c.lng.toFixed(5)], zoom: map.getZoom() });
-  save();
-});
-
-// CARTO styles. 'auto' follows the theme; the rest are an explicit choice in the drawer.
-const TILES = {
-  voyager:  ['Colour (Voyager)',  'rastertiles/voyager'],
-  positron: ['Light grey (Positron)', 'light_all'],
-  dark:     ['Dark matter',       'dark_all'],
-};
-const tileURL = k => `https://{s}.basemaps.cartocdn.com/${TILES[k][1]}/{z}/{x}/{y}{r}.png`;
-let tiles;
-
-function setBasemap() {
-  const choice = PREFS.basemap || 'auto';
-  const key = choice !== 'auto' ? choice
-            : document.documentElement.dataset.theme === 'dark' ? 'dark' : 'voyager';
-  // Only the dark basemap needs lifting; the light ones would wash out.
-  document.documentElement.dataset.lift = key === 'dark' ? 'yes' : 'no';
-  if (tiles) map.removeLayer(tiles);
-  tiles = L.tileLayer(tileURL(key), { maxZoom: 18 }).addTo(map);
-}
-
-function setTheme(t) {
-  document.documentElement.dataset.theme = t;
-  document.getElementById('theme').textContent = t === 'dark' ? 'light_mode' : 'dark_mode';
-  PREFS.theme = t;
-  save();
-  setBasemap();
-}
-const basemapSel = document.getElementById('basemap');
-basemapSel.insertAdjacentHTML('beforeend',
-  Object.entries(TILES).map(([k, [label]]) => `<option value="${k}">${label}</option>`).join(''));
-basemapSel.value = PREFS.basemap || 'auto';
-basemapSel.onchange = () => { PREFS.basemap = basemapSel.value; save(); setBasemap(); };
-
-setTheme(PREFS.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
-document.getElementById('theme').onclick = () =>
-  setTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
-
-// map.locate() wraps the Geolocation API — permission prompt, timeout and zoom-to-fit included.
-const locateBtn = document.getElementById('locate');
-let here, hereAt, hereMarker;
-let wantHerePopup = false;   // only pop up when the user asked; never on the landing auto-locate
-function findMe(setView) {
-  locateBtn.className = 'icon busy';
-  locateBtn.title = 'Finding your location…';
-  map.locate({ setView, maxZoom: 13, enableHighAccuracy: true, timeout: 10000 });
-}
-locateBtn.onclick = () => {
-  wantHerePopup = true;
-  if (!hereAt) return findMe(true);      // no fix yet — prompt for one
-  focusOn(hereAt, 13);                   // already have one: recentre and show what is around you
-  hereMarker.openPopup();
-};
-map.on('locationfound', e => {
-  hereAt = e.latlng;
-  locateBtn.className = 'icon on';
-  locateBtn.title = `Recentre on my location (±${Math.round(e.accuracy)} m)`;
-  if (here) here.remove();
-  hereMarker = L.marker(e.latlng, { icon: L.divIcon({
-    className: '', iconSize: [30, 30], iconAnchor: [15, 15], html: '<span class="pin me">person</span>',
-  }) }).bindPopup(() => herePopup(e), { minWidth: popWidth('here'), maxWidth: popWidth('here') });
-  here = L.layerGroup([
-    L.circle(e.latlng, { radius: e.accuracy, color: '#1a73e8', weight: 1, fillOpacity: .12 }),
-    hereMarker,
-  ]).addTo(map);
-  if (wantHerePopup) hereMarker.openPopup();
-  if (data.length) alerts();   // re-sort the alert list nearest-first now that we know where you are
-});
-map.on('locationerror', e => {
-  locateBtn.className = 'icon';
-  // Real reason, not a guess: "User denied Geolocation", "Timeout expired", …
-  locateBtn.title = /denied/i.test(e.message)
-    ? 'Location blocked — allow it in your browser’s site settings, then click again'
-    : `Couldn’t get your location: ${e.message}. Click to retry`;
-});
-
-// Same tap-to-open treatment as the status chip, for the legend's info bubble.
-document.querySelectorAll('.info').forEach(info => info.onclick = e => {
-  e.stopPropagation();
-  info.classList.toggle('open');
-});
-
-// Touch has no hover: tap the status chip to pin its stats open, tap elsewhere to dismiss.
-const netChip = document.getElementById('net');
-netChip.onclick = e => {
-  e.stopPropagation();
-  if (!e.target.closest('#netstats')) netChip.classList.toggle('open');
-};
-document.addEventListener('click', () => {
-  netChip.classList.remove('open');
-  document.querySelectorAll('.info.open').forEach(i => i.classList.remove('open'));
-});
-
-// Popups are rebuilt on every render, so delegate the "nearest webcam" jump.
-document.addEventListener('click', e => {
-  const btn = e.target.closest('[data-cam]');
-  const cam = btn && data.find(s => s.id === btn.dataset.cam);
-  if (cam) flashTo(cam);   // unhides the camera layer if it is switched off
-});
-
-// Click a still to view it full-size.
-const lightbox = document.getElementById('lightbox');
-document.addEventListener('click', e => {
-  const img = e.target.closest('img.shot');
-  if (!img) return;
-  e.stopPropagation();
-  lightbox.querySelector('img').src = img.src;
-  lightbox.querySelector('.cap').textContent = img.alt;
-  lightbox.hidden = false;
-});
-lightbox.onclick = () => lightbox.hidden = true;
-addEventListener('keydown', e => { if (e.key === 'Escape') lightbox.hidden = true; });
-
-// Same jump from anywhere outside the alert panel (which binds its own, plus a mobile collapse).
-document.addEventListener('click', e => {
-  const node = e.target.closest('[data-go]');
-  if (!node || node.closest('#alertBody')) return;
-  const t = data.find(s => s.id === node.dataset.go);
-  if (t) flashTo(t);
-});
-
-const menu = document.getElementById('menu');
-function setDrawer(open, pan = true) {
-  document.body.classList.toggle('drawer', open);
-  menu.textContent = open ? 'menu_open' : 'menu';
-  menu.setAttribute('aria-expanded', open);
-  // Keep whatever you were looking at centred in the *visible* half of the map.
-  if (pan) map.panBy([(open ? -1 : 1) * document.getElementById('bar').offsetWidth / 2, 0], { duration: .25 });
-  PREFS.drawer = open;
-  save();
-}
-menu.onclick = () => setDrawer(!document.body.classList.contains('drawer'));
-setDrawer(!!PREFS.drawer, false);
-
-// Gradient stops match the legend ramp in the panel — change both together.
-// Flooding is catchment-scale, so a hotspot should mean "this part of Selangor", not "this gauge".
-// leaflet.heat sizes blobs in screen pixels, which makes them cover less ground the further you
-// zoom in. Recomputing the radius per zoom pins each blob to a fixed distance on the ground.
-const HEAT_KM = 4;
-function heatScale() {
-  if (!map.hasLayer(heat)) return;              // nothing to size while the layer is off
-  const c = map.getCenter();
-  const east = L.latLng(c.lat, c.lng + HEAT_KM / (111 * Math.cos(c.lat * Math.PI / 180)));
-  const px = Math.abs(map.latLngToLayerPoint(east).x - map.latLngToLayerPoint(c).x);
-  // Capped at 120px: canvas blur cost grows with the square of the radius, and past this the
-  // blobs are wider than the screen anyway.
-  const r = Math.max(10, Math.min(120, px));
-  heat.setOptions({ radius: r, blur: r * 0.8 });
-}
-
-const heat = L.heatLayer([], {
-  radius: 70, blur: 55, maxZoom: 9,
-  gradient: { 0: '#4da3ff', 0.5: '#ffd166', 0.75: '#ff9f1c', 1: '#ff4d4d' },
-});
-// One cluster for everything, regardless of category. A badge shows the total, takes the colour and
-// icon of whichever kind dominates it, and turns red if any child is at danger / sounding.
-const cluster = L.markerClusterGroup({
-  // Tighten as you zoom rather than switching clustering off — several stations share exact
-  // coordinates (a rainfall and a river gauge on the same mast), so they overlap at any zoom.
-  // Those stay clustered to the end and fan out on click instead of hiding each other.
-  maxClusterRadius: z => z >= 15 ? 14 : z >= 13 ? 26 : 48,
-  showCoverageOnHover: false,
-  spiderfyOnMaxZoom: true,
-  spiderfyDistanceMultiplier: 1.6,
-  iconCreateFunction(c) {
-    const kids = c.getAllChildMarkers();
-    const tally = {};
-    let critical = false;
-    for (const m of kids) {
-      tally[m.options.kind] = (tally[m.options.kind] || 0) + 1;
-      critical ||= m.options.critical;
-    }
-    const top = Object.entries(tally).sort((a, b) => b[1] - a[1])[0][0];
-    const mixed = Object.keys(tally).length > 1;
-    return L.divIcon({
-      className: '', iconSize: [36, 36],
-      html: `<span class="cluster${critical ? ' danger' : ''}${mixed ? ' mixed' : ''}"
-                   style="--c:${KINDS[top].color}"><i>${KINDS[top].icon}</i>${kids.length}</span>`,
-    });
-  },
-}).addTo(map);
-
-const marks = {};                                    // kind -> markers, whether shown or not
-const shown = k => document.querySelector(`#layers input[data-kind="${k}"]`)?.checked;
-function syncCluster(alsoShow) {
-  cluster.clearLayers();
-  for (const [k, list] of Object.entries(marks)) {
-    if (shown(k) || k === alsoShow) cluster.addLayers(list);
-  }
-}
-
-for (const [k, v] of Object.entries(KINDS)) {
-  marks[k] = [];
-  document.getElementById('layers').insertAdjacentHTML('beforeend',
-    `<label class="chip" style="--c:${v.color}">
-       <input type="checkbox" data-kind="${k}"${PREFS.layers[k] !== false ? ' checked' : ''}>
-       <i class="glyph">${v.icon}</i>${v.label}</label>`);
-}
-heat.addTo(map);
-
-let data = [];
-const el = id => document.getElementById(id);
-const num = (v, u) => (v === null || v === undefined) ? '—' : v + u;
-
-// Spinner lives on the wrapper; the img clears it on load, or swaps itself out on failure.
-const camImg = (c, alt) => `<div class="shotwrap">
-  <img class="shot" src="api.php?cam=${c.id.split('-')[1]}" alt="${alt}"
-       onload="this.parentNode.classList.add('done')"
-       onerror="this.parentNode.classList.add('done');
-                this.replaceWith(Object.assign(document.createElement('div'),
-                  {className:'muted',textContent:'image unavailable'}))"></div>`;
-
-const metric = (k, v, cls = '') => `<div class="k muted">${k}</div><div class="v ${cls}">${v}</div>`;
-
-// Phones: as wide as the screen allows. Desktop: readings stay compact, stills get room.
-const popWidth = kind => innerWidth <= 600
-  ? Math.max(220, innerWidth - 24)
-  : kind === 'camera' ? 440 : 300;
-
-const parseMY = t => {                       // "21/07/2026 17:45:00" → Date
-  const m = /^(\d\d)\/(\d\d)\/(\d{4}) (\d\d):(\d\d)/.exec(t || '');
-  return m ? new Date(m[3], m[2] - 1, m[1], m[4], m[5]) : null;
-};
-
-// A flood gauge measures water depth OVER a flood-prone spot: negative means the ground is dry.
-// Several offline gauges are frozen on old flood readings, so staleness is stated, never implied.
-function gaugeBlock(s) {
-  if (s.depth == null) return '<div class="state">NO READING</div>';
-  const wet = s.depth > 0;
-  const when = parseMY(s.updated);
-  const stale = !s.online || (when && Date.now() - when > 864e5);   // 24h
-  const stops = [[0, 0], [s.warning || 0.15, 55], [s.danger || 0.3, 100]];
-  const pct = scalePos(s.depth, stops);
-  const col = statusColor(s.status >= 2 ? 3 : s.status);   // gauges only go normal / warning / danger
-
-  return `<div class="meter">
-      <div class="mtop">
-        <b style="color:${stale ? 'var(--muted)' : wet ? col : 'inherit'}">${
-          wet ? `${s.depth} m of water` : 'Dry ground'}</b>
-      </div>
-      ${wet ? `<div class="track">
-          <span class="fill" style="width:${pct.toFixed(1)}%;background:${stale ? 'var(--muted)' : col}"></span>
-          <i class="tick" style="left:55%"></i>
-        </div>
-        <div class="mscale muted">
-          <span style="left:55%">warning ${s.warning}</span><span style="left:100%">danger ${s.danger}</span>
-        </div>`
-        : `<div class="muted">water is ${Math.abs(s.depth)} m below the gauge marker</div>`}
-    </div>
-    ${stale ? `<div class="state">NOT CURRENT · last reported ${s.updated || 'unknown'}</div>` : ''}`;
-}
-
-// Traffic light by status: normal → alert → warning → danger.
-const STATUS_COLOR = ['#188038', '#f9ab00', '#e8710a', '#d93025'];
-const statusColor = n => STATUS_COLOR[Math.max(0, Math.min(3, n))] ?? STATUS_COLOR[0];
-
-/* Thresholds bunch up near the top (alert 4.4, warning 4.7, danger 5 on a 0–5 bar all land past
-   88%), so the scale is piecewise instead of linear: each threshold gets a fixed slot and the long
-   safe stretch below the first one is compressed into the opening 38%. */
-function scalePos(v, stops) {
-  if (v <= stops[0][0]) return 0;
-  for (let i = 1; i < stops.length; i++) {
-    const [v0, p0] = stops[i - 1], [v1, p1] = stops[i];
-    if (v <= v1) return p0 + (v - v0) / (v1 - v0 || 1) * (p1 - p0);
-  }
-  return 100;
-}
-
-function meter(s) {
-  const max = s.danger || s.warning || s.alert;
-  if (s.level == null || !max) return '<div class="muted">no level reading</div>';
-
-  const stops = [[0, 0]];
-  if (s.alert   && s.alert   < max) stops.push([s.alert, 38]);
-  if (s.warning && s.warning < max && s.warning > (s.alert ?? 0)) stops.push([s.warning, 68]);
-  stops.push([max, 100]);
-
-  const col = statusColor(s.status);
-  const marks = stops.slice(1, -1).map(([v, p], i) =>
-    `<i class="tick" style="left:${p}%" title="${i ? 'warning' : 'alert'} ${v} m"></i>`).join('');
-  const names = ['alert', 'warning', 'danger'].slice(-stops.length + 1);
-  const labels = stops.slice(1).map(([v, p], i) =>
-    `<span style="left:${p}%"><b>${v}</b>${names[i]}</span>`).join('');
-
-  return `<div class="meter">
-    <div class="mtop">
-      <b style="color:${col}">${s.level} m</b>
-      <span class="muted">${(s.level / max * 100).toFixed(0)}% of danger (${max} m)</span>
-    </div>
-    <div class="track">
-      <span class="fill" style="width:${scalePos(s.level, stops).toFixed(1)}%;background:${col}"></span>
-      ${marks}
-    </div>
-    <div class="mscale muted">${labels}</div>
-  </div>`;
-}
-
-// Every popup: badge + name + region header, then kind-specific body, then a status footer.
-// A station with nothing to report gets a grey badge — colour means "there is a reading here".
-const hasInfo = s => s.online && ({
-  river:    s.level != null,
-  rainfall: s.hourly != null,
-  siren:    s.status != null,
-  gauge:    s.depth != null,
-  camera:   !!s.image,
-}[s.kind] ?? false);
-
-function popup(s) {
-  const kind = KINDS[s.kind];
-  const tone = hasInfo(s) ? kind.color : 'var(--muted)';
-  const body = [];
-
-  if (s.kind === 'river' && s.trend != null) body.push(metric('Trend',
-    `${s.trend > 0 ? '▲' : '▼'} ${Math.abs(s.trend)} m`, s.trend > 0 ? 'up' : 'down'));
-  if (s.kind === 'rainfall') {
-    body.push(metric('Last hour', `<b>${num(s.hourly, ' mm')}</b>`));
-    body.push(metric('Today', num(s.daily, ' mm')));
-  }
-  // A siren has exactly one thing to say, so it gets a centred state block instead of a metric row.
-  const siren = s.kind !== 'siren' ? '' : !hasInfo(s)
-    ? '<div class="state">NO SIGNAL</div>'
-    : `<div class="state ${s.status > 0 ? 'on' : 'off'}">${s.status > 0 ? 'TRIGGERED' : 'IDLE'}</div>`;
-  const gauge = s.kind !== 'gauge' ? '' : gaugeBlock(s);
-
-  // Only camera popups carry an image; everything else just links to the closest one.
-  let shot;
-  if (s.kind === 'camera') {
-    shot = s.image ? camImg(s, `Latest still from ${s.name}`)
-                   : '<div class="muted">no camera feed</div>';
-  } else {
-    const cam = nearestCam(s);
-    shot = cam
-      ? `<button class="link" data-cam="${cam.id}">
-           <i>photo_camera</i> Show nearest webcam · ${cam.name} (${distKm(s, cam).toFixed(1)} km)
-         </button>`
-      : '<div class="muted">no camera nearby</div>';
-  }
-
-  return `<div class="pophead">
-      <span class="badge" style="--c:${tone}">
-        <i>${kind.icon}</i>${kind.one || kind.label}
-      </span>
-      <div class="popname">${s.name}</div>
-      <div class="muted">${s.district || 'district n/a'} · ${s.basin || 'basin n/a'}</div>
-    </div>
-    ${siren}${gauge}
-    ${s.kind === 'river' ? meter(s) : ''}
-    ${body.length ? `<div class="popbody">${body.join('')}</div>` : ''}
-    ${shot}
-    <div class="popfoot muted">${s.online ? 'online' : 'OFFLINE'}${
-      s.updated || s.shot ? ' · ' + (s.updated || s.shot) : ''}</div>`;
-}
-
-function color(s) {
-  if (!hasInfo(s)) return '#9aa0a6';   // grey: station is offline or reporting nothing
-  if (s.kind === 'river') return RIVER_COLOR[s.status] || '#4da3ff';
-  if (s.kind === 'rainfall') return RAIN_COLOR[s.status] || '#8f7bff';
-  if (s.kind === 'siren') return s.status > 0 ? '#ff4d4d' : KINDS.siren.color;   // red only when sounding
-  if (s.kind === 'gauge') return s.status >= 2 ? '#ff4d4d' : s.status === 1 ? '#ff9f1c' : KINDS.gauge.color;
-  return KINDS[s.kind].color;
-}
-
-function render() {
-  const district = el('district').value;
-  const risingOnly = el('risingOnly').checked;
-  Object.keys(marks).forEach(k => marks[k] = []);
-  const points = [];
-
-  for (const s of data) {
-    if (district && s.district !== district) continue;
-    if (risingOnly && !(s.kind === 'river' && s.trend > RISING)) continue;
-    if (!s.lat || !s.lng) continue;
-
-    const rising = s.kind === 'river' && s.trend > RISING;
-    const critical = (s.kind === 'river' && s.status >= 3) || (s.kind === 'siren' && s.status > 0);
-    const marker = L.marker([s.lat, s.lng], {
-      kind: s.kind, critical,                             // read back by the cluster badge
-      zIndexOffset: critical ? 1000 : rising ? 500 : 0,   // keep the urgent pins on top
-      icon: L.divIcon({
-        className: '', iconSize: [26, 26], iconAnchor: [13, 13],
-        html: `<span class="pin${s.online ? '' : ' off'}${rising ? ' rise' : ''}${critical ? ' danger' : ''}"
-                     style="--c:${color(s)}">${KINDS[s.kind].icon}</span>`,
-      }),
-    });
-    const wide = popWidth(s.kind);
-    marker.bindPopup(popup(s), {
-      minWidth: wide, maxWidth: wide,
-      // Tall popups open above the pin, so leave room up top; bottom clears the zoom/credit strip.
-      autoPanPaddingTopLeft: [16, 24], autoPanPaddingBottomRight: [16, 56],
-    });
-    // Centre whatever was clicked; autoPan then nudges for the popup's height. The zoom re-runs
-    // clustering, which tears the popup down again — so re-open it once the map has settled.
-    marker.on('click', () => {
-      focusOn([s.lat, s.lng], 13);
-      openStable(marker);
-    });
-    marks[s.kind].push(marker);
-
-    // Heat weight: how close to the danger mark, doubled when the level is climbing.
-    if (s.kind === 'river' && s.ratio) {
-      const w = Math.min(1, s.ratio * (rising ? 2 : 1));
-      if (w > 0.1) points.push([s.lat, s.lng, w]);
-    }
-  }
-  syncCluster();
-  heatScale();
-  heat.setLatLngs(points);
-  el('heat').checked ? heat.addTo(map) : heat.remove();
-  // Legend (and its opacity slider) only mean anything while the heatmap is on.
-  el('legend').style.display = el('heat').checked ? '' : 'none';
-  heatOpacity();
-}
-
-// Nearest station of one kind that is actually reporting something.
-const nearestOf = (kind, from) => data.reduce((best, s) =>
-  s.kind === kind && hasInfo(s) && (!best || distKm(from, s) < distKm(from, best)) ? s : best, null);
-
-// What each kind is worth saying in one line.
-const oneLiner = s => ({
-  river:    `${s.level} m · ${s.danger ? (s.level / s.danger * 100).toFixed(0) + '% of danger' : 'no danger mark'}`,
-  rainfall: `${s.hourly} mm last hour · ${s.daily ?? '—'} mm today`,
-  siren:    s.status > 0 ? 'TRIGGERED' : 'idle',
-  gauge:    s.depth > 0 ? `${s.depth} m of water` : `dry (${Math.abs(s.depth)} m below marker)`,
-}[s.kind] || '');
-
-// Built fresh on every open, so it reflects the latest poll rather than the fix's timestamp.
-function herePopup(e) {
-  if (!data.length) return '<b>You are here</b><br><span class="muted">stations still loading…</span>';
-  const rows = ['river', 'rainfall', 'siren', 'gauge'].map(k => {
-    const s = nearestOf(k, e.latlng);
-    if (!s) return `<div class="near"><i class="glyph" style="color:${KINDS[k].color}">${KINDS[k].icon}</i>
-      <div><div class="muted">no ${KINDS[k].label.toLowerCase()} reporting</div></div></div>`;
-    return `<div class="near" data-go="${s.id}">
-      <i class="glyph" style="color:${KINDS[k].color}">${KINDS[k].icon}</i>
-      <div>
-        <div>${s.name} <span class="muted">${distKm(e.latlng, s).toFixed(1)} km</span></div>
-        <div class="muted">${oneLiner(s)}</div>
-      </div></div>`;
-  }).join('');
-
-  const cam = nearestCam(e.latlng);
-  return `<div class="pophead">
-      <span class="badge" style="--c:#1a73e8"><i>person</i>You are here</span>
-      <div class="muted">accurate to about ${Math.round(e.accuracy)} m</div>
-    </div>
-    ${rows}
-    ${cam ? `<button class="link" data-cam="${cam.id}">
-      <i>photo_camera</i> Show nearest webcam · ${cam.name} (${distKm(e.latlng, cam).toFixed(1)} km)</button>` : ''}`;
-}
-
-// Equirectangular is plenty at Selangor scale and avoids a trig-heavy haversine.
-const distKm = (a, b) =>
-  Math.hypot((a.lng - b.lng) * Math.cos(a.lat * Math.PI / 180), a.lat - b.lat) * 111;
-
-// Centre on the visible half of the map: with the drawer open, dead-centre is under the panel.
-function focusOn(latlng, minZoom = 0) {
-  const z = Math.max(map.getZoom(), minZoom);
-  const shift = document.body.classList.contains('drawer')
-    ? document.getElementById('bar').offsetWidth / 2 : 0;
-  map.setView(map.unproject(map.project(L.latLng(latlng), z).subtract([shift, 0]), z), z);
-}
-
-const nearestCam = s => data.reduce((best, c) =>
-  c.kind === 'camera' && c.image && c.online && (!best || distKm(s, c) < distKm(s, best)) ? c : best, null);
-
-function sparkline(vals) {
-  if (!vals || vals.length < 2) return '<div class="muted">trend graph builds as we poll</div>';
-  const lo = Math.min(...vals), hi = Math.max(...vals), span = hi - lo || 1;
-  const pts = vals.map((v, i) =>
-    `${(i / (vals.length - 1) * 100).toFixed(1)},${(26 - (v - lo) / span * 24).toFixed(1)}`).join(' ');
-  const up = vals.at(-1) >= vals[0];
-  return `<svg viewBox="0 0 100 28" preserveAspectRatio="none" aria-hidden="true">
-    <polyline points="${pts}" fill="none" vector-effect="non-scaling-stroke"
-      stroke="${up ? '#d93025' : '#188038'}" stroke-width="2" stroke-linejoin="round"/></svg>
-    <div class="muted">${vals.length} samples · ${lo.toFixed(2)}–${hi.toFixed(2)} m</div>`;
-}
-
-// Leaflet's autoPan gives up when a popup is taller than the map, leaving the top cut off.
-// Nudge the view so the top edge is always readable — that is where the name and readings are.
-function keepPopupVisible() {
-  const pop = document.querySelector('.leaflet-popup');
-  if (!pop) return;
-  const box = map.getContainer().getBoundingClientRect();
-  const r = pop.getBoundingClientRect();
-  const gap = 12;
-  let shift = 0;
-  if (r.top < box.top + gap) shift = box.top + gap - r.top;                 // push content down
-  else if (r.bottom > box.bottom - gap)                                     // or up, but never so
-    shift = -Math.min(r.bottom - (box.bottom - gap), r.top - (box.top + gap));  // far the top clips
-  if (Math.abs(shift) > 2) map.panBy([0, -shift], { duration: .2 });
-}
-map.on('popupopen', () => {
-  keepPopupVisible();
-  setTimeout(keepPopupVisible, 500);   // again once a camera still has loaded and changed the height
-});
-
-// Zooming re-runs clustering, which rebuilds markers and quietly drops any open popup. Re-open it
-// once the map settles — cheap insurance whether the pan came from a click or a panel link.
-function openStable(marker) {
-  marker.openPopup();
-  map.once('moveend', () => { if (!marker.isPopupOpen()) marker.openPopup(); });
-}
-
-const FLASH_MS = 2400;
-
-// Fly to a station and ripple over it. If its layer is switched off, show it for the flash only —
-// unless the user turns that layer on in the meantime.
-function flashTo(t) {
-  const hidden = !shown(t.kind);
-  if (hidden) syncCluster(t.kind);
-
-  focusOn([t.lat, t.lng], 13);
-  const marker = marks[t.kind].find(l => distKm(t, l.getLatLng()) < 0.001);
-  // Inside a cluster the marker has no DOM node yet — expand down to it before opening the popup.
-  if (marker) cluster.zoomToShowLayer(marker, () => openStable(marker));
-
-  const ping = L.marker([t.lat, t.lng], {
-    icon: L.divIcon({ className: '', iconSize: [0, 0], html: '<i class="ping"></i>' }),
-    interactive: false, zIndexOffset: -1,
-  }).addTo(map);
-
-  setTimeout(() => {
-    ping.remove();
-    if (hidden && !shown(t.kind)) syncCluster();   // re-hide, unless it was switched on meanwhile
-  }, FLASH_MS);
-}
-
-function alerts() {
-  const district = el('district').value;
-  const hot = data.filter(s => (!district || s.district === district) && (
-    (s.kind === 'river' && (s.status >= 3 || s.trend > RISING)) ||
-    (s.kind === 'siren' && s.status > 0)));
-  const rising = hot.filter(s => s.trend > RISING).length;
-  const danger = hot.filter(s => s.kind === 'river' && s.status >= 3).length;
-  const sirens = hot.filter(s => s.kind === 'siren').length;
-
-  el('alerts').classList.toggle('show', hot.length > 0);
-  if (!hot.length) return;
-  el('alertTab').innerHTML =
-    `On alert (${rising} rising / ${danger} danger${sirens ? ` / ${sirens} siren` : ''})` +
-    (hereAt ? ` <span class="muted">· nearest first</span>` : '');
-
-  // Nearest-first once we know where you are; otherwise sirens, then closest-to-danger.
-  el('alertBody').innerHTML = hot
-    .sort(hereAt ? (a, b) => distKm(hereAt, a) - distKm(hereAt, b)
-                 : (a, b) => (b.kind === 'siren') - (a.kind === 'siren') || (b.ratio || 0) - (a.ratio || 0))
-    .map(s => {
-      const kind = KINDS[s.kind];
-      const cam = nearestCam(s);
-
-      const detail = s.kind === 'siren'
-        ? '<div class="state on">TRIGGERED</div>'
-        : `${meter(s)}
-           ${s.trend != null ? `<div class="muted">trend <b class="${s.trend > 0 ? 'up' : 'down'}">${
-             s.trend > 0 ? '▲' : '▼'} ${Math.abs(s.trend)} m</b> since we started polling</div>` : ''}
-           ${sparkline(s.history)}`;
-
-      return `<div class="alert">
-        <span class="badge" style="--c:${kind.color}"><i>${kind.icon}</i>${kind.one || kind.label}</span>
-        <div class="popname name" data-go="${s.id}">${s.name}</div>
-        <div class="muted">${s.district} · ${s.basin || 'basin n/a'}${
-          hereAt ? ` · <b>${distKm(hereAt, s).toFixed(1)} km from you</b>` : ''}</div>
-        ${detail}
-        ${cam ? `<button class="link" data-cam="${cam.id}">
-          <i>photo_camera</i> Show nearest webcam · ${cam.name} (${distKm(s, cam).toFixed(1)} km)</button>` : ''}
-        <div class="muted">updated ${s.updated || s.shot || 'unknown'}</div>
-      </div>`;
-    }).join('');
-
-  el('alertBody').querySelectorAll('[data-go]').forEach(node => node.onclick = () => {
-    const t = data.find(s => s.id === node.dataset.go);
-    if (!t) return;
-    // On a phone the panel covers the map, so get out of the way of the flash.
-    if (matchMedia('(max-width: 600px)').matches) {
-      el('alerts').classList.remove('open');
-      el('alertTab').setAttribute('aria-expanded', false);
-    }
-    flashTo(t);
-  });
-}
-
-function summary() {
-  const rows = Object.entries(data.reduce((a, s) => {
-    if (s.kind !== 'river') return a;
-    a[s.district] ??= { rising: 0, alert: 0 };
-    if (s.trend > RISING) a[s.district].rising++;
-    if (s.status > 0) a[s.district].alert++;
-    return a;
-  }, {})).filter(([, v]) => v.rising || v.alert)
-    .sort((a, b) => (b[1].rising + b[1].alert) - (a[1].rising + a[1].alert));
-
-  el('summary').innerHTML = rows.length
-    ? '<tr><td class="muted">District</td><td class="muted">rising / alert</td></tr>' +
-      rows.map(([d, v]) => `<tr><td>${d}</td><td><span class="up">${v.rising}</span> / ${v.alert}</td></tr>`).join('')
-    : '<tr><td class="muted">All water levels normal.</td></tr>';
-}
-
-const ago = t => {
-  const s = Math.max(0, (Date.now() - new Date(t)) / 1000);
-  return s < 90 ? `${s | 0}s ago` : s < 5400 ? `${s / 60 | 0}m ago` : `${(s / 3600).toFixed(1)}h ago`;
-};
-
-// Everything here is measured, not assumed: green needs a 200, a live upstream, and readings
-// stamped within the last 2h (JPS publishes hourly).
-function network(j, err) {
-  const stale = j && j.sourceUpdated && (Date.now() - new Date(j.sourceUpdated)) / 3.6e6 > 2;
-  const [color, text] = err          ? ['#ff4d4d', 'proxy unreachable']
-    : j.upstreamOk === false         ? ['#ff4d4d', 'upstream down — showing cache']
-    : stale                          ? ['#ffd166', 'connected, readings stale']
-                                     : ['#06d6a0', 'live'];
-  const sections = err ? [['Feed', [['error', err]]]] : [
-    ['Feed', [
-      ['stations', j.stations.length],
-      ['offline', `${j.offline} (${(j.offline / j.stations.length * 100).toFixed(0)}%)`],
-      ['readings', j.sourceUpdated ? ago(j.sourceUpdated) : 'unknown'],
-      ['polled', ago(j.fetched)],
-    ]],
-    ['Network', [
-      ['upstream', j.upstreamOk === false ? 'unreachable' : 'HTTP 200'],
-      ['detail calls', `${j.details.ok}/${j.details.requested}`],
-      ['fetch time', j.tookMs + ' ms'],
-      ['served from', j.cacheAge ? `cache, ${j.cacheAge}s old` : 'upstream'],
-    ]],
-  ];
-  const table = sections.map(([head, rows], i) =>
-    `<tr class="${i ? 'gap' : ''}"><td class="head muted" colspan="2">${head}</td></tr>` +
-    rows.map(([k, v]) => `<tr><td class="muted">${k}</td><td>${v}</td></tr>`).join('')).join('');
-
-  el('net').style.setProperty('--c', color);   // chip tint, dot and halo all follow the state
-  el('net').innerHTML = `<span class="swatch"></span><span>${text}</span>` +
-    `<table id="netstats" class="surface">${table}</table>`;
-}
-
-async function load() {
-  try {
-    const r = await fetch('api.php');
-    const j = await r.json();
-    if (!j.stations) throw new Error(j.error || 'HTTP ' + r.status);
-    data = j.stations;
-    const sel = el('district'), keep = sel.value || PREFS.district || '';
-    sel.innerHTML = '<option value="">All districts</option>' +
-      [...new Set(data.map(s => s.district).filter(Boolean))].sort()
-        .map(d => `<option${d === keep ? ' selected' : ''}>${d}</option>`).join('');
-    network(j);
-    render(); summary(); alerts();
-    el('splash').classList.add('gone');
-  } catch (e) {
-    network(null, e.message);
-    if (!el('splash').classList.contains('gone')) {
-      // Nothing has ever loaded. With no connection there is nothing truthful to show, so hold the
-      // splash; if we are online it is the feed that is down, so let them at the map.
-      if (!navigator.onLine) {
-        el('splash').classList.add('offline');
-        el('splashWarn').hidden = false;
-      } else {
-        el('splashMsg').textContent = 'could not reach the feed — showing the map anyway';
-        setTimeout(() => el('splash').classList.add('gone'), 1200);
-      }
-    }
-  }
-}
-
-// Reconnecting retries by itself; the button is for "I fixed it, try now".
-el('splashRetry').onclick = () => {
-  el('splash').classList.remove('offline');
-  el('splashWarn').hidden = true;
-  el('splashMsg').textContent = 'retrying…';
-  load();
-};
-addEventListener('online', () => { if (!el('splash').classList.contains('gone')) el('splashRetry').onclick(); });
-
-document.querySelectorAll('#layers input').forEach(cb => cb.onchange = () => {
-  syncCluster();
-  PREFS.layers[cb.dataset.kind] = cb.checked;
-  save();
-});
-// leaflet.heat has no opacity option, so we fade its canvas directly. It is recreated whenever the
-// layer is re-added, hence the re-apply after every render.
-function heatOpacity() {
-  const pct = +el('heatOpacity').value;
-  el('heatOpacityVal').textContent = pct + '%';
-  if (heat._canvas) heat._canvas.style.opacity = pct / 100;
-}
-el('heatOpacity').value = PREFS.heatOpacity ?? 100;
-el('heatOpacity').oninput = () => {
-  heatOpacity();
-  PREFS.heatOpacity = +el('heatOpacity').value;
-  save();
-};
-
-el('heat').checked = PREFS.heat !== false;
-el('risingOnly').checked = !!PREFS.risingOnly;
-el('district').onchange = el('heat').onchange = el('risingOnly').onchange = () => {
-  Object.assign(PREFS, {
-    district: el('district').value, heat: el('heat').checked, risingOnly: el('risingOnly').checked,
-  });
-  save();
-  render(); alerts();
-};
-
-const alertPanel = el('alerts'), alertTab = el('alertTab');
-alertTab.onclick = () => {
-  const open = alertPanel.classList.toggle('open');
-  alertTab.setAttribute('aria-expanded', open);
-  PREFS.alertsOpen = open;
-  save();
-};
-if (PREFS.alertsOpen !== false) alertPanel.classList.add('open');
-alertTab.setAttribute('aria-expanded', alertPanel.classList.contains('open'));
-
-requestAnimationFrame(() => document.body.classList.add('ready')); // no drawer slide on first paint
-load();
-findMe(false);  // locate on landing for the proximity sort, but leave the view where they left it
-
-let resizeTimer;   // popup width is baked in at render, so rebuild markers after a rotate
-addEventListener('resize', () => {
-  clearTimeout(resizeTimer);
-  resizeTimer = setTimeout(() => data.length && render(), 250);
-});
-setInterval(load, 300000); // matches the proxy's cache TTL
-</script>
+<script type="module" src="js/app.js"></script>

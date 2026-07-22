@@ -1,2 +1,5 @@
 .cache.json
-.history.json
+.history.db
+.history.db-wal
+.history.db-shm
+lib/

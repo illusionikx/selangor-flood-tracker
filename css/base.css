@@ -1,0 +1,275 @@
+/* Design tokens, reset, and the small components shared by popups, the alert panel and the splash.
+   Everything reads from the custom properties below, so the theme swap is one attribute. */
+
+:root {
+  color-scheme: light;
+  --surface: #fff; --on-surface: #1f1f1f; --muted: #5f6368; --outline: #dadce0;
+  --hover: #f1f3f4; --accent: #1a73e8;
+  --shadow: 0 1px 2px rgba(60,64,67,.3), 0 2px 6px 2px rgba(60,64,67,.15);
+  --drawer: 288px; --slide: .25s cubic-bezier(.4, 0, .2, 1);
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --surface: #202124; --on-surface: #e8eaed; --muted: #9aa0a6; --outline: #3c4043;
+  --hover: #303134; --accent: #8ab4f8;
+  --shadow: 0 1px 2px rgba(0,0,0,.6), 0 2px 6px 2px rgba(0,0,0,.3);
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0; font: 400 14px/1.5 Roboto, system-ui, sans-serif;
+  background: var(--surface); color: var(--on-surface);
+}
+h1 { font-size: 16px; font-weight: 500; margin: 0; letter-spacing: .1px; }
+label { display: flex; align-items: center; gap: 8px; margin: 6px 0; cursor: pointer; }
+table { border-collapse: collapse; font-size: 12px; min-width: 178px; }
+td { padding: 3px 0; }
+td:last-child { text-align: right; padding-left: 16px; }
+
+.surface { background: var(--surface); box-shadow: var(--shadow); }
+
+/* Slim scrollbars on the app's own scroll panes. Still `overflow: auto`, so they appear only when
+   the content actually overflows — a permanent gutter on a list of four districts is noise. */
+.scroll, .picklist, .leaflet-popup-content, #alertBody, #bar {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--on-surface) 28%, transparent) transparent;
+}
+.scroll::-webkit-scrollbar, .picklist::-webkit-scrollbar, .leaflet-popup-content::-webkit-scrollbar,
+#alertBody::-webkit-scrollbar, #bar::-webkit-scrollbar { width: 8px; height: 8px; }
+.scroll::-webkit-scrollbar-thumb, .picklist::-webkit-scrollbar-thumb,
+.leaflet-popup-content::-webkit-scrollbar-thumb, #alertBody::-webkit-scrollbar-thumb,
+#bar::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--on-surface) 28%, transparent);
+  border: 2px solid transparent; background-clip: content-box; border-radius: 999px;
+}
+.muted { color: var(--muted); font-size: 12px; }
+.swatch { display: inline-block; width: 10px; height: 10px; border-radius: 50%; }
+.glyph { font: 18px 'Material Symbols Outlined'; font-style: normal; }
+.up { color: #d93025; } .down { color: #188038; }
+:root[data-theme="dark"] .up { color: #f28b82; }
+:root[data-theme="dark"] .down { color: #81c995; }
+
+/* --- controls ------------------------------------------------------------------------------ */
+
+/* Toggle buttons (Material filter chips). Still a real checkbox underneath, just hidden, so every
+   handler, the prefs persistence and keyboard access stay as they were. */
+.chip {
+  display: flex; align-items: center; gap: 8px; margin: 6px 0; padding: 7px 14px 7px 10px;
+  border: 1px solid var(--outline); border-radius: 999px; cursor: pointer;
+  font-size: 13px; color: var(--muted); transition: background .15s, border-color .15s, color .15s;
+}
+.chip input { position: absolute; width: 1px; height: 1px; opacity: 0; margin: 0; }
+.chip:hover { background: var(--hover); }
+.chip:has(input:checked) {
+  color: var(--c, var(--accent)); border-color: var(--c, var(--accent));
+  background: color-mix(in srgb, var(--c, var(--accent)) 14%, transparent);
+}
+.chip:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+.chip .glyph { color: var(--c, var(--accent)); opacity: .55; }
+.chip:has(input:checked) .glyph { opacity: 1; }
+/* How many pins this layer holds under the current filters — pushed to the far edge of the chip. */
+.chip b { margin-left: auto; font-weight: 500; font-variant-numeric: tabular-nums; opacity: .7; }
+/* A filter with nothing to match goes flat and unclickable rather than emptying the map in silence. */
+.chip:has(input:disabled) { cursor: not-allowed; opacity: .55; }
+.chip:has(input:disabled):hover { background: none; }
+.chip .hint { margin-left: auto; font-size: 11px; opacity: .7; white-space: nowrap; }
+#shown { margin: 10px 2px 0; font-size: 12px; }
+
+select, #goto, #districtFind {
+  width: 100%; padding: 8px 10px; margin-bottom: 10px; font: inherit; font-size: 13px;
+  background: var(--surface); color: var(--on-surface);
+  border: 1px solid var(--outline); border-radius: 8px;
+}
+select:focus-visible, #goto:focus-visible, #districtFind:focus-visible, .icon:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 1px;
+}
+
+/* Searchable select: reads as a plain select until you click, then it's a filter box over a grouped,
+   scrollable list. Placement is map furniture and lives in chrome.css. */
+#gotoBox::after {
+  content: 'expand_more'; font: 20px 'Material Symbols Outlined'; color: var(--muted);
+  letter-spacing: normal; text-transform: none;   /* the font matches on ligature text */
+  position: absolute; right: 8px; top: 8px; pointer-events: none;
+}
+/* ponytail: rotate the caret rather than swap in a 'search' glyph — the icon font is subsetted and
+   adding one means refetching the woff2 and busting its cache. */
+#gotoBox:focus-within::after { transform: rotate(180deg); }
+#goto { padding-right: 32px; }
+#gotoHits {
+  position: absolute; z-index: 10; left: 0; right: 0; top: 100%; margin-top: 6px;
+  max-height: 46vh; border: 1px solid var(--outline); border-radius: 8px;
+}
+
+/* One list style, two users: the go-to results and the district filter. Both are "search box, then a
+   scrollable list grouped under headings", so they read as the same control rather than two. */
+/* Padding on the list, not only the rows: a heading sitting on the panel's own border reads as a
+   label *of* the box rather than of the group under it. */
+.picklist { list-style: none; margin: 0; padding: 6px; overflow: auto; }
+.picklist li {
+  display: flex; align-items: center; gap: 8px; padding: 7px 8px; font-size: 13px; cursor: pointer;
+  border-radius: 6px;
+}
+.picklist li.head, .picklist li.none {
+  padding: 10px 8px 5px; font-size: 11px; letter-spacing: .06em; color: var(--muted); cursor: default;
+}
+.picklist li.head:first-child { padding-top: 4px; }
+.picklist li.head:not(:first-child) { border-top: 1px solid var(--outline); margin-top: 6px; padding-top: 12px; }
+.picklist li.sel, .picklist li:not(.head, .none):hover {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+.picklist .glyph { font-size: 18px; flex: none; }
+.picklist b { margin-left: auto; font-weight: 500; font-size: 12px; opacity: .6; font-variant-numeric: tabular-nums; }
+
+/* District filter: the same list, inline and permanent — it is multi-select, and a dropdown that
+   closed on every pick would make hiding three districts three round trips. */
+#districts { margin-bottom: 12px; }
+#districtList { max-height: 40vh; border: 1px solid var(--outline); border-radius: 8px; }
+/* The row *is* the checkbox, as with the layer chips: a real input underneath, visually replaced by
+   the row's own state, so the list stays as plain as the go-to one next to it. */
+#districtList li { padding: 0 4px 0 0; }
+#districtList label {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px;
+  margin: 0; padding: 7px 8px; font-size: 13px;
+}
+#districtList label span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#districtList input { position: absolute; width: 1px; height: 1px; opacity: 0; margin: 0; }
+#districtList li:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: -2px; }
+/* A hidden district keeps its name and count — you need to see what you switched off. */
+#districtList li:has(input:not(:checked)) label { opacity: .4; text-decoration: line-through; }
+.solo {
+  flex: none; padding: 2px 9px; cursor: pointer;
+  font: 500 11px Roboto, sans-serif; color: var(--accent);
+  background: none; border: 1px solid var(--outline); border-radius: 999px;
+}
+/* Only reveal it on hover where there is a hover; on touch it has to be permanently there. */
+@media (hover: hover) {
+  .solo { visibility: hidden; }
+  #districtList li:hover .solo, #districtList li:focus-within .solo { visibility: visible; }
+}
+.rowbtns { display: flex; gap: 8px; margin-top: 8px; }
+.rowbtns .link { justify-content: center; }
+.link:disabled { opacity: .45; cursor: default; background: color-mix(in srgb, var(--accent) 10%, transparent); }
+
+.icon {
+  width: 40px; height: 40px; padding: 0; flex: none;
+  display: grid; place-items: center; cursor: pointer;
+  background: none; border: 0; border-radius: 50%; color: var(--muted);
+  font-family: 'Material Symbols Outlined'; font-size: 22px;
+}
+.icon:hover, body.drawer #menu { background: var(--hover); }
+
+.link {
+  display: flex; align-items: center; gap: 6px; width: 100%; padding: 8px 10px;
+  font: 500 12px/1.3 Roboto, sans-serif; text-align: left; cursor: pointer;
+  color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent);
+  border: 0; border-radius: 8px;
+}
+.link:hover { background: color-mix(in srgb, var(--accent) 20%, transparent); }
+.link i { font: 16px 'Material Symbols Outlined'; font-style: normal; flex: none; }
+
+/* --- shared blocks (popup + alert panel) ---------------------------------------------------- */
+
+.badge {
+  display: inline-flex; align-items: center; gap: 5px; margin-bottom: 6px;
+  padding: 3px 9px 3px 6px; border-radius: 999px; font-size: 11px; font-weight: 500;
+  letter-spacing: .3px; text-transform: uppercase;
+  color: var(--c); background: color-mix(in srgb, var(--c) 16%, transparent);
+}
+.badge i { font-family: 'Material Symbols Outlined'; font-size: 14px; }
+/* Icon fonts match on the ligature text, so uppercase/letter-spacing must not reach it. */
+.badge i, .link i, .glyph {
+  font-style: normal; text-transform: none; letter-spacing: normal; white-space: nowrap;
+}
+
+/* One thing to say (siren state, no reading, stale gauge) — centred block instead of a metric row. */
+.state {
+  margin-bottom: 8px; padding: 14px 10px; border-radius: 8px; text-align: center;
+  font-size: 16px; font-weight: 500; letter-spacing: 1px;
+  color: var(--muted); background: var(--hover);            /* no signal */
+}
+.state.off { color: #188038; background: color-mix(in srgb, #188038 12%, transparent); }
+.state.on  { color: #d93025; background: color-mix(in srgb, #d93025 14%, transparent); }
+:root[data-theme="dark"] .state.off { color: #81c995; }
+:root[data-theme="dark"] .state.on  { color: #f28b82; }
+
+/* --- sparkline ------------------------------------------------------------------------------ */
+
+/* The SVG stretches (preserveAspectRatio="none") so the line can use a 0-100 coordinate space at any
+   width — which is exactly why the hour labels are HTML underneath rather than <text> inside: text
+   in a stretched viewBox comes out distorted. */
+.spark { position: relative; margin: 6px 0 4px; }
+.spark svg { display: block; width: 100%; height: 34px; overflow: visible; }
+.spark line { stroke: var(--outline); stroke-width: 1; }
+/* Labels sit on their tick and are centred on it; the first and last are clamped inside the box so
+   a 12-hour axis can't push "06:00" off the edge of a 300px popup. */
+.spark .axis { position: relative; height: 14px; margin-top: 2px; }
+.spark .axis span {
+  position: absolute; transform: translateX(-50%);
+  font-size: 10px; font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.spark .axis span:first-child { transform: none; }
+.spark .axis span:last-child { transform: translateX(-100%); }
+
+.meter { margin: 4px 0 10px; }
+.meter .mtop { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.meter .mtop b { font-size: 17px; font-weight: 500; }
+.meter .mtop span { font-size: 11px; }
+.meter .track {
+  position: relative; height: 10px; margin: 8px 0 4px; border-radius: 999px; overflow: hidden;
+  background: color-mix(in srgb, var(--on-surface) 13%, transparent);
+}
+.meter .fill { display: block; height: 100%; border-radius: 999px; transition: width .3s; }
+.meter .tick {
+  position: absolute; top: 0; bottom: 0; width: 1px;
+  background: color-mix(in srgb, var(--on-surface) 40%, transparent);
+}
+/* Labels sit under their own tick, so they follow the compressed scale. Stacked (value over name)
+   because side-by-side "warning 63.6" / "danger 63.8" collide at these anchor spacings. */
+.meter .mscale { position: relative; height: 30px; font-size: 10px; line-height: 1.35; }
+.meter .mscale span {
+  position: absolute; transform: translateX(-50%); text-align: center;
+  display: flex; flex-direction: column;
+}
+.meter .mscale b { font-weight: 500; font-size: 11px; color: var(--on-surface); }
+.meter .mscale span:last-child { transform: translateX(-100%); text-align: right; }
+
+.near {
+  display: flex; align-items: flex-start; gap: 10px; padding: 7px 0;
+  border-bottom: 1px solid var(--outline);
+}
+.near:last-of-type { border-bottom: 0; }
+.near[data-go] { cursor: pointer; }
+.near[data-go]:hover { color: var(--accent); }
+.near .glyph { font-size: 18px; line-height: 1.4; }
+
+/* Camera still. Spinner lives on the wrapper; the img clears it on load. */
+.shotwrap {
+  position: relative; margin: 8px 0 6px; border-radius: 8px;
+  background: var(--hover); aspect-ratio: 16 / 9;
+}
+.shotwrap::after {
+  content: ''; position: absolute; left: 50%; top: 50%; width: 22px; height: 22px; margin: -11px;
+  border: 2px solid var(--outline); border-top-color: var(--accent); border-radius: 50%;
+  animation: spin .8s linear infinite;
+}
+.shotwrap:first-child { margin-top: 0; }   /* it leads a camera popup — no gap under the divider */
+.shotwrap.done { background: none; aspect-ratio: auto; }
+.shotwrap.done::after { content: none; }
+.shotwrap.done .shot { opacity: 1; }
+.shot {
+  display: block; width: 100%; border-radius: 8px; aspect-ratio: 16 / 9; object-fit: cover;
+  opacity: 0; cursor: zoom-in; transition: opacity .2s;
+}
+
+/* --- motion --------------------------------------------------------------------------------- */
+
+@keyframes pulse { 50% { opacity: .25; } }
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes halo {
+  from { transform: scale(.85); opacity: .9; }
+  to   { transform: scale(2);   opacity: 0; }
+}
+@keyframes ripple { from { transform: scale(.4); opacity: 1; } to { transform: scale(3.4); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .shotwrap::after { animation-duration: 2.4s; }
+}

@@ -1,0 +1,110 @@
+/* Leaflet overrides, station pins, cluster badges and the popup template. */
+
+/* CARTO's dark basemap is near-black; lift it so rivers and roads stay legible. Only the tile pane
+   is filtered — markers, heat and popups sit in other panes and keep their true colours. */
+:root[data-lift="yes"] .leaflet-tile-pane { filter: brightness(1.75) contrast(.92); }
+
+/* Zoom sits bottom-right (Maps-style), clear of the alert panel. */
+.leaflet-bottom.leaflet-right { margin-bottom: 26px; }
+.leaflet-control-zoom { border: 0 !important; box-shadow: var(--shadow); border-radius: 8px; overflow: hidden; }
+.leaflet-control-zoom a {
+  background: var(--surface) !important; color: var(--on-surface) !important;
+  border-color: var(--outline) !important;
+}
+.leaflet-control-zoom a:hover { background: var(--hover) !important; }
+
+/* --- popup shell ---------------------------------------------------------------------------- */
+
+.leaflet-popup-content-wrapper, .leaflet-popup-tip {
+  background: var(--surface); color: var(--on-surface); box-shadow: var(--shadow);
+}
+.leaflet-popup-content-wrapper { border-radius: 12px; }
+/* A camera still plus a sparkline can outgrow the map, and Leaflet's autoPan can't pan a popup that
+   is taller than the viewport into view — it just clips. Cap it and scroll instead: the header with
+   the name and the reading is at the top, so the part that gets scrolled is the part you can lose.
+   The map is inset 64px under the app bar; the rest is the popup's own tip, offset and margins. */
+.leaflet-popup-content {
+  font: 400 13px/1.5 Roboto, system-ui, sans-serif;
+  max-height: calc(100vh - 190px); overflow-y: auto; overscroll-behavior: contain;
+  padding-right: 8px;   /* gap between the text and the scrollbar when there is one */
+  margin-right: 10px;   /* was 24px: pulls the scrollbar in near the popup's own edge */
+}
+/* Leaflet parks the close button in that right-hand gutter, which put it outside the scrollbar.
+   Sit it inside instead, just left of the bar — and reserve the room in the header, which is the
+   only block whose first line runs that far right. */
+.leaflet-container a.leaflet-popup-close-button { right: 20px; top: 2px; }
+.leaflet-popup-content hr { border: 0; border-top: 1px solid var(--outline); margin: 8px 0; }
+.leaflet-popup-close-button { color: var(--muted) !important; }
+
+/* Standard popup: header (name / region / badge) → body metrics → still → footer. */
+.pophead {
+  padding: 0 28px 8px 0; margin-bottom: 8px; border-bottom: 1px solid var(--outline);
+}
+/* The badge trails the location now, so its spacing has to flip with it. */
+.pophead .badge, .pophead .badges { margin: 6px 0 0; }
+.popname { font-size: 15px; font-weight: 500; line-height: 1.3; }
+.popbody { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin-bottom: 8px; }
+.popbody .v { text-align: right; }
+.popfoot { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--outline); }
+
+/* One mast, several sensors: the place is named once in .pophead, then a section per sensor. */
+.pophead .badges { display: flex; flex-wrap: wrap; gap: 4px; }
+.sensor { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--outline); }
+/* NOT :first-of-type — .pophead is a div too, so it is the first-of-type and the rule matched
+   nothing, drawing a second rule directly under the header's own border. */
+.pophead + .sensor { margin-top: 0; padding-top: 0; border-top: 0; }
+.sensorhead { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+.sensorhead b { font-size: 12px; font-weight: 500; }
+.sensorhead .muted { flex: 1; min-width: 0; text-align: right; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; }
+/* Inside a section the per-sensor footer is a quiet caption, not another hard rule. */
+.sensor .popfoot { margin-top: 6px; padding-top: 0; border-top: 0; opacity: .8; }
+
+/* --- markers -------------------------------------------------------------------------------- */
+
+.pin {
+  position: relative; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%;
+  background: var(--surface); box-shadow: var(--shadow); color: var(--c, var(--accent));
+  font-family: 'Material Symbols Outlined'; font-size: 16px;
+}
+.pin.off { color: var(--muted); opacity: .6; }
+/* How many sensors this one pin stands for. Only rendered past one, so a plain pin stays plain. */
+.pin .n {
+  position: absolute; top: -3px; right: -3px; min-width: 14px; height: 14px; padding: 0 3px;
+  display: grid; place-items: center; border-radius: 999px;
+  font: 500 9px/1 Roboto, sans-serif; letter-spacing: 0; text-transform: none;
+  color: var(--surface); background: var(--on-surface); box-shadow: 0 0 0 1.5px var(--surface);
+}
+.pin.danger .n { color: #d93025; background: #fff; box-shadow: none; }
+.pin.rise { box-shadow: 0 0 0 2px #d93025, var(--shadow); }
+/* Danger level or a sounding siren: filled red, on top, with a repeating halo. */
+.pin.danger {
+  background: #d93025; color: #fff; border: 2px solid var(--surface); font-size: 15px;
+}
+.pin.danger::after {
+  content: ''; position: absolute; inset: -4px; border-radius: 50%;
+  border: 2px solid #d93025; animation: halo 1.8s ease-out infinite;
+}
+@media (prefers-reduced-motion: reduce) { .pin.danger::after { animation: none; opacity: .8; } }
+
+.pin.me { width: 30px; height: 30px; font-size: 20px; background: #1a73e8; color: #fff; border: 2px solid #fff; }
+
+.cluster {
+  display: grid; grid-auto-flow: column; align-items: center; gap: 3px;
+  width: 34px; height: 34px; border-radius: 999px; padding: 0 4px;
+  font-size: 12px; font-weight: 500; color: #fff; background: var(--c);
+  box-shadow: var(--shadow); border: 2px solid var(--surface);
+}
+.cluster i { font: 14px 'Material Symbols Outlined'; font-style: normal; opacity: .85; }
+.cluster.mixed { border-style: dashed; }              /* more than one kind inside */
+.cluster.danger {
+  background: #d93025;
+  box-shadow: 0 0 0 3px color-mix(in srgb, #d93025 35%, transparent), var(--shadow);
+}
+
+/* Ripple played over a station the user jumped to from a panel or link. */
+.ping, .ping::after {
+  position: absolute; left: 0; top: 0; width: 18px; height: 18px; margin: -9px 0 0 -9px;
+  border-radius: 50%; border: 3px solid #d93025; animation: ripple 1.2s ease-out 2;
+}
+.ping::after { content: ''; margin: -3px 0 0 -3px; animation-delay: .4s; }
