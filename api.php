@@ -35,6 +35,7 @@ const RISE_ETA   = 3;     // hours to its own danger mark
 const SIREN_STALE = 48 * 3600;
 const SITE_M = 25;   // metres — stations this close are sensors on one mast, not separate places
 const CACHE = __DIR__ . '/.cache.json';
+const LOCK  = __DIR__ . '/.refresh.lock';   // held for the length of a rebuild; see below
 const HIST  = __DIR__ . '/.history.db';
 const READ  = 86400;         // seconds of history loaded per poll (trend + sparkline)
 const RETAIN = 30 * 86400;   // seconds kept on disk; older samples are pruned
@@ -78,20 +79,42 @@ function serveCache(array $extra = []): never {
     exit;
 }
 
+/* Exactly one rebuild may be in flight at a time, process-wide.
+ *
+ * A cold rebuild fans out ~270 concurrent requests at JPS. Two visitors arriving on an expired
+ * cache is 540, three is 810 — which is not a busy site, it is the shape of a flood from one
+ * address, and the fastest way to have this server's IP blocked by the agency whose data the whole
+ * page depends on. The window is real and not small: the rebuild takes ~3.5s warm and ~15s cold,
+ * and every open tab polls on its own 5-minute timer, so their misses land wherever they land.
+ *
+ * `touch(CACHE)` used to claim the refresh, but only inside the `fastcgi_finish_request` branch —
+ * and Herd's SAPI is `cgi-fcgi`, which does not have that function. So on the machine this actually
+ * runs on, nothing claimed anything and every concurrent miss stampeded. A lock file is the fix
+ * that does not depend on the SAPI.
+ *
+ * The loser of the race serves the stale payload rather than waiting: it is at most one poll old,
+ * and a caller holding a connection open for 15s to receive data it already has is worse for
+ * everyone than data that is five minutes stale. */
+$lock = fopen(LOCK, 'c');
+$mine = $lock && flock($lock, LOCK_EX | LOCK_NB);
+
 if (is_file(CACHE)) {
     $age = time() - filemtime(CACHE);
-    if ($age < TTL) serveCache();
-    // Expired. One upstream table takes ~10s to render, so blocking the page on the refresh would
-    // mean a blank map for that long. Hand back the stale payload immediately, then refresh with the
-    // connection already closed. `touch` first: it claims the refresh, so simultaneous visitors get
-    // the stale copy instead of all stampeding the same slow upstream.
+    if ($age < TTL || !$mine) serveCache();   // fresh, or someone else is already rebuilding it
+    // One upstream table takes ~10s to render, so blocking the page on the refresh would mean a
+    // blank map for that long. Hand back the stale payload immediately, then refresh with the
+    // connection already closed.
     if (function_exists('fastcgi_finish_request')) {
-        touch(CACHE);
         echo json_encode(cachedPayload(), JSON_UNESCAPED_SLASHES);
         fastcgi_finish_request();
         ignore_user_abort(true);
     }
     // CLI (and any SAPI without that call) just falls through and refreshes in the foreground.
+} elseif (!$mine) {
+    // True cold start with nothing to serve. Waiting is the only honest option — but wait on the
+    // lock, so the arrivals queue behind one rebuild instead of each starting their own.
+    flock($lock, LOCK_EX);
+    if (is_file(CACHE)) serveCache();   // the winner finished while we waited; use what it wrote
 }
 
 /**

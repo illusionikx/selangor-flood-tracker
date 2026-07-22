@@ -80,7 +80,7 @@ export function render() {
       icon: L.divIcon({
         className: '', iconSize: [26, 26], iconAnchor: [13, 13],
         html: `<span class="pin${lead.online ? '' : ' off'}${rising ? ' rise' : ''}${
-                     critical ? ' danger' : ''}" style="--c:${color(lead)}">${KINDS[lead.kind].icon}${
+                     critical ? ' danger' : ''}" style="--c:${color(lead)}"><i class="i i-${KINDS[lead.kind].icon}"></i>${
                members.length > 1 ? `<b class="n">${members.length}</b>` : ''}</span>`,
       }),
     });

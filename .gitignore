@@ -3,3 +3,4 @@
 .history.db-wal
 .history.db-shm
 lib/
+.refresh.lock

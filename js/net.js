@@ -1,52 +1,83 @@
 // Polling the proxy, and the status chip that reports honestly on what came back.
 
+import { FEED, POLL_MS } from './config.js';
 import { state, PREFS } from './state.js';
 import { el, ago } from './util.js';
 import { render } from './render.js';
 import { alerts } from './alerts.js';
 
-// Everything here is measured, not assumed: green needs a 200, a live upstream, and readings
-// stamped within the last 2h (JPS publishes hourly).
+/* One word and a dot. The chip answers one question — is what I am looking at current? — and every
+   extra clause was answering a question nobody had asked yet ("upstream down — showing cache" is
+   two facts and a dash in a 64px bar). The diagnostics that used to be in the chip are still one
+   hover away; the ones that were only ever useful to me while building it (HTTP status, detail-call
+   tally, fetch milliseconds, offline percentage) are gone.
+
+   Still measured, not assumed: green needs a 200, a live upstream, and readings stamped within the
+   last 2h (JPS publishes hourly). */
+let last;   // the payload the chip is currently describing, so the ages can tick between polls
+
 function network(j, err) {
+  last = err ? null : j;
   const stale = j && j.sourceUpdated && (Date.now() - new Date(j.sourceUpdated)) / 3.6e6 > 2;
-  const [color, text] = err          ? ['#ff4d4d', 'proxy unreachable']
-    : j.upstreamOk === false         ? ['#ff4d4d', 'upstream down — showing cache']
-    : stale                          ? ['#ffd166', 'connected, readings stale']
+  const [color, text] = err          ? ['#ff4d4d', 'offline']
+    : j.upstreamOk === false         ? ['#ff4d4d', 'cached']
+    : stale                          ? ['#ffd166', 'stale']
                                      : ['#06d6a0', 'live'];
-  const sections = err ? [['Feed', [['error', err]]]] : [
-    ['Feed', [
-      ['stations', j.stations.length],
-      ['offline', `${j.offline} (${(j.offline / j.stations.length * 100).toFixed(0)}%)`],
-      ['readings', j.sourceUpdated ? ago(j.sourceUpdated) : 'unknown'],
-      ['polled', ago(j.fetched)],
-    ]],
-    ['Network', [
-      ['upstream', j.upstreamOk === false ? 'unreachable' : 'HTTP 200'],
-      ['detail calls', `${j.details.ok}/${j.details.requested}`],
-      ['fetch time', j.tookMs + ' ms'],
-      ['served from', j.cacheAge ? `cache, ${j.cacheAge}s old` : 'upstream'],
-    ]],
+  const rows = err ? [['problem', err]] : [
+    ['readings', j.sourceUpdated ? ago(j.sourceUpdated) : 'unknown'],
+    ['last checked', ago(j.fetched)],
+    ['stations', j.stations.length],
+    ['from', j.cacheAge ? `cache, ${j.cacheAge}s old` : 'JPS'],
   ];
-  const table = sections.map(([head, rows], i) =>
-    `<tr class="${i ? 'gap' : ''}"><td class="head muted" colspan="2">${head}</td></tr>` +
-    rows.map(([k, v]) => `<tr><td class="muted">${k}</td><td>${v}</td></tr>`).join('')).join('');
 
   el('net').style.setProperty('--c', color);   // chip tint, dot and halo all follow the state
-  el('net').innerHTML = `<span class="swatch"></span><span>${text}</span>` +
-    `<table id="netstats" class="surface">${table}</table>`;
+  el('net').innerHTML = `<span class="swatch"></span><span>${text}</span>`
+    + `<table id="netstats" class="surface">`
+    + rows.map(([k, v]) => `<tr><td class="muted">${k}</td><td>${v}</td></tr>`).join('')
+    // The one thing the chip can't show but everyone asks: it updates by itself, on a timer.
+    + `<tr class="note"><td colspan="2" class="muted">Refreshes itself every ${
+         POLL_MS / 60000} minutes. Nothing to reload.</td></tr></table>`;
 }
 
+/* The page updates itself every POLL_MS, but between polls the chip said "last checked 4 minutes
+   ago" for four minutes without moving — which reads as a page that has stopped, not one that is
+   waiting. Re-rendering the same payload every 30s costs nothing and makes the clock visibly run.
+   `stale` also flips on its own this way, without needing a poll to notice the readings aged out. */
+setInterval(() => last && network(last), 30000);
+
+/* What the splash says while the first poll is in flight. Only stages we can actually observe get
+   their own line — the fetch is one opaque round trip, so there is nothing to report between
+   "asked" and "answered" except that it is taking a while, which is worth saying because a cold
+   `api.php` fans out ~270 upstream calls and an expired page cache adds ~15s on top. A fake
+   progress bar over a wait we cannot measure would be a lie the user has no way to check. */
+const say = m => { if (!el('splash').classList.contains('gone')) el('splashMsg').textContent = m; };
+
 export async function load() {
+  const first = !el('splash').classList.contains('gone');
+  let slow, slower;
   try {
-    const r = await fetch('api.php');
+    if (first) {
+      say('contacting the proxy…');
+      slow = setTimeout(() => say('asking JPS for stations — this can take a few seconds'), 2500);
+      slower = setTimeout(() => say('still waiting on JPS. A cold start rebuilds the whole '
+        + 'station list, water levels, rainfall and cameras, and can take up to 20 seconds'), 8000);
+    }
+    const r = await fetch(FEED);
+    clearTimeout(slow); clearTimeout(slower);
+    if (first) say('reading water levels, rainfall, sirens and cameras…');
     const j = await r.json();
     if (!j.stations) throw new Error(j.error || 'HTTP ' + r.status);
     state.data = j.stations;
+    // render() blocks for as long as it takes to build 400-odd markers and popups, so the line
+    // has to be given a frame to paint in — set and then rendered in the same task, it would
+    // never appear at all.
+    if (first) { say(`placing ${j.stations.length} stations on the map…`); await new Promise(requestAnimationFrame); }
 
     network(j);
     render(); alerts();
     el('splash').classList.add('gone');
   } catch (e) {
+    clearTimeout(slow); clearTimeout(slower);
     network(null, e.message);
     if (!el('splash').classList.contains('gone')) {
       // Nothing has ever loaded. With no connection there is nothing truthful to show, so hold the

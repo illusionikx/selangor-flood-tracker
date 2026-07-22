@@ -41,7 +41,7 @@ header h1 .brand { font-size: 24px; color: var(--accent); flex: none; }
 
 /* Taller and wider than the sources dialog: this one is for scanning, so it takes the screen. */
 #dataBox {
-  width: min(760px, calc(100vw - 24px)); height: min(88vh, 900px); padding: 0;
+  width: min(1060px, calc(100vw - 24px)); height: min(88vh, 900px); padding: 0;
   display: flex; flex-direction: column; overflow: hidden;
   border: 1px solid var(--outline); border-radius: 12px;
   background: var(--surface); color: var(--on-surface); box-shadow: var(--shadow);
@@ -50,20 +50,52 @@ header h1 .brand { font-size: 24px; color: var(--accent); flex: none; }
 /* Search stays put while the list scrolls under it — the filter is useless if you have to scroll
    back up to change it after seeing the result. */
 #dataBox .dtop {
-  flex: none; padding: 16px 20px 12px; border-bottom: 1px solid var(--outline); background: var(--surface);
+  position: relative; flex: none; padding: 16px 20px 12px;
+  border-bottom: 1px solid var(--outline); background: var(--surface);
 }
-#dataBox h2 { font-size: 18px; font-weight: 500; margin-bottom: 10px; }
+/* In the header, not a footer bar: the table scrolls, and a close button below it was one more thing
+   pinned to the bottom of a dialog you are always at the top of. */
+#dataBox .dclose { position: absolute; top: 8px; right: 12px; font-size: 20px; }
+#dataBox h2 { font-size: 18px; font-weight: 500; margin-bottom: 10px; padding-right: 40px; }
 #dataBox #dataFind { margin-bottom: 6px; }
-#dataBox .dbot {
-  flex: none; padding: 10px 20px; border-top: 1px solid var(--outline); text-align: right;
+
+/* The table's stand-in for a popup's still: no room for the image itself in a row, so it opens the
+   same lightbox the popup image does. */
+.shotbtn {
+  display: inline-flex; align-items: center; gap: 5px; padding: 2px 9px; cursor: pointer;
+  font: 500 11px Roboto, sans-serif; color: var(--accent);
+  background: none; border: 1px solid var(--outline); border-radius: 999px;
 }
-#dataBox .dbot .link { display: inline-flex; width: auto; }
+.shotbtn:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); }
 
 table.data { flex: 1; display: block; overflow: auto; width: 100%; border-collapse: collapse; }
-table.data tbody { display: table; width: 100%; }
+/* Six columns need room, so the table scrolls sideways rather than squeezing them: `min-width` on the
+   sections is what lets them exceed the dialog, since `display: table` would otherwise honour 100%.
+   The whole thead is the sticky element, not its cells: as separate `display: table` boxes the two
+   sections lay out independently, and sticking the box freezes the row as one piece. */
+table.data thead, table.data tbody { display: table; width: 100%; min-width: 820px; }
+table.data thead { position: sticky; top: 0; z-index: 4; }
+/* Two sticky rows, so the offset has to be hard-coded: the column headings sit at the top and the
+   district headings park just under them. 30px is .chead's own height (11px text + 2×6px padding
+   + border) — change one and the other has to follow. */
+table.data .chead th {
+  text-align: left; padding: 6px 8px; cursor: pointer; user-select: none;
+  font-size: 11px; font-weight: 500; letter-spacing: .06em; text-transform: uppercase;
+  white-space: nowrap; background: var(--surface); border-bottom: 1px solid var(--outline);
+}
+table.data .chead th:hover { background: var(--hover); }
+table.data .chead th.on { color: var(--accent); }
+/* The arrow is drawn, not an icon: it has to sit inside an uppercase, letter-spaced cell. */
+table.data .chead th.on::after {
+  content: ''; display: inline-block; margin-left: 5px; vertical-align: .1em;
+  border: 4px solid transparent;
+}
+table.data .chead th.up::after   { border-bottom-color: currentColor; margin-bottom: 4px; }
+table.data .chead th.down::after { border-top-color: currentColor; margin-top: 4px; }
+table.data .chead .i { margin-right: 5px; vertical-align: -.15em; }
 /* Sticky district headings: scrolling a long district, you still know which one you are in. */
 table.data .dhead th {
-  position: sticky; top: 0; z-index: 1; text-align: left; padding: 10px 20px 6px;
+  position: sticky; top: 30px; z-index: 2; text-align: left; padding: 10px 20px 6px;
   font-size: 11px; font-weight: 500; letter-spacing: .06em; text-transform: uppercase;
   background: var(--hover); border-bottom: 1px solid var(--outline);
 }
@@ -72,20 +104,76 @@ table.data tr[data-mast] { cursor: pointer; }
 table.data tr[data-mast]:hover { background: var(--hover); }
 /* No coordinates upstream, so nothing to fly to — say so rather than offer a jump that goes nowhere. */
 table.data .nomap { font-style: italic; }
-table.data td { padding: 10px 20px; border-bottom: 1px solid var(--outline); vertical-align: top; }
-table.data td.nm { width: 38%; }
+table.data td { padding: 10px 8px; border-bottom: 1px solid var(--outline); vertical-align: top; }
+/* The location freezes while the readings scroll under it — a row of numbers with the place name
+   scrolled off is unreadable. Sticky needs its own background, or the cells slide through it. */
+table.data td.nm, table.data .chead th:first-child {
+  position: sticky; left: 0; width: 220px; min-width: 220px; padding-left: 20px;
+  background: var(--surface); border-right: 1px solid var(--outline);
+}
+table.data td.nm { z-index: 1; }
+table.data .chead th:first-child { z-index: 3; }   /* the corner is sticky in both directions */
+table.data tr[data-mast]:hover td.nm { background: var(--hover); }
+/* Every sensor column the same width, so the eye can travel down one without re-measuring. */
+table.data td.k, table.data .chead th:not(:first-child) { width: 120px; }
+table.data td.k { font-size: 12px; font-variant-numeric: tabular-nums; }
 table.data td.none { text-align: center; padding: 28px; }
-table.data .srow { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
-table.data .srow + .srow { margin-top: 6px; }
-table.data .srow .badge { margin: 0; flex: none; }
-table.data .srow .rd { font-size: 12px; font-variant-numeric: tabular-nums; }
-table.data .srow .alt { flex-basis: 100%; }
+/* Compact: 120px columns can't carry popup-sized type, and the badge is the thing being scanned. */
+table.data .cv b { font-weight: 500; font-size: 13px; }
+table.data .cv .val { margin-top: 2px; font-size: 11px; line-height: 1.35; }
+table.data .cv .muted { font-size: 11px; }
+/* A status badge fills its cell, so the colour band itself lines up down the column and can be read
+   without reading the word. */
+table.data .cv .badge {
+  display: flex; width: 100%; justify-content: center; margin: 0;
+  padding: 3px 4px; font-size: 10px; letter-spacing: .2px;
+}
+table.data .shotbtn { width: 100%; justify-content: center; }
+/* Marks a merged cell and carries the breakdown in its title. Pushed to the far edge of whatever it
+   sits in — inside the badge for the kinds that have one, on its own line for the kinds that don't. */
+table.data .cv .line { display: flex; align-items: center; gap: 6px; }
+table.data .sum {
+  margin-left: auto; flex: none; display: grid; place-items: center;
+  padding: 0; font-size: 13px; color: inherit; opacity: .65; cursor: pointer;
+  background: none; border: 0;
+}
+table.data .sum:hover { opacity: 1; }
+
+/* Top-layer panel, so the table's own scrolling can't clip it. Placement is set by table.js; the
+   `display` pair is also the fallback — a browser without popover support never matches
+   `:popover-open`, so the panel stays hidden instead of spilling into the cell. */
+.tipbox {
+  position: fixed; margin: 0; inset: auto; display: none;
+  min-width: 200px; max-width: min(320px, calc(100vw - 16px));
+  padding: 10px 12px; border: 1px solid var(--outline); border-radius: 10px;
+  color: var(--on-surface); font-size: 12px;
+}
+.tipbox:popover-open { display: block; }
+.tipbox .tiphead {
+  margin-bottom: 6px; font-size: 11px; font-weight: 500; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--muted);
+}
+.tipbox .tiprow { display: flex; gap: 12px; align-items: baseline; padding: 3px 0; }
+.tipbox .tiprow + .tiprow { border-top: 1px solid var(--outline); }
+.tipbox .tiprow span { flex: 1; min-width: 0; }
+.tipbox .tiprow b { font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* Inside a badge the marker is taken out of the flow, not pushed to the end with `margin-left: auto`
+   — that stole width from the centred label and shunted it left. Absolute, with matching padding on
+   both sides, so a cell with a marker and one without still read as the same badge. */
+table.data .cv .badge { position: relative; }
+table.data .cv .badge:has(.sum) { padding-inline: 14px; }
+table.data .cv .badge .sum {
+  position: absolute; right: 3px; top: 50%; transform: translateY(-50%);
+  margin: 0; opacity: .8; font-size: 12px; line-height: 1;
+}
+table.data .cv + .cv { margin-top: 8px; }   /* two of the same kind on one mast */
+table.data .dash { color: var(--outline); }
 
 @media (max-width: 600px) {
   #dataBox { width: 100vw; height: 100dvh; max-width: none; border-radius: 0; border: 0; }
-  table.data td { padding: 10px 14px; }
+  table.data td { padding: 10px 8px; }
   table.data .dhead th { padding: 10px 14px 6px; }
-  table.data td.nm { width: 42%; }
+  table.data td.nm { padding-left: 14px; }
 }
 
 /* --- live status chip + its popover --------------------------------------------------------- */
@@ -129,8 +217,7 @@ table.data .srow .alt { flex-basis: 100%; }
 /* .open is for touch, where there is no hover to reveal the stats. */
 #net:hover #netstats, #net:focus-within #netstats, #net.open #netstats,
 #net:hover::after, #net:focus-within::after, #net.open::after { opacity: 1; visibility: visible; }
-#netstats .head { font-weight: 500; font-size: 11px; letter-spacing: .8px; text-transform: uppercase; }
-#netstats tr.gap td { padding-top: 12px; }
+#netstats .note td { padding-top: 10px; line-height: 1.45; font-size: 11px; }
 
 /* --- drawer --------------------------------------------------------------------------------- */
 
@@ -246,12 +333,18 @@ body.drawer #legend, body.drawer #alerts { transform: translateX(var(--drawer));
 
 /* Full-view still. Tap/Esc closes; the image scales to whichever axis runs out first. */
 #lightbox {
-  position: fixed; inset: 0; z-index: 950; display: grid; place-content: center; gap: 10px;
-  padding: 24px; background: #000000e6; cursor: zoom-out;
+  width: 100vw; max-width: none; height: 100dvh; max-height: none; margin: 0; border: 0;
+  place-content: center; gap: 10px; padding: 24px; background: #000000e6; cursor: zoom-out;
 }
-#lightbox[hidden] { display: none; }
+#lightbox[open] { display: grid; }
+#lightbox::backdrop { background: #000000e6; }
 #lightbox img { max-width: 92vw; max-height: 82vh; border-radius: 8px; }
 #lightbox .cap { color: #dadce0; text-align: center; }
+/* A JPS still is fetched through our proxy and can take seconds. Without this the dialog opens on
+   an empty black screen, which reads as "the camera is dead" rather than "wait". */
+#lightbox .spin { justify-self: center; border-color: #ffffff40; border-top-color: #fff; }
+#lightbox:not(.loading) .spin { display: none; }
+#lightbox.loading img { display: none; }
 
 /* Splash: covers the map until the first poll lands. */
 #splash {
@@ -263,10 +356,14 @@ body.drawer #legend, body.drawer #alerts { transform: translateX(var(--drawer));
 #splash .mark { font-size: 48px; color: var(--accent); }
 #splash h1 { font-size: 22px; font-weight: 400; }
 #splash h1 b { font-weight: 500; color: var(--accent); }
-#splash .spin {
+/* Shared by the splash and the lightbox — same wait, same indicator. */
+.spin {
   width: 26px; height: 26px; border: 3px solid var(--outline); border-top-color: var(--accent);
   border-radius: 50%; animation: spin .8s linear infinite;
 }
+/* The status lines grow to a sentence on a slow cold start; hold the width so the splash doesn't
+   reflow around them, and reserve two lines so it doesn't jump as they change. */
+#splashMsg { max-width: 320px; min-height: 2.8em; line-height: 1.4; }
 #splash.offline .spin, #splash.offline #splashMsg { display: none; }
 #splashWarn { max-width: 320px; }
 #splashWarn .state { display: flex; align-items: center; justify-content: center; gap: 8px; }

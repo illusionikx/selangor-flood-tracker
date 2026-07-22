@@ -4,16 +4,19 @@
 <title>Klang Valley Flood Watch</title>
 <link rel="stylesheet" href="vendor/leaflet.css">
 <link rel="stylesheet" href="vendor/markercluster.css">
-<link rel="stylesheet" href="vendor/fonts.css?v=8">
-<link rel="stylesheet" href="css/icons.css?v=8">
-<link rel="stylesheet" href="css/base.css?v=8">
-<link rel="stylesheet" href="css/chrome.css?v=8">
-<link rel="stylesheet" href="css/map.css?v=8">
+<link rel="stylesheet" href="vendor/fonts.css?v=15">
+<link rel="stylesheet" href="css/icons.css?v=15">
+<link rel="stylesheet" href="css/base.css?v=15">
+<link rel="stylesheet" href="css/chrome.css?v=15">
+<link rel="stylesheet" href="css/map.css?v=15">
 
-<div id="lightbox" hidden>
+<!-- A <dialog>, not a div: the all-stations table is itself a modal dialog, and only the top layer
+     can paint over one. Esc and the backdrop come free with it. -->
+<dialog id="lightbox">
+  <div class="spin"></div>
   <img alt="">
   <div class="cap muted"></div>
-</div>
+</dialog>
 <div id="splash">
   <div class="mark"><i class="i i-water_drop"></i></div>
   <h1>Klang Valley <b>Flood Watch</b></h1>
@@ -71,13 +74,14 @@
 <!-- Every station in one list. Sticky search + header so the table scrolls under them. -->
 <dialog id="dataBox">
   <div class="dtop">
+    <form method="dialog"><button class="icon dclose" title="Close" aria-label="Close"
+      ><i class="i i-close"></i></button></form>
     <h2>All stations</h2>
     <input id="dataFind" type="text" autocomplete="off" placeholder="Filter by name, district or basin…"
            aria-label="Filter stations">
     <p id="dataCount" class="muted"></p>
   </div>
-  <table class="data"><tbody id="dataBody"></tbody></table>
-  <form method="dialog" class="dbot"><button class="link">Close</button></form>
+  <table class="data"><thead id="dataHead"></thead><tbody id="dataBody"></tbody></table>
 </dialog>
 <div id="map"></div>
 <div id="bar">

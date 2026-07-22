@@ -1,0 +1,78 @@
+# Bake the app to GitHub Pages. Pages serves static files only, so the PHP that normally answers
+# every visit runs here instead, on a schedule, and its output is published as `api.json`.
+#
+# The cost of that trade is freshness: cron is best-effort and often runs late, so the map is
+# 15-30 minutes behind rather than 5. Upstream stamps readings to the quarter hour, so this is
+# roughly one reading of lag, not many.
+name: pages
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '*/15 * * * *'   # GitHub disables this after 60 days with no commits — it emails first
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Never two bakes at once: they would race on the history db and on the deployment.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  bake:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: curl, dom, sqlite3, mbstring
+
+      - run: composer install --no-dev --no-progress --quiet
+
+      # The trend history is the one piece of state a bake can't rebuild. Losing it costs an hour
+      # of `rising` flags — everything keyed off them (alerts, filter, heat weighting) goes quiet
+      # until enough samples land again. Caches are evicted after 7 days unused; the schedule keeps
+      # this one warm, but a long quiet spell will still cost the samples.
+      - uses: actions/cache@v4
+        with:
+          path: .history.db
+          key: history-${{ github.run_id }}
+          restore-keys: history-
+
+      - name: Poll the three sources
+        run: php api.php > api.json
+
+      # api.php answers with an error object rather than a non-zero exit when upstream dies. Fail
+      # here instead of publishing it: a failed bake leaves the last good deployment on the site.
+      - name: Check the payload
+        run: |
+          php -r '$j = json_decode(file_get_contents("api.json"), true);
+                  $n = count($j["stations"] ?? []);
+                  echo "stations: $n\nsources: ", json_encode($j["sources"] ?? []), "\n";
+                  exit($n > 100 ? 0 : 1);'
+
+      - name: Stage the site
+        run: |
+          mkdir site
+          cp -r index.html api.json css js vendor site/
+          # The one line that separates the two builds — see js/config.js.
+          sed -i 's/^export const STATIC = false;/export const STATIC = true;/' site/js/config.js
+          grep -q 'STATIC = true' site/js/config.js
+          touch site/.nojekyll
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - id: deploy
+        uses: actions/deploy-pages@v4

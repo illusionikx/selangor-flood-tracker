@@ -239,17 +239,29 @@ document.addEventListener('click', e => {
 
 // --- lightbox --------------------------------------------------------------------------------------
 
+// Two ways in: the still inside a popup, and the table's "show image" button, which has no <img>
+// to click — it names the camera id and builds the same proxied URL.
 const lightbox = el('lightbox');
 document.addEventListener('click', e => {
   const img = e.target.closest('img.shot');
-  if (!img) return;
+  const btn = e.target.closest('[data-shot]');
+  if (!img && !btn) return;
   e.stopPropagation();
-  lightbox.querySelector('img').src = img.src;
-  lightbox.querySelector('.cap').textContent = img.alt;
-  lightbox.hidden = false;
+  const full = lightbox.querySelector('img');
+  // Spin until it lands. `complete` covers the popup's already-cached still, which fires no load
+  // event — without that check the spinner would sit there for ever over a picture that is ready.
+  lightbox.classList.add('loading');
+  full.src = img ? img.src : btn.dataset.shot;   // data-shot is the resolved URL, proxied or direct
+  if (full.complete) lightbox.classList.remove('loading');
+  lightbox.querySelector('.cap').textContent = img ? img.alt : btn.dataset.cap || '';
+  lightbox.showModal();
 });
-lightbox.onclick = () => lightbox.hidden = true;
-addEventListener('keydown', e => { if (e.key === 'Escape') lightbox.hidden = true; });
+// A dead camera stops the spinner too — the broken image and its alt text say more than a spinner
+// that never ends, which reads as "still trying".
+lightbox.querySelector('img').onload =
+lightbox.querySelector('img').onerror = () => lightbox.classList.remove('loading');
+
+lightbox.onclick = () => lightbox.close();   // <dialog> gives us Esc for nothing
 
 // --- splash ------------------------------------------------------------------------------------------
 

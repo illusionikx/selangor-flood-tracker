@@ -1,13 +1,13 @@
 // Every popup shares one template: badge + name + region header, then a kind-specific body, then a
 // status footer. The same meter/state blocks are reused by the alert panel.
 
-import { KINDS, SOURCES, SPARK_H } from './config.js';
+import { KINDS, SOURCES, SPARK_H, camSrc } from './config.js';
 import { num, ago, parseMY, distKm, hasInfo, statusColor, scalePos } from './util.js';
 import { nearestOf, nearestCam, oneLiner } from './stations.js';
 
 // Spinner lives on the wrapper; the img clears it on load, or swaps itself out on failure.
 export const camImg = (c, alt) => `<div class="shotwrap">
-  <img class="shot" src="api.php?cam=${c.id.split('-')[1]}" alt="${alt}"
+  <img class="shot" src="${camSrc(c)}" alt="${alt}"
        onload="this.parentNode.classList.add('done')"
        onerror="this.parentNode.classList.add('done');
                 this.replaceWith(Object.assign(document.createElement('div'),

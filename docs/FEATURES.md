@@ -397,6 +397,76 @@ multi-sensor variant does the same, with the badge row after the "N sensors at t
 to drop the first section's own rule, but `.pophead` is a `div` too and so *it* was the first of its
 type — the selector matched nothing. It is `.pophead + .sensor` now.
 
+**All-stations table is a matrix**: one row per mast, one column per sensor kind (the `KIND_RANK`
+order), with a sticky heading row above the sticky district headings. A column therefore reads as one
+measurement all the way down — you can scan every water level in a district without reading anything
+else — and a mast with no siren shows a dash instead of a gap you have to interpret.
+
+`oneLiner()` is deliberately *not* reused for the cells. It is written for a popup with 300px to
+spend, and "1.68 m · 34% of danger" in a 150px column wraps to three lines. Cells put the value first
+and the qualifier muted underneath. Six columns need room, so the dialog widened to 1060px and the
+table scrolls sideways below ~820px rather than squeezing them — `min-width` on `thead`/`tbody`,
+because `display: table` would otherwise honour the container's 100%.
+
+*Every column sorts*, ascending or descending, **within each district** — not across them. The
+district grouping is the point of this view; a flat 450-row list sorted by water level answers a
+question the alert panel already answers better, and loses the one this table exists for ("what is
+there, and where"). Names default to A–Z, readings to worst-first. A mast that lacks the sorted
+sensor sinks to the bottom whichever way the arrow points: an absent sensor is not a low reading.
+
+*A "location" here is looser than on the map.* The map groups sensors sharing a coordinate exactly,
+because a pin is a point. JPS scatters one site's sensors over a couple of hundred metres — river
+gauge on the bridge, rainfall mast at the depot — so this table merges within **200 m**, and within
+one district, since two masts either side of a district line are still two places to someone scanning
+by district. Greedy O(n²) over ~450 coordinate groups, and only while the dialog is open.
+
+*A 200 m site can hold two of the same kind* — two rainfall gauges either end of a township — and a
+cell has room for one answer. Numbers average, states OR together, and a camera cell offers the first
+feed there actually is. **Status does not average, it takes the worst:** a status code is a category,
+not a quantity (the mean of "normal" and "danger" is not "warning"), and a merged cell rendering
+calmer than its worst member is the one failure this app cannot have. So the number is the mean and
+the colour is the worst — which is also how you would read it aloud. A merged cell is marked with an `i` at the right
+edge of its badge. The same marker also carries the case a single sensor's own name differs from the
+place it sits at — both used to cost a line under the badge, both are now one icon.
+
+*It opens a native `popover`, not a `title` tooltip and not the app's `.tip`.* A title can't be
+styled or laid out; `.tip` is absolutely positioned and this table is a scroll container that would
+clip it. `popover` puts the panel in the **top layer** — no clipping, no z-index — and brings
+click-to-open (so touch works), light dismiss and Esc with it. Only placement needs JS, since CSS
+anchor positioning is still Chromium-only; `toggle` doesn't bubble, so that listener is on capture.
+Browsers without popover support never match `:popover-open`, so the panel stays `display: none`
+rather than spilling its contents into the cell.
+
+*The location column freezes* while the readings scroll under it — a row of numbers with the place
+name scrolled off is unreadable. Sticky cells need their own background or the scrolling ones slide
+straight through them, and the header's first cell is sticky in both directions, so it outranks both.
+
+*Cells lead with whatever is the answer.* Where the reading **is** a state — siren, flood gauge,
+rainfall intensity — that is a badge, with the number underneath as the evidence: `TRIGGERED`,
+`NOT ACTIVE` (out of contact, which must never look like "no reading"), `DRY` / `WATER` / `WARNING` /
+`DANGER`, `LIGHT` / `MODERATE` / `HEAVY` followed by the mm. Water level is the other way round: the
+level is the answer and its status is carried in the colour. Badge colours come from the status ramp
+even for rainfall — this is a status, not the violet that means "rainfall station".
+
+*Status badges fill their cell*, so the colour band lines up down a column and can be read without
+reading the word, and all five sensor columns are the same fixed 120px — the eye travels down one
+without re-measuring. Type shrinks to match: 10px badges, 11px sub-lines.
+
+*Two sticky rows means one hard-coded offset:* the district headings sit at `top: 30px`, which is the
+column header's own height. Change one and the other has to follow.
+
+**All-stations table: close button in the header, and a way to see a camera.** The close moved out of
+a footer bar into the top-right of the header — the table scrolls, so a control pinned below it was
+one more thing to travel to in a dialog you are always at the top of. Camera rows now carry a
+**Show image** button: there is no room for a still in a table row, so it opens the same lightbox the
+popup's image does, and the table stays open behind it.
+
+*The lightbox had to become a `<dialog>` for that.* It was a fixed-position div at `z-index: 950`,
+which cannot paint over `#dataBox` — that is a modal dialog, and only the top layer covers one. As a
+dialog it stacks correctly and Esc and the backdrop come free, which deleted the custom keydown
+handler. Adding the `close` icon was one line in `icons.css`; under the old subsetted font it would
+have meant refetching the woff2 and bumping `?v=` on two files.
+
 **Rainfall popups state whether it is raining**, the way a siren states TRIGGERED / IDLE. `3.4 mm`
 is a fact you then have to interpret; `MODERATE RAIN` is the reading. The bands are the server's own
 `rainStatus()` cutoffs (>0 / >10 / >30 / >60 mm an hour), so the block, the pin colour and the status
@@ -607,6 +677,129 @@ specifically so two modules can share `data` / `hereAt` without importing each o
 
 *Trade-off accepted:* thirteen files is more to open than one. It buys the ability to change the
 alert panel without scrolling past the heatmap, and to see at a glance what any file depends on.
+
+### Static build for GitHub Pages
+
+Pages serves files, not PHP, so `.github/workflows/pages.yml` runs the PHP on a `*/15` cron instead
+of on request: `composer install`, `php api.php > api.json`, stage `index.html css js vendor` plus
+that JSON, publish. The site is then a folder of static assets with a pre-baked payload.
+
+The two builds differ by **one line**: `STATIC` in `config.js`, flipped by a `sed` in the bake. It
+drives `FEED` (`api.json` vs `api.php`) and `camSrc()`. Nothing sniffs the hostname — a build that
+knows what it is beats one that guesses, and the local Herd copy is untouched by any of it.
+
+*Cameras need no proxy there.* `api.php` fetches stills server-side partly for mixed content —
+upstream advertises them as `http://`, which an https page will not load — but the same file is in
+fact served over TLS. So the static build points `<img>` straight at
+`https://infobanjirjps.selangor.gov.my/…/CCTV_Image/{id}.jpg` and 93 images stay out of the bake.
+`api.php` keeps proxying because it *also* validates that the host is JPS before streaming anything.
+Consequence: on Pages, a camera pane depends on upstream TLS staying up. If those certs lapse the
+images break there and keep working locally.
+
+*Bake-time `data-shot`.* The lightbox button used to carry a bare camera id that `ui.js` pasted into
+a proxy URL, which put a second copy of "how a still is addressed" in a file that has no other
+reason to know. `table.js` now writes the resolved URL and `ui.js` just uses it.
+
+*Trend history survives in the Actions cache*, keyed `history-${run_id}` with a `history-` restore
+key. This is the one piece of state a bake cannot rebuild, and caches are evicted after 7 days
+unused — the schedule keeps it warm, but a long quiet spell costs the samples and every `rising`
+flag goes false for an hour afterwards (see the gotcha about `rm .history.db`; same failure, remote).
+Not committed to the repo instead: the file reaches tens of MB over the 30-day retention, and
+pushing that four times an hour is a lot of traffic to avoid an occasional hour of flat trends.
+
+*Trade-offs accepted:* cron is best-effort and frequently late, so the map runs 15–30 minutes behind
+rather than 5, and the `POLL_MS` client refresh mostly re-fetches an unchanged file. GitHub disables
+schedules after 60 days without a commit. Free Actions minutes require a public repo, which Pages
+needs anyway. A poll that returns fewer than 100 stations fails the job deliberately, leaving the
+previous deployment up — `api.php` reports upstream failure as a JSON error object, not an exit
+code, so without that check a bad bake would publish cheerfully.
+
+*Not built:* a `gh-pages` branch. `upload-pages-artifact` publishes without a commit at all, so
+there is no history to force-push away every quarter hour.
+
+## One rebuild at a time, and only for people who are watching
+
+The refresh path had a stampede guard — `touch(CACHE)` to claim the work — but it sat inside the
+`if (function_exists('fastcgi_finish_request'))` branch. Herd's SAPI is `cgi-fcgi`, which does not
+have that function, so on the machine this actually runs on nothing ever claimed anything: every
+concurrent cache miss started its own fan-out. A cold rebuild is ~270 requests at JPS, so two
+visitors landing together made 540 and six made 1,620 — not a busy site, the shape of a flood from
+one address, aimed at the agency the entire page depends on.
+
+`flock` on `.refresh.lock` (gitignored) replaces it, because a lock file does not care which SAPI is
+running. The winner rebuilds; everyone else **serves the stale payload rather than queueing**. Stale
+here means at most one poll old, and holding a connection open for 15s to hand back data the caller
+already has is worse for both ends than data that is five minutes behind. The one case that does
+queue is a true cold start, where there is nothing to serve instead: those arrivals block on
+`flock(LOCK_EX)` and then re-check the cache the winner just wrote.
+
+Measured on six simultaneous requests against an expired cache: one took 4.9s and rebuilt, five
+returned identical payloads in ~0.3s.
+
+*Client side:* `setInterval` skips the poll while `document.hidden`, and `visibilitychange`
+refreshes on return if more than `POLL_MS` has passed. A forgotten background tab costing a request
+every five minutes for ever is traffic spent on data nobody is reading, and a returning tab is never
+staler than it would have been anyway.
+
+Upstream load is now capped at one fan-out per `TTL` regardless of how many people are on the page.
+
+*Not done:* lowering `curl_multi` concurrency from 20. It makes a cold start slower without reducing
+the total number of requests, and the burst was never the problem — the number of simultaneous
+bursts was.
+
+## The status chip says one word
+
+Four states, one word each: `live` (200, upstream up, readings under 2h), `stale` (connection fine,
+JPS's own readings older than 2h), `cached` (upstream down, last good payload), `offline` (proxy
+unreachable). The old labels were sentences — `upstream down — showing cache` is two facts and a
+dash inside a 64px bar. The chip answers one question, *is what I am looking at current*, and
+anything else was answering a question nobody had asked yet.
+
+The hover popover went from eight rows under two headings to four: readings age, last checked,
+station count, and cache-or-JPS. Dropped: HTTP status, detail-call tally, fetch milliseconds,
+offline percentage — all of it useful while building the proxy and to nobody since. `#netstats .head`
+and `tr.gap` went with them.
+
+It also carries the one thing the chip cannot show and everyone asks: *"Refreshes itself every 5
+minutes. Nothing to reload."*
+
+*The ages tick.* `network()` re-renders the last payload every 30s. Between polls the chip used to
+read "last checked 4 minutes ago" for four solid minutes, which reads as a page that has stopped
+rather than one that is waiting. This also lets `stale` flip on its own, without needing a poll to
+notice the readings aged out.
+
+## The splash says what it is doing
+
+Five lines, and every one of them is a stage that can actually be observed:
+
+| when | line |
+|---|---|
+| request sent | contacting the proxy… |
+| +2.5s | asking JPS for stations — this can take a few seconds |
+| +8s | still waiting on JPS. A cold start rebuilds the whole station list… up to 20 seconds |
+| response in | reading water levels, rainfall, sirens and cameras… |
+| parsed | placing 669 stations on the map… |
+
+The fetch is **one opaque round trip** — there is no server-side progress to report, so the two
+timed lines say only that it is slow and roughly why, which the reader can check against the clock.
+A progress bar over a wait nobody can measure would be a lie with no tell.
+
+The last line needs `await new Promise(requestAnimationFrame)` before `render()`: set and rendered
+in the same task it would never paint, because `render()` blocks for the whole marker build. Only
+the first poll narrates — `first` is captured before the fetch.
+
+`#splashMsg` gets `min-height: 2.8em` so the splash does not jump as the lines change length.
+
+## Lightbox spinner
+
+A JPS still goes through the proxy and can take seconds; without this the dialog opened on a black
+screen, which reads as *the camera is dead* rather than *wait*. Reuses the splash's spinner — the
+rule was promoted from `#splash .spin` to plain `.spin`, so this cost no new CSS.
+
+`.loading` is set before `src` and cleared on `load` **or** `error`: a dead camera stops the spinner
+too, because a spinner that never ends reads as "still trying". It is also cleared immediately if
+`img.complete` is already true — a still the popup has already cached fires no `load` event, and
+without that check the spinner would sit there for ever over a picture that was ready.
 
 ## Not built (and why)
 

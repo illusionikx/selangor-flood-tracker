@@ -37,6 +37,7 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `vendor/` | Leaflet, leaflet.heat (patched), markercluster, subsetted fonts — no CDN, hand-managed |
 | `lib/` | Composer's vendor dir (`symfony/dom-crawler`), gitignored — **not** `vendor/` |
 | `composer.json` | the one server-side dependency; `composer install` before first run |
+| `.github/workflows/pages.yml` | bakes the static GitHub Pages build — runs the PHP on cron, publishes `api.json` |
 | `.cache.json` | last payload (gitignored) |
 | `.history.db` | sqlite: water-level samples per station, 30-day retention (gitignored) |
 
@@ -168,6 +169,14 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
 - **No `fastcgi_finish_request` under Herd** — the SAPI is `cgi-fcgi`, so there is no way to close
   the connection and keep working. Stale-while-revalidate is impossible in-process; the page cache
   is the workaround. A cron hitting `api.php` every 5 min would keep the cache warm for good.
+  **Never put logic that must always run inside `if (function_exists('fastcgi_finish_request'))`** —
+  that branch is dead code on the machine this runs on. The stampede guard lived there for weeks and
+  therefore never guarded anything; see the lock below.
+- **One rebuild at a time, enforced by `flock` on `.refresh.lock`.** A cold rebuild is ~270 requests
+  at JPS, so N concurrent cache misses is 270N — the shape of a flood from one IP, aimed at the
+  source the whole page depends on. The loser of the race serves stale cache and does *not* queue,
+  except on a true cold start when there is nothing to serve. Anything added to the refresh path
+  must stay inside the lock, and any new upstream fan-out needs the same treatment.
 - **Herd serves everything `Cache-Control: max-age=10800`.** Three hours of stale CSS/JS after an
   edit unless the URL changes. The stylesheet links carry `?v=` — **bump it when you touch a css
   file**, the same as `vendor/fonts.css`. ES module imports have no such guard: hard-reload

@@ -11,10 +11,21 @@ import { render } from './render.js';
 
 requestAnimationFrame(() => document.body.classList.add('ready')); // no drawer slide on first paint
 
-load();
 findMe(false);   // locate on landing for the proximity sort, but leave the view where they left it
 
-setInterval(load, POLL_MS);
+/* Poll only while someone is looking. A tab left open in the background costs a request every five
+   minutes for ever, and a handful of forgotten tabs is a steady drum of traffic from one address
+   for data nobody is reading — the polite thing, and the thing least likely to get the server
+   blocked by JPS. Coming back refreshes at once if the data has aged past a poll, so an unattended
+   tab is never showing anything staler than it would have been. */
+let polled = 0;
+const poll = () => { polled = Date.now(); load(); };
+
+poll();
+setInterval(() => { if (!document.hidden) poll(); }, POLL_MS);
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && Date.now() - polled > POLL_MS) poll();
+});
 
 let resizeTimer;   // popup width is baked in at render, so rebuild markers after a rotate
 addEventListener('resize', () => {

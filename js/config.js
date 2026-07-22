@@ -53,3 +53,12 @@ export const HEAT_KM     = 4;      // ground size of one blob
 export const HEAT_MAX_PX = 220;    // blur cost is quadratic; past this the layer fades instead
 export const FLASH_MS    = 2400;   // how long the jump-to ripple runs
 export const POLL_MS     = 300000; // matches the proxy's cache TTL
+
+// GitHub Pages has no PHP. The Actions bake flips STATIC to true and drops api.php's output next to
+// index.html as api.json; nothing sniffs the hostname, and the two builds differ by this one line.
+// Camera stills need no proxy in that build: upstream serves the same file over TLS, so an https
+// page can hotlink it. api.php still fetches them server-side because it also validates the host.
+export const STATIC = false;
+export const FEED   = STATIC ? 'api.json' : 'api.php';
+export const camSrc = s =>
+  STATIC ? s.image.replace(/^http:/i, 'https:') : `api.php?cam=${s.id.split('-')[1]}`;
