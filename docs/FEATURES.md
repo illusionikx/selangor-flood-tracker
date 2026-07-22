@@ -1003,8 +1003,16 @@ A frame is therefore `.webp` **or** `.jpg`, and the extension is not knowable fr
 hence `shotFile()`, two stat calls rather than a manifest that could disagree with the directory.
 `?shot=` takes the content type off the file it found.
 
-**169 frames survive per camera** at steady state (the test prints it), so at 190 KB average that is
-**~2.9 GB** on disk for all 90 — against ~1.6 GB if `SHOT_W` were 1024. Download from JPS is
+`SHOT_Q` is deliberately high (82). Combined with the smaller-of-the-two rule that means the
+re-encode almost never wins, so what is actually stored is the original JPEG **byte for byte, with no
+generation loss at all** — the most faithful thing we can keep, and the cheapest to produce. WebP
+only takes over where it genuinely beats the original, which at that quality is a real saving rather
+than a coin toss. **1080p was never on the table**: JPS publishes 1280×720, so upscaling would double
+the file for no extra detail. 720p *is* the ceiling, and quality is the only axis left.
+
+**165 frames survive per camera** at steady state (the test prints it), so at a 245 KB source average
+that is **~3.7 GB** on disk for all 90 — and *flat from year one*, because the last tier deletes as
+fast as capture adds. ~1.6 GB if `SHOT_W` dropped to 1024. Download from JPS is
 unchanged either way (~1.1 GB/day): the full original is always fetched, the choice only affects what
 is kept. Lowering `SHOT_W` is a one-line change and roughly halves the archive.
 

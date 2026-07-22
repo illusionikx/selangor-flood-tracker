@@ -21,18 +21,29 @@
  * 1280x720. So SHOT_W is the native width and nothing is normally downscaled — it exists for the day
  * a camera starts publishing something larger.
  *
- * And at that size the frame is stored as **whichever of the two encodings is smaller**, which is
- * usually the original bytes untouched. Re-encoding 1280x720 CCTV to WebP q60 measured *larger* than
- * the JPEG it came from on half the cameras (181 KB vs 165, 169 vs 153) — paying a generation loss
- * to grow the file. That is not a fact about WebP, it is a fact about noisy night-time CCTV at this
+ * And at that size the frame is stored as **whichever of the two encodings is smaller**, which at
+ * SHOT_Q is usually the original bytes untouched. Re-encoding 1280x720 CCTV to WebP measured
+ * *larger* than the JPEG it came from on half the cameras even at q60 — paying a generation loss to
+ * grow the file. That is not a fact about WebP, it is a fact about noisy night-time CCTV at this
  * resolution, so the rule compares the two rather than asserting a winner: it stays right if JPS
  * changes its encoder, and it re-derives itself for free if SHOT_W is ever lowered, where the
  * re-encode does win by a wide margin.
+ *
+ * Source stills measure 245 KB on average (90 cameras, median 219, max 515), so the archive tops out
+ * near 3.7 GB — 165 frames a camera, and *flat* from the first year on, because the last tier
+ * deletes as fast as capture adds.
  */
 const SHOTS      = __DIR__ . '/shots';
 const SHOT_EVERY = 1800;    // 30 min between captures — see above
 const SHOT_W     = 1280;    // 720p — the native width of every camera measured
-const SHOT_Q     = 60;
+/* Deliberately high. Combined with the smaller-of-the-two rule below, a quality this close to the
+   source means the re-encode almost never wins, so what actually gets stored is the original JPEG,
+   byte for byte, with no generation loss at all — which is the most faithful thing we can keep and
+   also the cheapest to produce. WebP only takes over where it genuinely beats the original, and at
+   q82 that is a real saving rather than a coin toss.
+   1080p is not on the table and never was: JPS publishes 1280x720. Upscaling would double the file
+   for no extra detail. 720p *is* the ceiling here, so quality is the only axis left. */
+const SHOT_Q     = 82;
 const SHOT_MIN   = 4096;    // bytes: JPS answers a dead camera with a ~2 KB placeholder, not a 404
 /* Retention, as [frames younger than this, keep one per]. `0` means keep every frame. Applied on
  * age, so a frame thins itself as it gets older — kept every 30 min for a day, then six-hourly for a

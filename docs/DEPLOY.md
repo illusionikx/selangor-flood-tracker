@@ -29,7 +29,7 @@ wait for the quarter-hourly cron; the workflow runs the PHP on a runner and publ
 ### What Pages cannot do, and why
 
 - **No camera timeline.** It needs a filesystem that survives between runs and a PHP process to
-  write to it. A runner has neither, and the archive is ~2.9 GB — far past any artifact limit. The
+  write to it. A runner has neither, and the archive is ~3.7 GB — far past any artifact limit. The
   bar simply does not appear: `js/timeline.js` looks for `?cam=` in the image URL, the static build
   hotlinks JPS directly, so there is no id to ask about and no request is made. Nothing to disable.
 - **No `?cam=` proxy.** Upstream serves the same stills over TLS, so an https page can hotlink them.
@@ -51,38 +51,67 @@ bake leaves the last good deployment up, which is the right failure for a flood 
 
 ### Spec
 
-The binding constraint is **disk**, and it is entirely the camera archive.
+**LXC container: 12 GB, 2 cores, 1 GB RAM.** Steady state is ~6 GB, so that is 2× headroom and it
+never grows past it.
 
 | | steady state | note |
 |---|---|---|
-| `shots/` | **~2.9 GB** | 169 frames × 89 cameras × ~190 KB, at 720p |
-| `.history.db` | **~200 MB** | 30-day retention, ~2,100 rows/hour |
+| Debian rootfs + nginx + php-fpm + extensions | ~1.5 GB | no kernel, no swap, no boot partition |
+| apt cache & logs, a year with rotation | ~0.5 GB | |
+| `shots/` | **~3.7 GB** | 165 frames × 89 cameras × ~245 KB |
+| `.history.db` | ~200 MB | 30-day retention, ~2,100 rows/hour |
 | `.cache.json` | 350 KB | one payload |
-| app + `lib/` + `vendor/` | ~5 MB | |
+| app + `lib/` + `vendor/` | 2 MB | |
 
-`shots/` is ~2.9 GB **at 720p**. Setting `SHOT_W = 1024` in `shots.php` roughly halves it to ~1.6 GB
-and changes nothing else. Both figures are a ceiling, not a growth curve — retention holds them flat
-once a year has passed.
+On bare metal add the OS proper and buy the cheapest 128 GB SSD — at these sizes the disk question
+is moot, and **an SSD rather than an SD card is the part that matters**: the archive writes ~90 files
+every 30 minutes and deletes a similar number, ~8,600 writes a day for ever, which is an SD card's
+failure mode exactly.
 
-**Recommended:**
+### The archive does not grow without bound
 
-| | minimum | comfortable |
+This is the number people expect to be scary and isn't. Retention thins a frame by its *age*, with a
+hard cut at one year, so the last tier deletes as fast as capture adds:
+
+| age | frames per camera | archive |
 |---|---|---|
-| CPU | 2 cores, any x86-64 or ARM64 — a Pi 4 is enough | 4 cores |
-| RAM | 1 GB | 2 GB |
-| disk | 16 GB | **32 GB SSD** |
-| network | any home broadband | — |
+| 1 day | 48 | 1.1 GB |
+| 7 days | 72 | 1.6 GB |
+| 30 days | 118 | 2.6 GB |
+| 90 days | 126 | 2.8 GB |
+| **1 year** | **165** | **3.7 GB** |
+| 2 years | 165 | 3.7 GB — flat, for ever |
 
-Nothing here is CPU-bound in the normal case. The one spike is the capture pass: 90 JPEGs decoded
-and re-encoded every 30 minutes, ~25 s wall on this laptop, and GD holds a 1280×720 bitmap (~3.7 MB)
-per image with 10 in flight. A Pi 4 will take longer and still finish inside the window.
+Most of it lands in the first month; the next eleven add under a gigabyte, because past 30 days you
+are keeping one frame a week. Scale at **~40 MB per camera per year** if JPS publishes more.
 
-**Storage: use an SSD, not an SD card.** The archive writes ~90 files every 30 minutes and deletes a
-similar number — 8,600 file writes a day, for ever. That is an SD card's failure mode exactly.
+Where the frames actually are, which is what decides which knob is worth turning:
 
-**Bandwidth:** ~1.1 GB/day pulled *from JPS*, almost all of it camera stills. Outbound depends on
-visitors. If your line is metered or shared, this is the number to check first; `SHOT_EVERY` in
-`shots.php` is the dial (60 min halves it, and halves the 6-hour tier's density with it).
+| window | frames | share |
+|---|---|---|
+| < 6 h | 12 | 7% |
+| 6–24 h | 36 | 21% |
+| 1–7 d | 24 | 14% |
+| 7–30 d | 46 | 27% |
+| 30 d – 1 y | 47 | 28% |
+
+**55% of the archive is older than a week** — the part nobody scrubs — while the 6-hour replay the
+feature exists for is 7% of it. So if it ever needs to be smaller, thin the tail (`SHOT_TIERS`:
+month → 24 h, year → 14 d) for −28% that nobody will notice, or drop `SHOT_W` to 1024 for −45% of
+sharpness. **Do not reach for `SHOT_EVERY`**: an hour instead of 30 minutes saves 15% of disk and
+halves the density of the 6-hour replay, which is the worst trade on the table.
+
+### CPU, RAM, network
+
+Nothing is CPU-bound in the normal case. The one spike is the capture pass: 90 stills fetched every
+30 minutes, decoded to check them, and GD holds a 1280×720 bitmap (~3.7 MB) per image with 10 in
+flight. ~25 s wall here; a Pi 4 takes longer and still finishes well inside the window.
+
+**Bandwidth: ~1.1 GB/day pulled *from JPS***, almost all of it camera stills. Pruning cannot reduce
+this — every frame captured is kept at full density for the first 24 hours, so nothing is fetched and
+discarded. `SHOT_EVERY` is the only dial, with the trade named above. Upstream does honour
+conditional GET (`If-Modified-Since` → 304, zero bytes), which would be free to add, but at
+30-minute intervals only 2 cameras in 90 are stalled enough to benefit.
 
 ### Install
 
@@ -192,8 +221,8 @@ connection has a plainly worse availability story than JPS's own portals.
 ```bash
 php shots-test.php                                    # retention still correct — must stay green
 curl -s localhost/api.php | php -r 'echo json_encode(json_decode(stream_get_contents(STDIN),true)["sources"]),"\n";'
-du -sh /srv/flood/shots                               # watch it approach ~2.9 GB and then stop
-find /srv/flood/shots -name '*.*' | wc -l             # ~169 x cameras once a year has passed
+du -sh /srv/flood/shots                               # watch it approach ~3.7 GB and then stop
+find /srv/flood/shots -name '*.*' | wc -l             # ~165 x cameras once a year has passed
 ```
 
 **`parsed: 0` in `sources` means a scraped table moved**, not that the rivers went quiet. The
