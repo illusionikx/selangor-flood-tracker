@@ -31,7 +31,7 @@ map.on('locationfound', e => {
   if (layer) layer.remove();
 
   marker = L.marker(e.latlng, { icon: L.divIcon({
-    className: '', iconSize: [30, 30], iconAnchor: [15, 15], html: '<span class="pin me">person</span>',
+    className: '', iconSize: [30, 30], iconAnchor: [15, 15], html: '<span class="pin me"><i class="i i-person"></i></span>',
   }) }).bindPopup(() => herePopup(e, state.data.length > 0),
     { minWidth: popWidth('here'), maxWidth: popWidth('here') });
 

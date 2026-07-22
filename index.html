@@ -4,38 +4,39 @@
 <title>Klang Valley Flood Watch</title>
 <link rel="stylesheet" href="vendor/leaflet.css">
 <link rel="stylesheet" href="vendor/markercluster.css">
-<link rel="stylesheet" href="vendor/fonts.css?v=7">
-<link rel="stylesheet" href="css/base.css?v=7">
-<link rel="stylesheet" href="css/chrome.css?v=7">
-<link rel="stylesheet" href="css/map.css?v=7">
+<link rel="stylesheet" href="vendor/fonts.css?v=8">
+<link rel="stylesheet" href="css/icons.css?v=8">
+<link rel="stylesheet" href="css/base.css?v=8">
+<link rel="stylesheet" href="css/chrome.css?v=8">
+<link rel="stylesheet" href="css/map.css?v=8">
 
 <div id="lightbox" hidden>
   <img alt="">
   <div class="cap muted"></div>
 </div>
 <div id="splash">
-  <div class="mark">water_drop</div>
+  <div class="mark"><i class="i i-water_drop"></i></div>
   <h1>Klang Valley <b>Flood Watch</b></h1>
   <div class="spin"></div>
   <div class="muted" id="splashMsg">fetching stations from JPS…</div>
   <div id="splashWarn" hidden>
-    <div class="state on"><i>wifi_off</i> NO INTERNET CONNECTION</div>
+    <div class="state on"><i class="i i-wifi_off"></i> NO INTERNET CONNECTION</div>
     <p class="muted">This page needs a connection to read live water levels, rainfall and sirens
        from JPS. Anything shown without one would be out of date — and during a flood,
        out of date is worse than nothing.</p>
-    <button class="link" id="splashRetry"><i>refresh</i> Try again</button>
+    <button class="link" id="splashRetry"><i class="i i-refresh"></i> Try again</button>
   </div>
 </div>
 <header>
   <button id="menu" class="icon" title="Layers &amp; filters" aria-label="Layers and filters"
-          aria-expanded="false" aria-controls="bar">menu</button>
-  <h1><i class="glyph brand">water_drop</i><span>Klang Valley <b>Flood Watch</b></span></h1>
+          aria-expanded="false" aria-controls="bar"><i class="i i-menu"></i></button>
+  <h1><i class="glyph brand i i-water_drop"></i><span>Klang Valley <b>Flood Watch</b></span></h1>
   <div id="net" tabindex="0"><span>connecting…</span></div>
   <button id="data" class="icon" title="All stations as a table"
-          aria-label="All stations as a table">list_alt</button>
-  <button id="about" class="icon" title="Data sources" aria-label="Data sources">info</button>
+          aria-label="All stations as a table"><i class="i i-list_alt"></i></button>
+  <button id="about" class="icon" title="Data sources" aria-label="Data sources"><i class="i i-info"></i></button>
   <button id="locate" class="icon" title="Show my location" aria-label="Show my location"></button>
-  <button id="theme" class="icon" title="Toggle theme" aria-label="Toggle theme"></button>
+  <button id="theme" class="icon" title="Toggle theme" aria-label="Toggle theme"><i class="i"></i></button>
 </header>
 <!-- Native <dialog>: modal behaviour, backdrop, Esc-to-close and focus trapping come free. -->
 <dialog id="aboutBox">
@@ -65,8 +66,6 @@
   <p class="muted">Map tiles &copy; <a href="https://carto.com/attributions" target="_blank" rel="noopener">CARTO</a>,
      data &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>
      contributors.</p>
-  <!-- Text-only button: `close` is not in the subsetted icon font, and adding one glyph would mean
-       refetching the subset and busting every font cache. -->
   <form method="dialog"><button class="link">Close</button></form>
 </dialog>
 <!-- Every station in one list. Sticky search + header so the table scrolls under them. -->
@@ -95,9 +94,9 @@
       </div>
     </div>
     <label class="chip"><input type="checkbox" id="heat" checked>
-      <i class="glyph">water_drop</i>Water-level heatmap</label>
+      <i class="glyph i i-water_drop"></i>Water-level heatmap</label>
     <label class="chip"><input type="checkbox" id="risingOnly">
-      <i class="glyph">warning</i>Rising stations only <span id="risingHint" class="hint"></span></label>
+      <i class="glyph i i-warning"></i>Rising stations only <span id="risingHint" class="hint"></span></label>
   </div>
   <div>
     <div id="layers"></div>
@@ -119,7 +118,7 @@
 <div id="legend" class="surface">
   <div class="title">Water-level heat
     <span class="info" tabindex="0" aria-label="How the heatmap is calculated">
-      <i>info</i>
+      <i class="i i-info"></i>
       <span class="tip">
         <p><b>How it is worked out</b></p>
         <p>Each river station is weighted by its level divided by its own danger mark, so a small

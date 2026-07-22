@@ -19,8 +19,8 @@ header h1 .brand { font-size: 24px; color: var(--accent); flex: none; }
 
 #locate.busy { pointer-events: none; }
 #locate.busy::before { animation: pulse 1s infinite; }
-#locate::before { content: 'my_location'; }
-#locate.on::before { content: 'near_me'; color: var(--accent); }
+#locate::before { --i: var(--i-my_location); width: 22px; height: 22px; }
+#locate.on::before { --i: var(--i-near_me); color: var(--accent); }
 
 /* --- sources dialog -------------------------------------------------------------------------- */
 
@@ -167,7 +167,7 @@ body.drawer #legend, body.drawer #alerts { transform: translateX(var(--drawer));
 
 /* Info bubble: the formula lives in here so the legend itself stays a legend. */
 .info { position: relative; margin-left: auto; color: var(--muted); cursor: help; }
-.info > i { font: 16px 'Material Symbols Outlined'; font-style: normal; display: block; }
+.info > .i { font-size: 16px; display: block; }
 .info .tip {
   position: absolute; z-index: 401; bottom: calc(100% + 8px); right: -8px; width: 244px;
   padding: 12px 14px; border-radius: 12px; font-size: 12px; font-weight: 400;
@@ -209,21 +209,21 @@ body.drawer #legend, body.drawer #alerts { transform: translateX(var(--drawer));
 #alertTab:hover { background: var(--hover); }
 #alertTab > span:first-of-type { flex: 1; }        /* pushes the tally to the chevron */
 /* The leading glyph carries the state, coloured by alerts.js on the status ramp (grey when none). */
-#alertTab .lead { font: 20px 'Material Symbols Outlined'; color: var(--c, var(--muted)); }
+#alertTab .lead { font-size: 20px; color: var(--c, var(--muted)); }
 #alertTab .tally { display: flex; gap: 6px; }
 #alertTab .tally b {
   display: inline-flex; align-items: center; gap: 2px;
   padding: 2px 7px 2px 4px; border-radius: 999px; font-size: 12px;
   color: var(--c); background: color-mix(in srgb, var(--c) 16%, transparent);
 }
-#alertTab .tally i { font: 15px 'Material Symbols Outlined'; }
+#alertTab .tally .i { font-size: 15px; }
 #alertTab .lead, #alertTab .tally i { font-style: normal; letter-spacing: normal; }
 #alertBody .empty { padding: 12px 0; border-top: 1px solid var(--outline); margin: 0; }
 #alertTab::after {
-  content: 'expand_more'; font: 20px 'Material Symbols Outlined';
+  --i: var(--i-expand_more); width: 20px; height: 20px;
   margin-left: auto; color: var(--muted);
 }
-#alerts.open #alertTab::after { content: 'expand_less'; }
+#alerts.open #alertTab::after { --i: var(--i-expand_less); }
 #alertBody { display: none; max-height: min(52vh, 460px); overflow: auto; padding: 0 14px 12px; }
 #alerts.open #alertBody { display: block; }
 .alert { padding: 14px 0; border-top: 1px solid var(--outline); }
@@ -260,7 +260,7 @@ body.drawer #legend, body.drawer #alerts { transform: translateX(var(--drawer));
   transition: opacity .3s ease, visibility .3s;
 }
 #splash.gone { opacity: 0; visibility: hidden; }
-#splash .mark { font: 48px 'Material Symbols Outlined'; color: var(--accent); }
+#splash .mark { font-size: 48px; color: var(--accent); }
 #splash h1 { font-size: 22px; font-weight: 400; }
 #splash h1 b { font-weight: 500; color: var(--accent); }
 #splash .spin {
@@ -270,7 +270,7 @@ body.drawer #legend, body.drawer #alerts { transform: translateX(var(--drawer));
 #splash.offline .spin, #splash.offline #splashMsg { display: none; }
 #splashWarn { max-width: 320px; }
 #splashWarn .state { display: flex; align-items: center; justify-content: center; gap: 8px; }
-#splashWarn .state i { font: 20px 'Material Symbols Outlined'; font-style: normal; }
+#splashWarn .state .i { font-size: 20px; }
 #splashWarn p { margin: 12px 0; font-size: 12px; line-height: 1.6; text-align: left; }
 #splashWarn .link { justify-content: center; font-size: 13px; padding: 10px; }
 @media (prefers-reduced-motion: reduce) { #splash .spin { animation-duration: 2.4s; } }

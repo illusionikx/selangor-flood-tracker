@@ -40,7 +40,7 @@ const menu = el('menu');
 // phone-width auto-close would overwrite the preference and there'd be nothing to restore later.
 function setDrawer(open, pan = true, remember = true) {
   document.body.classList.toggle('drawer', open);
-  menu.textContent = open ? 'menu_open' : 'menu';
+  menu.firstElementChild.className = `i i-${open ? 'menu_open' : 'menu'}`;
   menu.setAttribute('aria-expanded', open);
   // Keep whatever you were looking at centred in the *visible* half of the map.
   if (pan) map.panBy([(open ? -1 : 1) * el('bar').offsetWidth / 2, 0], { duration: .25 });
@@ -60,7 +60,7 @@ for (const [k, v] of Object.entries(KINDS)) {
   el('layers').insertAdjacentHTML('beforeend',
     `<label class="chip" style="--c:${v.color}">
        <input type="checkbox" data-kind="${k}"${PREFS.layers[k] !== false ? ' checked' : ''}>
-       <i class="glyph">${v.icon}</i>${v.label}<b data-n="${k}"></b></label>`);
+       <i class="glyph i i-${v.icon}"></i>${v.label}<b data-n="${k}"></b></label>`);
 }
 // A full re-render, not just syncCluster: pins are built per *site* from the sensors currently
 // showing on it, so switching a layer changes which sensor leads a shared mast and what its popup
@@ -187,8 +187,8 @@ function draw(open = !gotoHits.hidden) {
     const head = d !== last ? `<li class="head" role="presentation">${d}</li>` : '';
     last = d;
     return `${head}<li role="option" data-i="${i}"${i === sel ? ' class="sel" aria-selected="true"' : ''}
-      ><i class="glyph" style="color:${s === NEAREST ? 'var(--accent)' : KINDS[s.kind].color}"
-      >${s === NEAREST ? 'my_location' : KINDS[s.kind].icon}</i>${s.name}</li>`;
+      ><i class="glyph i i-${s === NEAREST ? 'my_location' : KINDS[s.kind].icon}" style="color:${s === NEAREST ? 'var(--accent)' : KINDS[s.kind].color}"
+      ></i>${s.name}</li>`;
   }).join('') || '<li class="none">No station matches that</li>';
   gotoHits.hidden = !open;
   gotoIn.setAttribute('aria-expanded', open);

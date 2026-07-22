@@ -44,7 +44,7 @@ td:last-child { text-align: right; padding-left: 16px; }
 }
 .muted { color: var(--muted); font-size: 12px; }
 .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 50%; }
-.glyph { font: 18px 'Material Symbols Outlined'; font-style: normal; }
+.glyph { font-size: 18px; }
 .up { color: #d93025; } .down { color: #188038; }
 :root[data-theme="dark"] .up { color: #f28b82; }
 :root[data-theme="dark"] .down { color: #81c995; }
@@ -88,8 +88,7 @@ select:focus-visible, #goto:focus-visible, #districtFind:focus-visible, #dataFin
 /* Searchable select: reads as a plain select until you click, then it's a filter box over a grouped,
    scrollable list. Placement is map furniture and lives in chrome.css. */
 #gotoBox::after {
-  content: 'expand_more'; font: 20px 'Material Symbols Outlined'; color: var(--muted);
-  letter-spacing: normal; text-transform: none;   /* the font matches on ligature text */
+  --i: var(--i-expand_more); width: 20px; height: 20px; color: var(--muted);
   position: absolute; right: 8px; top: 8px; pointer-events: none;
 }
 /* ponytail: rotate the caret rather than swap in a 'search' glyph — the icon font is subsetted and
@@ -155,7 +154,7 @@ select:focus-visible, #goto:focus-visible, #districtFind:focus-visible, #dataFin
   width: 40px; height: 40px; padding: 0; flex: none;
   display: grid; place-items: center; cursor: pointer;
   background: none; border: 0; border-radius: 50%; color: var(--muted);
-  font-family: 'Material Symbols Outlined'; font-size: 22px;
+  font-size: 22px;
 }
 .icon:hover, body.drawer #menu { background: var(--hover); }
 
@@ -166,7 +165,7 @@ select:focus-visible, #goto:focus-visible, #districtFind:focus-visible, #dataFin
   border: 0; border-radius: 8px;
 }
 .link:hover { background: color-mix(in srgb, var(--accent) 20%, transparent); }
-.link i { font: 16px 'Material Symbols Outlined'; font-style: normal; flex: none; }
+.link .i { font-size: 16px; }
 
 /* --- shared blocks (popup + alert panel) ---------------------------------------------------- */
 
@@ -176,11 +175,8 @@ select:focus-visible, #goto:focus-visible, #districtFind:focus-visible, #dataFin
   letter-spacing: .3px; text-transform: uppercase;
   color: var(--c); background: color-mix(in srgb, var(--c) 16%, transparent);
 }
-.badge i { font-family: 'Material Symbols Outlined'; font-size: 14px; }
-/* Icon fonts match on the ligature text, so uppercase/letter-spacing must not reach it. */
-.badge i, .link i, .glyph {
-  font-style: normal; text-transform: none; letter-spacing: normal; white-space: nowrap;
-}
+.badge .i { font-size: 14px; }
+
 
 /* One thing to say (siren state, no reading, stale gauge) — centred block instead of a metric row. */
 .state {

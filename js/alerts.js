@@ -32,7 +32,7 @@ export function alerts() {
     [sirens, 'campaign',    'sounding', '#d93025'],
   ].filter(([n]) => n)
    .map(([n, icon, what, c]) => `<b style="--c:${c}" title="${n} ${what}" aria-label="${n} ${what}"
-        ><i>${icon}</i>${n}</b>`).join('');
+        ><i class="i i-${icon}"></i>${n}</b>`).join('');
 
   // The warning glyph is the at-a-glance signal, so it carries the size of the problem on the usual
   // status ramp: grey nothing, amber a handful, orange a bad night, red district-wide. The steps are
@@ -41,7 +41,7 @@ export function alerts() {
     : STATUS_COLOR[hot.length >= 10 ? 3 : hot.length >= 5 ? 2 : 1];
 
   el('alertTab').innerHTML =
-    `<i class="lead" style="--c:${c}">warning</i><span>On alert${
+    `<i class="lead i i-warning" style="--c:${c}"></i><span>On alert${
       hot.length && hereAt ? ' <span class="muted">· nearest first</span>' : ''
     }</span><span class="tally">${tally}</span>`;
 
@@ -83,13 +83,13 @@ export function alerts() {
            ${sparkline(s.history)}`;
 
       return `<div class="alert">
-        <span class="badge" style="--c:${kind.color}"><i>${kind.icon}</i>${kind.one || kind.label}</span>
+        <span class="badge" style="--c:${kind.color}"><i class="i i-${kind.icon}"></i>${kind.one || kind.label}</span>
         <div class="popname name" data-go="${s.id}">${s.name}</div>
         <div class="muted">${[s.district, s.state].filter(Boolean).join(', ')} · ${s.basin || 'basin n/a'}${
           hereAt ? ` · <b>${distKm(hereAt, s).toFixed(1)} km from you</b>` : ''}</div>
         ${detail}
         ${cam ? `<button class="link" data-cam="${cam.id}">
-          <i>photo_camera</i> Nearest station with a webcam · ${cam.name} (${distKm(s, cam).toFixed(1)} km)</button>` : ''}
+          <i class="i i-photo_camera"></i> Nearest station with a webcam · ${cam.name} (${distKm(s, cam).toFixed(1)} km)</button>` : ''}
         <div class="muted">updated ${s.updated || s.shot || 'unknown'}</div>
       </div>`;
     }).join('');

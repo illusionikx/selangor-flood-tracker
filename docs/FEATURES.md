@@ -139,15 +139,43 @@ zero coordinates, so the map has always dropped them silently — 446 rows again
 a row marked `not on the map · no coordinates` and, deliberately, no `data-mast`, so they offer no
 jump. A clickable row for a station at 0°, 0° would fly the map into the Atlantic.
 
-*The icon cost a font refetch.* `list_alt` wasn't in the subsetted `symbols.woff2`, so the subset
-was refetched with the documented `icon_names=` procedure and `?v=` bumped to 7 on both the
-stylesheet link and the font URLs. Verified with fontTools before trusting it: the new file is a
-strict superset — 24 ligatures against the old 23, nothing lost, `list_alt` gained. It is also
-2 KB *smaller*, which looked like a red flag until the ligature diff proved otherwise.
+*The icon for it is what finally killed the icon font* — see below.
 
 *`leads()` moved to `util.js`.* The table needs the same sensor ordering as the map, and having a
 view import another view would have put `render.js → table.js → render.js` in the graph. Both now
 import it from `util.js`, and the acyclic rule holds — checked by walking the import graph.
+
+**Icons are SVG masks, not an icon font** (`css/icons.css`) — same icon set as before, Material
+Symbols Outlined (Apache 2.0). What changed is delivery, because the font *was* the bug.
+
+*The failure mode, three times over.* A ligature icon font renders **text**. `<i>list_alt</i>` only
+becomes a picture if font shaping cooperates; when it doesn't, the raw word appears — `LIST_ALT`
+across the app bar. Each occurrence had a different trigger — a parent's `text-transform`, a glyph
+missing from the subset, a stale cached subset — and each was patched individually, because each
+looked like a different bug. They were one bug: the icon was text, and text has many ways to escape.
+
+*A mask cannot fail that way.* There is no text to transform and no ligature to match. The icon is
+a vector painted in `currentColor` and sized in `em`, so it inherits colour and size exactly as the
+font did. If a name is wrong, nothing paints — a missing icon can no longer render as a readable
+English word in the middle of the UI.
+
+*What this deleted:* `vendor/symbols.woff2`, its `@font-face`, the `icon_names=` refetch procedure,
+the two-file `?v=` bump on every icon addition, and the `text-transform: none; letter-spacing:
+normal` resets scattered across `.badge i`, `.link i` and `.glyph`. Adding an icon is now one rule.
+
+*Why not the Material icon library as a dependency?* It is the same set either way — this **is**
+Material Symbols. Delivered as a font it keeps the exact failure mode above; via CDN it breaks the
+project's no-CDN rule (the reason everything is vendored); via npm it needs a build step the project
+doesn't have. The full font would fix "glyph missing from subset" and none of the other triggers,
+at ~300 KB against 10 KB of CSS.
+
+*Trade-off accepted:* 10 KB of CSS versus a 3.5 KB font file, and the paths are generated rather
+than hand-written — regenerate with the script recorded in this file's history if the set changes.
+In exchange there is no second network request, no FOUT, and no cache-busting dance.
+
+*Found while doing it:* Herd answers a **missing** file with `index.html` and HTTP 200. Every
+"all assets return 200" check in this project was therefore weaker than it looked — a typo'd path
+would have passed it. The verify snippet in CLAUDE.md now checks `content_type`.
 
 **One mast, one pin** — a rainfall gauge, a river gauge, a siren and a camera on the same pole are
 published as four separate stations at one coordinate. Four pins stacked on each other made one
@@ -377,7 +405,10 @@ a grey `NO READING` with the last-reported time when the station has nothing, on
 as the siren: silence must never render as "not raining".
 
 **Camera popups lead with the picture.** For a camera the still *is* the reading, so it sits directly
-under the header. The "show nearest webcam" link on every other kind stays at the bottom — that is an
+under the header — and in a multi-sensor site popup the camera's whole section is hoisted to the top,
+ahead of the `leads` order that ranks it last. That ranking is about which reading is most *urgent*;
+in a popup the picture is what you opened the pin to look at, and scrolling past four sensors to
+reach it defeats the point. The sort is stable, so everything else keeps render.js's order. The "show nearest webcam" link on every other kind stays at the bottom — that is an
 action to take after reading the numbers, not one of them.
 
 **Popups scroll past the viewport.** A camera still plus a sparkline can be taller than the map, and

@@ -25,7 +25,7 @@ export const etaText = h => h <= 0 ? 'already at it'
 
 const camLink = (from, cam) => cam
   ? `<button class="link" data-cam="${cam.id}">
-       <i>photo_camera</i> Nearest station with a webcam · ${cam.name} (${distKm(from, cam).toFixed(1)} km)
+       <i class="i i-photo_camera"></i> Nearest station with a webcam · ${cam.name} (${distKm(from, cam).toFixed(1)} km)
      </button>`
   : '<div class="muted">no camera nearby</div>';
 
@@ -155,7 +155,7 @@ export function popup(s) {
       <div class="popname">${s.name}</div>
       ${region(s)}
       <span class="badge" style="--c:${tone}">
-        <i>${kind.icon}</i>${kind.one || kind.label}
+        <i class="i i-${kind.icon}"></i>${kind.one || kind.label}
       </span>
     </div>
     ${sensorBody(s)}
@@ -166,6 +166,12 @@ export function popup(s) {
    four stations at one coordinate, and drawing four pins on top of each other made a place look like
    four places. The site gets one pin and one popup — the place named once, then a section per
    sensor. Members arrive already sorted by how much each matters (see render.js). */
+/* `leads` ranks the camera last — it is the least urgent *reading*. In a popup it is the opposite:
+   the picture is what you opened the pin to look at, and scrolling past four sensors to reach it
+   defeats the point. Stable sort, so everything else keeps the order render.js chose. */
+const camFirst = members =>
+  [...members].sort((a, b) => (b.kind === 'camera') - (a.kind === 'camera'));
+
 export function sitePopup(members) {
   if (members.length === 1) return popup(members[0]);
   const lead = members[0];
@@ -178,13 +184,13 @@ export function sitePopup(members) {
       <div class="badges">${members.map(m => {
         const k = KINDS[m.kind];
         return `<span class="badge" style="--c:${hasInfo(m) ? k.color : 'var(--muted)'}"
-                ><i>${k.icon}</i>${k.one || k.label}</span>`;
+                ><i class="i i-${k.icon}"></i>${k.one || k.label}</span>`;
       }).join('')}</div>
     </div>
-    ${members.map(m => `<div class="sensor">
+    ${camFirst(members).map(m => `<div class="sensor">
       <div class="sensorhead">
-        <i class="glyph" style="color:${hasInfo(m) ? KINDS[m.kind].color : 'var(--muted)'}"
-          >${KINDS[m.kind].icon}</i>
+        <i class="glyph i i-${KINDS[m.kind].icon}" style="color:${hasInfo(m) ? KINDS[m.kind].color : 'var(--muted)'}"
+          ></i>
         <b>${KINDS[m.kind].one || KINDS[m.kind].label}</b>
         ${m.name !== lead.name ? `<span class="muted">${m.name}</span>` : ''}
       </div>
@@ -199,10 +205,10 @@ export function herePopup(e, loaded) {
   if (!loaded) return '<b>You are here</b><br><span class="muted">stations still loading…</span>';
   const rows = ['river', 'rainfall', 'siren', 'gauge'].map(k => {
     const s = nearestOf(k, e.latlng);
-    if (!s) return `<div class="near"><i class="glyph" style="color:${KINDS[k].color}">${KINDS[k].icon}</i>
+    if (!s) return `<div class="near"><i class="glyph i i-${KINDS[k].icon}" style="color:${KINDS[k].color}"></i>
       <div><div class="muted">no ${KINDS[k].label.toLowerCase()} reporting</div></div></div>`;
     return `<div class="near" data-go="${s.id}">
-      <i class="glyph" style="color:${KINDS[k].color}">${KINDS[k].icon}</i>
+      <i class="glyph i i-${KINDS[k].icon}" style="color:${KINDS[k].color}"></i>
       <div>
         <div>${s.name} <span class="muted">${distKm(e.latlng, s).toFixed(1)} km</span></div>
         <div class="muted">${oneLiner(s)}</div>
@@ -210,7 +216,7 @@ export function herePopup(e, loaded) {
   }).join('');
 
   return `<div class="pophead">
-      <span class="badge" style="--c:#1a73e8"><i>person</i>You are here</span>
+      <span class="badge" style="--c:#1a73e8"><i class="i i-person"></i>You are here</span>
       <div class="muted">accurate to about ${Math.round(e.accuracy)} m</div>
     </div>
     ${rows}

@@ -32,7 +32,7 @@ function setBasemap() {
 
 export function setTheme(t) {
   document.documentElement.dataset.theme = t;
-  el('theme').textContent = t === 'dark' ? 'light_mode' : 'dark_mode';
+  el('theme').firstElementChild.className = `i i-${t === 'dark' ? 'light_mode' : 'dark_mode'}`;
   PREFS.theme = t;
   save();
   setBasemap();
@@ -63,7 +63,7 @@ export const cluster = L.markerClusterGroup({
     return L.divIcon({
       className: '', iconSize: [36, 36],
       html: `<span class="cluster${critical ? ' danger' : ''}${mixed ? ' mixed' : ''}"
-                   style="--c:${KINDS[top].color}"><i>${KINDS[top].icon}</i>${kids.length}</span>`,
+                   style="--c:${KINDS[top].color}"><i class="i i-${KINDS[top].icon}"></i>${kids.length}</span>`,
     });
   },
 }).addTo(map);

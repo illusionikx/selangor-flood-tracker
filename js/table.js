@@ -68,7 +68,7 @@ export function dataTable() {
         </td>
         <td class="sn">${members.map(m => `<div class="srow">
           <span class="badge" style="--c:${hasInfo(m) ? KINDS[m.kind].color : 'var(--muted)'}"
-            ><i>${KINDS[m.kind].icon}</i>${KINDS[m.kind].one || KINDS[m.kind].label}</span>
+            ><i class="i i-${KINDS[m.kind].icon}"></i>${KINDS[m.kind].one || KINDS[m.kind].label}</span>
           <span class="rd" style="color:${color(m)}">${
             hasInfo(m) ? oneLiner(m) || '—' : 'no reading'}</span>
           ${m.name !== lead.name ? `<span class="alt muted">${m.name}</span>` : ''}

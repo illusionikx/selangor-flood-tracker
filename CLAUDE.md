@@ -16,6 +16,7 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `api.php` | server-side proxy + cache + source merge + poll history + camera image proxy |
 | `sources.php` | scrapers for the two HTML-only upstreams (national portal, JPS WP) |
 | `index.html` | markup only — no inline CSS or JS |
+| `css/icons.css` | every icon, as an SVG mask. Generated — see docs/FEATURES.md for the fetch |
 | `css/base.css` | tokens, reset, controls, blocks shared by popup + alert panel |
 | `css/chrome.css` | page furniture: app bar, status chip, drawer, legend, alerts, splash |
 | `css/map.css` | Leaflet overrides, pins, cluster badges, popup template |
@@ -171,11 +172,15 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   edit unless the URL changes. The stylesheet links carry `?v=` — **bump it when you touch a css
   file**, the same as `vendor/fonts.css`. ES module imports have no such guard: hard-reload
   (Ctrl+Shift+R) after a `js/` change, or the browser may run the old module.
-- **Icon font is subsetted.** `vendor/symbols.woff2` contains only the icons listed at the top of
-  `vendor/fonts.css`. Adding an icon means refetching with `icon_names=` **and bumping `?v=`** on
-  both the `fonts.css` link and the font URLs — browsers cache the old subset hard.
-- **Icon fonts match on ligature text.** `text-transform: uppercase` or `letter-spacing` on a
-  parent turns `water_drop` into unmatched text. `.badge i`, `.link i`, `.glyph` reset both.
+- **There is no icon font any more, and there must not be one again.** Icons are SVG masks in
+  `css/icons.css` (`<i class="i i-warning">`, or `--i: var(--i-warning)` on a pseudo-element).
+  A ligature font renders *text* that only becomes a picture if shaping cooperates, so a stray
+  `text-transform`, a glyph missing from the subset or one stale cached subset put the raw word on
+  screen — that happened three times, with three different triggers. Adding an icon is one rule in
+  `icons.css`; there is no binary to refetch and no `?v=` to bump.
+- **Herd serves `index.html` with HTTP 200 for missing files.** A typo'd asset path is *not* a 404,
+  so "everything returns 200" proves nothing — check `%{content_type}` instead. This is why a
+  missing `js/*.js` shows up as a module parse error in the console rather than a failed request.
 - **Zooming destroys open popups.** markercluster rebuilds marker DOM on zoom. Use `openStable()`
   (opens, re-opens on next `moveend` if it closed), and `cluster.zoomToShowLayer()` for a marker
   that may be inside a cluster.
@@ -251,8 +256,10 @@ curl -sk -o /dev/null -w '%{http_code}\n' "https://flood-exp.test/api.php?cam=1"
 T=$(mktemp -d); for f in js/*.js; do cp "$f" "$T/$(basename ${f%.js}).mjs"; done
 for f in "$T"/*.mjs; do node --check "$f" || echo "FAIL $f"; done
 
-# And that every file still serves (a typo'd import path is a silent 404, not an error):
-for f in js/*.js css/*.css; do curl -sk -o /dev/null -w "%{http_code} $f\n" "https://flood-exp.test/$f"; done
+# And that every file still serves. Check the *type*, not the status: Herd answers a missing file
+# with index.html and a 200, so a typo'd path passes a status check and fails in the browser.
+for f in js/*.js css/*.css; do
+  curl -sk -o /dev/null -w "%{content_type} $f\n" "https://flood-exp.test/$f"; done | grep -v 'javascript\|css'
 ```
 
 There is no test suite. Changes are verified by linting, syntax-checking the inline JS, querying

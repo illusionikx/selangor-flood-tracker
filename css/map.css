@@ -65,7 +65,7 @@
 .pin {
   position: relative; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%;
   background: var(--surface); box-shadow: var(--shadow); color: var(--c, var(--accent));
-  font-family: 'Material Symbols Outlined'; font-size: 16px;
+  font-size: 16px;
 }
 .pin.off { color: var(--muted); opacity: .6; }
 /* How many sensors this one pin stands for. Only rendered past one, so a plain pin stays plain. */
@@ -95,7 +95,7 @@
   font-size: 12px; font-weight: 500; color: #fff; background: var(--c);
   box-shadow: var(--shadow); border: 2px solid var(--surface);
 }
-.cluster i { font: 14px 'Material Symbols Outlined'; font-style: normal; opacity: .85; }
+.cluster .i { font-size: 14px; opacity: .85; }
 .cluster.mixed { border-style: dashed; }              /* more than one kind inside */
 .cluster.danger {
   background: #d93025;
