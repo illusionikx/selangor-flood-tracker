@@ -26,6 +26,11 @@ export const SOURCES = {
 export const RIVER_COLOR = { '-1': '#555', 0: '#4da3ff', 1: '#ffd166', 2: '#ff9f1c', 3: '#ff4d4d' };
 export const RAIN_COLOR  = { '-1': '#555', 0: '#3a3a6a', 1: '#6f7bff', 2: '#8f7bff', 3: '#c77dff', 4: '#ff4d4d' };
 
+// Which sensor speaks for a mast when several share one: a river gauge says more about a flood than
+// the rainfall gauge strapped to the same pole, and a camera says least until you open it. Used for
+// the pin's lead sensor and for the order sensors are listed in, so both tell the same story.
+export const KIND_RANK = ['river', 'siren', 'gauge', 'rainfall', 'camera'];
+
 // Traffic light by status: normal → alert → warning → danger.
 export const STATUS_COLOR = ['#188038', '#f9ab00', '#e8710a', '#d93025'];
 

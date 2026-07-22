@@ -75,12 +75,13 @@ td:last-child { text-align: right; padding-left: 16px; }
 .chip .hint { margin-left: auto; font-size: 11px; opacity: .7; white-space: nowrap; }
 #shown { margin: 10px 2px 0; font-size: 12px; }
 
-select, #goto, #districtFind {
+select, #goto, #districtFind, #dataFind {
   width: 100%; padding: 8px 10px; margin-bottom: 10px; font: inherit; font-size: 13px;
   background: var(--surface); color: var(--on-surface);
   border: 1px solid var(--outline); border-radius: 8px;
 }
-select:focus-visible, #goto:focus-visible, #districtFind:focus-visible, .icon:focus-visible {
+select:focus-visible, #goto:focus-visible, #districtFind:focus-visible, #dataFind:focus-visible,
+.icon:focus-visible {
   outline: 2px solid var(--accent); outline-offset: 1px;
 }
 
@@ -189,6 +190,8 @@ select:focus-visible, #goto:focus-visible, #districtFind:focus-visible, .icon:fo
 }
 .state.off { color: #188038; background: color-mix(in srgb, #188038 12%, transparent); }
 .state.on  { color: #d93025; background: color-mix(in srgb, #d93025 14%, transparent); }
+.state.mid { color: #b06000; background: color-mix(in srgb, #f9ab00 18%, transparent); }
+:root[data-theme="dark"] .state.mid { color: #fdd663; }
 :root[data-theme="dark"] .state.off { color: #81c995; }
 :root[data-theme="dark"] .state.on  { color: #f28b82; }
 

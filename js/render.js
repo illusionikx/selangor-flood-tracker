@@ -2,10 +2,11 @@
 
 import { KINDS, RISE_ETA } from './config.js';
 import { state, PREFS } from './state.js';
-import { el, color, popWidth, dkey } from './util.js';
+import { el, color, popWidth, dkey, isCritical, leads } from './util.js';
 import { map, marks, siteMark, shown, syncCluster, focusOn, openStable } from './map.js';
 import { heat, heatScale, heatOpacity } from './heat.js';
 import { sitePopup } from './popup.js';
+import { dataTable } from './table.js';
 
 state.rerender = () => render();
 
@@ -25,16 +26,6 @@ function syncRisingChip() {
   return chip.checked;
 }
 
-const isCritical = s =>
-  (s.kind === 'river' && s.status >= 3) || (s.kind === 'siren' && s.status > 0);
-
-/* Which sensor speaks for a site: whatever is most worth seeing from across the map. Rank by
-   trouble first, then by kind — a river gauge says more about a flood than the rainfall gauge
-   strapped to the same pole, and a camera says least until you open it. */
-const RANK = ['river', 'siren', 'gauge', 'rainfall', 'camera'];
-const leads = (a, b) =>
-  isCritical(b) - isCritical(a) || !!b.rising - !!a.rising ||
-  RANK.indexOf(a.kind) - RANK.indexOf(b.kind);
 
 export function render() {
   const hidden = new Set(PREFS.hidden || []);
@@ -119,6 +110,9 @@ export function render() {
   heatOpacity();
   counts();
   districts();
+  // Every poll rebuilds the map; the table has to follow or it sits on readings the map has already
+  // replaced. Only while it is open — no point rendering 435 rows into a closed dialog.
+  if (el('dataBox').open) dataTable();
 }
 
 /* The district filter: every district the feeds returned, grouped under its state, each with the

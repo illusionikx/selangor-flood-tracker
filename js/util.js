@@ -1,6 +1,6 @@
 // Small pure helpers plus the rules for "does this station actually know anything".
 
-import { KINDS, RIVER_COLOR, RAIN_COLOR, STATUS_COLOR, NO_INFO } from './config.js';
+import { KINDS, KIND_RANK, RIVER_COLOR, RAIN_COLOR, STATUS_COLOR, NO_INFO } from './config.js';
 
 export const el  = id => document.getElementById(id);
 
@@ -59,3 +59,14 @@ export function color(s) {
   if (s.kind === 'gauge')    return s.status >= 2 ? '#ff4d4d' : s.status === 1 ? '#ff9f1c' : KINDS.gauge.color;
   return KINDS[s.kind].color;
 }
+
+// Is this station the reason someone opens the map at all: a river at danger, or a siren sounding.
+export const isCritical = s =>
+  (s.kind === 'river' && s.status >= 3) || (s.kind === 'siren' && s.status > 0);
+
+/* Which sensor speaks for a mast when several share one — trouble first, then the standing rank in
+   config.js. Lives here rather than in render.js because the table needs the same order and a view
+   importing another view would put a cycle in the graph. */
+export const leads = (a, b) =>
+  isCritical(b) - isCritical(a) || !!b.rising - !!a.rising ||
+  KIND_RANK.indexOf(a.kind) - KIND_RANK.indexOf(b.kind);

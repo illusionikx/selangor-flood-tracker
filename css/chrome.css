@@ -37,6 +37,57 @@ header h1 .brand { font-size: 24px; color: var(--accent); flex: none; }
 #aboutBox .src .muted { line-height: 1.45; }
 #aboutBox form { margin-top: 18px; text-align: right; }
 
+/* --- all-stations table ----------------------------------------------------------------------- */
+
+/* Taller and wider than the sources dialog: this one is for scanning, so it takes the screen. */
+#dataBox {
+  width: min(760px, calc(100vw - 24px)); height: min(88vh, 900px); padding: 0;
+  display: flex; flex-direction: column; overflow: hidden;
+  border: 1px solid var(--outline); border-radius: 12px;
+  background: var(--surface); color: var(--on-surface); box-shadow: var(--shadow);
+}
+#dataBox::backdrop { background: #0009; }
+/* Search stays put while the list scrolls under it — the filter is useless if you have to scroll
+   back up to change it after seeing the result. */
+#dataBox .dtop {
+  flex: none; padding: 16px 20px 12px; border-bottom: 1px solid var(--outline); background: var(--surface);
+}
+#dataBox h2 { font-size: 18px; font-weight: 500; margin-bottom: 10px; }
+#dataBox #dataFind { margin-bottom: 6px; }
+#dataBox .dbot {
+  flex: none; padding: 10px 20px; border-top: 1px solid var(--outline); text-align: right;
+}
+#dataBox .dbot .link { display: inline-flex; width: auto; }
+
+table.data { flex: 1; display: block; overflow: auto; width: 100%; border-collapse: collapse; }
+table.data tbody { display: table; width: 100%; }
+/* Sticky district headings: scrolling a long district, you still know which one you are in. */
+table.data .dhead th {
+  position: sticky; top: 0; z-index: 1; text-align: left; padding: 10px 20px 6px;
+  font-size: 11px; font-weight: 500; letter-spacing: .06em; text-transform: uppercase;
+  background: var(--hover); border-bottom: 1px solid var(--outline);
+}
+table.data .dhead .muted { text-transform: none; letter-spacing: normal; margin-left: 6px; }
+table.data tr[data-mast] { cursor: pointer; }
+table.data tr[data-mast]:hover { background: var(--hover); }
+/* No coordinates upstream, so nothing to fly to — say so rather than offer a jump that goes nowhere. */
+table.data .nomap { font-style: italic; }
+table.data td { padding: 10px 20px; border-bottom: 1px solid var(--outline); vertical-align: top; }
+table.data td.nm { width: 38%; }
+table.data td.none { text-align: center; padding: 28px; }
+table.data .srow { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+table.data .srow + .srow { margin-top: 6px; }
+table.data .srow .badge { margin: 0; flex: none; }
+table.data .srow .rd { font-size: 12px; font-variant-numeric: tabular-nums; }
+table.data .srow .alt { flex-basis: 100%; }
+
+@media (max-width: 600px) {
+  #dataBox { width: 100vw; height: 100dvh; max-width: none; border-radius: 0; border: 0; }
+  table.data td { padding: 10px 14px; }
+  table.data .dhead th { padding: 10px 14px 6px; }
+  table.data td.nm { width: 42%; }
+}
+
 /* --- live status chip + its popover --------------------------------------------------------- */
 
 #net {

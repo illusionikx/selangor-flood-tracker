@@ -86,6 +86,18 @@ function gaugeBlock(s) {
     ${stale ? `<div class="state">NOT CURRENT · last reported ${s.updated || 'unknown'}</div>` : ''}`;
 }
 
+/* Same job as the siren's state block: answer the one question the pin is opened to answer, before
+   the numbers. "3.4 mm" is a fact you have to interpret; "MODERATE RAIN" is the reading. Bands are
+   the server's own rainStatus() cutoffs (>0 / >10 / >30 / >60 mm an hour), so the block, the pin
+   colour and the status code can never disagree. */
+const RAIN_STATE = ['NOT RAINING', 'LIGHT RAIN', 'MODERATE RAIN', 'HEAVY RAIN', 'VERY HEAVY RAIN'];
+const rainState = s => !hasInfo(s)
+  ? `<div class="state">NO READING</div>
+     <div class="muted">last reported ${s.updated ? `${s.updated} · ${ago(parseMY(s.updated))}`
+                                                  : 'never — this station has no timestamp'}</div>`
+  : `<div class="state ${s.status >= 3 ? 'on' : s.status >= 1 ? 'mid' : 'off'}"
+      >${RAIN_STATE[s.status] || 'NOT RAINING'}</div>`;
+
 /* Everything one sensor has to say, without its name or region — those belong to the place, and a
    site with five sensors on one mast would otherwise repeat them five times. */
 function sensorBody(s, withCam = true) {
@@ -102,6 +114,7 @@ function sensorBody(s, withCam = true) {
     body.push(metric('Today', num(s.daily, ' mm')));
   }
   const rain = s.kind === 'rainfall' ? rainBars(s.history) : '';
+  const wet = s.kind === 'rainfall' ? rainState(s) : '';
   // A siren has exactly one thing to say, so it gets a centred state block instead of a metric row.
   // "No signal" is only half the story: say when it last reported, so a siren that fell off the
   // network last March can't be mistaken for one that is quietly working.
@@ -120,7 +133,7 @@ function sensorBody(s, withCam = true) {
     : s.image ? camImg(s, `Latest still from ${s.name}`) : '<div class="muted">no camera feed</div>';
   const link = s.kind !== 'camera' && withCam ? camLink(s, nearestCam(s)) : '';
 
-  return `${still}${siren}${gauge}
+  return `${still}${siren}${gauge}${wet}
     ${s.kind === 'river' ? meter(s) : ''}
     ${body.length ? `<div class="popbody">${body.join('')}</div>` : ''}
     ${rain}${link}`;

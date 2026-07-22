@@ -29,6 +29,7 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `js/popup.js` | popup + meter + gauge + sparkline templates |
 | `js/render.js` | rebuilds markers and heat points; drawer summary table |
 | `js/alerts.js` | "On alert" panel |
+| `js/table.js` | the all-stations table dialog, grouped district → mast → sensor |
 | `js/locate.js` | geolocation and the "You are here" marker |
 | `js/net.js` | `load()` poll loop and the status chip |
 | `js/ui.js` | all DOM wiring: drawer, filters, chips, panels, lightbox, delegated jumps |

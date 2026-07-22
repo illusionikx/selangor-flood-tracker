@@ -7,6 +7,7 @@ import { map, setTheme, flashTo } from './map.js';
 import { heatOpacity } from './heat.js';
 import { byId } from './stations.js';
 import { render, districts } from './render.js';
+import { dataTable } from './table.js';
 import { alerts } from './alerts.js';
 import { load } from './net.js';
 
@@ -23,6 +24,13 @@ el('theme').onclick = () =>
 const aboutBox = el('aboutBox');
 el('about').onclick = () => aboutBox.showModal();
 aboutBox.onclick = e => { if (e.target === aboutBox) aboutBox.close(); };
+
+// --- all-stations table ------------------------------------------------------------------------
+
+const dataBox = el('dataBox');
+el('data').onclick = () => { dataTable(); dataBox.showModal(); el('dataFind').focus(); };
+dataBox.onclick = e => { if (e.target === dataBox) dataBox.close(); };
+el('dataFind').oninput = dataTable;
 
 // --- drawer ------------------------------------------------------------------------------------
 

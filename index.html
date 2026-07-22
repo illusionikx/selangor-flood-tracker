@@ -4,10 +4,10 @@
 <title>Klang Valley Flood Watch</title>
 <link rel="stylesheet" href="vendor/leaflet.css">
 <link rel="stylesheet" href="vendor/markercluster.css">
-<link rel="stylesheet" href="vendor/fonts.css?v=6">
-<link rel="stylesheet" href="css/base.css?v=6">
-<link rel="stylesheet" href="css/chrome.css?v=6">
-<link rel="stylesheet" href="css/map.css?v=6">
+<link rel="stylesheet" href="vendor/fonts.css?v=7">
+<link rel="stylesheet" href="css/base.css?v=7">
+<link rel="stylesheet" href="css/chrome.css?v=7">
+<link rel="stylesheet" href="css/map.css?v=7">
 
 <div id="lightbox" hidden>
   <img alt="">
@@ -31,6 +31,8 @@
           aria-expanded="false" aria-controls="bar">menu</button>
   <h1><i class="glyph brand">water_drop</i><span>Klang Valley <b>Flood Watch</b></span></h1>
   <div id="net" tabindex="0"><span>connecting…</span></div>
+  <button id="data" class="icon" title="All stations as a table"
+          aria-label="All stations as a table">list_alt</button>
   <button id="about" class="icon" title="Data sources" aria-label="Data sources">info</button>
   <button id="locate" class="icon" title="Show my location" aria-label="Show my location"></button>
   <button id="theme" class="icon" title="Toggle theme" aria-label="Toggle theme"></button>
@@ -66,6 +68,17 @@
   <!-- Text-only button: `close` is not in the subsetted icon font, and adding one glyph would mean
        refetching the subset and busting every font cache. -->
   <form method="dialog"><button class="link">Close</button></form>
+</dialog>
+<!-- Every station in one list. Sticky search + header so the table scrolls under them. -->
+<dialog id="dataBox">
+  <div class="dtop">
+    <h2>All stations</h2>
+    <input id="dataFind" type="text" autocomplete="off" placeholder="Filter by name, district or basin…"
+           aria-label="Filter stations">
+    <p id="dataCount" class="muted"></p>
+  </div>
+  <table class="data"><tbody id="dataBody"></tbody></table>
+  <form method="dialog" class="dbot"><button class="link">Close</button></form>
 </dialog>
 <div id="map"></div>
 <div id="bar">

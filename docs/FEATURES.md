@@ -124,6 +124,31 @@ is replaced by the sentence `no rain in the last 5.0 h` — a row of flat bars s
 *Shared axis machinery.* `timeAxis()` computes the window and the round-clock ticks once for both
 graphs, so the level line and the rain bars cannot drift apart on window, tick spacing or timezone.
 
+**All stations as a table** (`list_alt` in the app bar) — every mast under its district, each with a
+badge and a reading per sensor. The map answers "what is happening near here"; this answers "what is
+there", which is a different question and a bad fit for pins — you cannot scan 435 pins, and a mast
+holding six sensors shows one. Grouping matches the map exactly, so moving between them doesn't
+re-teach you the shape of the data. Clicking a row closes the dialog and flies to the mast.
+
+*Deliberately not filtered by the drawer.* This is "show me everything"; a table that quietly
+omitted the districts you switched off on the map would be the same trap as the silently-empty map.
+Its search box is the only filter, and what that hides, it hides in front of you.
+
+*It is also the only place the unmappable stations appear.* 11 cameras are published by JPS with
+zero coordinates, so the map has always dropped them silently — 446 rows against 435 pins. They get
+a row marked `not on the map · no coordinates` and, deliberately, no `data-mast`, so they offer no
+jump. A clickable row for a station at 0°, 0° would fly the map into the Atlantic.
+
+*The icon cost a font refetch.* `list_alt` wasn't in the subsetted `symbols.woff2`, so the subset
+was refetched with the documented `icon_names=` procedure and `?v=` bumped to 7 on both the
+stylesheet link and the font URLs. Verified with fontTools before trusting it: the new file is a
+strict superset — 24 ligatures against the old 23, nothing lost, `list_alt` gained. It is also
+2 KB *smaller*, which looked like a red flag until the ligature diff proved otherwise.
+
+*`leads()` moved to `util.js`.* The table needs the same sensor ordering as the map, and having a
+view import another view would have put `render.js → table.js → render.js` in the graph. Both now
+import it from `util.js`, and the acyclic rule holds — checked by walking the import graph.
+
 **One mast, one pin** — a rainfall gauge, a river gauge, a siren and a camera on the same pole are
 published as four separate stations at one coordinate. Four pins stacked on each other made one
 place look like four, and clicking any of them told you a quarter of the story. `api.php` groups
@@ -343,6 +368,13 @@ multi-sensor variant does the same, with the badge row after the "N sensors at t
 *Bug fixed with it:* the divider under the header was drawn twice. `.sensor:first-of-type` was meant
 to drop the first section's own rule, but `.pophead` is a `div` too and so *it* was the first of its
 type — the selector matched nothing. It is `.pophead + .sensor` now.
+
+**Rainfall popups state whether it is raining**, the way a siren states TRIGGERED / IDLE. `3.4 mm`
+is a fact you then have to interpret; `MODERATE RAIN` is the reading. The bands are the server's own
+`rainStatus()` cutoffs (>0 / >10 / >30 / >60 mm an hour), so the block, the pin colour and the status
+code cannot drift apart. Green when dry, amber for light and moderate, red for heavy and above — and
+a grey `NO READING` with the last-reported time when the station has nothing, on the same principle
+as the siren: silence must never render as "not raining".
 
 **Camera popups lead with the picture.** For a camera the still *is* the reading, so it sits directly
 under the header. The "show nearest webcam" link on every other kind stays at the bottom — that is an

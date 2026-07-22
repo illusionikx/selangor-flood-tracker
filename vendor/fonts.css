@@ -1,14 +1,14 @@
 /* Self-hosted so no third-party storage/tracking-prevention warnings. Latin subset only.
    Material Symbols is subsetted to the icons this app uses (see icon_names in the fetch URL):
    campaign dark_mode expand_less expand_more light_mode menu menu_open my_location near_me
-   info person photo_camera rainy refresh straighten warning water_drop wifi_off — add an icon here and the
+   info list_alt person photo_camera rainy refresh straighten warning water_drop wifi_off — add an icon here and the
    subset must be refetched. */
 @font-face {
   font-family: 'Roboto'; font-style: normal; font-weight: 100 900; font-display: swap;
-  src: url(roboto.woff2?v=5) format('woff2');
+  src: url(roboto.woff2?v=7) format('woff2');
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+2000-206F, U+2122, U+2191, U+2193, U+25BC, U+25B2;
 }
 @font-face {
   font-family: 'Material Symbols Outlined'; font-style: normal; font-weight: 400; font-display: block;
-  src: url(symbols.woff2?v=5) format('woff2');
+  src: url(symbols.woff2?v=7) format('woff2');
 }
