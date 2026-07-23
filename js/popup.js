@@ -119,7 +119,7 @@ function gaugeBlock(s) {
         : `<div class="muted">${s.depth < 0 ? `water is ${Math.abs(s.depth)} m below the gauge marker`
                                             : 'water is level with the gauge marker'}</div>`}
     </div>
-    ${stale ? `<div class="muted">last reported ${s.updated || 'unknown'}</div>` : ''}`;
+    ${stale && s.updated ? `<div class="muted">last reading ${ago(parseMY(s.updated))}</div>` : ''}`;
 }
 
 /* Same job as the siren's state block: answer the one question the pin is opened to answer, before
@@ -129,8 +129,8 @@ function gaugeBlock(s) {
 const RAIN_STATE = ['NOT RAINING', 'LIGHT RAIN', 'MODERATE RAIN', 'HEAVY RAIN', 'VERY HEAVY RAIN'];
 const rainState = s => !hasInfo(s)
   ? `<div class="state">NO READING</div>
-     <div class="muted">last reported ${s.updated ? `${s.updated} · ${ago(parseMY(s.updated))}`
-                                                  : 'never — this station has no timestamp'}</div>`
+     <div class="muted">${s.updated ? `last reading ${ago(parseMY(s.updated))}`
+                                    : 'never reported — this station has no timestamp'}</div>`
   : `<div class="state ${s.status >= 3 ? 'on' : s.status >= 1 ? 'mid' : 'off'}"
       >${RAIN_STATE[s.status] || 'NOT RAINING'}</div>`;
 
@@ -158,12 +158,13 @@ function sensorBody(s, withCam = true) {
     : s.kind === 'gauge' && s.history?.length ? sparkline(s.history, 'gauge') : '';
   const wet = s.kind === 'rainfall' ? rainState(s) : '';
   // A siren has exactly one thing to say, so it gets a centred state block instead of a metric row.
-  // "No signal" is only half the story: say when it last reported, so a siren that fell off the
-  // network last March can't be mistaken for one that is quietly working.
+  // "No signal" is only half the story: say how long it has been silent, so a siren that fell off the
+  // network last March can't be mistaken for one that is quietly working. Elapsed time only — the
+  // footer already prints the date, and these blocks used to repeat it a few lines above it.
   const siren = s.kind !== 'siren' ? '' : !hasInfo(s)
     ? `<div class="state">OUT OF CONTACT</div>
-       <div class="muted">last reported ${s.updated ? `${s.updated} · ${ago(parseMY(s.updated))}`
-                                                    : 'never — this station has no timestamp'}</div>`
+       <div class="muted">${s.updated ? `last signal ${ago(parseMY(s.updated))}`
+                                      : 'never reported — this station has no timestamp'}</div>`
     : `<div class="state ${s.status > 0 ? 'on' : 'off'}">${s.status > 0 ? 'TRIGGERED' : 'IDLE'}</div>
        ${sirenBand(s.history)}`;
   const gauge = s.kind !== 'gauge' ? '' : gaugeBlock(s);

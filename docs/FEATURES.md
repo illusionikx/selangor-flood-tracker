@@ -325,8 +325,8 @@ left alone; that is missing evidence, not evidence of failure.
 calls online is stamped within 48 h (`listOn_stale = 0`), and all 41 stale ones — 24 of them silent
 for over a month, one since July 2025 — are already flagged offline upstream. So `stationStatus`
 turns out to encode exactly this rule already. The change was kept anyway for two reasons: the
-popup can now say **when** a siren last reported (`OUT OF CONTACT · last reported 02/10/2025 · 293
-days ago`) instead of an unexplained OFFLINE, and the rule is a standing check on a field we would
+popup can now say **when** a siren last reported (`OUT OF CONTACT · last signal 293 days ago`)
+instead of an unexplained OFFLINE, and the rule is a standing check on a field we would
 otherwise be trusting blindly. Cost is honest: +212 detail requests per poll, ~3.5s → ~4.5s cold.
 
 **Camera image proxy** (`?cam=<id>`) — JPS advertises stills over plain http, unusable from an

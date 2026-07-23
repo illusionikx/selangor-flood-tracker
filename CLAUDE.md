@@ -223,8 +223,11 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   "steady", which is the one thing a graph of a dead sensor must not say. Anything offline or
   >24h old renders grey with an explicit `OFFLINE` block, the date in the footer. Never show these
   as live.
-- **41 sirens last reported months ago** (one in July 2025). They render `OUT OF CONTACT` with the
-  date, never `IDLE` — a silent siren and a dead siren look identical, and only one is safe.
+- **41 sirens last reported months ago** (one in July 2025). They render `OUT OF CONTACT` with how
+  long they have been silent, never `IDLE` — a silent siren and a dead siren look identical, and
+  only one is safe. The *date* belongs to `footLine()` and appears there only: the stale blocks for
+  siren, rainfall and gauge print elapsed time alone, because they sit a few lines above a footer
+  that already carries the timestamp and used to repeat it verbatim.
 - **A marquee needs three things measured, not guessed.** `js/ticker.js` renders the item set twice
   and translates `-50%`, which is only seamless if one copy is at least as wide as the box — so it
   repeats the set to cover the box *before* doubling. Width alone isn't enough: a single wide item
