@@ -40,6 +40,7 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `js/test.js` | test mode: fakes a flood in the client's copy of the payload |
 | `js/net.js` | `load()` poll loop and the status chip |
 | `js/ui.js` | all DOM wiring: drawer, filters, chips, panels, lightbox, delegated jumps |
+| `img/` | optional. Only `egg.webp` (the About easter egg). Absent is a supported state — see below |
 | `vendor/` | Leaflet, leaflet.heat (patched), markercluster, subsetted fonts — no CDN, hand-managed |
 | `lib/` | Composer's vendor dir (`symfony/dom-crawler`), gitignored — **not** `vendor/` |
 | `composer.json` | the one server-side dependency; `composer install` before first run |
@@ -208,6 +209,17 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
 - **Herd serves `index.html` with HTTP 200 for missing files.** A typo'd asset path is *not* a 404,
   so "everything returns 200" proves nothing — check `%{content_type}` instead. This is why a
   missing `js/*.js` shows up as a module parse error in the console rather than a failed request.
+- **A multi-click gesture needs `user-select: none` on everything it touches.** The browser counts
+  clicks whatever you are doing with them, so the third of any fast burst is a triple-click and
+  selects. The About egg is opened by seven fast clicks and then ignores clicks for 1.5s, so people
+  keep clicking — and the selection wash rendered the picture blue. Both `#aboutBox .logo` and
+  `#eggBox` carry the rule; anything else driven by repeated clicks will need it too.
+- **Nothing optional may be able to fail the Pages bake.** `img/` holds one decoration and may not
+  exist, so the staging step copies it with `[ -d img ] && cp -r img site/ || true`. An unconditional
+  `cp` of a missing directory fails the step, and a failed bake keeps the *last* deployment — so the
+  map would sit on stale readings because an easter egg was absent. Same rule for anything added to
+  that `cp` line: if it can go missing, it must not be able to stop the map updating. Under Herd the
+  same missing file is invisible (see above), so this only ever shows up in CI.
 - **`.leaflet-popup-content` scrolls, so it clips anything you position outside it.** It carries
   `overflow-y: auto` (that is what caps a tall popup), and a scroll container clips absolutely
   positioned descendants — so nothing inside the popup body can be lifted into the popup's top

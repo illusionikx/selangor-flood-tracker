@@ -28,6 +28,40 @@ const aboutBox = el('aboutBox');
 el('about').onclick = () => aboutBox.showModal();
 aboutBox.onclick = e => { if (e.target === aboutBox) aboutBox.close(); };
 
+/* Seven taps on the About logo inside five seconds. A rolling window of the last seven timestamps
+   rather than a counter and a timer: there is no interval to arm, clear or leak, and the gesture
+   stays open-ended — tap slowly for a minute and the oldest taps simply fall out of the window, so
+   it never has to decide when to "give up" and reset. `slice(-7)` is the whole state machine.
+   Deliberately not reachable any other way and deliberately undocumented in the UI. It sits inside
+   the About dialog, which is the one surface here that carries no warning, no reading and no alarm —
+   nothing a person could be relying on. An easter egg anywhere near the alert path would be a
+   surprise on a screen whose entire job is that nothing on it is a surprise. */
+const eggBox = el('eggBox');
+const EGG_HOLD = 1500;   // ms the picture is click-proof after opening — see below
+let taps = [], eggOk = true, eggAt = 0;
+// The image is fetched eagerly at page load, so a 404 is known long before anyone earns the egg.
+// Without this the gesture would open an empty box holding a broken-image glyph, which is a worse
+// reward than no egg at all — and it means this can ship before the picture does.
+eggBox.querySelector('img').onerror = () => { eggOk = false; };
+aboutBox.querySelector('.logo').onclick = () => {
+  taps = [...taps, Date.now()].slice(-7);
+  if (eggOk && taps.length === 7 && taps[6] - taps[0] < 5000) {
+    taps = [];
+    eggAt = Date.now();
+    eggBox.showModal();
+  }
+};
+/* Clicks are ignored for EGG_HOLD after it opens. The gesture that opens this is seven fast clicks,
+   so an eighth is usually already on its way when the dialog appears — without this, finding the
+   secret is rewarded with one frame of it. The hold outlasts the .45s pop on purpose: it is not
+   waiting for the animation, it is holding the picture still long enough to have been looked at,
+   which is the only reason it is on screen.
+   Esc is deliberately left alone. <dialog> closes on it natively and that stays true from the first
+   millisecond — a modal you cannot leave when you want to is a trap, and this one is a joke. */
+eggBox.onclick = () => {
+  if (Date.now() - eggAt > EGG_HOLD) eggBox.close();
+};
+
 // --- test mode ------------------------------------------------------------------------------
 // Toggling refetches rather than mutating what is on screen: turning it *off* has to undo a payload
 // that was edited in place, and the only honest undo is the real payload again.

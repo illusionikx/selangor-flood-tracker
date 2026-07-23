@@ -690,7 +690,14 @@ body.drawer #legend, body.drawer #alerts { transform: translateX(var(--drawer));
 /* The stage sizes to the frame so the A/B overlay can be laid over it exactly. `line-height: 0`
    because an inline-block wrapped round an <img> otherwise reserves a descender's worth of space
    under it, which the overlay does not have and so misaligns by a few pixels. */
-#lightbox .stage { position: relative; display: inline-block; line-height: 0; --ab: 50%; }
+/* `user-select` because A/B compare is a drag *across the picture*, and a drag across an image is
+   also how you select one — the divider would track the pointer while the browser painted its blue
+   selection wash over both frames. `user-drag` for the same gesture's other native meaning: without
+   it the first pixel of the drag can pick the image up and trail a ghost of it instead. Neither is
+   suppressed by `setPointerCapture`, which routes the events without claiming what they mean. */
+#lightbox .stage { position: relative; display: inline-block; line-height: 0; --ab: 50%;
+  -webkit-user-select: none; user-select: none; }
+#lightbox .stage img { -webkit-user-drag: none; }
 #lightbox img { max-width: min(968px, calc(100vw - 64px)); max-height: 62vh; border-radius: 8px; }
 #lightbox.cmp .stage { cursor: ew-resize; }
 /* The older frame, clipped to the divider. `height: 100%` alone lines the two up: both frames come
@@ -729,19 +736,38 @@ body.drawer #legend, body.drawer #alerts { transform: translateX(var(--drawer));
 .tlrow { display: flex; align-items: center; gap: 8px; width: 100%; }
 #tl .icon.on { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); }
 #tlscrub { flex: 1; min-width: 0; accent-color: var(--accent); cursor: pointer; }
-.tlranges { justify-content: center; flex-wrap: wrap; gap: 6px; }
-.tlr {
-  padding: 4px 12px; cursor: pointer; font: 500 11px Roboto, sans-serif;
-  color: var(--muted); background: none; border: 1px solid var(--outline); border-radius: 999px;
+/* One control, not five buttons. These are mutually exclusive — picking a range unpicks the others —
+   and as separate outlined pills each looked independently pressable, with nothing in the row saying
+   only one could ever be on. A single sunken track with the current segment filled says it in the
+   shape: the selection moves *along* the control rather than lighting up one of five. Sized to its
+   content and centred by `#tl`'s `justify-items`, so it reads as one object under the scrubber
+   rather than a row stretched to the dialog's width. */
+.tlranges {
+  width: auto; max-width: 100%; gap: 2px; padding: 3px;
+  background: var(--hover); border-radius: 999px;
 }
-.tlr:hover { background: var(--hover); color: var(--on-surface); }
-.tlr.on { color: #fff; background: var(--accent); border-color: var(--accent); }
+.tlr {
+  padding: 5px 13px; cursor: pointer; font: 500 11px Roboto, sans-serif; white-space: nowrap;
+  color: var(--muted); background: none; border: 0; border-radius: 999px;
+  -webkit-user-select: none; user-select: none;   /* clicked repeatedly while hunting a range */
+  transition: color .15s, background-color .15s;
+}
+.tlr:hover:not(.on) { color: var(--on-surface); }
+/* Text on the accent is `--surface`, never `#fff`. The accent flips to a pale blue (#8ab4f8) in the
+   dark theme, where white on it is a contrast failure — the token is already near-black there and
+   already white in the light theme, so one declaration is correct in both. */
+.tlr.on { color: var(--surface); background: var(--accent); }
+@media (prefers-reduced-motion: reduce) { .tlr { transition: none; } }
 
 /* Phones: the frame gives up height to keep the footer reachable with a thumb, and the dialog
    drops its width floor — at 360px a 460px minimum is a horizontal scrollbar. */
 @media (max-width: 600px) {
   #lightbox { padding: 12px; min-width: 0; width: calc(100vw - 16px); }
   #lightbox img { max-width: 100%; max-height: 46vh; }
+  /* Tighter segments rather than a wrapping row: a segmented control that wraps to two lines stops
+     looking like one track and is the reason this no longer wraps at all. Five labels at this
+     padding measure ~242px, inside the ~320px a 360px phone leaves after the dialog's own padding. */
+  .tlr { padding: 5px 9px; }
 }
 /* A JPS still is fetched through our proxy and can take seconds. Without this the dialog opens on
    an empty box, which reads as "the camera is dead" rather than "wait". */
@@ -773,6 +799,38 @@ body.drawer #legend, body.drawer #alerts { transform: translateX(var(--drawer));
 #splashWarn p { margin: 12px 0; font-size: 12px; line-height: 1.6; text-align: left; }
 #splashWarn .link { justify-content: center; font-size: 13px; padding: 10px; }
 @media (prefers-reduced-motion: reduce) { #splash .spin { animation-duration: 2.4s; } }
+
+/* --- the egg ---------------------------------------------------------------------------------- */
+
+/* Chromeless on purpose: no surface, no border, no padding, so the picture is the dialog rather than
+   sitting inside one. Sized in viewport units alone — this is the one image here whose dimensions
+   nobody controls, so it fits whatever it turns out to be instead of being told. */
+/* `user-select` for the same reason as the logo, and more sharply: this is opened by fast repeated
+   clicking and then deliberately ignores clicks for 1.5s, so the natural response is to click it
+   again — and the third of those is a triple-click, which selects the image and paints the browser's
+   blue selection wash straight over the picture. The one surface here that exists purely to be
+   looked at was the one turning blue while being looked at. */
+#eggBox { max-width: 92vw; max-height: 92vh; padding: 0; border: 0; background: none; overflow: hidden;
+  -webkit-user-select: none; user-select: none; }
+#eggBox::backdrop { background: #0009; }
+#eggBox img { display: block; max-width: 92vw; max-height: 92vh; border-radius: 12px; cursor: pointer;
+  -webkit-user-drag: none; }
+
+/* It pops rather than appears: up from 40% with an overshoot past 100% before it settles. The one
+   flourish in the interface, in the one place that can afford it — everything else here is reporting
+   a river. `[open]` is added by showModal(), so the animation re-runs on every open for free. */
+@keyframes eggPop  { from { opacity: 0; transform: scale(.4); } to { opacity: 1; transform: scale(1); } }
+@keyframes eggFade { from { opacity: 0; } to { opacity: 1; } }
+#eggBox[open] { animation: eggPop .45s cubic-bezier(.34, 1.56, .64, 1); }
+#eggBox[open]::backdrop { animation: eggFade .45s ease; }
+/* Reduced motion drops the scale and keeps the fade — the overshoot is the part worth removing, and
+   an opacity ramp is not the kind of motion that setting is asking about. The dismiss hold is a
+   timer in ui.js and does not read the animation, so this rule cannot affect it either way. */
+@media (prefers-reduced-motion: reduce) { #eggBox[open] { animation-name: eggFade; } }
+/* The logo stays a heading and must not start looking like a button — no hover state, no pointer
+   cursor, nothing advertising that it does anything. The only rule it needs is this one: seven fast
+   clicks on text otherwise drag-selects the wordmark, which is how the gesture announces itself. */
+#aboutBox .logo { -webkit-user-select: none; user-select: none; }
 
 /* --- phones --------------------------------------------------------------------------------- */
 

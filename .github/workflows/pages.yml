@@ -65,6 +65,10 @@ jobs:
         run: |
           mkdir site
           cp -r index.html api.json css js vendor site/
+          # img/ is optional — it holds only the About egg, which hides itself when the picture is
+          # missing (js/ui.js). Copied conditionally so an absent directory can never fail a bake and
+          # leave the map frozen on the last deployment over a decoration.
+          [ -d img ] && cp -r img site/ || true
           # The one line that separates the two builds — see js/config.js.
           sed -i 's/^export const STATIC = false;/export const STATIC = true;/' site/js/config.js
           grep -q 'STATIC = true' site/js/config.js

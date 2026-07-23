@@ -1277,12 +1277,36 @@ disk between the stops. These are the stops.
 The live still — the image the lightbox was opened on — sits one past the end of the scrubber. It is
 not in the archive, but on a timeline it is simply the newest thing there is. Playback skips it: it
 is a different image at a different resolution, and a full-size JPEG flashing in at the end of a run
-of WebP reads as a glitch. Playback loops, because a 12–60 frame clip is under 20 seconds and
-stopping dead means pressing play again to see it.
+of WebP reads as a glitch. Playback loops, because stopping dead means pressing play again to see it.
+
+**Playback runs at one frame a second, and that is not a frame rate.** Consecutive frames here are 30
+minutes to a week apart, so nothing on screen is continuous with what preceded it — there is no
+motion to smooth, and every frame is a separate scene that has to be *read*: has the water risen, is
+the road still there. The first pass was paced at 320 ms as though this were video, and pushed the
+whole archive past before any of it registered. A second a frame is the pace of looking rather than
+the pace of playback: a typical 30–60 frame range takes 30–60 s, with the scrubber there for anyone
+after one specific moment rather than the sweep.
 
 Changing range warms the whole window with `new Image()` — at most ~60 frames off local disk, served
 `immutable`. The alternative is a scrubber that stutters on every drag, which is the one interaction
 this feature exists for.
+
+**The five ranges are a segmented control, not five pills.** They are mutually exclusive — picking one
+unpicks the rest — and as separate outlined pills each looked independently pressable, with nothing
+in the row saying only one could ever be on. A single sunken track with the current segment filled
+says it in the shape: the selection moves *along* one control rather than lighting up one of five. It
+is sized to its content and centred rather than stretched to the dialog width, so it reads as one
+object sitting under the scrubber. On phones the segments tighten instead of wrapping — a segmented
+control on two lines stops looking like one track, and five labels at that padding measure ~242px
+inside the ~320px a 360px phone leaves.
+
+Selected segments take `color: var(--surface)` rather than `#fff`, which fixes a **dark-theme contrast
+failure**: the accent flips to a pale blue (`#8ab4f8`) there, and white text on it is unreadable.
+`--surface` is already near-black in dark and white in light, so one declaration is correct in both.
+
+**Pressing compare pauses playback.** Reaching for the divider means you have found the frame you want
+held against the live one, and playback would carry it away a second later — the same reason dragging
+the scrubber stops it.
 
 The bar is **hidden entirely** unless the archive holds at least two frames. A disabled scrubber over
 a single frame explains nothing its absence doesn't — and that is also what the static GitHub Pages
@@ -1292,9 +1316,38 @@ the condition under which there is no archive to offer.
 
 ### A/B compare
 
-One toggle. On, the **oldest frame in the selected range** is laid over the scrubbed one and clipped
-to a draggable divider, each side labelled with its own time — so widening the range widens what
-"before" means, which is the whole reason the ranges exist.
+One toggle. On, the **scrubbed frame** is laid over the live still and clipped to a draggable divider,
+each side labelled with its own time — a timestamp against `live`.
+
+**The fixed side is the present, and the moving side is the past.** The base image holds the live
+still — the picture the lightbox was opened on, so the one thing already familiar — and the clipped
+side scrubs and plays over it. Every scrubber position reads as "then, against now", and playing a
+range slides the past across a present that stays put. It was built the other way first, with a fixed
+*oldest* frame and the present moving over it, which compared two unfamiliar pictures and silently
+moved the reference every time the range changed. The ranges now only decide how far back the moving
+side can reach, which is the one job they should have.
+
+Putting the fixed image on the **base** rather than the overlay also steadies the box: `.stage` is
+sized by the in-flow base image, so a base that never changes is a stage that never resizes
+mid-playback.
+
+**Only while comparing, though.** With the divider off there is no overlay on screen, so the base
+image is the only thing there is and it has to be the one that moves — otherwise scrubbing with
+compare turned off would change the timestamp and nothing else. `paint()` therefore branches on
+whether the divider is up, and `setCompare()` repaints in **both** directions: switching compare off
+has to hand the moving frame back to the base image.
+
+Two places park the scrubber on `live`, and live is now the fixed side, so both had to learn to land
+elsewhere while comparing — otherwise the toggle lays the picture over itself, which reads as a broken
+divider rather than an empty one. Turning compare on jumps to the oldest frame in range; changing
+range while compare is up lands on the oldest frame of the *new* range, which is what "further back"
+was asking for anyway.
+
+One ordering consequence: because `setCompare()` now repaints unconditionally, `reset()` clears `cam`
+and `frames` **before** calling it. `openTimeline()` resets first, and by then `ui.js` has already put
+the new camera's live still in the img — a repaint still carrying the previous camera's state would
+overwrite it with a frame from the last one. `paint()` returns early without a `cam` for the same
+reason.
 
 Both frames come from one camera and share an aspect ratio, so matching `height: 100%` lines them up
 on both axes; no measuring, no resize listener. That survives the `SHOT_W` change too — frames
@@ -1302,6 +1355,13 @@ captured at 1024×576 sit in the archive beside new ones at 1280×720, and both 
 divider, because a 2px drag target is a target nobody hits on a phone — pointer events, so mouse and
 touch are one path. While compare is live, a click on the picture no longer closes the lightbox
 (`#lightbox.cmp`): there, a click on the picture is the start of a drag.
+
+The stage carries `user-select: none` and its images `-webkit-user-drag: none`, because a drag across
+a picture already means two things to the browser — select it, or pick it up and carry it. Without
+these the divider tracked the pointer correctly while a blue selection wash spread over both frames
+and a ghost of the image trailed the cursor. `setPointerCapture` does not prevent either: it routes
+the events to one element without claiming what they mean. Same root cause as the About egg turning
+blue, and the same one-line fix.
 
 *Trade-off accepted:* capture runs at the **end** of a refresh, inside the lock, after the payload is
 already on the wire. With no `fastcgi_finish_request` under Herd the connection cannot actually be
@@ -1455,6 +1515,64 @@ added at the repo root.
   to be" signal as the test-mode strip, which uses the same `#e8710a`.
 - **Test mode sits beside the close button**, because it is a mode and not a setting: the two things
   you want within reach of each other are "turn the pretend flood on" and "get out of here".
+
+### The egg
+
+Seven taps on the About logo inside five seconds pops `img/egg.webp` open, chromeless, on a dim
+backdrop — scaling up from 40% with an overshoot past 100% before it settles. Tap anywhere to
+dismiss, but **not until the pop has finished**.
+
+**That hold is not polish, it is a fix.** The gesture is seven fast clicks, so an eighth is usually
+already travelling when the dialog appears, and it lands on the thing that just opened — the reward
+for finding a secret was one frame of it. `EGG_HOLD` (1.5 s) is a plain timestamp comparison against
+when it opened.
+
+It is set to **outlast the 0.45 s pop by a wide margin on purpose**, and that is why it is a number
+rather than a hook into the animation. An earlier version asked the browser whether the animation was
+still running, which is tidier and answers the wrong question: it protects exactly as long as the
+flourish happens to last, so shortening the animation would quietly shorten the protection. The hold
+is not waiting for the animation to finish — it is holding the picture still long enough to have been
+looked at, which is the only reason it is on screen at all. Two independent numbers, correctly.
+
+**Esc is deliberately left alone.** `<dialog>` closes on it natively and that stays true from the
+first millisecond. A modal you cannot leave when you want to is a trap, and this one is a joke —
+the hold may cost a stray click, never an exit.
+
+Reduced motion drops the scale and keeps the fade: the overshoot is the part worth removing, and an
+opacity ramp is not the motion that setting is asking about. It cannot affect the hold either way.
+
+**Both the logo and the picture carry `user-select: none`, and that is not cosmetic.** A gesture
+built out of fast repeated clicking runs straight into the browser's own click counting: the third
+click of any burst is a triple-click, which selects. On the logo that drag-selects the wordmark; on
+the picture it lays the blue selection wash over the image. The hold makes the second one worse
+rather than better — nothing happens for 1.5 s, so the natural response is to click again, and the
+one surface here that exists purely to be looked at turns blue while being looked at. Any future
+control driven by a multi-click gesture needs the same rule.
+
+**Why it is in the About dialog and nowhere else.** That dialog is the one surface here carrying no
+reading, no warning and no alarm — nothing a person could be acting on. Everything else is either a
+measurement or a claim about a river, and a joke that fires near those is a surprise on a screen
+whose entire job is that nothing on it is a surprise. The logo is also inert: it is a heading, not a
+control, so nothing is displaced and no affordance is overloaded. It keeps no hover state and no
+pointer cursor for the same reason — the day it starts looking clickable it has cost something.
+
+**The gesture is a rolling window, not a counter and a timer.** `taps = [...taps, Date.now()]
+.slice(-7)`, then fire if the seventh is within 5 s of the first. There is no interval to arm, clear
+or leak, and nothing has to decide when to "give up" and reset — tap slowly for a minute and the old
+timestamps simply fall out of the window. `slice(-7)` is the entire state machine. Verified against
+the cases that matter: six taps do nothing, seven spread over six seconds do nothing, seven fast taps
+after a long idle spell still fire, fourteen fast taps fire exactly twice, and a span of exactly
+5000 ms is excluded (the test is strict `<`).
+
+**It hides itself when the picture is missing.** The `<img>` loads eagerly at page load, so a 404 is
+known long before anyone earns the egg; `onerror` sets a flag the gesture checks. Without it the
+reward for finding a secret would be an empty box holding a broken-image glyph, which is worse than
+no secret at all. It also means the mechanism could ship before the picture did.
+
+`img/` is the only optional directory in the build, so the Pages workflow copies it **conditionally**
+— `[ -d img ] && cp -r img site/ || true`. An unconditional `cp` of a missing directory fails the
+step, and a failed bake leaves the last deployment in place: the map would freeze on stale readings
+because a decoration was absent. Nothing that can go missing may be able to stop the map updating.
 
 ## `--hdr`
 

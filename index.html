@@ -7,7 +7,7 @@
 <link rel="stylesheet" href="vendor/fonts.css?v=49">
 <link rel="stylesheet" href="css/icons.css?v=50">
 <link rel="stylesheet" href="css/base.css?v=49">
-<link rel="stylesheet" href="css/chrome.css?v=54">
+<link rel="stylesheet" href="css/chrome.css?v=60">
 <link rel="stylesheet" href="css/map.css?v=58">
 
 <!-- A camera still. A <dialog>, not a div: it opens from the all-stations table, which is itself a
@@ -41,8 +41,8 @@
     <div class="tlrow">
       <button class="icon tlplay" title="Play" aria-label="Play"><i class="i i-play_arrow"></i></button>
       <input id="tlscrub" type="range" min="0" max="0" value="0" step="1" aria-label="Timeline position">
-      <button class="icon tlcmp" title="Compare with the oldest frame in view"
-              aria-label="Compare with the oldest frame in view" aria-pressed="false"
+      <button class="icon tlcmp" title="Compare against the live image"
+              aria-label="Compare against the live image" aria-pressed="false"
       ><i class="i i-compare"></i></button>
     </div>
     <div class="tlrow tlranges"></div>
@@ -221,6 +221,10 @@
      Symbols</a> (Apache 2.0); mapping by <a href="https://leafletjs.com/" target="_blank" rel="noopener">Leaflet</a>.
      Flood data remains the property of JPS Malaysia.</p>
 </dialog>
+<!-- Tap the About logo seven times inside five seconds. No header, no close button: the picture is
+     the entire content, so the whole surface dismisses it — the one case where tap-anywhere is right,
+     because there is nothing in here to tap *on*. Hidden for good if the image 404s; see js/ui.js. -->
+<dialog id="eggBox"><img src="img/egg.webp" alt=""></dialog>
 <!-- Every station in one list. Sticky search + header so the table scrolls under them. -->
 <dialog id="dataBox">
   <div class="dtop">

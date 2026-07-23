@@ -26,7 +26,13 @@ const RANGES = [
   ['month', 30 * 86400],
   ['year',  365 * 86400],
 ];
-const FRAME_MS = 320;   // playback pace: fast enough to read as motion, slow enough to see a frame
+/* One frame a second. Not an animation frame rate — consecutive frames here are 30 minutes to a week
+   apart, so nothing on screen is continuous with what preceded it and there is no motion to smooth.
+   Every frame is a separate scene that has to be read: has the water risen, is the road still there.
+   The first pass ran at 320ms, paced as if this were video, and pushed the whole archive past before
+   any of it registered. A second a frame is the pace of looking rather than the pace of playback; a
+   typical 30-60 frame range takes 30-60s, and the scrubber is there for anyone after one moment. */
+const FRAME_MS = 1000;
 
 // Malaysian, like every other clock on this page — the frames are stamped in unix seconds, and a
 // viewer in another timezone must not see an axis that disagrees with the readings beside it.
@@ -65,14 +71,22 @@ tl.querySelector('.tlranges').innerHTML = RANGES.map(([label, secs]) =>
   `<button class="tlr" data-secs="${secs}">${label}</button>`).join('');
 
 function paint() {
+  if (!cam) return;   // nothing to paint from, and the img belongs to whoever opened the lightbox
   const i = +scrub.value;
-  imgB.src = srcAt(i);
-  box.querySelector('.btime').textContent = labelAt(i);
-  // The comparison is always against the oldest frame still in view, so widening the range widens
-  // what "before" means — which is the whole reason the ranges exist.
-  if (frames.length) {
-    imgA.src = srcOf(frames[0]);
-    box.querySelector('.abtime').textContent = stamp(frames[0]);
+  /* B is the live still and holds still; A — the clipped side — is what scrubs and plays. The fixed
+     side is the one you already know, the picture the lightbox was opened on, so every position of
+     the scrubber reads as "then, against now" and playing a range slides the past across a present
+     that stays put. Keeping it on B rather than A also steadies the box: `.stage` is sized by the
+     in-flow base image, so a base that never changes is a stage that never resizes mid-playback.
+     Only while comparing, though. With the divider off there is no A on screen, so the base image is
+     the only thing there is and it has to be the one that moves — otherwise scrubbing a lightbox
+     with compare turned off would change the timestamp and nothing else. */
+  const on = !ab.hidden;
+  imgB.src = on ? liveSrc : srcAt(i);
+  box.querySelector('.btime').textContent = on ? 'live' : labelAt(i);
+  if (on) {
+    imgA.src = srcAt(i);
+    box.querySelector('.abtime').textContent = labelAt(i);
   }
 }
 
@@ -81,7 +95,11 @@ function setRange(secs) {
   const cut = Date.now() / 1000 - secs;
   frames = all.filter(ts => ts >= cut);
   scrub.max = frames.length;         // the extra slot is "live"
-  scrub.value = frames.length;
+  /* Rest on live normally — the newest thing there is, and what the lightbox was already showing.
+     While comparing, land on the oldest frame of the new range instead: live is the fixed side, so
+     resting there would put the picture against itself, and "further back" is what changing range
+     was asking for. */
+  scrub.value = ab.hidden ? frames.length : 0;
   tl.querySelectorAll('.tlr').forEach(b =>
     b.classList.toggle('on', +b.dataset.secs === secs));
   // Warm the whole window at once. It is at most ~60 frames off local disk, served immutable, and
@@ -120,7 +138,14 @@ function setCompare(on) {
   // ui.js reads this back: a click on the picture normally closes the lightbox, and while the
   // divider is live a click on the picture is a drag, not a dismissal.
   box.classList.toggle('cmp', !ab.hidden);
-  if (!ab.hidden) paint();
+  /* The scrubber rests on "live", and so is the fixed side — turning compare on there would lay the
+     picture over itself and read as a broken divider rather than an empty one. Open on the oldest
+     frame in range instead: the widest gap available, and the pairing this feature used to show by
+     default. */
+  if (!ab.hidden && isLive(+scrub.value)) scrub.value = 0;
+  // Both ways, not just on. Switching compare *off* has to hand the moving frame back to the base
+  // image, which is holding the live still while the divider is up.
+  paint();
 }
 
 /* Drag anywhere on the stage, not only on the handle: on a phone the divider is 2px wide and a
@@ -141,7 +166,9 @@ stage.addEventListener('pointermove', e => {
 
 scrub.oninput = () => { stop(); paint(); };
 play.onclick = toggle;
-cmp.onclick = () => setCompare(ab.hidden);
+// Pausing first: reaching for compare means you have found the frame you want to hold against the
+// live one, and playback would carry it away a second later. Same reason the scrubber stops on input.
+cmp.onclick = () => { stop(); setCompare(ab.hidden); };
 tl.querySelector('.tlranges').onclick = e => {
   const b = e.target.closest('[data-secs]');
   if (b) { stop(); setRange(+b.dataset.secs); }
@@ -168,9 +195,12 @@ export async function openTimeline(src) {
 
 export function reset() {
   stop();
-  setCompare(false);
+  /* Cleared *before* setCompare, which now repaints in both directions. openTimeline() resets first
+     and ui.js has already put the new camera's live still in the img by then — a repaint carrying
+     the previous camera's `cam` and `frames` would overwrite it with a frame from the last one. */
   cam = null;
   all = frames = [];
+  setCompare(false);
   tl.hidden = true;
   stage.style.removeProperty('--ab');
   box.querySelector('.btime').textContent = '';
