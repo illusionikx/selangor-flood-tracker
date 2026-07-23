@@ -184,10 +184,14 @@ server {
 `fastcgi_read_timeout` is not optional. The default 60 s is survivable but a cold start that also
 triggers a capture round has taken 40 s here, and a 504 mid-rebuild leaves the visitor with nothing.
 
-### Keep the cache warm — this is the important bit
+### The cron is not optional — it is what runs the site
 
-Under Herd there is no `fastcgi_finish_request`, so a refresh happens *inside* somebody's request and
-they wait for it. On a real server the fix is to make sure nobody ever is that somebody:
+**This whole app is request-driven. `api.php` only does work when something calls it**, so with no
+traffic nothing polls, nothing is captured, and nothing is sampled. A site nobody visited overnight
+has no camera frames and no history for that night — and on a flood map the worst gaps would land at
+3 a.m. during a storm, which is exactly the replay you would later want. Do not think of this cron as
+a cache optimisation. It *is* the thing that keeps the site alive; visitors are just people reading a
+cache it keeps warm.
 
 ```bash
 sudo tee /etc/cron.d/flood >/dev/null <<'EOF'
@@ -195,10 +199,25 @@ sudo tee /etc/cron.d/flood >/dev/null <<'EOF'
 EOF
 ```
 
-Five minutes matches `TTL`. With this running, every visitor gets a warm cache instantly, and the
-30-minute camera capture — the pass that adds ~25 s to one refresh in six — is always paid by cron
-rather than by a person. The `flock` on `.refresh.lock` means the cron and a visitor can never
-rebuild at once.
+Five minutes matches `TTL`, so it does three jobs at once:
+
+- **the camera archive fills 24/7** instead of only while someone happens to be watching;
+- **`rising` and the trend flags always have their hour of history** — after a gap they go null, and
+  everything keyed off them (alerts, the rising filter, heat weighting) goes quiet for an hour;
+- **the first real visitor gets a warm cache instantly** rather than paying for a cold ~15 s rebuild.
+  Under Herd there is no `fastcgi_finish_request`, so a refresh happens *inside* somebody's request
+  and they wait for it; the cron makes sure nobody is ever that somebody, and the 30-minute camera
+  capture — the pass that adds ~25 s to one refresh in six — is always paid here rather than by a
+  person. The `flock` on `.refresh.lock` means the cron and a visitor can never rebuild at once.
+
+It is a `curl` on a timer, not a daemon — nothing to supervise, one local HTTP request every five
+minutes.
+
+**The machine must therefore stay awake.** This keeps PHP working around the clock, so a host that
+suspends when idle will not fire the cron and you are back to gaps. On an always-on container or a Pi
+this is automatic; on a desktop that sleeps, disable sleep or the archive is only as continuous as
+the machine is. (`systemd` timers work equally well if you prefer them to `cron.d` — the requirement
+is a call every five minutes, not the mechanism.)
 
 ### HTTPS, from a home connection
 
