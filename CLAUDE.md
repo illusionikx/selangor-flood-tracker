@@ -208,6 +208,13 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
 - **Herd serves `index.html` with HTTP 200 for missing files.** A typo'd asset path is *not* a 404,
   so "everything returns 200" proves nothing — check `%{content_type}` instead. This is why a
   missing `js/*.js` shows up as a module parse error in the console rather than a failed request.
+- **`.leaflet-popup-content` scrolls, so it clips anything you position outside it.** It carries
+  `overflow-y: auto` (that is what caps a tall popup), and a scroll container clips absolutely
+  positioned descendants — so nothing inside the popup body can be lifted into the popup's top
+  margin to meet Leaflet's close button. The button is a child of `.leaflet-popup`, *outside* that
+  box, so it is the one free to move: its `top` is set to line up with the header's first line
+  (14px to the top of `.pophead`, + half the 18px `.sitecount` chip, − half its own 24px = 11px).
+  Anything else that wants to sit level with it moves the button, not itself.
 - **Zooming destroys open popups.** markercluster rebuilds marker DOM on zoom. Use `openStable()`
   (opens, re-opens on next `moveend` if it closed), and `cluster.zoomToShowLayer()` for a marker
   that may be inside a cluster.

@@ -32,7 +32,13 @@
 /* Leaflet parks the close button in that right-hand gutter, which put it outside the scrollbar.
    Sit it inside instead, just left of the bar — and reserve the room in the header, which is the
    only block whose first line runs that far right. */
-.leaflet-container a.leaflet-popup-close-button { right: 20px; top: 2px; }
+/* `top` lines the 24px button up with the first line of the header — the name, and the sensor-count
+   chip beside it. The chip sits at the top of `.pophead`, which starts 14px below the popup's top
+   edge (1px of wrapper padding plus the 13px margin Leaflet gives `.leaflet-popup-content`), and is
+   18px tall, so its centre is at 14 + 9 = 23px and the button's is 23 − 12 = 11px. The button is a
+   child of `.leaflet-popup`, outside the scrolling content box, which is why it is the one that
+   moves: the chip cannot be raised out of a container that clips it. */
+.leaflet-container a.leaflet-popup-close-button { right: 20px; top: 11px; }
 .leaflet-popup-content hr { border: 0; border-top: 1px solid var(--outline); margin: 8px 0; }
 .leaflet-popup-close-button { color: var(--muted) !important; }
 
@@ -45,15 +51,12 @@
    `right: 28px` clears the gutter .pophead already reserves for it. Only the name shares that line,
    so only the name pays for the room, via the adjacent-sibling rule below.
 
-   The two are positioned against different boxes, which is why `top` is negative. Leaflet's close
-   button is 24px square, absolute against `.leaflet-popup`, and map.css puts it at `top: 2px`. This
-   chip is absolute against `.pophead`, which starts 14px lower — 1px of wrapper padding plus the
-   13px top margin Leaflet gives `.leaflet-popup-content`. Centring the two therefore wants
-   2px + (24px − 18px) / 2 − 14px = −9px, and `height` is pinned so that arithmetic stays true when
-   the font changes. Move either the close button's `top` or this height and redo the sum. */
+   The chip cannot be lifted to meet the close button: `.leaflet-popup-content` scrolls, and a scroll
+   container clips absolutely-positioned descendants, so a negative `top` here just gets cut off at
+   the popup's top edge. The close button comes down to the chip instead — see its rule above. */
 .sitecount {
   position: absolute; right: 28px;
-  top: -9px; height: 18px;
+  top: 0; height: 18px;
   display: inline-flex; align-items: center; gap: 3px;
   padding: 0 7px 0 5px; border-radius: 999px;
   font: 500 11px/1 Roboto, sans-serif;
