@@ -38,8 +38,21 @@
 
 /* Standard popup: header (name / region / badge) → body metrics → still → footer. */
 .pophead {
+  position: relative;   /* the sensor-count chip hangs off the top-right corner */
   padding: 0 28px 8px 0; margin-bottom: 8px; border-bottom: 1px solid var(--outline);
 }
+/* How many sensors this popup is holding, parked in the corner beside Leaflet's close button —
+   `right: 28px` clears the gutter .pophead already reserves for it. Only the name shares that line,
+   so only the name pays for the room, via the adjacent-sibling rule below. */
+.sitecount {
+  position: absolute; top: 0; right: 28px;
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 1px 7px 1px 5px; border-radius: 999px;
+  font: 500 11px/1.6 Roboto, sans-serif;
+  color: var(--muted); background: var(--hover);
+}
+.sitecount .i { font-size: 13px; }
+.sitecount + .popname { padding-right: 52px; }
 /* The badge trails the location now, so its spacing has to flip with it. */
 .pophead .badge, .pophead .badges { margin: 6px 0 0; }
 .popname { font-size: 15px; font-weight: 500; line-height: 1.3; }

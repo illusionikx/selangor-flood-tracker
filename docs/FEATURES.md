@@ -357,6 +357,16 @@ while the mast is quiet:** any member with `status > 0` keeps the real status co
 no reading stays grey, so the new pin can never make a signalling or dead mast look calm. The glyph
 switches on member count alone; only the colour is conditional.
 
+**The site popup's sensor count is a corner chip, not a sentence.** A multi-sensor popup opened with
+a `6 sensors at this location` line under the region, which spent a whole row of a popup that is
+mostly rows — and restated what the badge list directly beneath it already showed. It is now a chip
+in the header's top-right, beside Leaflet's close button, carrying the same `layers` glyph the mast
+pin uses so the pin you tapped and the header you get say the same thing. Only the name shares that
+line, so only the name pays for the room (`.sitecount + .popname`, an adjacent-sibling rule — hence
+the chip is emitted *before* the name). The count is now a bare number on screen, so the sentence
+moves to `title`/`aria-label` with `role="img"`: a `<span>` needs the role for the label to be
+announced at all.
+
 **One timestamp per sensor, on one line.** A stale sensor used to print its recency twice: a
 sentence in the state block (`last signal 411.0h ago`) and the footer naming the same moment again
 two lines below (`OFFLINE · last reported 06/07/2026 10:19:05 · via JPS Selangor`). `footLine()` now

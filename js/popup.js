@@ -229,10 +229,18 @@ export function sitePopup(members) {
   const lead = members[0];
   const hasCam = members.some(m => m.kind === 'camera');
 
+  /* The count sits beside the close button as a chip, not as a "6 sensors at this location" line —
+     that spent a whole row of a popup that is mostly rows, restating what the badges under it
+     already list. Same `layers` glyph as the mast pin, so the pin you tapped and the header you got
+     say the same thing. Number alone on screen, so the sentence moves into title/aria — it is the
+     only place that count is stated in words now. Emitted before .popname because the CSS reserves
+     room for it with an adjacent-sibling rule. */
   return `<div class="pophead">
+      <span class="sitecount" role="img" title="${members.length} sensors at this location"
+            aria-label="${members.length} sensors at this location"
+        ><i class="i i-layers"></i>${members.length}</span>
       <div class="popname">${lead.name}</div>
       ${region(lead)}
-      <div class="muted">${members.length} sensors at this location</div>
       <div class="badges">${members.map(m => {
         const k = KINDS[m.kind];
         return `<span class="badge" style="--c:${hasInfo(m) ? k.color : 'var(--muted)'}"
