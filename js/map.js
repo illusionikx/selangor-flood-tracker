@@ -1,7 +1,7 @@
 // The Leaflet map itself: basemap/theme, the shared marker cluster, and the view helpers that
 // every panel uses to jump to a station.
 
-import { KINDS, TILES, FLASH_MS } from './config.js';
+import { KINDS, MAST, TILES, FLASH_MS } from './config.js';
 import { state, PREFS, save } from './state.js';
 import { el, distKm } from './util.js';
 
@@ -80,6 +80,28 @@ export function syncCluster(alsoShow) {
     if (shown(k) || k === alsoShow) cluster.addLayers(list);
   }
 }
+
+// --- mast area ---------------------------------------------------------------------------------
+
+/* The radius api.php folded these sensors together with, drawn under the pin while you point at it:
+   it answers "why is this one pin, and would that neighbour have joined it" without opening
+   anything. Only for masts that actually hold several sensors — a ring round a lone station draws a
+   boundary that grouped nothing.
+   One ring, reused: hovering across a row of pins would otherwise leave a trail of them, since a
+   marker torn down mid-hover never fires its mouseout. `interactive: false` so it can never swallow
+   the click meant for the pin underneath, and a circle (metres) rather than a circleMarker (pixels),
+   because the whole point is a fixed distance on the ground. */
+let mastRing = null;
+
+export function showMast(latlng) {
+  hideMast();
+  mastRing = L.circle(latlng, {
+    radius: state.siteM, interactive: false,
+    color: MAST.color, weight: 1, dashArray: '4 3', fillColor: MAST.color, fillOpacity: .08,
+  }).addTo(map);
+}
+
+export function hideMast() { mastRing?.remove(); mastRing = null; }
 
 // --- view helpers ------------------------------------------------------------------------------
 

@@ -599,6 +599,9 @@ $payload = json_encode([
     'upstreamOk' => true,
     'sourceUpdated' => $sourceTs ? date('c', $sourceTs) : null,
     'tookMs'   => (int)round((microtime(true) - $t0) * 1000),
+    // Published so the map can draw the mast radius it actually grouped by, rather than keeping a
+    // second copy of this number client-side for the two to drift apart.
+    'siteM'    => SITE_M,
     'endpoints' => [
         'StationRainfalls'  => count($rainfallList),
         'StationRiverLevels'=> count($riverList),

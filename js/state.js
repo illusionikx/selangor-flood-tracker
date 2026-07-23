@@ -10,6 +10,9 @@ export const state = {
   // decoration. A reload is the one thing everyone tries, so a reload must clear it.
   test: false,
   pinned: null,    // id of a station a jump forced past the drawer filters, until the user pans off
+  // Mast radius, in metres, for the hover ring. api.php's SITE_M is the real one and overwrites this
+  // on every poll — this is only what to draw before the first payload lands.
+  siteM: 50,
   // render.js parks itself here so map.js can rebuild the markers without importing it — the two
   // already point the other way (render.js -> map.js) and a cycle would break the module graph.
   rerender: () => {},

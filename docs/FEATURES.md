@@ -366,6 +366,34 @@ what gave way first, which is the one part of the tab that says what the panel *
 sent past the chevron with `order` so the chevron stays up on the title's line, and `:empty` keeps a
 quiet panel to a single line, since `alerts.js` writes the span whether or not it has anything in it.
 
+**Hovering a mast pin draws the area it grouped.** A dashed 50 m disc under the pin, in the mast
+indigo — it answers "why is this one pin, and would that neighbour have joined it" without opening
+anything. Only for pins holding several sensors: a ring round a lone station draws a boundary that
+grouped nothing. The radius is **published in the payload** (`siteM`) rather than kept as a second
+copy of `SITE_M` client-side, so the circle is always the radius the server actually grouped by.
+`interactive: false`, so it can never swallow the click meant for the pin; an `L.circle` (metres)
+rather than a `circleMarker` (pixels), since the whole point is a fixed distance on the ground.
+One ring is reused and `render()` clears it, because a marker torn down mid-hover never fires its
+`mouseout` and would strand its ring on the map. The popup shows it too — that is the touch
+equivalent, a finger having no hover — and `mouseout` defers while the popup is open, so moving off
+a pin you just opened doesn't pull the ring from under the list it explains.
+
+**Station search ignores punctuation and word order.** JPS writes the same place as `I.K.B.N.`,
+`IKBN` and `Ikbn` across its three feeds, so a reader typing one meant all three and a plain
+`includes()` found none of the others. Both sides have punctuation stripped and terms match in any
+order: `ikbn` now finds 4 stations instead of 2, `i.k.b.n.` 4 instead of 0, and `lui sg` finds
+`KG. SG. LUI`, which used to return nothing.
+
+Squashing the haystack rather than spacing it is what makes one test enough — a spaceless term found
+in the spaced text is always in the squashed text too, so the squashed form is a superset. The query
+is split on **whitespace only**, then punctuation is stripped *within* each word: splitting the query
+on punctuation turned `I.K.B.N` into four single-letter terms and matched 294 of 671 stations.
+
+*Substrings, not edit distance, and no scoring.* `klang` must never quietly surface `Hulu Kelang` —
+different places on this map — and it doesn't, since squashing removes spaces but never letters
+(`klang` 124 hits, `kelang` 1, both unchanged). Ranking is left alone because the list is read under
+district headings, and a relevance order would fight the grouping rather than help it.
+
 **Only one heatmap at a time.** The two chips are mutually exclusive: switching one on switches the
 other off, and switching the live one off leaves the map clean. Stacked, they were two answers to
 two questions in one picture — and worse, leaflet.heat accumulates alpha *across* layers, so
@@ -715,6 +743,12 @@ thing to the browser's own position cache, which is the layer that can actually 
 the stored copy is what survives the reload that clears it. Live and restored fixes go through one
 `place()` — nothing downstream should be able to tell which it got, because there is no difference
 worth telling.
+
+**The alert panel collapses on the way into phone width too**, not only on landing there — same
+handler shape as the drawer's, on the same `matchMedia` change. Expanded it covers a third of a
+phone screen, and a panel that was reasonable beside a 1200px map is not the same object at 380px.
+Restored to the saved preference on the way back out, and neither direction writes `PREFS`: the
+layout is deciding, not the user, and overwriting would leave nothing to restore.
 
 **A phone lands on the map and nothing else** — drawer shut, alert panel collapsed to its tab,
 whatever the saved preferences say. At that width each of them *is* the screen, so restoring a

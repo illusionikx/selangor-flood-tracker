@@ -4,7 +4,8 @@ import { KINDS, MAST, HEAT_FLOOR, RAIN_STOPS } from './config.js';
 import { state, PREFS } from './state.js';
 import { el, color, ink, popWidth, popPan, dkey, isCritical, leads, hasInfo, isIgnored, ignoredIds,
          scalePos, levelStops, gaugeStops } from './util.js';
-import { map, marks, siteMark, shown, syncCluster, focusOn, openStable } from './map.js';
+import { map, marks, siteMark, shown, syncCluster, focusOn, openStable,
+         showMast, hideMast } from './map.js';
 import { heat, rainHeat, heatScale, heatOpacity } from './heat.js';
 import { sitePopup } from './popup.js';
 import { dataTable } from './table.js';
@@ -33,6 +34,9 @@ export function render() {
   const risingOnly = syncRisingChip();
   Object.keys(marks).forEach(k => marks[k] = []);
   siteMark.clear();
+  // Every marker below is about to be replaced, and one torn down mid-hover never fires its
+  // mouseout — so the ring it was showing would be left on the map with nothing under it.
+  hideMast();
   const points = [];
   const rainPoints = [];
   const perKind = Object.fromEntries(Object.keys(marks).map(k => [k, 0]));
@@ -125,6 +129,15 @@ export function render() {
       focusOn([lead.lat, lead.lng], 13);
       openStable(marker);
     });
+    /* Show the grouping radius while the mast is pointed at — and while its popup is open, which is
+       the touch equivalent, since a finger has no hover. mouseout defers to the popup for the same
+       reason: moving the mouse off a pin you have just opened should not pull the ring out from
+       under the list it explains. */
+    if (multi) {
+      marker.on('mouseover popupopen', () => showMast([lead.lat, lead.lng]));
+      marker.on('mouseout', () => { if (!marker.isPopupOpen()) hideMast(); });
+      marker.on('popupclose', hideMast);
+    }
     marks[lead.kind].push(marker);
     siteMark.set(key, marker);
   }

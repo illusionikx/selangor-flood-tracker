@@ -240,8 +240,18 @@ alertTab.onclick = () => {
 // Same on landing for the alert panel: expanded it covers a third of a phone screen. It still
 // springs open by itself when something *becomes* an alert (see alerts.js) — that is news, and news
 // is worth the space; a list that was already there when you arrived is not.
-if (!phone.matches && PREFS.alertsOpen !== false) alertPanel.classList.add('open');
-alertTab.setAttribute('aria-expanded', alertPanel.classList.contains('open'));
+function syncAlertPanel() {
+  const open = !phone.matches && PREFS.alertsOpen !== false;
+  alertPanel.classList.toggle('open', open);
+  alertTab.setAttribute('aria-expanded', open);
+}
+syncAlertPanel();
+/* And again on every crossing of the breakpoint, for the reason landing on a phone collapses it:
+   expanded it covers a third of the screen, and a panel that was reasonable beside a 1200px map is
+   not the same object at 380px. Restored to the saved preference on the way back out. Neither
+   direction writes PREFS — the layout is deciding here, not the user, and overwriting the
+   preference would leave nothing to restore. Same contract as the drawer's handler above. */
+phone.addEventListener('change', syncAlertPanel);
 
 // --- tap-to-open popovers (touch has no hover) -----------------------------------------------------
 
@@ -273,16 +283,35 @@ let hits = [], sel = -1;
 const nearest = () => state.hereAt && state.data.reduce((best, s) =>
   s.lat && (!best || distKm(s, state.hereAt) < distKm(best, state.hereAt)) ? s : best, null);
 
+/* Matching ignores punctuation and word order. JPS writes the same place as `I.K.B.N.`, `IKBN` and
+   `Ikbn` across its three feeds, and someone typing one of them means all three — a plain
+   `includes()` found none of the others. Both sides have their punctuation stripped, so `ikbn`
+   reaches `I.K.B.N.`; terms match in any order, so `lui sg` finds `KG. SG. LUI`, which the old
+   substring test missed entirely.
+   Squashing the haystack rather than spacing it is what makes one test enough: a term with no
+   spaces that appears in the spaced text always appears in the squashed text too, so the squashed
+   form is a superset and the spaced one need not be checked at all.
+   Still substrings, not edit distance: `klang` must never quietly surface `Hulu Kelang`, because on
+   this map those are different places — and it doesn't, since squashing removes spaces but never
+   letters. No scoring either; the list is grouped under district headings, and a relevance order
+   would fight the grouping rather than help it. */
+const squash = t => t.toLowerCase().replace(/[^a-z0-9]/g, '');
+const hay = s => squash(`${s.name} ${s.district || ''} ${s.state || ''} ${KINDS[s.kind].label}`);
+// Split on whitespace *only*, then strip punctuation inside each word. Splitting the query on
+// punctuation instead turned `I.K.B.N` into four single-letter terms and matched 294 stations.
+const termsOf = q => q.trim().split(/\s+/).map(squash).filter(Boolean);
+const matches = (text, terms) => terms.every(t => text.includes(t));
+
 function search() {
-  const q = gotoIn.value.trim().toLowerCase();
+  const terms = termsOf(gotoIn.value);
   // No cap: an empty box lists all ~680, which is what a select does. Rendering them is ~5ms and
   // happens once per keystroke; virtualising a list nobody scrolls to the bottom of isn't worth it.
   hits = state.data
-    .filter(s => s.name && s.lat && (!q ||
-      `${s.name} ${s.district || ''} ${s.state || ''} ${KINDS[s.kind].label}`.toLowerCase().includes(q)))
+    .filter(s => s.name && s.lat && (!terms.length || matches(hay(s), terms)))
     // Heading first: a group is only a group if its rows are adjacent.
     .sort((a, b) => group(a).localeCompare(group(b)) || a.name.localeCompare(b.name));
-  if (state.hereAt && (!q || 'nearest station to me'.includes(q))) hits.unshift(NEAREST);
+  if (state.hereAt && (!terms.length || matches(squash('nearest station to me'), terms)))
+    hits.unshift(NEAREST);
   draw(true);
 }
 

@@ -415,9 +415,13 @@ table.data .dash { color: var(--outline); }
    Deliberately restrained. The chip is background information sitting beside a ticker that moves;
    two competing motions in one 64px bar is a bar you stop reading. The halo starts closer in, ends
    at 1.6× instead of 2×, and takes 2.6s over 1.8 — a slow pulse rather than a ping. */
-#net .swatch { position: relative; background: var(--c); }
+/* 7.5px, not the shared token's 10px: this dot sits in a 64px bar next to a moving ticker and does
+   not need to be the loudest thing in it. Scoped to #net so `.swatch` stays 10px wherever else it
+   is used as a colour key. The halo's inset drops by the same quarter, or the ring would sit
+   proportionally further out and undo the shrink. */
+#net .swatch { position: relative; width: 7.5px; height: 7.5px; background: var(--c); }
 #net .swatch::after {
-  content: ''; position: absolute; inset: -3px; border-radius: 50%;
+  content: ''; position: absolute; inset: -2.25px; border-radius: 50%;
   border: 1.5px solid var(--c); opacity: .7; animation: halo-soft 2.6s ease-out infinite;
 }
 @media (prefers-reduced-motion: reduce) { #net .swatch::after { animation: none; opacity: .7; } }
