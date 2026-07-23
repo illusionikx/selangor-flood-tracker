@@ -20,9 +20,23 @@ import { state } from './state.js';
 // at 40 alerts" is a question you can ask twice and get the same answer to.
 const EVERY = 4;          // every Nth eligible river is pushed over its danger mark
 const RISE_EVERY = 3;     // and every Nth of the rest is made to climb towards it
+const RAIN_EVERY = 5;     // every Nth rain gauge is made to rain
+const OFFLINE_EVERY = 11; // and every Nth station of any kind is knocked off the network
+
+// One from each of JPS's four intensity classes (>0 / >10 / >30 / >60 mm an hour), cycled, so the
+// rain heatmap shows its whole ramp rather than one colour repeated, and the popup gets all four
+// wordings. Same reason the climbing rivers get a spread of ETAs rather than a single number.
+const RAIN_MM = [4, 18, 42, 75];
 
 export function seedTest(data) {
-  let rivers = 0, sirens = 0;
+  let rivers = 0, sirens = 0, rains = 0, offline = 0;
+
+  /* Knock stations off the network first, not last. Every branch below requires `s.online`, so an
+     offlined station simply falls through and stays offline — which means the two fakes can never
+     land on the same station, with no bookkeeping to track which ones the flood already claimed.
+     Worth faking at all because "offline" is a whole rendering path — grey pins, the OFFLINE block,
+     `NOT CURRENT` in the panel — that otherwise only appears on stations that happen to be down. */
+  for (const s of data) if (++offline % OFFLINE_EVERY === 0) s.online = false;
 
   for (const s of data) {
     if (s.kind === 'river') {
@@ -53,6 +67,21 @@ export function seedTest(data) {
       s.history = Array.from({ length: 24 }, (_, i) => [
         Math.floor(Date.now() / 1000) - (23 - i) * 1800,
         +(s.level - (23 - i) * (s.rate / 2)).toFixed(2),
+      ]);
+    } else if (s.kind === 'rainfall' && s.online && ++rains % RAIN_EVERY === 0) {
+      const mm = RAIN_MM[(rains / RAIN_EVERY - 1) % RAIN_MM.length];
+      s.hourly = mm;
+      s.daily = +(mm * 3.5).toFixed(1);
+      // The same cutoffs rainStatus() applies server-side. Set rather than derived because the
+      // client never recomputes a status — the pin colour, the popup's band and the heat weight all
+      // read this one field, so a fake that only moved `hourly` would contradict itself.
+      s.status = mm > 60 ? 4 : mm > 30 ? 3 : mm > 10 ? 2 : 1;
+      // Hourly buckets, building into the current reading: rainfall is an interval quantity, so its
+      // graph is bars over RAIN_BUCKET, and a flat set of identical bars would tell us nothing about
+      // whether the bars line up with the axis.
+      s.history = Array.from({ length: 12 }, (_, i) => [
+        Math.floor(Date.now() / 1000) - (11 - i) * 3600,
+        +(mm * (0.2 + 0.8 * (i / 11))).toFixed(1),
       ]);
     } else if (s.kind === 'siren' && s.online && ++sirens % 9 === 0) {
       s.status = 1;

@@ -357,6 +357,12 @@ while the mast is quiet:** any member with `status > 0` keeps the real status co
 no reading stays grey, so the new pin can never make a signalling or dead mast look calm. The glyph
 switches on member count alone; only the colour is conditional.
 
+**The alert tab's counts sit on their own line.** Four of them — at danger, sounding, rising, not
+current — plus the chevron did not fit 300px beside `On alert · nearest first`, and the title is
+what gave way first, which is the one part of the tab that says what the panel *is*. The tally is
+sent past the chevron with `order` so the chevron stays up on the title's line, and `:empty` keeps a
+quiet panel to a single line, since `alerts.js` writes the span whether or not it has anything in it.
+
 **A second heatmap: rainfall.** Its own layer and its own chip (default off), beside the water one.
 Not another weight on the existing layer — the two answer different questions, "how high is the
 water" and "how hard is it coming down", and a mast carrying both sensors would have summed a river
@@ -1292,8 +1298,20 @@ testing strategy.
   next poll with the switch off is clean data again. Nothing downstream knows it is looking at a
   drill, which is the point — the drill exercises the real code.
 - **Deterministic, not random:** every 4th eligible river over its danger mark, every 3rd of the
-  rest made to climb, every 9th siren triggered. "Does the panel scroll right at 40 alerts" is a
-  question you can ask twice and get the same answer to.
+  rest made to climb, every 9th siren triggered, every 5th rain gauge raining, every 11th station of
+  any kind knocked offline. "Does the panel scroll right at 40 alerts" is a question you can ask
+  twice and get the same answer to. On the current payload: 24 rivers at danger, 24 climbing, 17
+  sirens sounding, 33 gauges raining, 51 stations off the network.
+- **Rain cycles all four of JPS's intensity classes** (4 / 18 / 42 / 75 mm an hour → light,
+  moderate, heavy, violent), so the rainfall heatmap shows its whole ramp rather than one colour
+  repeated, and the popup gets all four wordings. `status` is *set*, not left to be derived: the
+  client never recomputes it — the pin colour, the popup's band and the heat weight all read that
+  one field — so a fake that moved only `hourly` would contradict itself.
+- **Offlining runs first, before anything else is faked.** Every seeding branch requires `s.online`,
+  so an offlined station falls through and stays offline, and the two fakes can never land on the
+  same station — no bookkeeping needed to track which ones the flood already claimed. Worth faking
+  because "offline" is a whole rendering path (grey pins, the `OFFLINE` block, `NOT CURRENT` in the
+  panel) that otherwise only appears on whichever stations happen to be down that day.
 - The rising branch derives `rate` from a **target ETA** rather than using a fixed m/h. A flat rate
   means the flag depends on river size — 0.35 m/h reaches a 0.9m drain in half an hour and a 6m
   river in seventeen, so a fixed rate lit only 8 of 26 and left the rest silently climbing.
