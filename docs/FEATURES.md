@@ -181,13 +181,16 @@ would have passed it. The verify snippet in CLAUDE.md now checks `content_type`.
 published as four separate stations at one coordinate. Four pins stacked on each other made one
 place look like four, and clicking any of them told you a quarter of the story. `api.php` groups
 stations within `SITE_M` into a `site`, and the map draws one pin per site with one popup: the place
-named once, then a section per sensor. 669 mappable stations become 434 pins.
+named once, then a section per sensor. 671 mappable stations become 417 pins.
 
-*25 m, measured.* Grouping at 0 m merges 113 sites — but another 46 pairs sit a few metres apart
-because two feeds typed the same mast slightly differently, and exact-match misses all of them. The
-count rises to 161 by 25 m and then barely moves until 200 m, where it starts swallowing genuinely
-separate installations. 25 m is that knee. Largest real site holds six sensors: rainfall, river,
-three sirens and a camera at Batu 15, Hulu Langat.
+*50 m, measured.* Grouping at 0 m leaves 546 pins — but many pairs sit a few metres apart because two
+feeds typed the same mast slightly differently, and exact-match misses all of them. 25 m leaves 435,
+50 m leaves 417, and past that it crawls (414 at 75 m, 408 at 100 m) until 200 m starts swallowing
+genuinely separate installations. The distribution is bimodal — sensors are either bolted to one mast
+or hundreds of metres apart — so almost everything worth merging is already inside 25 m, which is why
+the curve is so flat. **Widened 25 → 50 m** anyway: the 18 pins it buys are masts straddling a river
+or sitting at opposite ends of one compound, and none of them were separate places. Largest real site
+holds six sensors: rainfall, river, three sirens and a camera at Batu 15, Hulu Langat.
 
 *Filter first, group second.* A site is built from the sensors still showing on it, so switching
 rainfall off on a mast that also carries a river gauge leaves the river pin exactly where it was.
@@ -362,6 +365,22 @@ current — plus the chevron did not fit 300px beside `On alert · nearest first
 what gave way first, which is the one part of the tab that says what the panel *is*. The tally is
 sent past the chevron with `order` so the chevron stays up on the title's line, and `:empty` keeps a
 quiet panel to a single line, since `alerts.js` writes the span whether or not it has anything in it.
+
+**Only one heatmap at a time.** The two chips are mutually exclusive: switching one on switches the
+other off, and switching the live one off leaves the map clean. Stacked, they were two answers to
+two questions in one picture — and worse, leaflet.heat accumulates alpha *across* layers, so
+overlapping blobs blended into a colour belonging to neither scale, reading as an intensity neither
+reading supported. They stay **checkboxes, not radios**, because "neither" has to remain reachable
+and a radio group cannot be cleared by clicking.
+
+The pair is stored as *one* preference (`PREFS.heatLayer`: `'water'`, `'rain'` or `''`). Two booleans
+can hold a state the UI can no longer represent — both on — and a pref saved before this change is
+exactly that, so the old keys are read once to migrate and then dropped from the blob.
+
+The legend therefore shows one scale or none, never a stack of two ramps to read against each other,
+and the divider that used to sit between them is gone. The opacity slider lives below both sections
+and serves whichever layer is live — `heatOpacity()` walks every layer, so it needs no knowledge of
+which one that is.
 
 **A second heatmap: rainfall.** Its own layer and its own chip (default off), beside the water one.
 Not another weight on the existing layer — the two answer different questions, "how high is the

@@ -34,7 +34,7 @@ const RISE_FLOOR = 0.10;  // m/hour — below this the rate is sensor rounding, 
 const RISE_ETA   = 3;     // hours to its own danger mark
 // Sirens report a daily heartbeat (most stamp 08:00). Two missed days is out of contact, not idle.
 const SIREN_STALE = 48 * 3600;
-const SITE_M = 25;   // metres — stations this close are sensors on one mast, not separate places
+const SITE_M = 50;   // metres — stations this close are sensors on one mast, not separate places
 const CACHE = __DIR__ . '/.cache.json';
 const LOCK  = __DIR__ . '/.refresh.lock';   // held for the length of a rebuild; see below
 const HIST  = __DIR__ . '/.history.db';
@@ -487,8 +487,11 @@ unset($s);
 // differently. They are one place, so they get one `site` key and the map draws one pin.
 //
 // Grouped greedily in build order, so the first station at a spot defines it. Measured on the live
-// set: 0 m merges 113 sites, 25 m merges 161, and it barely moves again until 200 m — which starts
-// swallowing genuinely separate installations. 25 m is that knee.
+// set (671 placed stations): 0 m leaves 546 pins, 25 m leaves 435, 50 m leaves 417, and past that it
+// crawls — 414 at 75 m, 408 at 100 m — until 200 m starts swallowing genuinely separate
+// installations. The distribution is bimodal: sensors are either bolted to one mast or hundreds of
+// metres apart, so almost everything worth merging is already inside 25 m. 50 m buys the 18 masts
+// that straddle a river or sit at opposite ends of one compound, and nothing else.
 $sites = [];
 foreach ($stations as &$s) {
     $s['site'] = null;

@@ -227,8 +227,8 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
 - **Zooming destroys open popups.** markercluster rebuilds marker DOM on zoom. Use `openStable()`
   (opens, re-opens on next `moveend` if it closed), and `cluster.zoomToShowLayer()` for a marker
   that may be inside a cluster.
-- **Stations within `SITE_M` (25 m) are one place.** `api.php` stamps a `site` key; the map draws one
-  pin per site, not per station (669 → 434). Anything reaching for a marker must go through
+- **Stations within `SITE_M` (50 m) are one place.** `api.php` stamps a `site` key; the map draws one
+  pin per site, not per station (671 → 417). Anything reaching for a marker must go through
   `siteMark` in `map.js` — a station's pin may be filed under another kind's bucket, because the
   bucket is the *lead* sensor's kind. Sites are built **after** filtering, so a hidden layer can
   never take a whole mast off the map; that is why layer chips call `render()`, not `syncCluster()`.

@@ -112,15 +112,29 @@ el('heatOpacity').oninput = () => {
   save();
 };
 
-el('heat').checked = PREFS.heat !== false;
-// Rain defaults off, unlike water. Two heatmaps over each other is two answers to two questions in
-// one picture, and the water one is what this page is for — the rain layer is the thing you switch
-// on to ask "where is it coming from", not the thing you land in.
-el('rainHeat').checked = !!PREFS.rainHeat;
+/* The two heatmaps are **one** choice, so they are stored as one preference: `'water'`, `'rain'` or
+   `''` for neither. A pair of booleans can hold a state the UI can no longer represent — both on —
+   and a pref saved before this change is exactly that, which is what the `??` branch migrates.
+   Water is the default because it is what this page is for; rain is what you switch to in order to
+   ask where the water is coming from. */
+const heatPref = PREFS.heatLayer ?? (PREFS.rainHeat ? 'rain' : PREFS.heat === false ? '' : 'water');
+delete PREFS.heat; delete PREFS.rainHeat;   // dropped from the blob on the next save()
+el('heat').checked = heatPref === 'water';
+el('rainHeat').checked = heatPref === 'rain';
 el('risingOnly').checked = !!PREFS.risingOnly;
+
 el('heat').onchange = el('rainHeat').onchange = el('risingOnly').onchange = e => {
-  Object.assign(PREFS, { heat: el('heat').checked, rainHeat: el('rainHeat').checked,
-                         risingOnly: el('risingOnly').checked });
+  /* One heatmap at a time. Stacked, they are two answers to two questions in one picture — and
+     worse, leaflet.heat accumulates alpha across layers, so overlapping blobs blend into a colour
+     that belongs to neither scale and reads as an intensity neither reading supports.
+     Checkboxes rather than radios because "neither" has to stay reachable, and a radio group cannot
+     be cleared by clicking. Switching one on switches the other off; switching the live one off
+     leaves the map clean. */
+  if (e.target === el('heat') && el('heat').checked) el('rainHeat').checked = false;
+  if (e.target === el('rainHeat') && el('rainHeat').checked) el('heat').checked = false;
+
+  PREFS.heatLayer = el('heat').checked ? 'water' : el('rainHeat').checked ? 'rain' : '';
+  PREFS.risingOnly = el('risingOnly').checked;
   save();
   // Both heatmaps are display options, not filters — only the rising chip closes the drawer.
   applyFilter(e.target === el('risingOnly'));

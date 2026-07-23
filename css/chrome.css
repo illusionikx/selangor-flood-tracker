@@ -483,10 +483,9 @@ body.drawer #legend, body.drawer #alerts { transform: translateX(var(--drawer));
   background: linear-gradient(90deg, #6f7bff 0%, #8f7bff 33.3%, #c77dff 66.7%, #ff4d4d 100%);
 }
 #legend .ticks { display: flex; justify-content: space-between; }
-/* The rule between the two scales, only when both are actually showing. Driven by a class rather
-   than `#lgWater + #lgRain`, because an adjacent-sibling selector still matches a hidden sibling —
-   rain alone would have drawn a divider under nothing. */
-#legend.both #lgRain { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--outline); }
+/* No rule between the two scales any more: the layers are mutually exclusive, so exactly one section
+   is ever on screen. (It was `#legend.both`, set from render.js — never `#lgWater + #lgRain`, since
+   an adjacent-sibling selector still matches a hidden sibling and drew a divider under nothing.) */
 
 /* Info bubble: the formula lives in here so the legend itself stays a legend. */
 .info { position: relative; margin-left: auto; color: var(--muted); cursor: help; }

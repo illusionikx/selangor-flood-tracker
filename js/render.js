@@ -132,16 +132,15 @@ export function render() {
   syncCluster();
   heat.setLatLngs(points);
   rainHeat.setLatLngs(rainPoints);
+  // ui.js keeps these two mutually exclusive, so the legend shows one scale or none — never a stack
+  // of two ramps to read against each other. The opacity slider lives below both and serves either.
   const wet = el('heat').checked, rainy = el('rainHeat').checked;
   wet   ? heat.addTo(map)     : heat.remove();
   rainy ? rainHeat.addTo(map) : rainHeat.remove();
-  // Each scale is drawn only while its own layer is on, and the panel (with the opacity slider both
-  // layers share) only while either is.
   el('lgWater').style.display = wet ? '' : 'none';
   el('lgRain').style.display = rainy ? '' : 'none';
   el('legend').style.display = wet || rainy ? '' : 'none';
-  el('legend').classList.toggle('both', wet && rainy);   // draws the rule between the two scales
-  heatScale();   // sizes whichever are on, and re-applies opacity to both
+  heatScale();   // sizes whichever is on, and re-applies opacity
   heatOpacity();
   counts();
   districts();
