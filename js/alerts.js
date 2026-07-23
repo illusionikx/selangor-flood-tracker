@@ -113,9 +113,8 @@ export function alerts() {
         <div class="muted">${[s.district, s.state].filter(Boolean).join(', ')} · ${s.basin || 'basin n/a'}${
           hereAt ? ` · <b>${distKm(hereAt, s).toFixed(1)} km from you</b>` : ''}</div>
         ${detail}
-        ${t === 'stale' ? `<div class="state">LAST KNOWN — NOT CURRENT</div>
-          <p class="muted">This station has stopped reporting. The reading above is the last one it
-             sent and the situation there may have changed either way.</p>` : ''}
+        ${t === 'stale' ? `<p class="muted">This station has stopped reporting. The reading above is
+             the last one it sent and the situation there may have changed either way.</p>` : ''}
         ${cam ? `<button class="link" data-cam="${cam.id}">
           <i class="i i-photo_camera"></i> Nearest station with a webcam · ${cam.name} (${distKm(s, cam).toFixed(1)} km)</button>` : ''}
         <div class="muted">updated ${s.updated || s.shot || 'unknown'}</div>

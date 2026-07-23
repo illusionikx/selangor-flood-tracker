@@ -1370,6 +1370,13 @@ listed, sinks below everything actionable, drops out of the counts and the tab c
 in words. Staleness is decided by `isStale()`, which is the same rule the popups already drew
 `NOT CURRENT` from — shared, so the two can never disagree about whether a station is trustworthy.
 
+The card used to carry a second `LAST KNOWN — NOT CURRENT` bar under the reading as well as the
+`NOT CURRENT` tag above it. Dropped: it restated the tag a few lines further down and its own label
+was a tautology — a last-known reading is what an offline station *has*. The sentence underneath it
+stayed, because that is the part carrying information the tag cannot ("the situation there may have
+changed either way"). The tag, the grey rule and the dimming still mark the card, so nothing that
+tells the reader this reading is untrustworthy was removed — only the duplicate of it.
+
 Applied to all three surfaces: the panel sorts by tier before distance (nearest-first is the better
 order *within* a tier, but across tiers it puts a forecast two streets away above a river already
 over its mark), the ticker colours the *reason* rather than the icon (the kind colour is what makes
