@@ -2,7 +2,7 @@
 // status footer. The same meter/state blocks are reused by the alert panel.
 
 import { KINDS, SOURCES, SPARK_H, camSrc } from './config.js';
-import { num, ago, parseMY, distKm, hasInfo, isStale, statusColor, scalePos,
+import { num, ago, noSec, parseMY, distKm, hasInfo, isStale, statusColor, scalePos,
          levelStops, gaugeStops } from './util.js';
 import { nearestOf, nearestCam, oneLiner } from './stations.js';
 
@@ -118,8 +118,7 @@ function gaugeBlock(s) {
         </div>`
         : `<div class="muted">${s.depth < 0 ? `water is ${Math.abs(s.depth)} m below the gauge marker`
                                             : 'water is level with the gauge marker'}</div>`}
-    </div>
-    ${stale && s.updated ? `<div class="muted">last reading ${ago(parseMY(s.updated))}</div>` : ''}`;
+    </div>`;
 }
 
 /* Same job as the siren's state block: answer the one question the pin is opened to answer, before
@@ -128,9 +127,7 @@ function gaugeBlock(s) {
    colour and the status code can never disagree. */
 const RAIN_STATE = ['NOT RAINING', 'LIGHT RAIN', 'MODERATE RAIN', 'HEAVY RAIN', 'VERY HEAVY RAIN'];
 const rainState = s => !hasInfo(s)
-  ? `<div class="state">NO READING</div>
-     <div class="muted">${s.updated ? `last reading ${ago(parseMY(s.updated))}`
-                                    : 'never reported — this station has no timestamp'}</div>`
+  ? '<div class="state">NO READING</div>'
   : `<div class="state ${s.status >= 3 ? 'on' : s.status >= 1 ? 'mid' : 'off'}"
       >${RAIN_STATE[s.status] || 'NOT RAINING'}</div>`;
 
@@ -158,13 +155,11 @@ function sensorBody(s, withCam = true) {
     : s.kind === 'gauge' && s.history?.length ? sparkline(s.history, 'gauge') : '';
   const wet = s.kind === 'rainfall' ? rainState(s) : '';
   // A siren has exactly one thing to say, so it gets a centred state block instead of a metric row.
-  // "No signal" is only half the story: say how long it has been silent, so a siren that fell off the
-  // network last March can't be mistaken for one that is quietly working. Elapsed time only — the
-  // footer already prints the date, and these blocks used to repeat it a few lines above it.
+  // "No signal" is only half the story — a siren that fell off the network last March must not read
+  // as one that is quietly working — but the *when* is footLine()'s job now, on one line with the
+  // date and the source, rather than a sentence here and the same moment again three lines down.
   const siren = s.kind !== 'siren' ? '' : !hasInfo(s)
-    ? `<div class="state">OUT OF CONTACT</div>
-       <div class="muted">${s.updated ? `last signal ${ago(parseMY(s.updated))}`
-                                      : 'never reported — this station has no timestamp'}</div>`
+    ? '<div class="state">OUT OF CONTACT</div>'
     : `<div class="state ${s.status > 0 ? 'on' : 'off'}">${s.status > 0 ? 'TRIGGERED' : 'IDLE'}</div>
        ${sirenBand(s.history)}`;
   const gauge = s.kind !== 'gauge' ? '' : gaugeBlock(s);
@@ -183,9 +178,19 @@ function sensorBody(s, withCam = true) {
     ${spark}${rain}${link}`;
 }
 
-const footLine = s => `<div class="popfoot muted">${s.online ? 'online' : 'OFFLINE'}${
-  s.updated || s.shot ? `${s.online ? ' · ' : ' · last reported '}${s.updated || s.shot}` : ''}${
-  SOURCES[s.source] ? ` · via ${SOURCES[s.source].short}` : ''}</div>`;
+/* The one place a timestamp is printed: `OFFLINE · last reported 06/07/2026 10:19 · 411.0h ago ·
+   via JPS Selangor`. The stale state blocks above used to carry the elapsed time while this carried
+   the date, which put the same moment on screen twice, a couple of lines apart. Elapsed time only
+   where it is the point — on a live station the date is the answer and "· 4m ago" is padding. */
+const footLine = s => {
+  const t = s.updated || s.shot;
+  const at = parseMY(t);
+  const late = at && (!s.online || isStale(s));
+  return `<div class="popfoot muted">${s.online ? 'online' : 'OFFLINE'}${
+    t ? `${s.online ? ' · ' : ' · last reported '}${noSec(t)}${late ? ` · ${ago(at)}` : ''}`
+      : s.online ? '' : ' · never reported'}${
+    SOURCES[s.source] ? ` · via ${SOURCES[s.source].short}` : ''}</div>`;
+};
 
 const region = s => `<div class="muted">${
   [s.district, s.state].filter(Boolean).join(', ') || 'district n/a'} · ${s.basin || 'basin n/a'}</div>`;

@@ -325,8 +325,9 @@ left alone; that is missing evidence, not evidence of failure.
 calls online is stamped within 48 h (`listOn_stale = 0`), and all 41 stale ones — 24 of them silent
 for over a month, one since July 2025 — are already flagged offline upstream. So `stationStatus`
 turns out to encode exactly this rule already. The change was kept anyway for two reasons: the
-popup can now say **when** a siren last reported (`OUT OF CONTACT · last signal 293 days ago`)
-instead of an unexplained OFFLINE, and the rule is a standing check on a field we would
+popup can now say **when** a siren last reported (`OUT OF CONTACT`, over a footer reading
+`OFFLINE · last reported 02/10/2025 · 7032.0h ago`) instead of an unexplained OFFLINE, and the rule
+is a standing check on a field we would
 otherwise be trusting blindly. Cost is honest: +212 detail requests per poll, ~3.5s → ~4.5s cold.
 
 **Camera image proxy** (`?cam=<id>`) — JPS advertises stills over plain http, unusable from an
@@ -355,6 +356,16 @@ on the map — the five type hues, the traffic-light statuses, the offline grey.
 while the mast is quiet:** any member with `status > 0` keeps the real status colour, and a lead with
 no reading stays grey, so the new pin can never make a signalling or dead mast look calm. The glyph
 switches on member count alone; only the colour is conditional.
+
+**One timestamp per sensor, on one line.** A stale sensor used to print its recency twice: a
+sentence in the state block (`last signal 411.0h ago`) and the footer naming the same moment again
+two lines below (`OFFLINE · last reported 06/07/2026 10:19:05 · via JPS Selangor`). `footLine()` now
+carries all of it — state, date, elapsed, source — and the state blocks for siren, rainfall and
+gauge print no time at all. Elapsed time is appended only when the station is offline or stale; on a
+live one the date is the answer and `· 4m ago` is padding. Seconds are dropped for display by
+`noSec()`, because the feeds stamp to the second but publish on a 15-minute slot, and the `:05` was
+enough to wrap the footer onto two lines on a phone. It trims the printed string only — nothing
+parses the result, so `parseMY()` still sees the verbatim stamp.
 
 **Clustering** — one shared cluster across all categories (per-category clustering stacked five
 badges on one town). Badge shows the total only, in one neutral slate chip — *no* kind icon or hue.

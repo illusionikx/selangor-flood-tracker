@@ -30,6 +30,11 @@ export const parseMY = t => {                // "21/07/2026 17:45:00" → Date
   return m ? new Date(m[3], m[2] - 1, m[1], m[4], m[5]) : null;
 };
 
+// JPS stamps to the second, but publishes on a 15-minute slot — the `:05` is noise, and it is noise
+// that pushes a footer onto two lines on a phone. Trims the seconds off a printed MYT stamp only;
+// nothing parses the result, so the underlying string stays verbatim for parseMY().
+export const noSec = t => (t || '').replace(/(\d\d:\d\d):\d\d/, '$1');
+
 export const ago = t => {
   const s = Math.max(0, (Date.now() - new Date(t)) / 1000);
   return s < 90 ? `${s | 0}s ago` : s < 5400 ? `${s / 60 | 0}m ago` : `${(s / 3600).toFixed(1)}h ago`;

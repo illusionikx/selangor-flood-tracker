@@ -223,11 +223,15 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   "steady", which is the one thing a graph of a dead sensor must not say. Anything offline or
   >24h old renders grey with an explicit `OFFLINE` block, the date in the footer. Never show these
   as live.
-- **41 sirens last reported months ago** (one in July 2025). They render `OUT OF CONTACT` with how
-  long they have been silent, never `IDLE` — a silent siren and a dead siren look identical, and
-  only one is safe. The *date* belongs to `footLine()` and appears there only: the stale blocks for
-  siren, rainfall and gauge print elapsed time alone, because they sit a few lines above a footer
-  that already carries the timestamp and used to repeat it verbatim.
+- **41 sirens last reported months ago** (one in July 2025). They render `OUT OF CONTACT`, never
+  `IDLE` — a silent siren and a dead siren look identical, and only one is safe.
+- **`footLine()` is the only place a timestamp is printed**, and it carries the whole story on one
+  line: `OFFLINE · last reported 06/07/2026 10:19 · 411.0h ago · via JPS Selangor`. The stale state
+  blocks (siren, rainfall, gauge) print no time at all — they each used to add a sentence naming the
+  same moment the footer named three lines below. Elapsed time is appended only when the station is
+  offline or stale, because on a live one the date is the answer and `· 4m ago` is padding. Seconds
+  are trimmed for display by `noSec()`; the underlying string stays verbatim, so `parseMY()` is
+  unaffected.
 - **A marquee needs three things measured, not guessed.** `js/ticker.js` renders the item set twice
   and translates `-50%`, which is only seamless if one copy is at least as wide as the box — so it
   repeats the set to cover the box *before* doubling. Width alone isn't enough: a single wide item

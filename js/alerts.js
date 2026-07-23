@@ -3,7 +3,7 @@
 
 import { KINDS, STATUS_COLOR, NO_INFO } from './config.js';
 import { state, PREFS } from './state.js';
-import { el, distKm, dkey, isHot, tier, TIER_RANK, isIgnored } from './util.js';
+import { el, distKm, dkey, isHot, tier, TIER_RANK, isIgnored, noSec } from './util.js';
 import { flashTo } from './map.js';
 import { nearestCam, byId } from './stations.js';
 import { meter, sparkline, etaText, rateHtml } from './popup.js';
@@ -117,7 +117,7 @@ export function alerts() {
              the last one it sent and the situation there may have changed either way.</p>` : ''}
         ${cam ? `<button class="link" data-cam="${cam.id}">
           <i class="i i-photo_camera"></i> Nearest station with a webcam · ${cam.name} (${distKm(s, cam).toFixed(1)} km)</button>` : ''}
-        <div class="muted">updated ${s.updated || s.shot || 'unknown'}</div>
+        <div class="muted">updated ${noSec(s.updated || s.shot) || 'unknown'}</div>
       </div>`;
     }).join('');
   // No advisory here. It lives on the ticker, which is the strip that stays visible while this panel
