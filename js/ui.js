@@ -113,11 +113,17 @@ el('heatOpacity').oninput = () => {
 };
 
 el('heat').checked = PREFS.heat !== false;
+// Rain defaults off, unlike water. Two heatmaps over each other is two answers to two questions in
+// one picture, and the water one is what this page is for — the rain layer is the thing you switch
+// on to ask "where is it coming from", not the thing you land in.
+el('rainHeat').checked = !!PREFS.rainHeat;
 el('risingOnly').checked = !!PREFS.risingOnly;
-el('heat').onchange = el('risingOnly').onchange = e => {
-  Object.assign(PREFS, { heat: el('heat').checked, risingOnly: el('risingOnly').checked });
+el('heat').onchange = el('rainHeat').onchange = el('risingOnly').onchange = e => {
+  Object.assign(PREFS, { heat: el('heat').checked, rainHeat: el('rainHeat').checked,
+                         risingOnly: el('risingOnly').checked });
   save();
-  applyFilter(e.target !== el('heat'));   // the heatmap is a display option, not a filter
+  // Both heatmaps are display options, not filters — only the rising chip closes the drawer.
+  applyFilter(e.target === el('risingOnly'));
 };
 
 // --- district filter ------------------------------------------------------------------------------

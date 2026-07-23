@@ -7,7 +7,7 @@
 <link rel="stylesheet" href="vendor/fonts.css?v=49">
 <link rel="stylesheet" href="css/icons.css?v=50">
 <link rel="stylesheet" href="css/base.css?v=49">
-<link rel="stylesheet" href="css/chrome.css?v=49">
+<link rel="stylesheet" href="css/chrome.css?v=50">
 <link rel="stylesheet" href="css/map.css?v=57">
 
 <!-- A camera still. A <dialog>, not a div: it opens from the all-stations table, which is itself a
@@ -186,6 +186,8 @@
     </details>
     <label class="chip"><input type="checkbox" id="heat" checked>
       <i class="glyph i i-water_drop"></i>Water-level heatmap</label>
+    <label class="chip"><input type="checkbox" id="rainHeat">
+      <i class="glyph i i-rainy"></i>Rainfall heatmap</label>
     <label class="chip"><input type="checkbox" id="risingOnly">
       <i class="glyph i i-warning"></i>Rising stations only <span id="risingHint" class="hint"></span></label>
   </div>
@@ -210,27 +212,51 @@
   <div id="alertBody"></div>
 </div>
 <div id="legend" class="surface">
-  <div class="title">Water-level heat
-    <span class="info" tabindex="0" aria-label="How the heatmap is calculated">
-      <i class="i i-info"></i>
-      <span class="tip">
-        <p><b>How it is worked out</b></p>
-        <p>Each station scores its reading against its <i>own</i> thresholds, so a small stream at
-           its limit is as hot as a big river at its limit. Rivers and flood gauges both count —
-           whichever is further up its scale wins the spot.</p>
-        <p>The colour is the band it has crossed: yellow past its alert mark, orange past warning,
-           red at danger. The same three marks the station's own meter draws.</p>
-        <p>A flood gauge that has tripped goes straight to red — water standing over a spot known
-           to flood is something observed, not forecast.</p>
-        <p>Below the alert mark, nothing is drawn. A map that is warm everywhere says nothing.</p>
-        <p class="muted">Rainfall, sirens and offline stations are not included.</p>
+  <div id="lgWater" class="lgsec">
+    <div class="title">Water-level heat
+      <span class="info" tabindex="0" aria-label="How the heatmap is calculated">
+        <i class="i i-info"></i>
+        <span class="tip">
+          <p><b>How it is worked out</b></p>
+          <p>Each station scores its reading against its <i>own</i> thresholds, so a small stream at
+             its limit is as hot as a big river at its limit. Rivers and flood gauges both count —
+             whichever is further up its scale wins the spot.</p>
+          <p>The colour is the band it has crossed: yellow past its alert mark, orange past warning,
+             red at danger. The same three marks the station's own meter draws.</p>
+          <p>A flood gauge that has tripped goes straight to red — water standing over a spot known
+             to flood is something observed, not forecast.</p>
+          <p>Below the alert mark, nothing is drawn. A map that is warm everywhere says nothing.</p>
+          <p class="muted">Rainfall has its own layer and scale; sirens and offline stations are not
+             included.</p>
+        </span>
       </span>
-    </span>
+    </div>
+    <div class="ramp"></div>
+    <!-- The three marks themselves, in the order the ramp crosses them. The prose that used to sit
+         under it is in the tip — the panel is a legend, not a page. -->
+    <div class="ticks muted"><span>alert</span><span>warning</span><span>danger</span></div>
   </div>
-  <div class="ramp"></div>
-  <!-- The three marks themselves, in the order the ramp crosses them. The prose that used to sit
-       under it is in the tip — the panel is a legend, not a page. -->
-  <div class="ticks muted"><span>alert</span><span>warning</span><span>danger</span></div>
+  <!-- Rainfall's own scale, drawn only while that layer is on. Separate section rather than a second
+       panel: the opacity slider below is shared, and two floating boxes on a phone is one too many. -->
+  <div id="lgRain" class="lgsec">
+    <div class="title">Rainfall heat
+      <span class="info" tabindex="0" aria-label="How the rainfall heatmap is calculated">
+        <i class="i i-info"></i>
+        <span class="tip">
+          <p><b>How it is worked out</b></p>
+          <p>Rain in the last hour, on the intensity classes JPS publishes: light above 0 mm,
+             moderate above 10, heavy above 30, violent above 60.</p>
+          <p>The colours are the rainfall pins' own, so a blob and a pin under it agree.</p>
+          <p>Every reporting rain gauge counts, and only rain that is actually falling is drawn — a
+             dry gauge paints nothing.</p>
+          <p class="muted">This is rain, not flooding. It says where the water is arriving, not
+             where it is standing — the water-level heat answers that.</p>
+        </span>
+      </span>
+    </div>
+    <div class="ramp rain"></div>
+    <div class="ticks muted"><span>light</span><span>moderate</span><span>heavy</span><span>violent</span></div>
+  </div>
   <label class="slider muted">Opacity
     <input type="range" id="heatOpacity" min="15" max="100" step="5" value="100">
     <span id="heatOpacityVal">100%</span>

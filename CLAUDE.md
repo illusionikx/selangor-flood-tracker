@@ -28,7 +28,7 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `js/util.js` | pure helpers + `hasInfo()` / `color()` / `isIgnored()` |
 | `js/stations.js` | queries over the station set (`nearestOf`, `nearestCam`, `byId`) |
 | `js/map.js` | map instance, basemap/theme, cluster, `focusOn` / `openStable` / `flashTo` |
-| `js/heat.js` | heat layer, ground-fixed sizing, opacity |
+| `js/heat.js` | both heat layers (water level, rainfall), ground-fixed sizing, shared opacity |
 | `js/popup.js` | popup + meter + gauge + sparkline templates |
 | `js/render.js` | rebuilds markers and heat points; drawer summary table |
 | `js/alerts.js` | "On alert" panel |
@@ -247,7 +247,7 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   because they want no animation. Their counts live on the `<summary>`, so a collapsed section still
   reports what it is holding — do not move a count into the body.
 - **`border-collapse: collapse` drops padding on the table box** — `#netstats` uses `separate`.
-- **leaflet.heat sizes in screen pixels.** `heatScale()` converts `HEAT_KM` (4km) to pixels per
+- **leaflet.heat sizes in screen pixels.** `heatScale()` converts `HEAT_KM` (5km) to pixels per
   zoom so blobs stay ground-fixed. Do **not** also call `heat.redraw()` — the plugin repaints on
   the following `moveend`, and doing both painted twice per zoom. Radius capped at 120px because
   blur cost is quadratic; past that cap the layer *fades out* rather than quietly covering less
@@ -286,6 +286,12 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   verbatim, so anything computed from a unix timestamp must be formatted with
   `timeZone: 'Asia/Kuala_Lumpur'` (see `MYT_HOUR` in `popup.js`) or it will disagree with the
   strings next to it for any viewer outside MYT. No `hour12` anywhere.
+- **A heat layer's weight is its alpha.** leaflet.heat draws each point at its weight, so a scale
+  that starts at 0 draws real readings as nothing. The water layer never hit this because its floor
+  is the alert slot (0.38); the rain layer's first class therefore *starts at 0.25* (`RAIN_STOPS`)
+  rather than counting up from zero. Light rain is most of the rain most of the time — 10 of 233
+  gauges reporting and none above 4 mm/h on the day it was built — so a scale from zero would have
+  shipped an empty-looking layer. Any new heat layer needs a floor chosen the same way.
 - **Rainfall is an interval quantity, not a level.** It gets `rainBars()`, never `sparkline()` — a
   line between two rain readings claims a value in between that never existed. And `hourlyRainfall`
   is a *rolling* hour, so it buckets by `RAIN_BUCKET` (1 h): finer buckets show the same rain twice.

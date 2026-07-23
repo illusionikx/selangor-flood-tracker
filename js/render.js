@@ -1,11 +1,11 @@
 // Rebuilds every marker and the heat layer from the current station set.
 
-import { KINDS, MAST, HEAT_FLOOR } from './config.js';
+import { KINDS, MAST, HEAT_FLOOR, RAIN_STOPS } from './config.js';
 import { state, PREFS } from './state.js';
 import { el, color, ink, popWidth, popPan, dkey, isCritical, leads, hasInfo, isIgnored, ignoredIds,
          scalePos, levelStops, gaugeStops } from './util.js';
 import { map, marks, siteMark, shown, syncCluster, focusOn, openStable } from './map.js';
-import { heat, heatScale, heatOpacity } from './heat.js';
+import { heat, rainHeat, heatScale, heatOpacity } from './heat.js';
 import { sitePopup } from './popup.js';
 import { dataTable } from './table.js';
 
@@ -34,6 +34,7 @@ export function render() {
   Object.keys(marks).forEach(k => marks[k] = []);
   siteMark.clear();
   const points = [];
+  const rainPoints = [];
   const perKind = Object.fromEntries(Object.keys(marks).map(k => [k, 0]));
 
   // Filter first, group second. A site is drawn from the sensors still showing on it, so switching
@@ -75,6 +76,12 @@ export function render() {
     // Below the alert slot nothing paints at all: there is nothing to act on down there, and a map
     // warm from end to end is a map nobody reads.
     if (near >= HEAT_FLOOR) points.push([s.lat, s.lng, near]);
+
+    // Rainfall drives its own layer, on its own scale — see heat.js for why the two aren't summed.
+    // The floor here is simply "is it raining": a class the reader is told about starts above 0 mm,
+    // and a dry gauge painting the palest violet would make the whole state look wet.
+    if (s.kind === 'rainfall' && hasInfo(s) && s.hourly > 0)
+      rainPoints.push([s.lat, s.lng, scalePos(s.hourly, RAIN_STOPS) / 100]);
 
     if (!pinned && !shown(s.kind)) continue;
     const key = s.site || s.id;
@@ -123,11 +130,18 @@ export function render() {
   }
 
   syncCluster();
-  heatScale();
   heat.setLatLngs(points);
-  el('heat').checked ? heat.addTo(map) : heat.remove();
-  // Legend (and its opacity slider) only mean anything while the heatmap is on.
-  el('legend').style.display = el('heat').checked ? '' : 'none';
+  rainHeat.setLatLngs(rainPoints);
+  const wet = el('heat').checked, rainy = el('rainHeat').checked;
+  wet   ? heat.addTo(map)     : heat.remove();
+  rainy ? rainHeat.addTo(map) : rainHeat.remove();
+  // Each scale is drawn only while its own layer is on, and the panel (with the opacity slider both
+  // layers share) only while either is.
+  el('lgWater').style.display = wet ? '' : 'none';
+  el('lgRain').style.display = rainy ? '' : 'none';
+  el('legend').style.display = wet || rainy ? '' : 'none';
+  el('legend').classList.toggle('both', wet && rainy);   // draws the rule between the two scales
+  heatScale();   // sizes whichever are on, and re-applies opacity to both
   heatOpacity();
   counts();
   districts();

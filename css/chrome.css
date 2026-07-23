@@ -477,7 +477,16 @@ body.drawer #legend, body.drawer #alerts { transform: translateX(var(--drawer));
      (0.68 − 0.38) / (1 − 0.38). Change with heat.js's gradient and config.js's slots. */
   background: linear-gradient(90deg, #ffd166 0%, #ff9f1c 48%, #ff4d4d 100%);
 }
+/* Rainfall's slice runs from the first class, so the four evenly-spaced RAIN_STOPS slots land on
+   thirds. Change with heat.js's rain gradient and config.js's RAIN_STOPS. */
+#legend .ramp.rain {
+  background: linear-gradient(90deg, #6f7bff 0%, #8f7bff 33.3%, #c77dff 66.7%, #ff4d4d 100%);
+}
 #legend .ticks { display: flex; justify-content: space-between; }
+/* The rule between the two scales, only when both are actually showing. Driven by a class rather
+   than `#lgWater + #lgRain`, because an adjacent-sibling selector still matches a hidden sibling —
+   rain alone would have drawn a divider under nothing. */
+#legend.both #lgRain { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--outline); }
 
 /* Info bubble: the formula lives in here so the legend itself stays a legend. */
 .info { position: relative; margin-left: auto; color: var(--muted); cursor: help; }

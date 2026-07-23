@@ -357,6 +357,31 @@ while the mast is quiet:** any member with `status > 0` keeps the real status co
 no reading stays grey, so the new pin can never make a signalling or dead mast look calm. The glyph
 switches on member count alone; only the colour is conditional.
 
+**A second heatmap: rainfall.** Its own layer and its own chip (default off), beside the water one.
+Not another weight on the existing layer — the two answer different questions, "how high is the
+water" and "how hard is it coming down", and a mast carrying both sensors would have summed a river
+level with the rain falling on it into one number answering neither. Two layers also means either
+can be read alone, which is the point of having two chips.
+
+Weights come from JPS's own intensity classes (`rainStatus()`: >0 light, >10 moderate, >30 heavy,
+>60 violent mm/h) via `RAIN_STOPS`, and the class edges land exactly on the gradient stops, so a
+blob changes colour precisely where the class changes. Colours are read straight out of `RAIN_COLOR`
+— the rainfall pins' own palette — so a violet blob and the violet pin under it cannot disagree.
+
+**The first class starts at 0.25, not 0, and that is the whole trick.** leaflet.heat uses a point's
+weight as its alpha, so a scale counting up from zero draws real rain as almost nothing. Light rain
+is most of the rain most of the time: 10 of 233 gauges were reporting when this was built, none
+above 4 mm/h, which on a from-zero scale would have been an empty-looking layer that looked broken.
+The water layer never hit this because its floor is the alert slot. Only rain actually falling is
+drawn — a dry gauge paints nothing, or the whole state would look wet.
+
+Both layers share one sizing pass, one opacity slider and one legend panel, with a section per
+active scale and a rule between them only when both are on. That rule is driven by a class on
+`#legend`, not `#lgWater + #lgRain`: an adjacent-sibling selector still matches a hidden sibling, so
+rain-alone would have drawn a divider under nothing.
+
+*Blob diameter went 4km → 5km* at the same time, for both layers.
+
 **The site popup's sensor count is a corner chip, not a sentence.** A multi-sensor popup opened with
 a `6 sensors at this location` line under the region, which spent a whole row of a popup that is
 mostly rows — and restated what the badge list directly beneath it already showed. It is now a chip
@@ -397,11 +422,11 @@ doubling across the countdown — 0.40 at 3 h, 0.67 at 1 h, 0.80 at the mark —
 that get any boost at all is still exactly the set on alert, because `eta` is only published for a
 station that is genuinely climbing.
 
-Blobs are pinned to 4km on the ground (`HEAT_KM`) rather than a pixel size, so zooming doesn't change
+Blobs are pinned to 5km on the ground (`HEAT_KM`) rather than a pixel size, so zooming doesn't change
 what a hotspot means. Legend with colour ramp, ⓘ explaining the formula, and an opacity slider;
 the whole legend hides with the layer. The vendored plugin is patched so blobs that size up past
 200px stop shedding a hard quarter-circle at the canvas corner — chose to fix the plugin rather
-than shrink the blobs, since 4km is the meaningful ground size for a weather system. Blur cost
+than shrink the blobs, since 5km is the meaningful ground size for a weather system. Blur cost
 still caps the radius at 220px, so past roughly street-level zoom the layer fades out instead —
 a hotspot that silently covered less ground at each zoom would be worse than no hotspot.
 

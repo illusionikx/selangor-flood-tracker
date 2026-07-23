@@ -61,7 +61,7 @@ export const TILES = { light: 'rastertiles/voyager', dark: 'dark_all' };
 // Sparkline window. Must not exceed the server's own SPARK_WIN — it sends nothing older.
 export const SPARK_H     = 12;     // hours on the graph's x axis
 
-export const HEAT_KM     = 4;      // ground size of one blob
+export const HEAT_KM     = 5;      // ground size of one blob
 /* Heat weight is a position on the threshold scale, not a fraction of danger: the popup meter's
    piecewise slots (alert 38%, warning 68%, danger 100%) keyed straight into the gradient, so a
    blob's colour names the band a station has crossed. The floor is the alert slot — below its first
@@ -72,6 +72,20 @@ export const HEAT_ALERT   = 0.38;
 export const HEAT_WARNING = 0.68;
 export const HEAT_FLOOR   = HEAT_ALERT;
 export const HEAT_MAX_PX = 220;    // blur cost is quadratic; past this the layer fades instead
+
+/* Rainfall heat, on JPS's own intensity classes (`rainStatus()` in sources.php: >0 light, >10
+   moderate, >30 heavy, >60 very heavy, mm in the last hour). The slots are evenly spaced because the
+   *class* is what the reader is being told — the millimetres between two classes are not a quantity
+   anyone acts on, exactly as the water scale spaces alert/warning/danger rather than metres.
+   The first class starts at 25, not 0, and that is the whole trick: leaflet.heat uses a point's
+   weight as its alpha, so a scale starting at zero would have drawn real rain as almost nothing.
+   Light rain is most of the rain most of the time — 10 of 233 gauges reporting, none above 4 mm/h,
+   on the day this was written — and an invisible layer is a broken one. The water layer gets this
+   for free because its floor is the alert slot; here the floor has to be built in. Above 60 mm the
+   scale is already full, which is right: the class is open-ended and the blob is as red as it goes.
+   Paired with heat.js's rain gradient (which reads its colours straight out of RAIN_COLOR, so a blob
+   and a rainfall pin can never disagree) and `.ramp.rain` in chrome.css — change the three together. */
+export const RAIN_STOPS = [[0, 25], [10, 50], [30, 75], [60, 100]];
 export const FLASH_MS    = 2400;   // how long the jump-to ripple runs
 export const POLL_MS     = 300000; // matches the proxy's cache TTL
 
