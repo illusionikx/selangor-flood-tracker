@@ -609,6 +609,13 @@ mark carries the identity alone. Five controls plus the status chip have to shar
 **Drawer** — hamburger, slides in, map re-centres by half its width so the view doesn't hide
 underneath. Holds the district filter, layer toggle chips and heatmap controls.
 
+**Open by default on desktop.** The test is `PREFS.drawer !== false`, so an unset preference counts
+as open and only an explicit close keeps it shut. A first desktop visit used to land on a bare map
+with every filter and layer chip behind an unlabelled hamburger — and at that width there is room
+for the panel beside the map, which is the whole reason it is a drawer rather than a sheet. A phone
+still lands with it closed regardless of the saved preference: there the drawer *is* the screen, so
+opening it would hand the user a filter panel where they expected a map.
+
 *No basemap picker.* It offered three CARTO styles; the basemap now simply follows the theme —
 Voyager in light, Dark Matter in dark. Three flavours of grey was a setting nobody needed, and every
 option in a drawer is one more thing to read past during a flood.

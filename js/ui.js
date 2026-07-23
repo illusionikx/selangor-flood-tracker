@@ -68,17 +68,23 @@ function setDrawer(open, pan = true, remember = true) {
   if (remember) { PREFS.drawer = open; save(); }
 }
 menu.onclick = () => setDrawer(!document.body.classList.contains('drawer'));
-// Landing on a phone starts with the map and nothing over it: at that width the drawer *is* the
-// screen, so restoring a saved-open one would hand the user a filter panel where they expected a
-// map. `remember: false` — this is the layout deciding, so the preference survives for the desktop
-// visit that set it.
-setDrawer(!phone.matches && !!PREFS.drawer, false, false);
+/* Open on desktop unless the user has closed it — `!== false`, not `!!`, so an unset preference
+   counts as open. The drawer holds every filter and the layer chips, and a first visit used to land
+   on a bare map with all of that behind an unlabelled hamburger; there is room for it beside the map
+   at this width, which is the whole reason it is a drawer rather than a sheet.
+   Landing on a phone starts with the map and nothing over it: at that width the drawer *is* the
+   screen, so opening one would hand the user a filter panel where they expected a map. Its own
+   default is therefore still closed, and a desktop preference never leaks into it.
+   `remember: false` — this is the layout deciding, so the preference survives for the desktop visit
+   that set it. */
+const wantDrawer = () => !phone.matches && PREFS.drawer !== false;
+setDrawer(wantDrawer(), false, false);
 
 // Crossing the breakpoint in either direction: shut at phone width, where the drawer *is* the whole
-// screen and an open one hides the map it is filtering; restored to the saved preference on the way
-// back out. Neither is remembered — the layout is deciding here, not the user, and overwriting the
-// preference would leave nothing to restore.
-phone.addEventListener('change', e => setDrawer(!e.matches && !!PREFS.drawer, false, false));
+// screen and an open one hides the map it is filtering; back to the desktop default on the way out.
+// Neither is remembered — the layout is deciding here, not the user, and overwriting the preference
+// would leave nothing to restore.
+phone.addEventListener('change', () => setDrawer(wantDrawer(), false, false));
 
 // --- layer chips -------------------------------------------------------------------------------
 
