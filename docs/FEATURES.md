@@ -1308,6 +1308,13 @@ failure**: the accent flips to a pale blue (`#8ab4f8`) there, and white text on 
 held against the live one, and playback would carry it away a second later — the same reason dragging
 the scrubber stops it.
 
+**Changing range does not.** A range is a zoom level on one timeline, not a different thing to watch,
+so widening it mid-clip should widen what is playing rather than end it. The run restarts at the
+oldest frame of the new range, which is what reaching for a wider range was asking to see. The play
+loop carries a `frames.length < 2` guard for the same reason: the range can now change underneath a
+running clip, and an empty one would make the loop a modulo by zero — landing `NaN` in the scrubber
+and freezing the picture mid-play, which looks exactly like the bug this change fixed.
+
 The bar is **hidden entirely** unless the archive holds at least two frames. A disabled scrubber over
 a single frame explains nothing its absence doesn't — and that is also what the static GitHub Pages
 build gets, where there is no PHP to have stored anything. The camera id is read back out of the

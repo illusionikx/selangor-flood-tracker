@@ -96,10 +96,11 @@ function setRange(secs) {
   frames = all.filter(ts => ts >= cut);
   scrub.max = frames.length;         // the extra slot is "live"
   /* Rest on live normally — the newest thing there is, and what the lightbox was already showing.
-     While comparing, land on the oldest frame of the new range instead: live is the fixed side, so
-     resting there would put the picture against itself, and "further back" is what changing range
-     was asking for. */
-  scrub.value = ab.hidden ? frames.length : 0;
+     Start at the oldest frame instead whenever something is going to *move*: while comparing, live
+     is the fixed side and resting there puts the picture against itself; while playing, the run
+     should begin at the far end of the range that was just asked for. Both mean "further back",
+     which is the only reason to reach for a wider range in the first place. */
+  scrub.value = (timer || !ab.hidden) ? 0 : frames.length;
   tl.querySelectorAll('.tlr').forEach(b =>
     b.classList.toggle('on', +b.dataset.secs === secs));
   // Warm the whole window at once. It is at most ~60 frames off local disk, served immutable, and
@@ -126,6 +127,9 @@ function toggle() {
   play.firstElementChild.className = 'i i-pause';
   play.title = play.ariaLabel = 'Pause';
   timer = setInterval(() => {
+    // The range can change underneath a running clip. A range holding nothing would make this a
+    // modulo by zero, which lands NaN in the scrubber and freezes the picture mid-play.
+    if (frames.length < 2) return stop();
     scrub.value = (+scrub.value + 1) % frames.length;
     paint();
   }, FRAME_MS);
@@ -170,8 +174,11 @@ play.onclick = toggle;
 // live one, and playback would carry it away a second later. Same reason the scrubber stops on input.
 cmp.onclick = () => { stop(); setCompare(ab.hidden); };
 tl.querySelector('.tlranges').onclick = e => {
+  // Deliberately does not stop playback. A range is a zoom level on one timeline, not a different
+  // thing to watch — changing it while a clip runs should widen what is being played, not end it.
+  // setRange restarts the run at the oldest frame of the new range.
   const b = e.target.closest('[data-secs]');
-  if (b) { stop(); setRange(+b.dataset.secs); }
+  if (b) setRange(+b.dataset.secs);
 };
 
 /* Called by ui.js the moment the lightbox opens, with whatever URL it put in the img. The camera id
