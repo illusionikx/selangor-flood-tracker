@@ -215,6 +215,15 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   box, so it is the one free to move: its `top` is set to line up with the header's first line
   (14px to the top of `.pophead`, + half the 18px `.sitecount` chip, − half its own 24px = 11px).
   Anything else that wants to sit level with it moves the button, not itself.
+- **Never open a popup while the map is still flying.** The popup's own `autoPan` fires a `panBy()`,
+  and if `setView`'s pan animation is still running the two compose into an off-centre view. This
+  only bit when the target was *already on screen* — the short-offset case is the one Leaflet
+  animates rather than resetting, and also the one markercluster's `zoomToShowLayer` answers
+  synchronously (the marker already has an icon). `flashTo()` therefore waits for `moveend`.
+  **Register that listener before calling `focusOn()`**: a long jump fails `_tryAnimatedPan`'s
+  size check and falls through to `_resetView`, which fires `moveend` from *inside* `setView` — and
+  so does a zero-length pan, straight out of `panBy`. A listener attached afterwards misses both and
+  the popup never opens at all.
 - **Zooming destroys open popups.** markercluster rebuilds marker DOM on zoom. Use `openStable()`
   (opens, re-opens on next `moveend` if it closed), and `cluster.zoomToShowLayer()` for a marker
   that may be inside a cluster.

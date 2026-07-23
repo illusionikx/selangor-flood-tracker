@@ -135,10 +135,17 @@ export function flashTo(t) {
   // so the marker is guaranteed to exist afterwards.
   if (state.pinned !== t.id) { state.pinned = t.id; state.rerender(); }
 
-  focusOn([t.lat, t.lng], 13);
+  /* Open only once the flight has landed. Opening mid-pan let the popup's own autoPan fire a panBy()
+     while focusOn()'s setView animation was still running, and the two composed into an off-centre
+     view. It only ever showed up when the target was *already* on screen: that is the case Leaflet
+     animates (a short offset) rather than jumping straight there, and also the case markercluster's
+     zoomToShowLayer answers synchronously, since the marker already has an icon in the viewport.
+     Registered *before* focusOn, not after: a long jump resets the view instead of animating, which
+     fires moveend from inside setView — a listener added afterwards would miss it and never open. */
   const marker = siteMark.get(t.site || t.id);
   // Inside a cluster the marker has no DOM node yet — expand down to it before opening the popup.
-  if (marker) cluster.zoomToShowLayer(marker, () => openStable(marker));
+  if (marker) map.once('moveend', () => cluster.zoomToShowLayer(marker, () => openStable(marker)));
+  focusOn([t.lat, t.lng], 13);
 
   const ping = L.marker([t.lat, t.lng], {
     icon: L.divIcon({ className: '', iconSize: [0, 0], html: '<i class="ping"></i>' }),

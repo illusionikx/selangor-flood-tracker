@@ -56,7 +56,7 @@
    the popup's top edge. The close button comes down to the chip instead — see its rule above. */
 .sitecount {
   position: absolute; right: 28px;
-  top: 0; height: 18px;
+  top: 1px; height: 18px;
   display: inline-flex; align-items: center; gap: 3px;
   padding: 0 7px 0 5px; border-radius: 999px;
   font: 500 11px/1 Roboto, sans-serif;
