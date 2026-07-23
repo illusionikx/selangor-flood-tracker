@@ -6,7 +6,7 @@ import { el, color, ink, popWidth, popPan, dkey, isCritical, leads, hasInfo, isI
          scalePos, levelStops, gaugeStops } from './util.js';
 import { map, marks, siteMark, shown, syncCluster, focusOn, openStable,
          showMast, hideMast } from './map.js';
-import { heat, rainHeat, heatScale, heatOpacity } from './heat.js';
+import { heat, rainHeat, heatScale, heatOpacity, thinHeat } from './heat.js';
 import { sitePopup } from './popup.js';
 import { dataTable } from './table.js';
 
@@ -143,8 +143,9 @@ export function render() {
   }
 
   syncCluster();
-  heat.setLatLngs(points);
-  rainHeat.setLatLngs(rainPoints);
+  // Thinned, not raw: overlapping blobs composite, and these are intensities rather than counts.
+  heat.setLatLngs(thinHeat(points));
+  rainHeat.setLatLngs(thinHeat(rainPoints));
   // ui.js keeps these two mutually exclusive, so the legend shows one scale or none — never a stack
   // of two ramps to read against each other. The opacity slider lives below both and serves either.
   const wet = el('heat').checked, rainy = el('rainHeat').checked;

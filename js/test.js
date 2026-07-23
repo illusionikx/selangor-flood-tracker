@@ -23,10 +23,16 @@ const RISE_EVERY = 3;     // and every Nth of the rest is made to climb towards 
 const RAIN_EVERY = 5;     // every Nth rain gauge is made to rain
 const OFFLINE_EVERY = 11; // and every Nth station of any kind is knocked off the network
 
-// One from each of JPS's four intensity classes (>0 / >10 / >30 / >60 mm an hour), cycled, so the
-// rain heatmap shows its whole ramp rather than one colour repeated, and the popup gets all four
-// wordings. Same reason the climbing rivers get a spread of ETAs rather than a single number.
-const RAIN_MM = [4, 18, 42, 75];
+/* Rain falls as a storm cell over central KL, not as a stripe of every class in station order.
+   Cycling the four intensities by index put violent rain next to light rain the length of the
+   state, which is not weather — and it made the rainfall heatmap look broken in exactly the way a
+   real bug does, because one violent gauge's blob covers its light neighbours. Intensity now falls
+   off with distance, so the fake reads as a cell and the heat ramp has a shape to draw.
+   Bands are km from the centre → mm in the last hour, one per JPS class, so all four still appear
+   and the popup still gets all four wordings. Past the last band it is dry: a cell with no edge is
+   a wet state, and the point is to see the gradient. */
+const STORM = [3.14, 101.69];                                 // central KL
+const STORM_BANDS = [[10, 75], [20, 42], [35, 18], [55, 4]];  // ≤ km → mm/h
 
 export function seedTest(data) {
   let rivers = 0, sirens = 0, rains = 0, offline = 0;
@@ -69,7 +75,10 @@ export function seedTest(data) {
         +(s.level - (23 - i) * (s.rate / 2)).toFixed(2),
       ]);
     } else if (s.kind === 'rainfall' && s.online && ++rains % RAIN_EVERY === 0) {
-      const mm = RAIN_MM[(rains / RAIN_EVERY - 1) % RAIN_MM.length];
+      const km = Math.hypot((s.lng - STORM[1]) * Math.cos(s.lat * Math.PI / 180),
+                            s.lat - STORM[0]) * 111;
+      const mm = STORM_BANDS.find(([r]) => km <= r)?.[1];
+      if (!mm) continue;   // outside the cell — this one stays dry
       s.hourly = mm;
       s.daily = +(mm * 3.5).toFixed(1);
       // The same cutoffs rainStatus() applies server-side. Set rather than derived because the

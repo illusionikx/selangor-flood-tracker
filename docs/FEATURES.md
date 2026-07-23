@@ -366,6 +366,29 @@ what gave way first, which is the one part of the tab that says what the panel *
 sent past the chevron with `order` so the chevron stays up on the title's line, and `:empty` keeps a
 quiet panel to a single line, since `alerts.js` writes the span whether or not it has anything in it.
 
+**Heat points are thinned, because a heatmap adds and an intensity does not.** leaflet.heat
+composites overlapping blobs, so N stations reporting the same thing painted something stronger than
+any of them reported. Density is the right model for "how many things are here"; both layers plot an
+*intensity* — a position on a threshold scale, or millimetres in an hour — and two gauges both
+reading 4 mm still means 4 mm.
+
+It showed up as red over an area where every gauge said *light*. Measured on the live network: 233
+rain gauges, a median of **4** inside one 5 km blob and up to **14**; alpha composites as
+`1 − Π(1 − aᵢ)`, so light rain at 0.26 stacks to **0.70 at four deep and 0.97 at twelve** — the top
+of the ramp, from readings at the bottom of it.
+
+`thinHeat()` keeps the strongest reading and drops anything its own blob already covers. That is
+exactly "the highest reading within a blob radius", which is what the colour was always claiming to
+mean, so the fix is the honest reading rather than a fudge factor. Afterwards no kept point has
+another inside the radius — 233 gauges → 102 points, worst case back to 0.26 — and blobs still
+overlap softly at their edges, where the brush has faded to nothing anyway.
+
+Applied to **both** layers. Water has one point on a calm day, so it changes nothing visible today,
+but the flaw is identical and only surfaces once many stations alert at once — the one moment the
+map has to be right. *Rejected:* raising simpleheat's `max` to absorb the stacking, which would have
+made a lone violent gauge render as light; and a `lighten` composite op, which blends colour but
+still accumulates alpha, so it fixes nothing here.
+
 **Hovering a mast pin draws the area it grouped.** A dashed 50 m disc under the pin, in the mast
 indigo — it answers "why is this one pin, and would that neighbour have joined it" without opening
 anything. Only for pins holding several sensors: a ring round a lone station draws a boundary that
@@ -1355,11 +1378,16 @@ testing strategy.
   any kind knocked offline. "Does the panel scroll right at 40 alerts" is a question you can ask
   twice and get the same answer to. On the current payload: 24 rivers at danger, 24 climbing, 17
   sirens sounding, 33 gauges raining, 51 stations off the network.
-- **Rain cycles all four of JPS's intensity classes** (4 / 18 / 42 / 75 mm an hour → light,
-  moderate, heavy, violent), so the rainfall heatmap shows its whole ramp rather than one colour
-  repeated, and the popup gets all four wordings. `status` is *set*, not left to be derived: the
-  client never recomputes it — the pin colour, the popup's band and the heat weight all read that
-  one field — so a fake that moved only `hourly` would contradict itself.
+- **Rain falls as a storm cell**, not as a stripe of every class in station order. Bands of km from
+  central KL map to the four JPS intensities (≤10 → 75 mm/h, ≤20 → 42, ≤35 → 18, ≤55 → 4, dry past
+  that), so all four classes still appear — 6 violent, 6 heavy, 11 moderate, 5 light on the current
+  set — but with a shape. Cycling them by index put violent rain next to light rain the length of
+  the state, which is not weather, and it made the rainfall heatmap *look* broken in exactly the way
+  a real bug does, since one violent gauge's blob covers its light neighbours. The cell has a dry
+  edge deliberately: a storm with no edge is just a wet state, and the gradient is the thing being
+  looked at. `status` is *set*, not left to be derived: the client never recomputes it — the pin
+  colour, the popup's band and the heat weight all read that one field — so a fake that moved only
+  `hourly` would contradict itself.
 - **Offlining runs first, before anything else is faked.** Every seeding branch requires `s.online`,
   so an offlined station falls through and stays offline, and the two fakes can never land on the
   same station — no bookkeeping needed to track which ones the flood already claimed. Worth faking

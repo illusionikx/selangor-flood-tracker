@@ -36,6 +36,32 @@ export const rainHeat = L.heatLayer([], {
 
 const layers = [heat, rainHeat];
 
+/* leaflet.heat composites overlapping blobs, so N stations reporting the same thing paint something
+   stronger than any of them reported. Density is the right model for "how many things are here";
+   both these layers plot an *intensity* — a position on a threshold scale, or millimetres in an
+   hour — and two gauges both reading 4 mm still means 4 mm, not 8.
+   Measured on the live rain network: 233 gauges, a median of 4 inside one blob and up to 14, which
+   stacks light rain (weight 0.26) to 0.97 — solid red across a state where nothing worse than light
+   rain was reported. That is the bug this fixes.
+   The fix is to keep the strongest reading and drop anything its own blob already covers, which is
+   precisely "the highest reading within a blob radius" — what the colour is supposed to mean. After
+   it, no kept point has another inside the radius, so the worst case is the reading itself again.
+   Blobs still overlap softly at their edges, because the brush has faded to nothing by then.
+   Water is thinned too. It has one point on a calm day, so this changes nothing visible today — but
+   the flaw is identical and only shows up once a lot of stations alert at once, which is the one
+   moment the map has to be right.
+   ponytail: O(n·kept), 233 × 102 here — a fraction of a millisecond. Grid-index it if the network
+   ever gets an order of magnitude denser. */
+export function thinHeat(points) {
+  const kept = [];
+  for (const p of [...points].sort((a, b) => b[2] - a[2])) {
+    const clash = kept.some(k =>
+      Math.hypot((k[1] - p[1]) * Math.cos(p[0] * Math.PI / 180), k[0] - p[0]) * 111 < HEAT_KM);
+    if (!clash) kept.push(p);
+  }
+  return kept;
+}
+
 let fade = 1;   // extra dimming once the blob can no longer cover its ground distance
 
 // leaflet.heat sizes blobs in screen pixels, which makes them cover less ground the further you

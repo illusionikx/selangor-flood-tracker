@@ -302,6 +302,16 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   verbatim, so anything computed from a unix timestamp must be formatted with
   `timeZone: 'Asia/Kuala_Lumpur'` (see `MYT_HOUR` in `popup.js`) or it will disagree with the
   strings next to it for any viewer outside MYT. No `hour12` anywhere.
+- **leaflet.heat composites overlapping blobs, and both our layers plot an intensity, not a density.**
+  Two gauges both reading 4 mm/h still means 4 mm/h, not 8 — but the canvas accumulates alpha, so N
+  stations reporting the same thing paint something stronger than any of them reported. Measured:
+  233 rain gauges, a median of 4 inside one 5 km blob and up to 14, stacking light rain (0.26) to
+  0.97 — solid red over a state where nothing worse than light rain was reported. `thinHeat()` in
+  `heat.js` fixes it by keeping the strongest reading and dropping anything its own blob already
+  covers, which *is* "the highest reading within a blob radius" — the thing the colour claims to
+  mean. **Any new heat layer must go through it**, and the water layer does too even though it has
+  one point on a calm day: the flaw only appears when many stations alert at once, which is the one
+  moment the map has to be right.
 - **A heat layer's weight is its alpha.** leaflet.heat draws each point at its weight, so a scale
   that starts at 0 draws real readings as nothing. The water layer never hit this because its floor
   is the alert slot (0.38); the rain layer's first class therefore *starts at 0.25* (`RAIN_STOPS`)
