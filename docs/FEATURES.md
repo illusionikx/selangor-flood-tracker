@@ -340,10 +340,28 @@ matter), default follows theme. Dark matter gets a brightness lift because it's 
 **Markers** — every station is a Material icon pin tinted by *status*, not by type. Danger-level
 rivers and sounding sirens render filled red with a pulsing halo and draw above everything.
 
+**Pins are filled, and the glyph picks its own contrast.** A pin used to be a white disc with a
+glyph in the station's colour, which put camera cyan on white at about 2:1 — the icon was drawn and
+unreadable, and the colour (the thing the map is actually saying) was a detail you had to lean in to
+see. Now the disc *is* the colour, ringed in `--surface` to stay off the basemap, and `ink()` in
+`util.js` picks near-black or white per fill by WCAG relative luminance. No single glyph colour
+works across this palette — it runs from `#3a3a6a` (no rain) to `#ffd166` (river alert) — so the
+choice has to be computed. Every colour the pin can take now clears 4.8:1, against ~2:1 before.
+
+**A mast of several sensors gets its own pin** — the `layers` glyph and `MAST.color` indigo, keeping
+the sensor-count badge. Same reasoning as the cluster badge: whichever kind leads a mixed stack, its
+colour and icon speak for sensors that aren't it. Indigo because it has to miss every other meaning
+on the map — the five type hues, the traffic-light statuses, the offline grey. **It is worn only
+while the mast is quiet:** any member with `status > 0` keeps the real status colour, and a lead with
+no reading stays grey, so the new pin can never make a signalling or dead mast look calm. The glyph
+switches on member count alone; only the colour is conditional.
+
 **Clustering** — one shared cluster across all categories (per-category clustering stacked five
-badges on one town). Badge shows total, takes the dominant kind's colour/icon, dashed when mixed,
-red when any child is critical. Never fully disables, because 134 coordinate pairs hold 2+
-stations — those spiderfy on click instead.
+badges on one town). Badge shows the total only, in one neutral slate chip — *no* kind icon or hue.
+It used to take the dominant kind's colour and icon, but a cluster is usually mixed, so that dressed
+a two-camera-plus-a-river badge as pure camera; the count is the only honest thing a merged badge can
+say. Still dashed when mixed and red when any child is critical. Never fully disables, because 134
+coordinate pairs hold 2+ stations — those spiderfy on click instead.
 
 **Heatmap** — weights river stations by level ÷ their own danger mark, scaled by how soon they reach
 it: `ratio × (1 + urgency)`, where urgency ramps from 0 at `RISE_ETA` hours out to 1 at the mark
@@ -1473,6 +1491,19 @@ whole purpose was to soften a hard cutoff at three hours, and a colour that mean
 mark" cannot also mean "arriving soon" without meaning neither. Urgency is still on the page in the
 places built for it — the alert panel, the `rising` filter, the ETA line in the popup. One fewer
 constant to keep in step across the client/server boundary.
+
+**Phone popups are a device-wide sheet whose foot sits just above the heat legend.** On a phone the
+popup runs full viewport width (`.leaflet-popup-content-wrapper { width: 100vw }`, content forced to
+`auto` over the `minWidth`/`maxWidth` Leaflet stamps from `popWidth()`), is capped to
+`calc(100vh - 390px)` and scrolls inside. Placement is deterministic, not autoPan: `popPan()` turns
+autoPan *off* on phones, and `keepPopupVisible()` in `map.js` pans the map so the popup's foot — the
+pin — lands just above the legend (`POP_LEGEND` 155px up from the bottom), filling the band up toward
+the alert panel, clamping the top at `POP_TOP` (200px) so a tall popup can't slide under the header.
+autoPan was tried first but its fit-*anywhere* logic left short popups sitting wherever they opened;
+pinning the foot is what "right above the heat scale" actually asked for. *Not `position: fixed`:*
+the popup pane sits inside a `transform`ed ancestor, so fixed anchors to that pane, not the viewport.
+The reserves are guesses off the chrome heights and pair across three files — `POP_TOP`/`POP_LEGEND`
+in `map.js`, the `390` cap in `map.css`, both keyed to `--hdr` (85), the alert panel and the legend.
 
 ## Not built (and why)
 

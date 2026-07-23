@@ -35,11 +35,18 @@ export const KIND_RANK = ['river', 'siren', 'gauge', 'rainfall', 'camera'];
 export const STATUS_COLOR = ['#188038', '#f9ab00', '#e8710a', '#d93025'];
 
 export const NO_INFO = '#9aa0a6';   // grey: offline or reporting nothing
+
 // "rising" is decided in api.php — a station reaching its own danger mark within its RISE_ETA at the
 // rate it is climbing now. One definition, server-side, so the panel and the filter can never
 // disagree about what counts as an alert. The client never re-derives it: it reads `s.rising`, or
 // the published `eta` where it wants to show the number. Nothing here mirrors the constant any more
 // — the heat ramp was the last thing that did, and it is keyed on thresholds now.
+
+// A mast carrying several sensors: no single kind's colour or glyph can speak for a mixed stack, so
+// it gets its own indigo and a "layers" glyph, and keeps the sensor count badge. Indigo because it
+// has to miss every other meaning on the map — the five type hues, the traffic-light statuses, and
+// the offline grey. Only worn while the mast is quiet; anything signalling keeps its status colour.
+export const MAST = { color: '#5c6bc0', icon: 'layers' };
 
 /* APM's flood emergency line directory — every state's number, kept current by the agency that
    answers them. The one outbound link on this page that is an *action* rather than a source, which

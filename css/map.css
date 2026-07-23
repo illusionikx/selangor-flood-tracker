@@ -62,12 +62,18 @@
 
 /* --- markers -------------------------------------------------------------------------------- */
 
+/* Filled with the station's colour, glyph in whatever `ink()` picked for it. It used to be a white
+   disc with a coloured glyph, which put e.g. camera cyan on white at ~2:1 — the icon was there and
+   unreadable, and the pin's colour was a detail you had to zoom to see rather than the first thing
+   the map tells you. The ring keeps a filled pin off the basemap. */
 .pin {
   position: relative; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%;
-  background: var(--surface); box-shadow: var(--shadow); color: var(--c, var(--accent));
-  font-size: 16px;
+  background: var(--c, var(--accent)); color: var(--ink, #fff);
+  border: 2px solid var(--surface); box-shadow: var(--shadow);
+  font-size: 15px;
 }
-.pin.off { color: var(--muted); opacity: .6; }
+/* Fill is already NO_INFO grey here — fading the glyph too would just hide it again. */
+.pin.off { opacity: .6; }
 /* How many sensors this one pin stands for. Only rendered past one, so a plain pin stays plain. */
 .pin .n {
   position: absolute; top: -3px; right: -3px; min-width: 14px; height: 14px; padding: 0 3px;
@@ -89,13 +95,15 @@
 
 .pin.me { width: 30px; height: 30px; font-size: 20px; background: #1a73e8; color: #fff; border: 2px solid #fff; }
 
+/* Just the count, in one neutral chip for every cluster — no kind icon or hue. Fixed slate rather
+   than a token so white text holds on both the light and dark basemaps, and it reads as neither a
+   station type (all saturated) nor offline (lighter grey). */
 .cluster {
-  display: grid; grid-auto-flow: column; align-items: center; gap: 3px;
-  width: 34px; height: 34px; border-radius: 999px; padding: 0 4px;
-  font-size: 12px; font-weight: 500; color: #fff; background: var(--c);
+  display: grid; place-items: center;
+  width: 34px; height: 34px; border-radius: 999px;
+  font-size: 13px; font-weight: 500; color: #fff; background: #5f6368;
   box-shadow: var(--shadow); border: 2px solid var(--surface);
 }
-.cluster .i { font-size: 14px; opacity: .85; }
 .cluster.mixed { border-style: dashed; }              /* more than one kind inside */
 .cluster.danger {
   background: #d93025;
@@ -117,4 +125,24 @@
   /* 30 + Leaflet's own 10px control margin = 40px, the legend's bottom. Both clear the credit. */
   .leaflet-bottom.leaflet-right { margin-bottom: 30px; }
   .leaflet-control-zoom a { width: 44px; height: 44px; line-height: 44px; font-size: 22px; }
+
+  /* Full device width: force the wrapper to the viewport and let content fill it, overriding the
+     minWidth/maxWidth Leaflet stamps from popWidth(). box-sizing so its padding stays inside the
+     screen; focusOn() has already centred the marker, so a viewport-wide popup sits edge to edge. */
+  .leaflet-popup-content-wrapper { width: 100vw; box-sizing: border-box; }
+  .leaflet-popup-content { width: auto !important; }
+  /* Cap the popup to the band between the alert panel (200px top) and the heat legend (155px bottom)
+     and scroll inside it; map.js keepPopupVisible() then drops it so its foot sits just above the
+     legend. 390 = the two reserves + the wrapper's own chrome, so a max-height popup still fits the
+     band without the top clamp lifting the pin. Pair with POP_TOP / POP_LEGEND in map.js. */
+  .leaflet-popup-content { max-height: calc(100vh - 390px); }
+
+  /* Compress the popup on phones: less spacing, and cap the camera still so it doesn't eat the
+     screen. ponytail: just tighter numbers on the existing rules. */
+  .leaflet-popup-content { font-size: 12px; }
+  .pophead { padding-bottom: 6px; margin-bottom: 6px; }
+  .popname { font-size: 14px; }
+  .popbody { gap: 3px 10px; margin-bottom: 6px; }
+  .sensor { margin-top: 7px; padding-top: 7px; }
+  .shotwrap, .shot { max-width: 210px; margin-left: auto; margin-right: auto; }
 }

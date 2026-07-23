@@ -2,7 +2,7 @@
 // zoom-to-fit included.
 
 import { state, PREFS, save } from './state.js';
-import { el, popWidth } from './util.js';
+import { el, popWidth, popPan } from './util.js';
 import { map, focusOn } from './map.js';
 import { herePopup } from './popup.js';
 import { alerts } from './alerts.js';
@@ -47,7 +47,7 @@ function place(latlng, accuracy, setView) {
   marker = L.marker(latlng, { icon: L.divIcon({
     className: '', iconSize: [30, 30], iconAnchor: [15, 15], html: '<span class="pin me"><i class="i i-person"></i></span>',
   }) }).bindPopup(() => herePopup({ latlng, accuracy }, state.data.length > 0),
-    { minWidth: popWidth('here'), maxWidth: popWidth('here') });
+    { minWidth: popWidth('here'), maxWidth: popWidth('here'), ...popPan() });
 
   layer = L.layerGroup([
     L.circle(latlng, { radius: accuracy, color: '#1a73e8', weight: 1, fillOpacity: .12 }),

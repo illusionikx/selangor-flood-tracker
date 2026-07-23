@@ -44,6 +44,12 @@ export const popWidth = kind => innerWidth <= 600
   ? Math.max(220, innerWidth - 24)
   : kind === 'camera' ? 440 : 300;
 
+// Phones: autoPan off — map.js keepPopupVisible() drops the popup's foot to just above the heat
+// legend deterministically, which autoPan's fit-anywhere logic can't. Desktop keeps the padded pan.
+export const popPan = () => innerWidth <= 600
+  ? { autoPan: false }
+  : { autoPanPaddingTopLeft: [16, 24], autoPanPaddingBottomRight: [16, 56] };
+
 export const statusColor = n => STATUS_COLOR[Math.max(0, Math.min(3, n))] ?? STATUS_COLOR[0];
 
 /* Thresholds bunch up near the top (alert 4.4, warning 4.7, danger 5 on a 0–5 bar all land past
@@ -91,6 +97,21 @@ export function color(s) {
   if (s.kind === 'siren')    return s.status > 0 ? '#ff4d4d' : KINDS.siren.color;   // red only when sounding
   if (s.kind === 'gauge')    return s.status >= 2 ? '#ff4d4d' : s.status === 1 ? '#ff9f1c' : KINDS.gauge.color;
   return KINDS[s.kind].color;
+}
+
+// Black or white, whichever stays legible on a given pin fill. No single glyph colour works across
+// this palette — it runs from #3a3a6a (no rain) to #ffd166 (river alert) — and a pin whose icon you
+// cannot read is a pin with no kind. WCAG relative luminance; white wins below .179, the crossover
+// where contrast against white and against near-black are equal.
+export function ink(hex) {
+  let h = hex.slice(1);
+  if (h.length === 3) h = h.replace(/./g, c => c + c);
+  const n = parseInt(h, 16);
+  const lin = shift => {
+    const c = (n >> shift & 255) / 255;
+    return c <= .03928 ? c / 12.92 : ((c + .055) / 1.055) ** 2.4;
+  };
+  return .2126 * lin(16) + .7152 * lin(8) + .0722 * lin(0) < .179 ? '#fff' : '#14181c';
 }
 
 // Is this station the reason someone opens the map at all: a river at danger, or a siren sounding.

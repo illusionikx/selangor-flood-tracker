@@ -1,8 +1,8 @@
 // Rebuilds every marker and the heat layer from the current station set.
 
-import { KINDS, HEAT_FLOOR } from './config.js';
+import { KINDS, MAST, HEAT_FLOOR } from './config.js';
 import { state, PREFS } from './state.js';
-import { el, color, popWidth, dkey, isCritical, leads, hasInfo, isIgnored, ignoredIds,
+import { el, color, ink, popWidth, popPan, dkey, isCritical, leads, hasInfo, isIgnored, ignoredIds,
          scalePos, levelStops, gaugeStops } from './util.js';
 import { map, marks, siteMark, shown, syncCluster, focusOn, openStable } from './map.js';
 import { heat, heatScale, heatOpacity } from './heat.js';
@@ -87,14 +87,21 @@ export function render() {
     const lead = members[0];
     const rising = members.some(m => m.rising);
     const critical = members.some(isCritical);
+    // A mast of several sensors gets the mast glyph whatever leads it, but only wears the mast
+    // colour while nothing on it is signalling and the lead is actually reporting — a status colour
+    // outranks it, and a mast with no reading must stay grey rather than look confident.
+    const multi = members.length > 1;
+    const quiet = multi && hasInfo(lead) && members.every(m => !(m.status > 0));
+    const c = quiet ? MAST.color : color(lead);
     const marker = L.marker([lead.lat, lead.lng], {
       kind: lead.kind, critical,                          // read back by the cluster badge
       zIndexOffset: critical ? 1000 : rising ? 500 : 0,   // keep the urgent pins on top
       icon: L.divIcon({
         className: '', iconSize: [26, 26], iconAnchor: [13, 13],
         html: `<span class="pin${lead.online ? '' : ' off'}${rising ? ' rise' : ''}${
-                     critical ? ' danger' : ''}" style="--c:${color(lead)}"><i class="i i-${KINDS[lead.kind].icon}"></i>${
-               members.length > 1 ? `<b class="n">${members.length}</b>` : ''}</span>`,
+                     critical ? ' danger' : ''}" style="--c:${c};--ink:${ink(c)}"><i class="i i-${
+               multi ? MAST.icon : KINDS[lead.kind].icon}"></i>${
+               multi ? `<b class="n">${members.length}</b>` : ''}</span>`,
       }),
     });
     // Widest member wins: a site holding a camera needs the room whatever leads it.
@@ -102,7 +109,8 @@ export function render() {
     marker.bindPopup(sitePopup(members), {
       minWidth: wide, maxWidth: wide,
       // Tall popups open above the pin, so leave room up top; bottom clears the zoom/credit strip.
-      autoPanPaddingTopLeft: [16, 24], autoPanPaddingBottomRight: [16, 56],
+      // On phones the padding widens to the alert-panel / legend band — see popPan().
+      ...popPan(),
     });
     // Centre whatever was clicked; autoPan then nudges for the popup's height. The zoom re-runs
     // clustering, which tears the popup down again — so re-open it once the map has settled.

@@ -40,8 +40,9 @@ export function setTheme(t) {
 
 // --- clustering --------------------------------------------------------------------------------
 
-// One cluster for everything, regardless of category. A badge shows the total, takes the colour and
-// icon of whichever kind dominates it, and turns red if any child is at danger / sounding.
+// One cluster for everything, regardless of category. A badge shows just the total in a neutral
+// chip — no kind icon or hue, because a cluster is usually mixed and a type colour would lie about
+// it — turning red if any child is at danger / sounding, dashed if it holds more than one kind.
 export const cluster = L.markerClusterGroup({
   // Tighten as you zoom rather than switching clustering off — several stations share exact
   // coordinates (a rainfall and a river gauge on the same mast), so they overlap at any zoom.
@@ -52,18 +53,13 @@ export const cluster = L.markerClusterGroup({
   spiderfyDistanceMultiplier: 1.6,
   iconCreateFunction(c) {
     const kids = c.getAllChildMarkers();
-    const tally = {};
+    const kinds = new Set();
     let critical = false;
-    for (const m of kids) {
-      tally[m.options.kind] = (tally[m.options.kind] || 0) + 1;
-      critical ||= m.options.critical;
-    }
-    const top = Object.entries(tally).sort((a, b) => b[1] - a[1])[0][0];
-    const mixed = Object.keys(tally).length > 1;
+    for (const m of kids) { kinds.add(m.options.kind); critical ||= m.options.critical; }
+    const mixed = kinds.size > 1;
     return L.divIcon({
       className: '', iconSize: [36, 36],
-      html: `<span class="cluster${critical ? ' danger' : ''}${mixed ? ' mixed' : ''}"
-                   style="--c:${KINDS[top].color}"><i class="i i-${KINDS[top].icon}"></i>${kids.length}</span>`,
+      html: `<span class="cluster${critical ? ' danger' : ''}${mixed ? ' mixed' : ''}">${kids.length}</span>`,
     });
   },
 }).addTo(map);
@@ -106,8 +102,18 @@ export function openStable(marker) {
 function keepPopupVisible() {
   const pop = document.querySelector('.leaflet-popup');
   if (!pop) return;
-  const box = map.getContainer().getBoundingClientRect();
   const r = pop.getBoundingClientRect();
+  // Phones: drop the popup so its foot — the pin — sits just above the heat legend, filling the band
+  // up towards the alert panel. Clamp the top so a band-taller popup can't slide under the header.
+  // POP_LEGEND / POP_TOP pair with map.css's popup max-height and util.js popPan(); move them together.
+  if (innerWidth <= 600) {
+    const POP_TOP = 200, POP_LEGEND = 155;
+    let shift = (innerHeight - POP_LEGEND) - r.bottom;      // pin down to just above the legend
+    if (r.top + shift < POP_TOP) shift = POP_TOP - r.top;   // …unless that buries the header
+    if (Math.abs(shift) > 2) map.panBy([0, -shift], { duration: .2 });
+    return;
+  }
+  const box = map.getContainer().getBoundingClientRect();
   const gap = 12;
   let shift = 0;
   if (r.top < box.top + gap) shift = box.top + gap - r.top;                 // push content down
