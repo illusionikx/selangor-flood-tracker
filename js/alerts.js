@@ -6,7 +6,7 @@ import { state, PREFS } from './state.js';
 import { el, distKm, dkey, isHot, tier, TIER_RANK, isIgnored, noSec } from './util.js';
 import { flashTo } from './map.js';
 import { nearestCam, byId } from './stations.js';
-import { meter, sparkline, etaText, rateHtml } from './popup.js';
+import { meter, sparkline, etaText, rateHtml, camLink } from './popup.js';
 
 // Last count, so the panel only auto-collapses on the *change* to zero. Starts non-zero so a first
 // load with nothing on alert still counts as a transition and collapses; a first load with alerts
@@ -115,8 +115,7 @@ export function alerts() {
         ${detail}
         ${t === 'stale' ? `<p class="muted">This station has stopped reporting. The reading above is
              the last one it sent and the situation there may have changed either way.</p>` : ''}
-        ${cam ? `<button class="link" data-cam="${cam.id}">
-          <i class="i i-photo_camera"></i> Nearest station with a webcam · ${cam.name} (${distKm(s, cam).toFixed(1)} km)</button>` : ''}
+        ${cam ? camLink(s, cam) : ''}
         <div class="muted">updated ${noSec(s.updated || s.shot) || 'unknown'}</div>
       </div>`;
     }).join('');

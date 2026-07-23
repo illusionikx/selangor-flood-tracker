@@ -49,9 +49,15 @@ export const etaText = h => h <= 0 ? 'already at it'
   : h <= 6 ? `in ~${h.toFixed(1)} h`
   : 'over 6 h away';
 
-const camLink = (from, cam) => cam
+/* A camera on the *same mast* is not a nearest-anything — it is this station's own view, so it says
+   so and drops the distance, which would read "0.0 km". Everywhere else the distance is the whole
+   point of the link (is this worth a look?) and the camera's name is not: it is a second place name
+   on a card that already carries one, and clicking through names it anyway. `from` may be a bare
+   latlng from a map click, which has no `site` — hence the guard rather than a plain comparison. */
+export const camLink = (from, cam) => cam
   ? `<button class="link" data-cam="${cam.id}">
-       <i class="i i-photo_camera"></i> Nearest station with a webcam · ${cam.name} (${distKm(from, cam).toFixed(1)} km)
+       <i class="i i-photo_camera"></i> ${from.site && from.site === cam.site
+         ? 'Show webcam' : `Nearest webcam · ${distKm(from, cam).toFixed(1)} km`}
      </button>`
   : '<div class="muted">no camera nearby</div>';
 

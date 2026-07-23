@@ -534,6 +534,21 @@ carries the "last reported" date, so the same date isn't printed twice a line ap
 popups link to the nearest webcam
 rather than embedding it; camera stills open full-size in a lightbox.
 
+**The webcam link is one template — `camLink()` in `popup.js`** — shared by the popup and the alert
+panel, which each had their own copy of the markup until they disagreed. It reads
+`Nearest webcam · 2.3 km`, and on a station that shares a mast with a camera, just **`Show webcam`**.
+Two things were cut and both were noise. The camera's *name* was a second place name on a card that
+already names a place, and clicking through names it anyway — on the alert panel it sat under the
+station name, the district, the basin and the distance-from-you, so it was the fifth label competing
+on a card whose job is one reading. And the *distance* is meaningless when it is zero: 113 of 589
+non-camera stations are within `SITE_M` of a camera, so the old wording routinely produced
+`Nearest station with a webcam · TTDI Jaya, Shah Alam (0.0 km)` next to a station called
+`T.T.D.I JAYA, SHAH ALAM` — the same mast, described as a journey. The popup never showed this
+because it already suppresses the link when the site holds its own camera (`hasCam`); the alert panel
+had no such check, which is why the fix belongs in the shared template rather than at either call
+site. `from` may be a bare latlng from a map click, so the same-mast test guards on `from.site`
+existing rather than comparing two undefineds and calling every map click a mast.
+
 ## Panels
 
 **Header** — 64px app bar: title, live status chip, sources, locate, theme toggle.
