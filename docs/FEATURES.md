@@ -366,6 +366,25 @@ what gave way first, which is the one part of the tab that says what the panel *
 sent past the chevron with `order` so the chevron stays up on the title's line, and `:empty` keeps a
 quiet panel to a single line, since `alerts.js` writes the span whether or not it has anything in it.
 
+**The About dialog now says what raises an alarm, and how to read the map** — two sections above the
+sources, which is where someone who has just been shown a red pin goes looking.
+
+*What puts a station on alert* lays out the three tiers against the real `.tg` tags the panel and
+ticker use, so the explanation cannot drift from the thing it explains: `HAPPENING NOW` (a river at
+or past its danger mark, or a siren sounding — observed), `FORECAST` (climbing ≥ 0.1 m/h with three
+non-dipping readings and its own danger mark ≤ 3 h away) and `NOT CURRENT` (either of those from a
+station since gone quiet, kept on the list but sorted last and out of the counts). It also states
+the two things the map is otherwise silent about: every mark is the station's *own*, so a drain and
+a river are each judged against what floods them; and rainfall, gauges and cameras are drawn but
+never alert.
+
+*Reading the map* is a legend built from the map's **own** `.pin` and `.cluster` markup at the size
+they are drawn — a legend redrawn in a second style is a legend that can disagree with the map. It
+covers the five type colours, the alert/warning/danger fills, the rising ring, the mast pin with its
+count, grey for no reading, and the cluster chip; then both heat ramps, reusing the gradients from
+the legend panel. Two columns on desktop, stacked on phones, where 154px of pins against 130px of
+prose was not a layout.
+
 **Heat points are thinned, because a heatmap adds and an intensity does not.** leaflet.heat
 composites overlapping blobs, so N stations reporting the same thing painted something stronger than
 any of them reported. Density is the right model for "how many things are here"; both layers plot an

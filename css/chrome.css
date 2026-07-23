@@ -199,10 +199,40 @@ body.testmode #testbadge { display: flex; }
   #aboutBox .logo { margin-bottom: 12px; padding: 30px 0 8px; }
   #aboutBox .logo .i { font-size: 34px; }
   #aboutBox .logo span { font-size: 18px; }
+  /* Two columns would be 154px of pins against 130px of prose at 360px wide. Stack instead — the
+     thing above what it means is the same reading order, just turned a corner. */
+  #aboutBox .key { grid-template-columns: 1fr; gap: 6px 0; }
+  #aboutBox .key > span:nth-child(even) { margin-bottom: 12px; }
 }
 #aboutBox .src { margin: 14px 0; display: grid; gap: 2px; }
 #aboutBox .src a { font-weight: 500; }
 #aboutBox .src .muted { line-height: 1.45; }
+
+/* Two-column key: the thing itself on the left, what it means on the right. `align-items: start`
+   so a one-line pin doesn't centre itself against four lines of prose. The left column sizes to its
+   content, which is a row of real pins in one case and a single tag in another. */
+#aboutBox .key {
+  display: grid; grid-template-columns: auto 1fr; gap: 12px 12px;
+  margin: 14px 0; align-items: start; font-size: 13px;
+}
+#aboutBox .key > span:nth-child(odd) { padding-top: 1px; }
+#aboutBox .key .tg { margin-left: 0; }        /* the panel indents it after a badge; here it leads */
+#aboutBox .pins { display: flex; gap: 6px; }
+/* The pins are the map's own `.pin` / `.cluster`, at the size they are drawn — a legend redrawn in
+   a second style is a legend that can disagree with the map. Scale the cluster chip down to sit in
+   a text column rather than dominate it. */
+#aboutBox .pins .cluster { width: 28px; height: 28px; font-size: 12px; }
+/* The heat ramps, same gradients as the legend panel's — see the `#legend .ramp` rules for why the
+   stops sit where they do; these are the identical scales, shown at explanation size. */
+#aboutBox .ramps { display: grid; gap: 10px; margin: 14px 0; }
+#aboutBox .ramps > span { display: grid; gap: 4px; }
+#aboutBox .ramps .ramp {
+  height: 10px; border-radius: 999px;
+  background: linear-gradient(90deg, #ffd166 0%, #ff9f1c 48%, #ff4d4d 100%);
+}
+#aboutBox .ramps .ramp.rain {
+  background: linear-gradient(90deg, #6f7bff 0%, #8f7bff 33.3%, #c77dff 66.7%, #ff4d4d 100%);
+}
 
 /* --- all-stations table ----------------------------------------------------------------------- */
 

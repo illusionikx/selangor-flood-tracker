@@ -7,7 +7,7 @@
 <link rel="stylesheet" href="vendor/fonts.css?v=49">
 <link rel="stylesheet" href="css/icons.css?v=50">
 <link rel="stylesheet" href="css/base.css?v=49">
-<link rel="stylesheet" href="css/chrome.css?v=53">
+<link rel="stylesheet" href="css/chrome.css?v=54">
 <link rel="stylesheet" href="css/map.css?v=58">
 
 <!-- A camera still. A <dialog>, not a div: it opens from the all-stations table, which is itself a
@@ -109,6 +109,86 @@
      <b>If you are in danger, call 999</b>, or the flood emergency line for your state:
      <a href="https://www.civildefence.gov.my/talian-kecemasan-bencana-banjir/" target="_blank"
         rel="noopener">civildefence.gov.my</a> (APM).</span></p>
+
+  <!-- What the alarm means, stated where someone can find it. The panel and the ticker show the
+       three tags; this is the only place that says what earns one. Tags are the real `.tg` classes,
+       so the explanation cannot drift from the thing being explained. -->
+  <h3>What puts a station on alert</h3>
+  <p class="muted">The <b>On alert</b> panel and the strip along the top list a station for one of
+     three reasons. Nothing else on this map raises an alarm.</p>
+  <div class="key">
+    <span><b class="tg tg-now">HAPPENING NOW</b></span>
+    <span>A river <b>at or past its danger mark</b>, or a <b>siren sounding</b>. Observed, not
+       predicted.</span>
+    <span><b class="tg tg-soon">FORECAST</b></span>
+    <span>A river climbing fast enough to reach <b>its own danger mark within 3 hours</b> — at least
+       0.1 m an hour, with its last three readings not dipping. Anything slower is sensor rounding
+       rather than a climb; anything further out is a guess with too little behind it.</span>
+    <span><b class="tg tg-stale">NOT CURRENT</b></span>
+    <span>Either of the above, from a station that has since gone quiet — offline, or a reading over
+       a day old. It stays on the list rather than vanishing, because a river sitting at its danger
+       mark whose telemetry just died is the last thing that should quietly disappear. It sorts to
+       the bottom and is left out of the counts.</span>
+  </div>
+  <p class="muted">Every mark is the station's <i>own</i>, as published by JPS, so a small drain and
+     a large river are each measured against what floods <i>them</i> — being “high” is meaningless
+     without knowing high for what. Rainfall, flood-depth gauges and cameras are drawn on the map
+     but never raise an alert. Sensors you have ignored raise none either, and the panel keeps
+     saying how many are silenced.</p>
+
+  <h3>Reading the map</h3>
+  <p class="muted">One pin per place. The glyph says what kind of sensor is there, the colour says
+     how it is doing. Type colours are never a traffic light, and traffic-light colours never mean
+     anything but status.</p>
+  <div class="key">
+    <span class="pins">
+      <span class="pin" style="--c:#4da3ff;--ink:#14181c"><i class="i i-water_drop"></i></span>
+      <span class="pin" style="--c:#8f7bff;--ink:#14181c"><i class="i i-rainy"></i></span>
+      <span class="pin" style="--c:#f06292;--ink:#14181c"><i class="i i-campaign"></i></span>
+      <span class="pin" style="--c:#a1887f;--ink:#14181c"><i class="i i-straighten"></i></span>
+      <span class="pin" style="--c:#26c6da;--ink:#14181c"><i class="i i-photo_camera"></i></span>
+    </span>
+    <span>The five kinds — water level, rainfall, siren, flood-depth gauge, camera — each in its own
+       colour, none of which is ever used for status.</span>
+
+    <span class="pins">
+      <span class="pin" style="--c:#ffd166;--ink:#14181c"><i class="i i-water_drop"></i></span>
+      <span class="pin" style="--c:#ff9f1c;--ink:#14181c"><i class="i i-water_drop"></i></span>
+      <span class="pin danger"><i class="i i-water_drop"></i></span>
+    </span>
+    <span>A river past its <b>alert</b>, <b>warning</b> and <b>danger</b> marks. At danger it fills
+       red and keeps a pulsing halo, and it is drawn over everything else.</span>
+
+    <span class="pins"><span class="pin rise" style="--c:#4da3ff;--ink:#14181c"
+      ><i class="i i-water_drop"></i></span></span>
+    <span>A red ring: climbing towards its danger mark, and forecast to reach it within 3 hours.</span>
+
+    <span class="pins"><span class="pin" style="--c:#5c6bc0;--ink:#fff"
+      ><i class="i i-layers"></i><b class="n">4</b></span></span>
+    <span>Several sensors on one mast, counted. Hover or open it to see the area they were grouped
+       from. If any of them is signalling, the pin takes that status colour instead.</span>
+
+    <span class="pins"><span class="pin off" style="--c:#9aa0a6;--ink:#14181c"
+      ><i class="i i-water_drop"></i></span></span>
+    <span>Grey and faded: offline, or reporting nothing. Never coloured — a station with no reading
+       must not look confident.</span>
+
+    <span class="pins"><span class="cluster">12</span></span>
+    <span>Pins too close together to draw apart, with how many. Zoom in or click to open them
+       out.</span>
+  </div>
+  <p class="muted">The two heatmaps answer different questions, so only one runs at a time.
+     <b>Water level</b> scores every river and flood gauge against its own marks — yellow past
+     alert, orange past warning, red at danger — and paints nothing below the first mark, because a
+     map that is warm everywhere says nothing.</p>
+  <div class="ramps">
+    <span><span class="ramp"></span><span class="muted">alert → warning → danger</span></span>
+    <span><span class="ramp rain"></span><span class="muted">light → moderate → heavy → violent</span></span>
+  </div>
+  <p class="muted"><b>Rainfall</b> uses the intensity classes JPS publishes — above 0, 10, 30 and 60
+     mm in the last hour. It says where the water is arriving, not where it is standing. Both are
+     smoothed over a few kilometres, because flooding is catchment-scale, and both show the
+     <i>strongest</i> reading in an area rather than adding neighbours together.</p>
 
   <h3>Where this data comes from</h3>
 
