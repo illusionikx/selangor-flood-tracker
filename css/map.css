@@ -43,16 +43,24 @@
 }
 /* How many sensors this popup is holding, parked in the corner beside Leaflet's close button —
    `right: 28px` clears the gutter .pophead already reserves for it. Only the name shares that line,
-   so only the name pays for the room, via the adjacent-sibling rule below. */
+   so only the name pays for the room, via the adjacent-sibling rule below.
+
+   The two are positioned against different boxes, which is why `top` is negative. Leaflet's close
+   button is 24px square, absolute against `.leaflet-popup`, and map.css puts it at `top: 2px`. This
+   chip is absolute against `.pophead`, which starts 14px lower — 1px of wrapper padding plus the
+   13px top margin Leaflet gives `.leaflet-popup-content`. Centring the two therefore wants
+   2px + (24px − 18px) / 2 − 14px = −9px, and `height` is pinned so that arithmetic stays true when
+   the font changes. Move either the close button's `top` or this height and redo the sum. */
 .sitecount {
-  position: absolute; top: 0; right: 28px;
+  position: absolute; right: 28px;
+  top: -9px; height: 18px;
   display: inline-flex; align-items: center; gap: 3px;
-  padding: 1px 7px 1px 5px; border-radius: 999px;
-  font: 500 11px/1.6 Roboto, sans-serif;
+  padding: 0 7px 0 5px; border-radius: 999px;
+  font: 500 11px/1 Roboto, sans-serif;
   color: var(--muted); background: var(--hover);
 }
 .sitecount .i { font-size: 13px; }
-.sitecount + .popname { padding-right: 52px; }
+.sitecount + .popname { padding-right: 40px; }
 /* The badge trails the location now, so its spacing has to flip with it. */
 .pophead .badge, .pophead .badges { margin: 6px 0 0; }
 .popname { font-size: 15px; font-weight: 500; line-height: 1.3; }
