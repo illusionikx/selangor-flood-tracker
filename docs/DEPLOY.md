@@ -143,6 +143,23 @@ That last line matters: `.cache.json`, `.history.db`, `.refresh.lock` and `shots
 PHP at runtime, in the app directory. If `www-data` cannot write there the site serves an error object
 and never caches anything.
 
+**On an unprivileged LXC — the usual Proxmox setup — that `chown` is not the whole story if `shots/`
+is a bind mount.** The container's `www-data` is uid 33 inside, but the kernel maps it to **100033 on
+the host** (33 + the default 100000 offset). A directory bind-mounted from the host therefore has to
+be owned by 100033 *on the host*, not by 33:
+
+```bash
+# On the Proxmox host, for a bind-mounted archive dir (skip this if shots/ lives on the
+# container's own rootfs — the in-container chown above is then sufficient):
+chown -R 100033:100033 /path/on/host/to/shots
+```
+
+Get this wrong and the failure is silent in the worst way: PHP cannot write the frame, `captureShots()`
+returns 0, and the site looks completely healthy — live map, live stills, everything but an archive
+that never fills. `du -sh shots` staying at zero after an hour is the tell. Keeping `shots/` on the
+container's own rootfs sidesteps it entirely, at the cost of the archive living inside the container
+image rather than on separately-managed storage.
+
 ### nginx
 
 ```nginx
