@@ -45,7 +45,7 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `lib/` | Composer's vendor dir (`symfony/dom-crawler`), gitignored — **not** `vendor/` |
 | `composer.json` | the one server-side dependency; `composer install` before first run |
 | `.github/workflows/pages.yml` | bakes the static GitHub Pages build — runs the PHP on cron, publishes `api.json` |
-| `docs/DEPLOY.md` | both targets: Pages (what it can't do) and a Debian box (spec, nginx, cron) |
+| `docs/DEPLOY.md` | both targets: Pages (what it can't do) and a Debian box / Proxmox LXC (spec, nginx, cron, container traps) |
 | `.cache.json` | last payload (gitignored) |
 | `.history.db` | sqlite: water-level samples per station, 30-day retention (gitignored) |
 | `shots/` | the camera archive — one dir per camera, `<unixts>.webp` per frame (gitignored) |
@@ -175,6 +175,14 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   and a descendant search counts the inner table's cells too, blowing the 14-cell guard.
 - **Iterating a `Crawler` yields raw `DOMNode`s**, which have no `attr()`. Use `->each(fn(Crawler
   $n) => $n->attr(…))` to stay in Crawler-land, or you get a fatal on the first attribute read.
+- **Never `file_get_contents()` a JPS URL — always curl.** `infobanjirjps.selangor.gov.my` resolves
+  to *two* A records and one of them (`58.27.97.62`) blackholes SYNs. curl races both (happy
+  eyeballs) and connects in ~10 ms; PHP's stream wrapper tries addresses serially with no connect
+  timeout of its own, so it eats the OS TCP timeout — 21 s on Windows — whenever it draws the dead
+  one. `?cam=` was the only outbound call in the repo not going through `fetchAll()`, and it was
+  therefore the only slow endpoint: ~21 s per still, 42 s when the https attempt lost and the http
+  fallback lost too. Stills now take ~0.8 s. The dead record may be removed or may move to the other
+  IP; the rule is about the mechanism, not that address.
 - **`rm -rf shots/` is a year of camera history**, and unlike `.history.db` it cannot rebuild —
   the frames only exist because we were running when they were taken. To re-test the capture path,
   `rm shots/.last` (the 30-minute stamp), not the directory.
@@ -243,6 +251,14 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   otherwise a poll would throw you back to the top of a card you were reading. Anything stateful
   added to the card (an open `<details>`, a scroll position, a text selection) is lost on that
   rebuild unless it is keyed the same way.
+- **Nothing may close the card except the reader**, and there is no `map.on('click', closeSide)` —
+  that was carried over from the popup, where it belonged, and it dismissed the panel mid-read. The
+  "you are here" card was hit hardest: locate.js draws an accuracy circle, and `L.Path` bubbles its
+  clicks to the map where `L.Marker` does not (`bubblingMouseEvents: false`), so at a coarse fix most
+  of the viewport closed it. `render()` no longer closes it either when the site leaves `sites`.
+  The three ways out are the ×, a dialog taking the screen (About, the table — both call
+  `closeSide()` in ui.js), and ⋮ → ignore. **Do not add a fourth without a reason that survives
+  "it vanished while I was reading it".**
 - **You cannot focus something you are still animating into view.** Two separate traps, both silent,
   and `#gotoBox` hit each in turn. A transitioned `visibility` *interpolates*: at t=0 of
   hidden→visible it still computes to `hidden`, so `focus()` is refused — hence `visibility 0s .25s`

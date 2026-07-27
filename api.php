@@ -58,9 +58,16 @@ if (isset($_GET['cam'])) {
         http_response_code(404);
         exit;
     }
-    // Prefer TLS to upstream; fall back to what it actually advertised.
-    $img = @file_get_contents(preg_replace('#^http://#i', 'https://', $url)) ?: @file_get_contents($url);
-    if ($img === false) { http_response_code(502); exit; }
+    /* curl, never file_get_contents. JPS publishes two A records for this host and one of them
+       (58.27.97.62) blackholes SYNs. curl races both and lands on the live one in ~10ms; PHP's
+       stream wrapper tries addresses serially with no connect timeout of its own, so it sat out
+       Windows' full 21s TCP timeout on roughly every other still — and the http fallback below
+       made a bad draw 42s. Every other upstream call here already goes through fetchAll, which is
+       the only reason this was the sole slow endpoint.
+       Prefer TLS to upstream; fall back to what it actually advertised. */
+    $try = fn($u) => fetchAll([$u], 1, false)[$u] ?? '';
+    $img = $try(preg_replace('#^http://#i', 'https://', $url)) ?: $try($url);
+    if ($img === '') { http_response_code(502); exit; }
     header('Content-Type: image/jpeg');
     header('Cache-Control: max-age=60');
     echo $img;
@@ -174,7 +181,11 @@ function fetchAll(array $urls, int $concurrency = 20, bool $json = true): array 
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT        => 25,
-            CURLOPT_USERAGENT      => 'flood-exp/1.0',
+            // Contact URL in the UA: this box pulls ~1.1 GB/day off JPS from one residential IP,
+            // which is the most conspicuous shape a web log has. Better their sysadmin can read
+            // what it is than have to guess. Identifying yourself is the polite form and the safe
+            // one; spoofing it would be neither.
+            CURLOPT_USERAGENT      => 'flood-exp/1.0 (+https://github.com/illusionikx/selangor-flood-tracker)',
             CURLOPT_FOLLOWLOCATION => true,   // the national portal 301s to its canonical path
             CURLOPT_MAXREDIRS      => 3,
         ]);
