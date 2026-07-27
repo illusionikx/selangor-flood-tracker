@@ -750,7 +750,13 @@ body.finding #find { display: none; }
   -webkit-user-select: none; user-select: none; }
 #lightbox .stage img { -webkit-user-drag: none; }
 #lightbox img { max-width: min(968px, calc(100vw - 64px)); max-height: 62vh; border-radius: 8px; }
-#lightbox.cmp .stage { cursor: ew-resize; }
+/* `touch-action: none` only while the divider is up, and it is what makes the drag work on a phone
+   at all: a horizontal swipe across a picture is also the browser's own pan gesture, and the browser
+   wins it — it claims the gesture a few pixels in and fires `pointercancel`, which takes the pointer
+   capture with it and leaves the divider stuck wherever the finger first landed. Scoped to `.cmp` so
+   an ordinary lightbox still scrolls and pinch-zooms like a picture; while comparing, the picture is
+   a control. */
+#lightbox.cmp .stage { cursor: ew-resize; touch-action: none; }
 /* The older frame, clipped to the divider. `height: 100%` alone lines the two up: both frames come
    from one camera, so they share an aspect ratio — matching one axis matches the other. */
 #lightbox .ab { position: absolute; inset: 0; width: var(--ab); overflow: hidden; }
@@ -764,6 +770,16 @@ body.finding #find { display: none; }
   content: ''; position: absolute; top: 50%; left: 50%; width: 34px; height: 34px;
   transform: translate(-50%, -50%); border: 2px solid #fff; border-radius: 50%;
   box-shadow: 0 0 6px #000a;
+}
+/* Touch, by input rather than by width: a tablet is a coarse pointer at any breakpoint. A 34px knob
+   is smaller than the finger on it and the 2px line disappears under the same finger, so there is
+   nothing left on screen saying where the divider is while you are moving it. 44px is the WCAG 2.5.8
+   target size and the line thickens with it so it stays findable either side of the knob.
+   The knob is decoration — the drag target is the whole picture (see slide() in timeline.js), which
+   is the only target that was ever big enough. */
+@media (pointer: coarse) {
+  #lightbox .abgrip { width: 3px; }
+  #lightbox .abgrip::after { width: 44px; height: 44px; }
 }
 /* Which frame is which, on the frame itself — a caption under the picture would make you look away
    from the thing you are comparing to find out what you are comparing. */

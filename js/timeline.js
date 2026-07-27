@@ -31,7 +31,9 @@ const RANGES = [
    Every frame is a separate scene that has to be read: has the water risen, is the road still there.
    The first pass ran at 320ms, paced as if this were video, and pushed the whole archive past before
    any of it registered. A second a frame is the pace of looking rather than the pace of playback; a
-   typical 30-60 frame range takes 30-60s, and the scrubber is there for anyone after one moment. */
+   typical 30-60 frame range takes 30-60s, and the scrubber is there for anyone after one moment.
+   Every frame, including live: a longer dwell on the last one was tried and it reads as the clip
+   having stalled, not as an arrival. There is nothing on screen saying a pause is deliberate. */
 const FRAME_MS = 1000;
 
 // Malaysian, like every other clock on this page — the frames are stamped in unix seconds, and a
@@ -116,21 +118,35 @@ function stop() {
   play.title = play.ariaLabel = 'Play';
 }
 
+/* The last position a run reaches. Live is part of the clip: the question a flood camera is opened
+   with is "how did it get to *this*", and a playback that stopped 30 minutes short of now and jumped
+   straight back to the oldest frame never answered it — it showed every photo except the one on
+   screen when play was pressed. Live was skipped originally because it is a full-size JPEG landing
+   at the end of a run of 720p WebP; it does land visibly, but arriving at the present is what the
+   clip is for.
+   Skipped only while comparing, where live is the *fixed* side — playing onto it would lay the
+   picture over itself, the same empty-divider state setCompare() steps around. */
+const lastPos = () => ab.hidden ? frames.length : frames.length - 1;
+
 /* Loops. A camera clip is 12–60 frames — under 20 seconds — and stopping dead at the end of a river
    rising means pressing play again to see it, which is how you end up watching the same 20 seconds
-   three times anyway. Live is skipped while playing: it is a different image at a different
-   resolution, and a full-size JPEG flashing in at the end of a run of WebP reads as a glitch. */
+   three times anyway. */
 function toggle() {
   if (timer) return stop();
   if (frames.length < 2) return;
-  if (+scrub.value >= frames.length - 1) scrub.value = 0;
+  /* Starts from wherever the scrubber already is — no rewind. It used to jump to frame 0 whenever it
+     was resting at the end, which meant opening a camera replaced the picture you had just asked to
+     see with one from hours ago before you had looked at it. The scrubber rests on live, so a clip
+     now opens on the live frame, wraps to the oldest and plays back up to it: "here is now, here is
+     how it got here". Costs nothing to arrange — the modulo already wraps, and the resting position
+     is already painted. */
   play.firstElementChild.className = 'i i-pause';
   play.title = play.ariaLabel = 'Pause';
   timer = setInterval(() => {
     // The range can change underneath a running clip. A range holding nothing would make this a
     // modulo by zero, which lands NaN in the scrubber and freezes the picture mid-play.
     if (frames.length < 2) return stop();
-    scrub.value = (+scrub.value + 1) % frames.length;
+    scrub.value = (+scrub.value + 1) % (lastPos() + 1);
     paint();
   }, FRAME_MS);
 }
@@ -178,7 +194,15 @@ tl.querySelector('.tlranges').onclick = e => {
   // thing to watch — changing it while a clip runs should widen what is being played, not end it.
   // setRange restarts the run at the oldest frame of the new range.
   const b = e.target.closest('[data-secs]');
-  if (b) setRange(+b.dataset.secs);
+  if (!b) return;
+  setRange(+b.dataset.secs);
+  /* And starts one if none was running. Asking for "week" is asking to see the week, not to be
+     handed a single still from the far end of it and left to find the play button — setRange has
+     already parked the scrubber on the oldest frame in the new window, which is the start of exactly
+     the clip that was just asked for.
+     Not while comparing: there the range is choosing *which* past frame to hold against live, and a
+     clip would carry it away a second later — the same reason the compare button pauses first. */
+  if (ab.hidden && !timer) toggle();   // `!timer`: toggle() on a running clip would stop it
 };
 
 /* Called by ui.js the moment the lightbox opens, with whatever URL it put in the img. The camera id
@@ -198,6 +222,14 @@ export async function openTimeline(src) {
   if (cam !== id || !Array.isArray(all) || all.length < 2) return;
   tl.hidden = false;
   setRange(RANGES[0][1]);
+  /* And plays, without being asked. Opening a camera full-screen *is* the request to look at it
+     properly, and the archive is the only thing here that has to be set in motion to be seen at all
+     — a still that opens paused looks exactly like a camera with no history behind it, which is what
+     the lightbox showed before this feature existed. The controls are right there the moment it
+     starts, so stopping it costs one press; finding out there was anything to play cost a press
+     nobody knew to make. Compare is always off at this point (reset() turns it off), so this is the
+     unconditional case of the same rule the range buttons follow. */
+  toggle();
 }
 
 export function reset() {

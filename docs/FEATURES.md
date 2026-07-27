@@ -1103,6 +1103,33 @@ Upstream load is now capped at one fan-out per `TTL` regardless of how many peop
 the total number of requests, and the burst was never the problem — the number of simultaneous
 bursts was.
 
+### The User-Agent names us on purpose
+
+Every upstream request — JSON API, both scraped pages, every camera still — goes through the one
+`curl_setopt_array` in `fetchAll()`, so there is exactly one place a User-Agent is set. It carries a
+contact URL:
+
+```
+flood-exp/1.0 (+https://github.com/illusionikx/selangor-flood-tracker)
+```
+
+A deployed box pulls **~1.1 GB/day off JPS from a single residential IP on a fixed five-minute tick,
+indefinitely**. That is the most conspicuous pattern a web log can hold, and JPS can already identify
+it from volume and rhythm alone — the UA changes nothing about *whether* they can, only whether the
+person reading the log has to guess. Naming the project turns an anonymous scraper into a legible
+one, which is the difference between something worth blocking and something worth an email.
+
+The alternative — a browser UA, or a rotating one — would be evasion, and evasion is what turns
+"reading a public feed" into something that looks like it needed hiding. Nothing here bypasses auth,
+CORS, a rate limit or a robots rule; the endpoints are public, unauthenticated and published for
+public use. The politeness measures are structural instead: the `flock` guard, the 5-minute payload
+cache, the 15-minute page cache for the slow KL table, and capture decoupled from polling so the
+archive costs ~90 stills per half hour rather than 90 per poll.
+
+*Not done:* conditional GET (`If-Modified-Since` → 304) on the stills. Upstream honours it, but at
+30-minute intervals only ~2 cameras in 90 are stale enough to return 304, so it trims requests and
+not the gigabyte. Worth revisiting only if `SHOT_EVERY` ever drops.
+
 ## The status chip says one word
 
 Four states, one word each: `live` (200, upstream up, readings under 2h), `stale` (connection fine,
@@ -1275,9 +1302,33 @@ archive *is* a set of fixed resolutions, so a continuous zoom would promise deta
 disk between the stops. These are the stops.
 
 The live still — the image the lightbox was opened on — sits one past the end of the scrubber. It is
-not in the archive, but on a timeline it is simply the newest thing there is. Playback skips it: it
-is a different image at a different resolution, and a full-size JPEG flashing in at the end of a run
-of WebP reads as a glitch. Playback loops, because stopping dead means pressing play again to see it.
+not in the archive, but on a timeline it is simply the newest thing there is. Playback loops, because
+stopping dead means pressing play again to see it.
+
+**Playback ends on the live frame.** It used to skip it and jump from the newest *stored* frame
+straight back to the oldest — so the clip showed every photo except the one that was on screen when
+you pressed play, and a camera whose archive is up to 30 minutes behind (`SHOT_EVERY`) never reached
+the present at all. The question a flood camera is opened with is "how did it get to *this*", and a
+playback that stops half an hour short of "this" does not answer it. The original reason for skipping
+was real — the live still is a full-size JPEG arriving at the end of a run of 720p WebP, and it does
+land visibly — but arriving at the present is the point of the clip. It is **still** skipped while
+comparing, where live is the fixed side: playing onto it would lay the picture over itself.
+
+**Live gets no longer dwell than any other frame.** A 2.5 s hold on it was tried first, on the
+reasoning that the frame a clip is played *towards* deserves to land — but at one second a frame the
+run has a rhythm, and a frame that outstays it reads as the clip having stalled rather than as an
+arrival. Nothing on screen says a pause is deliberate. Uniform timing also keeps the loop a plain
+`setInterval` rather than a self-rescheduling `setTimeout`.
+
+**A run starts wherever the scrubber already is, and the scrubber rests on live** — so a clip opens
+on the live frame, wraps to the oldest and plays back up to it: *here is now, here is how it got
+here*. Play used to rewind to frame 0 whenever it was resting at the end, which meant opening a
+camera swapped the picture you had just asked to see for one from hours ago before you had looked at
+it. Removing the rewind is a deletion, not a special case: the modulo already wraps, and the resting
+position has already been painted.
+
+`lastPos()` is the single place that knows where a run ends (`frames.length` normally, one less while
+comparing), so the loop cannot disagree with itself about where the end is.
 
 **Playback runs at one frame a second, and that is not a frame rate.** Consecutive frames here are 30
 minutes to a week apart, so nothing on screen is continuous with what preceded it — there is no
@@ -1314,6 +1365,22 @@ oldest frame of the new range, which is what reaching for a wider range was aski
 loop carries a `frames.length < 2` guard for the same reason: the range can now change underneath a
 running clip, and an empty one would make the loop a modulo by zero — landing `NaN` in the scrubber
 and freezing the picture mid-play, which looks exactly like the bug this change fixed.
+
+**Opening a camera starts the clip.** Not "resumes where you left off", not "waits for play" —
+`openTimeline()` plays as soon as the range is set. Opening a camera full-screen *is* the request to
+look at it properly, and the archive is the only thing in this dialog that has to be set in motion to
+be seen at all: a still that opens paused is indistinguishable from a camera with no history behind
+it, which is exactly what the lightbox was before the archive existed. The asymmetry is the point —
+stopping it costs one press with the control already on screen, while finding out there was anything
+to play cost a press nobody knew to make.
+
+**Changing range starts one too.** Picking "week" is asking to see the week, not to be handed a single
+still from the far end of it and left to find the play button — and `setRange()` has already parked
+the scrubber on the oldest frame in the new window, which is precisely the start of the clip that was
+just requested. So a range press plays it. Guarded twice: `!timer`, because calling the toggle on a
+running clip would *stop* it and undo the paragraph above; and `ab.hidden`, because while comparing a
+range press is choosing which past frame to hold against live, and a clip would carry it away a
+second later — the same reasoning as the compare button pausing first.
 
 The bar is **hidden entirely** unless the archive holds at least two frames. A disabled scrubber over
 a single frame explains nothing its absence doesn't — and that is also what the static GitHub Pages
@@ -1362,6 +1429,20 @@ captured at 1024×576 sit in the archive beside new ones at 1280×720, and both 
 divider, because a 2px drag target is a target nobody hits on a phone — pointer events, so mouse and
 touch are one path. While compare is live, a click on the picture no longer closes the lightbox
 (`#lightbox.cmp`): there, a click on the picture is the start of a drag.
+
+**`touch-action: none`, and only while comparing, is what makes the drag work on a phone at all.**
+A horizontal swipe across a picture is *also* the browser's own pan gesture, and the browser wins it:
+a few pixels in it claims the gesture and fires `pointercancel`, which takes the pointer capture with
+it and leaves the divider stuck wherever the finger first landed. The rule is scoped to
+`#lightbox.cmp` so an ordinary lightbox still scrolls and pinch-zooms like a picture — while
+comparing, the picture is a control, and everywhere else it is a picture.
+
+The knob grows to **44px on coarse pointers** (`@media (pointer: coarse)`, by input rather than by
+breakpoint — a tablet is a coarse pointer at any width), with the divider line thickened to 3px
+alongside it. At 34px the knob is smaller than the finger resting on it and the 2px line vanishes
+under the same finger, so nothing on screen says where the divider is at the moment you are moving
+it. 44px is the WCAG 2.5.8 target size. The knob is still **decoration** — the drag target remains
+the whole stage, which is the only target that was ever big enough.
 
 The stage carries `user-select: none` and its images `-webkit-user-drag: none`, because a drag across
 a picture already means two things to the browser — select it, or pick it up and carry it. Without
@@ -1886,9 +1967,21 @@ a band of map above and below it. A card that is one tap from dismissal is worth
 half-visible map behind a sheet that had to be positioned by hand against the legend and the alert
 panel — which is what `POP_TOP`/`POP_LEGEND` were, three files' worth of guessed chrome heights.
 
-*Also deliberately kept:* `map.on('click', closeSide)`, so clicking the map dismisses the card
-exactly as it dismissed the popup. Marker clicks never reach it — Leaflet's `Marker` sets
-`bubblingMouseEvents: false`.
+**Nothing dismisses the card except the reader.** `map.on('click', closeSide)` was carried over from
+the popup and removed again: a popup had to close on a map click because it was attached to a pin,
+and a panel is not. It made the card vanish mid-read, and the "you are here" card worst of all —
+locate.js draws an accuracy circle around your fix, and a circle is an `L.Path`, which *does* bubble
+its clicks to the map (unlike `L.Marker`, which sets `bubblingMouseEvents: false`). At a coarse fix
+that circle is most of the viewport, so "click the map" and "click near where I am" were one
+gesture. A poll does not close it either — if the place leaves the payload or a filter hides it, the
+card is left standing rather than pulled away; every reading in it is stamped and `footLine()` says
+how old it is.
+
+That leaves three ways out, all of them deliberate: the ×, opening a dialog that takes the screen
+(About, the all-stations table), and the ⋮ → *ignore this sensor*, which is the reader saying they
+do not want that station at all. Clicking another pin is not one of them — it *replaces* the
+contents. Neither is the lightbox: it is opened from a camera still inside the card, and you come
+back to the card when you close it.
 
 **Map furniture on the right steps aside rather than hiding under the panel** — `#toast`, `#credit`
 and Leaflet's bottom-right zoom controls translate by `--side` (360px), the same idea as the drawer
@@ -1929,6 +2022,30 @@ that row to match the height the ticker's had.
 
 Collapsed it is still a flex item paying the header's 12px gap on both sides, hence the `-12px`
 right margin that pulls one back.
+
+## Camera stills went through PHP's stream wrapper, and paid a dead DNS record for it
+
+**Symptom:** stills took 21–30 s to arrive, and often never appeared at all — with browsers capping
+concurrent connections per host, a card or table full of cameras queued behind six requests that
+were each sitting on a stalled socket, and the spinner in `ui.js` (which spins until the image
+lands, deliberately, so it never reads as "gave up") span for as long as anyone was willing to wait.
+
+**Cause:** `infobanjirjps.selangor.gov.my` resolves to two A records, `175.143.72.197` (alive, 12 ms)
+and `58.27.97.62` (SYNs go unanswered). curl implements happy eyeballs — it races the addresses and
+uses whichever answers, so the ~270-request `curl_multi` fan-out that builds the payload never
+noticed. `?cam=` was the one outbound fetch in the repo still using `file_get_contents()`, and PHP's
+HTTP stream wrapper walks the address list *serially* with no connect timeout of its own, so a bad
+draw waits out the operating system's TCP timeout: 21 s on Windows (SYN retries at 3 s, 6 s, 12 s).
+The handler then had an https-first / http-fallback pair, so losing both draws cost 42 s.
+
+**Fix:** route it through the existing `fetchAll()` — the same curl path everything else already
+used. Two lines, no new dependency, no timeout constant to tune, and the https/http fallback is
+kept. Measured 21–30 s → ~0.78 s per still.
+
+Deliberately *not* done: no local cache of live stills (they carry `max-age=60` and the archive in
+`shots/` already holds the history), no retry loop, and no pinning of the good IP — a hard-coded
+address is a second outage waiting for the day JPS renumbers. The general rule went into the gotcha
+list: **no JPS URL is ever fetched with `file_get_contents()`.**
 
 ## Not built (and why)
 
