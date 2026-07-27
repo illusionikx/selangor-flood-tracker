@@ -18,9 +18,9 @@ export const camImg = (c, alt) => `<div class="shotwrap">
    a station off the map on a single tap is the wrong affordance for something you scan with a thumb,
    and this is where the next per-sensor action will go.
    `popover` + `popovertarget` gives toggle, light dismiss and Esc for nothing; the panel lands in the
-   top layer, so the popup's own scrolling box can't clip it. Placement is ui.js's — CSS anchor
-   positioning is still Chromium-only. Ids are safe because Leaflet only builds the DOM of the popup
-   that is actually open, and there is only ever one. */
+   top layer, so the station panel's own scrolling box can't clip it. Placement is ui.js's — CSS
+   anchor positioning is still Chromium-only. Ids are safe because the panel holds one card at a
+   time, so only one copy of a given sensor's menu is ever in the document. */
 export const dots = s => `<button class="icon dots" popovertarget="mnu-${s.id}"
     title="More" aria-label="More actions for ${s.name}"><i class="i i-more_vert"></i></button>
   <div id="mnu-${s.id}" class="menu surface" popover>

@@ -3,7 +3,7 @@
 import { KINDS } from './config.js';
 import { state, PREFS, save } from './state.js';
 import { el, distKm, dkey, ignoredIds } from './util.js';
-import { map, setTheme, flashTo } from './map.js';
+import { map, setTheme, flashTo, closeSide } from './map.js';
 import { heatOpacity } from './heat.js';
 import { byId } from './stations.js';
 import { render, districts } from './render.js';
@@ -233,9 +233,8 @@ document.addEventListener('click', e => {
   const id = e.target.closest('[data-ignore]')?.dataset.ignore;
   if (!id) return;
   setIgnored(ignoredIds().add(id));
-  // Close the popup, not just the menu: the pin it belongs to has just gone, and a popup floating
-  // over the spot where its own marker used to be is a ghost.
-  map.closePopup();
+  // Close the card, not just the menu: the sensor it was describing has just been taken off the map.
+  closeSide();
 });
 
 el('ignoredList').onclick = e => {
@@ -311,8 +310,29 @@ document.addEventListener('click', () => {
 // "name district state kind", so typing a district or a state lists it whole.
 
 const NEAREST = { id: '@nearest', name: 'Nearest station to me', state: 'Your location' };
-const gotoIn = el('goto'), gotoHits = el('gotoHits');
+const gotoIn = el('goto'), gotoHits = el('gotoHits'), findBtn = el('find');
 let hits = [], sel = -1;
+
+/* The box lives in the app bar and is collapsed to its button until asked for — it is a control you
+   reach for deliberately, unlike the layer chips or the alert panel, and as 300px of permanent map
+   furniture it charged every visit for a search most of them never run. The button gives way to the
+   field rather than sitting beside it (see chrome.css), so there is nothing to press to close: it
+   closes on Escape, on picking a station, and on clicking away. The results list hangs below it. */
+function setFind(open) {
+  document.body.classList.toggle('finding', open);
+  findBtn.setAttribute('aria-expanded', open);
+  /* The box is `visibility: hidden` while shut — that is what keeps it out of the tab order — and
+     you cannot focus a hidden element. Reading offsetWidth forces the style flush that applies the
+     class, so by the next line the box is visible and the button that had focus is `display: none`
+     with focus already returned to <body>. Both have to have happened before focus(), and neither
+     has when this handler is entered. Not requestAnimationFrame: its callbacks run *before* the
+     frame's style recalc, so the box is still hidden there and the focus is silently dropped. */
+  if (open) { gotoIn.offsetWidth; return gotoIn.focus(); }
+  gotoIn.value = '';
+  sel = -1;
+  draw(false);
+}
+findBtn.onclick = () => setFind(true);
 
 const nearest = () => state.hereAt && state.data.reduce((best, s) =>
   s.lat && (!best || distKm(s, state.hereAt) < distKm(best, state.hereAt)) ? s : best, null);
@@ -370,20 +390,22 @@ function draw(open = !gotoHits.hidden) {
 function pick(i) {
   const t = hits[i] === NEAREST ? nearest() : hits[i];
   if (!t) return;
-  gotoIn.value = '';
   gotoIn.blur();
-  sel = -1; draw(false);
+  setFind(false);   // the search is over — collapse it back to the button and give the bar its room
   flashTo(t);
 }
 
 gotoIn.oninput = () => { sel = -1; search(); };
 gotoIn.onfocus = search;
-gotoIn.onblur = () => setTimeout(() => draw(false), 150);   // let a click on the list land first
+// Clicking away closes the whole thing, not just the list. The delay lets a click on a result land
+// first — that fires `mousedown` → pick(), which closes it anyway; without the wait the field would
+// be gone before the click completed.
+gotoIn.onblur = () => setTimeout(() => setFind(false), 150);
 gotoIn.onkeydown = e => {
   const step = { ArrowDown: 1, ArrowUp: -1 }[e.key];
   if (step) sel = Math.max(0, Math.min(hits.length - 1, sel + step));
   else if (e.key === 'Enter') return pick(sel < 0 ? 0 : sel);
-  else if (e.key === 'Escape') { gotoIn.value = ''; return draw(false); }
+  else if (e.key === 'Escape') return setFind(false);
   else return;
   e.preventDefault();
   draw();

@@ -13,57 +13,39 @@
 }
 .leaflet-control-zoom a:hover { background: var(--hover) !important; }
 
-/* --- popup shell ---------------------------------------------------------------------------- */
+/* --- the station card ------------------------------------------------------------------------ */
 
-.leaflet-popup-content-wrapper, .leaflet-popup-tip {
-  background: var(--surface); color: var(--on-surface); box-shadow: var(--shadow);
-}
-.leaflet-popup-content-wrapper { border-radius: 12px; }
-/* A camera still plus a sparkline can outgrow the map, and Leaflet's autoPan can't pan a popup that
-   is taller than the viewport into view — it just clips. Cap it and scroll instead: the header with
-   the name and the reading is at the top, so the part that gets scrolled is the part you can lose.
-   The map is inset 64px under the app bar; the rest is the popup's own tip, offset and margins. */
-.leaflet-popup-content {
-  font: 400 13px/1.5 Roboto, system-ui, sans-serif;
-  max-height: calc(100vh - 190px); overflow-y: auto; overscroll-behavior: contain;
-  padding-right: 8px;   /* gap between the text and the scrollbar when there is one */
-  margin-right: 10px;   /* was 24px: pulls the scrollbar in near the popup's own edge */
-}
-/* Leaflet parks the close button in that right-hand gutter, which put it outside the scrollbar.
-   Sit it inside instead, just left of the bar — and reserve the room in the header, which is the
-   only block whose first line runs that far right. */
-/* `top` lines the 24px button up with the first line of the header — the name, and the sensor-count
-   chip beside it. The chip sits at the top of `.pophead`, which starts 14px below the popup's top
-   edge (1px of wrapper padding plus the 13px margin Leaflet gives `.leaflet-popup-content`), and is
-   18px tall, so its centre is at 14 + 9 = 23px and the button's is 23 − 12 = 11px. The button is a
-   child of `.leaflet-popup`, outside the scrolling content box, which is why it is the one that
-   moves: the chip cannot be raised out of a container that clips it. */
-.leaflet-container a.leaflet-popup-close-button { right: 20px; top: 11px; }
-.leaflet-popup-content hr { border: 0; border-top: 1px solid var(--outline); margin: 8px 0; }
-.leaflet-popup-close-button { color: var(--muted) !important; }
+/* The blocks that fill the panel. The panel's own shell — where it sits, how it slides — is in
+   chrome.css; this is the template that used to be drawn inside a Leaflet popup and is otherwise
+   unchanged. Nothing here reserves room for a close button any more: the panel's sits in its own
+   row above the content, so the header is free to use its full width. */
+#sideBody { font: 400 13px/1.5 Roboto, system-ui, sans-serif; }
+#sideBody hr { border: 0; border-top: 1px solid var(--outline); margin: 8px 0; }
 
-/* Standard popup: header (name / region / badge) → body metrics → still → footer. */
+/* Standard card: header (name / region / badge) → body metrics → still → footer. */
 .pophead {
   position: relative;   /* the sensor-count chip hangs off the top-right corner */
-  padding: 0 28px 8px 0; margin-bottom: 8px; border-bottom: 1px solid var(--outline);
+  padding: 0 0 8px; margin-bottom: 8px; border-bottom: 1px solid var(--outline);
 }
-/* How many sensors this popup is holding, parked in the corner beside Leaflet's close button —
-   `right: 28px` clears the gutter .pophead already reserves for it. Only the name shares that line,
-   so only the name pays for the room, via the adjacent-sibling rule below.
-
-   The chip cannot be lifted to meet the close button: `.leaflet-popup-content` scrolls, and a scroll
-   container clips absolutely-positioned descendants, so a negative `top` here just gets cut off at
-   the popup's top edge. The close button comes down to the chip instead — see its rule above. */
+/* The name and the region line clear the panel's close button, which floats over this corner — but
+   only those two. The badge row below them runs the full width, or its ⋮ would sit inset from the
+   one on every sensor row under it. 34px = the button's 48 from the panel edge, less #sideBody's
+   own 16 of padding. */
+.pophead .popname, .pophead > .muted { padding-right: 34px; }
+/* How many sensors this card is holding, parked on the name's line just inside the close button.
+   Only the name shares that line, so only the name pays for the room, via the sibling rule below. */
 .sitecount {
-  position: absolute; right: 16px;
-  top: 2px; height: 18px;
+  position: absolute; right: 34px;
+  /* Centred on the name's line, which starts 18px down — the sticky header's own padding-top, set
+     in chrome.css. 18 + half a 15px/1.3 line − half of this chip's 18px = 19. Moves with it. */
+  top: 19px; height: 18px;
   display: inline-flex; align-items: center; gap: 3px;
   padding: 0 7px 0 5px; border-radius: 999px;
   font: 500 11px/1 Roboto, sans-serif;
   color: var(--muted); background: var(--hover);
 }
 .sitecount .i { font-size: 13px; }
-.sitecount + .popname { padding-right: 40px; }
+.sitecount + .popname { padding-right: 74px; }   /* the button's 34, plus the chip's own width */
 /* The badge trails the location now, so its spacing has to flip with it. */
 .pophead .badge, .pophead .badges { margin: 6px 0 0; }
 .popname { font-size: 15px; font-weight: 500; line-height: 1.3; }
@@ -74,9 +56,11 @@
 /* One mast, several sensors: the place is named once in .pophead, then a section per sensor. */
 .pophead .badges { display: flex; flex-wrap: wrap; gap: 4px; }
 .sensor { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--outline); }
-/* NOT :first-of-type — .pophead is a div too, so it is the first-of-type and the rule matched
-   nothing, drawing a second rule directly under the header's own border. */
-.pophead + .sensor { margin-top: 0; padding-top: 0; border-top: 0; }
+/* The first sensor draws no rule of its own — the header above it already ends in one, and the two
+   together were a double line. Keyed on `:first-child` in the scrolling box, *not* on
+   `.pophead + .sensor`: the header is lifted out of #sideBody into #sideHead (see map.js), so it is
+   no longer this element's sibling and a sibling selector silently stopped matching. */
+#sideBody > .sensor:first-child { margin-top: 0; padding-top: 0; border-top: 0; }
 .sensorhead { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
 .sensorhead b { font-size: 12px; font-weight: 500; }
 .sensorhead .muted { flex: 1; min-width: 0; text-align: right; overflow: hidden;
@@ -150,20 +134,9 @@
   .leaflet-bottom.leaflet-right { margin-bottom: 30px; }
   .leaflet-control-zoom a { width: 44px; height: 44px; line-height: 44px; font-size: 22px; }
 
-  /* Full device width: force the wrapper to the viewport and let content fill it, overriding the
-     minWidth/maxWidth Leaflet stamps from popWidth(). box-sizing so its padding stays inside the
-     screen; focusOn() has already centred the marker, so a viewport-wide popup sits edge to edge. */
-  .leaflet-popup-content-wrapper { width: 100vw; box-sizing: border-box; }
-  .leaflet-popup-content { width: auto !important; }
-  /* Cap the popup to the band between the alert panel (200px top) and the heat legend (155px bottom)
-     and scroll inside it; map.js keepPopupVisible() then drops it so its foot sits just above the
-     legend. 390 = the two reserves + the wrapper's own chrome, so a max-height popup still fits the
-     band without the top clamp lifting the pin. Pair with POP_TOP / POP_LEGEND in map.js. */
-  .leaflet-popup-content { max-height: calc(100vh - 390px); }
-
-  /* Compress the popup on phones: less spacing, and cap the camera still so it doesn't eat the
+  /* Compress the card on phones: less spacing, and cap the camera still so it doesn't eat the
      screen. ponytail: just tighter numbers on the existing rules. */
-  .leaflet-popup-content { font-size: 12px; }
+  #sideBody { font-size: 12px; }
   .pophead { padding-bottom: 6px; margin-bottom: 6px; }
   .popname { font-size: 14px; }
   .popbody { gap: 3px 10px; margin-bottom: 6px; }

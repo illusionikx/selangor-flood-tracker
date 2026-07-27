@@ -5,10 +5,10 @@
 <link rel="stylesheet" href="vendor/leaflet.css">
 <link rel="stylesheet" href="vendor/markercluster.css">
 <link rel="stylesheet" href="vendor/fonts.css?v=49">
-<link rel="stylesheet" href="css/icons.css?v=50">
-<link rel="stylesheet" href="css/base.css?v=49">
-<link rel="stylesheet" href="css/chrome.css?v=60">
-<link rel="stylesheet" href="css/map.css?v=58">
+<link rel="stylesheet" href="css/icons.css?v=51">
+<link rel="stylesheet" href="css/base.css?v=50">
+<link rel="stylesheet" href="css/chrome.css?v=68">
+<link rel="stylesheet" href="css/map.css?v=62">
 
 <!-- A camera still. A <dialog>, not a div: it opens from the all-stations table, which is itself a
      modal dialog, and only the top layer can paint over one — Esc, the backdrop and focus trapping
@@ -72,6 +72,20 @@
        instead of five items the flex row can space out however it likes. -->
   <div class="hactions">
     <div id="net" tabindex="0"><span>connecting…</span></div>
+    <button id="find" class="icon" title="Go to a station" aria-label="Go to a station"
+            aria-expanded="false" aria-controls="gotoBox"><i class="i i-search"></i></button>
+    <!-- "Go to a station", collapsed to its button until asked for. It used to be a 300px box parked
+         over the top-right of the map, which spent that much map on every screen that never used it —
+         and it is the one control here you reach for deliberately rather than glance at.
+         Immediately after #find, so it opens *where the button was* — the button hides and the box
+         takes its place, pushing the remaining controls right. On the far side of .hactions it grew
+         out of the other end of the status chip, which is not where anything was clicked. -->
+    <div id="gotoBox">
+      <input id="goto" type="text" autocomplete="off" placeholder="Go to a station…"
+             role="combobox" aria-expanded="false" aria-controls="gotoHits" aria-autocomplete="list"
+             aria-label="Go to a station">
+      <ul id="gotoHits" class="surface picklist" role="listbox" hidden></ul>
+    </div>
     <button id="data" class="icon" title="All stations as a table"
             aria-label="All stations as a table"><i class="i i-list_alt"></i></button>
     <button id="about" class="icon" title="About" aria-label="About"><i class="i i-info"></i></button>
@@ -240,6 +254,22 @@
   <table class="data"><thead id="dataHead"></thead><tbody id="dataBody"></tbody></table>
 </dialog>
 <div id="map"></div>
+<!-- Station detail, fixed to the right edge of the viewport. It was a Leaflet popup, which is
+     positioned by the pin it points at: where it landed depended on the zoom, the drawer, autoPan's
+     own nudge and whether the target was already on screen — and markercluster rebuilds marker DOM
+     on every zoom, so it was torn down mid-read. A panel in the page opens in the same place every
+     time, survives a poll, and nothing on the map can move or destroy it. -->
+<aside id="side" class="surface" aria-label="Station details">
+  <!-- The place: name, region, one badge per sensor. Its own box *above* the scrolling one, and
+       openSide() moves the card's `.pophead` into it — so it cannot scroll, rather than being told
+       not to. `position: sticky` inside the scroller did the same job in one CSS line, and is the
+       obvious answer, but a header that only stays put if nothing in the box ever defeats sticky is
+       a header that can come loose; this one has no scroll to come loose from. -->
+  <div id="sideHead"></div>
+  <button id="sideClose" class="icon" title="Close" aria-label="Close"
+    ><i class="i i-close"></i></button>
+  <div id="sideBody" class="scroll"></div>
+</aside>
 <div id="bar">
   <div>
     <!-- Both filter lists are <details>: two scrolling lists stacked above the chips pushed the
@@ -280,15 +310,7 @@
     <p id="shown" class="muted"></p>
   </div>
 </div>
-<!-- Map furniture, not a filter: jumping to a station is the one control you reach for while
-     looking at the map, so it sits on it rather than behind the drawer. -->
-<div id="gotoBox">
-  <input id="goto" type="text" autocomplete="off" placeholder="Go to a station…"
-         role="combobox" aria-expanded="false" aria-controls="gotoHits" aria-autocomplete="list"
-         aria-label="Go to a station">
-  <ul id="gotoHits" class="surface picklist" role="listbox" hidden></ul>
-</div>
-<!-- Sits under the "go to" box. Polite: assertive would interrupt a screen reader mid-sentence, and
+<!-- Top-right of the map. Polite: assertive would interrupt a screen reader mid-sentence, and
      the alert panel below carries the same information without a time limit. -->
 <div id="toast" class="surface" role="status" aria-live="polite"></div>
 <div id="alerts" class="surface">

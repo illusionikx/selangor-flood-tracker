@@ -1810,7 +1810,9 @@ mark" cannot also mean "arriving soon" without meaning neither. Urgency is still
 places built for it — the alert panel, the `rising` filter, the ETA line in the popup. One fewer
 constant to keep in step across the client/server boundary.
 
-**Phone popups are a device-wide sheet whose foot sits just above the heat legend.** On a phone the
+**Phone popups are a device-wide sheet whose foot sits just above the heat legend.**
+*Superseded — see "The station panel replaces the map popup" below. Kept for the reasoning, none of
+the code described here still exists.* On a phone the
 popup runs full viewport width (`.leaflet-popup-content-wrapper { width: 100vw }`, content forced to
 `auto` over the `minWidth`/`maxWidth` Leaflet stamps from `popWidth()`), is capped to
 `calc(100vh - 390px)` and scrolls inside. Placement is deterministic, not autoPan: `popPan()` turns
@@ -1822,6 +1824,111 @@ pinning the foot is what "right above the heat scale" actually asked for. *Not `
 the popup pane sits inside a `transform`ed ancestor, so fixed anchors to that pane, not the viewport.
 The reserves are guesses off the chrome heights and pair across three files — `POP_TOP`/`POP_LEGEND`
 in `map.js`, the `390` cap in `map.css`, both keyed to `--hdr` (85), the alert panel and the legend.
+
+## The station panel replaces the map popup
+
+**Station detail is now `#side`, a fixed panel on the right edge of the viewport.** It is filled by
+`openSide(key, html, mastAt)` in `map.js` and holds exactly what the popup held — `sitePopup()` is
+unchanged, and so are `meter()`, the sparklines and the ⋮ menu.
+
+The complaint was that the popup appeared unpredictably, and it did, for four separate reasons that
+all came from anchoring a card to a marker:
+
+- **It was positioned by the pin**, so where it landed depended on the zoom, the drawer, whether the
+  target was already on screen, and `autoPan`'s own nudge afterwards.
+- **`autoPan` raced `setView`.** Opening mid-flight composed a `panBy()` into a running pan
+  animation and left the view off-centre; `flashTo()` had to wait for `moveend`, and register that
+  listener *before* calling `focusOn()` because a long jump fires `moveend` from inside `setView`.
+- **Zoom destroyed it.** markercluster rebuilds marker DOM on zoom, so the popup vanished mid-read —
+  `openStable()` existed to re-open it on the next `moveend`, and `cluster.zoomToShowLayer()` to
+  wait for a clustered marker to have a DOM node at all.
+- **Every poll destroyed it too.** `render()` rebuilds all ~430 markers, which closed whatever card
+  was open — on a five-minute timer, on the page whose whole point is that it refreshes itself.
+
+None of that is a thing a panel in the page can suffer. All four mechanisms are deleted:
+`openStable()`, `keepPopupVisible()` with its `POP_TOP`/`POP_LEGEND` reserves, `popPan()`,
+`popWidth()`, the `zoomToShowLayer` dance in `flashTo()`, and the whole `.leaflet-popup-*` override
+block in `map.css`. `flashTo()` is now three lines: pin the station, fire the marker's own click,
+draw the ripple — so a jump from the alert panel, the ticker, the table or the search takes the same
+path as a click on the pin and cannot drift from it.
+
+**The open card is refreshed in place instead of closed.** `render()` ends by re-rendering whatever
+site `side.key` names, and closes the panel only if the filters have just taken that place off the
+map. `openSide()` resets `scrollTop` only when the key changes, so a poll does not throw you back to
+the top of a card you were reading. Keys starting `@` belong to the panel's non-station users
+(locate.js's "you are here"), which own their contents and are skipped by that pass.
+
+**The place stays put; only the readings scroll.** The panel is two boxes — `#sideHead` and
+`#sideBody` — and `openSide()` moves the card's `.pophead` (name, region, one badge per sensor) into
+the first one. A five-sensor mast runs several screens, and a column of numbers whose station name
+has scrolled off is unreadable; the badges go with it because "which sensor am I looking at" is the
+other half of that question.
+
+`position: sticky; top: 0` on `.pophead` inside `#sideBody` was the first answer and is one CSS line
+against three plus a line of JS. It was measured working — computed `position: sticky`, pinned at
+the scrollport edge with the body scrolled 600 of 1278px — and still reported as scrolling away.
+Rather than keep hunting for what defeated it, the header was moved out of the scroller: a header
+that stays put only while nothing in the box breaks sticky is a header that can come loose, and this
+one has no scroll to come loose from. The seam is that `.pophead` is always the card's first
+element — `sitePopup()` still returns one string and knows nothing about the split.
+
+The × is out of flow over the top-right corner rather than on a header row of its own — a row put it
+a whole line clear of the name it closes, above an empty strip the width of the panel. Three numbers
+are tied together: the button's `top: 8px`, `#sideHead .pophead`'s `padding-top: 18px` (8 + half the
+button's 40 − half the name's 19.5px line) and `.sitecount`'s `top: 19px`.
+
+**`focusOn()` now subtracts both sides.** The drawer takes the left, the panel the right; the shifts
+subtract, so the pin lands in the middle of what is left. Skipped below 600px, where the panel covers
+the map and there is no strip to aim at.
+
+*Trade-off accepted:* on a phone the panel covers the map below the app bar, where the old popup left
+a band of map above and below it. A card that is one tap from dismissal is worth more than a
+half-visible map behind a sheet that had to be positioned by hand against the legend and the alert
+panel — which is what `POP_TOP`/`POP_LEGEND` were, three files' worth of guessed chrome heights.
+
+*Also deliberately kept:* `map.on('click', closeSide)`, so clicking the map dismisses the card
+exactly as it dismissed the popup. Marker clicks never reach it — Leaflet's `Marker` sets
+`bubblingMouseEvents: false`.
+
+**Map furniture on the right steps aside rather than hiding under the panel** — `#toast`, `#credit`
+and Leaflet's bottom-right zoom controls translate by `--side` (360px), the same idea as the drawer
+pushing the legend and alert panel. The attribution has to stay readable and the zoom buttons usable;
+they are not decoration. Not `#map { right: var(--side) }`, which would resize the map and force an
+`invalidateSize()` plus a reflow of every layer on a control that opens and closes constantly.
+
+## "Go to a station" moved into the app bar
+
+**The search is collapsed to a magnifier in the header and slides out when pressed.** It used to be
+a 300px box parked over the top-right of the map — permanent furniture for a control you reach for
+deliberately, charging every visit that never searched for anything the width of it.
+
+`body.finding` is the whole state machine: the box animates from `width: 0` and is `visibility:
+hidden` while shut, so the input stays out of the tab order rather than being a zero-width focus
+trap. The button **gives way to the field** rather than sitting beside it — a magnifier next to an
+open search box is a control with nothing left to do, and on a 360px bar it is 40px the field wants.
+So there is nothing to press to close: it collapses on Escape, on picking a station, and on clicking
+away (the input's `blur`, on the same 150ms delay that lets a click on a result land first).
+
+Two things had to be got right for "and then focus it", and both failed silently:
+
+- **`visibility` cannot be in the transition.** A transitioned `visibility` interpolates, and at t=0
+  of hidden→visible it still computes to `hidden` — so `focus()` was refused on a box the user could
+  already see arriving. It is now `visibility 0s .25s`: instant on the way in (the open state zeroes
+  the delay), held to the end of the slide on the way out so the fade still plays.
+- **The focus has to come after a style flush.** The click that opens the box leaves focus on
+  `#find`, which is about to become `display: none` — the browser returns focus to `<body>` when
+  that lands, *after* the handler returns, so an earlier `focus()` is undone. Reading `offsetWidth`
+  forces both to have happened first. **Not `requestAnimationFrame`:** its callbacks run *before*
+  the frame's style recalc, so the box is still hidden there and the focus is dropped just the same.
+
+`#gotoBox` is a direct child of `<header>`, **not** of `.hactions`: at phone width the bar wraps, and
+only a direct child can claim a whole row. Open, it takes the ticker's row (`body.finding #ticker
+{ display: none }`) rather than adding a third — `--hdr` is a fixed 85px there, and a taller header
+would push the map down every time someone looked up a station. Its input is shortened to 34px in
+that row to match the height the ticker's had.
+
+Collapsed it is still a flex item paying the header's 12px gap on both sides, hence the `-12px`
+right margin that pulls one back.
 
 ## Not built (and why)
 

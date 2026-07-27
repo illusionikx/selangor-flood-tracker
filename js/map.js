@@ -103,50 +103,56 @@ export function showMast(latlng) {
 
 export function hideMast() { mastRing?.remove(); mastRing = null; }
 
+// --- station panel ------------------------------------------------------------------------------
+
+/* What used to be the map popup, moved out of the map.
+   A Leaflet popup is positioned by the thing it points at, so where it landed depended on the pin,
+   the zoom, the drawer, autoPan's nudge and whether the target was already on screen — the same
+   click put it somewhere different each time. Worse, markercluster rebuilds marker DOM on every
+   zoom and render() rebuilds every marker on every poll, so the popup was torn down under the
+   reader twice over.
+   This is a panel in the page: fixed to the right edge, opened in the same place every time, and
+   nothing the map does can move or destroy it. `side.key` is the site it is showing, so a poll
+   refreshes it in place instead of closing it — see the tail of render(). */
+export const side = { key: null };
+
+export function openSide(key, html, mastAt) {
+  const body = el('sideBody');
+  const moved = side.key !== key;
+  side.key = key;
+  body.innerHTML = html;
+  /* Lift the place out of the scrolling box. The card is one string — the template has no idea it
+     is being split — so the split happens here, on the one element that is always its first child.
+     A column of readings whose station name has scrolled off is unreadable, and a five-sensor mast
+     runs several screens. */
+  el('sideHead').replaceChildren(...[body.querySelector('.pophead')].filter(Boolean));
+  if (moved) body.scrollTop = 0;   // a refresh of the same station keeps your place in it
+  document.body.classList.add('side');
+  mastAt ? showMast(mastAt) : hideMast();
+}
+
+export function closeSide() {
+  side.key = null;
+  document.body.classList.remove('side');
+  hideMast();
+}
+
+el('sideClose').onclick = closeSide;
+// Same dismissal a popup had: a click on the map itself means "not that one". Marker clicks never
+// reach here — Leaflet stops them at the marker.
+map.on('click', closeSide);
+
 // --- view helpers ------------------------------------------------------------------------------
 
-// Centre on the visible half of the map: with the drawer open, dead-centre is under the panel.
+// Centre on the strip of map you can actually see: the drawer covers the left, the station panel
+// the right. Not on a phone, where the panel covers the map outright and there is no strip to aim at.
 export function focusOn(latlng, minZoom = 0) {
   const z = Math.max(map.getZoom(), minZoom);
-  const shift = document.body.classList.contains('drawer') ? el('bar').offsetWidth / 2 : 0;
+  const cls = document.body.classList;
+  const shift = (cls.contains('drawer') ? el('bar').offsetWidth / 2 : 0)
+    - (cls.contains('side') && innerWidth > 600 ? el('side').offsetWidth / 2 : 0);
   map.setView(map.unproject(map.project(L.latLng(latlng), z).subtract([shift, 0]), z), z);
 }
-
-// Zooming re-runs clustering, which rebuilds markers and quietly drops any open popup. Re-open it
-// once the map settles — cheap insurance whether the pan came from a click or a panel link.
-export function openStable(marker) {
-  marker.openPopup();
-  map.once('moveend', () => { if (!marker.isPopupOpen()) marker.openPopup(); });
-}
-
-// Leaflet's autoPan gives up when a popup is taller than the map, leaving the top cut off.
-// Nudge the view so the top edge is always readable — that is where the name and readings are.
-function keepPopupVisible() {
-  const pop = document.querySelector('.leaflet-popup');
-  if (!pop) return;
-  const r = pop.getBoundingClientRect();
-  // Phones: drop the popup so its foot — the pin — sits just above the heat legend, filling the band
-  // up towards the alert panel. Clamp the top so a band-taller popup can't slide under the header.
-  // POP_LEGEND / POP_TOP pair with map.css's popup max-height and util.js popPan(); move them together.
-  if (innerWidth <= 600) {
-    const POP_TOP = 200, POP_LEGEND = 155;
-    let shift = (innerHeight - POP_LEGEND) - r.bottom;      // pin down to just above the legend
-    if (r.top + shift < POP_TOP) shift = POP_TOP - r.top;   // …unless that buries the header
-    if (Math.abs(shift) > 2) map.panBy([0, -shift], { duration: .2 });
-    return;
-  }
-  const box = map.getContainer().getBoundingClientRect();
-  const gap = 12;
-  let shift = 0;
-  if (r.top < box.top + gap) shift = box.top + gap - r.top;                 // push content down
-  else if (r.bottom > box.bottom - gap)                                     // or up, but never so
-    shift = -Math.min(r.bottom - (box.bottom - gap), r.top - (box.top + gap));  // far the top clips
-  if (Math.abs(shift) > 2) map.panBy([0, -shift], { duration: .2 });
-}
-map.on('popupopen', () => {
-  keepPopupVisible();
-  setTimeout(keepPopupVisible, 500);   // again once a camera still has loaded and changed the height
-});
 
 // Fly to a station and ripple over it. If its layer is switched off, show it for the flash only —
 // unless the user turns that layer on in the meantime.
@@ -157,17 +163,12 @@ export function flashTo(t) {
   // so the marker is guaranteed to exist afterwards.
   if (state.pinned !== t.id) { state.pinned = t.id; state.rerender(); }
 
-  /* Open only once the flight has landed. Opening mid-pan let the popup's own autoPan fire a panBy()
-     while focusOn()'s setView animation was still running, and the two composed into an off-centre
-     view. It only ever showed up when the target was *already* on screen: that is the case Leaflet
-     animates (a short offset) rather than jumping straight there, and also the case markercluster's
-     zoomToShowLayer answers synchronously, since the marker already has an icon in the viewport.
-     Registered *before* focusOn, not after: a long jump resets the view instead of animating, which
-     fires moveend from inside setView — a listener added afterwards would miss it and never open. */
+  /* One way in: the marker's own click handler centres the map and fills the panel, so a jump from
+     a list and a click on the pin cannot drift apart. Nothing has to wait for the map to settle or
+     for a cluster to expand any more — the panel is a page element, not a thing anchored to a
+     marker's DOM node, which is what the old moveend / zoomToShowLayer dance existed to work around. */
   const marker = siteMark.get(t.site || t.id);
-  // Inside a cluster the marker has no DOM node yet — expand down to it before opening the popup.
-  if (marker) map.once('moveend', () => cluster.zoomToShowLayer(marker, () => openStable(marker)));
-  focusOn([t.lat, t.lng], 13);
+  marker ? marker.fire('click') : focusOn([t.lat, t.lng], 13);
 
   const ping = L.marker([t.lat, t.lng], {
     icon: L.divIcon({ className: '', iconSize: [0, 0], html: '<i class="ping"></i>' }),
@@ -181,8 +182,8 @@ export function flashTo(t) {
   }, FLASH_MS);
 }
 
-// "Navigated away" = a pan or zoom the user asked for. Not popupclose — markercluster tears popups
-// down on every zoom, so that would fire while the user is still looking at the station.
+// "Navigated away" = a pan or zoom the user asked for, not the panel closing: you can close the
+// card and still be looking at the pin it described.
 function unpin() {
   if (!state.pinned) return;
   state.pinned = null;

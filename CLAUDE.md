@@ -27,7 +27,7 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `js/state.js` | `state` (data + hereAt) and the `PREFS` blob. Breaks module cycles. |
 | `js/util.js` | pure helpers + `hasInfo()` / `color()` / `isIgnored()` |
 | `js/stations.js` | queries over the station set (`nearestOf`, `nearestCam`, `byId`) |
-| `js/map.js` | map instance, basemap/theme, cluster, `focusOn` / `openStable` / `flashTo` |
+| `js/map.js` | map instance, basemap/theme, cluster, the station panel (`openSide`), `focusOn` / `flashTo` |
 | `js/heat.js` | both heat layers (water level, rainfall), ground-fixed sizing, shared opacity |
 | `js/popup.js` | popup + meter + gauge + sparkline templates |
 | `js/render.js` | rebuilds markers and heat points; drawer summary table |
@@ -220,25 +220,39 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   map would sit on stale readings because an easter egg was absent. Same rule for anything added to
   that `cp` line: if it can go missing, it must not be able to stop the map updating. Under Herd the
   same missing file is invisible (see above), so this only ever shows up in CI.
-- **`.leaflet-popup-content` scrolls, so it clips anything you position outside it.** It carries
-  `overflow-y: auto` (that is what caps a tall popup), and a scroll container clips absolutely
-  positioned descendants — so nothing inside the popup body can be lifted into the popup's top
-  margin to meet Leaflet's close button. The button is a child of `.leaflet-popup`, *outside* that
-  box, so it is the one free to move: its `top` is set to line up with the header's first line
-  (14px to the top of `.pophead`, + half the 18px `.sitecount` chip, − half its own 24px = 11px).
-  Anything else that wants to sit level with it moves the button, not itself.
-- **Never open a popup while the map is still flying.** The popup's own `autoPan` fires a `panBy()`,
-  and if `setView`'s pan animation is still running the two compose into an off-centre view. This
-  only bit when the target was *already on screen* — the short-offset case is the one Leaflet
-  animates rather than resetting, and also the one markercluster's `zoomToShowLayer` answers
-  synchronously (the marker already has an icon). `flashTo()` therefore waits for `moveend`.
-  **Register that listener before calling `focusOn()`**: a long jump fails `_tryAnimatedPan`'s
-  size check and falls through to `_resetView`, which fires `moveend` from *inside* `setView` — and
-  so does a zero-length pan, straight out of `panBy`. A listener attached afterwards misses both and
-  the popup never opens at all.
-- **Zooming destroys open popups.** markercluster rebuilds marker DOM on zoom. Use `openStable()`
-  (opens, re-opens on next `moveend` if it closed), and `cluster.zoomToShowLayer()` for a marker
-  that may be inside a cluster.
+- **There is no map popup any more, and there must not be one again.** Station detail is `#side`, a
+  fixed panel on the right edge of the viewport, filled by `openSide(key, html, mastAt)` in `map.js`.
+  Everything a Leaflet popup needed — `autoPan` racing `setView`'s animation, `openStable()`
+  re-opening what a zoom had torn down, `cluster.zoomToShowLayer()` waiting for a marker to have a
+  DOM node at all, a `keepPopupVisible()` that nudged the view on phones — existed because the card
+  was anchored to a marker. The panel is a page element: nothing to pan into view, nothing to
+  destroy. Anything that wants to *show a station* calls `flashTo()`, which fires the marker's own
+  click; anything that wants to show something else calls `openSide()` with a key starting `@`
+  (see locate.js), which keeps `render()`'s refresh pass off it.
+- **The card arrives as one string and is split into two boxes.** `openSide()` moves the card's
+  `.pophead` — the place name, region and one badge per sensor — out of `#sideBody` and into
+  `#sideHead`, which is not inside anything that scrolls. `position: sticky` on it was tried first
+  and is one line rather than three, but a header that stays put only while nothing defeats sticky
+  is a header that can come loose; this one has no scroll to come loose from. **Anything that
+  reshapes `sitePopup()` must keep `.pophead` as its first element** — that is the seam.
+- **Three numbers put the place name on the close button's line and move together:** `#sideClose`'s
+  `top: 8px`, `#sideHead .pophead`'s `padding-top: 18px` (8 + half the button's 40 − half a 15px/1.3
+  line) and `.sitecount`'s `top: 19px`.
+- **`render()` refreshes the open card in place, so `openSide()` must stay idempotent.** It runs on
+  every poll for the site currently on screen. It resets `scrollTop` **only** when the key changes —
+  otherwise a poll would throw you back to the top of a card you were reading. Anything stateful
+  added to the card (an open `<details>`, a scroll position, a text selection) is lost on that
+  rebuild unless it is keyed the same way.
+- **You cannot focus something you are still animating into view.** Two separate traps, both silent,
+  and `#gotoBox` hit each in turn. A transitioned `visibility` *interpolates*: at t=0 of
+  hidden→visible it still computes to `hidden`, so `focus()` is refused — hence `visibility 0s .25s`
+  rather than `visibility var(--slide)`. And the click that opened the control leaves focus on the
+  button that is about to become `display: none`, which returns focus to `<body>` *after* the
+  handler returns — so the focus must follow a style flush (`el.offsetWidth`). `requestAnimationFrame`
+  does **not** work here: its callbacks run before the frame's style recalc.
+- **`focusOn()` centres on the strip of map that is actually visible**, which is now bounded on both
+  sides: the drawer takes the left, the panel the right, and the two shifts subtract. Skipped below
+  600px, where the panel covers the map outright and there is no strip to aim at.
 - **Stations within `SITE_M` (50 m) are one place.** `api.php` stamps a `site` key; the map draws one
   pin per site, not per station (671 → 417). Anything reaching for a marker must go through
   `siteMark` in `map.js` — a station's pin may be filed under another kind's bucket, because the
@@ -338,7 +352,7 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   plot against the clock, not against sample index. Windowed to `SPARK_WIN` (12h) and thinned to one point per `SPARK_BUCKET` (15 min)
   server-side; `SPARK_H` in `config.js` is a **cap**, not a fixed frame — the axis spans the points
   actually held and only starts sliding once they exceed it. It must not exceed `SPARK_WIN`.
-- Popups share one template: badge → name → region → body → still/link → footer. `meter()` renders
+- Station cards share one template: badge → name → region → body → still/link → footer. `meter()` renders
   water level on a **piecewise** scale (alert 38%, warning 68%, danger 100%) because real
   thresholds bunch above 88% on a linear bar.
 - Vendored assets only — no CDN, so Tracking Prevention has nothing to block. `leaflet-heat.js` is

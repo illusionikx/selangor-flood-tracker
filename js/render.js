@@ -2,9 +2,9 @@
 
 import { KINDS, MAST, HEAT_FLOOR, RAIN_STOPS } from './config.js';
 import { state, PREFS } from './state.js';
-import { el, color, ink, popWidth, popPan, dkey, isCritical, leads, hasInfo, isIgnored, ignoredIds,
+import { el, color, ink, dkey, isCritical, leads, hasInfo, isIgnored, ignoredIds,
          scalePos, levelStops, gaugeStops } from './util.js';
-import { map, marks, siteMark, shown, syncCluster, focusOn, openStable,
+import { map, marks, siteMark, shown, syncCluster, focusOn, side, openSide, closeSide,
          showMast, hideMast } from './map.js';
 import { heat, rainHeat, heatScale, heatOpacity, thinHeat } from './heat.js';
 import { sitePopup } from './popup.js';
@@ -115,31 +115,33 @@ export function render() {
                multi ? `<b class="n">${members.length}</b>` : ''}</span>`,
       }),
     });
-    // Widest member wins: a site holding a camera needs the room whatever leads it.
-    const wide = Math.max(...members.map(m => popWidth(m.kind)));
-    marker.bindPopup(sitePopup(members), {
-      minWidth: wide, maxWidth: wide,
-      // Tall popups open above the pin, so leave room up top; bottom clears the zoom/credit strip.
-      // On phones the padding widens to the alert-panel / legend band — see popPan().
-      ...popPan(),
-    });
-    // Centre whatever was clicked; autoPan then nudges for the popup's height. The zoom re-runs
-    // clustering, which tears the popup down again — so re-open it once the map has settled.
+    // Fill the panel, then centre the pin in what is left of the map. Panel first: focusOn() reads
+    // the panel's width to work out where "centre" is once it is open.
     marker.on('click', () => {
+      openSide(key, sitePopup(members), multi ? [lead.lat, lead.lng] : null);
       focusOn([lead.lat, lead.lng], 13);
-      openStable(marker);
     });
-    /* Show the grouping radius while the mast is pointed at — and while its popup is open, which is
-       the touch equivalent, since a finger has no hover. mouseout defers to the popup for the same
+    /* Show the grouping radius while the mast is pointed at — and while its card is open, which is
+       the touch equivalent, since a finger has no hover. mouseout defers to the panel for the same
        reason: moving the mouse off a pin you have just opened should not pull the ring out from
-       under the list it explains. */
+       under the list it explains. (openSide draws it; this is only the hover case.) */
     if (multi) {
-      marker.on('mouseover popupopen', () => showMast([lead.lat, lead.lng]));
-      marker.on('mouseout', () => { if (!marker.isPopupOpen()) hideMast(); });
-      marker.on('popupclose', hideMast);
+      marker.on('mouseover', () => showMast([lead.lat, lead.lng]));
+      marker.on('mouseout', () => { if (side.key !== key) hideMast(); });
     }
     marks[lead.kind].push(marker);
     siteMark.set(key, marker);
+  }
+
+  /* The open card, refreshed in place. A popup died with the marker it hung off, so every poll and
+     every zoom closed whatever you were reading; the panel is a page element, so the only thing it
+     needs from a rebuild is fresh numbers. Closed only if the filters have just taken that place off
+     the map entirely — a card describing a pin that is no longer there is a ghost.
+     Keys beginning `@` belong to the panel's non-station users (locate.js's "you are here"), which
+     own their own contents and are not in `sites`. */
+  if (side.key && side.key[0] !== '@') {
+    const m = sites.get(side.key);
+    m ? openSide(side.key, sitePopup(m), m.length > 1 ? [m[0].lat, m[0].lng] : null) : closeSide();
   }
 
   syncCluster();
@@ -220,7 +222,7 @@ export function ignoredPanel() {
       <button class="solo" data-unignore="${s.id}" title="Stop ignoring ${s.name}"
               aria-label="Stop ignoring ${s.name}">restore</button>
     </li>`).join('')
-    || '<li class="none">Nothing ignored. Use the ⋮ on any sensor in a map popup.</li>';
+    || '<li class="none">Nothing ignored. Use the ⋮ on any sensor in a station’s card.</li>';
   el('ignoredClear').disabled = !rows.length;
 }
 

@@ -2,15 +2,19 @@
 // zoom-to-fit included.
 
 import { state, PREFS, save } from './state.js';
-import { el, popWidth, popPan } from './util.js';
-import { map, focusOn } from './map.js';
+import { el } from './util.js';
+import { map, focusOn, openSide } from './map.js';
 import { herePopup } from './popup.js';
 import { alerts } from './alerts.js';
 import { dataTable } from './table.js';
 
 const btn = el('locate');
-let layer, marker, at;
+let layer, marker, at, acc;
 let wantPopup = false;   // only pop up when the user asked; never on the landing auto-locate
+
+// The one non-station card the panel shows. Built fresh on every open so it reflects the latest
+// poll; the `@` key keeps render()'s refresh pass off it, since it belongs to no site.
+const showHere = () => openSide('@here', herePopup({ latlng: at, accuracy: acc }, state.data.length > 0));
 
 /* A fix is worth keeping for a quarter of an hour. Every reload was re-asking the Geolocation API,
    which on a phone means waking the GPS for a position that has not meaningfully changed — and the
@@ -32,22 +36,22 @@ export function findMe(setView) {
 btn.onclick = () => {
   wantPopup = true;
   if (!at) return findMe(true);       // no fix yet — prompt for one
-  focusOn(at, 13);                    // already have one: recentre and show what is around you
-  marker.openPopup();
+  showHere();                         // already have one: recentre and show what is around you
+  focusOn(at, 13);
 };
 
 // One path for both a live fix and a restored one: everything downstream should not be able to tell
 // the difference, because there isn't one worth telling.
 function place(latlng, accuracy, setView) {
   at = state.hereAt = latlng;
+  acc = accuracy;
   btn.className = 'icon on';
   btn.title = `Recentre on my location (±${Math.round(accuracy)} m)`;
   if (layer) layer.remove();
 
   marker = L.marker(latlng, { icon: L.divIcon({
     className: '', iconSize: [30, 30], iconAnchor: [15, 15], html: '<span class="pin me"><i class="i i-person"></i></span>',
-  }) }).bindPopup(() => herePopup({ latlng, accuracy }, state.data.length > 0),
-    { minWidth: popWidth('here'), maxWidth: popWidth('here'), ...popPan() });
+  }) }).on('click', showHere);
 
   layer = L.layerGroup([
     L.circle(latlng, { radius: accuracy, color: '#1a73e8', weight: 1, fillOpacity: .12 }),
@@ -55,7 +59,7 @@ function place(latlng, accuracy, setView) {
   ]).addTo(map);
 
   if (setView) focusOn(latlng, 13);   // map.locate() does this itself; a restored fix has to ask
-  if (wantPopup) marker.openPopup();
+  if (wantPopup) showHere();
   if (state.data.length) alerts();   // re-sort the alert list nearest-first now that we know where you are
   // A fix can land while the table is open — it has a "my location" row that could not exist a
   // moment ago. Redraw so the row appears rather than waiting for the next thing to touch it.

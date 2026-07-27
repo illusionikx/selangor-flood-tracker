@@ -44,17 +44,6 @@ export const ago = t => {
 export const distKm = (a, b) =>
   Math.hypot((a.lng - b.lng) * Math.cos(a.lat * Math.PI / 180), a.lat - b.lat) * 111;
 
-// Phones: as wide as the screen allows. Desktop: readings stay compact, stills get room.
-export const popWidth = kind => innerWidth <= 600
-  ? Math.max(220, innerWidth - 24)
-  : kind === 'camera' ? 440 : 300;
-
-// Phones: autoPan off — map.js keepPopupVisible() drops the popup's foot to just above the heat
-// legend deterministically, which autoPan's fit-anywhere logic can't. Desktop keeps the padded pan.
-export const popPan = () => innerWidth <= 600
-  ? { autoPan: false }
-  : { autoPanPaddingTopLeft: [16, 24], autoPanPaddingBottomRight: [16, 56] };
-
 export const statusColor = n => STATUS_COLOR[Math.max(0, Math.min(3, n))] ?? STATUS_COLOR[0];
 
 /* Thresholds bunch up near the top (alert 4.4, warning 4.7, danger 5 on a 0–5 bar all land past
