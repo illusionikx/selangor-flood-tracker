@@ -25,7 +25,10 @@ el('theme').onclick = () =>
 // click on the backdrop as a close, which the element does not do on its own.
 
 const aboutBox = el('aboutBox');
-el('about').onclick = () => aboutBox.showModal();
+// The station card closes when a dialog takes the screen — you have gone somewhere else, and coming
+// back to a card you had forgotten was open is a surprise. That, and its own ×, are the only ways it
+// shuts: nothing on the map dismisses it, and a poll never does. See map.js.
+el('about').onclick = () => { closeSide(); aboutBox.showModal(); };
 aboutBox.onclick = e => { if (e.target === aboutBox) aboutBox.close(); };
 
 /* Seven taps on the About logo inside five seconds. A rolling window of the last seven timestamps
@@ -83,7 +86,7 @@ el('testOff').onclick = () => {
 // --- all-stations table ------------------------------------------------------------------------
 
 const dataBox = el('dataBox');
-el('data').onclick = () => { dataTable(); dataBox.showModal(); el('dataFind').focus(); };
+el('data').onclick = () => { closeSide(); dataTable(); dataBox.showModal(); el('dataFind').focus(); };
 dataBox.onclick = e => { if (e.target === dataBox) dataBox.close(); };
 el('dataFind').oninput = dataTable;
 

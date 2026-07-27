@@ -138,9 +138,14 @@ export function closeSide() {
 }
 
 el('sideClose').onclick = closeSide;
-// Same dismissal a popup had: a click on the map itself means "not that one". Marker clicks never
-// reach here — Leaflet stops them at the marker.
-map.on('click', closeSide);
+/* Deliberately **no** `map.on('click', closeSide)`. A popup had to close that way because it was
+   attached to a pin; a panel is not, and dismissing it on any stray click on the map made it
+   disappear while being read — the "you are here" card worst of all, because locate.js draws an
+   accuracy circle around you, and a circle is an L.Path, which unlike a Marker *does* bubble its
+   clicks to the map. At a wide fix that circle is most of the viewport, so "click the map" and
+   "click near where I am" were the same gesture.
+   The card closes when the reader says so: this button, or a dialog taking over the screen (ui.js).
+   Clicking another pin does not close it either — it replaces what is in it. */
 
 // --- view helpers ------------------------------------------------------------------------------
 

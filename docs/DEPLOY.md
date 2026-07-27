@@ -113,13 +113,66 @@ discarded. `SHOT_EVERY` is the only dial, with the trade named above. Upstream d
 conditional GET (`If-Modified-Since` → 304, zero bytes), which would be free to add, but at
 30-minute intervals only 2 cameras in 90 are stalled enough to benefit.
 
+### Proxmox LXC
+
+Where this actually runs. Unprivileged is correct — nothing needs host privileges except
+`/dev/net/tun`, and only if you want Tailscale.
+
+```bash
+pct create 112 local:vztmpl/debian-13-standard_13.0-1_amd64.tar.zst \
+  --hostname floodwatch --cores 2 --memory 1024 --swap 512 \
+  --rootfs local-lvm:12 --net0 name=eth0,bridge=vmbr0,ip=dhcp \
+  --unprivileged 1 --onboot 1 --start 1
+```
+
+`--onboot 1` is not cosmetic. **The cron is the app** (see below), so a container that does not come
+back after a host reboot is a hole in the camera archive and the trend history, and neither backfills.
+Keep `shots/` on the container's own rootfs — the 12 GB spec assumes it, and a host bind mount drags
+in the uid trap below for no benefit unless the archive must live on separately-managed storage.
+
+Four things bite here and nowhere else:
+
+- **`/run/php` does not exist, so php-fpm will not start.** It exits `78/EX_CONFIG`, and there is no
+  journal to explain why, because Debian dropped the package's `systemd-tmpfiles` dependency
+  *specifically for container use* — which is exactly where the directory then fails to appear.
+  Downstream this is a 502 on `api.php` and an offline-looking map; the real cause is only in
+  `/var/log/nginx/error.log`. Fix with a drop-in, never by editing the unit — a `php-fpm` upgrade
+  overwrites `/usr/lib/systemd/system/php8.4-fpm.service` and the fix would vanish silently:
+
+  ```bash
+  mkdir -p /etc/systemd/system/php8.4-fpm.service.d
+  printf '[Service]\nRuntimeDirectory=php\nRuntimeDirectoryMode=0755\nRuntimeDirectoryPreserve=yes\n' \
+    > /etc/systemd/system/php8.4-fpm.service.d/runtime-dir.conf
+  systemctl daemon-reload && systemctl restart php8.4-fpm
+  ```
+
+- **The web console is blank and accepts no keys**, while `pct enter` and `pct console` both work
+  fine. It is a setting, not a fault: `pct set 112 --cmode shell`. The default `tty` mode needs a
+  getty on `/dev/console` that several Debian-family templates never start. Do **not** go down the
+  `console-getty` road — on trixie it fails `243/CREDENTIALS` in an unprivileged container, and
+  fixing that still leaves the console blank, because that is not what the button talks to.
+
+- **The minimal template has no `sudo`.** You are root; drop it rather than installing it.
+
+- **Tailscale needs `/dev/net/tun` passed in**, or `tailscaled` starts and immediately dies. Container
+  stopped, on the *host*:
+
+  ```bash
+  modprobe tun && echo tun > /etc/modules-load.d/tun.conf
+  printf 'lxc.cgroup2.devices.allow: c 10:200 rwm\nlxc.mount.entry: /dev/net/tun dev/net/tun none bind,create=file\n' >> /etc/pve/lxc/112.conf
+  ```
+
+Back it up with `vzdump 112 --storage local --mode snapshot --compress zstd`. That covers the one
+thing on the box that cannot be rebuilt.
+
 ### Install
 
 ```bash
-sudo apt update
-sudo apt install -y nginx php-fpm php-curl php-gd php-sqlite3 php-mbstring php-xml \
-                    composer git
-php -v                      # composer.json requires >=8.2; developed against 8.2, CI bakes on 8.3
+apt update                  # as root — a minimal LXC template has no sudo
+apt install -y nginx php-fpm php-curl php-gd php-sqlite3 php-mbstring php-xml \
+               composer git curl
+php -v                      # >=8.2 required; developed on 8.2, CI bakes on 8.3, Debian 13 ships 8.4
+ls /run/php/                # the FPM unit and socket are named for that version — check, don't assume
 php -m | grep -E 'gd|curl|sqlite3|dom'
 php -r 'print_r(array_intersect_key(gd_info(), ["JPEG Support"=>1,"WebP Support"=>1]));'
 ```
@@ -129,14 +182,15 @@ stays silently empty. `php-xml` is what `symfony/dom-crawler` needs; without it 
 return nothing and the payload's `sources` counters go to zero (which is the alarm — see CLAUDE.md).
 
 ```bash
-sudo mkdir -p /srv/flood && sudo chown $USER:www-data /srv/flood
+mkdir -p /srv/flood
 git clone https://github.com/illusionikx/selangor-flood-tracker.git /srv/flood
 cd /srv/flood
 composer install --no-dev            # writes lib/, NOT vendor/ — vendor/ is hand-managed browser assets
 
-# api.php writes four things; www-data must own all of them.
-sudo -u www-data mkdir -p shots
-sudo chown www-data:www-data . shots
+# api.php writes four things; www-data must own all of them. -R because the auto-update cron below
+# runs git as www-data, and git refuses a repo it does not own.
+mkdir -p shots
+chown -R www-data:www-data /srv/flood
 ```
 
 That last line matters: `.cache.json`, `.history.db`, `.refresh.lock` and `shots/` are all created by
@@ -174,8 +228,10 @@ server {
 
     location = /api.php {
         include snippets/fastcgi-php.conf;
-        fastcgi_pass unix:/run/php/php8.2-fpm.sock;
+        # The unversioned symlink, not php8.4-fpm.sock — it survives a PHP major upgrade.
+        fastcgi_pass unix:/run/php/php-fpm.sock;
         # A cold rebuild fans out ~270 upstream calls and can take 20s; a capture round adds ~25s.
+        # Measured 45s on a 2-core LXC when a cold start and a capture round landed together.
         fastcgi_read_timeout 120;
     }
 
@@ -211,7 +267,7 @@ a cache optimisation. It *is* the thing that keeps the site alive; visitors are 
 cache it keeps warm.
 
 ```bash
-sudo tee /etc/cron.d/flood >/dev/null <<'EOF'
+tee /etc/cron.d/flood >/dev/null <<'EOF'
 */5 * * * * www-data curl -fsS -o /dev/null http://127.0.0.1/api.php
 EOF
 ```
@@ -238,16 +294,31 @@ is a call every five minutes, not the mechanism.)
 
 ### HTTPS, from a home connection
 
-**Cloudflare Tunnel is the right answer here**, not port forwarding:
+Two answers, and the choice is *who should be able to see it*, not which is better.
+
+**Private — Tailscale.** If the map is for you and a handful of people, this is the whole job:
+
+```bash
+curl -fsSL https://tailscale.com/install.sh | sh
+tailscale up                 # prints a login URL
+tailscale serve --bg 80      # https://<host>.<tailnet>.ts.net, real cert, tailnet only
+```
+
+Nothing is exposed, the cert renews itself, no certbot and no tunnel daemon. Needs the `/dev/net/tun`
+passthrough above. **The IP addresses stay plain http** — `http://100.x.y.z/` and the LAN address are
+*not* the served URL, and a browser is right to call them insecure; only the MagicDNS name carries the
+cert. `tailscale funnel` is the flag that would make it public, and it is not the same decision.
+
+**Public — Cloudflare Tunnel**, not port forwarding:
 
 ```bash
 # cloudflared tunnel create flood && ... ; then point the tunnel at http://127.0.0.1:80
-sudo apt install -y cloudflared
+apt install -y cloudflared
 ```
 
 No open inbound ports, no dynamic-DNS chase when the ISP rotates your address, TLS terminated for
 free, and your home IP is not in public DNS. If you do forward 80/443 instead, use certbot
-(`sudo apt install certbot python3-certbot-nginx`) and accept that the address is published.
+(`apt install certbot python3-certbot-nginx`) and accept that the address is published.
 
 Either way, keep the disclaimer visible. This is not an official warning channel, and a home
 connection has a plainly worse availability story than JPS's own portals.
@@ -281,6 +352,34 @@ cd /srv/flood && git pull && composer install --no-dev
 No build step, so that is the whole deploy. Bump the `?v=` on the stylesheet links when a CSS file
 changes (`index.html`), and hard-reload after a `js/` change — ES module imports carry no cache
 buster.
+
+Worth automating, since it is a `git pull` on a timer and nothing else. Append to the same cron file:
+
+```bash
+COMPOSER_HOME=/srv/flood/.composer
+*/15 * * * * www-data cd /srv/flood && git pull -q --ff-only && composer install --no-dev -q --no-interaction
+```
+
+Three details carry the weight. **`--ff-only`** refuses to merge, so a stray edit on the box stops
+deploys loudly instead of quietly generating merge commits on a deploy target. **`www-data`, not
+root** — git rejects a repo it does not own, and root would leave root-owned files in a tree PHP
+writes to; `COMPOSER_HOME` is set because www-data's `$HOME` is not writable under cron. And it is
+safe against the state files: `.cache.json`, `.history.db` and `shots/` are gitignored, so a deploy
+can never cost you history or camera frames.
+
+Same command as a script, so it is one word by hand and identical to what cron runs:
+
+```bash
+printf '#!/bin/sh\nexec su -s /bin/sh www-data -c '"'"'cd /srv/flood && git pull --ff-only && composer install --no-dev --no-interaction'"'"'\n' > /usr/local/bin/update
+chmod +x /usr/local/bin/update
+```
+
+`update` then works inside the container and as `pct exec 112 -- update` from the host. Running plain
+`git` as root in `/srv/flood` fails with *dubious ownership* — that is the guard working, not a fault.
+
+Cache behaviour is already right for this: `index.html` is no-cache and `js/` is 5 minutes, so clients
+pick up a deploy on their own. **CSS is the exception** — 30 days, busted only by the `?v=`. Forget to
+bump it and the server is updated while the browser is not.
 
 ---
 

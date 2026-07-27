@@ -4,7 +4,7 @@ import { KINDS, MAST, HEAT_FLOOR, RAIN_STOPS } from './config.js';
 import { state, PREFS } from './state.js';
 import { el, color, ink, dkey, isCritical, leads, hasInfo, isIgnored, ignoredIds,
          scalePos, levelStops, gaugeStops } from './util.js';
-import { map, marks, siteMark, shown, syncCluster, focusOn, side, openSide, closeSide,
+import { map, marks, siteMark, shown, syncCluster, focusOn, side, openSide,
          showMast, hideMast } from './map.js';
 import { heat, rainHeat, heatScale, heatOpacity, thinHeat } from './heat.js';
 import { sitePopup } from './popup.js';
@@ -135,14 +135,15 @@ export function render() {
 
   /* The open card, refreshed in place. A popup died with the marker it hung off, so every poll and
      every zoom closed whatever you were reading; the panel is a page element, so the only thing it
-     needs from a rebuild is fresh numbers. Closed only if the filters have just taken that place off
-     the map entirely — a card describing a pin that is no longer there is a ghost.
+     needs from a rebuild is fresh numbers.
+     If the place has left `sites` — a filter hid it, or the feeds dropped it — the card is left
+     exactly as it was rather than closed. Nothing here may vanish on its own while it is being
+     read, and a card that stops updating is not lying: every reading in it is stamped, and
+     footLine() says how old it is. Closing is the reader's to do.
      Keys beginning `@` belong to the panel's non-station users (locate.js's "you are here"), which
      own their own contents and are not in `sites`. */
-  if (side.key && side.key[0] !== '@') {
-    const m = sites.get(side.key);
-    m ? openSide(side.key, sitePopup(m), m.length > 1 ? [m[0].lat, m[0].lng] : null) : closeSide();
-  }
+  const open = side.key && side.key[0] !== '@' && sites.get(side.key);
+  if (open) openSide(side.key, sitePopup(open), open.length > 1 ? [open[0].lat, open[0].lng] : null);
 
   syncCluster();
   // Thinned, not raw: overlapping blobs composite, and these are intensities rather than counts.
