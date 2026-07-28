@@ -15,7 +15,7 @@ sources expose, and keeps working when an upstream goes down.
 | Rainfall | Last hour and today in mm, hourly history, status from none to very heavy |
 | Flood gauge | Flood depth over the marked spot (negative = dry ground) |
 | Siren | Triggered / idle, and when it last checked in |
-| CCTV | Latest still from the camera, with timestamp |
+| CCTV | Latest still from the camera, plus a scrubbable archive back through the last year |
 
 Every station carries its district, state and main river basin, plus which feed its reading came
 from — the three sources disagree by a few centimetres, and an unattributed number would read as a
@@ -43,7 +43,14 @@ markup allows it and guards on row width where it doesn't.
 - **Graphs on a real time axis** — level as a line, rainfall as bars (rain is an amount collected
   over a period, so a line between two readings would claim a value that never existed).
 - **One mast, one pin** — a rainfall gauge, a river gauge, a siren and a camera on the same pole are
-  published as four stations at one coordinate. They are grouped into one pin with one popup.
+  published as four stations at one coordinate. They are grouped into one pin, and one panel.
+- **Was it like this an hour ago?** — upstream publishes a camera's *now* and nothing else.
+  [shots.php](shots.php) keeps a frame every half hour and thins it with age (every frame for six
+  hours, one a week by the end of the year), so the lightbox can play the last day, week or month
+  back as a clip and compare any two moments side by side.
+- **Alerts you can turn off** — anything climbing towards its own danger mark is counted in the app
+  bar, listed in a panel and scrolled across the header. A sensor that cries wolf can be ignored
+  individually, and the app keeps saying how many are silenced rather than hiding that it is.
 - **Stale over blank** — if upstream is unreachable, the last good payload is served with
   `upstreamOk: false` and its age, rather than an empty map.
 - **CCTV over HTTPS** — upstream advertises camera stills over plain http, which an https page
@@ -66,9 +73,17 @@ link — no config.
 The front end has no build step and no dependencies: `index.html` loads ES modules directly, and
 Leaflet and the fonts are vendored in `vendor/`.
 
-`.cache.json` and `.history.db` are written next to `api.php` and are gitignored. Delete them to
-reset — but note that deleting `.history.db` discards the level history, so trends and graphs go
-blank for an hour while they rebuild.
+`.cache.json`, `.history.db` and `shots/` are written next to `api.php` and are gitignored. Deleting
+`.cache.json` costs nothing; deleting `.history.db` discards the level history, so trends and graphs
+go blank for an hour while they rebuild; `shots/` cannot rebuild at all — those frames exist only
+because something was running when they were taken.
+
+## Installing it
+
+Chrome offers **Install app** and iOS Safari's **Add to Home Screen** opens it standalone, from
+`manifest.json` and `sw.js`. The worker is network-first and caches only the shell, so an edit is
+live on the next load and there is no cache to bust. It never caches a reading at any age: with no
+connection the app says so rather than drawing a map from an old water level.
 
 ## Hosting it on GitHub Pages
 
@@ -92,7 +107,9 @@ PHP and cron and none of this applies.
     index.html   markup only — no inline CSS or JS
     api.php      proxy, cache, source merge, history, CCTV passthrough
     sources.php  scrapers for the two HTML-only feeds
+    shots.php    camera archive — capture, retention tiers, lookup
     css/ js/     styles and ES modules, one concern per file
+    sw.js        service worker + manifest.json and the icons — the installable bit
     vendor/      Leaflet + plugins + fonts, hand-vendored so there's no build step
     lib/         Composer's vendor dir (gitignored — *not* vendor/)
     docs/        what exists and why, including what was deliberately not built
