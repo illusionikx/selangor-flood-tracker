@@ -2,7 +2,7 @@
  *
  * A river level has had a graph all along; a camera had only "now" — which is the wrong tense for
  * the question people actually bring to a flood camera ("was it like this an hour ago?"). The server
- * keeps one frame per camera every 30 minutes and thins them by age (see SHOT_TIERS in api.php);
+ * keeps one frame per camera every 30 minutes and thins them by age (see SHOT_TIERS in shots.php);
  * this scrubs through what survived.
  *
  * The lightbox only, deliberately. A popup is 300px of readings you glance at; a timeline is
@@ -17,14 +17,25 @@
 import { el } from './util.js';
 
 /* Named windows rather than a free zoom. The retention tiers mean the archive is *already* a set of
-   resolutions — every frame for 6 hours, then 6-hourly, then 12-hourly, then weekly — so a
-   continuous zoom would promise detail that is not on disk between the stops. These are the stops. */
+   resolutions — half-hourly for a day, then 3-hourly, then 12-hourly, then weekly — so a continuous
+   zoom would promise detail that is not on disk between the stops. These are the stops.
+   `step` is that tier's spacing and the playback *thins to it*: retention works on a frame's age, so
+   a week window holds six days of 3-hourly frames and then 48 half-hourly ones at the near end, and
+   playing the lot spends most of the clip on the last day. The window says "a week"; the clip has to
+   move through it at one pace — and the tick strip is drawn off the same thinned list, so the
+   ruler's spacing and the clip's spacing cannot disagree.
+   Every step is picked so its window lands near 50 frames: 48, 56, 60, 52. That is a clip of about a
+   minute at one frame a second, the same weight of thing to sit through whichever range is chosen —
+   and it means a range and its tier are one decision, so `SHOT_TIERS` cannot be loosened without a
+   range going thin and short.
+   No 6-hour stop: the capture rate is `SHOT_EVERY` (30 min), so a "keep every frame" window is a
+   30-minute window with a second name — the finest resolution that exists is one frame per half
+   hour, and 24 h is where it is already offered. */
 const RANGES = [
-  ['6 h',   6 * 3600],
-  ['24 h',  24 * 3600],
-  ['week',  7 * 86400],
-  ['month', 30 * 86400],
-  ['year',  365 * 86400],
+  { label: '24 h',  win: 24 * 3600,   step: 1800,       every: 'one frame every 30 minutes' },
+  { label: 'week',  win: 7 * 86400,   step: 3 * 3600,   every: 'one frame every 3 hours' },
+  { label: 'month', win: 30 * 86400,  step: 12 * 3600,  every: 'one frame every 12 hours' },
+  { label: 'year',  win: 365 * 86400, step: 7 * 86400,  every: 'one frame a week' },
 ];
 /* One frame a second. Not an animation frame rate — consecutive frames here are 30 minutes to a week
    apart, so nothing on screen is continuous with what preceded it and there is no motion to smooth.
@@ -52,6 +63,8 @@ const imgA  = box.querySelector('.abimg');
 const grip  = box.querySelector('.abgrip');
 const tl    = el('tl');
 const scrub = el('tlscrub');
+const ticks = box.querySelector('.tlticks');
+const meta  = box.querySelector('.tlmeta');
 const play  = box.querySelector('.tlplay');
 const cmp   = box.querySelector('.tlcmp');
 
@@ -59,7 +72,7 @@ let cam = null;      // camera id while the lightbox is showing one, else null
 let all = [];        // every stored frame, unix seconds, ascending
 let frames = [];     // the subset inside the chosen range
 let liveSrc = '';    // the live proxied still — always the last position on the scrubber
-let range = RANGES[0][1];
+let range = RANGES[0];
 let timer = null;
 
 const srcOf = ts => `api.php?shot=${cam}&t=${ts}`;
@@ -69,8 +82,8 @@ const isLive = i => i >= frames.length;
 const srcAt  = i => isLive(i) ? liveSrc : srcOf(frames[i]);
 const labelAt = i => isLive(i) ? 'live' : stamp(frames[i]);
 
-tl.querySelector('.tlranges').innerHTML = RANGES.map(([label, secs]) =>
-  `<button class="tlr" data-secs="${secs}">${label}</button>`).join('');
+tl.querySelector('.tlranges').innerHTML = RANGES.map((r, i) =>
+  `<button class="tlr" data-i="${i}">${r.label}</button>`).join('');
 
 function paint() {
   if (!cam) return;   // nothing to paint from, and the img belongs to whoever opened the lightbox
@@ -92,10 +105,39 @@ function paint() {
   }
 }
 
-function setRange(secs) {
-  range = secs;
-  const cut = Date.now() / 1000 - secs;
-  frames = all.filter(ts => ts >= cut);
+/* One frame per `step`-wide bucket, newest in the bucket winning — the same rule and the same bucket
+   keys the server prunes by (`pruneShots()` in shots.php), so a window that has already been thinned
+   to this step comes through untouched and one that has not is thinned the same way it eventually
+   will be. Ascending in, ascending out: a Map keeps insertion order, and re-setting a key does not
+   move it. */
+function thin(list, step) {
+  const keep = new Map();
+  for (const ts of list) keep.set(Math.floor(ts / step), ts);
+  return [...keep.values()];
+}
+
+/* A ruler under the scrubber: one mark per frame, all the same mark. It was drawn with two heights
+   at first — a taller one on each new day — which laid a second, coarser grid over the frames and
+   left the strip saying two things at once. The window is thinned to the range's own step, so the
+   frames *are* the graduation: the marks are evenly spaced by construction and one of them is one
+   picture. That is the whole legend, and it needs no key.
+   Each carries its timestamp as a `title` (the native tooltip — nothing to position, nothing to
+   dismiss, and it works on the 1px mark because the hit box around it is 11px wide) and its index as
+   `data-i`, so the strip is a row of jump targets as well as a ruler.
+   Positions are a percentage of the *track*, which is inset by half a thumb at each end — hence the
+   8px margins on .tlticks rather than a padding, since a percentage offset resolves against the
+   padding box and a padding would not move it. */
+function drawTicks() {
+  ticks.innerHTML = frames.map((ts, i) =>
+    `<i data-i="${i}" title="${stamp(ts)}" style="left:${i / scrub.max * 100}%"></i>`
+  ).join('') + (frames.length
+    ? `<i class="now" data-i="${frames.length}" title="live" style="left:100%"></i>` : '');
+}
+
+function setRange(r) {
+  range = r;
+  const cut = Date.now() / 1000 - r.win;
+  frames = thin(all.filter(ts => ts >= cut), r.step);
   scrub.max = frames.length;         // the extra slot is "live"
   /* Rest on live normally — the newest thing there is, and what the lightbox was already showing.
      Start at the oldest frame instead whenever something is going to *move*: while comparing, live
@@ -103,8 +145,14 @@ function setRange(secs) {
      should begin at the far end of the range that was just asked for. Both mean "further back",
      which is the only reason to reach for a wider range in the first place. */
   scrub.value = (timer || !ab.hidden) ? 0 : frames.length;
-  tl.querySelectorAll('.tlr').forEach(b =>
-    b.classList.toggle('on', +b.dataset.secs === secs));
+  tl.querySelectorAll('.tlr').forEach((b, i) => b.classList.toggle('on', RANGES[i] === r));
+  /* The pace, and only the pace. It is the one thing not guessable from the picture — every range
+     plays at a frame a second, so while running they look identical and differ only in what each
+     second is worth. The frame count and the span were here too and are gone: both are already on
+     screen as the tick strip, which shows the count by being countable and the span by starting at
+     the left edge, and a caption repeating them in words made three lines of chrome out of one. */
+  meta.textContent = frames.length ? r.every : 'nothing stored this far back — live only';
+  drawTicks();
   // Warm the whole window at once. It is at most ~60 frames off local disk, served immutable, and
   // the alternative is a scrubber that stutters on every drag — the one interaction this exists for.
   frames.forEach(ts => { new Image().src = srcOf(ts); });
@@ -155,8 +203,8 @@ function setCompare(on) {
   ab.hidden = grip.hidden = !on || !frames.length;
   cmp.setAttribute('aria-pressed', String(!ab.hidden));
   cmp.classList.toggle('on', !ab.hidden);
-  // ui.js reads this back: a click on the picture normally closes the lightbox, and while the
-  // divider is live a click on the picture is a drag, not a dismissal.
+  // ui.js reads this back for its cursor; here it is the reason the picture stops being a play
+  // button — while the divider is up a press on the picture is a drag, not a press.
   box.classList.toggle('cmp', !ab.hidden);
   /* The scrubber rests on "live", and so is the fixed side — turning compare on there would lay the
      picture over itself and read as a broken divider rather than an empty one. Open on the oldest
@@ -184,7 +232,27 @@ stage.addEventListener('pointermove', e => {
   if (!ab.hidden && stage.hasPointerCapture(e.pointerId)) slide(e);
 });
 
+/* The picture is the play button. It is the largest target in the dialog and the thing being looked
+   at, so reaching to the footer to pause a clip means looking away from the frame you paused it on.
+   Nothing was on this click before — the lightbox closes on its backdrop only, deliberately, because
+   the old tap-anywhere overlay could not tell a dismissal from a scrub.
+   Not while comparing: there a press on the stage is the start of a drag on the divider, and the
+   same gesture cannot be both. `frames.length < 2` is toggle()'s own guard, so a camera with no
+   archive behind it keeps an inert picture rather than one that swallows clicks. */
+stage.onclick = () => { if (ab.hidden) toggle(); };
+
 scrub.oninput = () => { stop(); paint(); };
+/* A mark is its frame. Clicking one is the same act as dragging the thumb onto it — with the
+   timestamp already read off the tooltip, which is the case the scrubber serves worst: it has no
+   labels, so finding 18:00 on it is a drag-and-watch. Stops playback for the reason `oninput` does,
+   that having gone to a specific frame you are not asking to be carried off it a second later. */
+ticks.onclick = e => {
+  const t = e.target.closest('[data-i]');
+  if (!t) return;
+  stop();
+  scrub.value = t.dataset.i;
+  paint();
+};
 play.onclick = toggle;
 // Pausing first: reaching for compare means you have found the frame you want to hold against the
 // live one, and playback would carry it away a second later. Same reason the scrubber stops on input.
@@ -193,9 +261,9 @@ tl.querySelector('.tlranges').onclick = e => {
   // Deliberately does not stop playback. A range is a zoom level on one timeline, not a different
   // thing to watch — changing it while a clip runs should widen what is being played, not end it.
   // setRange restarts the run at the oldest frame of the new range.
-  const b = e.target.closest('[data-secs]');
+  const b = e.target.closest('[data-i]');
   if (!b) return;
-  setRange(+b.dataset.secs);
+  setRange(RANGES[+b.dataset.i]);
   /* And starts one if none was running. Asking for "week" is asking to see the week, not to be
      handed a single still from the far end of it and left to find the play button — setRange has
      already parked the scrubber on the oldest frame in the new window, which is the start of exactly
@@ -221,7 +289,12 @@ export async function openTimeline(src) {
   // Still the camera we opened? An impatient close-and-open-another beats a slow fetch otherwise.
   if (cam !== id || !Array.isArray(all) || all.length < 2) return;
   tl.hidden = false;
-  setRange(RANGES[0][1]);
+  /* Open on the narrowest window that actually holds a clip. 6 h is the right default on a server
+     that has been capturing all along and empty on one that has not — and an empty scrubber under a
+     camera with a week of frames behind it reads as "no archive", which is the state this whole
+     footer exists to replace. */
+  const t0 = Date.now() / 1000;
+  setRange(RANGES.find(r => all.filter(ts => ts >= t0 - r.win).length >= 2) ?? RANGES[0]);
   /* And plays, without being asked. Opening a camera full-screen *is* the request to look at it
      properly, and the archive is the only thing here that has to be set in motion to be seen at all
      — a still that opens paused looks exactly like a camera with no history behind it, which is what

@@ -1224,25 +1224,35 @@ only takes over where it genuinely beats the original, which at that quality is 
 than a coin toss. **1080p was never on the table**: JPS publishes 1280×720, so upscaling would double
 the file for no extra detail. 720p *is* the ceiling, and quality is the only axis left.
 
-**165 frames survive per camera** at steady state (the test prints it), so at a 245 KB source average
-that is **~3.7 GB** on disk for all 90 — and *flat from year one*, because the last tier deletes as
-fast as capture adds. ~1.6 GB if `SHOT_W` dropped to 1024. Download from JPS is
+**193 frames survive per camera** at steady state (the test prints it), so at a 245 KB source average
+that is **~4.3 GB** on disk for all 90 — and *flat from year one*, because the last tier deletes as
+fast as capture adds. ~1.9 GB if `SHOT_W` dropped to 1024. Download from JPS is
 unchanged either way (~1.1 GB/day): the full original is always fetched, the choice only affects what
 is kept. Lowering `SHOT_W` is a one-line change and roughly halves the archive.
+
+It was 165 frames and ~3.7 GB until the week tier went from 6-hourly to 3-hourly. **That 16% is
+bought deliberately**, and the buyer is the scrubber: a tier is what a range can *play*, and a week
+window at 6-hourly held 28 frames — a half-minute clip crossing seven days, against 48 for the day
+before it. Half the storage decision is a playback decision, and disk is the cheap side of it.
 
 ### Retention
 
 `SHOT_TIERS` in `shots.php`, applied on a frame's **age**, so a frame thins itself as it gets older
 rather than being filed once and forgotten:
 
-| age | kept |
-|---|---|
-| ≤ 6 h | every frame |
-| ≤ 24 h | one per 30 min |
-| ≤ 7 days | one per 6 h |
-| ≤ 30 days | one per 12 h |
-| ≤ 1 year | one per week |
-| older | deleted |
+| age | kept | frames in the matching scrubber range |
+|---|---|---|
+| ≤ 6 h | every frame | — |
+| ≤ 24 h | one per 30 min | 48 |
+| ≤ 7 days | one per 3 h | 56 |
+| ≤ 30 days | one per 12 h | 60 |
+| ≤ 1 year | one per week | 52 |
+| older | deleted | — |
+
+The third column is why the steps are what they are. **A tier is what a range can play**, so the two
+are one decision: every window lands near 50 frames, which is a clip of about a minute at one frame a
+second — the same weight of thing to sit through whichever range is picked. Loosening a tier does not
+just free disk, it shortens a clip and skips half of what happened in it.
 
 The first two tiers are the same density while `SHOT_EVERY` is 30 min. Both are written out anyway:
 the tiers are the **policy**, the capture rate is a **bandwidth cap**, and conflating them would mean
@@ -1297,9 +1307,69 @@ Lightbox only, deliberately. A popup is 300px of readings you glance at; a timel
 sit with, and the lightbox is already the full-screen "look at this properly" view. A scrubber in the
 popup would be two places to learn and one of them too small to use.
 
-**Named ranges, not a free zoom** (6 h / 24 h / week / month / year). The retention tiers mean the
+**Named ranges, not a free zoom** (24 h / week / month / year). The retention tiers mean the
 archive *is* a set of fixed resolutions, so a continuous zoom would promise detail that is not on
 disk between the stops. These are the stops.
+
+**There is no 6-hour stop.** It was the first one, and it meant "every frame we have" — but the
+capture rate is `SHOT_EVERY`, 30 minutes, so "every frame" *is* half-hourly and the stop was the
+24-hour window under a second name and a narrower lens. The finest resolution the archive can hold is
+one frame per half hour, and that is what the shortest range now says it is.
+
+**And a range plays at its own tier's spacing.** Each stop carries the `step` its tier is stored
+at — 30 min, 3 h, 12 h, weekly — and `thin()` decimates the window down to it before
+anything is played. It has to, because retention thins on a frame's *age*, not on the window you
+happen to be looking through: a week window holds six days of 3-hourly frames and then 48 half-hourly
+ones at the near end, so playing everything in it spent four fifths of the clip on the last day and
+crossed the six days before it in seconds. The window said "a week" and the clip did not move through
+it at a week's pace. `thin()` buckets by `floor(ts / step)` and keeps the newest in each — the same
+rule and the same bucket key `pruneShots()` prunes by, so a window already thinned to that step comes
+through untouched and one that has not is thinned the way it eventually will be on disk.
+
+*Cost accepted:* the near end of a wide range shows fewer frames than exist. That is the trade the
+ranges are for — the 24 h stop is there to see everything — and a clip that changes pace half way
+through is not a timeline, it is two.
+
+**The pace is written under the control** — `one frame every 3 hours`, and nothing else. Every range
+plays at a frame a second, so while running they look identical and differ only in what each second
+is worth; that is the one thing the picture cannot show. The caption also carried the frame count and
+the span (`· 29 frames · 22 Jul 06:00 → live`) for a while, and both went: the tick strip already
+shows the count by being countable and the span by starting at the left edge, so the words were a
+third line of chrome restating a picture. A window holding nothing still says so in words, because
+that is a state and not a number.
+
+**A tick strip under the scrubber: one mark per frame, all the same mark.** It was built with two
+heights — a taller one on each new day — which laid a second, coarser grid over the frames and left
+the strip saying two things at once. Since the window is thinned to the range's own step, the frames
+*are* the graduation: the marks are evenly spaced by construction and one mark is one picture. That
+is the whole legend, and it needs no key. Only "now" is different, wider and accented, because it is
+the one mark that is not an archived frame.
+
+Marks are placed by *index*, like the scrubber's own positions rather than by clock time, so a mark
+is always directly under the thumb that selects it. Positions are a percentage of the *track*, which
+starts half a thumb in from each end, so the strip is inset with a `margin` and not a `padding` — a
+percentage offset resolves against the padding box and padding would not have moved it.
+
+**Hover a mark to read its time, click it to go there.** The scrubber has no labels, so finding
+18:00 on it means dragging and watching; the marks carry the timestamp as a native `title` — nothing
+to position, nothing to dismiss — and their index as `data-i`. Each is 1px of paint inside an 11px
+hit box, which is the only reason either gesture works: a 1px target is neither hoverable nor
+tappable. The box is sized just under the tightest spacing any range produces, so the boxes tile the
+strip without overlapping and a click between two marks lands on the nearer one. Clicking stops
+playback, for the same reason dragging the scrubber does — having gone to a specific frame, you are
+not asking to be carried off it a second later.
+
+**The picture plays and pauses the clip.** It is the largest target in the dialog and the thing being
+looked at, so reaching to the footer to pause meant looking away from the frame you were pausing on.
+The click was free: the lightbox closes on its backdrop only, deliberately, so nothing was on it.
+Not while comparing — there a press on the stage is the start of a drag on the divider, and one
+gesture cannot be both. The cursor says which mode it is in, from `:has(#tl:not([hidden]))` rather
+than a class set from JS, since the state is already in the DOM.
+
+**Opening picks the narrowest range that actually holds a clip.** 24 h is the right default on a
+server that has been capturing all along, and empty on one that has not — an empty scrubber under a
+camera with a week of frames behind it reads as "no archive", which is the exact state this footer
+exists to replace.
 
 The live still — the image the lightbox was opened on — sits one past the end of the scrubber. It is
 not in the archive, but on a timeline it is simply the newest thing there is. Playback loops, because
@@ -1342,14 +1412,14 @@ Changing range warms the whole window with `new Image()` — at most ~60 frames 
 `immutable`. The alternative is a scrubber that stutters on every drag, which is the one interaction
 this feature exists for.
 
-**The five ranges are a segmented control, not five pills.** They are mutually exclusive — picking one
+**The ranges are a segmented control, not a row of pills.** They are mutually exclusive — picking one
 unpicks the rest — and as separate outlined pills each looked independently pressable, with nothing
 in the row saying only one could ever be on. A single sunken track with the current segment filled
-says it in the shape: the selection moves *along* one control rather than lighting up one of five. It
+says it in the shape: the selection moves *along* one control rather than lighting up one of four. It
 is sized to its content and centred rather than stretched to the dialog width, so it reads as one
 object sitting under the scrubber. On phones the segments tighten instead of wrapping — a segmented
-control on two lines stops looking like one track, and five labels at that padding measure ~242px
-inside the ~320px a 360px phone leaves.
+control on two lines stops looking like one track, and the labels at that padding measure well inside
+the ~320px a 360px phone leaves.
 
 Selected segments take `color: var(--surface)` rather than `#fff`, which fixes a **dark-theme contrast
 failure**: the accent flips to a pale blue (`#8ab4f8`) there, and white text on it is unreadable.

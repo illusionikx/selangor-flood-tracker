@@ -7,7 +7,7 @@
 <link rel="stylesheet" href="vendor/fonts.css?v=49">
 <link rel="stylesheet" href="css/icons.css?v=51">
 <link rel="stylesheet" href="css/base.css?v=50">
-<link rel="stylesheet" href="css/chrome.css?v=69">
+<link rel="stylesheet" href="css/chrome.css?v=71">
 <link rel="stylesheet" href="css/map.css?v=62">
 
 <!-- A camera still. A <dialog>, not a div: it opens from the all-stations table, which is itself a
@@ -40,12 +40,22 @@
   <div id="tl" hidden>
     <div class="tlrow">
       <button class="icon tlplay" title="Play" aria-label="Play"><i class="i i-play_arrow"></i></button>
-      <input id="tlscrub" type="range" min="0" max="0" value="0" step="1" aria-label="Timeline position">
+      <!-- Scrubber and its ruler as one column, so the marks line up with the track they measure. -->
+      <div class="tltrack">
+        <input id="tlscrub" type="range" min="0" max="0" value="0" step="1" aria-label="Timeline position">
+        <!-- One mark per stored frame, all alike, evenly spaced because the window is thinned to the
+             range's own step. Hover names the moment, click goes to it. `aria-hidden`: the scrubber
+             beside it is the same set of positions with a proper role and keyboard handling, so this
+             is a second way in for a pointer, not a second thing to read. -->
+        <div class="tlticks" aria-hidden="true"></div>
+      </div>
       <button class="icon tlcmp" title="Compare against the live image"
               aria-label="Compare against the live image" aria-pressed="false"
       ><i class="i i-compare"></i></button>
     </div>
     <div class="tlrow tlranges"></div>
+    <!-- The pace of the chosen range, which is the one thing the picture cannot show. -->
+    <p class="tlmeta muted" aria-live="polite"></p>
   </div>
 </dialog>
 <div id="splash">

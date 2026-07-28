@@ -46,14 +46,18 @@ const SHOT_W     = 1280;    // 720p — the native width of every camera measure
 const SHOT_Q     = 82;
 const SHOT_MIN   = 4096;    // bytes: JPS answers a dead camera with a ~2 KB placeholder, not a 404
 /* Retention, as [frames younger than this, keep one per]. `0` means keep every frame. Applied on
- * age, so a frame thins itself as it gets older — kept every 30 min for a day, then six-hourly for a
- * week, and so on down to weekly for a year. Anything past the last tier is deleted.
+ * age, so a frame thins itself as it gets older — kept every 30 min for a day, then three-hourly for
+ * a week, and so on down to weekly for a year. Anything past the last tier is deleted.
+ * The steps are chosen so that each of the scrubber's windows holds roughly the same number of
+ * frames — ~50, which is a clip of under a minute at one frame a second. A tier is what a range can
+ * play, so a tier twice as coarse as its window needs is a range that is over in half the time and
+ * skips half of what happened. The week tier was 6-hourly for that reason and is now 3.
  * The first two tiers are the same density while SHOT_EVERY is 30 min; they are both written out
  * because the tiers are the *policy* and the capture rate is a bandwidth cap that may change. */
 const SHOT_TIERS = [
     [6 * 3600,     0],           // 6 hours — every frame we have
     [24 * 3600,    1800],        // a day   — every 30 min
-    [7 * 86400,    6 * 3600],    // a week  — every 6 hours
+    [7 * 86400,    3 * 3600],    // a week  — every 3 hours
     [30 * 86400,   12 * 3600],   // a month — every 12 hours
     [365 * 86400,  7 * 86400],   // a year  — weekly
 ];

@@ -70,7 +70,7 @@ $gap = function (string $tier, int $step) use ($kept, $now, $band, $ok) {
 // The capture rate is 30 min, so the first two tiers keep everything they are given.
 $gap('6h',    1800);
 $gap('24h',   1800);
-$gap('week',  6 * 3600);
+$gap('week',  3 * 3600);
 $gap('month', 12 * 3600);
 $gap('year',  7 * 86400);
 $ok('nothing older than a year survives',  $now - min($kept) <= 365 * 86400);

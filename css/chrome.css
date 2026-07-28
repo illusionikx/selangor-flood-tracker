@@ -750,6 +750,10 @@ body.finding #find { display: none; }
   -webkit-user-select: none; user-select: none; }
 #lightbox .stage img { -webkit-user-drag: none; }
 #lightbox img { max-width: min(968px, calc(100vw - 64px)); max-height: 62vh; border-radius: 8px; }
+/* The picture plays and pauses the clip, so it says so — but only when there is a clip behind it
+   (`#tl` carries `hidden` otherwise) and only when the divider is down, where the same press is the
+   start of a drag. `:has()` rather than a class set from JS: the state is already in the DOM. */
+#lightbox:not(.cmp):has(#tl:not([hidden])) .stage { cursor: pointer; }
 /* `touch-action: none` only while the divider is up, and it is what makes the drag work on a phone
    at all: a horizontal swipe across a picture is also the browser's own pan gesture, and the browser
    wins it — it claims the gesture a few pixels in and fires `pointercancel`, which takes the pointer
@@ -802,7 +806,31 @@ body.finding #find { display: none; }
 #tl[hidden] { display: none; }
 .tlrow { display: flex; align-items: center; gap: 8px; width: 100%; }
 #tl .icon.on { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); }
-#tlscrub { flex: 1; min-width: 0; accent-color: var(--accent); cursor: pointer; }
+.tltrack { flex: 1; min-width: 0; display: grid; gap: 3px; }
+#tlscrub { width: 100%; margin: 0; accent-color: var(--accent); cursor: pointer; }
+/* The ruler. Marks are placed as a percentage of the *track*, which runs from half a thumb in to
+   half a thumb from the end — so the strip is inset by 8px with a margin, not a padding: a
+   percentage offset resolves against the padding box, and padding would not have moved it. */
+.tlticks { position: relative; height: 10px; margin: 0 8px; }
+/* Each mark is 1px of paint inside an 11px hit box. The box is the whole point: a 1px target is not
+   hoverable and not tappable, and these carry a tooltip and a jump. Sized just under the closest
+   spacing any range produces (60 marks across the track), so the boxes tile the strip without
+   overlapping — a click between two marks lands on the nearer one, which is what was meant. */
+.tlticks i {
+  position: absolute; top: 0; width: 11px; height: 100%;
+  transform: translateX(-50%); cursor: pointer;
+}
+.tlticks i::before {
+  content: ''; position: absolute; left: 50%; top: 1px; width: 1px; height: 8px;
+  background: var(--muted); transform: translateX(-50%);
+}
+/* One height for every mark. Two heights drew a second, coarser grid over the frames — and since
+   the window is thinned to the range's own step, the frames already *are* the graduation. */
+.tlticks i:hover::before { top: 0; height: 100%; width: 2px; background: var(--accent); }
+/* Now: the one mark that is not an archived frame. Wider and accented, so the end of the strip
+   reads as the present rather than as one more frame. */
+.tlticks i.now::before { width: 2px; background: var(--accent); }
+.tlmeta { margin: 0; font-size: 11px; text-align: center; }
 /* One control, not five buttons. These are mutually exclusive — picking a range unpicks the others —
    and as separate outlined pills each looked independently pressable, with nothing in the row saying
    only one could ever be on. A single sunken track with the current segment filled says it in the
