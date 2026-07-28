@@ -176,25 +176,38 @@ body.testmode header {
     var(--surface) 0 18px, color-mix(in srgb, #e8710a 12%, var(--surface)) 18px 36px);
   border-bottom-color: #e8710a;
 }
-#testbadge {
-  position: fixed; z-index: 700; left: 50%; transform: translateX(-50%);
-  top: calc(var(--hdr) + 12px); display: none; align-items: center; gap: 10px;
+/* One strip over the top of the map, holding every "you are not seeing all of it" pill. A grid
+   rather than each badge fixing itself, because test mode and the rising filter can both be on and
+   two independently-centred pills would land on each other. It does not take clicks; its children
+   do — otherwise an invisible full-width strip would eat the map under it. */
+#pills {
+  position: fixed; z-index: 700; top: calc(var(--hdr) + 12px); left: 50%;
+  transform: translateX(-50%); display: grid; gap: 8px; justify-items: center;
+  pointer-events: none;
+}
+#pills > * { pointer-events: auto; }
+#testbadge, #risebadge {
+  display: none; align-items: center; gap: 10px;
   padding: 8px 10px 8px 14px; border-radius: 999px;
-  background: #e8710a; color: #fff; box-shadow: var(--shadow);
-  font-size: 12px; line-height: 1;
+  box-shadow: var(--shadow); font-size: 12px; line-height: 1;
 }
-body.testmode #testbadge { display: flex; }
-#testbadge b { font-weight: 500; letter-spacing: .06em; }
-#testbadge span { opacity: .9; }
-#testbadge .i { font-size: 18px; }
-#testbadge button {
+#testbadge { background: #e8710a; color: #fff; }
+/* The accent, not the amber: a filter you switched on yourself is a state to be reminded of, not a
+   hazard — amber here would be the third thing on this page claiming something is wrong. Ink is
+   `--surface` and never `#fff`, because the accent is a pale blue on the dark theme. */
+#risebadge { background: var(--accent); color: var(--surface); }
+body.testmode #testbadge, body.rising #risebadge { display: flex; }
+#testbadge b, #risebadge b { font-weight: 500; letter-spacing: .06em; }
+#testbadge span, #risebadge span { opacity: .9; }
+#testbadge .i, #risebadge .i { font-size: 18px; }
+#testbadge button, #risebadge button {
   padding: 5px 12px; border: 0; border-radius: 999px; cursor: pointer;
-  background: #fff3; color: #fff; font: 500 11px Roboto, sans-serif;
+  background: #fff3; color: inherit; font: 500 11px Roboto, sans-serif;
 }
-#testbadge button:hover { background: #ffffff4d; }
+#testbadge button:hover, #risebadge button:hover { background: #ffffff4d; }
 @media (max-width: 600px) {
   /* The sentence is the first thing to lose: the label and the way out are what matter. */
-  #testbadge span { display: none; }
+  #testbadge span, #risebadge span { display: none; }
   /* The logo already has its own line, so nothing needs to wrap here — just less of everything. */
   #aboutBox { padding: 18px; }
   #aboutBox .logo { margin-bottom: 12px; padding: 30px 0 8px; }
@@ -472,7 +485,9 @@ header:has(#net.open) #netstats { opacity: 1; visibility: visible; }
   /* fixed, not absolute: the header is the positioned ancestor and it is only --hdr tall */
   position: fixed; z-index: 500; top: var(--hdr); left: 0; bottom: 0; width: var(--drawer);
   padding: 20px; overflow: auto; background: var(--surface); box-shadow: var(--shadow);
-  display: flex; flex-direction: column; gap: 24px;
+  /* No gap between the two columns of the drawer: every section already carries its own 12px, and a
+     24px seam on top of that made the one between Ignored sensors and Heatmap twice any other. */
+  display: flex; flex-direction: column;
   transform: translateX(-100%); visibility: hidden;
 }
 #bar > div { min-width: 0; }

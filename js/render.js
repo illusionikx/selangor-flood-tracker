@@ -241,6 +241,10 @@ export function counts() {
     document.querySelector(`#layers [data-n="${k}"]`).textContent = perKind[k] ?? 0;
     if (shown(k)) total += perKind[k] ?? 0;
   }
+  // On the section's summary, the same as the district filter's: collapsed, it still says what it
+  // is holding back.
+  const off = Object.keys(marks).filter(k => !shown(k)).length;
+  el('kindN').textContent = off ? `${off} hidden` : '';
   const pins = Object.values(marks).reduce((n, l) => n + l.length, 0);
   // The ignored count rides here rather than only in its own panel: this line is the one the eye
   // lands on to ask "why is the map this empty", and a sensor you silenced last week is exactly the

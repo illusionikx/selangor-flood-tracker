@@ -30,8 +30,8 @@
 <link rel="stylesheet" href="vendor/markercluster.css">
 <link rel="stylesheet" href="vendor/fonts.css?v=49">
 <link rel="stylesheet" href="css/icons.css?v=57">
-<link rel="stylesheet" href="css/base.css?v=57">
-<link rel="stylesheet" href="css/chrome.css?v=75">
+<link rel="stylesheet" href="css/base.css?v=60">
+<link rel="stylesheet" href="css/chrome.css?v=77">
 <link rel="stylesheet" href="css/map.css?v=74">
 
 <!-- A camera still. A <dialog>, not a div: it opens from the all-stations table, which is itself a
@@ -327,9 +327,13 @@
          one, without reopening a dropdown between each. -->
     <details id="districts" class="sect" open>
       <summary><i class="i i-near_me"></i>Districts<b id="districtN"></b></summary>
-      <input id="districtFind" type="text" autocomplete="off" placeholder="Filter districts…"
-             aria-label="Filter districts">
-      <ul id="districtList" class="picklist"></ul>
+      <!-- Filter and the list it filters as one box: they were two outlined rectangles stacked with
+           a gap, which reads as two controls when it is one. -->
+      <div class="pickbox">
+        <input id="districtFind" type="text" autocomplete="off" placeholder="Filter districts…"
+               aria-label="Filter districts">
+        <ul id="districtList" class="picklist"></ul>
+      </div>
       <div class="rowbtns">
         <button id="districtAll" class="link">Show all</button>
         <button id="districtNone" class="link">Hide all</button>
@@ -344,15 +348,30 @@
       <ul id="ignoredList" class="picklist"></ul>
       <div class="rowbtns"><button id="ignoredClear" class="link">Stop ignoring all</button></div>
     </details>
-    <label class="chip"><input type="checkbox" id="heat" checked>
-      <i class="glyph i i-water_drop"></i>Water-level heatmap</label>
-    <label class="chip"><input type="checkbox" id="rainHeat">
-      <i class="glyph i i-rainy"></i>Rainfall heatmap</label>
-    <label class="chip"><input type="checkbox" id="risingOnly">
-      <i class="glyph i i-warning"></i>Rising stations only <span id="risingHint" class="hint"></span></label>
   </div>
   <div>
-    <div id="layers"></div>
+    <!-- The two heatmaps are one choice, so they get one section. Its summary carries which of them
+         is on, for the same reason the district count sits on its own: a collapsed section still has
+         to say what it is holding. -->
+    <details id="heatsect" class="sect" open>
+      <summary><i class="i i-water_drop"></i>Heatmap<b id="heatN"></b></summary>
+      <label class="chip"><input type="checkbox" id="heat" checked>
+        <i class="glyph i i-water_drop"></i>Water-level heatmap</label>
+      <label class="chip"><input type="checkbox" id="rainHeat">
+        <i class="glyph i i-rainy"></i>Rainfall heatmap</label>
+      <!-- Under a rule because it is not a third heatmap: the two above are one mutually-exclusive
+           choice, this is a filter on the pins. It rides in the same section because it is the other
+           control that changes what the map is showing rather than which stations exist. -->
+      <hr>
+      <label class="chip"><input type="checkbox" id="risingOnly">
+        <i class="glyph i i-warning"></i>Rising stations only <span id="risingHint" class="hint"></span></label>
+    </details>
+    <details id="kinds" class="sect" open>
+      <summary><i class="i i-layers"></i>Sensor kinds<b id="kindN"></b></summary>
+      <div id="layers"></div>
+    </details>
+    <!-- Outside both sections on purpose: the `· N ignored` count is one of the two always-visible
+         indications that an alarm has been silenced, and a collapsed section would hide it. -->
     <p id="shown" class="muted"></p>
   </div>
 </div>
@@ -360,6 +379,14 @@
      the alert list behind the app bar's warning glyph carries the same information without a time
      limit. -->
 <div id="toast" class="surface" role="status" aria-live="polite"></div>
+<!-- Standing indications that the map is showing less than it holds. One strip, because test mode
+     and the rising filter can be on at the same time and two fixed pills would sit on each other.
+     The test badge appends itself here from test.js. -->
+<div id="pills">
+  <div id="risebadge"><i class="i i-visibility_off"></i><b>RISING ONLY</b>
+    <span>every station not climbing is hidden</span>
+    <button id="riseOff">Show all</button></div>
+</div>
 <div id="legend" class="surface">
   <div id="lgWater" class="lgsec">
     <div class="title">Water-level heat

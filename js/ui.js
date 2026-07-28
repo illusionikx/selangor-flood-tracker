@@ -159,6 +159,25 @@ delete PREFS.heat; delete PREFS.rainHeat;   // dropped from the blob on the next
 el('heat').checked = heatPref === 'water';
 el('rainHeat').checked = heatPref === 'rain';
 el('risingOnly').checked = !!PREFS.risingOnly;
+// Which of the two is on, on the section's summary — the one thing a collapsed heatmap section
+// otherwise stops saying.
+const heatName = () => el('heatN').textContent =
+  el('heat').checked ? 'water level' : el('rainHeat').checked ? 'rainfall' : 'off';
+heatName();
+
+/* The rising filter hides most of the map, and unlike the district picker it is one checkbox with
+   no list under it saying what it took away — a drawer you closed an hour ago is not an indication.
+   So it gets a standing pill over the map with the way out on it, the same shape test mode uses.
+   The same reasoning as the ignored-sensors panel: anything that suppresses stations has to say so
+   somewhere you cannot miss, and has to be undoable from there. */
+const risePill = () => document.body.classList.toggle('rising', el('risingOnly').checked);
+risePill();
+// Dispatching rather than calling the handler: it keys off `e.target` to work out which control
+// moved, and it is the one place that persists, re-filters and closes the drawer on a phone.
+el('riseOff').onclick = () => {
+  el('risingOnly').checked = false;
+  el('risingOnly').dispatchEvent(new Event('change'));
+};
 
 el('heat').onchange = el('rainHeat').onchange = el('risingOnly').onchange = e => {
   /* One heatmap at a time. Stacked, they are two answers to two questions in one picture — and
@@ -172,6 +191,8 @@ el('heat').onchange = el('rainHeat').onchange = el('risingOnly').onchange = e =>
 
   PREFS.heatLayer = el('heat').checked ? 'water' : el('rainHeat').checked ? 'rain' : '';
   PREFS.risingOnly = el('risingOnly').checked;
+  heatName();
+  risePill();
   save();
   // Both heatmaps are display options, not filters — only the rising chip closes the drawer.
   applyFilter(e.target === el('risingOnly'));

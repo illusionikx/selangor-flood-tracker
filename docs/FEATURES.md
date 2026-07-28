@@ -2522,3 +2522,68 @@ Leaflet's path options, which are SVG presentation attributes and cannot resolve
 Its four predecessors, in order: a blue disc with a person in it (a station, as far as the map was
 concerned), a bare outlined person (clipart on a map), a filled `near_me` arrow (a heading we do not
 have), and a `my_location` crosshair (correct, and invisible next to the river blue).
+
+## The drawer is four sections, not a list of controls
+
+**The district filter is one box.** The search field and the list it filters were two outlined
+rectangles with a 10px gap: two controls to look at, doing one job. They now share a single
+`.pickbox` border — the field on top, the list under it, one rounded outline round both. The gap
+was the only thing saying they were related, and a shared box says it better.
+
+**"only" sits on top of the count, not beside it.** It is revealed on hover, so the lane it used to
+occupy was reserved on every row all the time and pushed every district's number ~40px in from the
+edge for a button that was not there. It is absolutely positioned over the count now, filled with
+the hovered row's own colour (`accent 14%` resolved *against* the surface rather than composited
+over it, so it matches exactly). Two consequences worth keeping: the overlap lives inside the
+`@media (hover: hover)` block, because on touch the button is permanently visible and a permanent
+button on top of a number hides the number; and the row takes the same tint on `:focus-within`, or
+the button would land on an untinted row when it is reached by keyboard.
+
+**The heatmap pair and the sensor kinds are `<details>` sections** (`#heatsect`, `#kinds`), the same
+`.sect` as Districts and Ignored sensors — so the drawer is four labelled things rather than two
+lists followed by five loose chips, and the two layer groups can be folded away by anyone who set
+them once. They persist through the same `PREFS.sect` map keyed by id that the other two use.
+
+Each carries its state on its summary, which is the rule every section here obeys: `#heatN` names
+the live layer (`water level` / `rainfall` / `off`) because the two chips are one mutually-exclusive
+choice, and `#kindN` counts the kinds switched off, the same `N hidden` the district filter shows.
+
+**`#shown` stays outside both sections.** It carries the `· N ignored` count, which is one of the
+two always-visible indications that an alarm has been silenced — a collapsed section would hide it,
+and that is the thing the alert standard is most explicit about.
+
+*Later:* **"Rising stations only" moved into the heatmap section**, under an `<hr>`. It is not a
+third heatmap — the two above it are one mutually-exclusive choice and this is a filter on the pins
+— but it is the other control that changes what the map *shows* rather than which stations exist, so
+it shares the fold and the rule says where one ends. A rule rather than a fourth `.sect`: a heading
+for a single chip is a heading with nothing to hold.
+
+*And:* **one spacing for all four sections** — `#bar .sect { margin-bottom: 12px }`, replacing two
+per-section rules and the drawer's own 24px flex gap. The gap fell between the two columns, so the
+seam between Ignored sensors and Heatmap was 36px against 12px everywhere else, which read as a
+break in the stack rather than the next section.
+
+## "Rising only" says so on the map
+
+The rising filter hides most of the stations on the map, and unlike the district picker it is a
+single checkbox with no list under it naming what it removed — a drawer closed an hour ago is not an
+indication. So it now carries a **standing pill over the top of the map** while it is on, with
+"Show all" on it: `body.rising` → `#risebadge`. Same reasoning as the ignored-sensors panel, which
+the alert standard is explicit about: anything that suppresses stations has to say so somewhere that
+cannot be missed, and has to be undoable from there rather than only from where it was switched on.
+
+**The accent, not test mode's amber.** The shape is deliberately test mode's — it is the same
+sentence, "what you are looking at is not everything" — but a filter you switched on yourself is a
+state to be reminded of, not a hazard, and amber would make it the third thing on this page claiming
+something is wrong. Its ink is `--surface`, never `#fff`: the accent is a pale blue on the dark
+theme, where white on it is a contrast failure. (Same rule as `.tlr.on`.)
+
+**Both pills live in one `#pills` strip**, a centred grid, and `test.js` appends its badge there
+rather than to the body. Test mode and the rising filter can be on at once, and two independently
+`position: fixed`, independently centred pills would have sat on each other. The strip itself is
+`pointer-events: none` with its children back to `auto` — an invisible full-width bar across the map
+would otherwise eat every click under it.
+
+"Show all" **dispatches a `change` on the checkbox** rather than calling the handler: that handler
+keys off `e.target` to work out which of the three controls moved, and it is the one place that
+persists the preference, re-filters and closes the drawer on a phone.

@@ -165,15 +165,27 @@ td:last-child { text-align: right; padding-left: 16px; }
 .chip .hint { margin-left: auto; font-size: 11px; opacity: .7; white-space: nowrap; }
 #shown { margin: 10px 2px 0; font-size: 12px; }
 
-select, #goto, #districtFind, #dataFind {
+select, #goto, #dataFind {
   width: 100%; padding: 8px 10px; margin-bottom: 10px; font: inherit; font-size: 13px;
   background: var(--surface); color: var(--on-surface);
   border: 1px solid var(--outline); border-radius: 8px;
 }
-select:focus-visible, #goto:focus-visible, #districtFind:focus-visible, #dataFind:focus-visible,
+select:focus-visible, #goto:focus-visible, #dataFind:focus-visible,
 .icon:focus-visible {
   outline: 2px solid var(--accent); outline-offset: 1px;
 }
+
+/* Search box and the list it filters, as one outlined box. The border is the box's, not each part's:
+   a filter above the thing it filters is one control, and two rectangles with a gap between them
+   read as two. `overflow: hidden` so the list's own hover fills stop at the rounded corners, and the
+   input's focus ring is drawn inwards for the same reason. */
+.pickbox { border: 1px solid var(--outline); border-radius: 8px; overflow: hidden; }
+.pickbox input {
+  width: 100%; padding: 8px 10px; margin: 0; font: inherit; font-size: 13px;
+  background: none; color: var(--on-surface);
+  border: 0; border-bottom: 1px solid var(--outline);
+}
+.pickbox input:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 
 /* Searchable select: reads as a plain select until you click, then it's a filter box over a grouped,
    scrollable list. Placement is map furniture and lives in chrome.css. */
@@ -210,13 +222,17 @@ select:focus-visible, #goto:focus-visible, #districtFind:focus-visible, #dataFin
 .picklist .glyph { font-size: 18px; flex: none; }
 .picklist b { margin-left: auto; font-weight: 500; font-size: 12px; opacity: .6; font-variant-numeric: tabular-nums; }
 
+/* One spacing for every drawer section, so the four read as one stack — they were two rules and a
+   flex gap, which made the seam between the two columns twice the others. */
+#bar .sect { margin-bottom: 12px; }
+
 /* District filter: the same list, inline and permanent — it is multi-select, and a dropdown that
    closed on every pick would make hiding three districts three round trips. */
-#districts { margin-bottom: 12px; }
-#districtList { max-height: 40vh; border: 1px solid var(--outline); border-radius: 8px; }
+#districtList { max-height: 40vh; }         /* the border is .pickbox's — see above */
 /* The row *is* the checkbox, as with the layer chips: a real input underneath, visually replaced by
-   the row's own state, so the list stays as plain as the go-to one next to it. */
-#districtList li { padding: 0 4px 0 0; }
+   the row's own state, so the list stays as plain as the go-to one next to it.
+   `relative` for the "only" button, which is laid over the count rather than beside it. */
+#districtList li { position: relative; padding: 0 4px 0 0; }
 #districtList label {
   flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px;
   margin: 0; padding: 7px 8px; font-size: 13px;
@@ -231,10 +247,22 @@ select:focus-visible, #goto:focus-visible, #districtFind:focus-visible, #dataFin
   font: 500 11px Roboto, sans-serif; color: var(--accent);
   background: none; border: 1px solid var(--outline); border-radius: 999px;
 }
-/* Only reveal it on hover where there is a hover; on touch it has to be permanently there. */
+/* Only reveal it on hover where there is a hover; on touch it has to be permanently there — which is
+   also why the overlap below is inside this query. A button that is always on screen must not be
+   sitting on top of the number it would hide. */
 @media (hover: hover) {
   .solo { visibility: hidden; }
   #districtList li:hover .solo, #districtList li:focus-within .solo { visibility: visible; }
+  /* Over the count, not beside it: reserving a lane for a button that is only there on hover pushed
+     every district's number in from the edge all the time. Its fill is the hovered row's own colour
+     — accent 14% resolved against the surface instead of over it — so it reads as part of the row
+     rather than a chip floating on one. */
+  #districtList .solo {
+    position: absolute; right: 4px; top: 50%; transform: translateY(-50%);
+    background: color-mix(in srgb, var(--accent) 14%, var(--surface));
+  }
+  /* Keyboard gets the same tint hover gets, or the button would land on an untinted row. */
+  #districtList li:focus-within { background: color-mix(in srgb, var(--accent) 14%, transparent); }
 }
 /* Collapsible filter sections. The stock marker is replaced by a chevron on the right, because the
    count sits there too and a triangle on the left with a number on the right reads as two controls.
@@ -261,13 +289,17 @@ select:focus-visible, #goto:focus-visible, #districtFind:focus-visible, #dataFin
 /* Ignored sensors: the same picklist again, so it reads as a sibling of the district filter rather
    than a new kind of control. Two lines a row, because a station name alone is not enough to know
    which of the four "Sungai Klang" gauges you silenced. */
-#ignored { margin-bottom: 12px; }
 #ignoredList { max-height: 26vh; border: 1px solid var(--outline); border-radius: 8px; }
 #ignoredList .nm { flex: 1; min-width: 0; line-height: 1.35; }
 #ignoredList .nm .muted { font-size: 11px; }
 /* Always visible, unlike the district list's "only" — restoring is the whole reason this panel
    exists, so it must not be something you have to hover a row to discover. */
 #ignoredList .solo { visibility: visible; }
+
+/* The one divider in the drawer, between the heatmap pair and the rising filter sharing their
+   section. A rule rather than a second `.sect`: they belong to the same fold, and a heading for one
+   chip is a heading with nothing to hold. */
+#heatsect hr { margin: 12px 0 8px; border: 0; border-top: 1px solid var(--outline); }
 
 .rowbtns { display: flex; gap: 8px; margin-top: 8px; }
 .rowbtns .link { justify-content: center; }

@@ -105,8 +105,9 @@ export function paintTestChrome() {
   document.body.classList.toggle('testmode', state.test);
 }
 
-// Rendered once and left in the DOM; CSS shows it only while `body.testmode`.
-document.body.insertAdjacentHTML('beforeend',
+// Rendered once and left in the DOM; CSS shows it only while `body.testmode`. Into #pills, not the
+// body: the rising-only filter has a pill of its own and the two can be on together.
+document.getElementById('pills').insertAdjacentHTML('beforeend',
   `<div id="testbadge"><i class="i i-warning"></i><b>TEST MODE</b>
      <span>every alert on this map is fake</span>
      <button id="testOff">Turn off</button></div>`);
