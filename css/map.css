@@ -79,7 +79,7 @@
    pins the basemap was a field of counters and the *shape* of a water drop, which is the one thing
    that says what a pin is without being read, was down to 15px inside a 26px chip.
    Nothing is holding the contrast up now except the colour itself, which is why the palette moved
-   into tokens with a value per theme — see the block at the top of base.css, and the 4:1 floor it is
+   into tokens with a value per theme — see the block at the top of base.css, and the 3:1 floor it is
    held to. The shadow is the only other help: enough to lift a glyph off a busy tile, not enough to
    read as a second shape. `filter`, not `box-shadow`, because it follows the mask's rendered
    outline rather than its box. */

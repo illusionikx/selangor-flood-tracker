@@ -2405,12 +2405,43 @@ attribute on `<html>` with no re-render.
 
 *Why two.* One hex cannot serve the CARTO voyager basemap and dark_all. A colour picked to read on
 warm paper is mud on near-black; one picked for near-black is a pastel on white. The light set is
-**saturated and dark**, the dark set **light and softened** — same hues throughout, so a river is
+**deep and saturated**, the dark set **light and coloured** — same hues throughout, so a river is
 still blue and a siren still pink, and the type colours still miss the traffic light entirely.
 
-*Held to a number.* Every value clears **4:1 against both basemap extremes and both surfaces**,
-against the 3:1 that WCAG 1.4.11 asks of non-text. That is not decoration: the pins have no chip
-behind them any more, so a glyph's own colour is the whole of its legibility.
+*Held to a number.* Every value clears **3:1 against both basemap extremes and both surfaces**, which
+is what WCAG 1.4.11 asks of non-text. That is not decoration: the pins have no chip behind them any
+more, so a glyph's own colour is the whole of its legibility.
+
+*Second pass: each theme moved the way it had room to.* The first cut held everything at 4:1 and the
+map read drab — near-inks on the light theme, pastels on the dark one, and a set of five station
+kinds you had to look twice at to tell apart. The fix is not one adjustment applied twice, because
+the two themes have their headroom in different places. On white the hues are already near their most
+saturated for their lightness, so there is nowhere to go but **lighter**: the light set was
+brightened, spending contrast it had (4.2–6.3) down to a floor of ~3.1. On near-black the contrast
+was being carried by lightness, and chroma was what had been given up to get it — so the dark set was
+**saturated at the same lightness**, which costs nothing, because those values sit at 6–10:1 and only
+ever need 3.
+
+Three values did not move with their set, and each refusal is the rule proving itself:
+
+- `--me` on light. Hazard yellow at 3.12 is already on the floor; yellow's whole problem is that it
+  runs out of contrast against white before it runs out of lightness. Every step brighter drops it
+  under 3. It is the one light token still at its original value.
+- `--s-alert` and `--s-normal` on light took a **half** lift (to 3.33 and 3.58, not ~3.1) for the same
+  reason in weaker form — amber and green are the two rungs of the traffic light nearest yellow.
+- `--s-none` on dark was left alone. "No reading" is the absence of a colour; saturating the grey
+  would make it a hue, and a hue on this map is a claim.
+
+Nothing in the text stack moved: `--on-surface` and `--muted` are body text, still at 4.5:1, and the
+3:1 floor applies only to the marks on the map.
+
+*And the legend was lying.* The sample pins in `index.html` were still literal hexes from the palette
+two revisions ago (`#4da3ff`, `#f06292`, …) plus a `--ink` that stopped existing when `ink()` was
+deleted, so the key showed one set of colours and the map showed another — worse on the dark theme,
+where a legend hard-coded to light-theme values sat beside pins that had never used them. They are
+`var(--k-*)` / `var(--s-*)` now, and the mast sample carries `.multi` so it is drawn as the filled
+chip it is on the map. **A legend that is not built from the same tokens is a legend that goes stale
+silently** — there is nothing to fail.
 
 *What this deleted.* `ink()` in `util.js` — black or white by relative luminance, computed per pin
 fill — because only one pin is filled now and its glyph is `var(--surface)`, which is the same answer
@@ -2477,7 +2508,7 @@ anchored at its **tip** (`iconAnchor: [16, 29]`, not the box's centre) — a pin
 and Material leaves ~8% of the box as air below the point, so anchoring to the box bottom would float
 the mark above the fix.
 
-**The colour is `--me`, a hazard yellow** — `#b87b00` on the light theme, `#ffc233` on the dark,
+**The colour is `--me`, a hazard yellow** — `#b87b00` on the light theme, `#ffbb1a` on the dark,
 both clearing 3:1 on their basemap. It is the one mark on the map that is not a reading, so it gets
 the one hue a reading never wears on its own. *Noted, not resolved:* yellow is also the alert rung of
 the traffic light, and the colour language reserves that ramp for status. What keeps this from

@@ -30,9 +30,9 @@
 <link rel="stylesheet" href="vendor/markercluster.css">
 <link rel="stylesheet" href="vendor/fonts.css?v=49">
 <link rel="stylesheet" href="css/icons.css?v=57">
-<link rel="stylesheet" href="css/base.css?v=56">
+<link rel="stylesheet" href="css/base.css?v=57">
 <link rel="stylesheet" href="css/chrome.css?v=75">
-<link rel="stylesheet" href="css/map.css?v=73">
+<link rel="stylesheet" href="css/map.css?v=74">
 
 <!-- A camera still. A <dialog>, not a div: it opens from the all-stations table, which is itself a
      modal dialog, and only the top layer can paint over one — Esc, the backdrop and focus trapping
@@ -201,33 +201,33 @@
      anything but status.</p>
   <div class="key">
     <span class="pins">
-      <span class="pin" style="--c:#4da3ff;--ink:#14181c"><i class="i i-water_drop"></i></span>
-      <span class="pin" style="--c:#8f7bff;--ink:#14181c"><i class="i i-rainy"></i></span>
-      <span class="pin" style="--c:#f06292;--ink:#14181c"><i class="i i-campaign"></i></span>
-      <span class="pin" style="--c:#a1887f;--ink:#14181c"><i class="i i-straighten"></i></span>
-      <span class="pin" style="--c:#26c6da;--ink:#14181c"><i class="i i-photo_camera"></i></span>
+      <span class="pin" style="--c:var(--k-river)"><i class="i i-water_drop"></i></span>
+      <span class="pin" style="--c:var(--k-rainfall)"><i class="i i-rainy"></i></span>
+      <span class="pin" style="--c:var(--k-siren)"><i class="i i-campaign"></i></span>
+      <span class="pin" style="--c:var(--k-gauge)"><i class="i i-straighten"></i></span>
+      <span class="pin" style="--c:var(--k-camera)"><i class="i i-photo_camera"></i></span>
     </span>
     <span>The five kinds — water level, rainfall, siren, flood-depth gauge, camera — each in its own
        colour, none of which is ever used for status.</span>
 
     <span class="pins">
-      <span class="pin" style="--c:#ffd166;--ink:#14181c"><i class="i i-water_drop"></i></span>
-      <span class="pin" style="--c:#ff9f1c;--ink:#14181c"><i class="i i-water_drop"></i></span>
+      <span class="pin" style="--c:var(--s-alert)"><i class="i i-water_drop"></i></span>
+      <span class="pin" style="--c:var(--s-warning)"><i class="i i-water_drop"></i></span>
       <span class="pin danger"><i class="i i-water_drop"></i></span>
     </span>
     <span>A river past its <b>alert</b>, <b>warning</b> and <b>danger</b> marks. At danger it fills
        red and keeps a pulsing halo, and it is drawn over everything else.</span>
 
-    <span class="pins"><span class="pin rise" style="--c:#4da3ff;--ink:#14181c"
+    <span class="pins"><span class="pin rise" style="--c:var(--k-river)"
       ><i class="i i-water_drop"></i></span></span>
     <span>A red ring: climbing towards its danger mark, and forecast to reach it within 3 hours.</span>
 
-    <span class="pins"><span class="pin" style="--c:#5c6bc0;--ink:#fff"
+    <span class="pins"><span class="pin multi" style="--c:var(--k-mast)"
       ><i class="i i-layers"></i><b class="n">4</b></span></span>
     <span>Several sensors on one mast, counted. Hover or open it to see the area they were grouped
        from. If any of them is signalling, the pin takes that status colour instead.</span>
 
-    <span class="pins"><span class="pin off" style="--c:#9aa0a6;--ink:#14181c"
+    <span class="pins"><span class="pin off" style="--c:var(--s-none)"
       ><i class="i i-water_drop"></i></span></span>
     <span>Grey and faded: offline, or reporting nothing. Never coloured — a station with no reading
        must not look confident.</span>
