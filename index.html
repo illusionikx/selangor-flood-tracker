@@ -2,13 +2,37 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Klang Valley Flood Watch</title>
+<!-- Installable: Chrome's "Install app", and standalone from the iOS home screen. All paths here are
+     relative, because this ships to both the root of a Herd host and a GitHub Pages sub-path.
+     `theme-color` tints the standalone title bar and is kept in step with the theme toggle by
+     setTheme() in js/map.js — the toggle is a stored preference, so a prefers-color-scheme media
+     query on this tag would be wrong for anyone who overrode it. -->
+<meta name="theme-color" content="#ffffff">
+<!-- There is deliberately no `apple-mobile-web-app-capable` here, and no `mobile-web-app-capable`
+     either. Both are the pre-manifest way of asking for standalone, and Chrome's console suggests
+     swapping the first for the second — but the manifest's `display: standalone` has done that job
+     on iOS since 11.3 and on Chrome since always, so the answer is one tag fewer rather than a
+     differently-spelled legacy one. The single thing that still needs the Apple tag is
+     `apple-touch-startup-image`, and we ship no startup images. -->
+<meta name="apple-mobile-web-app-title" content="Flood Watch">
+<link rel="manifest" href="manifest.json">
+<!-- `?v=` for the same reason the stylesheets carry one: Herd serves everything with a three-hour
+     max-age, and a browser holds a favicon far longer than that anyway. The file name never changes
+     when the mark does, so this is the only thing that makes a new icon appear. Bump all four
+     (here, and the two srcs in manifest.json) whenever icon-build.php reruns. -->
+<link rel="icon" href="icon-192.png?v=3" type="image/png">
+<!-- iOS gets its own tile. It does not honour an alpha channel on a home-screen icon — it flattens
+     it onto a colour of its choosing, historically black — so the transparent icon above would come
+     back plated in exactly the thing that was deliberately removed. This one is opaque white on
+     purpose, with a smaller glyph because iOS rounds the corners itself. Built by icon-build.php. -->
+<link rel="apple-touch-icon" href="icon-180.png?v=3">
 <link rel="stylesheet" href="vendor/leaflet.css">
 <link rel="stylesheet" href="vendor/markercluster.css">
 <link rel="stylesheet" href="vendor/fonts.css?v=49">
-<link rel="stylesheet" href="css/icons.css?v=51">
-<link rel="stylesheet" href="css/base.css?v=50">
-<link rel="stylesheet" href="css/chrome.css?v=71">
-<link rel="stylesheet" href="css/map.css?v=62">
+<link rel="stylesheet" href="css/icons.css?v=57">
+<link rel="stylesheet" href="css/base.css?v=56">
+<link rel="stylesheet" href="css/chrome.css?v=75">
+<link rel="stylesheet" href="css/map.css?v=73">
 
 <!-- A camera still. A <dialog>, not a div: it opens from the all-stations table, which is itself a
      modal dialog, and only the top layer can paint over one — Esc, the backdrop and focus trapping
@@ -59,7 +83,7 @@
   </div>
 </dialog>
 <div id="splash">
-  <div class="mark"><i class="i i-water_drop"></i></div>
+  <div class="mark"><i class="i i-flood"></i></div>
   <h1>Klang Valley <b>Flood Watch</b></h1>
   <div class="spin"></div>
   <div class="muted" id="splashMsg">fetching stations from JPS…</div>
@@ -74,14 +98,20 @@
 <header>
   <button id="menu" class="icon" title="Layers &amp; filters" aria-label="Layers and filters"
           aria-expanded="false" aria-controls="bar"><i class="i i-menu"></i></button>
-  <h1><i class="glyph brand i i-water_drop"></i><span>Klang Valley <b>Flood Watch</b></span></h1>
+  <!-- The feed's state rides the mark as a dot on its corner, the way a presence dot rides an avatar:
+       it is a property of the thing it sits on, and it costs no bar width. Hovering the mark (or
+       tapping the dot) still brings up the full diagnostics — see #netstats below. -->
+  <h1><span class="mark"><i class="glyph brand i i-flood"></i><span id="net" tabindex="0"
+        role="img"></span></span><span class="word">Klang Valley <b>Flood Watch</b></span></h1>
+  <!-- Outside the <h1>: a <table> is flow content and cannot legally live inside a heading, so the
+       popover is a sibling positioned under the mark rather than a child of the dot. -->
+  <table id="netstats" class="surface"></table>
   <!-- Live alert ticker. `aria-hidden`: the same stations are in the alert panel as a real list, so
        a screen reader gets them there rather than as an endlessly repeating strip. -->
   <div id="ticker" aria-hidden="true"><div class="tk-run"></div></div>
-  <!-- One group, so the status chip and the four controls stay a block pinned to the right edge
-       instead of five items the flex row can space out however it likes. -->
+  <!-- One group, so the controls stay a block pinned to the right edge instead of six items the flex
+       row can space out however it likes. -->
   <div class="hactions">
-    <div id="net" tabindex="0"><span>connecting…</span></div>
     <button id="find" class="icon" title="Go to a station" aria-label="Go to a station"
             aria-expanded="false" aria-controls="gotoBox"><i class="i i-search"></i></button>
     <!-- "Go to a station", collapsed to its button until asked for. It used to be a 300px box parked
@@ -96,6 +126,11 @@
              aria-label="Go to a station">
       <ul id="gotoHits" class="surface picklist" role="listbox" hidden></ul>
     </div>
+    <!-- "On alert" lives here now rather than as a box parked over the top-left of the map. Filled by
+         alerts.js: the glyph takes the status colour and the badge the count. The list it opens is
+         the station panel (#side) — the same popout a pin opens, so a station picked out of the list
+         replaces the list in place instead of a second card appearing beside it. -->
+    <button id="alertBtn" class="icon" aria-expanded="false" aria-controls="side"></button>
     <button id="data" class="icon" title="All stations as a table"
             aria-label="All stations as a table"><i class="i i-list_alt"></i></button>
     <button id="about" class="icon" title="About" aria-label="About"><i class="i i-info"></i></button>
@@ -116,9 +151,9 @@
     <form method="dialog"><button class="icon dclose" title="Close" aria-label="Close"
       ><i class="i i-close"></i></button></form>
   </div>
-  <!-- The mark doubles as the dialog's heading: the drop and the two-line wordmark are the logo,
+  <!-- The mark doubles as the dialog's heading: the mark and the two-line wordmark are the logo,
        and "About" over the top of them would be a title for a title. -->
-  <h2 class="logo"><i class="i i-water_drop"></i><span>Klang Valley<br><b>Flood Watch</b></span></h2>
+  <h2 class="logo"><i class="i i-flood"></i><span>Klang Valley<br><b>Flood Watch</b></span></h2>
 
   <p>A live map of flood telemetry for Selangor, Kuala Lumpur and Putrajaya — river levels, rainfall,
      warning sirens and flood-depth gauges, from every station the Department of Irrigation and
@@ -241,8 +276,9 @@
      licence</a> — free to use, copy, modify and redistribute, with no warranty of any kind.</p>
   <p class="muted">Map tiles &copy; <a href="https://carto.com/attributions" target="_blank" rel="noopener">CARTO</a>,
      data &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>
-     contributors. Icons are <a href="https://fonts.google.com/icons" target="_blank" rel="noopener">Material
-     Symbols</a> (Apache 2.0); mapping by <a href="https://leafletjs.com/" target="_blank" rel="noopener">Leaflet</a>.
+     contributors. Icons and the app mark are <a href="https://fonts.google.com/icons" target="_blank"
+     rel="noopener">Material Symbols</a> (Apache 2.0);
+     mapping by <a href="https://leafletjs.com/" target="_blank" rel="noopener">Leaflet</a>.
      Flood data remains the property of JPS Malaysia.</p>
 </dialog>
 <!-- Tap the About logo seven times inside five seconds. No header, no close button: the picture is
@@ -321,12 +357,9 @@
   </div>
 </div>
 <!-- Top-right of the map. Polite: assertive would interrupt a screen reader mid-sentence, and
-     the alert panel below carries the same information without a time limit. -->
+     the alert list behind the app bar's warning glyph carries the same information without a time
+     limit. -->
 <div id="toast" class="surface" role="status" aria-live="polite"></div>
-<div id="alerts" class="surface">
-  <button id="alertTab" aria-expanded="false" aria-controls="alertBody"></button>
-  <div id="alertBody"></div>
-</div>
 <div id="legend" class="surface">
   <div id="lgWater" class="lgsec">
     <div class="title">Water-level heat

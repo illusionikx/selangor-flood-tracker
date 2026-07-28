@@ -13,9 +13,12 @@ header h1 {
   display: flex; align-items: center; gap: 8px;
   font-size: 22px; font-weight: 400; letter-spacing: 0; min-width: 0;
 }
-header h1 span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+header h1 .word { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 header h1 b { font-weight: 500; color: var(--accent); }
 header h1 .brand { font-size: 24px; color: var(--accent); flex: none; }
+/* Just the glyph's own box, so the status dot has a corner to hang off. `cursor: help` and the hover
+   target are on the mark rather than the whole h1: the wordmark is a title, not a control. */
+header h1 .mark { position: relative; display: flex; flex: none; cursor: help; }
 /* Everything that is not the menu or the mark, kept together and pushed to the right edge. */
 header .hactions { display: flex; align-items: center; gap: 4px; margin-left: auto; flex: none; }
 
@@ -64,10 +67,8 @@ header .hactions { display: flex; align-items: center; gap: 4px; margin-left: au
    and the colour language keeps the traffic-light ramp for status. Grey stays the default, so a
    stale alert needs no rule of its own — it simply never gets one of the two below. */
 #ticker .tk-why { color: var(--muted); }
-#ticker .tk-why.t-now  { color: #d93025; }
-#ticker .tk-why.t-soon { color: #e8710a; }
-:root[data-theme="dark"] #ticker .tk-why.t-now  { color: #f28b82; }
-:root[data-theme="dark"] #ticker .tk-why.t-soon { color: #fdd663; }
+#ticker .tk-why.t-now  { color: var(--s-danger); }
+#ticker .tk-why.t-soon { color: var(--s-warning); }
 /* The advisory. Not a link and not a station — the accent colour marks it as the app talking rather
    than another row of telemetry, and it is the only tile with no `data-go`. */
 #ticker .tk-say { cursor: default; }
@@ -425,57 +426,43 @@ table.data .dash { color: var(--outline); }
   table.data td.nm { padding-left: 14px; }
 }
 
-/* --- live status chip + its popover --------------------------------------------------------- */
+/* --- live status dot + its popover ---------------------------------------------------------- */
 
+/* On the mark's bottom-right corner, the way a presence dot rides an avatar. It was a pill with the
+   state written in it, parked in .hactions; the bar could not carry that, a ticker and six controls
+   at once, and of the three the state is the one that fits in a colour. The word is still in the
+   popover. The ring is the surface colour, so the dot reads as sitting *on* the glyph rather than
+   being part of it whichever theme is on. */
 #net {
-  /* No `margin-left: auto` here any more — #ticker sits immediately before it and carries the auto.
-     Two auto margins in one flex row *split* the free space, which would have parked the ticker in
-     the middle of the bar with a gap between it and the chip. */
-  position: relative; cursor: help;
-  font-size: 11px; font-weight: 500; letter-spacing: .6px; text-transform: uppercase;
-  display: flex; align-items: center; gap: 6px;
-  padding: 7px 14px 7px 12px; border-radius: 999px;
-  color: var(--c, var(--muted));
-  border: 1px solid color-mix(in srgb, var(--c, var(--outline)) 45%, transparent);
-  background: color-mix(in srgb, var(--c, transparent) 10%, transparent);
-  transition: color .3s, border-color .3s, background .3s;
+  position: absolute; right: -3px; bottom: -1px; width: 9px; height: 9px; border-radius: 50%;
+  background: var(--c, var(--muted)); box-shadow: 0 0 0 2px var(--surface);
+  transition: background .3s;
 }
-#net:hover { background: color-mix(in srgb, var(--c, var(--on-surface)) 20%, transparent); }
-/* Broadcast dot: solid centre, halo pushing outwards — reads as "receiving".
-   Deliberately restrained. The chip is background information sitting beside a ticker that moves;
-   two competing motions in one 64px bar is a bar you stop reading. The halo starts closer in, ends
-   at 1.6× instead of 2×, and takes 2.6s over 1.8 — a slow pulse rather than a ping. */
-/* 7.5px, not the shared token's 10px: this dot sits in a 64px bar next to a moving ticker and does
-   not need to be the loudest thing in it. Scoped to #net so `.swatch` stays 10px wherever else it
-   is used as a colour key. The halo's inset drops by the same quarter, or the ring would sit
-   proportionally further out and undo the shrink. */
-#net .swatch { position: relative; width: 7.5px; height: 7.5px; background: var(--c); }
-#net .swatch::after {
-  content: ''; position: absolute; inset: -2.25px; border-radius: 50%;
+/* Broadcast halo pushing outwards — reads as "receiving". Deliberately restrained: this sits in a
+   64px bar next to a ticker that moves, and two competing motions in one bar is a bar you stop
+   reading. It ends at 1.6× rather than 2× and takes 2.6s over 1.8 — a slow pulse, not a ping. */
+#net::after {
+  content: ''; position: absolute; inset: -2.5px; border-radius: 50%;
   border: 1.5px solid var(--c); opacity: .7; animation: halo-soft 2.6s ease-out infinite;
 }
-@media (prefers-reduced-motion: reduce) { #net .swatch::after { animation: none; opacity: .7; } }
+@media (prefers-reduced-motion: reduce) { #net::after { animation: none; opacity: .7; } }
 
+/* Anchored to the header (which is the positioned ancestor) rather than to the dot, because a
+   <table> cannot live inside the <h1> the dot is in. Left edge of the bar rather than under the
+   glyph: one number that survives the phone layout changing the mark's position. */
 #netstats {
-  position: absolute; z-index: 601; top: calc(100% + 10px); right: -8px; width: 236px;
+  position: absolute; z-index: 601; top: calc(var(--hdr) + 8px); left: 12px; width: 236px;
   padding: 14px 16px; border-radius: 12px; opacity: 0; visibility: hidden;
   transition: opacity .12s ease, visibility .12s;
   /* collapsed borders make the browser drop padding on the table box */
   border-collapse: separate; border-spacing: 0;
-  /* the chip is uppercase + tracked; the popover inside it must not inherit that */
-  font-size: 12px; font-weight: 400; letter-spacing: normal; text-transform: none;
-  color: var(--on-surface);
+  font-size: 12px; font-weight: 400; color: var(--on-surface);
 }
-/* callout pointer, on #net rather than the table — generated content on a table is unreliable */
-#net::after {
-  content: ''; position: absolute; top: calc(100% + 5px); right: 18px; z-index: 602;
-  width: 11px; height: 11px; background: var(--surface); transform: rotate(45deg);
-  box-shadow: -1px -1px 2px rgba(60, 64, 67, .18);
-  opacity: 0; visibility: hidden; transition: opacity .12s ease, visibility .12s;
-}
-/* .open is for touch, where there is no hover to reveal the stats. */
-#net:hover #netstats, #net:focus-within #netstats, #net.open #netstats,
-#net:hover::after, #net:focus-within::after, #net.open::after { opacity: 1; visibility: visible; }
+/* `:has` because the trigger is inside the <h1> and the popover is its sibling — there is no
+   combinator that walks back out. `.open` is for touch, where there is no hover to reveal it. */
+header:has(h1 .mark:hover) #netstats,
+header:has(h1 .mark:focus-within) #netstats,
+header:has(#net.open) #netstats { opacity: 1; visibility: visible; }
 #netstats .note td { padding-top: 10px; line-height: 1.45; font-size: 11px; }
 
 /* --- drawer --------------------------------------------------------------------------------- */
@@ -490,10 +477,10 @@ table.data .dash { color: var(--outline); }
 }
 #bar > div { min-width: 0; }
 /* Map furniture slides with the drawer instead of hiding under it. */
-#bar, #legend, #alerts { transition: transform var(--slide), visibility var(--slide); }
-body:not(.ready) #bar, body:not(.ready) #legend, body:not(.ready) #alerts { transition: none; }
+#bar, #legend { transition: transform var(--slide), visibility var(--slide); }
+body:not(.ready) #bar, body:not(.ready) #legend { transition: none; }
 body.drawer #bar { transform: none; visibility: visible; }
-body.drawer #legend, body.drawer #alerts { transform: translateX(var(--drawer)); }
+body.drawer #legend { transform: translateX(var(--drawer)); }
 
 /* --- heatmap legend ------------------------------------------------------------------------- */
 
@@ -566,6 +553,13 @@ body:not(.ready) #side { transition: none; }
 #sideHead .pophead { padding-top: 18px; margin-bottom: 0; }
 #sideClose { position: absolute; z-index: 2; top: 8px; right: 8px; }
 #sideBody { flex: 1; overflow: auto; overscroll-behavior: contain; padding: 0 16px 16px; }
+/* Retriggered by openSide() (class `swap`) only when the station actually changes — see map.js.
+   Both boxes animate, because the name is in one and the readings in the other and a wipe that
+   moved half the card would read as a glitch. Under reduced motion the slide is dropped and the
+   fade kept: something still has to say the content changed. */
+@keyframes sideSwap { from { opacity: 0; transform: translateX(14px); } }
+#side.swap #sideHead, #side.swap #sideBody { animation: sideSwap .22s cubic-bezier(.2, 0, 0, 1); }
+@media (prefers-reduced-motion: reduce) { @keyframes sideSwap { from { opacity: 0; } } }
 
 /* The right-hand strip belongs to the panel while it is open, so what already lives there steps
    aside rather than hiding under it — the attribution in particular has to stay readable, and the
@@ -590,7 +584,10 @@ body.side #toast, body.side #credit, body.side .leaflet-bottom.leaflet-right {
   transition: width var(--slide), opacity var(--slide), visibility 0s .25s;
 }
 body.finding #gotoBox {
-  width: min(280px, 42vw); opacity: 1; visibility: visible;
+  /* The 4px flex gap alone puts the field hard against the status chip: an icon button carries ~10px
+     of its own padding around the glyph, so the open field has to add that back to sit where the
+     magnifier sat. */
+  width: min(280px, 42vw); margin-left: 10px; opacity: 1; visibility: visible;
   transition: width var(--slide), opacity var(--slide), visibility 0s;
 }
 /* The button *becomes* the box rather than sitting beside it — a magnifier next to an open search
@@ -618,9 +615,9 @@ body.finding #find { display: none; }
 #toast .thead { display: flex; align-items: center; gap: 8px; font-size: 13px; }
 /* The header icon carries the tier: red for what is happening, amber for what is forecast, green
    for an all-clear. Same three colours as the panel's left rules, so the two agree at a glance. */
-#toast .thead .i { color: #e8710a; font-size: 18px; flex: none; }
-#toast.now .thead .i   { color: #d93025; }
-#toast.clear .thead .i { color: #188038; }
+#toast .thead .i { color: var(--s-warning); font-size: 18px; flex: none; }
+#toast.now .thead .i   { color: var(--s-danger); }
+#toast.clear .thead .i { color: var(--s-normal); }
 #toast .thead b { font-weight: 500; flex: 1; min-width: 0; line-height: 1.3; }
 #toast .tclose { flex: none; font-size: 16px; color: var(--muted); }
 #toast .trow {
@@ -636,52 +633,44 @@ body.finding #find { display: none; }
 #toast .tmore { margin: 6px 0 6px 2px; font-size: 11px; }
 #toast .trow:last-child { margin-bottom: 6px; }
 
-/* --- alert panel ---------------------------------------------------------------------------- */
+/* --- alert list (its button in the app bar; the list itself is in #side) ---------------------- */
 
-/* Top-left, always on screen — see alerts.js for why it no longer hides itself. */
-#alerts {
-  position: absolute; z-index: 400; left: 12px; top: calc(var(--hdr) + 12px); width: 300px;
-  display: flex; flex-direction: column; border-radius: 12px; overflow: hidden;
+/* The glyph takes the status ramp, so the button is the signal whether or not the list is open —
+   grey when nothing, then amber / orange / red as it gets worse (see alerts.js for the steps). */
+#alertBtn { position: relative; color: var(--c, var(--muted)); }
+/* Count on the corner, as a badge rather than beside the glyph: it has to fit a 40px control, and a
+   two-digit number next to a 22px icon is a control the bar has no room for. `:empty` covers the
+   all-clear — the grey glyph already says it, and a "0" is a number worth reading that isn't. */
+#alertBtn .abadge {
+  position: absolute; top: 1px; right: 0; min-width: 16px; height: 16px; padding: 0 4px;
+  /* Ink is the surface, not white: the status ramp is lighter on the dark theme (see the palette in
+     base.css), and white on a pale amber is the one combination this badge can't survive. */
+  border-radius: 999px; background: var(--c); color: var(--surface);
+  font: 500 10px/16px Roboto, sans-serif; font-style: normal;
+  box-shadow: 0 0 0 2px var(--surface);
 }
-#alertTab {
-  display: flex; align-items: center; gap: 8px; width: 100%; padding: 10px 14px;
-  font: 500 13px/1 Roboto, sans-serif; text-align: left; cursor: pointer;
-  background: none; border: 0; color: var(--on-surface);
-}
-#alertTab:hover { background: var(--hover); }
-#alertTab > span:first-of-type { flex: 1; }        /* pushes the tally to the chevron */
-/* The leading glyph carries the state, coloured by alerts.js on the status ramp (grey when none). */
-#alertTab .lead { font-size: 20px; color: var(--c, var(--muted)); }
-/* The counts get a line of their own under the title. Four of them — at danger, sounding, rising,
-   not current — plus the chevron did not fit 300px beside "On alert · nearest first", and the title
-   is what gives way first, which is the one part of the tab that says what the panel is.
-   `order` sends the tally past the chevron so the chevron stays up on the title's line; `:empty`
-   keeps a quiet panel to a single line, since alerts.js writes the span whether or not it fills. */
-#alertTab { flex-wrap: wrap; row-gap: 8px; }
-#alertTab::after { order: 0; }
-#alertTab .tally { display: flex; gap: 6px; order: 1; flex-basis: 100%; }
-#alertTab .tally:empty { display: none; }
-#alertTab .tally b {
+#alertBtn .abadge:empty { display: none; }
+/* The four counts — at danger, sounding, rising, not current — under the list's title. Icons rather
+   than words: all four at once is exactly when the list matters most, and that is when words wrap. */
+.tally { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.tally:empty { display: none; }
+.tally b {
   display: inline-flex; align-items: center; gap: 2px;
   padding: 2px 7px 2px 4px; border-radius: 999px; font-size: 12px;
   color: var(--c); background: color-mix(in srgb, var(--c) 16%, transparent);
 }
-#alertTab .tally .i { font-size: 15px; }
-#alertTab .lead, #alertTab .tally i { font-style: normal; letter-spacing: normal; }
-#alertBody .empty { padding: 12px 0; border-top: 1px solid var(--outline); margin: 0; }
-#alertTab::after {
-  --i: var(--i-expand_more); width: 20px; height: 20px;
-  margin-left: auto; color: var(--muted);
-}
-#alerts.open #alertTab::after { --i: var(--i-expand_less); }
-#alertBody { display: none; max-height: min(52vh, 460px); overflow: auto; padding: 0 14px 12px; }
-#alerts.open #alertBody { display: block; }
+.tally .i { font-size: 15px; }
+.tally i { font-style: normal; letter-spacing: normal; }
+.empty { padding: 12px 0 0; margin: 0; }
 /* Tier, twice over: a coloured left rule for the glance and a word for the meaning. Colour alone
    would be a code nobody was taught, and a word alone does not survive a scroll past forty of them.
    The rule is indented rather than full-bleed so the list still reads as one list. */
 .alert { padding: 14px 0 14px 10px; border-top: 1px solid var(--outline); border-left: 3px solid transparent; }
-.alert.t-now   { border-left-color: #d93025; }
-.alert.t-soon  { border-left-color: #e8710a; }
+/* Same rule as .sensor's: the head is lifted out of #sideBody into #sideHead and already ends in a
+   line, so the first row must not draw a second one under it. */
+#sideBody > .alert:first-child { border-top: 0; padding-top: 4px; }
+.alert.t-now   { border-left-color: var(--s-danger); }
+.alert.t-soon  { border-left-color: var(--s-warning); }
 .alert.t-stale { border-left-color: var(--outline); opacity: .82; }
 .tg {
   display: inline-block; margin-left: 6px; padding: 2px 7px; border-radius: 999px;
@@ -692,11 +681,9 @@ body.finding #find { display: none; }
    centre both boxes instead. */
 .alert .badge, .alert .tg { vertical-align: middle; }
 .alert .tg { margin-bottom: 6px; }
-.tg-now   { background: color-mix(in srgb, #d93025 16%, transparent); color: #d93025; }
-.tg-soon  { background: color-mix(in srgb, #e8710a 16%, transparent); color: #e8710a; }
+.tg-now   { background: color-mix(in srgb, var(--s-danger) 16%, transparent); color: var(--s-danger); }
+.tg-soon  { background: color-mix(in srgb, var(--s-warning) 16%, transparent); color: var(--s-warning); }
 .tg-stale { background: var(--hover); color: var(--muted); }
-:root[data-theme="dark"] .tg-now  { color: #f28b82; }
-:root[data-theme="dark"] .tg-soon { color: #fdd663; }
 .alert .name { cursor: pointer; }
 .alert .name:hover { color: var(--accent); }
 
@@ -952,8 +939,10 @@ body.finding #find { display: none; }
   }
   /* The title is the first thing worth losing: five buttons and the status chip all have to fit,
      and the drop icon carries the identity on its own once the tab title says the rest. */
-  header h1 span { display: none; }
-  #net span:not(.swatch) { display: none; }         /* dot only, keeps the bar on one line */
+  header h1 .word { display: none; }
+  /* The popover clears the two-row header rather than the one-row one; --hdr already carries the
+     difference, so this only has to stop sitting under the ticker's rule. */
+  #netstats { left: 8px; }
   /* The legend earns its space: the heatmap is the one layer whose colours mean nothing without it,
      and it is the layer a phone shows most of. Compacted rather than dropped — full width beside the
      zoom buttons, and the sentence explaining the doubling goes, since the tip already says it. */
@@ -970,8 +959,6 @@ body.finding #find { display: none; }
   #legend > .muted { display: none; }
   #legend .ramp { height: 8px; margin: 4px 0 3px; }
   #legend .slider { margin-top: 6px; padding-top: 6px; }
-  body.drawer #alerts { visibility: hidden; }       /* drawer covers the map anyway */
-  #alerts { left: 12px; right: 12px; width: auto; top: calc(var(--hdr) + 12px); }
   /* The station panel takes the screen below the app bar. A 360px column beside a 360px phone is no
      column at all, and the old popup already covered most of this width; one tap on its close button
      gives the map back. Nothing steps aside for it here — it is over everything. */
@@ -990,18 +977,16 @@ body.finding #find { display: none; }
      claim a row of the bar above it. `header` is `position: absolute`, so this anchors to it.
      47px = the header's 6px top padding + the 36px control row + the 5px gap the ticker used. */
   body.finding #gotoBox {
-    position: absolute; left: 4px; right: 8px; top: 47px; width: auto; height: 34px;
+    position: absolute; left: 4px; right: 8px; top: 47px; width: auto; height: 34px; margin-left: 0;
   }
   /* 34px, so the row it borrowed is the height the ticker's was — --hdr is a fixed 85px here and a
      taller input would push the map down. */
   body.finding #goto { padding: 6px 10px; }
   #gotoBox::after { top: 6px; }
   #gotoHits { width: auto; left: 0; right: 0; }
-  /* Desktop only. At this width the toast would land exactly on the alert panel, over the map, in
-     the band the user is already reading — and the panel springs open by itself when something
-     appears, so nothing is lost by leaving it to do that job. `display: none` rather than a JS
-     guard so it follows a rotate without anything having to notice. */
+  /* Desktop only. At this width the toast covers the top of the map — the band the user is already
+     reading — for a list the app bar's warning glyph is already counting two rows above it.
+     `display: none` rather than a JS guard so it follows a rotate without anything having to
+     notice. */
   #toast { display: none; }
-  #alertTab { padding: 12px 16px; }
-  #alertBody { padding: 0 16px 14px; max-height: 50vh; }
 }

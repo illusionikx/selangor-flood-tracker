@@ -11,6 +11,13 @@ import { render } from './render.js';
 
 requestAnimationFrame(() => document.body.classList.add('ready')); // no drawer slide on first paint
 
+/* Register the worker that makes this installable (see sw.js). Resolved against this module's own
+   URL rather than passing a bare 'sw.js', so it is the root worker on both hosts — the file sits
+   beside index.html, one level up from here. Failures are ignored on purpose: no worker means no
+   install button and nothing else, so there is nothing to tell anyone about. */
+if ('serviceWorker' in navigator)
+  navigator.serviceWorker.register(new URL('../sw.js', import.meta.url)).catch(() => {});
+
 findMe(false);   // locate on landing for the proximity sort, but leave the view where they left it
 
 /* Poll only while someone is looking. A tab left open in the background costs a request every five

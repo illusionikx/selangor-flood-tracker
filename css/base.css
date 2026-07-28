@@ -16,11 +16,51 @@
      panel all have to follow it down — they were six hard-coded 64/76/124/128s before. */
   --hdr: 64px;
 }
+/* --- the map palette -------------------------------------------------------------------------- */
+
+/* Station kinds and the traffic-light statuses, as tokens rather than the constants they used to be
+   in `config.js`. Every one of these is painted on two very different backgrounds — the warm paper
+   of the CARTO voyager basemap and the near-black of dark_all — and one hex cannot serve both. A
+   colour picked to read on white is mud on black; one picked to read on black is a pastel on white.
+   So there are two sets: **saturated and dark for the light theme, light and softened for the dark
+   one.** `config.js` emits `var(--k-river)` where it used to emit `#4da3ff`, which lands in the same
+   inline `style` attribute and costs nothing at the call sites — and the theme swap stays one
+   attribute on <html>, with no re-render.
+
+   Every value clears **4:1 against both basemap extremes and both surfaces**, against a 3:1
+   requirement for non-text (WCAG 1.4.11) — the pins carry no chip behind them any more, so the
+   glyph's own colour is the whole of its legibility.
+
+   The hues are unchanged: type colours stay off the traffic light (river blue, rainfall violet,
+   siren pink, gauge taupe, camera cyan, mast indigo), status keeps green → amber → orange → red.
+   What changed is only how light each one is. */
+:root {
+  --k-river: #0b62c4; --k-rainfall: #5a3fd0; --k-siren: #c2185b;
+  --k-gauge: #6d4c41; --k-camera: #00747f; --k-mast: #3949ab;
+  /* Rainfall's own ramp: dry, then the two mid classes wear the kind colour, then heavy. Very heavy
+     is --s-danger, like every other "this is now an emergency". */
+  --k-rain-dry: #454b8f; --k-rain-heavy: #8f3fd0;
+  --s-normal: #188038; --s-alert: #a86400; --s-warning: #c1440e; --s-danger: #c5221f;
+  --s-none: #5f6368;
+  /* You. Hazard yellow — the one thing on the map that is not a reading, so it is allowed the one
+     colour a reading never wears alone. It is deliberately near the alert amber without being it:
+     the shape is a house in a pin, which no station glyph resembles, so the hue is not what has to
+     carry "this is not a station". Light theme is deep enough to clear 3:1 on white; the dark one
+     can afford to be properly yellow. */
+  --me: #b87b00;
+}
 :root[data-theme="dark"] {
   color-scheme: dark;
   --surface: #202124; --on-surface: #e8eaed; --muted: #9aa0a6; --outline: #3c4043;
   --hover: #303134; --accent: #8ab4f8;
   --shadow: 0 1px 2px rgba(0,0,0,.6), 0 2px 6px 2px rgba(0,0,0,.3);
+
+  --k-river: #7fbcff; --k-rainfall: #b3a4ff; --k-siren: #ff8fb1;
+  --k-gauge: #c9ab9f; --k-camera: #4dd8e8; --k-mast: #a3adde;
+  --k-rain-dry: #9aa0e8; --k-rain-heavy: #d99cff;
+  --s-normal: #7ddc9a; --s-alert: #ffd166; --s-warning: #ffa15c; --s-danger: #ff8a80;
+  --s-none: #9aa0a6;
+  --me: #ffc233;
 }
 
 * { box-sizing: border-box; }
@@ -38,21 +78,21 @@ td:last-child { text-align: right; padding-left: 16px; }
 
 /* Slim scrollbars on the app's own scroll panes. Still `overflow: auto`, so they appear only when
    the content actually overflows — a permanent gutter on a list of four districts is noise. */
-.scroll, .picklist, #alertBody, #bar {
+.scroll, .picklist, #sideBody, #bar {
   scrollbar-width: thin;
   scrollbar-color: color-mix(in srgb, var(--on-surface) 28%, transparent) transparent;
 }
 .scroll::-webkit-scrollbar, .picklist::-webkit-scrollbar,
-#alertBody::-webkit-scrollbar, #bar::-webkit-scrollbar { width: 8px; height: 8px; }
+#sideBody::-webkit-scrollbar, #bar::-webkit-scrollbar { width: 8px; height: 8px; }
 .scroll::-webkit-scrollbar-thumb, .picklist::-webkit-scrollbar-thumb,
-#alertBody::-webkit-scrollbar-thumb, #bar::-webkit-scrollbar-thumb {
+#sideBody::-webkit-scrollbar-thumb, #bar::-webkit-scrollbar-thumb {
   background: color-mix(in srgb, var(--on-surface) 28%, transparent);
   border: 2px solid transparent; background-clip: content-box; border-radius: 999px;
 }
 .muted { color: var(--muted); font-size: 12px; }
 .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 50%; }
 .glyph { font-size: 18px; }
-.up { color: #d93025; } .down { color: #188038; }
+.up { color: var(--s-danger); } .down { color: var(--s-normal); }
 /* Rate of rise. The arrow travels the way the water is going: in from one side, half a second still
    so it can actually be read as a direction, then out the other. A back-and-forth wobble reads as
    fidgeting; a one-way pass reads as movement. */
@@ -68,7 +108,7 @@ td:last-child { text-align: right; padding-left: 16px; }
   display: inline-flex; align-items: center; gap: 1px;
   font-weight: 500; line-height: 1; vertical-align: middle;
 }
-.rate.up { color: #d93025; } .rate.down { color: #188038; }
+.rate.up { color: var(--s-danger); } .rate.down { color: var(--s-normal); }
 .rate .i { font-size: 1.7em; margin: -.5em 0; animation: rise 2s ease-in-out infinite; }
 .rate.down .i { animation-name: fall; }
 @keyframes rise {
@@ -82,8 +122,6 @@ td:last-child { text-align: right; padding-left: 16px; }
   75%, 100% { transform: translateY(6px);  opacity: 0; }
 }
 @media (prefers-reduced-motion: reduce) { .rate .i { animation: none; opacity: 1; } }
-:root[data-theme="dark"] .up { color: #f28b82; }
-:root[data-theme="dark"] .down { color: #81c995; }
 
 /* --- controls ------------------------------------------------------------------------------ */
 
@@ -253,12 +291,11 @@ select:focus-visible, #goto:focus-visible, #districtFind:focus-visible, #dataFin
   font-size: 16px; font-weight: 500; letter-spacing: 1px;
   color: var(--muted); background: var(--hover);            /* no signal */
 }
-.state.off { color: #188038; background: color-mix(in srgb, #188038 12%, transparent); }
-.state.on  { color: #d93025; background: color-mix(in srgb, #d93025 14%, transparent); }
-.state.mid { color: #b06000; background: color-mix(in srgb, #f9ab00 18%, transparent); }
-:root[data-theme="dark"] .state.mid { color: #fdd663; }
-:root[data-theme="dark"] .state.off { color: #81c995; }
-:root[data-theme="dark"] .state.on  { color: #f28b82; }
+/* The status tokens carry the per-theme value now — these three had grown their own dark overrides,
+   which is the same job done three times in two stylesheets. */
+.state.off { color: var(--s-normal); background: color-mix(in srgb, var(--s-normal) 12%, transparent); }
+.state.on  { color: var(--s-danger); background: color-mix(in srgb, var(--s-danger) 14%, transparent); }
+.state.mid { color: var(--s-alert);  background: color-mix(in srgb, var(--s-alert) 18%, transparent); }
 
 /* --- sparkline ------------------------------------------------------------------------------ */
 
@@ -301,14 +338,11 @@ select:focus-visible, #goto:focus-visible, #districtFind:focus-visible, #dataFin
 .meter .mscale b { font-weight: 500; font-size: 11px; color: var(--on-surface); }
 .meter .mscale span:last-child { transform: translateX(-100%); text-align: right; }
 
-.near {
-  display: flex; align-items: flex-start; gap: 10px; padding: 7px 0;
-  border-bottom: 1px solid var(--outline);
-}
-.near:last-of-type { border-bottom: 0; }
-.near[data-go] { cursor: pointer; }
-.near[data-go]:hover { color: var(--accent); }
-.near .glyph { font-size: 18px; line-height: 1.4; }
+/* A place named on a card that is not *this* card's place — the four sections of the "you are here"
+   card, and the camera under every still. It is somewhere else on the map, so the name is the jump
+   to it and is styled as one. */
+.place { font-weight: 500; cursor: pointer; }
+.place:hover { color: var(--accent); text-decoration: underline; }
 
 /* Camera still. Spinner lives on the wrapper; the img clears it on load. */
 .shotwrap {

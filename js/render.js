@@ -2,7 +2,7 @@
 
 import { KINDS, MAST, HEAT_FLOOR, RAIN_STOPS } from './config.js';
 import { state, PREFS } from './state.js';
-import { el, color, ink, dkey, isCritical, leads, hasInfo, isIgnored, ignoredIds,
+import { el, color, dkey, isCritical, leads, hasInfo, isIgnored, ignoredIds,
          scalePos, levelStops, gaugeStops } from './util.js';
 import { map, marks, siteMark, shown, syncCluster, focusOn, side, openSide,
          showMast, hideMast } from './map.js';
@@ -109,8 +109,11 @@ export function render() {
       zIndexOffset: critical ? 1000 : rising ? 500 : 0,   // keep the urgent pins on top
       icon: L.divIcon({
         className: '', iconSize: [26, 26], iconAnchor: [13, 13],
-        html: `<span class="pin${lead.online ? '' : ' off'}${rising ? ' rise' : ''}${
-                     critical ? ' danger' : ''}" style="--c:${c};--ink:${ink(c)}"><i class="i i-${
+        // `.multi` is the one pin that keeps a filled disc: it is standing for a stack rather than
+        // naming a sensor, and it carries a count that needs a field to sit on. Everything else is
+        // the glyph alone — see .pin in map.css.
+        html: `<span class="pin${multi ? ' multi' : ''}${lead.online ? '' : ' off'}${
+                     rising ? ' rise' : ''}${critical ? ' danger' : ''}" style="--c:${c}"><i class="i i-${
                multi ? MAST.icon : KINDS[lead.kind].icon}"></i>${
                multi ? `<b class="n">${members.length}</b>` : ''}</span>`,
       }),

@@ -1,7 +1,7 @@
 // The Leaflet map itself: basemap/theme, the shared marker cluster, and the view helpers that
 // every panel uses to jump to a station.
 
-import { KINDS, MAST, TILES, FLASH_MS } from './config.js';
+import { KINDS, TILES, FLASH_MS } from './config.js';
 import { state, PREFS, save } from './state.js';
 import { el, distKm } from './util.js';
 
@@ -33,6 +33,9 @@ function setBasemap() {
 export function setTheme(t) {
   document.documentElement.dataset.theme = t;
   el('theme').firstElementChild.className = `i i-${t === 'dark' ? 'light_mode' : 'dark_mode'}`;
+  // The standalone window's title bar. Same value the header paints itself, so an installed app
+  // has no seam above its own header — see the --surface tokens in css/base.css.
+  document.querySelector('meta[name=theme-color]').content = t === 'dark' ? '#202124' : '#ffffff';
   PREFS.theme = t;
   save();
   setBasemap();
@@ -95,9 +98,13 @@ let mastRing = null;
 
 export function showMast(latlng) {
   hideMast();
+  /* Colour comes from `.mastring` in map.css, not from the usual `color`/`fillColor` options: those
+     become SVG *presentation attributes*, where `var(--k-mast)` means nothing — and the mast colour
+     is a token now, with a value per theme. Any CSS rule outranks a presentation attribute, so a
+     class is both the way to reach it and the way to keep it in step with the pins. */
   mastRing = L.circle(latlng, {
-    radius: state.siteM, interactive: false,
-    color: MAST.color, weight: 1, dashArray: '4 3', fillColor: MAST.color, fillOpacity: .08,
+    radius: state.siteM, interactive: false, className: 'mastring',
+    weight: 1, dashArray: '4 3', fillOpacity: .08,
   }).addTo(map);
 }
 
@@ -127,15 +134,31 @@ export function openSide(key, html, mastAt) {
      runs several screens. */
   el('sideHead').replaceChildren(...[body.querySelector('.pophead')].filter(Boolean));
   if (moved) body.scrollTop = 0;   // a refresh of the same station keeps your place in it
+  /* Clicking a second pin swaps text inside a panel that does not move, and one card of readings
+     looks much like the next — so the swap is announced with a short wipe. Only on a real change of
+     station (a poll's in-place refresh must not flash), and only when the panel is already up: on
+     the way in it plays its own slide, which is announcement enough. Remove/reflow/add is how you
+     restart a CSS animation; the offsetWidth read is the flush that makes the removal count. */
+  if (moved && document.body.classList.contains('side')) {
+    const box = el('side');
+    box.classList.remove('swap'); box.offsetWidth; box.classList.add('swap');
+  }
   document.body.classList.add('side');
   mastAt ? showMast(mastAt) : hideMast();
+  syncAlertBtn();
 }
 
 export function closeSide() {
   side.key = null;
   document.body.classList.remove('side');
   hideMast();
+  syncAlertBtn();
 }
+
+/* The app bar's warning glyph is a disclosure for one particular occupant of this panel, and the
+   panel has half a dozen other ways to change what is in it — a pin, the table, "you are here", the
+   × — so the button's state is synced from here rather than from the click that opened it. */
+const syncAlertBtn = () => el('alertBtn').setAttribute('aria-expanded', side.key === '@alerts');
 
 el('sideClose').onclick = closeSide;
 /* Deliberately **no** `map.on('click', closeSide)`. A popup had to close that way because it was
@@ -175,16 +198,21 @@ export function flashTo(t) {
   const marker = siteMark.get(t.site || t.id);
   marker ? marker.fire('click') : focusOn([t.lat, t.lng], 13);
 
-  const ping = L.marker([t.lat, t.lng], {
-    icon: L.divIcon({ className: '', iconSize: [0, 0], html: '<i class="ping"></i>' }),
+  ping([t.lat, t.lng]);
+  // Only arm this after the flash: the flight and zoomToShowLayer above move the map themselves.
+  setTimeout(() => map.once('dragstart zoomstart', unpin), FLASH_MS);
+}
+
+/* An expanding ring over a point, then gone. Two callers with the same problem: the map has just
+   moved you somewhere and nothing on screen says which of the pins now in front of you is the one
+   you asked for. Non-interactive and behind the pins, so it can never eat the click on the thing it
+   is pointing at. `tone` picks the colour — see .ping in map.css. */
+export function ping(latlng, tone = '') {
+  const p = L.marker(latlng, {
+    icon: L.divIcon({ className: '', iconSize: [0, 0], html: `<i class="ping ${tone}"></i>` }),
     interactive: false, zIndexOffset: -1,
   }).addTo(map);
-
-  setTimeout(() => {
-    ping.remove();
-    // Only arm this after the flash: the flight and zoomToShowLayer above move the map themselves.
-    map.once('dragstart zoomstart', unpin);
-  }, FLASH_MS);
+  setTimeout(() => p.remove(), FLASH_MS);
 }
 
 // "Navigated away" = a pan or zoom the user asked for, not the panel closing: you can close the

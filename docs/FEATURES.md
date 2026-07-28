@@ -815,9 +815,36 @@ still springs open by itself when something *becomes* an alert — that is news,
 space; a list that was already there when you arrived is not.
 
 **Location** — auto-located on landing (view untouched) purely to enable proximity sorting;
-clicking the button recentres and opens a "You are here" popup listing the nearest water level,
-rainfall, siren and gauge with one meaningful number each, plus the nearest webcam. Errors report
-the real reason. *Known trade-off:* prompting on load risks Chrome auto-blocking the origin — the
+clicking the button recentres, ripples over where you are and opens a "You are here" card holding
+the nearest water level, rainfall, siren and gauge — each as a full sensor section, plus the nearest
+webcam's picture (see below). Errors report the real reason.
+
+**The marker is the glyph alone — no chip.** Every station pin is a filled disc, because that is
+what says "a sensor is here"; wearing the same chip put the reader into the dataset as a 672nd
+reading, and the accuracy circle under it is already the mark that has a shape. The chip was doing
+the contrast work, so a soft drop shadow takes that over, sitting the glyph above the map rather than
+in it. `filter`, not `box-shadow`: it follows the SVG mask's rendered shape rather than its box.
+
+A white halo was tried alongside it, as the contrast the chip used to give on a busy basemap, and
+pulled — it reads as a *glow*. On the dark basemap the arrow wore a bright fringe, which says lit
+object, not mark on a map.
+
+The glyph is `my_location`, the crosshair — what the locate button already wears, so the button and
+the mark it dropped are one picture. It took two goes to get there. The outlined person it started
+with looked like clipart dropped on the map: a picture of *someone standing at* the place, needing a
+field of its own to read against, which is what the chip had been providing. A filled `near_me`
+arrow fixed the contrast and introduced a heading we do not have. A crosshair is neither — it *is*
+the point it marks, so it needs no chip, and being centred on the fix it needs no tip to anchor
+either. (The same reason a Google-style teardrop was not the answer: a pin points at its tip, so it
+would have to be anchored at `[15,30]`, and it would want to be red.)
+
+The ripple is the same `ping()` the jump-to-station flash draws, in the location blue rather than
+the alert red — a red ring round your own position reads as a warning about you. It exists because
+arriving was the one step with no feedback: the button turns blue the moment a fix lands, but on
+every click after that the map pans to a marker that was already sitting there, so nothing on screen
+changed except the view. It fires only when you asked — the landing auto-locate places the marker
+without moving the view, and a ripple over a corner of the map nobody is looking at is a flicker
+with no referent — and on both arrival paths, a fresh fix and a restored one. *Known trade-off:* prompting on load risks Chrome auto-blocking the origin — the
 fix, if it becomes a problem, is to check `navigator.permissions` first.
 
 **Preferences** — one `prefs` blob in `localStorage`: theme, hidden districts, ignored sensors, layer
@@ -2028,6 +2055,55 @@ a whole line clear of the name it closes, above an empty strip the width of the 
 are tied together: the button's `top: 8px`, `#sideHead .pophead`'s `padding-top: 18px` (8 + half the
 button's 40 − half the name's 19.5px line) and `.sitecount`'s `top: 19px`.
 
+**The nearest webcam leads the card, as a link.** A camera's own still has always been the first
+thing in its card — the picture *is* the reading. Every other kind carries `camLink()` to the closest
+one instead, and that link used to sit at the *foot* of the card, below the meter, the metrics and
+the sparkline, on the argument that it is an action to take after reading the numbers. On a
+five-sensor mast that put it several screens down, and it is the wrong argument anyway: "can I see
+it?" is the first question a river level prompts, not the last. It now sits directly under the
+header on single-sensor cards and camera-less site cards alike.
+
+*Shown, not offered, was tried and pulled back.* Every card briefly opened with the still itself.
+It reads well and it is what the picture is for — but it fetches ~250 KB through the proxy (~0.8 s
+at JPS) on every card open, for a camera somewhere else, that you did not ask for. You opened a river
+gauge to read a river gauge. The line saying a picture exists and how far away it is, is enough to
+decide with. The same reasoning has always kept the alert panel on the link: N stills is N fetches
+for places you are scrolling past.
+
+**The one exception is the "you are here" card**, where the camera is not an aside — "what is around
+me" is the whole question, and a picture of it is an answer in a way "there is one 3 km away" is not.
+That card gets `camNear()`: the still, built as a `.sensor` section like every other kind on it —
+camera glyph in camera cyan, the distance in the head where the other sections put it, the place
+name (the jump to that camera), then the picture. One card, one fetch, asked for.
+
+**The "you are here" card is a full card now.** It used to be four one-line summaries (`oneLiner()`,
+since deleted — it had no other caller) and a link to the nearest webcam at the bottom. One line is
+enough to *rank* four stations; it is not enough to answer "is this bad?", which is the question you
+open your own location to ask, so every reading sent you off to four other cards to find out. Each
+kind now gets the same `.sensor` section a mast's card gives it — meter, trend, ETA, sparkline,
+footer, ⋮ — built from the same `sensorBody()`, so the two views cannot drift apart. The nearest
+camera's still leads it, as a fifth section (`camNear()` — see above; this is the only card that
+gets the picture rather than a link to it).
+
+The one thing this card must say that a mast's need not is **where each sensor is**. On a station
+card the header names the place once and all its sensors share it; here the four are four different
+places, so each section carries its own name, its district and basin, and how far away it is. The
+name is styled as, and is, the jump to that station — it is somewhere else on the map, and having
+just been told a siren 3 km away is triggered, going to look at it is the next thing you want.
+
+**Switching stations wipes the card.** The panel opens in the same place every time — which is the
+point of it — so clicking a second pin only changes the text inside a box that does not move, and
+one card of readings looks much like the next: same badge row, same meter, same footer line. A
+220ms fade-and-slide (`#side.swap`, keyframes in `chrome.css`, retriggered in `openSide()`) marks
+the change. It is gated twice: only when `side.key` actually changes, so the five-minute poll's
+in-place refresh never flashes, and only when the panel is already open, so it doesn't fight the
+slide-in. Under `prefers-reduced-motion` the travel is dropped and the fade kept — the feedback is
+the whole feature, so it degrades rather than disappearing.
+
+*Considered and not built:* a spinner (nothing is loading — the data is already in hand, and a
+spinner would claim a wait that isn't there) and flashing the panel border in a status colour (the
+colour language is reserved for severity; a green flash on a station at danger level is a lie).
+
 **`focusOn()` now subtracts both sides.** The drawer takes the left, the panel the right; the shifts
 subtract, so the pin lands in the middle of what is left. Skipped below 600px, where the panel covers
 the map and there is no strip to aim at.
@@ -2117,6 +2193,195 @@ Deliberately *not* done: no local cache of live stills (they carry `max-age=60` 
 address is a second outage waiting for the day JPS renumbers. The general rule went into the gotcha
 list: **no JPS URL is ever fetched with `file_get_contents()`.**
 
+## Installable — a PWA, in five files and no build step
+
+**What:** Chrome offers *Install app*; iOS Safari's *Add to Home Screen* opens it standalone with a
+real icon rather than a screenshot thumbnail and a Safari chrome. `manifest.json`, `sw.js`,
+`icon.svg` and the two PNGs baked from it, plus five lines of `<head>` and two of `app.js`.
+
+**Why it needs a service worker at all:** installability in Chrome is not just a manifest — the
+browser requires a registered worker with a `fetch` handler before it offers the button. So one
+exists, and since it has to exist it may as well do the one useful thing here: keep the shell
+reachable with no connection, so launching the installed app offline shows *this* app's "NO INTERNET
+CONNECTION" screen — which already explains why it will not draw a map from stale readings — instead
+of the browser's dinosaur.
+
+**Network-first, cache-as-you-go, and no precache list.** Both are the lazy choice on purpose:
+
+- *Cache-first* would be a third cache-busting ritual on top of the `?v=` on the stylesheets and
+  Herd's three-hour `max-age`. Its failure mode is an edit that is live for nobody, silently, until
+  a cache name is bumped — worse than a page that loads a few milliseconds slower.
+- *A precache list* is index.html's asset list copied into a second file, which goes stale the first
+  time a module is added and fails silently when it does. The first page view warms the cache with
+  exactly what the page actually requested, which is the same list, maintained by the browser.
+
+**The readings are never cached, at any age.** `sw.js` returns without calling `respondWith()` for
+`api.php` / `api.json`, so those requests behave exactly as if no worker were installed, error
+handling included. The splash refuses to draw a map without a connection because during a flood an
+out-of-date water level is worse than none; a worker quietly answering with yesterday's flood would
+undo that from underneath, and from a layer the page cannot see.
+
+**Icons.** The mark in `--accent` blue on transparency, at 86% of the canvas — no plate. It began as
+white on a full-bleed brand square, which is the safe answer (opaque, `maskable`-clean, identical on
+every backdrop) and looked like a shipped app tile rather than the mark itself. The plate came off;
+what follows from that:
+
+- **`purpose` is `any`, not `any maskable`.** A maskable icon is required to be opaque edge to edge —
+  the platform crops it to whatever shape it likes and fills nothing. Declaring a transparent icon
+  maskable gets it composited on a background of the platform's choosing, which is the one thing a
+  deliberate transparency cannot survive. Android now draws it on its own plate, which is what a
+  transparent icon is *for*.
+- **`background_color` is white, not blue.** It is the PWA splash colour, and a blue glyph on a blue
+  splash is nothing at all.
+- **The glyph is blue, not white.** Without a plate the icon sits on the browser's tab strip, a
+  wallpaper, a launcher — white disappears on half of them and black on the other half. `#1a73e8` is
+  legible on both and is already what the header's mark is.
+- **iOS gets its own opaque tile, `icon-180.png`.** Safari does not honour an alpha channel in a
+  home-screen icon — it flattens it, onto a colour that is not ours to choose and historically
+  black, which is exactly the plate that had just been removed. Depending on which colour any given
+  iOS version picks is the wrong bet in both directions, so the one platform that cannot do
+  transparency is handed a deliberate background instead of an accidental one: white, the app's own
+  light surface and the backdrop the blue mark was chosen against. 180px because that is the size
+  iOS asks for, and a smaller glyph (66% against 86%) because iOS rounds the corners itself and the
+  squircle takes a bite out of anything that runs to the edge.
+
+`icon-192.png` doubles as the favicon; browsers downscale it to 16px perfectly well, and it saves
+keeping a second source in step. Three PNGs, one drawing: `icon-build.php` renders them through a
+single function, so the tile and the icon cannot drift apart in anything but the two things that are
+meant to differ — the plate and the margin.
+
+All four references carry `?v=` — the two `<link>` tags and the two `icons[].src` in the manifest.
+The build rewrites the PNGs under the same names, Herd serves them with a three-hour `max-age`, and
+a browser will sit on a favicon for very much longer than that; without the bump a new mark simply
+does not appear, which reads as "the build didn't work". `icon-build.php` says so when it finishes,
+because a reminder that only lives in a document is a reminder nobody gets at the moment they need
+it.
+
+## The app mark — one raster, three surfaces
+
+**What:** the logo in the app bar, on the splash and in the About dialog is a flooded house, not the
+`water_drop` it used to be. `water_drop` is the *river-station* glyph — pins, legend, popup badges —
+so the brand and one of the five sensor types were the same picture, which is the one collision a
+map legend cannot afford. The mark now says what the site is about; the drop still says "river".
+
+**Source:** Material Symbols' own `flood` at `fill=1` (Apache 2.0) — the same family as every other
+icon on the page, so the mark and the station glyphs are one drawing set with one weight and one
+fill. It was a hand-traced Flaticon wave before; that credit has gone from the About with it, and
+the Credits line now names Material Symbols once for both.
+
+**One file feeds all three surfaces.** `icon.svg` is the bare glyph on transparency — no
+colour decisions in it, because the two consumers want different colours and neither wants the
+other's:
+
+- `--i-flood` in `css/icons.css` is those paths as a **mask**, exactly like the Material Symbols
+  beside it. `background: currentColor` shows through, so it recolours for free — no dark-theme
+  variant, no second file. Inline rather than `url(icon.svg)` so there is no separate asset that can
+  404 into an empty logo.
+- `icon-192.png` / `icon-512.png` are the same paths in white on the brand blue.
+
+`php icon-build.php` produces both from `icon.svg` and prints the CSS line to paste back. It parses
+the `viewBox` and the `d` attributes rather than embedding the file whole, which is what lets one
+drawing carry a fill it does not declare. There is still no SVG rasteriser on this machine (no
+Imagick, and `convert` on Windows is not ImageMagick), so 512 is a headless-Chrome screenshot and
+192 is GD downsampling that — the same two steps as before, now inside the script instead of in
+this document.
+
+**Trade-off accepted:** the mask is pasted into `icons.css` by hand rather than `@import`ed or built.
+That is one manual step on an icon that changes approximately never, against a build step on a repo
+whose whole point is not having one.
+
+**Deliberately not done:** a separate favicon, a light/dark logo pair, a wordmark lockup as an image.
+All three are things the mask already handles or the `<h1>` text already is.
+
+**`manifest.json`, not `manifest.webmanifest`** — Herd serves an unknown extension as
+`application/octet-stream`, and the correct type (`application/manifest+json`) would have to be
+added to the web server on every target: Herd, the nginx in `docs/DEPLOY.md`, and anything after
+them. `.json` is already typed correctly everywhere and browsers do not care which name it has.
+
+**No `*-web-app-capable` meta tag, of either spelling.** Chrome's console deprecates
+`apple-mobile-web-app-capable` and asks for `mobile-web-app-capable` instead — but they are the same
+pre-manifest mechanism with different vendor history, and `display: standalone` in the manifest has
+superseded both: on Chrome from the start, and on iOS since 11.3 (2018). Taking the warning at face
+value would have swapped one legacy tag for another and kept the redundancy. The tag was deleted
+instead. The single feature still genuinely tied to the Apple tag is `apple-touch-startup-image`, the
+iOS splash screen; we ship no startup images, so if those are ever wanted the tag returns *with*
+them. `apple-mobile-web-app-title` stays — it is not deprecated, and it pins the home-screen label on
+iOS versions that predate reading `short_name` from the manifest.
+
+**Every path is relative** — `start_url: "."`, `icon-192.png`, and `new URL('../sw.js',
+import.meta.url)` for the registration. The same files ship to the root of a Herd host and to a
+GitHub Pages sub-path; an absolute `/sw.js` is a 404 on one of them.
+
+**The icon carries the alert count.** One line in `alerts()`: `navigator.setAppBadge?.(live.length)`.
+It is the *same* number the panel's warning glyph takes its colour from — live alerts, district
+filter and ignore list applied, stale ones excluded — so an installed app on a home screen and the
+panel on screen can never disagree. `live` rather than `hot` for the reason the counts already give:
+a badge is a demand for attention, and a list of stations we can no longer read is a maintenance
+problem, not a flood. Zero clears the badge by spec, so there is no clearing branch.
+
+The Badging API is the whole implementation — no notification permission, no push subscription, no
+service-worker message. Optional chaining removes it where it does not exist, and the `.catch`
+absorbs iOS, which refuses it until notification permission is granted. That permission is *not*
+requested: a prompt on landing spends exactly the trust the [alert design
+standard](#alert-design-standard) says not to spend, for a number that is already on screen. The
+badge is a convenience for people who installed the app; it is not an alert channel, and nothing
+should start treating it as one without going through that standard first.
+
+Deliberately *not* done: no install-prompt UI (`beforeinstallprompt` banner) — the browser's own
+button is where people look for it, and a second one is a thing to dismiss; no offline copy of the
+last payload, per the above; no push notifications, which would be a new alert surface and belongs
+in the [alert design standard](#alert-design-standard) discussion, not smuggled in with an icon; no
+share target, shortcuts or screenshots in the manifest, none of which anything asks for yet.
+
+## The alert list moved into the app bar, and the status chip onto the mark
+
+Two things left the map. Both were paying rent on screen space with information a glance does not
+need at that size.
+
+**"On alert" is a button in the app bar**, between the search and the table, filled by `alerts.js`:
+the warning glyph takes the status ramp (grey nothing, amber a handful, orange a bad night, red
+district-wide — unchanged) and a badge on its corner carries the count. The list it opens is
+`#side`, the same popout a pin opens, under the key `@alerts`.
+
+Why the same popout rather than a second one: there is only ever one thing you are reading. The old
+panel sat top-left over the map at 300px, permanently, whether or not anything was on alert — and
+when you clicked a station in it, a *second* card opened on the opposite edge, so the map had a
+column of furniture on each side and a strip of map between them. Now the station replaces the list
+in the panel it was picked from, which is what following a link has always meant, and the way back
+is the button that is still lit in the bar.
+
+What that deleted, in order: the panel's own box, its collapse/expand tab and chevron, the
+`alertsOpen` preference and its restore-on-landing, the collapse-into-phone-width handler, the
+transform that slid it clear of the drawer, its scrollbar rules, and the per-row click handler that
+existed only to collapse the panel before flashing to a station on a phone. About 60 lines of CSS
+and 30 of JS, for a thing that reads the same and takes no map.
+
+**What was given up:** the list no longer springs open by itself when a station goes on alert. On the
+left edge that was free; on the right it would land on top of a card someone is reading, which is
+the one rule the panel has (*nothing may close or replace the card except the reader*). The
+compensation is that the signal is now permanent rather than conditional — the glyph and its count
+are in the bar at all times, at a fixed position, in a colour that says how bad it is, where the old
+tab could be scrolled behind, covered, or collapsed to a line. The interruption for *news* is still
+the toast, which is what that surface is for, and the ticker still carries the names.
+
+Checked against the [alert design standard](#alert-design-standard): the count is `live`, so stale
+stations are excluded from the number exactly as they are from the icon badge — the two can't
+disagree. Colour is not the only channel (the badge is a number, the button has a label naming the
+count, the list says the tier in words). No new surface was added; one was removed.
+
+**The status chip is a dot on the logo's corner.** It was a pill reading `LIVE` in `.hactions`; the
+bar could not carry that, a ticker and six controls at once, and of the three the feed's state is
+the only one that fits in a colour. So it rides the mark the way a presence dot rides an avatar — a
+property of the thing it sits on — with the same broadcast halo and the same four states. The word
+is not gone: it is the first row of the popover, which is now a `status` row above the readings,
+last-checked, station count and source rows that were always there.
+
+Hovering the *mark* opens it (a 24px target, not the 9px dot); tapping it does on touch. The table
+had to move out of the `<h1>` — flow content cannot legally live in a heading — so it is a sibling
+anchored to the header and revealed with `header:has(h1 .mark:hover)`, since no combinator walks
+back out of the heading. It is pinned to the bar's left gutter rather than under the glyph: one
+number that survives the phone layout moving the mark.
+
 ## Not built (and why)
 
 - **Heatmap tile cache** — no. The expensive part is the per-pixel colorize pass, and it changes
@@ -2129,3 +2394,100 @@ list: **no JPS URL is ever fetched with `file_get_contents()`.**
   stays a flat file. Not built on top of it: a server-side query API. Nothing asks for one yet; the
   poll response still carries everything the page renders.
 - **Self-hosted tiles** — the only remaining third-party request. Not lite.
+
+## The palette is two palettes
+
+**Every station colour is a CSS token with a value per theme** (`--k-*` for the five kinds and the
+mast, `--s-*` for the traffic light), defined at the top of `css/base.css`. `config.js` emits
+`var(--k-river)` where it used to emit `#4da3ff`; every consumer already dropped that value into an
+inline `style` or a `--c`, so the ~50 call sites did not change, and the theme swap is still one
+attribute on `<html>` with no re-render.
+
+*Why two.* One hex cannot serve the CARTO voyager basemap and dark_all. A colour picked to read on
+warm paper is mud on near-black; one picked for near-black is a pastel on white. The light set is
+**saturated and dark**, the dark set **light and softened** — same hues throughout, so a river is
+still blue and a siren still pink, and the type colours still miss the traffic light entirely.
+
+*Held to a number.* Every value clears **4:1 against both basemap extremes and both surfaces**,
+against the 3:1 that WCAG 1.4.11 asks of non-text. That is not decoration: the pins have no chip
+behind them any more, so a glyph's own colour is the whole of its legibility.
+
+*What this deleted.* `ink()` in `util.js` — black or white by relative luminance, computed per pin
+fill — because only one pin is filled now and its glyph is `var(--surface)`, which is the same answer
+from the token that already knows it. And six ad-hoc `:root[data-theme="dark"]` colour overrides
+across `base.css` and `chrome.css`, each of which was this idea done once, by hand, for one rule.
+
+*What still holds a real value, and why.* Anything painting **pixels rather than CSS**: the heat
+layers' gradients are baked into an `ImageData` and a canvas cannot resolve a token, so the rainfall
+ramp keeps `RAIN_HEAT` alongside `RAIN_COLOR` — one set for both themes, because a blob is
+composited *over* the basemap at low alpha rather than read against it. The legend ramps in
+`chrome.css` mirror those gradients and stay in step with them, not with the tokens. The cluster
+badges keep their fixed slate and red for the reason they always did: they are filled chips with
+white text, and white has to hold on both basemaps.
+
+*And one trap.* A token cannot go in an **SVG presentation attribute** — `stroke="var(--k-river)"`
+resolves to nothing. The sparkline's polyline, the area gradient's stops and the mast ring were all
+paint-by-attribute; they are `style="stroke:…"` and a `.mastring` class now. Leaflet's
+`color`/`fillColor` path options are presentation attributes too, which is why the mast ring is
+coloured from CSS — any CSS rule outranks one.
+
+## Pins are glyphs, not coins
+
+**A station pin is its icon and nothing else** — no disc, no ring, just the glyph in the station's
+colour with a soft drop shadow. It has been two other things: a white disc with a coloured glyph
+(camera cyan on white at ~2:1 — the icon was there and unreadable), then a filled disc with the glyph
+in whatever `ink()` picked. The filled version fixed the contrast and cost the thing the contrast was
+for: at 400 pins the map was a field of identical coins, and the *shape* — the one part of an icon
+that is read without being read — was down to 15px inside a 26px chip. Now the shape is the pin, at
+24px, and the colour tokens above are what keep it legible.
+
+**One pin keeps its disc: the mast.** A multi-sensor pin is standing for a stack rather than naming
+a sensor, so there is no glyph shape to protect, and it carries a sensor count that needs a field to
+sit on. Its ink is `var(--surface)`, white or near-black by theme.
+
+Danger keeps its halo, which is what the fill used to do — it makes the pin bigger than a glyph
+without hiding *which* glyph it is — and "rising" is a ring rather than a `box-shadow`, since a bare
+glyph has no box to trace.
+
+## The whole icon set is filled
+
+**Every glyph is Material Symbols at `fill=1`**, refetched in one pass. The pins are why: a station
+pin is its icon and nothing else now (see *Pins are glyphs, not coins*), and an outline standing on
+an arbitrary photograph of a city is a thin line with no field of its own to read against. A fill has
+area, and area is what survives being 24px over a satellite-grey street. What is right for the pins
+is right for the rest — an outlined `menu` beside a filled `water_drop` in the same bar reads as two
+icon sets, not one.
+
+The refetch is one URL per glyph, recorded at the top of `icons.css`:
+`…/materialsymbolsoutlined/<name>/fill1/24px.svg` (swap `fill1` for `default` to see the outlined
+variants these replaced). Two rules are not from that fetch and stay: `--i-compare`, hand-drawn
+because the stock glyph is a pair of arrows and this one has to say "two panels side by side"; and
+`--i-flood`, which comes out of `icon-build.php` because the app mark and the PNGs are one drawing.
+
+**The app mark is Material's `flood` now**, so the favicon, the installed-app icon, the splash and
+the header wear the same drawing as the station glyphs. `icon.svg` was replaced with that path and
+`php icon-build.php` re-baked all three PNGs; the `?v=` on both `<link>`s and both manifest `src`s
+went to 3, which is the only thing that makes a browser let go of a favicon.
+
+## "You are here" is a pin, in hazard yellow
+
+**`home_pin`** — a house inside a map pin. The shape is doing the work: no station glyph is a pin, so
+the mark reads as *a marker* rather than as a 672nd sensor before any colour is involved. It is
+anchored at its **tip** (`iconAnchor: [16, 29]`, not the box's centre) — a pin points at something,
+and Material leaves ~8% of the box as air below the point, so anchoring to the box bottom would float
+the mark above the fix.
+
+**The colour is `--me`, a hazard yellow** — `#b87b00` on the light theme, `#ffc233` on the dark,
+both clearing 3:1 on their basemap. It is the one mark on the map that is not a reading, so it gets
+the one hue a reading never wears on its own. *Noted, not resolved:* yellow is also the alert rung of
+the traffic light, and the colour language reserves that ramp for status. What keeps this from
+reading as "an alert, here" is the shape and only the shape. If it ever does read that way, the fix
+is the hue, not the pin.
+
+One colour for all of "you": the pin, the accuracy circle, the arrival ripple and the badge on the
+card. The circle and the ripple reach it through classes (`.mecircle`, `.ping.me`) rather than
+Leaflet's path options, which are SVG presentation attributes and cannot resolve a token.
+
+Its four predecessors, in order: a blue disc with a person in it (a station, as far as the map was
+concerned), a bare outlined person (clipart on a map), a filled `near_me` arrow (a heading we do not
+have), and a `my_location` crosshair (correct, and invisible next to the river blue).

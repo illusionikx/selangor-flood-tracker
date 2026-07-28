@@ -3,7 +3,7 @@
 
 import { state, PREFS, save } from './state.js';
 import { el } from './util.js';
-import { map, focusOn, openSide } from './map.js';
+import { map, focusOn, openSide, ping } from './map.js';
 import { herePopup } from './popup.js';
 import { alerts } from './alerts.js';
 import { dataTable } from './table.js';
@@ -33,11 +33,19 @@ export function findMe(setView) {
   map.locate({ setView, maxZoom: 13, enableHighAccuracy: true, timeout: 10000, maximumAge: FIX_TTL });
 }
 
+/* The ripple the jump-to-station flash uses, in the location blue rather than the alert red — a red
+   ring round your own position reads as a warning about you.
+   Arriving is the part with no feedback: the button goes blue the moment a fix lands, but the map
+   then pans and zooms to a marker that was already sitting there before you asked, so on the second
+   click nothing on screen changes except the view. This is what says "there — that one is you". */
+const flashMe = () => ping(at, 'me');
+
 btn.onclick = () => {
   wantPopup = true;
   if (!at) return findMe(true);       // no fix yet — prompt for one
   showHere();                         // already have one: recentre and show what is around you
   focusOn(at, 13);
+  flashMe();
 };
 
 // One path for both a live fix and a restored one: everything downstream should not be able to tell
@@ -50,16 +58,29 @@ function place(latlng, accuracy, setView) {
   if (layer) layer.remove();
 
   marker = L.marker(latlng, { icon: L.divIcon({
-    className: '', iconSize: [30, 30], iconAnchor: [15, 15], html: '<span class="pin me"><i class="i i-person"></i></span>',
+    /* A map pin, so it reads as a marker rather than as one more sensor glyph — and `home_pin`
+       rather than a plain teardrop, because the shape inside it is what says *whose* pin.
+       A pin points at its **tip**: the anchor is the bottom-centre of the box, not the middle, or
+       the mark would sit half its own height north of you. That is the whole difference between
+       this and the crosshair it replaced, which was the point it marked. */
+    // 29, not 32: Material draws the glyph inside its viewBox with a little air, so the pin's tip
+    // sits ~8% of the box above its bottom edge. Anchoring to the box would float the mark.
+    className: '', iconSize: [32, 32], iconAnchor: [16, 29],
+    html: '<span class="pin me"><i class="i i-home_pin"></i></span>',
   }) }).on('click', showHere);
 
+  // Coloured from `.mecircle` in map.css rather than through Leaflet's `color` option, for the same
+  // reason the mast ring is: those options become SVG presentation attributes, which cannot resolve
+  // a token — and "you" is one colour across the pin, this circle and the arrival ripple.
   layer = L.layerGroup([
-    L.circle(latlng, { radius: accuracy, color: '#1a73e8', weight: 1, fillOpacity: .12 }),
+    L.circle(latlng, { radius: accuracy, className: 'mecircle', weight: 1, fillOpacity: .12 }),
     marker,
   ]).addTo(map);
 
   if (setView) focusOn(latlng, 13);   // map.locate() does this itself; a restored fix has to ask
-  if (wantPopup) showHere();
+  // Only when the user asked. The landing auto-locate places the marker without moving the view, and
+  // a ripple over a corner of the map nobody is looking at is a flicker with no referent.
+  if (wantPopup) { showHere(); flashMe(); }
   if (state.data.length) alerts();   // re-sort the alert list nearest-first now that we know where you are
   // A fix can land while the table is open — it has a "my location" row that could not exist a
   // moment ago. Redraw so the row appears rather than waiting for the next thing to touch it.

@@ -61,6 +61,9 @@
    `.pophead + .sensor`: the header is lifted out of #sideBody into #sideHead (see map.js), so it is
    no longer this element's sibling and a sibling selector silently stopped matching. */
 #sideBody > .sensor:first-child { margin-top: 0; padding-top: 0; border-top: 0; }
+/* The nearest-webcam link leads every station card, so it needs room under it. The "you are here"
+   card has no link — it shows the picture instead, as a section like any other. */
+#sideBody > .link { margin-bottom: 8px; }
 .sensorhead { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
 .sensorhead b { font-size: 12px; font-weight: 500; }
 .sensorhead .muted { flex: 1; min-width: 0; text-align: right; overflow: hidden;
@@ -70,18 +73,36 @@
 
 /* --- markers -------------------------------------------------------------------------------- */
 
-/* Filled with the station's colour, glyph in whatever `ink()` picked for it. It used to be a white
-   disc with a coloured glyph, which put e.g. camera cyan on white at ~2:1 — the icon was there and
-   unreadable, and the pin's colour was a detail you had to zoom to see rather than the first thing
-   the map tells you. The ring keeps a filled pin off the basemap. */
+/* The glyph alone, in the station's own colour. It has been a filled disc and, before that, a white
+   disc with a coloured glyph — the white one put camera cyan on white at ~2:1, so the icon was there
+   and unreadable, and the filled one fixed that by making every station a coin on the map: at 400
+   pins the basemap was a field of counters and the *shape* of a water drop, which is the one thing
+   that says what a pin is without being read, was down to 15px inside a 26px chip.
+   Nothing is holding the contrast up now except the colour itself, which is why the palette moved
+   into tokens with a value per theme — see the block at the top of base.css, and the 4:1 floor it is
+   held to. The shadow is the only other help: enough to lift a glyph off a busy tile, not enough to
+   read as a second shape. `filter`, not `box-shadow`, because it follows the mask's rendered
+   outline rather than its box. */
 .pin {
-  position: relative; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%;
-  background: var(--c, var(--accent)); color: var(--ink, #fff);
-  border: 2px solid var(--surface); box-shadow: var(--shadow);
-  font-size: 15px;
+  position: relative; display: grid; place-items: center; width: 26px; height: 26px;
+  color: var(--c, var(--accent)); font-size: 24px;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .35));
 }
-/* Fill is already NO_INFO grey here — fading the glyph too would just hide it again. */
+/* Colour is already the offline grey here — fading the glyph as well would just hide it again. */
 .pin.off { opacity: .6; }
+/* The one pin that keeps a disc. It stands for a *stack* rather than naming a sensor, so there is no
+   glyph shape to protect, and it carries a count that needs a field to sit on. The ink is
+   `var(--surface)` — white on the light theme, near-black on the dark one, which is what the old
+   luminance-picking `ink()` in util.js computed by hand for every fill it was ever handed. */
+.pin.multi {
+  border-radius: 50%; font-size: 15px;
+  background: var(--c, var(--accent)); color: var(--surface);
+  border: 2px solid var(--surface); box-shadow: var(--shadow); filter: none;
+}
+/* The grouping radius drawn under a mast on hover — coloured here rather than through Leaflet's
+   `color`/`fillColor` options, which become SVG presentation attributes that cannot take a var().
+   Any CSS rule outranks one, so this is both how the token reaches it and what keeps it in step. */
+.mastring { stroke: var(--k-mast); fill: var(--k-mast); }
 /* How many sensors this one pin stands for. Only rendered past one, so a plain pin stays plain. */
 .pin .n {
   position: absolute; top: -3px; right: -3px; min-width: 14px; height: 14px; padding: 0 3px;
@@ -89,19 +110,44 @@
   font: 500 9px/1 Roboto, sans-serif; letter-spacing: 0; text-transform: none;
   color: var(--surface); background: var(--on-surface); box-shadow: 0 0 0 1.5px var(--surface);
 }
-.pin.danger .n { color: #d93025; background: #fff; box-shadow: none; }
-.pin.rise { box-shadow: 0 0 0 2px #d93025, var(--shadow); }
-/* Danger level or a sounding siren: filled red, on top, with a repeating halo. */
-.pin.danger {
-  background: #d93025; color: #fff; border: 2px solid var(--surface); font-size: 15px;
+.pin.multi.danger .n { color: var(--s-danger); background: var(--surface); box-shadow: none; }
+/* Forecast to reach danger. A ring rather than a fill, because it is a claim about the next few
+   hours and not a reading — on the bare pin it is drawn like the halo below, since there is no
+   longer a box for a box-shadow to trace. */
+.pin.rise::before {
+  content: ''; position: absolute; inset: -3px; border-radius: 50%;
+  border: 2px solid var(--s-danger);
 }
+.pin.multi.rise { box-shadow: 0 0 0 2px var(--s-danger), var(--shadow); }
+.pin.multi.rise::before { content: none; }
+/* Danger level or a sounding siren: on top, in the danger red, with a repeating halo. The halo is
+   what a filled disc used to do — it makes the pin bigger than a glyph without hiding which glyph
+   it is. */
 .pin.danger::after {
   content: ''; position: absolute; inset: -4px; border-radius: 50%;
-  border: 2px solid #d93025; animation: halo 1.8s ease-out infinite;
+  border: 2px solid var(--s-danger); animation: halo 1.8s ease-out infinite;
 }
+.pin.multi.danger { background: var(--s-danger); color: var(--surface); }
 @media (prefers-reduced-motion: reduce) { .pin.danger::after { animation: none; opacity: .8; } }
 
-.pin.me { width: 30px; height: 30px; font-size: 20px; background: #1a73e8; color: #fff; border: 2px solid #fff; }
+/* You are not a station. Every other pin is a filled disc because that is what says "a sensor is
+   here"; wearing the same chip put the reader into the dataset as a 672nd reading. The glyph alone,
+   in the location blue, is a different kind of thing on the map — and the accuracy circle under it
+   is already the mark that has a shape.
+   `home_pin` — a pin with a house in it, so the *shape* says "a marker, and it is yours" before the
+   colour says anything. It is anchored at its tip, not its centre; see locate.js.
+   One shadow, and it is a shadow: a white halo was tried as the contrast the chip used to provide
+   and it reads as a glow — on the dark basemap the mark wore a bright fringe, which is a lit object,
+   not a mark on a map. The soft dark one is enough to sit it above the basemap. `filter` rather than
+   `box-shadow` because it follows the mask's rendered shape, not its box. */
+.pin.me {
+  width: 32px; height: 32px; font-size: 32px;
+  background: none; border: 0; box-shadow: none; color: var(--me);
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .45));
+}
+/* The accuracy circle. Coloured here rather than through Leaflet's path options — those are SVG
+   presentation attributes and cannot take a token. Same trick as .mastring above. */
+.mecircle { stroke: var(--me); fill: var(--me); }
 
 /* Just the count, in one neutral chip for every cluster — no kind icon or hue. Fixed slate rather
    than a token so white text holds on both the light and dark basemaps, and it reads as neither a
@@ -118,12 +164,16 @@
   box-shadow: 0 0 0 3px color-mix(in srgb, #d93025 35%, transparent), var(--shadow);
 }
 
-/* Ripple played over a station the user jumped to from a panel or link. */
+/* Ripple played over a station the user jumped to from a panel or link, and over your own position
+   when you ask to be taken to it. Red is the default because a jump is nearly always to something
+   that is alerting; `--c` lets the arrival ripple in the location blue instead, since a red ring
+   round your own position would read as a warning about you. */
 .ping, .ping::after {
   position: absolute; left: 0; top: 0; width: 18px; height: 18px; margin: -9px 0 0 -9px;
-  border-radius: 50%; border: 3px solid #d93025; animation: ripple 1.2s ease-out 2;
+  border-radius: 50%; border: 3px solid var(--c, #d93025); animation: ripple 1.2s ease-out 2;
 }
 .ping::after { content: ''; margin: -3px 0 0 -3px; animation-delay: .4s; }
+.ping.me { --c: var(--me); }
 
 /* --- phones ------------------------------------------------------------------------------------ */
 

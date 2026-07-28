@@ -206,9 +206,9 @@ export function dataTable() {
 }
 
 /* One cell per sensor kind, so a column reads as one measurement all the way down and a mast that
-   has no siren shows a dash rather than a gap you have to interpret. oneLiner() is not reused here:
-   it is written for a popup with 300px to spend, and "1.68 m · 34% of danger" in a 150px column
-   wraps to three lines.
+   has no siren shows a dash rather than a gap you have to interpret. The cells are built here rather
+   than shared with the panel: a card has 300px to spend on one sensor, and "1.68 m · 34% of danger"
+   in a 150px column wraps to three lines.
 
    Where the reading *is* a state — a siren, a flood gauge, rainfall intensity — the cell leads with
    a badge rather than a number, because that is the answer; the number is the evidence. Water level

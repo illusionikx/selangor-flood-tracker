@@ -1,13 +1,19 @@
 // Constants shared across modules. No imports here — everything else may depend on this.
 
-// Station types. Colours are deliberately NOT traffic-light hues: green/amber/orange/red and grey
-// are reserved for status, so a type colour can never be mistaken for an alert level.
+/* Station types. Colours are deliberately NOT traffic-light hues: green/amber/orange/red and grey
+   are reserved for status, so a type colour can never be mistaken for an alert level.
+
+   They are `var()` references, not hexes, because each one needs a different value per theme — see
+   the palette block in `css/base.css` for the two sets and the contrast they are held to. Every
+   consumer drops the value into an inline `style` or a `--c`, so a var reference works unchanged,
+   and the theme swap needs no re-render. The one place that cannot take a var is a **canvas**: the
+   heat layer paints pixels, not CSS, so its gradient keeps real values — see RAIN_HEAT below. */
 export const KINDS = {
-  river:    { label: 'Water level', color: '#4da3ff', icon: 'water_drop' },
-  rainfall: { label: 'Rainfall',    color: '#8f7bff', icon: 'rainy' },
-  siren:    { label: 'Sirens',      color: '#f06292', icon: 'campaign',    one: 'Siren' },
-  gauge:    { label: 'Flood gauge', color: '#a1887f', icon: 'straighten' },
-  camera:   { label: 'Cameras',     color: '#26c6da', icon: 'photo_camera', one: 'Camera' },
+  river:    { label: 'Water level', color: 'var(--k-river)',    icon: 'water_drop' },
+  rainfall: { label: 'Rainfall',    color: 'var(--k-rainfall)', icon: 'rainy' },
+  siren:    { label: 'Sirens',      color: 'var(--k-siren)',    icon: 'campaign',    one: 'Siren' },
+  gauge:    { label: 'Flood gauge', color: 'var(--k-gauge)',    icon: 'straighten' },
+  camera:   { label: 'Cameras',     color: 'var(--k-camera)',   icon: 'photo_camera', one: 'Camera' },
 };
 
 // Who published the reading on a station. `api.php` stamps every station with one of these keys, so
@@ -22,9 +28,20 @@ export const SOURCES = {
               url: 'https://infobanjirjpskl.water.gov.my/' },
 };
 
-// Upstream status codes: river -1 offline, 0 normal, 1 alert, 2 warning, 3 danger.
-export const RIVER_COLOR = { '-1': '#555', 0: '#4da3ff', 1: '#ffd166', 2: '#ff9f1c', 3: '#ff4d4d' };
-export const RAIN_COLOR  = { '-1': '#555', 0: '#3a3a6a', 1: '#6f7bff', 2: '#8f7bff', 3: '#c77dff', 4: '#ff4d4d' };
+// Upstream status codes: river -1 offline, 0 normal, 1 alert, 2 warning, 3 danger. A river above its
+// first mark is wearing the traffic light, so it uses the status tokens themselves — there was never
+// a second amber, only a second spelling of one.
+export const RIVER_COLOR = { '-1': 'var(--s-none)', 0: 'var(--k-river)',
+  1: 'var(--s-alert)', 2: 'var(--s-warning)', 3: 'var(--s-danger)' };
+export const RAIN_COLOR  = { '-1': 'var(--s-none)', 0: 'var(--k-rain-dry)', 1: 'var(--k-rainfall)',
+  2: 'var(--k-rainfall)', 3: 'var(--k-rain-heavy)', 4: 'var(--s-danger)' };
+
+/* The same rainfall ramp as real values, for the heat layer's canvas gradient — leaflet.heat builds
+   an ImageData from it, and `var(--k-rainfall)` means nothing to a 2D context. One theme's worth,
+   because a translucent blob is composited over the basemap rather than read against it, and the
+   layer already dims and brightens with what is under it. Keep these in step with RAIN_COLOR's
+   *hues*: a violet blob and a violet rainfall pin have to mean the same thing. */
+export const RAIN_HEAT = { 1: '#6f7bff', 2: '#8f7bff', 3: '#c77dff', 4: '#ff4d4d' };
 
 // Which sensor speaks for a mast when several share one: a river gauge says more about a flood than
 // the rainfall gauge strapped to the same pole, and a camera says least until you open it. Used for
@@ -32,9 +49,9 @@ export const RAIN_COLOR  = { '-1': '#555', 0: '#3a3a6a', 1: '#6f7bff', 2: '#8f7b
 export const KIND_RANK = ['river', 'siren', 'gauge', 'rainfall', 'camera'];
 
 // Traffic light by status: normal → alert → warning → danger.
-export const STATUS_COLOR = ['#188038', '#f9ab00', '#e8710a', '#d93025'];
+export const STATUS_COLOR = ['var(--s-normal)', 'var(--s-alert)', 'var(--s-warning)', 'var(--s-danger)'];
 
-export const NO_INFO = '#9aa0a6';   // grey: offline or reporting nothing
+export const NO_INFO = 'var(--s-none)';   // grey: offline or reporting nothing
 
 // "rising" is decided in api.php — a station reaching its own danger mark within its RISE_ETA at the
 // rate it is climbing now. One definition, server-side, so the panel and the filter can never
@@ -46,7 +63,7 @@ export const NO_INFO = '#9aa0a6';   // grey: offline or reporting nothing
 // it gets its own indigo and a "layers" glyph, and keeps the sensor count badge. Indigo because it
 // has to miss every other meaning on the map — the five type hues, the traffic-light statuses, and
 // the offline grey. Only worn while the mast is quiet; anything signalling keeps its status colour.
-export const MAST = { color: '#5c6bc0', icon: 'layers' };
+export const MAST = { color: 'var(--k-mast)', icon: 'layers' };
 
 /* APM's flood emergency line directory — every state's number, kept current by the agency that
    answers them. The one outbound link on this page that is an *action* rather than a source, which
@@ -83,8 +100,9 @@ export const HEAT_MAX_PX = 220;    // blur cost is quadratic; past this the laye
    on the day this was written — and an invisible layer is a broken one. The water layer gets this
    for free because its floor is the alert slot; here the floor has to be built in. Above 60 mm the
    scale is already full, which is right: the class is open-ended and the blob is as red as it goes.
-   Paired with heat.js's rain gradient (which reads its colours straight out of RAIN_COLOR, so a blob
-   and a rainfall pin can never disagree) and `.ramp.rain` in chrome.css — change the three together. */
+   Paired with heat.js's rain gradient (RAIN_HEAT above — the same hues as the rainfall pins, as real
+   values, because a canvas cannot resolve a token) and `.ramp.rain` in chrome.css — change the three
+   together. */
 export const RAIN_STOPS = [[0, 25], [10, 50], [30, 75], [60, 100]];
 export const FLASH_MS    = 2400;   // how long the jump-to ripple runs
 export const POLL_MS     = 300000; // matches the proxy's cache TTL

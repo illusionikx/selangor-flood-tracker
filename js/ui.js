@@ -8,7 +8,7 @@ import { heatOpacity } from './heat.js';
 import { byId } from './stations.js';
 import { render, districts } from './render.js';
 import { dataTable } from './table.js';
-import { alerts } from './alerts.js';
+import { alerts, toggleAlerts } from './alerts.js';
 import { ticker } from './ticker.js';
 import { openTimeline, reset } from './timeline.js';
 import { load } from './net.js';
@@ -264,30 +264,11 @@ document.addEventListener('toggle', e => {
     ? `${r.bottom + 4}px` : `${r.top - box.offsetHeight - 4}px`;
 }, true);
 
-// --- alert panel ---------------------------------------------------------------------------------
-
-const alertPanel = el('alerts'), alertTab = el('alertTab');
-alertTab.onclick = () => {
-  const open = alertPanel.classList.toggle('open');
-  alertTab.setAttribute('aria-expanded', open);
-  PREFS.alertsOpen = open;
-  save();
-};
-// Same on landing for the alert panel: expanded it covers a third of a phone screen. It still
-// springs open by itself when something *becomes* an alert (see alerts.js) — that is news, and news
-// is worth the space; a list that was already there when you arrived is not.
-function syncAlertPanel() {
-  const open = !phone.matches && PREFS.alertsOpen !== false;
-  alertPanel.classList.toggle('open', open);
-  alertTab.setAttribute('aria-expanded', open);
-}
-syncAlertPanel();
-/* And again on every crossing of the breakpoint, for the reason landing on a phone collapses it:
-   expanded it covers a third of the screen, and a panel that was reasonable beside a 1200px map is
-   not the same object at 380px. Restored to the saved preference on the way back out. Neither
-   direction writes PREFS — the layout is deciding here, not the user, and overwriting the
-   preference would leave nothing to restore. Same contract as the drawer's handler above. */
-phone.addEventListener('change', syncAlertPanel);
+// --- alert list ------------------------------------------------------------------------------
+// Nothing more than a disclosure now — the list lives in #side and alerts.js owns both ends of it.
+// No open/closed preference either: the panel is not permanent furniture any more, so there is no
+// state to remember between visits, and nothing covers a third of a phone screen until asked.
+el('alertBtn').onclick = toggleAlerts;
 
 // --- tap-to-open popovers (touch has no hover) -----------------------------------------------------
 
@@ -295,11 +276,13 @@ document.querySelectorAll('.info').forEach(info => info.onclick = e => {
   e.stopPropagation();
   info.classList.toggle('open');
 });
-const netChip = el('net');
-netChip.onclick = e => {
-  e.stopPropagation();
-  if (!e.target.closest('#netstats')) netChip.classList.toggle('open');
-};
+// The dot is 9px, so on touch it is the mark around it that opens the diagnostics — a 24px target
+// rather than a 9px one, and the dot is a decoration on the mark anyway.
+const netChip = el('net'), netMark = document.querySelector('header h1 .mark');
+netMark.onclick = e => { e.stopPropagation(); netChip.classList.toggle('open'); };
+// The popover is no longer inside the thing that opens it (see index.html), so it has to keep its
+// own clicks off the close-everything handler below.
+el('netstats').onclick = e => e.stopPropagation();
 document.addEventListener('click', () => {
   netChip.classList.remove('open');
   document.querySelectorAll('.info.open').forEach(i => i.classList.remove('open'));
@@ -427,10 +410,11 @@ document.addEventListener('click', e => {
   const cam = btn && byId(btn.dataset.cam);
   if (cam) flashTo(cam);   // unhides the camera layer if it is switched off
 });
-// Same jump from anywhere outside the alert panel (which binds its own, plus a mobile collapse).
+// Same jump from anywhere, the alert list included — it is inside #side now, and the card it opens
+// takes the panel over, which is what a phone needed the old per-row handler to arrange by hand.
 document.addEventListener('click', e => {
   const node = e.target.closest('[data-go]');
-  if (!node || node.closest('#alertBody')) return;
+  if (!node) return;
   const t = byId(node.dataset.go);
   if (t) flashTo(t);
 });

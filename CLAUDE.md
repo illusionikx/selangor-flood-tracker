@@ -20,7 +20,7 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `index.html` | markup only — no inline CSS or JS |
 | `css/icons.css` | every icon, as an SVG mask. Generated — see docs/FEATURES.md for the fetch |
 | `css/base.css` | tokens, reset, controls, blocks shared by popup + alert panel |
-| `css/chrome.css` | page furniture: app bar, status chip, drawer, legend, alerts, splash |
+| `css/chrome.css` | page furniture: app bar, status dot, drawer, legend, splash |
 | `css/map.css` | Leaflet overrides, pins, cluster badges, popup template |
 | `js/app.js` | entry point — decides what happens on landing, nothing else |
 | `js/config.js` | constants (kinds, palettes, thresholds, tile styles). No imports. |
@@ -31,15 +31,21 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `js/heat.js` | both heat layers (water level, rainfall), ground-fixed sizing, shared opacity |
 | `js/popup.js` | popup + meter + gauge + sparkline templates |
 | `js/render.js` | rebuilds markers and heat points; drawer summary table |
-| `js/alerts.js` | "On alert" panel |
+| `js/alerts.js` | "On alert": the app bar's warning glyph, the list it opens in `#side`, the icon badge |
 | `js/table.js` | the all-stations table dialog, grouped district → mast → sensor |
 | `js/locate.js` | geolocation and the "You are here" marker |
 | `js/ticker.js` | header alert marquee — measured, seamless, speed scales with the alert count |
 | `js/timeline.js` | camera archive replay + A/B compare, inside the lightbox and nowhere else |
 | `js/toast.js` | desktop-only "new alert since last poll" toast |
 | `js/test.js` | test mode: fakes a flood in the client's copy of the payload |
-| `js/net.js` | `load()` poll loop and the status chip |
+| `js/net.js` | `load()` poll loop and the status dot on the logo |
 | `js/ui.js` | all DOM wiring: drawer, filters, chips, panels, lightbox, delegated jumps |
+| `manifest.json` | PWA manifest. `.json`, not `.webmanifest` — see the gotcha below |
+| `sw.js` | service worker: network-first shell cache, and the reason Chrome offers "Install app" |
+| `icon.svg` | the app mark: bare glyph, no fill. Source for the PNGs *and* the `--i-flood` mask |
+| `icon-build.php` | `php icon-build.php` — rebakes the two icons and prints the mask rule to paste |
+| `icon-192.png`, `icon-512.png` | manifest icons (`any`) and the favicon — the glyph on transparency |
+| `icon-180.png` | `apple-touch-icon`. Opaque, because iOS flattens alpha onto a colour of its own |
 | `img/` | optional. Only `egg.webp` (the About easter egg). Absent is a supported state — see below |
 | `vendor/` | Leaflet, leaflet.heat (patched), markercluster, subsetted fonts — no CDN, hand-managed |
 | `lib/` | Composer's vendor dir (`symfony/dom-crawler`), gitignored — **not** `vendor/` |
@@ -152,7 +158,7 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   mark at that rate — within `RISE_ETA` (3 h). `eta` is published whenever a station is climbing, so
   the UI can show what the cutoff is cutting off. The client reads `s.rising`; it never re-derives it,
   and nothing mirrors `RISE_ETA` client-side any more.
-- Response also carries real diagnostics used by the status chip: `tookMs`, `details.ok/requested`,
+- Response also carries real diagnostics used by the status popover: `tookMs`, `details.ok/requested`,
   `offline`, `cacheAge`, `sourceUpdated`.
 
 ## Colour language — do not violate
@@ -208,12 +214,54 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   edit unless the URL changes. The stylesheet links carry `?v=` — **bump it when you touch a css
   file**, the same as `vendor/fonts.css`. ES module imports have no such guard: hard-reload
   (Ctrl+Shift+R) after a `js/` change, or the browser may run the old module.
+  **The app icons carry `?v=` too**, in four places — the two `<link>` tags in `index.html` and the
+  two `icons[].src` in `manifest.json`. `icon-build.php` rewrites the PNGs under the same names, and
+  a browser holds a favicon for far longer than three hours, so bumping that number is the only
+  thing that makes a new mark appear. The script prints the reminder when it finishes.
 - **There is no icon font any more, and there must not be one again.** Icons are SVG masks in
   `css/icons.css` (`<i class="i i-warning">`, or `--i: var(--i-warning)` on a pseudo-element).
   A ligature font renders *text* that only becomes a picture if shaping cooperates, so a stray
   `text-transform`, a glyph missing from the subset or one stale cached subset put the raw word on
   screen — that happened three times, with three different triggers. Adding an icon is one rule in
   `icons.css`; there is no binary to refetch and no `?v=` to bump.
+- **The service worker must never cache a reading.** `sw.js` deliberately returns without calling
+  `respondWith()` for `api.php` and `api.json`, so those requests behave as if no worker existed.
+  The splash refuses to draw a map with no connection because a stale water level during a flood is
+  worse than none; a worker answering from cache would defeat that from a layer the page cannot see.
+  It is network-first for everything else too, so a `?v=` bump is still the only cache ritual —
+  **do not "optimise" it to cache-first**, or an edit goes live for nobody until a cache name moves.
+- **The app icons are transparent, so `purpose` must stay `any` — never `any maskable`.** A maskable
+  icon is required to be opaque edge to edge; declaring a transparent one maskable hands the
+  platform a background of its own choosing, which destroys the reason it is transparent. Same
+  chain: `background_color` is white because it is the *splash* colour and a blue glyph on a blue
+  splash is invisible, and the glyph is blue rather than white because with no plate it lands on a
+  tab strip, a wallpaper and a launcher, and white survives only some of those.
+- **Do not add `mobile-web-app-capable` — or put `apple-mobile-web-app-capable` back.** Chrome's
+  console deprecates the Apple tag and suggests the unprefixed one; both are the pre-manifest way of
+  asking for standalone, and `display: standalone` in `manifest.json` has covered it since iOS 11.3.
+  Adding the suggested tag would be a second legacy mechanism for something already declared. The
+  only thing still tied to the Apple tag is `apple-touch-startup-image`; if iOS splash screens are
+  ever wanted, that tag comes back *with* them and not before.
+- **iOS has its own icon, `icon-180.png`, and needs it.** Safari does not honour alpha on a
+  home-screen icon; it flattens it onto a colour of its own choosing, historically black — the exact
+  plate that was deliberately removed. So `apple-touch-icon` points at an opaque white tile with a
+  smaller glyph (iOS rounds the corners itself and the squircle bites anything near the edge), while
+  the favicon and the manifest keep the transparent pair. **Do not point `apple-touch-icon` back at
+  `icon-192.png`** — it will look right in every browser you can test locally and black on a phone.
+- **The icon badge follows the app bar's alert count and nothing else.** `navigator.setAppBadge()` in
+  `alerts()`, on `live` — the same number the panel's warning glyph is coloured by, with the district
+  filter and `PREFS.ignored` already applied and stale stations excluded. Never badge `hot`: stations
+  we can no longer read are a maintenance problem, not a flood. It deliberately does **not** request
+  notification permission (iOS needs it and simply goes without) — a prompt on landing is the
+  trust-spending the alert standard warns about, for a number already on screen. The badge is not an
+  alert channel; anything that wants to make it one goes through the alert design standard first.
+- **The PWA paths are all relative** (`start_url: "."`, `new URL('../sw.js', import.meta.url)`),
+  because the same files serve from the root of a Herd host *and* a GitHub Pages sub-path. An
+  absolute `/sw.js` is a 404 on one of the two, and a worker that fails to register just quietly
+  removes the install button.
+- **The manifest is `manifest.json`, not `.webmanifest`.** Herd types an unknown extension
+  `application/octet-stream`; the correct type would have to be added to every web server this ever
+  runs behind. `.json` is right everywhere already, and no browser cares about the name.
 - **Herd serves `index.html` with HTTP 200 for missing files.** A typo'd asset path is *not* a 404,
   so "everything returns 200" proves nothing — check `%{content_type}` instead. This is why a
   missing `js/*.js` shows up as a module parse error in the console rather than a failed request.
@@ -259,6 +307,23 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   The three ways out are the ×, a dialog taking the screen (About, the table — both call
   `closeSide()` in ui.js), and ⋮ → ignore. **Do not add a fourth without a reason that survives
   "it vanished while I was reading it".**
+- **The alert list is a tenant of `#side`, under the key `@alerts`.** It is not a panel of its own
+  any more, so there is nothing to place, slide past the drawer or collapse on a phone — and a
+  station picked out of the list *replaces* the list, which is why nothing binds the rows any more
+  (ui.js's delegated `[data-go]` handler reaches them, and the old per-row handler existed only to
+  collapse the panel on a phone first). Two consequences. Its head must stay the first element and
+  must be `.pophead`, the same seam every station card obeys — `openSide()` lifts it into
+  `#sideHead`. And **nothing springs it open by itself**: on the right edge it would land on a card
+  someone is reading, which is the rule directly above. The button's colour and count are on screen
+  the whole time, and the interruption for news is still the toast.
+- **`#alertBtn`'s `aria-expanded` is synced from `openSide()`/`closeSide()` in map.js**, not from the
+  click that opened it — the panel has half a dozen other ways to change what is in it (a pin, the
+  table, "you are here", the ×) and every one of them would have left the button lying.
+- **`#netstats` is a sibling of the `<h1>`, not a child of the dot that opens it.** A `<table>` is
+  flow content and cannot legally sit inside a heading, so the popover is anchored to `header` and
+  revealed by `header:has(h1 .mark:hover)` — there is no combinator that walks back out of the
+  heading to a sibling. The touch path toggles `.open` on `#net`, and `#netstats` has to stop its own
+  clicks (ui.js) because it is no longer inside the element the document handler exempts.
 - **You cannot focus something you are still animating into view.** Two separate traps, both silent,
   and `#gotoBox` hit each in turn. A transitioned `visibility` *interpolates*: at t=0 of
   hidden→visible it still computes to `hidden`, so `focus()` is refused — hence `visibility 0s .25s`

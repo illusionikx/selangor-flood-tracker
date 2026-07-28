@@ -4,7 +4,7 @@
 import { KINDS, SOURCES, SPARK_H, camSrc } from './config.js';
 import { num, ago, noSec, parseMY, distKm, hasInfo, isStale, statusColor, scalePos,
          levelStops, gaugeStops } from './util.js';
-import { nearestOf, nearestCam, oneLiner } from './stations.js';
+import { nearestOf, nearestCam } from './stations.js';
 
 // Spinner lives on the wrapper; the img clears it on load, or swaps itself out on failure.
 export const camImg = (c, alt) => `<div class="shotwrap">
@@ -49,11 +49,36 @@ export const etaText = h => h <= 0 ? 'already at it'
   : h <= 6 ? `in ~${h.toFixed(1)} h`
   : 'over 6 h away';
 
-/* A camera on the *same mast* is not a nearest-anything — it is this station's own view, so it says
-   so and drops the distance, which would read "0.0 km". Everywhere else the distance is the whole
-   point of the link (is this worth a look?) and the camera's name is not: it is a second place name
-   on a card that already carries one, and clicking through names it anyway. `from` may be a bare
-   latlng from a map click, which has no `site` — hence the guard rather than a plain comparison. */
+/* The "you are here" card, and only that card, shows the nearest camera's picture rather than a link
+   to it. There the camera is one of the five things you asked for — "what is around me" is the whole
+   question, and a picture of it is an answer in a way "there is one 3 km away" is not. On a station
+   card it is an aside: you opened a river gauge to read a river gauge, and a 250 KB still of
+   somewhere else, fetched whether you wanted it or not, is not what you asked for.
+   Built as a `.sensor` section like every other kind on that card, because that is what it is there —
+   glyph and label, the distance where the other sections put it, the place name, then the reading,
+   which here is the picture. `from` is a bare latlng, so there is no same-mast case to handle: your
+   own position shares a mast with nothing. */
+export function camNear(from, cam) {
+  const k = KINDS.camera;
+  return `<div class="sensor cam">
+    <div class="sensorhead">
+      <i class="glyph i i-${k.icon}" style="color:${cam ? k.color : 'var(--muted)'}"></i>
+      <b>Nearest camera</b>
+      ${cam ? `<span class="muted">${distKm(from, cam).toFixed(1)} km away</span>` : ''}
+    </div>
+    ${!cam ? '<div class="muted">no camera nearby</div>'
+      : `<div class="place" data-cam="${cam.id}" title="Show ${cam.name} on the map">${cam.name}</div>
+         ${camImg(cam, `Latest still from ${cam.name}`)}`}
+  </div>`;
+}
+
+/* Everywhere else — every station card, every alert row — the camera is offered, not shown. One
+   line at the top of the card saying a picture exists and how far away it is, which is enough to
+   decide whether you want it. The alert panel would be N proxied fetches at JPS for pictures of
+   places you are scrolling past; a station card would be one you did not ask for.
+   A camera on the *same mast* is not a nearest-anything — it is this station's own view, so it says
+   so and drops the distance, which would read "0.0 km". `from` may be a bare latlng from a map
+   click, which has no `site` — hence the guard rather than a plain comparison. */
 export const camLink = (from, cam) => cam
   ? `<button class="link" data-cam="${cam.id}">
        <i class="i i-photo_camera"></i> ${from.site && from.site === cam.site
@@ -170,18 +195,18 @@ function sensorBody(s, withCam = true) {
        ${sirenBand(s.history)}`;
   const gauge = s.kind !== 'gauge' ? '' : gaugeBlock(s);
 
-  // Only camera popups carry an image; everything else links to the closest one — but a site that
-  // already holds a camera has the picture right there, so the link would point at itself.
-  // The picture *is* the reading for a camera, so it leads. The nearest-webcam link on every other
-  // kind stays at the bottom: it is an action to take after reading the numbers, not one of them.
+  // A camera shows its own view; everything else offers the closest one — but a site that already
+  // holds a camera has the picture right there, so the link would point at itself.
+  // Either way the view of the water leads, above the numbers: "can I see it?" is the first
+  // question a level on a river prompts, not the last.
   const still = s.kind !== 'camera' ? ''
     : s.image ? camImg(s, `Latest still from ${s.name}`) : '<div class="muted">no camera feed</div>';
   const link = s.kind !== 'camera' && withCam ? camLink(s, nearestCam(s)) : '';
 
-  return `${still}${siren}${gauge}${wet}
+  return `${link}${still}${siren}${gauge}${wet}
     ${s.kind === 'river' ? meter(s) : ''}
     ${body.length ? `<div class="popbody">${body.join('')}</div>` : ''}
-    ${spark}${rain}${link}`;
+    ${spark}${rain}`;
 }
 
 /* The one place a timestamp is printed: `OFFLINE · last reported 06/07/2026 10:19 · 411.0h ago ·
@@ -253,6 +278,7 @@ export function sitePopup(members) {
                 ><i class="i i-${k.icon}"></i>${k.one || k.label}</span>`;
       }).join('')}</div>
     </div>
+    ${hasCam ? '' : camLink(lead, nearestCam(lead))}
     ${camFirst(members).map(m => `<div class="sensor">
       <div class="sensorhead">
         <i class="glyph i i-${KINDS[m.kind].icon}" style="color:${hasInfo(m) ? KINDS[m.kind].color : 'var(--muted)'}"
@@ -263,31 +289,52 @@ export function sitePopup(members) {
       </div>
       ${sensorBody(m, false)}
       ${footLine(m)}
-    </div>`).join('')}
-    ${hasCam ? '' : camLink(lead, nearestCam(lead))}`;
+    </div>`).join('')}`;
 }
 
-// Built fresh on every open, so it reflects the latest poll rather than the fix's timestamp.
+/* Built fresh on every open, so it reflects the latest poll rather than the fix's timestamp.
+   The same card a mast gets, assembled from what is nearest rather than from what shares a
+   coordinate: the closest camera's picture leads, then one section per kind with the full sensor
+   body — meter, trend, sparkline, footer — instead of the one-line summary it used to carry. A
+   line of summary is enough to rank four stations; it is not enough to answer "is this bad?",
+   which is the question you opened your own location to ask, and it sent you off to four other
+   cards to find out.
+   The one thing this card must say that a mast's need not: *where each sensor is*. On a station
+   card the header names the place once and every sensor shares it. Here the four are four
+   different places, so each section carries its own name, its district and how far away it is —
+   and the name is the jump to it, because that station is somewhere else on the map. */
 export function herePopup(e, loaded) {
   if (!loaded) return '<b>You are here</b><br><span class="muted">stations still loading…</span>';
+  const cam = nearestCam(e.latlng);
   const rows = ['river', 'rainfall', 'siren', 'gauge'].map(k => {
+    const kind = KINDS[k];
     const s = nearestOf(k, e.latlng);
-    if (!s) return `<div class="near"><i class="glyph i i-${KINDS[k].icon}" style="color:${KINDS[k].color}"></i>
-      <div><div class="muted">no ${KINDS[k].label.toLowerCase()} reporting</div></div></div>`;
-    return `<div class="near" data-go="${s.id}">
-      <i class="glyph i i-${KINDS[k].icon}" style="color:${KINDS[k].color}"></i>
-      <div>
-        <div>${s.name} <span class="muted">${distKm(e.latlng, s).toFixed(1)} km</span></div>
-        <div class="muted">${oneLiner(s)}</div>
-      </div></div>`;
+    const head = `<i class="glyph i i-${kind.icon}"
+        style="color:${s ? kind.color : 'var(--muted)'}"></i><b>${kind.one || kind.label}</b>`;
+    // nearestOf() only ever returns a station that is reporting, so there is no "no reading" case
+    // here — either the nearest one has something to say or nothing of this kind does.
+    if (!s) return `<div class="sensor">
+      <div class="sensorhead">${head}</div>
+      <div class="muted">no ${kind.label.toLowerCase()} reporting</div>
+    </div>`;
+    return `<div class="sensor">
+      <div class="sensorhead">${head}
+        <span class="muted">${distKm(e.latlng, s).toFixed(1)} km</span>
+        ${dots(s)}
+      </div>
+      <div class="place" data-go="${s.id}" title="Show ${s.name} on the map">${s.name}</div>
+      ${region(s)}
+      ${sensorBody(s, false)}
+      ${footLine(s)}
+    </div>`;
   }).join('');
 
   return `<div class="pophead">
-      <span class="badge" style="--c:#1a73e8"><i class="i i-person"></i>You are here</span>
+      <span class="badge" style="--c:var(--me)"><i class="i i-home_pin"></i>You are here</span>
       <div class="muted">accurate to about ${Math.round(e.accuracy)} m</div>
     </div>
-    ${rows}
-    ${camLink(e.latlng, nearestCam(e.latlng))}`;
+    ${camNear(e.latlng, cam)}
+    ${rows}`;
 }
 
 /* Hours are Malaysian, not the viewer's, so the axis agrees with every other timestamp on the page —
@@ -332,9 +379,11 @@ const rules = ticks => ticks.map(t =>
 let fillId = 0;
 const areaFill = c => {
   const id = `af${++fillId}`;
+  // `style`, not a `stop-color` attribute — the palette is `var()` tokens now (see config.js), and a
+  // presentation attribute does not resolve one. Same rule as the siren band's bars below.
   return [id, `<defs><linearGradient id="${id}" x1="0" x2="0" y1="1" y2="0">
-    <stop offset="0" stop-color="${c}" stop-opacity=".6"/>
-    <stop offset="1" stop-color="${c}" stop-opacity=".1"/>
+    <stop offset="0" style="stop-color:${c}" stop-opacity=".6"/>
+    <stop offset="1" style="stop-color:${c}" stop-opacity=".1"/>
   </linearGradient></defs>`];
 };
 
@@ -373,7 +422,7 @@ export function sparkline(points, kind = 'river') {
       ${rules(ticks)}
       <polygon points="${x(inWin[0][0])},28 ${pts} ${x(inWin.at(-1)[0])},28" fill="url(#${id})"/>
       <polyline points="${pts}" fill="none" vector-effect="non-scaling-stroke"
-        stroke="${col}" stroke-width="2" stroke-linejoin="round"/>
+        style="stroke:${col}" stroke-width="2" stroke-linejoin="round"/>
     </svg>
     ${axisHtml(ticks)}
     <div class="muted">${lo.toFixed(2)}–${hi.toFixed(2)} m over ${spanText(secs)}</div>
@@ -461,7 +510,7 @@ export function rainBars(points) {
           width="1.6" height="${(28 - y(s[0][1])).toFixed(2)}" fill="url(#${id})"/>`;
         return `<polygon points="${x(s[0][0])},28 ${pts} ${x(s.at(-1)[0])},28" fill="url(#${id})"/>
           <polyline points="${pts}" fill="none" vector-effect="non-scaling-stroke"
-            stroke="${KINDS.rainfall.color}" stroke-width="1.5" stroke-linejoin="round"/>`;
+            style="stroke:${KINDS.rainfall.color}" stroke-width="1.5" stroke-linejoin="round"/>`;
       }).join('')}
     </svg>
     ${axisHtml(ticks)}

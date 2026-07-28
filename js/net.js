@@ -9,11 +9,12 @@ import { alertToast } from './toast.js';
 import { ticker } from './ticker.js';
 import { seedTest } from './test.js';
 
-/* One word and a dot. The chip answers one question — is what I am looking at current? — and every
-   extra clause was answering a question nobody had asked yet ("upstream down — showing cache" is
-   two facts and a dash in a 64px bar). The diagnostics that used to be in the chip are still one
-   hover away; the ones that were only ever useful to me while building it (HTTP status, detail-call
-   tally, fetch milliseconds, offline percentage) are gone.
+/* A dot on the mark. It answers one question — is what I am looking at current? — and every extra
+   clause was answering a question nobody had asked yet ("upstream down — showing cache" is two facts
+   and a dash in a 64px bar). It was a pill with a word in it until the bar ran out of room for both
+   a ticker and six controls; the word and the diagnostics are one hover away on the logo, and the
+   ones that were only ever useful to me while building it (HTTP status, detail-call tally, fetch
+   milliseconds, offline percentage) are gone.
 
    Still measured, not assumed: green needs a 200, a live upstream, and readings stamped within the
    last 2h (JPS publishes hourly). */
@@ -23,25 +24,34 @@ function network(j, err) {
   last = err ? null : j;
   const stale = j && j.sourceUpdated && (Date.now() - new Date(j.sourceUpdated)) / 3.6e6 > 2;
   // Test mode outranks every real state: whatever the feed is doing, the map is not showing it.
-  const [color, text] = state.test   ? ['#e8710a', 'test mode']
-    : err                            ? ['#ff4d4d', 'offline']
-    : j.upstreamOk === false         ? ['#ff4d4d', 'cached']
-    : stale                          ? ['#ffd166', 'stale']
+  // Tokens, not hexes: the dot sits on the app bar, which is white on one theme and near-black on
+  // the other — see the palette block in base.css. 'live' keeps its own teal, which belongs to no
+  // station state and so needs no ramp.
+  const [color, text] = state.test   ? ['var(--s-warning)', 'test mode']
+    : err                            ? ['var(--s-danger)', 'offline']
+    : j.upstreamOk === false         ? ['var(--s-danger)', 'cached']
+    : stale                          ? ['var(--s-alert)', 'stale']
                                      : ['#06d6a0', 'live'];
-  const rows = err ? [['problem', err]] : [
+  /* The word leads the popover instead of sitting in the bar. The dot on the mark says *something
+     changed* in a colour; which state it is now is a word, and a word needs a place to be read
+     rather than a place to be glanced at. Nothing is lost: this row is the old chip's label. */
+  const rows = [['status', text], ...(err ? [['problem', err]] : [
     ['readings', j.sourceUpdated ? ago(j.sourceUpdated) : 'unknown'],
     ['last checked', ago(j.fetched)],
     ['stations', j.stations.length],
     ['from', j.cacheAge ? `cache, ${j.cacheAge}s old` : 'JPS'],
-  ];
+  ])];
 
-  el('net').style.setProperty('--c', color);   // chip tint, dot and halo all follow the state
-  el('net').innerHTML = `<span class="swatch"></span><span>${text}</span>`
-    + `<table id="netstats" class="surface">`
-    + rows.map(([k, v]) => `<tr><td class="muted">${k}</td><td>${v}</td></tr>`).join('')
-    // The one thing the chip can't show but everyone asks: it updates by itself, on a timer.
+  const dot = el('net');
+  dot.style.setProperty('--c', color);         // dot and halo follow the state
+  // The state is a colour on a 9px dot, so it has to be said in text somewhere a screen reader
+  // reaches without hovering anything. `role="img"` is on the element in index.html.
+  dot.setAttribute('aria-label', `Feed status: ${text}`);
+  el('netstats').innerHTML =
+    rows.map(([k, v]) => `<tr><td class="muted">${k}</td><td>${v}</td></tr>`).join('')
+    // The one thing the dot can't show but everyone asks: it updates by itself, on a timer.
     + `<tr class="note"><td colspan="2" class="muted">Refreshes itself every ${
-         POLL_MS / 60000} minutes. Nothing to reload.</td></tr></table>`;
+         POLL_MS / 60000} minutes. Nothing to reload.</td></tr>`;
 }
 
 /* The page updates itself every POLL_MS, but between polls the chip said "last checked 4 minutes

@@ -1,17 +1,25 @@
-// "On alert" panel. Always present: a panel that vanishes when all is well is indistinguishable
-// from a panel that broke, so quiet is stated rather than implied.
+// "On alert": a warning glyph in the app bar, always present — a control that vanishes when all is
+// well is indistinguishable from one that broke, so quiet is stated rather than implied — and the
+// list itself in the station panel, which is the same popout a pin opens.
 
 import { KINDS, STATUS_COLOR, NO_INFO } from './config.js';
 import { state, PREFS } from './state.js';
 import { el, distKm, dkey, isHot, tier, TIER_RANK, isIgnored, noSec } from './util.js';
-import { flashTo } from './map.js';
-import { nearestCam, byId } from './stations.js';
+import { side, openSide, closeSide } from './map.js';
+import { nearestCam } from './stations.js';
 import { meter, sparkline, etaText, rateHtml, camLink } from './popup.js';
 
-// Last count, so the panel only auto-collapses on the *change* to zero. Starts non-zero so a first
-// load with nothing on alert still counts as a transition and collapses; a first load with alerts
-// doesn't, leaving ui.js's saved open/closed preference alone.
-let wasHot = -1;
+/* The list shares #side with the station cards. `@`-prefixed, so render()'s per-poll refresh leaves
+   it alone (see the tail of render.js) — this module refreshes it instead, on the same poll.
+   Nothing springs it open by itself any more: on the right edge it would land on top of a card
+   someone is reading, and the glyph's colour and count are on screen the whole time either way.
+   The interruption for news is still the toast. */
+const KEY = '@alerts';
+let card = '';        // last built list, so the button can open it without waiting for a poll
+
+export function toggleAlerts() {
+  side.key === KEY ? closeSide() : openSide(KEY, card);
+}
 
 export function alerts() {
   const hidden = new Set(PREFS.hidden || []);
@@ -26,13 +34,24 @@ export function alerts() {
   const stale  = hot.length - live.length;
   const hereAt = state.hereAt;
 
-  // Icons rather than "(2 rising / 1 danger)": the tab is 300px wide and the words wrapped as soon
-  // as all three counts were non-zero — which is exactly when the panel matters most. Each count
+  /* The installed app's icon badge — the same number the tab's warning glyph is coloured by, so a
+     home screen and this panel never disagree. `live`, not `hot`: a badge is a demand for attention
+     and a list of stations we can no longer read is a maintenance problem, not a flood — the same
+     line the counts above already draw.
+     Zero clears it, per the spec, so there is no second branch. Optional chaining short-circuits the
+     whole expression where the API is absent (every browser but Chrome and recent Safari), and the
+     `.catch` swallows iOS refusing it until notification permission is granted — which is not asked
+     for here, because a permission prompt on landing is exactly the trust-spending the alert
+     standard warns about, and the badge is a nicety either way. */
+  navigator.setAppBadge?.(live.length).catch(() => {});
+
+  // Icons rather than "(2 rising / 1 danger)": the head is one panel-width and the words wrapped as
+  // soon as all three counts were non-zero — which is exactly when the list matters most. Each count
   // keeps its title/aria text, so nothing is conveyed by the glyph alone.
   const tally = [
-    [danger, 'warning',     'at danger', '#d93025'],
-    [sirens, 'campaign',    'sounding', '#d93025'],
-    [rising, 'expand_less', 'rising', '#e8710a'],
+    [danger, 'warning',     'at danger', STATUS_COLOR[3]],
+    [sirens, 'campaign',    'sounding', STATUS_COLOR[3]],
+    [rising, 'expand_less', 'rising', STATUS_COLOR[2]],
     [stale,  'wifi_off',    'not current', 'var(--muted)'],
   ].filter(([n]) => n)
    .map(([n, icon, what, c]) => `<b style="--c:${c}" title="${n} ${what}" aria-label="${n} ${what}"
@@ -46,20 +65,27 @@ export function alerts() {
   const c = !live.length ? NO_INFO
     : STATUS_COLOR[live.length >= 10 ? 3 : live.length >= 5 ? 2 : 1];
 
-  el('alertTab').innerHTML =
-    `<i class="lead i i-warning" style="--c:${c}"></i><span>On alert${
-      hot.length && hereAt ? ' <span class="muted">· nearest first</span>' : ''
-    }</span><span class="tally">${tally}</span>`;
+  /* The bar's own signal. The badge counts `live` — the same number as the app icon's, for the same
+     reason: it is a demand for attention, and stations we can no longer read are not one. The
+     breakdown that used to sit under the tab is in the panel head instead, where there is width for
+     it; the button carries the colour and the number, which is all a 40px control can say. */
+  const btn = el('alertBtn');
+  btn.style.setProperty('--c', c);
+  btn.innerHTML = `<i class="i i-warning"></i><b class="abadge">${live.length || ''}</b>`;
+  const what = live.length ? `${live.length} station${live.length > 1 ? 's' : ''} on alert`
+                           : 'On alert — all clear';
+  btn.title = what;
+  btn.setAttribute('aria-label', what);
 
-  // Collapse to the tab when there is nothing to list, and spring back open when something appears.
-  // Only on the transition, so a user who opened the all-clear to read it isn't shut again on the
-  // next poll — and reopening still respects their preference for a closed panel.
-  if (!hot.length !== !wasHot) {
-    const open = hot.length > 0 && PREFS.alertsOpen !== false;
-    el('alerts').classList.toggle('open', open);
-    el('alertTab').setAttribute('aria-expanded', open);
-  }
-  wasHot = hot.length;
+  // The head, lifted into #sideHead by openSide() — which is why it must stay the first element.
+  const head = `<div class="pophead"><div class="popname">On alert${
+    hot.length && hereAt ? ' <span class="muted">· nearest first</span>' : ''
+  }</div><div class="tally">${tally}</div></div>`;
+
+  const write = body => {
+    card = head + body;
+    if (side.key === KEY) openSide(KEY, card);
+  };
 
   if (!hot.length) {
     // Name the place only when there is one place to name; otherwise say the view is filtered, so a
@@ -72,11 +98,10 @@ export function alerts() {
        but counted, so the all-clear is one the reader can weigh. The number they need is the ignored
        sensors that are hot right now, not how many are ignored in total. */
     const muted = state.data.filter(s => isIgnored(s) && isHot(s)).length;
-    el('alertBody').innerHTML =
-      `<p class="empty muted">All clear${where}. Nothing rising or in danger.</p>${
-        muted ? `<p class="empty muted"><i class="i i-visibility_off"></i> ${muted} ignored sensor${
-          muted > 1 ? 's are' : ' is'} on alert — restore ${
-          muted > 1 ? 'them' : 'it'} under Ignored sensors in the filters.</p>` : ''}`;
+    write(`<p class="empty muted">All clear${where}. Nothing rising or in danger.</p>${
+      muted ? `<p class="empty muted"><i class="i i-visibility_off"></i> ${muted} ignored sensor${
+        muted > 1 ? 's are' : ' is'} on alert — restore ${
+        muted > 1 ? 'them' : 'it'} under Ignored sensors in the filters.</p>` : ''}`);
     return;
   }
 
@@ -84,7 +109,7 @@ export function alerts() {
      tiers it would put a forecast two streets away above a river already over its danger mark on
      the other side of town — and only one of those is happening. Stale sinks to the bottom whatever
      the distance: it is the one group you cannot act on. */
-  el('alertBody').innerHTML = hot
+  write(hot
     .sort((a, b) => TIER_RANK[tier(a)] - TIER_RANK[tier(b)]
       || (hereAt ? distKm(hereAt, a) - distKm(hereAt, b)
                  : (b.kind === 'siren') - (a.kind === 'siren') || (b.ratio || 0) - (a.ratio || 0)))
@@ -118,19 +143,10 @@ export function alerts() {
         ${cam ? camLink(s, cam) : ''}
         <div class="muted">updated ${noSec(s.updated || s.shot) || 'unknown'}</div>
       </div>`;
-    }).join('');
-  // No advisory here. It lives on the ticker, which is the strip that stays visible while this panel
-  // is scrolled, collapsed or covered — and repeating it in both would make it furniture.
-
-  // Bound here rather than delegated, because the phone case needs to collapse the panel first.
-  el('alertBody').querySelectorAll('[data-go]').forEach(node => node.onclick = () => {
-    const t = byId(node.dataset.go);
-    if (!t) return;
-    // On a phone the panel covers the map, so get out of the way of the flash.
-    if (matchMedia('(max-width: 600px)').matches) {
-      el('alerts').classList.remove('open');
-      el('alertTab').setAttribute('aria-expanded', false);
-    }
-    flashTo(t);
-  });
+    }).join(''));
+  // No advisory here. It lives on the ticker, which is the strip that stays visible while this list
+  // is closed or covered — and repeating it in both would make it furniture.
+  // Nor is anything bound to the rows: the list is in #side now, so ui.js's delegated [data-go]
+  // handler reaches it, and the station card it opens *replaces* the list rather than sitting behind
+  // it — which is the phone case the old per-row handler had to collapse the panel for.
 }

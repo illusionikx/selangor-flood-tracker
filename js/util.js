@@ -88,25 +88,17 @@ export function color(s) {
   if (!hasInfo(s)) return NO_INFO;
   if (s.kind === 'river')    return RIVER_COLOR[s.status] || KINDS.river.color;
   if (s.kind === 'rainfall') return RAIN_COLOR[s.status]  || KINDS.rainfall.color;
-  if (s.kind === 'siren')    return s.status > 0 ? '#ff4d4d' : KINDS.siren.color;   // red only when sounding
-  if (s.kind === 'gauge')    return s.status >= 2 ? '#ff4d4d' : s.status === 1 ? '#ff9f1c' : KINDS.gauge.color;
+  if (s.kind === 'siren')    return s.status > 0 ? statusColor(3) : KINDS.siren.color;   // red only when sounding
+  if (s.kind === 'gauge')    return s.status >= 2 ? statusColor(3)
+                                  : s.status === 1 ? statusColor(2) : KINDS.gauge.color;
   return KINDS[s.kind].color;
 }
 
-// Black or white, whichever stays legible on a given pin fill. No single glyph colour works across
-// this palette — it runs from #3a3a6a (no rain) to #ffd166 (river alert) — and a pin whose icon you
-// cannot read is a pin with no kind. WCAG relative luminance; white wins below .179, the crossover
-// where contrast against white and against near-black are equal.
-export function ink(hex) {
-  let h = hex.slice(1);
-  if (h.length === 3) h = h.replace(/./g, c => c + c);
-  const n = parseInt(h, 16);
-  const lin = shift => {
-    const c = (n >> shift & 255) / 255;
-    return c <= .03928 ? c / 12.92 : ((c + .055) / 1.055) ** 2.4;
-  };
-  return .2126 * lin(16) + .7152 * lin(8) + .0722 * lin(0) < .179 ? '#fff' : '#14181c';
-}
+/* `ink()` lived here: black or white, whichever stayed legible on a given pin fill, picked by
+   relative luminance. Two things deleted it. Only one pin is filled now — the mast — and its glyph
+   is `var(--surface)`, which is white on the light theme and near-black on the dark one, i.e. the
+   answer this used to compute, from the token that already knows it. And the palette is `var()`
+   references now, so there is no hex here to measure. */
 
 // Is this station the reason someone opens the map at all: a river at danger, or a siren sounding.
 export const isCritical = s =>

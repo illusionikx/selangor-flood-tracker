@@ -2,7 +2,7 @@
 // Flooding is catchment-scale, so a hotspot should mean "this part of Selangor", not "this gauge",
 // and rain arrives over the same sort of area.
 
-import { HEAT_KM, HEAT_MAX_PX, HEAT_ALERT, HEAT_WARNING, RAIN_COLOR } from './config.js';
+import { HEAT_KM, HEAT_MAX_PX, HEAT_ALERT, HEAT_WARNING, RAIN_HEAT } from './config.js';
 import { map } from './map.js';
 import { el } from './util.js';
 
@@ -24,13 +24,15 @@ export const heat = L.heatLayer([], {
    questions — "how high is the water" and "how hard is it coming down" — and a station carrying both
    would have summed a river level with the rain falling on it into one number that answers neither.
    Two layers also means either can be read alone, which is the point of the two chips.
-   Colours are RAIN_COLOR's own classes, so a violet blob and a violet rainfall pin mean the same
-   thing. The flat run below the first class *is* seen here, unlike the water layer: anything above
-   0 mm is drawn, so drizzle paints the lightest violet rather than nothing. */
+   Colours are RAIN_HEAT — the same classes the rainfall pins wear, as real values rather than the
+   tokens the pins use, because this gradient is baked into an ImageData and a canvas cannot resolve
+   a `var()`. One set for both themes: a blob is composited *over* the basemap at low alpha rather
+   than read against it. The flat run below the first class *is* seen here, unlike the water layer:
+   anything above 0 mm is drawn, so drizzle paints the lightest violet rather than nothing. */
 export const rainHeat = L.heatLayer([], {
   ...BASE,
   gradient: {
-    0: RAIN_COLOR[1], 0.25: RAIN_COLOR[1], 0.5: RAIN_COLOR[2], 0.75: RAIN_COLOR[3], 1: RAIN_COLOR[4],
+    0: RAIN_HEAT[1], 0.25: RAIN_HEAT[1], 0.5: RAIN_HEAT[2], 0.75: RAIN_HEAT[3], 1: RAIN_HEAT[4],
   },
 });
 
