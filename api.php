@@ -18,20 +18,27 @@ const SPARK_BUCKET = 900;    // 15 min — 48 points across the window at most
 // show the same rain two, three, four times over.
 const RAIN_BUCKET  = 3600;
 // Trend is a rate of rise (m/hour), the standard hydrological measure — JPS publishes none of its
-// own. Polls are irregular (the cache only refreshes when someone visits), so the baseline is the
-// sample nearest an hour old, and we give up rather than guess if nothing lands in the window.
-const TREND_WIN = 3600;
-const TREND_MIN = 1200;   // 20 min — closer than this and rounding noise dominates the rate
+// own. It is the MEDIAN OF EVERY PAIRWISE SLOPE in the window (Theil-Sen), not a chord between two
+// samples. A chord is one bad reading away from nonsense: the two-point version reported 9.61 m/h
+// on Sg. Kerayong, and the archive holds 846 steps of 0.5 m or more, 63 of which reverted on the
+// next sample. A median tolerates roughly 29% corrupt points and costs ~200 divisions per station.
+const TREND_MIN = 600;    // 10 min — the closest two samples may be and still form a usable pair
 const TREND_MAX = 10800;  // 3 h  — older than this says nothing about now
 // "Rising" is not a rate, it is a forecast: at the rate it is climbing now, this station reaches its
 // OWN danger mark within RISE_ETA hours. A fixed m/h can't do that job — 0.2 m/h is a quiet
 // afternoon on a big river 4 m below danger, and an emergency on a drain 30 cm below it.
-// The floor exists because levels are reported to the centimetre: over the shortest baseline we
-// accept (20 min), a single 1 cm tick is already 0.03 m/h, so anything under 0.1 is rounding.
-// Measured against our own samples in calm weather, 0.05 m/h — the previous bar — sat on the p90 of
+// The floor exists because levels are reported to the centimetre: over the shortest pair we accept,
+// a single 1 cm tick is already 0.06 m/h, so anything under 0.1 is rounding.
+// Measured against our own samples in calm weather, 0.05 m/h — an earlier bar — sat on the p90 of
 // ordinary fluctuation and fired on 3 cm of movement, flagging ~1 station-hour in 10 as "rising".
 const RISE_FLOOR = 0.10;  // m/hour — below this the rate is sensor rounding, not a climb
 const RISE_ETA   = 3;     // hours to its own danger mark
+// A tide is a rise. It climbs at 0.5-0.7 m/h twice a day at the gates and jetties (PINTU AIR IJOK,
+// BANDAR KLANG, TELUK PENYAMUN) and reaches danger never, so extrapolating one is a daily false
+// alarm. The level must therefore beat its own 24-hour high: a tide stays inside yesterday's
+// envelope and a flood breaks it. And it must hold for two consecutive polls — ISA-18.2's on-delay,
+// because one poll of climb was 48 on/off flips across 53 firings.
+const RISE_DAY = 86400;
 // Sirens report a daily heartbeat (most stamp 08:00). Two missed days is out of contact, not idle.
 const SIREN_STALE = 48 * 3600;
 const SITE_M = 50;   // metres — stations this close are sensors on one mast, not separate places
@@ -167,6 +174,25 @@ function sparkPoints(array $points, int $now, int $bucket = SPARK_BUCKET, bool $
     }
     ksort($out);
     return array_values($out);
+}
+
+/**
+ * The timestamp a reading was taken, not the one we happened to poll on.
+ *
+ * These two are not the same clock and the gap is not small. Upstream changes a value every ~25 min
+ * (median, measured over the archive) and we poll every ~8.5 min, so a level is a staircase: the
+ * same number comes back four or five times, and storing each arrival at `now` puts the step at our
+ * poll rather than at the measurement. Both ends of a rate then carry up to a poll interval of
+ * error, which over a short baseline is a rate wrong by more than 100% — the source of every
+ * phantom climb on a station whose level had not moved in five polls.
+ *
+ * Using the reading's own stamp also makes the (station, ts) primary key do real work: a repeated
+ * reading is one row, not five. JPS stamps a reading to the UPCOMING slot (17:45 at 17:36), so a
+ * stamp in the future is normal and is pulled back to now rather than treated as an error.
+ */
+function readTs(?string $updated, int $now): int {
+    $d = $updated ? DateTime::createFromFormat('d/m/Y H:i:s', $updated) : false;
+    return $d ? min($now, $d->getTimestamp()) : $now;
 }
 
 /** Fetch many URLs concurrently. Returns [url => decoded|null], or [url => body] when $json is off. */
@@ -452,9 +478,10 @@ unset($s);
 foreach ($stations as &$s) {
     if ($s['kind'] !== 'rainfall' || !isset($s['hourly'])) continue;
     $key = $s['id'];
+    $ts  = readTs($s['updated'] ?? null, $now);
     $s['history'] = sparkPoints(
-        array_merge($hist[$key] ?? [], [[$now, (float)$s['hourly']]]), $now, RAIN_BUCKET);
-    $samples[$key] = (float)$s['hourly'];
+        array_merge($hist[$key] ?? [], [[$ts, (float)$s['hourly']]]), $now, RAIN_BUCKET);
+    $samples[$key] = [$ts, (float)$s['hourly']];
 }
 unset($s);
 
@@ -470,9 +497,10 @@ foreach ($stations as &$s) {
     // graph of it must not do: a straight line reads as "steady", not as "nobody is listening".
     if ($s['kind'] !== 'gauge' || !isset($s['depth']) || !$s['online']) continue;
     $key = $s['id'];
-    $hist[$key] = array_merge($hist[$key] ?? [], [[$now, (float)$s['depth']]]);
+    $ts  = readTs($s['updated'] ?? null, $now);
+    $hist[$key] = array_merge($hist[$key] ?? [], [[$ts, (float)$s['depth']]]);
     $s['history'] = sparkPoints($hist[$key], $now);
-    $samples[$key] = (float)$s['depth'];
+    $samples[$key] = [$ts, (float)$s['depth']];
 }
 unset($s);
 
@@ -485,9 +513,10 @@ unset($s);
 foreach ($stations as &$s) {
     if ($s['kind'] !== 'siren' || !$s['online']) continue;
     $key = $s['id'];
-    $hist[$key] = array_merge($hist[$key] ?? [], [[$now, (float)$s['status']]]);
+    $ts  = readTs($s['updated'] ?? null, $now);
+    $hist[$key] = array_merge($hist[$key] ?? [], [[$ts, (float)$s['status']]]);
     $s['history'] = sparkPoints($hist[$key], $now, SPARK_BUCKET, true);
-    $samples[$key] = (float)$s['status'];
+    $samples[$key] = [$ts, (float)$s['status']];
 }
 unset($s);
 
@@ -519,48 +548,74 @@ unset($s);
 // --- Trend -------------------------------------------------------------------------------------
 // Runs last, over whichever reading won: a rate computed from a level we then overrode would be a
 // rate for a number nobody is shown.
+
+/** Theil-Sen: the median of every pairwise slope in the window, in m/hour. Null if no pair spans. */
+$slope = function (array $pts, int $at): ?float {
+    $win = [];
+    foreach ($pts as $p) if ($at - $p[0] >= 0 && $at - $p[0] <= TREND_MAX) $win[] = $p;
+    $n = count($win);
+    $sl = [];
+    for ($i = 0; $i < $n; $i++) for ($j = $i + 1; $j < $n; $j++) {
+        $dt = $win[$j][0] - $win[$i][0];
+        if ($dt >= TREND_MIN) $sl[] = ($win[$j][1] - $win[$i][1]) / ($dt / 3600);
+    }
+    if (!$sl) return null;
+    sort($sl);
+    $m = count($sl);
+    return $m % 2 ? $sl[($m - 1) / 2] : ($sl[intdiv($m, 2) - 1] + $sl[intdiv($m, 2)]) / 2;
+};
+
+/**
+ * Judge one sample: returns [rate m/h, hours to $mark] with the ETA null unless it is really
+ * climbing. Takes an index rather than the latest point so the previous poll can be judged by the
+ * same rules — which is the whole on-delay, with nothing persisted to do it.
+ */
+$assess = function (array $pts, int $i, ?float $mark) use ($slope): array {
+    [$at, $lvl] = $pts[$i];
+    $rate = $slope(array_slice($pts, 0, $i + 1), $at);
+    if ($rate === null || $rate < RISE_FLOOR || $i < 2 || $mark === null) return [$rate, null];
+    // Strictly higher across three samples. The old test allowed equality at both steps, so a level
+    // that had not moved in five polls still counted as climbing on a rate left over from an
+    // earlier step — which is exactly how a closed water gate kept reporting a 0.9 h ETA.
+    if ($lvl <= $pts[$i - 2][1]) return [$rate, null];
+    $day = [];
+    foreach ($pts as $p) if ($p[0] < $at && $at - $p[0] <= RISE_DAY) $day[] = $p[1];
+    if ($day && $lvl < max($day)) return [$rate, null];   // still inside its own daily envelope
+    return [$rate, round(max(0, ($mark - $lvl) / $rate), 2)];
+};
+
 foreach ($stations as &$s) {
     if ($s['kind'] !== 'river') continue;
     $key = $s['id'];
     $lvl = $s['level'];
-    $s['trend'] = $s['rate'] = $s['eta'] = null;
+    $s['rate'] = $s['eta'] = null;
     $s['rising'] = false;
     $s['history'] = [];
     $s['ratio'] = ($lvl !== null && ($s['danger'] ?? null)) ? round($lvl / $s['danger'], 3) : null;
     if ($lvl === null) continue;
 
+    $ts = readTs($s['updated'] ?? null, $now);
     $points = $hist[$key] ?? [];
-    $base = null;
-    foreach ($points as $p) {
-        $age = $now - $p[0];
-        if ($age < TREND_MIN || $age > TREND_MAX) continue;
-        if (!$base || abs($age - TREND_WIN) < abs(($now - $base[0]) - TREND_WIN)) $base = $p;
-    }
-    if ($base) {
-        $s['trend'] = round($lvl - $base[1], 3);
-        $s['rate']  = round(($lvl - $base[1]) / (($now - $base[0]) / 3600), 3);
-    }
-    // A single high reading is not a rise: the three most recent samples must not dip either.
-    // ponytail: non-decreasing, not strictly increasing — JPS refreshes slower than we poll, so
-    // repeated identical readings are normal and must not cancel a real climb.
-    $hist[$key] = array_merge($points, [[$now, $lvl]]);
-    $tail = array_slice($hist[$key], -3);
-    $climbing = $s['rate'] !== null && $s['rate'] >= RISE_FLOOR && count($tail) === 3
-             && $tail[1][1] >= $tail[0][1] && $tail[2][1] >= $tail[1][1];
+    // Same stamp as the last sample means the same reading came back. Append nothing.
+    if (!$points || end($points)[0] !== $ts) $points[] = [$ts, $lvl];
+    $hist[$key] = $points;
+    $last = count($points) - 1;
 
     // Hours to its own danger mark at the current rate. Reported whenever it is climbing at all, so
     // the popup can say "4 h away" on a station that isn't flagged — the flag is a cutoff on this
     // number, and a cutoff nobody can see the other side of is just an assertion.
     $mark = $s['danger'] ?? $s['warning'] ?? $s['alert'] ?? null;
-    $s['eta'] = ($climbing && $mark !== null)
-        ? round(max(0, ($mark - $lvl) / $s['rate']), 2)
-        : null;
-    $s['rising'] = $s['eta'] !== null && $s['eta'] <= RISE_ETA;
+    [$rate, $eta] = $assess($points, $last, $mark);
+    $s['rate'] = $rate === null ? null : round($rate, 3);
+    $s['eta']  = $eta;
+    // Two consecutive polls, both inside the cutoff. One is a spike.
+    $prev = $last > 0 ? $assess($points, $last - 1, $mark)[1] : null;
+    $s['rising'] = $eta !== null && $eta <= RISE_ETA && $prev !== null && $prev <= RISE_ETA;
     // The SPHTN arrow no longer stands in at cold start: "Rising" is now a claim about reaching a
     // danger mark within hours, and a bare direction arrow is no evidence for that.
     // [unix seconds, metres] — the graph plots against the clock, so it needs the clock.
-    $s['history'] = sparkPoints($hist[$key], $now);
-    $samples[$key] = $lvl;
+    $s['history'] = sparkPoints($points, $now);
+    $samples[$key] = [$ts, $lvl];
 }
 unset($s);
 
@@ -633,7 +688,7 @@ $payload = json_encode([
 
 $ins = $db->prepare('INSERT OR IGNORE INTO level (station, ts, level) VALUES (?, ?, ?)');
 $db->beginTransaction();
-foreach ($samples as $k => $v) $ins->execute([$k, $now, $v]);
+foreach ($samples as $k => [$ts, $v]) $ins->execute([$k, $ts, $v]);
 $db->exec('DELETE FROM level WHERE ts < ' . ($now - RETAIN));
 $db->commit();
 

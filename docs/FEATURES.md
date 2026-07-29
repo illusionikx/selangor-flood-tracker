@@ -33,13 +33,12 @@ would reach **its own danger mark within 3 hours** (`eta ≤ RISE_ETA`). A fixed
 job: 0.2 m/h is a quiet afternoon on a big river 4 m below danger and an emergency on a drain 30 cm
 below it. Every one of the 107 river stations publishes a danger mark, so this needs no fallback.
 
-Three guards sit under it. `rate ≥ RISE_FLOOR` (0.1 m/h), because levels are reported to the
-centimetre and over the shortest baseline we accept (20 min) a single 1 cm tick is already
-0.03 m/h — under 0.1 is rounding, not a climb. The three most recent samples must not dip, which
-rejects one bad reading spiking the rate; non-decreasing rather than strictly increasing, because
-JPS refreshes slower than we poll and repeated identical readings must not cancel a real climb. And
-the baseline window is bounded — younger than 20 min or older than 3 h is refused, leaving `rate`
-`null`, which renders as "no trend" rather than a confident zero.
+Four guards sit under it. `rate ≥ RISE_FLOOR` (0.1 m/h), because levels are reported to the
+centimetre and over the shortest pair we accept a single 1 cm tick is already 0.06 m/h. The level
+must be strictly higher than it was three samples ago. It must beat its own 24-hour high, which is
+what keeps a tide out. And it must hold for two consecutive polls. **The guards, the rate and the
+sample clock were all replaced after the first version fired 53 times and was wrong 53 times — see
+[The forecast was wrong every time it fired](#the-forecast-was-wrong-every-time-it-fired) below.**
 
 *Why it changed.* The old bar was `rate ≥ 0.05 m/h`. Measured against our own samples in calm
 weather that sat on the **p90 of ordinary fluctuation** — 10.5% of station-hours over it, tripping
@@ -2688,3 +2687,121 @@ districts on any device — so a phone loses one gesture, not one capability.
 
 `#ignoredList` keeps its own `.solo`, which is a different button under the same class: restoring a
 silenced sensor is that panel's entire job, and it has no count to compete with.
+
+## The forecast was wrong every time it fired
+
+We replayed the `rising` forecast over every sample in `.history.db`. That is 7.2 days, 109 river
+stations and 12,055 station-polls. It fired 53 times. Not one of those stations reached the mark the
+alert named. The flag also turned on and off 48 times across those 53 firings, so almost every
+alert lasted a single poll.
+
+Four separate defects produced that result. Three of them are in the maths. The fourth is upstream
+of the maths and is the largest.
+
+### The sample clock was ours, not the reading's
+
+`api.php` stored every sample against `$now`, the moment of the poll. Measured over the archive,
+upstream changes a value every 25 minutes at the median. We poll every 8.5 minutes. A level is
+therefore a staircase, and the same number arrives four or five times. Stamping each arrival with
+the poll time puts the step where we noticed it, not where it happened.
+
+Both ends of a rate then carry up to one poll interval of error. Over the 20-minute baseline the
+old code accepted, that is a rate wrong by more than 100%. It is the reason PINTU AIR IJOK reported
+`eta 0.9 h` through five consecutive polls at an unchanged level of 3.40 m.
+
+`readTs()` now takes the reading's own stamp, which every station already carries in `updated`. JPS
+stamps a reading to the *upcoming* slot. A stamp of 17:45 arrives at 17:36. A stamp in the future
+is therefore normal, and `readTs()` pulls it back to now. A stamp that fails to parse falls back to
+the poll time.
+
+Three things follow for free. The `(station, ts)` primary key now dedupes a repeated reading to one
+row instead of five. The sparkline plots against the clock that measured the reading. And a station
+frozen on an old reading stores that old timestamp, which `RETAIN` prunes and `SPARK_WIN` excludes,
+so a dead sensor stops writing fake current samples.
+
+### The rate was a chord between two samples
+
+The old `rate` picked the sample nearest an hour old and drew a straight line to now. One bad
+reading at either end is the whole answer. It reported **9.61 m/h** on Sg. Kerayong. The archive
+holds 846 steps of 0.5 m or more, and 63 of those reverted on the very next sample.
+
+`rate` is now the median of every pairwise slope in the 3-hour window — the Theil-Sen estimator. It
+[tolerates about 29% corrupt points](https://library.virginia.edu/data/articles/theil-sen-regression-programming-and-understanding-an-outlier-resistant-alternative-to-least-squares)
+and stays competitive with least squares on clean data. It costs about 200 divisions per station
+per poll, against 110 river stations. That is not a cost worth optimizing.
+
+`TREND_WIN` is gone with the baseline it targeted. `TREND_MIN` survives with a new job: it is now
+the closest two samples may be and still form a usable pair, and it dropped to 10 minutes because a
+median over many pairs does not need each pair to be clean.
+
+*Dropped:* the `trend` field, a raw level delta over the baseline window. No client read it.
+
+### The dip test accepted a level that never moved
+
+The old test asked that three samples not *decrease*. Three identical readings satisfy that. So a
+level standing still passed the anti-spike guard on a rate left over from a step that had already
+finished. The test is now strictly higher across the three samples.
+
+### A tide is a rise
+
+PINTU AIR IJOK is a water gate. BANDAR KLANG and TELUK PENYAMUN (JETI) are estuarine. A tide climbs
+at 0.5 to 0.7 m/h twice a day. It reaches danger never. Extrapolating one produces a false alarm on
+a timetable. This is a known trap in tidal-river gauging, where
+[datum and backwater effects](https://www.frontiersin.org/journals/climate/articles/10.3389/fclim.2026.1757212/full)
+are the usual trigger.
+
+The fix is one line and it is the honest signal, not a station blocklist: **the level must beat its
+own 24-hour high.** A tide stays inside yesterday's envelope. A flood breaks it. `READ` already
+loads 24 hours of history per poll, so the number is in hand.
+
+*Why not a blocklist of tidal stations:* somebody has to maintain it, it is wrong the first time JPS
+adds a gauge, and it says nothing about the many rivers that are mildly tidal at the mouth.
+
+### One poll of climb is a spike
+
+The 48 flips across 53 firings are alarm chattering, which the
+[alert design standard](#alert-design-standard) already commits us to avoiding under ISA-18.2. The
+standard cure is an on-delay. `rising` now needs two consecutive polls inside the cutoff.
+
+It costs nothing to store. `$assess()` takes a sample *index* rather than the latest point, so the
+previous poll goes through the same rules, on history already in memory. Nothing persists between
+requests, which matters because there is no process that lives between them.
+
+### Measured
+
+Each row adds to the one above, replayed over the same 7.2 days:
+
+| rule | fired | correct | flips |
+|---|---|---|---|
+| the old method | 53 | 0 | 48 |
+| Theil-Sen rate | 46 | 0 | 20 |
+| strictly higher | 39 | 0 | 19 |
+| above its 24-hour high | 10 | 0 | 11 |
+| two consecutive polls | 4 | 0 | 7 |
+
+**The `correct` column is zero throughout, and that is not a failure of the fix.** No station in
+those 7.2 days reached its mark at all. The replay can measure false alarms. It cannot measure
+misses. Anything claiming this method detects floods better needs a flood in the archive to say so.
+
+The live check is better evidence. On the poll that shipped this, 56 of 233 rain gauges reported
+rain and one read 31 mm/h. The method flagged three stations. ULU YAM had gone
+32.90 → 33.59 → 34.13 in half an hour, against a danger mark of 38.3. RIMBA KDR had gone 0.22 → 0.91. KG. RANTAU PANJANG had
+climbed steadily through four readings. BANDAR KLANG showed `eta 1.1 h` and was **not** flagged,
+which is the envelope rule doing its job on a tidal station.
+
+### Trade-offs accepted
+
+- **Straight-line extrapolation stays.** Rate-of-rise projection is
+  [a real operational method](https://www.weather.gov/media/marfc/FactSheets/Fact_Sheet_Understanding_River_Forecast_Process_FINAL_singlepgs.pdf),
+  and a real flood hydrograph is a curve that this method under-reads on the rising limb. Fitting a
+  curve to seven noisy points from one gauge would be a more confident wrong answer. The cure for
+  that is rainfall-runoff routing, which is a different project.
+- **Rainfall is still not an input**, although rain is the earlier signal by an hour. The samples are
+  already stored. Nothing joins a rain gauge to the catchment above a river station, and guessing
+  that join from distance would be worse than leaving it out.
+- **`$mark` still falls back** `danger ?? warning ?? alert`, so one flag can mean three severities.
+  This is an open gap against CAP's severity axis and belongs with the other four in the alert
+  design standard.
+- **Two polls of delay is up to 17 minutes of lead time** given the median poll gap. On a flashy
+  urban river that is real. It buys the end of 48 flips, and an alert nobody believes has no lead
+  time at all.

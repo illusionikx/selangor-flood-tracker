@@ -152,12 +152,16 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   seconds slower. **Do not tie capture to the poll**: 90 cameras × 250 KB × 288 polls is 6.5 GB/day
   aimed at JPS from one address, which is the stampede the lock exists to prevent, in slow motion.
 - Trend is **derived here**, not upstream: `.history.db` (sqlite, `level(station, ts, level)`,
-  PK-deduped, 30-day retention, WAL) holds the samples; each poll loads the last 24h. `rate` = m/hour against the sample nearest an hour old (refused outside 20 min–3 h, so
-  irregular polling can't produce a bogus figure). `rising` is a **forecast, not a rate**: climbing
-  at `≥ RISE_FLOOR` (0.1 m/h), last three samples not dipping, and `eta` — hours to its *own* danger
-  mark at that rate — within `RISE_ETA` (3 h). `eta` is published whenever a station is climbing, so
-  the UI can show what the cutoff is cutting off. The client reads `s.rising`; it never re-derives it,
-  and nothing mirrors `RISE_ETA` client-side any more.
+  PK-deduped, 30-day retention, WAL) holds the samples; each poll loads the last 24h. **`ts` is the
+  reading's own stamp (`readTs()`), never the poll time** — see the gotcha below. `rate` = the
+  **median of every pairwise slope** in a 3h window (Theil–Sen, pairs ≥ `TREND_MIN` apart), not a
+  chord between two samples. `rising` is a **forecast, not a rate**, and needs all five: rate
+  `≥ RISE_FLOOR` (0.1 m/h), level strictly above the sample two back, level ≥ its own 24h high (this
+  is what keeps a tide out), `eta` — hours to its *own* danger mark at that rate — within `RISE_ETA`
+  (3 h), and the same true on the previous poll (on-delay). `eta` is published whenever a station is
+  climbing, so the UI can show what the cutoff is cutting off. The client reads `s.rising`; it never
+  re-derives it, and nothing mirrors `RISE_ETA` client-side any more. `$assess()` takes a sample
+  *index* precisely so the on-delay needs nothing persisted between requests.
 - Response also carries real diagnostics used by the status popover: `tookMs`, `details.ok/requested`,
   `offline`, `cacheAge`, `sourceUpdated`.
 
@@ -192,6 +196,21 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
 - **`rm -rf shots/` is a year of camera history**, and unlike `.history.db` it cannot rebuild —
   the frames only exist because we were running when they were taken. To re-test the capture path,
   `rm shots/.last` (the 30-minute stamp), not the directory.
+- **A sample's `ts` is when the reading was taken, not when we polled.** Upstream changes a value
+  every ~25 min and we poll every ~8.5 min, so a level is a staircase and the same number arrives
+  four or five times. Stamping each arrival `now` puts the step where we noticed it, which put up to
+  a poll interval of error on *both* ends of a rate — a rate wrong by over 100% on a short baseline,
+  and the reason a station whose level had not moved in five polls reported a 0.9 h ETA to danger.
+  `readTs()` reads `updated`, clamps a future stamp (JPS stamps to the upcoming slot) and falls back
+  to `now` only when the parse fails. Anything new that writes to `level` must go through it.
+  Two side effects to keep: the `(station, ts)` PK now dedupes a repeated reading to one row, and a
+  station frozen on an old reading stores that old stamp, so `RETAIN` prunes it and `SPARK_WIN`
+  excludes it instead of drawing a flat live-looking line.
+- **A tide is a rise, and three of these stations are tidal.** PINTU AIR IJOK is a water gate;
+  BANDAR KLANG and TELUK PENYAMUN (JETI) are estuarine. They climb 0.5–0.7 m/h twice a day forever,
+  so any rate-based forecast flags them daily. The guard is `level ≥ its own 24h high`, not a
+  blocklist — a list needs maintaining, is wrong the day JPS adds a gauge, and says nothing about
+  rivers that are mildly tidal at the mouth. **Do not replace it with a station list.**
 - **Never `rm .history.db` to test a cold start** — it destroys the accumulated samples, every
   `rising` flag goes false for an hour, and anything keyed off `rising` (the filter, alert panel,
   drawer counts, heat weighting) goes quiet at once. To re-test the scrape path, expire the page
