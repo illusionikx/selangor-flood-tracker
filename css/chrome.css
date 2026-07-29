@@ -483,16 +483,33 @@ header:has(#net.open) #netstats { opacity: 1; visibility: visible; }
 /* <details> can't animate its close (children go display:none), so a body class drives it. */
 #bar {
   /* fixed, not absolute: the header is the positioned ancestor and it is only --hdr tall */
-  position: fixed; z-index: 500; top: var(--hdr); left: 0; bottom: 0; width: var(--drawer);
-  padding: 20px; overflow: auto; background: var(--surface); box-shadow: var(--shadow);
+  /* `height: calc(100dvh - …)`, not `bottom: 0`. A phone's browser resolves a fixed box's `bottom`
+     against the *large* viewport — the one with the address bar retracted — so the drawer was taller
+     than the strip actually on screen. Its content fitted inside that taller box, which meant no
+     scrollbar and a bottom section parked behind the browser chrome, unreachable. `dvh` is the
+     viewport as it stands right now, and it follows the bar in and out. */
+  position: fixed; z-index: 500; top: var(--hdr); left: 0; width: var(--drawer);
+  height: calc(100dvh - var(--hdr));
+  /* `overscroll-behavior: contain`, the same as #sideBody: without it, scrolling past the end of the
+     drawer chains to the document and takes the whole page with it. The station panel already had
+     the rule, which is why only this one did it. */
+  padding: 20px; overflow: auto; overscroll-behavior: contain;
+  background: var(--surface); box-shadow: var(--shadow);
   /* No gap between the two columns of the drawer: every section already carries its own 12px, and a
      24px seam on top of that made the one between Ignored sensors and Heatmap twice any other. */
   display: flex; flex-direction: column;
   transform: translateX(-100%); visibility: hidden;
 }
-#bar > div { min-width: 0; }
+/* `flex-shrink: 0`, and it is what makes the drawer scroll at all. #bar is a column flex container
+   with a fixed height, so a taller child does not overflow it — it *shrinks* to the container, its
+   own content spills out of the shrunken box, and #bar's scrollHeight never exceeds its height. The
+   result is a panel whose last sections are both clipped and unreachable. Only ever visible on a
+   phone, where the sections are stacked in a narrow column and run past one screen. */
+#bar > div { min-width: 0; flex-shrink: 0; }
 /* Map furniture slides with the drawer instead of hiding under it. */
-#bar, #legend { transition: transform var(--slide), visibility var(--slide); }
+/* `translate` too: a swipe writes the drag there rather than to `transform`, which is holding the
+   open/shut position — see swipeOff() in ui.js. This is what carries a half-swiped panel home. */
+#bar, #legend { transition: transform var(--slide), translate var(--slide), visibility var(--slide); }
 body:not(.ready) #bar, body:not(.ready) #legend { transition: none; }
 body.drawer #bar { transform: none; visibility: visible; }
 body.drawer #legend { transform: translateX(var(--drawer)); }
@@ -548,14 +565,49 @@ body.drawer #legend { transform: translateX(var(--drawer)); }
 /* Fixed to the right edge, under the app bar. Above the map furniture (400) and below the header
    (600); the drawer (500) is on the opposite edge, so the two never meet. */
 #side {
-  position: fixed; z-index: 450; top: var(--hdr); right: 0; bottom: 0; width: var(--side);
+  /* `100dvh`, for the same reason as #bar — see the note there. */
+  position: fixed; z-index: 450; top: var(--hdr); right: 0; width: var(--side);
+  height: calc(100dvh - var(--hdr));
   display: flex; flex-direction: column;
   border-left: 1px solid var(--outline);
   transform: translateX(100%); visibility: hidden;
-  transition: transform var(--slide), visibility var(--slide);
+  transition: transform var(--slide), translate var(--slide), visibility var(--slide);
 }
 body.side #side { transform: none; visibility: visible; }
 body:not(.ready) #side { transition: none; }
+/* --- panel edge tabs -------------------------------------------------------------------------- */
+
+/* One per panel, on the edge where that panel meets the map, sliding with it. That is the edge a
+   dismissing swipe starts from on a phone, so the button and the gesture are the same place — and on
+   a desktop it is a close control at the seam rather than only in a far corner.
+   `position: fixed` and a sibling of the panel, not a child: #bar and #side both scroll, and a child
+   sticking out of a scrolling box is clipped. Fixed to the *viewport* centre — half the viewport,
+   less half the tab — so it holds still while the panel behind it scrolls. */
+.ptab {
+  display: flex; align-items: center; justify-content: center;
+  /* `50dvh`, not `50%`: a fixed box's percentage resolves against the large viewport, so on a phone
+     the tab was centred on a screen taller than the one in front of you and sat low. */
+  position: fixed; top: calc(50dvh - 30px); height: 60px; width: 26px; padding: 0;
+  /* Grey plate, accent glyph. A solid accent tab was the loudest thing on the map, competing with
+     the status colours, which are the only hues on this page allowed to demand attention. The
+     accent is now only on the glyph, which is enough to read as a control — the shadow and the
+     `--hover` grey do the rest, the same way every other floating box here is drawn. */
+  border: 0; color: var(--accent); background: var(--hover);
+  box-shadow: var(--shadow); visibility: hidden;
+  transition: transform var(--slide), translate var(--slide), visibility var(--slide);
+}
+body:not(.ready) .ptab { transition: none; }
+/* expand_more turned to point the way the tab sends its panel — there is no chevron mask, and one
+   rotation costs less than two more icons. */
+.ptab .i { font-size: 20px; }
+#barTab .i { transform: rotate(90deg); }
+#sideTab .i { transform: rotate(-90deg); }
+/* Each tab sits one above its own panel's z-index, so it is over the map and never over the panel it
+   belongs to. Parked off screen with the panel, and pushed out by that panel's width. */
+#barTab { z-index: 501; left: 0; border-radius: 0 10px 10px 0; transform: translateX(-100%); }
+#sideTab { z-index: 451; right: 0; border-radius: 10px 0 0 10px; transform: translateX(100%); }
+body.drawer #barTab { transform: translateX(var(--drawer)); visibility: visible; }
+body.side #sideTab { transform: translateX(calc(-1 * var(--side))); visibility: visible; }
 /* The close button floats over the card's top-right corner rather than sitting on a row of its own:
    on its own row it was a whole line clear of the name it closes, above an empty strip the width of
    the panel.
@@ -936,7 +988,10 @@ body.finding #find { display: none; }
      was left after six controls — about 40px, which is not a ticker, it is a keyhole. */
   /* 6 (header pad) + 36 (controls) + 5 (gap) + 36 (ticker) = 83. Measured, not guessed: any slack
      here is dead white space between the ticker and the map. */
-  :root { --drawer: 86vw; --hdr: 85px; }
+  /* Both panels stop short of the far edge. A panel that covers the map completely reads as a new
+     page, and the strip it leaves is what says the map is still under there — plus it is where the
+     hide tab lives. 84vw is 58px of map at 360px, of which the tab takes 26. */
+  :root { --drawer: 84vw; --side: 84vw; --hdr: 85px; }
   header { gap: 4px; flex-wrap: wrap; align-content: flex-start; padding: 6px 8px 0 4px; }
   header > :not(#ticker) { order: 0; }
   /* Tighter controls so the mark, the chip and four buttons fit one line at 360px with room over. */
@@ -974,16 +1029,12 @@ body.finding #find { display: none; }
   #legend > .muted { display: none; }
   #legend .ramp { height: 8px; margin: 4px 0 3px; }
   #legend .slider { margin-top: 6px; padding-top: 6px; }
-  /* The station panel takes the screen below the app bar. A 360px column beside a 360px phone is no
-     column at all, and the old popup already covered most of this width; one tap on its close button
-     gives the map back. Nothing steps aside for it here — it is over everything. */
-  #side { width: auto; left: 0; border-left: 0; }
-  /* Nothing steps aside here — the panel is over the whole map, so there is nowhere to step to. The
-     zoom buttons go *behind* it instead: Leaflet gives its control corners `z-index: 1000`, which
-     floated them over the card. 400 puts them under the panel's 450, with the rest of the map
-     furniture. They come back the moment the card is closed. */
+  /* The station panel takes the screen below the app bar, less the peek strip. Nothing steps aside
+     for it here — it is over everything. */
+  /* Nothing steps aside here — the panel covers most of the map, so there is nowhere to step to. The
+     zoom buttons go *behind* it instead, which map.css now does for every Leaflet corner at every
+     width; this only has to cancel the desktop shift. */
   body.side #toast, body.side #credit, body.side .leaflet-bottom.leaflet-right { transform: none; }
-  body.side .leaflet-bottom.leaflet-right { z-index: 400; }
   /* The search takes the ticker's row rather than adding one: --hdr is a fixed two-line height, and
      a third line would push the map down every time someone looked up a station. */
   body.finding #ticker { display: none; }

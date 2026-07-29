@@ -30,9 +30,9 @@
 <link rel="stylesheet" href="vendor/markercluster.css">
 <link rel="stylesheet" href="vendor/fonts.css?v=49">
 <link rel="stylesheet" href="css/icons.css?v=57">
-<link rel="stylesheet" href="css/base.css?v=60">
-<link rel="stylesheet" href="css/chrome.css?v=77">
-<link rel="stylesheet" href="css/map.css?v=74">
+<link rel="stylesheet" href="css/base.css?v=62">
+<link rel="stylesheet" href="css/chrome.css?v=85">
+<link rel="stylesheet" href="css/map.css?v=75">
 
 <!-- A camera still. A <dialog>, not a div: it opens from the all-stations table, which is itself a
      modal dialog, and only the top layer can paint over one — Esc, the backdrop and focus trapping
@@ -316,6 +316,14 @@
     ><i class="i i-close"></i></button>
   <div id="sideBody" class="scroll"></div>
 </aside>
+<!-- A hide tab on the edge where each panel meets the map, so a panel can be shut from the seam
+     rather than only from a far corner. On a phone that is also where a dismissing swipe starts.
+     Fixed to the viewport, not nested in the panel: #bar and #side both scroll, and a child of a
+     scrolling box that sticks out of it is clipped. -->
+<button id="sideTab" class="ptab" title="Hide details" aria-label="Hide details"
+  ><i class="i i-expand_more"></i></button>
+<button id="barTab" class="ptab" title="Hide filters" aria-label="Hide filters"
+  ><i class="i i-expand_more"></i></button>
 <div id="bar">
   <div>
     <!-- Both filter lists are <details>: two scrolling lists stacked above the chips pushed the

@@ -247,9 +247,13 @@ select:focus-visible, #goto:focus-visible, #dataFind:focus-visible,
   font: 500 11px Roboto, sans-serif; color: var(--accent);
   background: none; border: 1px solid var(--outline); border-radius: 999px;
 }
-/* Only reveal it on hover where there is a hover; on touch it has to be permanently there — which is
-   also why the overlap below is inside this query. A button that is always on screen must not be
-   sitting on top of the number it would hide. */
+/* Where there is no hover there is nothing to reveal the button with, so it does not run there at
+   all. Pinned visible it was permanent, and permanent beside the count made every row in the list
+   carry a number and a control at once. The count is what the row is for, so the count is what stays.
+   Solo is a shortcut, not the only way through: the checkboxes hide districts on any device.
+   `#ignoredList` keeps its own `.solo` — restoring a silenced sensor is that panel's whole job. */
+@media (hover: none) { #districtList .solo { display: none; } }
+/* Where there is a hover, the count is the resting state and the button is what hovering swaps in. */
 @media (hover: hover) {
   .solo { visibility: hidden; }
   #districtList li:hover .solo, #districtList li:focus-within .solo { visibility: visible; }

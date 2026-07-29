@@ -2587,3 +2587,104 @@ would otherwise eat every click under it.
 "Show all" **dispatches a `change` on the checkbox** rather than calling the handler: that handler
 keys off `e.target` to work out which of the three controls moved, and it is the one place that
 persists the preference, re-filters and closes the drawer on a phone.
+
+## Both panels leave a peek of map, and both close from their outer edge
+
+At phone width the drawer and the station panel each covered the screen. A panel that covers the map
+completely reads as a new page, and the only way out was a control in a far corner — the × at the top
+of `#side`, and for the drawer the hamburger in the app bar, which is not on the panel at all.
+
+Both are now **84vw**, so a strip of map stays on screen beside each one. That strip is 58px at
+360px, and it does two jobs: it says the map is still under there, and it holds the hide tab.
+
+**The tab is on the edge where the panel meets the map** — `#barTab` on the drawer's right,
+`#sideTab` on the panel's left. That is also the edge a dismissing swipe starts from, so the button
+and the gesture are the same place. **It runs at every width**, not only on a phone: on a desktop it
+is a close control at the seam instead of only in a far corner, and the panels already slide the same
+way there, so it is the same rules with different offsets.
+
+It is fixed to the **centre of the viewport** — `top: calc(50% - 30px)` against its 60px height — so
+it holds still while the panel behind it scrolls. It is a **`--hover` grey plate with an accent
+glyph**. A solid accent tab was tried first and was the loudest thing on the map, competing with the
+status colours — the only hues on this page allowed to demand attention. The accent on the glyph
+alone still reads as a control, and the shadow draws the plate the same way every other floating box
+here is drawn.
+
+Each tab is `position: fixed` and a **sibling** of its panel, not a child: `#bar` and `#side` both
+scroll, and a child that sticks out of a scrolling box is clipped. The glyph is `expand_more` rotated
+a quarter turn, because there is no chevron mask and one rotation costs less than two more icons.
+
+**Swipe to dismiss** — `swipeOff()` in `js/ui.js`, touch events only. A mouse has the tab and the ×,
+and a drag with one is a text selection.
+
+*Two things it has to get right.* **The first 8px decide the axis**, and nothing moves before that:
+both panels scroll vertically, and a swipe that stole a scroll would cost more than the swipe is
+worth. A drag that starts on a range input is skipped outright, so the heat opacity slider keeps its
+own. **The drag is written to the `translate` property, not to `transform`.** Both the panel and its
+tab already carry a `transform` that places them — the open/shut slide, and the tab's offset by the
+panel width — and an inline `transform` would throw that away for the length of the drag. `translate`
+is a separate property that composes with it, so the finger only ever adds to where the box already
+is. Every rule that transitions `transform` on these three elements transitions `translate` too, and
+that is what carries a half-swiped panel home.
+
+Released under a third of the panel's width, it goes back. Past that, it closes through the same
+close path the tab uses, so nothing has a second way to shut.
+
+**One panel at a time, at phone width only.** Both are 84vw there and the drawer (z-index 500) is
+painted over the station panel (450), so a second one opening lands on the first. Each now closes the
+other: `setDrawer(true)` calls `closeSide()`, and `openSide()` announces itself so the drawer can
+shut. Above 600px nothing changes — there is room for the two on opposite edges, which is the layout
+they were built for.
+
+The station panel's half of that is a **`sideopen` event on `document`**, not a call. `ui.js` owns
+the drawer and already imports `map.js`; a call back the other way would close the import cycle the
+no-build rule forbids. It fires only on a real open, because `render()` calls `openSide()` on every
+poll to refresh the card in place. Both auto-closes pass `remember: false`, so a desktop drawer
+preference survives a visit on a phone.
+
+**Gotcha, and the reason only one panel had it:** `#bar` had no `overscroll-behavior`. Scrolling past
+the end of the drawer chained to the document and carried the whole page up with it, tab included.
+`#sideBody` has carried `contain` since it was built, so the station panel never showed the fault.
+Any new scrolling panel over the map needs the same rule.
+
+**And the flexbox trap under it.** `#bar` is a column flex container with a fixed height, so a child
+taller than the drawer does not overflow it — the default `flex-shrink: 1` shrinks the child to the
+container instead. The child's own content then spills out of the shrunken box, `#bar`'s
+`scrollHeight` never exceeds its height, and the last sections of the drawer are clipped *and*
+unreachable. `#bar > div` therefore carries `flex-shrink: 0`. It only ever showed on a phone, where
+the sections stack into a narrow column and run past one screen. Any scrolling flex container needs
+the same on its children.
+
+**Then the same bug in its other half: `dvh`, not `bottom: 0`.** A phone resolves a fixed box's
+`bottom` against the *large* viewport — the one with the address bar retracted — so both panels were
+taller than the strip actually on screen. The drawer's content fitted inside that taller box, which
+is a second way to get no scrollbar, with the last section parked behind the browser chrome. Both
+panels now take `height: calc(100dvh - var(--hdr))`, and the tab is centred on `50dvh` rather than
+`50%` for the same reason — on `50%` it was centred on a screen taller than the one in front of you
+and sat low. `dvh` is the viewport as it stands, and it follows the bar in and out. `#dataBox`
+already used the unit; this is the same rule, applied to the rest of the furniture.
+
+## Leaflet's controls join this page's stack
+
+Leaflet gives all four of its control corners `z-index: 1000`, which is above everything here — so
+the zoom buttons floated over the **splash**, a screen whose whole job is to say there is no map yet.
+`map.css` now sets `.leaflet-top, .leaflet-bottom` to **400**, the map-furniture band the legend
+already sits in: under the panels (450 / 500), the header (600) and the splash (900).
+
+One rule for all four corners rather than one per control, so anything added to any corner later
+lands in the same stack. It replaces the phone-only `body.side .leaflet-bottom.leaflet-right`
+override, which fixed the same clash for one control, on one edge, at one width.
+
+## The district list keeps its count on touch
+
+On a mouse the solo button is hidden until the row is hovered, laid over the count so no lane is
+reserved for a control that is usually not there. On touch there is no hover to reveal it, so it was
+pinned visible — and pinned *beside* the count, which made every row carry a number and a control at
+once. That is what a phone actually showed: a column of "Ampang 2 only".
+
+Under `@media (hover: none)` the button **does not run at all**, and the count stays. The count is
+what the row is for. Solo is a shortcut rather than the only way through, and the checkboxes hide
+districts on any device — so a phone loses one gesture, not one capability.
+
+`#ignoredList` keeps its own `.solo`, which is a different button under the same class: restoring a
+silenced sensor is that panel's entire job, and it has no count to compete with.

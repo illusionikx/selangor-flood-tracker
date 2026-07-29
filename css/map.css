@@ -5,6 +5,12 @@
 :root[data-lift="yes"] .leaflet-tile-pane { filter: brightness(1.75) contrast(.92); }
 
 /* Zoom sits bottom-right (Maps-style), clear of the alert panel. */
+/* Leaflet gives its control corners `z-index: 1000`, which is above everything this page has — the
+   splash included, so the zoom buttons floated over a screen that says there is no map yet. 400 puts
+   them in the map-furniture band with the legend, under the panels (450/500), the header (600) and
+   the splash (900). One rule for all four corners, so a control added to any of them lands in the
+   same stack. */
+.leaflet-top, .leaflet-bottom { z-index: 400; }
 .leaflet-bottom.leaflet-right { margin-bottom: 26px; }
 .leaflet-control-zoom { border: 0 !important; box-shadow: var(--shadow); border-radius: 8px; overflow: hidden; }
 .leaflet-control-zoom a {

@@ -143,7 +143,14 @@ export function openSide(key, html, mastAt) {
     const box = el('side');
     box.classList.remove('swap'); box.offsetWidth; box.classList.add('swap');
   }
-  document.body.classList.add('side');
+  /* At phone width the two panels are 84vw each and the drawer is painted over this one, so only one
+     of them may be open. The notice goes out as an event rather than a call because ui.js owns the
+     drawer and ui.js already imports this module — importing setDrawer back would close the cycle.
+     Only on a real open: render() calls openSide() on every poll to refresh the card in place. */
+  if (!document.body.classList.contains('side')) {
+    document.body.classList.add('side');
+    document.dispatchEvent(new Event('sideopen'));
+  }
   mastAt ? showMast(mastAt) : hideMast();
   syncAlertBtn();
 }

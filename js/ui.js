@@ -97,6 +97,8 @@ const menu = el('menu');
 // `remember: false` for opens and closes the layout forced rather than the user chose — otherwise a
 // phone-width auto-close would overwrite the preference and there'd be nothing to restore later.
 function setDrawer(open, pan = true, remember = true) {
+  // Phones only: see the `sideopen` listener below for the other half of this and the reasoning.
+  if (open && phone.matches) closeSide();
   document.body.classList.toggle('drawer', open);
   menu.firstElementChild.className = `i i-${open ? 'menu_open' : 'menu'}`;
   menu.setAttribute('aria-expanded', open);
@@ -122,6 +124,70 @@ setDrawer(wantDrawer(), false, false);
 // Neither is remembered — the layout is deciding here, not the user, and overwriting the preference
 // would leave nothing to restore.
 phone.addEventListener('change', () => setDrawer(wantDrawer(), false, false));
+
+/* One panel at a time, at phone width only. Both are 84vw there and the drawer is drawn over the
+   station panel, so a second one opening lands on top of the first — and above 600px there is room
+   for the two on opposite edges, which is the layout they were built for. Each closes the other.
+   The station panel's half arrives as an event because map.js owns openSide() and this module
+   already imports map.js; a call back the other way would close the import cycle.
+   `remember: false` and `pan: false` — the layout is deciding here, not the user, so the desktop
+   preference survives, and there is no visible map to keep centred at this width. */
+document.addEventListener('sideopen', () => { if (phone.matches) setDrawer(false, false, false); });
+
+// --- panel tabs and swipe (phones) ---------------------------------------------------------------
+
+/* At phone width each panel covers most of the map, and the only way out was a control in a far
+   corner — the × at the top of #side, and for the drawer the hamburger in the app bar, which is not
+   on the panel at all. The tab is on the edge the panel meets the map at, which is also the edge the
+   swipe starts from, so the button and the gesture are the same place. */
+el('barTab').onclick = () => setDrawer(false);
+el('sideTab').onclick = closeSide;
+
+/* Drag the panel off its own edge. `sign` is the direction that dismisses it: -1 for the drawer,
+   +1 for the station panel. Touch only — a mouse has the tab and a drag with one is a selection.
+   The first 8px decide the axis and nothing is moved before that: both panels scroll vertically, and
+   a swipe that stole a scroll would cost more than the swipe is worth. A range input keeps its own
+   drag (the drawer holds the heat opacity slider).
+   The drag is written to the `translate` property, not to `transform`. Both boxes already carry a
+   `transform` that places them — the panel's open/shut slide, the tab's offset by the panel width —
+   and an inline transform would throw those away for the length of the drag. `translate` is a
+   separate property that composes with it, so the finger only ever adds to where the box already is.
+   Both stylesheets transition it, which is what carries a released panel home. */
+function swipeOff(box, tab, sign, close) {
+  let x0 = 0, y0 = 0, dx = 0, axis = 0, on = false;
+  const move = v => { box.style.translate = tab.style.translate = v; };
+  box.addEventListener('touchstart', e => {
+    on = phone.matches && e.touches.length === 1 && !e.target.closest('input[type=range]');
+    axis = dx = 0;
+    x0 = e.touches[0].clientX; y0 = e.touches[0].clientY;
+  }, { passive: true });
+  box.addEventListener('touchmove', e => {
+    if (!on) return;
+    const mx = e.touches[0].clientX - x0, my = e.touches[0].clientY - y0;
+    if (!axis) {
+      if (Math.abs(mx) < 8 && Math.abs(my) < 8) return;
+      axis = Math.abs(mx) > Math.abs(my) ? 1 : -1;
+      // The finger is the animation now — the tab moves with the panel, so they stay one edge.
+      if (axis > 0) box.style.transition = tab.style.transition = 'none';
+    }
+    if (axis < 0) return;
+    dx = Math.max(0, mx * sign);                     // travel toward the edge, never away from it
+    move(`${dx * sign}px`);
+  }, { passive: true });
+  // Let go under a third of the way and the stylesheet's transition carries it back; past that it
+  // closes, and the same transition carries it the rest of the way out.
+  const drop = () => {
+    if (!on) return;
+    on = false;
+    box.style.transition = tab.style.transition = '';
+    move('');
+    if (dx > box.offsetWidth * .3) close();
+  };
+  box.addEventListener('touchend', drop);
+  box.addEventListener('touchcancel', drop);
+}
+swipeOff(el('bar'), el('barTab'), -1, () => setDrawer(false));
+swipeOff(el('side'), el('sideTab'), 1, closeSide);
 
 // --- layer chips -------------------------------------------------------------------------------
 
