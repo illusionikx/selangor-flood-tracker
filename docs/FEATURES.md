@@ -2067,6 +2067,12 @@ gone off today") in one look. Details:
 - `sparkPoints()` gained a `$peak` flag for this. Its normal rule is newest-wins per 15-minute
   bucket, which would drop a trigger that started and stopped inside one bucket — for a siren that
   is the single event the band exists to show, so it keeps the highest value instead.
+- **The caption is a time, not a tally.** It read `sounded in 11 of 11 readings`, which counted our
+  polls rather than the siren. The same siren behind a slower poll would have said `3 of 3` and
+  meant the same thing, and neither number says when it went off. The line now reads
+  `sounding since 17:15` while a siren is going, `last sounded 14:30` once it stops, and
+  `silent for the last 12.0 h` when the window holds no trigger at all. A running siren walks back
+  to the start of the run it is still in, so the time names the event and not the newest sample.
 
 Both follow through to the all-stations table. `gaugeState()` is exported and returns a third
 element — the pill's short form (`dry` / `water` / `rising` / `flooded`) — so the cell, its tip

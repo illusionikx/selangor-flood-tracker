@@ -429,9 +429,9 @@ export function sparkline(points, kind = 'river') {
   </div>`;
 }
 
-/* A siren's last 12 hours, as a band rather than a graph. Its samples are 0 or 1, so there is no
-   shape to plot: a polyline between them would draw ramps up and down that never happened, and an
-   axis of "0–1" is not a quantity anyone reads. What the pin is opened to ask is "has this thing
+/* A siren's last 12 hours, as a band rather than a graph. Its samples are status codes, not a
+   quantity, so there is no shape to plot: a polyline between them would draw ramps up and down that
+   never happened, and an axis of "0–2" is not a number anyone reads. What the pin is opened to ask is "has this thing
    gone off today", and a strip that is either quiet or red answers it at a glance.
 
    Each sample owns the span up to the next one. A gap longer than an hour and a half is left blank
@@ -456,14 +456,21 @@ export function sirenBand(points) {
       style="fill:${v > 0 ? on : 'var(--outline)'}"/>`;
   }).join('');
 
-  const fired = inWin.filter(([, v]) => v > 0).length;
+  /* A time, not a tally. "Sounded in 11 of 11 readings" counted our polls, which is our business and
+     not the reader's — the same siren behind a slower poll would say "3 of 3" and mean the same
+     thing, and neither number says when it went off. The question a siren log is opened with is when
+     it last sounded, so that is what the line says. */
+  let i = inWin.length - 1;
+  const live = inWin[i][1] > 0;
+  if (live) while (i > 0 && inWin[i - 1][1] > 0) i--;   // back to the start of the run still running
+  else while (i >= 0 && !inWin[i][1]) i--;              // back to the last sample that was on
   return `<div class="spark">
     <svg viewBox="0 0 100 28" preserveAspectRatio="none" aria-hidden="true">
       ${rules(ticks)}${bars}
     </svg>
     ${axisHtml(ticks)}
-    <div class="muted">${fired ? `sounded in ${fired} of ${inWin.length} readings`
-      : `silent for the last ${spanText(secs)}`}</div>
+    <div class="muted">${i < 0 ? `silent for the last ${spanText(secs)}`
+      : `${live ? 'sounding since' : 'last sounded'} ${MYT_CLOCK.format(inWin[i][0] * 1000)}`}</div>
   </div>`;
 }
 
