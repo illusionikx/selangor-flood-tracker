@@ -38,8 +38,8 @@ const metric = (k, v, cls = '') => `<div class="k muted">${k}</div><div class="v
    A rate of exactly zero gets no arrow at all; "steady" is not a direction. */
 export const rateHtml = s => s.rate == null ? '' : !s.rate
   ? '<b class="rate">steady</b>'
-  : `<b class="rate ${s.rate > 0 ? 'up' : 'down'}"><i class="i i-arrow_drop_${
-      s.rate > 0 ? 'up' : 'down'}"></i>${Math.abs(s.rate)} m/h</b>`;
+  : `<b class="rate ${s.rate > 0 ? 'up' : 'down'}"><i class="i i-arrow_${
+      s.rate > 0 ? 'upward' : 'downward'}"></i>${Math.abs(s.rate)} m/h</b>`;
 
 /* Hours until this station hits its own danger mark at the rate it is climbing now. Deliberately
    coarse past a couple of hours: a straight-line projection off an hour of samples is a rough
