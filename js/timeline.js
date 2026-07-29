@@ -163,7 +163,10 @@ function stop() {
   clearInterval(timer);
   timer = null;
   play.firstElementChild.className = 'i i-play_arrow';
-  play.title = play.ariaLabel = 'Play';
+  // Title and label diverge: the tooltip carries the key, the accessible name must not — a screen
+  // reader announcing "Play open-paren k" reads the binding as part of the control's name.
+  play.title = 'Play (k)';
+  play.ariaLabel = 'Play';
 }
 
 /* The last position a run reaches. Live is part of the clip: the question a flood camera is opened
@@ -176,12 +179,35 @@ function stop() {
    picture over itself, the same empty-divider state setCompare() steps around. */
 const lastPos = () => ab.hidden ? frames.length : frames.length - 1;
 
+/* Every deliberate move to a position goes through here: the step buttons, "now", and a click on a
+   tick. All three stop playback for the same reason `scrub.oninput` does — having asked for one
+   frame you are not asking to be carried off it a second later.
+   Clamped, not wrapped. Playback loops because a clip that stops dead means pressing play again;
+   a step is a nudge, and a nudge off the oldest frame that lands on the newest is a jump, not a
+   nudge. The ceiling is `lastPos()`, so while comparing the steps stay off live for the same reason
+   playback does — it is the fixed side, and stepping onto it lays the picture over itself. */
+function go(i) {
+  stop();
+  scrub.value = Math.max(0, Math.min(lastPos(), i));
+  paint();
+}
+
+/* Restarting a CSS animation needs the class off, a style flush, then the class on. `offsetWidth` is
+   the flush; requestAnimationFrame is not, because its callbacks run before the frame's style recalc
+   — the same trap `#gotoBox`'s focus hit. Without it a second press inside the animation's 350ms
+   adds a class that is already there and paints nothing. */
+function flash(b) {
+  b.classList.remove('flash');
+  b.offsetWidth;
+  b.classList.add('flash');
+}
+
 /* Loops. A camera clip is 12–60 frames — under 20 seconds — and stopping dead at the end of a river
    rising means pressing play again to see it, which is how you end up watching the same 20 seconds
    three times anyway. */
 function toggle() {
+  if (!timer && frames.length < 2) return;
   if (timer) return stop();
-  if (frames.length < 2) return;
   /* Starts from wherever the scrubber already is — no rewind. It used to jump to frame 0 whenever it
      was resting at the end, which meant opening a camera replaced the picture you had just asked to
      see with one from hours ago before you had looked at it. The scrubber rests on live, so a clip
@@ -189,7 +215,8 @@ function toggle() {
      how it got here". Costs nothing to arrange — the modulo already wraps, and the resting position
      is already painted. */
   play.firstElementChild.className = 'i i-pause';
-  play.title = play.ariaLabel = 'Pause';
+  play.title = 'Pause (k)';
+  play.ariaLabel = 'Pause';
   timer = setInterval(() => {
     // The range can change underneath a running clip. A range holding nothing would make this a
     // modulo by zero, which lands NaN in the scrubber and freezes the picture mid-play.
@@ -239,7 +266,7 @@ stage.addEventListener('pointermove', e => {
    Not while comparing: there a press on the stage is the start of a drag on the divider, and the
    same gesture cannot be both. `frames.length < 2` is toggle()'s own guard, so a camera with no
    archive behind it keeps an inert picture rather than one that swallows clicks. */
-stage.onclick = () => { if (ab.hidden) toggle(); };
+stage.onclick = () => { if (ab.hidden && !tl.hidden) { flash(play); toggle(); } };
 
 scrub.oninput = () => { stop(); paint(); };
 /* A mark is its frame. Clicking one is the same act as dragging the thumb onto it — with the
@@ -248,12 +275,67 @@ scrub.oninput = () => { stop(); paint(); };
    that having gone to a specific frame you are not asking to be carried off it a second later. */
 ticks.onclick = e => {
   const t = e.target.closest('[data-i]');
-  if (!t) return;
-  stop();
-  scrub.value = t.dataset.i;
-  paint();
+  if (t) go(+t.dataset.i);
 };
+const prevBtn = tl.querySelector('.tlstep[data-d="-1"]');
+const nextBtn = tl.querySelector('.tlstep[data-d="1"]');
+const nowBtn  = tl.querySelector('.tlnow');
+const trans   = tl.querySelector('.tltransport');
+
 play.onclick = toggle;
+tl.querySelectorAll('.tlstep').forEach(b => { b.onclick = () => go(+scrub.value + +b.dataset.d); });
+/* "Now" is `lastPos()`, not `frames.length`, so while comparing it lands on the newest *archived*
+   frame instead of on live. Live is the fixed side there; the nearest thing to now that the moving
+   side can hold is the frame before it, and that is what the button is asking for.
+   It pauses, like every step does — `go()` calls `stop()`. Arriving at the newest frame and then
+   being carried off it a second later is the one thing "go to now" must not do. */
+nowBtn.onclick = () => go(lastPos());
+
+/* One flash rule for the whole cluster, on the group rather than per button: whatever was pressed
+   lights up, whether the press came from a pointer, from Enter on a focused button, or from the
+   keyboard map below — which reaches these controls by calling `.click()`, so it lands here too.
+   The picture is the play button as well (see `stage.onclick`), and that is the press this exists
+   for: eyes on the frame, and the only other feedback an icon 200px away swapping between two
+   glyphs nobody is looking at. */
+trans.addEventListener('click', e => {
+  const b = e.target.closest('button');
+  if (b) flash(b);
+});
+
+/* YouTube's bindings, because a full-screen player is where people have already learned them, and
+   inventing a second set for the one dialog on this page that *is* a player would be a set to
+   learn. Space or `k` plays and pauses, `,` `.` and the arrows step a frame, End goes to now.
+   `j`/`l` are absent: on YouTube they are a coarser jump than the arrows, and here the coarse
+   control is the range — a frame is already 30 minutes to a week, so there is no second granularity
+   to bind. `0`/Home are absent for a different reason: there is no button for "oldest frame", and
+   every key here maps to a button so the press has something to light up.
+   Bound on the dialog, so the whole lightbox answers. A key you must focus something to use is a
+   key you must find first. */
+const KEYS = {
+  ' ': play, k: play,
+  ',': prevBtn, ArrowLeft: prevBtn,
+  '.': nextBtn, ArrowRight: nextBtn,
+  End: nowBtn,
+};
+/* The scrubber is an `<input type="range">` and handles these itself when it holds focus. Firing
+   here as well would move two frames per press. */
+const NATIVE = new Set(['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End']);
+play.addEventListener('blur', () => play.classList.remove('noring'));
+box.addEventListener('keydown', e => {
+  if (tl.hidden || e.ctrlKey || e.altKey || e.metaKey) return;
+  play.classList.remove('noring');   // any key means someone is navigating: give the ring back
+  if (e.target === scrub && NATIVE.has(e.key)) return;
+  /* Space on a focused button is that button's own press, and the browser fires it on keyup — so
+     handling it here too would run the action twice. Left alone, which is why the play button takes
+     focus when the timeline appears: space then lands on it natively and does the right thing.
+     Every *other* button in the dialog keeps its own space, including the close button. */
+  if (e.key === ' ' && e.target.closest('button')) return;
+  // Caps lock should not turn the bindings off. Only `k` is a letter, so one fallback covers it.
+  const b = KEYS[e.key] || KEYS[e.key.toLowerCase()];
+  if (!b) return;
+  e.preventDefault();       // space scrolls the page, arrows scroll the dialog
+  b.click();                // the button, not the action — so it flashes, exactly as if pressed
+});
 // Pausing first: reaching for compare means you have found the frame you want to hold against the
 // live one, and playback would carry it away a second later. Same reason the scrubber stops on input.
 cmp.onclick = () => { stop(); setCompare(ab.hidden); };
@@ -303,6 +385,17 @@ export async function openTimeline(src) {
      nobody knew to make. Compare is always off at this point (reset() turns it off), so this is the
      unconditional case of the same rule the range buttons follow. */
   toggle();
+  /* And takes focus. `<dialog>` focuses the first focusable thing it finds, which was the × — so
+     space, the key everyone reaches for first in a player, closed the lightbox. The footer does not
+     exist yet when showModal() runs (it is `hidden` until the archive has been fetched), so
+     `autofocus` in the markup cannot win that race; this is the moment it can. Programmatic focus is
+     not `:focus-visible` in most cases — but Chrome carries the modality of the *previous* focus
+     across, so opening the lightbox from a keyboard-focused control lands a ring on a button nobody
+     asked to focus. `.noring` suppresses that one ring and nothing else: the first key press or the
+     first blur takes it off, so a reader who is actually navigating gets the indicator back before
+     it can matter. */
+  play.focus({ preventScroll: true });
+  play.classList.add('noring');
 }
 
 export function reset() {

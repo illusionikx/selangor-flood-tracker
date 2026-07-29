@@ -856,11 +856,67 @@ body.finding #find { display: none; }
 #tl {
   display: grid; gap: 8px; justify-items: center; width: 100%;
   margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--outline);
+  container-type: inline-size;   /* the control row stacks off this width — see .tlctl */
 }
 #tl[hidden] { display: none; }
 .tlrow { display: flex; align-items: center; gap: 8px; width: 100%; }
 #tl .icon.on { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); }
 .tltrack { flex: 1; min-width: 0; display: grid; gap: 3px; }
+/* Transport left, range right, pushed to the two ends of the scrubber above them. Centring the
+   transport was tried first and looks wrong once anything shares its line — it reads as centred on
+   nothing, with the range control hanging off one side. The ends work because the row is the width
+   of the track: each cluster sits under the end of the thing it drives. */
+.tlctl { display: flex; align-items: center; justify-content: space-between; gap: 16px; width: 100%; }
+.tltransport { display: flex; gap: 4px; }
+.tlrangebox { display: flex; align-items: center; gap: 6px; }
+.tllabel {
+  font: 500 10px/1 Roboto, sans-serif; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--muted); white-space: nowrap;
+}
+/* Too narrow for one line: stack, and centre both. Transport stays first, so the control you reach
+   for most sits directly under the track it drives.
+   A container query, not a media query, because the thing that runs out of room is the dialog and
+   the dialog is sized by the camera frame — a 4:3 still on a wide screen leaves a narrow dialog, and
+   a viewport-width query would call that case roomy. `#tl` carries the `container-type`. */
+@container (max-width: 520px) {
+  .tlctl { flex-direction: column; justify-content: center; gap: 8px; }
+}
+/* Any transport button ripples when pressed, however the press arrived — pointer, Enter, or one of
+   the keyboard bindings, which reach the buttons by calling `.click()`. It earns its keep on play:
+   the picture is the play button and the keys are on the dialog, so most toggles are made with your
+   eyes on the frame, and the only other feedback is an icon swapping between two glyphs 200px away.
+   Android's ripple, near enough. The first version flipped the whole button to filled accent and
+   swelled it 30%, which is a state change rather than an acknowledgement — it read as "this control
+   is now on" on a button that had only been pressed. A disc of accent at 26% growing to the button's
+   own edge and fading out says the press landed and says nothing else.
+   Grown from the centre, not from the pointer. These are 40px circles, so the offset a real ripple
+   would take is a couple of pixels, and reading it needs a `pointerdown` listener and two custom
+   properties per press — for a difference nobody can see at this size. */
+/* `from` only. The resting state is the disc's own — invisible and full size — so the animation ends
+   by returning to it, and `.flash` can stay on the button for good without leaving an accent circle
+   parked over the glyph. `flash()` never removes the class; it re-adds it around a style flush. */
+@keyframes tlripple { from { opacity: .26; transform: scale(.3); } }
+@keyframes tlfade   { from { opacity: .26; } }
+.tltransport .flash::after {
+  content: ''; position: absolute; inset: 0; border-radius: inherit; opacity: 0;
+  background: var(--accent); animation: tlripple .45s ease-out;
+}
+/* The pseudo-element is positioned, so without this it paints over the glyph rather than under it —
+   the one way round a ripple must not go. */
+.tltransport button { position: relative; }
+/* The one focus ring nobody asked for. `openTimeline()` moves focus to play so that space works,
+   and Chrome carries the previous element's focus modality across a programmatic `focus()` — so
+   opening the lightbox from a keyboard-focused control ringed a button that had not been navigated
+   to. Suppressed for that first focus only: timeline.js drops the class on the first key press or
+   the first blur, so real keyboard navigation keeps the indicator. */
+.tlplay.noring:focus-visible { outline: none; }
+.tltransport .i { position: relative; z-index: 1; }
+/* Reduced motion drops the growth, not the acknowledgement. A press on the picture has no other
+   feedback, so removing this outright would take the answer away from the people who asked for less
+   movement. A fade is not movement. */
+@media (prefers-reduced-motion: reduce) {
+  .tltransport .flash::after { animation-name: tlfade; }
+}
 #tlscrub { width: 100%; margin: 0; accent-color: var(--accent); cursor: pointer; }
 /* The ruler. Marks are placed as a percentage of the *track*, which runs from half a thumb in to
    half a thumb from the end — so the strip is inset by 8px with a margin, not a padding: a
@@ -889,10 +945,10 @@ body.finding #find { display: none; }
    and as separate outlined pills each looked independently pressable, with nothing in the row saying
    only one could ever be on. A single sunken track with the current segment filled says it in the
    shape: the selection moves *along* the control rather than lighting up one of five. Sized to its
-   content and centred by `#tl`'s `justify-items`, so it reads as one object under the scrubber
-   rather than a row stretched to the dialog's width. */
+   content rather than stretched, so it reads as one object rather than a row the width of the
+   dialog — `.tlrangebox` places it, and carries its label. */
 .tlranges {
-  width: auto; max-width: 100%; gap: 2px; padding: 3px;
+  display: flex; align-items: center; width: auto; max-width: 100%; gap: 2px; padding: 3px;
   background: var(--hover); border-radius: 999px;
 }
 .tlr {

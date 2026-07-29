@@ -626,6 +626,13 @@ register from across a room and still be ignorable while you read the number bes
 entirely under `prefers-reduced-motion`. A rate of exactly zero reads `steady` with no arrow —
 "steady" is not a direction.
 
+*The glyph is now `arrow_upward` / `arrow_downward`*, not `arrow_drop_up` / `arrow_drop_down`. A
+drop triangle is a menu control — it points at a list, not at the ground. A shafted arrow points, so
+the direction survives the animation: the shaft enters the frame before the head does, and the eye
+reads travel from the shape alone. The travel is also in `em` now, not pixels, so it holds at any
+font size. The triangle needed 1.7em to look present, because it filled less than half its box. The
+arrow fills the box, so 1.2em is the same optical size.
+
 **River popups carry the sparkline too.** The alert panel has had it all along; the popup you reach
 by clicking the pin had the *numbers* for the trend (m/h, hours to danger) but not the shape they
 came from. The meter says where the level sits against its own thresholds — the graph says how it
@@ -1425,6 +1432,119 @@ position has already been painted.
 
 `lastPos()` is the single place that knows where a run ends (`frames.length` normally, one less while
 comparing), so the loop cannot disagree with itself about where the end is.
+
+### Transport: step back, step forward, go to now
+
+Play alone answers "show me the sweep". It does not answer "show me the frame before that one",
+which is the question a river rising asks of the viewer. A drag on the scrubber is the wrong tool
+for one frame: the thumb has no labels, and at 50 frames across a phone the thumb moves two or three
+frames per pixel. So the footer now carries four transport buttons — previous frame, play/pause,
+next frame, go to now.
+
+**A step is one stored frame, not a fixed span of time.** The range decides what a frame is worth,
+and the tick strip above the buttons already shows that spacing. A step of "15 minutes" would land
+between frames on every range except the finest.
+
+**Steps clamp. Playback wraps.** A clip that stops dead at the end means pressing play again, so the
+loop wraps. A step is a nudge, and a nudge off the oldest frame that lands on the newest is a jump.
+The two rules differ because the two acts differ.
+
+**"Go to now" is `lastPos()`, not the live slot.** While comparing, live is the fixed side, so the
+moving side can hold nothing newer than the last archived frame. One expression covers both states,
+and no branch says "except while comparing".
+
+Every deliberate move goes through one `go(i)`: the two step buttons, "go to now", and a click on a
+tick. All four stop playback, for the reason dragging the scrubber stops it. Having asked for one
+frame, you are not asking to be carried off it a second later.
+
+**The buttons sit on their own row, under the track.** Play used to be the one control beside the
+scrubber. Four buttons plus the scrubber do not fit a 360px phone.
+
+**Transport on the left, range on the right, pushed to the two ends of the row.** A centered
+transport was built first and looks wrong the moment anything shares its line: it reads as centered
+on nothing, with the range control hanging off one side. The ends work because the row is the width
+of the scrubber above it, so each cluster sits under the end of the thing it drives.
+
+The range control carries a small `Range` label to its left, which is also the group's accessible
+name. Four bare time words in a sunken track read as a filter until you press one. The label names
+which of the timeline's two dimensions they move.
+
+**The stacking rule is a container query, not a media query.** The thing that runs out of room is
+the dialog, and the dialog is sized by the camera frame — a 4:3 still on a wide screen leaves a
+narrow dialog, and a viewport-width query would call that case roomy. `#tl` takes
+`container-type: inline-size`, and below 520px of it the two stack and both center, transport on
+top. That is the first container query in this codebase. The 600px viewport breakpoint still governs
+everything else, including the tighter segment padding on phones.
+
+### The keys are YouTube's keys
+
+A full-screen player is where people already learned media keys, so this dialog takes the same ones
+rather than teaching a second set. `k` or space plays and pauses. `,` `.` and the arrows step one
+frame. End goes to now.
+
+**Every key presses its button.** The handler does not call the action, it calls `btn.click()`. So a
+key runs exactly what the button runs, and the button lights up, which is the only way a keystroke
+tells you which control it reached. It also means the key table cannot drift from what the buttons
+do — there is one implementation of each action, on the button.
+
+`j` and `l` are absent. On YouTube they are a coarser jump than the arrows. Here the coarse control
+is the range, and a frame is already 30 minutes to a week, so there is no second granularity to
+bind. `0` and Home are absent for a different reason: there is no "oldest frame" button, and a key
+with no button has nothing to light up. Home still works natively while the scrubber holds focus.
+
+The handler sits on the dialog, not on the scrubber. A key you must focus something to use is a key
+you must find first. Two natives are stepped around. The scrubber is an `<input type="range">` and
+handles the arrows, Home and End itself when it holds focus. And space on a focused button is that
+button's own press, fired by the browser on keyup — handling it again would run the action twice.
+
+**The play button takes focus when the timeline appears**, which is what makes space work. `<dialog>`
+focuses the first focusable thing it finds, and that was the ×, so space closed the lightbox instead
+of pausing it. `autofocus` in the markup cannot win this race: the footer is `hidden` until the
+archive has been fetched, so it does not exist when `showModal()` runs.
+
+That focus draws a ring nobody asked for. Chrome carries the modality of the previous focus across a
+programmatic `focus()`, so opening the lightbox from a keyboard-focused control rings a button that
+was never navigated to. A `.noring` class suppresses that one ring. The first key press and the
+first blur both take it off, so a reader who is actually navigating gets the indicator back before
+it can matter. Nothing else in the app loses a focus ring.
+
+The `<dialog>` elements lose their own outline app-wide. A dialog is a container, not a control, and
+`showModal()` focuses it whenever it finds nothing focusable inside. The ring says nothing a reader
+can act on, and the box already carries a border of its own.
+
+Each button's `title` names its key. The `aria-label` does not — a screen reader announcing "Play
+open-paren k" reads the binding as part of the control's name.
+
+### Pressed transport buttons flash
+
+The picture is the play button, and the keys are on the dialog. So most toggles are made with your
+eyes on the frame, and the only feedback is an icon swapping between two glyphs 200px away that
+nobody is looking at. Clicking the picture appeared to do nothing.
+
+Any transport button now ripples when pressed, whatever pressed it. One `click` listener on the
+group covers a pointer press, Enter on a focused button, and the keyboard bindings, because those
+reach the buttons through `.click()`. The stage adds one direct call, since a click on the picture
+is a press of the play button by another route.
+
+**Android's ripple, near enough.** The first version flipped the whole button to filled accent and
+swelled it 30%. That is a state change, not an acknowledgement — it read as "this control is now on"
+on a button that had only been pressed. A disc of accent at 26% opacity grows from 30% to the
+button's own edge over 450ms and fades out. It says the press landed, and says nothing else.
+
+It grows from the center, not from the pointer. These are 40px circles, so the offset a real ripple
+would take is a couple of pixels, and reading it costs a `pointerdown` listener and two custom
+properties per press.
+
+The keyframe names only its `from` state. The resting state is the disc's own — invisible and full
+size — so the animation ends by returning to it, and the class can stay on the button for good
+without parking an accent circle over the glyph. Reduced motion swaps the keyframe for one without
+the growth, rather than removing the effect: a press on the picture has no other feedback, and a
+fade is not movement.
+
+Restarting the animation needs the class removed, a style flush, then the class added. `offsetWidth`
+is the flush. `requestAnimationFrame` is not — its callbacks run before the frame's style recalc,
+the same trap the `#gotoBox` focus hit. Without the flush, a second press inside 450ms adds a class
+that is already there and paints nothing.
 
 **Playback runs at one frame a second, and that is not a frame rate.** Consecutive frames here are 30
 minutes to a week apart, so nothing on screen is continuous with what preceded it — there is no
