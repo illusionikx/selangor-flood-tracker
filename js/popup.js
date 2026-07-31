@@ -19,13 +19,16 @@ export const camWarn = cam => {
   return `<i class="camwarn i i-warning t-${a.tier}" title="${what} · ${a.km.toFixed(1)} km away"></i>`;
 };
 
-// Spinner lives on the wrapper; the img clears it on load, or swaps itself out on failure.
-export const camImg = (c, alt) => `<div class="shotwrap">
+/* Spinner lives on the wrapper; the img clears it on load, or swaps itself out on failure.
+   `data-clip` is the hook js/clip.js looks for — it carries the numeric camera id the proxy uses,
+   not the station id, because that is what ?shots= and ?shot= both take. */
+export const camImg = (c, alt) => `<div class="shotwrap" data-clip="${c.id.split('-')[1]}">
   <img class="shot" src="${camSrc(c)}" alt="${alt}" data-name="${c.name}"
        onload="this.parentNode.classList.add('done')"
        onerror="this.parentNode.classList.add('done');
                 this.replaceWith(Object.assign(document.createElement('div'),
-                  {className:'muted',textContent:'image unavailable'}))">${camWarn(c)}</div>`;
+                  {className:'muted',textContent:'image unavailable'}))">${camWarn(c)}
+  <p class="clipcap"></p></div>`;
 
 /* The ⋮ on every sensor. A menu rather than a bare "ignore" button: one unlabelled glyph that takes
    a station off the map on a single tap is the wrong affordance for something you scan with a thumb,

@@ -4,6 +4,8 @@
 import { KINDS, TILES, FLASH_MS } from './config.js';
 import { state, PREFS, save } from './state.js';
 import { el, distKm } from './util.js';
+import { byId } from './stations.js';
+import * as clip from './clip.js';
 
 // maxZoom on the map, not just the tile layer: markercluster is added below at module load, before
 // setBasemap() has run, and it throws "Map has no maxZoom specified" if no layer declares one yet.
@@ -153,9 +155,18 @@ export function openSide(key, html, mastAt) {
   }
   mastAt ? showMast(mastAt) : hideMast();
   syncAlertBtn();
+
+  /* The card holds at most one camera, and `data-clip` carries its proxy id. `start()` is
+     idempotent by that id, which is what makes this safe to call again on every poll — render()
+     re-runs openSide() for whatever is on screen, and a clip that restarted there would jump back
+     to frame 0 while somebody was watching it. */
+  const n = body.querySelector('[data-clip]')?.dataset.clip;
+  const cam = n ? byId(`camera-${n}`) : null;
+  cam ? clip.start(body, cam) : clip.stop();
 }
 
 export function closeSide() {
+  clip.stop();
   side.key = null;
   document.body.classList.remove('side');
   hideMast();

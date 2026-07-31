@@ -214,3 +214,11 @@
 }
 .camwarn.t-now  { color: var(--s-danger); }
 .camwarn.t-soon { color: var(--s-warning); }
+
+/* Under the picture, not over it. An overlay would land on the timestamp JPS burns into its own
+   frames, and this caption is read once rather than watched. */
+.clipcap {
+  margin: 4px 0 0; font-size: 11px; color: var(--muted);
+  text-align: center; letter-spacing: .02em;
+}
+.clipcap:empty { display: none; }

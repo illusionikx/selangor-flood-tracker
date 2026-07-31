@@ -117,6 +117,13 @@ export const CAM_MAX_KM = 5;
    api.php carries the same 2 for the timeline join. Change both together. */
 export const CAM_ALERT_KM = 2;
 
+/* The station panel plays what it has of the last three hours, at a frame a second. Capture runs
+   every 30 minutes (SHOT_EVERY in shots.php), so a full window is six frames and a six-second lap.
+   Past three hours a picture is not current, which is the same word the cards use for a reading
+   past a day. */
+export const CLIP_WIN = 3 * 3600;
+export const CLIP_MS  = 1000;
+
 export const FLASH_MS    = 2400;   // how long the jump-to ripple runs
 export const POLL_MS     = 300000; // matches the proxy's cache TTL
 
