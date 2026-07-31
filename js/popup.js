@@ -4,7 +4,20 @@
 import { KINDS, SOURCES, SPARK_H, camSrc } from './config.js';
 import { num, ago, noSec, parseMY, distKm, hasInfo, isStale, statusColor, scalePos,
          levelStops, gaugeStops } from './util.js';
-import { nearestOf, nearestCam } from './stations.js';
+import { nearestOf, nearestCam, camAlert } from './stations.js';
+
+/* The warning that rides a camera picture. Empty string when nothing near it is on alert, so it
+   costs nothing to interpolate unconditionally.
+   The disc is not decoration. A bare glyph lands on whatever the camera happens to be pointing at,
+   and half this footage is bright sky or wet concrete. The pins carry a disc for the same reason. */
+export const camWarn = cam => {
+  const a = camAlert(cam);
+  if (!a) return '';
+  const what = a.tier === 'now'
+    ? `${a.station.name} at danger`
+    : `${a.station.name} forecast to reach danger${a.station.eta ? ` in ${a.station.eta} h` : ''}`;
+  return `<i class="camwarn i i-warning t-${a.tier}" title="${what} · ${a.km.toFixed(1)} km away"></i>`;
+};
 
 // Spinner lives on the wrapper; the img clears it on load, or swaps itself out on failure.
 export const camImg = (c, alt) => `<div class="shotwrap">
@@ -12,7 +25,7 @@ export const camImg = (c, alt) => `<div class="shotwrap">
        onload="this.parentNode.classList.add('done')"
        onerror="this.parentNode.classList.add('done');
                 this.replaceWith(Object.assign(document.createElement('div'),
-                  {className:'muted',textContent:'image unavailable'}))"></div>`;
+                  {className:'muted',textContent:'image unavailable'}))">${camWarn(c)}</div>`;
 
 /* The ⋮ on every sensor. A menu rather than a bare "ignore" button: one unlabelled glyph that takes
    a station off the map on a single tap is the wrong affordance for something you scan with a thumb,

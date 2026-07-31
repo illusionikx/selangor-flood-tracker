@@ -6,6 +6,7 @@ import { el, distKm, dkey, ignoredIds } from './util.js';
 import { map, setTheme, flashTo, closeSide } from './map.js';
 import { heatOpacity, syncHeat } from './heat.js';
 import { byId } from './stations.js';
+import { camWarn } from './popup.js';
 import { render, districts } from './render.js';
 import { dataTable } from './table.js';
 import { alerts, toggleAlerts } from './alerts.js';
@@ -531,6 +532,14 @@ document.addEventListener('click', e => {
   // into a name is a rule that breaks the day the caption is reworded.
   full.alt = (img ? img.alt : btn.dataset.cap) || '';
   el('lbTitle').textContent = (img || btn).dataset.name || full.alt;
+  /* The same warning as the card, on the full-size view. The camera id is read back out of the
+     proxied URL — `?cam=<n>` is the proxy's own shape, and the table's "show image" button builds
+     the same URL, so both openers are covered by one rule. The static build hotlinks upstream and
+     matches nothing here, which is correct: it has no archive and no payload behind it either. */
+  const n = /[?&]cam=(\d+)/.exec(src || '')?.[1];
+  const c = n ? byId('camera-' + n) : null;
+  lightbox.querySelector('.camwarn')?.remove();
+  if (c) lightbox.querySelector('.stage').insertAdjacentHTML('beforeend', camWarn(c));
   lightbox.showModal();
   openTimeline(src);   // no-op unless this is a proxied camera with an archive behind it
 });
