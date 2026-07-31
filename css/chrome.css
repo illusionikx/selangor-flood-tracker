@@ -938,12 +938,20 @@ body.finding #find { display: none; }
   content: ''; position: absolute; left: 50%; top: 1px; width: 1px; height: 8px;
   background: var(--muted); transform: translateX(-50%);
 }
-/* One height for every mark. Two heights drew a second, coarser grid over the frames — and since
-   the window is thinned to the range's own step, the frames already *are* the graduation. */
+/* No mark height lands on a period. There are two heights: this 8px default and the full-height mark
+   that hover and the alert tiers below share. A *repeating* second height drew a second and coarser
+   grid over the frames, so a taller mark on each new day was dropped. The window is thinned to the
+   range's own step, so the frames already *are* the graduation. Hover and the alert marks name a
+   condition on one frame, not a scale. */
 .tlticks i:hover::before { top: 0; height: 100%; width: 2px; background: var(--accent); }
 /* Now: the one mark that is not an archived frame. Wider and accented, so the end of the strip
    reads as the present rather than as one more frame. */
 .tlticks i.now::before { width: 2px; background: var(--accent); }
+/* A frame taken while the river was in trouble. Taller and colored, so the strip shows when it
+   started without anyone playing the clip. The `.now` mark keeps the accent and is a different
+   thing entirely — that one means "the present", not "at danger". */
+.tlticks i.t-now::before  { height: 100%; top: 0; width: 2px; background: var(--s-danger); }
+.tlticks i.t-soon::before { height: 100%; top: 0; width: 2px; background: var(--s-warning); }
 .tlmeta { margin: 0; font-size: 11px; text-align: center; }
 /* One control, not five buttons. These are mutually exclusive — picking a range unpicks the others —
    and as separate outlined pills each looked independently pressable, with nothing in the row saying

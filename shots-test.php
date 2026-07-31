@@ -103,5 +103,39 @@ $ok('no orphaned .jpg survives a prune',
 array_map('unlink', glob(shotDir(TEST_ID) . '/*.*') ?: []);
 @rmdir(shotDir(TEST_ID));
 
+/* --- frameTiers -------------------------------------------------------------------------------
+ * The tier a frame was taken under. A wrong answer here paints a calm afternoon red, or leaves a
+ * flood gray, and either one is a lie told by a color on a photograph.
+ * The fake $assess below returns an ETA straight from a table, so this tests the join — which
+ * sample a frame lands on, and the on-delay — and not the forecast maths. api.php's own assess()
+ * is tested by the map every time it runs.
+ */
+echo "\nframeTiers:\n";
+
+$mark    = 3.0;
+$samples = [[1000, 1.0], [2000, 1.5], [3000, 2.0], [4000, 3.2], [5000, 3.4]];
+//            i=0         i=1          i=2          i=3          i=4
+// Fake forecast: index 0 is outside the cutoff; indices 1, 2, 3, 4 are inside.
+$eta  = [0 => null, 1 => 1.0, 2 => 1.0, 3 => 0.5, 4 => 0.2];  // Index 1 corrected from null to test on-delay properly
+$fake = fn(array $pts, int $i, ?float $m) => [null, $eta[$i] ?? null];
+
+$t = frameTiers([500, 1500, 2500, 3500, 4500], $samples, $mark, 3.0, $fake);
+
+$ok('a frame older than every sample is unscored', !isset($t[500]));
+$ok('a frame on a calm sample is unscored',        !isset($t[1500]));
+// 2500 lands on index 1 (eta 1.0), but its predecessor index 0 has eta null. On-delay requires both.
+$ok('one sample inside the cutoff is not soon',    !isset($t[2500]));
+// 3500 lands on index 2: eta 1.0 and the sample before it 1.0. Two in a row is the on-delay.
+$ok('two samples inside the cutoff is soon',       ($t[3500] ?? null) === 'soon');
+// 4500 lands on index 3, level 3.2, at or over the mark. Observed beats forecast.
+$ok('a level at the mark is now',                  ($t[4500] ?? null) === 'now');
+
+// 6000 is after the last sample, so the walk pins at index 4, level 3.4. Observed beats forecast.
+$t2 = frameTiers([6000], $samples, $mark, 3.0, $fake);
+$ok('a frame after all samples scores from the end', ($t2[6000] ?? null) === 'now');
+
+$ok('no danger mark scores nothing', frameTiers([4500], $samples, null, 3.0, $fake) === []);
+$ok('no samples score nothing',      frameTiers([4500], [], $mark, 3.0, $fake) === []);
+
 echo $fail ? "\n$fail FAILED\n" : "\nall passed\n";
 exit($fail ? 1 : 0);

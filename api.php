@@ -42,6 +42,9 @@ const RISE_DAY = 86400;
 // Sirens report a daily heartbeat (most stamp 08:00). Two missed days is out of contact, not idle.
 const SIREN_STALE = 48 * 3600;
 const SITE_M = 50;   // metres — stations this close are sensors on one mast, not separate places
+/* How close a river must be to a camera before its alert is allowed onto that camera's frames.
+   js/config.js carries the same 2 for the live warning glyph. Change both together. */
+const CAM_ALERT_KM = 2;
 const CACHE = __DIR__ . '/.cache.json';
 const LOCK  = __DIR__ . '/.refresh.lock';   // held for the length of a rebuild; see below
 const HIST  = __DIR__ . '/.history.db';
@@ -52,6 +55,44 @@ const RETAIN = 30 * 86400;   // seconds kept on disk; older samples are pruned
 date_default_timezone_set('Asia/Kuala_Lumpur'); // upstream timestamps are local MYT, unlabelled
 
 const HOST = 'infobanjirjps.selangor.gov.my';
+
+// slope and assess live here, above the early-returning endpoints, so ?shots= can reach assess too.
+// Hoisted out of the refresh path unchanged below; only the function heads moved.
+
+/** Theil-Sen: the median of every pairwise slope in the window, in m/hour. Null if no pair spans. */
+function slope(array $pts, int $at): ?float {
+    $win = [];
+    foreach ($pts as $p) if ($at - $p[0] >= 0 && $at - $p[0] <= TREND_MAX) $win[] = $p;
+    $n = count($win);
+    $sl = [];
+    for ($i = 0; $i < $n; $i++) for ($j = $i + 1; $j < $n; $j++) {
+        $dt = $win[$j][0] - $win[$i][0];
+        if ($dt >= TREND_MIN) $sl[] = ($win[$j][1] - $win[$i][1]) / ($dt / 3600);
+    }
+    if (!$sl) return null;
+    sort($sl);
+    $m = count($sl);
+    return $m % 2 ? $sl[($m - 1) / 2] : ($sl[intdiv($m, 2) - 1] + $sl[intdiv($m, 2)]) / 2;
+}
+
+/**
+ * Judge one sample: returns [rate m/h, hours to $mark] with the ETA null unless it is really
+ * climbing. Takes an index rather than the latest point so the previous poll can be judged by the
+ * same rules — which is the whole on-delay, with nothing persisted to do it.
+ */
+function assess(array $pts, int $i, ?float $mark): array {
+    [$at, $lvl] = $pts[$i];
+    $rate = slope(array_slice($pts, 0, $i + 1), $at);
+    if ($rate === null || $rate < RISE_FLOOR || $i < 2 || $mark === null) return [$rate, null];
+    // Strictly higher across three samples. The old test allowed equality at both steps, so a level
+    // that had not moved in five polls still counted as climbing on a rate left over from an
+    // earlier step — which is exactly how a closed water gate kept reporting a 0.9 h ETA.
+    if ($lvl <= $pts[$i - 2][1]) return [$rate, null];
+    $day = [];
+    foreach ($pts as $p) if ($p[0] < $at && $at - $p[0] <= RISE_DAY) $day[] = $p[1];
+    if ($day && $lvl < max($day)) return [$rate, null];   // still inside its own daily envelope
+    return [$rate, round(max(0, ($mark - $lvl) / $rate), 2)];
+}
 
 // ?cam=<id> streams a CCTV still. Upstream advertises these over plain http, which an https page
 // can't load, so we fetch server-side. Only ids we already hold a URL for — never an arbitrary URL.
@@ -76,16 +117,84 @@ if (isset($_GET['cam'])) {
     $img = $try(preg_replace('#^http://#i', 'https://', $url)) ?: $try($url);
     if ($img === '') { http_response_code(502); exit; }
     header('Content-Type: image/jpeg');
-    header('Cache-Control: max-age=60');
+    /* 300s = POLL_MS in js/config.js, and the two must move together. A still cannot change faster
+       than the payload that names it, so a shorter life buys nothing and costs a real request at
+       JPS. It costs one per open card per lifetime: js/clip.js re-sets this src on every ~7s lap,
+       and at 60s an open camera card sent a request a minute to the agency. Cards are opened most
+       during a flood, which is when those servers can take it least. */
+    header('Cache-Control: max-age=300');
     echo $img;
     exit;
 }
 
-// ?shots=<id> — which frames exist. The client asks once, when a lightbox opens.
+/* ?shots=<id> — which frames exist, and what the river beside the camera was doing when each one
+   was taken. The client asks once, when a lightbox opens, and again when a camera card opens.
+   Shape is [[ts, tier, stationId], …]. `tier` is "now", "soon" or null.
+   Three things leave a tier null, and all three show as an uncolored tick rather than a wrong one:
+   the frame is older than the 30 days of levels we keep, no river sits within CAM_ALERT_KM, or the
+   river publishes no danger mark to be measured against. Sirens are a fourth: this handler walks
+   rivers only. frameTiers() scores a sample against the station's own danger mark, and a siren
+   publishes none. Online sirens do reach .history.db as 0 or 1, so the samples are not the gap. */
 if (isset($_GET['shots'])) {
     header('Content-Type: application/json');
     header('Cache-Control: max-age=60');
-    echo json_encode(shotList((int)$_GET['shots']));
+    $id     = (int)$_GET['shots'];
+    $frames = shotList($id);
+    $rows   = array_map(fn($ts) => [$ts, null, null], $frames);
+
+    $st  = is_file(CACHE) ? (json_decode(file_get_contents(CACHE), true)['stations'] ?? []) : [];
+    $cam = null;
+    foreach ($st as $s) if ($s['kind'] === 'camera' && $s['id'] === 'camera-' . $id) { $cam = $s; break; }
+
+    if ($cam && $frames && is_file(HIST)) {
+        $km = function (array $a, array $b): float {
+            $x = ($a['lat'] - $b['lat']) * 111;
+            $y = ($a['lng'] - $b['lng']) * 111 * cos(deg2rad($a['lat']));
+            return sqrt($x * $x + $y * $y);
+        };
+        try {
+            // Read-only. This connection must never be able to write .history.db, and a read-write
+            // handle that is the last one open checkpoints the WAL on close.
+            $db = new PDO('sqlite:' . HIST, null, null, [
+                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                PDO::SQLITE_ATTR_OPEN_FLAGS => PDO::SQLITE_OPEN_READONLY,
+            ]);
+            // Start a day before the first frame. assess() looks back RISE_DAY for the tide guard, so
+            // a frame near the window's start needs that much history too, or the guard runs short.
+            $sel = $db->prepare('SELECT ts, level FROM level WHERE station = ? AND ts >= ? ORDER BY ts');
+            $best = [];   // frameTs => [rank, tier, stationId, distKm] — see the tie-break note below
+            foreach ($st as $r) {
+                if ($r['kind'] !== 'river' || empty($r['danger'])) continue;
+                $d = $km($cam, $r);
+                if ($d > CAM_ALERT_KM) continue;
+                $sel->execute([$r['id'], $frames[0] - RISE_DAY]);
+                $samples = array_map(fn($x) => [(int)$x['ts'], (float)$x['level']], $sel->fetchAll(PDO::FETCH_ASSOC));
+                foreach (frameTiers($frames, $samples, (float)$r['danger'], RISE_ETA, 'assess') as $ts => $t) {
+                    $rank = $t === 'now' ? 0 : 1;
+                    /* Worse tier wins first. Nearer river breaks a tie. camAlert() in js/stations.js
+                       ranks a camera's live glyph the same way. The two must agree, or a reader can
+                       ignore the river named on screen and the frame's tick stays colored, because
+                       the server named the other river in range. */
+                    if (!isset($best[$ts]) || $rank < $best[$ts][0]
+                        || ($rank === $best[$ts][0] && $d < $best[$ts][3])) {
+                        $best[$ts] = [$rank, $t, $r['id'], $d];
+                    }
+                }
+            }
+            /* Only the worst-tier station rides along, so the client can drop a tick raised by a sensor
+               the reader has ignored. It falls to uncolored rather than to the second-worst river.
+               ponytail: two hot rivers within 2 km of one camera is rare. Build the fallback if it is
+               not, which means sending a tier per station and letting the client pick. */
+            foreach ($rows as $k => $row) {
+                if (isset($best[$row[0]])) $rows[$k] = [$row[0], $best[$row[0]][1], $best[$row[0]][2]];
+            }
+        } catch (\Throwable $e) {
+            // A broken read must not become a cached 200 with a fatal-error body. Fall back to the
+            // plain frame list. The client already renders null tiers as an uncolored strip.
+            $rows = array_map(fn($ts) => [$ts, null, null], $frames);
+        }
+    }
+    echo json_encode($rows);
     exit;
 }
 
@@ -548,41 +657,8 @@ unset($s);
 // --- Trend -------------------------------------------------------------------------------------
 // Runs last, over whichever reading won: a rate computed from a level we then overrode would be a
 // rate for a number nobody is shown.
-
-/** Theil-Sen: the median of every pairwise slope in the window, in m/hour. Null if no pair spans. */
-$slope = function (array $pts, int $at): ?float {
-    $win = [];
-    foreach ($pts as $p) if ($at - $p[0] >= 0 && $at - $p[0] <= TREND_MAX) $win[] = $p;
-    $n = count($win);
-    $sl = [];
-    for ($i = 0; $i < $n; $i++) for ($j = $i + 1; $j < $n; $j++) {
-        $dt = $win[$j][0] - $win[$i][0];
-        if ($dt >= TREND_MIN) $sl[] = ($win[$j][1] - $win[$i][1]) / ($dt / 3600);
-    }
-    if (!$sl) return null;
-    sort($sl);
-    $m = count($sl);
-    return $m % 2 ? $sl[($m - 1) / 2] : ($sl[intdiv($m, 2) - 1] + $sl[intdiv($m, 2)]) / 2;
-};
-
-/**
- * Judge one sample: returns [rate m/h, hours to $mark] with the ETA null unless it is really
- * climbing. Takes an index rather than the latest point so the previous poll can be judged by the
- * same rules — which is the whole on-delay, with nothing persisted to do it.
- */
-$assess = function (array $pts, int $i, ?float $mark) use ($slope): array {
-    [$at, $lvl] = $pts[$i];
-    $rate = $slope(array_slice($pts, 0, $i + 1), $at);
-    if ($rate === null || $rate < RISE_FLOOR || $i < 2 || $mark === null) return [$rate, null];
-    // Strictly higher across three samples. The old test allowed equality at both steps, so a level
-    // that had not moved in five polls still counted as climbing on a rate left over from an
-    // earlier step — which is exactly how a closed water gate kept reporting a 0.9 h ETA.
-    if ($lvl <= $pts[$i - 2][1]) return [$rate, null];
-    $day = [];
-    foreach ($pts as $p) if ($p[0] < $at && $at - $p[0] <= RISE_DAY) $day[] = $p[1];
-    if ($day && $lvl < max($day)) return [$rate, null];   // still inside its own daily envelope
-    return [$rate, round(max(0, ($mark - $lvl) / $rate), 2)];
-};
+// slope and assess are named functions defined above, near ?cam=, so the ?shots= endpoint can reach
+// them too. That endpoint returns early and never enters the refresh path below.
 
 foreach ($stations as &$s) {
     if ($s['kind'] !== 'river') continue;
@@ -605,11 +681,11 @@ foreach ($stations as &$s) {
     // the popup can say "4 h away" on a station that isn't flagged — the flag is a cutoff on this
     // number, and a cutoff nobody can see the other side of is just an assertion.
     $mark = $s['danger'] ?? $s['warning'] ?? $s['alert'] ?? null;
-    [$rate, $eta] = $assess($points, $last, $mark);
+    [$rate, $eta] = assess($points, $last, $mark);
     $s['rate'] = $rate === null ? null : round($rate, 3);
     $s['eta']  = $eta;
     // Two consecutive polls, both inside the cutoff. One is a spike.
-    $prev = $last > 0 ? $assess($points, $last - 1, $mark)[1] : null;
+    $prev = $last > 0 ? assess($points, $last - 1, $mark)[1] : null;
     $s['rising'] = $eta !== null && $eta <= RISE_ETA && $prev !== null && $prev <= RISE_ETA;
     // The SPHTN arrow no longer stands in at cold start: "Rising" is now a claim about reaching a
     // danger mark within hours, and a bare direction arrow is no evidence for that.

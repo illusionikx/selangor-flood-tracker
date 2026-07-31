@@ -36,6 +36,7 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `js/locate.js` | geolocation and the "You are here" marker |
 | `js/ticker.js` | header alert marquee — measured, seamless, speed scales with the alert count |
 | `js/timeline.js` | camera archive replay + A/B compare, inside the lightbox and nowhere else |
+| `js/clip.js` | the station panel's 3-hour camera clip — no controls, that is the lightbox's job |
 | `js/toast.js` | desktop-only "new alert since last poll" toast |
 | `js/test.js` | test mode: fakes a flood in the client's copy of the payload |
 | `js/net.js` | `load()` poll loop and the status dot on the logo |
@@ -407,6 +408,21 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   off-canvas and offsets the shadow back on. Stock offset is 200, so any blob wider than that puts
   the *source* arc back on the canvas — a hard-edged circle clipped by the corner. Our vendored
   copy patches the offset to `1e4`. Second reason not to overwrite `leaflet-heat.js`.
+- **`?shots=` returns `[ts, tier, stationId]`, not a bare timestamp.** Both readers still accept a
+  bare number. `timeline.js` and `clip.js` each guard with `Array.isArray(r)`. The response is
+  cached for 60 seconds, so a deploy leaves the old shape in flight. Do not remove that fallback
+  while the cache header stands.
+- **`clip.start()` must stay idempotent by camera id *and* by generation.** `render()` calls
+  `openSide()` on every poll for the card on screen. A clip that restarted there would jump back to
+  frame 0 while somebody watched. So `start()` rebinds to the fresh nodes and keeps its place. The
+  id alone is not enough. A reader can close a card and reopen the same camera before the fetch
+  returns. `stop()` clears the id and the second `start()` sets it back, so both continuations
+  match. `gen` catches that case. `stop()` bumps it on every call, so a stale run can never match
+  again.
+- **The lightbox reads its camera from `data-clip`, not from the clicked image's `src`.** The panel
+  clip rewrites `img.src` to an archived frame every second. Matching `?cam=` against that src
+  fails on five frames in six. That opened a lightbox with no scrubber, no compare and no warning
+  glyph. Only the table's "show image" button has no such wrapper, and it keeps the old path.
 
 ## Conventions
 

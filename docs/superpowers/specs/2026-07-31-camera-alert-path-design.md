@@ -134,14 +134,17 @@ out to be common.
 
 Three limits apply. Each one shows as an uncolored tick. None of them shows a wrong color.
 
-1. **Sirens have no stored history.** `.history.db` samples rivers, rainfall and gauges. It does not
-   sample sirens. A siren raises the live triangle. A siren can never color a past tick. 57 of the
-   69 triangle-capable cameras have a river within 2 km, so most cameras still color their ticks.
+1. **A siren can never color a past tick.** `?shots=` walks rivers only. `frameTiers()` scores a
+   sample against the station's own danger mark, and a siren publishes none. `.history.db` does
+   hold siren samples, as 0 or 1, so the data is not the gap. A siren still raises the live
+   triangle. 57 of the 69 triangle-capable cameras have a river within 2 km, so most cameras still
+   color their ticks.
 2. **Levels retain 30 days. Frames retain a year.** The month range and the year range on the
    scrubber stay largely uncolored. Do not change the retention to fix this. The prune rule predates
    this feature and protects the disk.
 3. **The static Pages build has no PHP.** `?shots=` fails there. `timeline.js` already handles that
-   and draws no bar. `clip.js` does the same. It shows the plain still, with no caption and no loop.
+   and draws no bar. `clip.js` shows the plain still with no loop. It still captions it: the failed
+   `fetch` throws, and the idle branch prints `LATEST IMAGE` or `NOT CURRENT` from the payload stamp.
 
 ## 6. Measured
 
@@ -206,6 +209,7 @@ Then open the page and check four things by eye.
   learn one control is one too many.
 - **A higher capture rate near an alert.** More frames in the window need more requests at JPS.
   `SHOT_EVERY` exists to cap that. Raise it only with a measurement that justifies the cost.
-- **A siren history table.** It would color the ticks for 12 more cameras. It also adds a table, a
-  write path and a prune rule for one glyph.
+- **A second scoring rule for siren ticks.** Online sirens already reach `.history.db`, so the
+  samples are there. A 0/1 log needs a rule of its own, because the forecast rule needs a danger
+  mark. It would color the ticks for 12 more cameras.
 - **A second-worst fallback when the reader ignores the worst station.** Rare. Marked in the code.

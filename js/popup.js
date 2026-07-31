@@ -4,15 +4,37 @@
 import { KINDS, SOURCES, SPARK_H, camSrc } from './config.js';
 import { num, ago, noSec, parseMY, distKm, hasInfo, isStale, statusColor, scalePos,
          levelStops, gaugeStops } from './util.js';
-import { nearestOf, nearestCam } from './stations.js';
+import { nearestOf, nearestCam, camAlert } from './stations.js';
 
-// Spinner lives on the wrapper; the img clears it on load, or swaps itself out on failure.
-export const camImg = (c, alt) => `<div class="shotwrap">
+/* The warning that rides a camera picture. Empty string when nothing near it is on alert, so it
+   costs nothing to interpolate unconditionally.
+   The disc is not decoration. A bare glyph lands on whatever the camera happens to be pointing at,
+   and half this footage is bright sky or wet concrete. The pins carry a disc for the same reason. */
+export const camWarn = cam => {
+  const a = camAlert(cam);
+  if (!a) return '';
+  const what = a.tier === 'now'
+    ? `${a.station.name} at danger`
+    : `${a.station.name} forecast to reach danger${a.station.eta ? ` in ${a.station.eta} h` : ''}`;
+  /* A wrapper around the glyph, the same shape `.pin` uses: the disc is a background on the span,
+     and the mask is a background on the `<i>` inside it. Both on one element does not work — `.i`
+     paints `background: currentColor` and `.camwarn` paints the black disc, at equal specificity,
+     so map.css wins and the mask cuts the disc instead of the color. The triangle then rendered
+     black on every warned picture, which is the one thing this marker must not do. */
+  return `<span class="camwarn t-${a.tier}" title="${what} · ${a.km.toFixed(1)} km away"
+    ><i class="i i-warning"></i></span>`;
+};
+
+/* Spinner lives on the wrapper; the img clears it on load, or swaps itself out on failure.
+   `data-clip` is the hook js/clip.js looks for — it carries the numeric camera id the proxy uses,
+   not the station id, because that is what ?shots= and ?shot= both take. */
+export const camImg = (c, alt) => `<div class="shotwrap" data-clip="${c.id.split('-')[1]}">
   <img class="shot" src="${camSrc(c)}" alt="${alt}" data-name="${c.name}"
        onload="this.parentNode.classList.add('done')"
        onerror="this.parentNode.classList.add('done');
                 this.replaceWith(Object.assign(document.createElement('div'),
-                  {className:'muted',textContent:'image unavailable'}))"></div>`;
+                  {className:'muted',textContent:'image unavailable'}))">${camWarn(c)}
+  <p class="clipcap"></p></div>`;
 
 /* The ⋮ on every sensor. A menu rather than a bare "ignore" button: one unlabelled glyph that takes
    a station off the map on a single tap is the wrong affordance for something you scan with a thumb,
@@ -57,18 +79,20 @@ export const etaText = h => h <= 0 ? 'already at it'
    Built as a `.sensor` section like every other kind on that card, because that is what it is there —
    glyph and label, the distance where the other sections put it, the place name, then the reading,
    which here is the picture. `from` is a bare latlng, so there is no same-mast case to handle: your
-   own position shares a mast with nothing. */
+   own position shares a mast with nothing.
+   No camera in range prints nothing at all — not a section, not a line. A camera is an aside
+   everywhere it appears, and an aside that is absent has nothing to report. */
 export function camNear(from, cam) {
+  if (!cam) return '';
   const k = KINDS.camera;
   return `<div class="sensor cam">
     <div class="sensorhead">
-      <i class="glyph i i-${k.icon}" style="color:${cam ? k.color : 'var(--muted)'}"></i>
+      <i class="glyph i i-${k.icon}" style="color:${k.color}"></i>
       <b>Nearest camera</b>
-      ${cam ? `<span class="muted">${distKm(from, cam).toFixed(1)} km away</span>` : ''}
+      <span class="muted">${distKm(from, cam).toFixed(1)} km away</span>
     </div>
-    ${!cam ? '<div class="muted">no camera nearby</div>'
-      : `<div class="place" data-cam="${cam.id}" title="Show ${cam.name} on the map">${cam.name}</div>
-         ${camImg(cam, `Latest still from ${cam.name}`)}`}
+    <div class="place" data-cam="${cam.id}" title="Show ${cam.name} on the map">${cam.name}</div>
+    ${camImg(cam, `Latest still from ${cam.name}`)}
   </div>`;
 }
 
@@ -84,7 +108,7 @@ export const camLink = (from, cam) => cam
        <i class="i i-photo_camera"></i> ${from.site && from.site === cam.site
          ? 'Show webcam' : `Nearest webcam · ${distKm(from, cam).toFixed(1)} km`}
      </button>`
-  : '<div class="muted">no camera nearby</div>';
+  : '';
 
 export function meter(s) {
   const max = s.danger || s.warning || s.alert;

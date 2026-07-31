@@ -104,6 +104,26 @@ export const HEAT_MAX_PX = 220;    // blur cost is quadratic; past this the laye
    values, because a canvas cannot resolve a token) and `.ramp.rain` in chrome.css — change the three
    together. */
 export const RAIN_STOPS = [[0, 25], [10, 50], [30, 75], [60, 100]];
+
+/* How far a camera may be and still be offered as this station's nearest view. It reached 24 km
+   before this cap, which is a different river with different weather over it. 441 of 591 stations
+   keep a link at 5 km; the 150 that lose one show no link, rather than one that named a wrong river.
+   CAM_ALERT_KM is a tighter, separate question — see stations.js. */
+export const CAM_MAX_KM = 5;
+
+/* How close an alert must be before the picture is allowed to claim it. Separate from CAM_MAX_KM
+   on purpose: 5 km answers "which camera do I offer", 2 km answers "does this frame show the
+   trouble". So the app can offer a camera at 4.8 km and draw no warning on it, which is correct.
+   api.php carries the same 2 for the timeline join. Change both together. */
+export const CAM_ALERT_KM = 2;
+
+/* The station panel plays what it has of the last three hours, at a frame a second. Capture runs
+   every 30 minutes (SHOT_EVERY in shots.php), so a full window is six frames and a six-second lap.
+   Past three hours a picture is not current, which is the same word the cards use for a reading
+   past a day. */
+export const CLIP_WIN = 3 * 3600;
+export const CLIP_MS  = 1000;
+
 export const FLASH_MS    = 2400;   // how long the jump-to ripple runs
 export const POLL_MS     = 300000; // matches the proxy's cache TTL
 

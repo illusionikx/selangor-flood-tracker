@@ -792,9 +792,17 @@ station is a normal afternoon, ten at once is not — and they are deliberately 
 panel that scales, so the ramp keeps meaning status and nothing else.
 
 Each entry mirrors the popup layout: badge, name,
-region, distance from you, meter or state block, sparkline, nearest-webcam button. Sorted
-nearest-first when a location fix exists, otherwise sirens then closest-to-danger. Clicking flies
-to the station, ripples over it, and temporarily un-hides its layer if switched off.
+region, distance from you, meter or state block, sparkline, nearest-webcam button. Entries sort by
+tier first, then by kind within a tier (rivers before sirens), then by distance or danger rating.
+Clicking flies to the station, ripples over it, and temporarily un-hides its layer if switched off.
+
+**Alert list groups its sirens instead of interleaving them.** Tier always sorts first — observed
+danger ranks above a forecast — and within each tier, rivers come before sirens. A list that
+alternates between water levels and triggered sirens changes units on every row. A level is a
+number to judge. A siren is a decision somebody else made. Grouping sits below tier, never above
+it. A sounding siren must not fall under a river merely forecast to reach its mark. This reverses
+the no-location default (sirens first). Swap the two operands in the comparator — `(b.kind ===
+'siren') - (a.kind === 'siren')` — to restore the old behavior.
 
 ## User
 
@@ -1371,12 +1379,23 @@ shows the count by being countable and the span by starting at the left edge, so
 third line of chrome restating a picture. A window holding nothing still says so in words, because
 that is a state and not a number.
 
-**A tick strip under the scrubber: one mark per frame, all the same mark.** It was built with two
-heights — a taller one on each new day — which laid a second, coarser grid over the frames and left
-the strip saying two things at once. Since the window is thinned to the range's own step, the frames
-*are* the graduation: the marks are evenly spaced by construction and one mark is one picture. That
-is the whole legend, and it needs no key. Only "now" is different, wider and accented, because it is
-the one mark that is not an archived frame.
+**A tick strip under the scrubber: one mark per frame, and no mark height on a period.** The strip
+draws two heights. A plain frame is 8px of a 10px box, and the `now` mark is 8px too — width and
+color set that one apart, not height. A hovered mark and an alert frame both fill the box at 2px
+wide. What the strip rejects is a *repeating* second height. The first build made every new day
+taller, which laid a second and coarser grid over the frames. The strip then said two things at
+once. The window is thinned to the range's own step, so the frames already *are* the graduation.
+The marks are evenly spaced by construction, and one mark is one picture. That is the whole legend,
+and it needs no key.
+
+Three marks stand out from that ruler, and none of them is a graduation. "Now" is wider and
+accented, because it is the one mark that is not an archived frame. A hovered mark grows for as long
+as the pointer rests on it. A frame taken while a river was at danger, or forecast to reach it, is
+taller and wider. It carries the tier as a color.
+
+The rejected day mark repeated forever, so it read as a scale. These three do not repeat on any
+period. They name a condition on one frame. A second scale would compete with the frame spacing for
+the same job. A condition never competes, because it measures nothing.
 
 Marks are placed by *index*, like the scrubber's own positions rather than by clock time, so a mark
 is always directly under the thumb that selects it. Positions are a percentage of the *track*, which
@@ -3060,3 +3079,180 @@ go stale without anything failing. The stacked layout below 600px already covers
   zoom, and co-located pins spiderfy on click, so nothing is unreachable — it is denser to read.
 - **The cluster badge did not grow.** It is a counter rather than a mark, and a 54px chip over the
   map hides what it is counting. If the pins now look large beside it, that is the number to revisit.
+
+### No camera in range says nothing
+
+`camLink()` and `camNear()` return an empty string when no camera is within `CAM_MAX_KM`. Both
+printed "no camera nearby" before. The card is not a camera card. A river gauge card that opens
+with a grey line about a camera that does not exist spends its first line on an absence, and 150 of
+591 stations showed that line on every open. The link is an aside, so its absence is also an aside.
+
+The "you are here" card drops the whole camera section for the same reason. That card still names
+the four *water* kinds it finds nothing for, because you opened it to ask what is around you and
+"no siren reporting" is an answer to that question. The distance cap itself did not move. Nothing
+else changed either. The CSS keys the spacing of the first section on
+`#sideBody > .sensor:first-child`, so the section that is now first gets the same treatment the
+link had.
+
+## A camera picture says what the river beside it was doing
+
+Four changes, and they share one question. A reader opens a flood camera to ask one thing: is it
+like this now. Every change below answers that question, or gets out of its way.
+
+- **`nearestCam()` caps the nearest camera at 5 km** (`CAM_MAX_KM`). It reached 24 km before.
+- **A picture carries a warning glyph** when a river or siren within 2 km is on alert
+  (`CAM_ALERT_KM`).
+- **`?shots=` returns a tier per frame**, so the lightbox colors its tick strip.
+- **A station card plays its last three hours** (`js/clip.js`), a frame a second, no controls.
+
+### Two radii, two questions
+
+5 km answers which camera to offer. 2 km answers whether the frame shows the trouble. So the app
+can offer a camera at 4.8 km and draw no glyph on it. That is correct, and it is why the two
+numbers are not one number. A camera 5 km from a gauge is the nearest view of that valley. It is
+not a picture of that gauge.
+
+`CAM_MAX_KM` lives in `js/config.js` and applies only inside `nearestCam()`. `CAM_ALERT_KM` lives
+twice, in `js/config.js` and in `api.php`. The server needs its own copy to join a stored frame to
+a river. Change both together.
+
+### What the 5 km cap removed
+
+Measured on the live payload: 441 of 591 stations keep a camera link, and 150 lose one. Those 150
+pointed at cameras up to 24 km away, over a different river with different weather. A wrong view is
+worse than no view. See [No camera in range says nothing](#no-camera-in-range-says-nothing) for
+what the card prints instead.
+
+### The glyph, and why a stale alert draws none
+
+`camAlert()` in `js/stations.js` returns the worst tier within 2 km. Distance breaks a tie between
+two of the same tier. Red marks `now`, amber marks `soon`, and `stale` marks nothing.
+
+A stale alert needs the sentence the alert panel gives it. That sentence says the telemetry died,
+and the situation may have moved either way. A glyph on a photograph has no room for a sentence. A
+warning nobody can qualify is the wrong claim to put on a picture.
+
+`camAlert()` applies `isIgnored()` itself, rather than leaving it to the callers. `PREFS.ignored`
+is the one alarm-suppression control in this app. It already holds past the district filter, on the
+ticker and on the toast. This is a sixth surface under the same rule.
+
+The glyph rides the card still and the lightbox. It never rides a map pin. A pin already carries
+its own station's status, and a camera is not the river. The glyph sits on a translucent dark disc,
+because half this footage is bright sky or wet concrete.
+
+### A stored frame can be scored against the river it watched
+
+`?shots=<id>` used to return a list of timestamps. It now returns `[ts, tier, stationId]` per
+frame. The tier comes from replaying the live forecast at a past sample index.
+
+That reuse is the point. `$slope` and `$assess` were closures inside the refresh path. They are now
+named `slope()` and `assess()` above the early-returning endpoints. The bodies are unchanged. One
+rule has to judge the past and the present. A second scoring rule would let the timeline and the
+map disagree about one river.
+
+`frameTiers()` in `shots.php` does the join. It takes `assess` as a parameter rather than importing
+it. That keeps `shots.php` loadable by `shots-test.php`, which has no payload, no database and no
+network.
+
+Four hardening details, each worth keeping:
+
+- **The database opens `PDO::SQLITE_OPEN_READONLY`.** `.history.db` holds 30 days of samples that
+  nothing can rebuild. This path provably cannot touch them.
+- **A database failure degrades to the plain frame list**, with null tiers. The response carries
+  `max-age=60`, so a fatal body would sit in a cached 200 for a minute.
+- **The sample query starts at `$frames[0] - RISE_DAY`.** The forecast's tide guard looks back 24
+  hours. A frame at the window edge needs that lookback, or the guard runs short.
+- **The server breaks a tier tie by distance, matching `camAlert()` on the client.** Only the
+  worst-tier station id travels, and the client uses that id to drop a tick for an ignored sensor.
+  If the two rules disagreed, ignoring a river could leave its tick colored.
+
+### The tick strip is colored by tier
+
+`js/timeline.js` keeps a `tierAt` Map from frame timestamp to tier and station id. A mark turns red
+or amber for the tier that frame was taken under. The strip then answers "when did this start"
+without playing the whole clip.
+
+A station that has left the payload must not suppress the color. Only a station that is present and
+ignored turns a mark plain. A frame taken while a river was at danger was still taken while that
+river was at danger. An absent station is a lookup failure, not a reader's decision.
+
+### The station card plays three hours
+
+`js/clip.js` plays what the archive holds of the last `CLIP_WIN` (3 h). One frame lands per
+`CLIP_MS` (1000 ms). Capture runs every 30 minutes, so a full window is six frames and a six-second
+lap. The clip carries no controls. The lightbox holds the transport, the scrubber and the compare
+divider. Two places to learn one control is one too many.
+
+Fewer than two frames keeps the live still the card already drew. `?cam=` fetches that still from
+the agency when the card opens. So an empty window means this server did not capture, not that the
+camera stopped. Reaching into the archive for an older frame there would replace a live picture
+with a stale one.
+
+The caption says one of three things. A running clip says `LAST 3 HOURS · N frames`. A card with no
+clip says `LATEST IMAGE · <time>`. It says `NOT CURRENT · <time> · <age>` once that still passes
+three hours. NOT CURRENT is the word the cards already print on a reading over a day old.
+
+Two details cost a round of debugging each:
+
+- **The module keeps a generation counter, not just a camera id.** A reader can close a card and
+  reopen the same camera before the first fetch returns. Both continuations then read the id as
+  current, and two intervals run at once. Nothing holds the first handle any more. `stop()` bumps
+  `gen`, so a stale run can never match again.
+- **The lightbox resolves its camera from the wrapper's `data-clip`.** The clip rewrites `img.src`,
+  so matching `?cam=` against the src fails on an archived frame. Six clicks in seven opened a
+  lightbox with no scrubber, no compare and no glyph.
+
+### What the timeline cannot say
+
+Four things leave a tick uncolored. The first three can never leave one wrong. The fourth can
+disagree with the live glyph, and it is written down here rather than patched.
+
+- **A siren can never color a past tick.** `?shots=` walks rivers only, and `frameTiers()` scores a
+  sample against the station's own danger mark. A siren publishes no such mark. Its samples are 0
+  or 1, so the forecast rule has nothing to measure. 57 of the 69 glyph-capable cameras have a
+  river within 2 km, so most cameras still color.
+- **Levels retain 30 days and frames retain a year.** The month and year scrubber ranges stay
+  largely uncolored. Do not change retention to fix this. Levels feed a forecast, and a reader
+  watches frames.
+- **The static GitHub Pages build has no PHP**, so `?shots=` fails there. The scrubber draws no bar
+  and the card plays no clip. The card still captions the still: the failed `fetch` throws, `clip.js`
+  catches it, and the idle branch prints `LATEST IMAGE` or `NOT CURRENT` from the payload's own
+  timestamp. That caption needs no PHP, so it is the one part of this feature the static build keeps.
+- **The past and the present score danger by two different rules.** `api.php` colors a past tick
+  `now` when a stored sample reads at or above the station's own danger mark. The live glyph uses
+  `isCritical()`, which reads `status >= 3`. For a Selangor river that the national feed does not
+  override, `status` arrives from upstream and nothing re-derives it. So the two can disagree about
+  one river at one moment, and the last tick stays gray under a red glyph. Neither rule is wrong on
+  its own. Choosing one is a decision about which source owns the words "at danger", and that
+  decision does not belong in a fix wave. Do not change either rule to close the gap here.
+
+### Measured
+
+90 cameras are online with an image. 441 of 591 stations keep a camera link at 5 km. 69 of the 90
+cameras can ever raise a glyph at 2 km. 57 of those 69 have a river in range. A three-hour window
+holds six frames at most.
+
+Camera 17 currently carries three real `soon` frames from station `wl-157`, dated 29 and 31 July.
+That is the first end-to-end proof of the join on real archived data.
+
+### Trade-offs accepted
+
+- **About 1.5 MB preloads on the first card open.** Every later lap is free, because `?shot=` is
+  immutable for a year. The alternative was a first lap that flickers on every swap.
+- **Only the worst-tier station id travels.** A tick raised by an ignored station falls to
+  uncolored, not to the second-worst river. Two hot rivers within 2 km of one camera are rare.
+- **An idle card re-requests `?shots=` once per poll.** That is one local read behind a 60-second
+  cache.
+
+### Not built
+
+- **A control on the panel clip.** The lightbox holds the transport, and a picture that moves needs
+  no buttons.
+- **A higher capture rate near an alert.** `SHOT_EVERY` exists to cap the requests aimed at one
+  agency. A flood is exactly when that cap matters most.
+- **A second scoring rule for siren ticks.** Online sirens already reach `.history.db`, so the
+  samples are there. A 0/1 log needs a rule of its own, because the forecast rule needs a danger
+  mark. It would color ticks for up to twelve more cameras. It would also be a second rule judging
+  one strip.
+- **A second-worst fallback when the worst station is ignored.** A `ponytail:` comment in `api.php`
+  marks the spot. Build it if two hot rivers near one camera turn out to be common.

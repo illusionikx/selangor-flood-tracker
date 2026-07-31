@@ -14,7 +14,8 @@
  * disabled scrubber over one frame explains nothing that its absence doesn't.
  */
 
-import { el } from './util.js';
+import { el, isIgnored } from './util.js';
+import { byId } from './stations.js';
 
 /* Named windows rather than a free zoom. The retention tiers mean the archive is *already* a set of
    resolutions — half-hourly for a day, then 3-hourly, then 12-hourly, then weekly — so a continuous
@@ -70,6 +71,7 @@ const cmp   = box.querySelector('.tlcmp');
 
 let cam = null;      // camera id while the lightbox is showing one, else null
 let all = [];        // every stored frame, unix seconds, ascending
+let tierAt = new Map();   // frame ts -> {tier, id}, for the tick colors. Empty is the calm case.
 let frames = [];     // the subset inside the chosen range
 let liveSrc = '';    // the live proxied still — always the last position on the scrubber
 let range = RANGES[0];
@@ -116,21 +118,20 @@ function thin(list, step) {
   return [...keep.values()];
 }
 
-/* A ruler under the scrubber: one mark per frame, all the same mark. It was drawn with two heights
-   at first — a taller one on each new day — which laid a second, coarser grid over the frames and
-   left the strip saying two things at once. The window is thinned to the range's own step, so the
-   frames *are* the graduation: the marks are evenly spaced by construction and one of them is one
-   picture. That is the whole legend, and it needs no key.
-   Each carries its timestamp as a `title` (the native tooltip — nothing to position, nothing to
-   dismiss, and it works on the 1px mark because the hit box around it is 11px wide) and its index as
-   `data-i`, so the strip is a row of jump targets as well as a ruler.
-   Positions are a percentage of the *track*, which is inset by half a thumb at each end — hence the
-   8px margins on .tlticks rather than a padding, since a percentage offset resolves against the
-   padding box and a padding would not move it. */
+/* A ruler under the scrubber: one mark per frame. Marks taken while a river within CAM_ALERT_KM was
+   at danger, or forecast to reach it, carry that tier as a color — so the strip answers "when did
+   this start" without playing the whole clip.
+   The reader's own ignore list is applied here rather than on the server, which never learns it. A
+   tick raised by an ignored sensor falls back to plain, not to the next worst river. */
 function drawTicks() {
-  ticks.innerHTML = frames.map((ts, i) =>
-    `<i data-i="${i}" title="${stamp(ts)}" style="left:${i / scrub.max * 100}%"></i>`
-  ).join('') + (frames.length
+  ticks.innerHTML = frames.map((ts, i) => {
+    const a  = tierAt.get(ts);
+    const st = a ? byId(a.id) : null;
+    const on = !!a && !(st && isIgnored(st));
+    const why = on ? ` · ${a.tier === 'now' ? 'at danger' : 'forecast'}` : '';
+    return `<i data-i="${i}" title="${stamp(ts)}${why}" class="${on ? 't-' + a.tier : ''}"
+               style="left:${i / scrub.max * 100}%"></i>`;
+  }).join('') + (frames.length
     ? `<i class="now" data-i="${frames.length}" title="live" style="left:100%"></i>` : '');
 }
 
@@ -365,11 +366,18 @@ export async function openTimeline(src) {
   if (!id) return;
   cam = id;
   liveSrc = src;
+  let rows = [];
   try {
-    all = await (await fetch(`api.php?shots=${id}`)).json();
-  } catch { all = []; }
+    rows = await (await fetch(`api.php?shots=${id}`)).json();
+  } catch { rows = []; }
   // Still the camera we opened? An impatient close-and-open-another beats a slow fetch otherwise.
-  if (cam !== id || !Array.isArray(all) || all.length < 2) return;
+  if (cam !== id || !Array.isArray(rows)) return;
+  /* Rows are [ts, tier, stationId]. A bare number is the shape this endpoint returned before the
+     tiers landed, and a response cached for its 60 seconds can still be that old — so read both
+     rather than blank the scrubber for a minute after every deploy. */
+  all = rows.map(r => Array.isArray(r) ? r[0] : r);
+  tierAt = new Map(rows.filter(r => Array.isArray(r) && r[1]).map(r => [r[0], { tier: r[1], id: r[2] }]));
+  if (all.length < 2) return;
   tl.hidden = false;
   /* Open on the narrowest window that actually holds a clip. 6 h is the right default on a server
      that has been capturing all along and empty on one that has not — and an empty scrubber under a
@@ -405,6 +413,7 @@ export function reset() {
      the previous camera's `cam` and `frames` would overwrite it with a frame from the last one. */
   cam = null;
   all = frames = [];
+  tierAt = new Map();
   setCompare(false);
   tl.hidden = true;
   stage.style.removeProperty('--ab');

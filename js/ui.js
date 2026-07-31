@@ -1,11 +1,12 @@
 // DOM wiring: drawer, theme, filters, layer chips, panels, lightbox and the delegated jumps.
 
-import { KINDS } from './config.js';
+import { KINDS, camSrc } from './config.js';
 import { state, PREFS, save } from './state.js';
 import { el, distKm, dkey, ignoredIds } from './util.js';
 import { map, setTheme, flashTo, closeSide } from './map.js';
 import { heatOpacity, syncHeat } from './heat.js';
 import { byId } from './stations.js';
+import { camWarn } from './popup.js';
 import { render, districts } from './render.js';
 import { dataTable } from './table.js';
 import { alerts, toggleAlerts } from './alerts.js';
@@ -515,7 +516,14 @@ document.addEventListener('click', e => {
 // to click — it names the camera id and builds the same proxied URL.
 const lightbox = el('lightbox');
 document.addEventListener('click', e => {
-  const img = e.target.closest('img.shot');
+  /* Resolve any click inside a `.shotwrap` to that wrapper's still. The warning glyph is a sibling
+     of the img and takes its own pointer events, so a tap on it used to hit nothing at all — and on
+     a phone it covered a corner of the picture it was warning about. It also needs a touch
+     equivalent: the only explanation of the warning is a `title`, which no phone shows. Opening the
+     lightbox is that equivalent, because the same warning is drawn there at full size.
+     The table's `[data-shot]` button sits in no wrapper and keeps its own path. */
+  const img = e.target.closest('img.shot')
+           || e.target.closest('.shotwrap')?.querySelector('img.shot') || null;
   const btn = e.target.closest('[data-shot]');
   if (!img && !btn) return;
   e.stopPropagation();
@@ -523,7 +531,13 @@ document.addEventListener('click', e => {
   // Spin until it lands. `complete` covers the popup's already-cached still, which fires no load
   // event — without that check the spinner would sit there for ever over a picture that is ready.
   lightbox.classList.add('loading');
-  const src = img ? img.src : btn.dataset.shot;   // data-shot is the resolved URL, proxied or direct
+  /* A clip frame's `src` names an archived shot, not the live picture, and the lightbox always
+     opens on live. The wrapper carries `data-clip` with the camera's proxy id for exactly this:
+     look the camera up and rebuild its live URL, rather than reading the clicked <img>'s current
+     `src`. Only the table's "show image" button has no such wrapper, and keeps the old path. */
+  const clipId = img?.closest('[data-clip]')?.dataset.clip;
+  const clipCam = clipId ? byId(`camera-${clipId}`) : null;
+  const src = clipCam ? camSrc(clipCam) : img ? img.src : btn.dataset.shot;
   full.src = src;
   if (full.complete) lightbox.classList.remove('loading');
   // The place, as the dialog's title. Both openers carry it as `data-name` rather than having this
@@ -531,6 +545,14 @@ document.addEventListener('click', e => {
   // into a name is a rule that breaks the day the caption is reworded.
   full.alt = (img ? img.alt : btn.dataset.cap) || '';
   el('lbTitle').textContent = (img || btn).dataset.name || full.alt;
+  /* The same warning as the card, on the full-size view. The camera id is read back out of the
+     proxied URL — `?cam=<n>` is the proxy's own shape, and the table's "show image" button builds
+     the same URL, so both openers are covered by one rule. The static build hotlinks upstream and
+     matches nothing here, which is correct: it has no archive and no payload behind it either. */
+  const n = /[?&]cam=(\d+)/.exec(src || '')?.[1];
+  const c = n ? byId('camera-' + n) : null;
+  lightbox.querySelector('.camwarn')?.remove();
+  if (c) lightbox.querySelector('.stage').insertAdjacentHTML('beforeend', camWarn(c));
   lightbox.showModal();
   openTimeline(src);   // no-op unless this is a proxied camera with an archive behind it
 });

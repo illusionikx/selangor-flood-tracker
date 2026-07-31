@@ -249,7 +249,7 @@ git commit -m "A camera can now name the alert it is standing next to
 
 camAlert() returns the worst tier within 2 km, nearest breaking a tie. It
 drops stale, because a stale alert needs the sentence the panel gives it and
-a glyph on a photograph has no room for one. It honours PREFS.ignored, which
+a glyph on a photograph has no room for one. It honors PREFS.ignored, which
 every other alert surface already does."
 ```
 
@@ -584,8 +584,9 @@ Replace the `?shots=` handler:
    Shape is [[ts, tier, stationId], …]. `tier` is "now", "soon" or null.
    Three things leave a tier null, and all three show as an uncolored tick rather than a wrong one:
    the frame is older than the 30 days of levels we keep, no river sits within CAM_ALERT_KM, or the
-   river publishes no danger mark to be measured against. Sirens are a fourth: they alert live but
-   are never sampled into .history.db, so their past cannot be replayed at all. */
+   river publishes no danger mark to be measured against. Sirens are a fourth: this handler walks
+   rivers only. frameTiers() scores a sample against the station's own danger mark, and a siren
+   publishes none. Online sirens do reach .history.db as 0 or 1, so the samples are not the gap. */
 if (isset($_GET['shots'])) {
     header('Content-Type: application/json');
     header('Cache-Control: max-age=60');
@@ -702,7 +703,7 @@ needed assess() and slope() hoisted out of the refresh path into named
 functions the early endpoints can reach.
 
 timeline.js reads both shapes, because a response cached for its 60 seconds
-can still be the old one after a deploy. Nothing is coloured yet."
+can still be the old one after a deploy. No mark carries a color yet."
 ```
 
 ---
@@ -821,7 +822,7 @@ git commit -m "The tick strip says when the river was in trouble, not just when 
 
 Marks taken while a river within 2 km was at danger turn red, forecast turns
 amber, and the reader's ignore list is applied client-side because the
-server never learns it. A month with no flood in it colours nothing, which
+server never learns it. A month with no flood in it colors nothing, which
 is the right answer rather than a broken strip."
 ```
 
@@ -1110,14 +1111,14 @@ Add to `docs/FEATURES.md`, after the last section. Cover, in this order:
    away. Record the count. A future reader will ask if you measured it.
 4. **Why the fallback keeps the live still** and does not show an older archived frame.
 5. **Why `stale` draws no triangle** — a stale alert needs the sentence the panel gives it.
-6. **What the timeline cannot say.** The app never samples sirens, so nothing can replay their past.
-   Levels retain 30 days and frames retain a year, so the month and year ranges stay mostly
-   uncolored. The static Pages build has no PHP. All three show as an uncolored tick, never a wrong
-   one.
+6. **What the timeline cannot say.** `?shots=` walks rivers only, so nothing can replay a siren's
+   past. `frameTiers()` needs a danger mark, and a siren publishes none. Levels retain 30 days and
+   frames retain a year, so the month and year ranges stay mostly uncolored. The static Pages build
+   has no PHP. All three show as an uncolored tick, never a wrong one.
 7. **Trade-offs accepted** — the 1.5 MB preload on first open, and the single worst-tier station id
    rather than a full per-station tier map.
-8. **Not built** — a control on the panel clip, a higher capture rate near an alert, a siren history
-   table, a second-worst fallback when the worst station is ignored.
+8. **Not built** — a control on the panel clip, a higher capture rate near an alert, a second
+   scoring rule for siren ticks, a second-worst fallback when the worst station is ignored.
 
 - [ ] **Step 2: Update `CLAUDE.md`**
 
@@ -1175,8 +1176,84 @@ git add docs/FEATURES.md CLAUDE.md
 git commit -m "Write down the camera alert path, and what it cannot say
 
 Records the two radii and why they are different numbers, the 150 stations
-that lost a camera link, and the three cases that leave a tick uncoloured
+that lost a camera link, and the three cases that leave a tick uncolored
 rather than wrong."
+```
+
+---
+
+### Task 9: Cluster sirens inside each tier of the alert list
+
+Added after the plan was approved. It shares no code with the camera work and can land at any point.
+
+**Files:**
+- Modify: `js/alerts.js:117-120` — the comparator
+- Modify: `docs/FEATURES.md` — one paragraph
+
+**Interfaces:**
+- Consumes: `tier`, `TIER_RANK`, `distKm` — all already imported by `js/alerts.js`
+- Produces: nothing
+
+- [ ] **Step 1: Read what the comparator does today**
+
+Run: `sed -n '113,121p' js/alerts.js`
+
+It sorts by tier, then by distance when the reader's position is known, and otherwise puts sirens
+**first** and then sorts by `ratio`. Note that siren-first default. Step 2 reverses it.
+
+- [ ] **Step 2: Group the kinds inside the tier**
+
+Replace the comparator:
+
+```js
+  /* Tier before anything else. Nearest-first is the more useful order *within* a tier, but across
+     tiers it would put a forecast two streets away above a river already over its danger mark on
+     the other side of town — and only one of those is happening. Stale sinks to the bottom whatever
+     the distance: it is the one group you cannot act on.
+     Sirens then cluster inside their tier, after the rivers. Reading a list that alternates between
+     a water level and a triggered siren means changing units on every row, and the two want
+     different things from the reader — a level is a number to judge, a siren is already a decision
+     somebody else made. Grouping costs the strict nearest-first order inside a tier, which is why
+     it sits below tier and not above it.
+     This reverses the old no-location default, which led with sirens. Swap the two operands to put
+     sirens back on top. */
+  write(hot
+    .sort((a, b) => TIER_RANK[tier(a)] - TIER_RANK[tier(b)]
+      || (a.kind === 'siren') - (b.kind === 'siren')
+      || (hereAt ? distKm(hereAt, a) - distKm(hereAt, b)
+                 : (b.ratio || 0) - (a.ratio || 0)))
+```
+
+- [ ] **Step 3: Syntax-check**
+
+Run: the `node --check` loop. Expected: no `FAIL` lines.
+
+- [ ] **Step 4: Prove the grouping with real rows**
+
+Turn on test mode, open the alert panel, and read the order. Expected: inside `HAPPENING NOW` every
+river comes first, then every siren. `FORECAST` holds no sirens at all, because `isHot()` only ever
+marks a siren critical. Stale still sinks to the bottom.
+
+Check the no-location case too. Deny geolocation, or clear `hereAt` from the console, and confirm
+the list still groups and no longer leads with sirens.
+
+- [ ] **Step 5: Write it down**
+
+Add a paragraph to `docs/FEATURES.md` covering three points. What changed. Why grouping sits below
+tier and not above it. That the old siren-first default is gone, and how to restore it.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add js/alerts.js docs/FEATURES.md
+git commit -m "The alert list groups its sirens instead of interleaving them
+
+Inside a tier the rivers come first and the sirens follow. A list that
+alternates between the two changes units on every row, and it asks the
+reader to judge a number and obey a decision in the same breath.
+
+Grouping sits below tier, never above it. A sounding siren must not fall
+under a river that is only forecast to reach its mark."
 ```
 
 ---
