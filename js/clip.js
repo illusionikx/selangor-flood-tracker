@@ -118,11 +118,30 @@ export async function start(root, cam) {
   timer = setInterval(tick, CLIP_MS);
 }
 
+/* Now, as Malaysian wall-clock components, parsed back through the same function that reads a JPS
+   stamp. `parseMY()` builds its Date from MYT components in the *viewer's* zone, so what it returns
+   is only comparable against another Date built the same way. Both sides then carry the same
+   distortion and it cancels.
+   `isStale()` compares a parseMY() date against a raw clock and is right anyway, because its window
+   is 24 hours and no offset on earth is that wide. Three hours is narrower than the offset itself: a
+   reader at UTC+0 is eight hours out, so a nine-hour-old still captioned LATEST IMAGE.
+   `hourCycle: 'h23'` because `hour12: false` alone can print midnight as 24:00 on the day before,
+   which parses a day late. */
+const MYT_STAMP = new Intl.DateTimeFormat('en-GB', {
+  timeZone: 'Asia/Kuala_Lumpur', day: '2-digit', month: '2-digit', year: 'numeric',
+  hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
+});
+const nowMY = () => parseMY(MYT_STAMP.format(new Date()).replace(', ', ' '));
+
 /* What the caption says when there is no clip: when this picture was taken, and whether that is
    still current. NOT CURRENT is the word the cards already print on a reading over a day old. */
 function idle(cam) {
   const d = parseMY(cam.shot);
-  if (!d) return 'LATEST IMAGE';
-  const old = Date.now() - d > CLIP_WIN * 1000;
-  return `${old ? 'NOT CURRENT' : 'LATEST IMAGE'} · ${noSec(cam.shot)}${old ? ` · ${ago(d)}` : ''}`;
+  const now = nowMY();
+  if (!d || !now) return 'LATEST IMAGE';
+  const gap = now - d;
+  const old = gap > CLIP_WIN * 1000;
+  // ago() measures against the real clock, so hand it the true instant: the same gap, back from now.
+  return `${old ? 'NOT CURRENT' : 'LATEST IMAGE'} · ${noSec(cam.shot)}${
+    old ? ` · ${ago(Date.now() - gap)}` : ''}`;
 }

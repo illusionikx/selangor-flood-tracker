@@ -16,7 +16,13 @@ export const camWarn = cam => {
   const what = a.tier === 'now'
     ? `${a.station.name} at danger`
     : `${a.station.name} forecast to reach danger${a.station.eta ? ` in ${a.station.eta} h` : ''}`;
-  return `<i class="camwarn i i-warning t-${a.tier}" title="${what} · ${a.km.toFixed(1)} km away"></i>`;
+  /* A wrapper around the glyph, the same shape `.pin` uses: the disc is a background on the span,
+     and the mask is a background on the `<i>` inside it. Both on one element does not work — `.i`
+     paints `background: currentColor` and `.camwarn` paints the black disc, at equal specificity,
+     so map.css wins and the mask cuts the disc instead of the color. The triangle then rendered
+     black on every warned picture, which is the one thing this marker must not do. */
+  return `<span class="camwarn t-${a.tier}" title="${what} · ${a.km.toFixed(1)} km away"
+    ><i class="i i-warning"></i></span>`;
 };
 
 /* Spinner lives on the wrapper; the img clears it on load, or swaps itself out on failure.

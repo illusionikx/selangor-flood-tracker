@@ -143,7 +143,8 @@ Three limits apply. Each one shows as an uncolored tick. None of them shows a wr
    scrubber stay largely uncolored. Do not change the retention to fix this. The prune rule predates
    this feature and protects the disk.
 3. **The static Pages build has no PHP.** `?shots=` fails there. `timeline.js` already handles that
-   and draws no bar. `clip.js` does the same. It shows the plain still, with no caption and no loop.
+   and draws no bar. `clip.js` shows the plain still with no loop. It still captions it: the failed
+   `fetch` throws, and the idle branch prints `LATEST IMAGE` or `NOT CURRENT` from the payload stamp.
 
 ## 6. Measured
 

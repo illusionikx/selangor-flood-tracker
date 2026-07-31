@@ -516,7 +516,14 @@ document.addEventListener('click', e => {
 // to click — it names the camera id and builds the same proxied URL.
 const lightbox = el('lightbox');
 document.addEventListener('click', e => {
-  const img = e.target.closest('img.shot');
+  /* Resolve any click inside a `.shotwrap` to that wrapper's still. The warning glyph is a sibling
+     of the img and takes its own pointer events, so a tap on it used to hit nothing at all — and on
+     a phone it covered a corner of the picture it was warning about. It also needs a touch
+     equivalent: the only explanation of the warning is a `title`, which no phone shows. Opening the
+     lightbox is that equivalent, because the same warning is drawn there at full size.
+     The table's `[data-shot]` button sits in no wrapper and keeps its own path. */
+  const img = e.target.closest('img.shot')
+           || e.target.closest('.shotwrap')?.querySelector('img.shot') || null;
   const btn = e.target.closest('[data-shot]');
   if (!img && !btn) return;
   e.stopPropagation();

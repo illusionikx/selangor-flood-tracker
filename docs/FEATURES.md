@@ -1379,11 +1379,14 @@ shows the count by being countable and the span by starting at the left edge, so
 third line of chrome restating a picture. A window holding nothing still says so in words, because
 that is a state and not a number.
 
-**A tick strip under the scrubber: one mark per frame, and no mark height that repeats.** It was
-built with two heights, a taller one on each new day. That laid a second and coarser grid over the
-frames. The strip then said two things at once. Since the window is thinned to the range's own step,
-the frames *are* the graduation. The marks are evenly spaced by construction, and one mark is one
-picture. That is the whole legend, and it needs no key.
+**A tick strip under the scrubber: one mark per frame, and no mark height on a period.** The strip
+draws two heights. A plain frame is 8px of a 10px box, and the `now` mark is 8px too — width and
+color set that one apart, not height. A hovered mark and an alert frame both fill the box at 2px
+wide. What the strip rejects is a *repeating* second height. The first build made every new day
+taller, which laid a second and coarser grid over the frames. The strip then said two things at
+once. The window is thinned to the range's own step, so the frames already *are* the graduation.
+The marks are evenly spaced by construction, and one mark is one picture. That is the whole legend,
+and it needs no key.
 
 Three marks stand out from that ruler, and none of them is a graduation. "Now" is wider and
 accented, because it is the one mark that is not an archived frame. A hovered mark grows for as long
@@ -3201,7 +3204,8 @@ Two details cost a round of debugging each:
 
 ### What the timeline cannot say
 
-Three things leave a tick uncolored. None of them can leave it wrong.
+Four things leave a tick uncolored. The first three can never leave one wrong. The fourth can
+disagree with the live glyph, and it is written down here rather than patched.
 
 - **A siren can never color a past tick.** `?shots=` walks rivers only, and `frameTiers()` scores a
   sample against the station's own danger mark. A siren publishes no such mark. Its samples are 0
@@ -3210,8 +3214,17 @@ Three things leave a tick uncolored. None of them can leave it wrong.
 - **Levels retain 30 days and frames retain a year.** The month and year scrubber ranges stay
   largely uncolored. Do not change retention to fix this. Levels feed a forecast, and a reader
   watches frames.
-- **The static GitHub Pages build has no PHP**, so `?shots=` fails there. Both readers degrade to
-  no bar and no clip.
+- **The static GitHub Pages build has no PHP**, so `?shots=` fails there. The scrubber draws no bar
+  and the card plays no clip. The card still captions the still: the failed `fetch` throws, `clip.js`
+  catches it, and the idle branch prints `LATEST IMAGE` or `NOT CURRENT` from the payload's own
+  timestamp. That caption needs no PHP, so it is the one part of this feature the static build keeps.
+- **The past and the present score danger by two different rules.** `api.php` colors a past tick
+  `now` when a stored sample reads at or above the station's own danger mark. The live glyph uses
+  `isCritical()`, which reads `status >= 3`. For a Selangor river that the national feed does not
+  override, `status` arrives from upstream and nothing re-derives it. So the two can disagree about
+  one river at one moment, and the last tick stays gray under a red glyph. Neither rule is wrong on
+  its own. Choosing one is a decision about which source owns the words "at danger", and that
+  decision does not belong in a fix wave. Do not change either rule to close the gap here.
 
 ### Measured
 

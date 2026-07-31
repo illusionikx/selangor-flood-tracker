@@ -117,7 +117,12 @@ if (isset($_GET['cam'])) {
     $img = $try(preg_replace('#^http://#i', 'https://', $url)) ?: $try($url);
     if ($img === '') { http_response_code(502); exit; }
     header('Content-Type: image/jpeg');
-    header('Cache-Control: max-age=60');
+    /* 300s = POLL_MS in js/config.js, and the two must move together. A still cannot change faster
+       than the payload that names it, so a shorter life buys nothing and costs a real request at
+       JPS. It costs one per open card per lifetime: js/clip.js re-sets this src on every ~7s lap,
+       and at 60s an open camera card sent a request a minute to the agency. Cards are opened most
+       during a flood, which is when those servers can take it least. */
+    header('Cache-Control: max-age=300');
     echo $img;
     exit;
 }

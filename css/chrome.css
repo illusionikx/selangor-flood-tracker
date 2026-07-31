@@ -938,9 +938,11 @@ body.finding #find { display: none; }
   content: ''; position: absolute; left: 50%; top: 1px; width: 1px; height: 8px;
   background: var(--muted); transform: translateX(-50%);
 }
-/* No mark height repeats. Two heights drew a second and coarser grid over the frames. The window is
-   thinned to the range's own step, so the frames already *are* the graduation. Hover and the alert
-   marks below do grow. Each names a condition on one frame, not a scale. */
+/* No mark height lands on a period. There are two heights: this 8px default and the full-height mark
+   that hover and the alert tiers below share. A *repeating* second height drew a second and coarser
+   grid over the frames, so a taller mark on each new day was dropped. The window is thinned to the
+   range's own step, so the frames already *are* the graduation. Hover and the alert marks name a
+   condition on one frame, not a scale. */
 .tlticks i:hover::before { top: 0; height: 100%; width: 2px; background: var(--accent); }
 /* Now: the one mark that is not an archived frame. Wider and accented, so the end of the strip
    reads as the present rather than as one more frame. */
