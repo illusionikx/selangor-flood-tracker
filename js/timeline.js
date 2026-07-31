@@ -14,7 +14,8 @@
  * disabled scrubber over one frame explains nothing that its absence doesn't.
  */
 
-import { el } from './util.js';
+import { el, isIgnored } from './util.js';
+import { byId } from './stations.js';
 
 /* Named windows rather than a free zoom. The retention tiers mean the archive is *already* a set of
    resolutions — half-hourly for a day, then 3-hourly, then 12-hourly, then weekly — so a continuous
@@ -117,21 +118,20 @@ function thin(list, step) {
   return [...keep.values()];
 }
 
-/* A ruler under the scrubber: one mark per frame, all the same mark. It was drawn with two heights
-   at first — a taller one on each new day — which laid a second, coarser grid over the frames and
-   left the strip saying two things at once. The window is thinned to the range's own step, so the
-   frames *are* the graduation: the marks are evenly spaced by construction and one of them is one
-   picture. That is the whole legend, and it needs no key.
-   Each carries its timestamp as a `title` (the native tooltip — nothing to position, nothing to
-   dismiss, and it works on the 1px mark because the hit box around it is 11px wide) and its index as
-   `data-i`, so the strip is a row of jump targets as well as a ruler.
-   Positions are a percentage of the *track*, which is inset by half a thumb at each end — hence the
-   8px margins on .tlticks rather than a padding, since a percentage offset resolves against the
-   padding box and a padding would not move it. */
+/* A ruler under the scrubber: one mark per frame. Marks taken while a river within CAM_ALERT_KM was
+   at danger, or forecast to reach it, carry that tier as a color — so the strip answers "when did
+   this start" without playing the whole clip.
+   The reader's own ignore list is applied here rather than on the server, which never learns it. A
+   tick raised by an ignored sensor falls back to plain, not to the next worst river. */
 function drawTicks() {
-  ticks.innerHTML = frames.map((ts, i) =>
-    `<i data-i="${i}" title="${stamp(ts)}" style="left:${i / scrub.max * 100}%"></i>`
-  ).join('') + (frames.length
+  ticks.innerHTML = frames.map((ts, i) => {
+    const a  = tierAt.get(ts);
+    const st = a ? byId(a.id) : null;
+    const on = !!a && !(st && isIgnored(st));
+    const why = on ? ` · ${a.tier === 'now' ? 'at danger' : 'forecast'}` : '';
+    return `<i data-i="${i}" title="${stamp(ts)}${why}" class="${on ? 't-' + a.tier : ''}"
+               style="left:${i / scrub.max * 100}%"></i>`;
+  }).join('') + (frames.length
     ? `<i class="now" data-i="${frames.length}" title="live" style="left:100%"></i>` : '');
 }
 
