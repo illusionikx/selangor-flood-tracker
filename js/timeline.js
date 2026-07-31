@@ -70,6 +70,7 @@ const cmp   = box.querySelector('.tlcmp');
 
 let cam = null;      // camera id while the lightbox is showing one, else null
 let all = [];        // every stored frame, unix seconds, ascending
+let tierAt = new Map();   // frame ts -> {tier, id}, for the tick colors. Empty is the calm case.
 let frames = [];     // the subset inside the chosen range
 let liveSrc = '';    // the live proxied still — always the last position on the scrubber
 let range = RANGES[0];
@@ -365,11 +366,18 @@ export async function openTimeline(src) {
   if (!id) return;
   cam = id;
   liveSrc = src;
+  let rows = [];
   try {
-    all = await (await fetch(`api.php?shots=${id}`)).json();
-  } catch { all = []; }
+    rows = await (await fetch(`api.php?shots=${id}`)).json();
+  } catch { rows = []; }
   // Still the camera we opened? An impatient close-and-open-another beats a slow fetch otherwise.
-  if (cam !== id || !Array.isArray(all) || all.length < 2) return;
+  if (cam !== id || !Array.isArray(rows)) return;
+  /* Rows are [ts, tier, stationId]. A bare number is the shape this endpoint returned before the
+     tiers landed, and a response cached for its 60 seconds can still be that old — so read both
+     rather than blank the scrubber for a minute after every deploy. */
+  all = rows.map(r => Array.isArray(r) ? r[0] : r);
+  tierAt = new Map(rows.filter(r => Array.isArray(r) && r[1]).map(r => [r[0], { tier: r[1], id: r[2] }]));
+  if (all.length < 2) return;
   tl.hidden = false;
   /* Open on the narrowest window that actually holds a clip. 6 h is the right default on a server
      that has been capturing all along and empty on one that has not — and an empty scrubber under a
@@ -405,6 +413,7 @@ export function reset() {
      the previous camera's `cam` and `frames` would overwrite it with a frame from the last one. */
   cam = null;
   all = frames = [];
+  tierAt = new Map();
   setCompare(false);
   tl.hidden = true;
   stage.style.removeProperty('--ab');
