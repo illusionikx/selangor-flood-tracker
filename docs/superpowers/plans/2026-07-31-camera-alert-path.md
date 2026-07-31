@@ -1181,6 +1181,82 @@ rather than wrong."
 
 ---
 
+### Task 9: Cluster sirens inside each tier of the alert list
+
+Added after the plan was approved. It shares no code with the camera work and can land at any point.
+
+**Files:**
+- Modify: `js/alerts.js:117-120` — the comparator
+- Modify: `docs/FEATURES.md` — one paragraph
+
+**Interfaces:**
+- Consumes: `tier`, `TIER_RANK`, `distKm` — all already imported by `js/alerts.js`
+- Produces: nothing
+
+- [ ] **Step 1: Read what the comparator does today**
+
+Run: `sed -n '113,121p' js/alerts.js`
+
+It sorts by tier, then by distance when the reader's position is known, and otherwise puts sirens
+**first** and then sorts by `ratio`. Note that siren-first default. Step 2 reverses it.
+
+- [ ] **Step 2: Group the kinds inside the tier**
+
+Replace the comparator:
+
+```js
+  /* Tier before anything else. Nearest-first is the more useful order *within* a tier, but across
+     tiers it would put a forecast two streets away above a river already over its danger mark on
+     the other side of town — and only one of those is happening. Stale sinks to the bottom whatever
+     the distance: it is the one group you cannot act on.
+     Sirens then cluster inside their tier, after the rivers. Reading a list that alternates between
+     a water level and a triggered siren means changing units on every row, and the two want
+     different things from the reader — a level is a number to judge, a siren is already a decision
+     somebody else made. Grouping costs the strict nearest-first order inside a tier, which is why
+     it sits below tier and not above it.
+     This reverses the old no-location default, which led with sirens. Swap the two operands to put
+     sirens back on top. */
+  write(hot
+    .sort((a, b) => TIER_RANK[tier(a)] - TIER_RANK[tier(b)]
+      || (a.kind === 'siren') - (b.kind === 'siren')
+      || (hereAt ? distKm(hereAt, a) - distKm(hereAt, b)
+                 : (b.ratio || 0) - (a.ratio || 0)))
+```
+
+- [ ] **Step 3: Syntax-check**
+
+Run: the `node --check` loop. Expected: no `FAIL` lines.
+
+- [ ] **Step 4: Prove the grouping with real rows**
+
+Turn on test mode, open the alert panel, and read the order. Expected: inside `HAPPENING NOW` every
+river comes first, then every siren. `FORECAST` holds no sirens at all, because `isHot()` only ever
+marks a siren critical. Stale still sinks to the bottom.
+
+Check the no-location case too. Deny geolocation, or clear `hereAt` from the console, and confirm
+the list still groups and no longer leads with sirens.
+
+- [ ] **Step 5: Write it down**
+
+Add a paragraph to `docs/FEATURES.md` covering three points. What changed. Why grouping sits below
+tier and not above it. That the old siren-first default is gone, and how to restore it.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add js/alerts.js docs/FEATURES.md
+git commit -m "The alert list groups its sirens instead of interleaving them
+
+Inside a tier the rivers come first and the sirens follow. A list that
+alternates between the two changes units on every row, and it asks the
+reader to judge a number and obey a decision in the same breath.
+
+Grouping sits below tier, never above it. A sounding siren must not fall
+under a river that is only forecast to reach its mark."
+```
+
+---
+
 ## Notes for whoever executes this
 
 **Task order matters in two places.** Task 5 changes the `?shots=` payload shape, so it must land
