@@ -16,19 +16,24 @@
 import { CLIP_WIN, CLIP_MS, camSrc } from './config.js';
 import { noSec, parseMY, ago } from './util.js';
 
+const CLIP_HOURS = CLIP_WIN / 3600;   // the caption names the window; keep the two numbers tied
+
 let id = null;      // camera id the running loop belongs to, or null
+let gen = 0;        // bumped on every stop(); a stale await compares against this, not against id
 let shots = [];     // frame timestamps inside the window, ascending
 let at = 0;         // position in `shots`; shots.length is the live still
 let timer = null;
-let img = null, cap = null, live = '';
+let img = null, cap = null, live = '', capText = '';
 
 export function stop() {
   clearInterval(timer);
   timer = null;
   id = null;
+  gen += 1;
   shots = [];
   at = 0;
   img = cap = null;
+  capText = '';
 }
 
 // The live still is the last position, the same way the lightbox scrubber treats it: the clip is
@@ -36,16 +41,26 @@ export function stop() {
 const srcAt = i => i >= shots.length ? live : `api.php?shot=${id}&t=${shots[i]}`;
 
 function tick() {
+  /* A frame can fail. camImg()'s onerror replaces the failed <img> with a plain div, so the node
+     this loop writes to can vanish between one tick and the next — most likely at the live
+     position, where a 60-second-old proxy response can go stale mid-lap. Writing to a detached
+     element does nothing useful and never recovers on its own, so stop and let the next
+     openSide() rebuild the card and start a clean loop. */
+  if (!img || !img.isConnected) return stop();
   at = (at + 1) % (shots.length + 1);
-  if (img) img.src = srcAt(at);
+  img.src = srcAt(at);
 }
 
 /* Bind to whatever nodes the card holds right now. Called on a fresh card and on every rebuild of
-   the same card, so it must never reset `at`. */
+   the same card, so it must never reset `at`.
+   `capText` is the caption's own state, kept here for the same reason `at` is: `render()` swaps in
+   a blank `<p class="clipcap">` on every poll, and without this the caption would read for one
+   poll and then go empty for as long as the card stayed open. */
 function bind(box) {
   img = box.querySelector('img.shot');
   cap = box.querySelector('.clipcap');
   if (img && timer) img.src = srcAt(at);
+  if (cap) cap.textContent = capText;
 }
 
 export async function start(root, cam) {
@@ -55,6 +70,7 @@ export async function start(root, cam) {
   if (want === id) return bind(box);     // same camera, same loop, new nodes
   stop();
   id = want;
+  const myGen = gen;   // this run's generation; stop() bumps gen, id alone cannot tell two runs apart
   live = camSrc(cam);
   bind(box);
 
@@ -62,7 +78,11 @@ export async function start(root, cam) {
   try {
     rows = await (await fetch(`api.php?shots=${id}`)).json();
   } catch { rows = []; }
-  if (id !== want || !Array.isArray(rows)) return;   // the reader moved on while we fetched
+  /* `id !== want` alone missed the case where the reader closed the card and reopened the same
+     camera before this fetch returned: stop() clears id, the second start() sets id back to the
+     same value, and both continuations would then read id === want as true. `gen` catches it —
+     stop() bumps it on every call, so a stale run's captured `myGen` can never match again. */
+  if (myGen !== gen || !Array.isArray(rows)) return;
 
   const cut = Date.now() / 1000 - CLIP_WIN;
   shots = rows.map(r => Array.isArray(r) ? r[0] : r).filter(ts => ts >= cut);
@@ -73,11 +93,18 @@ export async function start(root, cam) {
      with a stale one. */
   if (shots.length < 2) {
     shots = [];
-    if (cap) cap.textContent = idle(cam);
+    capText = idle(cam);
+    if (cap) cap.textContent = capText;
+    /* Clear `id` rather than park on this camera. A card can stay open for hours, and the archive
+       can cross the two-frame line while it does — clearing `id` makes the next poll's start()
+       treat this as a fresh camera and check the archive again, instead of parking here in the
+       idle state for as long as the card stays open. */
+    id = null;
     return;
   }
 
-  if (cap) cap.textContent = `LAST 3 HOURS · ${shots.length} frames`;
+  capText = `LAST ${CLIP_HOURS} HOURS · ${shots.length} frames`;
+  if (cap) cap.textContent = capText;
   // Warm the whole lap before it starts. Six frames off local disk, served immutable for a year, so
   // every lap after the first is free — and without this the first lap flickers on every swap.
   await Promise.all(shots.map(ts => {
@@ -85,7 +112,7 @@ export async function start(root, cam) {
     im.src = `api.php?shot=${id}&t=${ts}`;
     return im.decode().catch(() => {});
   }));
-  if (id !== want) return;
+  if (myGen !== gen) return;
   at = 0;
   if (img) img.src = srcAt(0);
   timer = setInterval(tick, CLIP_MS);

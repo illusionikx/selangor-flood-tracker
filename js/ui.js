@@ -1,6 +1,6 @@
 // DOM wiring: drawer, theme, filters, layer chips, panels, lightbox and the delegated jumps.
 
-import { KINDS } from './config.js';
+import { KINDS, camSrc } from './config.js';
 import { state, PREFS, save } from './state.js';
 import { el, distKm, dkey, ignoredIds } from './util.js';
 import { map, setTheme, flashTo, closeSide } from './map.js';
@@ -524,7 +524,13 @@ document.addEventListener('click', e => {
   // Spin until it lands. `complete` covers the popup's already-cached still, which fires no load
   // event — without that check the spinner would sit there for ever over a picture that is ready.
   lightbox.classList.add('loading');
-  const src = img ? img.src : btn.dataset.shot;   // data-shot is the resolved URL, proxied or direct
+  /* A clip frame's `src` names an archived shot, not the live picture, and the lightbox always
+     opens on live. The wrapper carries `data-clip` with the camera's proxy id for exactly this:
+     look the camera up and rebuild its live URL, rather than reading the clicked <img>'s current
+     `src`. Only the table's "show image" button has no such wrapper, and keeps the old path. */
+  const clipId = img?.closest('[data-clip]')?.dataset.clip;
+  const clipCam = clipId ? byId(`camera-${clipId}`) : null;
+  const src = clipCam ? camSrc(clipCam) : img ? img.src : btn.dataset.shot;
   full.src = src;
   if (full.complete) lightbox.classList.remove('loading');
   // The place, as the dialog's title. Both openers carry it as `data-name` rather than having this
