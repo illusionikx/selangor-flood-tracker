@@ -584,8 +584,9 @@ Replace the `?shots=` handler:
    Shape is [[ts, tier, stationId], …]. `tier` is "now", "soon" or null.
    Three things leave a tier null, and all three show as an uncolored tick rather than a wrong one:
    the frame is older than the 30 days of levels we keep, no river sits within CAM_ALERT_KM, or the
-   river publishes no danger mark to be measured against. Sirens are a fourth: they alert live but
-   are never sampled into .history.db, so their past cannot be replayed at all. */
+   river publishes no danger mark to be measured against. Sirens are a fourth: this handler walks
+   rivers only. frameTiers() scores a sample against the station's own danger mark, and a siren
+   publishes none. Online sirens do reach .history.db as 0 or 1, so the samples are not the gap. */
 if (isset($_GET['shots'])) {
     header('Content-Type: application/json');
     header('Cache-Control: max-age=60');
@@ -1110,14 +1111,14 @@ Add to `docs/FEATURES.md`, after the last section. Cover, in this order:
    away. Record the count. A future reader will ask if you measured it.
 4. **Why the fallback keeps the live still** and does not show an older archived frame.
 5. **Why `stale` draws no triangle** — a stale alert needs the sentence the panel gives it.
-6. **What the timeline cannot say.** The app never samples sirens, so nothing can replay their past.
-   Levels retain 30 days and frames retain a year, so the month and year ranges stay mostly
-   uncolored. The static Pages build has no PHP. All three show as an uncolored tick, never a wrong
-   one.
+6. **What the timeline cannot say.** `?shots=` walks rivers only, so nothing can replay a siren's
+   past. `frameTiers()` needs a danger mark, and a siren publishes none. Levels retain 30 days and
+   frames retain a year, so the month and year ranges stay mostly uncolored. The static Pages build
+   has no PHP. All three show as an uncolored tick, never a wrong one.
 7. **Trade-offs accepted** — the 1.5 MB preload on first open, and the single worst-tier station id
    rather than a full per-station tier map.
-8. **Not built** — a control on the panel clip, a higher capture rate near an alert, a siren history
-   table, a second-worst fallback when the worst station is ignored.
+8. **Not built** — a control on the panel clip, a higher capture rate near an alert, a second
+   scoring rule for siren ticks, a second-worst fallback when the worst station is ignored.
 
 - [ ] **Step 2: Update `CLAUDE.md`**
 

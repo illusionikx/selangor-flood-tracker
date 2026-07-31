@@ -127,8 +127,9 @@ if (isset($_GET['cam'])) {
    Shape is [[ts, tier, stationId], …]. `tier` is "now", "soon" or null.
    Three things leave a tier null, and all three show as an uncolored tick rather than a wrong one:
    the frame is older than the 30 days of levels we keep, no river sits within CAM_ALERT_KM, or the
-   river publishes no danger mark to be measured against. Sirens are a fourth: they alert live but
-   are never sampled into .history.db, so their past cannot be replayed at all. */
+   river publishes no danger mark to be measured against. Sirens are a fourth: this handler walks
+   rivers only. frameTiers() scores a sample against the station's own danger mark, and a siren
+   publishes none. Online sirens do reach .history.db as 0 or 1, so the samples are not the gap. */
 if (isset($_GET['shots'])) {
     header('Content-Type: application/json');
     header('Cache-Control: max-age=60');
