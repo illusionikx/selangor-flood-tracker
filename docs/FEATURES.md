@@ -792,18 +792,17 @@ station is a normal afternoon, ten at once is not — and they are deliberately 
 panel that scales, so the ramp keeps meaning status and nothing else.
 
 Each entry mirrors the popup layout: badge, name,
-region, distance from you, meter or state block, sparkline, nearest-webcam button. Sorted
-nearest-first when a location fix exists, otherwise sirens then closest-to-danger. Clicking flies
-to the station, ripples over it, and temporarily un-hides its layer if switched off.
+region, distance from you, meter or state block, sparkline, nearest-webcam button. Entries sort by
+tier first, then by kind within a tier (rivers before sirens), then by distance or danger rating.
+Clicking flies to the station, ripples over it, and temporarily un-hides its layer if switched off.
 
 **Alert list groups its sirens instead of interleaving them.** Tier always sorts first — observed
 danger ranks above a forecast — and within each tier, rivers come before sirens. A list that
-alternates between a water level and a triggered siren means changing units on every row, and the
-two want different things from the reader: a level is a number to judge, a siren is a decision
-somebody else made. Grouping sits below tier, never above it; a sounding siren must not fall under
-a river merely forecast to reach its mark. This reverses the no-location default (sirens first).
-Swap the two operands in the comparator — `(b.kind === 'siren') - (a.kind === 'siren')` — to
-restore the old behaviour.
+alternates between water levels and triggered sirens changes units on every row. A level is a
+number to judge. A siren is a decision somebody else made. Grouping sits below tier, never above
+it. A sounding siren must not fall under a river merely forecast to reach its mark. This reverses
+the no-location default (sirens first). Swap the two operands in the comparator — `(b.kind ===
+'siren') - (a.kind === 'siren')` — to restore the old behavior.
 
 ## User
 

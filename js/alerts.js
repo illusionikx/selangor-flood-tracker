@@ -114,11 +114,10 @@ export function alerts() {
      tiers it would put a forecast two streets away above a river already over its danger mark on
      the other side of town — and only one of those is happening. Stale sinks to the bottom whatever
      the distance: it is the one group you cannot act on.
-     Sirens then cluster inside their tier, after the rivers. Reading a list that alternates between
-     a water level and a triggered siren means changing units on every row, and the two want
-     different things from the reader — a level is a number to judge, a siren is already a decision
-     somebody else made. Grouping costs the strict nearest-first order inside a tier, which is why
-     it sits below tier and not above it.
+     Sirens then cluster inside their tier, after the rivers. A list that alternates between a
+     water level and a triggered siren changes units on every row. A level is a number to judge.
+     A siren is already a decision somebody else made. Grouping costs the strict nearest-first
+     order inside a tier, which is why it sits below tier and not above it.
      This reverses the old no-location default, which led with sirens. Swap the two operands to put
      sirens back on top. */
   write(hot
