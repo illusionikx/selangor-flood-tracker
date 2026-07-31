@@ -131,6 +131,39 @@ function pruneShots(int $id, int $now): void {
     }
 }
 
+/* --- the alert tier a frame was taken under ------------------------------------------------------
+ * Cameras hold a year of frames. `.history.db` holds 30 days of levels. Where the two overlap, a
+ * frame can be scored against what the river was doing at the moment the shutter went.
+ *
+ * `$assess` is api.php's own forecast function, passed in rather than copied. That is the whole
+ * point: the past has to be judged by the rule the present is judged by, or the timeline and the
+ * map disagree about the same river. It is a parameter and not an import because this file must
+ * stay loadable by shots-test.php, which has no payload, no database and no network.
+ * ponytail: one seam, one parameter. If a third caller ever needs it, move assess() into its own
+ * file and import it in both places.
+ *
+ * Walks both lists together, so a camera with 170 frames and 1400 samples costs one pass, not
+ * 170 searches.
+ */
+function frameTiers(array $frames, array $samples, ?float $mark, float $riseEta, callable $assess): array
+{
+    $out = [];
+    if (!$samples || $mark === null) return $out;
+    $n = count($samples);
+    $i = 0;
+    foreach ($frames as $ts) {
+        while ($i + 1 < $n && $samples[$i + 1][0] <= $ts) $i++;
+        if ($samples[$i][0] > $ts) continue;               // the frame predates every sample
+        // Observed beats forecast. A river at its mark is not "expected to reach" anything.
+        if ($samples[$i][1] >= $mark) { $out[$ts] = 'now'; continue; }
+        $eta  = $assess($samples, $i, $mark)[1];
+        $prev = $i > 0 ? $assess($samples, $i - 1, $mark)[1] : null;
+        // Both inside the cutoff: the same on-delay the live flag uses. One sample is a spike.
+        if ($eta !== null && $eta <= $riseEta && $prev !== null && $prev <= $riseEta) $out[$ts] = 'soon';
+    }
+    return $out;
+}
+
 /* One frame per camera, at most once per SHOT_EVERY however often the payload refreshes.
    Returns how many frames were actually written. */
 function captureShots(array $stations): int {
