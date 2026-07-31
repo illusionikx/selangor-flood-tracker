@@ -111,6 +111,12 @@ export const RAIN_STOPS = [[0, 25], [10, 50], [30, 75], [60, 100]];
    CAM_ALERT_KM is a tighter, separate question — see stations.js. */
 export const CAM_MAX_KM = 5;
 
+/* How close an alert must be before the picture is allowed to claim it. Separate from CAM_MAX_KM
+   on purpose: 5 km answers "which camera do I offer", 2 km answers "does this frame show the
+   trouble". So the app can offer a camera at 4.8 km and draw no warning on it, which is correct.
+   api.php carries the same 2 for the timeline join. Change both together. */
+export const CAM_ALERT_KM = 2;
+
 export const FLASH_MS    = 2400;   // how long the jump-to ripple runs
 export const POLL_MS     = 300000; // matches the proxy's cache TTL
 
