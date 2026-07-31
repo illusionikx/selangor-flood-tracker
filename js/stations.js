@@ -10,7 +10,7 @@ export const nearestOf = (kind, from) => state.data.reduce((best, s) =>
 
 /* The cap lives here and nowhere else. camNear(), camLink() and the "you are here" card all call
    this, so one number keeps the three surfaces saying the same thing. Past the cap the callers
-   already have the right words: "no camera nearby". */
+   print nothing. */
 export const nearestCam = from => state.data.reduce((best, c) =>
   c.kind === 'camera' && c.image && c.online && distKm(from, c) <= CAM_MAX_KM &&
   (!best || distKm(from, c) < distKm(from, best)) ? c : best, null);

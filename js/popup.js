@@ -70,18 +70,20 @@ export const etaText = h => h <= 0 ? 'already at it'
    Built as a `.sensor` section like every other kind on that card, because that is what it is there —
    glyph and label, the distance where the other sections put it, the place name, then the reading,
    which here is the picture. `from` is a bare latlng, so there is no same-mast case to handle: your
-   own position shares a mast with nothing. */
+   own position shares a mast with nothing.
+   No camera in range prints nothing at all — not a section, not a line. A camera is an aside
+   everywhere it appears, and an aside that is absent has nothing to report. */
 export function camNear(from, cam) {
+  if (!cam) return '';
   const k = KINDS.camera;
   return `<div class="sensor cam">
     <div class="sensorhead">
-      <i class="glyph i i-${k.icon}" style="color:${cam ? k.color : 'var(--muted)'}"></i>
+      <i class="glyph i i-${k.icon}" style="color:${k.color}"></i>
       <b>Nearest camera</b>
-      ${cam ? `<span class="muted">${distKm(from, cam).toFixed(1)} km away</span>` : ''}
+      <span class="muted">${distKm(from, cam).toFixed(1)} km away</span>
     </div>
-    ${!cam ? '<div class="muted">no camera nearby</div>'
-      : `<div class="place" data-cam="${cam.id}" title="Show ${cam.name} on the map">${cam.name}</div>
-         ${camImg(cam, `Latest still from ${cam.name}`)}`}
+    <div class="place" data-cam="${cam.id}" title="Show ${cam.name} on the map">${cam.name}</div>
+    ${camImg(cam, `Latest still from ${cam.name}`)}
   </div>`;
 }
 
@@ -97,7 +99,7 @@ export const camLink = (from, cam) => cam
        <i class="i i-photo_camera"></i> ${from.site && from.site === cam.site
          ? 'Show webcam' : `Nearest webcam · ${distKm(from, cam).toFixed(1)} km`}
      </button>`
-  : '<div class="muted">no camera nearby</div>';
+  : '';
 
 export function meter(s) {
   const max = s.danger || s.warning || s.alert;

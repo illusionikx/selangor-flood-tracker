@@ -3060,3 +3060,17 @@ go stale without anything failing. The stacked layout below 600px already covers
   zoom, and co-located pins spiderfy on click, so nothing is unreachable — it is denser to read.
 - **The cluster badge did not grow.** It is a counter rather than a mark, and a 54px chip over the
   map hides what it is counting. If the pins now look large beside it, that is the number to revisit.
+
+### No camera in range says nothing
+
+`camLink()` and `camNear()` return an empty string when no camera is within `CAM_MAX_KM`. Both
+printed "no camera nearby" before. The card is not a camera card. A river gauge card that opens
+with a grey line about a camera that does not exist spends its first line on an absence, and 150 of
+591 stations showed that line on every open. The link is an aside, so its absence is also an aside.
+
+The "you are here" card drops the whole camera section for the same reason. That card still names
+the four *water* kinds it finds nothing for, because you opened it to ask what is around you and
+"no siren reporting" is an answer to that question. The distance cap itself did not move. Nothing
+else changed either. The CSS keys the spacing of the first section on
+`#sideBody > .sensor:first-child`, so the section that is now first gets the same treatment the
+link had.
