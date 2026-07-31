@@ -1379,12 +1379,20 @@ shows the count by being countable and the span by starting at the left edge, so
 third line of chrome restating a picture. A window holding nothing still says so in words, because
 that is a state and not a number.
 
-**A tick strip under the scrubber: one mark per frame, all the same mark.** It was built with two
-heights — a taller one on each new day — which laid a second, coarser grid over the frames and left
-the strip saying two things at once. Since the window is thinned to the range's own step, the frames
-*are* the graduation: the marks are evenly spaced by construction and one mark is one picture. That
-is the whole legend, and it needs no key. Only "now" is different, wider and accented, because it is
-the one mark that is not an archived frame.
+**A tick strip under the scrubber: one mark per frame, and no mark height that repeats.** It was
+built with two heights, a taller one on each new day. That laid a second and coarser grid over the
+frames. The strip then said two things at once. Since the window is thinned to the range's own step,
+the frames *are* the graduation. The marks are evenly spaced by construction, and one mark is one
+picture. That is the whole legend, and it needs no key.
+
+Three marks stand out from that ruler, and none of them is a graduation. "Now" is wider and
+accented, because it is the one mark that is not an archived frame. A hovered mark grows for as long
+as the pointer rests on it. A frame taken while a river was at danger, or forecast to reach it, is
+taller and wider. It carries the tier as a color.
+
+The rejected day mark repeated forever, so it read as a scale. These three do not repeat on any
+period. They name a condition on one frame. A second scale would compete with the frame spacing for
+the same job. A condition never competes, because it measures nothing.
 
 Marks are placed by *index*, like the scrubber's own positions rather than by clock time, so a mark
 is always directly under the thumb that selects it. Positions are a percentage of the *track*, which
