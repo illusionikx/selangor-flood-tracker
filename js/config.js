@@ -104,6 +104,13 @@ export const HEAT_MAX_PX = 220;    // blur cost is quadratic; past this the laye
    values, because a canvas cannot resolve a token) and `.ramp.rain` in chrome.css — change the three
    together. */
 export const RAIN_STOPS = [[0, 25], [10, 50], [30, 75], [60, 100]];
+
+/* How far a camera may be and still be offered as this station's nearest view. It reached 24 km
+   before this cap, which is a different river with different weather over it. 441 of 591 stations
+   keep a link at 5 km; the 150 that lose one now say "no camera nearby", which is true and was not.
+   CAM_ALERT_KM is a tighter, separate question — see stations.js. */
+export const CAM_MAX_KM = 5;
+
 export const FLASH_MS    = 2400;   // how long the jump-to ripple runs
 export const POLL_MS     = 300000; // matches the proxy's cache TTL
 
