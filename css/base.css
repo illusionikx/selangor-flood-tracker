@@ -49,9 +49,15 @@
   /* Rainfall's own ramp: dry, then the two mid classes wear the kind colour, then heavy. Very heavy
      is --s-danger, like every other "this is now an emergency". */
   --k-rain-dry: #5158a8; --k-rain-heavy: #a44ce6;
-  /* Amber and green sit closest to the floor — a yellow-green is at its lightest where white stops
-     seeing it — so these two took a smaller lift than the rest (3.3 and 3.6, not 3.1). */
-  --s-normal: #199040; --s-alert: #bc7100; --s-warning: #dc4f10; --s-danger: #df2723;
+  /* Third pass: all four spent down to the 3:1 floor exactly, measured on #efefef — the darkest paper
+     the light basemap puts behind a mark. Red gained the most (L 0.583 → 0.655) because red has the
+     most room; amber gained the least (0.617 → 0.637) because amber runs out of contrast against
+     white before it runs out of lightness. That limit is why the two themes cannot meet on amber.
+     Warning is the one hue that moved, 40° → 45°. At the floor all four rungs sit at the same
+     lightness, so hue is all that separates them, and orange-at-40° against red left the tightest
+     pair on the ramp tighter still. Five degrees puts warning the same distance from each neighbour.
+     ISA-18.2 asks that priority be distinguishable at a glance — that is what this pays for. */
+  --s-normal: #009e42; --s-alert: #c47600; --s-warning: #e55f00; --s-danger: #ff3b33;
   --s-none: #6d7176;
   /* You. Hazard yellow — the one thing on the map that is not a reading, so it is allowed the one
      colour a reading never wears alone. It is deliberately near the alert amber without being it:
@@ -72,7 +78,12 @@
   --k-river: #66b2ff; --k-rainfall: #a893ff; --k-siren: #ff7aa4;
   --k-gauge: #d4a48f; --k-camera: #2fd6e8; --k-mast: #96a4ee;
   --k-rain-dry: #8e95f0; --k-rain-heavy: #d488ff;
-  --s-normal: #5fdc86; --s-alert: #ffc94d; --s-warning: #ff9440; --s-danger: #ff7a6e;
+  /* Third pass: chroma to the sRGB edge on each hue, which for the three warm rungs meant dropping a
+     little lightness — they were already at the edge where they sat. The floor here is 4.5 on the
+     surface, not 3, and every one of them clears it. --s-danger lands within a shade of the light
+     theme's red, which is not a coincidence: red is the one rung where "reads on white" and "reads
+     on near-black" overlap, so the two themes agree on the colour that matters most. */
+  --s-normal: #26e275; --s-alert: #ffc000; --s-warning: #fe8400; --s-danger: #ff3a37;
   /* Not saturated with the others: "no reading" is the absence of a colour, and a tinted grey is a
      hue, which is a claim. */
   --s-none: #9aa0a6;
@@ -348,10 +359,18 @@ dialog:focus, dialog:focus-visible { outline: none; }
   color: var(--muted); background: var(--hover);            /* no signal */
 }
 /* The status tokens carry the per-theme value now — these three had grown their own dark overrides,
-   which is the same job done three times in two stylesheets. */
-.state.off { color: var(--s-normal); background: color-mix(in srgb, var(--s-normal) 12%, transparent); }
-.state.on  { color: var(--s-danger); background: color-mix(in srgb, var(--s-danger) 14%, transparent); }
-.state.mid { color: var(--s-alert);  background: color-mix(in srgb, var(--s-alert) 18%, transparent); }
+   which is the same job done three times in two stylesheets.
+   The ink is the token pulled 30% toward `--on-surface`, because this is the one place a status
+   colour is *text*. The tokens are held to 3:1, which is what WCAG asks of a mark on a map; a 16px
+   word asks 4.5, and a word set in its own colour on a tint of itself starts from less than either.
+   `OUT OF CONTACT` is the label this most has to hold, so the whole set is read at 4.5 or better.
+   One expression serves both themes: `--on-surface` is near-ink on the light theme and near-paper on
+   the dark one, so the mix always moves *away* from the surface behind it. The chip keeps the hue at
+   full strength — it is the background that carries the signal here, and the word that carries the
+   meaning. Same reason on `.tally b` in chrome.css. */
+.state.off { color: color-mix(in srgb, var(--s-normal) 70%, var(--on-surface)); background: color-mix(in srgb, var(--s-normal) 12%, transparent); }
+.state.on  { color: color-mix(in srgb, var(--s-danger) 70%, var(--on-surface)); background: color-mix(in srgb, var(--s-danger) 14%, transparent); }
+.state.mid { color: color-mix(in srgb, var(--s-alert)  70%, var(--on-surface)); background: color-mix(in srgb, var(--s-alert) 18%, transparent); }
 
 /* --- sparkline ------------------------------------------------------------------------------ */
 

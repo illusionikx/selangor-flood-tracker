@@ -57,13 +57,18 @@ export function alerts() {
    .map(([n, icon, what, c]) => `<b style="--c:${c}" title="${n} ${what}" aria-label="${n} ${what}"
         ><i class="i i-${icon}"></i>${n}</b>`).join('');
 
-  // The warning glyph is the at-a-glance signal, so it carries the size of the problem on the usual
-  // status ramp: grey nothing, amber a handful, orange a bad night, red district-wide. The steps are
-  // judgement, not a JPS definition — one rising station is normal, ten at once is not.
-  // Counted on `live`, not `hot`: a list made entirely of stations we can no longer read is a
-  // maintenance problem, not a flood, and must not paint the glyph red.
+  /* The warning glyph carries **severity, not headcount**: red the moment one station is at its
+     danger mark or one siren is sounding, amber while the worst of it is still a forecast, grey when
+     there is nothing. That is `tier()`'s own split — observed against projected — and the list below
+     already draws it as a red or amber rule per row, so the button now agrees with the rows it opens.
+     It used to ramp on the number instead (amber 1–4, orange 5–9, red 10+), which put an amber glyph
+     over a river standing at danger and a red one over ten stations merely forecast to climb. CAP
+     keeps severity and urgency on separate axes for exactly this reason, and the count was never
+     missing from the button — it is the badge on the corner.
+     Read from `live`, not `hot`: a list made entirely of stations we can no longer read is a
+     maintenance problem, not a flood, and must not paint the glyph red. */
   const c = !live.length ? NO_INFO
-    : STATUS_COLOR[live.length >= 10 ? 3 : live.length >= 5 ? 2 : 1];
+    : STATUS_COLOR[live.some(s => tier(s) === 'now') ? 3 : 1];
 
   /* The bar's own signal. The badge counts `live` — the same number as the app icon's, for the same
      reason: it is a demand for attention, and stations we can no longer read are not one. The

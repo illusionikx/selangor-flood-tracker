@@ -4,7 +4,7 @@ import { KINDS } from './config.js';
 import { state, PREFS, save } from './state.js';
 import { el, distKm, dkey, ignoredIds } from './util.js';
 import { map, setTheme, flashTo, closeSide } from './map.js';
-import { heatOpacity } from './heat.js';
+import { heatOpacity, syncHeat } from './heat.js';
 import { byId } from './stations.js';
 import { render, districts } from './render.js';
 import { dataTable } from './table.js';
@@ -230,6 +230,9 @@ el('risingOnly').checked = !!PREFS.risingOnly;
 const heatName = () => el('heatN').textContent =
   el('heat').checked ? 'water level' : el('rainHeat').checked ? 'rainfall' : 'off';
 heatName();
+// Before the first payload, not after it: render() is a whole poll away, and until it ran the map
+// carried the water layer and the legend carried both ramps whatever the pref said.
+syncHeat();
 
 /* The rising filter hides most of the map, and unlike the district picker it is one checkbox with
    no list under it saying what it took away — a drawer you closed an hour ago is not an indication.

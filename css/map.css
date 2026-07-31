@@ -89,9 +89,12 @@
    held to. The shadow is the only other help: enough to lift a glyph off a busy tile, not enough to
    read as a second shape. `filter`, not `box-shadow`, because it follows the mask's rendered
    outline rather than its box. */
+/* 39px, up from 26 — the whole mark and everything hung off it went up by half. The box is repeated
+   as `iconSize` in render.js, which is what actually positions the marker, so the two move together
+   or the pin stops pointing at its station. */
 .pin {
-  position: relative; display: grid; place-items: center; width: 26px; height: 26px;
-  color: var(--c, var(--accent)); font-size: 24px;
+  position: relative; display: grid; place-items: center; width: 39px; height: 39px;
+  color: var(--c, var(--accent)); font-size: 36px;
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .35));
 }
 /* Colour is already the offline grey here — fading the glyph as well would just hide it again. */
@@ -101,9 +104,9 @@
    `var(--surface)` — white on the light theme, near-black on the dark one, which is what the old
    luminance-picking `ink()` in util.js computed by hand for every fill it was ever handed. */
 .pin.multi {
-  border-radius: 50%; font-size: 15px;
+  border-radius: 50%; font-size: 22px;
   background: var(--c, var(--accent)); color: var(--surface);
-  border: 2px solid var(--surface); box-shadow: var(--shadow); filter: none;
+  border: 3px solid var(--surface); box-shadow: var(--shadow); filter: none;
 }
 /* The grouping radius drawn under a mast on hover — coloured here rather than through Leaflet's
    `color`/`fillColor` options, which become SVG presentation attributes that cannot take a var().
@@ -111,27 +114,27 @@
 .mastring { stroke: var(--k-mast); fill: var(--k-mast); }
 /* How many sensors this one pin stands for. Only rendered past one, so a plain pin stays plain. */
 .pin .n {
-  position: absolute; top: -3px; right: -3px; min-width: 14px; height: 14px; padding: 0 3px;
+  position: absolute; top: -4px; right: -4px; min-width: 21px; height: 21px; padding: 0 5px;
   display: grid; place-items: center; border-radius: 999px;
-  font: 500 9px/1 Roboto, sans-serif; letter-spacing: 0; text-transform: none;
-  color: var(--surface); background: var(--on-surface); box-shadow: 0 0 0 1.5px var(--surface);
+  font: 500 13px/1 Roboto, sans-serif; letter-spacing: 0; text-transform: none;
+  color: var(--surface); background: var(--on-surface); box-shadow: 0 0 0 2px var(--surface);
 }
 .pin.multi.danger .n { color: var(--s-danger); background: var(--surface); box-shadow: none; }
 /* Forecast to reach danger. A ring rather than a fill, because it is a claim about the next few
    hours and not a reading — on the bare pin it is drawn like the halo below, since there is no
    longer a box for a box-shadow to trace. */
 .pin.rise::before {
-  content: ''; position: absolute; inset: -3px; border-radius: 50%;
-  border: 2px solid var(--s-danger);
+  content: ''; position: absolute; inset: -5px; border-radius: 50%;
+  border: 3px solid var(--s-danger);
 }
-.pin.multi.rise { box-shadow: 0 0 0 2px var(--s-danger), var(--shadow); }
+.pin.multi.rise { box-shadow: 0 0 0 3px var(--s-danger), var(--shadow); }
 .pin.multi.rise::before { content: none; }
 /* Danger level or a sounding siren: on top, in the danger red, with a repeating halo. The halo is
    what a filled disc used to do — it makes the pin bigger than a glyph without hiding which glyph
    it is. */
 .pin.danger::after {
-  content: ''; position: absolute; inset: -4px; border-radius: 50%;
-  border: 2px solid var(--s-danger); animation: halo 1.8s ease-out infinite;
+  content: ''; position: absolute; inset: -6px; border-radius: 50%;
+  border: 3px solid var(--s-danger); animation: halo 1.8s ease-out infinite;
 }
 .pin.multi.danger { background: var(--s-danger); color: var(--surface); }
 @media (prefers-reduced-motion: reduce) { .pin.danger::after { animation: none; opacity: .8; } }
@@ -147,7 +150,7 @@
    not a mark on a map. The soft dark one is enough to sit it above the basemap. `filter` rather than
    `box-shadow` because it follows the mask's rendered shape, not its box. */
 .pin.me {
-  width: 32px; height: 32px; font-size: 32px;
+  width: 48px; height: 48px; font-size: 48px;
   background: none; border: 0; box-shadow: none; color: var(--me);
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .45));
 }

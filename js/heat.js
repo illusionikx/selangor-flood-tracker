@@ -90,7 +90,23 @@ export function heatOpacity() {
   for (const l of layers) if (l._canvas) l._canvas.style.opacity = pct / 100 * fade;
 }
 
+/* Puts the map and the legend on whichever of the two chips is ticked. ui.js keeps them mutually
+   exclusive, so exactly one scale is ever on screen — never a stack of two ramps to read against
+   each other. The opacity slider sits below both and serves either.
+   This runs at startup as well as on every render: index.html ships the water chip ticked and both
+   legend sections visible, and a render is a whole poll away — so a reader whose pref is rainfall
+   used to get the wrong legend, and the wrong layer, for as long as the first payload took. */
+export function syncHeat() {
+  const wet = el('heat').checked, rainy = el('rainHeat').checked;
+  wet   ? heat.addTo(map)     : heat.remove();
+  rainy ? rainHeat.addTo(map) : rainHeat.remove();
+  el('lgWater').style.display = wet ? '' : 'none';
+  el('lgRain').style.display = rainy ? '' : 'none';
+  el('legend').style.display = wet || rainy ? '' : 'none';
+  heatScale();   // sizes whichever is on, and re-applies opacity
+  heatOpacity();
+}
+
 // No redraw call here: leaflet.heat repaints on the moveend that follows every zoomend, so setting
 // the options first is enough. Calling redraw() as well painted the canvas twice per zoom.
 map.on('zoomend', heatScale);
-heat.addTo(map);

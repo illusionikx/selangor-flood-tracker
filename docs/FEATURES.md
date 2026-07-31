@@ -2931,3 +2931,132 @@ which is the envelope rule doing its job on a tidal station.
 - **Two polls of delay is up to 17 minutes of lead time** given the median poll gap. On a flashy
   urban river that is real. It buys the end of 48 flips, and an alert nobody believes has no lead
   time at all.
+
+## The heat layers now match the saved choice before the first payload
+
+**Landing showed both legend ramps, and the water layer, whatever you had picked.** The two heatmaps
+are one mutually-exclusive choice, held in `PREFS.heatLayer`. The map and the legend were put on that
+choice in one place only — `render()` — and `render()` does not run until the first poll returns.
+That is about 3.5 seconds on a warm cache, longer on a cold one, and never if the poll fails. Until
+then `index.html` had the water chip ticked and both `.lgsec` sections visible, and `heat.js` added
+the water layer at module load. A reader whose choice was rainfall got the wrong legend, and a reader
+who had switched both off got a legend for a layer that was not there.
+
+The chips themselves were already correct on landing — `ui.js` reads the pref and ticks one of them.
+Only the two things the chips are supposed to drive lagged.
+
+`syncHeat()` in `heat.js` now holds those six lines, and `ui.js` calls it once, right after it ticks
+the chips. `render()` calls the same function on every poll. One reconciliation, two callers.
+
+### Trade-offs accepted
+
+- **The initial state stays in the markup.** `#heat` keeps its `checked` attribute and the legend
+  sections keep no inline `display`, so the page is still readable with no JavaScript running.
+  `syncHeat()` corrects it in the same task as the rest of the drawer wiring, before paint.
+- **No new state.** The function reads the checkboxes, which `ui.js` has already set from the pref.
+  Nothing caches which layer is live, so there is no second copy of the answer to keep in step.
+
+## Third palette pass: the status ramp, and what the alert glyph is allowed to say
+
+Two complaints, one root. The light theme's status colours read brown, and the dark theme's read
+washed out — so the alert glyph in the app bar looked like a different control in each theme.
+
+### The colours
+
+The [second pass](#the-palette-is-two-palettes) moved each theme the way it had room to move
+and stopped short of the floor. This pass spends the rest.
+
+| token | light was | light now | dark was | dark now |
+|---|---|---|---|---|
+| `--s-normal` | `#199040` | `#009e42` | `#5fdc86` | `#26e275` |
+| `--s-alert` | `#bc7100` | `#c47600` | `#ffc94d` | `#ffc000` |
+| `--s-warning` | `#dc4f10` | `#e55f00` | `#ff9440` | `#fe8400` |
+| `--s-danger` | `#df2723` | `#ff3b33` | `#ff7a6e` | `#ff3a37` |
+
+The light set is at 3.06–3.08 against `#efefef`, the darkest paper the light basemap puts behind a
+mark, and 3.5 against white. That is the floor WCAG 1.4.11 sets for a non-text mark, held exactly.
+The dark set went to the sRGB edge on each hue, which for the three warm rungs meant giving up a
+little lightness — they were already at the edge where they sat. All four clear 4.5 on the surface.
+
+**Amber gained the least, and that is physics, not caution.** Yellow runs out of contrast against
+white before it runs out of lightness, so light amber cannot be brighter than `#c47600` and stay
+legible. This is the same limit that pinned `--me` two passes ago. The two themes therefore cannot
+meet on amber, and the divergence there is a fact about the hue rather than a choice.
+
+**They do meet on red.** Light `#ff3b33` and dark `#ff3a37` are a shade apart, because red is the one
+rung where "reads on white" and "reads on near-black" overlap. The rung that matters most is now the
+same colour in both themes.
+
+**`--s-warning` is the one hue that moved**, 40° to 45° in OKLCH. At the floor all four rungs sit at
+about the same lightness, so hue is the only thing separating them, and orange against red was
+already the tightest pair on the ramp. Five degrees puts warning an equal distance from each
+neighbour: 0.073 and 0.077 in OKLab, against 0.088 and 0.050 before. ISA-18.2 asks that priority be
+distinguishable at a glance, and this is what pays for it.
+
+`--s-none` did not move, for the reason it did not move last time. A tinted grey is a hue, and a hue
+on this map is a claim.
+
+### The tinted chips needed their own ink
+
+A status token is held to 3:1 because it is a mark. Three places set it as **text** on a tint of
+itself — the `.state` blocks in a station card (`OUT OF CONTACT`, `IDLE`), and the four counts in the
+alert list's head. Text asks 4.5, and a colour on a tint of itself starts from less than either
+number: `.state.on` measured 3.81 before this pass and 2.94 after it.
+
+The ink is now the token pulled 30% toward `--on-surface`, which puts the whole set at 4.5 or better
+in both themes. One expression covers both, because `--on-surface` is near-ink on the light theme and
+near-paper on the dark one — the mix always moves away from whatever surface is behind it. The chip
+keeps the hue at full strength. The background carries the signal; the word carries the meaning.
+
+The `.badge` chips on a station card use the same pattern with a **kind** colour, which this pass did
+not touch, so their contrast is unchanged. They are the same class of problem and are worth the same
+treatment when kind colours are next revisited.
+
+### The alert glyph now carries severity, not headcount
+
+The button used to take the status ramp by **count**: amber at 1–4 stations, orange at 5–9, red at
+10 or more. That put an amber glyph over a river standing at its danger mark, and a red one over ten
+stations merely forecast to climb.
+
+It reads `tier()` now — red the moment one station is at danger or one siren is sounding, amber while
+the worst of it is a forecast, grey when there is nothing. That is the split the list below it has
+drawn as a red or amber rule per row since the alert audit, so the button and the rows it opens now
+agree.
+
+CAP keeps severity and urgency on separate axes, and count is neither. The count was never missing
+from the button either — it is the badge on the corner, and it is the number the app icon carries.
+
+### Trade-offs accepted
+
+- **The orange rung is no longer reachable on the glyph.** `tier()` has two actionable tiers and the
+  button now has two colours. Orange is still on the pins, where it is a station's own status.
+- **"Ten at once" no longer has its own colour.** ISA-18.2's flood threshold is a real idea and this
+  was a nod to it, but it was riding on the severity channel. A flood of alerts deserves its own
+  indication rather than the loudest rung of somebody else's.
+- **The light set has no margin left.** Every value is within 0.08 of the 3:1 floor. Anything that
+  darkens the paper behind a mark — a basemap change, a print stylesheet — has to be measured, not
+  assumed. There is no fourth pass available in this direction.
+
+## The map pins grew by half
+
+26px to 39px, and the glyph inside from 24 to 36. Everything hung off the pin went up by the same
+half: the ring on a rising station, the halo on one at danger, the border and count on a mast chip,
+and the "you are here" mark from 32 to 48.
+
+**The box is declared twice and must stay in step.** `.pin` in `css/map.css` draws it, and
+`iconSize` / `iconAnchor` in `render.js` is what Leaflet actually positions the marker from. Change
+one alone and the pin stops pointing at its station. The same pair exists in `locate.js`, where the
+anchor is the pin's **tip** rather than its centre, and stays at ~92% of the box height for the air
+Material leaves under the glyph — 44 of 48, as it was 29 of 32.
+
+The five sample pins in the About key grew with them, because they are the map's own `.pin` at the
+map's own size. That is the point of the key: a legend drawn in a second style is a legend that can
+go stale without anything failing. The stacked layout below 600px already covers the wider row.
+
+### Trade-offs accepted
+
+- **Pins overlap sooner.** Clustering is unchanged, so a mark now covers about twice the ground it
+  did and stations metres apart crowd more at mid zoom. `maxClusterRadius` already tightens with
+  zoom, and co-located pins spiderfy on click, so nothing is unreachable — it is denser to read.
+- **The cluster badge did not grow.** It is a counter rather than a mark, and a 54px chip over the
+  map hides what it is counting. If the pins now look large beside it, that is the number to revisit.

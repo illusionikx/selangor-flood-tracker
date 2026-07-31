@@ -4,9 +4,9 @@ import { KINDS, MAST, HEAT_FLOOR, RAIN_STOPS } from './config.js';
 import { state, PREFS } from './state.js';
 import { el, color, dkey, isCritical, leads, hasInfo, isIgnored, ignoredIds,
          scalePos, levelStops, gaugeStops } from './util.js';
-import { map, marks, siteMark, shown, syncCluster, focusOn, side, openSide,
+import { marks, siteMark, shown, syncCluster, focusOn, side, openSide,
          showMast, hideMast } from './map.js';
-import { heat, rainHeat, heatScale, heatOpacity, thinHeat } from './heat.js';
+import { heat, rainHeat, syncHeat, thinHeat } from './heat.js';
 import { sitePopup } from './popup.js';
 import { dataTable } from './table.js';
 
@@ -108,7 +108,8 @@ export function render() {
       kind: lead.kind, critical,                          // read back by the cluster badge
       zIndexOffset: critical ? 1000 : rising ? 500 : 0,   // keep the urgent pins on top
       icon: L.divIcon({
-        className: '', iconSize: [26, 26], iconAnchor: [13, 13],
+        // Matches `.pin`'s box in map.css — Leaflet positions the marker off this, not off the CSS.
+        className: '', iconSize: [39, 39], iconAnchor: [19.5, 19.5],
         // `.multi` is the one pin that keeps a filled disc: it is standing for a stack rather than
         // naming a sensor, and it carries a count that needs a field to sit on. Everything else is
         // the glyph alone — see .pin in map.css.
@@ -152,16 +153,7 @@ export function render() {
   // Thinned, not raw: overlapping blobs composite, and these are intensities rather than counts.
   heat.setLatLngs(thinHeat(points));
   rainHeat.setLatLngs(thinHeat(rainPoints));
-  // ui.js keeps these two mutually exclusive, so the legend shows one scale or none — never a stack
-  // of two ramps to read against each other. The opacity slider lives below both and serves either.
-  const wet = el('heat').checked, rainy = el('rainHeat').checked;
-  wet   ? heat.addTo(map)     : heat.remove();
-  rainy ? rainHeat.addTo(map) : rainHeat.remove();
-  el('lgWater').style.display = wet ? '' : 'none';
-  el('lgRain').style.display = rainy ? '' : 'none';
-  el('legend').style.display = wet || rainy ? '' : 'none';
-  heatScale();   // sizes whichever is on, and re-applies opacity
-  heatOpacity();
+  syncHeat();   // layers + legend follow the chips; see heat.js
   counts();
   districts();
   ignoredPanel();

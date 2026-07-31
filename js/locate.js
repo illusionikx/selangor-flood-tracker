@@ -63,9 +63,9 @@ function place(latlng, accuracy, setView) {
        A pin points at its **tip**: the anchor is the bottom-centre of the box, not the middle, or
        the mark would sit half its own height north of you. That is the whole difference between
        this and the crosshair it replaced, which was the point it marked. */
-    // 29, not 32: Material draws the glyph inside its viewBox with a little air, so the pin's tip
+    // 44, not 48: Material draws the glyph inside its viewBox with a little air, so the pin's tip
     // sits ~8% of the box above its bottom edge. Anchoring to the box would float the mark.
-    className: '', iconSize: [32, 32], iconAnchor: [16, 29],
+    className: '', iconSize: [48, 48], iconAnchor: [24, 44],
     html: '<span class="pin me"><i class="i i-home_pin"></i></span>',
   }) }).on('click', showHere);
 
