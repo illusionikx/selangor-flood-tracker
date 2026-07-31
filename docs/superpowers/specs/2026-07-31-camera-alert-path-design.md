@@ -51,9 +51,14 @@ The clip has no controls. The lightbox holds the controls, and it keeps them.
 
 | frames in the window | display | caption |
 |---|---|---|
-| 2 or more | the clip, looping | `LAST 3 HOURS · 6 frames` |
-| exactly 1 | that frame, still | `LAST 3 HOURS · 1 frame` |
-| none | the newest frame in the archive | `NOT CURRENT · 29/07/2026 14:31 · 46.2h ago` |
+| 2 or more | the clip, looping, ending on the live still | `LAST 3 HOURS · 6 frames` |
+| fewer than 2 | the live still, as the card shows it today | `LATEST IMAGE · 31/07/2026 18:00` |
+| fewer than 2, and that still is over 3 hours old | the live still | `NOT CURRENT · 29/07/2026 14:31 · 46.2h ago` |
+
+The fallback keeps the live still. It does not reach into the archive for an older frame. `?cam=`
+fetches from JPS when the card opens, and the camera publishes its own stamp in `shot`. An empty
+window means this server did not capture, not that the camera stopped. An archived frame from two
+days ago in place of a live one would make the card worse.
 
 `NOT CURRENT` is the word the cards already print on a reading over 24 hours old. A picture over
 3 hours old makes the same claim about a different quantity. One word for one thing.
@@ -161,7 +166,8 @@ Numbers come from the current `.cache.json`. 90 cameras are online and carry an 
 | `js/timeline.js` | color the ticks from the tier |
 | `js/ui.js` | draw the triangle in the lightbox |
 | `css/map.css` | triangle, caption |
-| `css/base.css` | tick colors |
+| `css/chrome.css` | tick colors. `.tlticks` lives here, not in `css/base.css` |
+| `js/map.js` | start the clip from `openSide()`, stop it from `closeSide()` |
 | `index.html` | bump `?v=` on both stylesheets |
 | `api.php` | join frames to history, return the tier |
 | `shots.php` | none expected. Confirm during work |
