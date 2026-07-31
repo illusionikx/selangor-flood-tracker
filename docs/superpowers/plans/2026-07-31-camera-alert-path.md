@@ -249,7 +249,7 @@ git commit -m "A camera can now name the alert it is standing next to
 
 camAlert() returns the worst tier within 2 km, nearest breaking a tie. It
 drops stale, because a stale alert needs the sentence the panel gives it and
-a glyph on a photograph has no room for one. It honours PREFS.ignored, which
+a glyph on a photograph has no room for one. It honors PREFS.ignored, which
 every other alert surface already does."
 ```
 
@@ -702,7 +702,7 @@ needed assess() and slope() hoisted out of the refresh path into named
 functions the early endpoints can reach.
 
 timeline.js reads both shapes, because a response cached for its 60 seconds
-can still be the old one after a deploy. Nothing is coloured yet."
+can still be the old one after a deploy. No mark carries a color yet."
 ```
 
 ---
@@ -821,7 +821,7 @@ git commit -m "The tick strip says when the river was in trouble, not just when 
 
 Marks taken while a river within 2 km was at danger turn red, forecast turns
 amber, and the reader's ignore list is applied client-side because the
-server never learns it. A month with no flood in it colours nothing, which
+server never learns it. A month with no flood in it colors nothing, which
 is the right answer rather than a broken strip."
 ```
 
@@ -1175,7 +1175,7 @@ git add docs/FEATURES.md CLAUDE.md
 git commit -m "Write down the camera alert path, and what it cannot say
 
 Records the two radii and why they are different numbers, the 150 stations
-that lost a camera link, and the three cases that leave a tick uncoloured
+that lost a camera link, and the three cases that leave a tick uncolored
 rather than wrong."
 ```
 
