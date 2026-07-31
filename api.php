@@ -146,24 +146,46 @@ if (isset($_GET['shots'])) {
             $y = ($a['lng'] - $b['lng']) * 111 * cos(deg2rad($a['lat']));
             return sqrt($x * $x + $y * $y);
         };
-        $db  = new PDO('sqlite:' . HIST);
-        $sel = $db->prepare('SELECT ts, level FROM level WHERE station = ? AND ts >= ? ORDER BY ts');
-        $best = [];   // frameTs => [rank, tier, stationId] — worst tier wins across nearby rivers
-        foreach ($st as $r) {
-            if ($r['kind'] !== 'river' || empty($r['danger']) || $km($cam, $r) > CAM_ALERT_KM) continue;
-            $sel->execute([$r['id'], $frames[0]]);
-            $samples = array_map(fn($x) => [(int)$x['ts'], (float)$x['level']], $sel->fetchAll(PDO::FETCH_ASSOC));
-            foreach (frameTiers($frames, $samples, (float)$r['danger'], RISE_ETA, 'assess') as $ts => $t) {
-                $rank = $t === 'now' ? 0 : 1;
-                if (!isset($best[$ts]) || $rank < $best[$ts][0]) $best[$ts] = [$rank, $t, $r['id']];
+        try {
+            // Read-only. This connection must never be able to write .history.db, and a read-write
+            // handle that is the last one open checkpoints the WAL on close.
+            $db = new PDO('sqlite:' . HIST, null, null, [
+                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                PDO::SQLITE_ATTR_OPEN_FLAGS => PDO::SQLITE_OPEN_READONLY,
+            ]);
+            // Start a day before the first frame. assess() looks back RISE_DAY for the tide guard, so
+            // a frame near the window's start needs that much history too, or the guard runs short.
+            $sel = $db->prepare('SELECT ts, level FROM level WHERE station = ? AND ts >= ? ORDER BY ts');
+            $best = [];   // frameTs => [rank, tier, stationId, distKm] — see the tie-break note below
+            foreach ($st as $r) {
+                if ($r['kind'] !== 'river' || empty($r['danger'])) continue;
+                $d = $km($cam, $r);
+                if ($d > CAM_ALERT_KM) continue;
+                $sel->execute([$r['id'], $frames[0] - RISE_DAY]);
+                $samples = array_map(fn($x) => [(int)$x['ts'], (float)$x['level']], $sel->fetchAll(PDO::FETCH_ASSOC));
+                foreach (frameTiers($frames, $samples, (float)$r['danger'], RISE_ETA, 'assess') as $ts => $t) {
+                    $rank = $t === 'now' ? 0 : 1;
+                    /* Worse tier wins first. Nearer river breaks a tie. camAlert() in js/stations.js
+                       ranks a camera's live glyph the same way. The two must agree, or a reader can
+                       ignore the river named on screen and the frame's tick stays colored, because
+                       the server named the other river in range. */
+                    if (!isset($best[$ts]) || $rank < $best[$ts][0]
+                        || ($rank === $best[$ts][0] && $d < $best[$ts][3])) {
+                        $best[$ts] = [$rank, $t, $r['id'], $d];
+                    }
+                }
             }
-        }
-        /* Only the worst-tier station rides along, so the client can drop a tick raised by a sensor
-           the reader has ignored. It falls to uncolored rather than to the second-worst river.
-           ponytail: two hot rivers within 2 km of one camera is rare. Build the fallback if it is
-           not, which means sending a tier per station and letting the client pick. */
-        foreach ($rows as $k => $row) {
-            if (isset($best[$row[0]])) $rows[$k] = [$row[0], $best[$row[0]][1], $best[$row[0]][2]];
+            /* Only the worst-tier station rides along, so the client can drop a tick raised by a sensor
+               the reader has ignored. It falls to uncolored rather than to the second-worst river.
+               ponytail: two hot rivers within 2 km of one camera is rare. Build the fallback if it is
+               not, which means sending a tier per station and letting the client pick. */
+            foreach ($rows as $k => $row) {
+                if (isset($best[$row[0]])) $rows[$k] = [$row[0], $best[$row[0]][1], $best[$row[0]][2]];
+            }
+        } catch (\Throwable $e) {
+            // A broken read must not become a cached 200 with a fatal-error body. Fall back to the
+            // plain frame list. The client already renders null tiers as an uncolored strip.
+            $rows = array_map(fn($ts) => [$ts, null, null], $frames);
         }
     }
     echo json_encode($rows);
