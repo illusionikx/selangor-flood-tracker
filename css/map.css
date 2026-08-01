@@ -94,14 +94,16 @@
   color: var(--c, var(--accent)); font-size: 36px;
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .35));
 }
-/* A fifth off the single-sensor pins, and nothing else. At 400 pins on a phone the map was more
-   glyph than basemap, and a mark you cannot see the river under is not helping. `transform` rather
-   than a smaller font: it takes the halo, the rise ring and the drop shadow down with it in one
-   step, and it leaves the 39px layout box alone — that box is repeated as `iconSize` in render.js
-   and is what actually positions the marker over its station.
-   The mast keeps its size. It stands for a stack rather than one reading, it carries a count that
-   has to stay legible, and it is the pin that has the most to say. */
+/* A fifth off the single-sensor pins, and a third off the mast. At 400 pins on a phone the map was
+   more glyph than basemap, and a mark you cannot see the river under is not helping. The mast comes
+   down further because it is the only pin that is a filled disc: it covers what it stands on, where
+   a bare glyph lets the map through, so the same apparent weight costs it more ground.
+   `transform` rather than a smaller font: it takes the halo, the rise ring, the count badge and the
+   drop shadow down with it in one step, and it leaves the 39px layout box alone — that box is
+   repeated as `iconSize` in render.js and is what actually positions the marker over its station.
+   The two selectors never match the same element, so their equal specificity costs nothing. */
 .pin:not(.multi, .me) { transform: scale(.8); }
+.pin.multi { transform: scale(.7); }
 /* Colour is already the offline grey here — fading the glyph as well would just hide it again. */
 .pin.off { opacity: .6; }
 /* The one pin that keeps a disc. It stands for a *stack* rather than naming a sensor, so there is no
