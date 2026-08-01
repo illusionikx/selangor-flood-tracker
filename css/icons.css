@@ -40,6 +40,7 @@
      hand-traced Flaticon wave before; that credit is gone from the About with it. `water_drop` below
      is the river-station glyph — a different picture, deliberately. */
   --i-flood: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 -960 960 960'><path d='M80-80v-80q38 0 56.5-20t77.5-20q59 0 77 20t56 20q38 0 56-20t77-20q57 0 77.5 20t56.5 20q38 0 56-20t77-20q59 0 77 20t56 20v80q-58 0-77-20t-56-20q-37 0-56 20t-77 20q-58 0-77.5-20T480-120q-38 0-56 20t-77 20q-59 0-77-20t-56-20q-37 0-56 20T80-80Zm0-180v-80q38 0 56-20t77-20q6 0 12 .5t11 1.5l-38-140-55 72-63-50 311-384 461 176-29 75-84-34 81 301q14 8 27.5 15t32.5 7v80q-57-1-77-20.5T747-300q-38 0-56 20t-77 20q-57 0-77.5-20T480-300q-38 0-56 20t-77 20q-57 0-77-20t-56-20q-35 0-56 20t-78 20Zm538-81-56-212-155 41 37 136q8-2 16.5-3t19.5-1q57 0 81.5 22t56.5 17Z'/></svg>");
+  --i-history: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 -960 960 960'><path d='M480-120q-138 0-240.5-91.5T122-440h82q14 104 92.5 172T480-200q117 0 198.5-81.5T760-480q0-117-81.5-198.5T480-760q-69 0-129 32t-101 88h110v80H120v-240h80v94q51-64 124.5-99T480-840q75 0 140.5 28.5t114 77q48.5 48.5 77 114T840-480q0 75-28.5 140.5t-77 114q-48.5 48.5-114 77T480-120Zm112-192L440-464v-216h80v184l128 128-56 56Z'/></svg>");
   --i-home_pin: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 -960 960 960'><path d='M360-440h80v-110h80v110h80v-190l-120-80-120 80v190ZM480-80Q319-217 239.5-334.5T160-552q0-150 96.5-239T480-880q127 0 223.5 89T800-552q0 100-79.5 217.5T480-80Z'/></svg>");
   --i-info: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 -960 960 960'><path d='M440-280h80v-240h-80v240Zm68.5-331.5Q520-623 520-640t-11.5-28.5Q497-680 480-680t-28.5 11.5Q440-657 440-640t11.5 28.5Q463-600 480-600t28.5-11.5ZM480-80q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Z'/></svg>");
   --i-last_page: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 -960 960 960'><path d='m280-240-56-56 184-184-184-184 56-56 240 240-240 240Zm360 0v-480h80v480h-80Z'/></svg>");
@@ -80,7 +81,7 @@
 /* Pseudo-element icons: the component sets --i and the size, this supplies the rest. Listed here
    rather than repeated in three stylesheets, so there is one place that answers "how do icons
    work". */
-#locate::before, #gotoBox::after {
+#locate::before, #gotoBox::after, .spark::before {
   content: ''; display: block; background: currentColor;
   -webkit-mask: var(--i) center / contain no-repeat;
           mask: var(--i) center / contain no-repeat;
@@ -96,6 +97,7 @@
 .i-expand_less { --i: var(--i-expand_less); }
 .i-expand_more { --i: var(--i-expand_more); }
 .i-flood { --i: var(--i-flood); }
+.i-history { --i: var(--i-history); }
 .i-home_pin { --i: var(--i-home_pin); }
 .i-info { --i: var(--i-info); }
 .i-last_page { --i: var(--i-last_page); }

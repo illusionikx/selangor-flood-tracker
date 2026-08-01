@@ -7,7 +7,8 @@
 
 import { KINDS, KIND_RANK, NO_INFO, camSrc } from './config.js';
 import { state } from './state.js';
-import { el, dkey, distKm, hasInfo, color, statusColor, scalePos, leads, gaugeTone, gaugeColor } from './util.js';
+import { el, dkey, distKm, hasInfo, color, statusColor, scalePos, levelStops, leads, gaugeTone,
+         gaugeColor } from './util.js';
 import { nearestOf, nearestCam } from './stations.js';
 import { sparkline, rainBars, sirenBand, rateHtml, etaText, gaugeState } from './popup.js';
 import { flashTo } from './map.js';
@@ -66,8 +67,12 @@ el('dataHead').onclick = e => {
 const band = m => Math.max(0, m.status ?? 0);
 
 const sortKey = m => !m || !hasInfo(m) ? null : ({
-  // A station with no danger mark cannot be placed inside its band, so it sorts to the foot of it.
-  river:    [band(m), m.danger ? m.level / m.danger : 0],
+  /* The bar, and only the bar. The published band used to lead this key, on the grounds that a
+     sorted column is asked "show me the worst" — but `scalePos()` already carries the band: 38 is
+     the alert mark, 68 the warning mark, 100 the danger mark, on every river's own scale. Two terms
+     for one fact can only disagree, and when they did the column put a bar with nothing in it above
+     a bar two thirds full. A station with no mark at all draws no bar and sorts as an empty one. */
+  river:    [levelStops(m) ? scalePos(m.level, levelStops(m)) : 0, 0],
   rainfall: [band(m), m.hourly],
   siren:    [band(m), 0],           // hasInfo() has already dropped the ones that are out of contact
   gauge:    [gaugeTone(m), m.depth],
@@ -308,11 +313,8 @@ function summary(own, lead, scope) {
    No labels at 120px wide: the number above it is the reading, this is only the shape of it. */
 function gauge(m, hook) {
   const max = m.danger || m.warning || m.alert;
-  if (!max) return '';
-  const stops = [[0, 0]];
-  if (m.alert   && m.alert   < max) stops.push([m.alert, 38]);
-  if (m.warning && m.warning < max && m.warning > (m.alert ?? 0)) stops.push([m.warning, 68]);
-  stops.push([max, 100]);
+  const stops = levelStops(m);   // the meter's scale, not a copy of it — see util.js
+  if (!stops) return '';
 
   // Bar left, figure right, so both edges line up down the column. Past the danger mark the number
   // is replaced by a triangle: "112%" is a percentage you have to stop and reason about, and this

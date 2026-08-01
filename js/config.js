@@ -16,6 +16,26 @@ export const KINDS = {
   camera:   { label: 'Cameras',     color: 'var(--k-camera)',   icon: 'photo_camera', one: 'Camera' },
 };
 
+/* What an alert is called, per kind and tier. `[singular, plural]`.
+   Here rather than in alerts.js because two surfaces say it now: the panel groups its rows under
+   these titles, and the warning pill on a camera picture states the same phrase for the one station
+   it names. The two must not drift — a reader who scans the panel and then opens the picture beside
+   the river is reading one claim twice, and the second wording would read as a second claim.
+   CAP separates severity from certainty, and these words are where that separation reaches a reader:
+   `now` is observed, `soon` is a forecast, `stale` is a claim we can no longer stand behind. The tier
+   colours say it too, and colour alone is not a message. */
+export const ALERT_TITLE = {
+  'siren|now':   ['Triggered siren', 'Triggered sirens'],
+  'siren|stale': ['Siren out of contact', 'Sirens out of contact'],
+  'river|now':   ['Water level at danger', 'Water levels at danger'],
+  'river|soon':  ['Forecast to reach danger', 'Forecast to reach danger'],
+  'river|stale': ['Water level not current', 'Water levels not current'],
+  // These two reach the camera pill only. The panel draws from `isHot()`, which does not cover
+  // either kind, so nothing here puts a flood gauge or a rain gauge in the list.
+  'gauge|now':    ['Flood gauge at danger', 'Flood gauges at danger'],
+  'rainfall|now': ['Very heavy rain', 'Very heavy rain'],
+};
+
 // Who published the reading on a station. `api.php` stamps every station with one of these keys, so
 // a popup can always say where its number came from — three feeds disagreeing by a few centimetres
 // is normal, and unattributed numbers would make that look like a bug in the map.
@@ -83,6 +103,12 @@ export const TILES = { light: 'rastertiles/voyager', dark: 'dark_all' };
 
 // Sparkline window. Must not exceed the server's own SPARK_WIN — it sends nothing older.
 export const SPARK_H     = 12;     // hours on the graph's x axis
+
+/* The foot of a water-level bar, in alert→danger gaps below the first mark. See `levelStops()`.
+   Tuning knob, not a constant of nature: 6 on the payload it was picked from left 6 of 107 rivers
+   resting on the floor and 4 still crowding the alert tick. Lower it and calm stations flatten to
+   nothing; raise it and they bunch up under the tick again, which is the bug it was picked to fix. */
+export const LEVEL_FLOOR = 6;
 
 export const HEAT_KM     = 5;      // ground size of one blob
 /* Heat weight is a position on the threshold scale, not a fraction of danger: the popup meter's

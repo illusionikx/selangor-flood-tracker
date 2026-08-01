@@ -363,6 +363,15 @@ dialog:focus, dialog:focus-visible { outline: none; }
 .link:hover { background: color-mix(in srgb, var(--accent) 20%, transparent); }
 .link .i { font-size: 16px; }
 
+/* The nearest-water-level offer on a camera card: glyph, then the place over its caption, then the
+   reading on the right. The name is what the button opens, so it leads and it truncates rather than
+   pushing the number off the end — a station name runs to 50 characters and the reading is the one
+   part that must stay whole. */
+.link .lt { flex: 1; min-width: 0; display: grid; gap: 1px; text-align: left; }
+.link .lt b { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.link .lt small { font-size: 11px; font-weight: 400; opacity: .75; }
+.link .lv { flex: none; font-size: 14px; font-weight: 500; }
+
 /* --- shared blocks (popup + alert panel) ---------------------------------------------------- */
 
 .badge {
@@ -405,17 +414,53 @@ dialog:focus, dialog:focus-visible { outline: none; }
    width — which is exactly why the hour labels are HTML underneath rather than <text> inside: text
    in a stretched viewBox comes out distorted. */
 .spark { position: relative; margin: 6px 0 4px; }
-.spark svg { display: block; width: 100%; height: 34px; overflow: visible; }
+/* A plate under the plot. Without it a graph holding one sample is a stray line on the card, with
+   nothing to say it is a graph at all — which is what a station looks like for the first hour we
+   watch it. The plate is the frame the line is drawn in, so an almost-empty one reads as a graph
+   that has not filled up yet rather than as a rendering fault. Four percent of the text colour, not
+   `--hover`: that token is a control lighting up under a pointer and it is about twice this step,
+   which made the plate a panel of its own on a card that is already mostly panels. This has to be
+   the least a surface can be and still be a surface. Mixing off `--on-surface` rather than naming
+   two values keeps it correct in both themes and against whatever the card is painted. */
+/* 42px, a quarter taller than the 34 every graph used to share. A line has a shape and needs the
+   room to have it; the siren band does not, and it keeps the old height under `.band`. The two were
+   the same box with different marks in it, which is the one thing that made a status log and a
+   reading look like the same kind of statement. The viewBox is 0 0 100 28 and stretches, so the
+   height is a CSS number and nothing in the templates knows it. */
+.spark svg {
+  display: block; width: 100%; height: 42px; overflow: visible;
+  background: color-mix(in srgb, var(--on-surface) 4%, transparent); border-radius: 6px;
+}
+.spark.band svg { height: 34px; }
+/* And a mark saying what it is. One rule for all three graphs, because they are one element with
+   three fills. `::before`, not markup: no template gains a line and the icon cannot be forgotten by
+   a fourth graph added later. Set back with opacity — it labels the plate, it is not on it. */
+.spark::before {
+  --i: var(--i-history);
+  position: absolute; top: 3px; left: 4px; z-index: 1;
+  width: 11px; height: 11px; color: var(--muted); opacity: .55; pointer-events: none;
+}
 .spark line { stroke: var(--outline); stroke-width: 1; }
-/* Labels sit on their tick and are centred on it; the first and last are clamped inside the box so
-   a 12-hour axis can't push "06:00" off the edge of a 300px popup. */
+/* The crosshair at the sample under the pointer — drawn by js/sparktip.js, which explains why it is
+   in the SVG. `non-scaling-stroke` because the viewBox is stretched: without it a 1-unit line comes
+   out as many pixels wide as the graph is stretched. It is the readout's own line, so it takes the
+   readout's colour and stands back from the data with opacity rather than a lighter token. */
+.spark .xhair {
+  stroke: var(--on-surface); stroke-width: 1; opacity: .38;
+  vector-effect: non-scaling-stroke; pointer-events: none;
+}
+/* Labels sit on their tick. Whether one is centred on it or hangs off one side is decided per label
+   in `axisHtml()`, from where on the axis it lands — see popup.js. It was `:first-child` and
+   `:last-child` here, which is the same rule for the common case and wrong twice. A single tick is
+   both, so `:last-child` won and pulled the only label on the graph off the left edge of the panel —
+   what a station looks like for its first hour. And the two selectors are about position in the
+   list, not position on the axis, so a first tick already 12% along was still pinned left of where
+   it belonged. */
 .spark .axis { position: relative; height: 14px; margin-top: 2px; }
 .spark .axis span {
-  position: absolute; transform: translateX(-50%);
+  position: absolute;
   font-size: 10px; font-variant-numeric: tabular-nums; white-space: nowrap;
 }
-.spark .axis span:first-child { transform: none; }
-.spark .axis span:last-child { transform: translateX(-100%); }
 
 /* The hover readout — see js/sparktip.js for why it is a popover and not a plain fixed box. Being
    one means undoing the browser's own defaults for a dialog it expects to centre on the screen. */

@@ -29,10 +29,10 @@
 <link rel="stylesheet" href="vendor/leaflet.css">
 <link rel="stylesheet" href="vendor/markercluster.css">
 <link rel="stylesheet" href="vendor/fonts.css?v=49">
-<link rel="stylesheet" href="css/icons.css?v=64">
-<link rel="stylesheet" href="css/base.css?v=72">
-<link rel="stylesheet" href="css/chrome.css?v=110">
-<link rel="stylesheet" href="css/map.css?v=87">
+<link rel="stylesheet" href="css/icons.css?v=65">
+<link rel="stylesheet" href="css/base.css?v=77">
+<link rel="stylesheet" href="css/chrome.css?v=113">
+<link rel="stylesheet" href="css/map.css?v=90">
 
 <!-- A camera still. A <dialog>, not a div: it opens from the all-stations table, which is itself a
      modal dialog, and only the top layer can paint over one — Esc, the backdrop and focus trapping
@@ -85,8 +85,8 @@
         <!-- The seek bar runs the full width. Compare used to sit on its line and took a button's
              width off it — the one control here that is dragged, shortened for one that is pressed. -->
         <div class="tltrack">
-          <!-- The spans of the window during which a river within CAM_ALERT_KM was at danger, or was
-               forecast to reach it. Painted into the seek bar itself, in the status colour. It is not
+          <!-- The spans of the window during which a sensor within CAM_ALERT_KM was at danger, or, on
+               a river, was forecast to reach it. Painted into the seek bar itself, in the status colour. It is not
                a scale and carries no per-frame marks: those drew a ruler nobody read, over the one
                control here that has to be draggable. `aria-hidden` — the scrubber is the same set of
                positions with a proper role and keyboard handling. -->

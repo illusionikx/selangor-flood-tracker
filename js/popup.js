@@ -1,41 +1,72 @@
 // Every popup shares one template: badge + name + region header, then a kind-specific body, then a
 // status footer. The same meter/state blocks are reused by the alert panel.
 
-import { KINDS, SOURCES, SPARK_H, NO_INFO, camSrc } from './config.js';
+import { KINDS, SOURCES, SPARK_H, NO_INFO, ALERT_TITLE, camSrc } from './config.js';
 import { num, ago, noSec, parseMY, distKm, hasInfo, isStale, statusColor, scalePos,
-         levelStops, gaugeStops, gaugeColor } from './util.js';
-import { nearestOf, nearestCam, camAlert } from './stations.js';
+         levelStops, gaugeStops, gaugeColor, color } from './util.js';
+import { nearestOf, nearestCam, nearestLevel, camAlert } from './stations.js';
 
-/* The warning that rides a camera picture. Empty string when nothing near it is on alert, so it
-   costs nothing to interpolate unconditionally.
-   The disc is not decoration. A bare glyph lands on whatever the camera happens to be pointing at,
-   and half this footage is bright sky or wet concrete. The pins carry a disc for the same reason. */
-/* What is wrong, and its number. Not where — the place name is the one thing a camera picture does
-   not need told, because the card around it is already headed with it and the lightbox is showing
-   you the place. The distance is gone for the same reason: nothing within 2 km of this lens is far
-   enough away for the figure to change what the picture means.
-   A wrapper around the glyph, the same shape `.pin` uses: the mask is a background on the `<i>`, so
-   anything painting a background on the same element wins and the mask cuts that instead of the
-   colour. Keep them as two elements. */
-export const camWarn = cam => {
-  const a = camAlert(cam);
+/* The warning that rides a camera picture, in the lightbox and nowhere else. Empty string when
+   nothing near the lens is on alert, so it costs nothing to interpolate unconditionally.
+ *
+ * What is wrong, and its number. Not where — the place name is the one thing a camera picture does
+ * not need told, because the dialog around it is already headed with it. The distance is gone for
+ * the same reason: nothing within 2 km of this lens is far enough away for the figure to change what
+ * the picture means.
+ *
+ * The words come from `ALERT_TITLE`, the same table the alert panel groups its rows under, so a
+ * reader who scans the panel and then opens the picture beside that river reads one claim twice
+ * rather than two claims. That is also what puts the tier *in the words* — `Water level at danger`
+ * against `Forecast to reach danger`. The pill used to state the reading and leave red against amber
+ * to carry the difference, and colour alone is not a message, least of all on a photograph where
+ * nothing else is holding a scale. The figure trails the phrase and only where there is one.
+ *
+ * The alert is a parameter, defaulting to the live one. A camera in the lightbox is scrubbed through
+ * its archive, and a pill saying what is wrong *now* over a picture from last Tuesday is a wrong
+ * claim about that picture. timeline.js passes the alert that frame was taken under, including its
+ * own `level` — which is null on a frame older than the levels we keep, and then the pill states the
+ * phrase and no figure. `'level' in a` rather than `??`: on those frames the live number is the one
+ * thing it must not fall back to. A siren has no reading either, and never had one.
+ *
+ * Every kind keeps its own field and its own unit. A river reads `level` in metres, a flood gauge
+ * `depth` in metres, a rain gauge `hourly` in mm/h. The pill printed ` m` on whatever it was handed,
+ * which was safe only while the river was the one kind that reached it with a number.
+ *
+ * A wrapper around the glyph, the same shape `.pin` uses: the mask is a background on the `<i>`, so
+ * anything painting a background on the same element wins and the mask cuts that instead of the
+ * colour. Keep them as two elements. */
+const CAM_READ = {
+  river:    ['level',  ' m'],
+  gauge:    ['depth',  ' m'],
+  rainfall: ['hourly', ' mm/h'],
+};
+
+export const camWarn = (cam, a = camAlert(cam)) => {
   if (!a) return '';
   const s = a.station;
-  const what = s.kind === 'siren' ? 'Siren sounding'
-    : s.level != null ? `${KINDS[s.kind].label} ${s.level} m`
-    : KINDS[s.kind].label;
-  return `<span class="camwarn t-${a.tier}"><i class="i i-warning"></i><b>${what}</b></span>`;
+  const [field, unit] = CAM_READ[s.kind] || [];
+  // Gated on the kind having a reading at all, not on what was handed in: a siren's samples are 0
+  // and 1, so an archive frame passes `level: 1` and a pill that trusted it would print "1".
+  const lv = !field ? null : 'level' in a ? a.level : s[field];
+  const what = ALERT_TITLE[`${s.kind}|${a.tier}`]?.[0] || KINDS[s.kind].label;
+  return `<span class="camwarn t-${a.tier}"><i class="i i-warning"></i><b>${
+    what}${lv == null ? '' : `, ${lv}${unit}`}</b></span>`;
 };
 
 /* Spinner lives on the wrapper; the img clears it on load, or swaps itself out on failure.
    `data-clip` is the hook js/clip.js looks for — it carries the numeric camera id the proxy uses,
-   not the station id, because that is what ?shots= and ?shot= both take. */
+   not the station id, because that is what ?shots= and ?shot= both take.
+   No warning pill here any more. This still is a 3-hour clip that plays itself (see js/clip.js), so
+   the pill stated the live alert over a frame from hours ago — the same wrong claim the lightbox was
+   just fixed for, and this one has no scrubber, no seek bar and no room to answer it per frame. The
+   card around the picture already carries the alerting sensor as a section of its own, with the
+   reading, the meter and the graph. The lightbox keeps its pill, where every frame is scored. */
 export const camImg = (c, alt) => `<div class="shotwrap" data-clip="${c.id.split('-')[1]}">
   <img class="shot" src="${camSrc(c)}" alt="${alt}" data-name="${c.name}"
        onload="this.parentNode.classList.add('done')"
        onerror="this.parentNode.classList.add('done');
                 this.replaceWith(Object.assign(document.createElement('div'),
-                  {className:'muted',textContent:'image unavailable'}))">${camWarn(c)}
+                  {className:'muted',textContent:'image unavailable'}))">
   <p class="clipcap"></p></div>`;
 
 /* The ⓘ on every sensor: where this reading came from, when, and the one action there is.
@@ -110,10 +141,53 @@ export function camNear(from, cam) {
    A camera on the *same mast* is not a nearest-anything — it is this station's own view, so it says
    so and drops the distance, which would read "0.0 km". `from` may be a bare latlng from a map
    click, which has no `site` — hence the guard rather than a plain comparison. */
-export const camLink = (from, cam) => cam
-  ? `<button class="link" data-cam="${cam.id}">
-       <i class="i i-photo_camera"></i> ${from.site && from.site === cam.site
-         ? 'Show webcam' : `Nearest webcam · ${distKm(from, cam).toFixed(1)} km`}
+/* The camera is named, and the name leads. A distance alone said a picture exists somewhere over
+   there, and the reader had to open it to find out whether "over there" is their road or the next
+   town. The name answers that before the fetch, and it is what the lightbox is about to be titled
+   anyway.
+   Three parts, the same shape as levelLink() below: the place, then what it is and how far away as a
+   caption under it. Strung on one line — "Nearest webcam · Dataran Kajang · 3.2 km" — the name is a
+   fragment in the middle of a sentence that never resolves, and it breaks in the wrong place when it
+   wraps. The place is what the button opens, so it goes where a reader looks first. */
+export const camLink = (from, cam) => !cam ? ''
+  // Same mast: an action, not an offer. There is no other place to name and no distance to state, so
+  // it stays the plain one-line button it has always been.
+  : from.site && from.site === cam.site
+    ? `<button class="link" data-cam="${cam.id}">
+         <i class="i i-photo_camera"></i> Show webcam
+       </button>`
+    : `<button class="link" data-cam="${cam.id}">
+         <i class="i i-photo_camera"></i>
+         <span class="lt">
+           <b>${cam.name}</b>
+           <small>Nearest webcam · ${distKm(from, cam).toFixed(1)} km away</small>
+         </span>
+       </button>`;
+
+/* The reverse, for a camera standing on its own. Every other card offers the nearest picture; a
+   camera card offered nothing, and a picture of water is a question about a number — "is that high?"
+   — which the frame cannot answer. So it carries the nearest water level, named, with its reading.
+   The reading is coloured by `color()`, the same function the pin and the card use, because the
+   number alone means nothing without the mark it is measured against: 1.74 m is either a quiet river
+   or a flood, and the colour is the only part of that which fits on one line. The button jumps to
+   that station, where the meter states it properly.
+   Only on a camera that is not on a mast with a river. Where they share a mast the card is already
+   showing both, and this would be a link to the section under it. */
+/* Three parts, not one line of four. "Nearest water level · TAMAN MAYANG · 14.6 m · 1.2 km" is a
+   place, a reading and a distance strung together with the same separator, so it reads as a sentence
+   that never resolves and it breaks in the wrong place when it wraps. The place leads, because that
+   is what the button opens; what it is and how far away it is drop to a caption under it; the
+   reading goes right, where every other number in this app sits. Same shape as `.popbody`, and the
+   same shape camLink() uses — this one has a fourth part to place, and that is the only difference
+   between them. */
+export const levelLink = (from, s) => s
+  ? `<button class="link" data-go="${s.id}">
+       <i class="i i-${KINDS.river.icon}"></i>
+       <span class="lt">
+         <b>${s.name}</b>
+         <small>Nearest water level · ${distKm(from, s).toFixed(1)} km away</small>
+       </span>
+       <b class="lv" style="color:${color(s)}">${s.level} m</b>
      </button>`
   : '';
 
@@ -235,8 +309,11 @@ function sensorBody(s, withCam = true) {
   const still = s.kind !== 'camera' ? ''
     : s.image ? camImg(s, `Latest still from ${s.name}`) : '<div class="muted">no camera feed</div>';
   const link = s.kind !== 'camera' && withCam ? camLink(s, nearestCam(s)) : '';
+  // Under the picture, not over it: on a camera card the frame is the reading and this is the aside.
+  // `withCam` is false for a member of a mast, which is exactly the case that must not draw it.
+  const level = s.kind === 'camera' && withCam ? levelLink(s, nearestLevel(s)) : '';
 
-  return `${link}${still}${siren}${gauge}${wet}
+  return `${link}${still}${level}${siren}${gauge}${wet}
     ${s.kind === 'river' ? meter(s) : ''}
     ${body.length ? `<div class="popbody">${body.join('')}</div>` : ''}
     ${spark}${rain}`;
@@ -408,8 +485,18 @@ function timeAxis(points) {
   return { t0, t1, secs, inWin, x, ticks, step };
 }
 
+/* A label is centred on its tick, unless that would hang it over an edge of the panel — then it sits
+   inside the edge instead. The shift is decided from where the tick is on the axis, which is the
+   thing that actually decides whether it fits. CSS used to do it with `:first-child` and
+   `:last-child`, which is a guess at the same question: it is right whenever the first tick is at 0
+   and the last at 100, and wrong the rest of the time. With one tick on the graph it was both, the
+   right-hand rule won, and the only label on a new station's graph was dragged off the left of the
+   card.
+   8% of a 300px panel is 24px, and a label is about 34px wide — so a tick inside that band cannot be
+   centred without crossing the edge, and outside it always can. */
 const axisHtml = ticks => `<div class="axis muted" aria-hidden="true">${ticks.map(t =>
-  `<span style="left:${t.x}%">${t.at}</span>`).join('')}</div>`;
+  `<span style="left:${t.x}%;transform:translateX(${t.x < 8 ? 0 : t.x > 92 ? -100 : -50}%)"
+    >${t.at}</span>`).join('')}</div>`;
 
 const rules = ticks => ticks.map(t =>
   `<line x1="${t.x}" x2="${t.x}" y1="0" y2="28" vector-effect="non-scaling-stroke"/>`).join('');
@@ -513,7 +600,10 @@ export function sirenBand(points) {
   const live = inWin[i][1] > 0;
   if (live) while (i > 0 && inWin[i - 1][1] > 0) i--;   // back to the start of the run still running
   else while (i >= 0 && !inWin[i][1]) i--;              // back to the last sample that was on
-  return `<div class="spark"${readout(inWin, x, v => v > 0 ? 'sounding' : 'quiet')}>
+  // `.band` keeps the shorter box. A siren log is a state over time, not a shape — there is nothing
+  // in it that a quarter more height would draw better, and the difference in height is what says
+  // this is not a reading. See base.css.
+  return `<div class="spark band"${readout(inWin, x, v => v > 0 ? 'sounding' : 'quiet')}>
     <svg viewBox="0 0 100 28" preserveAspectRatio="none" aria-hidden="true">
       ${rules(ticks)}${bars}
     </svg>

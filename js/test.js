@@ -108,7 +108,13 @@ export function seedTest(data) {
            a 6 m river in seventeen, so a flat rate lit up 8 of 26 and left the rest silently
            climbing. Spreading the target over 0.5–2.5 h also gives the ticker and the panel a range
            of countdowns to render instead of one repeated number. */
-        s.level = +(mark * 0.82).toFixed(2);
+        /* Between the station's own marks, never a fraction of the danger mark. 82% of danger is
+           35.20 m on a river that alerts at 35.80 and reads against an absolute datum, which is
+           metres *below* its alert mark — so test mode stamped an alert on a station the scale put
+           in the safe stretch, and the row drew an amber number over an empty bar. The marks are
+           the only thing a level can be faked against. */
+        const foot = s.alert ?? s.warning ?? mark * 0.82;
+        s.level = +(foot + (mark - foot) * 0.4).toFixed(2);
         s.status = Math.max(s.status || 0, 1);
         s.eta = 0.5 + (rivers % 5) * 0.5;
         s.rate = +((mark - s.level) / s.eta).toFixed(2);

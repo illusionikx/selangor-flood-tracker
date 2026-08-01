@@ -254,10 +254,19 @@ body.testmode #testbadge, body.rising #risebadge { display: flex; }
 /* Taller and wider than the sources dialog: this one is for scanning, so it takes the screen. */
 #dataBox {
   width: min(1060px, calc(100vw - 24px)); height: min(88vh, 900px); padding: 0;
-  display: flex; flex-direction: column; overflow: hidden;
+  flex-direction: column; overflow: hidden;
   border: 1px solid var(--outline); border-radius: 12px;
   background: var(--surface); color: var(--on-surface); box-shadow: var(--shadow);
 }
+/* The `display` is on `[open]`, and it has to be. A browser closes a dialog with
+   `dialog:not([open]) { display: none }` in its own stylesheet, and any author rule setting
+   `display` on the element beats it — so a bare `#dataBox { display: flex }` laid the closed dialog
+   out on the page, all 450 rows of it, from the first time it was opened until reload. It was
+   invisible only because `#map` is absolutely positioned and painted over it, which made it a
+   picture that surfaced whenever the map did not paint: a table showing through the map mid-zoom.
+   `#lightbox[open]` next to it had it right; this one did not. Any dialog that needs a `display`
+   for its layout puts it here, never on the element. */
+#dataBox[open] { display: flex; }
 #dataBox::backdrop { background: #0009; }
 /* Search stays put while the list scrolls under it — the filter is useless if you have to scroll
    back up to change it after seeing the result. */
@@ -694,16 +703,21 @@ body.finding #find { display: none; }
 #toast.clear .thead .i { color: var(--s-normal); }
 #toast .thead b { font-weight: 500; flex: 1; min-width: 0; line-height: 1.3; }
 #toast .tclose { flex: none; font-size: 16px; color: var(--muted); }
+/* The place name and the reason are stacked, not side by side. On one line the reason held a fixed
+   width — "reaches danger in ~2.5 h" is a third of a 300px toast — and the name took whatever was
+   left, so it was cut off on almost every alert this data can produce. A notification naming a place
+   you cannot read is the one thing it must not do. Stacked, the name has the full row and wraps if
+   it needs to; the longest name in the payload is 50 characters and takes two lines. */
 #toast .trow {
-  display: flex; align-items: baseline; gap: 8px; width: 100%; margin-top: 8px; padding: 6px 8px;
+  display: grid; grid-template-columns: auto 1fr; gap: 2px 8px;
+  width: 100%; margin-top: 8px; padding: 6px 8px;
   text-align: left; cursor: pointer; background: none; border: 0; border-radius: 8px;
   color: var(--on-surface); font: 400 12px Roboto, sans-serif;
 }
 #toast .trow:hover { background: var(--hover); }
-#toast .trow .i { color: var(--c); flex: none; align-self: center; }
-#toast .tname { flex: 1; min-width: 0; font-weight: 500; overflow: hidden;
-  text-overflow: ellipsis; white-space: nowrap; }
-#toast .twhy { flex: none; font-size: 11px; }
+#toast .trow .i { color: var(--c); grid-row: span 2; align-self: center; }
+#toast .tname { font-weight: 500; font-size: 13px; line-height: 1.3; }
+#toast .twhy { font-size: 11px; }
 #toast .tmore { margin: 6px 0 6px 2px; font-size: 11px; }
 #toast .trow:last-child { margin-bottom: 6px; }
 
@@ -1042,7 +1056,7 @@ body.finding #find { display: none; }
 }
 .tltrack::before { right: 8px; background: var(--outline); }
 .tltrack::after  { width: calc((100% - 16px) * var(--p, 0)); background: var(--accent); z-index: 1; }
-/* The alert strip: the spans of the window when a river within CAM_ALERT_KM was at danger or was
+/* The alert strip: the spans of the window when a sensor within CAM_ALERT_KM was at danger or was
    forecast to reach it, in the same status colours everything else on this page uses. It replaced a
    mark per stored frame — 60 hairlines is a ruler, and a ruler over a control you have to drag reads
    as graduation rather than as a warning. The colour is the whole message now: something happened in

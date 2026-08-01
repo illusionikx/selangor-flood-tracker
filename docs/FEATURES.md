@@ -3814,6 +3814,99 @@ read as nothing having happened.
 a second. It is the answer every video player gives. The play button fires it too, so `k` and space
 get the same feedback as a click.
 
+### The warning belongs to the frame, not to the clock
+
+`ui.js` wrote the pill once, from the live alert, and it stayed there through the whole clip. A
+picture from last Tuesday carried a claim about the water right now. The seek bar under it was
+already right — its coloured spans come from `tierAt`, the per-frame tiers the server scores — so the
+picture and the bar directly under it disagreed.
+
+`paint()` now rewrites the pill for the frame on screen, from that same `tierAt`. Live is the one
+position that asks the live question, through `camWarn()`'s own default. `camWarn()` takes the alert
+as a second parameter for this, defaulting to `camAlert(cam)`.
+
+The figure is the reading nearest that frame in the station's `history`, within half an hour. Beyond
+the 12 hours of samples the payload carries there is none, and the pill states the sensor with no
+figure. `'level' in a` decides, not `??`. On an old frame the live number is the one value it must
+never fall back to.
+
+The reader's ignore list is applied here, the same way `drawTicks()` applies it. The server never
+learns that list.
+
+Two costs, both paid. The pill is compared as a string against the one already on screen, because
+`paint()` runs once a second through a clip and most frames carry the same warning as the one before.
+And a calm frame on a camera whose archive holds an alerting one gets a hidden pill instead of no
+pill. In the plain shape the strip above the picture is opened by `.player:has(.camwarn)`, so a pill
+that came and went would move the frame 30px down and back up while somebody watched. Cameras that
+never alert get no placeholder, which is the cost that rule exists to avoid.
+
+### The station panel's still lost its pill
+
+The card's picture carried the same wrong claim, and the same fix does not reach it. That still is a
+3-hour clip that plays itself. It has no scrubber, no seek bar and no room to state a warning per
+frame. So the pill said what the water is doing now, over a frame from hours ago.
+
+`camImg()` no longer emits it. The card around the picture already gives the alerting sensor a
+section of its own, with the reading, the meter and the graph. That says more than the pill said, and
+it says it about the right moment. Only the lightbox keeps a pill, where the server scores every
+frame.
+
+`camWarn()` stays exported for that one caller.
+
+### The pill states the tier, not just the reading
+
+`Water level 3.42 m` said what the number is and left red against amber to say what kind of trouble
+it is. A reader who does not know the palette cannot tell a river over its danger mark from one
+forecast to reach it in three hours. CAP separates severity from certainty, and colour alone was
+carrying that whole separation, on a photograph where nothing else holds a scale.
+
+The pill now reads `Water level at danger, 3.42 m` or `Forecast to reach danger, 3.42 m`. A siren
+reads `Triggered siren` and carries no figure.
+
+The words are not new. They are `ALERT_TITLE`, the table the alert panel already groups its rows
+under, moved from `alerts.js` to `config.js` so both surfaces read one copy. Somebody who scans the
+panel and then opens the picture beside that river now reads one claim twice. Two wordings would have
+read as two claims.
+
+### Four kinds can raise it, and the alert path did not move
+
+The pill covered rivers and sirens, because `camAlert()` filtered on `isHot()`. So a camera two
+streets from a flood gauge under water sat beside a red pin on the map and showed a clean picture.
+That reads as the picture disagreeing with the map.
+
+`camAlert()` now takes `isHot(s) || atDanger(s)`. `atDanger()` asks whether a sensor is at the top of
+its own scale, and it is already what paints that pin red — a river over its mark, a sounding siren,
+a flood gauge past 0.3 m of standing water, rainfall in JPS's top class. The pill answers the map's
+question now, not the panel's.
+
+**`isHot()` did not change, and nothing about what alerts you moved.** The alert panel, the icon
+badge, the ticker and the toast all draw from `isHot()` and list exactly what they listed before.
+Widening that set is an alert design decision and goes through the standard above. This one is a
+label on a photograph, which is the same claim the pin beside it was already making.
+
+Everything the widening adds is observed, so it is `now`. Only a river publishes a rate, so only a
+river gets `soon`.
+
+Each kind keeps its own field and its own unit — a river reads `level` in metres, a flood gauge
+`depth` in metres, a rain gauge `hourly` in mm/h. The pill used to print ` m` on whatever it was
+handed, which was safe only while the river was the one kind that reached it with a number. A siren
+prints no figure. Its samples are 0 and 1, and an archive frame passes that 1 straight in.
+
+### The archive scores all four kinds too
+
+The pill would have been nearly inert without this. `?shots=` walked rivers only, so a gauge or a
+rain gauge could raise a warning on the live frame and on no other — and the lightbox opens three
+hours back and plays forward, so the live frame is the one nobody starts on.
+
+`api.php` now scores each kind against its own mark: the published danger mark for a river and a
+gauge, 1 for a siren, and JPS's own class boundary for rainfall. Only the river is handed `assess`.
+The other three get one that never answers, which turns the `soon` half of `frameTiers()` off — the
+same split the live path makes.
+
+The rainfall mark is 60.1, not 60. `rainStatus()` scores `> 60` as the top class and `frameTiers()`
+compares with `>=`, so the two agree only at a value the feed cannot publish between. JPS reports
+rainfall to one decimal.
+
 ### Trade-offs accepted
 
 The bar covers the bottom of the picture while it is up. That is the trade for the height, and it is
@@ -3825,3 +3918,264 @@ picture on the device with the least of it.
 The `title` on each tick is gone, and with it the only place a frame's own timestamp could be read
 without moving to it. `.btime` prints the current frame's stamp on the picture, which is the same
 fact for the frame anyone is actually looking at.
+
+## A level bar starts near the river, not at zero metres
+
+`levelStops()` used to put the foot of every water-level bar at 0 m. Most of these stations read
+against an absolute datum. SERENDAH alerts at 35.80 m and was sitting at 34.06 m. So the whole safe
+stretch of the bar — the opening 38% — was spent on 35 metres of river bed that the water never
+visits, and the calm reading landed at 36.2%, hard against the alert tick at 38%. Every station on
+such a datum drew the same picture: a bar that looks one pixel from trouble and never moves. A rise
+of 30 cm moved it by a third of a point.
+
+The feed publishes no bed level and no normal range. The one unit it does give for "how far this
+river travels when it matters" is its own alert→danger gap. The foot of the bar is now `LEVEL_FLOOR`
+(6) of those gaps below the first mark. SERENDAH reads 19.6% and the same 30 cm rise now moves the
+bar 3.2 points. The three marks stay exactly where they were — 38 / 68 / 100 — so nothing about the
+bands, the heat gradient or the legend changes.
+
+`LEVEL_FLOOR` is a tuning knob and is marked as one in `config.js`. On the payload it was picked
+from, 6 left 6 of 107 rivers resting on the floor and 4 still near the alert tick. A smaller number
+flattens the calm stations to nothing. A larger one bunches them under the tick again, which is the
+fault it was chosen to fix.
+
+Water below the floor reads 0. That is the honest answer for a river metres under its first mark,
+and it is what the bar said before for anything at the bottom of the scale. Stations on a bed datum
+(BANDAR KLANG: alert 2.40, danger 3.00) compute a negative floor and keep their old behaviour, so
+the change only touches the stations that had the fault.
+
+The table's own bar was a hand-copied set of the same stops. It calls `levelStops()` now, so the
+scale has one definition again.
+
+### The water level column sorts by the bar it draws
+
+The column ordered on `level / danger`. The cell draws `scalePos()` on the piecewise scale. The two
+disagree, so two rivers could swap places against the picture in front of them. The sort key is the
+bar's own position now. Severity still leads it — a sorted column is asked "show me the worst" —
+and `scalePos()` already carries the band, so the two agree by construction.
+
+### Trade-offs accepted
+
+Rivers resting on the floor tie at 0 and fall back to alphabetical order. Six of 107 on the payload
+this was built against. The alternative is a second sort term that orders stations by how far below
+the floor they are, which is a ranking of how safe the safe ones are.
+
+The heat weight reads the same stops, so a calm river now contributes less warmth than it did. That
+is the layer working as documented: below its first published mark a station paints nothing, and
+these stations were painting a third of an alert.
+
+### The sort key is the bar, and nothing leads it
+
+The published band used to lead the water level sort key, on the grounds that a sorted column is
+asked "show me the worst". `scalePos()` already carries that band. 38 is the alert mark, 68 the
+warning mark, 100 the danger mark, on every river's own scale. Two terms for one fact can only
+disagree, and when they did the column put a bar with nothing in it above a bar two thirds full.
+The key is the bar's position alone now. A river with no published mark draws no bar and sorts as
+an empty one.
+
+### Test mode faked an alert the one way the scale cannot draw
+
+`seedTest()` built a climbing river as `danger × 0.82`. That is a fraction of the danger mark, and a
+river reading against an absolute datum alerts at 35.20 m and reaches danger at 35.80. So 82% of
+danger is 29.36 m — metres *below* the alert mark the fake had just stamped on it. Test mode was
+showing an amber reading on a station its own scale placed in the safe stretch. The bar from zero
+hid it at 32%. The bar from a real floor drew it empty, which is what the screenshot showed.
+
+The fake now lands 40% of the way from the station's alert mark to its danger mark. Every faked
+river draws at 62%, between the two ticks, whatever datum it reads against. Real data never had this
+fault: `api.php` derives a river's status from its own reading through `wlStatus()`, and 0 of 108
+rivers in the cache carry a status above normal with a level below their alert mark.
+
+## The toast names the place in full
+
+Each toast row was one line: the kind icon, the place name, then the reason. The reason took its own
+width — "reaches danger in ~2.5 h" is a third of a 300px toast — and the name took whatever was
+left, under a `text-overflow: ellipsis`. So the name was cut off on almost every alert this data can
+produce. "KG. LEMBAH JAYA UTARA, AMPANG" is 29 characters and had room for about 16 of them. A
+notification that names a place you cannot read has failed at the only thing it is for.
+
+The row is a two-column grid now. The icon spans both rows, the name has the full width of the
+second column, and the reason sits under it. Names wrap rather than truncate. The longest name in
+the payload is 50 characters and takes two lines.
+
+### Trade-offs accepted
+
+A three-station toast is now about 40px taller. It is top-right of the map on a desktop only, which
+is where the room is, and it already made way for the alert panel.
+
+## The graph draws a line at the sample you are reading
+
+The hover readout named a value and a time, and left you to find which part of the shape it came
+from. On a 12-hour graph a quarter of an inch is an hour, so the answer to "which peak is that"
+was a guess. A crosshair now stands at the sample under the pointer, and the readout sits above it.
+
+It is a `<line>` inside the graph's own SVG, not a second floating element. The readout has to
+float, because it is a box of text over a card that scrolls. The crosshair is one pixel of the
+picture. Putting it in the SVG also settles the top-layer question for free: the table draws its
+graphs inside a popover, and anything painted over one from outside has to be a popover itself.
+
+The stroke carries `vector-effect: non-scaling-stroke`. The viewBox is stretched to whatever width
+the graph lands in, so a plain 1-unit line comes out as many pixels wide as the graph is stretched —
+three of them in a 300px card. The data polyline already had the same attribute for the same reason.
+
+It follows the snapped sample, not the pointer. That is the rule the readout already used: readings
+are 15 minutes apart, and a crosshair that tracked the pointer would sit beside the number it is
+naming.
+
+### Trade-offs accepted
+
+The crosshair is drawn into markup that `render()` rebuilds every poll. A pointer resting still on a
+graph loses the line for one poll and gets it back on the next move. The alternative is to redraw it
+after every payload, which is state to carry for a mark that only means anything while a pointer is
+moving over it.
+
+## The gap between tiles is the page, not Leaflet's grey
+
+Leaflet paints `.leaflet-container` `#ddd`, in both themes, whatever the basemap under it looks
+like. A zoom out asks for four times as many tiles, and outside the area already on screen there is
+nothing to retain and scale over the gap. So the new tiles arrive one at a time over that grey, and
+on the dark basemap the ones still missing read as pale boxes.
+
+`.leaflet-container` takes `var(--surface)` now. An unpainted tile is the page showing through,
+which is what it is, and the value follows the theme toggle without a second definition. White sits
+against Voyager's #fbf8f3 land and #202124 against the lifted dark basemap, so a gap stops
+announcing itself either way.
+
+A sampled land colour was the other option. It is a fourth palette value to keep in step with a
+basemap we do not control, and it paints the sea the colour of land — half the tiles around Klang
+are water.
+
+### The crosshair follows the pointer, the reading holds
+
+The crosshair jumped to the nearest sample. That made the line a set of about 48 positions on a
+graph you drag a pointer across. You could move a centimetre and see nothing move, then have the
+line snap past the place you were aiming at.
+
+It sits under the pointer now, and the readout box moves with it. The reading is still a sample,
+because the graph holds nothing else, but it is the last sample at or before the line rather than
+the nearest one. Nearest was right while the crosshair stood on the sample it named. With the line
+free it would change the number half a step early, so a level appeared to arrive before the line
+reached the point that carried it. Holding the last reading is also what the station itself does
+between two readings.
+
+The readout no longer goes blank in the gaps for the same reason it never did: there are no gaps to
+go blank in. Every position on the graph has a last reading, and before the first sample there is
+nothing to draw, because the window starts at it.
+
+## The stations table was on the page the whole time
+
+Zooming out showed the all-stations table through the map. The cause was one declaration.
+
+A browser closes a `<dialog>` with `dialog:not([open]) { display: none }` in its own stylesheet, and
+any author rule that sets `display` on that element beats it. `#dataBox` set `display: flex` to
+stack its search box over its scrolling table. So from the first time anyone opened the table until
+the next reload, the closed dialog was laid out on the page — all 450 rows of it — and it was
+invisible only because `#map` is absolutely positioned and painted over it. It surfaced wherever
+the map did not paint, which is why it looked like a zoom bug.
+
+`#dataBox[open] { display: flex; }` fixes it. `#lightbox[open] { display: block; }` sits nine
+hundred lines below and had the rule right, which is the pattern to copy for any dialog that needs a
+`display` for its own layout.
+
+The closed dialog was also in the tab order and read by a screen reader as ordinary page content.
+That is the more serious half of the same fault, and it went unnoticed because the visible half
+looked like somebody else's rendering glitch.
+
+### What it was not
+
+The tile background was changed first, on the theory that the grid was Leaflet's `#ddd` showing
+through where tiles had not arrived. That is a real fault and the fix stays — Leaflet's grey is
+wrong in both themes and very wrong in the dark one. It was not this one. The lesson is the cheaper
+one: reproduce before diagnosing. A grid over a map looks like a tile grid, and the question that
+settled it in one round was "does it look like blank boxes, seams, or literally our table".
+
+## A camera card says what the water is doing
+
+Every card in this app offers the nearest picture. A camera card offered nothing back. That is the
+wrong way round: a still of a river is a question about a number — is that high? — and the frame
+cannot answer it. So a camera that does not share a mast with a river now carries the nearest water
+level, named, with its reading and how far away it is. The button jumps to that station, where the
+meter states it properly.
+
+It is three parts, not one line of four. The first attempt strung them together —
+"Nearest water level · TAMAN MAYANG · 14.6 m · 1.2 km" — a place, a reading and a distance on one
+separator, which reads as a sentence that never resolves and breaks in the wrong place when it
+wraps. The place leads now, because that is what the button opens. What it is and how far away it is
+drop to a caption under it. The reading goes right, where every other number in this app sits, and
+the name truncates rather than pushing it off the end.
+
+The reading is coloured by `color()`, the same function the pin and the card use. The number alone
+says nothing without the mark it is measured against: 1.74 m is a quiet river on one station and a
+flood on the next, and the colour is the only part of that which fits beside it.
+
+`nearestLevel()` in stations.js is the mirror of `nearestCam()` and shares its 5 km cap, because it
+is the same question turned around. Past that distance "the river in this picture" is not a claim
+this app can make from either end. 45 of the 62 standalone cameras get a line. The other 17 print
+nothing, which is what `camLink()` already does at the same distance.
+
+Cameras that share a mast with a river draw nothing new. That card is already showing both, and the
+line would be a link to the section under it.
+
+### The nearest webcam button names the camera, in the same shape
+
+"Nearest webcam · 3.2 km" said a picture exists somewhere over there and left the reader to open it
+to find out whether "over there" is their road or the next town. The name answers that before the
+fetch, and it is what the lightbox is titled anyway.
+
+It takes the same three-part shape: the place on top, what it is and how far away as a caption under
+it. Strung on one line the name was a fragment in the middle of a sentence that never resolves. The
+two buttons differ in one thing now — the level line has a reading to put on the right, and the
+webcam line has none.
+
+The same-mast branch keeps its bare "Show webcam". There is no other place to name and no distance
+to state, so it is an action rather than an offer.
+
+### Trade-offs accepted
+
+Both buttons are two lines tall where they used to be one. A camera card and a river card each
+carry one of them, never both, so nothing gained a row it did not already have.
+
+A name over about 30 characters is cut with an ellipsis. On the level line the reading is the part
+that must stay whole; on the webcam line it keeps the two buttons the same width. The full name is
+on the card the button opens.
+
+## A graph with one sample still looks like a graph
+
+A station we have watched for an hour draws one line and one hour label. On a bare card that is a
+stray mark with a number under it, and the number was falling off the edge. Three changes, and none
+of them touches what is plotted.
+
+**The plot sits on a plate.** `.spark svg` takes four percent of the text colour, mixed off
+`--on-surface` so it is correct in both themes and against whatever the card is painted. The plate
+is the frame the line is drawn in, so an almost-empty one reads as a graph that has not filled up
+yet rather than as a rendering fault. `--hover` was the first value and it was about twice this
+step. That token is a control lighting up under a pointer, and at that weight the plate read as a
+panel of its own on a card that is already mostly panels. This has to be the least a surface can be
+and still be a surface.
+
+**A history glyph marks the corner.** `.spark::before` with `--i-history`, set back with opacity —
+it labels the plate, it is not on it. One rule serves all three graphs, because they are one element
+with three fills, and a fourth graph added later cannot forget to include it.
+
+**Every hour label stays inside the card.** The clamping was `:first-child` and `:last-child` in
+CSS. That is a guess at the real question: it is right whenever the first tick sits at 0 and the
+last at 100, and wrong the rest of the time. With a single tick on the graph the element is both,
+the right-hand rule won, and the only label a new station has was dragged off the left of the panel.
+`axisHtml()` now decides the shift from where the tick lands on the axis — inside the first 8% it
+hangs right, past 92% it hangs left, everywhere else it is centred. 8% of a 300px panel is 24px and
+a label is about 34px wide, so a tick inside that band cannot be centred without crossing the edge,
+and one outside it always can.
+
+**The line graphs are a quarter taller.** 42px against the band's 34. A line has a shape and needs
+the room to have it. A siren log is a state over time and there is nothing in it that more height
+would draw better. They were the same box with different marks in it, which is what made a status
+log and a reading look like the same kind of statement. The viewBox is 0 0 100 28 and stretches, so
+the height is a CSS number and no template knows it.
+
+### Trade-offs accepted
+
+The plate is one more surface on a card that is mostly surfaces. It earns it on the graph that has
+almost nothing in it, which is the one that needed help.
+
+The glyph has no words. The caption under every graph already says what window it covers, and a
+`title` is not a tooltip on a phone.

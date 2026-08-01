@@ -16,6 +16,7 @@
 
 import { el, isIgnored } from './util.js';
 import { byId } from './stations.js';
+import { camWarn } from './popup.js';
 
 /* Named windows rather than a free zoom. The retention tiers mean the archive is *already* a set of
    resolutions — half-hourly for a day, then 3-hourly, then 12-hourly, then weekly — so a continuous
@@ -82,6 +83,7 @@ let liveSrc = '';    // the live proxied still — always the last position on t
 let range = RANGES[0];
 let timer = null;
 let lead = null;     // the pause before a freshly opened camera starts playing itself
+let warned = '';     // the warning pill currently on the picture, so a repaint can skip its own work
 
 const srcOf = ts => `api.php?shot=${cam}&t=${ts}`;
 // One past the end of `frames` is the live still. It is not in the archive — it is what the lightbox
@@ -93,6 +95,34 @@ const labelAt = i => isLive(i) ? 'live' : stamp(frames[i]);
 tl.querySelector('.tlranges').innerHTML = RANGES.map((r, i) =>
   `<button class="tlr" data-i="${i}"><span class="tls">${r.label}</span
    ><span class="tll"></span></button>`).join('');
+
+/* The station's reading nearest a frame, or null. `history` is the same 12-hour window the sparklines
+   are drawn from, thinned to one sample per 15 minutes — so half an hour either side is one bucket of
+   tolerance and anything further away is a different reading. Older frames have no sample at all, and
+   null is the honest answer there: the pill names the sensor and states no figure. */
+function levelAt(st, ts) {
+  let best = null;
+  for (const [t, v] of st.history || [])
+    if (Math.abs(t - ts) <= 1800 && (best === null || Math.abs(t - ts) < Math.abs(best[0] - ts)))
+      best = [t, v];
+  return best && best[1];
+}
+
+/* The warning pill for the frame on screen, which is not the same question as the warning pill for
+   now. `tierAt` already carries what the server scored each frame against — the same map the coloured
+   spans in the seek bar are drawn from — so the picture and the bar under it cannot disagree.
+   Live is the one position that asks the live question, through camWarn()'s own default.
+   The reader's ignore list is applied here for the same reason drawTicks() applies it: the server
+   never learns it. */
+function warnFor(i) {
+  const c = byId('camera-' + cam);
+  if (!c) return '';
+  if (isLive(i)) return camWarn(c);
+  const a = tierAt.get(frames[i]);
+  const st = a && byId(a.id);
+  if (!a || !st || isIgnored(st)) return '';
+  return camWarn(c, { tier: a.tier, station: st, level: levelAt(st, frames[i]) });
+}
 
 function paint() {
   if (!cam) return;   // nothing to paint from, and the img belongs to whoever opened the lightbox
@@ -115,6 +145,23 @@ function paint() {
     imgA.src = srcAt(i);
     box.querySelector('.abtime').textContent = labelAt(i);
   }
+  /* The pill follows the moving side, which is A while comparing and the base image otherwise — the
+     same frame `.abtime` and `.btime` are naming. Compared against what is already on screen, because
+     this runs once a second through a whole clip and most frames carry the same warning as the one
+     before them (or none at all, which is most cameras most days). */
+  const w = warnFor(i);
+  if (w !== warned) {
+    warned = w;
+    const player = box.querySelector('.player');
+    player.querySelector('.camwarn')?.remove();
+    /* A hidden pill stands in for a calm frame, on any camera whose archive holds an alerting one.
+       In the plain shape the strip above the picture is opened by `.player:has(.camwarn)`, so a pill
+       that came and went as the clip ran would move the frame 30px down and back up again while
+       somebody watched it. The placeholder holds the strip open for the whole clip and shows
+       nothing. Cameras that never alert never get one, which is the cost that rule exists to avoid. */
+    player.insertAdjacentHTML('beforeend',
+      w || (tierAt.size ? '<span class="camwarn" hidden></span>' : ''));
+  }
 }
 
 /* One frame per `step`-wide bucket, newest in the bucket winning — the same rule and the same bucket
@@ -128,8 +175,9 @@ function thin(list, step) {
   return [...keep.values()];
 }
 
-/* Colour inside the seek bar, over the frames taken while a river within CAM_ALERT_KM was at danger
-   or was forecast to reach it — so the bar answers "when did this start" without playing the clip.
+/* Colour inside the seek bar, over the frames taken while a sensor within CAM_ALERT_KM was at danger
+   or, on a river, was forecast to reach it — so the bar answers "when did this start" without
+   playing the clip.
    One span per alerting frame, a frame wide, in that tier's status colour. Only those: a mark per
    stored frame drew a 60-line ruler over the one control here that has to be dragged, and a
    graduation is not what this strip is for.
@@ -475,6 +523,9 @@ export function reset() {
   cam = null;
   all = frames = [];
   tierAt = new Map();
+  /* Forget the pill as well. ui.js writes the live one straight into `.player` as it opens the next
+     camera, so a cached string that happened to match would skip a paint that has to happen. */
+  warned = '';
   setCompare(false);
   tl.hidden = true;
   stage.style.removeProperty('--ab');

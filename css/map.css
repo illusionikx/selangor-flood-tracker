@@ -4,6 +4,17 @@
    is filtered — markers, heat and popups sit in other panes and keep their true colours. */
 :root[data-lift="yes"] .leaflet-tile-pane { filter: brightness(1.75) contrast(.92); }
 
+/* What shows where a tile has not arrived yet. Leaflet's own value is `#ddd`, in both themes and
+   whatever the basemap looks like. Zooming out asks for four times the tiles and, outside the area
+   you already had, there is nothing to retain and scale over the gap — so they land one at a time
+   over that grey, and the empty ones read as pale boxes on the dark map.
+   `--surface` rather than a sampled land colour: an unpainted tile is the page showing through, it
+   follows the theme toggle for free, and #fff against Voyager's #fbf8f3 land and #202124 against the
+   lifted dark basemap are both close enough that a gap stops announcing itself.
+   This is not what put a table on the map mid-zoom — that was `#dataBox` laid out behind it. See
+   the `[open]` rule in chrome.css. */
+.leaflet-container { background: var(--surface); }
+
 /* Zoom sits bottom-right (Maps-style), clear of the alert panel. */
 /* Leaflet gives its control corners `z-index: 1000`, which is above everything this page has — the
    splash included, so the zoom buttons floated over a screen that says there is no map yet. 400 puts
@@ -214,7 +225,10 @@
 
 /* The alert marker on a camera picture. Top left, because the bottom carries the timestamp overlay
    JPS burns into its own frames and the right is where the lightbox close button lands.
-   Absolute inside .shotwrap and inside .player — both are already positioned.
+   Absolute inside `.player`, which is the lightbox and the only place this appears. The station
+   panel's still dropped it: that picture is a 3-hour clip playing itself, so a live pill on it was a
+   claim about now over a frame from hours ago, and the card around it already carries the alerting
+   sensor as a section with the reading, the meter and the graph.
    It says what is wrong on the picture itself. It was a glyph on a dark disc with the words in a
    `title`, which is a tooltip that never opens on a phone, opens after a second on a mouse, and
    cannot be styled — so the marker meant "something" and the something was unreachable on half the
@@ -242,6 +256,10 @@
 .camwarn .i { font-size: 16px; flex: none; filter: drop-shadow(0 1px 3px rgb(0 0 0 / .95)); }
 .camwarn.t-now  .i { color: var(--s-danger); }
 .camwarn.t-soon .i { color: var(--s-warning); }
+/* `display: flex` above beats the browser's own `[hidden]` rule, so it has to be said again. The
+   lightbox scrubs through an archive and parks an empty pill on the calm frames — see paint() in
+   js/timeline.js — which holds the strip above the picture open and shows nothing in it. */
+.camwarn[hidden] { display: none; }
 
 /* Under the picture, not over it. An overlay would land on the timestamp JPS burns into its own
    frames, and this caption is read once rather than watched. */

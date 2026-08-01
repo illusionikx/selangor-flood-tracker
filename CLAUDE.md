@@ -304,6 +304,13 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   map would sit on stale readings because an easter egg was absent. Same rule for anything added to
   that `cp` line: if it can go missing, it must not be able to stop the map updating. Under Herd the
   same missing file is invisible (see above), so this only ever shows up in CI.
+- **A `<dialog>`'s `display` goes on `[open]`, never on the element.** The browser closes a dialog
+  with `dialog:not([open]) { display: none }` in its own stylesheet, and any author rule setting
+  `display` beats it. `#dataBox { display: flex }` therefore laid the closed table dialog out on the
+  page — 450 rows, in the tab order and read by screen readers — invisible only because `#map` is
+  absolutely positioned and painted over it. It surfaced through the map whenever a tile was missing,
+  which read as a Leaflet zoom bug and was chased as one. `#dataBox[open]` and `#lightbox[open]` are
+  the pattern.
 - **There is no map popup any more, and there must not be one again.** Station detail is `#side`, a
   fixed panel on the right edge of the viewport, filled by `openSide(key, html, mastAt)` in `map.js`.
   Everything a Leaflet popup needed — `autoPan` racing `setView`'s animation, `openStable()`
@@ -420,6 +427,9 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   lens — so `CAM_EVERY` floods every third site that holds both a camera and a river. Without it the
   camera warning was faked by luck, on 6 of the 31 such sites. Anything new that alerts needs a knob
   here, or it ships unseen: that is why the gauge has one, at a rung real data almost never reaches.
+  **A faked level is placed against the station's own marks, never as a fraction of the danger
+  mark.** `danger × 0.82` is 29.36 m on a river that alerts at 35.80, so the fake stamped an alert on
+  a station the scale put in the safe stretch, and the row drew an amber number over an empty bar.
 - **The alert panel is a directory, not a stack of readings.** `groupCard()` in `alerts.js` draws one
   card per kind per tier — five at most, usually two — and **every row in it is a place**, grouped on
   `site` so a mast with two gauges over their marks is one row. One card per station carried a meter,
@@ -464,6 +474,11 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   ground. `maxZoom` on the layer is **not** a display limit — it divides every weight by
   `2^(maxZoom − zoom)`, so anything inside the usable zoom range dims blobs as you zoom out. Pinned
   to 0.
+- **Leaflet paints its container `#ddd` in both themes.** That is what shows through wherever a tile
+  has not arrived, and a zoom out has nothing to retain over the newly revealed area — so the
+  missing tiles read as a grid of pale boxes on the dark basemap. `.leaflet-container` takes
+  `var(--surface)` in `map.css`. Anything that changes the basemap has to keep a gap looking like
+  the page rather than like a table.
 - **`maxZoom` belongs on the map, not only the tile layer.** `cluster` is created and added at
   `map.js` load time, before `setBasemap()` adds any tile layer, and markercluster throws
   *"Map has no maxZoom specified"* if nothing has declared one by then.
@@ -521,6 +536,34 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   and `--muted` would flip with the theme while the picture behind them did not. White and
   `#ffffffb3` in both themes. `--accent` is the one token that stays, on the thumb and the played
   rail, and it is legible on the scrim in either theme.
+- **The lightbox's warning pill belongs to the frame on screen, not to the clock.** `paint()` in
+  `timeline.js` rewrites it from `tierAt` — the same per-frame tiers the seek bar's coloured spans are
+  drawn from, so the picture and the bar under it cannot disagree. Live is the only position that asks
+  the live question. The metre figure comes from the station's `history` within half an hour of that
+  frame and is **omitted** past the 12 hours of samples the payload carries, which is why `camWarn()`
+  tests `'level' in a` rather than `??`: falling back to the live number there would print today's
+  water on a picture from last week. A calm frame gets a `hidden` pill rather than none, so the mobile
+  strip that `.player:has(.camwarn)` opens does not shut mid-clip and shift the picture 30px.
+  **The pill is the lightbox's alone** — `camImg()` used to put one on the station panel's still too,
+  and that picture is a 3-hour clip playing itself with nowhere to state a warning per frame. The
+  card around it already gives the alerting sensor a section with the reading, the meter and the
+  graph. Do not put it back there without a way to score the frame on screen.
+  **Its words are `ALERT_TITLE` in `config.js`**, the same table the alert panel groups its rows
+  under — `Water level at danger` / `Forecast to reach danger` / `Triggered siren`, with the reading
+  appended where there is one. It lives in `config.js` rather than `alerts.js` because two surfaces
+  read it and `popup.js` cannot import `alerts.js` (that module already imports `popup.js`). Change
+  the phrase in one place or the panel and the picture start making two claims about one river.
+- **The camera pill is the one alert surface that reads `atDanger()`, not `isHot()`.**
+  `camAlert()` takes `isHot(s) || atDanger(s)`, so a flood gauge under water and rainfall in JPS's
+  top class put a warning on the picture — because `atDanger()` is what already paints that camera's
+  neighbour red on the map, and a clean picture beside a red pin reads as the map being wrong.
+  **`isHot()` is untouched**: the alert panel, the icon badge, the ticker and the toast list exactly
+  what they listed before, and widening *those* still goes through the alert design standard. Every
+  kind `atDanger()` adds is observed, so it is `now` — only a river publishes a rate, so only a river
+  gets `soon`. Each kind reads its own field and unit through `CAM_READ` in `popup.js` (`level` m,
+  `depth` m, `hourly` mm/h); a siren prints no figure, because its samples are 0 and 1 and an archive
+  frame hands that 1 straight in. `?shots=` scores the same four kinds server-side, or the pill would
+  show on the live frame only — and the lightbox opens three hours back, so nobody would see it.
 - **`.abtime` must stay outside `.ab`.** `.ab` is the older frame clipped to the divider, so a label
   inside it is cut in half whenever the divider comes near the left edge — and the right-hand label,
   which lives in the unclipped box, never is, which is what made it look like a bug. Both labels are
@@ -582,7 +625,12 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   actually held and only starts sliding once they exceed it. It must not exceed `SPARK_WIN`.
 - Station cards share one template: badge → name → region → body → still/link → footer. `meter()` renders
   water level on a **piecewise** scale (alert 38%, warning 68%, danger 100%) because real
-  thresholds bunch above 88% on a linear bar.
+  thresholds bunch above 88% on a linear bar. **The scale does not start at 0 m** — most stations read
+  against an absolute datum (SERENDAH alerts at 35.80 m), so a bar from zero put every calm one hard
+  against the alert tick and froze it there. `levelStops()` floors it `LEVEL_FLOOR` (6) alert→danger
+  gaps below the first mark. One definition, in `util.js`: the meter, the table bar, the table's sort
+  key and the heat weight all read it. Do not hand-copy the stops — `table.js` did, and its sort and
+  its bar then disagreed.
 - Vendored assets only — no CDN, so Tracking Prevention has nothing to block. `leaflet-heat.js` is
   **patched** (`willReadFrequently` on 3 `getContext` calls); don't overwrite it with a fresh copy.
 

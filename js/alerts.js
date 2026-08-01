@@ -2,7 +2,7 @@
 // well is indistinguishable from one that broke, so quiet is stated rather than implied — and the
 // list itself in the station panel, which is the same popout a pin opens.
 
-import { KINDS, STATUS_COLOR, NO_INFO } from './config.js';
+import { KINDS, STATUS_COLOR, NO_INFO, ALERT_TITLE } from './config.js';
 import { state, PREFS } from './state.js';
 import { el, distKm, dkey, isHot, tier, TIER_RANK, isIgnored, noSec } from './util.js';
 import { side, openSide, closeSide } from './map.js';
@@ -41,14 +41,9 @@ const siteSize = () => {
    identical furniture. Now the answer is the list, and the reading behind any row is one tap away
    on that station's own card, where there is width for a graph.
    Grouped by `site`, so a mast with two river gauges over their marks is one row and not two, and
-   the row wears the `layers` glyph when more than one sensor stands there. */
-const GROUP_TITLE = {
-  'siren|now':   ['Triggered siren', 'Triggered sirens'],
-  'siren|stale': ['Siren out of contact', 'Sirens out of contact'],
-  'river|now':   ['Water level at danger', 'Water levels at danger'],
-  'river|soon':  ['Forecast to reach danger', 'Forecast to reach danger'],
-  'river|stale': ['Water level not current', 'Water levels not current'],
-};
+   the row wears the `layers` glyph when more than one sensor stands there.
+   The titles themselves live in config.js as `ALERT_TITLE`, because the warning pill on a camera
+   picture states the same phrase for the one station it names. The two must not drift. */
 const TIER_TAG = {
   now:   '<span class="tg tg-now">HAPPENING NOW</span>',
   soon:  '<span class="tg tg-soon">FORECAST</span>',
@@ -83,7 +78,7 @@ function groupCard(items, kind, t, hereAt) {
     ? distKm(hereAt, a.lead) - distKm(hereAt, b.lead)
     : (b.lead.ratio || 0) - (a.lead.ratio || 0));
 
-  const [one, many] = GROUP_TITLE[`${kind}|${t}`] || [k.label, k.label];
+  const [one, many] = ALERT_TITLE[`${kind}|${t}`] || [k.label, k.label];
   return `<div class="alert t-${t} grouped">
     <span class="badge" style="--c:${k.color}"><i class="i i-${k.icon}"></i>${k.one || k.label}</span
       >${TIER_TAG[t]}

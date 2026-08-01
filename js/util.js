@@ -1,6 +1,7 @@
 // Small pure helpers plus the rules for "does this station actually know anything".
 
-import { KINDS, KIND_RANK, RIVER_COLOR, RAIN_COLOR, STATUS_COLOR, GAUGE_COLOR, NO_INFO } from './config.js';
+import { KINDS, KIND_RANK, RIVER_COLOR, RAIN_COLOR, STATUS_COLOR, GAUGE_COLOR, NO_INFO,
+         LEVEL_FLOOR } from './config.js';
 import { PREFS } from './state.js';
 
 export const el  = id => document.getElementById(id);
@@ -58,14 +59,24 @@ export function scalePos(v, stops) {
   return 100;
 }
 
-/* The stops themselves, shared by the popup meter and the heat weight. One definition, because they
-   are now the same scale: a blob's colour is the band the station has crossed, so the meter's 38 /
-   68 / 100 slots have to be the numbers the gradient is keyed on. Null where there is no mark at
-   all to measure against. */
+/* The stops themselves, shared by the popup meter, the table bar and the heat weight. One
+   definition, because they are all the same scale: a blob's colour is the band the station has
+   crossed, so the meter's 38 / 68 / 100 slots have to be the numbers the gradient is keyed on. Null
+   where there is no mark at all to measure against.
+
+   The bar does *not* start at zero metres. Most of these stations read against an absolute datum —
+   SERENDAH alerts at 35.80 m and sits at 34.06 — so a scale from 0 spent its whole safe stretch on
+   metres the river never visits, and every calm station on such a datum drew a bar hard against the
+   alert tick that never visibly moved. The only unit the feed gives us for "how far this river
+   travels when it matters" is its own alert→danger gap, so the foot of the bar is `LEVEL_FLOOR`
+   gaps below the first mark. Anything under that reads 0, which is the honest answer: well below.
+   Stations on a bed datum (alert 2.40, danger 3.00) floor out negative and keep the old behaviour. */
 export function levelStops(s) {
   const max = s.danger || s.warning || s.alert;
   if (!max) return null;
-  const stops = [[0, 0]];
+  const first = s.alert || s.warning || max;
+  const gap = max - first;
+  const stops = [[gap > 0 ? first - gap * LEVEL_FLOOR : 0, 0]];
   if (s.alert   && s.alert   < max) stops.push([s.alert, 38]);
   if (s.warning && s.warning < max && s.warning > (s.alert ?? 0)) stops.push([s.warning, 68]);
   stops.push([max, 100]);

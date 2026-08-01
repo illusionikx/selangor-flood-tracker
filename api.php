@@ -42,9 +42,13 @@ const RISE_DAY = 86400;
 // Sirens report a daily heartbeat (most stamp 08:00). Two missed days is out of contact, not idle.
 const SIREN_STALE = 48 * 3600;
 const SITE_M = 50;   // metres — stations this close are sensors on one mast, not separate places
-/* How close a river must be to a camera before its alert is allowed onto that camera's frames.
+/* How close a sensor must be to a camera before its alert is allowed onto that camera's frames.
    js/config.js carries the same 2 for the live warning glyph. Change both together. */
 const CAM_ALERT_KM = 2;
+/* The lowest rainfall reading that is JPS's top class. `rainStatus()` in sources.php scores
+   `> 60` as class 4, and frameTiers() compares with `>=`, so the two agree only at a value the
+   feed cannot publish between. JPS reports rainfall to one decimal, so 60.1 is that value. */
+const RAIN_DANGER = 60.1;
 const CACHE = __DIR__ . '/.cache.json';
 const LOCK  = __DIR__ . '/.refresh.lock';   // held for the length of a rebuild; see below
 const HIST  = __DIR__ . '/.history.db';
@@ -130,11 +134,12 @@ if (isset($_GET['cam'])) {
 /* ?shots=<id> — which frames exist, and what the river beside the camera was doing when each one
    was taken. The client asks once, when a lightbox opens, and again when a camera card opens.
    Shape is [[ts, tier, stationId], …]. `tier` is "now", "soon" or null.
-   Three things leave a tier null, and all three show as an uncolored tick rather than a wrong one:
-   the frame is older than the 30 days of levels we keep, no river sits within CAM_ALERT_KM, or the
-   river publishes no danger mark to be measured against. Sirens are a fourth: this handler walks
-   rivers only. frameTiers() scores a sample against the station's own danger mark, and a siren
-   publishes none. Online sirens do reach .history.db as 0 or 1, so the samples are not the gap. */
+   Rivers, gauges, sirens and rainfall, each against its own mark — the same four kinds the live
+   warning glyph on a camera picture can name, so the picture and the strip under it agree whichever
+   frame is on screen. Only the river gets `soon`, because only the river has a rate to project.
+   Two things leave a tier null, and both show as an uncolored tick rather than a wrong one: the
+   frame is older than the 30 days of levels we keep, or nothing with a mark sits within
+   CAM_ALERT_KM. */
 if (isset($_GET['shots'])) {
     header('Content-Type: application/json');
     header('Cache-Control: max-age=60');
@@ -164,12 +169,28 @@ if (isset($_GET['shots'])) {
             $sel = $db->prepare('SELECT ts, level FROM level WHERE station = ? AND ts >= ? ORDER BY ts');
             $best = [];   // frameTs => [rank, tier, stationId, distKm] — see the tie-break note below
             foreach ($st as $r) {
-                if ($r['kind'] !== 'river' || empty($r['danger'])) continue;
+                /* Each kind against its own mark. A river and a gauge publish one; a siren is 0 or 1
+                   in this table and 1 is the whole of "sounding"; rainfall is scored on JPS's own
+                   class boundary. Anything else — a camera — has nothing to score. */
+                $mark = match ($r['kind']) {
+                    'river', 'gauge' => empty($r['danger']) ? null : (float)$r['danger'],
+                    'siren'          => 1.0,
+                    'rainfall'       => RAIN_DANGER,
+                    default          => null,
+                };
+                if ($mark === null) continue;
                 $d = $km($cam, $r);
                 if ($d > CAM_ALERT_KM) continue;
                 $sel->execute([$r['id'], $frames[0] - RISE_DAY]);
                 $samples = array_map(fn($x) => [(int)$x['ts'], (float)$x['level']], $sel->fetchAll(PDO::FETCH_ASSOC));
-                foreach (frameTiers($frames, $samples, (float)$r['danger'], RISE_ETA, 'assess') as $ts => $t) {
+                /* Only a river carries a forecast. Standing water, a sounding siren and rain falling
+                   now are observed states with no rate to project — so those three are handed an
+                   assess that never answers, which is what turns the `soon` half of frameTiers off.
+                   The same split the live path makes: `isHot()` forecasts rivers and nothing else. */
+                $tiers = $r['kind'] === 'river'
+                    ? frameTiers($frames, $samples, $mark, RISE_ETA, 'assess')
+                    : frameTiers($frames, $samples, $mark, 0, fn() => [null, null]);
+                foreach ($tiers as $ts => $t) {
                     $rank = $t === 'now' ? 0 : 1;
                     /* Worse tier wins first. Nearer river breaks a tie. camAlert() in js/stations.js
                        ranks a camera's live glyph the same way. The two must agree, or a reader can
