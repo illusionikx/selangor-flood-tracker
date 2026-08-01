@@ -1,6 +1,6 @@
 // Small pure helpers plus the rules for "does this station actually know anything".
 
-import { KINDS, KIND_RANK, RIVER_COLOR, RAIN_COLOR, STATUS_COLOR, NO_INFO } from './config.js';
+import { KINDS, KIND_RANK, RIVER_COLOR, RAIN_COLOR, STATUS_COLOR, GAUGE_COLOR, NO_INFO } from './config.js';
 import { PREFS } from './state.js';
 
 export const el  = id => document.getElementById(id);
@@ -75,6 +75,20 @@ export function levelStops(s) {
 // A gauge has no alert mark — only warning and danger — so it sits on the same slots minus the first.
 export const gaugeStops = s => [[0, 0], [s.warning || 0.15, 68], [s.danger || 0.3, 100]];
 
+/* Where a flood gauge sits on the traffic light. Upstream publishes three codes against its own two
+   marks (0.15 m warning, 0.3 m danger), so any water shallower than 0.15 m shared code 0 with dry
+   ground — and a spot with water standing on it painted the same quiet taupe as a spot with none.
+   Water over a place known to flood is never the normal state, so it takes the alert rung at least,
+   and the two published marks move up to warning and danger. Dry ground alone keeps 0.
+   One definition for the pin, the card, the table cell and the table's hover panel. */
+export const gaugeTone = s => s.depth == null || s.depth <= 0 ? 0
+  : s.status >= 2 ? 3
+  : s.status >= 1 ? 2 : 1;
+
+// The colour that goes with it. Not `statusColor()` — a gauge's rung 1 is `--s-trace`, not the
+// alert amber, because upstream never published a mark down there. See GAUGE_COLOR in config.js.
+export const gaugeColor = s => GAUGE_COLOR[gaugeTone(s)];
+
 // A station with nothing to report gets grey everywhere — colour means "there is a reading here".
 export const hasInfo = s => s.online && ({
   river:    s.level != null,
@@ -89,8 +103,8 @@ export function color(s) {
   if (s.kind === 'river')    return RIVER_COLOR[s.status] || KINDS.river.color;
   if (s.kind === 'rainfall') return RAIN_COLOR[s.status]  || KINDS.rainfall.color;
   if (s.kind === 'siren')    return s.status > 0 ? statusColor(3) : KINDS.siren.color;   // red only when sounding
-  if (s.kind === 'gauge')    return s.status >= 2 ? statusColor(3)
-                                  : s.status === 1 ? statusColor(2) : KINDS.gauge.color;
+  // Taupe only while the ground is dry. Any depth at all is a status, and wears a status colour.
+  if (s.kind === 'gauge')    return gaugeTone(s) ? gaugeColor(s) : KINDS.gauge.color;
   return KINDS[s.kind].color;
 }
 
@@ -103,6 +117,21 @@ export function color(s) {
 // Is this station the reason someone opens the map at all: a river at danger, or a siren sounding.
 export const isCritical = s =>
   (s.kind === 'river' && s.status >= 3) || (s.kind === 'siren' && s.status > 0);
+
+/* Has this sensor reached the top of its own scale — whatever its own scale is? A river over its
+   danger mark, a siren sounding, a flood gauge past 0.3 m of standing water, rainfall in JPS's top
+   class. This is what the **map** paints red, and it is deliberately wider than `isCritical()`.
+   A pin has to be red whenever anything at that place is at its worst, and a mast whose lead sensor
+   is a quiet river used to draw blue over a flood gauge under water beside it. `isCritical()` stays
+   narrow because it feeds `isHot()`, and through it the alert panel, the icon badge, the ticker and
+   the toast. Widening those is an alert-design decision and goes through the standard in
+   docs/FEATURES.md — this is a colour on a map, which is a different claim. */
+export const atDanger = s => hasInfo(s) && ({
+  river:    s.status >= 3,
+  siren:    s.status > 0,
+  gauge:    gaugeTone(s) === 3,
+  rainfall: s.status >= 4,
+}[s.kind] ?? false);
 
 /* What the "On alert" panel lists — critical, plus rivers forecast to reach danger within RISE_ETA.
    Lives here so the panel and the toast cannot drift apart: a toast announcing something the panel
@@ -144,5 +173,5 @@ export const TIER_RANK = { now: 0, soon: 1, stale: 2 };
    config.js. Lives here rather than in render.js because the table needs the same order and a view
    importing another view would put a cycle in the graph. */
 export const leads = (a, b) =>
-  isCritical(b) - isCritical(a) || !!b.rising - !!a.rising ||
+  atDanger(b) - atDanger(a) || !!b.rising - !!a.rising ||
   KIND_RANK.indexOf(a.kind) - KIND_RANK.indexOf(b.kind);

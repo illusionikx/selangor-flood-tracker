@@ -2,7 +2,7 @@
 
 import { KINDS, MAST, HEAT_FLOOR, RAIN_STOPS } from './config.js';
 import { state, PREFS } from './state.js';
-import { el, color, dkey, isCritical, leads, hasInfo, isIgnored, ignoredIds,
+import { el, color, dkey, atDanger, statusColor, leads, hasInfo, isIgnored, ignoredIds,
          scalePos, levelStops, gaugeStops } from './util.js';
 import { marks, siteMark, shown, syncCluster, focusOn, side, openSide,
          showMast, hideMast } from './map.js';
@@ -97,13 +97,18 @@ export function render() {
     members.sort(leads);
     const lead = members[0];
     const rising = members.some(m => m.rising);
-    const critical = members.some(isCritical);
+    const critical = members.some(atDanger);
     // A mast of several sensors gets the mast glyph whatever leads it, but only wears the mast
     // colour while nothing on it is signalling and the lead is actually reporting — a status colour
     // outranks it, and a mast with no reading must stay grey rather than look confident.
     const multi = members.length > 1;
     const quiet = multi && hasInfo(lead) && members.every(m => !(m.status > 0));
-    const c = quiet ? MAST.color : color(lead);
+    /* Danger outranks everything, and it is stated here rather than left to `leads()` picking the
+       worst sensor and `color()` happening to return red for it. Anything at the top of its own
+       scale — a river over its mark, a sounding siren, a flood gauge under water, rainfall in the
+       top class — paints the whole place red, whichever of them is speaking for it. A pin the eye
+       has to decode is a pin nobody reads in the ten seconds that matter. */
+    const c = critical ? statusColor(3) : quiet ? MAST.color : color(lead);
     const marker = L.marker([lead.lat, lead.lng], {
       kind: lead.kind, critical,                          // read back by the cluster badge
       zIndexOffset: critical ? 1000 : rising ? 500 : 0,   // keep the urgent pins on top
@@ -143,7 +148,7 @@ export function render() {
      If the place has left `sites` — a filter hid it, or the feeds dropped it — the card is left
      exactly as it was rather than closed. Nothing here may vanish on its own while it is being
      read, and a card that stops updating is not lying: every reading in it is stamped, and
-     footLine() says how old it is. Closing is the reader's to do.
+     the sensor's info menu says how old it is. Closing is the reader's to do.
      Keys beginning `@` belong to the panel's non-station users (locate.js's "you are here"), which
      own their own contents and are not in `sites`. */
   const open = side.key && side.key[0] !== '@' && sites.get(side.key);

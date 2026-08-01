@@ -415,6 +415,12 @@ table.data button[data-pop] { cursor: pointer; }
 .mi:hover { background: color-mix(in srgb, var(--accent) 14%, transparent); }
 .mi .i { font-size: 18px; color: var(--muted); margin-top: 1px; }
 .mi small { font-size: 11px; }
+/* Where the reading came from, above the one action. It reads like the item under it and answers
+   to nothing — no pointer, no hover fill — because a block that lit up under the mouse in a list of
+   one button would promise a second one. */
+.mi.info { cursor: default; }
+.mi.info:hover { background: none; }
+.menu hr { margin: 4px 6px; border: 0; border-top: 1px solid var(--outline); }
 /* Smaller than the app-bar buttons: this one sits inside a 300px popup beside a badge. */
 .dots { width: 28px; height: 28px; font-size: 18px; margin-left: auto; }
 .popact { display: flex; align-items: center; gap: 6px; margin: 6px 0 0; }
@@ -755,12 +761,30 @@ body.finding #find { display: none; }
 .tg-now   { background: color-mix(in srgb, var(--s-danger) 16%, transparent); color: var(--s-danger); }
 .tg-soon  { background: color-mix(in srgb, var(--s-warning) 16%, transparent); color: var(--s-warning); }
 .tg-stale { background: var(--hover); color: var(--muted); }
-.alert .name { cursor: pointer; }
-.alert .name:hover { color: var(--accent); }
-
-/* sparkline sizing lives in base.css with the rest of .spark — the panel only pads it */
-.alert .state { margin: 8px 0 4px; padding: 10px; font-size: 14px; }
-.alert .link { margin-top: 8px; }
+/* One card per kind per tier, and every row in it is a place — see alerts.js for why. The rows are
+   laid out as a list rather than as more alert blocks: a rule down the left of each one would claim
+   each place is its own alert, which is the shape this replaced. */
+.alert.grouped .popname { margin-bottom: 2px; }
+.slist { list-style: none; margin: 0; padding: 0; }
+.slist li {
+  display: flex; align-items: flex-start; gap: 8px;
+  padding: 7px 8px 7px 6px; border-radius: 6px; cursor: pointer; line-height: 1.35;
+}
+.slist li:hover { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.slist .i { font-size: 18px; flex: none; margin-top: 1px; }
+.slist .nm { flex: 1; min-width: 0; }
+.slist small { font-size: 11px; }
+/* The reading, right-aligned so a column of them lines up down the list and can be scanned as one. */
+.slist .rd {
+  flex: none; text-align: right; font-weight: 500;
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.slist .rd small { font-weight: 400; }
+/* The glyph takes the tier's own colour, the same one the card's left rule carries. */
+.alert.t-now   .slist .i { color: var(--s-danger); }
+.alert.t-soon  .slist .i { color: var(--s-warning); }
+.alert.t-stale .slist .i { color: var(--muted); }
+.alert.grouped p { margin: 8px 0 0; }
 
 /* --- credit --------------------------------------------------------------------------------- */
 

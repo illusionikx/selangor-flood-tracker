@@ -6,8 +6,7 @@ import { KINDS, STATUS_COLOR, NO_INFO } from './config.js';
 import { state, PREFS } from './state.js';
 import { el, distKm, dkey, isHot, tier, TIER_RANK, isIgnored, noSec } from './util.js';
 import { side, openSide, closeSide } from './map.js';
-import { nearestCam } from './stations.js';
-import { meter, sparkline, etaText, rateHtml, camLink } from './popup.js';
+import { etaText } from './popup.js';
 
 /* The list shares #side with the station cards. `@`-prefixed, so render()'s per-poll refresh leaves
    it alone (see the tail of render.js) — this module refreshes it instead, on the same poll.
@@ -19,6 +18,88 @@ let card = '';        // last built list, so the button can open it without wait
 
 export function toggleAlerts() {
   side.key === KEY ? closeSide() : openSide(KEY, card);
+}
+
+/* How many sensors stand where this one does. The glyph in the siren list says whether a place is
+   a lone siren or a mast, because those are two different things to open: a mast has a river level
+   sitting next to the siren, and that is the reading you actually want when a siren goes off. Same
+   `layers` glyph the mast pin wears, so the map and the list name the same thing the same way. */
+const siteSize = () => {
+  const n = new Map();
+  for (const s of state.data) {
+    const k = s.site || s.id;
+    n.set(k, (n.get(k) || 0) + 1);
+  }
+  return n;
+};
+
+/* One card per kind per tier, and **every row in it is a place**, not a sensor.
+   The panel used to be one card per station, each carrying a meter, a trend line and a 12-hour
+   graph. That is the right shape for one alert and the wrong shape for forty: a night that trips
+   twenty sirens and pushes thirty rivers over their marks turned the panel into a scroll, and the
+   one question it exists to answer — where is this happening — was spread over two screens of
+   identical furniture. Now the answer is the list, and the reading behind any row is one tap away
+   on that station's own card, where there is width for a graph.
+   Grouped by `site`, so a mast with two river gauges over their marks is one row and not two, and
+   the row wears the `layers` glyph when more than one sensor stands there. */
+const GROUP_TITLE = {
+  'siren|now':   ['Triggered siren', 'Triggered sirens'],
+  'siren|stale': ['Siren out of contact', 'Sirens out of contact'],
+  'river|now':   ['Water level at danger', 'Water levels at danger'],
+  'river|soon':  ['Forecast to reach danger', 'Forecast to reach danger'],
+  'river|stale': ['Water level not current', 'Water levels not current'],
+};
+const TIER_TAG = {
+  now:   '<span class="tg tg-now">HAPPENING NOW</span>',
+  soon:  '<span class="tg tg-soon">FORECAST</span>',
+  stale: '<span class="tg tg-stale">NOT CURRENT</span>',
+};
+
+/* The right-hand column of a row: the number, and the one thing that number needs beside it to be
+   read. A siren has neither — it is sounding, which the card title already said. */
+function reading(s, t) {
+  if (s.kind === 'siren') return '';
+  if (s.level == null) return '';
+  const max = s.danger || s.warning || s.alert;
+  const under = t === 'stale' ? noSec(s.updated) || ''
+    : t === 'soon' && s.eta != null ? etaText(s.eta)
+    : max ? `${(s.level / max * 100).toFixed(0)}% of danger` : '';
+  return `<b class="rd">${s.level} m${under ? `<br><small class="muted">${under}</small>` : ''}</b>`;
+}
+
+function groupCard(items, kind, t, hereAt) {
+  const size = siteSize();
+  const k = KINDS[kind];
+
+  // One row per place. The worst sensor there speaks for it and is what the row jumps to.
+  const places = new Map();
+  for (const s of items) {
+    const key = s.site || s.id;
+    const at = places.get(key);
+    if (!at || (s.ratio || 0) > (at.lead.ratio || 0)) places.set(key, { lead: s, n: (at?.n || 0) + 1 });
+    else places.set(key, { ...at, n: at.n + 1 });
+  }
+  const rows = [...places.values()].sort((a, b) => hereAt
+    ? distKm(hereAt, a.lead) - distKm(hereAt, b.lead)
+    : (b.lead.ratio || 0) - (a.lead.ratio || 0));
+
+  const [one, many] = GROUP_TITLE[`${kind}|${t}`] || [k.label, k.label];
+  return `<div class="alert t-${t} grouped">
+    <span class="badge" style="--c:${k.color}"><i class="i i-${k.icon}"></i>${k.one || k.label}</span
+      >${TIER_TAG[t]}
+    <div class="popname">${rows.length > 1 ? many : one}</div>
+    <ul class="slist">${rows.map(({ lead: s, n }) => `<li data-go="${s.id}"
+        title="Show ${s.name} on the map">
+        <i class="i i-${(size.get(s.site || s.id) || 1) > 1 ? 'layers' : k.icon}"></i>
+        <span class="nm">${s.name}<br><small class="muted">${
+          [s.district, s.state].filter(Boolean).join(', ')}${
+          hereAt ? ` · ${distKm(hereAt, s).toFixed(1)} km` : ''}${
+          n > 1 ? ` · ${n} sensors` : ''}</small></span>
+        ${reading(s, t)}
+      </li>`).join('')}</ul>
+    ${t === 'stale' ? `<p class="muted">These stations have stopped reporting. Each reading above is
+       the last one it sent, and the situation there may have changed either way.</p>` : ''}
+  </div>`;
 }
 
 export function alerts() {
@@ -114,47 +195,24 @@ export function alerts() {
      tiers it would put a forecast two streets away above a river already over its danger mark on
      the other side of town — and only one of those is happening. Stale sinks to the bottom whatever
      the distance: it is the one group you cannot act on.
-     Sirens then cluster inside their tier, after the rivers. A list that alternates between a
-     water level and a triggered siren changes units on every row. A level is a number to judge.
-     A siren is already a decision somebody else made. Grouping costs the strict nearest-first
-     order inside a tier, which is why it sits below tier and not above it.
-     This reverses the old no-location default, which led with sirens. Swap the two operands to put
-     sirens back on top. */
-  write(hot
-    .sort((a, b) => TIER_RANK[tier(a)] - TIER_RANK[tier(b)]
-      || (a.kind === 'siren') - (b.kind === 'siren')
-      || (hereAt ? distKm(hereAt, a) - distKm(hereAt, b)
-                 : (b.ratio || 0) - (a.ratio || 0)))
-    .map(s => {
-      const kind = KINDS[s.kind];
-      const cam = nearestCam(s);
-      const t = tier(s);
-
-      const detail = s.kind === 'siren'
-        ? '<div class="state on">TRIGGERED</div>'
-        : `${meter(s)}
-           ${s.rate != null ? `<div class="muted">trend ${rateHtml(s)}${
-             s.eta != null ? ` · danger <b class="${s.rising ? 'up' : ''}">${etaText(s.eta)}</b>` : ''}</div>` : ''}
-           ${sparkline(s.history)}`;
-
-      /* Says which of the three this is, in words, above the reading. The left rule carries the same
-         thing in colour for a glance; neither is alone, because a colour nobody has been taught is
-         a decoration. */
-      const head = t === 'now'  ? '<span class="tg tg-now">HAPPENING NOW</span>'
-                 : t === 'soon' ? '<span class="tg tg-soon">FORECAST</span>'
-                                : '<span class="tg tg-stale">NOT CURRENT</span>';
-
-      return `<div class="alert t-${t}">
-        <span class="badge" style="--c:${kind.color}"><i class="i i-${kind.icon}"></i>${kind.one || kind.label}</span>${head}
-        <div class="popname name" data-go="${s.id}">${s.name}</div>
-        <div class="muted">${[s.district, s.state].filter(Boolean).join(', ')} · ${s.basin || 'basin n/a'}${
-          hereAt ? ` · <b>${distKm(hereAt, s).toFixed(1)} km from you</b>` : ''}</div>
-        ${detail}
-        ${t === 'stale' ? `<p class="muted">This station has stopped reporting. The reading above is
-             the last one it sent and the situation there may have changed either way.</p>` : ''}
-        ${cam ? camLink(s, cam) : ''}
-        <div class="muted">updated ${noSec(s.updated || s.shot) || 'unknown'}</div>
-      </div>`;
+     Sirens lead inside their tier. A level is a number to judge and a decision still to make. A
+     siren is a decision that somebody has already made and acted on, which is the shorter road to
+     doing something about it. Swap the two operands to put water levels back on top.
+     Five groups at most, then, and usually two: the whole panel fits a screen at any size of flood,
+     which is the point of it. Ordering inside a group is `groupCard()`'s. */
+  const groups = new Map();
+  for (const s of hot) {
+    const key = `${tier(s)}|${s.kind}`;
+    groups.has(key) ? groups.get(key).push(s) : groups.set(key, [s]);
+  }
+  write([...groups.entries()]
+    .sort(([a], [b]) => {
+      const [ta, ka] = a.split('|'), [tb, kb] = b.split('|');
+      return TIER_RANK[ta] - TIER_RANK[tb] || (kb === 'siren') - (ka === 'siren');
+    })
+    .map(([key, items]) => {
+      const [t, kind] = key.split('|');
+      return groupCard(items, kind, t, hereAt);
     }).join(''));
   // No advisory here. It lives on the ticker, which is the strip that stays visible while this list
   // is closed or covered — and repeating it in both would make it furniture.

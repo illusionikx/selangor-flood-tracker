@@ -30,6 +30,7 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `js/map.js` | map instance, basemap/theme, cluster, the station panel (`openSide`), `focusOn` / `flashTo` |
 | `js/heat.js` | both heat layers (water level, rainfall), ground-fixed sizing, shared opacity |
 | `js/popup.js` | popup + meter + gauge + sparkline templates |
+| `js/sparktip.js` | the hover/tap readout on every graph. One delegated listener, no imports |
 | `js/render.js` | rebuilds markers and heat points; drawer summary table |
 | `js/alerts.js` | "On alert": the app bar's warning glyph, the list it opens in `#side`, the icon badge |
 | `js/table.js` | the all-stations table dialog, grouped district → mast → sensor |
@@ -168,10 +169,17 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
 
 ## Colour language — do not violate
 
-- **Station type** never uses a traffic-light hue: river blue `#4da3ff`, rainfall violet `#8f7bff`,
-  siren pink `#f06292`, gauge taupe `#a1887f`, camera cyan `#26c6da`.
-- **Status only**: green `#188038` → amber `#f9ab00` → orange `#e8710a` → red `#d93025`
-  (`STATUS_COLOR`), plus grey `#9aa0a6` for offline / no reading.
+- **Station type** never uses a traffic-light hue: river blue, rainfall violet, siren pink, gauge
+  taupe, camera cyan, mast indigo. Tokens `--k-*`.
+- **Status only**: green → amber → orange → red (`--s-normal` / `--s-alert` / `--s-warning` /
+  `--s-danger`, exposed as `STATUS_COLOR`), plus grey `--s-none` for offline / no reading.
+- **The values live in `css/base.css` and nowhere else**, two sets, one per theme. Do not write a hex
+  into a JS file or copy one into a doc — every hex outside that block is a value that will go stale
+  the next time the palette moves, and it has moved four times. The one exception is a **canvas**:
+  the heat gradient cannot resolve a token, so `RAIN_HEAT` in `config.js` keeps real values.
+- `--s-trace` is a fifth rung, sitting between normal and alert, and a flood gauge is its only user.
+  It exists because JPS marks a gauge at 0.15 m and 0.3 m, so water under the first mark is a real
+  reading with no published name. See `GAUGE_COLOR` in `config.js`.
 - `hasInfo(s)` decides colour vs grey. A station with no reading must never look confident.
 
 ## Gotchas that have already bitten
@@ -368,13 +376,72 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   as live.
 - **41 sirens last reported months ago** (one in July 2025). They render `OUT OF CONTACT`, never
   `IDLE` — a silent siren and a dead siren look identical, and only one is safe.
-- **`footLine()` is the only place a timestamp is printed**, and it carries the whole story on one
-  line: `OFFLINE · last reported 06/07/2026 10:19 · 411.0h ago · via JPS Selangor`. The stale state
-  blocks (siren, rainfall, gauge) print no time at all — they each used to add a sentence naming the
-  same moment the footer named three lines below. Elapsed time is appended only when the station is
-  offline or stale, because on a live one the date is the answer and `· 4m ago` is padding. Seconds
-  are trimmed for display by `noSec()`; the underlying string stays verbatim, so `parseMY()` is
-  unaffected.
+- **Nothing outranks a popover except another popover.** The table draws its graphs inside `.tipbox`,
+  which is a `popover` and therefore in the **top layer** — above every `z-index` on the page, because
+  the top layer is not part of the stacking context at all. So `js/sparktip.js`'s readout is itself a
+  popover (`manual`, so it cannot light-dismiss the panel it sits on). Anything new that has to paint
+  over the table's panels, the ⋮ menus or the lightbox needs the same treatment; raising a z-index
+  will look like it works everywhere except over a popover, which is the one place it matters.
+- **A graph's samples ride on the element, in `data-pts`.** `readout()` in `popup.js` writes
+  `[x%, label]` per sample and words the label itself (`1.74 m · 14:15`, `sounding · 22:30`), so the
+  one listener that reads them needs no units, no clock and no sensor kind. The attribute is
+  **single-quoted** because JSON quotes with double ones. Any new graph that wants the readout emits
+  the same attribute; any that does not simply has no `[data-pts]` to match.
+- **A flood gauge's status colour comes from `gaugeColor()` in `util.js` and nowhere else.** Upstream
+  publishes 3 codes against 2 marks, so any depth under 0.15 m shared code 0 with *dry ground* — and
+  a wet spot painted the same taupe as a dry one, which is the colour this app reserves for a sensor
+  that cannot report. `gaugeTone()` gives the rung (dry → 0, any water → 1, the warning mark → 2,
+  danger → 3) and `GAUGE_COLOR` gives the colour, which is **not** `STATUS_COLOR` — rung 1 is
+  `--s-trace`, because upstream published no mark down there and amber would claim one. Four
+  surfaces read it: pin, card, table cell, table hover panel. It deliberately changes **no alert
+  surface** — `isHot()` never covered gauges, so the count, the badge and the ticker do not move. If
+  a gauge ever needs to alert, that goes through the alert design standard first.
+- **The Selangor list publishes `-1` for "no status" on stations that are reporting a number.** 144
+  of 233 rain gauges and 15 rivers, on the payload this was found. `api.php` now derives the missing
+  code from the reading, through the same `rainStatus()` / `wlStatus()` the two scraped feeds already
+  use — server-side, because there is one definition of a status and it is that file's. `band()` in
+  `table.js` clamps `-1` to 0 as the guard behind it. Never re-derive a status client-side.
+- **`atDanger()` is the map's red; `isCritical()` is the alert path's.** They are different questions
+  and must not be merged. `atDanger()` asks "is this sensor at the top of its own scale" — a river
+  over its mark, a sounding siren, a flood gauge under water, rainfall in JPS's top class — and it
+  drives the pin colour, the `.danger` halo, the cluster badge and `leads()`. A pin has to be red
+  whenever anything at that place is at its worst, and a mast led by a quiet river used to draw blue
+  over a flooded gauge beside it. `isCritical()` is narrower, and feeds `isHot()` and through it the
+  alert panel, the icon badge, the ticker and the toast. **Widening `isCritical()` widens every alert
+  surface at once** — that is an alert-design decision, and it goes through the standard first.
+  `render.js` states the red explicitly (`critical ? statusColor(3) : …`) rather than trusting
+  `leads()` to elect the worst sensor and `color()` to return red for it.
+- **Test mode makes a place tell one story.** `seedTest()` walks stations, so its first pass could
+  leave a river over its danger mark on the same mast as a dry gauge and an idle siren — four
+  unrelated faults on one pole, which reads as a bug rather than as weather. A second pass over
+  `site` brings every online member of a flooded site up to match, through one idempotent `drown()`.
+  Offline members stay offline on purpose: a sensor down on an alerting mast is a real rendering
+  path. **A camera has nothing of its own to fake** — `camAlert()` measures from the alert to the
+  lens — so `CAM_EVERY` floods every third site that holds both a camera and a river. Without it the
+  camera warning was faked by luck, on 6 of the 31 such sites. Anything new that alerts needs a knob
+  here, or it ships unseen: that is why the gauge has one, at a rung real data almost never reaches.
+- **The alert panel is a directory, not a stack of readings.** `groupCard()` in `alerts.js` draws one
+  card per kind per tier — five at most, usually two — and **every row in it is a place**, grouped on
+  `site` so a mast with two gauges over their marks is one row. One card per station carried a meter,
+  a trend line and a 12-hour graph each, which is right for one alert and wrong for forty: test mode
+  makes 64, and they now fill 3 cards. The meter and the graph are on the station card, which every
+  row opens with one tap. **Do not put a reading back in this panel** — the row's number (percent of
+  danger / hours to it / the stamp on a stale one) is the whole of what a scan needs.
+- **`title` is not a tooltip on a phone.** It never opens on touch, waits about a second on a mouse
+  and takes no styling — so anything whose meaning lives in a `title` means nothing on half the
+  devices this runs on. That is why the camera warning prints its words on the picture (`Water level
+  3.42 m`), why the table uses a `popover` panel instead, and why a new affordance that needs
+  explaining needs it *on screen*. A `title` is acceptable only as a duplicate of something already
+  visible — the jump hint on an alert row, the count on a chip.
+- **`sourceInfo()` is the only place a timestamp is printed, and it lives inside the ⓘ menu.** Three
+  facts, all about the plumbing: are we hearing from this station, what was the stamp on the last
+  thing it sent, which of the three feeds won. None of them changes what the water is doing, and as a
+  footer line they repeated per sensor down a six-sensor mast. They are what you check when you doubt
+  the number, so they sit where you go to look. The stale state blocks (siren, rainfall, gauge) print
+  no time at all. Elapsed time is appended only when the station is offline or stale, because on a
+  live one the date is the answer and `· 4m ago` is padding. Seconds are trimmed for display by
+  `noSec()`; the underlying string stays verbatim, so `parseMY()` is unaffected. **The ⋮ is an ⓘ** —
+  the glyph promised actions and held exactly one.
 - **A marquee needs three things measured, not guessed.** `js/ticker.js` renders the item set twice
   and translates `-50%`, which is only seamless if one copy is at least as wide as the box — so it
   repeats the set to cover the box *before* doubling. Width alone isn't enough: a single wide item

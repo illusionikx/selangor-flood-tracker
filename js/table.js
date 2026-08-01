@@ -7,7 +7,7 @@
 
 import { KINDS, KIND_RANK, NO_INFO, camSrc } from './config.js';
 import { state } from './state.js';
-import { el, dkey, distKm, hasInfo, color, statusColor, scalePos, leads } from './util.js';
+import { el, dkey, distKm, hasInfo, color, statusColor, scalePos, leads, gaugeTone, gaugeColor } from './util.js';
 import { nearestOf, nearestCam } from './stations.js';
 import { sparkline, rainBars, sirenBand, rateHtml, etaText, gaugeState } from './popup.js';
 import { flashTo } from './map.js';
@@ -48,25 +48,40 @@ el('dataHead').onclick = e => {
   dataTable();
 };
 
-/* How much a sensor "is" for sorting. One number per kind, so a column of gauges and a column of
-   sirens both sort by the thing that matters in them. A mast without that kind sinks to the bottom
-   whichever way the arrow points — an absent sensor is not a low reading. */
-const sortKey = m => !m || !hasInfo(m) ? -Infinity : ({
-  river:    m.danger ? m.level / m.danger : m.level,
-  rainfall: m.hourly,
-  siren:    m.online ? m.status + 1 : 0,
-  gauge:    m.depth,
-  camera:   m.image ? 1 : 0,
-}[m.kind] ?? -Infinity);
+/* How much a sensor "is" for sorting: `[severity, size]`, in that order, for every kind.
+   Severity first because that is the question a sorted column is asked — "show me the worst" — and
+   the size alone answered it wrongly on any column whose stations do not share one scale. Two rivers
+   at 90% of their own danger marks are equally close to trouble whether one reads 2 m and the other
+   20 m, and a river with no published mark at all was ranked on bare metres against neighbours
+   ranked on a fraction. So the published status decides the band, and the reading orders the band.
+   A mast without that kind sinks to the bottom whichever way the arrow points — an absent sensor is
+   not a low reading. */
+/* -1 is upstream's "no status", and the Selangor list publishes it on stations that are online and
+   reporting a real number — 144 rain gauges and 15 rivers before `api.php` started deriving the
+   missing code from the reading itself. That derivation is the fix, and it is server-side because
+   this app has exactly one definition of a status. This clamp is the guard behind it: -1 is an
+   unknown band and not a band below normal, and the cells already draw it as normal
+   (`RAIN[Math.max(0, m.status)]`, and a siren at -1 renders IDLE). Without it a river reading 3 m
+   would sort under one reading 0.1 m the day a feed goes quiet in a new way. */
+const band = m => Math.max(0, m.status ?? 0);
+
+const sortKey = m => !m || !hasInfo(m) ? null : ({
+  // A station with no danger mark cannot be placed inside its band, so it sorts to the foot of it.
+  river:    [band(m), m.danger ? m.level / m.danger : 0],
+  rainfall: [band(m), m.hourly],
+  siren:    [band(m), 0],           // hasInfo() has already dropped the ones that are out of contact
+  gauge:    [gaugeTone(m), m.depth],
+  camera:   [m.image ? 1 : 0, 0],
+}[m.kind] ?? null);
 
 const byCol = (a, b) => {
   if (sortCol === 'nm') return sortDir * a.lead.name.localeCompare(b.lead.name);
   const ka = sortKey(merge(a.members.filter(m => m.kind === sortCol)));
   const kb = sortKey(merge(b.members.filter(m => m.kind === sortCol)));
-  if (ka === kb) return a.lead.name.localeCompare(b.lead.name);
-  if (ka === -Infinity) return 1;            // missing sinks either way
-  if (kb === -Infinity) return -1;
-  return sortDir * (ka - kb);
+  if (!ka) return kb ? 1 : a.lead.name.localeCompare(b.lead.name);   // missing sinks either way
+  if (!kb) return -1;
+  const d = (ka[0] - kb[0]) || (ka[1] - kb[1]);
+  return d ? sortDir * d : a.lead.name.localeCompare(b.lead.name);
 };
 
 /* Widening a site to 200 m means it can now hold two of the same kind — two rainfall gauges either
@@ -246,8 +261,7 @@ const tipVal = m => {
     return pill(label, statusColor(tone)) + val(`${m.hourly} mm/h`);
   }
   const [, , label] = gaugeState(m);
-  return pill(label, m.depth <= 0 ? statusColor(0) : statusColor(m.status))
-    + val(`${Math.abs(m.depth)} m`);
+  return pill(label, gaugeColor(m)) + val(`${Math.abs(m.depth)} m`);
 };
 
 /* Returns [hook, panel]: an attribute to hang on whatever the cell already draws, and the panel
@@ -354,7 +368,7 @@ function cell(own, lead, scope = '') {
   // Word comes from the popup's own gaugeState(), so a pin and its row can never say different
   // things about the same status.
   const [, , label] = gaugeState(m);
-  return wrap(`${pill(label, m.depth <= 0 ? statusColor(0) : statusColor(m.status), hook)}<div class="val">${
+  return wrap(`${pill(label, gaugeColor(m), hook)}<div class="val">${
     m.depth > 0 ? `${m.depth} m<span class="muted"> deep</span>`
                 : `<span class="muted">${Math.abs(m.depth)} m below</span>`}</div>`);
 }

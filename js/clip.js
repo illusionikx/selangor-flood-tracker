@@ -103,7 +103,9 @@ export async function start(root, cam) {
     return;
   }
 
-  capText = `LAST ${CLIP_HOURS} HOURS · ${shots.length} frames`;
+  // The window, and nothing else. The frame count was ours, not the reader's: six frames or four is
+  // a fact about when this server happened to be running, and it answers no question anyone has.
+  capText = `Last ${CLIP_HOURS} hours`;
   if (cap) cap.textContent = capText;
   // Warm the whole lap before it starts. Six frames off local disk, served immutable for a year, so
   // every lap after the first is free — and without this the first lap flickers on every swap.
@@ -134,14 +136,14 @@ const MYT_STAMP = new Intl.DateTimeFormat('en-GB', {
 const nowMY = () => parseMY(MYT_STAMP.format(new Date()).replace(', ', ' '));
 
 /* What the caption says when there is no clip: when this picture was taken, and whether that is
-   still current. NOT CURRENT is the word the cards already print on a reading over a day old. */
+   still current. "Not current" is the words the cards already print on a reading over a day old. */
 function idle(cam) {
   const d = parseMY(cam.shot);
   const now = nowMY();
-  if (!d || !now) return 'LATEST IMAGE';
+  if (!d || !now) return 'Latest image';
   const gap = now - d;
   const old = gap > CLIP_WIN * 1000;
   // ago() measures against the real clock, so hand it the true instant: the same gap, back from now.
-  return `${old ? 'NOT CURRENT' : 'LATEST IMAGE'} · ${noSec(cam.shot)}${
+  return `${old ? 'Not current' : 'Latest image'} · ${noSec(cam.shot)}${
     old ? ` · ${ago(Date.now() - gap)}` : ''}`;
 }

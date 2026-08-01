@@ -597,7 +597,8 @@ deepest river in Klang would sit above a deeper one in Petaling and the order wo
 district moves into the location cell instead: you still need to know where a row is, it just stops
 being what the table is organised by. Names default to A–Z, readings to worst-first. A mast that
 lacks the sorted sensor sinks to the bottom whichever way the arrow points — an absent sensor is not
-a low reading.
+a low reading. Every reading column sorts on **severity first, then size** — see "Worst first means
+the status first" below.
 
 *Water level carries a mini gauge*, the popup's meter shrunk to a column: same piecewise scale (alert
 38%, warning 68%, danger 100%), tick marks at the thresholds, no labels. A linear bar would draw
@@ -2069,8 +2070,9 @@ station use — `DRY GROUND` / `WATER ON GROUND` / `WATER RISING` / `FLOODED`, w
 the block over when the reading is stale. The gauge was the last kind whose state you had to infer
 from a number and a bar: "0.22 m of water" is a fact you interpret, and the bands are the server's
 own thresholds (0.15 m warning, 0.3 m danger) so the words, the pin colour and the status code
-cannot disagree. Water present but below the warning mark gets **no tone at all** — it is neither
-the green of dry ground nor a warning, and a couple of centimetres does not earn either.
+cannot disagree. Water present but below the warning mark first shipped with **no tone at all**, on
+the grounds that a couple of centimetres is neither the green of dry ground nor a warning. That was
+reversed — see "A gauge with water on it wears a status colour" below.
 
 **A siren now carries its last 12 hours as a band**, not a graph. Its samples are 0 or 1, so there
 is no shape to plot — a polyline would draw ramps up and down that never happened, and a "0–1" axis
@@ -3256,3 +3258,301 @@ That is the first end-to-end proof of the join on real archived data.
   one strip.
 - **A second-worst fallback when the worst station is ignored.** A `ponytail:` comment in `api.php`
   marks the spot. Build it if two hot rivers near one camera turn out to be common.
+
+## Five changes from a day of use
+
+Four defects and one addition. All of them came from a reader using the app after the camera work
+landed.
+
+### The camera picture fills the panel on a phone
+
+The phone rules capped `.shotwrap` and `.shot` at 210px and centered them. That cap dates from the
+map popup, which floated over the map and had to leave the map visible.
+
+The panel is the whole screen on a phone. So the cap left a small picture in a full-width column, with empty space on both
+sides. The picture is the one block on a camera card that a reader cannot use at half size. It fills
+the width now, like every other block in the card.
+
+### A gauge with water on it wears a status color
+
+Upstream publishes three codes against two marks: 0.15 m warning and 0.3 m danger. Any depth under
+0.15 m therefore shared code 0 with dry ground. The pin kept the quiet taupe and the state block
+kept no tone at all. The first version defended that. Two centimeters is neither the green of dry
+ground nor a warning.
+
+But grey and taupe are what this app paints on a sensor that cannot report. A
+flood gauge answers one question. Is this flood-prone spot wet? Water standing on it is never the
+normal state.
+
+`gaugeTone()` in `js/util.js` now gives that answer once, for all four surfaces: the pin, the card,
+the table cell and the table hover panel. It maps dry ground to 0, water on the ground to 1, the
+published warning mark to 2, and the danger mark to 3.
+
+`GAUGE_COLOR` in `js/config.js` turns the rung into a color, and it is not `STATUS_COLOR`. Rung 1
+takes `--s-trace`, a yellow-green between the dry green and the alert amber. Amber names a mark, and
+upstream published none down there. A flood gauge is the one kind that uses the whole ramp, so
+`.state.trace` and `.state.warn` join `off`, `mid` and `on` in `css/base.css`.
+
+Two gauges sat in that band on the day of the change. TAMAN MERU UTAMA read 0.06 m and KG. ORANG
+ASLI KELINSING read 0.13 m.
+
+*Not changed:* the heat weight and the alert list. `isHot()` never covered gauges, so the alert
+count, the icon badge and the ticker do not move. This change gives a color to a reading. It does
+not add an alarm.
+
+### Every sounding siren shares one card
+
+A water level is a number that a reader weighs. Its row hands over the marks, the last three hours
+and a camera link, because all three help that judgment. A siren is not a measurement.
+
+Somebody has already made the decision and set it off, so the reader has nothing left to weigh. And
+there are 212 sirens. Test mode trips about 22 of them. One card each turned a flood into a scroll
+of one repeated word, with every river reading buried under it.
+
+`sirenCard()` in `js/alerts.js` collapses them to a title and a list of places. Each row carries the
+name, the district and the distance, and a glyph that says whether the siren stands alone or on a
+mast. A mast has a river level next to the siren, and that is the reading a reader wants next.
+
+No timestamp and no online state on a row. A siren we cannot hear from is not in this list. It is
+`stale`, and it keeps a card of its own, where the timestamp is the point and the trouble is the
+sensor rather than the water.
+
+The sort already clustered sirens inside their tier, so the first one draws the card and the rest
+draw nothing. Sirens now lead their tier rather than trail it, which puts the card at the head of
+the panel. A level is a number to judge and a decision still to make. A siren is a decision somebody
+already made and acted on, which is the shorter road to acting yourself.
+
+### Worst first means the status first
+
+Each reading column sorted on one number per kind. A water level sorted on how far it stood toward its own
+danger mark. That works only while every station in the column carries the same kind of number. A
+river with no published mark fell back to bare meters and ranked against neighbors ranked on a
+fraction.
+
+And a river at 96% of its danger mark, which upstream had already put on alert, sat below
+a river at 97% that upstream called normal.
+
+`sortKey()` returns `[severity, size]` now, for every kind. The published status picks the band and
+the reading orders the band. A station with no danger mark sorts to the foot of its own band,
+because nothing places it inside one.
+
+Sorting on the status exposed a hole in the status. The Selangor list endpoints publish `-1`, which
+means "no status", on stations that report a real number: 144 of 233 rain gauges and 15 rivers.
+
+`-1` is an unknown band, not a band below normal. So a gauge reporting 4 mm/h sorted under one
+reporting 0.5 mm/h, and the cells had drawn the first of those as "dry" all along.
+
+`api.php` now derives the missing code from the reading, through the same `rainStatus()` and
+`wlStatus()` that the two scraped feeds already pass through. The fix belongs there and not in the
+client: this app keeps one definition of a status, and `api.php` owns it.
+
+After the change no online station carries `-1`, and five more rain gauges report a real class.
+`band()` in `js/table.js` still clamps `-1` to 0. That is the guard behind the fix, for the day a
+feed goes quiet in a new way.
+
+### Every graph answers a pointer
+
+The three graphs are 100-unit SVGs, stretched to whatever width they land in. Not one number appears
+on them. The axis names the hours, the caption names the range, and everything between is shape.
+"About two thirds of the way up, somewhere around noon" was as close as the eye could get to a
+reading that the data holds exactly.
+
+Point at any graph now and a small box names the sample under the pointer: `1.74 m · 14:15`,
+`3 mm/h · 09:00`, `sounding · 22:30`. A tap does the same on a phone, and a drag scrubs along the
+line.
+
+`js/sparktip.js` is one delegated listener for every graph in the app, because all three graphs are
+the same markup wherever they land: the station card, the alert list and the table hover panels.
+Each graph ships its own samples in `data-pts`, as `[x%, label]` per sample. The function that draws
+the graph words those labels, so the listener needs no unit, no clock and no notion of a sensor
+kind.
+
+Two details that cost more than they look:
+
+- **The readout is a popover.** The table draws its graphs inside `.tipbox`, which is a popover
+  itself and therefore sits in the top layer. No `z-index` reaches above that. Only another
+  top-layer element paints over one. The readout uses `popover="manual"`, so opening it cannot
+  light-dismiss the panel under it.
+- **It names the nearest sample, not the sample under the pointer.** Readings sit a quarter of an
+  hour apart and the space between two of them holds nothing. A readout that blanked in the gaps
+  would flicker across the whole width of the graph.
+
+*Not built:* a marker line down the graph at the sample. The box already sits on the x of the sample it names. A line would
+say the same thing, and it would be a second element to keep in step.
+
+## The card is the reading again
+
+Three changes to what a station card says, and one to the palette it says it in.
+
+### The light palette moved up ten steps of lightness
+
+Three separate reports said the same thing: the marks on the light theme are too dark to pick out.
+The third pass had held every value at 3:1 on `#efefef`, the darkest paper the light basemap puts
+behind a mark, which is what WCAG 1.4.11 asks of a non-text mark.
+
+It read as a set of near-inks on a pale map.
+
+Every light value now moves **+10 L\* in CIELAB**, at its own hue, with chroma raised 8% and then
+fitted to the sRGB gamut. Fitted, not clipped: clipping a channel shifts the hue, and hue is what
+separates one rung of this palette from the next.
+
+What it costs, stated plainly. The four status colors now sit near **2.2:1 on that paper**, under
+the 3:1 floor. The kind colors land between 2.6 and 3.8. The pins keep their drop shadow, and that
+shadow now carries more of the work than the color does. If a mark ever gets hard to find, deepen
+the shadow before darkening these again.
+
+`--s-danger` is the one value left alone. Red runs out of sRGB before the others. At L\* 67 it fits
+a chroma of only 60 and comes out salmon, which nobody reads as danger. It is also the one rung
+where the light and the dark theme agree, and that is worth keeping.
+
+### The provenance moved into the sensor menu
+
+Every card printed a footer: are we online, what was the stamp on the last reading, which feed won.
+Three facts about the plumbing, in the same column as the reading, repeated once per sensor down a
+mast that can hold six.
+
+None of them changes what the water does. They are what a reader checks after doubting the
+number. So they now sit where a reader goes to look: `sourceInfo()` builds them as the first item of
+the sensor menu, above the ignore action, and the card is the reading again.
+
+The menu button changed with it. It was a `⋮`, which promises a list of actions and held exactly
+one. It is an `ⓘ` now, which is what the panel mostly holds. The item itself is not a button and
+takes no hover fill, or it would promise a second action that is not there.
+
+### The clip caption dropped the frame count
+
+`LAST 3 HOURS · 6 frames` became `Last 3 hours`, left aligned.
+
+The frame count was a fact about this server. Six frames or four depends on when this server ran,
+and it answers no question a reader has. **The rule generalizes to the whole app.** Do not
+tell a reader a number that only describes how the app works.
+
+Sentence case for the same reason the count went. All caps is a raised voice, and a caption under a
+picture is not raising it.
+
+## Danger outranks everything, and a fake flood is one event
+
+### The map paints red for anything at the top of its own scale
+
+`isCritical()` covers a river over its danger mark and a sounding siren. It drives `isHot()`, and
+through that the alert panel, the icon badge, the ticker and the toast.
+
+It also drove the pin. That left two kinds out. A flood gauge under 30 cm of standing water is at
+the top of its scale, and so is a rain gauge in the top JPS class. Neither one is `isCritical`.
+
+The cost showed on a mast. `leads()` elects the sensor that speaks for a place, and it elected on
+`isCritical()`, so a quiet river outranked the flooded gauge on the same pole. The pin came out
+river blue over a gauge under water.
+
+`atDanger()` in `js/util.js` asks the question the map needs: is this sensor at the worst its own scale
+can report? A river over its mark, a sounding siren, a gauge past 0.3 m, rainfall in the top class.
+It drives the pin color, the halo, the cluster badge and `leads()`.
+
+`render.js` states the red outright, `critical ? statusColor(3) : ...`, rather than trusting
+`leads()` to elect the worst sensor and `color()` to happen to return red for it.
+
+**The two questions stay apart.** Widening `isCritical()` would have been one word and it would have
+widened every alert surface at once. A color on a map says "look here". An entry in the alert panel
+says "act". Those are different claims, and the second one goes through the alert design standard.
+
+### Test mode: a place tells one story
+
+`seedTest()` walks stations one at a time. So it could leave a river 4% over its danger mark on the
+same mast as a rain gauge reporting nothing, a dry flood gauge and an idle siren.
+
+That is not a flood. It is four unrelated faults on one pole, and the mast card read as a bug.
+
+A second pass now walks sites. Any site holding a river at danger has the rest of its online sensors
+brought up to match, through one idempotent `drown()`: the rain that caused it, the gauge under
+water, the siren sounding. Thirty sites, and none of them keeps a quiet sibling.
+
+Offline members stay offline. A real flood knocks sensors off the network, and "one sensor on an
+alerting mast has stopped reporting" is a rendering path worth looking at.
+
+### The camera warning needed a knob of its own
+
+A camera has nothing to fake. `camAlert()` measures from the alert to the lens, so the only way to
+raise the warning triangle is to put an alert next to a camera.
+
+That was left to which stations happened to land on a multiple of four. It reached 6 of the 31 sites
+that hold both a camera and a river. `CAM_EVERY` now floods every third such site on purpose.
+
+Measured over the payload behind this note: 36 of 81 online cameras carry a triangle, 29 of them
+red, and 16 have the alert on their own mast.
+
+### The gauge needed one too, at a rung real data never reaches
+
+Test mode never produced a flooded gauge, so neither the danger rung nor the new `--s-trace` rung
+had a way to show. `GAUGE_EVERY` puts every fourth gauge under water. `WET_EVERY` alternates the two
+rungs between: 0.08 m for water on the ground and 0.2 m for past the warning mark.
+
+The result covers the whole ramp: 8 dry, 7 on the trace rung, and 5 flooded.
+
+**The rule this leaves behind.** Anything new that alerts needs a knob in `js/test.js`, or it ships
+unseen. Two of the three gaps above existed because a feature landed and nothing faked it.
+
+## The alert panel became a directory
+
+### Every row is a place
+
+The panel was one card per station. Each card carried a badge, a tier tag, a place, a meter, a trend
+line and a 12-hour graph. That is the right shape for one alert and the wrong shape for forty.
+
+Test mode makes 64 of them. The panel turned into two screens of identical furniture, and the one
+question it exists to answer got lost in it: where is this happening?
+
+`groupCard()` in `js/alerts.js` now draws one card per kind per tier, and every row inside it is a
+place. Sirens went first, one release earlier. Water levels follow, at danger and forecast alike.
+The same 64 alerts now fill 3 cards.
+
+A row carries the place, its district, the distance from the reader, and the number. The number
+changes with the tier: a percentage of the danger mark when the river is over it, the hours to that
+mark under a forecast, the stamp on the last reading when the station has gone
+quiet. The right column sets `tabular-nums`, so a reader can scan a list of them down the page.
+
+Rows group on `site`, so a mast with two river gauges over their marks is one row and not two. The
+worst sensor there speaks for the row, and the row says how many are behind it.
+
+The glyph is the `layers` mast mark where more than one sensor stands at that place. It is the kind's own
+glyph where one sensor does. Either one takes the tier color, the same color as the left rule.
+
+**What the panel gave up.** The meter, the trend line and the sparkline are no longer in it. They
+live on the station card, which every row opens with one tap, and that card has the width for them.
+A stale group keeps its warning sentence, once, instead of once per station.
+
+### The pins lost a fifth
+
+At 400 marks the light basemap was more glyph than map. Every single-sensor pin is now
+`transform: scale(.8)`.
+
+A transform, not a smaller font: it takes the danger halo, the rise ring and the drop shadow down
+with it in one step, and it leaves the 39px layout box alone. `render.js` repeats that box as `iconSize`, and that is
+what positions the marker over its station.
+
+The mast pin keeps its size. It stands for a stack rather than one reading, it carries a count that
+has to stay legible, and it is the pin with the most to say.
+
+### The camera warning says what is wrong
+
+It was a triangle on a dark disc, with the words in a `title` attribute.
+
+A `title` is a tooltip that never opens on a phone, waits a second on a mouse, and takes no style. So the marker meant "something", and the something was unreachable on half the devices this
+runs on.
+
+The words are on the picture now: `Water level 3.42 m`, or `Siren sounding`. Not the place name, and
+not the distance. The card around the picture is already headed with the place, and nothing within
+2 km of a lens is far enough away to change what the picture means.
+
+The disc went with the tooltip. Legibility is a shadow instead: the glyph carries the same
+`drop-shadow` the map pins use against busy tiles, and the words carry a `text-shadow` hard enough to
+hold over bright sky or wet concrete. The marker is `pointer-events: none`, which also gives back
+the 28px of dead corner the disc used to take out of a picture that opens the lightbox.
+
+### The sensor menu states the connection as a badge
+
+`Online` and `Offline` were a word beside a check mark. They are a badge now, green or gray, with a
+wifi glyph. It is the one item in that panel that reports a state rather than a fact.
+A badge is how this app says that everywhere else.
+
+`--i-wifi` joins `--i-wifi_off` in `css/icons.css`. One rule and one class, which is the whole cost
+of an icon here.
