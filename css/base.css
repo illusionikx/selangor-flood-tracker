@@ -43,12 +43,26 @@
 
    The hues are unchanged: type colours stay off the traffic light (river blue, rainfall violet,
    siren pink, gauge taupe, camera cyan, mast indigo), status keeps green → amber → orange → red. */
+/* Fourth pass, and the last one driven by a contrast floor. Every value here moved **+10 L\* in
+   CIELAB**, at its own hue, with chroma raised 8% and then fitted to the sRGB gamut rather than
+   clipped per channel — clipping a channel shifts the hue, which is the one thing a palette keyed on
+   hue cannot afford. The third pass held the set at 3:1 on #efefef, the darkest paper the light
+   basemap puts behind a mark, and read *dark*: a set of near-inks on a pale map, three times
+   reported as too dim to pick out at a glance.
+   What that costs, stated plainly: the four status colours now sit near **2.2:1 on that paper**,
+   under the 3:1 WCAG 1.4.11 asks of a non-text mark. The kind colours land 2.6–3.8. The pins keep
+   their drop shadow, which is what lifts a glyph off a busy tile, and it is now doing more of the
+   work than the colour is. If a mark ever becomes hard to find, deepen that shadow before darkening
+   these again — the dark values are what got reported, three separate times.
+   `--s-danger` is the one value left alone. Red runs out of sRGB before the others: at L 67 it fits
+   only C 60 and comes out salmon, which is not a colour anyone reads as danger. It also happens to
+   be the one rung where the light and dark themes agree, and that is worth keeping. */
 :root {
-  --k-river: #0f6fdc; --k-rainfall: #6a4ae6; --k-siren: #dc1a66;
-  --k-gauge: #835747; --k-camera: #008894; --k-mast: #4356c6;
+  --k-river: #3a88ff; --k-rainfall: #8964ff; --k-siren: #ff3c7e;
+  --k-gauge: #a06f5d; --k-camera: #23a3b1; --k-mast: #5d6deb;
   /* Rainfall's own ramp: dry, then the two mid classes wear the kind colour, then heavy. Very heavy
      is --s-danger, like every other "this is now an emergency". */
-  --k-rain-dry: #5158a8; --k-rain-heavy: #a44ce6;
+  --k-rain-dry: #6a70ca; --k-rain-heavy: #c069ff;
   /* Third pass: all four spent down to the 3:1 floor exactly, measured on #efefef — the darkest paper
      the light basemap puts behind a mark. Red gained the most (L 0.583 → 0.655) because red has the
      most room; amber gained the least (0.617 → 0.637) because amber runs out of contrast against
@@ -57,8 +71,15 @@
      lightness, so hue is all that separates them, and orange-at-40° against red left the tightest
      pair on the ramp tighter still. Five degrees puts warning the same distance from each neighbour.
      ISA-18.2 asks that priority be distinguishable at a glance — that is what this pays for. */
-  --s-normal: #009e42; --s-alert: #c47600; --s-warning: #e55f00; --s-danger: #ff3b33;
+  --s-normal: #22bb55; --s-alert: #e68e16; --s-warning: #ff7e33; --s-danger: #ff3b33;
   --s-none: #6d7176;
+  /* The rung between "nothing" and the first published mark, and the only place it is used is a
+     flood gauge with water standing on it. A gauge is the one sensor whose thresholds start above
+     the thing worth knowing: JPS marks 0.15 m and 0.3 m, so two centimetres of water over a spot
+     known to flood shared a code with dry ground. Amber overstates it and green denies it.
+     Hue sits halfway between the green and the amber, at the same L\* as the rest of the ramp, so it
+     reads as one step along the same scale rather than a new colour with a meaning of its own. */
+  --s-trace: #a0aa24;
   /* You. Hazard yellow — the one thing on the map that is not a reading, so it is allowed the one
      colour a reading never wears alone. It is deliberately near the alert amber without being it:
      the shape is a house in a pin, which no station glyph resembles, so the hue is not what has to
@@ -84,6 +105,7 @@
      theme's red, which is not a coincidence: red is the one rung where "reads on white" and "reads
      on near-black" overlap, so the two themes agree on the colour that matters most. */
   --s-normal: #26e275; --s-alert: #ffc000; --s-warning: #fe8400; --s-danger: #ff3a37;
+  --s-trace: #add72f;   /* same halfway hue, on this theme's own lightness */
   /* Not saturated with the others: "no reading" is the absence of a colour, and a tinted grey is a
      hue, which is a claim. */
   --s-none: #9aa0a6;
@@ -371,6 +393,11 @@ dialog:focus, dialog:focus-visible { outline: none; }
 .state.off { color: color-mix(in srgb, var(--s-normal) 70%, var(--on-surface)); background: color-mix(in srgb, var(--s-normal) 12%, transparent); }
 .state.on  { color: color-mix(in srgb, var(--s-danger) 70%, var(--on-surface)); background: color-mix(in srgb, var(--s-danger) 14%, transparent); }
 .state.mid { color: color-mix(in srgb, var(--s-alert)  70%, var(--on-surface)); background: color-mix(in srgb, var(--s-alert) 18%, transparent); }
+/* The two extra rungs a flood gauge needs. It is the one sensor that uses the whole ramp — dry,
+   water on the ground, past its warning mark, flooded — so it is the one that needed both the
+   yellow-green under the amber and the orange between amber and red. */
+.state.trace { color: color-mix(in srgb, var(--s-trace) 70%, var(--on-surface)); background: color-mix(in srgb, var(--s-trace) 20%, transparent); }
+.state.warn  { color: color-mix(in srgb, var(--s-warning) 70%, var(--on-surface)); background: color-mix(in srgb, var(--s-warning) 16%, transparent); }
 
 /* --- sparkline ------------------------------------------------------------------------------ */
 
@@ -389,6 +416,16 @@ dialog:focus, dialog:focus-visible { outline: none; }
 }
 .spark .axis span:first-child { transform: none; }
 .spark .axis span:last-child { transform: translateX(-100%); }
+
+/* The hover readout — see js/sparktip.js for why it is a popover and not a plain fixed box. Being
+   one means undoing the browser's own defaults for a dialog it expects to centre on the screen. */
+.sparktip {
+  position: fixed; inset: auto; margin: 0; border: 0; padding: 3px 8px; border-radius: 6px;
+  font: 500 11px/1.5 Roboto, sans-serif; white-space: nowrap; pointer-events: none;
+  color: var(--surface); background: var(--on-surface); box-shadow: var(--shadow);
+  transform: translate(-50%, -100%);
+}
+.sparktip.below { transform: translate(-50%, 0); }
 
 .meter { margin: 4px 0 10px; }
 .meter .mtop { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }

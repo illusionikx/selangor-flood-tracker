@@ -1,28 +1,30 @@
 // Every popup shares one template: badge + name + region header, then a kind-specific body, then a
 // status footer. The same meter/state blocks are reused by the alert panel.
 
-import { KINDS, SOURCES, SPARK_H, camSrc } from './config.js';
+import { KINDS, SOURCES, SPARK_H, NO_INFO, camSrc } from './config.js';
 import { num, ago, noSec, parseMY, distKm, hasInfo, isStale, statusColor, scalePos,
-         levelStops, gaugeStops } from './util.js';
+         levelStops, gaugeStops, gaugeColor } from './util.js';
 import { nearestOf, nearestCam, camAlert } from './stations.js';
 
 /* The warning that rides a camera picture. Empty string when nothing near it is on alert, so it
    costs nothing to interpolate unconditionally.
    The disc is not decoration. A bare glyph lands on whatever the camera happens to be pointing at,
    and half this footage is bright sky or wet concrete. The pins carry a disc for the same reason. */
+/* What is wrong, and its number. Not where — the place name is the one thing a camera picture does
+   not need told, because the card around it is already headed with it and the lightbox is showing
+   you the place. The distance is gone for the same reason: nothing within 2 km of this lens is far
+   enough away for the figure to change what the picture means.
+   A wrapper around the glyph, the same shape `.pin` uses: the mask is a background on the `<i>`, so
+   anything painting a background on the same element wins and the mask cuts that instead of the
+   colour. Keep them as two elements. */
 export const camWarn = cam => {
   const a = camAlert(cam);
   if (!a) return '';
-  const what = a.tier === 'now'
-    ? `${a.station.name} at danger`
-    : `${a.station.name} forecast to reach danger${a.station.eta ? ` in ${a.station.eta} h` : ''}`;
-  /* A wrapper around the glyph, the same shape `.pin` uses: the disc is a background on the span,
-     and the mask is a background on the `<i>` inside it. Both on one element does not work — `.i`
-     paints `background: currentColor` and `.camwarn` paints the black disc, at equal specificity,
-     so map.css wins and the mask cuts the disc instead of the color. The triangle then rendered
-     black on every warned picture, which is the one thing this marker must not do. */
-  return `<span class="camwarn t-${a.tier}" title="${what} · ${a.km.toFixed(1)} km away"
-    ><i class="i i-warning"></i></span>`;
+  const s = a.station;
+  const what = s.kind === 'siren' ? 'Siren sounding'
+    : s.level != null ? `${KINDS[s.kind].label} ${s.level} m`
+    : KINDS[s.kind].label;
+  return `<span class="camwarn t-${a.tier}"><i class="i i-warning"></i><b>${what}</b></span>`;
 };
 
 /* Spinner lives on the wrapper; the img clears it on load, or swaps itself out on failure.
@@ -36,16 +38,21 @@ export const camImg = (c, alt) => `<div class="shotwrap" data-clip="${c.id.split
                   {className:'muted',textContent:'image unavailable'}))">${camWarn(c)}
   <p class="clipcap"></p></div>`;
 
-/* The ⋮ on every sensor. A menu rather than a bare "ignore" button: one unlabelled glyph that takes
-   a station off the map on a single tap is the wrong affordance for something you scan with a thumb,
-   and this is where the next per-sensor action will go.
-   `popover` + `popovertarget` gives toggle, light dismiss and Esc for nothing; the panel lands in the
-   top layer, so the station panel's own scrolling box can't clip it. Placement is ui.js's — CSS
+/* The ⓘ on every sensor: where this reading came from, when, and the one action there is.
+   It was a ⋮ holding a single "ignore" item, with the provenance printed as a footer line under
+   every card. Two problems with that. The glyph promised actions and held one, and the footer was
+   three facts about *us* — our connection to the station, the stamp on the last packet, which feed
+   won — sitting in the reading's own column, on every sensor of a six-sensor mast. None of it
+   changes what the water is doing. It is what you check when you doubt the number, so it now lives
+   where you go to look, one tap away, and the card is the reading again.
+   `popover` + `popovertarget` gives toggle, light dismiss and Esc for nothing; the panel lands in
+   the top layer, so the station panel's own scrolling box can't clip it. Placement is ui.js's — CSS
    anchor positioning is still Chromium-only. Ids are safe because the panel holds one card at a
    time, so only one copy of a given sensor's menu is ever in the document. */
 export const dots = s => `<button class="icon dots" popovertarget="mnu-${s.id}"
-    title="More" aria-label="More actions for ${s.name}"><i class="i i-more_vert"></i></button>
+    title="Details" aria-label="Details and actions for ${s.name}"><i class="i i-info"></i></button>
   <div id="mnu-${s.id}" class="menu surface" popover>
+    ${sourceInfo(s)}
     <button class="mi" data-ignore="${s.id}"><i class="i i-visibility_off"></i>
       <span>Ignore this sensor<br><small class="muted">hides it and stops it alerting you</small></span>
     </button>
@@ -139,15 +146,17 @@ export function meter(s) {
    carries a status like they do, and until now it was the one kind whose state you had to infer from
    a number and a bar — "0.22 m of water" is a fact you interpret, "WARNING" is the reading.
    Bands are the server's own thresholds (0.15 m / 0.3 m), so block and pin colour cannot disagree.
-   Water below the warning mark gets no tone at all: it is neither the green of dry ground nor a
-   warning, and painting it either way would overstate what a couple of centimetres means. */
+   Water below the warning mark used to get no tone at all, on the grounds that a couple of
+   centimetres is neither dry ground nor a warning. It read as "no reading", which is worse: a gauge
+   exists to say whether a flood-prone spot is wet, and grey is the colour this app uses for a sensor
+   that cannot say. Every rung comes from `gaugeTone()` now — see util.js. */
 /* Third element is the table's short form: a pill in a scannable column cannot carry "water on
    ground", but it must not disagree with the popup either, so both come out of here. */
 export const gaugeState = s => s.depth <= 0
   ? ['off', 'DRY GROUND', 'dry']
   : s.status >= 2 ? ['on', 'FLOODED', 'flooded']
-  : s.status >= 1 ? ['mid', 'WATER RISING', 'rising']
-  : ['', 'WATER ON GROUND', 'water'];
+  : s.status >= 1 ? ['warn', 'WATER RISING', 'rising']
+  : ['trace', 'WATER ON GROUND', 'water'];
 
 // A flood gauge measures water depth OVER a flood-prone spot: negative means the ground is dry.
 // Several offline gauges are frozen on old flood readings, so staleness is stated, never implied.
@@ -157,7 +166,7 @@ function gaugeBlock(s) {
   const stale = isStale(s);   // same rule the alert tiers use — see util.js
   const [tone, word] = gaugeState(s);   // shared with the table, so the two views cannot disagree
   const pct = scalePos(s.depth, gaugeStops(s));   // shared with the heat weight — see util.js
-  const col = statusColor(s.status >= 2 ? 3 : s.status);   // gauges only go normal / warning / danger
+  const col = gaugeColor(s);   // same rung the pin and the table cell take
 
   return `<div class="state ${stale ? '' : tone}">${stale ? 'OFFLINE' : word}</div>
     <div class="meter">
@@ -211,8 +220,8 @@ function sensorBody(s, withCam = true) {
   const wet = s.kind === 'rainfall' ? rainState(s) : '';
   // A siren has exactly one thing to say, so it gets a centred state block instead of a metric row.
   // "No signal" is only half the story — a siren that fell off the network last March must not read
-  // as one that is quietly working — but the *when* is footLine()'s job now, on one line with the
-  // date and the source, rather than a sentence here and the same moment again three lines down.
+  // as one that is quietly working — but the *when* is sourceInfo()'s job now, inside the sensor's
+  // own info menu, rather than a sentence here and the same moment again three lines down.
   const siren = s.kind !== 'siren' ? '' : !hasInfo(s)
     ? '<div class="state">OUT OF CONTACT</div>'
     : `<div class="state ${s.status > 0 ? 'on' : 'off'}">${s.status > 0 ? 'TRIGGERED' : 'IDLE'}</div>
@@ -233,19 +242,31 @@ function sensorBody(s, withCam = true) {
     ${spark}${rain}`;
 }
 
-/* The one place a timestamp is printed: `OFFLINE · last reported 06/07/2026 10:19 · 411.0h ago ·
-   via JPS Selangor`. The stale state blocks above used to carry the elapsed time while this carried
-   the date, which put the same moment on screen twice, a couple of lines apart. Elapsed time only
-   where it is the point — on a live station the date is the answer and "· 4m ago" is padding. */
-const footLine = s => {
+/* The one place a timestamp is printed, and it now sits inside `dots()` rather than under the card.
+   Three facts, all about the plumbing: whether we are hearing from the station, the stamp on the
+   last thing it sent, and which of the three feeds won the reading. Elapsed time is appended only
+   where it is the point — on a live station the date is the answer and "· 4m ago" is padding.
+   Not a button. It is the panel's first item because it is what the ignore action underneath it is
+   read against: you silence a sensor after you decide you cannot trust it. */
+function sourceInfo(s) {
   const t = s.updated || s.shot;
   const at = parseMY(t);
   const late = at && (!s.online || isStale(s));
-  return `<div class="popfoot muted">${s.online ? 'online' : 'OFFLINE'}${
-    t ? `${s.online ? ' · ' : ' · last reported '}${noSec(t)}${late ? ` · ${ago(at)}` : ''}`
-      : s.online ? '' : ' · never reported'}${
-    SOURCES[s.source] ? ` · via ${SOURCES[s.source].short}` : ''}</div>`;
-};
+  const when = t
+    ? `${s.online ? 'Updated ' : 'Last reported '}${noSec(t)}${late ? ` · ${ago(at)}` : ''}`
+    : s.online ? '' : 'Never reported';
+  /* The connection state is a badge, not a glyph and a word. It is the one thing in this panel that
+     is a *state* rather than a fact, and the badge is what this app already uses to say so — the
+     same pill the card's own header wears. Green when we are hearing from the station, grey when we
+     are not, which is the grey `hasInfo()` paints everywhere else for the same reason. */
+  return `<div class="mi info">
+      <span><span class="badge" style="--c:${s.online ? 'var(--s-normal)' : NO_INFO}"
+          ><i class="i i-${s.online ? 'wifi' : 'wifi_off'}"></i>${s.online ? 'Online' : 'Offline'}</span>${
+        when ? `<br><small class="muted">${when}</small>` : ''}${
+        SOURCES[s.source] ? `<br><small class="muted">Via ${SOURCES[s.source].name}</small>` : ''}
+      </span>
+    </div><hr>`;
+}
 
 const region = s => `<div class="muted">${
   [s.district, s.state].filter(Boolean).join(', ') || 'district n/a'} · ${s.basin || 'basin n/a'}</div>`;
@@ -265,8 +286,7 @@ export function popup(s) {
         ${dots(s)}
       </div>
     </div>
-    ${sensorBody(s)}
-    ${footLine(s)}`;
+    ${sensorBody(s)}`;
 }
 
 /* One mast, several sensors: a rainfall gauge, a river gauge, a siren and a camera are published as
@@ -312,7 +332,6 @@ export function sitePopup(members) {
         ${dots(m)}
       </div>
       ${sensorBody(m, false)}
-      ${footLine(m)}
     </div>`).join('')}`;
 }
 
@@ -349,7 +368,6 @@ export function herePopup(e, loaded) {
       <div class="place" data-go="${s.id}" title="Show ${s.name} on the map">${s.name}</div>
       ${region(s)}
       ${sensorBody(s, false)}
-      ${footLine(s)}
     </div>`;
   }).join('');
 
@@ -396,6 +414,13 @@ const axisHtml = ticks => `<div class="axis muted" aria-hidden="true">${ticks.ma
 const rules = ticks => ticks.map(t =>
   `<line x1="${t.x}" x2="${t.x}" y1="0" y2="28" vector-effect="non-scaling-stroke"/>`).join('');
 
+/* What the hover readout says, baked here rather than shipped as bare numbers: each graph knows its
+   own units and its own words for a value, and js/sparktip.js is deliberately one listener for all
+   three. `[x%, label]` per sample, so the module needs no scale, no clock and no notion of what it
+   is pointing at. Single-quoted attribute, because JSON quotes with double ones. */
+const readout = (inWin, x, label) => ` data-pts='${JSON.stringify(
+  inWin.map(([t, v]) => [+x(t), `${label(v)} · ${MYT_CLOCK.format(t * 1000)}`]))}'`;
+
 /* Area fill under a line. Two stops rather than a fade to nothing: at the bottom the shape has to
    read as a mass, at the top it has to not compete with the line drawn on it. Ids are minted
    per call because several of these can be on the page at once — a duplicate id and every chart
@@ -440,7 +465,7 @@ export function sparkline(points, kind = 'river') {
   const col = KINDS[kind].color;
   const [id, defs] = areaFill(col);
 
-  return `<div class="spark">
+  return `<div class="spark"${readout(inWin, x, v => `${v} m`)}>
     <svg viewBox="0 0 100 28" preserveAspectRatio="none" aria-hidden="true">
       ${defs}
       ${rules(ticks)}
@@ -488,7 +513,7 @@ export function sirenBand(points) {
   const live = inWin[i][1] > 0;
   if (live) while (i > 0 && inWin[i - 1][1] > 0) i--;   // back to the start of the run still running
   else while (i >= 0 && !inWin[i][1]) i--;              // back to the last sample that was on
-  return `<div class="spark">
+  return `<div class="spark"${readout(inWin, x, v => v > 0 ? 'sounding' : 'quiet')}>
     <svg viewBox="0 0 100 28" preserveAspectRatio="none" aria-hidden="true">
       ${rules(ticks)}${bars}
     </svg>
@@ -530,7 +555,7 @@ export function rainBars(points) {
   }
   const [id, defs] = areaFill(KINDS.rainfall.color);
 
-  return `<div class="spark">
+  return `<div class="spark"${readout(inWin, x, v => `${v} mm/h`)}>
     <svg viewBox="0 0 100 28" preserveAspectRatio="none" aria-hidden="true">
       ${defs}
       ${rules(ticks)}

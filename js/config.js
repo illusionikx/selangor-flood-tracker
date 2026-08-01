@@ -51,6 +51,12 @@ export const KIND_RANK = ['river', 'siren', 'gauge', 'rainfall', 'camera'];
 // Traffic light by status: normal → alert → warning → danger.
 export const STATUS_COLOR = ['var(--s-normal)', 'var(--s-alert)', 'var(--s-warning)', 'var(--s-danger)'];
 
+/* A flood gauge's own ramp, indexed by `gaugeTone()` in util.js. The same four rungs, except that
+   the first step off dry ground is `--s-trace` and not the alert amber. JPS marks a gauge at 0.15 m
+   and 0.3 m only, so the band under the first mark is real water that upstream never named, and
+   amber claims more about two centimetres than anyone knows. Green denies it outright. */
+export const GAUGE_COLOR = ['var(--s-normal)', 'var(--s-trace)', 'var(--s-warning)', 'var(--s-danger)'];
+
 export const NO_INFO = 'var(--s-none)';   // grey: offline or reporting nothing
 
 // "rising" is decided in api.php — a station reaching its own danger mark within its RISE_ETA at the

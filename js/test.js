@@ -21,6 +21,8 @@ import { state } from './state.js';
 const EVERY = 4;          // every Nth eligible river is pushed over its danger mark
 const RISE_EVERY = 3;     // and every Nth of the rest is made to climb towards it
 const RAIN_EVERY = 5;     // every Nth rain gauge is made to rain
+const GAUGE_EVERY = 4;    // every Nth flood gauge goes under water
+const WET_EVERY = 3;      // and every Nth of the rest gets the shallow rung, which has its own colour
 const OFFLINE_EVERY = 11; // and every Nth station of any kind is knocked off the network
 
 /* Rain falls as a storm cell over central KL, not as a stripe of every class in station order.
@@ -34,8 +36,55 @@ const OFFLINE_EVERY = 11; // and every Nth station of any kind is knocked off th
 const STORM = [3.14, 101.69];                                 // central KL
 const STORM_BANDS = [[10, 75], [20, 42], [35, 18], [55, 4]];  // ≤ km → mm/h
 
+// Every Nth site holding both a camera and a river is pushed over the mark whatever the first pass
+// decided — see the site pass at the foot of seedTest() for why the camera path needs its own knob.
+const CAM_EVERY = 3;
+
+// Half a day of samples climbing into the current reading. A flat line under a station claiming to
+// climb is the sort of detail that makes a screenshot useless.
+const ramp = (now, step) => Array.from({ length: 24 }, (_, i) => [
+  Math.floor(Date.now() / 1000) - (23 - i) * 1800,
+  +(now - (23 - i) * step).toFixed(2),
+]);
+
+// One sensor, pushed to the worst its own kind can report. Used by the first pass on rivers and by
+// the site pass on everything else at a place that is already under water.
+function drown(s) {
+  if (!s.online) return false;
+  if (s.kind === 'river') {
+    const mark = s.danger ?? s.warning ?? s.alert;
+    if (mark == null) return false;
+    // Already over: status 3 is what the popup, pin colour and alert panel all key off.
+    s.level = +(mark * 1.04).toFixed(2);
+    s.status = 3;
+    s.rate = 0.22; s.eta = 0; s.rising = true;
+    s.ratio = 1;
+    s.history = ramp(s.level, s.rate / 2);
+  } else if (s.kind === 'rainfall') {
+    // Heavy, not very heavy: the top class belongs to the middle of the storm cell, and a mast that
+    // happens to sit under a flooding river is not automatically the worst of the weather. A gauge
+    // already inside the cell keeps what the cell gave it — this may only ever raise a reading.
+    if ((s.hourly ?? 0) >= 45) return true;
+    s.hourly = 45; s.daily = 158; s.status = 3;
+    s.history = Array.from({ length: 12 }, (_, i) => [
+      Math.floor(Date.now() / 1000) - (11 - i) * 3600, +(45 * (0.2 + 0.8 * (i / 11))).toFixed(1),
+    ]);
+  } else if (s.kind === 'gauge') {
+    const mark = s.danger ?? 0.3;
+    s.depth = +(mark * 1.2).toFixed(2);
+    s.status = 2;
+    s.history = ramp(s.depth, mark / 40);
+  } else if (s.kind === 'siren') {
+    s.status = 1;
+    s.history = Array.from({ length: 12 }, (_, i) => [
+      Math.floor(Date.now() / 1000) - (11 - i) * 1800, i > 8 ? 1 : 0,
+    ]);
+  } else return false;   // a camera has nothing of its own to fake — see the site pass
+  return true;
+}
+
 export function seedTest(data) {
-  let rivers = 0, sirens = 0, rains = 0, offline = 0;
+  let rivers = 0, sirens = 0, rains = 0, gauges = 0, offline = 0;
 
   /* Knock stations off the network first, not last. Every branch below requires `s.online`, so an
      offlined station simply falls through and stays offline — which means the two fakes can never
@@ -50,10 +99,8 @@ export function seedTest(data) {
       if (mark == null || !s.online) continue;
       rivers++;
       if (rivers % EVERY === 0) {
-        // Already over: status 3 is what the popup, pin colour and alert panel all key off.
-        s.level = +(mark * 1.04).toFixed(2);
-        s.status = 3;
-        s.rate = 0.22; s.eta = 0; s.rising = true;
+        drown(s);
+        continue;
       } else if (rivers % RISE_EVERY === 0) {
         /* Climbing, not yet there — the case `rising` exists for, and the one worth eyeballing.
            The rate is derived from a target ETA rather than fixed, because a fixed m/h means the
@@ -68,12 +115,7 @@ export function seedTest(data) {
         s.rising = true;
       } else continue;
       s.ratio = mark ? Math.min(1, s.level / mark) : s.ratio;
-      // A flat line under a station claiming to climb is the sort of detail that makes a screenshot
-      // useless, so the sparkline gets a matching ramp: half a day, rising into the current reading.
-      s.history = Array.from({ length: 24 }, (_, i) => [
-        Math.floor(Date.now() / 1000) - (23 - i) * 1800,
-        +(s.level - (23 - i) * (s.rate / 2)).toFixed(2),
-      ]);
+      s.history = ramp(s.level, s.rate / 2);
     } else if (s.kind === 'rainfall' && s.online && ++rains % RAIN_EVERY === 0) {
       const km = Math.hypot((s.lng - STORM[1]) * Math.cos(s.lat * Math.PI / 180),
                             s.lat - STORM[0]) * 111;
@@ -92,9 +134,48 @@ export function seedTest(data) {
         Math.floor(Date.now() / 1000) - (11 - i) * 3600,
         +(mm * (0.2 + 0.8 * (i / 11))).toFixed(1),
       ]);
+    } else if (s.kind === 'gauge' && s.online && s.depth != null && ++gauges % GAUGE_EVERY === 0) {
+      drown(s);
+    } else if (s.kind === 'gauge' && s.online && s.depth != null && gauges % WET_EVERY === 0) {
+      /* The two rungs between dry and flooded, alternating so both appear. 0.08 m is water standing
+         on the ground under the 0.15 m mark JPS publishes — its own rung, its own colour, and one
+         that almost never shows on real data (two gauges on the day it was built), so without a knob
+         here that colour would ship unseen. 0.2 m is past the warning mark. */
+      s.depth = gauges % 2 ? 0.08 : 0.2;
+      s.status = s.depth > 0.15 ? 1 : 0;
+      s.history = ramp(s.depth, s.depth / 50);
     } else if (s.kind === 'siren' && s.online && ++sirens % 9 === 0) {
       s.status = 1;
     }
+  }
+
+  /* Second pass: a place tells one story.
+     The pass above walks stations one at a time, so it could leave a river 4% over its danger mark
+     on the same mast as a rainfall gauge reporting nothing, a dry flood gauge and an idle siren.
+     That is not a flood. It is four unrelated faults on one pole, and the mast card read as a bug
+     rather than as weather. Any site holding a river at danger now brings the rest of its sensors up
+     to match: the rain that caused it, the gauge under water, the siren sounding.
+     Offline members stay offline. A real flood does knock sensors off the network, and "one sensor
+     on an alerting mast has stopped reporting" is a rendering path worth being able to look at.
+     The camera is the reason for the second knob. It has nothing of its own to fake — the warning
+     triangle on a picture is measured from the alert to the lens by camAlert() — so the only way to
+     exercise it is to put an alert next to a camera. Leaving that to which stations happened to land
+     on a multiple of four faked the camera path by luck: 6 of the 31 sites that hold both a camera
+     and a river. Every third such site is now pushed over the mark on purpose. */
+  const bySite = new Map();
+  for (const s of data) {
+    const k = s.site || s.id;
+    bySite.has(k) ? bySite.get(k).push(s) : bySite.set(k, [s]);
+  }
+
+  let camSites = 0;
+  for (const members of bySite.values()) {
+    let flooded = members.some(m => m.online && m.kind === 'river' && m.status >= 3);
+    if (!flooded && members.some(m => m.kind === 'camera') && members.some(m => m.kind === 'river')
+        && ++camSites % CAM_EVERY === 0) {
+      flooded = members.filter(m => m.kind === 'river').some(drown);
+    }
+    if (flooded) members.forEach(drown);   // idempotent: a station already there is re-set to it
   }
 }
 

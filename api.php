@@ -444,7 +444,12 @@ foreach ($rainfallList as $s) {
         'basin'    => $s['mainRiverBasin'],
         'lat'      => (float)$s['latitude'],
         'lng'      => (float)$s['longitude'],
-        'status'   => (int)$s['status'],          // -1 none .. 4 very heavy
+        // -1 none .. 4 very heavy. The list publishes -1 on stations that are reporting a real
+        // number — 144 of 233 rain gauges — so where there is a reading, the class comes from the
+        // same rainStatus() the two scraped feeds already go through. See the note above the river
+        // block below: one definition of a status, and it is this file's.
+        'status'   => (int)$s['status'] < 0 && isset($d['hourlyRainfall'])
+                        ? rainStatus((float)$d['hourlyRainfall']) : (int)$s['status'],
         'online'   => (int)$s['stationStatus'] === 1,
         'code'     => $s['station_Id'] ?? null,   // national JPS code — the key the other feeds share
         'source'   => 'selangor',
@@ -468,7 +473,14 @@ foreach ($riverList as $s) {
         'basin'    => $s['mainRiverBasin'],
         'lat'      => (float)$s['latitude'],
         'lng'      => (float)$s['longitude'],
-        'status'   => (int)$s['wL1Status'],       // -1 offline, 0 normal, 1 alert, 2 warning, 3 danger
+        /* -1 offline, 0 normal, 1 alert, 2 warning, 3 danger. The list carries -1 on 15 stations
+           that are online and reporting a level, so where there is a reading and a mark to measure
+           it against, the code comes from wlStatus() — the same function the national portal's rows
+           already go through, for the same reason: a status the reader can check against the number
+           printed beside it beats one the feed asserts and the number contradicts. */
+        'status'   => (int)$s['wL1Status'] < 0 && $lvl !== null
+          ? wlStatus($lvl, $d['wL1SPAlert'] ?? null, $d['wL1SPWarning'] ?? null, $danger)
+          : (int)$s['wL1Status'],
         'online'   => (int)$s['stationStatus'] === 1,
         'level'    => $lvl,
         'alert'    => $d['wL1SPAlert']  ?? null,

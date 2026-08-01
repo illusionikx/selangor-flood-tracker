@@ -14,6 +14,7 @@ import { ticker } from './ticker.js';
 import { openTimeline, reset } from './timeline.js';
 import { load } from './net.js';
 import { paintTestChrome } from './test.js';
+import './sparktip.js';   // side effect only: one delegated readout for every graph on the page
 
 // --- theme ---------------------------------------------------------------------------------------
 
