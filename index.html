@@ -31,8 +31,8 @@
 <link rel="stylesheet" href="vendor/fonts.css?v=49">
 <link rel="stylesheet" href="css/icons.css?v=64">
 <link rel="stylesheet" href="css/base.css?v=72">
-<link rel="stylesheet" href="css/chrome.css?v=100">
-<link rel="stylesheet" href="css/map.css?v=84">
+<link rel="stylesheet" href="css/chrome.css?v=110">
+<link rel="stylesheet" href="css/map.css?v=87">
 
 <!-- A camera still. A <dialog>, not a div: it opens from the all-stations table, which is itself a
      modal dialog, and only the top layer can paint over one — Esc, the backdrop and focus trapping
@@ -49,58 +49,82 @@
   </div>
   <div class="lbbody">
     <div class="spin"></div>
-    <!-- The stage sizes itself to the frame, so the A/B overlay can be laid exactly over it. Both
-         images come from the same camera and share an aspect ratio, so matching their height is
-         enough to line them up pixel for pixel. -->
-    <div class="stage">
-      <img alt="">
-      <div class="ab" hidden><img class="abimg" alt=""><span class="abtime"></span></div>
-      <span class="abgrip" hidden aria-hidden="true"></span>
-      <span class="btime"></span>
-    </div>
-  </div>
-  <!-- The footer. Hidden unless this camera actually has an archive — a scrubber over one frame is
-       furniture, and that is also what the static build gets, where nothing was ever stored. -->
-  <div id="tl" hidden>
-    <div class="tlrow">
-      <!-- Scrubber and its ruler as one column, so the marks line up with the track they measure. -->
-      <div class="tltrack">
-        <input id="tlscrub" type="range" min="0" max="0" value="0" step="1" aria-label="Timeline position">
-        <!-- One mark per stored frame, all alike, evenly spaced because the window is thinned to the
-             range's own step. Hover names the moment, click goes to it. `aria-hidden`: the scrubber
-             beside it is the same set of positions with a proper role and keyboard handling, so this
-             is a second way in for a pointer, not a second thing to read. -->
-        <div class="tlticks" aria-hidden="true"></div>
+    <!-- The player: the frame, the controls and the warning pill as three siblings. The controls and
+         the pill were inside `.stage` and had to come out of it. `.stage` is exactly the picture's
+         box — `.ab` and `.abgrip` are `inset: 0` of it, which is what lines the A/B halves up — so
+         anything that must sit *beside* the picture rather than on it cannot live in there. On a
+         phone both step out of the frame, and that is the whole reason for this element. -->
+    <div class="player">
+      <!-- The stage sizes itself to the frame, so the A/B overlay can be laid exactly over it. Both
+           images come from the same camera and share an aspect ratio, so matching their height is
+           enough to line them up pixel for pixel. -->
+      <div class="stage">
+        <img alt="">
+        <div class="ab" hidden><img class="abimg" alt=""></div>
+        <!-- The divider. The knob holds two arrows, because a bare ring on a photograph says a circle
+             is there and nothing about what to do with it. -->
+        <span class="abgrip" hidden aria-hidden="true"><span class="abknob"></span></span>
+        <!-- Which frame is which. Outside `.ab` on purpose: that box is clipped to the divider, so a
+             label inside it was cut in half whenever the divider came near the left edge. -->
+        <span class="abtime"></span>
+        <span class="btime"></span>
+        <!-- The picture's one line of speech, shown for three seconds and gone. Two things use it:
+             compare, whose gesture is a drag across a photograph and so cannot look like anything,
+             and the two ends of the timeline, where a step button has nowhere left to go. Written
+             from timeline.js — it holds no text of its own. -->
+        <span class="hintbox" aria-hidden="true"></span>
+        <!-- The play and pause flash. A press on the picture changed a glyph 200px away, on a control
+             nobody was looking at, so half the presses read as nothing having happened. -->
+        <span class="tapfx" aria-hidden="true"><i class="i"></i></span>
       </div>
-      <button class="icon tlcmp" title="Compare against the live image"
-              aria-label="Compare against the live image" aria-pressed="false"
-      ><i class="i i-compare"></i></button>
-    </div>
-    <!-- Controls. Its own row rather than buttons beside the track: play used to be the only control
-         there, and four of them plus the scrubber do not fit a 360px phone. Transport on the centre
-         line, range on the right, both under the track they drive.
-         Step is one *stored* frame, not a fixed span of time — the range decides what a frame is
-         worth, and the tick strip above shows that spacing. -->
-    <div class="tlctl">
-      <div class="tltransport" role="group" aria-label="Playback">
-        <button class="icon tlstep" data-d="-1" title="Previous frame (,)" aria-label="Previous frame"
-        ><i class="i i-skip_previous"></i></button>
-        <button class="icon tlplay" title="Play (k)" aria-label="Play"><i class="i i-play_arrow"></i></button>
-        <button class="icon tlstep" data-d="1" title="Next frame (.)" aria-label="Next frame"
-        ><i class="i i-skip_next"></i></button>
-        <button class="icon tlnow" title="Go to now (End)" aria-label="Go to now"
-        ><i class="i i-last_page"></i></button>
+      <!-- The controls, over the picture. A player's chrome belongs on the player: the space under the
+           frame was the same height whether or not anyone was using it, and the picture is the thing
+           people came to look at. Hidden unless this camera has an archive — a scrubber over one frame
+           is furniture, and that is also what the static build gets, where nothing was ever stored. -->
+      <div id="tl" hidden>
+        <!-- The seek bar runs the full width. Compare used to sit on its line and took a button's
+             width off it — the one control here that is dragged, shortened for one that is pressed. -->
+        <div class="tltrack">
+          <!-- The spans of the window during which a river within CAM_ALERT_KM was at danger, or was
+               forecast to reach it. Painted into the seek bar itself, in the status colour. It is not
+               a scale and carries no per-frame marks: those drew a ruler nobody read, over the one
+               control here that has to be draggable. `aria-hidden` — the scrubber is the same set of
+               positions with a proper role and keyboard handling. -->
+          <div class="tlticks" aria-hidden="true"></div>
+          <input id="tlscrub" type="range" min="0" max="0" value="0" step="1" aria-label="Timeline position">
+        </div>
+        <!-- Controls. Its own row rather than buttons beside the track: play used to be the only control
+             there, and four of them plus the scrubber do not fit a 360px phone. Transport on the centre
+             line, range on the right, both under the track they drive.
+             Step is one *stored* frame, not a fixed span of time — the range decides what a frame is
+             worth. -->
+        <div class="tlctl">
+          <!-- Every button on one side. Compare is a press like the four beside it, so it belongs
+               with them rather than on the track's line, and the wrapper keeps the five together
+               when the row stacks on a narrow dialog. The gap between the two groups is what says
+               compare is not a transport control. -->
+          <div class="tlleft">
+            <div class="tltransport" role="group" aria-label="Playback">
+              <button class="icon tlstep" data-d="-1" title="Previous frame (,)" aria-label="Previous frame"
+              ><i class="i i-skip_previous"></i></button>
+              <button class="icon tlplay" title="Play (k)" aria-label="Play"><i class="i i-play_arrow"></i></button>
+              <button class="icon tlstep" data-d="1" title="Next frame (.)" aria-label="Next frame"
+              ><i class="i i-skip_next"></i></button>
+              <button class="icon tlnow" title="Go to now (End)" aria-label="Go to now"
+              ><i class="i i-last_page"></i></button>
+            </div>
+            <button class="icon tlcmp" title="Compare against the live image"
+                    aria-label="Compare against the live image" aria-pressed="false"
+            ><i class="i i-compare"></i></button>
+          </div>
+          <!-- The chosen segment spells itself out — "24 hours, 30 minutes per frame" where the
+               others read "week", "month", "year". The pace was a caption line under the controls,
+               which is a line of chrome for a fact about one of five buttons. "Range" was a label
+               beside them and is now the group's `aria-label`, where it costs no pixels. -->
+          <div class="tlranges" role="group" aria-label="Range"></div>
+        </div>
       </div>
-      <!-- The label names the axis the segments move along. Four bare time words in a sunken track
-           read as a filter until you press one; "Range" says which of the timeline's two dimensions
-           they change, and it is the group's accessible name as well. -->
-      <div class="tlrangebox">
-        <span class="tllabel" id="tlRangeLabel">Range</span>
-        <div class="tlranges" role="group" aria-labelledby="tlRangeLabel"></div>
-      </div>
     </div>
-    <!-- The pace of the chosen range, which is the one thing the picture cannot show. -->
-    <p class="tlmeta muted" aria-live="polite"></p>
   </div>
 </dialog>
 <div id="splash">

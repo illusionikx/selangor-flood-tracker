@@ -490,6 +490,51 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   clip rewrites `img.src` to an archived frame every second. Matching `?cam=` against that src
   fails on five frames in six. That opened a lightbox with no scrubber, no compare and no warning
   glyph. Only the table's "show image" button has no such wrapper, and it keeps the old path.
+- **`.stage` is exactly the picture's box, and nothing that sits beside the picture may live in it.**
+  `.ab` is `inset: 0` of `.stage` and `.abgrip` spans its full height — that is what lines the two
+  A/B halves up pixel for pixel, and it holds only while `.stage` is the frame and nothing else. The
+  control bar and the warning pill are therefore siblings of it inside **`.player`**, which is the
+  box both overlays are positioned against. `ui.js` injects `camWarn()` into `.player`, not
+  `.stage`, for the same reason.
+- **The overlay bar is the special case and lives behind a query; the in-flow bar is the default.**
+  `@media (hover: hover) and (min-width: 601px)` — marked `PLAYER_OVERLAY` in `chrome.css` — is the
+  only place `#tl` is absolute, white, scrimmed and self-hiding. Everything outside it is the plain
+  shape: in flow under the frame, on the dialog surface, in `var(--muted)` / `var(--hover)` /
+  `var(--outline)` like every other control. **Do not invert this.** It was written the other way
+  first (overlay by default, footer under `@media (hover: none)`), and any device that reports
+  `hover: hover` when it should not — a touchscreen laptop, a paired stylus, an Android browser in
+  desktop mode — fell through to a permanent black bar on the photograph that no pointer could
+  dismiss. The safe shape has to be the one a misread lands on. Both halves of the query earn their
+  place: the pointer test, because a bar that hides itself needs something to bring it back; the
+  width test, because a phone can lie about the first one. The literal whites belong **inside** that
+  block only — they cannot be tokens over a photograph, since tokens flip with the theme and the
+  picture does not.
+- **The seek bar is painted by `.tltrack`, not by the input.** The alert spans have to sit inside the
+  bar and under the thumb, and `accent-color` cannot draw them — so `#tlscrub` is transparent
+  (`appearance: none`, no track background) and the rail, the played part and the spans are three
+  layers below it. `paint()` writes the play position to `--p` **on the track**, not on the input:
+  the pseudo-elements that read it belong to the parent. There is no tick per frame any more, and
+  there must not be one again — 60 hairlines over a control you drag is a graduation, and the frames
+  are already an even grid, so the marks measured nothing the spacing did not. Colour is the whole
+  message: a span is red or amber because a river near that lens was in trouble then.
+- **The control bar's colours are literal, not tokens.** It sits on a photograph, so `--on-surface`
+  and `--muted` would flip with the theme while the picture behind them did not. White and
+  `#ffffffb3` in both themes. `--accent` is the one token that stays, on the thumb and the played
+  rail, and it is legible on the scrim in either theme.
+- **`.abtime` must stay outside `.ab`.** `.ab` is the older frame clipped to the divider, so a label
+  inside it is cut in half whenever the divider comes near the left edge — and the right-hand label,
+  which lives in the unclipped box, never is, which is what made it look like a bug. Both labels are
+  children of `.stage` now, and `#lightbox:not(.cmp) .abtime` does the hiding that `.ab[hidden]` did.
+- **The opening play delay is cancelled by `stop()`, and that is the only guard it has.**
+  `openTimeline()` parks the scrubber three hours back and starts the clip two seconds later. Every
+  deliberate move — a step, the scrubber, the compare button, `reset()` — reaches `stop()`, which
+  clears `lead`. Anything new that means "I am looking at this frame" must go through `stop()` too,
+  or it will be carried off that frame two seconds after landing on it.
+- **A range segment holds two labels, and `setRange()` must never write over the button itself.**
+  The short label is `.tls`, the long one `.tll`, and the pill grows because the CSS transitions each
+  from `width: 0` to `width: auto` — which is only animatable because `interpolate-size:
+  allow-keywords` is set on `.tlr`. Setting `b.textContent` would remove both spans, and the control
+  would go back to jumping on every click with nothing in the console to say why.
 
 ## Conventions
 

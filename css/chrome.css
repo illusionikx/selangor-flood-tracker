@@ -56,7 +56,7 @@ header .hactions { display: flex; align-items: center; gap: 4px; margin-left: au
 /* Hover to read, hover to click — a moving target you cannot catch is a link that isn't one. */
 #ticker:hover .tk-run { animation-play-state: paused; }
 #ticker .tk-i {
-  display: inline-flex; align-items: center; gap: 6px; padding: 4px 0;
+  display: inline-flex; align-items: center; gap: 6px; padding: 4px 0 6px 0;
   background: none; border: 0; color: var(--on-surface); cursor: pointer;
   font: 400 12px/1 Roboto, sans-serif; white-space: nowrap;
 }
@@ -812,14 +812,32 @@ body.finding #find { display: none; }
 }
 #lightbox[open] { display: block; }
 #lightbox::backdrop { background: #0009; }
-#lightbox h2 {
-  flex: 1; min-width: 0; font-size: 16px; font-weight: 500;
+/* Two lines: the camera's name, then its district and state. It wraps rather than truncating — the
+   dialog is sized by the picture and is at least 460px wide, so a long place name has the room, and
+   half a place name is worse than two lines of one. */
+#lightbox h2 { flex: 1; min-width: 0; font-size: 16px; font-weight: 500; line-height: 1.3; }
+/* The second line does truncate. It is context, not the answer, and it must not push the picture
+   down a line on a narrow dialog. */
+#lbTitle .lbwhere {
+  display: block; font: 400 12px/1.35 Roboto, sans-serif; color: var(--muted);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 /* Grid, so the spinner and the frame occupy the same cell — the box does not jump when one
    replaces the other. The min-height is what stops it collapsing to nothing while loading. */
 #lightbox .lbbody { display: grid; place-items: center; min-height: 140px; }
 #lightbox .lbbody > * { grid-area: 1 / 1; }
+/* The player: the frame, the control bar and the warning pill. On a mouse the last two are laid over
+   the first, so this box is exactly the frame; on a phone they leave the picture and this box is the
+   column that holds all three. Either way it is what the two overlays are positioned against —
+   `.stage` cannot be, because `.ab` is `inset: 0` of it and that is what lines the A/B halves up. */
+#lightbox .player { position: relative; display: inline-block; line-height: 0; }
+/* The warning pill sits above the frame in the plain shape, in a strip of its own — it is the one
+   thing on this dialog that has to be read *with* the picture rather than instead of a corner of it,
+   and a screen with no room for an overlay bar has no corner to spare either. The strip is opened by
+   `:has()`, because most cameras carry no warning and 30px of empty above every one of them is the
+   cost this was changed to stop paying. PLAYER_OVERLAY puts it back in the corner. */
+#lightbox .player:has(.camwarn) { padding-top: 30px; }
+#lightbox .camwarn { top: 0; left: 0; max-width: 100%; }
 /* The stage sizes to the frame so the A/B overlay can be laid over it exactly. `line-height: 0`
    because an inline-block wrapped round an <img> otherwise reserves a descender's worth of space
    under it, which the overlay does not have and so misaligns by a few pixels. */
@@ -831,7 +849,10 @@ body.finding #find { display: none; }
 #lightbox .stage { position: relative; display: inline-block; line-height: 0; --ab: 50%;
   -webkit-user-select: none; user-select: none; }
 #lightbox .stage img { -webkit-user-drag: none; }
-#lightbox img { max-width: min(968px, calc(100vw - 64px)); max-height: 62vh; border-radius: 8px; }
+/* The plain shape's height: the control bar is a strip under the frame here, and the two have to fit
+   the same screen. PLAYER_OVERLAY raises it to 74vh, where the bar is laid over the picture and
+   costs it nothing. */
+#lightbox img { max-width: min(968px, calc(100vw - 64px)); max-height: 58vh; border-radius: 8px; }
 /* The picture plays and pauses the clip, so it says so — but only when there is a clip behind it
    (`#tl` carries `hidden` otherwise) and only when the divider is down, where the same press is the
    start of a drag. `:has()` rather than a class set from JS: the state is already in the DOM. */
@@ -852,11 +873,24 @@ body.finding #find { display: none; }
   position: absolute; top: 0; bottom: 0; left: var(--ab); width: 2px; background: #fff;
   box-shadow: 0 0 6px #000a;
 }
-#lightbox .abgrip::after {
-  content: ''; position: absolute; top: 50%; left: 50%; width: 34px; height: 34px;
-  transform: translate(-50%, -50%); border: 2px solid #fff; border-radius: 50%;
-  box-shadow: 0 0 6px #000a;
+/* A solid knob with an arrow each way. The first one was an outlined ring with the photograph showing
+   through it, which announced that a circle was there and nothing about what to do with it — and on a
+   pale frame the outline went with it. White plate, dark arrows: the same pairing works over any
+   picture, and the arrows are the only part that has to be read.
+   Literal colours, like the rest of the furniture over a photograph. A token would flip with the
+   theme while the frame under it did not. */
+#lightbox .abknob {
+  position: absolute; top: 50%; left: 50%; display: flex; align-items: center; justify-content: center;
+  gap: 5px; width: 34px; height: 34px; transform: translate(-50%, -50%);
+  border-radius: 50%; background: #fff; box-shadow: 0 1px 5px #0009;
 }
+/* Two border triangles rather than an icon mask: there is no chevron in css/icons.css, and a pair of
+   arrows that exist in one place is not worth refetching the icon set for. */
+#lightbox .abknob::before, #lightbox .abknob::after {
+  content: ''; width: 0; height: 0; border: 5px solid transparent;
+}
+#lightbox .abknob::before { border-right-color: #3c4043; }
+#lightbox .abknob::after  { border-left-color: #3c4043; }
 /* Touch, by input rather than by width: a tablet is a coarse pointer at any breakpoint. A 34px knob
    is smaller than the finger on it and the 2px line disappears under the same finger, so there is
    nothing left on screen saying where the divider is while you are moving it. 44px is the WCAG 2.5.8
@@ -865,42 +899,93 @@ body.finding #find { display: none; }
    is the only target that was ever big enough. */
 @media (pointer: coarse) {
   #lightbox .abgrip { width: 3px; }
-  #lightbox .abgrip::after { width: 44px; height: 44px; }
+  #lightbox .abknob { width: 44px; height: 44px; }
 }
 /* Which frame is which, on the frame itself — a caption under the picture would make you look away
-   from the thing you are comparing to find out what you are comparing. */
+   from the thing you are comparing to find out what you are comparing.
+   Both are children of `.stage`, not of `.ab`. `.ab` is clipped to the divider, so the left label was
+   cut off by the very control it describes as soon as the divider came near the left edge — while the
+   right one, in the unclipped box, never was. */
 #lightbox .abtime, #lightbox .btime {
-  position: absolute; bottom: 8px; padding: 3px 8px; border-radius: 999px;
+  position: absolute; bottom: 8px; z-index: 1; padding: 3px 8px; border-radius: 999px;
   font: 500 11px/1.4 Roboto, sans-serif; color: #fff; background: #000000a6; white-space: nowrap;
 }
 #lightbox .abtime { left: 8px; }
 #lightbox .btime { right: 8px; }
+#lightbox:not(.cmp) .abtime { display: none; }
 #lightbox:not(.cmp) .btime:empty { display: none; }
+#lightbox .abtime, #lightbox .btime { transition: bottom .2s ease 1.6s; }
+/* The picture's one line of speech, shown for three seconds and gone. Compare uses it, because it is
+   the only control here whose gesture is invisible — every other one is a button, and a picture
+   cannot look draggable. The ends of the timeline use it too, where a step button has nowhere left to
+   go and a clamp that paints nothing is a control that looks broken. It says itself once and leaves.
+   A permanent caption over a photograph would be read once and then be in the way for good. */
+#lightbox .hintbox {
+  /* Above the knob, not near the foot of the frame: the control bar covers the bottom ~90px of the
+     picture whenever a pointer is on it, and switching compare on leaves the pointer exactly there. */
+  position: absolute; left: 50%; bottom: calc(50% + 30px); z-index: 3;
+  padding: 5px 12px; border-radius: 999px; background: #000000bf;
+  font: 500 12px/1.4 Roboto, sans-serif; color: #fff; white-space: nowrap;
+  transform: translateX(-50%); opacity: 0; pointer-events: none;
+}
+#lightbox .hintbox.on { animation: hintbox 3.2s ease-out forwards; }
+@keyframes hintbox { 0% { opacity: 0 } 8%, 84% { opacity: 1 } 100% { opacity: 0 } }
+/* The press on the picture, made visible where the press landed. The play button lives in the control
+   bar, which self-hides on a mouse and is 200px from the middle of the frame either way — so the only
+   answer to a click on the picture was a glyph swapping somewhere nobody was looking. This is the
+   same answer every video player gives: the state that was just entered, in the middle, gone in half
+   a second. */
+#lightbox .tapfx {
+  position: absolute; top: 50%; left: 50%; z-index: 3;
+  display: grid; place-items: center; width: 64px; height: 64px;
+  border-radius: 50%; background: #000000a6; color: #fff; font-size: 32px;
+  transform: translate(-50%, -50%); opacity: 0; pointer-events: none;
+}
+#lightbox .tapfx.on { animation: tapfx .45s ease-out; }
+@keyframes tapfx {
+  from { opacity: 1; transform: translate(-50%, -50%) scale(.7); }
+  to   { opacity: 0; transform: translate(-50%, -50%) scale(1.3); }
+}
 
-/* --- camera timeline: the dialog's footer -------------------------------------------------------
-   Under the frame, never over it — it is used continuously while the picture is being read, and a
-   bar that covers part of the picture is a bar you have to move out of the way to use it. Its own
-   rule above, because a footer that is sometimes absent needs a boundary that goes with it. */
+/* --- camera timeline: the player's controls -----------------------------------------------------
+   Two shapes, and the plain one is the default.
+
+   In flow under the frame, on the dialog's own surface, in the dialog's own colours — that is what
+   this block sets up. `PLAYER_OVERLAY` below lays it over the picture instead, the way a video
+   player does, and it is entered only where both halves of the bargain hold: a real pointer to
+   reveal it with, and a screen wide enough that the bar is not most of the picture.
+
+   Written this way round on purpose. The overlay is the shape with conditions on it, so it belongs
+   behind the query; the footer is the shape that is always safe, so it belongs in the base rules.
+   The first version had it the other way — overlay by default, footer under `@media (hover: none)`
+   — and a device that reports `hover: hover` when it should not (a touchscreen laptop, a tablet
+   with a stylus paired, an Android browser in desktop mode) fell through to a permanent black bar
+   sitting on the photograph with no pointer able to dismiss it. A misread here now costs a footer,
+   which is merely plainer. */
 #tl {
-  display: grid; gap: 8px; justify-items: center; width: 100%;
-  margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--outline);
+  display: grid; gap: 2px; justify-items: center; width: 100%;
+  padding: 10px 0 2px; line-height: 1.4;
   container-type: inline-size;   /* the control row stacks off this width — see .tlctl */
 }
 #tl[hidden] { display: none; }
-.tlrow { display: flex; align-items: center; gap: 8px; width: 100%; }
+/* 34px rather than the 40px an icon button is everywhere else. Two rows of them sit under a picture
+   that is already capped by the viewport, and in the overlay shape they are two rows *of* the
+   picture — six pixels a row is twelve either way. Still over the 24px minimum. */
+#tl .icon { width: 34px; height: 34px; font-size: 20px; }
 #tl .icon.on { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); }
-.tltrack { flex: 1; min-width: 0; display: grid; gap: 3px; }
+/* The seek bar, full width — it is the one control here that is dragged, and it used to give a
+   button's width away to compare. `position: relative` because the alert strip and the two painted
+   rails are all absolutely placed inside it, over the same 4px line the thumb runs along. */
+.tltrack { position: relative; width: 100%; height: 20px; }
 /* Transport left, range right, pushed to the two ends of the scrubber above them. Centring the
    transport was tried first and looks wrong once anything shares its line — it reads as centred on
    nothing, with the range control hanging off one side. The ends work because the row is the width
    of the track: each cluster sits under the end of the thing it drives. */
-.tlctl { display: flex; align-items: center; justify-content: space-between; gap: 16px; width: 100%; }
-.tltransport { display: flex; gap: 4px; }
-.tlrangebox { display: flex; align-items: center; gap: 6px; }
-.tllabel {
-  font: 500 10px/1 Roboto, sans-serif; letter-spacing: .06em; text-transform: uppercase;
-  color: var(--muted); white-space: nowrap;
-}
+.tlctl { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; }
+/* The five buttons. The 10px gap is the whole statement that compare is not one of the four beside
+   it — they step and play, it changes what the picture is. Their own gap is 2px. */
+.tlleft { display: flex; align-items: center; gap: 10px; }
+.tltransport { display: flex; gap: 2px; }
 /* Too narrow for one line: stack, and centre both. Transport stays first, so the control you reach
    for most sits directly under the track it drives.
    A container query, not a media query, because the thing that runs out of room is the dialog and
@@ -945,66 +1030,155 @@ body.finding #find { display: none; }
 @media (prefers-reduced-motion: reduce) {
   .tltransport .flash::after { animation-name: tlfade; }
 }
-#tlscrub { width: 100%; margin: 0; accent-color: var(--accent); cursor: pointer; }
-/* The ruler. Marks are placed as a percentage of the *track*, which runs from half a thumb in to
-   half a thumb from the end — so the strip is inset by 8px with a margin, not a padding: a
-   percentage offset resolves against the padding box, and padding would not have moved it. */
-.tlticks { position: relative; height: 10px; margin: 0 8px; }
-/* Each mark is 1px of paint inside an 11px hit box. The box is the whole point: a 1px target is not
-   hoverable and not tappable, and these carry a tooltip and a jump. Sized just under the closest
-   spacing any range produces (60 marks across the track), so the boxes tile the strip without
-   overlapping — a click between two marks lands on the nearer one, which is what was meant. */
-.tlticks i {
-  position: absolute; top: 0; width: 11px; height: 100%;
-  transform: translateX(-50%); cursor: pointer;
+/* The rail and the played part of it, painted by the track rather than by the input. The native
+   range track cannot carry the alert spans — they have to sit *inside* the bar, under the thumb —
+   so the input goes transparent and everything visible is drawn here. `--p` is the play position as
+   a percentage; timeline.js writes it on every paint.
+   Both are inset 8px, which is where the track a native thumb travels actually starts and ends: the
+   thumb is centred on its value, so its centre never reaches the input's own edge. */
+.tltrack::before, .tltrack::after {
+  content: ''; position: absolute; left: 8px; top: 50%; height: 4px;
+  border-radius: 2px; transform: translateY(-50%); pointer-events: none;
 }
-.tlticks i::before {
-  content: ''; position: absolute; left: 50%; top: 1px; width: 1px; height: 8px;
-  background: var(--muted); transform: translateX(-50%);
+.tltrack::before { right: 8px; background: var(--outline); }
+.tltrack::after  { width: calc((100% - 16px) * var(--p, 0)); background: var(--accent); z-index: 1; }
+/* The alert strip: the spans of the window when a river within CAM_ALERT_KM was at danger or was
+   forecast to reach it, in the same status colours everything else on this page uses. It replaced a
+   mark per stored frame — 60 hairlines is a ruler, and a ruler over a control you have to drag reads
+   as graduation rather than as a warning. The colour is the whole message now: something happened in
+   this part of the window, drag to it. Over the played rail, so it is not erased by progress. */
+/* Four layers share one 4px line, all absolute, so `z-index` states the order rather than leaving it
+   to DOM order — `::after` is the parent's *last* child and would otherwise paint the played rail
+   over both the alert spans and the thumb. Rail 0, played 1, alert spans 2, the input on top. */
+.tlticks {
+  position: absolute; left: 8px; right: 8px; top: 50%; height: 4px; z-index: 2;
+  transform: translateY(-50%); border-radius: 2px; overflow: hidden; pointer-events: none;
 }
-/* No mark height lands on a period. There are two heights: this 8px default and the full-height mark
-   that hover and the alert tiers below share. A *repeating* second height drew a second and coarser
-   grid over the frames, so a taller mark on each new day was dropped. The window is thinned to the
-   range's own step, so the frames already *are* the graduation. Hover and the alert marks name a
-   condition on one frame, not a scale. */
-.tlticks i:hover::before { top: 0; height: 100%; width: 2px; background: var(--accent); }
-/* Now: the one mark that is not an archived frame. Wider and accented, so the end of the strip
-   reads as the present rather than as one more frame. */
-.tlticks i.now::before { width: 2px; background: var(--accent); }
-/* A frame taken while the river was in trouble. Taller and colored, so the strip shows when it
-   started without anyone playing the clip. The `.now` mark keeps the accent and is a different
-   thing entirely — that one means "the present", not "at danger". */
-.tlticks i.t-now::before  { height: 100%; top: 0; width: 2px; background: var(--s-danger); }
-.tlticks i.t-soon::before { height: 100%; top: 0; width: 2px; background: var(--s-warning); }
-.tlmeta { margin: 0; font-size: 11px; text-align: center; }
+.tlticks i { position: absolute; top: 0; height: 100%; min-width: 2px; }
+.tlticks i.t-now  { background: var(--s-danger); }
+.tlticks i.t-soon { background: var(--s-warning); }
+/* The input itself is only the thumb and the hit area — every painted part of the bar is above. It
+   covers the whole 20px box so the grab target is a finger's worth of height, not 4px. */
+#tlscrub {
+  position: absolute; inset: 0; z-index: 3; width: 100%; height: 100%; margin: 0; cursor: pointer;
+  -webkit-appearance: none; appearance: none; background: none;
+}
+#tlscrub::-webkit-slider-runnable-track { height: 4px; background: none; }
+#tlscrub::-moz-range-track { height: 4px; background: none; }
+/* `margin-top` centres the thumb on a 4px track in WebKit, which places it from the track's top
+   edge; Firefox centres it itself. The ring is what keeps it on a white sky. */
+#tlscrub::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 13px; height: 13px; margin-top: -4.5px;
+  border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 1px #0006;
+}
+#tlscrub::-moz-range-thumb {
+  width: 13px; height: 13px; border: 0; border-radius: 50%;
+  background: var(--accent); box-shadow: 0 0 0 1px #0006;
+}
 /* One control, not five buttons. These are mutually exclusive — picking a range unpicks the others —
    and as separate outlined pills each looked independently pressable, with nothing in the row saying
    only one could ever be on. A single sunken track with the current segment filled says it in the
    shape: the selection moves *along* the control rather than lighting up one of five. Sized to its
    content rather than stretched, so it reads as one object rather than a row the width of the
-   dialog — `.tlrangebox` places it, and carries its label. */
+   dialog. The chosen segment grows to hold its pace — `24 hours, 30 minutes per frame` — so the
+   control changes width as it is used, which is also what says the selection is inside it. */
 .tlranges {
-  display: flex; align-items: center; width: auto; max-width: 100%; gap: 2px; padding: 3px;
+  display: flex; align-items: center; width: auto; max-width: 100%; gap: 2px; padding: 2px;
   background: var(--hover); border-radius: 999px;
 }
 .tlr {
-  padding: 5px 13px; cursor: pointer; font: 500 11px Roboto, sans-serif; white-space: nowrap;
+  padding: 4px 11px; cursor: pointer; font: 500 11px Roboto, sans-serif; white-space: nowrap;
   color: var(--muted); background: none; border: 0; border-radius: 999px;
   -webkit-user-select: none; user-select: none;   /* clicked repeatedly while hunting a range */
   transition: color .15s, background-color .15s;
+  interpolate-size: allow-keywords;               /* see .tls / .tll below */
 }
+/* Both labels ride in the button, short and long, and the chosen one wipes the other out. A width
+   of `auto` is only animatable because of `interpolate-size` above, so a browser without it swaps
+   the words at once and everything else still holds. */
+.tls, .tll {
+  display: inline-block; overflow: hidden; white-space: nowrap; vertical-align: bottom;
+  transition: width .25s, opacity .25s;
+}
+.tls, .tlr.on .tll { width: auto; opacity: 1; }
+.tll, .tlr.on .tls { width: 0;    opacity: 0; }
 .tlr:hover:not(.on) { color: var(--on-surface); }
 /* Text on the accent is `--surface`, never `#fff`. The accent flips to a pale blue (#8ab4f8) in the
    dark theme, where white on it is a contrast failure — the token is already near-black there and
    already white in the light theme, so one declaration is correct in both. */
 .tlr.on { color: var(--surface); background: var(--accent); }
-@media (prefers-reduced-motion: reduce) { .tlr { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .tlr, .tls, .tll { transition: none; } }
 
-/* Phones: the frame gives up height to keep the footer reachable with a thumb, and the dialog
-   drops its width floor — at 360px a 460px minimum is a horizontal scrollbar. */
+/* --- PLAYER_OVERLAY: the same controls, laid over the picture -----------------------------------
+   Both halves of the query are required, and each rules out a different failure.
+
+   `hover: hover` — the bar hides itself, so without a pointer to bring it back it would have to
+   stay up for good, and a bar that cannot be dismissed is a strip of the photograph taken away
+   rather than a player's chrome. Tapping to reveal was the alternative: that is a tap meaning
+   "show the controls" competing with the tap meaning play, on the one surface that already has a
+   job.
+
+   `min-width: 601px` — the same 600px breakpoint the rest of the app turns on. A phone that lies
+   about its pointer (desktop mode, a paired stylus, a touchscreen laptop) is caught by the width
+   even when the first test passes, and a narrow desktop window gets the shape that fits it.
+
+   Everything in here is an override. The controls themselves are already built and already
+   coloured; this moves them onto the frame and repaints them for a photograph. */
+@media (hover: hover) and (min-width: 601px) {
+  #tl {
+    position: absolute; left: 0; right: 0; bottom: 0; z-index: 3;
+    padding: 32px 10px 12px; border-radius: 0 0 8px 8px;
+    /* A scrim, not a bar. A solid strip is a second object sitting on the photograph; a gradient
+       fading up out of the bottom edge darkens what is behind the controls and nothing else. */
+    background: linear-gradient(transparent, #000000d9 60%);
+    color: #fff;
+    cursor: default;   /* the picture is the play button and says so; the bar over it is not */
+    /* Away by default, and it fades *late*: 1.6s is long enough to cross the picture to the range
+       buttons without losing them on the way. Coming back there is no delay at all.
+       `visibility` is stepped rather than faded, so the buttons stop taking clicks the instant the
+       fade ends — otherwise an invisible bar covers the bottom of the picture, which is the play
+       button. */
+    opacity: 0; visibility: hidden;
+    transition: opacity .2s ease 1.6s, visibility 0s linear 1.8s;
+  }
+  /* Up while the pointer is anywhere on the player — the bar included, so reaching for it holds it —
+     and while anything in it is keyboard-focused. `:focus-visible` rather than `:focus`, so the
+     programmatic focus openTimeline() puts on play does not pin the bar open for a reader who never
+     touched the keyboard. */
+  #lightbox .player:hover #tl, #tl:has(:focus-visible) {
+    opacity: 1; visibility: visible; transition-delay: 0s;
+  }
+  /* Light on dark, because what is behind is a photograph rather than the dialog. These cannot be
+     theme tokens: the tokens flip with the theme and the picture does not. */
+  #tl .icon { color: #fff; }
+  #tl .icon:hover { background: #ffffff26; }
+  #tl .icon.on { background: #ffffff26; color: var(--accent); }
+  .tltrack::before { background: #ffffff4d; }
+  .tlranges { background: #ffffff26; }
+  .tlr { color: #ffffffb3; }
+  .tlr:hover:not(.on) { color: #fff; }
+  /* The frame labels sit in the corner the bar comes up over, so they step above it and go back down
+     with it on the same delay. Only where there is a bar: with no archive `#tl` is `hidden` and the
+     label keeps the corner. */
+  #lightbox .player:has(#tl:not([hidden])):hover :is(.abtime, .btime),
+  #lightbox .player:has(#tl:focus-visible) :is(.abtime, .btime) {
+    bottom: 88px; transition-delay: 0s;
+  }
+  /* And the pill comes back into the picture's corner, off the strip it takes in the plain shape.
+     The `:has()` has to be repeated: it is what set the padding, and it outranks a plain `.player`
+     however late in the file that plain rule appears. */
+  #lightbox .player:has(.camwarn) { padding-top: 0; }
+  #lightbox .camwarn { top: 8px; left: 8px; max-width: calc(100% - 16px); }
+  /* The frame takes back what the footer would have cost it. */
+  #lightbox img { max-height: 74vh; }
+}
+
+/* Phones: the dialog drops its width floor — at 360px a 460px minimum is a horizontal scrollbar. */
 @media (max-width: 600px) {
   #lightbox { padding: 12px; min-width: 0; width: calc(100vw - 16px); }
-  #lightbox img { max-width: 100%; max-height: 46vh; }
+  /* Lower still than the base, because here the dialog has the least screen to work with and the
+     control bar is a strip under the frame rather than an overlay on it. */
+  #lightbox img { max-width: 100%; max-height: 50vh; }
   /* Tighter segments rather than a wrapping row: a segmented control that wraps to two lines stops
      looking like one track and is the reason this no longer wraps at all. Five labels at this
      padding measure ~242px, inside the ~320px a 360px phone leaves after the dialog's own padding. */

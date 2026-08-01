@@ -3556,3 +3556,272 @@ A badge is how this app says that everywhere else.
 
 `--i-wifi` joins `--i-wifi_off` in `css/icons.css`. One rule and one class, which is the whole cost
 of an icon here.
+
+## The lightbox is a player
+
+The camera lightbox was a picture with a footer under it. The footer held the seek bar, the transport,
+the range control and a caption. It measured about 90px and it was there whether or not anyone was
+reaching for it. The dialog caps the picture at a share of the viewport height, so those 90px came
+straight off the thing people opened the lightbox to look at.
+
+### The controls moved onto the frame
+
+`#tl` is now the last child of `.stage`, absolutely placed along the bottom edge. A gradient scrim
+fades up out of that edge, so the controls have something to sit on and the rest of the picture keeps
+its own contrast. The picture grew from 62vh to 74vh in the same change, and from 46vh to 62vh on a
+phone.
+
+The bar is hidden by default and appears while a pointer is on the picture. It goes away 1.6 seconds
+after the pointer leaves. The delay is the point. A bar that vanishes the moment you leave the
+picture is a bar you lose while crossing to the range buttons.
+
+`visibility` is stepped, not faded. Opacity alone would leave an invisible control bar taking clicks
+over the bottom of the picture, and the picture is the play button.
+
+Keyboard use holds it open through `#tl:has(:focus-visible)`. Not `:focus` — `openTimeline()` moves
+focus to the play button on open so that space works, and `:focus` would pin the bar open for a
+reader who never touched a key.
+
+A phone gets the bar permanently, under `@media (hover: none)`. The alternative is a tap that means
+"show the controls" competing with the tap that means play. That is a state machine for a surface
+that already has one.
+
+### The two frame labels step above it
+
+`.btime` and `.abtime` sit in the same corner the bar comes up over. They move to `bottom: 96px`
+while the bar is up, on the same 1.6 second delay, so the two move as one thing. With no archive
+behind the camera, `#tl` is `hidden` and the labels keep the corner.
+
+### The seek bar shows danger, not graduation
+
+The ruler under the scrubber is gone. It drew one hairline per stored frame, up to 60 of them, over
+the one control here that has to be dragged. The frames are already a regular grid, so the marks
+measured nothing the spacing did not.
+
+What is left is the colour. A frame taken while a river within `CAM_ALERT_KM` was at danger, or was
+forecast to reach it, paints a span of the bar in that tier's status colour — red for `t-now`, amber
+for `t-soon`. The bar answers "when did this start" without anyone playing the clip, which is the
+only thing the marks were ever read for.
+
+The bar is drawn by `.tltrack`, not by the input. The alert spans have to sit inside the bar and
+under the thumb, which `accent-color` cannot do, so `#tlscrub` is transparent and the rail, the
+played part and the spans are three layers under it. `paint()` writes the play position to `--p` on
+the track.
+
+The tick tooltips and the click-a-mark-to-go-there path went with the marks. The scrubber is the same
+set of positions with a proper role, keyboard handling and a full-height grab target.
+
+### The stage had to let the bar through
+
+Two of the stage's own gestures now start inside a control. A press on the seek bar was also the
+start of an A/B divider drag, and a press on any button was also a press on the picture, which plays
+and pauses. One `tl.contains(e.target)` guard on each covers every control in the bar, including
+anything added to it later.
+
+### The camera warning wears a transparent pill
+
+The warning on a camera picture was bare words with a heavy `text-shadow`. A shadow only darkens what
+is already behind the letters, and JPS daylight footage is bright sky and wet concrete.
+
+It is a translucent pill now: `rgb(0 0 0 / .55)` with a 3px backdrop blur, around the glyph and the
+words together, so the two read as one label. The shadow stays as a second line of defence. This is
+not the old disc coming back — that was furniture around a glyph that stood alone, and this is a
+plate under a label that has words.
+
+The glyph came down from 22px to 16px in the same step. It was sized to stand alone on a photograph.
+Inside the pill it is one of two things on a line of 12px text, and at 22px it reached the pill's own
+edge and made a badge out of a label.
+
+### Compare joined the transport
+
+The compare button sat on the seek bar's line and took a button's width off it. That is the one
+control here that gets dragged, shortened for one that gets pressed.
+
+It is now the fifth button in the control row, in a `.tlleft` wrapper with the four transport
+buttons. A 10px gap separates it from their 2px — that gap is the whole statement that compare is not
+a transport control. They step and play; it changes what the picture is.
+
+The wrapper is what keeps the five on one line when the row stacks on a narrow dialog. Without it the
+container query would have made three rows out of two.
+
+`.tlrow` is gone with it. The track is a direct child of `#tl` at full width.
+
+### The overlay is the special case, not the default
+
+The bar has two shapes. In flow under the frame, on the dialog's own surface and in the dialog's own
+colours; or laid over the picture with a scrim, in white, fading in and out with the pointer.
+
+The plain shape is the base. The overlay is behind
+`@media (hover: hover) and (min-width: 601px)`, and both halves are required.
+
+`hover: hover`, because the bar hides itself. With no pointer to bring it back it would have to stay
+up for good, and a bar that cannot be dismissed is a strip of the photograph taken away rather than a
+player's chrome. Tap-to-reveal was the alternative: a tap meaning "show the controls" competing with
+the tap meaning play, on the one surface that already has a job.
+
+`min-width: 601px`, the same breakpoint the rest of the app turns on. A phone that lies about its
+pointer — desktop mode, a paired stylus, a touchscreen laptop — is caught by the width even when the
+first test passes.
+
+This is the second attempt. The first had it the other way round: overlay by default, footer under
+`@media (hover: none)`. A device that reports `hover: hover` when it should not fell through to a
+permanent black bar sitting on the photograph, with no pointer able to dismiss it, and it happened
+often enough to be reported as "sometimes it reverts to the desktop control". A misread now costs a
+footer, which is merely plainer.
+
+The literal whites moved with the overlay. In flow the bar reads `var(--muted)`, `var(--hover)` and
+`var(--outline)` like every other control in the dialog, and it follows the theme. The tokens cannot
+be used over a photograph, because they flip with the theme and the picture does not.
+
+The warning pill follows the same split: a strip above the frame in the plain shape, the picture's
+top-left corner in the overlay. The strip is opened by `:has(.camwarn)`, so a camera with no warning
+pays nothing for it.
+
+The frame is capped at 58vh in the plain shape, 74vh under the overlay, 50vh below 600px.
+
+This needed a new element. `.stage` is exactly the picture's box — `.ab` and `.abgrip` are `inset: 0`
+of it, and that is what lines the two A/B halves up pixel for pixel — so anything that has to sit
+*beside* the picture cannot live inside it. `.player` wraps the frame, the bar and the pill as three
+siblings. On a mouse the last two are laid over the first and `.player` is still exactly the frame.
+On a phone `#tl` goes `position: static`, falls into flow under the frame, and `.player` grows to
+hold it.
+
+The frame gives up height for it: 50vh on a phone against the 74vh a mouse gets.
+
+Two things got simpler. The bar is no longer inside `.stage`, so the `tl.contains(e.target)` guards
+on the stage's click and its divider drag are gone — a press on a control never reaches the picture
+now. And the reveal is keyed on `.player:hover` rather than `.stage:hover`, so hovering the bar
+itself holds it open, which the old selector had to do through the delay.
+
+### The title says where the camera is
+
+`#lbTitle` was the camera's name alone. JPS names a camera for the road or the bridge it points at —
+`Pekan Batang Kali`, `JAMBATAN SUNGAI DAMANSARA` — which places it only for somebody who already
+knows the area.
+
+The district and the state are a second line under it now, in the same order and the same words the
+station card puts in its `.pophead`. The basin is left off. The card carries it, and it answers a
+question about the river rather than about where you are looking.
+
+The name wraps and the second line truncates. The dialog is sized by the picture and is at least
+460px wide, so a long place name has the room, and half a place name is worse than two lines of one.
+The second line is context rather than the answer, so it must not push the picture down a line.
+
+Both lines are set with `textContent`, not one interpolated string. They are upstream names.
+
+### The bar gave back a third of its height
+
+The first version of the bar was 90px of picture. Three changes took it to about 60.
+
+The caption line went, and its one fact with it. The chosen range segment now spells itself out —
+`24 hours, 30 minutes per frame` where the others read `week`, `month`, `year`. A pace stated on the
+button that sets it cannot be read against the wrong range, and it costs no row. The empty case moved
+with it: `week, nothing stored this far back`.
+
+The `Range` label beside the segments went the same way. It said which of the timeline's two
+dimensions the words change, which is worth a line in a footer and is not worth a line over a
+photograph. It survives as the group's `aria-label`.
+
+The icon buttons are 34px here, not the 40px they are everywhere else in the app, and the row gaps
+came down to 2px. Two rows of buttons stack over the frame, so six pixels a row is twelve off the
+picture — and these sit on a scrim that already separates them from what is behind, so they need less
+room than a button on the app bar to read as one.
+
+### The range segments grow into their label
+
+The chosen segment carries more words than the others, so every click changed the width of the pill
+at once. The control jumped, and the button under the pointer was not the button the pointer had
+aimed at by the time the click landed.
+
+Each segment now holds both labels. `.tls` is the short one, `.tll` is the long one, and the CSS
+wipes one out as the other comes in over 250ms. The text that is leaving stays in place and gets
+clipped to nothing, so the words moving out is the animation. Nothing measures anything, and the
+pill follows because its width is its content.
+
+A width of `auto` is not animatable on its own. `interpolate-size: allow-keywords` on `.tlr` makes
+it so, and it is declared there rather than on the root to keep it off every other element in the
+app. A browser without it swaps the labels at once, which is what the control did before. The
+transition is dropped under `prefers-reduced-motion: reduce`.
+
+### The divider says which way to drag
+
+The knob was a ring with the photograph showing through it. It stated that a circle was there and
+nothing about what to do with it, and on a pale frame the white outline went with the frame. It is now
+a solid white plate with a dark arrow each way. The plate reads over any picture, and the arrows are
+the only part that has to be read.
+
+The arrows are border triangles. There is no chevron in `css/icons.css`, and one pair of arrows in one
+control is not worth refetching the icon set for.
+
+`slide()` clamps the divider by half the knob's width instead of to 0 and 100 percent. At either end
+the knob used to hang half off the picture and onto the dialog behind it. The clamp reads the width
+off the element, because the knob grows to 44px on a coarse pointer. It costs the last few pixels of
+wipe at each end, which is the trade every before-and-after slider makes.
+
+The gesture itself still needs saying once. A picture cannot look draggable, and compare is the only
+control on this dialog that is not a button. `.hintbox` prints `Drag across the picture to compare`
+for three seconds every time the divider comes up, then fades. A permanent caption over a photograph
+would be read once and be in the way after that. It sits above the knob rather than near the foot of
+the frame, because the control bar covers the bottom of the picture and the pointer is on that bar at
+the moment compare is switched on.
+
+### The ends of the timeline say so
+
+`go()` clamps, so a step off the oldest frame and a step off the newest both land where they started.
+The button lit up and the picture did not change, which reads as a control that is broken rather than
+one that has finished.
+
+Both ends now speak, through the same `.hintbox` compare uses. `say()` writes the line and the box
+shows it for three seconds. The test is whether the picture moved, so pressing "go to now" on the
+newest frame answers too. Three lines cover it: `Oldest frame in this range`, `Live already, nothing
+newer`, and `Newest frame in this range` for the compare case, where live is the fixed side and the
+steps stop one frame short of it.
+
+The box holds no text of its own any more. There is one box and several things to say into it, so
+every line is written from `timeline.js`.
+
+### The left timestamp left the clipped box
+
+`.ab` is the older frame clipped to the divider. The label for that frame was inside it, so the
+divider cut the label in half whenever it came near the left edge. The right label, in the unclipped
+box, never had the problem, which is what made it look like a bug rather than a layout.
+
+Both labels are now children of `.stage`. `#lightbox:not(.cmp) .abtime` hides the left one, which the
+`hidden` attribute on `.ab` used to do for free.
+
+### A camera opens three hours back, and waits
+
+Opening rested on live. That is the right answer for a range button — you asked for a window, and the
+newest frame in it is the one you know — but it is the wrong answer for opening, because live is the
+frame the lightbox was already showing. Nothing new appeared, and the first thing the clip did was
+jump backwards.
+
+It now opens on the nearest frame to three hours ago. Far enough back that the water has moved, near
+enough that it is still this weather.
+
+Playback starts two seconds later instead of at once. A clip already running when the dialog finishes
+opening gives its first frames away to a reader who is still finding the picture. The delay is in
+`openTimeline()` and nowhere else. Somebody pressing a range button is already watching. Any
+deliberate move cancels it, because every one of them goes through `stop()`.
+
+### The press on the picture is answered on the picture
+
+The picture plays and pauses the clip. The only sign of it was a 34px glyph in the control bar, which
+self-hides on a mouse and is a long way from the middle of the frame either way, so half the presses
+read as nothing having happened.
+
+`.tapfx` flashes the state that was just entered in the middle of the frame, and is gone in under half
+a second. It is the answer every video player gives. The play button fires it too, so `k` and space
+get the same feedback as a click.
+
+### Trade-offs accepted
+
+The bar covers the bottom of the picture while it is up. That is the trade for the height, and it is
+the trade every video player makes.
+
+There is no tap-to-reveal on a phone. The bar is simply always there, which costs the bottom of the
+picture on the device with the least of it.
+
+The `title` on each tick is gone, and with it the only place a frame's own timestamp could be read
+without moving to it. `.btime` prints the current frame's stamp on the picture, which is the same
+fact for the frame anyone is actually looking at.

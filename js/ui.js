@@ -545,15 +545,27 @@ document.addEventListener('click', e => {
   // strip a prefix off the alt text — "Latest still from X" is a caption, and parsing a caption back
   // into a name is a rule that breaks the day the caption is reworded.
   full.alt = (img ? img.alt : btn.dataset.cap) || '';
-  el('lbTitle').textContent = (img || btn).dataset.name || full.alt;
-  /* The same warning as the card, on the full-size view. The camera id is read back out of the
-     proxied URL — `?cam=<n>` is the proxy's own shape, and the table's "show image" button builds
-     the same URL, so both openers are covered by one rule. The static build hotlinks upstream and
-     matches nothing here, which is correct: it has no archive and no payload behind it either. */
+  /* The camera behind this still. Read back out of the proxied URL — `?cam=<n>` is the proxy's own
+     shape, and the table's "show image" button builds the same URL, so both openers are covered by
+     one rule. The static build hotlinks upstream and matches nothing here, which is correct: it has
+     no archive and no payload behind it either. */
   const n = /[?&]cam=(\d+)/.exec(src || '')?.[1];
   const c = n ? byId('camera-' + n) : null;
+  /* Place on the first line, district and state under it — the same order and the same words the
+     station card puts in its `.pophead`, because it is the same question. A JPS camera is named for
+     the road or the bridge it points at ("JAMBATAN SUNGAI DAMANSARA"), which places it only for
+     somebody who already knows the area. The basin is left off: the card carries it, and it answers
+     a question about the river rather than about where you are looking.
+     `textContent` on both, not one interpolated string. These are upstream names. */
+  const head = el('lbTitle');
+  head.textContent = (img || btn).dataset.name || full.alt;
+  const where = c && [c.district, c.state].filter(Boolean).join(', ');
+  if (where) head.append(Object.assign(document.createElement('span'),
+    { className: 'lbwhere', textContent: where }));
   lightbox.querySelector('.camwarn')?.remove();
-  if (c) lightbox.querySelector('.stage').insertAdjacentHTML('beforeend', camWarn(c));
+  // `.player`, not `.stage`: on a phone the pill sits above the frame rather than in a corner of it,
+  // and `.stage` is exactly the frame.
+  if (c) lightbox.querySelector('.player').insertAdjacentHTML('beforeend', camWarn(c));
   lightbox.showModal();
   openTimeline(src);   // no-op unless this is a proxied camera with an archive behind it
 });

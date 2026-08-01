@@ -32,11 +32,15 @@ import { byId } from './stations.js';
    No 6-hour stop: the capture rate is `SHOT_EVERY` (30 min), so a "keep every frame" window is a
    30-minute window with a second name — the finest resolution that exists is one frame per half
    hour, and 24 h is where it is already offered. */
+/* `label` is the resting word, `long` and `every` are what the *chosen* segment says instead — the
+   pace was a caption line of its own under the controls, which is a whole row of chrome to state a
+   fact about one of five buttons. On the button it costs nothing and cannot be read against the
+   wrong range. */
 const RANGES = [
-  { label: '24 h',  win: 24 * 3600,   step: 1800,       every: 'one frame every 30 minutes' },
-  { label: 'week',  win: 7 * 86400,   step: 3 * 3600,   every: 'one frame every 3 hours' },
-  { label: 'month', win: 30 * 86400,  step: 12 * 3600,  every: 'one frame every 12 hours' },
-  { label: 'year',  win: 365 * 86400, step: 7 * 86400,  every: 'one frame a week' },
+  { label: '24 h',  long: '24 hours', win: 24 * 3600,   step: 1800,       every: '30 minutes per frame' },
+  { label: 'week',  long: 'week',     win: 7 * 86400,   step: 3 * 3600,   every: '3 hours per frame' },
+  { label: 'month', long: 'month',    win: 30 * 86400,  step: 12 * 3600,  every: '12 hours per frame' },
+  { label: 'year',  long: 'year',     win: 365 * 86400, step: 7 * 86400,  every: '1 week per frame' },
 ];
 /* One frame a second. Not an animation frame rate — consecutive frames here are 30 minutes to a week
    apart, so nothing on screen is continuous with what preceded it and there is no motion to smooth.
@@ -65,9 +69,10 @@ const grip  = box.querySelector('.abgrip');
 const tl    = el('tl');
 const scrub = el('tlscrub');
 const ticks = box.querySelector('.tlticks');
-const meta  = box.querySelector('.tlmeta');
 const play  = box.querySelector('.tlplay');
 const cmp   = box.querySelector('.tlcmp');
+const hint  = box.querySelector('.hintbox');
+const tapfx = box.querySelector('.tapfx');
 
 let cam = null;      // camera id while the lightbox is showing one, else null
 let all = [];        // every stored frame, unix seconds, ascending
@@ -76,6 +81,7 @@ let frames = [];     // the subset inside the chosen range
 let liveSrc = '';    // the live proxied still — always the last position on the scrubber
 let range = RANGES[0];
 let timer = null;
+let lead = null;     // the pause before a freshly opened camera starts playing itself
 
 const srcOf = ts => `api.php?shot=${cam}&t=${ts}`;
 // One past the end of `frames` is the live still. It is not in the archive — it is what the lightbox
@@ -85,7 +91,8 @@ const srcAt  = i => isLive(i) ? liveSrc : srcOf(frames[i]);
 const labelAt = i => isLive(i) ? 'live' : stamp(frames[i]);
 
 tl.querySelector('.tlranges').innerHTML = RANGES.map((r, i) =>
-  `<button class="tlr" data-i="${i}">${r.label}</button>`).join('');
+  `<button class="tlr" data-i="${i}"><span class="tls">${r.label}</span
+   ><span class="tll"></span></button>`).join('');
 
 function paint() {
   if (!cam) return;   // nothing to paint from, and the img belongs to whoever opened the lightbox
@@ -99,6 +106,9 @@ function paint() {
      the only thing there is and it has to be the one that moves — otherwise scrubbing a lightbox
      with compare turned off would change the timestamp and nothing else. */
   const on = !ab.hidden;
+  // The played part of the seek bar. The input is transparent (every visible part of the bar is
+  // painted by `.tltrack`), so the fill is a custom property rather than `accent-color`.
+  scrub.parentElement.style.setProperty('--p', +scrub.max ? i / +scrub.max : 0);
   imgB.src = on ? liveSrc : srcAt(i);
   box.querySelector('.btime').textContent = on ? 'live' : labelAt(i);
   if (on) {
@@ -118,21 +128,21 @@ function thin(list, step) {
   return [...keep.values()];
 }
 
-/* A ruler under the scrubber: one mark per frame. Marks taken while a river within CAM_ALERT_KM was
-   at danger, or forecast to reach it, carry that tier as a color — so the strip answers "when did
-   this start" without playing the whole clip.
+/* Colour inside the seek bar, over the frames taken while a river within CAM_ALERT_KM was at danger
+   or was forecast to reach it — so the bar answers "when did this start" without playing the clip.
+   One span per alerting frame, a frame wide, in that tier's status colour. Only those: a mark per
+   stored frame drew a 60-line ruler over the one control here that has to be dragged, and a
+   graduation is not what this strip is for.
    The reader's own ignore list is applied here rather than on the server, which never learns it. A
-   tick raised by an ignored sensor falls back to plain, not to the next worst river. */
+   span raised by an ignored sensor is simply not drawn. */
 function drawTicks() {
+  const n = +scrub.max || 1;
   ticks.innerHTML = frames.map((ts, i) => {
     const a  = tierAt.get(ts);
     const st = a ? byId(a.id) : null;
-    const on = !!a && !(st && isIgnored(st));
-    const why = on ? ` · ${a.tier === 'now' ? 'at danger' : 'forecast'}` : '';
-    return `<i data-i="${i}" title="${stamp(ts)}${why}" class="${on ? 't-' + a.tier : ''}"
-               style="left:${i / scrub.max * 100}%"></i>`;
-  }).join('') + (frames.length
-    ? `<i class="now" data-i="${frames.length}" title="live" style="left:100%"></i>` : '');
+    if (!a || (st && isIgnored(st))) return '';
+    return `<i class="t-${a.tier}" style="left:${i / n * 100}%;width:${100 / n}%"></i>`;
+  }).join('');
 }
 
 function setRange(r) {
@@ -146,13 +156,18 @@ function setRange(r) {
      should begin at the far end of the range that was just asked for. Both mean "further back",
      which is the only reason to reach for a wider range in the first place. */
   scrub.value = (timer || !ab.hidden) ? 0 : frames.length;
-  tl.querySelectorAll('.tlr').forEach((b, i) => b.classList.toggle('on', RANGES[i] === r));
-  /* The pace, and only the pace. It is the one thing not guessable from the picture — every range
-     plays at a frame a second, so while running they look identical and differ only in what each
-     second is worth. The frame count and the span were here too and are gone: both are already on
-     screen as the tick strip, which shows the count by being countable and the span by starting at
-     the left edge, and a caption repeating them in words made three lines of chrome out of one. */
-  meta.textContent = frames.length ? r.every : 'nothing stored this far back — live only';
+  /* The chosen segment spells itself out; the rest stay one word. The pace is the one thing not
+     guessable from the picture — every range plays at a frame a second, so while running they look
+     identical and differ only in what each second is worth. An empty window says so in the same
+     place, which is the only other thing the old caption line was ever used for. */
+  tl.querySelectorAll('.tlr').forEach((b, i) => {
+    const on = RANGES[i] === r;
+    b.classList.toggle('on', on);
+    /* Both labels stay in the button and the CSS wipes one out as the other comes in. The one being
+       dropped keeps its text: it is clipped to nothing, and the words leaving is the animation. */
+    if (on) b.querySelector('.tll').textContent =
+      `${r.long}, ${frames.length ? r.every : 'nothing stored this far back'}`;
+  });
   drawTicks();
   // Warm the whole window at once. It is at most ~60 frames off local disk, served immutable, and
   // the alternative is a scrubber that stutters on every drag — the one interaction this exists for.
@@ -163,6 +178,11 @@ function setRange(r) {
 function stop() {
   clearInterval(timer);
   timer = null;
+  /* Every deliberate stop cancels the opening delay too. The scrubber, the steps and the compare
+     button all come through here, and each of them means "I am looking at this frame" — a clip that
+     started itself two seconds later would carry them straight off it. */
+  clearTimeout(lead);
+  lead = null;
   play.firstElementChild.className = 'i i-play_arrow';
   // Title and label diverge: the tooltip carries the key, the accessible name must not — a screen
   // reader announcing "Play open-paren k" reads the binding as part of the control's name.
@@ -186,10 +206,19 @@ const lastPos = () => ab.hidden ? frames.length : frames.length - 1;
    Clamped, not wrapped. Playback loops because a clip that stops dead means pressing play again;
    a step is a nudge, and a nudge off the oldest frame that lands on the newest is a jump, not a
    nudge. The ceiling is `lastPos()`, so while comparing the steps stay off live for the same reason
-   playback does — it is the fixed side, and stepping onto it lays the picture over itself. */
+   playback does — it is the fixed side, and stepping onto it lays the picture over itself.
+   A clamp that lands where it started paints nothing, and a control that answers a press with
+   nothing on screen reads as broken rather than as finished. So the ends say so. The test is "did
+   the picture move", which covers "now" pressed on the newest frame as well as a step off either
+   end — the button lit up, and that is the only other thing that happened. */
 function go(i) {
   stop();
-  scrub.value = Math.max(0, Math.min(lastPos(), i));
+  const at = Math.max(0, Math.min(lastPos(), i));
+  if (at === +scrub.value)
+    say(at === 0 ? 'Oldest frame in this range'
+      : isLive(at) ? 'Live already, nothing newer'
+      : 'Newest frame in this range');
+  scrub.value = at;
   paint();
 }
 
@@ -197,10 +226,25 @@ function go(i) {
    the flush; requestAnimationFrame is not, because its callbacks run before the frame's style recalc
    — the same trap `#gotoBox`'s focus hit. Without it a second press inside the animation's 350ms
    adds a class that is already there and paints nothing. */
-function flash(b) {
-  b.classList.remove('flash');
+function flash(b, cls = 'flash') {
+  b.classList.remove(cls);
   b.offsetWidth;
-  b.classList.add('flash');
+  b.classList.add(cls);
+}
+
+/* The picture's one line of speech. Every message is written here rather than held in the markup,
+   because there is one box and several things to say into it. */
+function say(msg) {
+  hint.textContent = msg;
+  flash(hint, 'on');
+}
+
+/* The middle-of-the-picture play/pause flash, showing the state that was just entered — the same
+   answer every video player gives a press on the frame. Called from the two presses a reader makes
+   with their eyes on the picture: the picture itself, and the play button. */
+function tapFlash() {
+  tapfx.firstElementChild.className = timer ? 'i i-play_arrow' : 'i i-pause';
+  flash(tapfx, 'on');
 }
 
 /* Loops. A camera clip is 12–60 frames — under 20 seconds — and stopping dead at the end of a river
@@ -239,6 +283,9 @@ function setCompare(on) {
      frame in range instead: the widest gap available, and the pairing this feature used to show by
      default. */
   if (!ab.hidden && isLive(+scrub.value)) scrub.value = 0;
+  // The gesture is a drag across a photograph, and a photograph cannot look draggable. Said once,
+  // for three seconds, each time the divider comes up.
+  if (!ab.hidden) say('Drag across the picture to compare');
   // Both ways, not just on. Switching compare *off* has to hand the moving frame back to the base
   // image, which is holding the live still while the divider is up.
   paint();
@@ -246,10 +293,17 @@ function setCompare(on) {
 
 /* Drag anywhere on the stage, not only on the handle: on a phone the divider is 2px wide and a
    2px drag target is a target nobody hits. Pointer events, so mouse and touch are one path. */
+/* Clamped in pixels, by half the knob, so the knob stays on the picture — at 0% it hung off the edge
+   of the frame with half of it over the dialog. Read off the element rather than named here: the knob
+   grows to 44px on a coarse pointer, and two places holding the same number is one place to forget.
+   `--ab` drives the line, the knob and the clip on `.ab` together, so clamping here keeps the three
+   in step. It costs the last few pixels of wipe at either end, which is what every before-and-after
+   slider does for the same reason. */
 function slide(e) {
   const r = stage.getBoundingClientRect();
-  stage.style.setProperty('--ab',
-    `${Math.max(0, Math.min(100, (e.clientX - r.left) / r.width * 100)).toFixed(1)}%`);
+  const k = grip.firstElementChild.offsetWidth / 2;
+  const x = Math.max(k, Math.min(r.width - k, e.clientX - r.left));
+  stage.style.setProperty('--ab', `${(x / r.width * 100).toFixed(1)}%`);
 }
 stage.addEventListener('pointerdown', e => {
   if (ab.hidden) return;
@@ -267,23 +321,17 @@ stage.addEventListener('pointermove', e => {
    Not while comparing: there a press on the stage is the start of a drag on the divider, and the
    same gesture cannot be both. `frames.length < 2` is toggle()'s own guard, so a camera with no
    archive behind it keeps an inert picture rather than one that swallows clicks. */
-stage.onclick = () => { if (ab.hidden && !tl.hidden) { flash(play); toggle(); } };
+stage.onclick = () => { if (ab.hidden && !tl.hidden) { toggle(); tapFlash(); } };
 
 scrub.oninput = () => { stop(); paint(); };
-/* A mark is its frame. Clicking one is the same act as dragging the thumb onto it — with the
-   timestamp already read off the tooltip, which is the case the scrubber serves worst: it has no
-   labels, so finding 18:00 on it is a drag-and-watch. Stops playback for the reason `oninput` does,
-   that having gone to a specific frame you are not asking to be carried off it a second later. */
-ticks.onclick = e => {
-  const t = e.target.closest('[data-i]');
-  if (t) go(+t.dataset.i);
-};
 const prevBtn = tl.querySelector('.tlstep[data-d="-1"]');
 const nextBtn = tl.querySelector('.tlstep[data-d="1"]');
 const nowBtn  = tl.querySelector('.tlnow');
 const trans   = tl.querySelector('.tltransport');
 
-play.onclick = toggle;
+// The button flashes as well (the group listener below), but the eyes are on the frame, not on a
+// 34px control — and `k` and space reach this same handler, so the keyboard gets the flash too.
+play.onclick = () => { toggle(); tapFlash(); };
 tl.querySelectorAll('.tlstep').forEach(b => { b.onclick = () => go(+scrub.value + +b.dataset.d); });
 /* "Now" is `lastPos()`, not `frames.length`, so while comparing it lands on the newest *archived*
    frame instead of on live. Live is the fixed side there; the nearest thing to now that the moving
@@ -385,14 +433,27 @@ export async function openTimeline(src) {
      footer exists to replace. */
   const t0 = Date.now() / 1000;
   setRange(RANGES.find(r => all.filter(ts => ts >= t0 - r.win).length >= 2) ?? RANGES[0]);
+  /* Open three hours back, not on live. `setRange()` rests on live, which is the right answer when a
+     range is chosen — you asked for a window and the newest frame in it is the one you know. Opening
+     is a different question: the frame on screen is the one the lightbox was already showing, so
+     resting there shows nothing new and the first thing the clip does is jump backwards. Three hours
+     is far enough that the water has moved and near enough to still be this weather. */
+  const OPEN_BACK = 3 * 3600;
+  const i = frames.findIndex(ts => ts >= t0 - OPEN_BACK);
+  scrub.value = i < 0 ? 0 : i;
+  paint();
   /* And plays, without being asked. Opening a camera full-screen *is* the request to look at it
      properly, and the archive is the only thing here that has to be set in motion to be seen at all
      — a still that opens paused looks exactly like a camera with no history behind it, which is what
      the lightbox showed before this feature existed. The controls are right there the moment it
      starts, so stopping it costs one press; finding out there was anything to play cost a press
      nobody knew to make. Compare is always off at this point (reset() turns it off), so this is the
-     unconditional case of the same rule the range buttons follow. */
-  toggle();
+     unconditional case of the same rule the range buttons follow.
+     Two seconds late, though. A clip that is already running when the dialog finishes opening gives
+     the opening frame away, and the reader is still finding the picture. The delay belongs here and
+     nowhere else — a range button is pressed by somebody who is already watching. Any deliberate
+     move cancels it, through `stop()`. */
+  lead = setTimeout(() => { lead = null; if (!timer) toggle(); }, 2000);
   /* And takes focus. `<dialog>` focuses the first focusable thing it finds, which was the × — so
      space, the key everyone reaches for first in a player, closed the lightbox. The footer does not
      exist yet when showModal() runs (it is `hidden` until the archive has been fetched), so

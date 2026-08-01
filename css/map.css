@@ -214,24 +214,32 @@
 
 /* The alert marker on a camera picture. Top left, because the bottom carries the timestamp overlay
    JPS burns into its own frames and the right is where the lightbox close button lands.
-   Absolute inside .shotwrap and inside .stage — both are already positioned.
+   Absolute inside .shotwrap and inside .player — both are already positioned.
    It says what is wrong on the picture itself. It was a glyph on a dark disc with the words in a
    `title`, which is a tooltip that never opens on a phone, opens after a second on a mouse, and
    cannot be styled — so the marker meant "something" and the something was unreachable on half the
    devices this runs on. The disc went with it: a chip of furniture in the corner of a photograph,
    sized for a glyph that is no longer alone there.
-   Legibility is a shadow now, not a plate. Camera footage is bright sky and wet concrete, so the
-   glyph carries the same `drop-shadow` the map pins use against busy tiles, and the words carry a
-   `text-shadow` hard enough to hold over either. `pointer-events: none` because the picture under it
-   opens the lightbox, and a 28px dead square in the corner of it was the old disc's other cost. */
+   A translucent pill, not a disc and not bare words. The disc was furniture around a glyph that no
+   longer stands alone; bare words with a heavy `text-shadow` replaced it and held over most footage
+   but not all of it — this is JPS daylight video of wet concrete and bright sky, and a shadow only
+   darkens what is already behind the letters. One box behind the glyph and the words together reads
+   as one label, keeps the shadow as a second line of defence, and lets the blur carry the rest.
+   `pointer-events: none` because the picture under it opens the lightbox, and a dead patch in the
+   corner of it was the old disc's other cost. */
 .camwarn {
   position: absolute; top: 8px; left: 8px; z-index: 2;
   display: flex; align-items: center; gap: 5px; max-width: calc(100% - 16px);
+  padding: 4px 10px 4px 8px; border-radius: 999px;
+  background: rgb(0 0 0 / .55); backdrop-filter: blur(3px);
   font: 500 12px/1.25 Roboto, sans-serif;
-  color: #fff; text-shadow: 0 1px 3px rgb(0 0 0 / .95), 0 0 10px rgb(0 0 0 / .7);
+  color: #fff; text-shadow: 0 1px 3px rgb(0 0 0 / .95);
   pointer-events: none;
 }
-.camwarn .i { font-size: 22px; flex: none; filter: drop-shadow(0 1px 3px rgb(0 0 0 / .95)); }
+/* 16px, not the 22px it was. The glyph was sized to be legible alone on a photograph; inside the
+   pill it is one of two things on a line of 12px text, and at 22px it reached the pill's own edge
+   and made a badge out of a label. */
+.camwarn .i { font-size: 16px; flex: none; filter: drop-shadow(0 1px 3px rgb(0 0 0 / .95)); }
 .camwarn.t-now  .i { color: var(--s-danger); }
 .camwarn.t-soon .i { color: var(--s-warning); }
 
