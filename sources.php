@@ -169,6 +169,27 @@ function wlStatus(?float $lvl, ?float $alert, ?float $warning, ?float $danger): 
     return 0;
 }
 
+/**
+ * A flood gauge's rung, from the depth over the spot it watches.
+ *
+ * Four rungs against two published marks, which is the same shape `gaugeTone()` draws client-side
+ * and has to stay so: dry ground is 0, any standing water at all is 1, the 0.15 m warning mark is 2,
+ * the 0.3 m danger mark is 3. The middle rung exists because upstream publishes three codes against
+ * its two marks, so water shallower than 0.15 m shared a code with dry ground — and a wet spot
+ * painted like a dry one is the one thing a flood gauge must never do.
+ *
+ * Here rather than in the browser for the reason every status is here: one definition. `gaugeTone()`
+ * reads the code upstream published for the *current* reading; this scores a stored depth, which
+ * upstream never scored at all.
+ */
+function gaugeStatus(?float $depth, ?float $warning, ?float $danger): int {
+    if ($depth === null) return -1;
+    if ($depth <= 0) return 0;
+    if ($danger  !== null && $depth >= $danger)  return 3;
+    if ($warning !== null && $depth >= $warning) return 2;
+    return 1;
+}
+
 /** JPS rainfall intensity classes (mm in the last hour), as published on the national portal. */
 function rainStatus(?float $hourly): int {
     if ($hourly === null) return -1;

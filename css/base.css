@@ -441,6 +441,10 @@ dialog:focus, dialog:focus-visible { outline: none; }
   width: 11px; height: 11px; color: var(--muted); opacity: .55; pointer-events: none;
 }
 .spark line { stroke: var(--outline); stroke-width: 1; }
+/* A published mark, drawn across the plot — see `sparkline()` for when one is drawn at all. Dashed,
+   because it is a threshold and not a reading, and the one solid line on this graph is the water.
+   Its colour is set inline from `statusColor()`. */
+.spark line.mk { stroke-width: 1; stroke-dasharray: 4 3; opacity: .85; }
 /* The crosshair at the sample under the pointer — drawn by js/sparktip.js, which explains why it is
    in the SVG. `non-scaling-stroke` because the viewBox is stretched: without it a 1-unit line comes
    out as many pixels wide as the graph is stretched. It is the readout's own line, so it takes the
@@ -471,6 +475,14 @@ dialog:focus, dialog:focus-visible { outline: none; }
   transform: translate(-50%, -100%);
 }
 .sparktip.below { transform: translate(-50%, 0); }
+/* The glyph on a sample at the warning rung or above. `:popover-open`, never on `.sparktip` itself:
+   a browser closes a popover with `[popover]:not(:popover-open) { display: none }` in its own
+   stylesheet, and an author `display` beats it — which is how `#dataBox` ended up laid out on the
+   page behind the map. Same trap, same guard.
+   The colour is written on the element by sparktip.js and the glyph paints in `currentColor`, so the
+   two cannot disagree. */
+.sparktip:popover-open { display: flex; align-items: center; gap: 4px; }
+.sparktip.warn::before { --i: var(--i-warning); width: 12px; height: 12px; flex: none; }
 
 .meter { margin: 4px 0 10px; }
 .meter .mtop { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }

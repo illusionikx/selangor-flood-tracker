@@ -64,12 +64,20 @@ function show(e) {
      readings anyway — it holds the last thing the station said. */
   let hit = pts[0];
   for (const p of pts) { if (p[0] > at) break; hit = p; }
-  const label = hit[1];
+  const [, label, tone, warn] = hit;
 
   crosshair(svg, at);
 
+  /* The sample's own status, dressed by the graph that drew it: a colour to print the reading in,
+     and a glyph when it is at the warning rung or above. Both arrive in `data-pts` as a CSS colour
+     and a flag — this module still knows no units, no clock, no kinds and no palette, and a graph
+     with nothing to say about status simply ships neither. The status behind them is `api.php`'s,
+     scored where the reading was stored. See `sparkPoints()` and `TONE` in popup.js.
+     `textContent`, still: the glyph is a `::before` in CSS, so nothing here builds markup. */
   const t = box();
   t.textContent = label;
+  t.style.color = tone || '';
+  t.classList.toggle('warn', !!warn);
   if (!t.matches(':popover-open')) t.showPopover();
   // Above the graph, unless there is no room — the table's panels open near the top of the screen.
   // Measured after it is shown, because a popover that is closed has no width to clamp against.

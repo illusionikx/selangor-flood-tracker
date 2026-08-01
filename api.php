@@ -293,14 +293,25 @@ if (is_file(CACHE)) {
  *
  * $peak keeps the highest value in the bucket instead of the newest — for sirens, where the samples
  * are 0/1 and a trigger that stopped inside one bucket is the single thing the graph exists to show.
+ *
+ * $score, where a kind has one, appends the status that sample was at: [ts, value, code]. The hover
+ * readout on the graph colours itself by it and marks anything at the warning rung or above. It is
+ * scored HERE and not in the browser for the same reason the live reading is — there is one
+ * definition of a status in this app and it is this file's, through the same wlStatus()/rainStatus()
+ * the feeds themselves go through. A client comparing a historical value to the marks beside it
+ * would be a second definition, and the second one is always the one that drifts.
+ * Kinds without a scorer keep the two-element shape, and every reader destructures [ts, value], so
+ * the extra element is invisible to all of them.
  */
-function sparkPoints(array $points, int $now, int $bucket = SPARK_BUCKET, bool $peak = false): array {
+function sparkPoints(array $points, int $now, int $bucket = SPARK_BUCKET, bool $peak = false,
+                     ?callable $score = null): array {
     $out = [];
     foreach ($points as [$ts, $v]) {
         if ($now - $ts > SPARK_WIN) continue;
         $b = intdiv($ts, $bucket);
         if ($peak && isset($out[$b]) && $out[$b][1] >= $v) continue;
-        $out[$b] = [$ts, round($v, 3)];
+        $r = round($v, 3);
+        $out[$b] = $score ? [$ts, $r, $score($r)] : [$ts, $r];
     }
     ksort($out);
     return array_values($out);
@@ -622,7 +633,8 @@ foreach ($stations as &$s) {
     $key = $s['id'];
     $ts  = readTs($s['updated'] ?? null, $now);
     $s['history'] = sparkPoints(
-        array_merge($hist[$key] ?? [], [[$ts, (float)$s['hourly']]]), $now, RAIN_BUCKET);
+        array_merge($hist[$key] ?? [], [[$ts, (float)$s['hourly']]]), $now, RAIN_BUCKET,
+        false, fn($v) => rainStatus($v));
     $samples[$key] = [$ts, (float)$s['hourly']];
 }
 unset($s);
@@ -641,7 +653,8 @@ foreach ($stations as &$s) {
     $key = $s['id'];
     $ts  = readTs($s['updated'] ?? null, $now);
     $hist[$key] = array_merge($hist[$key] ?? [], [[$ts, (float)$s['depth']]]);
-    $s['history'] = sparkPoints($hist[$key], $now);
+    $s['history'] = sparkPoints($hist[$key], $now, SPARK_BUCKET, false,
+        fn($v) => gaugeStatus($v, $s['warning'] ?? null, $s['danger'] ?? null));
     $samples[$key] = [$ts, (float)$s['depth']];
 }
 unset($s);
@@ -722,8 +735,10 @@ foreach ($stations as &$s) {
     $s['rising'] = $eta !== null && $eta <= RISE_ETA && $prev !== null && $prev <= RISE_ETA;
     // The SPHTN arrow no longer stands in at cold start: "Rising" is now a claim about reaching a
     // danger mark within hours, and a bare direction arrow is no evidence for that.
-    // [unix seconds, metres] — the graph plots against the clock, so it needs the clock.
-    $s['history'] = sparkPoints($points, $now);
+    // [unix seconds, metres, status] — the graph plots against the clock, so it needs the clock, and
+    // the readout names the band each sample was in.
+    $s['history'] = sparkPoints($points, $now, SPARK_BUCKET, false,
+        fn($v) => wlStatus($v, $s['alert'] ?? null, $s['warning'] ?? null, $s['danger'] ?? null));
     $samples[$key] = [$ts, $lvl];
 }
 unset($s);

@@ -4179,3 +4179,93 @@ almost nothing in it, which is the one that needed help.
 
 The glyph has no words. The caption under every graph already says what window it covers, and a
 `title` is not a tooltip on a phone.
+
+## The level graph draws the marks the water is near
+
+A sparkline now draws the station's own alert, warning and danger marks across the plot, dashed, in
+the status colour each one means everywhere else. A flood gauge draws its two.
+
+The hard part is not the line. It is the y axis. The axis spans the readings and nothing else,
+because the readings are the point: a river that moved 8 cm in twelve hours has to draw those 8 cm
+as a shape. Stretch the axis up to a danger mark three metres above and that shape flattens to a
+straight line under a red rule, which says less than the graph said before — on the 95 of 105 rivers
+that are nowhere near their marks, which is every river most days.
+
+So a mark is drawn only when it is within one *data span* of the readings, and the axis grows only
+that far. Stated as a guarantee: the readings always keep at least half the height of the graph. A
+mark further away than the river has moved all day is not something this graph can show without
+becoming a worse graph, and the meter directly above states all three with their values anyway.
+Perfectly flat readings have no shape to lose, so they fall back to the alert→danger gap.
+
+Measured on the payload it was built against: 10 of 105 rivers draw a mark on a quiet day. Every
+station climbing into trouble draws them the whole way up, which is when they are worth having.
+
+### Trade-offs accepted
+
+The marks carry no labels. Text in a stretched viewBox distorts, which is why the hour labels are
+HTML underneath, and a second HTML layer for three dashes is more machinery than the meter above
+already provides. The colours are the app's status ramp and they mean the same three things here as
+everywhere else.
+
+A calm river shows nothing new. That is the feature working: the mark appears as the water comes
+within reach of it, which makes its arrival information rather than furniture.
+
+## Rainfall draws its classes, and the readout names the band
+
+Two halves of the same change: a sample's status is now a fact the graph carries, so both the plot
+and the readout can use it.
+
+**The rain graph draws JPS's intensity classes** — moderate at 10 mm/h, heavy at 30, the top class
+at 60, in `RAIN_COLOR`. The boundaries are `RAIN_STOPS`, the same array the heat gradient is keyed
+on, so the graph and the map cannot disagree about where heavy rain starts. Same admission rule as
+the level graph: a class is drawn only when it is within one data span of the readings. The rain
+axis is zero-based, so that span is the peak itself, and 4 mm/h of drizzle does not get its graph
+flattened to draw a line at 60.
+
+**The hover readout is printed in the sample's own colour**, with a warning glyph from the warning
+rung up. A river wears the traffic light from its first mark (`RIVER_COLOR`) and the glyph starts at
+its warning mark. Rainfall wears `RAIN_COLOR` and the glyph starts at *heavy*: light and moderate
+rain is most of the rain there ever is, and a warning triangle on a drizzle is the cry-wolf failure
+the alert standard exists to prevent.
+
+### The status is scored where the reading is stored
+
+The client does not compare a historical value to the marks beside it. That would be a second
+definition of a status, and the second one always drifts. `sparkPoints()` in `api.php` takes an
+optional scorer and appends the code to each sample: `[ts, value, code]`, through the same
+`wlStatus()`, `rainStatus()` and `gaugeStatus()` the feeds themselves go through. Rivers, rainfall
+and flood gauges have a scorer. Sirens keep the two-element shape and print plain: their samples are
+0 and 1, and the readout already says "sounding" or "quiet" in words.
+
+Every reader destructures `[ts, value]`, so the extra element is invisible to all of them. It costs
+about 7.5 KB on a 284 KB payload.
+
+`js/sparktip.js` still knows no units, no clock, no kinds and no palette. It receives a CSS colour
+and a flag in `data-pts` and writes them to the element. The glyph is a `::before`, so the module
+builds no markup and keeps using `textContent`.
+
+### The tip's `display` is on `:popover-open`
+
+`.sparktip` needed `display: flex` for the glyph. A browser closes a popover with
+`[popover]:not(:popover-open) { display: none }` in its own stylesheet, and an author rule setting
+`display` beats it — which is exactly how the stations table ended up laid out on the page behind
+the map. The rule is on `:popover-open`, and it is the same guard for the same trap.
+
+### The gauge scorer is new, and it is not a new alert surface
+
+`gaugeStatus()` joins the other two in `sources.php`. Four rungs against two published marks, the
+same shape `gaugeTone()` draws client-side and has to stay so: dry ground is 0, any standing water is
+1, the 0.15 m warning mark is 2, the 0.3 m danger mark is 3. `gaugeTone()` reads the code upstream
+published for the current reading. This scores a stored depth, which upstream never scored at all.
+
+A gauge readout wears `GAUGE_COLOR`, whose second rung is `--s-trace` rather than the alert amber,
+because upstream published no mark down there. Its glyph starts at rung 2, which is a published mark.
+
+That glyph is not a widening of `isCritical()` and nothing about what alerts you has moved. It is a
+readout under a pointer, on a sample somebody went looking for, and it counts nothing, badges
+nothing and interrupts nobody. The alert design standard governs what claims attention. This waits
+to be asked.
+
+### Trade-offs accepted
+
+The per-sample code costs about 7.5 KB on a 284 KB payload, now across three kinds.

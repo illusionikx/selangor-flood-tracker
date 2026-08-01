@@ -1,7 +1,8 @@
 // Every popup shares one template: badge + name + region header, then a kind-specific body, then a
 // status footer. The same meter/state blocks are reused by the alert panel.
 
-import { KINDS, SOURCES, SPARK_H, NO_INFO, ALERT_TITLE, camSrc } from './config.js';
+import { KINDS, SOURCES, SPARK_H, NO_INFO, ALERT_TITLE, RIVER_COLOR, RAIN_COLOR,
+         GAUGE_COLOR, RAIN_STOPS, camSrc } from './config.js';
 import { num, ago, noSec, parseMY, distKm, hasInfo, isStale, statusColor, scalePos,
          levelStops, gaugeStops, gaugeColor, color } from './util.js';
 import { nearestOf, nearestCam, nearestLevel, camAlert } from './stations.js';
@@ -289,8 +290,8 @@ function sensorBody(s, withCam = true) {
   // for the trend (m/h, hours to danger) but not the shape they came from.
   // Gauges get one too, in their own taupe: "0.12 m of water" is a fact, "filling for three hours"
   // is the answer. Only where there is history — offline gauges are not sampled at all.
-  const spark = s.kind === 'river' ? sparkline(s.history)
-    : s.kind === 'gauge' && s.history?.length ? sparkline(s.history, 'gauge') : '';
+  const spark = s.kind === 'river' ? sparkline(s.history, 'river', s)
+    : s.kind === 'gauge' && s.history?.length ? sparkline(s.history, 'gauge', s) : '';
   const wet = s.kind === 'rainfall' ? rainState(s) : '';
   // A siren has exactly one thing to say, so it gets a centred state block instead of a metric row.
   // "No signal" is only half the story — a siren that fell off the network last March must not read
@@ -505,8 +506,34 @@ const rules = ticks => ticks.map(t =>
    own units and its own words for a value, and js/sparktip.js is deliberately one listener for all
    three. `[x%, label]` per sample, so the module needs no scale, no clock and no notion of what it
    is pointing at. Single-quoted attribute, because JSON quotes with double ones. */
-const readout = (inWin, x, label) => ` data-pts='${JSON.stringify(
-  inWin.map(([t, v]) => [+x(t), `${label(v)} · ${MYT_CLOCK.format(t * 1000)}`]))}'`;
+/* How a sample's own status is dressed in the readout: the colour to print it in, and whether it
+   earns a warning glyph. Keyed by kind because the two ramps are different questions. A river wears
+   the traffic light from its first mark up (`RIVER_COLOR`), and the glyph starts at the warning
+   mark — the second of its three. Rainfall has no marks of its own, only JPS's four intensity
+   classes, so it wears `RAIN_COLOR` and the glyph starts at *heavy*: light and moderate rain is most
+   of the rain there ever is, and a warning triangle on a drizzle is the cry-wolf failure the alert
+   standard is about.
+   A flood gauge wears `GAUGE_COLOR`, whose second rung is `--s-trace` and not the alert amber
+   because upstream published no mark down there. Its glyph starts at rung 2, which *is* a published
+   mark — the 0.15 m warning. This is not a new alert surface and does not widen `isCritical()`: it
+   is a readout under a pointer, on a sample somebody went looking for, and it counts nothing, badges
+   nothing and interrupts nobody. The alert standard is about what claims attention; this waits to be
+   asked.
+   The code itself is `api.php`'s — see `sparkPoints()`. Nothing here derives a status. */
+const TONE = {
+  river:    c => [RIVER_COLOR[c], c >= 2],
+  rainfall: c => [RAIN_COLOR[c],  c >= 3],
+  gauge:    c => [GAUGE_COLOR[c], c >= 2],
+};
+
+/* `[x%, text, colour, warn]` per sample. The third and fourth are absent on a kind that has no
+   status to give, and js/sparktip.js treats both as "print it plain" — so a graph opts in by having
+   a scorer server-side, and no reader needs a special case. */
+const readout = (inWin, x, label, kind) => ` data-pts='${JSON.stringify(
+  inWin.map(([t, v, c]) => {
+    const [col, warn] = (c == null ? null : TONE[kind]?.(c)) || [];
+    return [+x(t), `${label(v)} · ${MYT_CLOCK.format(t * 1000)}`, col || '', warn ? 1 : 0];
+  }))}'`;
 
 /* Area fill under a line. Two stops rather than a fade to nothing: at the bottom the shape has to
    read as a mass, at the top it has to not compete with the line drawn on it. Ids are minted
@@ -533,7 +560,12 @@ const spanText = secs => secs < 3600
 
    The x axis spans the readings actually held, capped at SPARK_H hours. Times are 24-hour, like
    every other clock in this app and in the JPS data behind it. */
-export function sparkline(points, kind = 'river') {
+/* Which rung of the traffic light each published mark is. `statusColor()` and nothing else, because
+   these are the same three marks the meter draws and a fourth spelling of amber is how palettes
+   drift. A flood gauge publishes only the upper two, and they land on the same two rungs. */
+const MARK_RUNG = { alert: 1, warning: 2, danger: 3 };
+
+export function sparkline(points, kind = 'river', st = null) {
   if (!points || points.length < 2) return '<div class="muted">trend graph builds as we poll</div>';
 
   // The axis spans the readings we actually hold, up to a 12-hour cap — so two hours of history
@@ -542,8 +574,39 @@ export function sparkline(points, kind = 'river') {
   if (inWin.length < 2) return `<div class="muted">no readings in the last ${SPARK_H} hours</div>`;
 
   const vals = inWin.map(([, v]) => v);
-  const lo = Math.min(...vals), hi = Math.max(...vals), span = hi - lo || 1;
+  const lo0 = Math.min(...vals), hi0 = Math.max(...vals);
+
+  /* The station's own marks, drawn across the graph — but only the ones the water is anywhere near.
+     The y axis spans the readings and nothing else, because the readings are the point: a river that
+     moved 8 cm in twelve hours has to draw those 8 cm as a shape. Stretching the axis up to a danger
+     mark three metres above would flatten that shape to a flat line under a red rule, which says
+     less than the graph did before, on the 89 of 105 rivers that are nowhere near their marks.
+     So a mark is drawn only when it is within one *data span* of the readings, and the axis grows
+     only that far. That is the rule stated as a guarantee: the readings always keep at least half
+     the height of the graph, so the shape survives every mark that is ever drawn. A mark further
+     away than the river has moved all day is not something this graph can show without becoming a
+     worse graph, and the meter directly above states all three with their values anyway.
+     Perfectly flat readings have no shape to protect, so they fall back to the alert→danger gap —
+     the unit `levelStops()` uses for the foot of the meter, and the only thing the feed publishes
+     about how far this river travels when it matters.
+     On the payload this was measured: 10 of 105 rivers draw a mark on a quiet day, and any station
+     climbing into trouble draws them all the way up, which is when they are worth having.
+     No labels on them. Text in a stretched viewBox distorts, and the meter directly above names all
+     three marks with their values, in these exact colours. */
+  const named = kind === 'gauge' ? ['warning', 'danger'] : ['alert', 'warning', 'danger'];
+  const top = st?.danger ?? st?.warning ?? st?.alert;
+  const first = st?.alert ?? st?.warning ?? top;
+  const reach = (hi0 - lo0) || (top > first ? top - first : 1);
+  const marks = !st ? [] : named.map(n => [n, st[n]])
+    .filter(([, v]) => v != null && v <= hi0 + reach && v >= lo0 - reach);
+
+  const lo = Math.min(lo0, ...marks.map(m => m[1]));
+  const hi = Math.max(hi0, ...marks.map(m => m[1]));
+  const span = hi - lo || 1;
   const y = v => (26 - (v - lo) / span * 24).toFixed(2);
+  const marked = marks.map(([n, v]) =>
+    `<line class="mk" x1="0" x2="100" y1="${y(v)}" y2="${y(v)}" vector-effect="non-scaling-stroke"
+      style="stroke:${statusColor(MARK_RUNG[n])}"/>`).join('');
   const pts = inWin.map(([t, v]) => `${x(t)},${y(v)}`).join(' ');
   // The station's own colour, not a red-for-rising / green-for-falling line. Direction is already
   // stated next to it as a rate with an arrow, and a traffic-light hue on a *type* is the one thing
@@ -552,11 +615,12 @@ export function sparkline(points, kind = 'river') {
   const col = KINDS[kind].color;
   const [id, defs] = areaFill(col);
 
-  return `<div class="spark"${readout(inWin, x, v => `${v} m`)}>
+  return `<div class="spark"${readout(inWin, x, v => `${v} m`, kind)}>
     <svg viewBox="0 0 100 28" preserveAspectRatio="none" aria-hidden="true">
       ${defs}
       ${rules(ticks)}
       <polygon points="${x(inWin[0][0])},28 ${pts} ${x(inWin.at(-1)[0])},28" fill="url(#${id})"/>
+      ${marked}
       <polyline points="${pts}" fill="none" vector-effect="non-scaling-stroke"
         style="stroke:${col}" stroke-width="2" stroke-linejoin="round"/>
     </svg>
@@ -603,7 +667,7 @@ export function sirenBand(points) {
   // `.band` keeps the shorter box. A siren log is a state over time, not a shape — there is nothing
   // in it that a quarter more height would draw better, and the difference in height is what says
   // this is not a reading. See base.css.
-  return `<div class="spark band"${readout(inWin, x, v => v > 0 ? 'sounding' : 'quiet')}>
+  return `<div class="spark band"${readout(inWin, x, v => v > 0 ? 'sounding' : 'quiet', 'siren')}>
     <svg viewBox="0 0 100 28" preserveAspectRatio="none" aria-hidden="true">
       ${rules(ticks)}${bars}
     </svg>
@@ -628,9 +692,19 @@ export function rainBars(points) {
   const { secs, inWin, x, ticks } = timeAxis(points);
   if (!inWin.length) return `<div class="muted">no readings in the last ${SPARK_H} hours</div>`;
 
-  const hi = Math.max(...inWin.map(([, v]) => v));
+  const hi0 = Math.max(...inWin.map(([, v]) => v));
   // All zeroes is a real answer, and a row of flat bars states it worse than a sentence does.
-  if (!hi) return `<div class="muted">no rain in the last ${spanText(secs)}</div>`;
+  if (!hi0) return `<div class="muted">no rain in the last ${spanText(secs)}</div>`;
+
+  /* JPS's intensity classes, drawn across the plot — moderate at 10 mm/h, heavy at 30, the top class
+     at 60. `RAIN_STOPS` holds the same boundaries for the heat gradient, so the graph and the map
+     cannot disagree about where heavy rain starts, and index i is the lower bound of code i+1.
+     Same rule as the level graph: a class is drawn only when it is within one data span of the
+     readings, and the axis grows only that far, so the readings keep at least half the height. The
+     axis is zero-based here, so the span is the peak itself — 4 mm/h of drizzle does not get its
+     graph flattened to draw a line at 60. */
+  const marks = RAIN_STOPS.map(([v], i) => [v, i + 1]).slice(1).filter(([v]) => v <= hi0 * 2);
+  const hi = Math.max(hi0, ...marks.map(m => m[0]));
 
   /* An area, not bars — but cut into segments wherever an hour is missing, so a gap in the record
      still draws as a gap. That was the whole reason bars were used here: an unbroken line across a
@@ -645,10 +719,12 @@ export function rainBars(points) {
   }
   const [id, defs] = areaFill(KINDS.rainfall.color);
 
-  return `<div class="spark"${readout(inWin, x, v => `${v} mm/h`)}>
+  return `<div class="spark"${readout(inWin, x, v => `${v} mm/h`, 'rainfall')}>
     <svg viewBox="0 0 100 28" preserveAspectRatio="none" aria-hidden="true">
       ${defs}
       ${rules(ticks)}
+      ${marks.map(([v, code]) => `<line class="mk" x1="0" x2="100" y1="${y(v)}" y2="${y(v)}"
+        vector-effect="non-scaling-stroke" style="stroke:${RAIN_COLOR[code]}"/>`).join('')}
       ${segs.filter(s => s.length).map(s => {
         const pts = s.map(([t, v]) => `${x(t)},${y(v)}`).join(' ');
         // A lone reading has no line to draw, so it gets a sliver wide enough to see.

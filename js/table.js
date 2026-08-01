@@ -282,11 +282,11 @@ const trend = m => (m.kind === 'river' && m.rate != null
     ? `<div class="tipnote muted">trend ${rateHtml(m)}${
         m.eta != null ? ` · danger ${etaText(m.eta)}` : ''}</div>`
     : '')
-  + (m.kind === 'river' ? sparkline(m.history)
+  + (m.kind === 'river' ? sparkline(m.history, 'river', m)
     // Only where there is one: an offline gauge is not sampled, and "graph builds as we poll" on a
     // sensor nobody is hearing from would promise a line that is never going to arrive. Same rule
     // for the siren band, which is only sampled while the siren is in contact.
-    : m.kind === 'gauge' ? (m.history?.length ? sparkline(m.history, 'gauge') : '')
+    : m.kind === 'gauge' ? (m.history?.length ? sparkline(m.history, 'gauge', m) : '')
     : m.kind === 'siren' ? (m.history?.length ? sirenBand(m.history) : '')
     : m.kind === 'rainfall' ? rainBars(m.history) : '');
 

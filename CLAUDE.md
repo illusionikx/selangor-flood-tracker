@@ -304,13 +304,14 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   map would sit on stale readings because an easter egg was absent. Same rule for anything added to
   that `cp` line: if it can go missing, it must not be able to stop the map updating. Under Herd the
   same missing file is invisible (see above), so this only ever shows up in CI.
-- **A `<dialog>`'s `display` goes on `[open]`, never on the element.** The browser closes a dialog
+- **A `<dialog>`'s `display` goes on `[open]`, and a popover's on `:popover-open` — never on the
+  element.** The browser closes a dialog
   with `dialog:not([open]) { display: none }` in its own stylesheet, and any author rule setting
   `display` beats it. `#dataBox { display: flex }` therefore laid the closed table dialog out on the
   page — 450 rows, in the tab order and read by screen readers — invisible only because `#map` is
   absolutely positioned and painted over it. It surfaced through the map whenever a tile was missing,
-  which read as a Leaflet zoom bug and was chased as one. `#dataBox[open]` and `#lightbox[open]` are
-  the pattern.
+  which read as a Leaflet zoom bug and was chased as one. `#dataBox[open]`, `#lightbox[open]` and
+  `.sparktip:popover-open` are the pattern.
 - **There is no map popup any more, and there must not be one again.** Station detail is `#side`, a
   fixed panel on the right edge of the viewport, filled by `openSide(key, html, mastAt)` in `map.js`.
   Everything a Leaflet popup needed — `autoPan` racing `setView`'s animation, `openStable()`
@@ -619,7 +620,11 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   line between two rain readings claims a value in between that never existed. And `hourlyRainfall`
   is a *rolling* hour, so it buckets by `RAIN_BUCKET` (1 h): finer buckets show the same rain twice.
 - `history` is `[[unix seconds, value], …]` on rivers (metres), rainfall (mm/h) and gauges (metres of
-  depth, negative = dry) — the graphs
+  depth, negative = dry). Rivers, rainfall and gauges carry a **third element, the status that
+  sample was at**, scored in `sparkPoints()` through `wlStatus()` / `rainStatus()` / `gaugeStatus()` —
+  the hover readout colours itself by it and flags the warning rung up. **Never score a historical
+  value client-side**; add a scorer in `api.php` instead. Every reader destructures `[ts, value]`, so
+  a kind without one is not a special case anywhere. The graphs
   plot against the clock, not against sample index. Windowed to `SPARK_WIN` (12h) and thinned to one point per `SPARK_BUCKET` (15 min)
   server-side; `SPARK_H` in `config.js` is a **cap**, not a fixed frame — the axis spans the points
   actually held and only starts sliding once they exceed it. It must not exceed `SPARK_WIN`.
