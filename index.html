@@ -31,7 +31,7 @@
 <link rel="stylesheet" href="vendor/fonts.css?v=49">
 <link rel="stylesheet" href="css/icons.css?v=66">
 <link rel="stylesheet" href="css/base.css?v=79">
-<link rel="stylesheet" href="css/chrome.css?v=114">
+<link rel="stylesheet" href="css/chrome.css?v=115">
 <link rel="stylesheet" href="css/map.css?v=90">
 
 <!-- A camera still. A <dialog>, not a div: it opens from the all-stations table, which is itself a
@@ -224,33 +224,40 @@
      <a href="https://www.civildefence.gov.my/talian-kecemasan-bencana-banjir/" target="_blank"
         rel="noopener">civildefence.gov.my</a> (APM).</span></p>
 
-  <!-- What the alarm means, stated where someone can find it. The panel and the ticker show the
-       three tags; this is the only place that says what earns one. Tags are the real `.tg` classes,
-       so the explanation cannot drift from the thing being explained. -->
-  <h3>What puts a station on alert</h3>
-  <p class="muted">The <b>On alert</b> panel and the strip along the top list a station for one of
-     three reasons. Nothing else on this map raises an alarm.</p>
-  <div class="key">
-    <span><b class="tg tg-now">HAPPENING NOW</b></span>
-    <span>A river <b>at or past its danger mark</b>, or a <b>siren sounding</b>. Observed, not
-       predicted.</span>
-    <span><b class="tg tg-soon">FORECAST</b></span>
-    <span>A river climbing fast enough to reach <b>its own danger mark within 3 hours</b> — at least
-       0.1 m an hour, with its last three readings not dipping. Anything slower is sensor rounding
-       rather than a climb; anything further out is a guess with too little behind it.</span>
-    <span><b class="tg tg-stale">NOT CURRENT</b></span>
-    <span>Either of the above, from a station that has since gone quiet — offline, or a reading over
-       a day old. It stays on the list rather than vanishing, because a river sitting at its danger
-       mark whose telemetry just died is the last thing that should quietly disappear. It sorts to
-       the bottom and is left out of the counts.</span>
-  </div>
-  <p class="muted">Every mark is the station's <i>own</i>, as published by JPS, so a small drain and
-     a large river are each measured against what floods <i>them</i> — being “high” is meaningless
-     without knowing high for what. Rainfall, flood-depth gauges and cameras are drawn on the map
-     but never raise an alert. Sensors you have ignored raise none either, and the panel keeps
-     saying how many are silenced.</p>
+  <h3>Where this data comes from</h3>
 
-  <h3>Reading the map</h3>
+  <div class="src">
+    <a href="https://publicinfobanjir.water.gov.my/" target="_blank" rel="noopener">Public Infobanjir</a>
+    <span class="muted">JPS Malaysia. Water levels and flood thresholds. Takes priority wherever it
+      carries a station, so a reading matches the national portal.</span>
+  </div>
+  <div class="src">
+    <a href="https://infobanjirjps.selangor.gov.my/" target="_blank" rel="noopener">JPS Selangor Infobanjir</a>
+    <span class="muted">Selangor stations, and the only source here for cameras, sirens and flood
+      gauges. Supplies the coordinates every pin is drawn at.</span>
+  </div>
+  <div class="src">
+    <a href="https://infobanjirjpskl.water.gov.my/" target="_blank" rel="noopener">JPS Wilayah Persekutuan (SPHTN)</a>
+    <span class="muted">Kuala Lumpur and Putrajaya — water level and rainfall stations the Selangor
+      feed does not cover, with their coordinates.</span>
+  </div>
+
+  <p class="muted">Each station popup names the feed its reading came from. Where the feeds disagree,
+     the newest reading wins, except that Public Infobanjir's figure is preferred outright.</p>
+
+  <h3>Credits</h3>
+  <p class="muted">Built by <a href="https://github.com/illusionikx" target="_blank" rel="noopener">illusionikx</a>.
+     Released under the <a href="https://opensource.org/licenses/MIT" target="_blank" rel="noopener">MIT
+     licence</a> — free to use, copy, modify and redistribute, with no warranty of any kind.</p>
+  <p class="muted">Map tiles &copy; <a href="https://carto.com/attributions" target="_blank" rel="noopener">CARTO</a>,
+     data &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>
+     contributors. Icons and the app mark are <a href="https://fonts.google.com/icons" target="_blank"
+     rel="noopener">Material Symbols</a> (Apache 2.0);
+     mapping by <a href="https://leafletjs.com/" target="_blank" rel="noopener">Leaflet</a>.
+     Flood data remains the property of JPS Malaysia.</p>
+  </div>
+  <div id="paneHelp" role="tabpanel" aria-labelledby="tabHelp" hidden>
+  <h3>How to read the map</h3>
   <p class="muted">One pin per place. The glyph says what kind of sensor is there, the colour says
      how it is doing. Type colours are never a traffic light, and traffic-light colours never mean
      anything but status.</p>
@@ -295,48 +302,37 @@
      <b>Water level</b> scores every river and flood gauge against its own marks — yellow past
      alert, orange past warning, red at danger — and paints nothing below the first mark, because a
      map that is warm everywhere says nothing.</p>
-  <div class="ramps">
-    <span><span class="ramp"></span><span class="muted">alert → warning → danger</span></span>
-    <span><span class="ramp rain"></span><span class="muted">light → moderate → heavy → violent</span></span>
-  </div>
   <p class="muted"><b>Rainfall</b> uses the intensity classes JPS publishes — above 0, 10, 30 and 60
      mm in the last hour. It says where the water is arriving, not where it is standing. Both are
      smoothed over a few kilometres, because flooding is catchment-scale, and both show the
      <i>strongest</i> reading in an area rather than adding neighbours together.</p>
 
-  <h3>Where this data comes from</h3>
-
-  <div class="src">
-    <a href="https://publicinfobanjir.water.gov.my/" target="_blank" rel="noopener">Public Infobanjir</a>
-    <span class="muted">JPS Malaysia. Water levels and flood thresholds. Takes priority wherever it
-      carries a station, so a reading matches the national portal.</span>
+  <!-- What the alarm means, stated where someone can find it. The panel and the ticker show the
+       three tags; this is the only place that says what earns one. Tags are the real `.tg` classes,
+       so the explanation cannot drift from the thing being explained. -->
+  <h3>What puts a station on alert</h3>
+  <p class="muted">The <b>On alert</b> panel and the strip along the top list a station for one of
+     three reasons. Nothing else on this map raises an alarm.</p>
+  <div class="key">
+    <span><b class="tg tg-now">HAPPENING NOW</b></span>
+    <span>A river <b>at or past its danger mark</b>, or a <b>siren sounding</b>. Observed, not
+       predicted.</span>
+    <span><b class="tg tg-soon">FORECAST</b></span>
+    <span>A river climbing fast enough to reach <b>its own danger mark within 3 hours</b> — at least
+       0.1 m an hour, with its last three readings not dipping. Anything slower is sensor rounding
+       rather than a climb; anything further out is a guess with too little behind it.</span>
+    <span><b class="tg tg-stale">NOT CURRENT</b></span>
+    <span>Either of the above, from a station that has since gone quiet — offline, or a reading over
+       a day old. It stays on the list rather than vanishing, because a river sitting at its danger
+       mark whose telemetry just died is the last thing that should quietly disappear. It sorts to
+       the bottom and is left out of the counts.</span>
   </div>
-  <div class="src">
-    <a href="https://infobanjirjps.selangor.gov.my/" target="_blank" rel="noopener">JPS Selangor Infobanjir</a>
-    <span class="muted">Selangor stations, and the only source here for cameras, sirens and flood
-      gauges. Supplies the coordinates every pin is drawn at.</span>
+  <p class="muted">Every mark is the station's <i>own</i>, as published by JPS, so a small drain and
+     a large river are each measured against what floods <i>them</i> — being “high” is meaningless
+     without knowing high for what. Rainfall, flood-depth gauges and cameras are drawn on the map
+     but never raise an alert. Sensors you have ignored raise none either, and the panel keeps
+     saying how many are silenced.</p>
   </div>
-  <div class="src">
-    <a href="https://infobanjirjpskl.water.gov.my/" target="_blank" rel="noopener">JPS Wilayah Persekutuan (SPHTN)</a>
-    <span class="muted">Kuala Lumpur and Putrajaya — water level and rainfall stations the Selangor
-      feed does not cover, with their coordinates.</span>
-  </div>
-
-  <p class="muted">Each station popup names the feed its reading came from. Where the feeds disagree,
-     the newest reading wins, except that Public Infobanjir's figure is preferred outright.</p>
-
-  <h3>Credits</h3>
-  <p class="muted">Built by <a href="https://github.com/illusionikx" target="_blank" rel="noopener">illusionikx</a>.
-     Released under the <a href="https://opensource.org/licenses/MIT" target="_blank" rel="noopener">MIT
-     licence</a> — free to use, copy, modify and redistribute, with no warranty of any kind.</p>
-  <p class="muted">Map tiles &copy; <a href="https://carto.com/attributions" target="_blank" rel="noopener">CARTO</a>,
-     data &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>
-     contributors. Icons and the app mark are <a href="https://fonts.google.com/icons" target="_blank"
-     rel="noopener">Material Symbols</a> (Apache 2.0);
-     mapping by <a href="https://leafletjs.com/" target="_blank" rel="noopener">Leaflet</a>.
-     Flood data remains the property of JPS Malaysia.</p>
-  </div>
-  <div id="paneHelp" role="tabpanel" aria-labelledby="tabHelp" hidden></div>
 </dialog>
 <!-- Tap the About logo seven times inside five seconds. No header, no close button: the picture is
      the entire content, so the whole surface dismisses it — the one case where tap-anywhere is right,
