@@ -32,16 +32,25 @@ import { camWarn } from './popup.js';
    range going thin and short.
    No 6-hour stop: the capture rate is `SHOT_EVERY` (30 min), so a "keep every frame" window is a
    30-minute window with a second name — the finest resolution that exists is one frame per half
-   hour, and 24 h is where it is already offered. */
+   hour, and 24 h is where it is already offered.
+   `anchor` is the clock time a range's slots aim at, and it is the same number `SHOT_TIERS` carries
+   in shots.php. A bare `floor(ts / step)` aligns to UTC midnight, which at +8 put the week on 01:30,
+   the month on 07:30 and 19:30, and the year on a Thursday — hours nobody chose, on a camera whose
+   whole point is comparing the same place at the same time of day. `every` states the target, so a
+   reader can see what a range aims at before playing it. */
 /* `label` is the resting word, `long` and `every` are what the *chosen* segment says instead — the
    pace was a caption line of its own under the controls, which is a whole row of chrome to state a
    fact about one of five buttons. On the button it costs nothing and cannot be read against the
    wrong range. */
 const RANGES = [
-  { label: '24 h',  long: '24 hours', win: 24 * 3600,   step: 1800,       every: '30 minutes per frame' },
-  { label: 'week',  long: 'week',     win: 7 * 86400,   step: 3 * 3600,   every: '3 hours per frame' },
-  { label: 'month', long: 'month',    win: 30 * 86400,  step: 12 * 3600,  every: '12 hours per frame' },
-  { label: 'year',  long: 'year',     win: 365 * 86400, step: 7 * 86400,  every: '1 week per frame' },
+  { label: '24 h',  long: '24 hours', win: 24 * 3600,   step: 1800,       anchor: 0,
+    every: '30 minutes per frame' },
+  { label: 'week',  long: 'week',     win: 7 * 86400,   step: 3 * 3600,   anchor: 7200,
+    every: '3 hours per frame, from 01:00' },
+  { label: 'month', long: 'month',    win: 30 * 86400,  step: 12 * 3600,  anchor: 28800,
+    every: '12 hours per frame, 04:00 and 16:00' },
+  { label: 'year',  long: 'year',     win: 365 * 86400, step: 7 * 86400,  anchor: 374400,
+    every: '1 week per frame, Mondays 16:00' },
 ];
 /* One frame a second. Not an animation frame rate — consecutive frames here are 30 minutes to a week
    apart, so nothing on screen is continuous with what preceded it and there is no motion to smooth.
@@ -164,14 +173,21 @@ function paint() {
   }
 }
 
-/* One frame per `step`-wide bucket, newest in the bucket winning — the same rule and the same bucket
-   keys the server prunes by (`pruneShots()` in shots.php), so a window that has already been thinned
-   to this step comes through untouched and one that has not is thinned the same way it eventually
-   will be. Ascending in, ascending out: a Map keeps insertion order, and re-setting a key does not
+/* One frame per slot, the frame nearest that slot's target winning — the same expression and the
+   same anchors the server prunes by (`pruneShots()` in shots.php), so a window that has already been
+   thinned comes through untouched and one that has not is thinned the way it eventually will be.
+   A slot holding nothing is simply absent, which is what "the closest frame" means on an archive
+   with gaps: the rule bounds a frame to half a step from its target and needs no tolerance of its
+   own. Ascending in, ascending out: slots are visited in order, and re-setting a Map key does not
    move it. */
-function thin(list, step) {
+function thin(list, step, anchor) {
   const keep = new Map();
-  for (const ts of list) keep.set(Math.floor(ts / step), ts);
+  for (const ts of list) {
+    const slot = Math.floor((ts - anchor + step / 2) / step);
+    const target = anchor + slot * step;
+    const held = keep.get(slot);
+    if (held === undefined || Math.abs(ts - target) < Math.abs(held - target)) keep.set(slot, ts);
+  }
   return [...keep.values()];
 }
 
@@ -196,7 +212,7 @@ function drawTicks() {
 function setRange(r) {
   range = r;
   const cut = Date.now() / 1000 - r.win;
-  frames = thin(all.filter(ts => ts >= cut), r.step);
+  frames = thin(all.filter(ts => ts >= cut), r.step, r.anchor);
   scrub.max = frames.length;         // the extra slot is "live"
   /* Rest on live normally — the newest thing there is, and what the lightbox was already showing.
      Start at the oldest frame instead whenever something is going to *move*: while comparing, live
@@ -475,7 +491,7 @@ export async function openTimeline(src) {
   tierAt = new Map(rows.filter(r => Array.isArray(r) && r[1]).map(r => [r[0], { tier: r[1], id: r[2] }]));
   if (all.length < 2) return;
   tl.hidden = false;
-  /* Open on the narrowest window that actually holds a clip. 6 h is the right default on a server
+  /* Open on the narrowest window that actually holds a clip. 24 h is the right default on a server
      that has been capturing all along and empty on one that has not — and an empty scrubber under a
      camera with a week of frames behind it reads as "no archive", which is the state this whole
      footer exists to replace. */
