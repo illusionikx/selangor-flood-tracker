@@ -117,7 +117,7 @@ array_map('unlink', glob(shotDir(TEST_ID) . '/*.*') ?: []);
 - [ ] **Step 3: Run the test to verify the new assertions fail**
 
 Run: `php shots-test.php`
-Expected: FAIL. `SHOT_TIERS` rows still hold two elements, so `[, $step, $anchor]` leaves `$anchor` null and PHP warns `Undefined array key 2`. The `week`, `month`, `year` and `nearest` assertions all report `FAIL`. The 21 pre-existing assertions still report `ok`.
+Expected: FAIL. `SHOT_TIERS` rows still hold two elements, so `[, $step, $anchor]` leaves `$anchor` null and PHP warns `Undefined array key 2`. The `week`, `month`, `year` and `nearest` assertions all report `FAIL`. The 20 pre-existing assertions still report `ok`.
 
 - [ ] **Step 4: Add the anchor column to `SHOT_TIERS`**
 
@@ -185,7 +185,7 @@ function pruneShots(int $id, int $now): void {
 - [ ] **Step 6: Lint and run the test**
 
 Run: `php -l shots.php && php shots-test.php`
-Expected: `No syntax errors detected`, then `all passed` and exit 0. **All 28 assertions pass** — the 21 that existed plus the 7 added. The pre-existing spacing assertions still hold because every anchor is a multiple of 1800, so targets land exactly on the test's 30-minute grid.
+Expected: `No syntax errors detected`, then `all passed` and exit 0. **All 27 assertions pass** — the 20 that existed plus the 7 added. The pre-existing spacing assertions still hold because every anchor is a multiple of 1800, so targets land exactly on the test's 30-minute grid.
 
 - [ ] **Step 7: Commit**
 
