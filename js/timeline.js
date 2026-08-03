@@ -62,13 +62,27 @@ const RANGES = [
    having stalled, not as an arrival. There is nothing on screen saying a pause is deliberate. */
 const FRAME_MS = 1000;
 
-// Malaysian, like every other clock on this page — the frames are stamped in unix seconds, and a
-// viewer in another timezone must not see an axis that disagrees with the readings beside it.
-const MYT = new Intl.DateTimeFormat('en-GB', {
-  timeZone: 'Asia/Kuala_Lumpur', day: '2-digit', month: 'short',
+/* Malaysian, like every other clock on this page — the frames are stamped in unix seconds, and a
+   viewer in another timezone must not see an axis that disagrees with the readings beside it.
+   The full date, because the year range holds frames 365 days old and `14 Nov, 17:00` says the same
+   thing about last November as about this one. The weekday earns its place on that range in
+   particular: it aims at Monday 16:00, so the weekday is what shows the anchor holding.
+   Two forms, because the long one does not fit a phone. Measured from the vendored Roboto at 11px
+   over every weekday and month, `Wednesday 30 September 2026 at 16:00` is a 213.8px pill — and a
+   320px viewport gives a 256px picture, where it overlaps the `live` pill in compare mode and covers
+   83% of the photograph. The short form is 137.7px, 54% of that picture, and clears `live` by 70px.
+   `en-GB` writes the short form as `Thu, 1 Jan 2026, 16:00` and the long one with no comma at all,
+   joined by `at` — so one `replace` strips the weekday comma and does nothing to the long form. */
+const dateFmt = w => new Intl.DateTimeFormat('en-GB', {
+  timeZone: 'Asia/Kuala_Lumpur', weekday: w, day: 'numeric',
+  month: w === 'long' ? 'long' : 'short', year: 'numeric',
   hour: '2-digit', minute: '2-digit', hour12: false,
 });
-const stamp = ts => MYT.format(ts * 1000);
+const MYT_LONG = dateFmt('long'), MYT_SHORT = dateFmt('short');
+// 600px is this repository's standing breakpoint. Read on each call rather than cached, so the
+// stamp carries no state and needs no resize listener of its own.
+const NARROW = matchMedia('(max-width: 600px)');
+const stamp = ts => (NARROW.matches ? MYT_SHORT : MYT_LONG).format(ts * 1000).replace(',', '');
 
 const box   = el('lightbox');
 const stage = box.querySelector('.stage');
@@ -172,6 +186,12 @@ function paint() {
       w || (tierAt.size ? '<span class="camwarn" hidden></span>' : ''));
   }
 }
+
+/* A turn from landscape to portrait crosses the breakpoint, and the stamp on screen was written by
+   the wider formatter. `paint()` is idempotent and re-reads `NARROW.matches`, so one line is the
+   whole fix. Landscape is the roomier direction and would survive without this; portrait is the one
+   that would keep a 213.8px pill on a 256px picture until the next frame. */
+NARROW.onchange = () => paint();
 
 /* One frame per slot, the frame nearest that slot's target winning — the same expression and the
    same anchors the server prunes by (`pruneShots()` in shots.php), so a window that has already been
