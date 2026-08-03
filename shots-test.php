@@ -103,6 +103,71 @@ $ok('no orphaned .jpg survives a prune',
 array_map('unlink', glob(shotDir(TEST_ID) . '/*.*') ?: []);
 @rmdir(shotDir(TEST_ID));
 
+/* --- the anchors ---------------------------------------------------------------------------------
+ * A tier's third number is the clock time its slots aim at. The constants are hand-computed — the
+ * target time in UTC, modulo the step — which is exactly the kind of number that is wrong without a
+ * symptom. The prune would keep one frame per 12 hours as asked, at the wrong hour, for ever.
+ *
+ * Asserted against `time()`, never against the epoch. Malaysia ran UTC+7:30 until 1982, so PHP
+ * renders a 1970 instant 30 minutes early and a correct anchor would look broken.
+ */
+echo "\nanchors:\n";
+date_default_timezone_set('Asia/Kuala_Lumpur');
+
+$AIM = [
+    2 => ['week',  '01:00, then every 3 hours', fn(int $t) => date('i', $t) === '00' && (int)date('G', $t) % 3 === 1],
+    3 => ['month', '04:00 and 16:00',           fn(int $t) => date('i', $t) === '00' && in_array((int)date('G', $t), [4, 16], true)],
+    4 => ['year',  'Monday 16:00',              fn(int $t) => date('D H:i', $t) === 'Mon 16:00'],
+];
+foreach ($AIM as $i => [$name, $desc, $want]) {
+    [, $step, $anchor] = SHOT_TIERS[$i];
+    $slot = intdiv(time() - $anchor + intdiv($step, 2), $step);
+    $t    = $anchor + $slot * $step;
+    $ok(sprintf('%-5s aims at %-26s (this slot: %s)', $name, $desc, date('D j M Y H:i', $t)), $want($t));
+}
+$ok('the 6h and 24h tiers take no anchor', SHOT_TIERS[0][2] === 0 && SHOT_TIERS[1][2] === 0);
+
+/* A slot keeps the last frame taken *before* its target — the state as of that moment, not the
+   nearest picture to it. The second case is the one that separates the two rules: at a 16:00 target
+   with frames at 15:24 and 16:10, "nearest" answers 16:10, which is a photograph from after the time
+   it would be labelled with. */
+echo "\nthe last frame before the target wins:\n";
+$pair = function (int $a, int $b) {
+    array_map('unlink', glob(shotDir(TEST_ID) . '/*.*') ?: []);
+    @mkdir(shotDir(TEST_ID), 0777, true);
+    touch(shotDir(TEST_ID) . "/$a.webp");
+    touch(shotDir(TEST_ID) . "/$b.jpg");
+};
+[, $mStep, $mAnchor] = SHOT_TIERS[3];                 // the month tier, one frame per 12 h
+$slot   = intdiv($now - 10 * 86400 - $mAnchor + $mStep - 1, $mStep);
+$target = $mAnchor + $slot * $mStep;                  // about 10 days back, inside the month tier
+
+// Two frames before one target: the later of them answers for it.
+$pair($target - 8 * 3600, $target - 3600);
+pruneShots(TEST_ID, $now);
+$ok('the later of two frames before the target wins', shotList(TEST_ID) === [$target - 3600]);
+
+// The 15:24 / 16:10 case. The frame past the target answers for the *next* target, so it never
+// displaces the one before it, and both survive in their own slots.
+$pair($target - 36 * 60, $target + 10 * 60);
+pruneShots(TEST_ID, $now);
+$ok('a frame past the target does not take its slot',
+    shotList(TEST_ID) === [$target - 36 * 60, $target + 10 * 60]);
+
+// Exactly on the target answers for that target, not for the one after it.
+$pair($target - 3600, $target);
+pruneShots(TEST_ID, $now);
+$ok('a frame exactly on the target answers for it',   shotList(TEST_ID) === [$target]);
+
+$pair($target - 8 * 3600, $target - 3600);
+pruneShots(TEST_ID, $now);
+$kept2 = shotList(TEST_ID);
+pruneShots(TEST_ID, $now);
+$ok('a second prune leaves the winner alone',         shotList(TEST_ID) === $kept2);
+
+array_map('unlink', glob(shotDir(TEST_ID) . '/*.*') ?: []);
+@rmdir(shotDir(TEST_ID));
+
 /* --- frameTiers -------------------------------------------------------------------------------
  * The tier a frame was taken under. A wrong answer here paints a calm afternoon red, or leaves a
  * flood gray, and either one is a lie told by a color on a photograph.

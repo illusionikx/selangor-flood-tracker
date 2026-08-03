@@ -117,7 +117,7 @@ array_map('unlink', glob(shotDir(TEST_ID) . '/*.*') ?: []);
 - [ ] **Step 3: Run the test to verify the new assertions fail**
 
 Run: `php shots-test.php`
-Expected: FAIL. `SHOT_TIERS` rows still hold two elements, so `[, $step, $anchor]` leaves `$anchor` null and PHP warns `Undefined array key 2`. The `week`, `month`, `year` and `nearest` assertions all report `FAIL`. The 21 pre-existing assertions still report `ok`.
+Expected: FAIL. `SHOT_TIERS` rows still hold two elements, so `[, $step, $anchor]` leaves `$anchor` null and PHP warns `Undefined array key 2`. The `week`, `month`, `year` and `nearest` assertions all report `FAIL`. The 20 pre-existing assertions still report `ok`.
 
 - [ ] **Step 4: Add the anchor column to `SHOT_TIERS`**
 
@@ -185,7 +185,7 @@ function pruneShots(int $id, int $now): void {
 - [ ] **Step 6: Lint and run the test**
 
 Run: `php -l shots.php && php shots-test.php`
-Expected: `No syntax errors detected`, then `all passed` and exit 0. **All 28 assertions pass** — the 21 that existed plus the 7 added. The pre-existing spacing assertions still hold because every anchor is a multiple of 1800, so targets land exactly on the test's 30-minute grid.
+Expected: `No syntax errors detected`, then `all passed` and exit 0. **All 27 assertions pass** — the 20 that existed plus the 7 added. The pre-existing spacing assertions still hold because every anchor is a multiple of 1800, so targets land exactly on the test's 30-minute grid.
 
 - [ ] **Step 7: Commit**
 
@@ -236,24 +236,30 @@ function thin(list, step, anchor) {
   return [...keep.values()];
 }
 
-const WEEK_STEP = 3 * 3600, WEEK_ANCHOR = 7200;
+const STEP = 3 * 3600, ANCHOR = 7200, SPACING = 2400;   // the week range; frames every 40 min
 const t0 = Math.floor(Date.UTC(2026, 7, 3, 8, 0) / 1000);
-// Frames every 40 minutes, deliberately off the 3-hour grid.
 const all = [];
-for (let t = t0 - 7 * 86400; t <= t0; t += 2400) all.push(t);
-const out = thin(all, WEEK_STEP, WEEK_ANCHOR);
+for (let t = t0 - 7 * 86400; t <= t0; t += SPACING) all.push(t);
+const out = thin(all, STEP, ANCHOR);
 
-const ascending = out.every((v, i, a) => !i || v > a[i - 1]);
 const worst = Math.max(...out.map(t => {
-  const s = Math.floor((t - WEEK_ANCHOR + WEEK_STEP / 2) / WEEK_STEP);
-  return Math.abs(t - (WEEK_ANCHOR + s * WEEK_STEP));
+  const s = Math.floor((t - ANCHOR + STEP / 2) / STEP);
+  return Math.abs(t - (ANCHOR + s * STEP));
 }));
-console.assert(ascending, 'FAIL: output is not ascending');
-console.assert(out.length === 57, `FAIL: expected 57 frames, got ${out.length}`);
-console.assert(worst <= WEEK_STEP / 2, `FAIL: a frame sits ${worst / 60}min from its target`);
-console.log(ascending && out.length === 57 && worst <= WEEK_STEP / 2
-  ? `ok  ${out.length} frames, worst offset ${worst / 60}min (bound ${WEEK_STEP / 120}min)`
-  : 'FAILED');
+/* The bound is half the INPUT spacing, not half the step. With a frame every 40 minutes there is
+   always one within 20 minutes of any target, so that is what "nearest the target" has to deliver.
+   Half a step is the bucket's own width, and the old newest-in-bucket rule satisfies it too — so a
+   half-step bound passes on both rules and proves nothing. */
+const BOUND = SPACING / 2;
+let bad = 0;
+const is = (what, pass) => { if (!pass) bad++; console.log((pass ? 'ok   ' : 'FAIL ') + what); };
+is('ascending', out.every((v, i, a) => !i || v > a[i - 1]));
+is(`57 frames (got ${out.length})`, out.length === 57);
+is(`worst offset ${worst / 60}min is within ${BOUND / 60}min`, worst <= BOUND);
+console.log(bad ? `
+${bad} FAILED` : '
+all passed');
+process.exit(bad ? 1 : 0);
 ```
 
 - [ ] **Step 2: Run it against the current two-argument `thin()` to watch it fail**
@@ -269,7 +275,7 @@ function thin(list, step) {
 ```
 
 Run: `node <scratchpad>/thin-check.mjs`
-Expected: FAIL — the worst offset assertion trips, because UTC-aligned buckets keep the newest frame in each bucket rather than the one nearest 01:00. Restore the new version afterwards.
+Expected: FAIL — `worst offset 40min is within 20min`. UTC-aligned buckets keep the newest frame in each bucket, which sits 40 minutes from the 01:00 grid where the anchored rule sits 20. Restore the new version afterwards.
 
 - [ ] **Step 3: Give each range its anchor**
 

@@ -32,16 +32,22 @@ import { camWarn } from './popup.js';
    range going thin and short.
    No 6-hour stop: the capture rate is `SHOT_EVERY` (30 min), so a "keep every frame" window is a
    30-minute window with a second name — the finest resolution that exists is one frame per half
-   hour, and 24 h is where it is already offered. */
+   hour, and 24 h is where it is already offered.
+   `anchor` is the clock time a range's slots aim at, and it is the same number `SHOT_TIERS` carries
+   in shots.php. A bare `floor(ts / step)` aligns to UTC midnight, which at +8 put the week on 01:30,
+   the month on 07:30 and 19:30, and the year on a Thursday — hours nobody chose, on a camera whose
+   whole point is comparing the same place at the same time of day. It stays out of `every`: the
+   stamp under the picture already says when each frame was taken, and a button that recited the
+   grid as well would be stating twice what a reader can read once. */
 /* `label` is the resting word, `long` and `every` are what the *chosen* segment says instead — the
    pace was a caption line of its own under the controls, which is a whole row of chrome to state a
    fact about one of five buttons. On the button it costs nothing and cannot be read against the
    wrong range. */
 const RANGES = [
-  { label: '24 h',  long: '24 hours', win: 24 * 3600,   step: 1800,       every: '30 minutes per frame' },
-  { label: 'week',  long: 'week',     win: 7 * 86400,   step: 3 * 3600,   every: '3 hours per frame' },
-  { label: 'month', long: 'month',    win: 30 * 86400,  step: 12 * 3600,  every: '12 hours per frame' },
-  { label: 'year',  long: 'year',     win: 365 * 86400, step: 7 * 86400,  every: '1 week per frame' },
+  { label: '24 h',  long: '24 hours', win: 24 * 3600,   step: 1800,      anchor: 0,      every: '30 minutes per frame' },
+  { label: 'week',  long: 'week',     win: 7 * 86400,   step: 3 * 3600,  anchor: 7200,   every: '3 hours per frame' },
+  { label: 'month', long: 'month',    win: 30 * 86400,  step: 12 * 3600, anchor: 28800,  every: '12 hours per frame' },
+  { label: 'year',  long: 'year',     win: 365 * 86400, step: 7 * 86400, anchor: 374400, every: '1 week per frame' },
 ];
 /* One frame a second. Not an animation frame rate — consecutive frames here are 30 minutes to a week
    apart, so nothing on screen is continuous with what preceded it and there is no motion to smooth.
@@ -53,13 +59,27 @@ const RANGES = [
    having stalled, not as an arrival. There is nothing on screen saying a pause is deliberate. */
 const FRAME_MS = 1000;
 
-// Malaysian, like every other clock on this page — the frames are stamped in unix seconds, and a
-// viewer in another timezone must not see an axis that disagrees with the readings beside it.
-const MYT = new Intl.DateTimeFormat('en-GB', {
-  timeZone: 'Asia/Kuala_Lumpur', day: '2-digit', month: 'short',
+/* Malaysian, like every other clock on this page — the frames are stamped in unix seconds, and a
+   viewer in another timezone must not see an axis that disagrees with the readings beside it.
+   The full date, because the year range holds frames 365 days old and `14 Nov, 17:00` says the same
+   thing about last November as about this one. The weekday earns its place on that range in
+   particular: it aims at Monday 16:00, so the weekday is what shows the anchor holding.
+   Two forms, because the long one does not fit a phone. Measured from the vendored Roboto at 11px
+   over every weekday and month, `Wednesday 30 September 2026 at 16:00` is a 213.8px pill — and a
+   320px viewport gives a 256px picture, where it overlaps the `live` pill in compare mode and covers
+   83% of the photograph. The short form is 137.7px, 54% of that picture, and clears `live` by 70px.
+   `en-GB` writes the short form as `Thu, 1 Jan 2026, 16:00` and the long one with no comma at all,
+   joined by `at` — so one `replace` strips the weekday comma and does nothing to the long form. */
+const dateFmt = w => new Intl.DateTimeFormat('en-GB', {
+  timeZone: 'Asia/Kuala_Lumpur', weekday: w, day: 'numeric',
+  month: w === 'long' ? 'long' : 'short', year: 'numeric',
   hour: '2-digit', minute: '2-digit', hour12: false,
 });
-const stamp = ts => MYT.format(ts * 1000);
+const MYT_LONG = dateFmt('long'), MYT_SHORT = dateFmt('short');
+// 600px is this repository's standing breakpoint. Read on each call rather than cached, so the
+// stamp carries no state and needs no resize listener of its own.
+const NARROW = matchMedia('(max-width: 600px)');
+const stamp = ts => (NARROW.matches ? MYT_SHORT : MYT_LONG).format(ts * 1000).replace(',', '');
 
 const box   = el('lightbox');
 const stage = box.querySelector('.stage');
@@ -164,14 +184,25 @@ function paint() {
   }
 }
 
-/* One frame per `step`-wide bucket, newest in the bucket winning — the same rule and the same bucket
-   keys the server prunes by (`pruneShots()` in shots.php), so a window that has already been thinned
-   to this step comes through untouched and one that has not is thinned the same way it eventually
-   will be. Ascending in, ascending out: a Map keeps insertion order, and re-setting a key does not
-   move it. */
-function thin(list, step) {
+/* A turn from landscape to portrait crosses the breakpoint, and the stamp on screen was written by
+   the wider formatter. `paint()` is idempotent and re-reads `NARROW.matches`, so one line is the
+   whole fix. Landscape is the roomier direction and would survive without this; portrait is the one
+   that would keep a 213.8px pill on a 256px picture until the next frame. */
+NARROW.onchange = () => paint();
+
+/* One frame per slot, and a frame's slot is the next target at or after it — so what survives is the
+   last frame taken *before* that target, which is the state as of it. The same expression and the
+   same anchors the server prunes by (`pruneShots()` in shots.php), so a window that has already been
+   thinned comes through untouched and one that has not is thinned the way it eventually will be.
+   Not the *nearest* frame to the target: with frames at 15:24 and 16:10 the nearest to 16:00 is
+   16:10, and a picture taken after the time it is labelled with is the one thing this must not do.
+   A slot holding nothing is simply absent, which is what "the closest frame" means on an archive
+   with gaps — it needs no tolerance of its own. Ascending in, ascending out: slots are visited in
+   order, and re-setting a Map key does not move it. */
+function thin(list, step, anchor) {
   const keep = new Map();
-  for (const ts of list) keep.set(Math.floor(ts / step), ts);
+  // (x + step - 1) / step floored is ceil() on positives: a frame lands on the target it precedes.
+  for (const ts of list) keep.set(Math.floor((ts - anchor + step - 1) / step), ts);
   return [...keep.values()];
 }
 
@@ -196,7 +227,7 @@ function drawTicks() {
 function setRange(r) {
   range = r;
   const cut = Date.now() / 1000 - r.win;
-  frames = thin(all.filter(ts => ts >= cut), r.step);
+  frames = thin(all.filter(ts => ts >= cut), r.step, r.anchor);
   scrub.max = frames.length;         // the extra slot is "live"
   /* Rest on live normally — the newest thing there is, and what the lightbox was already showing.
      Start at the oldest frame instead whenever something is going to *move*: while comparing, live
@@ -475,7 +506,7 @@ export async function openTimeline(src) {
   tierAt = new Map(rows.filter(r => Array.isArray(r) && r[1]).map(r => [r[0], { tier: r[1], id: r[2] }]));
   if (all.length < 2) return;
   tl.hidden = false;
-  /* Open on the narrowest window that actually holds a clip. 6 h is the right default on a server
+  /* Open on the narrowest window that actually holds a clip. 24 h is the right default on a server
      that has been capturing all along and empty on one that has not — and an empty scrubber under a
      camera with a week of frames behind it reads as "no archive", which is the state this whole
      footer exists to replace. */

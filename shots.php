@@ -45,21 +45,31 @@ const SHOT_W     = 1280;    // 720p — the native width of every camera measure
    for no extra detail. 720p *is* the ceiling here, so quality is the only axis left. */
 const SHOT_Q     = 82;
 const SHOT_MIN   = 4096;    // bytes: JPS answers a dead camera with a ~2 KB placeholder, not a 404
-/* Retention, as [frames younger than this, keep one per]. `0` means keep every frame. Applied on
- * age, so a frame thins itself as it gets older — kept every 30 min for a day, then three-hourly for
- * a week, and so on down to weekly for a year. Anything past the last tier is deleted.
+/* Retention, as [frames younger than this, keep one per, the clock time the bucket aims at]. `0` in
+ * the second slot means keep every frame. Applied on age, so a frame thins itself as it gets older —
+ * kept every 30 min for a day, then three-hourly for a week, and so on down to weekly for a year.
+ * Anything past the last tier is deleted.
  * The steps are chosen so that each of the scrubber's windows holds roughly the same number of
  * frames — ~50, which is a clip of under a minute at one frame a second. A tier is what a range can
  * play, so a tier twice as coarse as its window needs is a range that is over in half the time and
  * skips half of what happened. The week tier was 6-hourly for that reason and is now 3.
  * The first two tiers are the same density while SHOT_EVERY is 30 min; they are both written out
- * because the tiers are the *policy* and the capture rate is a bandwidth cap that may change. */
+ * because the tiers are the *policy* and the capture rate is a bandwidth cap that may change.
+ *
+ * The third number is the **anchor**: the target time in UTC, modulo the step. A slot's target is
+ * `anchor + slot * step`, and the frame kept is the last one taken *before* that target. Without it
+ * the buckets fall on `floor(ts / step)`, which aligns to UTC midnight — so at +8 the week landed on
+ * 01:30, the month on 07:30 and 19:30, and the year on a Thursday, none of which anybody chose. The
+ * targets nest: 16:00 is on the 3-hour grid and Monday 16:00 is on the 12-hour grid, so a frame keeps
+ * hitting its target as it ages from one tier to the next instead of drifting once per tier.
+ * `thin()` in js/timeline.js repeats these numbers and the slot expression. Change one, change both,
+ * or the ruler and the clip file the same frame in two different slots. */
 const SHOT_TIERS = [
-    [6 * 3600,     0],           // 6 hours — every frame we have
-    [24 * 3600,    1800],        // a day   — every 30 min
-    [7 * 86400,    3 * 3600],    // a week  — every 3 hours
-    [30 * 86400,   12 * 3600],   // a month — every 12 hours
-    [365 * 86400,  7 * 86400],   // a year  — weekly
+    [6 * 3600,     0,          0],           // 6 hours — every frame we have
+    [24 * 3600,    1800,       0],           // a day   — every 30 min
+    [7 * 86400,    3 * 3600,   7200],        // a week  — 01:00 MYT, then every 3 hours
+    [30 * 86400,   12 * 3600,  28800],       // a month — 04:00 and 16:00 MYT
+    [365 * 86400,  7 * 86400,  374400],      // a year  — Monday 16:00 MYT
 ];
 
 /* --- the archive ---------------------------------------------------------------------------------
@@ -115,17 +125,22 @@ function encodeShot(string $raw): ?array {
 
 /* Thin one camera's archive down to SHOT_TIERS. Bucket keys carry their step, because two tiers
    dividing by different numbers could otherwise land on the same integer and silently delete each
-   other's frames. The list is ascending, so the newest frame in a bucket is the one left standing —
-   for a 12-hour bucket that is the end of the period, which is what "what did it look like that
-   evening" means. */
+   other's frames. The slot a frame answers for is the **next target at or after it**, so the frame
+   left standing is the last one taken before that target — the state of the river as of 16:00, not
+   the nearest picture to 16:00. Those differ: with frames at 15:24 and 16:10, the nearest to 16:00
+   is 16:10, which is a photograph from after the moment it would be labelled with. The list is
+   ascending and re-setting a key does not move it, so "the last one before the target" is just the
+   last write to win — and that is stable under repetition, which is what keeps this idempotent. */
 function pruneShots(int $id, int $now): void {
     $keep = [];
     foreach (shotList($id) as $ts) {
         $age = $now - $ts;
-        $step = null;
-        foreach (SHOT_TIERS as [$maxAge, $every]) if ($age <= $maxAge) { $step = $every; break; }
+        $step = $anchor = null;
+        foreach (SHOT_TIERS as [$maxAge, $every, $at]) if ($age <= $maxAge) { [$step, $anchor] = [$every, $at]; break; }
         if ($step === null) { @unlink(shotFile($id, $ts)); continue; }   // past the last tier
-        $b = $step ? "$step:" . intdiv($ts, $step) : "0:$ts";
+        // intdiv(x + step - 1, step) is ceil() on positives: a frame lands on the target it precedes,
+        // and a frame exactly on a target answers for that target rather than the one after it.
+        $b = $step ? "$step:" . intdiv($ts - $anchor + $step - 1, $step) : "0:$ts";
         if (isset($keep[$b])) @unlink(shotFile($id, $keep[$b]));
         $keep[$b] = $ts;
     }
