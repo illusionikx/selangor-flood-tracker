@@ -103,10 +103,11 @@ Bump `?v=` on the `chrome.css` link in `index.html`.
 2. What this site is. Unchanged.
 3. Why it exists. Unchanged.
 4. The `.notice` block: not an official warning channel, call 999, the APM link. Unchanged.
-5. `Where this data comes from`: the three `.src` blocks and the paragraph about which feed wins.
+5. `How this was built`: new. See below.
+6. `Where this data comes from`: the three `.src` blocks and the paragraph about which feed wins.
    Unchanged.
-6. `Credits`: the author, the licence, the tiles, the icons, Leaflet. Unchanged.
-7. `Developer`: new. See below.
+7. `Credits`: the author, the licence, the tiles, the icons, Leaflet. Unchanged.
+8. `Developer`: new. See below.
 
 ### Help
 
@@ -186,6 +187,56 @@ About six rows.
 - This is not a rainfall forecast. JPS measured every number on this map. JPS predicted none of them.
 - A station JPS does not publish is not here.
 
+## The "How this was built" section
+
+A new `<h3>` in the About pane, directly under the `.notice` block. It sits there because it makes
+the same kind of statement as the notice. Both tell a reader how much weight this site carries.
+
+Three short paragraphs, then two links.
+
+> **How this was built**
+>
+> This site is vibe coded. An AI wrote most of it, over a few evenings. It exists because reading
+> three government pages to answer one question about my own river was absurd.
+>
+> So there is no team behind it, and no warranty. It can be wrong. The code is open. Read it, and
+> tell me what I got wrong.
+>
+> It keeps no account, runs no analytics and sets no cookies. It loads nothing from a third party.
+> Your location, if you share it, stays in the browser. Nothing sends it anywhere.
+>
+> **Source code** — the whole site, and the scrapers behind it.
+> **Report a mistake** — a wrong reading, a station in the wrong place, a page that will not load.
+
+### Why here and not in Credits
+
+The complaint about the official pages is already in About, one paragraph up. It reads: "The
+official portals each hold a piece of it and none of them plot it together." That is the same point
+with the evidence attached, so this section does not repeat it. This section adds the one fact
+About never stated: a machine wrote the code.
+
+Credits keeps its byline, and the byline keeps its link to the GitHub profile of the author. The repo
+link is an action, not a credit, so it goes here beside the issues link.
+
+### Claims to check before this ships
+
+Each of these is true today. Each can stop being true.
+
+| claim | how to check |
+|---|---|
+| no analytics | `grep -rn "gtag\|plausible\|umami\|analytics" index.html js/ sw.js` returns nothing |
+| no cookies | `grep -rn "document.cookie" js/` returns nothing. `PREFS` uses `localStorage` |
+| nothing from a third party | `CLAUDE.md` bans a CDN. Every asset is in `vendor/` |
+| location never leaves the browser | `js/locate.js` draws a marker. `api.php` takes no coordinates |
+
+The last claim is the strongest one on the page, because this site asks for a location. Anything
+that ever posts a coordinate must delete that sentence in the same change.
+
+### Markup
+
+Two `.src` blocks, the same pattern the three source links already use: a bold link, then one muted
+line. This adds no CSS.
+
 ## The Developer section
 
 The last section of the About pane. It holds the test-mode toggle, the numbers behind the last
@@ -214,7 +265,7 @@ place the per-source counters appear at all. `CLAUDE.md` names those counters as
 scraper that broke: `parsed: 0` means a table moved upstream. That alarm had no surface.
 
 One function builds both. `ui.js` gains a renderer that takes a mount point and a flag for the
-counters. `#netstats` and this block both call it. Two copies of the same table would drift.
+counters. `#netstats` and this block both call it. Two copies of the same table drift apart.
 
 ### Actions
 
@@ -240,7 +291,7 @@ public. Four rules, and all four hold server-side, because a guard in the browse
    other loser of that race.
 2. It does **not** expire the page cache. The scraped KL and national pages keep their fifteen
    minutes. That cache exists because the KL rainfall table takes about ten seconds upstream.
-   Forcing a full re-scrape would triple the cost of the button.
+   A full re-scrape triples the cost of the button.
 3. A stamp file allows **one force per sixty seconds**, for the whole site, not per visitor. A
    denied force serves the cache and says why in the response.
 4. `api.php` reads `?force=1` from a `GET` only. It changes nothing on disk except the cache it
@@ -255,8 +306,8 @@ The response reports what happened, so the button can say `refreshed`, `served f
 
 ### Trade-offs accepted
 
-- The section is public. Anyone can open it and press Refresh now. A password or a query flag would mean
-  an auth surface on a site that has none. The server-side rate limit
+- The section is public. Anyone can open it and press Refresh now. A password or a query flag adds
+  an auth surface to a site that has none. The server-side rate limit
   is the guard, and it holds whoever presses the button.
 - Test mode is one scroll further from the close button than it was.
 - The diagnostics duplicate `#netstats` on screen, but not in code. One renderer feeds both.
@@ -301,6 +352,8 @@ We accept that.
 - Check the dialog at 360px wide. The tab strip and the test-mode toggle do not collide.
 - Check both themes. The new rule must hold no hex.
 - `python ste-lint.py` over the new prose.
+- Re-run the four greps under "Claims to check before this ships". All four must still hold.
+- Follow both new links. The repo and the issues page must both resolve.
 - Press Refresh now twice inside a minute. The second press must serve cache and say so.
 - Hold `.refresh.lock` from a shell, then press Refresh now. It must serve stale cache at once.
 - `php -l api.php` after the `?force=1` branch lands.
@@ -315,6 +368,9 @@ We accept that.
 - No separate wiki page or external help site.
 - No `?` keyboard shortcut sheet.
 - No first-run tour or coach marks.
+- No version number or build date. The Pages bake publishes none, and a stale one misleads.
+- No changelog. Nothing feeds it.
+- No uptime or accuracy claim. I cannot back either one.
 - No password or hidden flag on the Developer section.
 - No force that expires the page cache as well.
 - No queue behind the refresh lock. A loser serves stale cache, as it does now.
