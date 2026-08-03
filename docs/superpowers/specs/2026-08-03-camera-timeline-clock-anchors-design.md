@@ -88,8 +88,8 @@ The weekday earns its place on the year range. That range aims at Monday 16:00, 
 what tells the reader the anchor holds and which week the frame belongs to.
 
 `en-GB` renders the weekday as `Fri, 14 Nov 2025, 17:00`, with two commas. `stamp()` drops the first
-one. `String.replace` takes a string and replaces one match, and the locale is fixed here, so the
-first comma is always the weekday comma.
+one. `String.replace` takes a string and replaces one match. This formatter names its own locale, so
+the first comma is always the weekday comma.
 
 Print both on every frame, not only on old ones. A rule that hides the year most of the time gives
 the reader nothing to trust when the year does appear. The stamp grows to 22 characters.
