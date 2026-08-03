@@ -132,10 +132,12 @@ header .hactions { display: flex; align-items: center; gap: 4px; margin-left: au
 .modalhead h2 { flex: 1; min-width: 0; margin: 0; }
 .modalhead .dclose { margin: -8px -10px -8px 0; font-size: 20px; }
 .modalhead form { margin: 0; }
-/* Capped so a paragraph does not run the full 820px dialog width — about 100 characters per line at
-   that width, past comfortable reading. `ch` tracks the font, unlike a fixed px cap. The `.key`
-   grid keeps no cap: its two-column layout is what asked for the width in the first place. */
-#aboutBox p { max-width: 70ch; margin: 10px 0; line-height: 1.5; }
+/* No `max-width` on the paragraph. A 70ch cap was tried when the dialog went to 820px, to keep a
+   line under about 100 characters. It gave the pane two right edges: the prose stopped short while
+   the `.key` grid next to it ran the full width, and the ragged gutter read as a layout fault. One
+   edge for everything beats a comfortable measure here. Anything that wants a narrower line has to
+   narrow the whole pane, grid included. */
+#aboutBox p { margin: 10px 0; line-height: 1.5; }
 /* Nothing left in this row but the close button, pushed to the corner. */
 #aboutBox .modalhead { justify-content: flex-end; margin-bottom: 0; }
 
