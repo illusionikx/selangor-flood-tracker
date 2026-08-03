@@ -57,9 +57,9 @@ const SHOT_MIN   = 4096;    // bytes: JPS answers a dead camera with a ~2 KB pla
  * because the tiers are the *policy* and the capture rate is a bandwidth cap that may change.
  *
  * The third number is the **anchor**: the target time in UTC, modulo the step. A slot's target is
- * `anchor + slot * step`, and the frame nearest that target is the one kept. Without it the buckets
- * fall on `floor(ts / step)`, which aligns to UTC midnight — so at +8 the week range landed on 01:30,
- * the month on 07:30 and 19:30, and the year on a Thursday, none of which anybody chose. The three
+ * `anchor + slot * step`, and the frame kept is the last one taken *before* that target. Without it
+ * the buckets fall on `floor(ts / step)`, which aligns to UTC midnight — so at +8 the week landed on
+ * 01:30, the month on 07:30 and 19:30, and the year on a Thursday, none of which anybody chose. The
  * targets nest: 16:00 is on the 3-hour grid and Monday 16:00 is on the 12-hour grid, so a frame keeps
  * hitting its target as it ages from one tier to the next instead of drifting once per tier.
  * `thin()` in js/timeline.js repeats these numbers and the slot expression. Change one, change both,
@@ -125,9 +125,12 @@ function encodeShot(string $raw): ?array {
 
 /* Thin one camera's archive down to SHOT_TIERS. Bucket keys carry their step, because two tiers
    dividing by different numbers could otherwise land on the same integer and silently delete each
-   other's frames. Within a slot the frame nearest the slot's target survives — see the anchor note
-   above. That rule is stable under repetition, which is what keeps this idempotent: the winner is
-   still the winner on the next pass, however many times capture runs it. */
+   other's frames. The slot a frame answers for is the **next target at or after it**, so the frame
+   left standing is the last one taken before that target — the state of the river as of 16:00, not
+   the nearest picture to 16:00. Those differ: with frames at 15:24 and 16:10, the nearest to 16:00
+   is 16:10, which is a photograph from after the moment it would be labelled with. The list is
+   ascending and re-setting a key does not move it, so "the last one before the target" is just the
+   last write to win — and that is stable under repetition, which is what keeps this idempotent. */
 function pruneShots(int $id, int $now): void {
     $keep = [];
     foreach (shotList($id) as $ts) {
@@ -135,15 +138,11 @@ function pruneShots(int $id, int $now): void {
         $step = $anchor = null;
         foreach (SHOT_TIERS as [$maxAge, $every, $at]) if ($age <= $maxAge) { [$step, $anchor] = [$every, $at]; break; }
         if ($step === null) { @unlink(shotFile($id, $ts)); continue; }   // past the last tier
-        if (!$step)         { $keep["0:$ts"] = $ts; continue; }          // this tier keeps everything
-        $slot   = intdiv($ts - $anchor + intdiv($step, 2), $step);
-        $target = $anchor + $slot * $step;
-        $b      = "$step:$slot";
-        if (!isset($keep[$b])) { $keep[$b] = $ts; continue; }
-        // The list is ascending, so an exact tie keeps the older frame. Either way one file goes.
-        $lose = abs($ts - $target) < abs($keep[$b] - $target) ? $keep[$b] : $ts;
-        @unlink(shotFile($id, $lose));
-        if ($lose !== $ts) $keep[$b] = $ts;
+        // intdiv(x + step - 1, step) is ceil() on positives: a frame lands on the target it precedes,
+        // and a frame exactly on a target answers for that target rather than the one after it.
+        $b = $step ? "$step:" . intdiv($ts - $anchor + $step - 1, $step) : "0:$ts";
+        if (isset($keep[$b])) @unlink(shotFile($id, $keep[$b]));
+        $keep[$b] = $ts;
     }
 }
 

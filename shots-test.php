@@ -127,9 +127,11 @@ foreach ($AIM as $i => [$name, $desc, $want]) {
 }
 $ok('the 6h and 24h tiers take no anchor', SHOT_TIERS[0][2] === 0 && SHOT_TIERS[1][2] === 0);
 
-/* Two frames in one slot. The nearer one to the target survives, whichever order they arrived in.
-   "Newest in the bucket" passes the first of these two and fails the second. */
-echo "\nnearest the target wins:\n";
+/* A slot keeps the last frame taken *before* its target — the state as of that moment, not the
+   nearest picture to it. The second case is the one that separates the two rules: at a 16:00 target
+   with frames at 15:24 and 16:10, "nearest" answers 16:10, which is a photograph from after the time
+   it would be labelled with. */
+echo "\nthe last frame before the target wins:\n";
 $pair = function (int $a, int $b) {
     array_map('unlink', glob(shotDir(TEST_ID) . '/*.*') ?: []);
     @mkdir(shotDir(TEST_ID), 0777, true);
@@ -137,22 +139,31 @@ $pair = function (int $a, int $b) {
     touch(shotDir(TEST_ID) . "/$b.jpg");
 };
 [, $mStep, $mAnchor] = SHOT_TIERS[3];                 // the month tier, one frame per 12 h
-$slot   = intdiv($now - 10 * 86400 - $mAnchor + intdiv($mStep, 2), $mStep);
+$slot   = intdiv($now - 10 * 86400 - $mAnchor + $mStep - 1, $mStep);
 $target = $mAnchor + $slot * $mStep;                  // about 10 days back, inside the month tier
 
-$pair($target - 2 * 3600, $target + 5 * 3600);
+// Two frames before one target: the later of them answers for it.
+$pair($target - 8 * 3600, $target - 3600);
 pruneShots(TEST_ID, $now);
-$ok('the earlier frame wins when it is nearer', shotList(TEST_ID) === [$target - 2 * 3600]);
+$ok('the later of two frames before the target wins', shotList(TEST_ID) === [$target - 3600]);
 
-$pair($target - 5 * 3600, $target + 3600);
+// The 15:24 / 16:10 case. The frame past the target answers for the *next* target, so it never
+// displaces the one before it, and both survive in their own slots.
+$pair($target - 36 * 60, $target + 10 * 60);
 pruneShots(TEST_ID, $now);
-$ok('the later frame wins when it is nearer',   shotList(TEST_ID) === [$target + 3600]);
+$ok('a frame past the target does not take its slot',
+    shotList(TEST_ID) === [$target - 36 * 60, $target + 10 * 60]);
 
-$pair($target - 2 * 3600, $target + 5 * 3600);
+// Exactly on the target answers for that target, not for the one after it.
+$pair($target - 3600, $target);
+pruneShots(TEST_ID, $now);
+$ok('a frame exactly on the target answers for it',   shotList(TEST_ID) === [$target]);
+
+$pair($target - 8 * 3600, $target - 3600);
 pruneShots(TEST_ID, $now);
 $kept2 = shotList(TEST_ID);
 pruneShots(TEST_ID, $now);
-$ok('a second prune leaves the winner alone',   shotList(TEST_ID) === $kept2);
+$ok('a second prune leaves the winner alone',         shotList(TEST_ID) === $kept2);
 
 array_map('unlink', glob(shotDir(TEST_ID) . '/*.*') ?: []);
 @rmdir(shotDir(TEST_ID));

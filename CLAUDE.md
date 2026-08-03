@@ -207,7 +207,10 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   `rm shots/.last` (the 30-minute stamp), not the directory.
 - **A retention bucket aims at a clock time, and both sides must aim at the same one.** `SHOT_TIERS`
   carries a third number per tier — the anchor, which is the target time in UTC modulo the step — and
-  `pruneShots()` keeps the frame **nearest** that target, not the newest in the bucket. `thin()` in
+  a frame's slot is the **next target at or after it**, so what survives is the last frame taken
+  *before* that target. Not the nearest one to it: with frames at 15:24 and 16:10 the nearest to
+  16:00 is 16:10, and a picture taken after the time it is labelled with is the one thing this must
+  not do. `thin()` in
   `js/timeline.js` repeats the same expression and the same numbers, so the ruler and the clip cannot
   file one frame in two slots. Week aims at 01:00 MYT, month at 04:00 and 16:00, year at Monday
   16:00, and the three nest, so a frame keeps hitting its target as it ages between tiers. The old

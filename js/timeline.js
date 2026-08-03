@@ -36,21 +36,18 @@ import { camWarn } from './popup.js';
    `anchor` is the clock time a range's slots aim at, and it is the same number `SHOT_TIERS` carries
    in shots.php. A bare `floor(ts / step)` aligns to UTC midnight, which at +8 put the week on 01:30,
    the month on 07:30 and 19:30, and the year on a Thursday — hours nobody chose, on a camera whose
-   whole point is comparing the same place at the same time of day. `every` states the target, so a
-   reader can see what a range aims at before playing it. */
+   whole point is comparing the same place at the same time of day. It stays out of `every`: the
+   stamp under the picture already says when each frame was taken, and a button that recited the
+   grid as well would be stating twice what a reader can read once. */
 /* `label` is the resting word, `long` and `every` are what the *chosen* segment says instead — the
    pace was a caption line of its own under the controls, which is a whole row of chrome to state a
    fact about one of five buttons. On the button it costs nothing and cannot be read against the
    wrong range. */
 const RANGES = [
-  { label: '24 h',  long: '24 hours', win: 24 * 3600,   step: 1800,       anchor: 0,
-    every: '30 minutes per frame' },
-  { label: 'week',  long: 'week',     win: 7 * 86400,   step: 3 * 3600,   anchor: 7200,
-    every: '3 hours per frame, from 01:00' },
-  { label: 'month', long: 'month',    win: 30 * 86400,  step: 12 * 3600,  anchor: 28800,
-    every: '12 hours per frame, 04:00 and 16:00' },
-  { label: 'year',  long: 'year',     win: 365 * 86400, step: 7 * 86400,  anchor: 374400,
-    every: '1 week per frame, Mondays 16:00' },
+  { label: '24 h',  long: '24 hours', win: 24 * 3600,   step: 1800,      anchor: 0,      every: '30 minutes per frame' },
+  { label: 'week',  long: 'week',     win: 7 * 86400,   step: 3 * 3600,  anchor: 7200,   every: '3 hours per frame' },
+  { label: 'month', long: 'month',    win: 30 * 86400,  step: 12 * 3600, anchor: 28800,  every: '12 hours per frame' },
+  { label: 'year',  long: 'year',     win: 365 * 86400, step: 7 * 86400, anchor: 374400, every: '1 week per frame' },
 ];
 /* One frame a second. Not an animation frame rate — consecutive frames here are 30 minutes to a week
    apart, so nothing on screen is continuous with what preceded it and there is no motion to smooth.
@@ -193,21 +190,19 @@ function paint() {
    that would keep a 213.8px pill on a 256px picture until the next frame. */
 NARROW.onchange = () => paint();
 
-/* One frame per slot, the frame nearest that slot's target winning — the same expression and the
+/* One frame per slot, and a frame's slot is the next target at or after it — so what survives is the
+   last frame taken *before* that target, which is the state as of it. The same expression and the
    same anchors the server prunes by (`pruneShots()` in shots.php), so a window that has already been
    thinned comes through untouched and one that has not is thinned the way it eventually will be.
+   Not the *nearest* frame to the target: with frames at 15:24 and 16:10 the nearest to 16:00 is
+   16:10, and a picture taken after the time it is labelled with is the one thing this must not do.
    A slot holding nothing is simply absent, which is what "the closest frame" means on an archive
-   with gaps: the rule bounds a frame to half a step from its target and needs no tolerance of its
-   own. Ascending in, ascending out: slots are visited in order, and re-setting a Map key does not
-   move it. */
+   with gaps — it needs no tolerance of its own. Ascending in, ascending out: slots are visited in
+   order, and re-setting a Map key does not move it. */
 function thin(list, step, anchor) {
   const keep = new Map();
-  for (const ts of list) {
-    const slot = Math.floor((ts - anchor + step / 2) / step);
-    const target = anchor + slot * step;
-    const held = keep.get(slot);
-    if (held === undefined || Math.abs(ts - target) < Math.abs(held - target)) keep.set(slot, ts);
-  }
+  // (x + step - 1) / step floored is ceil() on positives: a frame lands on the target it precedes.
+  for (const ts of list) keep.set(Math.floor((ts - anchor + step - 1) / step), ts);
   return [...keep.values()];
 }
 

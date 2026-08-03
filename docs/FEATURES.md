@@ -4276,9 +4276,13 @@ Both sides of the archive bucketed a frame by `floor(ts / step)`. That expressio
 midnight. Malaysia runs UTC+8, so the frame that survived landed at an hour nobody chose. The week
 range sat on 01:30, the month on 07:30 and 19:30, and the year on a Thursday.
 
-A tier now carries a third number, the **anchor**. The slot is
-`floor((ts - anchor + step / 2) / step)` and the target is `anchor + slot * step`. The frame nearest
-its target wins the slot.
+A tier now carries a third number, the **anchor**. A slot is the next target at or after a frame,
+so the frame left standing is the last one taken *before* that target. The slot expression is
+`floor((ts - anchor + step - 1) / step)`, which is `ceil()` on positive numbers.
+
+That gives the state as of 16:00, not the nearest picture to 16:00. The two differ. Take frames at
+15:24 and 16:10. The nearest to 16:00 is 16:10, which is a photograph from after the time it would
+carry. A timeline must never show that.
 
 | range | step | anchor | aims at (MYT) |
 |---|---|---|---|
@@ -4290,9 +4294,9 @@ The three targets nest. 16:00 sits on the 3-hour grid, and Monday 16:00 sits on 
 a frame keeps hitting its target as it ages from one tier to the next. It does not drift once per
 tier.
 
-The rule bounds its own error. A frame never sits further than half a step from its target. A slot
-with no frame is absent from the list. So "show the closest frame" needs no tolerance value and no
-empty slots to skip.
+A slot with no frame is absent from the list. So "show the closest frame" needs no tolerance value
+and no empty slots to skip. On a server capturing every 30 minutes a frame is never more than 30
+minutes before its target.
 
 `pruneShots()` and `thin()` write the same expression. A rule in one file only would let the ruler
 and the clip file one frame in two slots.
@@ -4320,9 +4324,11 @@ joined by `at`. So one `String.replace` strips the weekday comma and does nothin
 
 ### Trade-offs accepted
 
-The first prune after this change deleted 88 of 1337 stored frames. Each one sat 33 to 119 minutes
-from a frame that survived, in a window that steps 3 or 12 hours. One rule now covers the whole
-archive, and no branch carries the old bucketing.
+The first prune after this change deleted 353 of 1425 stored frames, all of them in the week tier.
+That is the one-time cost of moving an archive from the old UTC grid to this one. Both grids
+keep one frame per 3 hours, so nothing changes in the steady state. Each deleted frame sat 33 to 128
+minutes from the frame that replaced it, in a tier whose resolution is 3 hours. One rule now covers
+the whole archive, and no branch carries the old bucketing.
 
 Retention works on age, so the grid fills as frames age into each tier. The month grid is correct 7
 days after the change. The year grid is correct after 30 days. Frames already pruned keep their old
