@@ -155,6 +155,26 @@ header .hactions { display: flex; align-items: center; gap: 4px; margin-left: au
 }
 #aboutBox h3:first-of-type { border-top: 1px solid var(--outline); padding-top: 18px; }
 
+/* The tab strip. A row of two text buttons with an underline on the selected one — the same shape
+   every browser and editor uses, so it needs no label saying it is a tab strip. Tokens only: this
+   sits on the dialog surface, which flips with the theme. */
+#aboutBox .tabs {
+  display: flex; gap: 4px;
+  border-bottom: 1px solid var(--outline);
+  margin-top: 4px;
+}
+#aboutBox .tabs button {
+  appearance: none; background: none; border: 0; cursor: pointer;
+  padding: 10px 14px; margin-bottom: -1px;
+  font: inherit; font-size: 14px; color: var(--muted);
+  border-bottom: 2px solid transparent;
+}
+#aboutBox .tabs button:hover { color: var(--on-surface); }
+#aboutBox .tabs button[aria-selected="true"] {
+  color: var(--on-surface); border-bottom-color: var(--accent);
+}
+#aboutBox .tabs button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
 /* --- test mode --------------------------------------------------------------------------------- */
 
 /* A switch, not a checkbox: it changes what the whole map means, and should not look like the

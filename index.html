@@ -31,7 +31,7 @@
 <link rel="stylesheet" href="vendor/fonts.css?v=49">
 <link rel="stylesheet" href="css/icons.css?v=66">
 <link rel="stylesheet" href="css/base.css?v=79">
-<link rel="stylesheet" href="css/chrome.css?v=113">
+<link rel="stylesheet" href="css/chrome.css?v=114">
 <link rel="stylesheet" href="css/map.css?v=90">
 
 <!-- A camera still. A <dialog>, not a div: it opens from the all-stations table, which is itself a
@@ -178,7 +178,8 @@
     <button id="alertBtn" class="icon" aria-expanded="false" aria-controls="side"></button>
     <button id="data" class="icon" title="All stations as a table"
             aria-label="All stations as a table"><i class="i i-list_alt"></i></button>
-    <button id="about" class="icon" title="About" aria-label="About"><i class="i i-info"></i></button>
+    <button id="about" class="icon" title="Help and about"
+            aria-label="Help and about"><i class="i i-info"></i></button>
     <button id="locate" class="icon" title="Show my location" aria-label="Show my location"></button>
     <button id="theme" class="icon" title="Toggle theme" aria-label="Toggle theme"><i class="i"></i></button>
   </div>
@@ -196,6 +197,15 @@
     <form method="dialog"><button class="icon dclose" title="Close" aria-label="Close"
       ><i class="i i-close"></i></button></form>
   </div>
+  <!-- Two panes, one dialog. Its own row rather than a slot in .modalhead: the test-mode toggle,
+       the close button and two tabs collide at 360px, and the tabs are the wider pair. The logo
+       lives inside the About pane, not above both — it is that pane's heading, and above both it
+       would cost 76px of scroll before the first line of help. -->
+  <div class="tabs" role="tablist">
+    <button role="tab" id="tabAbout" aria-controls="paneAbout" aria-selected="true">About</button>
+    <button role="tab" id="tabHelp" aria-controls="paneHelp" aria-selected="false">Help</button>
+  </div>
+  <div id="paneAbout" role="tabpanel" aria-labelledby="tabAbout">
   <!-- The mark doubles as the dialog's heading: the mark and the two-line wordmark are the logo,
        and "About" over the top of them would be a title for a title. -->
   <h2 class="logo"><i class="i i-flood"></i><span>Klang Valley<br><b>Flood Watch</b></span></h2>
@@ -325,6 +335,8 @@
      rel="noopener">Material Symbols</a> (Apache 2.0);
      mapping by <a href="https://leafletjs.com/" target="_blank" rel="noopener">Leaflet</a>.
      Flood data remains the property of JPS Malaysia.</p>
+  </div>
+  <div id="paneHelp" role="tabpanel" aria-labelledby="tabHelp" hidden></div>
 </dialog>
 <!-- Tap the About logo seven times inside five seconds. No header, no close button: the picture is
      the entire content, so the whole surface dismisses it — the one case where tap-anywhere is right,

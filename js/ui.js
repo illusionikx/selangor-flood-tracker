@@ -33,6 +33,26 @@ const aboutBox = el('aboutBox');
 el('about').onclick = () => { closeSide(); aboutBox.showModal(); };
 aboutBox.onclick = e => { if (e.target === aboutBox) aboutBox.close(); };
 
+/* Two panes, one dialog. `hidden` on the pane and `aria-selected` on the button are the whole state.
+   Nothing is stored: the dialog resets to About on close, so it always opens where the design says.
+   The scroll reset is not cosmetic — the panes are different lengths, and switching from the foot of
+   About into Help would drop you into the middle of a sentence.
+   ponytail: no roving tabindex. The ARIA practice makes a tab list one Tab stop and moves between
+   tabs with the arrow keys; with exactly two tabs that only makes the second one harder to reach. */
+const PANES = { tabAbout: 'paneAbout', tabHelp: 'paneHelp' };
+function showPane(tabId) {
+  for (const [t, p] of Object.entries(PANES)) {
+    el(t).setAttribute('aria-selected', String(t === tabId));
+    el(p).hidden = t !== tabId;
+  }
+  aboutBox.scrollTop = 0;
+}
+aboutBox.querySelector('.tabs').onclick = e => {
+  const b = e.target.closest('[role=tab]');
+  if (b) showPane(b.id);
+};
+aboutBox.onclose = () => showPane('tabAbout');
+
 /* Seven taps on the About logo inside five seconds. A rolling window of the last seven timestamps
    rather than a counter and a timer: there is no interval to arm, clear or leak, and the gesture
    stays open-ended — tap slowly for a minute and the oldest taps simply fall out of the window, so
