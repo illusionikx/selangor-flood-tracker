@@ -399,7 +399,7 @@ for (const d of document.querySelectorAll('#bar .sect')) {
 }
 
 // --- ignored sensors -------------------------------------------------------------------------------
-// The ⋮ in a map popup adds one; this panel is the only way back. render.js draws the list.
+// The Details button in a station card adds one; this panel is the only way back. render.js draws the list.
 
 function setIgnored(ids) {
   PREFS.ignored = [...ids];
@@ -410,7 +410,7 @@ function setIgnored(ids) {
   render(); alerts(); ticker();
 }
 
-// Delegated: the ⋮ menu is rebuilt with its popup on every poll, so there is nothing stable to bind.
+// Delegated: the Details menu is rebuilt with its station card on every poll, so there is nothing stable to bind.
 document.addEventListener('click', e => {
   const id = e.target.closest('[data-ignore]')?.dataset.ignore;
   if (!id) return;
@@ -428,7 +428,7 @@ el('ignoredList').onclick = e => {
 };
 el('ignoredClear').onclick = () => setIgnored(new Set());
 
-/* Placement for the ⋮ menu, by hand — CSS anchor positioning is Chromium-only, exactly as in the
+/* Placement for the Details menu, by hand — CSS anchor positioning is Chromium-only, exactly as in the
    table's hover panels. `toggle` does not bubble, hence the capture phase. */
 document.addEventListener('toggle', e => {
   const box = e.target;

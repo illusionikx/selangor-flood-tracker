@@ -205,7 +205,7 @@ export function districts() {
   el('districtNone').disabled = hidden.size >= tally.size;
 }
 
-/* The sensors switched off from a popup's ⋮, listed so they can be switched back on.
+/* The sensors switched off from a station card's Details button, listed so they can be switched back on.
    Always drawn, never hidden when empty — an ignored sensor is a muted alarm, and a muted alarm you
    cannot find is the failure ISA-18.2 spends a chapter on. This list plus the count on the line
    below the layer chips are the only two places on the page that say a sensor has been silenced, so
@@ -223,7 +223,7 @@ export function ignoredPanel() {
       <button class="solo" data-unignore="${s.id}" title="Stop ignoring ${s.name}"
               aria-label="Stop ignoring ${s.name}">restore</button>
     </li>`).join('')
-    || '<li class="none">Nothing ignored. Use the ⋮ on any sensor in a station’s card.</li>';
+    || '<li class="none">Nothing ignored. Use the Details button on any sensor in a station’s card.</li>';
   el('ignoredClear').disabled = !rows.length;
 }
 
