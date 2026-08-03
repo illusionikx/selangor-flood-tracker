@@ -81,22 +81,27 @@ code path for two tiers. The 88 deleted frames counted below include this effect
 The stamp under the picture reads `14 Nov, 17:00`. It carries no year and no weekday. The year range
 holds frames 365 days old, so a frame from last November reads the same as one from this November.
 
-Add both: `Mon 03 Aug 2026, 16:00`. The `MYT` formatter in `js/timeline.js` gains `weekday: 'short'`
-and `year: 'numeric'`. It feeds `.btime` and `.abtime`, the only stamps the lightbox prints.
+Write the date in full: `Monday 3 August 2026 at 16:00`. The `MYT` formatter in `js/timeline.js`
+takes `weekday: 'long'`, `day: 'numeric'`, `month: 'long'` and `year: 'numeric'`. It feeds `.btime`
+and `.abtime`, the only stamps the lightbox prints.
 
 The weekday earns its place on the year range. That range aims at Monday 16:00, so the weekday is
 what tells the reader the anchor holds and which week the frame belongs to.
 
-`en-GB` renders the weekday as `Fri, 14 Nov 2025, 17:00`, with two commas. `stamp()` drops the first
-one. `String.replace` takes a string and replaces one match. This formatter names its own locale, so
-the first comma is always the weekday comma.
+The long form also costs less code than the short one. `en-GB` renders `weekday: 'short'` as
+`Mon, 03 Aug 2026, 16:00`, with two commas, so `stamp()` would have to strip one. The long form
+carries no comma and joins the two halves with `at`. So `stamp()` stays one line.
 
-Print both on every frame, not only on old ones. A rule that hides the year most of the time gives
-the reader nothing to trust when the year does appear. The stamp grows to 22 characters.
+Take `day: 'numeric'`, not `day: '2-digit'`. The stamp reads as a sentence, and a sentence says
+`3 August`, not `03 August`.
 
-The width is safe in both states. In compare mode `paint()` writes `live` into `.btime`, so only
-`.abtime` carries a stamp. Outside compare mode the CSS hides `.abtime`. So the picture never holds
-two full stamps.
+Print the full date on every frame, not only on old ones. A rule that hides the year most of the
+time gives the reader nothing to trust when the year does appear.
+
+The width holds on the narrowest phone. `#lightbox img` caps at `min(968px, 100vw - 64px)`, so a
+320px viewport gives a 256px picture. The pill starts 8px in and runs about 184px, which leaves
+64px. Only one pill ever carries a stamp. In compare mode `paint()` writes `live` into `.btime`,
+and outside compare mode the CSS hides `.abtime`.
 
 Two other formatters keep their present shape. `MYT_STAMP` in `js/clip.js` already carries the year
 and does date arithmetic, not display. `MYT_CLOCK` in `js/popup.js` labels a 12-hour graph.
@@ -107,7 +112,7 @@ and does date arithmetic, not display. `MYT_CLOCK` in `js/popup.js` labels a 12-
 |---|---|
 | `shots.php` | `SHOT_TIERS` gains the anchor column. `pruneShots()` swaps its bucket key and its winner test. |
 | `js/timeline.js` | `RANGES` gains `anchor`. `thin(list, step, anchor)` picks the nearest frame. |
-| `js/timeline.js` | The `MYT` formatter gains `weekday: 'short'` and `year: 'numeric'`. `stamp()` drops the first comma. |
+| `js/timeline.js` | The `MYT` formatter takes the full date: `weekday`/`month` long, `day`/`year` numeric. |
 | `js/timeline.js` | Range labels state the clock time. Example: `week, 3 hours per frame from 01:00`. |
 | `js/timeline.js` | The comment above `setRange` names a 6-hour stop that no longer exists. Correct it. |
 | `shots-test.php` | Three assertions. See below. |
