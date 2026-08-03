@@ -19,5 +19,8 @@ export const state = {
 };
 
 // One blob for every user setting. ponytail: localStorage, not a settings service.
-export const PREFS = { layers: {}, ...JSON.parse(localStorage.getItem('prefs') || '{}') };
-export const save = () => localStorage.setItem('prefs', JSON.stringify(PREFS));
+// Named once and exported: the Developer section's "Reset settings" reads it too, and a second
+// spelling of the same key is a second place for the two to drift.
+export const PREFS_KEY = 'prefs';
+export const PREFS = { layers: {}, ...JSON.parse(localStorage.getItem(PREFS_KEY) || '{}') };
+export const save = () => localStorage.setItem(PREFS_KEY, JSON.stringify(PREFS));

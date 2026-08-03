@@ -133,7 +133,7 @@ header .hactions { display: flex; align-items: center; gap: 4px; margin-left: au
 .modalhead .dclose { margin: -8px -10px -8px 0; font-size: 20px; }
 .modalhead form { margin: 0; }
 #aboutBox p { margin: 10px 0; line-height: 1.5; }
-/* No title left in this row — just the mode switch and the close, pushed to the corner. */
+/* Nothing left in this row but the close button, pushed to the corner. */
 #aboutBox .modalhead { justify-content: flex-end; margin-bottom: 0; }
 
 /* The disclaimer, lifted out of the run of grey paragraphs. It is the one line on this page with
@@ -271,9 +271,23 @@ body.testmode #testbadge, body.rising #risebadge { display: flex; }
 #devstats td { padding: 3px 0; vertical-align: top; }
 #devstats td:first-child { width: 42%; color: var(--muted); }
 
+/* `.link` was written for a <button>, which carries no underline of its own. `#devRaw` is the only
+   `<a class="link">` in the app, and an anchor keeps the browser's own underline unless told
+   otherwise. Here, beside the other Developer rules, rather than in base.css: this stylesheet's
+   `?v=` is already bumped for this change, and base.css would need the same bump for one rule. */
+.rowbtns a.link { text-decoration: none; }
+
 /* `.link` sets `display: flex`, and an author rule beats the user agent's `[hidden]` rule — so the
    attribute alone does not hide this button. The Pages build has no api.php to force. */
 .rowbtns .link[hidden] { display: none; }
+
+/* .testtog was a flex item in .modalhead, where `flex: none` sized it to its content. Here it is a
+   block-level flex container and would stretch the full pane, so the pill has to claim its width. */
+#paneAbout .testtog { width: fit-content; }
+
+/* Three controls, not the drawer's two. They wrap rather than shrink past their own text. */
+#paneAbout .rowbtns { flex-wrap: wrap; }
+#paneAbout .rowbtns .link { width: auto; flex: 1 1 auto; }
 
 /* --- all-stations table ----------------------------------------------------------------------- */
 

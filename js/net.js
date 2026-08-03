@@ -118,6 +118,11 @@ export async function load() {
     // district must not read as stations going on alert.
     alertToast();
     el('splash').classList.add('gone');
+    // A real poll landed, with a fresh payload behind lastPayload(). Dispatched rather than
+    // imported straight into ui.js — that module already imports this one, and importing back the
+    // other way would close the cycle. ui.js repaints the Developer table only while it is on
+    // screen, the same rule openSide() already follows for the station panel.
+    document.dispatchEvent(new Event('poll'));
   } catch (e) {
     clearTimeout(slow); clearTimeout(slower);
     network(null, e.message);

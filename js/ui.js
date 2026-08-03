@@ -1,7 +1,7 @@
 // DOM wiring: drawer, theme, filters, layer chips, panels, lightbox and the delegated jumps.
 
 import { KINDS, camSrc, FEED, STATIC } from './config.js';
-import { state, PREFS, save } from './state.js';
+import { state, PREFS, PREFS_KEY, save } from './state.js';
 import { el, distKm, dkey, ignoredIds } from './util.js';
 import { map, setTheme, flashTo, closeSide } from './map.js';
 import { heatOpacity, syncHeat } from './heat.js';
@@ -58,12 +58,19 @@ aboutBox.onclose = () => showPane('tabAbout');
    opens and when the About pane comes back, because a poll may have landed while Help was on
    screen. There is nothing to tear down, so re-painting is the whole update. */
 function paintDev() {
+  el('devMsg').textContent = '';   // clear the last action's outcome — it may name an older poll
   const j = lastPayload();
   el('devstats').innerHTML = !j
     ? '<tr><td class="muted" colspan="2">no payload yet</td></tr>'
     : [...feedRows(j), ...sourceRows(j)]
         .map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join('');
 }
+// A poll can land while the dialog sits open on the Developer section — #netstats re-renders every
+// 30 seconds for the same reason: a frozen "last checked" reads as a page that has stopped. `poll`
+// only fires once a payload actually exists, and only from a real fetch, never from a re-render the
+// filters trigger — see the dispatch in net.js. Repainting only while the dialog is open matches
+// openSide()'s own rule for the station panel: nothing redraws what nobody can see.
+document.addEventListener('poll', () => { if (aboutBox.open) paintDev(); });
 
 /* Refresh now exists only where there is something to refresh. The Pages build serves a baked
    api.json written by a cron job, so a force there is a 404 against a file that has no opinion. */
@@ -96,9 +103,9 @@ el('devForce').onclick = async () => {
    deliberately. It fails in the safe direction — clearing it un-silences sensors, so it can only
    add alerts, never hide one — but "safe" is not "expected". */
 el('devReset').onclick = () => {
-  if (!confirm('Reset the theme, the district filter, the layer chips and the ignored sensors?\n\n'
-      + 'This cannot be undone.')) return;
-  localStorage.removeItem('prefs');
+  if (!confirm('Reset every setting to its default? This clears the theme, the district filter, '
+      + 'the layer chips, the heatmap and the ignored sensors.\n\nThis cannot be undone.')) return;
+  localStorage.removeItem(PREFS_KEY);
   location.reload();
 };
 
