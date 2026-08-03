@@ -192,12 +192,16 @@ About six rows.
 A new `<h3>` in the About pane, directly under the `.notice` block. It sits there because it makes
 the same kind of statement as the notice. Both tell a reader how much weight this site carries.
 
-Three short paragraphs, then two links.
+Four short paragraphs, then two links.
 
 > **How this was built**
 >
 > This site is vibe coded. An AI wrote most of it, over a few evenings. It exists because reading
 > three government pages to answer one question about my own river was absurd.
+>
+> It started as Selangor alone. I work in Kuala Lumpur, so I added that too, and Putrajaya arrived
+> on the same feed. A Selangor map became a Klang Valley one. The repository still carries the
+> first name.
 >
 > So there is no team behind it, and no warranty. It can be wrong. The code is open. Read it, and
 > tell me what I got wrong.
@@ -207,6 +211,19 @@ Three short paragraphs, then two links.
 >
 > **Source code** — the whole site, and the scrapers behind it.
 > **Report a mistake** — a wrong reading, a station in the wrong place, a page that will not load.
+
+### The scope paragraph earns its place twice
+
+It tells the origin story. It also answers a question the Source code link creates. The repository
+is `selangor-flood-tracker`. The app is `Klang Valley Flood Watch`. A reader who follows the link
+meets that mismatch at once, and this paragraph is the answer to it.
+
+The claim about Putrajaya is accurate. `CLAUDE.md` records that the SPHTN feed carries Kuala Lumpur
+and Putrajaya together. Putrajaya needed no third integration.
+
+This paragraph does **not** go in the existing "why it exists" paragraph, which a reader finds one
+screen above. That paragraph makes one point: the three portals hold pieces and none of them plot
+them together. Scope history in the middle of it costs the point its edge.
 
 ### Why here and not in Credits
 
