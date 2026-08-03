@@ -261,6 +261,11 @@ body.testmode #testbadge, body.rising #risebadge { display: flex; }
    a text column rather than dominate it. */
 #aboutBox .pins .cluster { width: 28px; height: 28px; font-size: 12px; }
 
+/* The left cell of a how-to row: the control's own glyph, then its own name. Aligned to the first
+   line, because a name can wrap to two and the glyph belongs beside the first. */
+#aboutBox .ctl { display: flex; align-items: flex-start; gap: 8px; }
+#aboutBox .ctl .i { font-size: 18px; flex: none; color: var(--muted); }
+
 #aboutBox kbd {
   font: inherit; font-size: 12px; padding: 1px 6px;
   border: 1px solid var(--outline); border-radius: 4px; background: var(--hover);

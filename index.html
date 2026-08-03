@@ -31,7 +31,7 @@
 <link rel="stylesheet" href="vendor/fonts.css?v=49">
 <link rel="stylesheet" href="css/icons.css?v=66">
 <link rel="stylesheet" href="css/base.css?v=79">
-<link rel="stylesheet" href="css/chrome.css?v=119">
+<link rel="stylesheet" href="css/chrome.css?v=120">
 <link rel="stylesheet" href="css/map.css?v=90">
 
 <!-- A camera still. A <dialog>, not a div: it opens from the all-stations table, which is itself a
@@ -309,43 +309,42 @@
   <p id="devMsg" class="muted" role="status"></p>
   </div>
   <div id="paneHelp" role="tabpanel" aria-labelledby="tabHelp" tabindex="0" hidden>
-  <!-- Only what a tap does not teach. There is no "tap a pin" row: a reader who opened this dialog
-       has already tapped things, and a list that starts by explaining the obvious teaches the reader
-       that the rest is not worth reading. -->
+  <!-- Every row leads with the glyph the reader is hunting for and the control's own name, the same
+       way the pin legend below shows real pins. The first version named internal parts — "the
+       drawer", "a chip", "the ⋮ menu" — and none of those words are on screen. One of them was not
+       even true any more: the ⋮ became an ⓘ. Show the thing, and the words cannot drift from it. -->
   <h3>How to use the map</h3>
   <div class="key">
-    <span><b>Ignore a sensor</b></span>
-    <span>Open its card and use the ⋮ menu. The sensor stays on the map and raises no alert. The
-       drawer keeps the count, and gives it back.</span>
+    <span class="ctl"><i class="i i-menu"></i><b>Layers &amp; filters</b></span>
+    <span>Pick districts. Turn sensor kinds on and off. Show only the stations climbing towards
+       their danger mark. The counts say what each filter holds.</span>
 
-    <span><b>Check where a reading came from</b></span>
-    <span>The same ⋮ menu names the feed. It prints the stamp on the last reading. It says whether
-       the station still answers.</span>
+    <span class="ctl"><i class="i i-search"></i><b>Go to a station</b></span>
+    <span>Type a place name and jump straight to it.</span>
 
-    <span><b>Look back at a camera</b></span>
-    <span>Tap the picture on a camera card. The player opens three hours back. Drag the divider to
-       hold that frame against the live one.</span>
+    <span class="ctl"><i class="i i-my_location"></i><b>Show my location</b></span>
+    <span>Puts you on the map, and offers the nearest river and the nearest camera.</span>
 
-    <span><b>Show only what is climbing</b></span>
-    <span>A chip in the drawer. It leaves only the stations climbing towards their danger mark.</span>
+    <span class="ctl"><i class="i i-info"></i><b>Details</b></span>
+    <span>On any station card. It names the feed the reading came from. It gives the time JPS
+       stamped it, and says whether the station still answers. It is also where you silence a
+       sensor.</span>
 
-    <span><b>Show one district</b></span>
-    <span>The Districts list in the drawer. The count on the heading says how many are on.</span>
+    <span class="ctl"><i class="i i-list_alt"></i><b>All stations as a table</b></span>
+    <span>Every station at once. It sorts, filters, and groups by district.</span>
 
-    <span><b>Read a point on a graph</b></span>
-    <span>Move the pointer over the graph. On a phone, hold a finger on it. The reading and its time
-       appear above the line.</span>
+    <span class="ctl"><i class="i i-play_arrow"></i><b>The camera player</b></span>
+    <span>Tap any camera picture. It opens three hours back. Drag the divider to hold that frame
+       against the live one. <kbd>k</kbd> plays. <kbd>,</kbd> and <kbd>.</kbd> step one frame.
+       <kbd>End</kbd> returns to now.</span>
 
-    <span><b>See every station at once</b></span>
-    <span>The list button in the app bar. The table sorts, filters, and groups by district.</span>
+    <span class="ctl"><b>Read a point on a graph</b></span>
+    <span>Move the pointer over the graph. On a phone, hold a finger on it. The reading and its
+       time appear above the line.</span>
 
-    <span><b>Install it</b></span>
+    <span class="ctl"><b>Install it</b></span>
     <span>The browser offers to install this site. It then opens without browser chrome. It still
        needs a connection.</span>
-
-    <span><b>Drive the camera player</b></span>
-    <span><kbd>k</kbd> or space plays. <kbd>,</kbd> and <kbd>.</kbd> step one frame.
-       <kbd>End</kbd> returns to the live picture.</span>
   </div>
   <h3>How to read the map</h3>
   <p class="muted">One pin per place. The glyph says what kind of sensor is there, the colour says
