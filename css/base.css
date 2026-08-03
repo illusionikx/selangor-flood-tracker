@@ -344,9 +344,6 @@ dialog:focus, dialog:focus-visible { outline: none; }
 
 .rowbtns { display: flex; gap: 8px; margin-top: 8px; }
 .rowbtns .link { justify-content: center; }
-/* `.link` styles a <button>, which has no underline by default. The Developer section's "Raw
-   payload" link is an `<a>`. An anchor keeps its underline unless a rule removes it. */
-.rowbtns a.link { text-decoration: none; }
 .link:disabled { opacity: .45; cursor: default; background: color-mix(in srgb, var(--accent) 10%, transparent); }
 
 .icon {
