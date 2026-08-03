@@ -101,7 +101,7 @@ header .hactions { display: flex; align-items: center; gap: 4px; margin-left: au
 /* Wider than a plain dialog: this one carries the logo lockup, three source entries and a credits
    block, and at 440px the source descriptions ran to four lines each. */
 #aboutBox {
-  max-width: min(600px, calc(100vw - 32px)); padding: 24px;
+  max-width: min(820px, calc(100vw - 32px)); padding: 24px;
   border: 1px solid var(--outline); border-radius: 12px;
   background: var(--surface); color: var(--on-surface); box-shadow: var(--shadow);
 }

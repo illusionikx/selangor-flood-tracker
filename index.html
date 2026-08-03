@@ -31,7 +31,7 @@
 <link rel="stylesheet" href="vendor/fonts.css?v=49">
 <link rel="stylesheet" href="css/icons.css?v=66">
 <link rel="stylesheet" href="css/base.css?v=79">
-<link rel="stylesheet" href="css/chrome.css?v=120">
+<link rel="stylesheet" href="css/chrome.css?v=121">
 <link rel="stylesheet" href="css/map.css?v=90">
 
 <!-- A camera still. A <dialog>, not a div: it opens from the all-stations table, which is itself a
@@ -309,42 +309,117 @@
   <p id="devMsg" class="muted" role="status"></p>
   </div>
   <div id="paneHelp" role="tabpanel" aria-labelledby="tabHelp" tabindex="0" hidden>
-  <!-- Every row leads with the glyph the reader is hunting for and the control's own name, the same
-       way the pin legend below shows real pins. The first version named internal parts — "the
-       drawer", "a chip", "the ⋮ menu" — and none of those words are on screen. One of them was not
-       even true any more: the ⋮ became an ⓘ. Show the thing, and the words cannot drift from it. -->
-  <h3>How to use the map</h3>
+  <!-- Four sections, not one. The old single list mixed three different things: the six buttons in
+       the header, the whole filters drawer summarised in one line, and two lines ("Read a point on a
+       graph", "Install it") that are not controls at all — a gesture and a platform feature. It also
+       reused the ⓘ for two different meanings: this dialog opens from an ⓘ in the app bar, and the
+       same glyph sat on the station card's "Details" button one section down. A reader who had just
+       pressed ⓘ to get here saw ⓘ again meaning something else. The fix never shows ⓘ in this pane —
+       the Details button is named by position instead — and never shows ▶ as a way to open the
+       camera, because there is no play button until the picture is already open.
+       Every row still leads with the glyph the reader is hunting for, where that glyph is the one on
+       screen at that exact spot. Where none is — a click on a picture, a button named only by its
+       menu position — the row leads with the name instead, the same way the Details row always did. -->
+  <h3>The buttons along the top</h3>
   <div class="key">
     <span class="ctl"><i class="i i-menu"></i><b>Layers &amp; filters</b></span>
-    <span>Pick districts. Turn sensor kinds on and off. Show only the stations climbing towards
-       their danger mark. The counts say what each filter holds.</span>
+    <span>Opens the drawer that holds every filter.</span>
 
     <span class="ctl"><i class="i i-search"></i><b>Go to a station</b></span>
     <span>Type a place name and jump straight to it.</span>
 
-    <span class="ctl"><i class="i i-my_location"></i><b>Show my location</b></span>
-    <span>Puts you on the map, and offers the nearest river and the nearest camera.</span>
-
-    <span class="ctl"><i class="i i-info"></i><b>Details</b></span>
-    <span>On any station card. It names the feed the reading came from. It gives the time JPS
-       stamped it, and says whether the station still answers. It is also where you silence a
-       sensor.</span>
+    <span class="ctl"><i class="i i-warning"></i><b>On alert</b></span>
+    <span>Opens the list of stations on alert now. The badge shows how many.</span>
 
     <span class="ctl"><i class="i i-list_alt"></i><b>All stations as a table</b></span>
-    <span>Every station at once. It sorts, filters, and groups by district.</span>
+    <span>Lists every station. Sort it, filter it, or group it by district.</span>
 
-    <span class="ctl"><i class="i i-play_arrow"></i><b>The camera player</b></span>
-    <span>Tap any camera picture. It opens three hours back. Drag the divider to hold that frame
-       against the live one. <kbd>k</kbd> plays. <kbd>,</kbd> and <kbd>.</kbd> step one frame.
-       <kbd>End</kbd> returns to now.</span>
+    <span class="ctl"><i class="i i-my_location"></i><b>Show my location</b></span>
+    <span>Puts you on the map. Offers the nearest river and the nearest camera.</span>
 
-    <span class="ctl"><b>Read a point on a graph</b></span>
-    <span>Move the pointer over the graph. On a phone, hold a finger on it. The reading and its
-       time appear above the line.</span>
+    <span class="ctl"><i class="i i-dark_mode"></i><b>Toggle theme</b></span>
+    <span>Switches the map and the page between light and dark.</span>
 
     <span class="ctl"><b>Install it</b></span>
     <span>The browser offers to install this site. It then opens without browser chrome. It still
        needs a connection.</span>
+  </div>
+  <h3>Filters</h3>
+  <div class="key">
+    <span class="ctl"><i class="i i-near_me"></i><b>Districts</b></span>
+    <span>Filter the list by name. Turn a district on or off, or show only one. Show all or hide
+       all in one click.</span>
+
+    <span class="ctl"><i class="i i-visibility_off"></i><b>Ignored sensors</b></span>
+    <span>Lists every sensor you silenced. It stays on screen even when empty, so a silenced alarm
+       is never out of sight.</span>
+
+    <span class="ctl"><i class="i i-water_drop"></i><b>Heatmap</b></span>
+    <span>Choose water level or rainfall, not both. Turn one on to see where the water is
+       worst.</span>
+
+    <span><b>Rising stations only</b></span>
+    <span>A separate filter, not a heatmap. Hides every station that is not climbing towards its
+       danger mark.</span>
+
+    <span class="ctl"><i class="i i-layers"></i><b>Sensor kinds</b></span>
+    <span>A chip for each kind of sensor. Turn any of the five off to hide it everywhere on the
+       map.</span>
+
+    <span><b>The count below the filters</b></span>
+    <span>States how many stations are on the map and how many sensors you ignored. It never
+       collapses out of view.</span>
+  </div>
+  <h3>The station panel</h3>
+  <div class="key">
+    <span><b>Open a station</b></span>
+    <span>Click any pin. Its card opens in a panel on the right and stays there while you read
+       it.</span>
+
+    <span><b>The head</b></span>
+    <span>Names the place, its district and basin, and shows one badge for each sensor there.</span>
+
+    <span><b>The meter</b></span>
+    <span>Draws the level of a river against its own alert, warning and danger marks.</span>
+
+    <span><b>The graph</b></span>
+    <span>A line for a river or a flood gauge. Bars for rainfall. Both cover the last 12
+       hours.</span>
+
+    <span><b>Read a point on a graph</b></span>
+    <span>Move the pointer over it. On a phone, hold a finger on it. The reading and its time
+       appear above the line.</span>
+
+    <span><b>Details</b></span>
+    <span>A button on every sensor. It names the feed, the time of the last reading, and whether
+       the station still answers. It is also where you ignore a sensor.</span>
+
+    <span><b>Offline</b></span>
+    <span>A grey block replaces the reading when a station has gone quiet.</span>
+  </div>
+  <h3>The camera viewer</h3>
+  <div class="key">
+    <span><b>Open the camera</b></span>
+    <span>Click any camera picture. The player opens three hours back, not at the live frame.</span>
+
+    <span class="ctl"><i class="i i-skip_previous"></i><i class="i i-play_arrow"></i
+      ><i class="i i-skip_next"></i><i class="i i-last_page"></i><b>Transport</b></span>
+    <span>Step one frame back or forward, play through them, or jump straight back to the live
+       frame.</span>
+
+    <span class="ctl"><i class="i i-compare"></i><b>Compare</b></span>
+    <span>Drag the divider it reveals to hold an older frame against the live one.</span>
+
+    <span><b>The seek bar</b></span>
+    <span>Colored spans mark when a sensor near that camera was in trouble.</span>
+
+    <span><b>Range</b></span>
+    <span>Four ranges: 24 hours, a week, a month, a year. Each frame is 30 minutes, 3 hours, 12
+       hours or 1 week apart.</span>
+
+    <span><b>Keys</b></span>
+    <span><kbd>k</kbd> or space plays. <kbd>,</kbd> and <kbd>.</kbd> step one frame. <kbd>End</kbd>
+       returns to now.</span>
   </div>
   <h3>How to read the map</h3>
   <p class="muted">One pin per place. The glyph says what kind of sensor is there, the colour says

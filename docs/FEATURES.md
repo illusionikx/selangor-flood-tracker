@@ -4486,3 +4486,60 @@ all.
 - No memory of the last pane a reader had open.
 - No `?` keyboard shortcut sheet. The four bindings already print on the buttons that use them.
 - No URL fragment that opens a pane directly.
+
+## The Help pane split into four sections, because one list mixed four things
+
+The Help pane once opened on a single `How to use the map` list of eight rows. The owner rejected
+it on screen for four reasons, and the fix rebuilds that one heading into four:
+`The buttons along the top`, `Filters`, `The station panel`, `The camera viewer`.
+
+### The ⓘ meant two things in one flow
+
+The list showed `i-info` for the "Details" button on the station card. The `#about` button that
+opens this dialog carries the same glyph. A reader who pressed ⓘ to reach Help then saw ⓘ again,
+naming something else. The rebuild never prints `i-info` inside the Help pane. The Details row
+names the button by its position on the card instead of by its glyph.
+
+### The ▶ was a lie
+
+The list showed `i-play_arrow` for "The camera player," beside a sentence that starts "Tap any
+camera picture." There is no play button at that point. The play control exists only once the
+lightbox is open. The rebuilt camera section leads with the true entry point. A row named `Open the
+camera` carries no glyph, because no glyph sits on a photograph. It shows the transport glyphs
+(`i-skip_previous`, `i-play_arrow`, `i-skip_next`, `i-last_page`, `i-compare`) only under a
+`Transport` row that comes after it, where they are genuinely on screen.
+
+### A gesture and a platform feature are not controls
+
+"Read a point on a graph" and "Install it" sat in the same list as six buttons. A hover gesture is
+not a control this page built. Neither is the install prompt the browser shows on its own. "Read a
+point on a graph" moved into `The station panel`, beside the meter and the graph it describes.
+"Install it" stayed at the end of `The buttons along the top`. The owner allowed either keeping it
+there or dropping it. It survives because a reader scanning the button list is the reader most
+likely to wonder how to keep this page on a home screen.
+
+### Filters had one line for a whole subsystem
+
+The old list gave the entire drawer one sentence: districts, ignored sensors, two heatmaps, the
+rising-only filter, five sensor-kind chips, and the always-visible counts. The new `Filters`
+section gives each piece its own row, including the two counts that never collapse. The drawer
+keeps its own "N hidden" summaries. The `#shown` line sits beneath every section. Both are the two
+indications the alert design standard requires to stay visible whenever an alarm is silenced.
+
+### The dialog widened to fit four sections without a longer scroll
+
+The `max-width` on `#aboutBox` moved from `min(600px, calc(100vw - 32px))` to
+`min(820px, calc(100vw - 32px))`. The `calc()` stays untouched, so a phone still gets
+`100vw - 32px` regardless of the first number. The existing `@media (max-width: 600px)` block
+needed no change. It already reshapes `.key` to one column and shrinks the logo below that
+breakpoint, and none of its rules name `600px` as the width of the dialog itself.
+
+### Trade-offs accepted
+
+- The `Transport` row in the camera viewer carries four icons in one `.ctl` cell rather than one
+  row each. Splitting them adds four rows to describe one button group that already reads as one
+  group in the player itself (`role="group" aria-label="Playback"`).
+- The four new sections use American spelling ("Colored spans"), the spelling this project asks
+  for in new prose. The unmoved sections below them keep the British spelling they already had
+  ("colour"). This change did not ask for a rewrite of moved or existing prose, so the pane now
+  holds two spellings rather than one.
