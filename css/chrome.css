@@ -263,6 +263,18 @@ body.testmode #testbadge, body.rising #risebadge { display: flex; }
   border: 1px solid var(--outline); border-radius: 4px; background: var(--hover);
 }
 
+/* --- developer section -------------------------------------------------------------------------- */
+
+/* `separate`, not `collapse` — collapse drops padding on the table box, which is the same trap
+   #netstats already documents. */
+#devstats { border-collapse: separate; width: 100%; margin: 12px 0; font-size: 13px; }
+#devstats td { padding: 3px 0; vertical-align: top; }
+#devstats td:first-child { width: 42%; color: var(--muted); }
+
+/* `.link` sets `display: flex`, and an author rule beats the user agent's `[hidden]` rule — so the
+   attribute alone does not hide this button. The Pages build has no api.php to force. */
+.rowbtns .link[hidden] { display: none; }
+
 /* --- all-stations table ----------------------------------------------------------------------- */
 
 /* Taller and wider than the sources dialog: this one is for scanning, so it takes the screen. */

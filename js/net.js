@@ -20,6 +20,31 @@ import { seedTest } from './test.js';
    last 2h (JPS publishes hourly). */
 let last;   // the payload the chip is currently describing, so the ages can tick between polls
 
+/* The four facts behind the status dot. Exported because the Developer section in the About dialog
+   shows the same numbers, and two copies of this list would drift the first time one of them gained
+   a row. */
+export const feedRows = j => [
+  ['readings', j.sourceUpdated ? ago(j.sourceUpdated) : 'unknown'],
+  ['last checked', ago(j.fetched)],
+  ['stations', j.stations.length],
+  ['from', j.cacheAge ? `cache, ${j.cacheAge}s old` : 'JPS'],
+];
+
+/* What the dot has no room for. The scraped counters are the alarm for a scraper that broke —
+   `parsed: 0` means a table moved upstream, not that the rivers went quiet — and until now they
+   were in the payload and on no screen. */
+export const sourceRows = j => [
+  ['fetch time', `${j.tookMs ?? '?'} ms`],
+  ['detail calls', `${j.details?.ok ?? '?'} of ${j.details?.requested ?? '?'}`],
+  ['kl scraped', `${j.sources?.kl?.parsed ?? '?'} parsed, ${j.sources?.kl?.added ?? '?'} added`],
+  ['national scraped',
+    `${j.sources?.national?.parsed ?? '?'} parsed, ${j.sources?.national?.applied ?? '?'} applied`],
+  ['offline stations', j.offline ?? '?'],
+];
+
+/** The payload the chip is currently describing, so the About dialog reports the same poll. */
+export const lastPayload = () => last;
+
 function network(j, err) {
   last = err ? null : j;
   const stale = j && j.sourceUpdated && (Date.now() - new Date(j.sourceUpdated)) / 3.6e6 > 2;
@@ -35,12 +60,7 @@ function network(j, err) {
   /* The word leads the popover instead of sitting in the bar. The dot on the mark says *something
      changed* in a colour; which state it is now is a word, and a word needs a place to be read
      rather than a place to be glanced at. Nothing is lost: this row is the old chip's label. */
-  const rows = [['status', text], ...(err ? [['problem', err]] : [
-    ['readings', j.sourceUpdated ? ago(j.sourceUpdated) : 'unknown'],
-    ['last checked', ago(j.fetched)],
-    ['stations', j.stations.length],
-    ['from', j.cacheAge ? `cache, ${j.cacheAge}s old` : 'JPS'],
-  ])];
+  const rows = [['status', text], ...(err ? [['problem', err]] : feedRows(j))];
 
   const dot = el('net');
   dot.style.setProperty('--c', color);         // dot and halo follow the state

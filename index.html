@@ -31,7 +31,7 @@
 <link rel="stylesheet" href="vendor/fonts.css?v=49">
 <link rel="stylesheet" href="css/icons.css?v=66">
 <link rel="stylesheet" href="css/base.css?v=79">
-<link rel="stylesheet" href="css/chrome.css?v=116">
+<link rel="stylesheet" href="css/chrome.css?v=117">
 <link rel="stylesheet" href="css/map.css?v=90">
 
 <!-- A camera still. A <dialog>, not a div: it opens from the all-stations table, which is itself a
@@ -189,11 +189,6 @@
   <!-- Controls first in the source, so the close button is the first thing reachable by keyboard,
        but they read as a corner strip rather than a header row. -->
   <div class="modalhead">
-    <!-- Beside the close button because it is a mode, not a setting: the two things you want within
-         reach of each other are "turn the pretend flood on" and "get out of here". -->
-    <label class="testtog" title="Fill the map with fake alerts to see how it behaves in a flood">
-      <input type="checkbox" id="testMode"><span>Test mode</span>
-    </label>
     <form method="dialog"><button class="icon dclose" title="Close" aria-label="Close"
       ><i class="i i-close"></i></button></form>
   </div>
@@ -292,6 +287,26 @@
      rel="noopener">Material Symbols</a> (Apache 2.0);
      mapping by <a href="https://leafletjs.com/" target="_blank" rel="noopener">Leaflet</a>.
      Flood data remains the property of JPS Malaysia.</p>
+
+  <!-- The toggle moved here out of the close-button row. Its old spot had a reason — a mode and its
+       exit within reach of each other — and the tabs weakened it: this pane is now short enough that
+       the close button is one scroll away, and the amber test-mode strip across the top of the page
+       is what actually gets you out. Here it sits under a heading that names what it is. -->
+  <h3>Developer</h3>
+  <label class="testtog" title="Fill the map with fake alerts to see how it behaves in a flood">
+    <input type="checkbox" id="testMode"><span>Test mode</span>
+  </label>
+  <p class="muted">Fills the map with fake alerts, in this browser only. Nothing reaches JPS, and
+     nothing is stored.</p>
+
+  <table id="devstats"></table>
+
+  <div class="rowbtns">
+    <button id="devForce" class="link"><i class="i i-refresh"></i> Refresh now</button>
+    <a id="devRaw" class="link" href="api.php" target="_blank" rel="noopener">Raw payload</a>
+    <button id="devReset" class="link">Reset settings</button>
+  </div>
+  <p id="devMsg" class="muted" role="status"></p>
   </div>
   <div id="paneHelp" role="tabpanel" aria-labelledby="tabHelp" hidden>
   <!-- Only what a tap does not teach. There is no "tap a pin" row: a reader who opened this dialog

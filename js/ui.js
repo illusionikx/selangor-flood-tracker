@@ -1,6 +1,6 @@
 // DOM wiring: drawer, theme, filters, layer chips, panels, lightbox and the delegated jumps.
 
-import { KINDS, camSrc } from './config.js';
+import { KINDS, camSrc, FEED, STATIC } from './config.js';
 import { state, PREFS, save } from './state.js';
 import { el, distKm, dkey, ignoredIds } from './util.js';
 import { map, setTheme, flashTo, closeSide } from './map.js';
@@ -12,7 +12,7 @@ import { dataTable } from './table.js';
 import { alerts, toggleAlerts } from './alerts.js';
 import { ticker } from './ticker.js';
 import { openTimeline, reset } from './timeline.js';
-import { load } from './net.js';
+import { load, feedRows, sourceRows, lastPayload } from './net.js';
 import { paintTestChrome } from './test.js';
 import './sparktip.js';   // side effect only: one delegated readout for every graph on the page
 
@@ -30,7 +30,7 @@ const aboutBox = el('aboutBox');
 // The station card closes when a dialog takes the screen — you have gone somewhere else, and coming
 // back to a card you had forgotten was open is a surprise. That, and its own ×, are the only ways it
 // shuts: nothing on the map dismisses it, and a poll never does. See map.js.
-el('about').onclick = () => { closeSide(); aboutBox.showModal(); };
+el('about').onclick = () => { closeSide(); paintDev(); aboutBox.showModal(); };
 aboutBox.onclick = e => { if (e.target === aboutBox) aboutBox.close(); };
 
 /* Two panes, one dialog. `hidden` on the pane and `aria-selected` on the button are the whole state.
@@ -46,12 +46,61 @@ function showPane(tabId) {
     el(p).hidden = t !== tabId;
   }
   aboutBox.scrollTop = 0;
+  if (tabId === 'tabAbout') paintDev();
 }
 aboutBox.querySelector('.tabs').onclick = e => {
   const b = e.target.closest('[role=tab]');
   if (b) showPane(b.id);
 };
 aboutBox.onclose = () => showPane('tabAbout');
+
+/* The same numbers the status dot shows, plus the ones it has no room for. Painted when the dialog
+   opens and when the About pane comes back, because a poll may have landed while Help was on
+   screen. There is nothing to tear down, so re-painting is the whole update. */
+function paintDev() {
+  const j = lastPayload();
+  el('devstats').innerHTML = !j
+    ? '<tr><td class="muted" colspan="2">no payload yet</td></tr>'
+    : [...feedRows(j), ...sourceRows(j)]
+        .map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join('');
+}
+
+/* Refresh now exists only where there is something to refresh. The Pages build serves a baked
+   api.json written by a cron job, so a force there is a 404 against a file that has no opinion. */
+if (STATIC) el('devForce').hidden = true;
+
+el('devRaw').href = FEED;
+
+/* The server owns the rate limit — a guard in here guards nothing. This only reports what the
+   server decided, and reloads the map either way so the button never leaves a stale number on
+   screen next to the word "refreshed". */
+el('devForce').onclick = async () => {
+  const b = el('devForce');
+  b.disabled = true;
+  el('devMsg').textContent = 'refreshing…';
+  try {
+    const r = await fetch(FEED + (FEED.includes('?') ? '&' : '?') + 'force=1', { cache: 'no-store' });
+    const j = await r.json();
+    el('devMsg').textContent = j.forced
+      ? `refreshed in ${j.tookMs} ms`
+      : `not refreshed — ${j.forceWhy || 'served from cache'}`;
+    await load();
+  } catch (e) {
+    el('devMsg').textContent = 'failed — ' + e.message;
+  }
+  b.disabled = false;
+  paintDev();
+};
+
+/* Native confirm(), because this drops the ignored list and that is the one setting somebody chose
+   deliberately. It fails in the safe direction — clearing it un-silences sensors, so it can only
+   add alerts, never hide one — but "safe" is not "expected". */
+el('devReset').onclick = () => {
+  if (!confirm('Reset the theme, the district filter, the layer chips and the ignored sensors?\n\n'
+      + 'This cannot be undone.')) return;
+  localStorage.removeItem('prefs');
+  location.reload();
+};
 
 /* Seven taps on the About logo inside five seconds. A rolling window of the last seven timestamps
    rather than a counter and a timer: there is no interval to arm, clear or leak, and the gesture
