@@ -4519,9 +4519,9 @@ after it. `i-compare` gets its own `Compare` row beside it. Both are genuinely o
 button in the header. A hover gesture is not a control this page built. Neither is the install
 prompt the browser shows on its own. "Read a point on a graph" moved into `The station panel`,
 beside the meter and the graph it describes.
-"Install it" stayed at the end of `The buttons along the top`. The owner allowed either keeping it
-there or dropping it. It survives because a reader scanning the button list is the reader most
-likely to wonder how to keep this page on a home screen.
+"Install it" is gone. It sat under a heading named for buttons this page draws, and the install
+prompt is not one of them. The browser decides when to offer it, on its own rules, and a reader
+who never sees the offer cannot act on the instruction. The README still documents installing.
 
 ### Filters had one line for a whole subsystem
 
