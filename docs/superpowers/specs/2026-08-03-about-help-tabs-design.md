@@ -192,7 +192,7 @@ About six rows.
 A new `<h3>` in the About pane, directly under the `.notice` block. It sits there because it makes
 the same kind of statement as the notice. Both tell a reader how much weight this site carries.
 
-Four short paragraphs, then two links.
+Six short paragraphs, then two links.
 
 > **How this was built**
 >
@@ -206,7 +206,12 @@ Four short paragraphs, then two links.
 > So there is no team behind it, and no warranty. It can be wrong. The code is open. Read it, and
 > tell me what I got wrong.
 >
-> It keeps no account, runs no analytics and sets no cookies. It loads nothing from a third party.
+> It keeps no account, runs no analytics and sets no cookies. It loads no tracking script from
+> anyone.
+>
+> The map tiles come from CARTO, so CARTO sees which tiles your browser asks for. Nothing else on
+> this page is theirs.
+>
 > Your location, if you share it, stays in the browser. Nothing sends it anywhere.
 >
 > **Source code** — the whole site, and the scrapers behind it.
@@ -243,7 +248,8 @@ Each of these is true today. Each can stop being true.
 |---|---|
 | no analytics | `grep -rn "gtag\|plausible\|umami\|analytics" index.html js/ sw.js` returns nothing |
 | no cookies | `grep -rn "document.cookie" js/` returns nothing. `PREFS` uses `localStorage` |
-| nothing from a third party | `CLAUDE.md` bans a CDN. Every asset is in `vendor/` |
+| no tracking script from anyone | every absolute URL in `index.html`, `css/`, `js/`, `sw.js` is either a comment, a clickable link, or the CARTO tile fetch below — none is a tracker |
+| CARTO tiles are the one accepted third party | `js/map.js:24` builds tile URLs against `basemaps.cartocdn.com`, fetched on every pan and zoom; Credits already names CARTO for exactly this |
 | location never leaves the browser | `js/locate.js` draws a marker. `api.php` takes no coordinates |
 
 The last claim is the strongest one on the page, because this site asks for a location. Anything

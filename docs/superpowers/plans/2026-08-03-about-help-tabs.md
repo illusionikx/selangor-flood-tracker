@@ -496,12 +496,19 @@ Run every one. A claim that is false must not ship, and each of these can stop b
 cd /d/Herd/flood-exp
 grep -rn "gtag\|plausible\|umami\|analytics\|googletagmanager" index.html js/ sw.js ; echo "--- analytics above, expect none ---"
 grep -rn "document.cookie" js/ ; echo "--- cookies above, expect none ---"
-grep -rniE "https?://(cdn|unpkg|jsdelivr|fonts\.googleapis)" index.html css/ js/ ; echo "--- third party above, expect none ---"
+grep -rohE "https?://[a-zA-Z0-9.-]+" index.html css/ js/ sw.js | sort -u ; echo "--- every distinct host above: classify each as fetched at runtime or a user-clicked link ---"
 grep -rn "coords\|latitude\|longitude" js/locate.js | head
 grep -n "lat\|lng\|coord" api.php | grep -i "_GET\|_POST" ; echo "--- api.php reading coordinates above, expect none ---"
 ```
 
-Expected: the first three print nothing before their marker line. `js/locate.js` uses the coordinates locally to draw a marker. `api.php` accepts no coordinate parameter.
+Expected: the first two print nothing before their marker line. The third lists every host the page
+can reach; check each one by hand. A host is fetched only if the code loads it without a click — a
+`<script src>`, a `fetch`, a tile layer, an `<img>` — not merely linked from an `<a href>`.
+`js/map.js:24` fetches map tiles from `basemaps.cartocdn.com` on every pan and zoom; that is the one
+accepted third party, and it is already named in the Credits section below it. A grep for a host
+prefix such as `cdn.` misses a host like `basemaps.cartocdn.com`, so do not narrow the pattern back
+to a short list of known CDN names. `js/locate.js` uses the coordinates locally to draw a marker.
+`api.php` accepts no coordinate parameter.
 
 If any check fails, stop and report it. Do not soften the sentence — delete the claim it belongs to.
 
@@ -510,11 +517,15 @@ If any check fails, stop and report it. Do not soften the sentence — delete th
 In `#paneAbout`, directly after the closing `</p>` of the `.notice` block and before `<h3>Where this data comes from</h3>`:
 
 ```html
-  <!-- Under the notice, because both paragraphs answer one question: how much weight does this site
+  <!-- Under the notice, because both blocks answer one question: how much weight does this site
        carry. The complaint about the official portals is already two paragraphs up, with the
        evidence attached, so this does not repeat it. What About never said is that a machine wrote
-       the code. Every claim in the third paragraph is checked by a grep in the plan for this
-       change — anything that ever posts a coordinate must delete the last sentence of it. -->
+       the code.
+       The last three paragraphs each make a claim about privacy. The plan for this change carries
+       a grep behind every one. The tile sentence is there because the credits below name CARTO,
+       and a page that credits a third party while claiming to load nothing from one contradicts
+       itself in a single screen. Anything that ever posts a coordinate must delete the last
+       paragraph. -->
   <h3>How this was built</h3>
   <p class="muted">This site is vibe coded. An AI wrote most of it, over a few evenings. It exists
      because reading three government pages to answer one question about my own river was
@@ -524,8 +535,11 @@ In `#paneAbout`, directly after the closing `</p>` of the `.notice` block and be
      still carries the first name.</p>
   <p class="muted">So there is no team behind it, and no warranty. It can be wrong. The code is
      open. Read it, and tell me what I got wrong.</p>
-  <p class="muted">It keeps no account, runs no analytics and sets no cookies. It loads nothing from
-     a third party. Your location, if you share it, stays in the browser. Nothing sends it
+  <p class="muted">It keeps no account, runs no analytics and sets no cookies. It loads no tracking
+     script from anyone.</p>
+  <p class="muted">The map tiles come from CARTO, so CARTO sees which tiles your browser asks for.
+     Nothing else on this page is theirs.</p>
+  <p class="muted">Your location, if you share it, stays in the browser. Nothing sends it
      anywhere.</p>
 
   <div class="src">
