@@ -94,14 +94,12 @@ frame list and do not change.
 
 `shots-test.php` gains three assertions:
 
-1. Each anchor resolves to the stated MYT clock time. This is the assertion that matters. A hand
-   written constant is the part that goes wrong without a symptom.
+1. Each anchor resolves to the stated MYT clock time. Assert against a current timestamp. This is
+   the assertion that matters. A hand written constant is the part that goes wrong without a symptom.
 2. Given two frames in one slot, the frame nearer the target survives.
 3. `pruneShots()` stays idempotent. A second run deletes nothing.
 
-**Assert against a current timestamp, never against the epoch.** Malaysia ran UTC+7:30 until 1982.
-PHP applies that offset to a 1970 instant, so a correct anchor reads 30 minutes off and looks like a
-bad constant.
+Malaysia is UTC+8. The anchors are modular arithmetic and read no timezone table.
 
 ## Accepted costs
 
