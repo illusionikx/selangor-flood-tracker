@@ -296,6 +296,7 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
     $ok('a force rebuilds a fresh cache',          serveFromCache(10, true, true) === false);
     $ok('a force that lost the lock is served',    serveFromCache(10, false, true) === true);
     $ok('a stale cache rebuilds',                  serveFromCache(TTL + 1, true, false) === false);
+    $ok('a cache at exactly TTL rebuilds',         serveFromCache(TTL, true, false) === false);
     $ok('a stale cache that lost the lock waits',  serveFromCache(TTL + 1, false, false) === true);
     $ok('a forced loser never rebuilds',           serveFromCache(TTL + 1, false, true) === true);
 
@@ -309,13 +310,18 @@ $t0 = microtime(true);
 /** Age from when the payload was actually fetched — mtime doubles as a lock and gets touched. */
 function cachedPayload(): array {
     $j = json_decode(@file_get_contents(CACHE), true) ?: [];
-    return $j + ['cacheAge' => max(0, time() - strtotime($j['fetched'] ?? 'now'))];
+    /* `forced` and `forceWhy` describe the request that built this file, not the request reading
+       it. PHP's array + is left-biased, so the defaults must sit on the LEFT to beat whatever the
+       file holds. Every cached read passes through this function, on every exit, so no exit can
+       replay a stale value again. */
+    return ['forced' => false, 'forceWhy' => null] + $j
+         + ['cacheAge' => max(0, time() - strtotime($j['fetched'] ?? 'now'))];
 }
 
 function serveCache(array $extra = []): never {
-    /* Left-biased union. An explicit refusal in $extra wins, and a plain poll reads false rather
-       than replaying the flag from whichever rebuild happened to write this file. */
-    echo json_encode($extra + ['forced' => false, 'forceWhy' => null] + cachedPayload(), JSON_UNESCAPED_SLASHES);
+    // $extra is left-biased, so an explicit refusal passed in here still overrides. The defaults
+    // for an ordinary poll live in cachedPayload() now, since every exit reads through it.
+    echo json_encode($extra + cachedPayload(), JSON_UNESCAPED_SLASHES);
     exit;
 }
 
@@ -885,7 +891,9 @@ $payload = json_encode([
     'ttl'      => TTL,
     'upstreamOk' => true,
     'forced'   => $force,
-    'forceWhy' => $forceWhy ?: null,
+    // forceWhy explains a refusal. A successful force has nothing to explain, so it publishes null
+    // rather than the self-check label ('ok', 'first' or 'clock moved') forceAllowed() returned.
+    'forceWhy' => $force ? null : ($forceWhy ?: null),
     'sourceUpdated' => $sourceTs ? date('c', $sourceTs) : null,
     'tookMs'   => (int)round((microtime(true) - $t0) * 1000),
     // Published so the map can draw the mast radius it actually grouped by, rather than keeping a
