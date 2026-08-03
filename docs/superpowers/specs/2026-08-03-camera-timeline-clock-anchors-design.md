@@ -81,16 +81,27 @@ code path for two tiers. The 88 deleted frames counted below include this effect
 The stamp under the picture reads `14 Nov, 17:00`. It carries no year and no weekday. The year range
 holds frames 365 days old, so a frame from last November reads the same as one from this November.
 
-Write the date in full: `Monday 3 August 2026 at 16:00`. The `MYT` formatter in `js/timeline.js`
-takes `weekday: 'long'`, `day: 'numeric'`, `month: 'long'` and `year: 'numeric'`. It feeds `.btime`
-and `.abtime`, the only stamps the lightbox prints.
+Write the date in full, and abbreviate it on a phone:
+
+| viewport | stamp | worst pill |
+|---|---|---|
+| above 600px | `Wednesday 30 September 2026 at 16:00` | 213.8px |
+| 600px and below | `Mon 14 Sept 2026, 16:00` | 137.7px |
 
 The weekday earns its place on the year range. That range aims at Monday 16:00, so the weekday is
-what tells the reader the anchor holds and which week the frame belongs to.
+what tells the reader the anchor holds and which week the frame belongs to. The phone keeps the
+weekday for that reason and shortens both names instead.
 
-The long form also costs less code than the short one. `en-GB` renders `weekday: 'short'` as
-`Mon, 03 Aug 2026, 16:00`, with two commas, so `stamp()` would have to strip one. The long form
-carries no comma and joins the two halves with `at`. So `stamp()` stays one line.
+`js/timeline.js` holds two `Intl.DateTimeFormat` instances. `stamp()` reads
+`matchMedia('(max-width: 600px)')` and picks one. 600px is the standing breakpoint in this repository.
+
+`stamp()` reads `.matches` on each call, so it needs no resize listener and holds no state. One
+line binds `onchange` to `paint()`. A reader who turns a phone from landscape to portrait then gets
+the short form at once, rather than on the next frame.
+
+`stamp()` also strips the first comma. `en-GB` writes the short form as `Thu, 1 Jan 2026, 16:00`,
+with a comma after the weekday. It writes the long form with no comma at all and joins the halves
+with `at`. So one `String.replace` fixes the short form and does nothing to the long one.
 
 Take `day: 'numeric'`, not `day: '2-digit'`. The stamp reads as a sentence, and a sentence says
 `3 August`, not `03 August`.
@@ -98,10 +109,12 @@ Take `day: 'numeric'`, not `day: '2-digit'`. The stamp reads as a sentence, and 
 Print the full date on every frame, not only on old ones. A rule that hides the year most of the
 time gives the reader nothing to trust when the year does appear.
 
-The width holds on the narrowest phone. `#lightbox img` caps at `min(968px, 100vw - 64px)`, so a
-320px viewport gives a 256px picture. The pill starts 8px in and runs about 184px, which leaves
-64px. Only one pill ever carries a stamp. In compare mode `paint()` writes `live` into `.btime`,
-and outside compare mode the CSS hides `.abtime`.
+Both forms clear the picture at every width. `#lightbox img` caps at `min(968px, 100vw - 64px)`, so
+a 320px viewport gives a 256px picture. The short form takes 54% of it and clears the `live` pill by
+70px. Widths come from the vendored `Roboto` at 11px, over every weekday and month of a year.
+
+Only one pill ever carries a stamp. In compare mode `paint()` writes `live` into `.btime`. Outside
+compare mode the CSS hides `.abtime`.
 
 Two other formatters keep their present shape. `MYT_STAMP` in `js/clip.js` already carries the year
 and does date arithmetic, not display. `MYT_CLOCK` in `js/popup.js` labels a 12-hour graph.
@@ -112,7 +125,7 @@ and does date arithmetic, not display. `MYT_CLOCK` in `js/popup.js` labels a 12-
 |---|---|
 | `shots.php` | `SHOT_TIERS` gains the anchor column. `pruneShots()` swaps its bucket key and its winner test. |
 | `js/timeline.js` | `RANGES` gains `anchor`. `thin(list, step, anchor)` picks the nearest frame. |
-| `js/timeline.js` | The `MYT` formatter takes the full date: `weekday`/`month` long, `day`/`year` numeric. |
+| `js/timeline.js` | Two date formatters, long and short. `stamp()` picks one on `matchMedia`, and strips the first comma. |
 | `js/timeline.js` | Range labels state the clock time. Example: `week, 3 hours per frame from 01:00`. |
 | `js/timeline.js` | The comment above `setRange` names a 6-hour stop that no longer exists. Correct it. |
 | `shots-test.php` | Three assertions. See below. |
