@@ -375,7 +375,7 @@ We accept that.
 - Check the dialog at 360px wide. The tab strip and the test-mode toggle do not collide.
 - Check both themes. The new rule must hold no hex.
 - `python ste-lint.py` over the new prose.
-- Re-run the four greps under "Claims to check before this ships". All four must still hold.
+- Re-run the five checks under "Claims to check before this ships". All five must still hold.
 - Follow both new links. The repo and the issues page must both resolve.
 - Press Refresh now twice inside a minute. The second press must serve cache and say so.
 - Hold `.refresh.lock` from a shell, then press Refresh now. It must serve stale cache at once.

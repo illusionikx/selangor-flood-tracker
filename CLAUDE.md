@@ -13,7 +13,7 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 
 | file | role |
 |---|---|
-| `api.php` | server-side proxy + cache + source merge + poll history + camera image proxy |
+| `api.php` | server-side proxy + cache + source merge + poll history + camera image proxy + rate-limited `?force=1` |
 | `sources.php` | scrapers for the two HTML-only upstreams (national portal, JPS WP) |
 | `shots.php` | camera archive: capture, retention tiers, lookup. Required by `api.php` |
 | `shots-test.php` | `php shots-test.php` — one of two runnable checks. Guards retention. Exercises `pruneShots()` |
@@ -145,6 +145,13 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
 - Every station carries `source` (`selangor` / `kl` / `national`) and, where known, `code`.
 - `?cam=<id>` streams a camera still. Validates the id is an integer, looks the URL up in the
   cached payload, and rejects any host that isn't JPS. Never proxies an arbitrary URL.
+- `?force=1` treats the 5-minute file cache as expired, inside the existing `flock` on
+  `.refresh.lock` — never a second path to JPS. `forceAllowed()` caps it at one force per 60
+  seconds, site-wide, through a stamp file. `serveFromCache()` then makes the same cache-or-rebuild
+  choice an ordinary poll makes, with the force flag as one more input. Both functions carry their
+  own offline check, `php api.php --selftest`. The one caller is the About dialog's Developer
+  section, next to the per-source `parsed` counters and a Raw payload link. See
+  `docs/FEATURES.md` for the four rules and the arithmetic behind 60 seconds.
 - **Camera archive** (`shots.php`): `?shots=<id>` lists a camera's stored frames, `?shot=<id>&t=<ts>`
   serves one. Both parameters are cast to `int` before touching the filesystem, so the path cannot
   leave `shots/` — the same rule as `?cam=`. A frame is stored as **`.webp` or `.jpg`, whichever came
@@ -246,7 +253,11 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   is the workaround. A cron hitting `api.php` every 5 min would keep the cache warm for good.
   **Never put logic that must always run inside `if (function_exists('fastcgi_finish_request'))`** —
   that branch is dead code on the machine this runs on. The stampede guard lived there for weeks and
-  therefore never guarded anything; see the lock below.
+  therefore never guarded anything; see the lock below. It caught a second fix the same way: the
+  `?force=1` feature's defaults for `forced`/`forceWhy` were first added only to `serveCache()`, and
+  this branch echoes `cachedPayload()` directly, so it kept replaying a stale `forced: true` for five
+  minutes after every real force. Dead here, live on the nginx/php-fpm target `docs/DEPLOY.md`
+  describes. Whatever a fix touches in `serveCache()` must be checked against this branch too.
 - **One rebuild at a time, enforced by `flock` on `.refresh.lock`.** A cold rebuild is ~270 requests
   at JPS, so N concurrent cache misses is 270N — the shape of a flood from one IP, aimed at the
   source the whole page depends on. The loser of the race serves stale cache and does *not* queue,
@@ -325,7 +336,10 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   page — 450 rows, in the tab order and read by screen readers — invisible only because `#map` is
   absolutely positioned and painted over it. It surfaced through the map whenever a tile was missing,
   which read as a Leaflet zoom bug and was chased as one. `#dataBox[open]`, `#lightbox[open]` and
-  `.sparktip:popover-open` are the pattern.
+  `.sparktip:popover-open` are the pattern. The same trap caught a plain `[hidden]` attribute too:
+  `.link { display: flex }` in `base.css` beats the browser's own `[hidden] { display: none }`, so
+  the Developer section's "Refresh now" button — hidden on the GitHub Pages build, where the query it
+  needs does nothing — needed `.rowbtns .link[hidden] { display: none }` to actually disappear.
 - **There is no map popup any more, and there must not be one again.** Station detail is `#side`, a
   fixed panel on the right edge of the viewport, filled by `openSide(key, html, mastAt)` in `map.js`.
   Everything a Leaflet popup needed — `autoPan` racing `setView`'s animation, `openStable()`
@@ -593,6 +607,32 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   from `width: 0` to `width: auto` — which is only animatable because `interpolate-size:
   allow-keywords` is set on `.tlr`. Setting `b.textContent` would remove both spans, and the control
   would go back to jumping on every click with nothing in the console to say why.
+- **A claim about what the app does not do needs a check that lists what it does do.** The About
+  pane once said "It loads nothing from a third party." A grep for known CDN prefixes verified it:
+  `https?://(cdn|unpkg|jsdelivr|fonts\.googleapis)`. That pattern matches only a host starting `cdn`
+  right after the scheme, so `basemaps.cartocdn.com` passed clean on the wrong letters alone.
+  `js/map.js:24` fetches tiles from that host on every pan and every zoom. The Credits block in the
+  same pane already names CARTO for exactly those tiles. The claim shipped false anyway. A guess at
+  what a violation looks like proves nothing. The check must list every absolute URL the code
+  contains, then classify each one as fetched or merely linked. Any future "we send no X" or "we load
+  nothing from Y" sentence needs that same full sweep, not a short grep aimed at known offenders.
+- **A value read back out of the cache must default inside the one function every cached read passes
+  through, not at each call site.** `?force=1` stamps `forced: true` into the payload it triggers,
+  and that payload is what `.cache.json` stores afterward. The first fix defaulted
+  `forced`/`forceWhy` back to false inside `serveCache()` alone. Every ordinary poll that read
+  through the other cached-read exit kept reporting `forced: true` for five minutes after any real
+  force. See the `fastcgi_finish_request` gotcha above for that exit. The working fix moved the
+  defaults into `cachedPayload()`, the one function both exits call before they echo anything to a
+  browser. A flag two exits can both return needs one default both of them share, not a copy pasted
+  into each.
+- **Moving an element to a new parent can change which flex rule governs it, even when the
+  element's own rules stay the same.** `.testtog` was a flex item inside `.modalhead`. There,
+  `flex: none` sized it to its own content, and it drew as a pill. Moved to sit as a block child of
+  `#paneAbout`, its own `display: flex` made it a flex container instead, one that stretches to the
+  width of its new parent. Left as is, `.testtog:has(:checked)` paints a full-width amber bar across
+  the pane. `#paneAbout .testtog { width: fit-content }` pins it back down at the new site. A
+  component moved between a flex-item role and a flex-container role needs its sizing rule restated.
+  The old rule does not travel with it.
 
 ## Conventions
 

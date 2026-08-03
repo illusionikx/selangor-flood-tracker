@@ -4346,3 +4346,143 @@ No maximum distance, past which a slot shows nothing. The bucket rule already bo
 half a step.
 
 No rewrite of the frames already stored.
+
+## About and Help share one dialog
+
+The About dialog now holds two panes: About and Help. The `#about` button opens the same dialog
+as before. There is no new dialog, and no new button in the app bar.
+
+### Two panes, one dialog
+
+Tabs replace two other options. An accordion keeps both panes in one scroll, on a dialog already
+too long for that. A second dialog needs a second open button, and the app bar has no room for one.
+
+The logo moved inside the About pane. It is the identity of that pane, not of the dialog. A logo
+above both panes costs scroll on Help before the first line of help text.
+
+About opens first, even though Help holds most of the words. The desktop convention puts About
+last, as a leaf of Help. This dialog puts safety first instead. The not-official notice and the
+emergency number sit in About, so a first-time reader meets them before anything else. That reader
+outranks a naming convention.
+
+### What moved, and what was deleted
+
+The pin legend and the alert rules moved to Help unedited. Their wording had already passed a style
+check, and this change did not ask for a rewrite.
+
+The heat ramp swatches were deleted, not moved. `#legend` on the map draws the same two scales from
+live values. A second copy in a dialog goes stale the first time the palette moves, and the palette
+has moved four times already.
+
+Three of eight planned FAQ rows were kept. The other five were deleted, because the interface
+already answers each one where the reader asks it. A grey pin already says why it is grey. A silent
+siren already prints "OUT OF CONTACT". A row that restates an on-screen answer teaches the reader to
+stop reading the dialog.
+
+### How this was built
+
+A new section in About states four things: the code is AI-written, the project carries no
+warranty, it tracks nothing, and where a shared location goes. Four checks ran against the code
+before this section shipped: a grep for analytics scripts, a grep for `document.cookie`, a grep for
+third-party hosts, and a manual read of every line that touches a location. All four held.
+
+The first version of the third-party claim was wrong. It said the site "loads nothing from a third
+party." `js/map.js:24` fetches map tiles from `basemaps.cartocdn.com` on every pan and every zoom,
+and the Credits block two paragraphs down already names CARTO for exactly that. The dialog
+contradicted itself within one screen.
+
+The grep meant to catch this was `https?://(cdn|unpkg|jsdelivr|fonts\.googleapis)`. It matches only
+a host that starts with `cdn` right after the scheme, so `basemaps.cartocdn.com` passed through
+clean. That pattern guessed at hosts a tracker uses. It never asked what the page actually fetches.
+
+The fix names the one exception: map tiles, from CARTO, credited two paragraphs down. The check was
+rewritten to match: list every absolute URL in the code, then classify each one as fetched at
+runtime or merely linked. A claim about what a site does not do needs a check that enumerates what
+the site does do. A guess at what a violation looks like is not that check.
+
+### The Developer section
+
+The About pane gains a Developer section: the same diagnostics `#netstats` shows on hover, plus the
+per-source counters. `CLAUDE.md` already names those counters as the alarm for a scraper that
+broke — `parsed: 0` means an upstream table moved — but nothing on screen showed them before this.
+`#netstats` and the new section share one renderer, so the two views cannot drift apart.
+
+Three buttons sit under the counters: Refresh now, Raw payload, and Reset settings. Refresh now is
+the one with teeth.
+
+`?force=1` treats the five-minute file cache as expired, inside the existing lock on
+`.refresh.lock`. Four rules keep it safe, and all four hold server-side, because a guard in the
+browser guards nothing:
+
+1. It runs inside the existing lock. A concurrent rebuild wins the race, and this request serves
+   stale cache instead of queuing behind it, the same as any other loser.
+2. It does not expire the fifteen-minute page cache. That cache exists because the KL rainfall
+   table takes about ten seconds to render upstream. Expiring it on every press triples the cost of
+   one button.
+3. A stamp file allows one force per sixty seconds, for the whole site, not per visitor. A denied
+   force serves the cache and states why.
+4. The endpoint reads `?force=1` from a GET request only. A non-GET request gets a plain reason
+   instead of a silent no-op.
+
+Sixty seconds bounds the worst case at 270 requests per minute, about 4.5 per second. A normal cold
+rebuild already fires 270 requests in about three seconds, which is 90 per second. The button
+cannot produce a burst the site does not already produce on a cold start.
+
+Two defects surfaced in review, both about where a value defaults.
+
+`forced` first defaulted inside `serveCache()`, one of two functions that return a cached payload to
+a browser. Every ordinary poll read the flag back from `.cache.json` and reported `forced: true` for
+the next five minutes, because the flag a force request wrote sat in the same file every plain poll
+also serves. The fix moved the default into `cachedPayload()` instead, the one function every cached
+read passes through. The lesson generalizes: a flag written once and read back through several call
+sites must default at the one place all of them pass through, not at each exit.
+
+The first attempt at that fix missed one of the two exits. `serveCache()` got the default. The
+branch that echoes `cachedPayload()` directly, guarded by
+`if (function_exists('fastcgi_finish_request'))`, did not. That branch is dead under Herd, whose
+SAPI is `cgi-fcgi`, so nothing here caught the miss. It is live on the nginx and php-fpm target
+`docs/DEPLOY.md` describes. `CLAUDE.md` already documents this exact trap, for a stampede guard that
+sat unused in the same branch for weeks. It caught a second fix the same way.
+
+Two smaller defects also came from moving markup into this section.
+
+The test-mode toggle moved here, out of `.modalhead`. The move changed which flex rule governed it.
+As a flex item in a flex row, `flex: none` had sized it to its content. As a block child of a pane
+with its own `display: flex`, it became a flex container that stretches to the width of its parent.
+The fix pins `width: fit-content` on the moved element at its new site. Moving a component to a new
+parent can change which layout rule governs it, even when the component's own rules do not change.
+
+The Refresh now button hides on the GitHub Pages build, where `FEED` points at a static `api.json`
+file. That file ignores a `?force=1` query and returns no `forced` field at all, so the button
+reports "not refreshed" forever on a build a cron job already keeps warm. Hiding it uses the `hidden`
+attribute, and `.link { display: flex }` in `css/base.css` beat the browser's own
+`[hidden] { display: none }` rule — the same trap this project already documents for a `<dialog>`
+that will not close. The fix adds `.rowbtns .link[hidden] { display: none }`, scoped so the drawer's
+own two buttons keep their default behavior.
+
+### `php api.php --selftest`
+
+The check lives in the endpoint itself, not a second test file. It covers `forceAllowed()`'s rate
+limit and `serveFromCache()`'s cache-or-rebuild choice, both arithmetic on a handful of integers.
+Running that arithmetic through a real request means a 270-request fan-out at JPS for every
+assertion. The self-test runs the same arithmetic offline, in milliseconds, against no upstream at
+all.
+
+### Trade-offs accepted
+
+- The Developer section is public. Anyone who opens the dialog can press Refresh now. The rate
+  limit is the whole defense. A password or a hidden query flag adds an auth surface to a site
+  that has none anywhere else.
+- Test mode sits one scroll further from the close button than it did before the tabs existed.
+- The Help pane holds a mixed prose register. The moved sections read as they always did. This
+  change did not ask for a rewrite, and none happened.
+
+### Not built
+
+- No version number, no changelog, and no uptime claim. Nothing in this project can back any of the
+  three.
+- No roving tabindex on the tab strip. Two tabs make the arrow-key convention slower than a plain
+  Tab press.
+- No memory of the last pane a reader had open.
+- No `?` keyboard shortcut sheet. The four bindings already print on the buttons that use them.
+- No URL fragment that opens a pane directly.
