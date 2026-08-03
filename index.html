@@ -31,8 +31,8 @@
 <link rel="stylesheet" href="vendor/fonts.css?v=49">
 <link rel="stylesheet" href="css/icons.css?v=66">
 <link rel="stylesheet" href="css/base.css?v=79">
-<link rel="stylesheet" href="css/chrome.css?v=121">
-<link rel="stylesheet" href="css/map.css?v=90">
+<link rel="stylesheet" href="css/chrome.css?v=122">
+<link rel="stylesheet" href="css/map.css?v=91">
 
 <!-- A camera still. A <dialog>, not a div: it opens from the all-stations table, which is itself a
      modal dialog, and only the top layer can paint over one — Esc, the backdrop and focus trapping
@@ -309,13 +309,13 @@
   <p id="devMsg" class="muted" role="status"></p>
   </div>
   <div id="paneHelp" role="tabpanel" aria-labelledby="tabHelp" tabindex="0" hidden>
-  <!-- Four sections, not one. The old single list mixed three different things: the six buttons in
-       the header, the whole filters drawer summarised in one line, and two lines ("Read a point on a
+  <!-- Four sections, not one. The old single list mixed three different things: one header button,
+       the whole filters drawer summarised in one line, and two lines ("Read a point on a
        graph", "Install it") that are not controls at all — a gesture and a platform feature. It also
        reused the ⓘ for two different meanings: this dialog opens from an ⓘ in the app bar, and the
        same glyph sat on the station card's "Details" button one section down. A reader who had just
        pressed ⓘ to get here saw ⓘ again meaning something else. The fix never shows ⓘ in this pane —
-       the Details button is named by position instead — and never shows ▶ as a way to open the
+       the Details row leads with the button's name instead — and never shows ▶ as a way to open the
        camera, because there is no play button until the picture is already open.
        Every row still leads with the glyph the reader is hunting for, where that glyph is the one on
        screen at that exact spot. Where none is — a click on a picture, a button named only by its
@@ -332,13 +332,15 @@
     <span>Opens the list of stations on alert now. The badge shows how many.</span>
 
     <span class="ctl"><i class="i i-list_alt"></i><b>All stations as a table</b></span>
-    <span>Lists every station. Sort it, filter it, or group it by district.</span>
+    <span>Lists every station, grouped by district. Sort the list, or filter it.</span>
 
     <span class="ctl"><i class="i i-my_location"></i><b>Show my location</b></span>
-    <span>Puts you on the map. Offers the nearest river and the nearest camera.</span>
+    <span>Puts you on the map, and offers the nearest sensor of each kind. The glyph becomes an
+       arrow while your location is showing.</span>
 
     <span class="ctl"><i class="i i-dark_mode"></i><b>Toggle theme</b></span>
-    <span>Switches the map and the page between light and dark.</span>
+    <span>Switches the map and the page between light and dark. The glyph names the theme it will
+       switch to.</span>
 
     <span class="ctl"><b>Install it</b></span>
     <span>The browser offers to install this site. It then opens without browser chrome. It still
@@ -347,8 +349,8 @@
   <h3>Filters</h3>
   <div class="key">
     <span class="ctl"><i class="i i-near_me"></i><b>Districts</b></span>
-    <span>Filter the list by name. Turn a district on or off, or show only one. Show all or hide
-       all in one click.</span>
+    <span>Turn a district on or off. On a mouse, hover a row to show only that district. Show all
+       and Hide all do the whole list at once.</span>
 
     <span class="ctl"><i class="i i-visibility_off"></i><b>Ignored sensors</b></span>
     <span>Lists every sensor you silenced. It stays on screen even when empty, so a silenced alarm
@@ -395,7 +397,7 @@
        the station still answers. It is also where you ignore a sensor.</span>
 
     <span><b>Offline</b></span>
-    <span>A grey block replaces the reading when a station has gone quiet.</span>
+    <span>A gray block replaces the reading when a station has gone quiet.</span>
   </div>
   <h3>The camera viewer</h3>
   <div class="key">
@@ -546,8 +548,8 @@
        hour ago is worse than none.</span>
 
     <span><b>The reading is twenty minutes old.</b></span>
-    <span>JPS updates a station about every 25 minutes. The Details button sits top right of the
-       card. It shows when JPS took the reading, not when this site fetched it.</span>
+    <span>JPS updates a station about every 25 minutes. Every sensor carries a Details button. It
+       shows when JPS took the reading, not when this site fetched it.</span>
 
     <span><b>The camera picture is not from now.</b></span>
     <span>A camera card plays the last three hours. The player opens three hours back. Press the
@@ -643,10 +645,11 @@
         <button id="districtNone" class="link">Hide all</button>
       </div>
     </details>
-    <!-- Sensors switched off one at a time from a station card's Details button. Always here, even empty: this summary
-         and the count under the layer chips are the only two places that say a sensor has been
-         silenced, and a muted alarm nobody can find is the thing every alarm standard warns about.
-         Collapsed by default — the count on the summary is the indication, not the open list. -->
+    <!-- Sensors switched off one at a time from a station card's Details button. Always here, even
+         empty: this summary and the count under the layer chips are the only two places that say a
+         sensor has been silenced, and a muted alarm nobody can find is the thing every alarm
+         standard warns about. Collapsed by default — the count on the summary is the indication,
+         not the open list. -->
     <details id="ignored" class="sect">
       <summary><i class="i i-visibility_off"></i>Ignored sensors<b id="ignoredN"></b></summary>
       <ul id="ignoredList" class="picklist"></ul>

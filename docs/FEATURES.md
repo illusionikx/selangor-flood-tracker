@@ -3419,6 +3419,10 @@ The menu button changed with it. It was a `⋮`, which promises a list of action
 one. It is an `ⓘ` now, which is what the panel mostly holds. The item itself is not a button and
 takes no hover fill, or it would promise a second action that is not there.
 
+Six stale references to the old glyph survived that change. A later cleanup found them. Two were
+on screen: the ignored-sensors empty state, and the About pane's help text. The glyph had changed
+long before the text caught up.
+
 ### The clip caption dropped the frame count
 
 `LAST 3 HOURS · 6 frames` became `Last 3 hours`, left aligned.
@@ -4489,7 +4493,7 @@ all.
 
 ## The Help pane split into four sections, because one list mixed four things
 
-The Help pane once opened on a single `How to use the map` list of eight rows. The owner rejected
+The Help pane once opened on a single `How to use the map` list of nine rows. The owner rejected
 it on screen for four reasons, and the fix rebuilds that one heading into four:
 `The buttons along the top`, `Filters`, `The station panel`, `The camera viewer`.
 
@@ -4505,15 +4509,16 @@ names the button by its position on the card instead of by its glyph.
 The list showed `i-play_arrow` for "The camera player," beside a sentence that starts "Tap any
 camera picture." There is no play button at that point. The play control exists only once the
 lightbox is open. The rebuilt camera section leads with the true entry point. A row named `Open the
-camera` carries no glyph, because no glyph sits on a photograph. It shows the transport glyphs
-(`i-skip_previous`, `i-play_arrow`, `i-skip_next`, `i-last_page`, `i-compare`) only under a
-`Transport` row that comes after it, where they are genuinely on screen.
+camera` carries no glyph, because no glyph sits on a photograph. It shows the four transport glyphs
+(`i-skip_previous`, `i-play_arrow`, `i-skip_next`, `i-last_page`) under a `Transport` row that comes
+after it. `i-compare` gets its own `Compare` row beside it. Both are genuinely on screen.
 
 ### A gesture and a platform feature are not controls
 
-"Read a point on a graph" and "Install it" sat in the same list as six buttons. A hover gesture is
-not a control this page built. Neither is the install prompt the browser shows on its own. "Read a
-point on a graph" moved into `The station panel`, beside the meter and the graph it describes.
+"Read a point on a graph" and "Install it" sat in the same nine-row list, which named only one
+button in the header. A hover gesture is not a control this page built. Neither is the install
+prompt the browser shows on its own. "Read a point on a graph" moved into `The station panel`,
+beside the meter and the graph it describes.
 "Install it" stayed at the end of `The buttons along the top`. The owner allowed either keeping it
 there or dropping it. It survives because a reader scanning the button list is the reader most
 likely to wonder how to keep this page on a home screen.
@@ -4543,3 +4548,6 @@ breakpoint, and none of its rules name `600px` as the width of the dialog itself
   for in new prose. The unmoved sections below them keep the British spelling they already had
   ("colour"). This change did not ask for a rewrite of moved or existing prose, so the pane now
   holds two spellings rather than one.
+- A later change (widening `#aboutBox` to 820px) gave `#aboutBox p` a `max-width` in `ch` units, so
+  a paragraph stops well short of the full dialog width. The `.key` grid keeps no cap: its
+  two-column layout is what asked for the width in the first place.

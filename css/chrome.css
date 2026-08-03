@@ -132,7 +132,10 @@ header .hactions { display: flex; align-items: center; gap: 4px; margin-left: au
 .modalhead h2 { flex: 1; min-width: 0; margin: 0; }
 .modalhead .dclose { margin: -8px -10px -8px 0; font-size: 20px; }
 .modalhead form { margin: 0; }
-#aboutBox p { margin: 10px 0; line-height: 1.5; }
+/* Capped so a paragraph does not run the full 820px dialog width — about 100 characters per line at
+   that width, past comfortable reading. `ch` tracks the font, unlike a fixed px cap. The `.key`
+   grid keeps no cap: its two-column layout is what asked for the width in the first place. */
+#aboutBox p { max-width: 70ch; margin: 10px 0; line-height: 1.5; }
 /* Nothing left in this row but the close button, pushed to the corner. */
 #aboutBox .modalhead { justify-content: flex-end; margin-bottom: 0; }
 
@@ -455,9 +458,10 @@ table.data button[data-pop] { cursor: pointer; }
 .tipbox .tiprow > span:first-child { flex: 1; min-width: 0; }
 .tipbox .tv { display: flex; align-items: center; gap: 6px; flex: none; }
 .tipbox .tv b { font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; }
-/* The ⋮ menu on a sensor, in the top layer for the same reason the table's panels are: a Leaflet
-   popup is a small scrolling box, and a menu drawn inside one would be clipped by it. Placement is
-   ui.js's; the `display` pair doubles as the fallback where `popover` is unsupported. */
+/* The Details menu on a sensor, in the top layer for the same reason the table's panels
+   are: a Leaflet popup is a small scrolling box, and a menu drawn inside one would be
+   clipped by it. Placement is ui.js's; the `display` pair doubles as the fallback where
+   `popover` is unsupported. */
 .menu {
   position: fixed; margin: 0; inset: auto; display: none;
   min-width: 210px; max-width: calc(100vw - 16px);

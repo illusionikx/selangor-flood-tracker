@@ -223,7 +223,8 @@ export function ignoredPanel() {
       <button class="solo" data-unignore="${s.id}" title="Stop ignoring ${s.name}"
               aria-label="Stop ignoring ${s.name}">restore</button>
     </li>`).join('')
-    || '<li class="none">Nothing ignored. Use the Details button on any sensor in a station’s card.</li>';
+    || '<li class="none">Nothing ignored. Use the Details button on any sensor in a station’s '
+     + 'card.</li>';
   el('ignoredClear').disabled = !rows.length;
 }
 

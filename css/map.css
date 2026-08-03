@@ -45,9 +45,9 @@
   padding: 0 0 8px; margin-bottom: 8px; border-bottom: 1px solid var(--outline);
 }
 /* The name and the region line clear the panel's close button, which floats over this corner — but
-   only those two. The badge row below them runs the full width, or its ⋮ would sit inset from the
-   one on every sensor row under it. 34px = the button's 48 from the panel edge, less #sideBody's
-   own 16 of padding. */
+   only those two. The badge row below them runs the full width, or its Details button would sit
+   inset from the one on every sensor row under it. 34px = the button's 48 from the panel edge, less
+   #sideBody's own 16 of padding. */
 .pophead .popname, .pophead > .muted { padding-right: 34px; }
 /* How many sensors this card is holding, parked on the name's line just inside the close button.
    Only the name shares that line, so only the name pays for the room, via the sibling rule below. */
