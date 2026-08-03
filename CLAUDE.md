@@ -16,7 +16,7 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `api.php` | server-side proxy + cache + source merge + poll history + camera image proxy |
 | `sources.php` | scrapers for the two HTML-only upstreams (national portal, JPS WP) |
 | `shots.php` | camera archive: capture, retention tiers, lookup. Required by `api.php` |
-| `shots-test.php` | `php shots-test.php` — the only runnable check here. Exercises `pruneShots()` |
+| `shots-test.php` | `php shots-test.php` — one of two runnable checks. Guards retention. Exercises `pruneShots()` |
 | `index.html` | markup only — no inline CSS or JS |
 | `css/icons.css` | every icon, as an SVG mask. Generated — see docs/FEATURES.md for the fetch |
 | `css/base.css` | tokens, reset, controls, blocks shared by popup + alert panel |
@@ -677,8 +677,8 @@ for f in js/*.js css/*.css; do
 ```
 
 ```bash
-php shots-test.php            # the one runnable check: camera retention. Must stay green.
-php api.php --selftest       # the force-refresh rate limit, offline. Must stay green.
+php shots-test.php            # one of two runnable checks. Guards camera retention. Must stay green.
+php api.php --selftest       # the other. Guards the force-refresh rate limit and cache choice. Must stay green.
 curl -sk "https://flood-exp.test/api.php?shots=1"                          # frame timestamps
 curl -sk -o /dev/null -w '%{http_code} %{content_type}\n' \
      "https://flood-exp.test/api.php?shot=1&t=$(curl -sk 'https://flood-exp.test/api.php?shots=1' \
@@ -688,8 +688,15 @@ curl -sk -o /dev/null -w '%{http_code} %{content_type}\n' \
 There is otherwise no test suite. Changes are verified by linting, syntax-checking the modules,
 querying `.cache.json` for the data shape being relied on, and looking at the page.
 
-`shots-test.php` is the exception, and deliberately narrow: retention is the only rule in this repo
-that can *quietly destroy* data. Everything else either works or visibly does not, but a prune that
-buckets a frame wrongly deletes months of camera history and looks identical to one that worked —
-and because it runs on every capture, a rule that shaves one extra frame per pass empties the
-archive over a week without ever being wrong in a single run. Hence the idempotence assertion.
+`shots-test.php` and `php api.php --selftest` are the two runnable checks here, and each guards a
+different risk.
+
+`shots-test.php` is deliberately narrow: retention is the only rule in this repo that can *quietly
+destroy* data. Everything else either works or visibly does not, but a prune that buckets a frame
+wrongly deletes months of camera history and looks identical to one that worked — and because it
+runs on every capture, a rule that shaves one extra frame per pass empties the archive over a week
+without ever being wrong in a single run. Hence the idempotence assertion.
+
+`api.php --selftest` guards the two decisions that gate a request to JPS: `forceAllowed()`'s rate
+limit and `serveFromCache()`'s cache-or-rebuild choice. Both are arithmetic on a few integers, so
+the check runs offline in milliseconds rather than through a 270-request fan-out.
