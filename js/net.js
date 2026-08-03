@@ -34,6 +34,7 @@ export const feedRows = j => [
    `parsed: 0` means a table moved upstream, not that the rivers went quiet — and until now they
    were in the payload and on no screen. */
 export const sourceRows = j => [
+  ['upstream', j.upstreamOk === false ? 'not answering' : 'ok'],
   ['fetch time', `${j.tookMs ?? '?'} ms`],
   ['detail calls', `${j.details?.ok ?? '?'} of ${j.details?.requested ?? '?'}`],
   ['kl scraped', `${j.sources?.kl?.parsed ?? '?'} parsed, ${j.sources?.kl?.added ?? '?'} added`],

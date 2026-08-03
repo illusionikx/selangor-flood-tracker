@@ -153,7 +153,10 @@ header .hactions { display: flex; align-items: center; gap: 4px; margin-left: au
   margin: 22px 0 8px; font-size: 11px; font-weight: 500; letter-spacing: .08em;
   text-transform: uppercase; color: var(--muted);
 }
-#aboutBox h3:first-of-type { border-top: 1px solid var(--outline); padding-top: 18px; }
+/* Scoped to the About pane only. :first-of-type matches per parent, so with two panes the
+   unscoped rule painted a rule on the first h3 of each — "How this was built" in About, and also
+   "How to use the map" in Help, landing just under the tab strip's own border-bottom. */
+#paneAbout h3:first-of-type { border-top: 1px solid var(--outline); padding-top: 18px; }
 
 /* The tab strip. A row of two text buttons with an underline on the selected one — the same shape
    every browser and editor uses, so it needs no label saying it is a tab strip. Tokens only: this

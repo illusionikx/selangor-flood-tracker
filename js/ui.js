@@ -62,8 +62,13 @@ aboutBox.onclose = () => { showPane('tabAbout'); el('devMsg').textContent = ''; 
    screen. There is nothing to tear down, so re-painting is the whole update. */
 function paintDev() {
   const j = lastPayload();
+  // net.js sets `last` to null on any fetch error, so a missing payload here can mean two different
+  // things: nothing has ever arrived, or a poll ran and failed after an earlier one succeeded.
+  // #netstats already tells these apart (it reports `status: offline` with the problem), so this
+  // row must too, or a reader watching Developer sees "no payload yet" during a live outage.
   el('devstats').innerHTML = !j
-    ? '<tr><td class="muted" colspan="2">no payload yet</td></tr>'
+    ? `<tr><td class="muted" colspan="2">${state.data.length ? 'last poll failed' : 'no payload yet'
+        }</td></tr>`
     : [...feedRows(j), ...sourceRows(j)]
         .map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join('');
 }
@@ -90,12 +95,14 @@ el('devForce').onclick = async () => {
   try {
     const r = await fetch(FEED + (FEED.includes('?') ? '&' : '?') + 'force=1', { cache: 'no-store' });
     const j = await r.json();
-    el('devMsg').textContent = j.forced
+    // The dialog can close while the fetch is in flight. onclose already cleared #devMsg for the
+    // next session, and a result landing after that must not write into it.
+    if (aboutBox.open) el('devMsg').textContent = j.forced
       ? `refreshed in ${j.tookMs} ms`
       : `not refreshed — ${j.forceWhy || 'served from cache'}`;
     await load();
   } catch (e) {
-    el('devMsg').textContent = 'failed — ' + e.message;
+    if (aboutBox.open) el('devMsg').textContent = 'failed — ' + e.message;
   }
   b.disabled = false;
   // Not redundant with the `poll` listener above: on the catch path load() never ran, so no `poll`

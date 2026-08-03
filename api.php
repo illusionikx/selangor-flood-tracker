@@ -376,7 +376,10 @@ if (is_file(CACHE)) {
     // One upstream table takes ~10s to render, so blocking the page on the refresh would mean a
     // blank map for that long. Hand back the stale payload immediately, then refresh with the
     // connection already closed.
-    if (function_exists('fastcgi_finish_request')) {
+    // A force is the one exception. Stale-while-revalidate suits an ordinary poll, because nobody
+    // asked to see the rebuild. Refresh now exists so a reader can see what the rebuild produced,
+    // so a forced request must wait in the foreground and get the real payload back.
+    if (!$force && function_exists('fastcgi_finish_request')) {
         echo json_encode(cachedPayload(), JSON_UNESCAPED_SLASHES);
         fastcgi_finish_request();
         ignore_user_abort(true);

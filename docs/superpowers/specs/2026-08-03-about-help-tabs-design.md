@@ -1,7 +1,7 @@
 # About and help, in two tabs
 
 Date: 2026-08-03
-Status: approved. Implementation has not started.
+Status: implemented, on branch `about-help-tabs`.
 
 ## What this changes
 

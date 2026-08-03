@@ -31,7 +31,7 @@
 <link rel="stylesheet" href="vendor/fonts.css?v=49">
 <link rel="stylesheet" href="css/icons.css?v=66">
 <link rel="stylesheet" href="css/base.css?v=79">
-<link rel="stylesheet" href="css/chrome.css?v=118">
+<link rel="stylesheet" href="css/chrome.css?v=119">
 <link rel="stylesheet" href="css/map.css?v=90">
 
 <!-- A camera still. A <dialog>, not a div: it opens from the all-stations table, which is itself a
@@ -308,7 +308,7 @@
   </div>
   <p id="devMsg" class="muted" role="status"></p>
   </div>
-  <div id="paneHelp" role="tabpanel" aria-labelledby="tabHelp" hidden>
+  <div id="paneHelp" role="tabpanel" aria-labelledby="tabHelp" tabindex="0" hidden>
   <!-- Only what a tap does not teach. There is no "tap a pin" row: a reader who opened this dialog
        has already tapped things, and a list that starts by explaining the obvious teaches the reader
        that the rest is not worth reading. -->
@@ -457,9 +457,9 @@
     <span>The rainfall bands JPS publishes. They start above 0, 10, 30 and 60 mm in the last
        hour.</span>
 
-    <span><b>frame</b></span>
-    <span>One stored camera picture. The archive keeps recent frames close together and old ones
-       far apart.</span>
+    <span><b>frame</b> and <b>tier</b></span>
+    <span>A frame is one stored camera picture. A tier is how long the archive keeps a frame
+       before it thins the record.</span>
   </div>
 
   <!-- Three rows, and only three. Everything else a reader might ask is already answered on the
