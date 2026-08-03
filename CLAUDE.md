@@ -678,6 +678,7 @@ for f in js/*.js css/*.css; do
 
 ```bash
 php shots-test.php            # the one runnable check: camera retention. Must stay green.
+php api.php --selftest       # the force-refresh rate limit, offline. Must stay green.
 curl -sk "https://flood-exp.test/api.php?shots=1"                          # frame timestamps
 curl -sk -o /dev/null -w '%{http_code} %{content_type}\n' \
      "https://flood-exp.test/api.php?shot=1&t=$(curl -sk 'https://flood-exp.test/api.php?shots=1' \

@@ -55,6 +55,14 @@ const HIST  = __DIR__ . '/.history.db';
 const READ  = 86400;         // seconds of history loaded per poll (trend + sparkline)
 const RETAIN = 30 * 86400;   // seconds kept on disk; older samples are pruned
 
+/* A forced refresh skips the file cache, so it costs a full ~270-request fan-out at JPS. This
+   button is public, so the guard is here and not in the browser. One force per minute for the
+   whole site caps the worst case at ~4.5 requests a second — a cold rebuild already fires 270 in
+   about three seconds, which is 90 a second, so the button cannot make a burst this site does not
+   already make on its own. */
+const FORCE_EVERY = 60;
+const FORCE_STAMP = __DIR__ . '/.force.stamp';
+
 
 date_default_timezone_set('Asia/Kuala_Lumpur'); // upstream timestamps are local MYT, unlabelled
 
@@ -234,6 +242,51 @@ if (isset($_GET['shot'])) {
     exit;
 }
 
+/**
+ * May a forced refresh run now?
+ *
+ * @param int      $now       unix seconds
+ * @param int|null $lastForce mtime of FORCE_STAMP, or null when no force has ever run
+ * @return array{0: bool, 1: string} allowed, and why
+ */
+function forceAllowed(int $now, ?int $lastForce, int $window = FORCE_EVERY): array {
+    if ($lastForce === null) return [true, 'first'];
+    $since = $now - $lastForce;
+    // A stamp in the future means a clock moved, not that someone forced a refresh in the future.
+    // Refusing until it catches up would disable the button for as long as the skew lasts.
+    if ($since < 0) return [true, 'clock moved'];
+    return $since >= $window ? [true, 'ok'] : [false, 'rate limited'];
+}
+
+/* `php api.php --selftest` — the guard above, checked offline. It lives here rather than in a
+   second test file because the rule is arithmetic on two integers, and a separate test would need
+   a third file to hold the function so both could import it. CLI only, and it exits before the
+   first header. */
+if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
+    $fail = 0;
+    $ok = function (string $what, bool $pass) use (&$fail) {
+        if (!$pass) $fail++;
+        echo ($pass ? '  ok   ' : '  FAIL ') . $what . "\n";
+    };
+    $now = 1800000000;
+
+    echo "forceAllowed():\n";
+    $ok('no stamp at all is allowed',            forceAllowed($now, null)[0] === true);
+    $ok('a stamp 61s old is allowed',            forceAllowed($now, $now - 61)[0] === true);
+    $ok('a stamp exactly 60s old is allowed',    forceAllowed($now, $now - 60)[0] === true);
+    $ok('a stamp 59s old is refused',            forceAllowed($now, $now - 59)[0] === false);
+    $ok('a stamp from this second is refused',   forceAllowed($now, $now)[0] === false);
+    $ok('a refusal says why',                    forceAllowed($now, $now)[1] === 'rate limited');
+    /* A stamp in the future would otherwise lock the button out until the clock caught up. Same
+       hazard readTs() already guards against on a JPS reading, for the same reason: a clock we do
+       not own moved. */
+    $ok('a stamp from the future is allowed',    forceAllowed($now, $now + 3600)[0] === true);
+    $ok('the window is honoured when passed',    forceAllowed($now, $now - 10, 5)[0] === true);
+
+    echo $fail ? "\n$fail FAILED\n" : "\nall ok\n";
+    exit($fail ? 1 : 0);
+}
+
 header('Content-Type: application/json');
 $t0 = microtime(true);
 
@@ -267,9 +320,26 @@ function serveCache(array $extra = []): never {
 $lock = fopen(LOCK, 'c');
 $mine = $lock && flock($lock, LOCK_EX | LOCK_NB);
 
+/* The Developer section's "Refresh now". It expires the *file* cache and nothing else — the scraped
+   pages keep their own 15-minute cache in the `page` table, because the KL rainfall table takes
+   about ten seconds upstream and re-scraping it would triple the cost of one button press.
+   It is not a second refresh path: it falls into the same lock, and a loser still serves stale
+   cache rather than queueing. GET only, so a prefetch of a link can never trip it. */
+$force = isset($_GET['force']) && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET';
+$forceWhy = '';
+if ($force) {
+    [$allowed, $forceWhy] = forceAllowed(time(), is_file(FORCE_STAMP) ? filemtime(FORCE_STAMP) : null);
+    if ($allowed) touch(FORCE_STAMP); else $force = false;
+}
+
 if (is_file(CACHE)) {
     $age = time() - filemtime(CACHE);
-    if ($age < TTL || !$mine) serveCache();   // fresh, or someone else is already rebuilding it
+    // Fresh and nobody forced it, or someone else is already rebuilding it.
+    if (($age < TTL && !$force) || !$mine) {
+        serveCache(isset($_GET['force'])
+            ? ['forced' => false, 'forceWhy' => $mine ? ($forceWhy ?: 'cache is fresh') : 'another refresh is running']
+            : []);
+    }
     // One upstream table takes ~10s to render, so blocking the page on the refresh would mean a
     // blank map for that long. Hand back the stale payload immediately, then refresh with the
     // connection already closed.
@@ -787,6 +857,7 @@ $payload = json_encode([
     'cacheAge' => 0,
     'ttl'      => TTL,
     'upstreamOk' => true,
+    'forced'   => $force,
     'sourceUpdated' => $sourceTs ? date('c', $sourceTs) : null,
     'tookMs'   => (int)round((microtime(true) - $t0) * 1000),
     // Published so the map can draw the mast radius it actually grouped by, rather than keeping a
