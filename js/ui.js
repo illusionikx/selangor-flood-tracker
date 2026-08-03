@@ -52,13 +52,15 @@ aboutBox.querySelector('.tabs').onclick = e => {
   const b = e.target.closest('[role=tab]');
   if (b) showPane(b.id);
 };
-aboutBox.onclose = () => showPane('tabAbout');
+// The message a force leaves in #devMsg belongs to the dialog session that produced it, not to any
+// one repaint — clearing it here, not in paintDev(), is what stops a poll landing mid-read from
+// wiping a result nobody has seen yet. Close the dialog and it is gone; reopen and force a fresh one.
+aboutBox.onclose = () => { showPane('tabAbout'); el('devMsg').textContent = ''; };
 
 /* The same numbers the status dot shows, plus the ones it has no room for. Painted when the dialog
    opens and when the About pane comes back, because a poll may have landed while Help was on
    screen. There is nothing to tear down, so re-painting is the whole update. */
 function paintDev() {
-  el('devMsg').textContent = '';   // clear the last action's outcome — it may name an older poll
   const j = lastPayload();
   el('devstats').innerHTML = !j
     ? '<tr><td class="muted" colspan="2">no payload yet</td></tr>'
@@ -96,6 +98,8 @@ el('devForce').onclick = async () => {
     el('devMsg').textContent = 'failed — ' + e.message;
   }
   b.disabled = false;
+  // Not redundant with the `poll` listener above: on the catch path load() never ran, so no `poll`
+  // event fired, and this is the only repaint that follows a failed force at all.
   paintDev();
 };
 
