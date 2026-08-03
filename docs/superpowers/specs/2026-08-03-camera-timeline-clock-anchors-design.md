@@ -76,12 +76,27 @@ hour mark, where it used to keep the newest frame in each half-hour bucket. Capt
 minutes, so a bucket holds one frame and the two rules agree. The uniform rule avoids a second
 code path for two tiers. The 88 deleted frames counted below include this effect.
 
+### The frame stamp
+
+The stamp under the picture reads `14 Nov, 17:00`. It carries no year. The year range holds frames
+365 days old, so a frame from last November reads the same as a frame from this November.
+
+Add the year: `14 Nov 2025, 17:00`. The `MYT` formatter in `js/timeline.js` gains `year: 'numeric'`.
+It feeds `.btime` and `.abtime`, which are the only stamps the lightbox prints.
+
+Print the year on every frame, not only on old ones. A rule that hides the year most of the time
+gives the reader nothing to trust when the year does appear. The cost is 5 characters.
+
+Two other formatters keep their present shape. `MYT_STAMP` in `js/clip.js` already carries the year
+and does date arithmetic, not display. `MYT_CLOCK` in `js/popup.js` labels a 12-hour graph.
+
 ### Changes
 
 | file | change |
 |---|---|
 | `shots.php` | `SHOT_TIERS` gains the anchor column. `pruneShots()` swaps its bucket key and its winner test. |
 | `js/timeline.js` | `RANGES` gains `anchor`. `thin(list, step, anchor)` picks the nearest frame. |
+| `js/timeline.js` | The `MYT` formatter gains `year: 'numeric'`. |
 | `js/timeline.js` | Range labels state the clock time. Example: `week, 3 hours per frame from 01:00`. |
 | `js/timeline.js` | The comment above `setRange` names a 6-hour stop that no longer exists. Correct it. |
 | `shots-test.php` | Three assertions. See below. |
