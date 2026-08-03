@@ -258,6 +258,11 @@ body.testmode #testbadge, body.rising #risebadge { display: flex; }
    a text column rather than dominate it. */
 #aboutBox .pins .cluster { width: 28px; height: 28px; font-size: 12px; }
 
+#aboutBox kbd {
+  font: inherit; font-size: 12px; padding: 1px 6px;
+  border: 1px solid var(--outline); border-radius: 4px; background: var(--hover);
+}
+
 /* --- all-stations table ----------------------------------------------------------------------- */
 
 /* Taller and wider than the sources dialog: this one is for scanning, so it takes the screen. */

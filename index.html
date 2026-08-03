@@ -31,7 +31,7 @@
 <link rel="stylesheet" href="vendor/fonts.css?v=49">
 <link rel="stylesheet" href="css/icons.css?v=66">
 <link rel="stylesheet" href="css/base.css?v=79">
-<link rel="stylesheet" href="css/chrome.css?v=115">
+<link rel="stylesheet" href="css/chrome.css?v=116">
 <link rel="stylesheet" href="css/map.css?v=90">
 
 <!-- A camera still. A <dialog>, not a div: it opens from the all-stations table, which is itself a
@@ -257,6 +257,44 @@
      Flood data remains the property of JPS Malaysia.</p>
   </div>
   <div id="paneHelp" role="tabpanel" aria-labelledby="tabHelp" hidden>
+  <!-- Only what a tap does not teach. There is no "tap a pin" row: a reader who opened this dialog
+       has already tapped things, and a list that starts by explaining the obvious teaches the reader
+       that the rest is not worth reading. -->
+  <h3>How to use the map</h3>
+  <div class="key">
+    <span><b>Ignore a sensor</b></span>
+    <span>Open its card and use the ⋮ menu. The sensor stays on the map and raises no alert. The
+       drawer keeps the count, and gives it back.</span>
+
+    <span><b>Check where a reading came from</b></span>
+    <span>The same ⋮ menu names the feed. It prints the stamp on the last reading. It says whether
+       the station still answers.</span>
+
+    <span><b>Look back at a camera</b></span>
+    <span>Tap the picture on a camera card. The player opens three hours back. Drag the divider to
+       hold that frame against the live one.</span>
+
+    <span><b>Show only what is climbing</b></span>
+    <span>A chip in the drawer. It leaves only the stations climbing towards their danger mark.</span>
+
+    <span><b>Show one district</b></span>
+    <span>The Districts list in the drawer. The count on the heading says how many are on.</span>
+
+    <span><b>Read a point on a graph</b></span>
+    <span>Move the pointer over the graph. On a phone, hold a finger on it. The reading and its time
+       appear above the line.</span>
+
+    <span><b>See every station at once</b></span>
+    <span>The list button in the app bar. The table sorts, filters, and groups by district.</span>
+
+    <span><b>Install it</b></span>
+    <span>The browser offers to install this site. It then opens without browser chrome. It still
+       needs a connection.</span>
+
+    <span><b>Drive the camera player</b></span>
+    <span><kbd>k</kbd> or space plays. <kbd>,</kbd> and <kbd>.</kbd> step one frame.
+       <kbd>End</kbd> returns to the live picture.</span>
+  </div>
   <h3>How to read the map</h3>
   <p class="muted">One pin per place. The glyph says what kind of sensor is there, the colour says
      how it is doing. Type colours are never a traffic light, and traffic-light colours never mean
@@ -332,6 +370,85 @@
      without knowing high for what. Rainfall, flood-depth gauges and cameras are drawn on the map
      but never raise an alert. Sensors you have ignored raise none either, and the panel keeps
      saying how many are silenced.</p>
+
+  <h3>Words on this map</h3>
+  <div class="key">
+    <span><b>alert, warning, danger mark</b></span>
+    <span>The three levels JPS publishes for one station. Every station has its own set, so a drain
+       and a river are each measured against what floods them.</span>
+
+    <span><b>rising</b></span>
+    <span>Forecast to reach its own danger mark within three hours. It is a forecast, not a
+       direction.</span>
+
+    <span><b>mast</b></span>
+    <span>One pole that carries more than one sensor.</span>
+
+    <span><b>site</b></span>
+    <span>Sensors within 50 metres of each other. The map draws one pin per site, not per
+       sensor.</span>
+
+    <span><b>stale</b></span>
+    <span>The station was on alert, and has since gone quiet.</span>
+
+    <span><b>offline</b></span>
+    <span>No reading arrived. The pin goes grey, and it never takes a status colour.</span>
+
+    <span><b>water level</b></span>
+    <span>The height of the river against a fixed datum. It does not start at zero, which is why a
+       calm station still shows a number in the thirties.</span>
+
+    <span><b>flood-depth gauge</b></span>
+    <span>The depth of water over a spot that floods. A negative reading is dry ground.</span>
+
+    <span><b>intensity class</b></span>
+    <span>The rainfall bands JPS publishes. They start above 0, 10, 30 and 60 mm in the last
+       hour.</span>
+
+    <span><b>frame</b></span>
+    <span>One stored camera picture. The archive keeps recent frames close together and old ones
+       far apart.</span>
+  </div>
+
+  <!-- Three rows, and only three. Everything else a reader might ask is already answered on the
+       thing itself: a grey pin opens a card that says why it is grey, a silent siren says OUT OF
+       CONTACT. A second copy of those sentences is a second copy to keep true. -->
+  <h3>Why it does that</h3>
+  <div class="key">
+    <span><b>The map is empty and says it cannot load.</b></span>
+    <span>This site refuses to draw a map it cannot refresh. During a flood, a water level from an
+       hour ago is worse than none.</span>
+
+    <span><b>The reading is twenty minutes old.</b></span>
+    <span>JPS updates a station about every 25 minutes. The time in the ⋮ menu is when JPS took the
+       reading, not when this site fetched it.</span>
+
+    <span><b>The camera picture is not from now.</b></span>
+    <span>A camera card plays the last three hours. The player opens three hours back. Press the
+       live button to return to now.</span>
+  </div>
+
+  <h3>What it cannot tell you</h3>
+  <div class="key">
+    <span><b>Cameras, sirens and flood-depth gauges</b></span>
+    <span>Selangor only. JPS publishes none of the three for Kuala Lumpur or Putrajaya.</span>
+
+    <span><b>Rainfall from the national portal</b></span>
+    <span>The portal publishes it, but not in a form this site can read. Rainfall comes from the
+       other two feeds.</span>
+
+    <span><b>History past twelve hours</b></span>
+    <span>The graphs hold twelve hours. There is no longer record on screen.</span>
+
+    <span><b>A notification</b></span>
+    <span>This site sends none. It must be open to warn you.</span>
+
+    <span><b>A rain forecast</b></span>
+    <span>Every number on this map was measured. None of it was predicted.</span>
+
+    <span><b>A station JPS does not publish</b></span>
+    <span>It is not here. This site adds no station of its own.</span>
+  </div>
   </div>
 </dialog>
 <!-- Tap the About logo seven times inside five seconds. No header, no close button: the picture is
