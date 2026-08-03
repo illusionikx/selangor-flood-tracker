@@ -1282,14 +1282,14 @@ before it. Half the storage decision is a playback decision, and disk is the che
 `SHOT_TIERS` in `shots.php`, applied on a frame's **age**, so a frame thins itself as it gets older
 rather than being filed once and forgotten:
 
-| age | kept | frames in the matching scrubber range |
-|---|---|---|
-| ≤ 6 h | every frame | — |
-| ≤ 24 h | one per 30 min | 48 |
-| ≤ 7 days | one per 3 h | 56 |
-| ≤ 30 days | one per 12 h | 60 |
-| ≤ 1 year | one per week | 52 |
-| older | deleted | — |
+| age | kept | aims at (MYT) | frames in the matching scrubber range |
+|---|---|---|---|
+| ≤ 6 h | every frame | — | — |
+| ≤ 24 h | one per 30 min | — | 48 |
+| ≤ 7 days | one per 3 h | 01:00, then every 3 hours | 56 |
+| ≤ 30 days | one per 12 h | 04:00 and 16:00 | 60 |
+| ≤ 1 year | one per week | Monday 16:00 | 52 |
+| older | deleted | — | — |
 
 The third column is why the steps are what they are. **A tier is what a range can play**, so the two
 are one decision: every window lands near 50 frames, which is a clip of about a minute at one frame a
@@ -4269,3 +4269,74 @@ to be asked.
 ### Trade-offs accepted
 
 The per-sample code costs about 7.5 KB on a 284 KB payload, now across three kinds.
+
+### The archive files a frame under the clock time it aims at
+
+Both sides of the archive bucketed a frame by `floor(ts / step)`. That expression aligns to UTC
+midnight. Malaysia runs UTC+8, so the frame that survived landed at an hour nobody chose. The week
+range sat on 01:30, the month on 07:30 and 19:30, and the year on a Thursday.
+
+A tier now carries a third number, the **anchor**. The slot is
+`floor((ts - anchor + step / 2) / step)` and the target is `anchor + slot * step`. The frame nearest
+its target wins the slot.
+
+| range | step | anchor | aims at (MYT) |
+|---|---|---|---|
+| week | 3 h | 7200 | 01:00, then every 3 hours |
+| month | 12 h | 28800 | 04:00 and 16:00 |
+| year | 7 d | 374400 | Monday 16:00 |
+
+The three targets nest. 16:00 sits on the 3-hour grid, and Monday 16:00 sits on the 12-hour grid. So
+a frame keeps hitting its target as it ages from one tier to the next. It does not drift once per
+tier.
+
+The rule bounds its own error. A frame never sits further than half a step from its target. A slot
+with no frame is absent from the list. So "show the closest frame" needs no tolerance value and no
+empty slots to skip.
+
+`pruneShots()` and `thin()` write the same expression. A rule in one file only would let the ruler
+and the clip file one frame in two slots.
+
+### The stamp under the picture is a full date
+
+`14 Nov, 17:00` says the same thing about last November as about this one, and the year range holds
+frames 365 days old. The stamp now reads `Monday 3 August 2026 at 16:00`.
+
+The weekday earns its place on the year range. That range aims at Monday 16:00, so the weekday is
+what shows the anchor holding.
+
+A phone gets `Mon 3 Aug 2026, 16:00` instead. Measured from the vendored Roboto at 11px over every
+weekday and month, the long form is a 213.8px pill.
+
+`#lightbox img` caps at `min(968px, 100vw - 64px)`. So a 320px viewport gives a 256px picture. There
+the long form covers 83% of the photograph and overlaps the `live` pill in compare mode. The short
+form is 137.7px and clears it by 70px.
+
+`stamp()` reads `matchMedia('(max-width: 600px)')` on each call, so it holds no state. One line binds
+`onchange` to `paint()`, for a turn from landscape to portrait.
+
+`en-GB` writes the short form as `Thu, 1 Jan 2026, 16:00` and the long form with no comma at all,
+joined by `at`. So one `String.replace` strips the weekday comma and does nothing to the long form.
+
+### Trade-offs accepted
+
+The first prune after this change deleted 88 of 1337 stored frames. Each one sat 33 to 119 minutes
+from a frame that survived, in a window that steps 3 or 12 hours. One rule now covers the whole
+archive, and no branch carries the old bucketing.
+
+Retention works on age, so the grid fills as frames age into each tier. The month grid is correct 7
+days after the change. The year grid is correct after 30 days. Frames already pruned keep their old
+times.
+
+A sparse archive still shows off-target frames. Capture runs when a poll runs, so a machine without a
+cron stores frames in bursts. The closest frame to 04:00 can then be hours away. The stamp states the
+real capture time, so the picture reports its own age.
+
+### Not built
+
+No viewer-facing time picker. Three fixed schedules cover the need. Add a picker when they stop.
+
+No maximum distance, past which a slot shows nothing. The bucket rule already bounds the error to
+half a step.
+
+No rewrite of the frames already stored.

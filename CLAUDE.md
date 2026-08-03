@@ -205,6 +205,17 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
 - **`rm -rf shots/` is a year of camera history**, and unlike `.history.db` it cannot rebuild —
   the frames only exist because we were running when they were taken. To re-test the capture path,
   `rm shots/.last` (the 30-minute stamp), not the directory.
+- **A retention bucket aims at a clock time, and both sides must aim at the same one.** `SHOT_TIERS`
+  carries a third number per tier — the anchor, which is the target time in UTC modulo the step — and
+  `pruneShots()` keeps the frame **nearest** that target, not the newest in the bucket. `thin()` in
+  `js/timeline.js` repeats the same expression and the same numbers, so the ruler and the clip cannot
+  file one frame in two slots. Week aims at 01:00 MYT, month at 04:00 and 16:00, year at Monday
+  16:00, and the three nest, so a frame keeps hitting its target as it ages between tiers. The old
+  rule bucketed on `floor(ts / step)`, which aligns to **UTC** midnight: at +8 that put the week
+  range on 01:30, the month on 07:30 and 19:30, and the year on a Thursday. Change an anchor in one
+  file only and the two sides disagree about where a slot starts. `shots-test.php` asserts each
+  anchor against `time()` — **never against the epoch**, because Malaysia ran UTC+7:30 until 1982 and
+  PHP renders a 1970 instant 30 minutes early, which makes a correct constant look broken.
 - **A sample's `ts` is when the reading was taken, not when we polled.** Upstream changes a value
   every ~25 min and we poll every ~8.5 min, so a level is a staircase and the same number arrives
   four or five times. Stamping each arrival `now` puts the step where we noticed it, which put up to
