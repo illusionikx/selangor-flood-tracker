@@ -282,7 +282,7 @@
   <h3>Credits</h3>
   <p class="muted">Built by <a href="https://github.com/illusionikx" target="_blank" rel="noopener">illusionikx</a>.
      Released under the <a href="https://opensource.org/licenses/MIT" target="_blank" rel="noopener">MIT
-     licence</a> — free to use, copy, modify and redistribute, with no warranty of any kind.</p>
+     license</a> — free to use, copy, modify and redistribute, with no warranty of any kind.</p>
   <p class="muted">Map tiles &copy; <a href="https://carto.com/attributions" target="_blank" rel="noopener">CARTO</a>,
      data &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>
      contributors. Icons and the app mark are <a href="https://fonts.google.com/icons" target="_blank"
@@ -424,8 +424,8 @@
        returns to now.</span>
   </div>
   <h3>How to read the map</h3>
-  <p class="muted">One pin per place. The glyph says what kind of sensor is there, the colour says
-     how it is doing. Type colours are never a traffic light, and traffic-light colours never mean
+  <p class="muted">One pin per place. The glyph says what kind of sensor is there, the color says
+     how it is doing. Type colors are never a traffic light, and traffic-light colors never mean
      anything but status.</p>
   <div class="key">
     <span class="pins">
@@ -436,7 +436,7 @@
       <span class="pin" style="--c:var(--k-camera)"><i class="i i-photo_camera"></i></span>
     </span>
     <span>The five kinds — water level, rainfall, siren, flood-depth gauge, camera — each in its own
-       colour, none of which is ever used for status.</span>
+       color, none of which is ever used for status.</span>
 
     <span class="pins">
       <span class="pin" style="--c:var(--s-alert)"><i class="i i-water_drop"></i></span>
@@ -453,11 +453,11 @@
     <span class="pins"><span class="pin multi" style="--c:var(--k-mast)"
       ><i class="i i-layers"></i><b class="n">4</b></span></span>
     <span>Several sensors on one mast, counted. Hover or open it to see the area they were grouped
-       from. If any of them is signalling, the pin takes that status colour instead.</span>
+       from. If any of them is signalling, the pin takes that status color instead.</span>
 
     <span class="pins"><span class="pin off" style="--c:var(--s-none)"
       ><i class="i i-water_drop"></i></span></span>
-    <span>Grey and faded: offline, or reporting nothing. Never coloured — a station with no reading
+    <span>Gray and faded: offline, or reporting nothing. Never colored — a station with no reading
        must not look confident.</span>
 
     <span class="pins"><span class="cluster">12</span></span>
@@ -470,8 +470,8 @@
      map that is warm everywhere says nothing.</p>
   <p class="muted"><b>Rainfall</b> uses the intensity classes JPS publishes — above 0, 10, 30 and 60
      mm in the last hour. It says where the water is arriving, not where it is standing. Both are
-     smoothed over a few kilometres, because flooding is catchment-scale, and both show the
-     <i>strongest</i> reading in an area rather than adding neighbours together.</p>
+     smoothed over a few kilometers, because flooding is catchment-scale, and both show the
+     <i>strongest</i> reading in an area rather than adding neighbors together.</p>
 
   <!-- What the alarm means, stated where someone can find it. The panel and the ticker show the
        three tags; this is the only place that says what earns one. Tags are the real `.tg` classes,
@@ -513,14 +513,14 @@
     <span>One pole that carries more than one sensor.</span>
 
     <span><b>site</b></span>
-    <span>Sensors within 50 metres of each other. The map draws one pin per site, not per
+    <span>Sensors within 50 m of each other. The map draws one pin per site, not per
        sensor.</span>
 
     <span><b>stale</b></span>
     <span>The station was on alert, and has since gone quiet.</span>
 
     <span><b>offline</b></span>
-    <span>No reading arrived. The pin goes grey, and it never takes a status colour.</span>
+    <span>No reading arrived. The pin goes gray, and it never takes a status color.</span>
 
     <span><b>water level</b></span>
     <span>The height of the river against a fixed datum. It does not start at zero, which is why a
@@ -720,7 +720,7 @@
           <p>Each station scores its reading against its <i>own</i> thresholds, so a small stream at
              its limit is as hot as a big river at its limit. Rivers and flood gauges both count —
              whichever is further up its scale wins the spot.</p>
-          <p>The colour is the band it has crossed: yellow past its alert mark, orange past warning,
+          <p>The color is the band it has crossed: yellow past its alert mark, orange past warning,
              red at danger. The same three marks the station's own meter draws.</p>
           <p>A flood gauge that has tripped goes straight to red — water standing over a spot known
              to flood is something observed, not forecast.</p>
@@ -745,7 +745,7 @@
           <p><b>How it is worked out</b></p>
           <p>Rain in the last hour, on the intensity classes JPS publishes: light above 0 mm,
              moderate above 10, heavy above 30, violent above 60.</p>
-          <p>The colours are the rainfall pins' own, so a blob and a pin under it agree.</p>
+          <p>The colors are the rainfall pins' own, so a blob and a pin under it agree.</p>
           <p>Every reporting rain gauge counts, and only rain that is actually falling is drawn — a
              dry gauge paints nothing.</p>
           <p class="muted">This is rain, not flooding. It says where the water is arriving, not

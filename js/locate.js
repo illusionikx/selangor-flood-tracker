@@ -54,7 +54,7 @@ function place(latlng, accuracy, setView) {
   at = state.hereAt = latlng;
   acc = accuracy;
   btn.className = 'icon on';
-  btn.title = `Recentre on my location (±${Math.round(accuracy)} m)`;
+  btn.title = `Recenter on my location (±${Math.round(accuracy)} m)`;
   if (layer) layer.remove();
 
   marker = L.marker(latlng, { icon: L.divIcon({

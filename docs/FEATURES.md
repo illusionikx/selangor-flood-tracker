@@ -4765,3 +4765,15 @@ sensor kind, so it takes neither color language and the star is the whole indica
 **Trade-off accepted.** At low zoom a large favorites list is loose pins overlapping each other and
 the clusters. That is the request: a favorite that clustering can swallow is a favorite the reader
 cannot find.
+
+### Spelling
+
+This app uses American spelling everywhere: prose, code and every user-facing string. The interface
+strings were converted with the place-search and favorites work. Comments and internal documentation
+are swept separately, because a 500-line spelling change inside a feature diff makes the feature
+impossible to review.
+
+Two rules for any future conversion. Never touch an identifier, a CSS property or an HTML attribute —
+`aria-labelledby` is an attribute name and `color` is already the CSS property. And prefer the symbol
+`m` over the word "meters" in a new string, because `meter()` in `popup.js` draws the water-level bar
+and the two would otherwise share a spelling.
