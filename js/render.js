@@ -1,7 +1,7 @@
 // Rebuilds every marker and the heat layer from the current station set.
 
 import { KINDS, MAST, HEAT_FLOOR, RAIN_STOPS } from './config.js';
-import { state, PREFS } from './state.js';
+import { state, PREFS, save } from './state.js';
 import { el, color, dkey, atDanger, statusColor, leads, hasInfo, isIgnored, ignoredIds,
          favIds, isFav, scalePos, levelStops, gaugeStops } from './util.js';
 import { marks, siteMark, shown, syncCluster, focusOn, side, openSide,
@@ -28,10 +28,28 @@ function syncRisingChip() {
   return chip.checked;
 }
 
+/* A filter that empties the map and cannot be reasoned about reads as a bug, so the chip is dead
+   while nothing is starred and says why. It also un-checks itself in that state, or a reader who
+   cleared their favorites would come back to a blank map and a control they could not press.
+   The un-check has to be saved, not just displayed. `el('favOnly').checked = !!PREFS.favOnly` in
+   ui.js reads the stored preference on every load, so an un-check this function performs on the
+   reader's behalf and never writes to PREFS is one the next reload silently reverses: clear every
+   favorite, the chip goes off on screen but PREFS.favOnly stays true, then reload and the filter
+   comes back on with no favorite behind it, hiding most of the map for no reason the reader chose. */
+function syncFavChip() {
+  const chip = el('favOnly');
+  const n = state.data.filter(isFav).length;
+  chip.disabled = !n;
+  el('favHint').textContent = n ? '' : 'none starred';
+  if (!n) { chip.checked = false; PREFS.favOnly = false; save(); }
+  return chip.checked;
+}
+
 
 export function render() {
   const hidden = new Set(PREFS.hidden || []);
   const risingOnly = syncRisingChip();
+  const favOnly = syncFavChip();
   Object.keys(marks).forEach(k => marks[k] = []);
   siteMark.clear();
   // Every marker below is about to be replaced, and one torn down mid-hover never fires its
@@ -54,6 +72,7 @@ export function render() {
       if (isIgnored(s)) continue;
       if (hidden.has(dkey(s))) continue;
       if (risingOnly && !s.rising) continue;
+      if (favOnly && !isFav(s)) continue;
     }
 
     // Counted before the layer check: the chip's number is "what this layer would add".
@@ -291,5 +310,6 @@ export function counts() {
   const nIgn = state.data.filter(s => ign.has(s.id)).length;
   el('shown').textContent = `${total} of ${state.data.length} stations on the map` +
     (pins && pins < total ? ` · ${pins} pins` : '') +
+    (el('favOnly').checked ? ' · favorites only' : '') +
     (nIgn ? ` · ${nIgn} ignored` : '');
 }

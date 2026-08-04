@@ -679,6 +679,13 @@
       <hr>
       <label class="chip"><input type="checkbox" id="risingOnly">
         <i class="glyph i i-warning"></i>Rising stations only <span id="risingHint" class="hint"></span></label>
+      <!-- A view filter, like the district picker and unlike the ignored list: it hides pins and
+           changes no alert. The two indications that it is on are the drawer panel above and the
+           `· favorites only` note in #shown below, which is the same pair the ignored list uses. It
+           needs no standing pill the way the rising filter does, because that one is a lone checkbox
+           with no list under it saying what it took away, and this one has exactly that list. -->
+      <label class="chip"><input type="checkbox" id="favOnly">
+        <i class="glyph i i-star"></i>Favorites only <span id="favHint" class="hint"></span></label>
     </details>
     <details id="kinds" class="sect" open>
       <summary><i class="i i-layers"></i>Sensor kinds<b id="kindN"></b></summary>

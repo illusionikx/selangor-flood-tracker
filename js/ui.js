@@ -315,6 +315,7 @@ delete PREFS.heat; delete PREFS.rainHeat;   // dropped from the blob on the next
 el('heat').checked = heatPref === 'water';
 el('rainHeat').checked = heatPref === 'rain';
 el('risingOnly').checked = !!PREFS.risingOnly;
+el('favOnly').checked = !!PREFS.favOnly;
 // Which of the two is on, on the section's summary — the one thing a collapsed heatmap section
 // otherwise stops saying.
 const heatName = () => el('heatN').textContent =
@@ -338,7 +339,8 @@ el('riseOff').onclick = () => {
   el('risingOnly').dispatchEvent(new Event('change'));
 };
 
-el('heat').onchange = el('rainHeat').onchange = el('risingOnly').onchange = e => {
+el('heat').onchange = el('rainHeat').onchange = el('risingOnly').onchange =
+  el('favOnly').onchange = e => {
   /* One heatmap at a time. Stacked, they are two answers to two questions in one picture — and
      worse, leaflet.heat accumulates alpha across layers, so overlapping blobs blend into a colour
      that belongs to neither scale and reads as an intensity neither reading supports.
@@ -350,11 +352,12 @@ el('heat').onchange = el('rainHeat').onchange = el('risingOnly').onchange = e =>
 
   PREFS.heatLayer = el('heat').checked ? 'water' : el('rainHeat').checked ? 'rain' : '';
   PREFS.risingOnly = el('risingOnly').checked;
+  PREFS.favOnly = el('favOnly').checked;
   heatName();
   risePill();
   save();
-  // Both heatmaps are display options, not filters — only the rising chip closes the drawer.
-  applyFilter(e.target === el('risingOnly'));
+  // Both heatmaps are display options, not filters — only the two pin filters close the drawer.
+  applyFilter(e.target === el('risingOnly') || e.target === el('favOnly'));
 };
 
 // --- district filter ------------------------------------------------------------------------------
