@@ -4557,9 +4557,8 @@ breakpoint, and none of its rules name `600px` as the width of the dialog itself
   row each. Splitting them adds four rows to describe one button group that already reads as one
   group in the player itself (`role="group" aria-label="Playback"`).
 - The four new sections use American spelling ("Colored spans"), the spelling this project asks
-  for in new prose. The unmoved sections below them keep the British spelling they already had
-  ("colour"). This change did not ask for a rewrite of moved or existing prose, so the pane now
-  holds two spellings rather than one.
+  for in new prose. Task 15's spelling sweep later converted the pane's older sections too, so the
+  Help pane now reads in one spelling throughout rather than two.
 - A later change (widening `#aboutBox` to 820px) gave `#aboutBox p` a `max-width` in `ch` units, so
   a paragraph stops well short of the full dialog width. The `.key` grid keeps no cap: its
   two-column layout is what asked for the width in the first place.
@@ -4693,14 +4692,19 @@ The go-to box searched the station list and nothing else, so a reader who wanted
 a housing area had to know which station covered it first.
 
 `?place=` joins `?cam=`, `?shots=` and `?shot=` on the existing entry point, which already owns every
-outbound request in this repository. It proxies OpenStreetMap Nominatim server-side, so the browser
-still reaches no third party and the vendored-only rule holds. The query is trimmed, collapsed,
-lowercased and rejected outside 2 to 80 characters by `placeQuery()`, which `php api.php --selftest`
-exercises offline.
+outbound request this server makes. It proxies OpenStreetMap Nominatim server-side. This feature adds
+no new third party to the browser. The browser still talks only to this origin and to CARTO's
+basemap tiles (`js/map.js` fetches those on every pan and zoom — see the About pane's Credits block).
+Only this server's PHP code reaches OpenStreetMap. The query is trimmed, collapsed, lowercased and
+rejected outside 2 to 80 characters by `placeQuery()`, which `php api.php --selftest` exercises
+offline.
 
-Results are bounded to `BOX`, the coverage area with about 0.1 degrees of margin on the station
-extent, so "Klang" means the Selangor town. The box is published in the payload as `box`, so no JS
-file keeps a second copy to go stale.
+`BOX` bounds results to the coverage area, with about 0.1 degrees of margin on the station extent,
+so "Klang" means the Selangor town. The payload publishes the box as `box`, alongside `siteM` and
+`ttl`, as a plain diagnostic a caller can read without opening the source. **Decision:** keep it
+rather than remove it. It costs one array entry, and it helps anyone who reads the endpoint's raw
+response. No client script reads it today — `js/ui.js`'s out-of-area message is a hand-written list
+of state names, and a bounding box cannot generate that list on its own.
 
 Each answer is cached in the `page` table of `.history.db` for 30 days, because place names do not
 move. The rate limit guards the uncached path only, at one lookup per second site-wide, and it reuses
@@ -4715,9 +4719,11 @@ calls this when the reader picks the search row.
 
 ### The place card
 
-`herePopup()` already assembled "what is near this point", so it became `nearPopup(latlng, head,
-capKm)` and the two callers differ only in the head they pass. `herePopup()` stays as a thin wrapper
-and `locate.js` needed no change.
+`herePopup()` already assembled "what is near this point". It became `nearPopup(latlng, head,
+capKm)`. The two callers differ only in the head they pass. `herePopup()` stays as a thin wrapper,
+and this refactor itself needed no change to `locate.js`. (The file did change later on this same
+branch, but only for the unrelated American-spelling sweep — "Recentre" to "Recenter" — not for
+anything the place card touches.)
 
 The card opens under the key `@place`, joining `@here` and `@alerts` on the rule that a `@` key keeps
 `render()`'s refresh pass off a card that belongs to no site. The pin is a plain `L.Marker` in
@@ -4731,7 +4737,7 @@ must follow one rule, and that card would otherwise name a siren 60 km away.
 **Not built.** Place search on the GitHub Pages build. That build has no PHP, so the trigger row is
 gated on `STATIC` exactly as "Refresh now" is.
 
-**About pane.** The privacy paragraphs gained one sentence, because a typed place name now reaches
+**About pane.** The privacy paragraphs gained two sentences, because a typed place name now reaches
 this server and OpenStreetMap. The claim about the reader's own location is unchanged and still
 true: this feature sends a name, never a coordinate.
 
@@ -4745,10 +4751,10 @@ and must state what one press will undo.
 A sensor is never in both lists. Favoriting drops the id from `ignored` and ignoring drops it from
 `favs`, because "show me this first" and "never show me this" is not a state a person meant to be in.
 
-Four surfaces: a `FAVORITES` group leading an untouched search box, a drawer panel that mirrors
-Ignored sensors, a `Favorites only` map filter, and favorites-first ordering inside each alert panel
-card. On the map a pin carries a star when the reader has starred **any** sensor at that site, and
-the map draws it outside the cluster so a chip cannot swallow it.
+Five surfaces: a `FAVORITES` group leading an untouched search box, a drawer panel that mirrors
+Ignored sensors, a `Favorites only` map filter, favorites-first ordering inside each alert panel
+card, and the map pin itself. A pin carries a star when the reader has starred **any** sensor at
+that site, and the map draws it outside the cluster so a chip cannot swallow it.
 
 **Alert-standard note.** The alert panel's ordering is the only alert surface this touches, and it
 moves order only. The set of alerts does not change. Nothing suppresses an alert, and no count moves.
@@ -4759,8 +4765,12 @@ definition. Favorites are not an alarm control.
 two districts away that a reader muted is the failure ISA-18.2 spends a chapter on. `PREFS.ignored`
 stays the one suppression control in this app.
 
-**Not built.** A favorites map layer or a color of its own. A favorite is neither a status nor a
-sensor kind, so it takes neither color language and the star is the whole indication.
+**Not built.** A favorites layer *chip* or a color of its own. A favorite is neither a status nor a
+sensor kind, so it takes neither color language and the star is the whole indication. A plain
+`favLayer` layer group (`js/map.js`) does exist, outside the cluster — that is the mechanism behind
+"the map draws it outside the cluster" above, not a user-facing layer with a toggle of its own. Do
+not fold it back into `cluster`: see "A cluster badge counts what it is hiding" in `CLAUDE.md`, which
+this same branch added, for why the split has to stay.
 
 **Trade-off accepted.** At low zoom a large favorites list is loose pins overlapping each other and
 the clusters. That is the request: a favorite that clustering can swallow is a favorite the reader

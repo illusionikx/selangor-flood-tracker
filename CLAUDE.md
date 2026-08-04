@@ -1,7 +1,8 @@
 # Klang Valley Flood Watch
 
 Single-page map of live flood telemetry for Selangor, Kuala Lumpur and Putrajaya, from three JPS
-sources.
+sources. `api.php` also proxies OpenStreetMap Nominatim server-side for the go-to box's place search
+(`?place=`) — a fourth upstream host, contacted only from PHP, never from the browser.
 No auth, no build step, no framework. Served by Laravel Herd at `https://flood-exp.test`.
 
 > **Keep the docs current.** When a feature lands or a decision is made, append it to
@@ -13,7 +14,7 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 
 | file | role |
 |---|---|
-| `api.php` | server-side proxy + cache + source merge + poll history + camera image proxy + rate-limited `?force=1` |
+| `api.php` | server-side proxy + cache + source merge + poll history + camera image proxy + rate-limited `?force=1` + place lookup (`?place=`, proxies Nominatim) |
 | `sources.php` | scrapers for the two HTML-only upstreams (national portal, JPS WP) |
 | `shots.php` | camera archive: capture, retention tiers, lookup. Required by `api.php` |
 | `shots-test.php` | `php shots-test.php` — one of two runnable checks. Guards retention. Exercises `pruneShots()` |
@@ -72,6 +73,8 @@ Dependencies must stay acyclic; anything two modules both need lives in `state.j
 Three JPS feeds, joined on the national station code (`station_Id` in the Selangor API, `Station ID`
 in both HTML tables). Priority for a *reading* is national → whichever feed placed the pin.
 Coordinates only ever come from Selangor or WP; the national portal publishes none.
+(`api.php` also proxies a fourth, unrelated upstream — OpenStreetMap Nominatim, for `?place=` — but
+that one is not a flood-data source and joins nothing here; see the `## api.php` section below.)
 
 | source | gives | shape |
 |---|---|---|
@@ -173,6 +176,23 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   *index* precisely so the on-delay needs nothing persisted between requests.
 - Response also carries real diagnostics used by the status popover: `tookMs`, `details.ok/requested`,
   `offline`, `cacheAge`, `sourceUpdated`.
+- **`?place=<query>` — the go-to box's place search.** Proxies OpenStreetMap Nominatim server-side, so
+  this adds no new third party to the *browser*: the browser still talks only to this origin and to
+  CARTO's basemap tiles (see the third-party gotcha below), and Nominatim is reached only from PHP.
+  `placeQuery()` trims, collapses, lowercases and rejects the query outside 2–80 characters or on
+  invalid UTF-8, and `placeParam()` guards the one call site that turns `$_GET['place']` into the
+  string it expects — see the array-cast gotcha below. Results are bounded to `BOX`, the coverage
+  area with about 0.1 degrees of margin on the station extent, and only four fields survive per
+  result (`name`, `detail`, `lat`, `lon`) — the raw Nominatim response is large and its shape is not
+  ours to depend on. Each answer is cached in the `page` table of `.history.db` for **30 days**
+  (`PLACE_TTL`), because place names do not move — a much longer life than the scraped pages' 15
+  minutes. The uncached path is rate-limited to one lookup per second, site-wide, guarded by
+  `.place.lock` (taken, used and released around the check only, never across the fetch) and stamped
+  in `.place.stamp` via the same `forceAllowed()` the force-refresh button uses, at its own
+  `PLACE_EVERY` window. The connect to `.history.db` is wrapped in try/catch: this handler has
+  already sent `Content-Type: application/json` by the time it runs, so an uncaught `PDOException`
+  would put a PHP fatal-error page inside a response a client expects to parse as JSON — a connect
+  failure degrades to "no cache" rather than a broken response.
 
 ## Colour language — do not violate
 
@@ -194,6 +214,17 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
 - **`-9999` means "no reading"** in both scraped feeds, rendered as `-9,999.00` in one of them.
   `numOrNull()` strips separators and nulls anything ≤ −9990. Treated as a level, it would render a
   station as catastrophically dry and poison its trend history.
+- **A `(string)` cast on `$_GET[...]` does not throw on an array — it emits a warning and coerces
+  silently.** `?place[]=x` makes `$_GET['place']` an array. `(string)` on it prints
+  `Warning: Array to string conversion` and yields the literal string `"Array"`, five characters that
+  pass `placeQuery()`'s length check clean — so the warning lands inside a response whose
+  `Content-Type` is already `application/json`, breaking the parse for a client that sent one
+  malformed query string, and the request still spends the site-wide rate limit on a garbage query.
+  `?cam=` and `?shots=` never had this problem because `(int)` on an array is silent. `placeParam()`
+  in `api.php` is the guard: refuse anything that is not already a `string` before it reaches
+  `placeQuery()`, rather than cast and hope. Any future endpoint that reads a `$_GET` value as a
+  string needs the same check at the call site — the validator downstream cannot fix a type problem
+  that already corrupted the response.
 - **The KL endpoints return bare `<tr>` fragments.** Both libxml and the HTML5 parser discard rows
   that aren't inside a table, so `crawl()` wraps every page in `<table>` before parsing. Drop the
   wrap and the KL feeds silently return nothing.
@@ -501,8 +532,11 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   guarantees a follower. And `#ticker` must have a **fixed flex basis** — sized to content the
   header re-laid itself out every poll as the alert count changed.
 - **`.solo` is hidden until hover, globally.** The rule lives on the class, not on `#districtList`,
-  so any new list reusing that pill button gets an invisible control on a mouse. `#ignoredList`
-  overrides it back to `visible` — restoring is the whole point of that panel.
+  so any new list reusing that pill button gets an invisible control on a mouse. `#ignoredList` and
+  `#favList` both override it back to `visible` — restoring is the whole point of either panel — and
+  share one `::after` that grows the hit area past the small pill, `inset: -10px -6px`, because a
+  two-line row must not grow around the control to make it a real touch target. The two selectors are
+  merged in `css/base.css` on purpose, so the ignored list and the favorites list cannot drift apart.
 - **`<details>` can't animate closed** (children go `display:none`) and hides non-`<summary>`
   children entirely — that's why the drawer is a `body.drawer` class and the credit sits outside.
   The two filter sections *inside* the drawer (`#districts`, `#ignored`) are `<details>` precisely
@@ -744,11 +778,18 @@ for f in js/*.js css/*.css; do
 
 ```bash
 php shots-test.php            # one of two runnable checks. Guards camera retention. Must stay green.
-php api.php --selftest       # the other. Guards the force-refresh rate limit and cache choice. Must stay green.
+php api.php --selftest       # the other. Guards the force-refresh rate limit, cache choice, and the
+                              # place-lookup validator/rate limit. Must stay green.
 curl -sk "https://flood-exp.test/api.php?shots=1"                          # frame timestamps
 curl -sk -o /dev/null -w '%{http_code} %{content_type}\n' \
      "https://flood-exp.test/api.php?shot=1&t=$(curl -sk 'https://flood-exp.test/api.php?shots=1' \
      | php -r 'echo json_decode(stream_get_contents(STDIN))[0];')"          # 200 image/webp
+
+# Place search. Run sparingly — an uncached query reaches Nominatim, a free service with a
+# one-request-per-second policy this proxy is the only thing enforcing. Expect a 200 with a
+# non-empty `places` array on a real place name.
+curl -sk "https://flood-exp.test/api.php?place=Bandar+Utama" \
+     | php -r 'echo json_encode(json_decode(stream_get_contents(STDIN),true)),"\n";'
 ```
 
 There is otherwise no test suite. Changes are verified by linting, syntax-checking the modules,
@@ -763,6 +804,12 @@ wrongly deletes months of camera history and looks identical to one that worked 
 runs on every capture, a rule that shaves one extra frame per pass empties the archive over a week
 without ever being wrong in a single run. Hence the idempotence assertion.
 
-`api.php --selftest` guards the two decisions that gate a request to JPS: `forceAllowed()`'s rate
-limit and `serveFromCache()`'s cache-or-rebuild choice. Both are arithmetic on a few integers, so
-the check runs offline in milliseconds rather than through a 270-request fan-out.
+`api.php --selftest` guards the decisions that gate a request to an upstream — JPS **or** Nominatim,
+now that `?place=` reaches a second one. `forceAllowed()`'s rate limit and `serveFromCache()`'s
+cache-or-rebuild choice are the original two, both arithmetic on a few integers so the check runs
+offline in milliseconds rather than through a 270-request fan-out. The place lookup added its own
+block of the same shape: `placeQuery()`'s validation (length, whitespace collapse, the invalid-UTF-8
+case with no PHP notice), `placeParam()`'s array-cast guard (see the gotcha above), and
+`forceAllowed()` reused at `PLACE_EVERY`'s window for the per-second Nominatim limit — fifteen
+assertions in all, half the check's total, and all offline for the same reason: no test here should
+cost a real request to either upstream.
