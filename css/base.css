@@ -363,7 +363,12 @@ dialog:focus, dialog:focus-visible { outline: none; }
 #ignoredList .nm .muted, #favList .nm .muted { font-size: 11px; }
 /* Always visible, unlike the district list's "only" — reviewing and undoing the list is the whole
    reason both panels exist, so the control must not be something you hover a row to discover. */
-#ignoredList .solo, #favList .solo { visibility: visible; }
+#ignoredList .solo, #favList .solo { visibility: visible; position: relative; }
+/* The pill stays small so a two-line row does not grow around it, and the hit area grows past it
+   instead. Both panels, not just the favorites one: the two selectors were merged above precisely
+   so they cannot drift, and a 19px control that a phone genuinely shows is the same defect on
+   either list. `#districtList`'s copy needs none of this — that one is `display: none` on touch. */
+#ignoredList .solo::after, #favList .solo::after { content: ''; position: absolute; inset: -10px -6px; }
 
 /* The mast's star. It rides in the badge row rather than beside the close button, because the three
    numbers that put the place name on that line move together and a second chip up there would be a
