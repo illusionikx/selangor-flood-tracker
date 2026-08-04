@@ -149,6 +149,13 @@ export const CAM_MAX_KM = 5;
    api.php carries the same 2 for the timeline join. Change both together. */
 export const CAM_ALERT_KM = 2;
 
+/* How far a sensor may be and still answer "what is near this point". The location card had no cap
+   at all, so it would name a siren 60 km away, which is a different weather system and a different
+   catchment. About the width of a district here.
+   The camera keeps CAM_MAX_KM (5), which is a narrower and separate question — whether "the river in
+   this picture" is a claim this app can make. */
+export const NEAR_MAX_KM = 10;
+
 /* The station panel plays what it has of the last three hours, at a frame a second. Capture runs
    every 30 minutes (SHOT_EVERY in shots.php), so a full window is six frames and a six-second lap.
    Past three hours a picture is not current, which is the same word the cards use for a reading
