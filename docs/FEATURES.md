@@ -4687,6 +4687,32 @@ list the next keystroke replaces points at rows that are no longer there.
 **Not built.** A card per sensor. There is one card per site by design, and the site card already
 shows every reading of every sensor there.
 
+### `api.php?place=`
+
+The go-to box searched the station list and nothing else, so a reader who wanted the water level near
+a housing area had to know which station covered it first.
+
+`?place=` joins `?cam=`, `?shots=` and `?shot=` on the existing entry point, which already owns every
+outbound request in this repository. It proxies OpenStreetMap Nominatim server-side, so the browser
+still reaches no third party and the vendored-only rule holds. The query is trimmed, collapsed,
+lowercased and rejected outside 2 to 80 characters by `placeQuery()`, which `php api.php --selftest`
+exercises offline.
+
+Results are bounded to `BOX`, the coverage area with about 0.1 degrees of margin on the station
+extent, so "Klang" means the Selangor town. The box is published in the payload as `box`, so no JS
+file keeps a second copy to go stale.
+
+Each answer is cached in the `page` table of `.history.db` for 30 days, because place names do not
+move. The rate limit guards the uncached path only, at one lookup per second site-wide, and it reuses
+`forceAllowed()` rather than growing a second copy of the same arithmetic. An unlimited public proxy
+to Nominatim is an open relay that gets our address blocked.
+
+Only four fields survive: name, detail, lat and lon. The raw response is large and its shape moves
+between versions, and the client must not depend on a schema we do not own.
+
+**Not built.** Per-keystroke autocomplete. Nominatim's usage policy names it, and the client only
+calls this when the reader picks the search row.
+
 ## Favorites
 
 `PREFS.favs` is an array of station ids, the mirror of `PREFS.ignored` and stored in the same blob.

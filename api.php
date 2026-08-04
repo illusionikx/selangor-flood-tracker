@@ -152,6 +152,93 @@ if (isset($_GET['cam'])) {
     exit;
 }
 
+/* ?place=<query> — turn a place name into a coordinate, inside the coverage area only.
+   The browser reaches no third party: this is the same rule every other outbound call here follows,
+   and it is what lets the About pane keep its privacy paragraph honest with one added sentence.
+   Explicit, never per keystroke. The client only calls this when the reader picks the search row,
+   which is what Nominatim's usage policy asks for. */
+if (isset($_GET['place'])) {
+    header('Content-Type: application/json');
+    $q = placeQuery((string)$_GET['place']);
+    if ($q === null) {
+        http_response_code(400);
+        echo json_encode(['places' => [], 'error' => 'query too short']);
+        exit;
+    }
+
+    /* The `page` table again, not a new store: this is one more slow upstream read with a long life,
+       which is exactly what that table holds. Created here as well as in the refresh path below,
+       because a place search can be the first thing that ever touches this file. */
+    $db = new PDO('sqlite:' . HIST, null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+    $db->exec('PRAGMA journal_mode=WAL');
+    $db->exec('CREATE TABLE IF NOT EXISTS page (url TEXT PRIMARY KEY, ts INTEGER, body TEXT) WITHOUT ROWID');
+
+    $key = 'place:' . $q;
+    $sel = $db->prepare('SELECT ts, body FROM page WHERE url = ?');
+    $sel->execute([$key]);
+    $hit = $sel->fetch(PDO::FETCH_ASSOC);
+    if ($hit && time() - (int)$hit['ts'] < PLACE_TTL) {
+        header('Cache-Control: max-age=600');
+        echo $hit['body'];
+        exit;
+    }
+
+    /* The limit guards the uncached path only. A repeat search costs OpenStreetMap nothing, so
+       refusing it would punish the reader for a request that never leaves this box. */
+    [$allowed] = forceAllowed(
+        time(), is_file(PLACE_STAMP) ? filemtime(PLACE_STAMP) : null, PLACE_EVERY);
+    if (!$allowed) {
+        http_response_code(429);
+        echo json_encode(['places' => [], 'error' => 'rate limited']);
+        exit;
+    }
+    touch(PLACE_STAMP);
+
+    $url = NOMINATIM . '?' . http_build_query([
+        'q'            => $q,
+        'format'       => 'jsonv2',
+        'limit'        => 8,
+        'countrycodes' => 'my',
+        'viewbox'      => implode(',', BOX),
+        'bounded'      => 1,
+    ]);
+    // fetchAll, never file_get_contents — the same rule the whole file follows. It also carries the
+    // identifying User-Agent that Nominatim's policy requires.
+    $raw = json_decode(fetchAll([$url], 1, false)[$url] ?? '', true);
+    if (!is_array($raw)) {
+        http_response_code(502);
+        echo json_encode(['places' => [], 'error' => 'unavailable']);
+        exit;
+    }
+
+    /* Four fields, and nothing else. The raw response is large, its shape moves between versions,
+       and the client must not depend on a schema we do not own.
+       `display_name` is the full comma-separated address. Its first part repeats `name`, so the
+       detail line takes the next three — which is the district, the state and usually the postcode
+       area. */
+    $places = [];
+    foreach ($raw as $r) {
+        $name = trim((string)($r['name'] ?? ''));
+        $full = (string)($r['display_name'] ?? '');
+        if ($name === '') $name = trim(explode(',', $full)[0] ?? '');
+        if ($name === '') continue;
+        $parts = array_slice(array_map('trim', explode(',', $full)), 1, 3);
+        $places[] = [
+            'name'   => $name,
+            'detail' => implode(', ', array_filter($parts)),
+            'lat'    => (float)($r['lat'] ?? 0),
+            'lon'    => (float)($r['lon'] ?? 0),
+        ];
+    }
+
+    $body = json_encode(['places' => $places, 'error' => null]);
+    $db->prepare('INSERT OR REPLACE INTO page (url, ts, body) VALUES (?, ?, ?)')
+       ->execute([$key, time(), $body]);
+    header('Cache-Control: max-age=600');
+    echo $body;
+    exit;
+}
+
 /* ?shots=<id> — which frames exist, and what the river beside the camera was doing when each one
    was taken. The client asks once, when a lightbox opens, and again when a camera card opens.
    Shape is [[ts, tier, stationId], …]. `tier` is "now", "soon" or null.
@@ -968,6 +1055,9 @@ $payload = json_encode([
     // Published so the map can draw the mast radius it actually grouped by, rather than keeping a
     // second copy of this number client-side for the two to drift apart.
     'siteM'    => SITE_M,
+    // Published so the client can word its own out-of-area message from the numbers the server
+    // actually bounds on, rather than keeping a second copy of the box in a JS file to go stale.
+    'box'      => BOX,
     'endpoints' => [
         'StationRainfalls'  => count($rainfallList),
         'StationRiverLevels'=> count($riverList),
