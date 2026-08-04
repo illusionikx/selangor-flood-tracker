@@ -269,6 +269,18 @@ dialog:focus, dialog:focus-visible { outline: none; }
   font: 500 11px Roboto, sans-serif; color: var(--muted); font-variant-numeric: tabular-nums;
 }
 .picklist .sn .i { font-size: 13px; }
+/* The chevron that opens a mast. `tabindex="-1"` in the markup keeps it out of the tab order: the
+   list is driven by the arrow keys from the field, and a tab stop per mast would be 417 of them. */
+.picklist .xp {
+  flex: none; display: grid; place-items: center; width: 24px; height: 24px; padding: 0;
+  border: 0; background: none; color: var(--muted); cursor: pointer; border-radius: 6px;
+}
+.picklist .xp:hover { background: var(--hover); color: var(--on-surface); }
+.picklist .xp .i { font-size: 18px; transition: transform .15s; }
+.picklist .xp.on .i { transform: rotate(180deg); }
+/* A sensor inside an open mast. Indented to the depth of the row's own glyph, so the two read as a
+   tree rather than as two lists. */
+.picklist li.sub { padding-left: 30px; }
 
 /* One spacing for every drawer section, so the four read as one stack — they were two rules and a
    flex gap, which made the seam between the two columns twice the others. */

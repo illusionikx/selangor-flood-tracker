@@ -544,6 +544,23 @@ const where = s => [s.district, s.state].filter(Boolean).join(', ') || 'district
 // Selangor both have a Gombak.
 const group = s => `${s.state || '—'} · ${s.district || 'district n/a'}`;
 
+/* Which mast rows are open. Cleared whenever the query changes: a tree left half-open under a list
+   that has been replaced is furniture with nothing under it. A favorites row and a district row for
+   one mast share a key, so opening either opens both — which is right, because they are one place
+   listed twice. */
+const expanded = new Set();
+
+/* A site row, and its sensors under it when the row is open. One function, so the favorites group
+   and the district groups cannot grow two different ideas of what an expanded mast looks like.
+   A sensor row carries `lead`, the mast's own name, because a sensor named the same as its mast has
+   nothing to add by repeating it. */
+function rowsFor(key, ms, g, sub) {
+  const out = [{ t: 'site', key, ms, g, sub }];
+  if (ms.length > 1 && expanded.has(key))
+    for (const s of ms) out.push({ t: 'sensor', s, key, g, lead: ms[0].name });
+  return out;
+}
+
 function search() {
   const terms = termsOf(gotoIn.value);
   const sites = sitesOf(state.data.filter(s => s.name && s.lat));
@@ -554,7 +571,7 @@ function search() {
     // Heading first: a group is only a group if its rows are adjacent.
     .sort(([, a], [, b]) =>
       group(a[0]).localeCompare(group(b[0])) || a[0].name.localeCompare(b[0].name))
-    .map(([key, ms]) => ({ t: 'site', key, ms, g: group(ms[0]), sub: '' }));
+    .flatMap(([key, ms]) => rowsFor(key, ms, group(ms[0]), ''));
 
   if (state.hereAt && (!terms.length || matches(squash('nearest station to me'), terms)))
     hits.unshift({ t: 'near', g: 'Your location' });
@@ -581,14 +598,30 @@ function rowHtml(r, i) {
       ><i class="glyph i i-my_location" style="color:var(--accent)"></i
       ><span class="nm">${NEAREST.name}</span></li>`;
 
+  /* A sensor inside an open mast. Its own glyph and its own kind, because "which of the six" is the
+     only question this row exists to answer. */
+  if (r.t === 'sensor') {
+    const k = KINDS[r.s.kind];
+    return `<li role="option" data-i="${i}" class="sub${i === sel ? ' sel' : ''}"${
+        i === sel ? ' aria-selected="true"' : ''}
+      ><i class="glyph i i-${k.icon}" style="color:${k.color}"></i
+      ><span class="nm">${k.one || k.label}${
+        r.s.name !== r.lead ? `<br><small class="muted">${r.s.name}</small>` : ''
+      }</span></li>`;
+  }
+
   const lead = r.ms[0], n = r.ms.length;
   const icon = n > 1 ? MAST.icon : KINDS[lead.kind].icon;
   const tint = n > 1 ? MAST.color : KINDS[lead.kind].color;
+  const open = expanded.has(r.key);
   return `<li role="option" data-i="${i}"${cls}
       ><i class="glyph i i-${icon}" style="color:${tint}"></i
       ><span class="nm">${lead.name}${
         r.sub ? `<br><small class="muted">${r.sub}</small>` : ''}</span>${
-      n > 1 ? `<b class="sn"><i class="i i-layers"></i>${n}</b>` : ''}</li>`;
+      n > 1 ? `<b class="sn"><i class="i i-layers"></i>${n}</b>
+        <button class="xp${open ? ' on' : ''}" data-x="${r.key}" tabindex="-1"
+                aria-label="${open ? 'Hide' : 'Show'} the sensors at ${lead.name}"
+          ><i class="i i-expand_more"></i></button>` : ''}</li>`;
 }
 
 function pick(i) {
@@ -601,7 +634,7 @@ function pick(i) {
   flashTo(t);
 }
 
-gotoIn.oninput = () => { sel = -1; search(); };
+gotoIn.oninput = () => { sel = -1; expanded.clear(); search(); };
 gotoIn.onfocus = search;
 // Clicking away closes the whole thing, not just the list. The delay lets a click on a result land
 // first — that fires `mousedown` → pick(), which closes it anyway; without the wait the field would
@@ -612,12 +645,31 @@ gotoIn.onkeydown = e => {
   if (step) sel = Math.max(0, Math.min(hits.length - 1, sel + step));
   else if (e.key === 'Enter') return pick(sel < 0 ? 0 : sel);
   else if (e.key === 'Escape') return setFind(false);
+  // The standard tree keys. The up and down arrows already walk visible rows only, because the
+  // sub-rows are spliced into `hits` itself and not hidden with CSS.
+  else if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+    const r = hits[sel];
+    if (!r || r.t !== 'site' || r.ms.length < 2) return;
+    e.key === 'ArrowRight' ? expanded.add(r.key) : expanded.delete(r.key);
+    e.preventDefault();
+    return search();
+  }
   else return;
   e.preventDefault();
   draw();
   gotoHits.querySelector('.sel')?.scrollIntoView({ block: 'nearest' });
 };
 gotoHits.onmousedown = e => {
+  /* Keep focus in the field. `gotoIn.onblur` closes the whole control after 150 ms, so a click that
+     is meant to leave the list open has to stop the blur before it starts. pick() closes the box
+     itself when it means to. */
+  e.preventDefault();
+  const x = e.target.closest('[data-x]');
+  if (x) {
+    const k = x.dataset.x;
+    expanded.has(k) ? expanded.delete(k) : expanded.add(k);
+    return search();
+  }
   const li = e.target.closest('[data-i]');
   if (li) pick(+li.dataset.i);
 };
