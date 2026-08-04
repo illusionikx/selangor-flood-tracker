@@ -211,10 +211,16 @@ export function districts() {
    cannot find is the failure ISA-18.2 spends a chapter on. This list plus the count on the line
    below the layer chips are the only two places on the page that say a sensor has been silenced, so
    neither of them gets to disappear. Row order is the order they were ignored in: it is a short
-   list, and "the one I just switched off" is at the bottom where you left it. */
+   list, and "the one I just switched off" is at the bottom where you left it.
+   That promise means walking `ids` — a `Set` built by insertion order — rather than filtering
+   `state.data`, the shape this had before: `state.data` is the merged payload's own order, which is
+   arbitrary from a reader's chair and silently broke the promise above. `.filter(Boolean)` is
+   load-bearing, not defensive filler: the feeds drop and restore stations between polls, and
+   `PREFS` deliberately keeps an id through a poll where it is missing, so `find()` returning
+   `undefined` here is routine, not a bug. */
 export function ignoredPanel() {
   const ids = ignoredIds();
-  const rows = state.data.filter(s => ids.has(s.id));
+  const rows = [...ids].map(id => state.data.find(s => s.id === id)).filter(Boolean);
 
   el('ignoredN').textContent = rows.length || '';
   el('ignoredList').innerHTML = rows.map(s => `<li>
@@ -232,10 +238,14 @@ export function ignoredPanel() {
 /* The sensors starred from a station card, listed so they can be found and unstarred. One row per
    sensor: this panel manages the saved list, and a list that hid five of a mast's six entries could
    not be used to remove one of them. Row order is the order they were starred in — a short list, and
-   "the one I just added" is at the bottom where it was left. */
+   "the one I just added" is at the bottom where it was left.
+   Same reasoning as `ignoredPanel()` above: walk `ids` (insertion order), not `state.data` (merged
+   payload order, arbitrary from a reader's chair). `.filter(Boolean)` drops any id the current
+   payload does not carry — a normal state, not an error, since a station can be missing from one
+   poll and back on the next. */
 export function favPanel() {
   const ids = favIds();
-  const rows = state.data.filter(s => ids.has(s.id));
+  const rows = [...ids].map(id => state.data.find(s => s.id === id)).filter(Boolean);
 
   el('favN').textContent = rows.length || '';
   el('favList').innerHTML = rows.map(s => `<li>
