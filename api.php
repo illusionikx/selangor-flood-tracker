@@ -74,11 +74,11 @@ const PLACE_STAMP = __DIR__ . '/.place.stamp';
 const PLACE_LOCK  = __DIR__ . '/.place.lock';
 const PLACE_TTL   = 30 * 86400;   // place names do not move
 const NOMINATIM   = 'https://nominatim.openstreetmap.org/search';
-/* The coverage box: Selangor, Kuala Lumpur and Putrajaya. The 673 stations in the payload span
+/* The coverage box: Selangor, Kuala Lumpur and Putrajaya. The 683 stations in the payload span
    latitude 2.6088 to 3.8470 and longitude 100.8229 to 101.9215, and this adds about 0.1 degrees of
    margin on each side so a place at the edge still resolves. Nominatim reads `viewbox` as
-   west,north,east,south. Published in the payload as `box`, so the client can word its own
-   out-of-area message from these numbers rather than from a second copy in a JS file. */
+   west,north,east,south. Published in the payload as `box`, a plain diagnostic alongside `siteM`
+   and `ttl` below — see the note there. No client script derives anything from it today. */
 const BOX = [100.72, 3.95, 102.02, 2.50];
 
 date_default_timezone_set('Asia/Kuala_Lumpur'); // upstream timestamps are local MYT, unlabelled
@@ -157,34 +157,51 @@ if (isset($_GET['cam'])) {
 }
 
 /* ?place=<query> — turn a place name into a coordinate, inside the coverage area only.
-   The browser reaches no third party: this is the same rule every other outbound call here follows,
-   and it is what lets the About pane keep its privacy paragraph honest with one added sentence.
+   This adds no new third party to the browser: the browser still talks only to this origin and to
+   CARTO's basemap tiles (js/map.js fetches those on every pan and zoom, named in the About pane's
+   Credits block), and Nominatim is reached only from here, server-side. That distinction is what
+   lets the About pane's privacy paragraph stay honest with one added sentence.
    Explicit, never per keystroke. The client only calls this when the reader picks the search row,
    which is what Nominatim's usage policy asks for. */
 if (isset($_GET['place'])) {
     header('Content-Type: application/json');
-    $q = placeQuery((string)$_GET['place']);
+    $q = placeQuery(placeParam($_GET['place']));
     if ($q === null) {
         http_response_code(400);
-        echo json_encode(['places' => [], 'error' => 'query too short']);
+        echo json_encode(['places' => [], 'error' => 'invalid place query']);
         exit;
     }
 
     /* The `page` table again, not a new store: this is one more slow upstream read with a long life,
        which is exactly what that table holds. Created here as well as in the refresh path below,
-       because a place search can be the first thing that ever touches this file. */
-    $db = new PDO('sqlite:' . HIST, null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
-    $db->exec('PRAGMA journal_mode=WAL');
-    $db->exec('CREATE TABLE IF NOT EXISTS page (url TEXT PRIMARY KEY, ts INTEGER, body TEXT) WITHOUT ROWID');
+       because a place search can be the first thing that ever touches this file.
+       Caught, unlike the connect in the refresh path further down: this handler has already sent
+       Content-Type: application/json above, so an uncaught PDOException here — an unwritable
+       .history.db, a locked file, disk full — would put PHP's fatal-error page inside a response a
+       client expects to parse as JSON. The refresh path's own connect has the same shape of gap but
+       is not this task; this one is fixed because a public, rate-limited endpoint is more exposed.
+       A connect failure only costs the cache: $db stays null, every read/write below is skipped, and
+       the lookup still runs and still passes through the rate limit two blocks down — it is just not
+       remembered for next time. */
+    $db = null;
+    try {
+        $db = new PDO('sqlite:' . HIST, null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+        $db->exec('PRAGMA journal_mode=WAL');
+        $db->exec('CREATE TABLE IF NOT EXISTS page (url TEXT PRIMARY KEY, ts INTEGER, body TEXT) WITHOUT ROWID');
+    } catch (\Throwable $e) {
+        $db = null;
+    }
 
     $key = 'place:' . $q;
-    $sel = $db->prepare('SELECT ts, body FROM page WHERE url = ?');
-    $sel->execute([$key]);
-    $hit = $sel->fetch(PDO::FETCH_ASSOC);
-    if ($hit && time() - (int)$hit['ts'] < PLACE_TTL) {
-        header('Cache-Control: max-age=600');
-        echo $hit['body'];
-        exit;
+    if ($db) {
+        $sel = $db->prepare('SELECT ts, body FROM page WHERE url = ?');
+        $sel->execute([$key]);
+        $hit = $sel->fetch(PDO::FETCH_ASSOC);
+        if ($hit && time() - (int)$hit['ts'] < PLACE_TTL) {
+            header('Cache-Control: max-age=600');
+            echo $hit['body'];
+            exit;
+        }
     }
 
     /* The limit guards the uncached path only. A repeat search costs OpenStreetMap nothing, so
@@ -253,15 +270,18 @@ if (isset($_GET['place'])) {
     }
 
     $body = json_encode(['places' => $places, 'error' => null]);
-    $db->prepare('INSERT OR REPLACE INTO page (url, ts, body) VALUES (?, ?, ?)')
-       ->execute([$key, time(), $body]);
-    /* The scraper's page rows are a fixed, small set on a 15-minute TTL — they can never grow.
-       A place row is keyed by whatever a reader typed into a public URL, so the table grows without
-       bound unless something prunes it. Scoped to `place:%` only: the scraped rows have their own
-       much shorter TTL and their own fixed keys, and do not need this pass. Runs on the uncached
-       path only, which is already the slow path, so one more statement costs nothing extra felt. */
-    $db->prepare("DELETE FROM page WHERE url LIKE 'place:%' AND ts < ?")
-       ->execute([time() - PLACE_TTL]);
+    if ($db) {
+        $db->prepare('INSERT OR REPLACE INTO page (url, ts, body) VALUES (?, ?, ?)')
+           ->execute([$key, time(), $body]);
+        /* The scraper's page rows are a fixed, small set on a 15-minute TTL — they can never grow.
+           A place row is keyed by whatever a reader typed into a public URL, so the table grows
+           without bound unless something prunes it. Scoped to `place:%` only: the scraped rows have
+           their own much shorter TTL and their own fixed keys, and do not need this pass. Runs on
+           the uncached path only, which is already the slow path, so one more statement costs
+           nothing extra felt. */
+        $db->prepare("DELETE FROM page WHERE url LIKE 'place:%' AND ts < ?")
+           ->execute([time() - PLACE_TTL]);
+    }
     header('Cache-Control: max-age=600');
     echo $body;
     exit;
@@ -416,6 +436,23 @@ function placeQuery(string $raw): ?string {
     return mb_strtolower($q);
 }
 
+/**
+ * The one call site that turns $_GET['place'] into the string placeQuery() expects.
+ *
+ * PHP's (string) cast on an array does not throw — it emits `Warning: Array to string conversion`
+ * and yields the literal string "Array", five characters that pass placeQuery() clean. A request of
+ * ?place[]=x makes $_GET['place'] an array, so that cast would print the warning straight into a
+ * response that already declared Content-Type: application/json (corrupting the body for a
+ * well-formed client), and then spend the site-wide rate limit on a garbage query. `?cam=` and
+ * `?shots=` never had this problem because `(int)` on an array is silent.
+ * The fix is here rather than inside placeQuery() because the validator's contract is about the
+ * content of a string; whether the value handed to it *is* one is the caller's job, same as the
+ * mb_check_encoding() guard already inside placeQuery() draws that line for encoding.
+ */
+function placeParam(mixed $v): string {
+    return is_string($v) ? $v : '';
+}
+
 /* `php api.php --selftest` — the guard above, checked offline. It lives here rather than in a
    second test file because the rule is arithmetic on two integers, and a separate test would need
    a third file to hold the function so both could import it. CLI only, and it exits before the
@@ -458,6 +495,14 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
     $ok('whitespace only is refused',  placeQuery("   \t ") === null);
     $ok('80 characters are allowed',   placeQuery(str_repeat('a', 80)) === str_repeat('a', 80));
     $ok('81 characters are refused',   placeQuery(str_repeat('a', 81)) === null);
+
+    echo "\nplaceParam():\n";
+    $ok('a plain string passes through',  placeParam('kg lui') === 'kg lui');
+    // ?place[]=x makes $_GET['place'] an array. (string) on that is a silent-looking "Array" that
+    // would clear placeQuery()'s length check; placeParam() must refuse it outright instead.
+    $ok('an array becomes empty string',  placeParam(['x']) === '');
+    $ok('null becomes empty string',      placeParam(null) === '');
+    $ok('empty string stays refused',     placeQuery(placeParam([])) === null);
 
     /* The bug this guards is not the return value — the accidental path already returns null. It is
        that the call *emits* a deprecation, and `?place=` sets Content-Type: application/json before
@@ -1083,8 +1128,11 @@ $payload = json_encode([
     // Published so the map can draw the mast radius it actually grouped by, rather than keeping a
     // second copy of this number client-side for the two to drift apart.
     'siteM'    => SITE_M,
-    // Published so the client can word its own out-of-area message from the numbers the server
-    // actually bounds on, rather than keeping a second copy of the box in a JS file to go stale.
+    // Diagnostics only, like siteM and ttl above: the box this endpoint actually bounds Nominatim
+    // results to, published so a caller reading this response — curl, the Developer section's Raw
+    // payload link — can see the real numbers without opening the source. No client script reads
+    // this field today; js/ui.js's out-of-area message is a hand-written list of state names, which
+    // a bounding box cannot generate on its own (a box has no idea it covers "Selangor").
     'box'      => BOX,
     'endpoints' => [
         'StationRainfalls'  => count($rainfallList),
