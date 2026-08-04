@@ -355,12 +355,35 @@ function sourceInfo(s) {
 const region = s => `<div class="muted">${
   [s.district, s.state].filter(Boolean).join(', ') || 'district n/a'} · ${s.basin || 'basin n/a'}</div>`;
 
+/* The star in a card header's top-right corner, beside the close button. One card kind carries one
+   sensor and the other carries a mast, and they differ only in how many ids a press acts on and in
+   what the tooltip calls the thing. One builder for both, so the two cannot grow different shapes,
+   different wording or different glyph rules.
+   `ids` is comma separated. ui.js's handler reads a full list as "remove every one" and anything
+   short of full as "add every one", which is what makes a mast's star fill only when all of its
+   sensors are starred while one press still acts on all of them.
+   The `title` is allowed under this project's rule that a tooltip may only duplicate something
+   already on screen: the glyph and its colour already report the state, and this only names the
+   action they are offering. Nothing lives in the tooltip alone, so a phone loses nothing. */
+const favStar = (ids, set, what) => {
+  const says = `${set ? 'Remove' : 'Add'} this ${what} ${set ? 'from' : 'to'} favorites`;
+  return `<button class="favbtn${set ? ' on' : ''}" data-fav="${ids}"
+              aria-pressed="${set}" title="${says}" aria-label="${says}"
+        ><i class="i i-star${set ? '' : '_outline'}"></i></button>`;
+};
+
 export function popup(s) {
   const kind = KINDS[s.kind];
   const tone = hasInfo(s) ? kind.color : 'var(--muted)';
-  // Place first, sensor second: you look up a popup by where it is, and the badge answers the
-  // follow-up question ("what is this reading?") rather than the opening one.
+  /* Place first, sensor second: you look up a popup by where it is, and the badge answers the
+     follow-up question ("what is this reading?") rather than the opening one.
+     The star sits in the same corner it holds on a mast card. A single-sensor card can also be
+     starred from its ⓘ menu, which is two ways to the same switch — kept on purpose, because the
+     corner is where a reader learns to look across every card, and the menu item has to stay for
+     the sensors listed on a mast and on the "near this point" cards, which have no corner of their
+     own. Emitted before .popname because the CSS reserves the room with a sibling rule. */
   return `<div class="pophead">
+      ${favStar(s.id, isFav(s), 'sensor')}
       <div class="popname">${s.name}</div>
       ${region(s)}
       <div class="popact">
@@ -397,15 +420,9 @@ export function sitePopup(members) {
      count went because the badge row directly below the name already lists one badge per sensor, so
      the chip restated what was an inch under it — and this corner is the only place on the card with
      room for a control that belongs to the whole mast rather than to one sensor on it.
-     Emitted before .popname because the CSS reserves room for it with an adjacent-sibling rule.
-     The `title` is allowed here under the rule that a tooltip may only duplicate something already
-     on screen: the star's own colour already says which state it is in, and this names the action
-     that colour is offering. It is not where the meaning lives, so a phone loses nothing. */
-  const favSays = favAll ? 'Remove this mast from favorites' : 'Add this mast to favorites';
+     Emitted before .popname because the CSS reserves room for it with an adjacent-sibling rule. */
   return `<div class="pophead">
-      <button class="favbtn${favAll ? ' on' : ''}" data-fav="${favIdList}"
-              aria-pressed="${favAll}" title="${favSays}" aria-label="${favSays}"
-        ><i class="i i-star${favAll ? '' : '_outline'}"></i></button>
+      ${favStar(favIdList, favAll, 'mast')}
       <div class="popname">${lead.name}</div>
       ${region(lead)}
       <div class="badges">${members.map(m => {

@@ -4847,6 +4847,16 @@ amber. The map draws one near amber alert pins. Color is not the message on eith
 tag names the tier in words, and the star is a shape no sensor wears. Even so, this is the tightest
 place the palette has ever had to hold three meanings in one band.
 
+**Both card kinds carry the star, from one builder.** A single-sensor station short-circuits to
+`popup()`, which never had one — the star existed only on the mast card, so a reader on a plain
+station had to open the ⓘ menu to find the switch. `favStar()` now draws it for both. The two
+differ in how many ids one press acts on, and in whether the tooltip says "sensor" or "mast".
+
+A single-sensor card can be starred from its corner and from its ⓘ menu. That is two ways to one
+switch, and it stays. The corner is where a reader learns to look across every card. The menu item stays
+anyway, because the sensors listed down a mast and on the "near this point" cards need it. Neither
+of those has a corner of its own.
+
 **The search box lost its sensor count too.** A mast row showed a `layers` glyph and a count. The
 count goes for the same reason the card's did. The mast glyph already says this is a stack. The
 chevron says it opens, and opening it lists the sensors — the number named, rather than stated.
