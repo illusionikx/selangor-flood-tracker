@@ -668,6 +668,12 @@ gotoHits.onmousedown = e => {
   if (x) {
     const k = x.dataset.x;
     expanded.has(k) ? expanded.delete(k) : expanded.add(k);
+    /* Re-point sel at the row the reader just clicked. Its sub-rows splice in *below* it, so
+       expanding a row above the selected one shifts every index below by however many sensors it
+       has — the old sel number would now land on a different row. The keyboard path (ArrowRight /
+       ArrowLeft) never needs this: it always toggles the row at sel itself, and that row keeps its
+       own index because its children are inserted after it, not before. */
+    sel = +x.closest('[data-i]').dataset.i;
     return search();
   }
   const li = e.target.closest('[data-i]');
