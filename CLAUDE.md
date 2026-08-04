@@ -689,6 +689,15 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   and anything new added to that list must add a branch there as well as in `rowHtml()`, or a reader
   will select a row that does nothing. The sub-rows are spliced into `hits` itself rather than hidden
   with CSS, which is what lets the existing arrow keys keep walking visible rows with no new code.
+- **A picked place refills the list; it opens no card.** `place` and `ask` are the two rows that
+  close nothing and keep focus in the box — every other row ends the search. Picking a place sets
+  `nearPlace`, drops the pin and moves the map, and `search()` then answers about that point instead
+  of about the query: the sites within `NEAR_MAX_KM`, nearest first. There **was** a card here, a
+  copy of "You are here" under the key `@place`, and it is gone — four sensor sections with a meter
+  and a graph each, when the question a place search asks is "which station covers here". Do not put
+  it back. `nearPlace` is cleared by `oninput` and by `setFind(false)`, or the next open answers about
+  a place the reader typed away from. The pin is not cleared: it marks somewhere they asked about,
+  and it lives until another place replaces it.
 - **Nothing calls `?place=` until the reader asks.** Nominatim's usage policy names per-keystroke
   autocomplete, so the lookup hangs off an explicit row at the foot of the list and never off
   `oninput`. `lookup()` carries a generation counter for the same reason `clip.js` does. Do not

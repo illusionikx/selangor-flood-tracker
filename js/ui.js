@@ -1,12 +1,12 @@
 // DOM wiring: drawer, theme, filters, layer chips, panels, lightbox and the delegated jumps.
 
-import { KINDS, MAST, camSrc, FEED, STATIC } from './config.js';
+import { KINDS, MAST, camSrc, FEED, STATIC, NEAR_MAX_KM } from './config.js';
 import { state, PREFS, PREFS_KEY, save } from './state.js';
 import { el, distKm, dkey, ignoredIds, leads, favIds, isFav } from './util.js';
 import { map, setTheme, flashTo, closeSide, showPlace } from './map.js';
 import { heatOpacity, syncHeat } from './heat.js';
 import { byId } from './stations.js';
-import { camWarn, placePopup } from './popup.js';
+import { camWarn } from './popup.js';
 import { render, districts } from './render.js';
 import { dataTable } from './table.js';
 import { alerts, toggleAlerts } from './alerts.js';
@@ -477,13 +477,13 @@ document.addEventListener('click', e => {
      `menu` rather than the detached one this handler started with.
      Two paths past setFavs(), not one. render() rebuilds #sideBody wholesale for an ordinary station
      card, which destroys the open popover and mints a fresh, closed one with the same id — that is
-     the reopen branch below. But render() deliberately skips every `@`-keyed card (`@here`, `@place`;
-     see openSide() in map.js), so on those two the menu this click is inside is never destroyed: it
-     is still open, `:popover-open` is still true, and nothing above has touched its label or its
-     heart. Left alone, a reader who favorites a sensor from "You are here" or a searched place sees
-     no confirmation at all — the menu item still reads "Add to favorites" beside a hollow grey heart
-     after the press. So the still-open case gets its own branch: patch the glyph and the label in
-     place, since no rebuild is coming to do it for us.
+     the reopen branch below. But render() deliberately skips every `@`-keyed card (`@here`; see
+     openSide() in map.js), so there the menu this click is inside is never destroyed: it is still
+     open, `:popover-open` is still true, and nothing above has touched its label or its heart. Left
+     alone, a reader who favorites a sensor from "You are here" sees no confirmation at all — the menu
+     item still reads "Add to favorites" beside a hollow grey heart after the press. So the still-open
+     case gets its own branch: patch the glyph and the label in place, since no rebuild is coming to
+     do it for us.
      The glyph swaps class as well as colour, because the heart carries the state in its fill: hollow
      for no, solid for yes. Colour alone would leave a solid heart sitting there through both. */
   const menuId = b.closest('[popover]')?.id;
@@ -577,6 +577,20 @@ const NEAREST = { id: '@nearest', name: 'Nearest station to me', state: 'Your lo
 const gotoIn = el('goto'), gotoHits = el('gotoHits'), findBtn = el('find');
 let hits = [], sel = -1;
 
+/* The place the list is currently answering about, once the reader has picked one. Set by `pick()`,
+   cleared by any edit to the box and by closing the control — a list of what is near somewhere the
+   reader has typed away from is furniture with nothing under it, the same rule `expanded` follows.
+   Declared here with `hits` and `sel`, above `setFind()`, rather than beside the place-lookup state
+   it belongs with further down. `setFind()` clears it, and a `let` read before its own declaration
+   throws rather than reading undefined — safe only while nothing calls `setFind()` during module
+   evaluation, which is a promise about load order this file should not be making.
+   There was a card here first: a copy of "You are here", pointed at the searched point and opened in
+   `#side` under the key `@place`. It answered a question nobody asked. A reader who searches for a
+   place wants the station that covers it, and the card made them read four sensor sections to reach
+   the one line in each that was a jump. The stations belong in the list they were already looking
+   at, where every other row already opens a station card with one press. */
+let nearPlace = null;
+
 /* The box lives in the app bar and is collapsed to its button until asked for — it is a control you
    reach for deliberately, unlike the layer chips or the alert panel, and as 300px of permanent map
    furniture it charged every visit for a search most of them never run. The button gives way to the
@@ -594,6 +608,12 @@ function setFind(open) {
   if (open) { gotoIn.offsetWidth; return gotoIn.focus(); }
   gotoIn.value = '';
   sel = -1;
+  /* The search is over, so the place question is over with it. Without this the next open would come
+     back to a list of what is near a place the reader picked minutes ago, under a heading naming it,
+     with an empty box above — `onfocus` calls search() and the `nearPlace` branch answers before the
+     query is ever read. The pin stays on the map: it marks somewhere they asked about, and it lives
+     until another place replaces it, exactly as the "you are here" pin does. */
+  nearPlace = null;
   draw(false);
 }
 findBtn.onclick = () => setFind(true);
@@ -676,10 +696,12 @@ let places = [], pstate = '', gen = 0;
 // the line is, which is exactly the 400-reported-as-an-outage bug this constant exists to avoid.
 const PLACE_MAX = 80;
 
-/* `p.name`, `p.detail` and the echoed query below are the only three interpolations in this file
-   that come from outside JPS: OpenStreetMap via Nominatim is editable by anyone on earth, unlike
-   the government feeds every neighboring row draws from, and a place named with a script payload
-   would run in the reader's page the moment it hit `innerHTML`. The echoed query rides along for
+/* `p.name`, `p.detail`, the "Near …" heading a picked place sets and the echoed query below are the
+   only interpolations in this file that come from outside JPS: OpenStreetMap via Nominatim is
+   editable by anyone on earth, unlike the government feeds every neighboring row draws from, and a
+   place named with a script payload would run in the reader's page the moment it hit `innerHTML`.
+   The name survives a pick — it becomes the heading over the nearby stations — so escaping it once
+   in the result row is not enough on its own. The echoed query rides along for
    the same reason — it lands in the identical `innerHTML` call — even though it is the reader's own
    typed text and the risk there is only ever self-inflicted. Scoped to these three call sites on
    purpose: sweeping every interpolation in this file is a separate change with its own review. */
@@ -743,6 +765,28 @@ function rowsFor(key, ms, g, sub) {
 function search() {
   const terms = termsOf(gotoIn.value);
   const sites = sitesOf(state.data.filter(s => s.name && s.lat));
+
+  /* A place has been picked, so the question has changed: not "what matches what I typed" any more
+     but "what is near where I picked". Nearest first — the whole point of the group is the order —
+     and bounded by `NEAR_MAX_KM`, past which a station shares no catchment with the point asked
+     about and naming it would be a worse answer than naming none.
+     Rows are ordinary site rows, so a mast still opens its sensors and a press still flies the map:
+     one row shape, one `pick()` branch, and nothing here to keep in step with the rest of the box.
+     `nearPlace.name` is the one string in this list that came from Nominatim rather than JPS, so it
+     is escaped on the way into the heading — see `escHtml` above. */
+  if (nearPlace) {
+    const at = L.latLng(nearPlace.lat, nearPlace.lon);
+    const g = `Near ${escHtml(nearPlace.name)}`;
+    hits = [...sites.entries()]
+      .map(([key, ms]) => ({ key, ms, km: distKm(at, ms[0]) }))
+      .filter(r => r.km <= NEAR_MAX_KM)
+      .sort((a, b) => a.km - b.km)
+      .flatMap(r => rowsFor(r.key, r.ms, g, `${r.km.toFixed(1)} km · ${where(r.ms[0])}`));
+    if (!hits.length)
+      hits = [{ t: 'msg', text: `No station within ${NEAR_MAX_KM} km of that place`, g }];
+    return draw(true);
+  }
+
   // No cap: an empty box lists all ~417 sites, which is what a select does. Rendering them is a few
   // milliseconds per keystroke, and virtualising a list nobody scrolls to the end of is not worth it.
   hits = [...sites.entries()]
@@ -873,20 +917,25 @@ function pick(i) {
     return;
   }
   if (r.t === 'msg') return;
-  /* A searched place: drop the accent pin and open the nearby-sensors card at that point.
-     `r.p.name` and `r.p.detail` come from Nominatim — editable by anyone on earth, unlike every
-     other field this file interpolates — and `placePopup()` writes them straight into the card's
-     HTML with no escaping of its own (it is a template function, not a sink; the sink is
-     `openSide()`'s `body.innerHTML = html` in map.js). `rowHtml()` above already escapes both for
-     the search-result row, and the card needs the same treatment for the same reason: skipping it
-     here would still leave a script payload live the moment the reader picks the row, even though
-     the list itself was already safe to look at. */
+  /* A searched place is not a destination — it is a second question. So this row is the one row in
+     the box that opens no card and closes nothing: it drops the accent pin, moves the map, and hands
+     the list back to the reader holding the stations near that point. The station they pick next is
+     what actually flies the map, through the ordinary site branch below.
+     The box keeps the place name so it is plain what the list is answering. Setting `.value` from
+     script fires no `input` event, so the `nearPlace` set on the line above survives the assignment
+     — the very thing `oninput` exists to clear.
+     `gen++` for the same reason `oninput` bumps it: the reader may have picked one result while a
+     lookup for a query they were still editing was in flight, and that answer must not paint its
+     rows over the list this row just built. */
   if (r.t === 'place') {
-    gotoIn.blur();
-    setFind(false);
-    const at = L.latLng(r.p.lat, r.p.lon);
-    showPlace(at, placePopup(at, escHtml(r.p.name), escHtml(r.p.detail)));
-    return;
+    nearPlace = { name: r.p.name, lat: r.p.lat, lon: r.p.lon };
+    gotoIn.value = r.p.name;
+    places = [];
+    pstate = '';
+    gen++;
+    sel = -1;
+    showPlace(L.latLng(r.p.lat, r.p.lon));
+    return search();
   }
   const t = r.t === 'near' ? nearest() : r.t === 'sensor' ? r.s : r.ms[0];
   if (!t) return;
@@ -917,6 +966,7 @@ gotoIn.oninput = () => {
   expanded.clear();
   places = [];
   pstate = '';
+  nearPlace = null;
   gen++;
   search();
 };

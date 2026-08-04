@@ -444,35 +444,42 @@ export function sitePopup(members) {
     </div>`).join('')}`;
 }
 
-/* "What is near this point", for any point. The nearest camera's picture leads, then one section per
-   kind with the full sensor body — meter, trend, sparkline, footer. A line of summary is enough to
-   rank four stations and not enough to answer "is this bad?", which is the question anyone opens
-   this card to ask.
+/* "What is near where you are". The nearest camera's picture leads, then one section per kind with
+   the full sensor body — meter, trend, sparkline, footer. A line of summary is enough to rank four
+   stations and not enough to answer "is this bad?", which is the question anyone opens this card to
+   ask.
    The one thing this card must say that a mast's need not is *where each sensor is*. On a station
    card the header names the place once and every sensor shares it. Here the four are four different
    places, so each section carries its own name, district and distance — and the name is the jump to
    it, because that station is somewhere else on the map.
-   `capKm` bounds every kind but the camera. Past it the section says so rather than naming a sensor
-   that shares no catchment with the point asked about. */
-export function nearPopup(latlng, head, capKm) {
-  const cam = nearestCam(latlng);
+   `NEAR_MAX_KM` bounds every kind but the camera. Past it the section says so rather than naming a
+   sensor that shares no catchment with the point asked about. A siren 60 km from a reader was never
+   a useful answer.
+   This took a head and a cap as parameters while a searched place drew the same card with an accent
+   badge. That card is gone — a place search now answers with the stations near it, listed in the
+   search box itself (see `nearPlace` in ui.js) — and with one caller left the two parameters were
+   two ways to build one card. Built fresh on every open, so it reflects the latest poll rather than
+   the fix's own timestamp. */
+export function herePopup(e, loaded) {
+  if (!loaded) return '<b>You are here</b><br><span class="muted">stations still loading…</span>';
+  const at = e.latlng;
   const rows = ['river', 'rainfall', 'siren', 'gauge'].map(k => {
     const kind = KINDS[k];
-    let s = nearestOf(k, latlng);
-    if (s && distKm(latlng, s) > capKm) s = null;
-    /* `title`, not `head`: the card's own head is this function's parameter, and shadowing it inside
-       the callback would put a sensor's glyph where the card's badge belongs. */
+    let s = nearestOf(k, at);
+    if (s && distKm(at, s) > NEAR_MAX_KM) s = null;
+    /* `title`, not `head`: the card's own head is written below, and shadowing that name inside the
+       callback would put a sensor's glyph where the card's badge belongs. */
     const title = `<i class="glyph i i-${kind.icon}"
         style="color:${s ? kind.color : 'var(--muted)'}"></i><b>${kind.one || kind.label}</b>`;
     // nearestOf() only ever returns a station that is reporting, so there is no "no reading" case
     // here — either the nearest one inside the cap has something to say or nothing does.
     if (!s) return `<div class="sensor">
       <div class="sensorhead">${title}</div>
-      <div class="muted">no ${kind.label.toLowerCase()} within ${capKm} km</div>
+      <div class="muted">no ${kind.label.toLowerCase()} within ${NEAR_MAX_KM} km</div>
     </div>`;
     return `<div class="sensor" data-sensor="${s.id}">
       <div class="sensorhead">${title}
-        <span class="muted">${distKm(latlng, s).toFixed(1)} km</span>
+        <span class="muted">${distKm(at, s).toFixed(1)} km</span>
         ${dots(s)}
       </div>
       <div class="place" data-go="${s.id}" title="Show ${s.name} on the map">${s.name}</div>
@@ -481,29 +488,11 @@ export function nearPopup(latlng, head, capKm) {
     </div>`;
   }).join('');
 
-  return `${head}${camNear(latlng, cam)}${rows}`;
-}
-
-/* Built fresh on every open, so it reflects the latest poll rather than the fix's timestamp. */
-export function herePopup(e, loaded) {
-  if (!loaded) return '<b>You are here</b><br><span class="muted">stations still loading…</span>';
-  /* The cap applies here too. One function must follow one rule, and two cards built by one builder
-     saying different things is the drift this codebase argues against everywhere else. A siren 60 km
-     from a reader was never a useful answer. */
-  return nearPopup(e.latlng, `<div class="pophead">
+  return `<div class="pophead">
       <span class="badge" style="--c:var(--me)"><i class="i i-home_pin"></i>You are here</span>
       <div class="muted">accurate to about ${Math.round(e.accuracy)} m</div>
-    </div>`, NEAR_MAX_KM);
+    </div>${camNear(at, nearestCam(at))}${rows}`;
 }
-
-/* A place the reader searched for. The same card, with a different head — accent rather than the
-   location blue, because this is somewhere they asked about and not where they are. No accuracy
-   line: a geocode has no accuracy to state. */
-export const placePopup = (latlng, name, detail) => nearPopup(latlng, `<div class="pophead">
-    <span class="badge" style="--c:var(--accent)"><i class="i i-place"></i>Searched place</span>
-    <div class="popname">${name}</div>
-    ${detail ? `<div class="muted">${detail}</div>` : ''}
-  </div>`, NEAR_MAX_KM);
 
 /* Hours are Malaysian, not the viewer's, so the axis agrees with every other timestamp on the page —
    JPS stamps its readings in MYT with no offset, and we print those verbatim. Reading the map from

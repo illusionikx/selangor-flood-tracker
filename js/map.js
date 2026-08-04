@@ -252,13 +252,14 @@ function unpin() {
 }
 
 /* A place the reader searched for. One marker at a time, kept until another place replaces it — the
-   same life the "you are here" pin has, and closing the card does not clear it.
+   same life the "you are here" pin has, and closing the search box does not clear it.
    A plain L.Marker, not an L.Path: paths bubble their clicks to the map and markers do not, and
    nothing about this pin may close the card someone is reading.
-   The `@place` key keeps render()'s refresh pass off the card, the same rule `@here` and `@alerts`
-   follow — it belongs to no site. */
+   The mark and the view are all this does. The answer to a place search is the list of stations near
+   it, and that is drawn in the search box itself — see `nearPlace` in ui.js. This opened a card of
+   its own at first, under the key `@place`, and there is deliberately no card here any more. */
 let placeMark = null;
-export function showPlace(latlng, html) {
+export function showPlace(latlng) {
   if (placeMark) placeMark.remove();
   placeMark = L.marker(latlng, { icon: L.divIcon({
     // Same box and same tip anchor as the "you are here" pin: a pin points at its tip, not its
@@ -266,7 +267,6 @@ export function showPlace(latlng, html) {
     className: '', iconSize: [48, 48], iconAnchor: [24, 44],
     html: '<span class="pin place"><i class="i i-place"></i></span>',
   }) }).addTo(map);
-  openSide('@place', html);
   focusOn(latlng, 13);
   ping(latlng, 'place');
 }

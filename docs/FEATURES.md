@@ -4720,22 +4720,49 @@ between versions, and the client must not depend on a schema we do not own.
 **Not built.** Per-keystroke autocomplete. Nominatim's usage policy names it, and the client only
 calls this when the reader picks the search row.
 
-### The place card
+### Picking a place answers in the list, not in a card
 
-`herePopup()` already assembled "what is near this point". It became `nearPopup(latlng, head,
-capKm)`. The two callers differ only in the head they pass. `herePopup()` stays as a thin wrapper,
-and this refactor itself needed no change to `locate.js`. (The file did change later on this same
-branch, but only for the unrelated American-spelling sweep — "Recentre" to "Recenter" — not for
-anything the place card touches.)
+A place row opens no card. It drops the pin, moves the map, and refills the search box with the
+stations near that point — nearest first, one row per site, under a heading that names the place.
+The reader then picks a station, and that row flies the map and opens the station's own card, the
+same way every other row in this box does.
 
-The card opens under the key `@place`, joining `@here` and `@alerts` on the rule that a `@` key keeps
-`render()`'s refresh pass off a card that belongs to no site. The pin is a plain `L.Marker` in
-`--accent`, anchored at its tip, with no accuracy circle — a geocode has no accuracy to state. It
-persists until another place replaces it, exactly as the "you are here" pin does.
+The first build opened a card instead. `herePopup()` already assembled "what is near this point", so
+it became `nearPopup(latlng, head, capKm)` with two callers that differed only in the head, and a
+searched place drew that card under the key `@place`.
 
-`NEAR_MAX_KM` (10) bounds river, rainfall, siren and gauge. The camera keeps `CAM_MAX_KM` (5),
-which already means something narrower. The cap applies to the "you are here" card too: one builder
-must follow one rule, and that card would otherwise name a siren 60 km away.
+**Why the list replaced it.** The card answered a question nobody asked. It gave four sensor sections,
+each with a meter, a trend line and a 12-hour graph, and a reader who searched for a place wanted
+one thing from it: the station that covers the place. Reaching that station meant reading four
+sections to find the one line in each that was a jump. A place search asks "which station covers
+here", and a list of stations is that answer stated directly. It also costs one press instead of
+two, and it leaves `#side` alone, so a card the reader was already reading survives the search.
+
+With the card gone there is one caller left, so `nearPopup()` folded back into `herePopup()`. A head
+parameter and a cap parameter were two ways to build one card.
+
+`nearPlace` in `js/ui.js` holds the picked place. `search()` reads it before it reads the query and
+answers about the place instead. Any edit to the box clears it, and closing the control clears it.
+A list of what is near somewhere the reader has typed away from is furniture with nothing under it.
+The pin outlives both, because it marks somewhere they asked about.
+
+The rows are ordinary site rows. A mast still opens its sensors on the chevron, `pick()` needs no new
+branch, and the favorites mark still shows. `NEAR_MAX_KM` (10) bounds the list, past which a station
+shares no catchment with the point asked about.
+
+The pin is a plain `L.Marker` in `--accent`, anchored at its tip, with no accuracy circle — a geocode
+has no accuracy to state. It persists until another place replaces it, exactly as the "you are here"
+pin does.
+
+The "you are here" card keeps its own `NEAR_MAX_KM` cap on river, rainfall, siren and gauge. The
+camera keeps `CAM_MAX_KM` (5), which already means something narrower. Drop the cap and that card
+names a siren 60 km away.
+
+**Not built.** A favorite mark on the place itself. Favorites are sensors, and a geocode is not one.
+
+**Escaping.** The place name survives the pick — it becomes the heading over the nearby stations —
+so escaping it once in the result row is not enough. `escHtml()` covers the heading too. Nominatim
+returns text anyone on earth can edit, unlike the government feeds every other row draws from.
 
 **Not built.** Place search on the GitHub Pages build. That build has no PHP, so the trigger row is
 gated on `STATIC` exactly as "Refresh now" is.
