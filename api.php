@@ -77,7 +77,6 @@ const NOMINATIM   = 'https://nominatim.openstreetmap.org/search';
    out-of-area message from these numbers rather than from a second copy in a JS file. */
 const BOX = [100.72, 3.95, 102.02, 2.50];
 
-
 date_default_timezone_set('Asia/Kuala_Lumpur'); // upstream timestamps are local MYT, unlabelled
 
 const HOST = 'infobanjirjps.selangor.gov.my';
@@ -291,6 +290,11 @@ function serveFromCache(int $age, bool $mine, bool $force): bool {
  * are different queries to a geocoder.
  */
 function placeQuery(string $raw): ?string {
+    // preg_replace with /u returns null on invalid UTF-8 rather than passing the bytes through, and
+    // trim(null) is deprecated — which would print a notice into a response whose Content-Type is
+    // already application/json, breaking the parse for a client that sent one bad byte. Reject the
+    // input here instead: the contract belongs to the validator, not to whoever calls it.
+    if (!mb_check_encoding($raw, 'UTF-8')) return null;
     $q = trim(preg_replace('/\s+/u', ' ', $raw));
     $n = mb_strlen($q);
     if ($n < 2 || $n > 80) return null;
@@ -339,6 +343,19 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
     $ok('whitespace only is refused',  placeQuery("   \t ") === null);
     $ok('80 characters are allowed',   placeQuery(str_repeat('a', 80)) === str_repeat('a', 80));
     $ok('81 characters are refused',   placeQuery(str_repeat('a', 81)) === null);
+
+    /* The bug this guards is not the return value — the accidental path already returns null. It is
+       that the call *emits* a deprecation, and `?place=` sets Content-Type: application/json before
+       it ever runs. One notice printed ahead of the body and the client gets a parse error instead
+       of a result. So the check counts diagnostics, not answers.
+       An error handler rather than ob_start(): output buffering only sees the notice while
+       display_errors is on, so that check would quietly pass on a box configured otherwise. */
+    $notices = 0;
+    set_error_handler(function ($no) use (&$notices) { $notices++; return true; });
+    $bad = placeQuery("bandar \xB1\x31 utama");
+    restore_error_handler();
+    $ok('invalid UTF-8 is refused',       $bad === null);
+    $ok('invalid UTF-8 raises no notice', $notices === 0);
 
     /* The place lookup reuses forceAllowed(): it is the same arithmetic on the same two integers,
        with its own stamp file and its own window. A second copy would be a second thing to get
