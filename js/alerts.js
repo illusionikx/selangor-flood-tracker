@@ -4,7 +4,7 @@
 
 import { KINDS, STATUS_COLOR, NO_INFO, ALERT_TITLE } from './config.js';
 import { state, PREFS } from './state.js';
-import { el, distKm, dkey, isHot, tier, TIER_RANK, isIgnored, noSec } from './util.js';
+import { el, distKm, dkey, isHot, tier, TIER_RANK, isIgnored, noSec, isFav } from './util.js';
 import { side, openSide, closeSide } from './map.js';
 import { etaText } from './popup.js';
 
@@ -32,6 +32,15 @@ const siteSize = () => {
     n.set(k, (n.get(k) || 0) + 1);
   }
   return n;
+};
+
+/* Which places hold something starred. Keyed on `site`, and true when **any** sensor there is
+   starred — the same rule the pin badge and the search group use, so a reader who starred the camera
+   at a mast still sees that mast lifted when the river beside it goes over its mark. */
+const favSites = () => {
+  const k = new Set();
+  for (const s of state.data) if (isFav(s)) k.add(s.site || s.id);
+  return k;
 };
 
 /* One card per kind per tier, and **every row in it is a place**, not a sensor.
@@ -65,6 +74,7 @@ function reading(s, t) {
 
 function groupCard(items, kind, t, hereAt) {
   const size = siteSize();
+  const fav = favSites();
   const k = KINDS[kind];
 
   // One row per place. The worst sensor there speaks for it and is what the row jumps to.
@@ -75,9 +85,14 @@ function groupCard(items, kind, t, hereAt) {
     if (!at || (s.ratio || 0) > (at.lead.ratio || 0)) places.set(key, { lead: s, n: (at?.n || 0) + 1 });
     else places.set(key, { ...at, n: at.n + 1 });
   }
-  const rows = [...places.values()].sort((a, b) => hereAt
-    ? distKm(hereAt, a.lead) - distKm(hereAt, b.lead)
-    : (b.lead.ratio || 0) - (a.lead.ratio || 0));
+  /* Starred places first. Order only: the set of rows, the counts above them, the icon badge, the
+     ticker and the toast are all unchanged, and `isHot()` is untouched. Widening what alerts is an
+     alert-design decision and goes through the standard in docs/FEATURES.md. This is not that. */
+  const rows = [...places.values()].sort((a, b) =>
+    (fav.has(b.lead.site || b.lead.id) - fav.has(a.lead.site || a.lead.id))
+    || (hereAt
+      ? distKm(hereAt, a.lead) - distKm(hereAt, b.lead)
+      : (b.lead.ratio || 0) - (a.lead.ratio || 0)));
 
   const [one, many] = ALERT_TITLE[`${kind}|${t}`] || [k.label, k.label];
   return `<div class="alert t-${t} grouped">
@@ -87,6 +102,8 @@ function groupCard(items, kind, t, hereAt) {
     <ul class="slist">${rows.map(({ lead: s, n }) => `<li data-go="${s.id}"
         title="Show ${s.name} on the map">
         <i class="i i-${(size.get(s.site || s.id) || 1) > 1 ? 'layers' : k.icon}"></i>
+        ${fav.has(s.site || s.id)
+          ? '<i class="i i-star fvm" role="img" aria-label="Favorite"></i>' : ''}
         <span class="nm">${s.name}<br><small class="muted">${
           [s.district, s.state].filter(Boolean).join(', ')}${
           hereAt ? ` · ${distKm(hereAt, s).toFixed(1)} km` : ''}${
