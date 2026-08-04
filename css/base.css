@@ -258,6 +258,17 @@ dialog:focus, dialog:focus-visible { outline: none; }
 }
 .picklist .glyph { font-size: 18px; flex: none; }
 .picklist b { margin-left: auto; font-weight: 500; font-size: 12px; opacity: .6; font-variant-numeric: tabular-nums; }
+/* The go-to list rows carry a name and sometimes a muted second line, so the name needs a column of
+   its own rather than sitting as a bare text node beside the glyph. */
+.picklist .nm { flex: 1; min-width: 0; line-height: 1.35; overflow: hidden; }
+.picklist .nm small { font-size: 11px; }
+/* How many sensors this one row stands for. Same `layers` glyph as the mast pin and the site card's
+   own count chip, so the row, the pin and the card header all say it the same way. */
+.picklist .sn {
+  margin-left: auto; display: flex; align-items: center; gap: 3px;
+  font: 500 11px Roboto, sans-serif; color: var(--muted); font-variant-numeric: tabular-nums;
+}
+.picklist .sn .i { font-size: 13px; }
 
 /* One spacing for every drawer section, so the four read as one stack — they were two rules and a
    flex gap, which made the seam between the two columns twice the others. */

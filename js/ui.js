@@ -1,8 +1,8 @@
 // DOM wiring: drawer, theme, filters, layer chips, panels, lightbox and the delegated jumps.
 
-import { KINDS, camSrc, FEED, STATIC } from './config.js';
+import { KINDS, MAST, camSrc, FEED, STATIC } from './config.js';
 import { state, PREFS, PREFS_KEY, save } from './state.js';
-import { el, distKm, dkey, ignoredIds } from './util.js';
+import { el, distKm, dkey, ignoredIds, leads } from './util.js';
 import { map, setTheme, flashTo, closeSide } from './map.js';
 import { heatOpacity, syncHeat } from './heat.js';
 import { byId } from './stations.js';
@@ -521,39 +521,80 @@ const hay = s => squash(`${s.name} ${s.district || ''} ${s.state || ''} ${KINDS[
 const termsOf = q => q.trim().split(/\s+/).map(squash).filter(Boolean);
 const matches = (text, terms) => terms.every(t => text.includes(t));
 
-function search() {
-  const terms = termsOf(gotoIn.value);
-  // No cap: an empty box lists all ~680, which is what a select does. Rendering them is ~5ms and
-  // happens once per keystroke; virtualising a list nobody scrolls to the bottom of isn't worth it.
-  hits = state.data
-    .filter(s => s.name && s.lat && (!terms.length || matches(hay(s), terms)))
-    // Heading first: a group is only a group if its rows are adjacent.
-    .sort((a, b) => group(a).localeCompare(group(b)) || a.name.localeCompare(b.name));
-  if (state.hereAt && (!terms.length || matches(squash('nearest station to me'), terms)))
-    hits.unshift(NEAREST);
-  draw(true);
-}
+/* One row per site, the same grouping `render()` draws pins from. The list used to show one row per
+   sensor, so a six-sensor mast filled six rows and one pin, and a reader comparing the two had no
+   way to tell that was one place. `leads()` names the row, and `render()` names the pin with the
+   same call, so the two surfaces cannot print two names for one place. */
+const sitesOf = list => {
+  const m = new Map();
+  for (const s of list) {
+    const k = s.site || s.id;
+    m.has(k) ? m.get(k).push(s) : m.set(k, [s]);
+  }
+  for (const ms of m.values()) ms.sort(leads);
+  return m;
+};
+
+// A site matches when any sensor on it matches. The squashed haystacks join, so one test covers the
+// whole mast — typing `camera` still finds every place that has one.
+const siteHay = ms => ms.map(hay).join(' ');
+const where = s => [s.district, s.state].filter(Boolean).join(', ') || 'district n/a';
 
 // Grouped by state *and* district, because the district names alone are ambiguous: Kuala Lumpur and
 // Selangor both have a Gombak.
 const group = s => `${s.state || '—'} · ${s.district || 'district n/a'}`;
 
+function search() {
+  const terms = termsOf(gotoIn.value);
+  const sites = sitesOf(state.data.filter(s => s.name && s.lat));
+  // No cap: an empty box lists all ~417 sites, which is what a select does. Rendering them is a few
+  // milliseconds per keystroke, and virtualising a list nobody scrolls to the end of is not worth it.
+  hits = [...sites.entries()]
+    .filter(([, ms]) => !terms.length || matches(siteHay(ms), terms))
+    // Heading first: a group is only a group if its rows are adjacent.
+    .sort(([, a], [, b]) =>
+      group(a[0]).localeCompare(group(b[0])) || a[0].name.localeCompare(b[0].name))
+    .map(([key, ms]) => ({ t: 'site', key, ms, g: group(ms[0]), sub: '' }));
+
+  if (state.hereAt && (!terms.length || matches(squash('nearest station to me'), terms)))
+    hits.unshift({ t: 'near', g: 'Your location' });
+  draw(true);
+}
+
 function draw(open = !gotoHits.hidden) {
   let last = null;
-  gotoHits.innerHTML = hits.map((s, i) => {
-    const d = s === NEAREST ? s.state : group(s);
-    const head = d !== last ? `<li class="head" role="presentation">${d}</li>` : '';
-    last = d;
-    return `${head}<li role="option" data-i="${i}"${i === sel ? ' class="sel" aria-selected="true"' : ''}
-      ><i class="glyph i i-${s === NEAREST ? 'my_location' : KINDS[s.kind].icon}" style="color:${s === NEAREST ? 'var(--accent)' : KINDS[s.kind].color}"
-      ></i>${s.name}</li>`;
+  gotoHits.innerHTML = hits.map((r, i) => {
+    const head = r.g !== last ? `<li class="head" role="presentation">${r.g}</li>` : '';
+    last = r.g;
+    return head + rowHtml(r, i);
   }).join('') || '<li class="none">No station matches that</li>';
   gotoHits.hidden = !open;
   gotoIn.setAttribute('aria-expanded', open);
 }
 
+/* One row, whatever it stands for. The glyph is the mast's `layers` on a site of several sensors and
+   the lead sensor's own glyph on a site of one — the same rule the pin follows, so a row and the pin
+   it opens carry the same mark. */
+function rowHtml(r, i) {
+  const cls = i === sel ? ' class="sel" aria-selected="true"' : '';
+  if (r.t === 'near') return `<li role="option" data-i="${i}"${cls}
+      ><i class="glyph i i-my_location" style="color:var(--accent)"></i
+      ><span class="nm">${NEAREST.name}</span></li>`;
+
+  const lead = r.ms[0], n = r.ms.length;
+  const icon = n > 1 ? MAST.icon : KINDS[lead.kind].icon;
+  const tint = n > 1 ? MAST.color : KINDS[lead.kind].color;
+  return `<li role="option" data-i="${i}"${cls}
+      ><i class="glyph i i-${icon}" style="color:${tint}"></i
+      ><span class="nm">${lead.name}${
+        r.sub ? `<br><small class="muted">${r.sub}</small>` : ''}</span>${
+      n > 1 ? `<b class="sn"><i class="i i-layers"></i>${n}</b>` : ''}</li>`;
+}
+
 function pick(i) {
-  const t = hits[i] === NEAREST ? nearest() : hits[i];
+  const r = hits[i];
+  if (!r) return;
+  const t = r.t === 'near' ? nearest() : r.ms[0];
   if (!t) return;
   gotoIn.blur();
   setFind(false);   // the search is over — collapse it back to the button and give the bar its room
