@@ -41,7 +41,13 @@ function syncFavChip() {
   const n = state.data.filter(isFav).length;
   chip.disabled = !n;
   el('favHint').textContent = n ? '' : 'none starred';
-  if (!n) { chip.checked = false; PREFS.favOnly = false; save(); }
+  if (!n) {
+    chip.checked = false;
+    // Only on the way into the empty state. This branch runs on every poll for every reader who
+    // has starred nothing — which is every new visitor — so writing here unguarded put a
+    // localStorage write on the poll loop forever, for a preference that had not moved.
+    if (PREFS.favOnly) { PREFS.favOnly = false; save(); }
+  }
   return chip.checked;
 }
 
