@@ -200,7 +200,7 @@ export function dataTable() {
     ? `<tr class="here">
         <td class="nm">
           <div class="popname">My location</div>
-          <div class="muted">nearest reporting station per sensor</div>
+          <div class="muted">Nearest reporting station per sensor</div>
         </td>
         ${KIND_RANK.map(k => {
           const s = k === 'camera' ? nearestCam(here) : nearestOf(k, here);
@@ -359,7 +359,7 @@ function cell(own, lead, scope = '') {
     return wrap(bar
       ? bar + `<div class="val"><b style="color:${color(m)}">${m.level} m</b></div>`
       : line(`<b style="color:${color(m)}">${m.level} m</b>`)
-        + '<div class="val muted">no danger mark</div>');
+        + '<div class="val muted">No danger mark</div>');
   }
   if (m.kind === 'rainfall') {
     const [label, tone] = RAIN[Math.max(0, m.status)] || RAIN[0];

@@ -93,14 +93,17 @@ export async function load() {
   let slow, slower;
   try {
     if (first) {
-      say('contacting the proxy…');
-      slow = setTimeout(() => say('asking JPS for stations — this can take a few seconds'), 2500);
-      slower = setTimeout(() => say('still waiting on JPS. A cold start rebuilds the whole '
-        + 'station list, water levels, rainfall and cameras, and can take up to 20 seconds'), 8000);
+      // "Proxy" and "cold start" were our words for our own plumbing. A reader waiting on a splash
+      // screen wants to know that something is happening and roughly how long, which is all these
+      // say now.
+      say('Contacting the server…');
+      slow = setTimeout(() => say('Asking JPS for stations. This can take a few seconds.'), 2500);
+      slower = setTimeout(() => say('Still waiting on JPS. The first load reads every station, '
+        + 'water level, rain gauge and camera. This can take up to 20 seconds.'), 8000);
     }
     const r = await fetch(FEED);
     clearTimeout(slow); clearTimeout(slower);
-    if (first) say('reading water levels, rainfall, sirens and cameras…');
+    if (first) say('Reading water levels, rainfall, sirens and cameras…');
     const j = await r.json();
     if (!j.stations) throw new Error(j.error || 'HTTP ' + r.status);
     state.data = j.stations;
@@ -111,7 +114,7 @@ export async function load() {
     // render() blocks for as long as it takes to build 400-odd markers and popups, so the line
     // has to be given a frame to paint in — set and then rendered in the same task, it would
     // never appear at all.
-    if (first) { say(`placing ${j.stations.length} stations on the map…`); await new Promise(requestAnimationFrame); }
+    if (first) { say(`Placing ${j.stations.length} stations on the map…`); await new Promise(requestAnimationFrame); }
 
     network(j);
     render(); alerts(); ticker();
@@ -134,7 +137,7 @@ export async function load() {
         el('splash').classList.add('offline');
         el('splashWarn').hidden = false;
       } else {
-        el('splashMsg').textContent = 'could not reach the feed — showing the map anyway';
+        el('splashMsg').textContent = 'Could not reach the flood data. Showing the map anyway.';
         setTimeout(() => el('splash').classList.add('gone'), 1200);
       }
     }

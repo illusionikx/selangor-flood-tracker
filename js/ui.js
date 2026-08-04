@@ -91,7 +91,7 @@ el('devRaw').href = FEED;
 el('devForce').onclick = async () => {
   const b = el('devForce');
   b.disabled = true;
-  el('devMsg').textContent = 'refreshing…';
+  el('devMsg').textContent = 'Refreshing…';
   try {
     const r = await fetch(FEED + (FEED.includes('?') ? '&' : '?') + 'force=1', { cache: 'no-store' });
     const j = await r.json();
@@ -102,7 +102,7 @@ el('devForce').onclick = async () => {
       : `not refreshed — ${j.forceWhy || 'served from cache'}`;
     await load();
   } catch (e) {
-    if (aboutBox.open) el('devMsg').textContent = 'failed — ' + e.message;
+    if (aboutBox.open) el('devMsg').textContent = 'Failed — ' + e.message;
   }
   b.disabled = false;
   // Not redundant with the `poll` listener above: on the catch path load() never ran, so no `poll`
@@ -1109,7 +1109,7 @@ lightbox.addEventListener('close', reset);
 el('splashRetry').onclick = () => {
   el('splash').classList.remove('offline');
   el('splashWarn').hidden = true;
-  el('splashMsg').textContent = 'retrying…';
+  el('splashMsg').textContent = 'Retrying…';
   load();
 };
 addEventListener('online', () => {

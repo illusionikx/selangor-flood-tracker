@@ -33,7 +33,7 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `js/popup.js` | popup + meter + gauge + sparkline templates |
 | `js/sparktip.js` | the hover/tap readout on every graph. One delegated listener, no imports |
 | `js/render.js` | rebuilds markers and heat points; drawer summary table |
-| `js/alerts.js` | "On alert": the app bar's warning glyph, the list it opens in `#side`, the icon badge |
+| `js/alerts.js` | "On alert": the app bar's warning glyph, the list it opens in `#side`, the icon badge, the red favicon |
 | `js/table.js` | the all-stations table dialog, grouped district → mast → sensor |
 | `js/locate.js` | geolocation and the "You are here" marker |
 | `js/ticker.js` | header alert marquee — measured, seamless, speed scales with the alert count |
@@ -454,6 +454,23 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   as live.
 - **41 sirens last reported months ago** (one in July 2025). They render `OUT OF CONTACT`, never
   `IDLE` — a silent siren and a dead siren look identical, and only one is safe.
+- **A siren reading 1 is a claim, not a fact, and the river behind it is the check.** JPS sounds a
+  siren for one minute at the Amaran mark, repeating every 3 hours while the water stays there, and
+  every 5 at Bahaya. So the alarm is a claim about a river level the payload already holds.
+  `sirenBacked()` in `api.php` asks it: `backed` is true when a river within `SIREN_KM` (5 km) is at
+  status ≥ 2, false when rivers are in reach and none is, **null when there is none to ask**.
+  `sounding()` in `util.js` reads `backed !== false` — the null case keeps the benefit of the doubt,
+  because silencing a real evacuation alarm beats carrying a doubtful one. 15 of the 17 alarms in our
+  archive were unbacked, including one held 127 hours with its own gauge 2 m under the mark, and
+  believing them kept the app bar red every day of the week. **Do not replace this with a duration
+  cutoff** — that was the first attempt, and JPS's repeat cadence means a genuine flood holds a siren
+  on all day, so any cutoff short enough to catch the stuck ones discards the real one. Both reds
+  read `sounding()`, `isCritical()` and `atDanger()` — a red pin beside a panel that refuses to list
+  it is the map contradicting the panel. **`?shots=` asks the same question per frame**, through
+  `$sirenFrames` — `frameTiers` against each nearby river's *warning* mark, intersected with the
+  siren's frames. It must never fall back to the live `backed` flag: a picture from last week is
+  judged by last week's water, the same rule `camWarn()` obeys. Flood gauges are **not** backing
+  evidence — measured, they hold no samples across any alarm window on record.
 - **Nothing outranks a popover except another popover.** The table draws its graphs inside `.tipbox`,
   which is a `popover` and therefore in the **top layer** — above every `z-index` on the page, because
   the top layer is not part of the stacking context at all. So `js/sparktip.js`'s readout is itself a
@@ -713,6 +730,16 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   Four gaps are open there; raise them when alert work comes up rather than adding a fifth surface.
 - Responsive is a standing requirement (breakpoint 600px), including touch equivalents for every
   hover-only affordance.
+- **A message on screen is written for the reader, not for the system.** Three rules, and the whole
+  UI was swept for them once. **Sentence case** — a capital at the front of every rendered string,
+  including the small `.muted` helper lines, which were all lowercase fragments. **No hedging** —
+  the writing standard bans "probably", and a hedge is dishonest anyway where the app has already
+  acted on the judgement it is hedging about. **None of our vocabulary**: `proxy`, `cold start`,
+  `as we poll`, `stuck relay`, `warning mark`, `the alert list` and `5 km` are how *we* describe the
+  plumbing, and a reader wants the verdict and one fact behind it. The siren line is the model —
+  `Faulty signal. No river nearby is high.` replaced a 28-word sentence that never answered whether
+  there was a flood. The ALL-CAPS blocks (`TRIGGERED`, `HEAVY RAIN`, `HAPPENING NOW`) are a
+  deliberate visual language and are **not** messages — leave them.
 - All user settings live in one `prefs` blob in `localStorage` (`PREFS` + `save()`).
 - **`PREFS.ignored` is the only alarm-suppression control**, and it is applied *further* than the
   district filter: `isIgnored()` gates pins, heat, the alert panel, the ticker **and** the toast. The
@@ -794,6 +821,14 @@ php shots-test.php            # one of two runnable checks. Guards camera retent
 php api.php --selftest       # the other. Guards the force-refresh rate limit, cache choice, and the
                               # place-lookup validator/rate limit. Must stay green.
 curl -sk "https://flood-exp.test/api.php?shots=1"                          # frame timestamps
+
+# Which archived frames still carry an alert span, and which sensor raised each one. The siren rule
+# lives in a closure inside the request handler and cannot be reached by --selftest, so this sweep is
+# its check: a siren id appearing here must have had a river at its Amaran mark at that time. Both
+# stuck relays (siren-50, siren-1081) coloured 14 frames before the rule and none after it.
+for d in shots/*/; do id=$(basename "$d"); curl -sk "https://flood-exp.test/api.php?shots=$id"; done \
+  | php -r 'while($l=fgets(STDIN)) foreach(json_decode($l,true)?:[] as $f) if($f[1]!==null) echo "$f[2] $f[1]\n";' \
+  | sort | uniq -c
 curl -sk -o /dev/null -w '%{http_code} %{content_type}\n' \
      "https://flood-exp.test/api.php?shot=1&t=$(curl -sk 'https://flood-exp.test/api.php?shots=1' \
      | php -r 'echo json_decode(stream_get_contents(STDIN))[0];')"          # 200 image/webp

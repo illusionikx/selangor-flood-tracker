@@ -2064,6 +2064,124 @@ interrupt faster — it is to **stop interrupting and defer to the overview disp
 viewer, not an alert originator; the two-tier observed-vs-forecast split gets the same benefit
 without the ceremony.
 
+### A siren's alarm is checked against the water
+
+A siren was the one alert in this app taken purely on trust. It publishes 0 or 1 and no scale, so a 1
+was read as sounding. Following the archive, that was wrong nearly every time it mattered.
+
+Every siren alarm on record, cross-referenced against the rivers around it at the time:
+
+| siren | held 1 for | nearest river | its level | its Amaran mark |
+|---|---|---|---|---|
+| KG. MELAYU SUBANG | 127 h | 0.01 km | 34.28 m | 36.15 m |
+| SIREN PEKAN BANTING | 37 h+ | 4.26 km | 1.68 m | 2.70 m |
+| SIREN TMN. SRI MUDA 2 | 3.7 h | 0.44 km | 1.76 m | 4.70 m |
+| BATU TIGA SHAH ALAM | one poll | 0.02 km | 5.51 m | 5.00 m |
+
+Fifteen of the seventeen had no river near them within reach of its warning mark. Two did, both at
+Batu Tiga on 31/07, and those are the two this app should be shouting about.
+
+**The rule comes from JPS, not from us.** A siren sounds for one minute at the Amaran mark and
+repeats every 3 hours while the water stays there, and at Bahaya it sounds on a higher note and
+repeats every 5. So the alarm is a claim about a river level — and the river levels are already in
+the payload. `sirenBacked()` in `api.php` asks them: `backed` is true when a river within `SIREN_KM`
+(5 km) stands at Amaran or above, false when there are rivers in reach and none is, and **null when
+there is no river within 5 km to ask**. `sounding()` in `util.js` reads `backed !== false`, so the
+null case keeps the benefit of the doubt. Silencing a real evacuation alarm is far worse than
+carrying a doubtful one, and 194 of 212 sirens have a river inside 5 km — 133 inside 2 km — so the
+unanswerable case is 18 stations, not a hole in the middle of the feature.
+
+**Duration was tried first, and it is wrong in the direction that matters.** The first cut called a
+siren stuck once it had read 1 for more than 6 hours, which the archive supports: real events ran 0
+to 4 hours and faults ran 29 hours to 5 days. Then JPS's repeat cadence arrived. At Bahaya the alarm
+repeats every 5 hours *for as long as the water is up*, so a genuine flood holds a siren on all day,
+and any cutoff short enough to catch the stuck ones would have thrown away the real one. A rule that
+fails safe on ordinary data and dangerously on the worst day of the year is not a rule. The water is
+what the siren is claiming, so the water is what gets asked.
+
+**Both reds read it** — `isCritical()` for the alert path and `atDanger()` for the map. This is the
+one narrowing that deliberately moves every alert surface at once: the panel, the icon badge, the
+ticker, the toast and the pin colour all stop firing on a stuck relay together. Leaving the map red
+would have put a red pin beside a panel refusing to list it, and a reader would be right to trust
+neither.
+
+**What it fixed.** The app bar's warning glyph has three rungs — grey, amber for a forecast, red for
+something observed — and the amber one was unreachable. Any one of 212 sirens latched anywhere in
+Selangor made every day red, so the colour carried no information and the panel's own forecast tier
+had no colour of its own on the button. On the payload this was written against, the count went from
+1 to 0 and the glyph from permanently red to correct.
+
+**The card still reports what the station reports.** A doubted siren shows `TRIGGERED` in the off
+tone, its 12-hour band, and one line: *Faulty signal. No river nearby is high.*
+
+That line is written for someone standing near the siren, not for someone reading the rule. It said
+"no river within 5 km is at its warning mark, which is what makes a siren sound — read as a stuck
+relay and left out of the alert list", which is three clauses of plumbing that never answer the only
+question being asked, which is whether there is a flood. `5 km`, `warning mark`, `stuck relay` and
+the alert list are our vocabulary for our own bookkeeping. What a reader needs is the verdict first
+and one fact behind it. The verdict is still ours and still checkable — the rivers are on the same
+map, one tap away.
+
+**No hedge.** The line said *probably* a faulty signal for one draft. The writing standard bans the
+word, and this screen is a second reason to. The judgement has already been acted on — the station is
+out of the alert list, off the icon badge and off the ticker — so a hedge on the one screen that
+explains that decision hides it rather than qualifies it. State it, and leave it open to check.
+
+**The rest of the interface was swept the same way.** The siren line was not the only string written
+from inside the system. Three rules came out of it, and they are now in `CLAUDE.md`.
+
+*Sentence case.* Every rendered string opens with a capital. The small `.muted` helper lines were all
+lowercase fragments. `no level reading`, `no camera feed`, `accurate to about 40 m` and `nearest
+reporting station per sensor` read as labels rather than as anything addressed to a person.
+
+*None of our vocabulary.* The splash said `contacting the proxy…`, which names a piece of our
+architecture to someone watching a loading screen, and `a cold start rebuilds the whole station
+list`, which is our word for our own cache being empty. They now say `Contacting the server…` and
+`Still waiting on JPS. The first load reads every station, water level, rain gauge and camera. This
+can take up to 20 seconds.` Three graphs said they build `as we poll`, which describes our timer.
+They say `Graph builds as readings arrive`, which describes what the reader will see.
+
+*Consistent voice in a list.* The toast's reasons were lowercase fragments, such as `at danger` and
+`stopped reporting`. They are sentence case now, beside the station name they belong to.
+
+**Not swept: the ALL-CAPS state blocks.** `TRIGGERED`, `HEAVY RAIN`, `DRY GROUND`, `HAPPENING NOW`
+and the rest are a visual language — one word, centred, colour-coded, doing the job a badge does.
+They are not sentences and sentence case would make them look like unfinished ones. The glossary
+terms in the About dialog stay lowercase for the same reason: they are dictionary headwords.
+
+**The camera archive is asked the same question, per frame.** `?shots=` scores each stored frame
+against what the sensors near that camera were doing when the shutter went, and a siren counted as
+sounding there on the same trust the live path had just dropped. Measured before the fix: 10 of 19
+frames on the Pekan Banting camera and 4 of 19 on Kg. Melayu Subang were red from the two stuck
+relays, on photographs of calm water. The scrubber is where a reader goes to check what the map
+claimed, so a stuck relay surviving there undoes the fix in the one place it is checked.
+
+`$sirenFrames` in `api.php` reruns `frameTiers` over each river within `SIREN_KM` of the siren
+against that river's **warning** mark — the same function that scores everything else, so the answer
+is "which frames was this river at Amaran for", with no second scorer to drift. The siren's frames
+are intersected with that set. The live rule cannot stand in here: a picture from last week has to be
+judged by last week's water, which is the same reason `camWarn()` tests `'level' in a` rather than
+falling back to the live figure.
+
+Two things carry over from the live rule. No river in reach leaves the frames alone, so an
+unanswerable siren keeps the benefit of the doubt. And it runs only for a siren that scored a frame
+at all, so the 189 camera-siren pairs within `CAM_ALERT_KM` cost nothing until one of them reads 1.
+
+Across the whole archive — 91 cameras, 1702 frames — this leaves 10 coloured frames: two rivers, and
+`siren-1083` and `siren-1020`, which are the 31/07 Batu Tiga pair whose rivers really were at Amaran.
+The rule dropped both stuck relays and kept both real alarms.
+
+**Deliberately not done: flood gauges as backing evidence.** Standing water near a siren is a
+different network and a weaker claim than the level JPS wires the siren to, and the archive says it
+would add nothing. Of the 17 sirens that have ever read 1, six have no gauge within 5 km, and every
+one of the rest has **no gauge samples at all** across its alarm window — offline gauges are not
+sampled, and there are 36 gauges against 109 rivers. The one exception peaked at 0.08 m, under the
+0.15 m warning mark, beside a siren the rivers had already backed. No rejected alarm would have been
+rescued.
+
+**Also not done: a per-siren river mapping.** JPS does not publish which gauge drives which siren,
+and a hand-kept list is a list to maintain forever, wrong the day a station moves.
+
 ## Gauge state block, and the siren band
 
 Two gaps in the popup, both about a station carrying a status nobody printed.
@@ -2483,6 +2601,30 @@ number or none of them is trusted. The base string is read once at module load, 
 already-prefixed title would stack a count per poll. Forecast alerts are included with no mark of
 their own: the panel and the badge already count them together, and a tab strip has room for a digit
 and not for a distinction.
+
+**The favicon turns red at the top rung, and only there.** `favicon()` in `alerts.js` takes one
+boolean — is the app bar's warning glyph red — and swaps the tab mark for a red copy of the same
+glyph, back to the blue one when the red clears. It is the fourth mirror of the same state, after the
+button, the app icon's badge and the title.
+
+It carries the state and not the count, because the title in front of it already carries the count
+and 16 pixels of one shape cannot say two things. It is red or plain for the same reason: the middle
+rungs are the ones that size cannot tell apart, and an amber mark a reader has to squint at is a
+worse signal than a blue one they read as "nothing new".
+
+The red mark is **painted at run time**, not shipped. `icon.svg` is the one drawing every other mark
+is baked from, so a hand-kept red PNG is a file that goes stale the next time the glyph moves.
+`favicon()` draws that SVG into a 64px canvas, fills it through `source-in` — the same alpha trick
+`css/icons.css` plays with a mask — and hands the canvas to the `<link rel=icon>` as a data URL.
+`toDataURL()` gives a PNG, so the tag's `type="image/png"` stays true and no browser has to support
+an SVG favicon. The fill comes from `--s-danger` rather than a hex, so it is the palette's red and
+not a copy of it. Read at paint time: a theme flip while the mark is red keeps the previous theme's
+red until the state flips again, and both are red.
+
+It repaints only when the state changes, because `alerts()` runs on every poll. Two guards behind
+that: the flag is re-checked after `decode()` resolves, so a state that cleared mid-decode does not
+get a red mark painted on top of it, and a `catch` leaves the blue mark standing if the drawing
+fails.
 
 Deliberately *not* done: no install-prompt UI (`beforeinstallprompt` banner) — the browser's own
 button is where people look for it, and a second one is a thing to dismiss; no offline copy of the

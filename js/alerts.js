@@ -115,6 +115,38 @@ function groupCard(items, kind, t, hereAt) {
   </div>`;
 }
 
+/* The tab mark, at the top rung only. A favicon is 16 pixels of one shape, so it can carry a state
+   or a count but never both, and the count is already on the title in front of it. Red or the plain
+   blue mark — nothing in between, because the middle rungs are exactly the ones 16 pixels cannot
+   tell apart.
+   Painted rather than shipped as a second PNG: `icon.svg` is the one drawing every other mark is
+   baked from (see icon-build.php), and a hand-kept red copy is a file that goes stale the next time
+   the glyph moves. `source-in` fills the alpha the glyph left behind — the same trick css/icons.css
+   plays with a mask, and the reason the colour can come from `--s-danger` rather than a hex.
+   Only repaints when the state flips: this runs on every poll. */
+const FAV = document.querySelector('link[rel=icon]');
+const FAV_SRC = FAV.getAttribute('href');   // the blue mark, to go back to
+let favRed = false;
+const favicon = red => {
+  if (red === favRed) return;
+  favRed = red;
+  if (!red) return void (FAV.href = FAV_SRC);
+  const im = new Image();
+  im.src = 'icon.svg';
+  im.decode().then(() => {
+    const cv = document.createElement('canvas');
+    cv.width = cv.height = 64;
+    const x = cv.getContext('2d');
+    x.drawImage(im, 0, 0, 64, 64);
+    x.globalCompositeOperation = 'source-in';
+    // The token, not a hex — the palette lives in base.css and has moved four times. It is read at
+    // paint time, so a theme flip while red keeps the old red until the next flip. Both are red.
+    x.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--s-danger').trim();
+    x.fillRect(0, 0, 64, 64);
+    if (favRed) FAV.href = cv.toDataURL();   // the state may have cleared while the SVG decoded
+  }).catch(() => {});                        // no drawing, no repaint — the blue mark stands
+};
+
 export function alerts() {
   const hidden = new Set(PREFS.hidden || []);
   const hot = state.data.filter(s => !hidden.has(dkey(s)) && !isIgnored(s) && isHot(s));
@@ -167,6 +199,9 @@ export function alerts() {
      maintenance problem, not a flood, and must not paint the glyph red. */
   const c = !live.length ? NO_INFO
     : STATUS_COLOR[live.some(s => tier(s) === 'now') ? 3 : 1];
+
+  // The tab follows the button at the top rung, so a background tab says the same thing the bar does.
+  favicon(c === STATUS_COLOR[3]);
 
   /* The bar's own signal. The badge counts `live` — the same number as the app icon's, for the same
      reason: it is a demand for attention, and stations we can no longer read are not one. The

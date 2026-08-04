@@ -93,7 +93,7 @@ export const dots = s => `<button class="icon dots" popovertarget="mnu-${s.id}"
                  : 'lists it first in the search box and the alert panel'}</small></span>
     </button>
     <button class="mi" data-ignore="${s.id}"><i class="i i-visibility_off"></i>
-      <span>Ignore this sensor<br><small class="muted">hides it and stops it alerting you</small></span>
+      <span>Ignore this sensor<br><small class="muted">Hides it and stops it alerting you</small></span>
     </button>
   </div>`;
 
@@ -202,7 +202,7 @@ export const levelLink = (from, s) => s
 export function meter(s) {
   const max = s.danger || s.warning || s.alert;
   const stops = levelStops(s);   // shared with the heat weight — see util.js
-  if (s.level == null || !stops) return '<div class="muted">no level reading</div>';
+  if (s.level == null || !stops) return '<div class="muted">No level reading</div>';
 
   const col = statusColor(s.status);
   const marks = stops.slice(1, -1).map(([v, p], i) =>
@@ -304,9 +304,26 @@ function sensorBody(s, withCam = true) {
   // "No signal" is only half the story — a siren that fell off the network last March must not read
   // as one that is quietly working — but the *when* is sourceInfo()'s job now, inside the sensor's
   // own info menu, rather than a sentence here and the same moment again three lines down.
+  /* A doubted one says both things. `TRIGGERED` stays, because that is what the station reports and
+     this card is where you come to read what it reports — but the alert panel has dropped it, and a
+     card that showed the same word as a real alarm would leave that looking like a fault in the
+     panel. `off` tone, because the word is now a description of a stuck relay rather than a warning
+     about water.
+     The line under it is written for someone standing near this siren, not for someone reading the
+     rule: the verdict first, then the one fact behind it. It said "no river within 5 km is at its
+     warning mark, which is what makes a siren sound — read as a stuck relay and left out of the
+     alert list", which is three clauses of plumbing and never answers "so is there a flood or not".
+     `5 km`, `warning mark`, `stuck relay` and the alert list are all our vocabulary, and a reader
+     who wants to check us has the rivers on the same map, one tap away.
+     No hedge, by the writing standard and because a hedge would be dishonest twice over: we have
+     already acted on this judgement — the station is out of the alert list, off the badge and off
+     the ticker — so softening the words on the one screen that explains it would hide a decision
+     rather than qualify it. Say it plainly and let it be checked. */
+  const stuck = s.kind === 'siren' && s.backed === false;
   const siren = s.kind !== 'siren' ? '' : !hasInfo(s)
     ? '<div class="state">OUT OF CONTACT</div>'
-    : `<div class="state ${s.status > 0 ? 'on' : 'off'}">${s.status > 0 ? 'TRIGGERED' : 'IDLE'}</div>
+    : `<div class="state ${s.status > 0 && !stuck ? 'on' : 'off'}">${s.status > 0 ? 'TRIGGERED' : 'IDLE'}</div>
+       ${stuck ? '<div class="muted">Faulty signal. No river nearby is high.</div>' : ''}
        ${sirenBand(s.history)}`;
   const gauge = s.kind !== 'gauge' ? '' : gaugeBlock(s);
 
@@ -315,7 +332,7 @@ function sensorBody(s, withCam = true) {
   // Either way the view of the water leads, above the numbers: "can I see it?" is the first
   // question a level on a river prompts, not the last.
   const still = s.kind !== 'camera' ? ''
-    : s.image ? camImg(s, `Latest still from ${s.name}`) : '<div class="muted">no camera feed</div>';
+    : s.image ? camImg(s, `Latest still from ${s.name}`) : '<div class="muted">No camera feed</div>';
   const link = s.kind !== 'camera' && withCam ? camLink(s, nearestCam(s)) : '';
   // Under the picture, not over it: on a camera card the frame is the reading and this is the aside.
   // `withCam` is false for a member of a mast, which is exactly the case that must not draw it.
@@ -461,7 +478,7 @@ export function sitePopup(members) {
    two ways to build one card. Built fresh on every open, so it reflects the latest poll rather than
    the fix's own timestamp. */
 export function herePopup(e, loaded) {
-  if (!loaded) return '<b>You are here</b><br><span class="muted">stations still loading…</span>';
+  if (!loaded) return '<b>You are here</b><br><span class="muted">Stations still loading…</span>';
   const at = e.latlng;
   const rows = ['river', 'rainfall', 'siren', 'gauge'].map(k => {
     const kind = KINDS[k];
@@ -475,7 +492,7 @@ export function herePopup(e, loaded) {
     // here — either the nearest one inside the cap has something to say or nothing does.
     if (!s) return `<div class="sensor">
       <div class="sensorhead">${title}</div>
-      <div class="muted">no ${kind.label.toLowerCase()} within ${NEAR_MAX_KM} km</div>
+      <div class="muted">No ${kind.label.toLowerCase()} within ${NEAR_MAX_KM} km</div>
     </div>`;
     return `<div class="sensor" data-sensor="${s.id}">
       <div class="sensorhead">${title}
@@ -490,7 +507,7 @@ export function herePopup(e, loaded) {
 
   return `<div class="pophead">
       <span class="badge" style="--c:var(--me)"><i class="i i-home_pin"></i>You are here</span>
-      <div class="muted">accurate to about ${Math.round(e.accuracy)} m</div>
+      <div class="muted">Accurate to about ${Math.round(e.accuracy)} m</div>
     </div>${camNear(at, nearestCam(at))}${rows}`;
 }
 
@@ -625,12 +642,13 @@ const spanText = secs => secs < 3600
 const MARK_RUNG = { alert: 1, warning: 2, danger: 3 };
 
 export function sparkline(points, kind = 'river', st = null) {
-  if (!points || points.length < 2) return '<div class="muted">trend graph builds as we poll</div>';
+  // "As we poll" told the reader about our timer. What they need is that the graph fills itself in.
+  if (!points || points.length < 2) return '<div class="muted">Graph builds as readings arrive</div>';
 
   // The axis spans the readings we actually hold, up to a 12-hour cap — so two hours of history
   // draws as two labelled hours rather than a sliver at the edge of a mostly empty 12-hour frame.
   const { secs, inWin, x, ticks } = timeAxis(points);
-  if (inWin.length < 2) return `<div class="muted">no readings in the last ${SPARK_H} hours</div>`;
+  if (inWin.length < 2) return `<div class="muted">No readings in the last ${SPARK_H} hours</div>`;
 
   const vals = inWin.map(([, v]) => v);
   const lo0 = Math.min(...vals), hi0 = Math.max(...vals);
@@ -699,10 +717,10 @@ export function sparkline(points, kind = 'river', st = null) {
    silent. Quiet is drawn in the outline colour, not green — the state block above already carries
    the green, and a 12-hour reassurance is more than a log of samples is entitled to give. */
 export function sirenBand(points) {
-  if (!points || !points.length) return '<div class="muted">siren log builds as we poll</div>';
+  if (!points || !points.length) return '<div class="muted">Log builds as readings arrive</div>';
 
   const { t1, secs, inWin, x, ticks } = timeAxis(points);
-  if (!inWin.length) return `<div class="muted">no readings in the last ${SPARK_H} hours</div>`;
+  if (!inWin.length) return `<div class="muted">No readings in the last ${SPARK_H} hours</div>`;
 
   const on = statusColor(3);
   const bars = inWin.map(([t, v], i) => {
@@ -748,14 +766,14 @@ export function sirenBand(points) {
    One bar per clock hour, because `hourly` is a rolling one-hour total — the server buckets to
    RAIN_BUCKET for the same reason, so two samples 15 minutes apart can't show the same rain twice. */
 export function rainBars(points) {
-  if (!points || !points.length) return '<div class="muted">rain graph builds as we poll</div>';
+  if (!points || !points.length) return '<div class="muted">Graph builds as readings arrive</div>';
 
   const { secs, inWin, x, ticks } = timeAxis(points);
-  if (!inWin.length) return `<div class="muted">no readings in the last ${SPARK_H} hours</div>`;
+  if (!inWin.length) return `<div class="muted">No readings in the last ${SPARK_H} hours</div>`;
 
   const hi0 = Math.max(...inWin.map(([, v]) => v));
   // All zeroes is a real answer, and a row of flat bars states it worse than a sentence does.
-  if (!hi0) return `<div class="muted">no rain in the last ${spanText(secs)}</div>`;
+  if (!hi0) return `<div class="muted">No rain in the last ${spanText(secs)}</div>`;
 
   /* JPS's intensity classes, drawn across the plot — moderate at 10 mm/h, heavy at 30, the top class
      at 60. `RAIN_STOPS` holds the same boundaries for the heat gradient, so the graph and the map
@@ -797,6 +815,6 @@ export function rainBars(points) {
       }).join('')}
     </svg>
     ${axisHtml(ticks)}
-    <div class="muted">peak ${hi} mm in an hour · last ${spanText(secs)}</div>
+    <div class="muted">Peak ${hi} mm in an hour · last ${spanText(secs)}</div>
   </div>`;
 }

@@ -40,11 +40,11 @@ const rows = list => list.slice(0, LIST).map(s => {
   const t = tier(s);
   // `null` only reaches here from the all-clear list: off the alert set entirely. A cleared station
   // that is still climbing keeps its forecast line, because that is still true of it.
-  const why = t === null   ? 'back below its danger mark'
-    : t === 'stale'        ? 'stopped reporting'
-    : s.kind === 'siren'   ? 'siren sounding'
-    : s.status >= 3        ? 'at danger'
-    : `reaches danger ${s.eta != null && s.eta < 1 ? 'within the hour' : `in ~${s.eta} h`}`;
+  const why = t === null   ? 'Back below its danger mark'
+    : t === 'stale'        ? 'Stopped reporting'
+    : s.kind === 'siren'   ? 'Siren sounding'
+    : s.status >= 3        ? 'At danger'
+    : `Reaches danger ${s.eta != null && s.eta < 1 ? 'within the hour' : `in ~${s.eta} h`}`;
   return `<button class="trow" data-go="${s.id}">
     <i class="i i-${KINDS[s.kind].icon}" style="--c:${KINDS[s.kind].color}"></i>
     <span class="tname">${s.name}</span>
@@ -60,7 +60,7 @@ function show(kind, head, list) {
       <b>${head}</b>
       <button class="tclose icon" aria-label="Dismiss"><i class="i i-close"></i></button>
     </div>${rows(list)}${
-    list.length > LIST ? `<div class="tmore muted">and ${list.length - LIST} more — see the alert panel</div>` : ''}`;
+    list.length > LIST ? `<div class="tmore muted">${list.length - LIST} more — see the alert panel</div>` : ''}`;
 
   box.classList.add('open');
   lastShown = Date.now();

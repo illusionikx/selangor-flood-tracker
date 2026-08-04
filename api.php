@@ -41,6 +41,15 @@ const RISE_ETA   = 3;     // hours to its own danger mark
 const RISE_DAY = 86400;
 // Sirens report a daily heartbeat (most stamp 08:00). Two missed days is out of contact, not idle.
 const SIREN_STALE = 48 * 3600;
+/* How far from a siren a river may be and still be the water that siren is wired to.
+   JPS publishes what makes a siren sound: one minute at the Amaran mark, repeating every 3 hours
+   while the water stays there, and one minute on a higher note at Bahaya, repeating every 5 hours.
+   So the alarm is a function of a river level we already hold, and a 1 with no river up behind it is
+   a relay stuck on rather than a flood — which is the only reading of it that survives the archive.
+   Measured on the live set: 194 of 212 sirens have a river inside 5 km, 133 inside 2 km, and 9 have
+   none inside 10 km. 5 km is where the curve flattens. It is deliberately generous — asking too wide
+   can only let a doubtful alarm stand, and asking too narrow would silence a real one. */
+const SIREN_KM = 5.0;
 const SITE_M = 50;   // metres — stations this close are sensors on one mast, not separate places
 /* How close a sensor must be to a camera before its alert is allowed onto that camera's frames.
    js/config.js carries the same 2 for the live warning glyph. Change both together. */
@@ -121,6 +130,33 @@ function assess(array $pts, int $i, ?float $mark): array {
     foreach ($pts as $p) if ($p[0] < $at && $at - $p[0] <= RISE_DAY) $day[] = $p[1];
     if ($day && $lvl < max($day)) return [$rate, null];   // still inside its own daily envelope
     return [$rate, round(max(0, ($mark - $lvl) / $rate), 2)];
+}
+
+/**
+ * Is a siren's alarm backed by the water it is wired to?
+ *
+ * True when a river within SIREN_KM stands at its Amaran mark or above, false when there are rivers
+ * in reach and none of them is, and null when there is no river in reach to ask. The three answers
+ * are different things and the caller must not collapse them: false is evidence against the alarm,
+ * null is no evidence either way, and a siren nobody can check keeps the benefit of the doubt.
+ *
+ * Duration was tried first and is wrong in the direction that matters. JPS repeats the alarm every
+ * 3 hours at Amaran and every 5 at Bahaya for as long as the water stays up, so a genuine flood
+ * holds a siren on for half a day, and any cutoff short enough to catch the stuck ones would have
+ * dismissed the real one. The water is what the siren is claiming. Ask the water.
+ *
+ * $rivers is [[lat, lng, status], …]. Status 2 is Amaran and 3 is Bahaya — see wlStatus().
+ */
+function sirenBacked(float $lat, float $lng, array $rivers): ?bool {
+    $asked = false;
+    foreach ($rivers as [$rlat, $rlng, $status]) {
+        // Equirectangular, like every other distance in this file: at this latitude and over 5 km
+        // the error against a great circle is centimetres, and the answer is a yes or no at 5 km.
+        if (hypot($rlat - $lat, ($rlng - $lng) * cos(deg2rad($lat))) * 111 > SIREN_KM) continue;
+        $asked = true;
+        if ($status >= 2) return true;
+    }
+    return $asked ? false : null;
 }
 
 // ?cam=<id> streams a CCTV still. Upstream advertises these over plain http, which an https page
@@ -323,6 +359,35 @@ if (isset($_GET['shots'])) {
             // Start a day before the first frame. assess() looks back RISE_DAY for the tide guard, so
             // a frame near the window's start needs that much history too, or the guard runs short.
             $sel = $db->prepare('SELECT ts, level FROM level WHERE station = ? AND ts >= ? ORDER BY ts');
+
+            /* The same question sirenBacked() asks live, asked of each frame's own moment: was a
+               river within SIREN_KM at its Amaran mark when the shutter went? Without it a relay
+               stuck on paints a month of calm photographs red — measured, before this existed, at 10
+               of 19 frames on the Pekan Banting camera and 4 of 19 on Kg. Melayu Subang, both from
+               sirens whose rivers were metres below their marks the whole time.
+               `frameTiers` against the river's *warning* mark rather than its danger mark is the
+               whole scorer: it returns `now` for exactly the frames that river was at Amaran or
+               above for. The live rule reads today's river; this one cannot, because a picture from
+               last week must be judged by last week's water.
+               Same benefit of the doubt as live: no river in reach to ask leaves the tiers alone.
+               Only ever called for a siren that scored something, so the 189 camera-siren pairs in
+               range cost nothing until one of them actually reads 1. */
+            $sirenFrames = function (array $siren, array $tiers) use ($st, $km, $sel, $frames): array {
+                $asked = false;
+                $backedAt = [];
+                foreach ($st as $r) {
+                    if ($r['kind'] !== 'river' || empty($r['warning']) || !$r['lat']) continue;
+                    if ($km($siren, $r) > SIREN_KM) continue;
+                    $asked = true;
+                    $sel->execute([$r['id'], $frames[0] - RISE_DAY]);
+                    $s = array_map(fn($x) => [(int)$x['ts'], (float)$x['level']], $sel->fetchAll(PDO::FETCH_ASSOC));
+                    foreach (frameTiers($frames, $s, (float)$r['warning'], 0, fn() => [null, null]) as $ts => $t) {
+                        $backedAt[$ts] = true;
+                    }
+                }
+                return $asked ? array_intersect_key($tiers, $backedAt) : $tiers;
+            };
+
             $best = [];   // frameTs => [rank, tier, stationId, distKm] — see the tie-break note below
             foreach ($st as $r) {
                 /* Each kind against its own mark. A river and a gauge publish one; a siren is 0 or 1
@@ -346,6 +411,8 @@ if (isset($_GET['shots'])) {
                 $tiers = $r['kind'] === 'river'
                     ? frameTiers($frames, $samples, $mark, RISE_ETA, 'assess')
                     : frameTiers($frames, $samples, $mark, 0, fn() => [null, null]);
+                // A siren's 1 is a claim about a river, here as much as live. Ask the water.
+                if ($r['kind'] === 'siren' && $tiers) $tiers = $sirenFrames($r, $tiers);
                 foreach ($tiers as $ts => $t) {
                     $rank = $t === 'now' ? 0 : 1;
                     /* Worse tier wins first. Nearer river breaks a tie. camAlert() in js/stations.js
@@ -525,6 +592,33 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
         forceAllowed($now, $now - 1, PLACE_EVERY)[0] === true);
     $ok('a second lookup in one second is refused',
         forceAllowed($now, $now, PLACE_EVERY)[0] === false);
+
+    /* sirenBacked() decides whether a siren that says it is sounding is believed, and a wrong answer
+       is silent in both directions: too strict and a real evacuation alarm never reaches the panel,
+       too loose and the app bar sits red for days on a stuck relay. The coordinates below are the
+       real ones — SIREN PEKAN BANTING and its only river 4.26 km off, and KG. MELAYU SUBANG with its
+       own gauge on the same spot, which is the 127-hour alarm this rule was written for. */
+    echo "\nsirenBacked():\n";
+    [$slat, $slng] = [2.811543, 101.508659];        // SIREN PEKAN BANTING
+    $near = [1.68, 2.7];                            // KG. SG. MANGGIS: level, Amaran mark
+    $ok('no rivers in reach is unknown, not refused',
+        sirenBacked($slat, $slng, []) === null);
+    $ok('a river 4.3 km off below Amaran refuses',
+        sirenBacked($slat, $slng, [[2.849, 101.531, 0]]) === false);
+    $ok('the same river at Amaran backs it',
+        sirenBacked($slat, $slng, [[2.849, 101.531, 2]]) === true);
+    $ok('Bahaya backs it too',
+        sirenBacked($slat, $slng, [[2.849, 101.531, 3]]) === true);
+    // Status 1 is Siaga, one mark below the level JPS says makes a siren sound.
+    $ok('Siaga alone does not back it',
+        sirenBacked($slat, $slng, [[2.849, 101.531, 1]]) === false);
+    $ok('one river up among quiet ones backs it',
+        sirenBacked($slat, $slng, [[2.849, 101.531, 0], [2.80, 101.50, 3]]) === true);
+    // A flooding river on the other side of the state says nothing about this siren.
+    $ok('a river past SIREN_KM is not asked',
+        sirenBacked($slat, $slng, [[3.20, 101.70, 3]]) === null);
+    $ok('a far flood cannot back a near refusal',
+        sirenBacked($slat, $slng, [[2.849, 101.531, 0], [3.20, 101.70, 3]]) === false);
 
     echo $fail ? "\n$fail FAILED\n" : "\nall ok\n";
     exit($fail ? 1 : 0);
@@ -997,6 +1091,14 @@ unset($s);
 // until now the only evidence for it was a heartbeat timestamp. Out-of-contact sirens are skipped
 // for the same reason offline gauges are — a flat IDLE band from a sensor nobody can hear is a lie.
 // ponytail: full-resolution samples like every other kind; bucket to the hour if the table bloats.
+//
+// Every placed river, as [lat, lng, status], for sirenBacked() below. Built once: 212 sirens against
+// 109 rivers is 23k distance tests, which is nothing, but rebuilding the list inside the loop is a
+// list built 212 times.
+$riverMarks = [];
+foreach ($stations as $r) {
+    if ($r['kind'] === 'river' && $r['lat'] && $r['lng']) $riverMarks[] = [$r['lat'], $r['lng'], (int)$r['status']];
+}
 foreach ($stations as &$s) {
     if ($s['kind'] !== 'siren' || !$s['online']) continue;
     $key = $s['id'];
@@ -1004,6 +1106,11 @@ foreach ($stations as &$s) {
     $hist[$key] = array_merge($hist[$key] ?? [], [[$ts, (float)$s['status']]]);
     $s['history'] = sparkPoints($hist[$key], $now, SPARK_BUCKET, true);
     $samples[$key] = [$ts, (float)$s['status']];
+    /* Does the water agree that this siren is sounding? Decided here, against river statuses that
+       are final by this point — the national override has already run — so "still sounding" has one
+       definition and it is this file's. The client reads the flag, exactly as it reads `rising`.
+       Only asked of a siren that claims to be sounding: a quiet one has nothing to check. */
+    $s['backed'] = $s['status'] > 0 ? sirenBacked($s['lat'], $s['lng'], $riverMarks) : null;
 }
 unset($s);
 

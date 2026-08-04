@@ -139,9 +139,23 @@ export function color(s) {
    answer this used to compute, from the token that already knows it. And the palette is `var()`
    references now, so there is no hex here to measure. */
 
+/* Is this siren actually sounding? A siren has no scale: it reads 0 or 1, and until now 1 was taken
+   at face value. It cannot be. Our own archive holds one that read 1 for 127 hours straight while
+   the river on the same spot sat 2 metres below its Amaran mark, and 15 of the 17 alarms on record
+   have no river anywhere near them up at all. Believing them put the app bar's glyph red every day
+   of the week, which is the cry-wolf failure the alert design standard names outright.
+   JPS publishes the rule: a siren sounds for a minute at Amaran and repeats every 3 hours while the
+   water stays there, and at Bahaya every 5. So the alarm is a claim about a river level we already
+   hold, and `backed` in api.php is that river answering — one definition, server-side, like
+   `rising`. The client reads the flag and never re-derives it.
+   `!== false`, not truthiness: `null` is "no river within 5 km to ask", and a siren nobody can check
+   keeps the benefit of the doubt. Silencing a real evacuation alarm is the worse of the two errors.
+   Both reds read this, the alert path's and the map's: a pin painted red off a siren the alert panel
+   refuses to list is the map contradicting the panel, and one of them is wrong on screen. */
+export const sounding = s => s.kind === 'siren' && s.status > 0 && s.backed !== false;
+
 // Is this station the reason someone opens the map at all: a river at danger, or a siren sounding.
-export const isCritical = s =>
-  (s.kind === 'river' && s.status >= 3) || (s.kind === 'siren' && s.status > 0);
+export const isCritical = s => (s.kind === 'river' && s.status >= 3) || sounding(s);
 
 /* Has this sensor reached the top of its own scale — whatever its own scale is? A river over its
    danger mark, a siren sounding, a flood gauge past 0.3 m of standing water, rainfall in JPS's top
@@ -153,7 +167,7 @@ export const isCritical = s =>
    docs/FEATURES.md — this is a colour on a map, which is a different claim. */
 export const atDanger = s => hasInfo(s) && ({
   river:    s.status >= 3,
-  siren:    s.status > 0,
+  siren:    sounding(s),
   gauge:    gaugeTone(s) === 3,
   rainfall: s.status >= 4,
 }[s.kind] ?? false);
