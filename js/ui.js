@@ -474,12 +474,31 @@ document.addEventListener('click', e => {
      `showPopover()` called from script does not move focus by itself — only a popover opened by its
      own declarative invoker does that (and then only onto an `autofocus` descendant, which this menu
      has none of) — so the button just pressed is refocused by hand too, queried out of the reopened
-     `menu` rather than the detached one this handler started with. */
+     `menu` rather than the detached one this handler started with.
+     Two paths past setFavs(), not one. render() rebuilds #sideBody wholesale for an ordinary station
+     card, which destroys the open popover and mints a fresh, closed one with the same id — that is
+     the reopen branch below. But render() deliberately skips every `@`-keyed card (`@here`, `@place`;
+     see openSide() in map.js), so on those two the menu this click is inside is never destroyed: it
+     is still open, `:popover-open` is still true, and nothing above has touched its label or its
+     star's colour. Left alone, a reader who stars a sensor from "You are here" or a searched place
+     sees no confirmation at all — the menu item still reads "Favorite this sensor" in grey after the
+     press. So the still-open case gets its own branch: patch the icon and the label in place, since
+     no rebuild is coming to do it for us. */
   const menuId = b.closest('[popover]')?.id;
   setFavs(ids);
   if (!menuId) return;
   const menu = document.getElementById(menuId);
-  if (menu && !menu.matches(':popover-open')) {
+  if (!menu) return;
+  if (menu.matches(':popover-open')) {
+    const item = menu.querySelector('[data-fav]');
+    const on = item && ids.has(item.dataset.fav);
+    const star = item?.querySelector('.i-star');
+    if (star) star.style.color = on ? 'var(--accent)' : 'var(--muted)';
+    const label = item?.querySelector('span');
+    if (label) label.innerHTML = `${on ? 'Remove from favorites' : 'Favorite this sensor'}<br>` +
+      `<small class="muted">${on ? 'stops listing it first'
+        : 'lists it first in the search box and the alert panel'}</small>`;
+  } else {
     menu.showPopover();
     menu.querySelector('[data-fav]')?.focus();
   }
@@ -685,6 +704,19 @@ async function lookup(q) {
     places = [];
     pstate = 'Place search is unavailable';
   }
+  /* search() unshifts one row per place onto the very front of `hits` — "Results lead the list" in
+     the comment above that call — which moves every row already in the list back by places.length,
+     `sel` included. Left alone, `sel` still names the old numeric position, so after the shift it
+     names whatever row now happens to sit there: an ordinary district row several rows past where
+     the reader actually was, highlighted for no reason of their doing. The chevron handler
+     (gotoHits.onmousedown) hits the same problem in the opposite direction — rowsFor() splices new
+     rows in below the toggled one — and fixes it the same way: recompute the index the row of
+     interest will occupy, rather than trust a number that predates the splice. Here the shift is
+     uniform and known in advance, so a plain offset does the job. Guarded on `places.length` because
+     an empty or failed answer pushes its message row onto the *foot* of the list instead (no shift
+     at all — see rowHtml()'s note on that case), and guarded on `sel >= 0` because nothing is
+     selected. */
+  if (sel >= 0 && places.length) sel += places.length;
   search();
 }
 
@@ -777,8 +809,15 @@ function rowHtml(r, i) {
       ><i class="glyph i i-search" style="color:var(--accent)"></i
       ><span class="nm">Search the map for “${escHtml(gotoIn.value.trim())}”</span></li>`;
 
-  // Not an option and not selectable: there is nothing to pick, only something to read.
-  if (r.t === 'msg') return `<li class="none">${r.text}</li>`;
+  /* Not an option and not selectable — pick() returns immediately on r.t === 'msg' — but it can
+     still be the row `sel` is sitting on: the arrow keys walk every index in `hits` including this
+     one, and Enter on the trigger row calls lookup(), which rebuilds `hits` with a "Searching…" row
+     at the very index the trigger row just occupied, without sel ever moving off it. Dropping the
+     `.sel` class here (the original bug) made the highlight vanish in both cases with no row on
+     screen marked current. Showing it instead — without `role="option"`/`aria-selected`, since this
+     is still not a real option — costs one class and keeps "where the keyboard is" visible even on a
+     row that answers nothing back to Enter. */
+  if (r.t === 'msg') return `<li class="none${i === sel ? ' sel' : ''}">${r.text}</li>`;
 
   if (r.t === 'place') return `<li role="option" data-i="${i}"${cls}
       ><i class="glyph i i-place" style="color:var(--accent)"></i
