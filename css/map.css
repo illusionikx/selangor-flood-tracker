@@ -41,7 +41,7 @@
 
 /* Standard card: header (name / region / badge) → body metrics → still → footer. */
 .pophead {
-  position: relative;   /* the sensor-count chip hangs off the top-right corner */
+  position: relative;   /* the mast's favorite star hangs off the top-right corner */
   padding: 0 0 8px; margin-bottom: 8px; border-bottom: 1px solid var(--outline);
 }
 /* The name and the region line clear the panel's close button, which floats over this corner — but
@@ -147,7 +147,7 @@
    whichever theme is live, which is a border made of light rather than a circle made of paint. */
 .pin .fv {
   position: absolute; bottom: -2px; right: -2px; font-size: 15px; line-height: 1;
-  color: var(--accent);
+  color: var(--fav);
   filter: drop-shadow(0 0 1.5px var(--surface)) drop-shadow(0 0 1.5px var(--surface));
 }
 /* Forecast to reach danger. A ring rather than a fill, because it is a claim about the next few

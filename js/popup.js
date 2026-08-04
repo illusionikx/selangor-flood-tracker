@@ -405,7 +405,7 @@ export function sitePopup(members) {
   return `<div class="pophead">
       <button class="favbtn${favAll ? ' on' : ''}" data-fav="${favIdList}"
               aria-pressed="${favAll}" title="${favSays}" aria-label="${favSays}"
-        ><i class="i i-star"></i></button>
+        ><i class="i i-star${favAll ? '' : '_outline'}"></i></button>
       <div class="popname">${lead.name}</div>
       ${region(lead)}
       <div class="badges">${members.map(m => {

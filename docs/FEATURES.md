@@ -4825,3 +4825,28 @@ mast to favorites`, or `Remove this mast from favorites`. The `aria-label` carri
 
 **Trade-off accepted.** A card no longer states its sensor count in words anywhere. The badge row is
 the answer, and it was already the better one.
+
+### The star reads as a star
+
+The favorite star reported its state with color alone. It went muted to `--accent`. It now changes shape as
+well. Unset draws the outline glyph. Set draws the filled one, in gold.
+
+**The outline is the one `fill=0` icon in `css/icons.css`.** Every glyph in that file uses `fill=1`. The
+rule behind that is simple. A filled icon and an outlined one, side by side, read as two icon sets. This pair earns the
+exception, because the pair *is* the message. One control never shows both at once. An empty star
+against a filled one is the oldest idiom there is for this. Both come from Material
+Symbols, the same source as the rest of the file, with `/default/` in place of `/fill1/`.
+
+**Gold is the third mark in the amber band.** `--s-alert` holds amber for the alert rung. `--me` holds hazard yellow for "you are here". `--fav` is the third, and
+the band has little room left. Shape separates them. The `--me` note above already makes that
+argument. No station glyph is a star, so the hue never has to carry "this is not a reading". The light value stops just over the 3:1 non-text floor. Yellow runs out of contrast on white
+before it runs out of lightness. `--me` hit that wall first.
+
+**Where this is worth watching.** The alert panel draws a gold star on rows whose tier tag is
+amber. The map draws one near amber alert pins. Color is not the message on either surface. The tier
+tag names the tier in words, and the star is a shape no sensor wears. Even so, this is the tightest
+place the palette has ever had to hold three meanings in one band.
+
+**The search box lost its sensor count too.** A mast row showed a `layers` glyph and a count. The
+count goes for the same reason the card's did. The mast glyph already says this is a stack. The
+chevron says it opens, and opening it lists the sensors — the number named, rather than stated.

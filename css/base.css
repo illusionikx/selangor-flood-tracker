@@ -89,6 +89,15 @@
      it is already sitting on the floor, and yellow has nowhere to go — every step lighter drops it
      under 3. */
   --me: #b87b00;
+  /* A favorite. Gold, because a star that is not gold is not read as a star — the shape and the
+     colour are one idiom here, which is why this is allowed a hue rather than taking --accent.
+     It is the third mark in the amber band, after --s-alert and --me, and it is separated the only
+     way that band allows: less red than the alert amber, lighter than the hazard yellow of "you".
+     What actually keeps the three apart is shape, exactly as the --me note above argues — no
+     station glyph is a star, so the hue never has to carry "this is not a reading".
+     Light theme cannot go brighter. Yellow runs out of contrast on white before it runs out of
+     lightness, the same wall --me hit, so this sits just over the 3:1 non-text floor and stops. */
+  --fav: #c99700;
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
@@ -110,6 +119,10 @@
      hue, which is a claim. */
   --s-none: #9aa0a6;
   --me: #ffbb1a;
+  /* Paler and greener than both --s-alert (#ffc000) and --me (#ffbb1a), which is the whole of the
+     room this band has on this theme. On the map the star also carries a --surface halo, so it is
+     never read against the basemap alone. */
+  --fav: #ffd24a;
 }
 
 * { box-sizing: border-box; }
@@ -266,13 +279,6 @@ dialog:focus, dialog:focus-visible { outline: none; }
    its own rather than sitting as a bare text node beside the glyph. */
 .picklist .nm { flex: 1; min-width: 0; line-height: 1.35; overflow: hidden; }
 .picklist .nm small { font-size: 11px; }
-/* How many sensors this one row stands for. Same `layers` glyph as the mast pin and the site card's
-   own count chip, so the row, the pin and the card header all say it the same way. */
-.picklist .sn {
-  margin-left: auto; display: flex; align-items: center; gap: 3px;
-  font: 500 11px Roboto, sans-serif; color: var(--muted); font-variant-numeric: tabular-nums;
-}
-.picklist .sn .i { font-size: 13px; }
 /* The chevron that opens a mast. `tabindex="-1"` in the markup keeps it out of the tab order: the
    list is driven by the arrow keys from the field, and a tab stop per mast would be 417 of them. */
 .picklist .xp {
@@ -290,10 +296,10 @@ dialog:focus, dialog:focus-visible { outline: none; }
 /* A sensor inside an open mast. Indented to the depth of the row's own glyph, so the two read as a
    tree rather than as two lists. */
 .picklist li.sub { padding-left: 30px; }
-/* The star on a row. Accent, because a favorite is neither a status nor a sensor kind. It sits
-   before the sensor count so the two never trade places as a mast gains or loses sensors. */
-.picklist .fvm { flex: none; margin-left: auto; font-size: 15px; color: var(--accent); }
-.picklist .fvm + .sn { margin-left: 6px; }
+/* The star on a row. A favorite is neither a status nor a sensor kind, so it takes neither color
+   language. `.nm` is `flex: 1` and absorbs the slack, so everything after it already sits right —
+   the `margin-left: auto` is belt and braces for a row that ever loses its name column. */
+.picklist .fvm { flex: none; margin-left: auto; font-size: 15px; color: var(--fav); }
 /* Accent, same rule as the picklist star above — a favorite is neither a status nor a sensor kind.
    The star also carries the plain `.i` icon class, and chrome.css colors every `.slist .i` by tier
    (`.alert.t-now .slist .i` etc, four classes, specificity 0,4,0) so it can paint the *kind* glyph
@@ -301,7 +307,7 @@ dialog:focus, dialog:focus-visible { outline: none; }
    chrome.css loads after base.css — and a status hue on a favorite mark breaks the one rule this
    app never bends: red/amber/orange/grey mean status and nothing else. So this selector is five
    classes deep on purpose, one more than the rule it has to beat, rather than four and lucky. */
-.alert.grouped .slist .i.fvm { flex: none; font-size: 14px; color: var(--accent); }
+.alert.grouped .slist .i.fvm { flex: none; font-size: 14px; color: var(--fav); }
 
 /* One spacing for every drawer section, so the four read as one stack — they were two rules and a
    flex gap, which made the seam between the two columns twice the others. */
@@ -397,7 +403,7 @@ dialog:focus, dialog:focus-visible { outline: none; }
   border: 0; background: none; cursor: pointer; color: var(--muted);
 }
 .favbtn:hover { color: var(--on-surface); }
-.favbtn.on { color: var(--accent); }
+.favbtn.on { color: var(--fav); }
 /* 20px, not the 17 it wore inside a ring. A bare glyph has no border drawing its edge, so it has to
    be the thing that fills the box. */
 .favbtn .i { font-size: 20px; }

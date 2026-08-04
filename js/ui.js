@@ -849,8 +849,10 @@ function rowHtml(r, i) {
       ><span class="nm">${lead.name}${
         r.sub ? `<br><small class="muted">${r.sub}</small>` : ''}</span>${
       r.ms.some(isFav) ? '<i class="i i-star fvm" role="img" aria-label="Favorite"></i>' : ''}${
-      n > 1 ? `<b class="sn"><i class="i i-layers"></i>${n}</b>
-        <button class="xp${open ? ' on' : ''}" data-x="${r.xkey}" tabindex="-1"
+      /* No sensor count on the row. The mast glyph on the left already says this is a stack, the
+         chevron on the right says it opens, and opening it lists the sensors themselves — which is
+         the number, named. The station card dropped its own count for the same reason. */
+      n > 1 ? `<button class="xp${open ? ' on' : ''}" data-x="${r.xkey}" tabindex="-1"
                 aria-label="${open ? 'Hide' : 'Show'} the sensors at ${lead.name}"
           ><i class="i i-expand_more"></i></button>` : ''}</li>`;
 }
