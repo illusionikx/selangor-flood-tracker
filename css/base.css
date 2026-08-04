@@ -286,6 +286,10 @@ dialog:focus, dialog:focus-visible { outline: none; }
 /* A sensor inside an open mast. Indented to the depth of the row's own glyph, so the two read as a
    tree rather than as two lists. */
 .picklist li.sub { padding-left: 30px; }
+/* The star on a row. Accent, because a favorite is neither a status nor a sensor kind. It sits
+   before the sensor count so the two never trade places as a mast gains or loses sensors. */
+.picklist .fvm { flex: none; margin-left: auto; font-size: 15px; color: var(--accent); }
+.picklist .fvm + .sn { margin-left: 6px; }
 
 /* One spacing for every drawer section, so the four read as one stack — they were two rules and a
    flex gap, which made the seam between the two columns twice the others. */

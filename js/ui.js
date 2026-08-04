@@ -617,18 +617,28 @@ const where = s => [s.district, s.state].filter(Boolean).join(', ') || 'district
 const group = s => `${s.state || '—'} · ${s.district || 'district n/a'}`;
 
 /* Which mast rows are open. Cleared whenever the query changes: a tree left half-open under a list
-   that has been replaced is furniture with nothing under it. A favorites row and a district row for
-   one mast share a key, so opening either opens both — which is right, because they are one place
-   listed twice. */
+   that has been replaced is furniture with nothing under it.
+   Keyed by group *and* site — not by site alone. A favorites row and a district row for one mast are
+   still two rows: they occupy two different places in the list, and a reader who opens the one they
+   can see has no way to know a second copy, somewhere else in the box, just opened with it. A shared
+   key did exactly that: toggling the district copy spliced sensor rows into the favorites copy sitting
+   above it too, growing a list the reader was not looking at and shifting every row below the one they
+   actually clicked — which is the bug the chevron's index-stability fix (see rowHtml below) exists to
+   avoid. Composing `g` and `key` into one string gives the favorites occurrence and the district
+   occurrence independent state, so opening one never silently opens the other. */
 const expanded = new Set();
 
 /* A site row, and its sensors under it when the row is open. One function, so the favorites group
    and the district groups cannot grow two different ideas of what an expanded mast looks like.
    A sensor row carries `lead`, the mast's own name, because a sensor named the same as its mast has
-   nothing to add by repeating it. */
+   nothing to add by repeating it.
+   `xkey` — the composite `expanded` is keyed by — is computed once here and carried on the row object,
+   so `rowHtml()` and the keyboard/mouse handlers all read the same string rather than three places
+   rebuilding `${g}|${key}` and risking one of them drifting out of step with the others. */
 function rowsFor(key, ms, g, sub) {
-  const out = [{ t: 'site', key, ms, g, sub }];
-  if (ms.length > 1 && expanded.has(key))
+  const xkey = `${g}|${key}`;
+  const out = [{ t: 'site', key, xkey, ms, g, sub }];
+  if (ms.length > 1 && expanded.has(xkey))
     for (const s of ms) out.push({ t: 'sensor', s, key, g, lead: ms[0].name });
   return out;
 }
@@ -645,8 +655,24 @@ function search() {
       group(a[0]).localeCompare(group(b[0])) || a[0].name.localeCompare(b[0].name))
     .flatMap(([key, ms]) => rowsFor(key, ms, group(ms[0]), ''));
 
-  if (state.hereAt && (!terms.length || matches(squash('nearest station to me'), terms)))
-    hits.unshift({ t: 'near', g: 'Your location' });
+  /* Favorites lead an untouched box only. Once the reader types, the district headings are the
+     answer, and a favorite that matches the query is already listed under its own district —
+     printing it twice would put one place in two places in one list.
+     A site is here when **any** sensor on it is starred, the same rule the pin badge and the map
+     filter use, so all three surfaces answer one question — deliberately not the mast star's own
+     rule of *every* sensor starred, which answers "is this whole mast one favorite", not "does this
+     list belong here". */
+  if (!terms.length) {
+    const fav = [...sites.entries()].filter(([, ms]) => ms.some(isFav));
+    hits.unshift(...fav.flatMap(([key, ms]) => rowsFor(key, ms, 'FAVORITES', where(ms[0]))));
+  }
+
+  // Below the favorites, not above: `unshift` would put "Nearest station to me" ahead of them, and a
+  // permanent group belongs above a positional one.
+  if (state.hereAt && (!terms.length || matches(squash('nearest station to me'), terms))) {
+    const at = hits.findIndex(r => r.g !== 'FAVORITES');
+    hits.splice(at < 0 ? hits.length : at, 0, { t: 'near', g: 'Your location' });
+  }
   draw(true);
 }
 
@@ -679,19 +705,20 @@ function rowHtml(r, i) {
       ><i class="glyph i i-${k.icon}" style="color:${k.color}"></i
       ><span class="nm">${k.one || k.label}${
         r.s.name !== r.lead ? `<br><small class="muted">${r.s.name}</small>` : ''
-      }</span></li>`;
+      }</span>${isFav(r.s) ? '<i class="i i-star fvm" role="img" aria-label="Favorite"></i>' : ''}</li>`;
   }
 
   const lead = r.ms[0], n = r.ms.length;
   const icon = n > 1 ? MAST.icon : KINDS[lead.kind].icon;
   const tint = n > 1 ? MAST.color : KINDS[lead.kind].color;
-  const open = expanded.has(r.key);
+  const open = expanded.has(r.xkey);
   return `<li role="option" data-i="${i}"${cls}
       ><i class="glyph i i-${icon}" style="color:${tint}"></i
       ><span class="nm">${lead.name}${
         r.sub ? `<br><small class="muted">${r.sub}</small>` : ''}</span>${
+      r.ms.some(isFav) ? '<i class="i i-star fvm" role="img" aria-label="Favorite"></i>' : ''}${
       n > 1 ? `<b class="sn"><i class="i i-layers"></i>${n}</b>
-        <button class="xp${open ? ' on' : ''}" data-x="${r.key}" tabindex="-1"
+        <button class="xp${open ? ' on' : ''}" data-x="${r.xkey}" tabindex="-1"
                 aria-label="${open ? 'Hide' : 'Show'} the sensors at ${lead.name}"
           ><i class="i i-expand_more"></i></button>` : ''}</li>`;
 }
@@ -733,7 +760,9 @@ gotoIn.onkeydown = e => {
   else if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
     const r = hits[sel];
     if (!r || r.t !== 'site' || r.ms.length < 2) return;
-    e.key === 'ArrowRight' ? expanded.add(r.key) : expanded.delete(r.key);
+    // `r.xkey`, not `r.key` — the row on screen is one occurrence of the mast, and only that
+    // occurrence's chevron may open. See the comment on `expanded` above.
+    e.key === 'ArrowRight' ? expanded.add(r.xkey) : expanded.delete(r.xkey);
     e.preventDefault();
     return search();
   }
