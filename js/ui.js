@@ -448,7 +448,31 @@ document.addEventListener('click', e => {
   const ids = favIds();
   const full = list.every(id => ids.has(id));
   for (const id of list) full ? ids.delete(id) : ids.add(id);
+  /* The sensor's star lives inside its own ⓘ menu — a `popover` — and `setFavs()` calls `render()`,
+     which rebuilds the open card by replacing #sideBody wholesale (see openSide() in map.js). That
+     destroys the open popover along with everything else on the card and mints a fresh, closed one
+     with the same id. Left alone, the reader never sees the label flip to "Remove from favorites" —
+     the confirmation the copy promises, and the reason this is a menu item rather than a bare icon —
+     and focus falls back to <body> because the element it was on no longer exists.
+     So the menu's id is captured before the rebuild, since the node itself will not survive it, and
+     reopened by id afterward. The mast star has no popover ancestor: `closest('[popover]')` is null
+     there, `menuId` stays undefined, and everything past the early return is skipped — the mast case
+     was already fine, because that button lives directly on the card and needs no menu to reopen.
+     Two guards past that. The element `menuId` names may not exist — render() only rebuilds a card
+     that is actually open, and a poll landing in between could have moved the reader elsewhere — so
+     this reads it back with getElementById() and does nothing on a miss rather than assume it is
+     still there. And `showPopover()` throws on an already-open popover, so `:popover-open` is checked
+     first; nothing here expects that to be true, since a fresh element parses as closed, but it costs
+     one comparison to not have to find out by triggering an exception.
+     The card itself is deliberately left alone by this whole handler — starring changes nothing on
+     screen, so there is nothing to close. That is the opposite of the ignore handler just above,
+     which deliberately calls closeSide(): ignoring removes the very sensor the card is describing, so
+     the card is closed because what it was showing is gone. */
+  const menuId = b.closest('[popover]')?.id;
   setFavs(ids);
+  if (!menuId) return;
+  const menu = document.getElementById(menuId);
+  if (menu && !menu.matches(':popover-open')) menu.showPopover();
 });
 
 el('ignoredList').onclick = e => {
