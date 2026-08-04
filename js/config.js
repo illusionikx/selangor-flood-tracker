@@ -86,7 +86,8 @@ export const NO_INFO = 'var(--s-none)';   // grey: offline or reporting nothing
 // — the heat ramp was the last thing that did, and it is keyed on thresholds now.
 
 // A mast carrying several sensors: no single kind's colour or glyph can speak for a mixed stack, so
-// it gets its own indigo and a "layers" glyph, and keeps the sensor count badge. Indigo because it
+// it gets its own indigo and a "layers" glyph. It carried a sensor count too, on a filled disc; both
+// are gone, and the glyph is what says "a stack stands here" now. Indigo because it
 // has to miss every other meaning on the map — the five type hues, the traffic-light statuses, and
 // the offline grey. Only worn while the mast is quiet; anything signalling keeps its status colour.
 export const MAST = { color: 'var(--k-mast)', icon: 'layers' };

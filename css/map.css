@@ -103,52 +103,40 @@
   color: var(--c, var(--accent)); font-size: 36px;
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .35));
 }
-/* A fifth off the single-sensor pins, and a third off the mast. At 400 pins on a phone the map was
-   more glyph than basemap, and a mark you cannot see the river under is not helping. The mast comes
-   down further because it is the only pin that is a filled disc: it covers what it stands on, where
-   a bare glyph lets the map through, so the same apparent weight costs it more ground.
-   `transform` rather than a smaller font: it takes the halo, the rise ring, the count badge and the
-   drop shadow down with it in one step, and it leaves the 39px layout box alone — that box is
-   repeated as `iconSize` in render.js and is what actually positions the marker over its station.
-   The two selectors never match the same element, so their equal specificity costs nothing. */
-.pin:not(.multi, .me, .place) { transform: scale(.8); }
-.pin.multi { transform: scale(.7); }
+/* A fifth off every station pin, mast included. At 400 pins on a phone the map was more glyph than
+   basemap, and a mark you cannot see the river under is not helping. The mast used to come down
+   further, because it was the only pin that was a filled disc and a disc covers what it stands on.
+   It is a bare glyph now, so it pays the same as the rest.
+   `transform` rather than a smaller font: it takes the halo, the rise ring and the drop shadow down
+   with it in one step, and it leaves the 39px layout box alone — that box is repeated as `iconSize`
+   in render.js and is what actually positions the marker over its station. */
+.pin:not(.me, .place) { transform: scale(.8); }
 /* Colour is already the offline grey here — fading the glyph as well would just hide it again. */
 .pin.off { opacity: .6; }
-/* The one pin that keeps a disc. It stands for a *stack* rather than naming a sensor, so there is no
-   glyph shape to protect, and it carries a count that needs a field to sit on. The ink is
-   `var(--surface)` — white on the light theme, near-black on the dark one, which is what the old
-   luminance-picking `ink()` in util.js computed by hand for every fill it was ever handed. */
-.pin.multi {
-  border-radius: 50%; font-size: 22px;
-  background: var(--c, var(--accent)); color: var(--surface);
-  border: 3px solid var(--surface); box-shadow: var(--shadow); filter: none;
-}
+/* A mast has no rule of its own any more. It was a filled disc carrying a sensor count, on the
+   argument that it stands for a stack rather than naming a sensor, so it had no glyph shape to
+   protect. The `layers` glyph is a shape, it protects itself, and a disc at every mast put a plate
+   over the very ground the map is for. It is the same bare glyph as every other pin now, in the
+   mast indigo, and the count is gone with the plate that carried it — see render.js. */
 /* The grouping radius drawn under a mast on hover — coloured here rather than through Leaflet's
    `color`/`fillColor` options, which become SVG presentation attributes that cannot take a var().
    Any CSS rule outranks one, so this is both how the token reaches it and what keeps it in step. */
 .mastring { stroke: var(--k-mast); fill: var(--k-mast); }
-/* How many sensors this one pin stands for. Only rendered past one, so a plain pin stays plain. */
-.pin .n {
-  position: absolute; top: -4px; right: -4px; min-width: 21px; height: 21px; padding: 0 5px;
-  display: grid; place-items: center; border-radius: 999px;
-  font: 500 13px/1 Roboto, sans-serif; letter-spacing: 0; text-transform: none;
-  color: var(--surface); background: var(--on-surface); box-shadow: 0 0 0 2px var(--surface);
-}
-.pin.multi.danger .n { color: var(--s-danger); background: var(--surface); box-shadow: none; }
-/* A favorited place. Bottom right, opposite the sensor count at the top right, so a favorited
-   six-sensor mast shows both marks. Solid always — the badge is only drawn when the place is a
-   favorite, so there is no hollow state to show.
-   The glyph alone, with no disc behind it — the same rule the pins themselves follow, since a plate
-   covers ground the map needs and says nothing the shape does not.
-   The halo is what pays for dropping the disc. `.pin` carries a drop-shadow that its children
-   inherit, but `.pin.multi` sets `filter: none`, so on a mast this heart lands on a filled indigo or
-   red circle with nothing separating it. It also earns its keep beside a siren pin, which is pink. Two stacked surface-coloured shadows draw a thin edge in
-   whichever theme is live, which is a border made of light rather than a circle made of paint. */
+/* A favorited place, bottom right of the pin. Solid always — the badge is only drawn when the place
+   is a favorite, so there is no hollow state to show here.
+   The outline is what makes 15px of pink survive. It sits over a basemap, over another pin's glyph,
+   and beside a siren pin that is pink itself, and a blurred halo was not enough at this size.
+   Four hard 1px shadows, one per direction, draw a real stroke rather than a glow: a blurred
+   `drop-shadow` spreads its opacity out and leaves the edge soft exactly where the shape is thin,
+   which on a heart is the two upper curves. Offsets and no blur keep it crisp. `--surface`, so the
+   stroke flips with the theme, then one soft dark shadow underneath for lift off pale tiles. */
 .pin .fv {
   position: absolute; bottom: -2px; right: -2px; font-size: 15px; line-height: 1;
   color: var(--fav);
-  filter: drop-shadow(0 0 1.5px var(--surface)) drop-shadow(0 0 1.5px var(--surface));
+  filter:
+    drop-shadow(1px 0 0 var(--surface)) drop-shadow(-1px 0 0 var(--surface))
+    drop-shadow(0 1px 0 var(--surface)) drop-shadow(0 -1px 0 var(--surface))
+    drop-shadow(0 1px 1px rgba(0, 0, 0, .45));
 }
 /* Forecast to reach danger. A ring rather than a fill, because it is a claim about the next few
    hours and not a reading — on the bare pin it is drawn like the halo below, since there is no
@@ -157,8 +145,6 @@
   content: ''; position: absolute; inset: -5px; border-radius: 50%;
   border: 3px solid var(--s-danger);
 }
-.pin.multi.rise { box-shadow: 0 0 0 3px var(--s-danger), var(--shadow); }
-.pin.multi.rise::before { content: none; }
 /* Danger level or a sounding siren: on top, in the danger red, with a repeating halo. The halo is
    what a filled disc used to do — it makes the pin bigger than a glyph without hiding which glyph
    it is. */
@@ -166,13 +152,11 @@
   content: ''; position: absolute; inset: -6px; border-radius: 50%;
   border: 3px solid var(--s-danger); animation: halo 1.8s ease-out infinite;
 }
-.pin.multi.danger { background: var(--s-danger); color: var(--surface); }
 @media (prefers-reduced-motion: reduce) { .pin.danger::after { animation: none; opacity: .8; } }
 
-/* You are not a station. Every other pin is a filled disc because that is what says "a sensor is
-   here"; wearing the same chip put the reader into the dataset as a 672nd reading. The glyph alone,
-   in the location blue, is a different kind of thing on the map — and the accuracy circle under it
-   is already the mark that has a shape.
+/* You are not a station. This mark is bigger than a station pin and it does not shrink with them,
+   because the reader is not a 672nd reading in the set. Its colour and its shape both say so — and
+   the accuracy circle under it is already a mark no station has.
    `home_pin` — a pin with a house in it, so the *shape* says "a marker, and it is yours" before the
    colour says anything. It is anchored at its tip, not its centre; see locate.js.
    One shadow, and it is a shadow: a white halo was tried as the contrast the chip used to provide

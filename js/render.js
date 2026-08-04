@@ -128,10 +128,10 @@ export function render() {
     // outranks it, and a mast with no reading must stay grey rather than look confident.
     const multi = members.length > 1;
     const quiet = multi && hasInfo(lead) && members.every(m => !(m.status > 0));
-    /* A star on the pin when **any** sensor here is starred — not when all of them are, which is the
-       mast header button's rule. The two answer different questions. The button is a control and
+    /* A heart on the pin when **any** sensor here is a favorite — not when all of them are, which is
+       the mast header button's rule. The two answer different questions. The button is a control and
        acts on every sensor at the mast, so it has to state exactly what one press will undo. This is
-       an indication, and it says "something you starred is here". A mast where the reader starred
+       an indication, and it says "something of yours is here". A mast where the reader favorited
        only the river must still be findable at a glance. */
     const fav = members.some(isFav);
     /* Danger outranks everything, and it is stated here rather than left to `leads()` picking the
@@ -146,13 +146,13 @@ export function render() {
       icon: L.divIcon({
         // Matches `.pin`'s box in map.css — Leaflet positions the marker off this, not off the CSS.
         className: '', iconSize: [39, 39], iconAnchor: [19.5, 19.5],
-        // `.multi` is the one pin that keeps a filled disc: it is standing for a stack rather than
-        // naming a sensor, and it carries a count that needs a field to sit on. Everything else is
-        // the glyph alone — see .pin in map.css.
+        /* Every pin is the glyph alone. A mast was a filled disc carrying a sensor count, and it
+           is the same bare glyph as the rest now — the `layers` mark is what says "a stack stands
+           here", and the count went with the plate it sat on. `.multi` still rides on the span,
+           because the hover ring and the panel key both ask whether this pin is a mast. */
         html: `<span class="pin${multi ? ' multi' : ''}${lead.online ? '' : ' off'}${
                      rising ? ' rise' : ''}${critical ? ' danger' : ''}" style="--c:${c}"><i class="i i-${
                multi ? MAST.icon : KINDS[lead.kind].icon}"></i>${
-               multi ? `<b class="n">${members.length}</b>` : ''}${
                fav ? '<b class="fv"><i class="i i-favorite"></i></b>' : ''}</span>`,
       }),
     });

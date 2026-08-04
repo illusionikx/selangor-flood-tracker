@@ -4861,3 +4861,27 @@ down a mast and on the "near this point" cards need it. Neither has a corner of 
 **The search box lost its sensor count too.** A mast row showed a `layers` glyph and a count. The
 count goes for the same reason the card's did. The mast glyph already says this is a stack. The
 chevron says it opens. Opening it lists the sensors, which is the number named rather than stated.
+
+### The mast pin drops its disc and its count
+
+A mast pin was a filled disc in the mast indigo, carrying a white `layers` glyph and a sensor count
+in a corner badge. Everything else on the map is a bare glyph. The mast is one too now, and the
+count is gone with the plate that carried it.
+
+The old argument ran that a mast stands for a stack rather than naming a sensor. It had no glyph
+shape to protect, so it could carry a plate. That reads backwards. The `layers` mark **is** a shape,
+it protects itself, and a disc at every mast put a plate over the ground the map exists to show. The
+count went for the same reason it went from the station card and the search box: opening the place
+lists the sensors, which is the number named rather than stated.
+
+Two rules folded away with it. A mast scaled to `.7` where every other pin scaled to `.8`, purely
+because a disc covers more than a glyph. It pays the same as the rest now. And a rising or
+critical mast drew its ring as a `box-shadow` on the disc, with the shared `::before` halo switched
+off. Both now use the same halo every other pin uses.
+
+**The favorite heart needed a real outline.** A blurred `--surface` halo was not enough at 15px. A
+blurred shadow spreads its opacity out and goes softest exactly where the shape is thinnest, which
+on a heart is the two upper curves. Four hard 1px shadows, one per direction, draw a stroke instead
+of a glow, and one soft dark shadow under them lifts it off pale tiles. The mark sits over a basemap, over another
+pin's glyph, and sometimes beside a siren pin that is pink itself. The stroke is what keeps it
+readable in all three places.
