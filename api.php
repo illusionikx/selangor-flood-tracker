@@ -63,6 +63,20 @@ const RETAIN = 30 * 86400;   // seconds kept on disk; older samples are pruned
 const FORCE_EVERY = 60;
 const FORCE_STAMP = __DIR__ . '/.force.stamp';
 
+/* Place search. One uncached lookup per second, site-wide — Nominatim's usage policy asks for no
+   more, and this proxy is a public URL that anyone can call. A cached hit skips the limit, because
+   it costs OpenStreetMap nothing. */
+const PLACE_EVERY = 1;
+const PLACE_STAMP = __DIR__ . '/.place.stamp';
+const PLACE_TTL   = 30 * 86400;   // place names do not move
+const NOMINATIM   = 'https://nominatim.openstreetmap.org/search';
+/* The coverage box: Selangor, Kuala Lumpur and Putrajaya. The 673 stations in the payload span
+   latitude 2.6088 to 3.8470 and longitude 100.8229 to 101.9215, and this adds about 0.1 degrees of
+   margin on each side so a place at the edge still resolves. Nominatim reads `viewbox` as
+   west,north,east,south. Published in the payload as `box`, so the client can word its own
+   out-of-area message from these numbers rather than from a second copy in a JS file. */
+const BOX = [100.72, 3.95, 102.02, 2.50];
+
 
 date_default_timezone_set('Asia/Kuala_Lumpur'); // upstream timestamps are local MYT, unlabelled
 
@@ -266,6 +280,23 @@ function serveFromCache(int $age, bool $mine, bool $force): bool {
     return ($age < TTL && !$force) || !$mine;
 }
 
+/**
+ * Normalize and validate a place query. Returns the normalized string, or null when it is unusable.
+ *
+ * Separate from the endpoint so the self-check can exercise it without a network call, exactly as
+ * forceAllowed() and serveFromCache() are. The query never builds a path or a URL — it becomes one
+ * query-string parameter to one fixed host — so the `?cam=` rule holds by construction here too.
+ *
+ * Not the client's squash(): that one strips punctuation to match station names, and `kg.` and `kg`
+ * are different queries to a geocoder.
+ */
+function placeQuery(string $raw): ?string {
+    $q = trim(preg_replace('/\s+/u', ' ', $raw));
+    $n = mb_strlen($q);
+    if ($n < 2 || $n > 80) return null;
+    return mb_strtolower($q);
+}
+
 /* `php api.php --selftest` — the guard above, checked offline. It lives here rather than in a
    second test file because the rule is arithmetic on two integers, and a separate test would need
    a third file to hold the function so both could import it. CLI only, and it exits before the
@@ -299,6 +330,24 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
     $ok('a cache at exactly TTL rebuilds',         serveFromCache(TTL, true, false) === false);
     $ok('a stale cache that lost the lock waits',  serveFromCache(TTL + 1, false, false) === true);
     $ok('a forced loser never rebuilds',           serveFromCache(TTL + 1, false, true) === true);
+
+    echo "\nplaceQuery():\n";
+    $ok('a plain query normalizes',    placeQuery('Bandar Utama') === 'bandar utama');
+    $ok('runs of space collapse',      placeQuery("  kg.   sg   lui \n") === 'kg. sg lui');
+    $ok('one character is refused',    placeQuery('a') === null);
+    $ok('two characters are allowed',  placeQuery('pj') === 'pj');
+    $ok('whitespace only is refused',  placeQuery("   \t ") === null);
+    $ok('80 characters are allowed',   placeQuery(str_repeat('a', 80)) === str_repeat('a', 80));
+    $ok('81 characters are refused',   placeQuery(str_repeat('a', 81)) === null);
+
+    /* The place lookup reuses forceAllowed(): it is the same arithmetic on the same two integers,
+       with its own stamp file and its own window. A second copy would be a second thing to get
+       wrong. */
+    echo "\nplace rate limit:\n";
+    $ok('a lookup one second later is allowed',
+        forceAllowed($now, $now - 1, PLACE_EVERY)[0] === true);
+    $ok('a second lookup in one second is refused',
+        forceAllowed($now, $now, PLACE_EVERY)[0] === false);
 
     echo $fail ? "\n$fail FAILED\n" : "\nall ok\n";
     exit($fail ? 1 : 0);
