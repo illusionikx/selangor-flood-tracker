@@ -4,7 +4,7 @@
 import { KINDS, SOURCES, SPARK_H, NO_INFO, ALERT_TITLE, RIVER_COLOR, RAIN_COLOR,
          GAUGE_COLOR, RAIN_STOPS, camSrc } from './config.js';
 import { num, ago, noSec, parseMY, distKm, hasInfo, isStale, statusColor, scalePos,
-         levelStops, gaugeStops, gaugeColor, color } from './util.js';
+         levelStops, gaugeStops, gaugeColor, color, isFav } from './util.js';
 import { nearestOf, nearestCam, nearestLevel, camAlert } from './stations.js';
 
 /* The warning that rides a camera picture, in the lightbox and nowhere else. Empty string when
@@ -85,6 +85,12 @@ export const dots = s => `<button class="icon dots" popovertarget="mnu-${s.id}"
     title="Details" aria-label="Details and actions for ${s.name}"><i class="i i-info"></i></button>
   <div id="mnu-${s.id}" class="menu surface" popover>
     ${sourceInfo(s)}
+    <button class="mi" data-fav="${s.id}"
+      ><i class="i i-star" style="color:${isFav(s) ? 'var(--accent)' : 'var(--muted)'}"></i>
+      <span>${isFav(s) ? 'Remove from favorites' : 'Favorite this sensor'}<br><small class="muted">${
+        isFav(s) ? 'stops listing it first'
+                 : 'lists it first in the search box and the alert panel'}</small></span>
+    </button>
     <button class="mi" data-ignore="${s.id}"><i class="i i-visibility_off"></i>
       <span>Ignore this sensor<br><small class="muted">hides it and stops it alerting you</small></span>
     </button>
@@ -381,6 +387,11 @@ export function sitePopup(members) {
   if (members.length === 1) return popup(members[0]);
   const lead = members[0];
   const hasCam = members.some(m => m.kind === 'camera');
+  /* Filled only when every sensor here is starred, because this button acts on all of them and has
+     to state exactly what one press will undo. The pin on the map uses the opposite rule — any
+     sensor starred draws a star — because that badge is an indication and not a control. */
+  const favAll = members.every(isFav);
+  const favIdList = members.map(m => m.id).join(',');
 
   /* The count sits beside the close button as a chip, not as a "6 sensors at this location" line —
      that spent a whole row of a popup that is mostly rows, restating what the badges under it
@@ -394,7 +405,11 @@ export function sitePopup(members) {
         ><i class="i i-layers"></i>${members.length}</span>
       <div class="popname">${lead.name}</div>
       ${region(lead)}
-      <div class="badges">${members.map(m => {
+      <div class="badges"><button class="favbtn${favAll ? ' on' : ''}" data-fav="${favIdList}"
+          aria-pressed="${favAll}"
+          title="${favAll ? 'Remove every sensor here from favorites'
+                          : 'Favorite every sensor at this mast'}"
+        ><i class="i i-star"></i></button>${members.map(m => {
         const k = KINDS[m.kind];
         return `<span class="badge" style="--c:${hasInfo(m) ? k.color : 'var(--muted)'}"
                 ><i class="i i-${k.icon}"></i>${k.one || k.label}</span>`;

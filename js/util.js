@@ -21,6 +21,20 @@ export const el  = id => document.getElementById(id);
 export const ignoredIds = () => new Set(PREFS.ignored || []);
 export const isIgnored = s => (PREFS.ignored || []).includes(s.id);
 
+/* Sensors the reader has starred, by station id. The mirror of `ignoredIds()` above, stored the same
+   way and for the same reason: an id that drops out of the payload for one poll must not be
+   forgotten, because the feeds add and drop stations all the time.
+ *
+ * A sensor is never in both lists. `setFavs()` and `setIgnored()` in ui.js each drop the id from the
+ * other, because "show me this first" and "never show me this" is not a state a person meant to be
+ * in — and if the code picked a winner at read time, one of the two controls would silently do
+ * nothing.
+ *
+ * Favorites are **not** an alarm control. They order lists and they filter the map. They suppress
+ * nothing. `PREFS.ignored` stays the one suppression control in this app. */
+export const favIds = () => new Set(PREFS.favs || []);
+export const isFav = s => (PREFS.favs || []).includes(s.id);
+
 // Filter key for a district. State-qualified because the names collide: Kuala Lumpur has a Gombak
 // constituency and Selangor has a Gombak district, and hiding one must not hide the other.
 export const dkey = s => `${s.state || '—'}|${s.district || 'Unknown'}`;

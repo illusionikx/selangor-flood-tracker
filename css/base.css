@@ -365,6 +365,18 @@ dialog:focus, dialog:focus-visible { outline: none; }
    exists, so it must not be something you have to hover a row to discover. */
 #ignoredList .solo { visibility: visible; }
 
+/* The mast's star. It rides in the badge row rather than beside the close button, because the three
+   numbers that put the place name on that line move together and a second chip up there would be a
+   fourth. Accent, not a status hue and not a sensor kind — a favorite is neither. */
+.favbtn {
+  flex: none; display: grid; place-items: center; width: 28px; height: 28px; padding: 0;
+  border: 1px solid var(--outline); border-radius: 999px; cursor: pointer;
+  background: none; color: var(--muted);
+}
+.favbtn:hover { background: var(--hover); color: var(--on-surface); }
+.favbtn.on { color: var(--accent); border-color: var(--accent); }
+.favbtn .i { font-size: 17px; }
+
 /* The one divider in the drawer, between the heatmap pair and the rising filter sharing their
    section. A rule rather than a second `.sect`: they belong to the same fold, and a heading for one
    chip is a heading with nothing to hold. */

@@ -2,7 +2,7 @@
 
 import { KINDS, MAST, camSrc, FEED, STATIC } from './config.js';
 import { state, PREFS, PREFS_KEY, save } from './state.js';
-import { el, distKm, dkey, ignoredIds, leads } from './util.js';
+import { el, distKm, dkey, ignoredIds, leads, favIds, isFav } from './util.js';
 import { map, setTheme, flashTo, closeSide } from './map.js';
 import { heatOpacity, syncHeat } from './heat.js';
 import { byId } from './stations.js';
@@ -115,7 +115,8 @@ el('devForce').onclick = async () => {
    add alerts, never hide one — but "safe" is not "expected". */
 el('devReset').onclick = () => {
   if (!confirm('Reset every setting to its default? This clears the theme, the district filter, '
-      + 'the layer chips, the heatmap and the ignored sensors.\n\nThis cannot be undone.')) return;
+      + 'the layer chips, the heatmap, the favorites and the ignored sensors.\n\n'
+      + 'This cannot be undone.')) return;
   localStorage.removeItem(PREFS_KEY);
   location.reload();
 };
@@ -403,11 +404,27 @@ for (const d of document.querySelectorAll('#bar .sect')) {
 
 function setIgnored(ids) {
   PREFS.ignored = [...ids];
+  /* A starred sensor cannot also be a silenced one. Ignoring drops it from the favorites, and
+     favoriting drops it from the ignored, so neither control can be left pointing at a sensor the
+     other one owns. */
+  PREFS.favs = (PREFS.favs || []).filter(id => !ids.has(id));
   save();
   // A jump-pinned station outranks every filter, including this one — so drop the pin, or ignoring
   // the very station you just jumped to would leave it on the map.
   state.pinned = null;
   render(); alerts(); ticker();
+}
+
+/* The mirror. It does **not** call `ticker()`, and that is the whole difference between the two:
+   ignoring changes what alerts you, and starring changes only the order things are listed in. If a
+   later change makes this line need `ticker()`, that is an alert-design decision and it goes through
+   the standard in docs/FEATURES.md first. */
+function setFavs(ids) {
+  PREFS.favs = [...ids];
+  PREFS.ignored = (PREFS.ignored || []).filter(id => !ids.has(id));
+  save();
+  state.pinned = null;
+  render(); alerts();
 }
 
 // Delegated: the Details menu is rebuilt with its station card on every poll, so there is nothing stable to bind.
@@ -417,6 +434,21 @@ document.addEventListener('click', e => {
   setIgnored(ignoredIds().add(id));
   // Close the card, not just the menu: the sensor it was describing has just been taken off the map.
   closeSide();
+});
+
+/* One handler for both controls. A mast's star sends every id it stands for, comma separated; a
+   sensor's menu item sends one. The rule is the same either way: full means remove, anything less
+   than full means add. That is what makes the mast star read filled only when every sensor there is
+   starred, and what makes one press act on all of them.
+   Delegated, because both controls are rebuilt with the station card on every poll. */
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-fav]');
+  if (!b) return;
+  const list = b.dataset.fav.split(',');
+  const ids = favIds();
+  const full = list.every(id => ids.has(id));
+  for (const id of list) full ? ids.delete(id) : ids.add(id);
+  setFavs(ids);
 });
 
 el('ignoredList').onclick = e => {
