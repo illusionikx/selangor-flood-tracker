@@ -3,10 +3,10 @@
 import { KINDS, MAST, camSrc, FEED, STATIC } from './config.js';
 import { state, PREFS, PREFS_KEY, save } from './state.js';
 import { el, distKm, dkey, ignoredIds, leads, favIds, isFav } from './util.js';
-import { map, setTheme, flashTo, closeSide } from './map.js';
+import { map, setTheme, flashTo, closeSide, showPlace } from './map.js';
 import { heatOpacity, syncHeat } from './heat.js';
 import { byId } from './stations.js';
-import { camWarn } from './popup.js';
+import { camWarn, placePopup } from './popup.js';
 import { render, districts } from './render.js';
 import { dataTable } from './table.js';
 import { alerts, toggleAlerts } from './alerts.js';
@@ -827,11 +827,21 @@ function pick(i) {
     return;
   }
   if (r.t === 'msg') return;
-  // The next task gives this row its real behavior — a pin and the nearby-sensors card. Until then
-  // it is inert rather than a crash: a place row is in `hits` and carries `data-i`, so it is
-  // reachable by click and by Enter, and falling through to `r.ms[0]` on a row that has no `ms`
-  // throws. A row that does nothing is a missing feature; a row that throws is a broken page.
-  if (r.t === 'place') return;
+  /* A searched place: drop the accent pin and open the nearby-sensors card at that point.
+     `r.p.name` and `r.p.detail` come from Nominatim — editable by anyone on earth, unlike every
+     other field this file interpolates — and `placePopup()` writes them straight into the card's
+     HTML with no escaping of its own (it is a template function, not a sink; the sink is
+     `openSide()`'s `body.innerHTML = html` in map.js). `rowHtml()` above already escapes both for
+     the search-result row, and the card needs the same treatment for the same reason: skipping it
+     here would still leave a script payload live the moment the reader picks the row, even though
+     the list itself was already safe to look at. */
+  if (r.t === 'place') {
+    gotoIn.blur();
+    setFind(false);
+    const at = L.latLng(r.p.lat, r.p.lon);
+    showPlace(at, placePopup(at, escHtml(r.p.name), escHtml(r.p.detail)));
+    return;
+  }
   const t = r.t === 'near' ? nearest() : r.t === 'sensor' ? r.s : r.ms[0];
   if (!t) return;
   gotoIn.blur();

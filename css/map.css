@@ -180,6 +180,9 @@
   background: none; border: 0; box-shadow: none; color: var(--me);
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .45));
 }
+/* A searched place. Accent rather than the location blue: this is somewhere the reader asked about,
+   not where they are, and the two marks must not be read as the same thing. */
+.pin.place { color: var(--accent); font-size: 40px; }
 /* The accuracy circle. Coloured here rather than through Leaflet's path options — those are SVG
    presentation attributes and cannot take a token. Same trick as .mastring above. */
 .mecircle { stroke: var(--me); fill: var(--me); }
@@ -209,6 +212,7 @@
 }
 .ping::after { content: ''; margin: -3px 0 0 -3px; animation-delay: .4s; }
 .ping.me { --c: var(--me); }
+.ping.place { --c: var(--accent); }
 
 /* --- phones ------------------------------------------------------------------------------------ */
 

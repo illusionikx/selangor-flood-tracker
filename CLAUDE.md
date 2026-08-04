@@ -646,6 +646,16 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   the pane. `#paneAbout .testtog { width: fit-content }` pins it back down at the new site. A
   component moved between a flex-item role and a flex-container role needs its sizing rule restated.
   The old rule does not travel with it.
+- **The go-to box lists sites, and `hits` holds row objects rather than stations.** Six row shapes
+  share one array: `site`, `sensor`, `near`, `ask`, `place` and `msg`. `pick()` switches on `r.t`,
+  and anything new added to that list must add a branch there as well as in `rowHtml()`, or a reader
+  will select a row that does nothing. The sub-rows are spliced into `hits` itself rather than hidden
+  with CSS, which is what lets the existing arrow keys keep walking visible rows with no new code.
+- **Nothing calls `?place=` until the reader asks.** Nominatim's usage policy names per-keystroke
+  autocomplete, so the lookup hangs off an explicit row at the foot of the list and never off
+  `oninput`. `lookup()` carries a generation counter for the same reason `clip.js` does. Do not
+  "improve" this into a debounced auto-search: every abandoned query would still leave the machine,
+  and a fast typist would fire several.
 
 ## Conventions
 

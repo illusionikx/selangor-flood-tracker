@@ -4713,6 +4713,28 @@ between versions, and the client must not depend on a schema we do not own.
 **Not built.** Per-keystroke autocomplete. Nominatim's usage policy names it, and the client only
 calls this when the reader picks the search row.
 
+### The place card
+
+`herePopup()` already assembled "what is near this point", so it became `nearPopup(latlng, head,
+capKm)` and the two callers differ only in the head they pass. `herePopup()` stays as a thin wrapper
+and `locate.js` needed no change.
+
+The card opens under the key `@place`, joining `@here` and `@alerts` on the rule that a `@` key keeps
+`render()`'s refresh pass off a card that belongs to no site. The pin is a plain `L.Marker` in
+`--accent`, anchored at its tip, with no accuracy circle — a geocode has no accuracy to state. It
+persists until another place replaces it, exactly as the "you are here" pin does.
+
+`NEAR_MAX_KM` (10) bounds river, rainfall, siren and gauge. The camera keeps `CAM_MAX_KM` (5),
+which already means something narrower. The cap applies to the "you are here" card too: one builder
+must follow one rule, and that card would otherwise name a siren 60 km away.
+
+**Not built.** Place search on the GitHub Pages build. That build has no PHP, so the trigger row is
+gated on `STATIC` exactly as "Refresh now" is.
+
+**About pane.** The privacy paragraphs gained one sentence, because a typed place name now reaches
+this server and OpenStreetMap. The claim about the reader's own location is unchanged and still
+true: this feature sends a name, never a coordinate.
+
 ## Favorites
 
 `PREFS.favs` is an array of station ids, the mirror of `PREFS.ignored` and stored in the same blob.
