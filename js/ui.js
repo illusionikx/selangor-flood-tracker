@@ -632,6 +632,17 @@ function pick(i) {
   gotoIn.blur();
   setFind(false);   // the search is over — collapse it back to the button and give the bar its room
   flashTo(t);
+  /* A sensor row and its mast row open the same card, because there is one card per site. So the
+     sensor row says *which* sensor, by taking its block into view and marking it. flashTo() fires
+     the marker's own click, which fills the panel synchronously, so the block is in the document by
+     the time this line runs. */
+  if (r.t !== 'sensor') return;
+  const block = el('sideBody').querySelector(`[data-sensor="${t.id}"]`);
+  if (!block) return;
+  block.scrollIntoView({ block: 'nearest' });
+  block.classList.remove('flash');
+  block.offsetWidth;                 // restart the animation if the same block is picked twice
+  block.classList.add('flash');
 }
 
 gotoIn.oninput = () => { sel = -1; expanded.clear(); search(); };

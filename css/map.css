@@ -265,3 +265,11 @@
    frames, and this caption is read once rather than watched. */
 .clipcap { margin: 4px 0 0; font-size: 11px; color: var(--muted); }
 .clipcap:empty { display: none; }
+
+/* The sensor a search sub-row asked for. It fades rather than staying marked, because the card is
+   rebuilt in place on every poll and a permanent mark would outlive the question that set it. */
+#sideBody .sensor.flash { animation: sflash 1.6s ease-out; }
+@keyframes sflash {
+  from { background: color-mix(in srgb, var(--accent) 26%, transparent); }
+  to   { background: transparent; }
+}

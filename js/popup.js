@@ -401,7 +401,7 @@ export function sitePopup(members) {
       }).join('')}</div>
     </div>
     ${hasCam ? '' : camLink(lead, nearestCam(lead))}
-    ${camFirst(members).map(m => `<div class="sensor">
+    ${camFirst(members).map(m => `<div class="sensor" data-sensor="${m.id}">
       <div class="sensorhead">
         <i class="glyph i i-${KINDS[m.kind].icon}" style="color:${hasInfo(m) ? KINDS[m.kind].color : 'var(--muted)'}"
           ></i>

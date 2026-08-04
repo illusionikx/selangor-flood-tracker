@@ -4667,3 +4667,22 @@ the border of the plot is a frame, not a gridline.
 All three graphs get it. They share `timeAxis()`. The level line, the rain bars and the siren band
 label their present the same way, on the station card, in the alert panel and in the table's hover
 panels.
+
+## Search by place
+
+### The go-to box lists places, not sensors
+
+The box listed one row per sensor and the map draws one pin per site, so a six-sensor mast was six
+rows and one pin. A reader comparing the two had no way to tell that was one place. The box now
+groups on `s.site || s.id`, the same key `render()` groups on, and names the row with the same
+`leads()` call that names the pin. About 417 rows, down from about 680.
+
+A mast row carries a chevron that lists its sensors. Both a mast row and a sensor row open the same
+card, because there is one card per site. A sensor row additionally scrolls that sensor's block into
+view and flashes it, anchored on a `data-sensor` attribute in `sitePopup()`.
+
+**Trade-off accepted.** Every keystroke closes the open rows. A tree that stays half-open under a
+list the next keystroke replaces points at rows that are no longer there.
+
+**Not built.** A card per sensor. There is one card per site by design, and the site card already
+shows every reading of every sensor there.
