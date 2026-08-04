@@ -21,7 +21,10 @@ documentation.
 Two rules for the conversion:
 
 1. Convert output strings only. Leave comments and documentation alone. A 500-line spelling sweep
-   inside a feature diff makes the feature impossible to review. Take that sweep as its own commit.
+   inside a feature diff makes the feature impossible to review.
+   The remaining 480 matches sit in `CLAUDE.md`, `docs/FEATURES.md`, `docs/DEPLOY.md`, `README.md`
+   and inline comments. Sweep them in one commit **after this feature ships**. Do not start that
+   sweep earlier, and do not fold it into any commit below.
 2. Never touch an identifier, a CSS property or an HTML attribute. `aria-labelledby` is an
    attribute name. `color` is already the CSS property.
 
