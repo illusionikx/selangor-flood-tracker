@@ -251,6 +251,10 @@ dialog:focus, dialog:focus-visible { outline: none; }
 .picklist li.head, .picklist li.none {
   padding: 10px 8px 5px; font-size: 11px; letter-spacing: .06em; color: var(--muted); cursor: default;
 }
+/* A place-search state ("Too many searches just now — try again in a moment") runs longer than a
+   group heading, and `.picklist li` above sets `flex` with no wrap — so without this, a long message
+   stretched the panel to its own width instead of wrapping inside it. */
+.picklist li.none { display: block; white-space: normal; line-height: 1.4; }
 .picklist li.head:first-child { padding-top: 4px; }
 .picklist li.head:not(:first-child) { border-top: 1px solid var(--outline); margin-top: 6px; padding-top: 12px; }
 .picklist li.sel, .picklist li:not(.head, .none):hover {

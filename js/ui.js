@@ -631,6 +631,34 @@ const group = s => `${s.state || '—'} · ${s.district || 'district n/a'}`;
    occurrence independent state, so opening one never silently opens the other. */
 const expanded = new Set();
 
+/* The place lookup. Nothing leaves the browser until the reader picks the row at the foot of the
+   list — Nominatim's usage policy names per-keystroke autocomplete, and an explicit row respects it
+   outright. `gen` is the same guard clip.js uses: a slow answer to a query nobody is waiting for any
+   more must not paint over a newer one. */
+let places = [], pstate = '', gen = 0;
+
+async function lookup(q) {
+  const my = ++gen;
+  places = [];
+  pstate = 'Searching…';
+  search();
+  try {
+    const r = await fetch(`api.php?place=${encodeURIComponent(q)}`, { cache: 'no-store' });
+    const j = await r.json();
+    if (my !== gen) return;
+    places = j.places || [];
+    pstate = places.length ? ''
+      : r.status === 429 ? 'Too many searches just now — try again in a moment'
+      : r.ok ? 'No place by that name in Selangor, Kuala Lumpur or Putrajaya'
+      : 'Place search is unavailable';
+  } catch {
+    if (my !== gen) return;
+    places = [];
+    pstate = 'Place search is unavailable';
+  }
+  search();
+}
+
 /* A site row, and its sensors under it when the row is open. One function, so the favorites group
    and the district groups cannot grow two different ideas of what an expanded mast looks like.
    A sensor row carries `lead`, the mast's own name, because a sensor named the same as its mast has
@@ -676,6 +704,18 @@ function search() {
     const at = hits.findIndex(r => r.g !== 'FAVORITES');
     hits.splice(at < 0 ? hits.length : at, 0, { t: 'near', g: 'Your location' });
   }
+
+  /* Results lead the list, the trigger row sits at its foot. A place is what the reader asked for
+     when nothing local matched, so it belongs above; the offer to go and look is the last resort and
+     belongs below.
+     Nothing here on the GitHub Pages build: that build serves a baked api.json and `?place=` is a
+     404 against a file with no opinion, exactly as "Refresh now" is. */
+  if (!STATIC && terms.length) {
+    if (places.length)
+      hits.unshift(...places.map(p => ({ t: 'place', p, g: 'PLACES', sub: p.detail })));
+    else
+      hits.push(pstate ? { t: 'msg', text: pstate, g: 'PLACES' } : { t: 'ask', g: 'PLACES' });
+  }
   draw(true);
 }
 
@@ -695,6 +735,19 @@ function draw(open = !gotoHits.hidden) {
    it opens carry the same mark. */
 function rowHtml(r, i) {
   const cls = i === sel ? ' class="sel" aria-selected="true"' : '';
+
+  if (r.t === 'ask') return `<li role="option" data-i="${i}"${cls}
+      ><i class="glyph i i-search" style="color:var(--accent)"></i
+      ><span class="nm">Search the map for “${gotoIn.value.trim()}”</span></li>`;
+
+  // Not an option and not selectable: there is nothing to pick, only something to read.
+  if (r.t === 'msg') return `<li class="none">${r.text}</li>`;
+
+  if (r.t === 'place') return `<li role="option" data-i="${i}"${cls}
+      ><i class="glyph i i-place" style="color:var(--accent)"></i
+      ><span class="nm">${r.p.name}${
+        r.sub ? `<br><small class="muted">${r.sub}</small>` : ''}</span></li>`;
+
   if (r.t === 'near') return `<li role="option" data-i="${i}"${cls}
       ><i class="glyph i i-my_location" style="color:var(--accent)"></i
       ><span class="nm">${NEAREST.name}</span></li>`;
@@ -729,6 +782,14 @@ function rowHtml(r, i) {
 function pick(i) {
   const r = hits[i];
   if (!r) return;
+  /* The trigger row is the only thing here that does not close the box: the reader is still in the
+     middle of the same search, and the answer arrives into the list they are looking at. */
+  if (r.t === 'ask') {
+    const q = gotoIn.value.trim();
+    if (q.length >= 2) lookup(q);
+    return;
+  }
+  if (r.t === 'msg') return;
   const t = r.t === 'near' ? nearest() : r.t === 'sensor' ? r.s : r.ms[0];
   if (!t) return;
   gotoIn.blur();
@@ -747,7 +808,15 @@ function pick(i) {
   block.classList.add('flash');
 }
 
-gotoIn.oninput = () => { sel = -1; expanded.clear(); search(); };
+/* A place result belongs to the query that fetched it. Leaving stale hits under a changed query is
+   the same lie a stale reading would be. */
+gotoIn.oninput = () => {
+  sel = -1;
+  expanded.clear();
+  places = [];
+  pstate = '';
+  search();
+};
 gotoIn.onfocus = search;
 // Clicking away closes the whole thing, not just the list. The delay lets a click on a result land
 // first — that fires `mousedown` → pick(), which closes it anyway; without the wait the field would
