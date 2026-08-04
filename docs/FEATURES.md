@@ -4690,26 +4690,26 @@ shows every reading of every sensor there.
 ## Favorites
 
 `PREFS.favs` is an array of station ids, the mirror of `PREFS.ignored` and stored in the same blob.
-A star on a sensor's ⓘ menu adds one. A star on a mast header adds every sensor there, and reads
-filled only when every one of them is starred, because that button acts on all of them and has to
-state what one press will undo.
+A star on a sensor's ⓘ menu adds one. A star on a mast header adds every sensor there. It reads
+filled only when the reader has starred every one of them, because that button acts on all of them
+and must state what one press will undo.
 
 A sensor is never in both lists. Favoriting drops the id from `ignored` and ignoring drops it from
 `favs`, because "show me this first" and "never show me this" is not a state a person meant to be in.
 
 Four surfaces: a `FAVORITES` group leading an untouched search box, a drawer panel that mirrors
 Ignored sensors, a `Favorites only` map filter, and favorites-first ordering inside each alert panel
-card. On the map a pin carries a star when **any** sensor at that site is starred, and it is drawn
-outside the cluster so a chip cannot swallow it.
+card. On the map a pin carries a star when the reader has starred **any** sensor at that site, and
+the map draws it outside the cluster so a chip cannot swallow it.
 
 **Alert-standard note.** The alert panel's ordering is the only alert surface this touches, and it
-moves order only. The set of alerts does not change, nothing is suppressed, no count moves, and the
-icon badge, the ticker and the toast are untouched. `isHot()` keeps its current definition. Favorites
-are not an alarm control.
+moves order only. The set of alerts does not change. Nothing suppresses an alert, and no count moves.
+This change does not touch the icon badge, the ticker or the toast. `isHot()` keeps its current
+definition. Favorites are not an alarm control.
 
-**Not built.** Favorites as an alert scope, which would suppress alerts elsewhere. A flood two
-districts away that a reader muted is the failure ISA-18.2 spends a chapter on. `PREFS.ignored` stays
-the one suppression control in this app.
+**Not built.** Favorites as an alert scope. That kind of scope suppresses alerts elsewhere. A flood
+two districts away that a reader muted is the failure ISA-18.2 spends a chapter on. `PREFS.ignored`
+stays the one suppression control in this app.
 
 **Not built.** A favorites map layer or a color of its own. A favorite is neither a status nor a
 sensor kind, so it takes neither color language and the star is the whole indication.

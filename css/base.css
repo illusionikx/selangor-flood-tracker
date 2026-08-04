@@ -290,7 +290,14 @@ dialog:focus, dialog:focus-visible { outline: none; }
    before the sensor count so the two never trade places as a mast gains or loses sensors. */
 .picklist .fvm { flex: none; margin-left: auto; font-size: 15px; color: var(--accent); }
 .picklist .fvm + .sn { margin-left: 6px; }
-.slist .fvm { flex: none; font-size: 14px; color: var(--accent); }
+/* Accent, same rule as the picklist star above — a favorite is neither a status nor a sensor kind.
+   The star also carries the plain `.i` icon class, and chrome.css colors every `.slist .i` by tier
+   (`.alert.t-now .slist .i` etc, four classes, specificity 0,4,0) so it can paint the *kind* glyph
+   red/amber/grey next to it. A selector of equal specificity would lose that tie to source order —
+   chrome.css loads after base.css — and a status hue on a favorite mark breaks the one rule this
+   app never bends: red/amber/orange/grey mean status and nothing else. So this selector is five
+   classes deep on purpose, one more than the rule it has to beat, rather than four and lucky. */
+.alert.grouped .slist .i.fvm { flex: none; font-size: 14px; color: var(--accent); }
 
 /* One spacing for every drawer section, so the four read as one stack — they were two rules and a
    flex gap, which made the seam between the two columns twice the others. */
