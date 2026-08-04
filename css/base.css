@@ -369,6 +369,7 @@ dialog:focus, dialog:focus-visible { outline: none; }
    numbers that put the place name on that line move together and a second chip up there would be a
    fourth. Accent, not a status hue and not a sensor kind — a favorite is neither. */
 .favbtn {
+  position: relative;
   flex: none; display: grid; place-items: center; width: 28px; height: 28px; padding: 0;
   border: 1px solid var(--outline); border-radius: 999px; cursor: pointer;
   background: none; color: var(--muted);
@@ -376,6 +377,11 @@ dialog:focus, dialog:focus-visible { outline: none; }
 .favbtn:hover { background: var(--hover); color: var(--on-surface); }
 .favbtn.on { color: var(--accent); border-color: var(--accent); }
 .favbtn .i { font-size: 17px; }
+/* The visible button stays 28px so it sits level with the sensor badges beside it. The hit area
+   grows past it, because a finger needs about 40px and a star that misses is a mast nobody can
+   file. `inset` rather than padding: padding would push the badge row taller and re-space the
+   card header. Same trick, same reason, as the search box's chevron. */
+.favbtn::after { content: ''; position: absolute; inset: -6px; }
 
 /* The one divider in the drawer, between the heatmap pair and the rising filter sharing their
    section. A rule rather than a second `.sect`: they belong to the same fold, and a heading for one
