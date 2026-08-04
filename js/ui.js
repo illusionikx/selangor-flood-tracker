@@ -627,7 +627,7 @@ function rowHtml(r, i) {
 function pick(i) {
   const r = hits[i];
   if (!r) return;
-  const t = r.t === 'near' ? nearest() : r.ms[0];
+  const t = r.t === 'near' ? nearest() : r.t === 'sensor' ? r.s : r.ms[0];
   if (!t) return;
   gotoIn.blur();
   setFind(false);   // the search is over — collapse it back to the button and give the bar its room
