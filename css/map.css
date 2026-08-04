@@ -138,6 +138,14 @@
   color: var(--surface); background: var(--on-surface); box-shadow: 0 0 0 2px var(--surface);
 }
 .pin.multi.danger .n { color: var(--s-danger); background: var(--surface); box-shadow: none; }
+/* A starred place. Bottom right, opposite the sensor count at the top right, so a starred six-sensor
+   mast shows both marks. `--accent`, because a favorite is neither a status nor a sensor kind and
+   must take neither color language. */
+.pin .fv {
+  position: absolute; bottom: -3px; right: -3px; width: 18px; height: 18px;
+  display: grid; place-items: center; border-radius: 999px; font-size: 12px;
+  color: var(--surface); background: var(--accent); box-shadow: 0 0 0 2px var(--surface);
+}
 /* Forecast to reach danger. A ring rather than a fill, because it is a claim about the next few
    hours and not a reading — on the bare pin it is drawn like the halo below, since there is no
    longer a box for a box-shadow to trace. */

@@ -103,6 +103,12 @@ export function render() {
     // outranks it, and a mast with no reading must stay grey rather than look confident.
     const multi = members.length > 1;
     const quiet = multi && hasInfo(lead) && members.every(m => !(m.status > 0));
+    /* A star on the pin when **any** sensor here is starred — not when all of them are, which is the
+       mast header button's rule. The two answer different questions. The button is a control and
+       acts on every sensor at the mast, so it has to state exactly what one press will undo. This is
+       an indication, and it says "something you starred is here". A mast where the reader starred
+       only the river must still be findable at a glance. */
+    const fav = members.some(isFav);
     /* Danger outranks everything, and it is stated here rather than left to `leads()` picking the
        worst sensor and `color()` happening to return red for it. Anything at the top of its own
        scale — a river over its mark, a sounding siren, a flood gauge under water, rainfall in the
@@ -110,7 +116,7 @@ export function render() {
        has to decode is a pin nobody reads in the ten seconds that matter. */
     const c = critical ? statusColor(3) : quiet ? MAST.color : color(lead);
     const marker = L.marker([lead.lat, lead.lng], {
-      kind: lead.kind, critical,                          // read back by the cluster badge
+      kind: lead.kind, critical, fav,                     // read back by the cluster badge and the split
       zIndexOffset: critical ? 1000 : rising ? 500 : 0,   // keep the urgent pins on top
       icon: L.divIcon({
         // Matches `.pin`'s box in map.css — Leaflet positions the marker off this, not off the CSS.
@@ -121,7 +127,8 @@ export function render() {
         html: `<span class="pin${multi ? ' multi' : ''}${lead.online ? '' : ' off'}${
                      rising ? ' rise' : ''}${critical ? ' danger' : ''}" style="--c:${c}"><i class="i i-${
                multi ? MAST.icon : KINDS[lead.kind].icon}"></i>${
-               multi ? `<b class="n">${members.length}</b>` : ''}</span>`,
+               multi ? `<b class="n">${members.length}</b>` : ''}${
+               fav ? '<b class="fv"><i class="i i-star"></i></b>' : ''}</span>`,
       }),
     });
     // Fill the panel, then centre the pin in what is left of the map. Panel first: focusOn() reads

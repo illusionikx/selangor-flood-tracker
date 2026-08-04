@@ -405,6 +405,13 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   never take a whole mast off the map; that is why layer chips call `render()`, not `syncCluster()`.
 - Clustering still never fully disables: sites can sit metres apart. `maxClusterRadius` tightens
   with zoom and co-located pins spiderfy on click.
+- **A cluster badge counts what it is hiding, not what is in the area.** Favorites are drawn on
+  `favLayer` in `map.js` and never enter `cluster`, so a chip over a patch holding 13 pins can read
+  12. That is the correct number: the chip is hiding 12 pins and the 13th is drawn beside it. The
+  same holds for the badge's red — `iconCreateFunction` ORs `m.options.critical` across its children,
+  so a chip goes neutral when the only critical pin near it is an unclustered favorite drawing itself
+  red. Nothing leaves the screen. Do not "fix" the count by folding the favorites back in; that would
+  make the badge claim to hide pins that are visible.
 - **Offline gauges are frozen on old flood readings** (3.55m from April) — so they are *not sampled
   into `.history.db`* and carry no `history`. A flat line at a number from months ago reads as
   "steady", which is the one thing a graph of a dead sensor must not say. Anything offline or

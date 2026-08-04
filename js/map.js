@@ -79,10 +79,20 @@ export const siteMark = new Map();
 
 export const shown = k => document.querySelector(`#layers input[data-kind="${k}"]`)?.checked;
 
+/* Favorites never cluster. A star swallowed by a chip is a star that did not work, and finding your
+   own stations at a glance is the whole point of setting one. markercluster has no per-marker opt
+   out, so they go on a plain layer group beside it. The split lives here because this function
+   already walks `marks` and already gates on `shown(k)`, and layer visibility must stay in one
+   place. */
+export const favLayer = L.layerGroup().addTo(map);
+
 export function syncCluster(alsoShow) {
   cluster.clearLayers();
+  favLayer.clearLayers();
   for (const [k, list] of Object.entries(marks)) {
-    if (shown(k) || k === alsoShow) cluster.addLayers(list);
+    if (!(shown(k) || k === alsoShow)) continue;
+    cluster.addLayers(list.filter(m => !m.options.fav));
+    for (const m of list) if (m.options.fav) favLayer.addLayer(m);
   }
 }
 
