@@ -393,23 +393,22 @@ export function sitePopup(members) {
   const favAll = members.every(isFav);
   const favIdList = members.map(m => m.id).join(',');
 
-  /* The count sits beside the close button as a chip, not as a "6 sensors at this location" line —
-     that spent a whole row of a popup that is mostly rows, restating what the badges under it
-     already list. Same `layers` glyph as the mast pin, so the pin you tapped and the header you got
-     say the same thing. Number alone on screen, so the sentence moves into title/aria — it is the
-     only place that count is stated in words now. Emitted before .popname because the CSS reserves
-     room for it with an adjacent-sibling rule. */
+  /* The star holds the corner beside the close button, where a sensor-count chip used to sit. The
+     count went because the badge row directly below the name already lists one badge per sensor, so
+     the chip restated what was an inch under it — and this corner is the only place on the card with
+     room for a control that belongs to the whole mast rather than to one sensor on it.
+     Emitted before .popname because the CSS reserves room for it with an adjacent-sibling rule.
+     The `title` is allowed here under the rule that a tooltip may only duplicate something already
+     on screen: the star's own colour already says which state it is in, and this names the action
+     that colour is offering. It is not where the meaning lives, so a phone loses nothing. */
+  const favSays = favAll ? 'Remove this mast from favorites' : 'Add this mast to favorites';
   return `<div class="pophead">
-      <span class="sitecount" role="img" title="${members.length} sensors at this location"
-            aria-label="${members.length} sensors at this location"
-        ><i class="i i-layers"></i>${members.length}</span>
+      <button class="favbtn${favAll ? ' on' : ''}" data-fav="${favIdList}"
+              aria-pressed="${favAll}" title="${favSays}" aria-label="${favSays}"
+        ><i class="i i-star"></i></button>
       <div class="popname">${lead.name}</div>
       ${region(lead)}
-      <div class="badges"><button class="favbtn${favAll ? ' on' : ''}" data-fav="${favIdList}"
-          aria-pressed="${favAll}"
-          title="${favAll ? 'Remove every sensor here from favorites'
-                          : 'Favorite every sensor at this mast'}"
-        ><i class="i i-star"></i></button>${members.map(m => {
+      <div class="badges">${members.map(m => {
         const k = KINDS[m.kind];
         return `<span class="badge" style="--c:${hasInfo(m) ? k.color : 'var(--muted)'}"
                 ><i class="i i-${k.icon}"></i>${k.one || k.label}</span>`;

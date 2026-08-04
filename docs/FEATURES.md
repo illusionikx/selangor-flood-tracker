@@ -476,6 +476,9 @@ rain-alone would have drawn a divider under nothing.
 
 *Blob diameter went 4km → 5km* at the same time, for both layers.
 
+> **Superseded.** The corner chip described below is gone. The favorite star holds that slot now —
+> see "The mast star takes the header's corner" at the end of this file.
+
 **The site popup's sensor count is a corner chip, not a sentence.** A multi-sensor popup opened with
 a `6 sensors at this location` line under the region, which spent a whole row of a popup that is
 mostly rows — and restated what the badge list directly beneath it already showed. It is now a chip
@@ -4787,3 +4790,38 @@ Two rules for any future conversion. Never touch an identifier, a CSS property o
 `aria-labelledby` is an attribute name and `color` is already the CSS property. And prefer the symbol
 `m` over the word "meters" in a new string, because `meter()` in `popup.js` draws the water-level bar
 and the two would otherwise share a spelling.
+
+### The mast star takes the header's corner
+
+A multi-sensor card carried two marks in its header. A sensor-count chip sat beside the close
+button, and a favorite star sat inside the badge row below the place name. One control replaces
+both. The star takes the corner and the count goes.
+
+The count went because it restated its own neighbor. The badge row sits directly under the name and draws one
+badge per sensor. A reader who wanted the number saw it an inch below the chip that stated it. The star had no such alternative. It acts on the whole
+mast. Inside the badge row it read as one more sensor, not as a control over all of them.
+
+`.pophead .favbtn` centers on the place name's line at `top: 14px`. That is the header's own
+`padding-top: 18px`, plus half a 15px/1.3 line, less half the button's 28px. That is the same
+arithmetic the chip used with its own height. `CLAUDE.md` records the three numbers that move together.
+Only one thing fits in that corner. The adjacent-sibling rule that reserves the room lets a second
+chip sit on the place name instead of beside it.
+
+**The star lost its ring, and the pin's star lost its disc.** Both are the bare glyph now. Every pin
+on this map is a glyph with no plate. The reason applies here too. A disc covers ground, and it
+says nothing the shape does not already say. Color carries the state: muted when unset, `--accent` when
+set. The rest of this app reports itself the same way. `--accent` and never a `--s-*`, because a
+favorite is neither a status nor a sensor kind.
+
+Dropping the pin's disc cost it its edge, so the glyph pays for it with light instead of paint.
+`.pin` carries a drop-shadow its children inherit. But `.pin.multi` sets `filter: none`. On a mast
+the star then lands on a filled indigo or red circle, with nothing between them. Two stacked
+`--surface` drop-shadows draw a thin halo that flips with the theme.
+
+**The star carries a tooltip, and this project allows it here.** The rule is that a `title` means
+nothing on a phone, so it must only duplicate something already on screen. The star's own color
+already reports which state it is in. The tooltip names the action that color offers: `Add this
+mast to favorites`, or `Remove this mast from favorites`. The `aria-label` carries the same text. Nothing lives only in the tooltip, so a touch device loses nothing.
+
+**Trade-off accepted.** A card no longer states its sensor count in words anywhere. The badge row is
+the answer, and it was already the better one.

@@ -386,22 +386,25 @@ dialog:focus, dialog:focus-visible { outline: none; }
    either list. `#districtList`'s copy needs none of this — that one is `display: none` on touch. */
 #ignoredList .solo::after, #favList .solo::after { content: ''; position: absolute; inset: -10px -6px; }
 
-/* The mast's star. It rides in the badge row rather than beside the close button, because the three
-   numbers that put the place name on that line move together and a second chip up there would be a
-   fourth. Accent, not a status hue and not a sensor kind — a favorite is neither. */
+/* The mast's star: the glyph alone, with no plate behind it. Every mark on the map is a bare glyph
+   for the same reason — a disc covers what it stands on and buys nothing a shape does not already
+   say. Colour carries the state, muted to accent, which is how every other control here reports
+   itself. Accent and never a `--s-*`: a favorite is neither a status nor a sensor kind.
+   Positioned in map.css, beside the close button — see `.pophead .favbtn` there. */
 .favbtn {
   position: relative;
   flex: none; display: grid; place-items: center; width: 28px; height: 28px; padding: 0;
-  border: 1px solid var(--outline); border-radius: 999px; cursor: pointer;
-  background: none; color: var(--muted);
+  border: 0; background: none; cursor: pointer; color: var(--muted);
 }
-.favbtn:hover { background: var(--hover); color: var(--on-surface); }
-.favbtn.on { color: var(--accent); border-color: var(--accent); }
-.favbtn .i { font-size: 17px; }
-/* The visible button stays 28px so it sits level with the sensor badges beside it. The hit area
-   grows past it, because a finger needs about 40px and a star that misses is a mast nobody can
-   file. `inset` rather than padding: padding would push the badge row taller and re-space the
-   card header. Same trick, same reason, as the search box's chevron. */
+.favbtn:hover { color: var(--on-surface); }
+.favbtn.on { color: var(--accent); }
+/* 20px, not the 17 it wore inside a ring. A bare glyph has no border drawing its edge, so it has to
+   be the thing that fills the box. */
+.favbtn .i { font-size: 20px; }
+/* The visible button stays 28px so it clears the close button beside it. The hit area grows past
+   it, because a finger needs about 40px and a star that misses is a mast nobody can file. `inset`
+   rather than padding: padding would resize the button and move it off the name's line. Same trick,
+   same reason, as the search box's chevron. */
 .favbtn::after { content: ''; position: absolute; inset: -6px; }
 
 /* The one divider in the drawer, between the heatmap pair and the rising filter sharing their

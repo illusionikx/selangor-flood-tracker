@@ -686,7 +686,8 @@ body.side #sideTab { transform: translateX(calc(-1 * var(--side))); visibility: 
 #sideHead { flex: none; padding: 0 16px 8px; }
 #sideHead:empty { display: none; }
 /* 18px = the close button's 8px top + half its 40px height − half the name's 15px/1.3 line, so the
-   place and the × sit on one line. The three numbers move together — see .sitecount in map.css. */
+   place and the × sit on one line. The three numbers move together — see `.pophead .favbtn` in
+   map.css, which centres the mast's star on this same line. */
 #sideHead .pophead { padding-top: 18px; margin-bottom: 0; }
 #sideClose { position: absolute; z-index: 2; top: 8px; right: 8px; }
 #sideBody { flex: 1; overflow: auto; overscroll-behavior: contain; padding: 0 16px 16px; }

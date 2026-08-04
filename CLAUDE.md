@@ -388,7 +388,11 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   reshapes `sitePopup()` must keep `.pophead` as its first element** — that is the seam.
 - **Three numbers put the place name on the close button's line and move together:** `#sideClose`'s
   `top: 8px`, `#sideHead .pophead`'s `padding-top: 18px` (8 + half the button's 40 − half a 15px/1.3
-  line) and `.sitecount`'s `top: 19px`.
+  line) and `.pophead .favbtn`'s `top: 14px` (18 + half that line − half the button's 28). The
+  favorite star holds that corner. A sensor-count chip held it first, at `top: 19px` for an 18px
+  height — if anything is ever parked there again, it is the same arithmetic with its own height.
+  **Only one thing fits.** `.pophead .favbtn + .popname` reserves the room with an adjacent-sibling
+  rule, so a second chip in that corner would sit on the place name rather than beside it.
 - **`render()` refreshes the open card in place, so `openSide()` must stay idempotent.** It runs on
   every poll for the site currently on screen. It resets `scrollTop` **only** when the key changes —
   otherwise a poll would throw you back to the top of a card you were reading. Anything stateful

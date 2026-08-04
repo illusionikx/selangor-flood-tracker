@@ -49,20 +49,18 @@
    inset from the one on every sensor row under it. 34px = the button's 48 from the panel edge, less
    #sideBody's own 16 of padding. */
 .pophead .popname, .pophead > .muted { padding-right: 34px; }
-/* How many sensors this card is holding, parked on the name's line just inside the close button.
-   Only the name shares that line, so only the name pays for the room, via the sibling rule below. */
-.sitecount {
+/* The mast's favorite star, parked on the name's line just inside the close button. It holds the
+   slot a sensor-count chip used to: the badge row under the name lists one badge per sensor, so the
+   count restated what sat an inch below it, and a control for the whole mast had nowhere else to go
+   that was not beside a single sensor's own row.
+   Only the name shares this line, so only the name pays for the room, via the sibling rule below. */
+.pophead .favbtn {
   position: absolute; right: 34px;
   /* Centred on the name's line, which starts 18px down — the sticky header's own padding-top, set
-     in chrome.css. 18 + half a 15px/1.3 line − half of this chip's 18px = 19. Moves with it. */
-  top: 19px; height: 18px;
-  display: inline-flex; align-items: center; gap: 3px;
-  padding: 0 7px 0 5px; border-radius: 999px;
-  font: 500 11px/1 Roboto, sans-serif;
-  color: var(--muted); background: var(--hover);
+     in chrome.css. 18 + half a 15px/1.3 line − half this button's 28px = 14. Moves with it. */
+  top: 14px;
 }
-.sitecount .i { font-size: 13px; }
-.sitecount + .popname { padding-right: 74px; }   /* the button's 34, plus the chip's own width */
+.pophead .favbtn + .popname { padding-right: 68px; }   /* the close button's 34, plus this one's 28 and a gap */
 /* The badge trails the location now, so its spacing has to flip with it. */
 .pophead .badge, .pophead .badges { margin: 6px 0 0; }
 .popname { font-size: 15px; font-weight: 500; line-height: 1.3; }
@@ -140,11 +138,17 @@
 .pin.multi.danger .n { color: var(--s-danger); background: var(--surface); box-shadow: none; }
 /* A starred place. Bottom right, opposite the sensor count at the top right, so a starred six-sensor
    mast shows both marks. `--accent`, because a favorite is neither a status nor a sensor kind and
-   must take neither color language. */
+   must take neither color language.
+   The glyph alone, with no disc behind it — the same rule the pins themselves follow, since a plate
+   covers ground the map needs and says nothing the shape does not.
+   The halo is what pays for dropping the disc. `.pin` carries a drop-shadow that its children
+   inherit, but `.pin.multi` sets `filter: none`, so on a mast this star lands on a filled indigo or
+   red circle with nothing separating it. Two stacked surface-coloured shadows draw a thin edge in
+   whichever theme is live, which is a border made of light rather than a circle made of paint. */
 .pin .fv {
-  position: absolute; bottom: -3px; right: -3px; width: 18px; height: 18px;
-  display: grid; place-items: center; border-radius: 999px; font-size: 12px;
-  color: var(--surface); background: var(--accent); box-shadow: 0 0 0 2px var(--surface);
+  position: absolute; bottom: -2px; right: -2px; font-size: 15px; line-height: 1;
+  color: var(--accent);
+  filter: drop-shadow(0 0 1.5px var(--surface)) drop-shadow(0 0 1.5px var(--surface));
 }
 /* Forecast to reach danger. A ring rather than a fill, because it is a claim about the next few
    hours and not a reading — on the bare pin it is drawn like the halo below, since there is no
