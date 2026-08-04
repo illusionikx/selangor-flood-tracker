@@ -726,8 +726,10 @@ export function sirenBand(points) {
   const bars = inWin.map(([t, v], i) => {
     const nxt = inWin[i + 1]?.[0];
     const end = nxt && nxt - t <= 5400 ? nxt : Math.min(t + 900, t1);
-    // A lone sample at the right edge has no width of its own; give it enough to be visible.
-    const x0 = +x(t), w = Math.max(+x(end) - x0, 0.8);
+    // A lone sample at the right edge has no width of its own; give it enough to be visible — and
+    // pull it back inside the plot, because the newest sample sits *on* x=100 and `.spark svg` is
+    // `overflow: visible`, so the minimum width would hang off the plate as a stray sliver.
+    const w = Math.max(+x(end) - +x(t), 0.8), x0 = Math.min(+x(t), 100 - w);
     // `style`, not a `fill` attribute: var() in a presentation attribute is not reliable everywhere.
     return `<rect x="${x0.toFixed(2)}" y="9" width="${w.toFixed(2)}" height="10" rx="1"
       style="fill:${v > 0 ? on : 'var(--outline)'}"/>`;
