@@ -790,6 +790,11 @@ function pick(i) {
     return;
   }
   if (r.t === 'msg') return;
+  // The next task gives this row its real behavior — a pin and the nearby-sensors card. Until then
+  // it is inert rather than a crash: a place row is in `hits` and carries `data-i`, so it is
+  // reachable by click and by Enter, and falling through to `r.ms[0]` on a row that has no `ms`
+  // throws. A row that does nothing is a missing feature; a row that throws is a broken page.
+  if (r.t === 'place') return;
   const t = r.t === 'near' ? nearest() : r.t === 'sensor' ? r.s : r.ms[0];
   if (!t) return;
   gotoIn.blur();
