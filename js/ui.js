@@ -467,12 +467,19 @@ document.addEventListener('click', e => {
      The card itself is deliberately left alone by this whole handler — starring changes nothing on
      screen, so there is nothing to close. That is the opposite of the ignore handler just above,
      which deliberately calls closeSide(): ignoring removes the very sensor the card is describing, so
-     the card is closed because what it was showing is gone. */
+     the card is closed because what it was showing is gone.
+     `showPopover()` called from script does not move focus by itself — only a popover opened by its
+     own declarative invoker does that (and then only onto an `autofocus` descendant, which this menu
+     has none of) — so the button just pressed is refocused by hand too, queried out of the reopened
+     `menu` rather than the detached one this handler started with. */
   const menuId = b.closest('[popover]')?.id;
   setFavs(ids);
   if (!menuId) return;
   const menu = document.getElementById(menuId);
-  if (menu && !menu.matches(':popover-open')) menu.showPopover();
+  if (menu && !menu.matches(':popover-open')) {
+    menu.showPopover();
+    menu.querySelector('[data-fav]')?.focus();
+  }
 });
 
 el('ignoredList').onclick = e => {
