@@ -15,6 +15,7 @@ import { etaText } from './popup.js';
    The interruption for news is still the toast. */
 const KEY = '@alerts';
 let card = '';        // last built list, so the button can open it without waiting for a poll
+const TITLE = document.title;   // the base, read once — alerts() prefixes a count onto it
 
 export function toggleAlerts() {
   side.key === KEY ? closeSide() : openSide(KEY, card);
@@ -120,6 +121,10 @@ export function alerts() {
      for here, because a permission prompt on landing is exactly the trust-spending the alert
      standard warns about, and the badge is a nicety either way. */
   navigator.setAppBadge?.(live.length).catch(() => {});
+
+  // Same number again, for the tab strip and the window title bar — the one alert surface that is
+  // readable while the page is in a background tab.
+  document.title = (live.length ? `(${live.length}) ` : '') + TITLE;
 
   // Icons rather than "(2 rising / 1 danger)": the head is one panel-width and the words wrapped as
   // soon as all three counts were non-zero — which is exactly when the list matters most. Each count

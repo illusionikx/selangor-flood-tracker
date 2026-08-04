@@ -2473,6 +2473,14 @@ standard](#alert-design-standard) says not to spend, for a number that is alread
 badge is a convenience for people who installed the app; it is not an alert channel, and nothing
 should start treating it as one without going through that standard first.
 
+**The window title carries the same count**, in the same line of `alerts()`: `(2) Klang Valley Flood
+Watch` when two stations are on alert, and the bare name when none are. It is a third mirror of
+`live.length` — the button's badge, the app icon's badge and now the tab — so all three say one
+number or none of them is trusted. The base string is read once at module load, because prefixing an
+already-prefixed title would stack a count per poll. Forecast alerts are included with no mark of
+their own: the panel and the badge already count them together, and a tab strip has room for a digit
+and not for a distinction.
+
 Deliberately *not* done: no install-prompt UI (`beforeinstallprompt` banner) — the browser's own
 button is where people look for it, and a second one is a thing to dismiss; no offline copy of the
 last payload, per the above; no push notifications, which would be a new alert surface and belongs
