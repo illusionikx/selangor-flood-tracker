@@ -6,4 +6,5 @@ lib/
 .refresh.lock
 .force.stamp
 .place.stamp
+.place.lock
 shots/

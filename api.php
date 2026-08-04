@@ -68,6 +68,10 @@ const FORCE_STAMP = __DIR__ . '/.force.stamp';
    it costs OpenStreetMap nothing. */
 const PLACE_EVERY = 1;
 const PLACE_STAMP = __DIR__ . '/.place.stamp';
+// A lock of its own, not the stamp file: opening the stamp with mode 'c' would create it and stamp
+// it with the current time as a side effect of merely checking it, so the very first request would
+// find a stamp it had just made and read itself as rate-limited.
+const PLACE_LOCK  = __DIR__ . '/.place.lock';
 const PLACE_TTL   = 30 * 86400;   // place names do not move
 const NOMINATIM   = 'https://nominatim.openstreetmap.org/search';
 /* The coverage box: Selangor, Kuala Lumpur and Putrajaya. The 673 stations in the payload span
@@ -184,15 +188,32 @@ if (isset($_GET['place'])) {
     }
 
     /* The limit guards the uncached path only. A repeat search costs OpenStreetMap nothing, so
-       refusing it would punish the reader for a request that never leaves this box. */
+       refusing it would punish the reader for a request that never leaves this box.
+       Read-decide-write has to happen as one atomic step, or two concurrent requests for two
+       *different* uncached queries both read the same stale mtime, both see themselves as the
+       first request this second, and both call Nominatim — two browser tabs or a page-reload race
+       is ordinary traffic on a public endpoint, not an adversary, and is enough to trigger this.
+       Unlike `?force=1`'s expensive path, nothing else here serializes concurrent callers — this
+       mtime check *is* the whole guard, so it has to be correct alone.
+       The lock is taken, used and released here, not held across the fetch below: the fetch takes
+       about a second on a cold query, and holding the lock that long would serialize every reader
+       behind whichever one is slowest, which trades a rare 429 for a queue on every request. */
+    $lock = fopen(PLACE_LOCK, 'c');
+    flock($lock, LOCK_EX);
+    // filemtime() is cached per request by PHP's stat cache, so a read taken after another process
+    // just touched the file — inside this very lock — would still return the pre-touch value.
+    // Without this the lock serializes the race without fixing it.
+    clearstatcache();
     [$allowed] = forceAllowed(
         time(), is_file(PLACE_STAMP) ? filemtime(PLACE_STAMP) : null, PLACE_EVERY);
+    if ($allowed) touch(PLACE_STAMP);
+    flock($lock, LOCK_UN);
+    fclose($lock);
     if (!$allowed) {
         http_response_code(429);
         echo json_encode(['places' => [], 'error' => 'rate limited']);
         exit;
     }
-    touch(PLACE_STAMP);
 
     $url = NOMINATIM . '?' . http_build_query([
         'q'            => $q,
@@ -234,6 +255,13 @@ if (isset($_GET['place'])) {
     $body = json_encode(['places' => $places, 'error' => null]);
     $db->prepare('INSERT OR REPLACE INTO page (url, ts, body) VALUES (?, ?, ?)')
        ->execute([$key, time(), $body]);
+    /* The scraper's page rows are a fixed, small set on a 15-minute TTL — they can never grow.
+       A place row is keyed by whatever a reader typed into a public URL, so the table grows without
+       bound unless something prunes it. Scoped to `place:%` only: the scraped rows have their own
+       much shorter TTL and their own fixed keys, and do not need this pass. Runs on the uncached
+       path only, which is already the slow path, so one more statement costs nothing extra felt. */
+    $db->prepare("DELETE FROM page WHERE url LIKE 'place:%' AND ts < ?")
+       ->execute([time() - PLACE_TTL]);
     header('Cache-Control: max-age=600');
     echo $body;
     exit;
