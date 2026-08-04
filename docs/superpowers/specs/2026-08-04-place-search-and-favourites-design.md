@@ -3,12 +3,31 @@
 Date: 2026-08-04
 Status: approved, ready to plan
 
-## Note on spelling
+## Spelling
 
-This document uses American spelling. The interface of this app uses British spelling already.
-Examples are "Recentre on my location" and "Colour language". Every quoted user-facing string in
-this document therefore keeps the British form, such as "Favourite this sensor". Do not change the
-existing interface strings.
+This app uses American spelling everywhere. This document, every new string and every string it
+touches follows that rule.
+
+The interface holds British spellings today. Convert every user-facing one as part of this work.
+The set is small, because most of the 502 matches in the repository sit in comments and in
+documentation.
+
+| file | what to convert |
+|---|---|
+| `index.html` | the Help pane and the About pane: colour, coloured, colours, grey, metres, neighbours, licence |
+| `js/locate.js` | the `Recentre on my location` title string |
+| `js/alerts.js`, `js/popup.js`, `js/render.js`, `js/table.js` | any British word inside an output string, a `title` or an `aria-label` |
+
+Two rules for the conversion:
+
+1. Convert output strings only. Leave comments and documentation alone. A 500-line spelling sweep
+   inside a feature diff makes the feature impossible to review. Take that sweep as its own commit.
+2. Never touch an identifier, a CSS property or an HTML attribute. `aria-labelledby` is an
+   attribute name. `color` is already the CSS property.
+
+One collision to watch. `meter()` in `popup.js` draws the water-level bar. The unit becomes
+"meters" after this change. Prefer the symbol `m` in a new string, so no reader has to tell the
+component from the unit.
 
 ## Problem
 
@@ -172,7 +191,7 @@ every reading of every sensor there.
 
 ### Favorites group
 
-With the field empty, a `FAVOURITES` group sits at the top of the list. It sits above
+With the field empty, a `FAVORITES` group sits at the top of the list. It sits above
 `Nearest station to me`. It lists favorited sites.
 
 A site appears in the group when any sensor there is a favorite. This is the same rule the pin
@@ -294,7 +313,7 @@ picks a winner at read time, one of the two controls silently does nothing.
 ### Controls
 
 **Per sensor.** Add a second item to the ⓘ menu that already holds Ignore. The two actions belong
-together. The item reads `Favourite this sensor` or `Remove from favourites`, with a star glyph.
+together. The item reads `Favorite this sensor` or `Remove from favorites`, with a star glyph.
 
 **Per mast.** Add a `★` button to the mast card's header. It reads filled **only when every sensor
 at that mast is a favorite**.
@@ -305,19 +324,19 @@ every sensor there.
 ### Surfaces
 
 1. **Search box.** See Part 2.
-2. **Drawer panel.** `Favourite sensors`, built like `Ignored sensors`. Same list markup. A count
+2. **Drawer panel.** `Favorite sensors`, built like `Ignored sensors`. Same list markup. A count
    on the `<summary>`, so a collapsed section still reports what it holds. A per-row remove and a
    clear-all. Always drawn. When empty it names the ⓘ menu.
    This panel lists **one row per sensor**, not one row per site. The search box groups by site
    because it matches the map. This panel manages the saved list itself, so it must show every id
    the list holds. A reader who starred one gauge of six needs to see which one.
-3. **Map filter.** A `Favourites only` chip beside the layer chips. It stores `PREFS.favOnly`. It
+3. **Map filter.** A `Favorites only` chip beside the layer chips. It stores `PREFS.favOnly`. It
    calls `render()`, not `syncCluster()`. `render()` builds sites after it filters, so a partly
    favorited mast draws a pin holding only its favorited sensors. The district and layer filters
    already behave this way.
    Disable the chip when the reader has saved no favorites. A filter that empties the map without
    an explanation reads as a bug.
-   When the chip is on, `#shown` appends `· favourites only`. That line already carries
+   When the chip is on, `#shown` appends `· favorites only`. That line already carries
    `· N ignored`. It is the line the eye lands on to ask why the map is this empty.
 4. **Alert panel order.** Inside each card, favorite rows sort first. The existing order holds
    below them. Each such row carries a small `★`, so the order explains itself.
@@ -400,7 +419,7 @@ stages, and keep each stage shippable on its own.
 | `js/map.js` | `syncCluster()` split, favorites layer group |
 | `js/render.js` | pin `★` badge, `favOnly` filter, favorites drawer panel, `#shown` line |
 | `js/alerts.js` | favorite rows sort first |
-| `index.html` | favorites drawer panel, `Favourites only` chip, About privacy sentence |
+| `index.html` | favorites drawer panel, `Favorites only` chip, About privacy sentence |
 | `css/base.css` | sub-row and `★` styles |
 | `css/chrome.css` | drawer panel, chip |
 | `css/map.css` | pin `★` badge |
@@ -451,6 +470,6 @@ By hand:
 3. Search twice, and confirm the second search hits the cache.
 4. Favorite a sensor, then a whole mast, and check the drawer, the chip and the pin star.
 5. Ignore a favorited sensor, and confirm it leaves the favorites list.
-6. Clear every favorite, and confirm the `Favourites only` chip stays disabled.
+6. Clear every favorite, and confirm the `Favorites only` chip stays disabled.
 7. Put a favorite on alert with test mode, and confirm it sorts first and the counts do not move.
 8. Repeat 1 to 7 below 600px.
