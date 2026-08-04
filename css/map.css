@@ -41,7 +41,7 @@
 
 /* Standard card: header (name / region / badge) → body metrics → still → footer. */
 .pophead {
-  position: relative;   /* the mast's favorite star hangs off the top-right corner */
+  position: relative;   /* the favorite heart hangs off the top-right corner */
   padding: 0 0 8px; margin-bottom: 8px; border-bottom: 1px solid var(--outline);
 }
 /* The name and the region line clear the panel's close button, which floats over this corner — but
@@ -49,7 +49,7 @@
    inset from the one on every sensor row under it. 34px = the button's 48 from the panel edge, less
    #sideBody's own 16 of padding. */
 .pophead .popname, .pophead > .muted { padding-right: 34px; }
-/* The mast's favorite star, parked on the name's line just inside the close button. It holds the
+/* The favorite heart, parked on the name's line just inside the close button. It holds the
    slot a sensor-count chip used to: the badge row under the name lists one badge per sensor, so the
    count restated what sat an inch below it, and a control for the whole mast had nowhere else to go
    that was not beside a single sensor's own row.
@@ -136,14 +136,14 @@
   color: var(--surface); background: var(--on-surface); box-shadow: 0 0 0 2px var(--surface);
 }
 .pin.multi.danger .n { color: var(--s-danger); background: var(--surface); box-shadow: none; }
-/* A starred place. Bottom right, opposite the sensor count at the top right, so a starred six-sensor
-   mast shows both marks. `--accent`, because a favorite is neither a status nor a sensor kind and
-   must take neither color language.
+/* A favorited place. Bottom right, opposite the sensor count at the top right, so a favorited
+   six-sensor mast shows both marks. Solid always — the badge is only drawn when the place is a
+   favorite, so there is no hollow state to show.
    The glyph alone, with no disc behind it — the same rule the pins themselves follow, since a plate
    covers ground the map needs and says nothing the shape does not.
    The halo is what pays for dropping the disc. `.pin` carries a drop-shadow that its children
-   inherit, but `.pin.multi` sets `filter: none`, so on a mast this star lands on a filled indigo or
-   red circle with nothing separating it. Two stacked surface-coloured shadows draw a thin edge in
+   inherit, but `.pin.multi` sets `filter: none`, so on a mast this heart lands on a filled indigo or
+   red circle with nothing separating it. It also earns its keep beside a siren pin, which is pink. Two stacked surface-coloured shadows draw a thin edge in
    whichever theme is live, which is a border made of light rather than a circle made of paint. */
 .pin .fv {
   position: absolute; bottom: -2px; right: -2px; font-size: 15px; line-height: 1;

@@ -480,10 +480,12 @@ document.addEventListener('click', e => {
      the reopen branch below. But render() deliberately skips every `@`-keyed card (`@here`, `@place`;
      see openSide() in map.js), so on those two the menu this click is inside is never destroyed: it
      is still open, `:popover-open` is still true, and nothing above has touched its label or its
-     star's colour. Left alone, a reader who stars a sensor from "You are here" or a searched place
-     sees no confirmation at all — the menu item still reads "Favorite this sensor" in grey after the
-     press. So the still-open case gets its own branch: patch the icon and the label in place, since
-     no rebuild is coming to do it for us. */
+     heart. Left alone, a reader who favorites a sensor from "You are here" or a searched place sees
+     no confirmation at all — the menu item still reads "Add to favorites" beside a hollow grey heart
+     after the press. So the still-open case gets its own branch: patch the glyph and the label in
+     place, since no rebuild is coming to do it for us.
+     The glyph swaps class as well as colour, because the heart carries the state in its fill: hollow
+     for no, solid for yes. Colour alone would leave a solid heart sitting there through both. */
   const menuId = b.closest('[popover]')?.id;
   setFavs(ids);
   if (!menuId) return;
@@ -492,10 +494,13 @@ document.addEventListener('click', e => {
   if (menu.matches(':popover-open')) {
     const item = menu.querySelector('[data-fav]');
     const on = item && ids.has(item.dataset.fav);
-    const star = item?.querySelector('.i-star');
-    if (star) star.style.color = on ? 'var(--accent)' : 'var(--muted)';
+    const heart = item?.querySelector('.i-favorite, .i-favorite_outline');
+    if (heart) {
+      heart.className = `i i-favorite${on ? '' : '_outline'}`;
+      heart.style.color = on ? 'var(--fav)' : 'var(--muted)';
+    }
     const label = item?.querySelector('span');
-    if (label) label.innerHTML = `${on ? 'Remove from favorites' : 'Favorite this sensor'}<br>` +
+    if (label) label.innerHTML = `${on ? 'Remove from favorites' : 'Add to favorites'}<br>` +
       `<small class="muted">${on ? 'stops listing it first'
         : 'lists it first in the search box and the alert panel'}</small>`;
   } else {
@@ -837,7 +842,7 @@ function rowHtml(r, i) {
       ><i class="glyph i i-${k.icon}" style="color:${k.color}"></i
       ><span class="nm">${k.one || k.label}${
         r.s.name !== r.lead ? `<br><small class="muted">${r.s.name}</small>` : ''
-      }</span>${isFav(r.s) ? '<i class="i i-star fvm" role="img" aria-label="Favorite"></i>' : ''}</li>`;
+      }</span>${isFav(r.s) ? '<i class="i i-favorite fvm" role="img" aria-label="Favorite"></i>' : ''}</li>`;
   }
 
   const lead = r.ms[0], n = r.ms.length;
@@ -848,7 +853,7 @@ function rowHtml(r, i) {
       ><i class="glyph i i-${icon}" style="color:${tint}"></i
       ><span class="nm">${lead.name}${
         r.sub ? `<br><small class="muted">${r.sub}</small>` : ''}</span>${
-      r.ms.some(isFav) ? '<i class="i i-star fvm" role="img" aria-label="Favorite"></i>' : ''}${
+      r.ms.some(isFav) ? '<i class="i i-favorite fvm" role="img" aria-label="Favorite"></i>' : ''}${
       /* No sensor count on the row. The mast glyph on the left already says this is a stack, the
          chevron on the right says it opens, and opening it lists the sensors themselves — which is
          the number, named. The station card dropped its own count for the same reason. */

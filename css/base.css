@@ -89,15 +89,14 @@
      it is already sitting on the floor, and yellow has nowhere to go — every step lighter drops it
      under 3. */
   --me: #b87b00;
-  /* A favorite. Gold, because a star that is not gold is not read as a star — the shape and the
-     colour are one idiom here, which is why this is allowed a hue rather than taking --accent.
-     It is the third mark in the amber band, after --s-alert and --me, and it is separated the only
-     way that band allows: less red than the alert amber, lighter than the hazard yellow of "you".
-     What actually keeps the three apart is shape, exactly as the --me note above argues — no
-     station glyph is a star, so the hue never has to carry "this is not a reading".
-     Light theme cannot go brighter. Yellow runs out of contrast on white before it runs out of
-     lightness, the same wall --me hit, so this sits just over the 3:1 non-text floor and stops. */
-  --fav: #c99700;
+  /* A favorite. Pink, because a heart that is not pink is not read as a heart — the shape and the
+     colour are one idiom, which is why this takes a hue of its own rather than --accent.
+     It shares a band with --k-siren, and that is the collision to know about: a siren pin is pink
+     too. Shape is what separates them, exactly as the --me note below argues for hazard yellow —
+     no station glyph is a heart, so the hue never has to carry "this is not a reading". This one
+     is deeper and more magenta than the siren's, which is all the room the band has.
+     Deep enough to clear the 3:1 non-text floor on white, which the brighter pinks do not. */
+  --fav: #cc1f7a;
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
@@ -119,10 +118,10 @@
      hue, which is a claim. */
   --s-none: #9aa0a6;
   --me: #ffbb1a;
-  /* Paler and greener than both --s-alert (#ffc000) and --me (#ffbb1a), which is the whole of the
-     room this band has on this theme. On the map the star also carries a --surface halo, so it is
-     never read against the basemap alone. */
-  --fav: #ffd24a;
+  /* More magenta than --k-siren (#ff7aa4), which is the whole of the room this band has on this
+     theme. On the map the heart also carries a --surface halo, so it is never read against the
+     basemap alone. */
+  --fav: #ff85d0;
 }
 
 * { box-sizing: border-box; }
@@ -296,12 +295,12 @@ dialog:focus, dialog:focus-visible { outline: none; }
 /* A sensor inside an open mast. Indented to the depth of the row's own glyph, so the two read as a
    tree rather than as two lists. */
 .picklist li.sub { padding-left: 30px; }
-/* The star on a row. A favorite is neither a status nor a sensor kind, so it takes neither color
-   language. `.nm` is `flex: 1` and absorbs the slack, so everything after it already sits right —
+/* The heart on a row. Solid, because a row only draws one when the place is already a favorite —
+   there is no "not set" to show here, unlike the header control. `.nm` is `flex: 1` and absorbs the slack, so everything after it already sits right —
    the `margin-left: auto` is belt and braces for a row that ever loses its name column. */
 .picklist .fvm { flex: none; margin-left: auto; font-size: 15px; color: var(--fav); }
-/* Accent, same rule as the picklist star above — a favorite is neither a status nor a sensor kind.
-   The star also carries the plain `.i` icon class, and chrome.css colors every `.slist .i` by tier
+/* Same rule as the picklist heart above. The heart also carries the plain `.i` icon class, and
+   chrome.css colors every `.slist .i` by tier
    (`.alert.t-now .slist .i` etc, four classes, specificity 0,4,0) so it can paint the *kind* glyph
    red/amber/grey next to it. A selector of equal specificity would lose that tie to source order —
    chrome.css loads after base.css — and a status hue on a favorite mark breaks the one rule this
@@ -392,10 +391,10 @@ dialog:focus, dialog:focus-visible { outline: none; }
    either list. `#districtList`'s copy needs none of this — that one is `display: none` on touch. */
 #ignoredList .solo::after, #favList .solo::after { content: ''; position: absolute; inset: -10px -6px; }
 
-/* The mast's star: the glyph alone, with no plate behind it. Every mark on the map is a bare glyph
-   for the same reason — a disc covers what it stands on and buys nothing a shape does not already
-   say. Colour carries the state, muted to accent, which is how every other control here reports
-   itself. Accent and never a `--s-*`: a favorite is neither a status nor a sensor kind.
+/* The favorite heart, in a card header's corner: the glyph alone, with no plate behind it. Every
+   mark on the map is a bare glyph for the same reason — a disc covers what it stands on and buys
+   nothing a shape does not already say. Fill carries the state, hollow to solid, and colour follows
+   it from muted to `--fav`. Never a `--s-*`: a favorite is not a status.
    Positioned in map.css, beside the close button — see `.pophead .favbtn` there. */
 .favbtn {
   position: relative;
@@ -405,10 +404,10 @@ dialog:focus, dialog:focus-visible { outline: none; }
 .favbtn:hover { color: var(--on-surface); }
 .favbtn.on { color: var(--fav); }
 /* 20px, not the 17 it wore inside a ring. A bare glyph has no border drawing its edge, so it has to
-   be the thing that fills the box. */
+   be the thing that fills the box. The hollow variant needs it most: an outline at 17 is thin. */
 .favbtn .i { font-size: 20px; }
 /* The visible button stays 28px so it clears the close button beside it. The hit area grows past
-   it, because a finger needs about 40px and a star that misses is a mast nobody can file. `inset`
+   it, because a finger needs about 40px and a heart that misses is a mast nobody can file. `inset`
    rather than padding: padding would resize the button and move it off the name's line. Same trick,
    same reason, as the search box's chevron. */
 .favbtn::after { content: ''; position: absolute; inset: -6px; }

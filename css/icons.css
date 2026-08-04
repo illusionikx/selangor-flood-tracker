@@ -11,10 +11,13 @@
    to bump on two files, no subset to keep in step with the markup, and no way for a missing icon to
    render as a readable word instead of a picture.
 
-   **Filled, not outlined** (`fill=1`), the whole set. A station pin is the glyph and nothing else
-   now — no disc behind it — and an outline standing on an arbitrary photograph of a city is a thin
-   line with no field to read against. What is good for the pins is good for the rest: an outline and
-   a fill side by side in the same bar read as two icon sets.
+   **Filled, not outlined** (`fill=1`), with one deliberate exception. A station pin is the glyph and
+   nothing else now — no disc behind it — and an outline standing on an arbitrary photograph of a
+   city is a thin line with no field to read against. What is good for the pins is good for the rest:
+   an outline and a fill side by side in the same bar read as two icon sets.
+   The exception is `--i-favorite_outline`, which exists because there the pair *is* the message —
+   hollow means "not a favorite", solid means "favorite" — and one control never shows both at once.
+   Adding a second `fill=0` glyph needs that same argument, not just a preference.
 
    Refetch one with:
      https://fonts.gstatic.com/s/i/short-term/release/materialsymbolsoutlined/<name>/fill1/24px.svg
@@ -34,6 +37,12 @@
   --i-dark_mode: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 -960 960 960'><path d='M480-120q-150 0-255-105T120-480q0-150 105-255t255-105q14 0 27.5 1t26.5 3q-41 29-65.5 75.5T444-660q0 90 63 153t153 63q55 0 101-24.5t75-65.5q2 13 3 26.5t1 27.5q0 150-105 255T480-120Z'/></svg>");
   --i-expand_less: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 -960 960 960'><path d='m296-345-56-56 240-240 240 240-56 56-184-184-184 184Z'/></svg>");
   --i-expand_more: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 -960 960 960'><path d='M480-345 240-585l56-56 184 184 184-184 56 56-240 240Z'/></svg>");
+  /* The favorite mark, and the one place this file carries a `fill=0` glyph beside its filled twin.
+     Everywhere else an outlined icon next to a filled one reads as two icon sets. Here the pair *is*
+     the message — hollow means "not a favorite", solid means "favorite" — and one control never
+     shows both at once. Both come from Material Symbols, `/fill1/` and `/default/` of the same name. */
+  --i-favorite: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 -960 960 960'><path d='m480-120-58-52q-101-91-167-157T150-447.5Q111-500 95.5-544T80-634q0-94 63-157t157-63q52 0 99 22t81 62q34-40 81-62t99-22q94 0 157 63t63 157q0 46-15.5 90T810-447.5Q771-395 705-329T538-172l-58 52Z'/></svg>");
+  --i-favorite_outline: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 -960 960 960'><path d='m480-120-58-52q-101-91-167-157T150-447.5Q111-500 95.5-544T80-634q0-94 63-157t157-63q52 0 99 22t81 62q34-40 81-62t99-22q94 0 157 63t63 157q0 46-15.5 90T810-447.5Q771-395 705-329T538-172l-58 52Zm0-108q96-86 158-147.5t98-107q36-45.5 50-81t14-70.5q0-60-40-100t-100-40q-47 0-87 26.5T518-680h-76q-15-41-55-67.5T300-774q-60 0-100 40t-40 100q0 35 14 70.5t50 81q36 45.5 98 107T480-228Zm0-273Z'/></svg>");
   /* The app logo, and the source of every baked PNG — `php icon-build.php` reads this same glyph out
      of icon.svg and screenshots it into icon-512/192/180. Material's own `flood`, so the mark, the
      favicon, the installed app and the station glyphs are one drawing set rather than two. It was a
@@ -62,12 +71,6 @@
   --i-search: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 -960 960 960'><path d='M784-120 532-372q-30 24-69 38t-83 14q-109 0-184.5-75.5T120-580q0-109 75.5-184.5T380-840q109 0 184.5 75.5T640-580q0 44-14 83t-38 69l252 252-56 56ZM380-400q75 0 127.5-52.5T560-580q0-75-52.5-127.5T380-760q-75 0-127.5 52.5T200-580q0 75 52.5 127.5T380-400Z'/></svg>");
   --i-skip_next: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 -960 960 960'><path d='M660-240v-480h80v480h-80Zm-440 0v-480l360 240-360 240Z'/></svg>");
   --i-skip_previous: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 -960 960 960'><path d='M220-240v-480h80v480h-80Zm520 0L380-480l360-240v480Z'/></svg>");
-  --i-star: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 -960 960 960'><path d='m233-120 65-281L80-590l288-25 112-265 112 265 288 25-218 189 65 281-247-149-247 149Z'/></svg>");
-  /* The one `fill=0` glyph in the file, and it earns the exception. Everywhere else a filled and an
-     outlined icon side by side would read as two icon sets; here the pair *is* the message — outline
-     means "not a favorite", filled means "favorite" — and the two never appear together. Fetched
-     from the same source with `/default/` in place of `/fill1/`. */
-  --i-star_outline: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 -960 960 960'><path d='m354-287 126-76 126 77-33-144 111-96-146-13-58-136-58 135-146 13 111 97-33 143ZM233-120l65-281L80-590l288-25 112-265 112 265 288 25-218 189 65 281-247-149-247 149Zm247-350Z'/></svg>");
   --i-straighten: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 -960 960 960'><path d='M160-240q-33 0-56.5-23.5T80-320v-320q0-33 23.5-56.5T160-720h120v240h80v-240h80v240h80v-240h80v240h80v-240h120q33 0 56.5 23.5T880-640v320q0 33-23.5 56.5T800-240H160Z'/></svg>");
   --i-visibility: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 -960 960 960'><path d='M607.5-372.5Q660-425 660-500t-52.5-127.5Q555-680 480-680t-127.5 52.5Q300-575 300-500t52.5 127.5Q405-320 480-320t127.5-52.5Zm-204-51Q372-455 372-500t31.5-76.5Q435-608 480-608t76.5 31.5Q588-545 588-500t-31.5 76.5Q525-392 480-392t-76.5-31.5ZM214-281.5Q94-363 40-500q54-137 174-218.5T480-800q146 0 266 81.5T920-500q-54 137-174 218.5T480-200q-146 0-266-81.5Z'/></svg>");
   --i-visibility_off: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 -960 960 960'><path d='M792-56 624-222q-35 11-70.5 16.5T480-200q-151 0-269-83.5T40-500q21-53 53-98.5t73-81.5L56-792l56-56 736 736-56 56ZM480-320q11 0 20.5-1t20.5-4L305-541q-3 11-4 20.5t-1 20.5q0 75 52.5 127.5T480-320Zm292 18L645-428q7-17 11-34.5t4-37.5q0-75-52.5-127.5T480-680q-20 0-37.5 4T408-664L306-766q41-17 84-25.5t90-8.5q151 0 269 83.5T920-500q-23 59-60.5 109.5T772-302ZM587-486 467-606q28-5 51.5 4.5T559-574q17 18 24.5 41.5T587-486Z'/></svg>");
@@ -103,6 +106,8 @@
 .i-dark_mode { --i: var(--i-dark_mode); }
 .i-expand_less { --i: var(--i-expand_less); }
 .i-expand_more { --i: var(--i-expand_more); }
+.i-favorite { --i: var(--i-favorite); }
+.i-favorite_outline { --i: var(--i-favorite_outline); }
 .i-flood { --i: var(--i-flood); }
 .i-history { --i: var(--i-history); }
 .i-home_pin { --i: var(--i-home_pin); }
@@ -126,8 +131,6 @@
 .i-search { --i: var(--i-search); }
 .i-skip_next { --i: var(--i-skip_next); }
 .i-skip_previous { --i: var(--i-skip_previous); }
-.i-star { --i: var(--i-star); }
-.i-star_outline { --i: var(--i-star_outline); }
 .i-straighten { --i: var(--i-straighten); }
 .i-visibility { --i: var(--i-visibility); }
 .i-visibility_off { --i: var(--i-visibility_off); }

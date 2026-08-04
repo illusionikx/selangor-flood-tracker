@@ -86,8 +86,9 @@ export const dots = s => `<button class="icon dots" popovertarget="mnu-${s.id}"
   <div id="mnu-${s.id}" class="menu surface" popover>
     ${sourceInfo(s)}
     <button class="mi" data-fav="${s.id}"
-      ><i class="i i-star" style="color:${isFav(s) ? 'var(--accent)' : 'var(--muted)'}"></i>
-      <span>${isFav(s) ? 'Remove from favorites' : 'Favorite this sensor'}<br><small class="muted">${
+      ><i class="i i-favorite${isFav(s) ? '' : '_outline'}"
+         style="color:${isFav(s) ? 'var(--fav)' : 'var(--muted)'}"></i>
+      <span>${isFav(s) ? 'Remove from favorites' : 'Add to favorites'}<br><small class="muted">${
         isFav(s) ? 'stops listing it first'
                  : 'lists it first in the search box and the alert panel'}</small></span>
     </button>
@@ -355,21 +356,20 @@ function sourceInfo(s) {
 const region = s => `<div class="muted">${
   [s.district, s.state].filter(Boolean).join(', ') || 'district n/a'} · ${s.basin || 'basin n/a'}</div>`;
 
-/* The star in a card header's top-right corner, beside the close button. One card kind carries one
-   sensor and the other carries a mast, and they differ only in how many ids a press acts on and in
-   what the tooltip calls the thing. One builder for both, so the two cannot grow different shapes,
-   different wording or different glyph rules.
+/* The favorite heart in a card header's top-right corner, beside the close button. One card kind
+   carries one sensor and the other carries a mast, and they differ only in how many ids a press
+   acts on. One builder for both, so the two cannot grow different shapes or different wording.
    `ids` is comma separated. ui.js's handler reads a full list as "remove every one" and anything
-   short of full as "add every one", which is what makes a mast's star fill only when all of its
-   sensors are starred while one press still acts on all of them.
+   short of full as "add every one", which is what makes a mast's heart fill only when all of its
+   sensors are favorites while one press still acts on all of them.
    The `title` is allowed under this project's rule that a tooltip may only duplicate something
    already on screen: the glyph and its colour already report the state, and this only names the
    action they are offering. Nothing lives in the tooltip alone, so a phone loses nothing. */
-const favStar = (ids, set, what) => {
-  const says = `${set ? 'Remove' : 'Add'} this ${what} ${set ? 'from' : 'to'} favorites`;
+const favMark = (ids, set) => {
+  const says = set ? 'Remove from favorites' : 'Add to favorites';
   return `<button class="favbtn${set ? ' on' : ''}" data-fav="${ids}"
               aria-pressed="${set}" title="${says}" aria-label="${says}"
-        ><i class="i i-star${set ? '' : '_outline'}"></i></button>`;
+        ><i class="i i-favorite${set ? '' : '_outline'}"></i></button>`;
 };
 
 export function popup(s) {
@@ -377,13 +377,13 @@ export function popup(s) {
   const tone = hasInfo(s) ? kind.color : 'var(--muted)';
   /* Place first, sensor second: you look up a popup by where it is, and the badge answers the
      follow-up question ("what is this reading?") rather than the opening one.
-     The star sits in the same corner it holds on a mast card. A single-sensor card can also be
-     starred from its ⓘ menu, which is two ways to the same switch — kept on purpose, because the
+     The heart sits in the same corner it holds on a mast card. A single-sensor card can also be
+     favorited from its ⓘ menu, which is two ways to the same switch — kept on purpose, because the
      corner is where a reader learns to look across every card, and the menu item has to stay for
      the sensors listed on a mast and on the "near this point" cards, which have no corner of their
      own. Emitted before .popname because the CSS reserves the room with a sibling rule. */
   return `<div class="pophead">
-      ${favStar(s.id, isFav(s), 'sensor')}
+      ${favMark(s.id, isFav(s))}
       <div class="popname">${s.name}</div>
       ${region(s)}
       <div class="popact">
@@ -410,19 +410,19 @@ export function sitePopup(members) {
   if (members.length === 1) return popup(members[0]);
   const lead = members[0];
   const hasCam = members.some(m => m.kind === 'camera');
-  /* Filled only when every sensor here is starred, because this button acts on all of them and has
-     to state exactly what one press will undo. The pin on the map uses the opposite rule — any
-     sensor starred draws a star — because that badge is an indication and not a control. */
+  /* Solid only when every sensor here is a favorite, because this button acts on all of them and
+     has to state exactly what one press will undo. The pin on the map uses the opposite rule — any
+     one favorite draws a heart — because that badge is an indication and not a control. */
   const favAll = members.every(isFav);
   const favIdList = members.map(m => m.id).join(',');
 
-  /* The star holds the corner beside the close button, where a sensor-count chip used to sit. The
+  /* The heart holds the corner beside the close button, where a sensor-count chip used to sit. The
      count went because the badge row directly below the name already lists one badge per sensor, so
      the chip restated what was an inch under it — and this corner is the only place on the card with
      room for a control that belongs to the whole mast rather than to one sensor on it.
      Emitted before .popname because the CSS reserves room for it with an adjacent-sibling rule. */
   return `<div class="pophead">
-      ${favStar(favIdList, favAll, 'mast')}
+      ${favMark(favIdList, favAll)}
       <div class="popname">${lead.name}</div>
       ${region(lead)}
       <div class="badges">${members.map(m => {

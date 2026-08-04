@@ -103,7 +103,7 @@ function groupCard(items, kind, t, hereAt) {
         title="Show ${s.name} on the map">
         <i class="i i-${(size.get(s.site || s.id) || 1) > 1 ? 'layers' : k.icon}"></i>
         ${fav.has(s.site || s.id)
-          ? '<i class="i i-star fvm" role="img" aria-label="Favorite"></i>' : ''}
+          ? '<i class="i i-favorite fvm" role="img" aria-label="Favorite"></i>' : ''}
         <span class="nm">${s.name}<br><small class="muted">${
           [s.district, s.state].filter(Boolean).join(', ')}${
           hereAt ? ` · ${distKm(hereAt, s).toFixed(1)} km` : ''}${

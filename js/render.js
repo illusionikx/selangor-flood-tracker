@@ -153,7 +153,7 @@ export function render() {
                      rising ? ' rise' : ''}${critical ? ' danger' : ''}" style="--c:${c}"><i class="i i-${
                multi ? MAST.icon : KINDS[lead.kind].icon}"></i>${
                multi ? `<b class="n">${members.length}</b>` : ''}${
-               fav ? '<b class="fv"><i class="i i-star"></i></b>' : ''}</span>`,
+               fav ? '<b class="fv"><i class="i i-favorite"></i></b>' : ''}</span>`,
       }),
     });
     // Fill the panel, then centre the pin in what is left of the map. Panel first: focusOn() reads

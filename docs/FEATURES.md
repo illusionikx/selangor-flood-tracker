@@ -476,8 +476,8 @@ rain-alone would have drawn a divider under nothing.
 
 *Blob diameter went 4km → 5km* at the same time, for both layers.
 
-> **Superseded.** The corner chip described below is gone. The favorite star holds that slot now —
-> see "The mast star takes the header's corner" at the end of this file.
+> **Superseded.** The corner chip described below is gone. The favorite mark holds that slot now —
+> see "The favorite mark takes the header's corner" at the end of this file.
 
 **The site popup's sensor count is a corner chip, not a sentence.** A multi-sensor popup opened with
 a `6 sensors at this location` line under the region, which spent a whole row of a popup that is
@@ -4747,17 +4747,17 @@ true: this feature sends a name, never a coordinate.
 ## Favorites
 
 `PREFS.favs` is an array of station ids, the mirror of `PREFS.ignored` and stored in the same blob.
-A star on a sensor's ⓘ menu adds one. A star on a mast header adds every sensor there. It reads
-filled only when the reader has starred every one of them, because that button acts on all of them
-and must state what one press will undo.
+A mark on a sensor's ⓘ menu adds one. A mark on a mast header adds every sensor there. It reads
+solid only when every one of them is a favorite, because that button acts on all of them and must
+state what one press will undo.
 
 A sensor is never in both lists. Favoriting drops the id from `ignored` and ignoring drops it from
 `favs`, because "show me this first" and "never show me this" is not a state a person meant to be in.
 
 Five surfaces: a `FAVORITES` group leading an untouched search box, a drawer panel that mirrors
 Ignored sensors, a `Favorites only` map filter, favorites-first ordering inside each alert panel
-card, and the map pin itself. A pin carries a star when the reader has starred **any** sensor at
-that site, and the map draws it outside the cluster so a chip cannot swallow it.
+card, and the map pin itself. A pin carries the mark when **any** sensor at that site is a
+favorite, and the map draws it outside the cluster so a chip cannot swallow it.
 
 **Alert-standard note.** The alert panel's ordering is the only alert surface this touches, and it
 moves order only. The set of alerts does not change. Nothing suppresses an alert, and no count moves.
@@ -4769,7 +4769,7 @@ two districts away that a reader muted is the failure ISA-18.2 spends a chapter 
 stays the one suppression control in this app.
 
 **Not built.** A favorites layer *chip* or a color of its own. A favorite is neither a status nor a
-sensor kind, so it takes neither color language and the star is the whole indication. A plain
+sensor kind, so it takes no kind color, and the mark itself is the whole indication. A plain
 `favLayer` layer group (`js/map.js`) does exist, outside the cluster — that is the mechanism behind
 "the map draws it outside the cluster" above, not a user-facing layer with a toggle of its own. Do
 not fold it back into `cluster`: see "A cluster badge counts what it is hiding" in `CLAUDE.md`, which
@@ -4791,72 +4791,73 @@ Two rules for any future conversion. Never touch an identifier, a CSS property o
 `m` over the word "meters" in a new string, because `meter()` in `popup.js` draws the water-level bar
 and the two would otherwise share a spelling.
 
-### The mast star takes the header's corner
+### The favorite mark takes the header's corner
 
 A multi-sensor card carried two marks in its header. A sensor-count chip sat beside the close
-button, and a favorite star sat inside the badge row below the place name. One control replaces
-both. The star takes the corner and the count goes.
+button, and a favorite mark sat inside the badge row below the place name. One control replaces
+both. The mark takes the corner and the count goes.
 
-The count went because it restated its own neighbor. The badge row sits directly under the name and draws one
-badge per sensor. A reader who wanted the number saw it an inch below the chip that stated it. The star had no such alternative. It acts on the whole
-mast. Inside the badge row it read as one more sensor, not as a control over all of them.
+The count went because it restated its own neighbor. The badge row sits directly under the name and
+draws one badge per sensor. A reader who wanted the number saw it an inch below the chip that stated
+it. The mark had no such alternative. It acts on the whole mast. Inside the badge row it read as one
+more sensor, not as a control over all of them.
 
 `.pophead .favbtn` centers on the place name's line at `top: 14px`. That is the header's own
 `padding-top: 18px`, plus half a 15px/1.3 line, less half the button's 28px. That is the same
-arithmetic the chip used with its own height. `CLAUDE.md` records the three numbers that move together.
-Only one thing fits in that corner. The adjacent-sibling rule that reserves the room lets a second
-chip sit on the place name instead of beside it.
+arithmetic the chip used with its own height. `CLAUDE.md` records the three numbers that move
+together. Only one thing fits in that corner. The adjacent-sibling rule that reserves the room lets
+a second chip sit on the place name instead of beside it.
 
-**The star lost its ring, and the pin's star lost its disc.** Both are the bare glyph now. Every pin
-on this map is a glyph with no plate. The reason applies here too. A disc covers ground, and it
-says nothing the shape does not already say. Color carries the state: muted when unset, `--accent` when
-set. The rest of this app reports itself the same way. `--accent` and never a `--s-*`, because a
-favorite is neither a status nor a sensor kind.
+**The header mark lost its ring, and the pin's mark lost its disc.** Both are the bare glyph now.
+Every pin on this map is a glyph with no plate. The reason applies here too. A disc covers ground,
+and it says nothing the shape does not already say.
 
 Dropping the pin's disc cost it its edge, so the glyph pays for it with light instead of paint.
 `.pin` carries a drop-shadow its children inherit. But `.pin.multi` sets `filter: none`. On a mast
-the star then lands on a filled indigo or red circle, with nothing between them. Two stacked
+the mark then lands on a filled indigo or red circle, with nothing between them. Two stacked
 `--surface` drop-shadows draw a thin halo that flips with the theme.
 
-**The star carries a tooltip, and this project allows it here.** The rule is that a `title` means
-nothing on a phone, so it must only duplicate something already on screen. The star's own color
-already reports which state it is in. The tooltip names the action that color offers: `Add this
-mast to favorites`, or `Remove this mast from favorites`. The `aria-label` carries the same text. Nothing lives only in the tooltip, so a touch device loses nothing.
+**The mark carries a tooltip, and this project allows it here.** The rule is that a `title` means
+nothing on a phone. So it must only duplicate something already on screen. The glyph already reports
+which state it is in. The tooltip names the action that state offers. The `aria-label` carries the
+same words. Nothing lives only in the tooltip, so a touch device loses nothing.
 
 **Trade-off accepted.** A card no longer states its sensor count in words anywhere. The badge row is
 the answer, and it was already the better one.
 
-### The star reads as a star
+### The favorite mark is a heart
 
-The favorite star reported its state with color alone. It went muted to `--accent`. It now changes shape as
-well. Unset draws the outline glyph. Set draws the filled one, in gold.
+The favorite mark reported its state with color alone, muted to `--accent`. It is a heart now, and
+it carries the state in its shape as well. A hollow heart means "not a favorite". A solid pink one
+means "favorite".
 
-**The outline is the one `fill=0` icon in `css/icons.css`.** Every glyph in that file uses `fill=1`. The
-rule behind that is simple. A filled icon and an outlined one, side by side, read as two icon sets. This pair earns the
-exception, because the pair *is* the message. One control never shows both at once. An empty star
-against a filled one is the oldest idiom there is for this. Both come from Material
-Symbols, the same source as the rest of the file, with `/default/` in place of `/fill1/`.
+**The hollow heart is the one `fill=0` icon in `css/icons.css`.** Every other glyph in that file
+uses `fill=1`. The rule behind that is simple. A filled icon and an outlined one read as two icon sets when they sit
+side by side. This pair earns the exception, because the pair *is* the message. One control
+never shows both at once. A hollow heart against a solid one is the oldest idiom for this. Both
+glyphs come from Material Symbols, `/fill1/` and `/default/` of one name.
 
-**Gold is the third mark in the amber band.** `--s-alert` holds amber for the alert rung. `--me` holds hazard yellow for "you are here". `--fav` is the third, and
-the band has little room left. Shape separates them. The `--me` note above already makes that
-argument. No station glyph is a star, so the hue never has to carry "this is not a reading". The light value stops just over the 3:1 non-text floor. Yellow runs out of contrast on white
-before it runs out of lightness. `--me` hit that wall first.
+**Pink shares a band with `--k-siren`, and that is the collision to know about.** A siren pin is
+pink too. `--fav` runs deeper and more magenta, which is the only room the band has. Shape separates
+the two. The `--me` note in `base.css` already makes that argument for hazard yellow. No station
+glyph is a heart, so the hue never has to carry "this is not a reading". The light value sits just
+over the 3:1 non-text floor on white. The brighter pinks do not clear it.
 
-**Where this is worth watching.** The alert panel draws a gold star on rows whose tier tag is
-amber. The map draws one near amber alert pins. Color is not the message on either surface. The tier
-tag names the tier in words, and the star is a shape no sensor wears. Even so, this is the tightest
-place the palette has ever had to hold three meanings in one band.
+**Where to watch it.** The map draws a pink heart on a pin that can sit beside a pink siren pin.
+Color is not the message there. The heart is a shape no sensor wears, and it carries a `--surface`
+halo, so it never reads against the basemap alone. Even so, no two marks on this map have ever sat this close in one
+hue band.
 
-**Both card kinds carry the star, from one builder.** A single-sensor station short-circuits to
-`popup()`, which never had one — the star existed only on the mast card, so a reader on a plain
-station had to open the ⓘ menu to find the switch. `favStar()` now draws it for both. The two
-differ in how many ids one press acts on, and in whether the tooltip says "sensor" or "mast".
+**Both card kinds carry the mark, from one builder.** A single-sensor station short-circuits to
+`popup()`, which never had one. The mark lived on the mast card alone. A reader on a plain station
+had to open the ⓘ menu to find the switch. `favMark()` draws it for both now. The two differ in how
+many ids one press acts on. The tooltip reads the same on both. It says `Add to favorites`, or
+`Remove from favorites`.
 
-A single-sensor card can be starred from its corner and from its ⓘ menu. That is two ways to one
-switch, and it stays. The corner is where a reader learns to look across every card. The menu item stays
-anyway, because the sensors listed down a mast and on the "near this point" cards need it. Neither
-of those has a corner of its own.
+A single-sensor card offers the switch twice, in its corner and in its ⓘ menu. That stays. The
+corner is where a reader learns to look across every card. The menu item stays anyway. The sensors listed
+down a mast and on the "near this point" cards need it. Neither has a corner of its own.
 
 **The search box lost its sensor count too.** A mast row showed a `layers` glyph and a count. The
 count goes for the same reason the card's did. The mast glyph already says this is a stack. The
-chevron says it opens, and opening it lists the sensors — the number named, rather than stated.
+chevron says it opens. Opening it lists the sensors, which is the number named rather than stated.

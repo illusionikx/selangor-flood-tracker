@@ -389,7 +389,7 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
 - **Three numbers put the place name on the close button's line and move together:** `#sideClose`'s
   `top: 8px`, `#sideHead .pophead`'s `padding-top: 18px` (8 + half the button's 40 − half a 15px/1.3
   line) and `.pophead .favbtn`'s `top: 14px` (18 + half that line − half the button's 28). The
-  favorite star holds that corner. A sensor-count chip held it first, at `top: 19px` for an 18px
+  favorite heart holds that corner. A sensor-count chip held it first, at `top: 19px` for an 18px
   height — if anything is ever parked there again, it is the same arithmetic with its own height.
   **Only one thing fits.** `.pophead .favbtn + .popname` reserves the room with an adjacent-sibling
   rule, so a second chip in that corner would sit on the place name rather than beside it.
