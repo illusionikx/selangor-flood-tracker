@@ -358,12 +358,12 @@ dialog:focus, dialog:focus-visible { outline: none; }
 /* Ignored sensors: the same picklist again, so it reads as a sibling of the district filter rather
    than a new kind of control. Two lines a row, because a station name alone is not enough to know
    which of the four "Sungai Klang" gauges you silenced. */
-#ignoredList { max-height: 26vh; border: 1px solid var(--outline); border-radius: 8px; }
-#ignoredList .nm { flex: 1; min-width: 0; line-height: 1.35; }
-#ignoredList .nm .muted { font-size: 11px; }
-/* Always visible, unlike the district list's "only" — restoring is the whole reason this panel
-   exists, so it must not be something you have to hover a row to discover. */
-#ignoredList .solo { visibility: visible; }
+#ignoredList, #favList { max-height: 26vh; border: 1px solid var(--outline); border-radius: 8px; }
+#ignoredList .nm, #favList .nm { flex: 1; min-width: 0; line-height: 1.35; }
+#ignoredList .nm .muted, #favList .nm .muted { font-size: 11px; }
+/* Always visible, unlike the district list's "only" — reviewing and undoing the list is the whole
+   reason both panels exist, so the control must not be something you hover a row to discover. */
+#ignoredList .solo, #favList .solo { visibility: visible; }
 
 /* The mast's star. It rides in the badge row rather than beside the close button, because the three
    numbers that put the place name on that line move together and a second chip up there would be a

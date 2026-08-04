@@ -3,7 +3,7 @@
 import { KINDS, MAST, HEAT_FLOOR, RAIN_STOPS } from './config.js';
 import { state, PREFS } from './state.js';
 import { el, color, dkey, atDanger, statusColor, leads, hasInfo, isIgnored, ignoredIds,
-         scalePos, levelStops, gaugeStops } from './util.js';
+         favIds, isFav, scalePos, levelStops, gaugeStops } from './util.js';
 import { marks, siteMark, shown, syncCluster, focusOn, side, openSide,
          showMast, hideMast } from './map.js';
 import { heat, rainHeat, syncHeat, thinHeat } from './heat.js';
@@ -162,6 +162,7 @@ export function render() {
   counts();
   districts();
   ignoredPanel();
+  favPanel();
   // Every poll rebuilds the map; the table has to follow or it sits on readings the map has already
   // replaced. Only while it is open — no point rendering 435 rows into a closed dialog.
   if (el('dataBox').open) dataTable();
@@ -226,6 +227,28 @@ export function ignoredPanel() {
     || '<li class="none">Nothing ignored. Use the Details button on any sensor in a station’s '
      + 'card.</li>';
   el('ignoredClear').disabled = !rows.length;
+}
+
+/* The sensors starred from a station card, listed so they can be found and unstarred. One row per
+   sensor: this panel manages the saved list, and a list that hid five of a mast's six entries could
+   not be used to remove one of them. Row order is the order they were starred in — a short list, and
+   "the one I just added" is at the bottom where it was left. */
+export function favPanel() {
+  const ids = favIds();
+  const rows = state.data.filter(s => ids.has(s.id));
+
+  el('favN').textContent = rows.length || '';
+  el('favList').innerHTML = rows.map(s => `<li>
+      <i class="glyph i i-${KINDS[s.kind].icon}" style="color:${KINDS[s.kind].color}"></i>
+      <span class="nm">${s.name}<br><span class="muted">${
+        [s.district, s.state].filter(Boolean).join(', ')} · ${
+        KINDS[s.kind].one || KINDS[s.kind].label}</span></span>
+      <button class="solo" data-unfav="${s.id}"
+              aria-label="Remove ${s.name} from favorites">remove</button>
+    </li>`).join('')
+    || '<li class="none">Nothing starred yet. Use the star on a mast, or the Details button on any '
+     + 'sensor in a station’s card.</li>';
+  el('favClear').disabled = !rows.length;
 }
 
 // What the filters actually left on the map. Counted per *station*, not per marker: several sensors

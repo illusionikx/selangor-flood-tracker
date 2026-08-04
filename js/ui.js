@@ -491,6 +491,15 @@ el('ignoredList').onclick = e => {
 };
 el('ignoredClear').onclick = () => setIgnored(new Set());
 
+el('favList').onclick = e => {
+  const id = e.target.closest('[data-unfav]')?.dataset.unfav;
+  if (!id) return;
+  const ids = favIds();
+  ids.delete(id);
+  setFavs(ids);
+};
+el('favClear').onclick = () => setFavs(new Set());
+
 /* Placement for the Details menu, by hand — CSS anchor positioning is Chromium-only, exactly as in the
    table's hover panels. `toggle` does not bubble, hence the capture phase. */
 document.addEventListener('toggle', e => {

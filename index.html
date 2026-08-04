@@ -30,7 +30,7 @@
 <link rel="stylesheet" href="vendor/markercluster.css">
 <link rel="stylesheet" href="vendor/fonts.css?v=49">
 <link rel="stylesheet" href="css/icons.css?v=68">
-<link rel="stylesheet" href="css/base.css?v=85">
+<link rel="stylesheet" href="css/base.css?v=86">
 <link rel="stylesheet" href="css/chrome.css?v=123">
 <link rel="stylesheet" href="css/map.css?v=92">
 
@@ -642,6 +642,15 @@
         <button id="districtAll" class="link">Show all</button>
         <button id="districtNone" class="link">Hide all</button>
       </div>
+    </details>
+    <!-- Sensors starred from a station card. Listed one row per sensor, not one row per site: the
+         search box groups by site because it matches the map, and this panel manages the saved list
+         itself, so it has to show every id the list holds. A reader who starred one gauge of six
+         needs to see which one. Collapsed by default — the count on the summary is the indication. -->
+    <details id="favs" class="sect">
+      <summary><i class="i i-star"></i>Favorite sensors<b id="favN"></b></summary>
+      <ul id="favList" class="picklist"></ul>
+      <div class="rowbtns"><button id="favClear" class="link">Remove all favorites</button></div>
     </details>
     <!-- Sensors switched off one at a time from a station card's Details button. Always here, even
          empty: this summary and the count under the layer chips are the only two places that say a
