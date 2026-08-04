@@ -40,12 +40,34 @@ const STORM_BANDS = [[10, 75], [20, 42], [35, 18], [55, 4]];  // ≤ km → mm/h
 // decided — see the site pass at the foot of seedTest() for why the camera path needs its own knob.
 const CAM_EVERY = 3;
 
+/* Every fake sample carries the status it was at, the third element real samples get from
+   `sparkPoints()` in api.php. Without it the graph's hover readout printed a faked flood in plain
+   ink, because the readout colours a sample by its own code and a two-element sample has none —
+   so the one surface built to show a level crossing its mark was the one surface test mode could
+   not show it on.
+   These mirror `wlStatus()`, `gaugeStatus()` and `rainStatus()` in sources.php. They are copies,
+   for the same reason the rainfall branch below already copies its cutoffs: nothing here reaches a
+   server, so there is no scorer to ask. Real data is still scored server-side and never here. */
+const wlCode = s => v => v >= (s.danger ?? Infinity) ? 3 : v >= (s.warning ?? Infinity) ? 2
+  : v >= (s.alert ?? Infinity) ? 1 : 0;
+const gaugeCode = s => v => v <= 0 ? 0 : v >= (s.danger ?? 0.3) ? 3
+  : v >= (s.warning ?? 0.15) ? 2 : 1;
+const rainCode = v => v > 60 ? 4 : v > 30 ? 3 : v > 10 ? 2 : v > 0 ? 1 : 0;
+
 // Half a day of samples climbing into the current reading. A flat line under a station claiming to
 // climb is the sort of detail that makes a screenshot useless.
-const ramp = (now, step) => Array.from({ length: 24 }, (_, i) => [
-  Math.floor(Date.now() / 1000) - (23 - i) * 1800,
-  +(now - (23 - i) * step).toFixed(2),
-]);
+const ramp = (now, step, code) => Array.from({ length: 24 }, (_, i) => {
+  const v = +(now - (23 - i) * step).toFixed(2);
+  return [Math.floor(Date.now() / 1000) - (23 - i) * 1800, v, code(v)];
+});
+
+/* Hourly buckets, building into the current reading: rainfall is an interval quantity, so its graph
+   is bars over RAIN_BUCKET, and a flat set of identical bars would tell us nothing about whether the
+   bars line up with the axis. */
+const rainRamp = mm => Array.from({ length: 12 }, (_, i) => {
+  const v = +(mm * (0.2 + 0.8 * (i / 11))).toFixed(1);
+  return [Math.floor(Date.now() / 1000) - (11 - i) * 3600, v, rainCode(v)];
+});
 
 // One sensor, pushed to the worst its own kind can report. Used by the first pass on rivers and by
 // the site pass on everything else at a place that is already under water.
@@ -59,21 +81,19 @@ function drown(s) {
     s.status = 3;
     s.rate = 0.22; s.eta = 0; s.rising = true;
     s.ratio = 1;
-    s.history = ramp(s.level, s.rate / 2);
+    s.history = ramp(s.level, s.rate / 2, wlCode(s));
   } else if (s.kind === 'rainfall') {
     // Heavy, not very heavy: the top class belongs to the middle of the storm cell, and a mast that
     // happens to sit under a flooding river is not automatically the worst of the weather. A gauge
     // already inside the cell keeps what the cell gave it — this may only ever raise a reading.
     if ((s.hourly ?? 0) >= 45) return true;
     s.hourly = 45; s.daily = 158; s.status = 3;
-    s.history = Array.from({ length: 12 }, (_, i) => [
-      Math.floor(Date.now() / 1000) - (11 - i) * 3600, +(45 * (0.2 + 0.8 * (i / 11))).toFixed(1),
-    ]);
+    s.history = rainRamp(45);
   } else if (s.kind === 'gauge') {
     const mark = s.danger ?? 0.3;
     s.depth = +(mark * 1.2).toFixed(2);
     s.status = 2;
-    s.history = ramp(s.depth, mark / 40);
+    s.history = ramp(s.depth, mark / 40, gaugeCode(s));
   } else if (s.kind === 'siren') {
     s.status = 1;
     s.history = Array.from({ length: 12 }, (_, i) => [
@@ -121,7 +141,7 @@ export function seedTest(data) {
         s.rising = true;
       } else continue;
       s.ratio = mark ? Math.min(1, s.level / mark) : s.ratio;
-      s.history = ramp(s.level, s.rate / 2);
+      s.history = ramp(s.level, s.rate / 2, wlCode(s));
     } else if (s.kind === 'rainfall' && s.online && ++rains % RAIN_EVERY === 0) {
       const km = Math.hypot((s.lng - STORM[1]) * Math.cos(s.lat * Math.PI / 180),
                             s.lat - STORM[0]) * 111;
@@ -132,14 +152,8 @@ export function seedTest(data) {
       // The same cutoffs rainStatus() applies server-side. Set rather than derived because the
       // client never recomputes a status — the pin colour, the popup's band and the heat weight all
       // read this one field, so a fake that only moved `hourly` would contradict itself.
-      s.status = mm > 60 ? 4 : mm > 30 ? 3 : mm > 10 ? 2 : 1;
-      // Hourly buckets, building into the current reading: rainfall is an interval quantity, so its
-      // graph is bars over RAIN_BUCKET, and a flat set of identical bars would tell us nothing about
-      // whether the bars line up with the axis.
-      s.history = Array.from({ length: 12 }, (_, i) => [
-        Math.floor(Date.now() / 1000) - (11 - i) * 3600,
-        +(mm * (0.2 + 0.8 * (i / 11))).toFixed(1),
-      ]);
+      s.status = rainCode(mm);
+      s.history = rainRamp(mm);
     } else if (s.kind === 'gauge' && s.online && s.depth != null && ++gauges % GAUGE_EVERY === 0) {
       drown(s);
     } else if (s.kind === 'gauge' && s.online && s.depth != null && gauges % WET_EVERY === 0) {
@@ -149,7 +163,7 @@ export function seedTest(data) {
          here that colour would ship unseen. 0.2 m is past the warning mark. */
       s.depth = gauges % 2 ? 0.08 : 0.2;
       s.status = s.depth > 0.15 ? 1 : 0;
-      s.history = ramp(s.depth, s.depth / 50);
+      s.history = ramp(s.depth, s.depth / 50, gaugeCode(s));
     } else if (s.kind === 'siren' && s.online && ++sirens % 9 === 0) {
       s.status = 1;
     }

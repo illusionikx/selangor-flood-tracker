@@ -459,6 +459,12 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   **A faked level is placed against the station's own marks, never as a fraction of the danger
   mark.** `danger × 0.82` is 29.36 m on a river that alerts at 35.80, so the fake stamped an alert on
   a station the scale put in the safe stretch, and the row drew an amber number over an empty bar.
+  **A fake sample carries a status code too**, the third element real samples get from
+  `sparkPoints()` — `wlCode()` / `gaugeCode()` / `rainCode()` in `test.js` copy the cutoffs in
+  `sources.php` (a siren needs none — its value is its status). That is the one place a status is
+  scored client-side, and it is allowed because
+  nothing in test mode reaches a server. Without it the hover readout printed a faked flood in plain
+  ink, which hid the very crossing the fake exists to show.
 - **The alert panel is a directory, not a stack of readings.** `groupCard()` in `alerts.js` draws one
   card per kind per tier — five at most, usually two — and **every row in it is a place**, grouped on
   `site` so a mast with two gauges over their marks is one row. One card per station carried a meter,
@@ -676,7 +682,10 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
 - `history` is `[[unix seconds, value], …]` on rivers (metres), rainfall (mm/h) and gauges (metres of
   depth, negative = dry). Rivers, rainfall and gauges carry a **third element, the status that
   sample was at**, scored in `sparkPoints()` through `wlStatus()` / `rainStatus()` / `gaugeStatus()` —
-  the hover readout colours itself by it and flags the warning rung up. **Never score a historical
+  the hover readout prints a normal sample in its own ink and colours only a sample past a published
+  mark, with the warning glyph on every sample that takes a colour (`TONE` in `popup.js`, and a flood
+  gauge's `--s-trace` rung is the one exception). A siren carries no third element and needs none —
+  its samples are 0 and 1, which *is* the status, so `TONE.siren` reads the value. **Never score a historical
   value client-side**; add a scorer in `api.php` instead. Every reader destructures `[ts, value]`, so
   a kind without one is not a special case anywhere. The graphs
   plot against the clock, not against sample index. Windowed to `SPARK_WIN` (12h) and thinned to one point per `SPARK_BUCKET` (15 min)

@@ -468,14 +468,20 @@ dialog:focus, dialog:focus-visible { outline: none; }
 
 /* The hover readout — see js/sparktip.js for why it is a popover and not a plain fixed box. Being
    one means undoing the browser's own defaults for a dialog it expects to centre on the screen. */
+/* It sits on the page's own surface, not inverted onto it: dark ink on paper in the light theme,
+   light ink on near-black in the dark one. The chip used to be the other way round, which put an
+   amber or a red reading on the one background in the app those tokens were never checked against —
+   the status palette is held to its contrast ratios on `--surface`. The outline is what keeps a
+   same-coloured box off a same-coloured card now that the fill no longer does it. */
 .sparktip {
-  position: fixed; inset: auto; margin: 0; border: 0; padding: 3px 8px; border-radius: 6px;
+  position: fixed; inset: auto; margin: 0; padding: 3px 8px; border-radius: 6px;
+  border: 1px solid var(--outline);
   font: 500 11px/1.5 Roboto, sans-serif; white-space: nowrap; pointer-events: none;
-  color: var(--surface); background: var(--on-surface); box-shadow: var(--shadow);
+  color: var(--on-surface); background: var(--surface); box-shadow: var(--shadow);
   transform: translate(-50%, -100%);
 }
 .sparktip.below { transform: translate(-50%, 0); }
-/* The glyph on a sample at the warning rung or above. `:popover-open`, never on `.sparktip` itself:
+/* The glyph on a sample past a published mark. `:popover-open`, never on `.sparktip` itself:
    a browser closes a popover with `[popover]:not(:popover-open) { display: none }` in its own
    stylesheet, and an author `display` beats it — which is how `#dataBox` ended up laid out on the
    page behind the map. Same trap, same guard.

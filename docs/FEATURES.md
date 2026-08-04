@@ -4232,6 +4232,10 @@ its warning mark. Rainfall wears `RAIN_COLOR` and the glyph starts at *heavy*: l
 rain is most of the rain there ever is, and a warning triangle on a drizzle is the cry-wolf failure
 the alert standard exists to prevent.
 
+> Superseded below by [The readout prints a normal sample
+> plain](#the-readout-prints-a-normal-sample-plain). A normal sample now takes no hue at all, and every
+> sample that does take one also takes the glyph.
+
 ### The status is scored where the reading is stored
 
 The client does not compare a historical value to the marks beside it. That would be a second
@@ -4551,3 +4555,107 @@ breakpoint, and none of its rules name `600px` as the width of the dialog itself
 - A later change (widening `#aboutBox` to 820px) gave `#aboutBox p` a `max-width` in `ch` units, so
   a paragraph stops well short of the full dialog width. The `.key` grid keeps no cap: its
   two-column layout is what asked for the width in the first place.
+
+## The readout prints a normal sample plain
+
+The hover readout tinted every sample it showed. A calm river printed blue, a dry gauge printed
+green, light rain printed violet. That is a colour on the samples that do not matter, which is what
+makes a colour on the samples that do matter easy to miss. A reader has to look at the hue to learn
+that the hue is not saying anything.
+
+A normal sample now takes no colour. The readout keeps its own ink, `var(--on-surface)`: black on
+white in the light theme, white on near-black in the dark one. Only a sample past a published mark
+takes a hue, and the hue is the traffic light — amber at the alert mark, orange at the warning mark,
+red at danger.
+
+**The chip is no longer inverted**, which this change is what asked for. It was white ink on a
+near-black box in the light theme and the reverse in the dark one. A tinted reading therefore landed
+on the one background in the app the status tokens were never checked against: the palette is held
+to its contrast ratios on `--surface`, and the chip was `--on-surface`. The chip now takes the
+surface it floats over, and a 1px `--outline` keeps it off a card of the same colour, which the fill
+used to do on its own.
+
+**The colour and the warning triangle now travel together.** Every sample that takes a hue also
+takes the glyph, so a tinted number can never be the only warning on screen. A river earns both at
+its first mark, one rung earlier than before. Rainfall keeps the old cutoff: nothing until *heavy*,
+because light and moderate rain is most of the rain there ever is, and a triangle on a drizzle is
+the cry-wolf failure the alert design standard exists to prevent.
+
+`TONE` in `js/popup.js` is the whole change. A flood gauge is the one kind whose colour and glyph
+still part company, at rung 1: that is real water under the first published mark, so it stays
+`--s-trace` with no triangle. It is neither a normal reading nor a threshold pass, and the reason
+that rung exists at all is that upstream named no mark down there.
+
+An offline sample keeps its grey (`NO_INFO`), for the same reason it always had one. Grey is not a
+status on the traffic light, it is the absence of a reading.
+
+`js/sparktip.js` did not change. It still receives a CSS colour and a flag, and it still knows no
+units, no clock, no kinds and no palette. A kind that has nothing to say now ships an empty colour
+more often, which the module already treated as "print it plain".
+
+### Test mode had to start scoring its own samples
+
+A faked flood printed plain in the readout, at every level and on every kind. `seedTest()` built its
+histories as `[ts, value]`, and the third element is where a sample's status lives — so the readout
+had nothing to colour by. The one surface built to show a level crossing its mark was the one
+surface test mode had no way to show it on. That is exactly the gap test mode exists to close.
+
+`js/test.js` now scores each fake sample as it makes it, through `wlCode()`, `gaugeCode()` and
+`rainCode()`. These copy the cutoffs in `wlStatus()`, `gaugeStatus()` and `rainStatus()` in
+`sources.php`. **This is not the client scoring history.** Nothing in test mode reaches a server, so
+there is no scorer to ask, and the file already copied the rainfall cutoffs for the live status for
+the same reason. Real samples are still scored in `api.php` and nowhere else.
+
+Two duplicated bodies went with it: both rainfall fakes now call one `rainRamp()`, and the live
+rainfall status now calls `rainCode()` instead of repeating the ladder inline.
+
+A siren's fakes keep the two-element shape, because a siren needs no scorer anywhere. Its samples
+are 0 and 1, which is the status itself. See the section below.
+
+### A siren reads its own value, and says `Sounding`
+
+The readout colours a siren sample red when the siren was sounding, with the same triangle every
+other kind gets. That is the answer `atDanger()` already gives for the pin beside it, so the graph
+and the map make one claim.
+
+It needs no code on the sample and no scorer in `api.php`. A siren's history is 0 and 1, which *is*
+its status. `TONE.siren` therefore reads the value, and every scorer in the table now takes both the
+code and the value. A kind that leaves a sample unscored hands its scorer `undefined`, and every
+comparison in the table is false against that — which is the plain print. The old `c == null` guard
+in `readout()` did that job and is gone.
+
+The words are `Sounding` and `Quiet` now, not `sounding` and `quiet`. The readout prints this word
+where every other graph prints a number, and a lower-case word beside `1.74 m` reads as a fragment
+of a sentence rather than as a reading.
+
+### Trade-offs accepted
+
+- Rainfall classes 1 and 2 (light and moderate) lost their violet. They now read the same as no
+  rain at all in the readout. The plot behind the pointer still draws the class bands, so the
+  intensity is on screen. The readout names the millimetres, which is the finer answer anyway.
+- A river at its alert mark now shows a triangle in the readout where it showed a plain amber
+  number before. This adds no alert surface: the change touches `isCritical()`, the badge, the
+  ticker and the toast in no way. The readout appears under a pointer, on a sample somebody went
+  looking for.
+
+## The right edge of a graph says `now`
+
+Every label on the axis was a clock time, so the end of the line was one more hour to read against
+the clock in the corner of the screen. That end is the one a reader looks at first. It now carries
+the word `now`.
+
+The label sits at 100%, which is the newest sample. That is not the wall clock, and the two are up
+to half an hour apart: JPS moves a value about every 25 minutes. Within the hour it is what `now`
+means for this station, because there is nothing more recent to have.
+
+Past an hour the graph takes no edge label at all. A station frozen on an old reading gets a plain
+axis rather than a word that claims the line reaches the present. That is the same rule the offline
+blocks and the stale footer already follow: the app does not date a reading it cannot vouch for.
+
+Two details make it fit. `timeAxis()` drops a clock tick inside 8% of the right edge, because two
+labels cannot share that end. And it marks the `now` tick so `rules()` skips it. A vertical line on
+the border of the plot is a frame, not a gridline.
+
+All three graphs get it. They share `timeAxis()`. The level line, the rain bars and the siren band
+label their present the same way, on the station card, in the alert panel and in the table's hover
+panels.

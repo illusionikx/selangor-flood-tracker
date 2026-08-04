@@ -483,6 +483,19 @@ function timeAxis(points) {
   for (let t = Math.ceil(t0 / step) * step; t <= t1; t += step) {
     ticks.push({ x: x(t), at: MYT_CLOCK.format(t * 1000) });
   }
+  /* The right edge, named. Every other label is a clock time, so the end of the line was one more
+     hour to read against the clock in the corner of the screen — and it is the end a reader looks at
+     first. `now` says which end that is without a second reading of the axis.
+     It is the *newest sample*, not the wall clock, and those are up to half an hour apart: JPS moves
+     a value about every 25 minutes. Within the hour that is what "now" means for this station,
+     because there is nothing more recent to have. Past an hour the graph has stopped being current
+     and takes no label at all rather than a false one — the same rule the rest of the app follows
+     for a reading it can no longer vouch for.
+     `now: 1` keeps it off `rules()`: a vertical line on the border of the plot is not a gridline. */
+  if (Date.now() / 1000 - t1 < 3600) {
+    if (100 - ticks.at(-1)?.x < 8) ticks.pop();   // no room for both labels at that end
+    ticks.push({ x: '100.00', at: 'now', now: 1 });
+  }
   return { t0, t1, secs, inWin, x, ticks, step };
 }
 
@@ -499,7 +512,7 @@ const axisHtml = ticks => `<div class="axis muted" aria-hidden="true">${ticks.ma
   `<span style="left:${t.x}%;transform:translateX(${t.x < 8 ? 0 : t.x > 92 ? -100 : -50}%)"
     >${t.at}</span>`).join('')}</div>`;
 
-const rules = ticks => ticks.map(t =>
+const rules = ticks => ticks.filter(t => !t.now).map(t =>
   `<line x1="${t.x}" x2="${t.x}" y1="0" y2="28" vector-effect="non-scaling-stroke"/>`).join('');
 
 /* What the hover readout says, baked here rather than shipped as bare numbers: each graph knows its
@@ -507,31 +520,40 @@ const rules = ticks => ticks.map(t =>
    three. `[x%, label]` per sample, so the module needs no scale, no clock and no notion of what it
    is pointing at. Single-quoted attribute, because JSON quotes with double ones. */
 /* How a sample's own status is dressed in the readout: the colour to print it in, and whether it
-   earns a warning glyph. Keyed by kind because the two ramps are different questions. A river wears
-   the traffic light from its first mark up (`RIVER_COLOR`), and the glyph starts at the warning
-   mark — the second of its three. Rainfall has no marks of its own, only JPS's four intensity
-   classes, so it wears `RAIN_COLOR` and the glyph starts at *heavy*: light and moderate rain is most
-   of the rain there ever is, and a warning triangle on a drizzle is the cry-wolf failure the alert
-   standard is about.
-   A flood gauge wears `GAUGE_COLOR`, whose second rung is `--s-trace` and not the alert amber
-   because upstream published no mark down there. Its glyph starts at rung 2, which *is* a published
-   mark — the 0.15 m warning. This is not a new alert surface and does not widen `isCritical()`: it
-   is a readout under a pointer, on a sample somebody went looking for, and it counts nothing, badges
-   nothing and interrupts nobody. The alert standard is about what claims attention; this waits to be
-   asked.
-   The code itself is `api.php`'s — see `sparkPoints()`. Nothing here derives a status. */
+   earns a warning glyph. **A normal reading is printed plain** — the readout's own ink, black on
+   white or white on black with the theme — because a colour on every sample is a colour that says
+   nothing on the samples that matter. Only a sample past a published mark takes a hue, and every
+   sample that takes one also takes the glyph: the colour and the triangle are one statement, so a
+   tinted number can never be the only warning a reader has to notice.
+   Keyed by kind because the ramps answer different questions. A river takes the traffic light from
+   its first mark up (`RIVER_COLOR`): amber at the alert mark, orange at the warning mark, red at
+   danger. Rainfall has no marks of its own, only JPS's four intensity classes, so it stays plain up
+   to *heavy* — light and moderate rain is most of the rain there ever is, and a warning triangle on
+   a drizzle is the cry-wolf failure the alert standard is about.
+   A flood gauge keeps `--s-trace` at rung 1 and no glyph with it: that is real water under the first
+   published mark, so it is neither normal nor a threshold pass. Its glyph starts at rung 2, the
+   0.15 m warning. This is not a new alert surface and does not widen `isCritical()`: it is a readout
+   under a pointer, on a sample somebody went looking for, and it counts nothing, badges nothing and
+   interrupts nobody. The alert standard is about what claims attention; this waits to be asked.
+   The code itself is `api.php`'s — see `sparkPoints()`. Nothing here derives a status.
+   A siren is the exception, and it needs no scorer anywhere: its samples *are* its status, 0 or 1,
+   so it reads the value rather than a code. A sounding siren takes the danger red, the same answer
+   `atDanger()` already gives for the pin beside it. Each scorer therefore takes both, and a kind
+   that leaves a sample unscored hands its scorer `undefined` — every comparison below is false
+   against that, which is the plain print. */
 const TONE = {
-  river:    c => [RIVER_COLOR[c], c >= 2],
-  rainfall: c => [RAIN_COLOR[c],  c >= 3],
-  gauge:    c => [GAUGE_COLOR[c], c >= 2],
+  river:    c => [c > 0 ? RIVER_COLOR[c] : c < 0 ? NO_INFO : '', c >= 1],
+  rainfall: c => [c > 2 ? RAIN_COLOR[c]  : c < 0 ? NO_INFO : '', c >= 3],
+  gauge:    c => [c > 0 ? GAUGE_COLOR[c] : '', c >= 2],
+  siren:    (c, v) => [v > 0 ? statusColor(3) : '', v > 0],
 };
 
-/* `[x%, text, colour, warn]` per sample. The third and fourth are absent on a kind that has no
-   status to give, and js/sparktip.js treats both as "print it plain" — so a graph opts in by having
-   a scorer server-side, and no reader needs a special case. */
+/* `[x%, text, colour, warn]` per sample. The last two are empty on a normal reading and on a kind
+   with no status to give, and js/sparktip.js treats both as "print it plain" — so no reader needs a
+   special case. */
 const readout = (inWin, x, label, kind) => ` data-pts='${JSON.stringify(
   inWin.map(([t, v, c]) => {
-    const [col, warn] = (c == null ? null : TONE[kind]?.(c)) || [];
+    const [col, warn] = TONE[kind]?.(c, v) || [];
     return [+x(t), `${label(v)} · ${MYT_CLOCK.format(t * 1000)}`, col || '', warn ? 1 : 0];
   }))}'`;
 
@@ -667,7 +689,9 @@ export function sirenBand(points) {
   // `.band` keeps the shorter box. A siren log is a state over time, not a shape — there is nothing
   // in it that a quarter more height would draw better, and the difference in height is what says
   // this is not a reading. See base.css.
-  return `<div class="spark band"${readout(inWin, x, v => v > 0 ? 'sounding' : 'quiet', 'siren')}>
+  // Capitalised, because the readout prints this word where every other graph prints a number, and
+  // a lower-case word beside `1.74 m` reads as a fragment of a sentence rather than a reading.
+  return `<div class="spark band"${readout(inWin, x, v => v > 0 ? 'Sounding' : 'Quiet', 'siren')}>
     <svg viewBox="0 0 100 28" preserveAspectRatio="none" aria-hidden="true">
       ${rules(ticks)}${bars}
     </svg>
