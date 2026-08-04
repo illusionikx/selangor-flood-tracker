@@ -633,9 +633,34 @@ const expanded = new Set();
 
 /* The place lookup. Nothing leaves the browser until the reader picks the row at the foot of the
    list — Nominatim's usage policy names per-keystroke autocomplete, and an explicit row respects it
-   outright. `gen` is the same guard clip.js uses: a slow answer to a query nobody is waiting for any
-   more must not paint over a newer one. */
+   outright.
+   `gen` does not count how many lookups have started — it names *which query the list currently
+   belongs to*. The first cut only bumped it inside `lookup()`, on the theory that a fetch is the
+   only thing that needs invalidating. It missed the case where the reader edits the box while a
+   fetch from an earlier query is still in flight: the `ask` row deliberately leaves the box open
+   (see `pick()`), so there is nothing stopping a second edit before the first answer lands, and
+   `oninput` cleared the *rendered* results but never touched `gen` — so a stale answer for query A
+   could still pass `my === gen` and render under a box that now reads query B. Every edit has to
+   invalidate an in-flight lookup as surely as starting a new one does, so `oninput` bumps `gen` too
+   (see below). */
 let places = [], pstate = '', gen = 0;
+
+// Mirrors placeQuery()'s own limit in api.php. A client-side bound is a courtesy — it keeps the
+// common case (a long paste) from ever leaving the browser — never the guard: the server enforces
+// its own 80-character limit independently and answers a longer query with its own 400 regardless
+// of what this constant says. Change one without the other and the two sides disagree about where
+// the line is, which is exactly the 400-reported-as-an-outage bug this constant exists to avoid.
+const PLACE_MAX = 80;
+
+/* `p.name`, `p.detail` and the echoed query below are the only three interpolations in this file
+   that come from outside JPS: OpenStreetMap via Nominatim is editable by anyone on earth, unlike
+   the government feeds every neighboring row draws from, and a place named with a script payload
+   would run in the reader's page the moment it hit `innerHTML`. The echoed query rides along for
+   the same reason — it lands in the identical `innerHTML` call — even though it is the reader's own
+   typed text and the risk there is only ever self-inflicted. Scoped to these three call sites on
+   purpose: sweeping every interpolation in this file is a separate change with its own review. */
+const escHtml = s => String(s).replace(/[&<>"']/g,
+  c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 async function lookup(q) {
   const my = ++gen;
@@ -649,6 +674,10 @@ async function lookup(q) {
     places = j.places || [];
     pstate = places.length ? ''
       : r.status === 429 ? 'Too many searches just now — try again in a moment'
+      // 400 is placeQuery() rejecting the query outright — too long, or invalid UTF-8 — and is a
+      // problem with what the reader typed, not with reaching JPS or Nominatim. Reporting it as
+      // "unavailable" blames this site's plumbing for the reader's own input.
+      : r.status === 400 ? 'That search is too long — try a shorter place name.'
       : r.ok ? 'No place by that name in Selangor, Kuala Lumpur or Putrajaya'
       : 'Place search is unavailable';
   } catch {
@@ -713,8 +742,16 @@ function search() {
   if (!STATIC && terms.length) {
     if (places.length)
       hits.unshift(...places.map(p => ({ t: 'place', p, g: 'PLACES', sub: p.detail })));
+    else if (pstate)
+      hits.push({ t: 'msg', text: pstate, g: 'PLACES' });
+    // The common case of the 80-character limit, caught here so it never reaches the server: a
+    // long paste gets the same plain message the server's own 400 produces, without a round trip.
+    // This is the courtesy half of the bound described on PLACE_MAX above — the server's own check
+    // is what actually enforces it, including on the UTF-8 case this one does not catch.
+    else if (gotoIn.value.trim().length > PLACE_MAX)
+      hits.push({ t: 'msg', text: 'That search is too long — try a shorter place name.', g: 'PLACES' });
     else
-      hits.push(pstate ? { t: 'msg', text: pstate, g: 'PLACES' } : { t: 'ask', g: 'PLACES' });
+      hits.push({ t: 'ask', g: 'PLACES' });
   }
   draw(true);
 }
@@ -738,15 +775,15 @@ function rowHtml(r, i) {
 
   if (r.t === 'ask') return `<li role="option" data-i="${i}"${cls}
       ><i class="glyph i i-search" style="color:var(--accent)"></i
-      ><span class="nm">Search the map for “${gotoIn.value.trim()}”</span></li>`;
+      ><span class="nm">Search the map for “${escHtml(gotoIn.value.trim())}”</span></li>`;
 
   // Not an option and not selectable: there is nothing to pick, only something to read.
   if (r.t === 'msg') return `<li class="none">${r.text}</li>`;
 
   if (r.t === 'place') return `<li role="option" data-i="${i}"${cls}
       ><i class="glyph i i-place" style="color:var(--accent)"></i
-      ><span class="nm">${r.p.name}${
-        r.sub ? `<br><small class="muted">${r.sub}</small>` : ''}</span></li>`;
+      ><span class="nm">${escHtml(r.p.name)}${
+        r.sub ? `<br><small class="muted">${escHtml(r.sub)}</small>` : ''}</span></li>`;
 
   if (r.t === 'near') return `<li role="option" data-i="${i}"${cls}
       ><i class="glyph i i-my_location" style="color:var(--accent)"></i
@@ -814,12 +851,17 @@ function pick(i) {
 }
 
 /* A place result belongs to the query that fetched it. Leaving stale hits under a changed query is
-   the same lie a stale reading would be. */
+   the same lie a stale reading would be — and clearing `places`/`pstate` alone is not enough: a
+   fetch from the query being edited away from can still be in flight (the `ask` row leaves the box
+   open on purpose), and without bumping `gen` here too, that fetch's answer would still pass
+   `my === gen` in lookup() and render under a box that has since moved on to a different query. See
+   the comment on `gen`'s declaration above. */
 gotoIn.oninput = () => {
   sel = -1;
   expanded.clear();
   places = [];
   pstate = '';
+  gen++;
   search();
 };
 gotoIn.onfocus = search;
