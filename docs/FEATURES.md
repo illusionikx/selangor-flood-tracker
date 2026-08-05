@@ -2807,8 +2807,7 @@ anchored at its **tip** (`iconAnchor: [16, 29]`, not the box's centre) — a pin
 and Material leaves ~8% of the box as air below the point, so anchoring to the box bottom would float
 the mark above the fix.
 
-**The colour is `--me`, a hazard yellow** — `#b87b00` on the light theme, `#ffbb1a` on the dark,
-both clearing 3:1 on their basemap. It is the one mark on the map that is not a reading, so it gets
+**The colour is `--me`, a hazard yellow.** It is the one mark on the map that is not a reading, so it gets
 the one hue a reading never wears on its own. *Noted, not resolved:* yellow is also the alert rung of
 the traffic light, and the colour language reserves that ramp for status. What keeps this from
 reading as "an alert, here" is the shape and only the shape. If it ever does read that way, the fix
@@ -2818,9 +2817,57 @@ One colour for all of "you": the pin, the accuracy circle, the arrival ripple an
 card. The circle and the ripple reach it through classes (`.mecircle`, `.ping.me`) rather than
 Leaflet's path options, which are SVG presentation attributes and cannot resolve a token.
 
+**The light value spends the 3:1 floor, and it is the only one in the set that does** (`#e0a500`,
+2026-08-05). It holds 2.20 on white and 1.91 on `#efefef`, the darkest paper the light basemap puts
+behind a mark. It was `#b87b00` at 3.58 and 3.11 — on the floor exactly, and on the map it read as
+brown, which is the one thing a hazard mark must not do.
+
+The trade was made with the numbers on the table, in this order. A yellow that clears 3:1 on white
+*is* a dark yellow: that is the hue, not a badly chosen value, and every step lighter drops it
+further. Two attempts at an outline would have bought the contrast back from somewhere other than
+the fill, and both failed on the map — see *Two attempts at an outline on a station glyph*. So the
+floor is spent here, deliberately, once.
+
+What pays for it is what always paid for it: the shape. A house in a pin resembles no station glyph,
+and it is drawn at 48px against every station's 29. `--s-alert` beside it holds 2.55 on white, so
+this is one step past an amber the map already carries rather than a new kind of value.
+
+*The cost, stated:* the "You are here" badge on the station card is 11px uppercase type in this
+colour, and 2.20 is under any text floor. It was under 4.5 at `#b87b00` too. If that badge ever has
+to be read rather than recognised, it takes its own token — the pin is what this value is for.
+
 Its four predecessors, in order: a blue disc with a person in it (a station, as far as the map was
 concerned), a bare outlined person (clipart on a map), a filled `near_me` arrow (a heading we do not
 have), and a `my_location` crosshair (correct, and invisible next to the river blue).
+
+## Two attempts at an outline on a station glyph, and why neither shipped
+
+**A station pin is a bare glyph, and it stays bare.** The `--me` pin reads as brown on the light
+basemap (see *"You are here" is a pin, in hazard yellow*), and the cause is the 3:1 floor: a yellow
+that clears it on white paper is a dark yellow. The fix attempted was to stop asking the fill to
+carry contrast on its own — put an edge on every glyph, then let the map draw with the dark theme's
+brighter set on both themes.
+
+**First attempt: four hard 1px drop shadows**, one per direction, which is the trick
+`.pin .fv` uses on the favorite heart. It covers four directions only, so a water drop's diagonals
+come out thinner than its sides.
+
+**Second attempt: a real outline.** The glyph painted twice from the same mask — a copy scaled up in
+`--edge` behind the glyph itself. Even at every angle, and worse for it. At 400 pins a grey
+silhouette behind every glyph is 400 grey blobs: the outline becomes the mark and the colour inside
+it becomes a fill. Turning `--edge` down from `--outline` to `--muted` and thickening the scale from
+1.14 to 1.2 traded one failure for the other and fixed neither.
+
+**The lesson is not the width or the colour.** A 29px glyph has no room for a second colour inside
+its own footprint. Anything that wants to help these pins has to act on what is *behind* them — the
+tile-pane filter at the top of `map.css` is where the dark theme already does exactly that.
+
+**One thing from that work is worth keeping, and it is a trap, not a feature.** `filter` applies
+*before* `mask` in the render order: the element paints, the filter applies, then the mask clips. An
+`.i` is a box of `currentColor` with the glyph masked out of it, so a drop shadow on it is computed
+from the box, lands outside the box, and is clipped away. Nothing renders, nothing errors. The
+favorite heart works only because its filter sits on the `<b class="fv">` wrapper and the mask is on
+the `.i` inside. Any future effect on an icon needs that same shape.
 
 ## The drawer is four sections, not a list of controls
 
@@ -4560,6 +4607,42 @@ The fix names the one exception: map tiles, from CARTO, credited two paragraphs 
 rewritten to match: list every absolute URL in the code, then classify each one as fetched at
 runtime or merely linked. A claim about what a site does not do needs a check that enumerates what
 the site does do. A guess at what a violation looks like is not that check.
+
+A later pass rewrote the section in the voice of a blog post. One paragraph per beat, a short one
+where the story turns, and the reader carried from the complaint to the code to the field work. A
+single dense block came first, and it reads as a specification. The blunt sentences survive the
+rewrite word for word. The code is vibe coded, no team stands behind it, and the closing line asks
+the reader to name what I got wrong.
+
+The rewrite also gained the camera coordinates. `CAM_FIX` in `api.php` was already the one place
+this app overrides an upstream value. The About pane never said how I made those corrections. It
+says it now. I went to some of those places in person. For the rest I read the picture, a road sign
+or a bridge or a river bend, and matched it against the station name. Five cameras stay wrong on
+the map, and the section says that too. A reader who finds a camera in the wrong district learns
+here that the app knows. They also learn that an invented coordinate is the worse option.
+
+The section carries no em dash. A machine wrote this prose, the em dash is the tell, and the last
+line of the section says who wrote it, in plain words. That line is worth less under a punctuation
+habit that says the opposite.
+
+The privacy claims became a spec sheet for one revision, and then went back to paragraphs. The
+sheet reused `.key`, the two-column list the Help pane uses for its legends, and it read well. It also read as a datasheet
+for a product. Each of those five lines is a claim about what this site does not do, which is an
+argument, and an argument in a specification table asks the reader to accept it as a measured fact.
+A paragraph makes the same claim and shows its reasoning in the same breath. The CARTO line is the
+proof: as a row it says "CARTO, so CARTO sees which tiles your browser asks for", and as a sentence
+it can also say what CARTO does not get.
+
+Ten paragraphs later became five. A paragraph break asks the reader to stop, and the section had
+put a stop between the complaint and the code, between the shuffle and the field work, and between
+each of four claims about data that answer one question together. The five that remain are the
+beats: why this exists, what the cameras did, how I checked them, what the project is not, and what
+it does with the data a reader gives it. The words did not change. Only the breaks did.
+
+The register changed with the shape. The story above stays blunt, and it ends on the line that says
+an AI wrote it. Everything below that line uses plain words, with no jokes and no shrugging,
+because a reader who reaches those paragraphs wants to know what happens to a location they share.
+That seam is the point of the section, and the comment in `index.html` names it.
 
 ### The Developer section
 

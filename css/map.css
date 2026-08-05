@@ -111,6 +111,19 @@
    with it in one step, and it leaves the 39px layout box alone — that box is repeated as `iconSize`
    in render.js and is what actually positions the marker over its station. */
 .pin:not(.me, .place) { transform: scale(.8); }
+/* **A station glyph carries no outline, and one was tried twice.** First as four hard drop shadows,
+   one per direction, then as a real outline — the glyph painted twice from the same mask, a copy
+   scaled up in a grey behind the glyph itself. The point of either was to let the map draw with one
+   palette on both themes: with an edge separating the mark from the tile, the fill would not have to
+   hold 3:1 against white paper on its own.
+   Both were ugly on the map. Four shadows cover four directions, so a water drop's diagonals come
+   out thinner than its sides. The scaled copy is even at every angle and is worse for it: at 400
+   pins a grey silhouette behind every glyph is 400 grey blobs, and the outline reads as the mark
+   while the colour inside it reads as a fill. Turning the grey down to `--muted` and thickening it
+   only traded one failure for the other.
+   The lesson is not the width or the colour. **A 29px glyph has no room for a second colour inside
+   its own footprint.** Anything that wants to help these pins has to act on what is behind them —
+   see the tile-pane filter at the top of this file, which is how the dark theme already does it. */
 /* Colour is already the offline grey here — fading the glyph as well would just hide it again. */
 .pin.off { opacity: .6; }
 /* A mast has no rule of its own any more. It was a filled disc carrying a sensor count, on the

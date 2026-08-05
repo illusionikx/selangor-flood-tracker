@@ -83,12 +83,17 @@
   /* You. Hazard yellow — the one thing on the map that is not a reading, so it is allowed the one
      colour a reading never wears alone. It is deliberately near the alert amber without being it:
      the shape is a house in a pin, which no station glyph resembles, so the hue is not what has to
-     carry "this is not a station". Light theme is deep enough to clear 3:1 on white; the dark one
-     can afford to be properly yellow.
-     This is the one light value that did *not* get brightened with the rest: at 3.12 on warm paper
-     it is already sitting on the floor, and yellow has nowhere to go — every step lighter drops it
-     under 3. */
-  --me: #b87b00;
+     carry "this is not a station".
+     **This is the one value in the light set that is deliberately under the 3:1 floor**, at 2.20 on
+     white and 1.91 on #efefef, the darkest paper the light basemap puts behind a mark. It was
+     `#b87b00`, which held 3.58 and 3.11 — on the floor exactly, and on the map it read as brown. A
+     yellow that clears 3:1 on white *is* a dark yellow; that is the physics of the hue, not a badly
+     chosen value, and two attempts at an outline to buy the contrast back are recorded in map.css
+     as failures. So the floor is spent here on purpose. What pays for it is the shape: a house in a
+     pin, which no station glyph resembles, and 48px against every station's 29.
+     For scale, `--s-alert` beside it holds 2.55 on white — this is not an outlier in the set, it is
+     one step past the amber it already sits next to. */
+  --me: #e0a500;
   /* A favorite. Pink, because a heart that is not pink is not read as a heart — the shape and the
      colour are one idiom, which is why this takes a hue of its own rather than --accent.
      It shares a band with --k-siren, and that is the collision to know about: a siren pin is pink
@@ -104,6 +109,11 @@
   --hover: #303134; --accent: #8ab4f8;
   --shadow: 0 1px 2px rgba(0,0,0,.6), 0 2px 6px 2px rgba(0,0,0,.3);
 
+  /* This set was briefly the map's set on *both* themes, scoped to `.leaflet-pane`, on the argument
+     that an outline on every glyph would separate the mark from the tile and so free the fill from
+     having to hold 3:1 on white paper. The outline is gone — see the note on `.pin > .i` in map.css
+     — and this went back with it. Without one, the light theme's deeper values are what keep a pin
+     legible on white paper, and they stay. */
   --k-river: #66b2ff; --k-rainfall: #a893ff; --k-siren: #ff7aa4;
   --k-gauge: #d4a48f; --k-camera: #2fd6e8; --k-mast: #96a4ee;
   --k-rain-dry: #8e95f0; --k-rain-heavy: #d488ff;

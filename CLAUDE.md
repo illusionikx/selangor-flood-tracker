@@ -335,6 +335,21 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   two `icons[].src` in `manifest.json`. `icon-build.php` rewrites the PNGs under the same names, and
   a browser holds a favicon for far longer than three hours, so bumping that number is the only
   thing that makes a new mark appear. The script prints the reminder when it finishes.
+- **`filter` runs before `mask`, so a filter on an `.i` is discarded.** The spec order is: paint the
+  element, apply the filter, *then* clip with the mask. An `.i` is a box of `currentColor` with the
+  glyph masked out of it, so a `drop-shadow` on it is computed from the box, lands outside the box,
+  and the mask clips it off. Nothing renders and nothing errors — the pin stroke shipped invisible on
+  both themes this way. The favorite heart works because its filter is on the `<b class="fv">`
+  wrapper and the mask is on the `.i` inside it — `.pin`'s own soft shadow works for the same reason,
+  since `.pin` is a plain `<span>`. Anything that wants an effect on an icon needs that wrapper.
+- **A station glyph gets no outline, and two shapes of one have already been tried and reverted.**
+  Four hard drop shadows cover four directions, so a water drop's diagonals come out thinner than its
+  sides. A real outline — the glyph painted twice from the same mask, a scaled copy behind it — is
+  even at every angle and worse for it: at 400 pins a grey silhouette behind every glyph is 400 grey
+  blobs, and the edge becomes the mark. Neither width nor colour was the problem. A 29px glyph has no
+  room for a second colour inside its own footprint, so anything meant to help these pins acts on
+  what is **behind** them — `.leaflet-tile-pane`'s filter, which is how the dark theme already does
+  it. See `docs/FEATURES.md`, *Two attempts at an outline on a station glyph*.
 - **There is no icon font any more, and there must not be one again.** Icons are SVG masks in
   `css/icons.css` (`<i class="i i-warning">`, or `--i: var(--i-warning)` on a pseudo-element).
   A ligature font renders *text* that only becomes a picture if shaping cooperates, so a stray
