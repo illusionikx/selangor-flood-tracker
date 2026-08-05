@@ -4633,8 +4633,8 @@ location they share. The comment in `index.html` names that seam, so a later edi
 two voices back together.
 
 The rewrite also put the camera coordinates in front of a reader. `CAM_FIX` in `api.php` is the one
-place this app overrides a value its source states, and About never said how those corrections were
-made. It says it now. I went to some of those places in person. For the rest I read the picture, a
+place this app overrides a value its source states, and About never said how I made those
+corrections. It says it now. I went to some of those places in person. For the rest I read the picture, a
 road sign or a bridge or a river bend, and matched it against the station name. Camera 1288 is the
 first entry a visit confirmed, and its point moved about 500 m to what I found there. Five cameras
 stay wrong on the map, and the section says that too. A reader who finds a camera in the wrong
