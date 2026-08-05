@@ -65,7 +65,11 @@ const SITE_M = 50;   // metres — stations this close are sensors on one mast, 
    a rainfall gauge, a river and a flood gauge on one TAMAN DESA KEMUNING mast, so the camera takes
    the coordinate JPS already publishes for that place rather than the one a gazetteer guesses. The
    geocode landed 200 m off, which is outside SITE_M, so the camera drew as a place of its own beside
-   a mast it belongs on. Prefer a same-named station whenever the payload holds one.
+   a mast it belongs on. Prefer a same-named station whenever the payload holds one. 1280 is the
+   case that ranks the two: the geocode for "Sungai Lui" lands 2.3 km from the KG. SG. LUI mast, next
+   to a different station on the same river. A gazetteer answers about a river. The mast is upstream
+   stating where the place is. 1283 moved off a geocode the same way, onto the JENDERAM HILIR mast
+   1.9 km from it.
    1282 is the same route with the name only close, not equal: the camera reads "Kg Simpang Balak"
    and the siren reads "KG. SG. BALAK", which is Sungai and not Simpang. What carries it is that the
    published point was not in Hulu Langat at all, and the siren of the near name is. A near name is
@@ -76,24 +80,38 @@ const SITE_M = 50;   // metres — stations this close are sensors on one mast, 
    which is the district JPS gives 1285, and 1285 is the only Kuala Langat camera in the batch. So
    there is exactly one station the orphaned point can belong to. Use this rule only when both halves
    hold: the neighbours agree on a district, and one uncorrected camera in the batch is filed under it.
-   Three names no gazetteer holds (1272, 1281, 1289), one that only matched a highway (1315),
-   and one the checks disagreed about (1280) are left as published. They are wrong on the map and
-   honestly so.
+   The strongest way in is that same swap solved for every camera at once. The shuffle is one closed
+   permutation, not a scatter of bad numbers. Take each suspect camera's published point and name the
+   station nearest to it. Thirteen of the fourteen name another camera in the batch, inside 550 m.
+   The cycle runs 1276→1280→1287→1288→1284→1278→1282→1277→1281→1286→1289→1283→1276, with 1279 and
+   1285 swapped as a pair. One camera and one point are then left over, and they can only be each
+   other: 1281 takes the point published for 1277. That is how 1281 got in with no gazetteer hit and
+   no same-named mast, and it is stronger evidence than either. Rebuild the whole map before you
+   argue about one pin.
+   The cycle also names the cameras that are NOT in the shuffle. 1271, 1272, 1273, 1274, 1275, 1315
+   and 1316 all sit near a station of their own name or district, and the cycle closes without them.
+   They are published correctly. 1272 and 1315 were called wrong here for months on the strength of
+   a failed gazetteer lookup alone.
+   1289 says the same thing from the other side: no gazetteer holds Rimba KDR, and JPS publishes a
+   RIMBA KDR mast in the district it files the camera under. Search the payload first.
    CAM_FIX_KM makes the table retire itself: an override is applied only while the published value is
    still far from it, so the day JPS corrects a station we go back to following the feed. */
 const CAM_FIX_KM = 2.0;
 const CAM_FIX = [
-    1276 => [3.093060, 101.406711],     // Sg. Puluh Aman Perdana   — published 51 km away, in Ampang, LOCATION SOMEWHAT CONFIRMED
+    1276 => [3.093060, 101.406711],     // Sg. Puluh Aman Perdana   — the point 1283 was published at, LOCATION CONFIRMED
     1277 => [3.02151, 101.52422],       // Taman Desa Kemuning      — the mast of that name, LOCATION CONFIRMED
-    1278 => [3.19970, 101.54617],       // Paya Jaras               — published 33 km away, in Serdang
+    1278 => [3.194995, 101.533625],       // Paya Jaras               — published 33 km away, in Serdang, LOCATION CONFIRMED
     1279 => [3.120836, 101.6017783],    // Kolam Sg Kayu Ara        — published 34 km away, in Sepang, LOCATION CONFIRMED
-    1282 => [3.00959, 101.77177],       // Kg Simpang Balak         — the SIREN KG. SG. BALAK site, LOCATION SOMEWHAT CONFIRMED
-    1283 => [2.88740, 101.71457],       // Jenderam Hilir           — published 41 km away, in Klang
-    1284 => [2.92542, 101.75676],       // Kolam Takungan Sg Merab  — published 39 km away, in Sungai Buloh
+    1280 => [3.17379, 101.86914],       // Sg Lui                   — the KG. SG. LUI mast, LOCATION CONFIRMED
+    1281 => [3.09389, 101.79128],       // Sg Betong                — the point 1277 was published at, LOCATION CONFIRMED
+    1282 => [3.00959, 101.77177],       // Kg Simpang Balak         — the SIREN KG. SG. BALAK site, LOCATION CONFIRMED
+    1283 => [2.89697, 101.72834],       // Jenderam Hilir           — the mast of that name, LOCATION CONFIRMED
+    1284 => [2.94060, 101.74336],       // Kolam Takungan Sg Merab  — the K/TAKUNGAN SG. MERAB mast, LOCATION CONFIRMED
     1285 => [2.8272222, 101.6567808],   // Kg Bukit Serdang         — the point 1279 was published at
-    1286 => [3.59115, 101.60487],       // Kg Jawa Kerling          — published 49 km away, on the coast
-    1287 => [3.20993, 101.76085],       // RP SK Hulu Klang         — published 69 km away, in Tanjung Karang
+    1286 => [3.58450, 101.59203],       // Kg Jawa Kerling          — the SIREN KG. JAWA KERLING mast, 278 m from the point 1281 was published at, LOCATION CONFIRMED
+    1287 => [3.198805, 101.760541],     // RP SK Hulu Klang       — published 69 km away, in Tanjung Karang, LOCATION CONFIRMED
     1288 => [3.424508, 101.181142],     // Pekan Tanjung Karang     — published 83 km away, in Bangi, LOCATION CONFIRMED
+    1289 => [3.70943, 101.17493],       // Rimba KDR                — the mast of that name, LOCATION CONFIRMED
 ];
 /* How close a sensor must be to a camera before its alert is allowed onto that camera's frames.
    js/config.js carries the same 2 for the live warning glyph. Change both together. */
