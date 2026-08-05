@@ -5,7 +5,7 @@ import { state, PREFS, save } from './state.js';
 import { el, color, dkey, atDanger, statusColor, leads, hasInfo, isIgnored, ignoredIds,
          favIds, isFav, scalePos, levelStops, gaugeStops } from './util.js';
 import { marks, siteMark, shown, syncCluster, focusOn, side, openSide,
-         showMast, hideMast } from './map.js';
+         showMast, hideMast, pinGlyph } from './map.js';
 import { heat, rainHeat, syncHeat, thinHeat } from './heat.js';
 import { sitePopup } from './popup.js';
 import { dataTable } from './table.js';
@@ -151,8 +151,8 @@ export function render() {
            here", and the count went with the plate it sat on. `.multi` still rides on the span,
            because the hover ring and the panel key both ask whether this pin is a mast. */
         html: `<span class="pin${multi ? ' multi' : ''}${lead.online ? '' : ' off'}${
-                     rising ? ' rise' : ''}${critical ? ' danger' : ''}" style="--c:${c}"><i class="i i-${
-               multi ? MAST.icon : KINDS[lead.kind].icon}"></i>${
+                     rising ? ' rise' : ''}${critical ? ' danger' : ''}" style="--c:${c}">${
+               pinGlyph(multi ? MAST.icon : KINDS[lead.kind].icon)}${
                fav ? '<b class="fv"><i class="i i-favorite"></i></b>' : ''}</span>`,
       }),
     });

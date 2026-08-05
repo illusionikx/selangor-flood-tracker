@@ -262,6 +262,37 @@ function unpin() {
   state.rerender();
 }
 
+/* **A pin's glyph is an inline `<svg><use>`, not a masked `<i>`.** A CSS mask keeps only the alpha
+   of the picture and paints the box in `currentColor`, so there is no fill and no stroke to address
+   — an outline had to be faked from a second copy of the shape, which is what the two reverted
+   attempts in `css/map.css` were. A real `stroke` on a real path is one shape, even at every angle.
+   ponytail: the symbols are lifted out of `css/icons.css` at first use, so the path data still lives
+   in exactly one place and adding an icon is still one line there. Only the map pins take this path.
+   Every other icon in the app is still a mask, because nothing else needs a second colour. */
+const sprite = document.body.appendChild(
+  Object.assign(document.createElementNS('http://www.w3.org/2000/svg', 'svg'), { id: 'glyphs' }));
+sprite.setAttribute('aria-hidden', 'true');
+const built = new Set();
+export function pinGlyph(name) {
+  if (!built.has(name)) {
+    built.add(name);
+    const url = getComputedStyle(document.documentElement).getPropertyValue('--i-' + name);
+    const body = url.match(/<svg[^>]*>(.*)<\/svg>/s);
+    if (!body) return '';                    // an icon name with no rule in icons.css
+    /* `vector-effect` is stamped on the path here rather than declared in the stylesheet, and that is
+       not a style choice. It is one of the few SVG presentation properties that does **not**
+       inherit, so a rule on `.pinglyph` lands on the outer `<svg>` — which paints nothing — and
+       never reaches the path inside the `<use>` shadow tree. `fill`, `stroke`, `stroke-width` and
+       `paint-order` all inherit and do cross that boundary, so they stay in map.css where they can
+       be read and tuned. Without this the width is measured in the 960-unit viewBox instead of in
+       screen pixels: about 33 units to the pixel at a station pin's size, so a stroke of 2 is
+       invisible and only something past 100 shows up. */
+    sprite.insertAdjacentHTML('beforeend', `<symbol id="g-${name}" viewBox="0 -960 960 960">${
+      body[1].replaceAll('<path ', "<path vector-effect='non-scaling-stroke' ")}</symbol>`);
+  }
+  return `<svg class="pinglyph"><use href="#g-${name}"/></svg>`;
+}
+
 /* A place the reader searched for. One marker at a time, kept until another place replaces it — the
    same life the "you are here" pin has, and closing the search box does not clear it.
    A plain L.Marker, not an L.Path: paths bubble their clicks to the map and markers do not, and
@@ -276,7 +307,7 @@ export function showPlace(latlng) {
     // Same box and same tip anchor as the "you are here" pin: a pin points at its tip, not its
     // middle, and Material draws the glyph with a little air below it inside the viewBox.
     className: '', iconSize: [48, 48], iconAnchor: [24, 44],
-    html: '<span class="pin place"><i class="i i-place"></i></span>',
+    html: `<span class="pin place">${pinGlyph('place')}</span>`,
   }) }).addTo(map);
   focusOn(latlng, 13);
   ping(latlng);   // the default accent ripple — `.ping.place` is gone, it painted the same colour

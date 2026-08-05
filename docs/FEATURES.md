@@ -2825,7 +2825,7 @@ brown, which is the one thing a hazard mark must not do.
 The trade was made with the numbers on the table, in this order. A yellow that clears 3:1 on white
 *is* a dark yellow: that is the hue, not a badly chosen value, and every step lighter drops it
 further. Two attempts at an outline would have bought the contrast back from somewhere other than
-the fill, and both failed on the map — see *Two attempts at an outline on a station glyph*. So the
+the fill, and both failed on the map — see *Three attempts at an outline on a station glyph*. So the
 floor is spent here, deliberately, once.
 
 What pays for it is what always paid for it: the shape. A house in a pin resembles no station glyph,
@@ -2840,7 +2840,7 @@ Its four predecessors, in order: a blue disc with a person in it (a station, as 
 concerned), a bare outlined person (clipart on a map), a filled `near_me` arrow (a heading we do not
 have), and a `my_location` crosshair (correct, and invisible next to the river blue).
 
-## Two attempts at an outline on a station glyph, and why neither shipped
+## Three attempts at an outline on a station glyph, and what the third one changed
 
 **A station pin is a bare glyph, and it stays bare.** The `--me` pin reads as brown on the light
 basemap (see *"You are here" is a pin, in hazard yellow*), and the cause is the 3:1 floor: a yellow
@@ -2858,9 +2858,74 @@ silhouette behind every glyph is 400 grey blobs: the outline becomes the mark an
 it becomes a fill. Turning `--edge` down from `--outline` to `--muted` and thickening the scale from
 1.14 to 1.2 traded one failure for the other and fixed neither.
 
-**The lesson is not the width or the colour.** A 29px glyph has no room for a second colour inside
-its own footprint. Anything that wants to help these pins has to act on what is *behind* them — the
-tile-pane filter at the top of `map.css` is where the dark theme already does exactly that.
+**Both attempts had the same cause, and it was the delivery, not the design.** A CSS mask keeps only
+the alpha of the picture. The element under it is a solid box of `currentColor` clipped to that
+alpha, so there is no fill and no stroke to address — an outline could only ever be faked from a
+second copy of the shape, and a mask has no path to offset. Scaling is the only way to grow one, and
+a scaled glyph grows away from its own centre rather than outward from its edge. That is why the
+second attempt put a silhouette *behind* the mark instead of a border *around* it.
+
+**Third attempt: put the SVG in the document and stroke the path.** `pinGlyph()` in `js/map.js`
+returns `<svg class="pinglyph"><use href="#g-water_drop"/></svg>`, and `.pinglyph` in `css/map.css`
+takes `fill: currentColor` and `stroke: var(--surface)`. Three declarations carry it:
+
+- `paint-order: stroke` paints the stroke *under* the fill. A stroke is centred on the path, so
+  without this it would eat half its width out of a 29px glyph.
+- `vector-effect: non-scaling-stroke` states the width in screen pixels rather than in the
+  960-unit viewBox — about 33 units to the pixel at a station pin's size, so without it a stroke of
+  1 is invisible and only something past 100 shows at all. It is one of the few SVG presentation
+  properties that does **not** inherit, so it cannot be declared on `.pinglyph`: a rule there lands
+  on the outer `<svg>`, which paints nothing, and never reaches the path inside the `<use>` shadow
+  tree. `pinGlyph()` stamps it on the path instead. Everything else here inherits and crosses that
+  boundary, so it stays in the stylesheet. One pixel then holds at 31px on a station pin and at
+  48px on the "you are here" pin, and `.pin`'s `scale(.8)` does not thin it.
+- `stroke: var(--surface)` — white on the light theme, near-black on the dark one, so the edge
+  reads as a gap punched in the basemap rather than as a ring drawn on top of it. Two values were
+  tried in front of it and both failed the same way. `--muted` is the inverse pair, dark on light,
+  and a dark ring round every glyph is the second attempt's failure arriving through a better
+  technique. `--outline` is a step softer in the same direction and still reads as a ring. Not
+  `#fff`/`#000`: that pair is what `--surface` already is either side of a shade, and it would not
+  follow the theme toggle.
+
+It is one shape, offset along its own outline, so it is the same width at a diagonal as at a side
+and it adds nothing behind the glyph that the glyph does not already cover. It also replaced the
+soft `drop-shadow` the pins used to carry, on both the station pins and the "you are here" mark: the
+shadow existed to lift a glyph with no edge off a busy tile, and two marks around one 29px glyph is
+one too many. The job is to stop the fill carrying 3:1 against white paper alone. **A stroke wide enough to read as a border of its own
+is the 400-blob failure again in a better technique** — that is the line to watch when tuning it.
+
+One more thing an `<svg>` does that a mask did not: it clips to its own viewport, and a stroke is
+drawn outside the path's bounds. So the edge is shaved flat wherever the glyph meets the side of its
+box. Growing the element does not help — the viewBox scales with it and the overhang grows in step.
+`overflow: visible` is the fix. Padding the viewBox in user units and growing `width`/`height` by
+the same ratio also works and is two numbers that must be kept in step, for a box nothing is laid
+out against.
+
+**The path data is still in one place.** `pinGlyph()` lifts each symbol out of the `--i-*` token in
+`css/icons.css` at first use and appends it to a hidden `#glyphs` sprite, so adding an icon is still
+one line in `icons.css` and there is no second copy to drift. **Only the map pins take this path.**
+Every other icon in the app is still a mask, because nothing else needs a second colour, and an
+`<svg>` per icon across the app bar and the cards would be markup where a token is enough.
+
+**What the outline was for, finally collected.** The point of all three attempts was to stop the
+fill carrying contrast on its own, so the map could draw with one palette on both themes. That is
+now done: the map-palette block in `css/base.css` is selected by `:root[data-theme="dark"], .pin`,
+so a station pin takes the dark theme's brighter set whatever the theme is. The same set was tried
+on both themes once before, scoped to `.leaflet-pane`, and went back with the fake outline it
+depended on. `.pin` rather than `.leaflet-pane` this time, because the stroke is on the pin glyph
+and nothing else in that pane has one.
+
+Scope matters here. Every other surface that paints a kind or a status — a badge, a table cell, a
+chip, the legend, the alert panel — sits outside `.pin` and still swaps with the theme, because none
+of them has an outline and the fill is all they have. And every token a pin resolves has to be in
+that block: `--c` arrives as an inline `style` on `.pin` itself, and a `var()` in an inline style
+resolves against that same element, so a kind left out would quietly fall back to the theme value
+and draw one pin off-palette.
+
+Trade-offs accepted: the pins now cost an SVG element each instead of a `<span>`, and one regular
+expression reads a stylesheet value at runtime. Not built: a stroke on any icon outside the map, a
+per-kind stroke colour, and a build step to bake the sprite — the symbols are made on demand and
+there are eight of them.
 
 **One thing from that work is worth keeping, and it is a trap, not a feature.** `filter` applies
 *before* `mask` in the render order: the element paints, the filter applies, then the mask clips. An

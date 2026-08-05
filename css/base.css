@@ -108,12 +108,23 @@
   --surface: #202124; --on-surface: #e8eaed; --muted: #9aa0a6; --outline: #3c4043;
   --hover: #303134; --accent: #8ab4f8;
   --shadow: 0 1px 2px rgba(0,0,0,.6), 0 2px 6px 2px rgba(0,0,0,.3);
-
-  /* This set was briefly the map's set on *both* themes, scoped to `.leaflet-pane`, on the argument
-     that an outline on every glyph would separate the mark from the tile and so free the fill from
-     having to hold 3:1 on white paper. The outline is gone — see the note on `.pin > .i` in map.css
-     — and this went back with it. Without one, the light theme's deeper values are what keep a pin
-     legible on white paper, and they stay. */
+}
+/* **The map palette, and it is this set on both themes.** The selector is the whole of the change:
+   the values below are the dark theme's, and `.pin` takes them whatever the theme is, so a station
+   pin is the same colour on white paper as on the near-black basemap. Every other surface that
+   paints a kind or a status — a badge, a table cell, a chip, the legend, the alert panel — is
+   outside `.pin` and so still gets the light theme's deeper set on the light theme, because none of
+   them has an outline and the fill is all they have.
+   That is what makes this work now and not before: the pin glyph carries a real `stroke` (see
+   `.pinglyph` in map.css), so its fill no longer has to hold 3:1 against white paper on its own.
+   This exact set was tried on both themes once already, scoped to `.leaflet-pane`, and was reverted
+   with the fake outline it depended on. `.pin` rather than `.leaflet-pane` this time, because the
+   stroke is on the pin glyph and nothing else in that pane has one.
+   Every token a pin resolves has to be in here. `--c` arrives as an inline `style` on `.pin` itself
+   (render.js), and a `var()` in an inline style resolves against that same element — so a kind
+   missing from this block would quietly fall back to the theme value and draw one pin off-palette.
+   `--me` and `--fav` are here for the two marks inside `.pin` that read them. */
+:root[data-theme="dark"], .pin {
   --k-river: #66b2ff; --k-rainfall: #a893ff; --k-siren: #ff7aa4;
   --k-gauge: #d4a48f; --k-camera: #2fd6e8; --k-mast: #96a4ee;
   --k-rain-dry: #8e95f0; --k-rain-heavy: #d488ff;

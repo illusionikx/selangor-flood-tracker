@@ -3,7 +3,7 @@
 
 import { state, PREFS, save } from './state.js';
 import { el } from './util.js';
-import { map, focusOn, openSide, ping } from './map.js';
+import { map, focusOn, openSide, ping, pinGlyph } from './map.js';
 import { herePopup } from './popup.js';
 import { alerts } from './alerts.js';
 import { dataTable } from './table.js';
@@ -66,7 +66,7 @@ function place(latlng, accuracy, setView) {
     // 44, not 48: Material draws the glyph inside its viewBox with a little air, so the pin's tip
     // sits ~8% of the box above its bottom edge. Anchoring to the box would float the mark.
     className: '', iconSize: [48, 48], iconAnchor: [24, 44],
-    html: '<span class="pin me"><i class="i i-home_pin"></i></span>',
+    html: `<span class="pin me">${pinGlyph('home_pin')}</span>`,
   }) }).on('click', showHere);
 
   // Coloured from `.mecircle` in map.css rather than through Leaflet's `color` option, for the same

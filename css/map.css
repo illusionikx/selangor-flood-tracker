@@ -90,18 +90,18 @@
    and unreadable, and the filled one fixed that by making every station a coin on the map: at 400
    pins the basemap was a field of counters and the *shape* of a water drop, which is the one thing
    that says what a pin is without being read, was down to 15px inside a 26px chip.
-   Nothing is holding the contrast up now except the colour itself, which is why the palette moved
-   into tokens with a value per theme — see the block at the top of base.css, and the 3:1 floor it is
-   held to. The shadow is the only other help: enough to lift a glyph off a busy tile, not enough to
-   read as a second shape. `filter`, not `box-shadow`, because it follows the mask's rendered
-   outline rather than its box. */
+   What holds the contrast up is the stroke on the glyph itself — see `.pinglyph` below. There was a
+   soft `drop-shadow` here as well, from back when the glyph had no edge of its own and needed
+   lifting off a busy tile. Two marks around one 29px glyph is one too many: the stroke already
+   separates the pin from whatever is under it, and the shadow only softened the edge doing the work.
+   It is gone, and with it the reason the palette carried a value per theme for a pin — the map set
+   in base.css is now selected by `.pin` on both themes. */
 /* 39px, up from 26 — the whole mark and everything hung off it went up by half. The box is repeated
    as `iconSize` in render.js, which is what actually positions the marker, so the two move together
    or the pin stops pointing at its station. */
 .pin {
   position: relative; display: grid; place-items: center; width: 39px; height: 39px;
   color: var(--c, var(--accent)); font-size: 36px;
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .35));
 }
 /* A fifth off every station pin, mast included. At 400 pins on a phone the map was more glyph than
    basemap, and a mark you cannot see the river under is not helping. The mast used to come down
@@ -111,19 +111,59 @@
    with it in one step, and it leaves the 39px layout box alone — that box is repeated as `iconSize`
    in render.js and is what actually positions the marker over its station. */
 .pin:not(.me, .place) { transform: scale(.8); }
-/* **A station glyph carries no outline, and one was tried twice.** First as four hard drop shadows,
-   one per direction, then as a real outline — the glyph painted twice from the same mask, a copy
-   scaled up in a grey behind the glyph itself. The point of either was to let the map draw with one
-   palette on both themes: with an edge separating the mark from the tile, the fill would not have to
-   hold 3:1 against white paper on its own.
-   Both were ugly on the map. Four shadows cover four directions, so a water drop's diagonals come
-   out thinner than its sides. The scaled copy is even at every angle and is worse for it: at 400
-   pins a grey silhouette behind every glyph is 400 grey blobs, and the outline reads as the mark
-   while the colour inside it reads as a fill. Turning the grey down to `--muted` and thickening it
-   only traded one failure for the other.
-   The lesson is not the width or the colour. **A 29px glyph has no room for a second colour inside
-   its own footprint.** Anything that wants to help these pins has to act on what is behind them —
-   see the tile-pane filter at the top of this file, which is how the dark theme already does it. */
+/* The glyph itself. It is an SVG element, not a mask — see `pinGlyph()` in map.js for why, and read
+   the note below for what that buys. `1em` off the `.pin`'s `font-size`, so every rule that sizes a
+   pin by its font (`.me`, `.place`) still sizes the glyph.
+   `fill` takes the pin colour the mask took from `color`. The stroke is `--surface`, the page's own
+   plate colour — white on the light theme, near-black on the dark one — so the edge reads as a gap
+   punched in the basemap rather than as a ring drawn on top of it. Three values were tried and the
+   order matters. `--muted` is the inverse pair, dark on light, and a dark ring round every glyph is
+   the second attempt's failure arriving through a better technique. `--outline` is a step softer in
+   the same direction and still reads as a ring. Do not write a hex here, and in particular do not
+   reach for `#fff`/`#000`: that pair is what `--surface` already is either side of a shade, it would
+   not follow the theme toggle, and the palette lives in base.css and nowhere else.
+   `paint-order: stroke` paints the stroke *under* the fill, so a stroke centred on the path shows
+   only its outer half and eats none of the glyph.
+   **`stroke-width` is in screen pixels, not viewBox units, and the thing that makes it so is not
+   here.** `vector-effect: non-scaling-stroke` is one of the few SVG presentation properties that
+   does not inherit, so a rule on this element lands on the outer `<svg>`, which paints nothing, and
+   never reaches the path inside the `<use>` shadow tree. It is stamped on the path by `pinGlyph()`
+   in map.js instead, and the note is there. Everything below inherits into that shadow tree and so
+   belongs here. One is one pixel at 31px on the map and at 48px on the "you are here" pin alike, and
+   `.pin`'s `scale(.8)` does not thin it. Wider was tried and read as a border in its own right,
+   which is the failure the two fake outlines below both landed in. */
+/* The symbol sprite `pinGlyph()` appends to the body. An `<svg>` with no size defaults to 300×150,
+   so without this it is a blank box at the foot of the page. `display: none` on the outer element
+   does not stop a `<use>` reaching a `<symbol>` inside it — that is what a symbol is for. */
+#glyphs { display: none; }
+.pinglyph {
+  width: 1em; height: 1em; display: block;
+  fill: currentColor; stroke: var(--surface); stroke-width: 1;
+  /* An `<svg>` clips to its viewport, and the stroke is drawn outside the path's own bounds — so at
+     any real width the edge is shaved flat wherever the glyph touches the side of its box. Growing
+     the element does not help: the viewBox scales with it and the overhang grows in step.
+     `overflow: visible` is the fix, and it costs nothing. The alternative is padding the viewBox in
+     user units and growing `width`/`height` by the same ratio, which is two numbers that have to be
+     kept in step for a box nothing is laid out against. */
+  paint-order: stroke; overflow: visible;
+}
+/* **The outline above is the third attempt, and the first two were fakes.** First four hard drop
+   shadows, one per direction. Then the glyph painted twice from the same mask, a copy scaled up in a
+   grey behind the glyph itself. Both were reverted, and the reason each failed is the same reason
+   this one does not.
+   Four shadows cover four directions, so a water drop's diagonals come out thinner than its sides.
+   The scaled copy is even at every angle and is worse for it: a mask has no path to offset, so
+   scaling is the only way to grow it, and a scaled glyph grows away from its own centre rather than
+   outward from its edge. At 400 pins that reads as 400 grey silhouettes with a coloured shape laid
+   on them. Turning the grey down to `--muted` and thickening it only traded one failure for the
+   other.
+   A real `stroke` on a real path is neither. It is one shape, offset along its own outline, so it is
+   the same width at a diagonal as at a side and it adds nothing behind the glyph that the glyph does
+   not already cover. That is what the mask could not do at any width or colour, and it is the whole
+   reason the pins carry an SVG element now. **Do not go back to a second copy of the shape.**
+   Keep it in `--surface` and keep it thin. The job is to separate the mark from the tile so the
+   fill does not have to hold 3:1 against white paper on its own. A stroke wide enough to be read as
+   a border is the 400-blob failure again in a better technique. */
 /* Colour is already the offline grey here — fading the glyph as well would just hide it again. */
 .pin.off { opacity: .6; }
 /* A mast has no rule of its own any more. It was a filled disc carrying a sensor count, on the
@@ -172,14 +212,13 @@
    the accuracy circle under it is already a mark no station has.
    `home_pin` — a pin with a house in it, so the *shape* says "a marker, and it is yours" before the
    colour says anything. It is anchored at its tip, not its centre; see locate.js.
-   One shadow, and it is a shadow: a white halo was tried as the contrast the chip used to provide
-   and it reads as a glow — on the dark basemap the mark wore a bright fringe, which is a lit object,
-   not a mark on a map. The soft dark one is enough to sit it above the basemap. `filter` rather than
-   `box-shadow` because it follows the mask's rendered shape, not its box. */
+   It carried a soft drop shadow of its own and it went with the station pins', for the same reason:
+   this is a `.pin`, so `.pinglyph` strokes it too, and a shadow under an edge only softens the edge.
+   A white halo was tried here long before either and reads as a glow — on the dark basemap the mark
+   wore a bright fringe, which is a lit object, not a mark on a map. */
 .pin.me {
   width: 48px; height: 48px; font-size: 48px;
   background: none; border: 0; box-shadow: none; color: var(--me);
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .45));
 }
 /* A searched place. Accent rather than the location blue: this is somewhere the reader asked about,
    not where they are, and the two marks must not be read as the same thing.

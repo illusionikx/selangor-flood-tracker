@@ -203,7 +203,13 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   taupe, camera cyan, mast indigo. Tokens `--k-*`.
 - **Status only**: green → amber → orange → red (`--s-normal` / `--s-alert` / `--s-warning` /
   `--s-danger`, exposed as `STATUS_COLOR`), plus grey `--s-none` for offline / no reading.
-- **The values live in `css/base.css` and nowhere else**, two sets, one per theme. Do not write a hex
+- **The values live in `css/base.css` and nowhere else**, two sets, one per theme — except on a map
+  pin. `.pin` shares the dark theme's set on both themes, through the selector
+  `:root[data-theme="dark"], .pin` on the map-palette block, because the pin glyph carries a real
+  `stroke` and its fill no longer has to hold 3:1 against white paper alone. Every other surface that
+  paints a kind or a status still swaps with the theme. Any token a pin resolves must be in that
+  block: `--c` arrives as an inline style on `.pin` itself, so a missing one falls back to the theme
+  value and draws a single pin off-palette. Do not write a hex
   into a JS file or copy one into a doc — every hex outside that block is a value that will go stale
   the next time the palette moves, and it has moved four times. The one exception is a **canvas**:
   the heat gradient cannot resolve a token, so `RAIN_HEAT` in `config.js` keeps real values.
@@ -354,14 +360,25 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   both themes this way. The favorite heart works because its filter is on the `<b class="fv">`
   wrapper and the mask is on the `.i` inside it — `.pin`'s own soft shadow works for the same reason,
   since `.pin` is a plain `<span>`. Anything that wants an effect on an icon needs that wrapper.
-- **A station glyph gets no outline, and two shapes of one have already been tried and reverted.**
-  Four hard drop shadows cover four directions, so a water drop's diagonals come out thinner than its
-  sides. A real outline — the glyph painted twice from the same mask, a scaled copy behind it — is
-  even at every angle and worse for it: at 400 pins a grey silhouette behind every glyph is 400 grey
-  blobs, and the edge becomes the mark. Neither width nor colour was the problem. A 29px glyph has no
-  room for a second colour inside its own footprint, so anything meant to help these pins acts on
-  what is **behind** them — `.leaflet-tile-pane`'s filter, which is how the dark theme already does
-  it. See `docs/FEATURES.md`, *Two attempts at an outline on a station glyph*.
+- **A map pin's glyph is an inline `<svg><use>`, not a masked `<i>`, and the outline is the reason.**
+  A CSS mask keeps only the alpha of the picture and paints the box in `currentColor`, so there is no
+  fill and no stroke to address. Two attempts faked one and both were reverted. Four hard drop
+  shadows cover four directions, so a water drop's diagonals come out thinner than its sides. A
+  scaled copy of the mask behind the glyph is even at every angle and worse for it: a mask has no
+  path to offset, so it grows away from its own centre rather than outward from its edge, and at 400
+  pins that is 400 grey silhouettes with a coloured shape laid on them. A real `stroke` on a real
+  path is neither — one shape, offset along its own outline, with `paint-order: stroke` putting it
+  under the fill and `vector-effect: non-scaling-stroke` holding the width at 1 screen pixel through
+  `.pin`'s `scale(.8)` and the 48px `.me` pin alike — that property does **not** inherit, so it is
+  stamped on the path in `pinGlyph()` and cannot be declared on `.pinglyph`. The pins lost their
+  `drop-shadow` when they gained the stroke: two marks around one 29px glyph is one too many.
+  **Do not go back to a second copy of the shape**, and keep the stroke thin and in `--surface`: it
+  is the gap between the mark and the tile, and one wide enough to read as a border is the 400-blob
+  failure in a better technique.
+  `pinGlyph()` in `js/map.js` lifts each symbol out of `css/icons.css` at first use, so the path data
+  still lives in one place and adding an icon is still one line there. **Only the map pins take this
+  path** — every other icon in the app is still a mask, because nothing else needs a second colour.
+  See `docs/FEATURES.md`, *Three attempts at an outline on a station glyph*.
 - **There is no icon font any more, and there must not be one again.** Icons are SVG masks in
   `css/icons.css` (`<i class="i i-warning">`, or `--i: var(--i-warning)` on a pseudo-element).
   A ligature font renders *text* that only becomes a picture if shaping cooperates, so a stray
