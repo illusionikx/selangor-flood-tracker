@@ -240,12 +240,18 @@ export function flashTo(t) {
    the ring alone says "here" without saying what "here" is. It is not a popup — nothing is anchored
    to a marker, nothing survives the flash and nothing takes a click (see the panel note above). */
 export function ping(latlng, tone = '', label = '') {
-  const p = L.marker(latlng, {
-    icon: L.divIcon({ className: '', iconSize: [0, 0],
-      html: `<i class="ping ${tone}"></i>${label ? `<b class="pinglabel">${label}</b>` : ''}` }),
-    interactive: false, zIndexOffset: -1,
-  }).addTo(map);
-  setTimeout(() => p.remove(), FLASH_MS);
+  /* Two markers, not one, because the ring and the name want opposite ends of the stack. The ring
+     belongs *under* the pins, or it draws a circle over the thing it is pointing at. The name
+     belongs over them, or the pin it is naming hides it — a station marker is 39px anchored at its
+     middle, so anything within 20px of the point is behind the glyph. Both are `interactive: false`,
+     which is what actually keeps the click on the pin; the z order is only about paint. */
+  const mark = (html, z) => {
+    const p = L.marker(latlng, { icon: L.divIcon({ className: '', iconSize: [0, 0], html }),
+      interactive: false, zIndexOffset: z }).addTo(map);
+    setTimeout(() => p.remove(), FLASH_MS);
+  };
+  mark(`<i class="ping ${tone}"></i>`, -1);
+  if (label) mark(`<b class="pinglabel">${label}</b>`, 1000);
 }
 
 // "Navigated away" = a pan or zoom the user asked for, not the panel closing: you can close the

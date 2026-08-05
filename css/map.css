@@ -227,14 +227,26 @@
 /* The name of the place the ripple is over, gone when the ripple is. 2.4s is FLASH_MS, the same
    number `.ping`'s two 1.2s runs already spell out — the marker is removed on that timer, so a
    longer animation here would be cut off rather than finish. Not interactive: its marker is
-   `interactive: false`, and `pointer-events` keeps it off the pin it is naming. */
+   `interactive: false`, and `pointer-events` keeps it off the pin it is naming.
+   28px clears the pin. A station marker is 39px anchored at its middle, so its glyph reaches about
+   20px above the point, and a chip any lower than this is a chip behind a pin. The 6px tail below
+   the chip eats the first 6px of that gap.
+   `filter: drop-shadow`, not `box-shadow`: the shadow has to follow the tail, and a box shadow
+   traces the border box, which the tail hangs outside of. The chip is a plain `<b>` and not an
+   `.i`, so it carries no mask and the filter renders — see the mask gotcha in CLAUDE.md. */
 .pinglabel {
-  position: absolute; left: 0; bottom: 18px; translate: -50% 0; pointer-events: none;
-  max-width: 40vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  padding: 3px 9px; border-radius: 999px; box-shadow: var(--shadow);
+  position: absolute; left: 0; bottom: 28px; translate: -50% 0; pointer-events: none;
+  white-space: nowrap;   /* no clip and no cap: the tail is a child, so any overflow rule cuts it off */
+  padding: 3px 9px; border-radius: 999px; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .35));
   background: var(--surface); color: var(--on-surface);
   font-size: 12px; font-weight: 500; line-height: 1.4;
   animation: pinglabel 2.4s ease-in forwards;
+}
+/* The tail. Borders, not a rotated square: a rotated square needs its own background and would show
+   its corners past the rounded end of a short chip. */
+.pinglabel::after {
+  content: ''; position: absolute; left: 50%; top: 100%; translate: -50% 0;
+  border: 6px solid transparent; border-top-color: var(--surface);
 }
 @keyframes pinglabel { 0%, 70% { opacity: 1; } 100% { opacity: 0; } }
 

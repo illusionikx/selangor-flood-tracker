@@ -5399,3 +5399,25 @@ facts about the station and not a gloss on a button.
 
 `ui.js` writes the favorite label with `textContent` now, rather than rebuilding the same markup with
 `innerHTML`. It repaints that one item live when the heart is pressed with the menu still open.
+
+**The name chip shipped behind the pin.** `ping()` drew the ring and the label inside one marker, and
+that marker carries `zIndexOffset: -1` so the ring paints under the station pins rather than over the
+one it points at. The label inherited that. A station marker is 39px anchored at its middle, so its
+glyph covers everything within 20px of the point, and the chip sat at 18px.
+
+`ping()` now draws two markers. The ring keeps `-1`. The name takes `1000` and sits 28px up, clear of
+the glyph. Both stay `interactive: false`, which is the thing that actually keeps the click on the
+pin. The z order was only ever about paint.
+
+**The chip grew a tail.** A rounded box floating 28px over a ripple names a place without pointing at
+one. `.pinglabel::after` draws a 6px triangle out of borders, centred under the chip. Borders, not a
+rotated square: a square needs a background of its own, and its corners show past the rounded end of
+a short chip.
+
+The shadow moved from `box-shadow` to `filter: drop-shadow`, because a box shadow traces the border
+box and the tail hangs outside it. The chip is a plain `<b>`, so it carries no mask and the filter
+renders. An icon in this app cannot take a filter for that exact reason.
+
+The width cap and the ellipsis went at the same time. Both need `overflow: hidden`, and the tail is a
+child, so any clip on the chip cuts the tail off. A station name is around 30 characters and the chip
+lives for 2.4 seconds over a point the map has just centred.
