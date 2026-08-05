@@ -223,28 +223,45 @@
        carry. The complaint about the official portals is already two paragraphs up, with the
        evidence attached, so this does not repeat it. What About never said is that a machine wrote
        the code.
-       The last three paragraphs each make a claim about privacy. The plan for this change carries
-       a grep behind every one. The tile sentence is there because the credits below name CARTO,
-       and a page that credits a third party while claiming to load nothing from one contradicts
-       itself in a single screen. Anything that ever posts a coordinate must delete the last
-       paragraph. -->
+       Two voices, on purpose, and the seam is the blank line before the second comment. Above it
+       the section tells a story and is written to be read once. Below it the paragraphs state what
+       this site does with a reader's data, and their own comment carries the rules for what may go
+       there. The admission that an AI wrote the prose sits in the first sentence it applies to,
+       not as a punchline at the end, because a reader who stops after one paragraph has still
+       been told. -->
   <h3>How this was built</h3>
-  <p class="muted">This site is vibe coded. An AI wrote most of it, over a few evenings. It exists
-     because reading three government pages to answer one question about my own river was
-     absurd.</p>
-  <p class="muted">It started as Selangor alone. I work in Kuala Lumpur, so I added that too, and
-     Putrajaya arrived on the same feed. A Selangor map became a Klang Valley one. The repository
-     still carries the first name.</p>
-  <p class="muted">So there is no team behind it, and no warranty. It can be wrong. The code is
-     open. Read it, and tell me what I got wrong.</p>
-  <p class="muted">It keeps no account, runs no analytics and sets no cookies. It loads no tracking
-     script from anyone.</p>
-  <p class="muted">The map tiles come from CARTO, so CARTO sees which tiles your browser asks for.
-     Nothing else on this page is theirs.</p>
-  <p class="muted">A place you search for goes to this site’s own server, which asks OpenStreetMap
-     where it is. That happens only when you pick the search row, never as you type.</p>
-  <p class="muted">Your location, if you share it, stays in the browser. Nothing sends it
-     anywhere.</p>
+  <p class="muted">One question. Three government websites. That was what it took to find out
+     whether the river near my house was rising, and it was absurd, so I built this instead. This
+     site is vibe coded. An AI wrote most of it over a few evenings, and these paragraphs too, and
+     I spent those evenings telling it what was wrong. It started as Selangor alone. Then I
+     remembered that I spend every working day in Kuala Lumpur, so that went in too, and Putrajaya
+     came along on the same feed. The repository never got the message, and still carries the old
+     name.</p>
+  <p class="muted">The hard part was not the code. It was the cameras. JPS publishes a coordinate
+     for every flood camera, and one batch of them came out shuffled. A camera named after a town
+     in Kuala Selangor drew its pin 83 km away, in Bangi. There is no second source to check
+     against, because the list and the detail repeat the same wrong number.</p>
+  <p class="muted">So I checked them the slow way. Some of them I went to in person, stood in front
+     of, and confirmed with my own eyes. The rest I geoguessed. Open the camera and read what the
+     picture gives you. A road sign, a bridge, the bend of a river. Then hunt that view down on a
+     map until the place and the station name finally agree.</p>
+
+  <!-- The blunt voice stops at the line above. These two paragraphs are the ones a reader may need
+       to act on, and every sentence in them makes a claim that can be checked against the code, so
+       they are written plainly and without jokes. The plan for this change carries a grep behind
+       every one. A table was tried here and reverted: a claim about what this site does not do is
+       an argument, and an argument reads as a row of specifications only if the reader already
+       trusts it. The tile sentence is there because the credits below name CARTO, and a page that
+       credits a third party while claiming to load nothing from one contradicts itself in a single
+       screen. Anything that ever posts a coordinate must delete the last sentence. -->
+  <p class="muted">No team stands behind this project, and it carries no warranty. A reading can be
+     wrong, stale or missing. The source code is open, and a report of a mistake is welcome.</p>
+  <p class="muted">The site keeps no account, runs no analytics and sets no cookies. It loads no
+     tracking script from any provider. CARTO serves the map tiles, so CARTO sees which tiles your
+     browser requests, and nothing else on this page comes from them. A place you search for goes
+     to this site’s own server, which asks OpenStreetMap where it is. That request happens only
+     when you select the search row, never as you type. A location you share stays in the browser,
+     and the site sends it nowhere.</p>
 
   <div class="src">
     <a href="https://github.com/illusionikx/selangor-flood-tracker" target="_blank"

@@ -93,7 +93,7 @@ const CAM_FIX = [
     1285 => [2.8272222, 101.6567808],   // Kg Bukit Serdang         — the point 1279 was published at
     1286 => [3.59115, 101.60487],       // Kg Jawa Kerling          — published 49 km away, on the coast
     1287 => [3.20993, 101.76085],       // RP SK Hulu Klang         — published 69 km away, in Tanjung Karang
-    1288 => [3.42486, 101.17653],       // Pekan Tanjung Karang     — published 83 km away, in Bangi
+    1288 => [3.424508, 101.181142],       // Pekan Tanjung Karang   — published 83 km away, in Bangi, LOCATION CONFIRMED
 ];
 /* How close a sensor must be to a camera before its alert is allowed onto that camera's frames.
    js/config.js carries the same 2 for the live warning glyph. Change both together. */
