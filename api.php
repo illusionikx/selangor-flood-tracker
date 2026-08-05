@@ -51,6 +51,50 @@ const SIREN_STALE = 48 * 3600;
    can only let a doubtful alarm stand, and asking too narrow would silence a real one. */
 const SIREN_KM = 5.0;
 const SITE_M = 50;   // metres — stations this close are sensors on one mast, not separate places
+/* JPS shuffled the coordinates inside one batch of cameras. The feed publishes Kayu Ara's position
+   under camera 1285 and Tanjung Karang's under 1287, so 1279 draws in Sepang and 1288 in Bangi —
+   34 km and 83 km from the place each one is named after and filed under. Both the list and the
+   detail endpoint carry the same wrong value, so there is nothing upstream to prefer.
+   An entry gets in one of two ways, and never on a bare guess.
+   Most had to pass two checks that fail in different ways: the station's name geocodes to this point,
+   AND this point sits near the median of the non-camera stations in the district JPS itself assigns.
+   A name alone is not enough — "Bukit Serdang" (1285) geocodes cleanly to Seri Kembangan, 30 km
+   outside the Kuala Langat it is filed under, which is a second station of the same name and not
+   evidence about this one.
+   A station of another kind carrying the same name beats both, and 1277 came in that way. JPS puts
+   a rainfall gauge, a river and a flood gauge on one TAMAN DESA KEMUNING mast, so the camera takes
+   the coordinate JPS already publishes for that place rather than the one a gazetteer guesses. The
+   geocode landed 200 m off, which is outside SITE_M, so the camera drew as a place of its own beside
+   a mast it belongs on. Prefer a same-named station whenever the payload holds one.
+   1282 is the same route with the name only close, not equal: the camera reads "Kg Simpang Balak"
+   and the siren reads "KG. SG. BALAK", which is Sungai and not Simpang. What carries it is that the
+   published point was not in Hulu Langat at all, and the siren of the near name is. A near name is
+   weaker evidence than an equal one, so this entry is marked SOMEWHAT CONFIRMED and the next reader
+   is free to overrule it. Do not let a near name in on its own.
+   1285 is the other way in, and it is the swap read from the other end. Correcting 1279 orphans the
+   point JPS had published for it, and the five stations nearest that point are all in Kuala Langat —
+   which is the district JPS gives 1285, and 1285 is the only Kuala Langat camera in the batch. So
+   there is exactly one station the orphaned point can belong to. Use this rule only when both halves
+   hold: the neighbours agree on a district, and one uncorrected camera in the batch is filed under it.
+   Three names no gazetteer holds (1272, 1281, 1289), one that only matched a highway (1315),
+   and one the checks disagreed about (1280) are left as published. They are wrong on the map and
+   honestly so.
+   CAM_FIX_KM makes the table retire itself: an override is applied only while the published value is
+   still far from it, so the day JPS corrects a station we go back to following the feed. */
+const CAM_FIX_KM = 2.0;
+const CAM_FIX = [
+    1276 => [3.093060, 101.406711],     // Sg. Puluh Aman Perdana   — published 51 km away, in Ampang, LOCATION SOMEWHAT CONFIRMED
+    1277 => [3.02151, 101.52422],       // Taman Desa Kemuning      — the mast of that name, LOCATION CONFIRMED
+    1278 => [3.19970, 101.54617],       // Paya Jaras               — published 33 km away, in Serdang
+    1279 => [3.120836, 101.6017783],    // Kolam Sg Kayu Ara        — published 34 km away, in Sepang, LOCATION CONFIRMED
+    1282 => [3.00959, 101.77177],       // Kg Simpang Balak         — the SIREN KG. SG. BALAK site, LOCATION SOMEWHAT CONFIRMED
+    1283 => [2.88740, 101.71457],       // Jenderam Hilir           — published 41 km away, in Klang
+    1284 => [2.92542, 101.75676],       // Kolam Takungan Sg Merab  — published 39 km away, in Sungai Buloh
+    1285 => [2.8272222, 101.6567808],   // Kg Bukit Serdang         — the point 1279 was published at
+    1286 => [3.59115, 101.60487],       // Kg Jawa Kerling          — published 49 km away, on the coast
+    1287 => [3.20993, 101.76085],       // RP SK Hulu Klang         — published 69 km away, in Tanjung Karang
+    1288 => [3.42486, 101.17653],       // Pekan Tanjung Karang     — published 83 km away, in Bangi
+];
 /* How close a sensor must be to a camera before its alert is allowed onto that camera's frames.
    js/config.js carries the same 2 for the live warning glyph. Change both together. */
 const CAM_ALERT_KM = 2;
@@ -157,6 +201,21 @@ function sirenBacked(float $lat, float $lng, array $rivers): ?bool {
         if ($status >= 2) return true;
     }
     return $asked ? false : null;
+}
+
+/**
+ * The published position of a camera, or the corrected one where JPS shuffled a batch — see CAM_FIX.
+ * Applies to cameras only, because they are the only kind the shuffle touched, and only while the
+ * feed still disagrees by more than CAM_FIX_KM. That last test is what keeps the table from going
+ * stale in the one direction that would hurt: once JPS publishes the right coordinate, ours stops
+ * being an override and the feed wins again with nothing to edit here.
+ */
+function camFix(string $kind, int $id, float $lat, float $lng): array {
+    if ($kind !== 'camera' || !isset(CAM_FIX[$id])) return [$lat, $lng];
+    [$flat, $flng] = CAM_FIX[$id];
+    // Equirectangular, as everywhere else in this file — see sirenBacked() above.
+    $off = hypot($flat - $lat, ($flng - $lng) * cos(deg2rad($flat))) * 111;
+    return $off > CAM_FIX_KM ? [$flat, $flng] : [$lat, $lng];
 }
 
 // ?cam=<id> streams a CCTV still. Upstream advertises these over plain http, which an https page
@@ -620,6 +679,33 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
     $ok('a far flood cannot back a near refusal',
         sirenBacked($slat, $slng, [[2.849, 101.531, 0], [3.20, 101.70, 3]]) === false);
 
+    /* camFix() overrides a coordinate the feed publishes, which is the one thing in this file that
+       makes the map disagree with its source on purpose. Both directions have to hold: it must move
+       a camera JPS has in the wrong state, and it must get out of the way the moment JPS is right.
+       The numbers are the real ones — camera 1279 is Kolam Sg Kayu Ara, published in Sepang. */
+    echo "\ncamFix():\n";
+    [$plat, $plng] = [2.8272222, 101.6567808];      // what the feed publishes for 1279
+    [$tlat, $tlng] = CAM_FIX[1279];                 // where Kayu Ara is
+    $ok('a shuffled camera is moved to the corrected point',
+        camFix('camera', 1279, $plat, $plng) === [$tlat, $tlng]);
+    $ok('a camera not in the table is left alone',
+        camFix('camera', 1269, $plat, $plng) === [$plat, $plng]);
+    // The table is keyed by camera id, and every kind has its own id space — siren 1279 is a siren.
+    $ok('another kind sharing the id is left alone',
+        camFix('siren', 1279, $plat, $plng) === [$plat, $plng]);
+    $ok('the table retires itself once the feed agrees',
+        camFix('camera', 1279, $tlat, $tlng) === [$tlat, $tlng]);
+    // Just inside CAM_FIX_KM: close enough that JPS is describing the same place, so the feed wins.
+    $ok('a small disagreement defers to the feed',
+        camFix('camera', 1279, $tlat + 0.01, $tlng) === [$tlat + 0.01, $tlng]);
+    $ok('a large disagreement does not',
+        camFix('camera', 1279, $tlat + 0.05, $tlng) === [$tlat, $tlng]);
+    // Every entry must be inside the coverage box, or a typo would park a camera in another country.
+    foreach (CAM_FIX as $id => [$flat, $flng]) {
+        $ok("camera $id lands inside the coverage box",
+            $flat >= BOX[3] && $flat <= BOX[1] && $flng >= BOX[0] && $flng <= BOX[2]);
+    }
+
     echo $fail ? "\n$fail FAILED\n" : "\nall ok\n";
     exit($fail ? 1 : 0);
 }
@@ -967,6 +1053,8 @@ foreach ([['siren', 'StationSirens'], ['gauge', 'StationFloodGauges'], ['camera'
               && ($t = DateTime::createFromFormat('d/m/Y H:i:s', $updated))
               && $now - $t->getTimestamp() > SIREN_STALE;
 
+        [$lat, $lng] = camFix($kind, (int)$s['stationId'], (float)$s['latitude'], (float)$s['longitude']);
+
         $stations[] = [
             'image'    => $cam['imageUrl'] ?? null,
             'shot'     => isset($cam['lastUpdate']) ? date('d/m/Y H:i:s', strtotime($cam['lastUpdate'])) : null,
@@ -978,8 +1066,8 @@ foreach ([['siren', 'StationSirens'], ['gauge', 'StationFloodGauges'], ['camera'
             'name'     => trim($s['stationName']),
             'district' => $s['districtName'],
             'basin'    => $s['mainRiverBasin'],
-            'lat'      => (float)$s['latitude'],
-            'lng'      => (float)$s['longitude'],
+            'lat'      => $lat,
+            'lng'      => $lng,
             'status'   => (int)($fg['status'] ?? $s['status'] ?? 0),
             'online'   => !$stale && (bool)($s['isOnline'] ?? ((int)($s['stationStatus'] ?? 0) === 1)),
             'reading'  => $s['lastReading'] ?? null,

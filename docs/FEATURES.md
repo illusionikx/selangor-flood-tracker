@@ -5054,3 +5054,97 @@ on a heart is the two upper curves. Four hard 1px shadows, one per direction, dr
 of a glow, and one soft dark shadow under them lifts it off pale tiles. The mark sits over a basemap, over another
 pin's glyph, and sometimes beside a siren pin that is pink itself. The stroke is what keeps it
 readable in all three places.
+
+## Eleven cameras that JPS plots in the wrong district
+
+`Kolam Sg Kayu Ara` is a camera in Petaling Jaya. The map drew it 34 km away in Sepang. The pin was
+faithful to the feed.
+
+JPS publishes the wrong coordinate against that camera. The list endpoint and the detail endpoint
+carry the same value, so there was no better number upstream to prefer.
+
+The fault is not one bad number. JPS shuffled the coordinates inside one batch of cameras, ids 1276
+to 1289. The coordinate on camera 1285 points at Kayu Ara, 1.5 km from where a gazetteer puts the
+place. The coordinate on camera 1287 points at Tanjung Karang, 250 m out.
+
+Each coordinate is real. JPS attaches each one to the wrong camera. Camera 1288, named
+`Pekan Tanjung Karang`, drew in Bangi. That is 83 km from the town in its own name, and outside the
+district JPS gives it.
+
+`CAM_FIX` in `api.php` corrects eleven of them. This is the only place the app overrides a value its
+source states. The bar to add an entry is therefore high, and an entry gets in one of two ways.
+
+**The first way is two checks that fail in different ways.** Both must pass:
+
+1. The station name must geocode to the point, through the same Nominatim proxy `?place=` uses.
+2. That point must sit near the median of the non-camera stations in the district JPS itself assigns.
+
+A name alone is not enough, and check 2 is what proves it. `Bukit Serdang`, camera 1285, geocodes
+cleanly and confidently to Seri Kembangan. That is 30 km outside the Kuala Langat district JPS gives
+it, because a second place carries the same name.
+
+A table built on check 1 alone writes that coordinate in. It then moves a camera from one wrong
+place to another wrong place, with a clean-looking match as its evidence.
+
+**A same-named station of another kind beats both checks.** Camera 1277 came in this way.
+
+JPS puts a rainfall gauge, a river and a flood gauge on one `TAMAN DESA KEMUNING` mast. The camera
+carries that name too, so it takes the coordinate JPS already publishes for the place. A gazetteer
+guesses at a name. The mast is upstream stating where the place is.
+
+The geocode had landed 200 m off. That is outside `SITE_M`, so the camera drew as a place of its own
+beside a mast it belongs on. It is one pin with four sensors now.
+
+Camera 1282 took the same route on a name that is only close. It reads `Kg Simpang Balak`. The siren
+reads `SIREN KG. SG. BALAK`, which is Sungai and not Simpang.
+
+What carries that one is the district. The published point was not in Hulu Langat at all, and the
+siren of the near name is. A near name is weaker evidence than an equal one, so the table marks the
+entry `SOMEWHAT CONFIRMED` and the next reader can overrule it. A near name never gets in alone.
+
+**The third way is the swap, read from the other end.** Camera 1285 came in this way, and the
+geocode played no part in it.
+
+Correcting camera 1279 orphans the point JPS had published for it. The five stations nearest that
+orphaned point are all in Kuala Langat. That is the district JPS gives camera 1285. Camera 1285 is
+also the only Kuala Langat camera in the shuffled batch, so exactly one station can own the point.
+
+That argument needs both halves. The neighbours must agree on a district, and the batch must hold
+exactly one uncorrected camera that JPS files under it. With two candidates in the district the argument says nothing,
+and a coordinate goes in only when the evidence names one station.
+
+**Five stations stay wrong on the map on purpose.** Three names no gazetteer holds (1272, 1281,
+1289). One matched only a highway (1315). One more failed because the checks disagreed (1280).
+Camera 1289 is the worst pin in the payload at 118 km from its district, and it stays.
+
+A coordinate we invent is worse than one we can show belongs to upstream. Nothing inside this repo
+can detect the first kind. The outlier sweep in `CLAUDE.md` lists the second kind every time it runs.
+
+**`CAM_FIX_KM` retires the table by itself.** An override applies only while the feed still disagrees
+by more than 2 km. The day JPS corrects a station, our value stops being an override. The feed wins
+again, and no line here waits for somebody to remember to delete it.
+
+A hard-coded correction that outlives the fault it corrects becomes the fault. This one cannot.
+
+`camFix()` is pure arithmetic on a few floats, so it joins `forceAllowed()` and `sirenBacked()` in
+`php api.php --selftest`. Six assertions cover both directions and the id space. A siren numbered
+1279 is not camera 1279.
+
+One more assertion per entry puts the corrected point inside `BOX`. That check is cheap, and it
+catches the one mistake a hand-typed coordinate table really invites. A typo parks a camera in
+another country.
+
+### Not built
+
+**Nothing detects the general case.** The district-median sweep is a shell command in `CLAUDE.md`,
+not code in the app. It reports real outliers as well as faults, because a large district genuinely
+holds stations 27 km from its centre. Read its output as a shortlist to check by name.
+
+Wiring it into the payload needs a threshold. Any threshold is wrong for Hulu Selangor or useless
+for Petaling.
+
+**No flag on the doubtful pins in the UI.** Seven cameras stay in the wrong place, and the map says
+nothing about it. A reader cannot act on that warning. It also adds a new alert-shaped surface for a
+data-entry error at JPS.
+
+The alert design standard governs anything that alerts, and this does not clear it.

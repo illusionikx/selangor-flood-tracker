@@ -146,6 +146,9 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
 - Merge order: Selangor API → KL (skipping any station within ~200 m of one we already have, since
   the two feeds share no station codes) → national override by code → trend pass over the winner.
 - Every station carries `source` (`selangor` / `kl` / `national`) and, where known, `code`.
+- **`camFix()` corrects nine camera coordinates that JPS publishes against the wrong camera.** It is
+  the only place this app overrides a value the feed states. See the gotcha below for the rule that
+  admits an entry to `CAM_FIX`, and for the seven stations left wrong on purpose.
 - `?cam=<id>` streams a camera still. Validates the id is an integer, looks the URL up in the
   cached payload, and rejects any host that isn't JPS. Never proxies an arbitrary URL.
 - `?force=1` treats the 5-minute file cache as expired, inside the existing `flock` on
@@ -214,6 +217,36 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
 - **`-9999` means "no reading"** in both scraped feeds, rendered as `-9,999.00` in one of them.
   `numOrNull()` strips separators and nulls anything ≤ −9990. Treated as a level, it would render a
   station as catastrophically dry and poison its trend history.
+- **JPS shuffled the coordinates inside one batch of cameras, so a pin can be 83 km from its name.**
+  The coordinate the feed publishes for camera 1285 points at Kayu Ara, and the one for camera 1287
+  points at Tanjung Karang. So camera 1279 drew in Sepang and camera 1288 in Bangi, each one filed
+  under a district it was nowhere near. The list endpoint and the detail endpoint carry the same
+  wrong value, so there is no better source to prefer. `CAM_FIX` in `api.php` corrects eleven of them,
+  and an entry gets in one of two ways. **Most must pass two checks that fail in different ways**:
+  the station name must geocode to the point, and that point must sit near the median of the
+  non-camera stations in the district JPS itself assigns. A name alone is not enough. `Bukit Serdang`
+  (camera 1285) geocodes cleanly to Seri Kembangan, 30 km outside the Kuala Langat district JPS gives
+  it, because a second place carries that name. **A same-named station of another kind beats both**,
+  and camera 1277 came in that way: JPS already publishes a TAMAN DESA KEMUNING mast, so the camera
+  takes that coordinate rather than a gazetteer guess. The geocode landed 200 m off, which is outside
+  `SITE_M`, so the camera drew as a place of its own beside a mast it belongs on. Camera 1282 took
+  the same route on a name that is only close: it reads `Kg Simpang Balak` and the siren reads
+  `SIREN KG. SG. BALAK`, which is Sungai and not Simpang. What carries it is the district. The
+  published point was not in Hulu Langat at all. The siren of the near name is. **A near name is
+  weaker evidence than an equal one**, so the table marks that entry `SOMEWHAT CONFIRMED`. A near
+  name never gets in on its own.
+  **The third way in is the swap, read from the other end.** Correcting camera 1279 orphans the
+  point JPS published for it. The five stations nearest that point are all in Kuala Langat, which is the district JPS gives
+  camera 1285. That camera is also the only Kuala Langat one in the batch, so exactly one station can
+  own the orphaned point. Use that rule
+  only when both halves hold: the neighbours agree on a district, and the batch holds exactly one
+  uncorrected camera that JPS files under it. **Five stations stay wrong on the map on purpose** — three names that no
+  gazetteer holds (1272, 1281, 1289), one that matched only a highway (1315), and one where the
+  checks disagreed (1280). A coordinate we invent is worse than one we can show belongs to upstream.
+  `CAM_FIX_KM` retires the table by itself: an override applies only while the feed still disagrees
+  by more than 2 km. The day JPS corrects a station, the feed wins again, and no line here waits for
+  somebody to delete it. Do not extend this to another kind without the same evidence — the shuffle
+  touched cameras only.
 - **A `(string)` cast on `$_GET[...]` does not throw on an array — it emits a warning and coerces
   silently.** `?place[]=x` makes `$_GET['place']` an array. `(string)` on it prints
   `Warning: Array to string conversion` and yields the literal string `"Array"`, five characters that
@@ -817,6 +850,18 @@ for f in js/*.js css/*.css; do
 ```
 
 ```bash
+# Is any station plotted outside the district it is filed under? This is the sweep that found the
+# shuffled camera batch. It measures each station against the median of its own district, so a large
+# district reports real outliers too — BUKIT FRASER is 27 km from the centre of Hulu Selangor and is
+# correct. Read it as a shortlist to check by name, never as a list of faults.
+php -r '$p=json_decode(file_get_contents(".cache.json"),true);$g=[];
+foreach($p["stations"] as $s){if(!$s["lat"]||!$s["lng"])continue;$g[$s["state"]."|".$s["district"]][]=$s;}
+$m=function($a){sort($a);$n=count($a);return $n%2?$a[($n-1)/2]:($a[$n/2-1]+$a[$n/2])/2;};$o=[];
+foreach($g as $k=>$r){if(count($r)<4)continue;$cl=$m(array_column($r,"lat"));$cn=$m(array_column($r,"lng"));
+foreach($r as $s){$km=hypot($s["lat"]-$cl,($s["lng"]-$cn)*cos(deg2rad($cl)))*111;
+if($km>25)$o[]=sprintf("%6.1f km  %-24s %-14s %s",$km,$k,$s["id"],$s["name"]);}}
+rsort($o);echo implode("\n",$o),"\n";'
+
 php shots-test.php            # one of two runnable checks. Guards camera retention. Must stay green.
 php api.php --selftest       # the other. Guards the force-refresh rate limit, cache choice, and the
                               # place-lookup validator/rate limit. Must stay green.
