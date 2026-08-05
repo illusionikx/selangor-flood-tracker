@@ -4608,6 +4608,38 @@ rewritten to match: list every absolute URL in the code, then classify each one 
 runtime or merely linked. A claim about what a site does not do needs a check that enumerates what
 the site does do. A guess at what a violation looks like is not that check.
 
+A later pass rewrote the section in the voice of a blog post. One paragraph per beat, and the
+reader carried from the complaint to the code to the field work. Two other shapes came first. A
+single dense paragraph reads as a specification. A two-column `.key` table, reused from the Help
+pane, reads as a datasheet for a product, and each of those lines is a claim about what this site
+does not do. A claim of that kind is an argument, and an argument in a table asks the reader to
+take it as a measured fact. A sentence can also say what CARTO does not get.
+
+The section carries no em dash. A machine wrote this prose, the em dash is the tell, and the first
+paragraph says who wrote it in plain words. That line is worth less under a punctuation habit that
+says the opposite. It sits in the first sentence it applies to rather than as a punchline at the
+end, which is the worse joke and the better disclosure. A reader who stops after one paragraph has
+still been told.
+
+Ten paragraphs became five. A paragraph break asks the reader to stop, and the section had put a
+stop between the complaint and the code, between the shuffle and the field work, and between four
+claims about data that answer one question together. The five beats that remain are why this
+exists, what the cameras did, how I checked them, what the project is not, and what it does with
+the data a reader gives it.
+
+The register changes at the third break. The three story paragraphs stay blunt. The two under them
+use plain words, with no jokes, because a reader who gets that far wants to know what happens to a
+location they share. The comment in `index.html` names that seam, so a later edit does not blur the
+two voices back together.
+
+The rewrite also put the camera coordinates in front of a reader. `CAM_FIX` in `api.php` is the one
+place this app overrides a value its source states, and About never said how those corrections were
+made. It says it now. I went to some of those places in person. For the rest I read the picture, a
+road sign or a bridge or a river bend, and matched it against the station name. Camera 1288 is the
+first entry a visit confirmed, and its point moved about 500 m to what I found there. Five cameras
+stay wrong on the map, and the section says that too. A reader who finds a camera in the wrong
+district learns here that the app knows, and that an invented coordinate is the worse option.
+
 A later pass rewrote the section in the voice of a blog post. One paragraph per beat, a short one
 where the story turns, and the reader carried from the complaint to the code to the field work. A
 single dense block came first, and it reads as a specification. The blunt sentences survive the
