@@ -226,7 +226,7 @@ export function flashTo(t) {
   const marker = siteMark.get(t.site || t.id);
   marker ? marker.fire('click') : focusOn([t.lat, t.lng], 13);
 
-  ping([t.lat, t.lng]);
+  ping([t.lat, t.lng], '', t.name);
   // Only arm this after the flash: the flight and zoomToShowLayer above move the map themselves.
   setTimeout(() => map.once('dragstart zoomstart', unpin), FLASH_MS);
 }
@@ -234,10 +234,15 @@ export function flashTo(t) {
 /* An expanding ring over a point, then gone. Two callers with the same problem: the map has just
    moved you somewhere and nothing on screen says which of the pins now in front of you is the one
    you asked for. Non-interactive and behind the pins, so it can never eat the click on the thing it
-   is pointing at. `tone` picks the colour — see .ping in map.css. */
-export function ping(latlng, tone = '') {
+   is pointing at. `tone` picks the colour — see .ping in map.css.
+   `label` names the place over the ripple and fades with it. The panel already carries the name, but
+   the panel is on the other edge of the screen: after a jump the reader is looking at the map, and
+   the ring alone says "here" without saying what "here" is. It is not a popup — nothing is anchored
+   to a marker, nothing survives the flash and nothing takes a click (see the panel note above). */
+export function ping(latlng, tone = '', label = '') {
   const p = L.marker(latlng, {
-    icon: L.divIcon({ className: '', iconSize: [0, 0], html: `<i class="ping ${tone}"></i>` }),
+    icon: L.divIcon({ className: '', iconSize: [0, 0],
+      html: `<i class="ping ${tone}"></i>${label ? `<b class="pinglabel">${label}</b>` : ''}` }),
     interactive: false, zIndexOffset: -1,
   }).addTo(map);
   setTimeout(() => p.remove(), FLASH_MS);
@@ -268,5 +273,5 @@ export function showPlace(latlng) {
     html: '<span class="pin place"><i class="i i-place"></i></span>',
   }) }).addTo(map);
   focusOn(latlng, 13);
-  ping(latlng, 'place');
+  ping(latlng);   // the default accent ripple — `.ping.place` is gone, it painted the same colour
 }

@@ -88,14 +88,27 @@ export const dots = s => `<button class="icon dots" popovertarget="mnu-${s.id}"
     <button class="mi" data-fav="${s.id}"
       ><i class="i i-favorite${isFav(s) ? '' : '_outline'}"
          style="color:${isFav(s) ? 'var(--fav)' : 'var(--muted)'}"></i>
-      <span>${isFav(s) ? 'Remove from favorites' : 'Add to favorites'}<br><small class="muted">${
-        isFav(s) ? 'stops listing it first'
-                 : 'lists it first in the search box and the alert panel'}</small></span>
+      <span>${isFav(s) ? 'Remove from favorites' : 'Add to favorites'}</span>
     </button>
+    ${mapLink(s)}
     <button class="mi" data-ignore="${s.id}"><i class="i i-visibility_off"></i>
-      <span>Ignore this sensor<br><small class="muted">Hides it and stops it alerting you</small></span>
+      <span>Ignore this sensor</span>
     </button>
   </div>`;
+
+/* Where this station is, on a map that knows about roads. This app answers "what is the water
+   doing"; it holds no route, no street view and no satellite tile, and every one of those is the
+   next question somebody asks about a place they can see is flooding.
+   An `<a>`, not a button with a script behind it — the browser already knows how to open a link in a
+   tab, and on a phone it hands the coordinate to the Maps app. `?api=1` is Google's documented
+   cross-platform form, so it does the same thing on every device.
+   It is a link and not a fetch, so the About pane's "loads no tracking script" claim is untouched:
+   nothing reaches Google until the reader chooses to go there. The GitHub links in that same dialog
+   are the same class of thing. A station with no coordinate simply has no item — the national portal
+   publishes none, and those stations are only reachable from the table. */
+const mapLink = s => !s.lat || !s.lng ? '' : `<a class="mi" target="_blank" rel="noopener"
+      href="https://www.google.com/maps/search/?api=1&amp;query=${s.lat},${s.lng}"
+    ><i class="i i-place"></i><span>Open in Google Maps</span></a>`;
 
 const metric = (k, v, cls = '') => `<div class="k muted">${k}</div><div class="v ${cls}">${v}</div>`;
 
@@ -389,6 +402,15 @@ const favMark = (ids, set) => {
         ><i class="i i-favorite${set ? '' : '_outline'}"></i></button>`;
 };
 
+/* The card's title is also the way back to its pin. The panel does not move when the map does, so a
+   pan or a zoom leaves a reader holding a card with no idea which part of the screen it describes —
+   and the card is often opened from a list, a search or the alert panel, where the map was never
+   looked at. `data-go` is the jump every other list already uses (see ui.js), so this costs one
+   attribute: it centres the pin and names it on the map for the length of the ripple.
+   Emitted after the heart, because the CSS reserves that corner with an adjacent-sibling rule. */
+const goName = s =>
+  `<div class="popname" data-go="${s.id}" title="Show ${s.name} on the map">${s.name}</div>`;
+
 export function popup(s) {
   const kind = KINDS[s.kind];
   const tone = hasInfo(s) ? kind.color : 'var(--muted)';
@@ -401,7 +423,7 @@ export function popup(s) {
      own. Emitted before .popname because the CSS reserves the room with a sibling rule. */
   return `<div class="pophead">
       ${favMark(s.id, isFav(s))}
-      <div class="popname">${s.name}</div>
+      ${goName(s)}
       ${region(s)}
       <div class="popact">
         <span class="badge" style="--c:${tone}">
@@ -440,7 +462,7 @@ export function sitePopup(members) {
      Emitted before .popname because the CSS reserves room for it with an adjacent-sibling rule. */
   return `<div class="pophead">
       ${favMark(favIdList, favAll)}
-      <div class="popname">${lead.name}</div>
+      ${goName(lead)}
       ${region(lead)}
       <div class="badges">${members.map(m => {
         const k = KINDS[m.kind];

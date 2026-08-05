@@ -5170,7 +5170,7 @@ of a glow, and one soft dark shadow under them lifts it off pale tiles. The mark
 pin's glyph, and sometimes beside a siren pin that is pink itself. The stroke is what keeps it
 readable in all three places.
 
-## Eleven cameras that JPS plots in the wrong district
+## Fourteen cameras that JPS plots in the wrong district
 
 `Kolam Sg Kayu Ara` is a camera in Petaling Jaya. The map drew it 34 km away in Sepang. The pin was
 faithful to the feed.
@@ -5186,7 +5186,7 @@ Each coordinate is real. JPS attaches each one to the wrong camera. Camera 1288,
 `Pekan Tanjung Karang`, drew in Bangi. That is 83 km from the town in its own name, and outside the
 district JPS gives it.
 
-`CAM_FIX` in `api.php` corrects eleven of them. This is the only place the app overrides a value its
+`CAM_FIX` in `api.php` corrects fourteen of them. This is the only place the app overrides a value its
 source states. The bar to add an entry is therefore high, and an entry gets in one of two ways.
 
 **The first way is two checks that fail in different ways.** Both must pass:
@@ -5217,6 +5217,22 @@ What carries that one is the district. The published point was not in Hulu Langa
 siren of the near name is. A near name is weaker evidence than an equal one, so the table marks the
 entry `SOMEWHAT CONFIRMED` and the next reader can overrule it. A near name never gets in alone.
 
+Camera 1280 is the case that ranks a mast against a geocode. The gazetteer answer for `Sungai Lui`
+lands 2.3 km from the `KG. SG. LUI` mast, beside a different station on the same river. A gazetteer
+answers about a river. The mast is upstream stating where the place is.
+
+Camera 1283 moved off a geocode for the same reason. It reads `Jenderam Hilir`, and JPS puts a
+rainfall gauge and a river on a `JENDERAM HILIR` mast 1.9 km from the geocoded point. The camera now
+draws on that mast.
+
+**Search the payload before the gazetteer.** Camera 1289 is what taught that order. It sat with the
+stations left as published, and it was the worst pin on the map at 118 km from its district. The
+reason recorded for it was that no gazetteer holds `Rimba KDR`.
+
+That reason was never the whole question. JPS publishes a `RIMBA KDR` rainfall gauge and river, in
+Sabak Bernam, the district JPS files the camera under. The mast answers a name the gazetteer misses.
+A missing geocode says nothing about whether upstream already states where a place is.
+
 **The third way is the swap, read from the other end.** Camera 1285 came in this way, and the
 geocode played no part in it.
 
@@ -5228,9 +5244,39 @@ That argument needs both halves. The neighbours must agree on a district, and th
 exactly one uncorrected camera that JPS files under it. With two candidates in the district the argument says nothing,
 and a coordinate goes in only when the evidence names one station.
 
-**Five stations stay wrong on the map on purpose.** Three names no gazetteer holds (1272, 1281,
-1289). One matched only a highway (1315). One more failed because the checks disagreed (1280).
-Camera 1289 is the worst pin in the payload at 118 km from its district, and it stays.
+**The strongest way is that swap solved for the whole batch at once.** Start here next time.
+
+Take the point JPS publishes for each suspect camera. Name the non-camera station nearest to it.
+Thirteen of the fourteen points land within 550 m of a station that carries the name of another
+camera in the batch.
+The answer is a permutation, and it closes:
+
+```
+1276 → 1280 → 1287 → 1288 → 1284 → 1278 → 1282 → 1277 → 1281 → 1286 → 1289 → 1283 → 1276
+1279 ↔ 1285
+```
+
+Read `X → Y` as: the point JPS publishes for camera X is the true point of camera Y.
+
+Thirteen links come from names. The fourteenth needs no name at all.
+
+Those thirteen leave exactly one camera and exactly one point over. The two can only match each
+other. So camera 1281, `Sg Betong`, takes the point JPS publishes for camera 1277. No gazetteer
+holds that name. No mast carries it either. The cycle beats both, because the other thirteen links
+allow no other answer.
+
+**Rebuild the whole map before you argue about one pin.** One camera at a time took ten rounds and
+still left four wrong. The permutation took one query and left none.
+
+**No station stays wrong on the map now.** Cameras 1271, 1272, 1273, 1274, 1275, 1315 and 1316 each
+sit within 1.1 km of a station of their own name. The cycle closes without them. JPS publishes all
+seven correctly.
+
+This page called two of them, 1272 and 1315, wrong for months. The whole case against them was a
+gazetteer lookup that returned nothing. A gazetteer answers about its own index, not about a
+coordinate. Camera 1289 shows the same trap from the other side. It was the worst pin on the map at
+118 km. No gazetteer holds `Rimba KDR`. JPS publishes a RIMBA KDR mast, in the district it files
+that camera under.
 
 A coordinate we invent is worse than one we can show belongs to upstream. Nothing inside this repo
 can detect the first kind. The outlier sweep in `CLAUDE.md` lists the second kind every time it runs.
@@ -5263,3 +5309,93 @@ nothing about it. A reader cannot act on that warning. It also adds a new alert-
 data-entry error at JPS.
 
 The alert design standard governs anything that alerts, and this does not clear it.
+
+## The card title is the way back to its pin
+
+The station panel is fixed to the right edge of the viewport. The map behind it moves. So a pan or a
+zoom leaves a reader holding a card that describes a place no longer on screen, with nothing to say
+where it went. The panel is also opened from four places that never look at the map first: the alert
+list, the all-stations table, the ticker and the go-to box.
+
+The card's title now carries `data-go`, the same attribute every list in the app already uses to jump
+to a station. `goName()` in `js/popup.js` emits it, for a single sensor and for a mast alike. The
+delegated handler in `js/ui.js` was already there and needed no change.
+
+A click centres the pin, plays the ripple and refreshes the card in place. The key does not change,
+so `openSide()` keeps the reader's scroll position and plays no swap wipe.
+
+**The ripple now names the place.** `ping()` takes a third argument, and `flashTo()` passes the
+station name. The label is a chip over the ring, and it fades out with it after `FLASH_MS`.
+
+The panel holds that name too, on the other edge of the screen. After a jump the reader is looking at
+the map, and a bare ring says "here" without saying what "here" is. Every other jump gets the same
+label, because they all go through `flashTo()`.
+
+This is not a map popup, and the rule against one still holds. The label attaches to no marker.
+Nothing survives the flash. The marker carries `interactive: false` and the label adds
+`pointer-events: none`, so it cannot take a click from the pin it names.
+
+### Not built
+
+**No keyboard handler on the title.** It is a `<div>` with a `title`. That matches the alert rows and
+the place names on the "near this point" card. Each of those is a second route to a pin that already
+takes a click on the map. One role and one key handler here, and none on the other three, leaves the
+app less consistent than it started.
+
+**No permanent label under the pin.** 417 pins with a name each make a second map over the first. The
+label answers one question, at the moment of one jump.
+
+**The ripple is `--accent`, not red.** It started red, on the argument that a jump is nearly always
+to something that is alerting. The pin under the ring already carries the status colour, so the ring
+was not the thing saying so. Red is this app's word for danger, and a red ring round every arrival
+spends that word on "look here".
+
+`--me` still holds the location ripple, because any other colour round your own position reads as a
+claim about you. `.ping.place` went with the change. It named the colour that is now the default.
+
+## Open in Google Maps
+
+The ⓘ menu on a sensor now holds a third item. It opens the station's coordinate in Google Maps, in
+a new tab.
+
+This app answers one question: what is the water doing. It holds no route, no street view and no
+satellite tile. Each of those is the next thing a reader wants about a place they can see is
+flooding, and each of them is somebody else's map.
+
+`mapLink()` in `js/popup.js` writes an `<a class="mi">`, not a button with a script behind it. The
+browser opens a link in a tab already, and a phone hands the coordinate straight to the Maps app.
+The URL is Google's documented `?api=1` search form, so one address covers every platform.
+
+`.mi` gained `text-decoration: none`, because the rule now dresses an anchor as well as two buttons.
+
+**A station with no coordinate gets no item.** The national portal publishes none, and a card for one
+of those stations opens from the all-stations table.
+
+**The About pane needed no change.** Its claim is about what the page loads, and this is a link. No
+request reaches Google until the reader chooses to go there. The source-code and issue links in the
+same dialog are the same class of thing. The full sweep of absolute URLs in the client code puts
+`www.google.com` beside `github.com`, `carto.com` and `openstreetmap.org` as linked and never
+fetched. `basemaps.cartocdn.com` remains the one third-party host the browser contacts.
+
+### Not built
+
+**No second map provider, and no picker.** One item that works is the whole feature. A choice of
+three is a preference to store, a menu to draw and two more addresses to keep current.
+
+**Nothing opens directions.** A route needs a start point, so it needs your location or a typed
+address. The coordinate is what this app knows.
+
+## The ⓘ menu's actions lost their subtitles
+
+Each action in the menu carried a line of small grey text under it. "Lists it first in the search box
+and the alert panel." "Hides it and stops it alerting you." "This point, in a new tab."
+
+Three items became six lines, and the menu read as a page of documentation. Every subtitle restated
+its own verb. A reader who does not know what "Add to favorites" does learns nothing from "lists it
+first", and a reader who does know reads it on every open forever.
+
+The three actions are now one line each. `sourceInfo()` keeps its two small lines, because those are
+facts about the station and not a gloss on a button.
+
+`ui.js` writes the favorite label with `textContent` now, rather than rebuilding the same markup with
+`innerHTML`. It repaints that one item live when the heart is pressed with the menu still open.

@@ -500,9 +500,7 @@ document.addEventListener('click', e => {
       heart.style.color = on ? 'var(--fav)' : 'var(--muted)';
     }
     const label = item?.querySelector('span');
-    if (label) label.innerHTML = `${on ? 'Remove from favorites' : 'Add to favorites'}<br>` +
-      `<small class="muted">${on ? 'stops listing it first'
-        : 'lists it first in the search box and the alert panel'}</small>`;
+    if (label) label.textContent = on ? 'Remove from favorites' : 'Add to favorites';
   } else {
     menu.showPopover();
     menu.querySelector('[data-fav]')?.focus();

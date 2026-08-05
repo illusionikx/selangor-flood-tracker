@@ -210,17 +210,38 @@
   box-shadow: 0 0 0 3px color-mix(in srgb, #d93025 35%, transparent), var(--shadow);
 }
 
-/* Ripple played over a station the user jumped to from a panel or link, and over your own position
-   when you ask to be taken to it. Red is the default because a jump is nearly always to something
-   that is alerting; `--c` lets the arrival ripple in the location blue instead, since a red ring
-   round your own position would read as a warning about you. */
+/* Ripple played over a station the user jumped to from a panel or link, over a place the user
+   searched for, and over your own position when you ask to be taken to it.
+   `--accent`, not red. A jump is often to something that is alerting, but the ripple is not the
+   thing saying so — the pin under it already carries the status colour, and a red ring is the app's
+   word for danger. Painting one round every arrival spends that word on "look here", which is all
+   this means. `--c` keeps the location ripple in its own amber, since any other colour round your
+   own position reads as a claim about you. */
 .ping, .ping::after {
   position: absolute; left: 0; top: 0; width: 18px; height: 18px; margin: -9px 0 0 -9px;
-  border-radius: 50%; border: 3px solid var(--c, #d93025); animation: ripple 1.2s ease-out 2;
+  border-radius: 50%; border: 3px solid var(--c, var(--accent)); animation: ripple 1.2s ease-out 2;
 }
 .ping::after { content: ''; margin: -3px 0 0 -3px; animation-delay: .4s; }
 .ping.me { --c: var(--me); }
-.ping.place { --c: var(--accent); }
+
+/* The name of the place the ripple is over, gone when the ripple is. 2.4s is FLASH_MS, the same
+   number `.ping`'s two 1.2s runs already spell out — the marker is removed on that timer, so a
+   longer animation here would be cut off rather than finish. Not interactive: its marker is
+   `interactive: false`, and `pointer-events` keeps it off the pin it is naming. */
+.pinglabel {
+  position: absolute; left: 0; bottom: 18px; translate: -50% 0; pointer-events: none;
+  max-width: 40vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  padding: 3px 9px; border-radius: 999px; box-shadow: var(--shadow);
+  background: var(--surface); color: var(--on-surface);
+  font-size: 12px; font-weight: 500; line-height: 1.4;
+  animation: pinglabel 2.4s ease-in forwards;
+}
+@keyframes pinglabel { 0%, 70% { opacity: 1; } 100% { opacity: 0; } }
+
+/* The card's title is a jump back to its pin — see `goName()` in popup.js. Only where it carries
+   one: the alert panel's head and the table's hover panel reuse `.popname` and go nowhere. */
+.popname[data-go] { cursor: pointer; }
+.popname[data-go]:hover { text-decoration: underline; }
 
 /* --- phones ------------------------------------------------------------------------------------ */
 

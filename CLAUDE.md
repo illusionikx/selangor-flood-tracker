@@ -221,7 +221,7 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   The coordinate the feed publishes for camera 1285 points at Kayu Ara, and the one for camera 1287
   points at Tanjung Karang. So camera 1279 drew in Sepang and camera 1288 in Bangi, each one filed
   under a district it was nowhere near. The list endpoint and the detail endpoint carry the same
-  wrong value, so there is no better source to prefer. `CAM_FIX` in `api.php` corrects eleven of them,
+  wrong value, so there is no better source to prefer. `CAM_FIX` in `api.php` corrects fourteen of them,
   and an entry gets in one of two ways. **Most must pass two checks that fail in different ways**:
   the station name must geocode to the point, and that point must sit near the median of the
   non-camera stations in the district JPS itself assigns. A name alone is not enough. `Bukit Serdang`
@@ -240,9 +240,21 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   camera 1285. That camera is also the only Kuala Langat one in the batch, so exactly one station can
   own the orphaned point. Use that rule
   only when both halves hold: the neighbours agree on a district, and the batch holds exactly one
-  uncorrected camera that JPS files under it. **Five stations stay wrong on the map on purpose** — three names that no
-  gazetteer holds (1272, 1281, 1289), one that matched only a highway (1315), and one where the
-  checks disagreed (1280). A coordinate we invent is worse than one we can show belongs to upstream.
+  uncorrected camera that JPS files under it.
+  **The strongest way in is that same swap solved for the whole batch at once.** The shuffle is one
+  closed permutation. Name the station nearest each suspect camera's published point, and thirteen of
+  the fourteen points name another camera in the batch, inside 550 m. The cycle runs
+  1276→1280→1287→1288→1284→1278→1282→1277→1281→1286→1289→1283→1276, with 1279 and 1285 swapped as a
+  pair. One camera and one point are then left over and can only be each other, which is how camera
+  1281 got in with no gazetteer hit and no same-named mast. **Rebuild the whole map before you argue
+  about one pin** — solving them one at a time took ten rounds and left four wrong.
+  The cycle also names the cameras that are **not** in the shuffle: 1271, 1272, 1273, 1274, 1275,
+  1315 and 1316 each sit near a station of their own name, and the cycle closes without them. Two of
+  those (1272, 1315) were called wrong here for months on a failed gazetteer lookup alone. **A name
+  a gazetteer misses is not a wrong coordinate.** Camera 1289 makes the same point from the other
+  side: no gazetteer holds `Rimba KDR`, and JPS publishes a RIMBA KDR mast in the district it files
+  the camera under. Search the payload first, then the gazetteer.
+  A coordinate we invent is worse than one we can show belongs to upstream.
   `CAM_FIX_KM` retires the table by itself: an override applies only while the feed still disagrees
   by more than 2 km. The day JPS corrects a station, the feed wins again, and no line here waits for
   somebody to delete it. Do not extend this to another kind without the same evidence — the shuffle
@@ -428,6 +440,12 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   destroy. Anything that wants to *show a station* calls `flashTo()`, which fires the marker's own
   click; anything that wants to show something else calls `openSide()` with a key starting `@`
   (see locate.js), which keeps `render()`'s refresh pass off it.
+  **The name chip `flashTo()` leaves over the ripple is not a popup either.** `ping()` draws it
+  inside its own throwaway marker, which is `interactive: false` and removed after `FLASH_MS` —
+  nothing anchors it to a station's pin and nothing outlives the flash. It exists because the panel
+  is fixed to the right edge while the map moves under it, so the card's title carries `data-go`
+  (`goName()` in `popup.js`) as the way back to the pin, and a bare ring says "here" without saying
+  what "here" is. Anything that wants a *persistent* label on the map is the thing this rule forbids.
 - **The card arrives as one string and is split into two boxes.** `openSide()` moves the card's
   `.pophead` — the place name, region and one badge per sensor — out of `#sideBody` and into
   `#sideHead`, which is not inside anything that scrolls. `position: sticky` on it was tried first
@@ -876,6 +894,21 @@ foreach($g as $k=>$r){if(count($r)<4)continue;$cl=$m(array_column($r,"lat"));$cn
 foreach($r as $s){$km=hypot($s["lat"]-$cl,($s["lng"]-$cn)*cos(deg2rad($cl)))*111;
 if($km>25)$o[]=sprintf("%6.1f km  %-24s %-14s %s",$km,$k,$s["id"],$s["name"]);}}
 rsort($o);echo implode("\n",$o),"\n";'
+
+# What each published camera point actually is. This is the sweep that solved the shuffle: it names
+# the nearest non-camera station to every raw coordinate the feed publishes. A camera in the shuffle
+# lands within ~550 m of a station that carries ANOTHER camera's name, and those pairs form one
+# closed cycle. A camera near a station of its own name is published correctly. Run it against the
+# live list, not .cache.json — the cache holds coordinates CAM_FIX has already rewritten.
+php -r '$c=curl_init("https://infobanjirjps.selangor.gov.my/JPSAPI/api/CCTVS");
+curl_setopt_array($c,[CURLOPT_RETURNTRANSFER=>1,CURLOPT_SSL_VERIFYPEER=>0,CURLOPT_TIMEOUT=>20]);
+$r=json_decode(curl_exec($c),true);curl_close($c);
+$p=json_decode(file_get_contents(".cache.json"),true);
+$km=fn($a,$b,$c2,$d)=>hypot($a-$c2,($b-$d)*cos(deg2rad($a)))*111;$non=[];
+foreach($p["stations"] as $s) if($s["kind"]!=="camera"&&$s["lat"]&&$s["lng"]) $non[]=$s;
+foreach($r as $s){$la=(float)$s["latitude"];$ln=(float)$s["longitude"];if(!$la)continue;
+$b=null;$bd=1e9;foreach($non as $n){$d=$km($la,$ln,$n["lat"],$n["lng"]);if($d<$bd){$bd=$d;$b=$n;}}
+printf("%-5d %-28s %6.0f m  %-30s %s\n",$s["stationId"],$s["stationName"],$bd*1000,$b["name"],$b["district"]);}'
 
 php shots-test.php            # one of two runnable checks. Guards camera retention. Must stay green.
 php api.php --selftest       # the other. Guards the force-refresh rate limit, cache choice, and the

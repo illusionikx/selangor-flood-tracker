@@ -474,6 +474,7 @@ table.data button[data-pop] { cursor: pointer; }
   display: flex; align-items: flex-start; gap: 10px; width: 100%; padding: 8px 10px;
   font: 400 13px/1.35 Roboto, sans-serif; color: inherit; text-align: left;
   background: none; border: 0; border-radius: 6px; cursor: pointer;
+  text-decoration: none;   /* one item is an <a> — see mapLink() in popup.js */
 }
 .mi:hover { background: color-mix(in srgb, var(--accent) 14%, transparent); }
 .mi .i { font-size: 18px; color: var(--muted); margin-top: 1px; }
