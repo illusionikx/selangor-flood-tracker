@@ -63,7 +63,10 @@ export const cluster = L.markerClusterGroup({
     for (const m of kids) { kinds.add(m.options.kind); critical ||= m.options.critical; }
     const mixed = kinds.size > 1;
     return L.divIcon({
-      className: '', iconSize: [36, 36],
+      // Two pixels of air around `.cluster`'s 24px chip. Down 30% from 36/34 — the chip is a count,
+      // not a station, and at the old size it read as the largest mark on the map. Both numbers move
+      // together or the badge stops sitting over the pins it is hiding.
+      className: '', iconSize: [25, 25],
       html: `<span class="cluster${critical ? ' danger' : ''}${mixed ? ' mixed' : ''}">${kids.length}</span>`,
     });
   },

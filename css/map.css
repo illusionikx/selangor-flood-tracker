@@ -274,8 +274,10 @@
    heart cast. Anything else drawn onto the map takes this pair too. */
 .cluster {
   display: grid; place-items: center;
-  width: 34px; height: 34px; border-radius: 999px;
-  font-size: 13px; font-weight: 500; color: #fff; background: #5f6368;
+  /* 30% off 34, with the type and the danger ring taken down with it. The box is repeated as
+     `iconSize` in map.js, which is what positions the badge, so the two move together. */
+  width: 24px; height: 24px; border-radius: 999px;
+  font-size: 11px; font-weight: 500; color: #fff; background: #5f6368;
   border: 1px solid var(--surface); filter: drop-shadow(0 1px 1px rgba(0, 0, 0, .45));
 }
 .cluster.mixed { border-style: dashed; }              /* more than one kind inside */
@@ -283,7 +285,7 @@
    it is a state of this chip rather than the lift every mark on the map gets. */
 .cluster.danger {
   background: #d93025;
-  box-shadow: 0 0 0 3px color-mix(in srgb, #d93025 35%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, #d93025 35%, transparent);
 }
 
 /* Ripple played over a station the user jumped to from a panel or link, over a place the user
