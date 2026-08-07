@@ -2901,6 +2901,24 @@ box. Growing the element does not help — the viewBox scales with it and the ov
 the same ratio also works and is two numbers that must be kept in step, for a box nothing is laid
 out against.
 
+**The favorite heart is the same kind of glyph, and it needed one thing the station mark did not.**
+It drew its own edge with four hard 1px `drop-shadow`s, one per direction, from before a pin glyph
+was a path — hard because a blurred shadow leaves the edge soft exactly where the shape is thin,
+which on a heart is the two upper curves, and four offsets leave the diagonals between them thin
+anyway. It is a `.pinglyph` now and takes the same real stroke. It keeps a soft `drop-shadow` of its
+own, which is **not** a duplicate of `.pin`'s: a filter renders its element and every descendant as
+one image and casts a single shadow from the union silhouette, so `.pin`'s falls on the basemap and
+nothing falls from the heart onto the station glyph it overlaps.
+
+What cost the most time was the stacking. The heart is the last child of `.pin` and it is positioned,
+so CSS2.1 painting order puts it at step 7 and the unpositioned station `<svg>` at step 3 — it could
+not be underneath, and on every favorited pin it was. Both are now given explicit rungs:
+`.pin > .pinglyph` at `position: relative; z-index: 0`, `.pin .fv` at 2. The `position` is load
+bearing, because an unpositioned box cannot take a `z-index` at all. Two other explanations were
+chased first and both were wrong — a `filter` on a parent creates a containing block for absolute
+descendants but does not reorder them, and the heart's missing shadow was a depth problem rather
+than an order one. **Do not delete either declaration as redundant on the strength of the spec.**
+
 **The path data is still in one place.** `pinGlyph()` lifts each symbol out of the `--i-*` token in
 `css/icons.css` at first use and appends it to a hidden `#glyphs` sprite, so adding an icon is still
 one line in `icons.css` and there is no second copy to drift. **Only the map pins take this path.**

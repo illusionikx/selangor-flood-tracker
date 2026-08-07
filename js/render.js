@@ -153,7 +153,7 @@ export function render() {
         html: `<span class="pin${multi ? ' multi' : ''}${lead.online ? '' : ' off'}${
                      rising ? ' rise' : ''}${critical ? ' danger' : ''}" style="--c:${c}">${
                pinGlyph(multi ? MAST.icon : KINDS[lead.kind].icon)}${
-               fav ? '<b class="fv"><i class="i i-favorite"></i></b>' : ''}</span>`,
+               fav ? `<b class="fv">${pinGlyph('favorite')}</b>` : ''}</span>`,
       }),
     });
     // Fill the panel, then centre the pin in what is left of the map. Panel first: focusOn() reads

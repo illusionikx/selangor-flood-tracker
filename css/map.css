@@ -90,18 +90,21 @@
    and unreadable, and the filled one fixed that by making every station a coin on the map: at 400
    pins the basemap was a field of counters and the *shape* of a water drop, which is the one thing
    that says what a pin is without being read, was down to 15px inside a 26px chip.
-   What holds the contrast up is the stroke on the glyph itself — see `.pinglyph` below. There was a
-   soft `drop-shadow` here as well, from back when the glyph had no edge of its own and needed
-   lifting off a busy tile. Two marks around one 29px glyph is one too many: the stroke already
-   separates the pin from whatever is under it, and the shadow only softened the edge doing the work.
-   It is gone, and with it the reason the palette carried a value per theme for a pin — the map set
-   in base.css is now selected by `.pin` on both themes. */
+   Two things hold the pin up and they are the pair the favorite heart has used all along: an edge in
+   `--surface`, and one soft dark shadow under it. The edge is the stroke on the glyph — see
+   `.pinglyph` below — and it is what let the palette stop carrying a value per theme for a pin, so
+   the map set in base.css is now selected by `.pin` on both themes. The shadow is what the edge
+   cannot do: `--surface` is a light plate on the light theme, and a light edge on a pale tile
+   separates nothing. The shadow is the same one `.pin .fv` casts, so the pin and the badge on it
+   sit at one height. `filter`, not `box-shadow` — it follows the glyph's rendered outline rather
+   than its box. */
 /* 39px, up from 26 — the whole mark and everything hung off it went up by half. The box is repeated
    as `iconSize` in render.js, which is what actually positions the marker, so the two move together
    or the pin stops pointing at its station. */
 .pin {
   position: relative; display: grid; place-items: center; width: 39px; height: 39px;
   color: var(--c, var(--accent)); font-size: 36px;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, .45));
 }
 /* A fifth off every station pin, mast included. At 400 pins on a phone the map was more glyph than
    basemap, and a mark you cannot see the river under is not helping. The mast used to come down
@@ -129,16 +132,26 @@
    does not inherit, so a rule on this element lands on the outer `<svg>`, which paints nothing, and
    never reaches the path inside the `<use>` shadow tree. It is stamped on the path by `pinGlyph()`
    in map.js instead, and the note is there. Everything below inherits into that shadow tree and so
-   belongs here. One is one pixel at 31px on the map and at 48px on the "you are here" pin alike, and
-   `.pin`'s `scale(.8)` does not thin it. Wider was tried and read as a border in its own right,
-   which is the failure the two fake outlines below both landed in. */
+   belongs here. Two is two pixels at 31px on the map and at 48px on the "you are here" pin alike, and
+   `.pin`'s `scale(.8)` does not thin it.
+   **Two draws a one-pixel edge, not a two-pixel one.** A stroke is centred on the path and
+   `paint-order` hides the inner half under the fill, so what you see is always half the number. One
+   pixel is what `.pin .fv` draws with its four hard shadows, so two here is what makes the heart and
+   the glyph it sits on carry the same edge. Halve or double both together or they drift. */
 /* The symbol sprite `pinGlyph()` appends to the body. An `<svg>` with no size defaults to 300×150,
    so without this it is a blank box at the foot of the page. `display: none` on the outer element
    does not stop a `<use>` reaching a `<symbol>` inside it — that is what a symbol is for. */
 #glyphs { display: none; }
+/* **Both glyphs on a pin are positioned and ordered by hand.** The painting order already says a
+   positioned child with a `z-index` paints over an unpositioned block sibling, so the favorite heart
+   should have been on top of the station glyph with nothing stated here. It was not, on every
+   favorited pin. Rather than keep arguing with the render, the two are given explicit rungs: the
+   station mark at 0, the heart at 2 in `.pin .fv` below. An unpositioned box cannot take a `z-index`
+   at all, which is why this carries `position: relative` — that is the whole job of it. */
+.pin > .pinglyph { position: relative; z-index: 0; }
 .pinglyph {
   width: 1em; height: 1em; display: block;
-  fill: currentColor; stroke: var(--surface); stroke-width: 1;
+  fill: currentColor; stroke: var(--surface); stroke-width: 2;
   /* An `<svg>` clips to its viewport, and the stroke is drawn outside the path's own bounds — so at
      any real width the edge is shaved flat wherever the glyph touches the side of its box. Growing
      the element does not help: the viewBox scales with it and the overhang grows in step.
@@ -179,17 +192,34 @@
    is a favorite, so there is no hollow state to show here.
    The outline is what makes 15px of pink survive. It sits over a basemap, over another pin's glyph,
    and beside a siren pin that is pink itself, and a blurred halo was not enough at this size.
-   Four hard 1px shadows, one per direction, draw a real stroke rather than a glow: a blurred
-   `drop-shadow` spreads its opacity out and leaves the edge soft exactly where the shape is thin,
-   which on a heart is the two upper curves. Offsets and no blur keep it crisp. `--surface`, so the
-   stroke flips with the theme, then one soft dark shadow underneath for lift off pale tiles. */
+   **This is a `.pinglyph` like the station mark, so it carries the same real stroke**, and it needs
+   nothing of its own but a colour and a place to stand. It drew that edge with four hard 1px
+   `drop-shadow`s instead, one per direction, from before a pin glyph was a path — the shadows had to
+   be hard because a blurred one spreads its opacity out and leaves the edge soft exactly where the
+   shape is thin, which on a heart is the two upper curves. Four offsets cover four directions, and
+   the diagonals between them came out thin.
+   **The soft shadow stays, and it is not a duplicate of `.pin`'s.** A `filter` renders its element
+   and every descendant as one image and then casts one shadow from the union silhouette — so `.pin`'s
+   shadow falls on the basemap, and nothing falls from the heart onto the station glyph it overlaps.
+   This filter is what lifts the heart off that glyph. It was removed once on the reasoning that the
+   parent already cast it, and the heart went flat against the mark under it. */
+/* On the corner, overlapping it. It was pushed out to 5 and 6 while the heart looked as though it
+   were painted under the station glyph — the reading was that the overlap was hiding it. That was
+   the wrong diagnosis: the cause was the stacking, fixed on `.pin > .pinglyph` above, and the room
+   bought nothing once the order was right. 3 and 3 puts it back on the corner it belongs on. 17px
+   rather than the 15 it drew at before, which is the one thing kept from that pass — a heart is
+   read by its shape and it is the smallest shape on the map. */
 .pin .fv {
-  position: absolute; bottom: -2px; right: -2px; font-size: 15px; line-height: 1;
+  position: absolute; bottom: -3px; right: -3px; font-size: 17px; line-height: 1;
   color: var(--fav);
-  filter:
-    drop-shadow(1px 0 0 var(--surface)) drop-shadow(-1px 0 0 var(--surface))
-    drop-shadow(0 1px 0 var(--surface)) drop-shadow(0 -1px 0 var(--surface))
-    drop-shadow(0 1px 1px rgba(0, 0, 0, .45));
+  /* In front of everything else on the pin. DOM order already puts it over the glyph, but not over
+     `.pin.danger::after` — a pseudo-element is the last child of its host, so the danger halo painted
+     across the heart on exactly the pins where both are drawn. A `z-index` on an element that is
+     already positioned settles it for the halo, the rise ring and anything added later.
+     2, against the station glyph's explicit 0 — see `.pin > .pinglyph` above for why neither is
+     left to the painting order. */
+  z-index: 2;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, .45));
 }
 /* Forecast to reach danger. A ring rather than a fill, because it is a claim about the next few
    hours and not a reading — on the bare pin it is drawn like the halo below, since there is no
@@ -212,10 +242,10 @@
    the accuracy circle under it is already a mark no station has.
    `home_pin` — a pin with a house in it, so the *shape* says "a marker, and it is yours" before the
    colour says anything. It is anchored at its tip, not its centre; see locate.js.
-   It carried a soft drop shadow of its own and it went with the station pins', for the same reason:
-   this is a `.pin`, so `.pinglyph` strokes it too, and a shadow under an edge only softens the edge.
-   A white halo was tried here long before either and reads as a glow — on the dark basemap the mark
-   wore a bright fringe, which is a lit object, not a mark on a map. */
+   It carries the edge and the shadow every `.pin` does and states neither of its own — its old rule
+   set a slightly heavier shadow, which was a second number for the same job. A white halo was tried
+   here long before either and reads as a glow: on the dark basemap the mark wore a bright fringe,
+   which is a lit object, not a mark on a map. */
 .pin.me {
   width: 48px; height: 48px; font-size: 48px;
   background: none; border: 0; box-shadow: none; color: var(--me);
@@ -236,17 +266,24 @@
 
 /* Just the count, in one neutral chip for every cluster — no kind icon or hue. Fixed slate rather
    than a token so white text holds on both the light and dark basemaps, and it reads as neither a
-   station type (all saturated) nor offline (lighter grey). */
+   station type (all saturated) nor offline (lighter grey).
+   **The edge and the shadow are the pin's, to the pixel.** A chip and a pin sit side by side at
+   every zoom, so two ways of lifting a mark off the basemap is two marks that do not look like one
+   set. This carried a 2px border and Material's two-layer `--shadow`; the border is 1px, the same
+   width `.pinglyph` strokes at, and the shadow is the single soft one the pins and the favorite
+   heart cast. Anything else drawn onto the map takes this pair too. */
 .cluster {
   display: grid; place-items: center;
   width: 34px; height: 34px; border-radius: 999px;
   font-size: 13px; font-weight: 500; color: #fff; background: #5f6368;
-  box-shadow: var(--shadow); border: 2px solid var(--surface);
+  border: 1px solid var(--surface); filter: drop-shadow(0 1px 1px rgba(0, 0, 0, .45));
 }
 .cluster.mixed { border-style: dashed; }              /* more than one kind inside */
+/* The red glow stays a `box-shadow`: it is a ring around a circle, which a spread draws exactly, and
+   it is a state of this chip rather than the lift every mark on the map gets. */
 .cluster.danger {
   background: #d93025;
-  box-shadow: 0 0 0 3px color-mix(in srgb, #d93025 35%, transparent), var(--shadow);
+  box-shadow: 0 0 0 3px color-mix(in srgb, #d93025 35%, transparent);
 }
 
 /* Ripple played over a station the user jumped to from a panel or link, over a place the user

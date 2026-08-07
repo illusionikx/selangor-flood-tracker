@@ -379,6 +379,17 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   still lives in one place and adding an icon is still one line there. **Only the map pins take this
   path** — every other icon in the app is still a mask, because nothing else needs a second colour.
   See `docs/FEATURES.md`, *Three attempts at an outline on a station glyph*.
+- **Both glyphs on a map pin carry an explicit `z-index`, and the painting order alone did not hold
+  them.** `.pin` draws the station mark and, on a favorited place, a heart badge over its bottom-right
+  corner. The heart is the last child *and* it is positioned, so CSS2.1 painting order puts it at
+  step 7 and the unpositioned station `<svg>` at step 3 — the heart could not be underneath, and it
+  was, on every favorited pin. `.pin > .pinglyph` now takes `position: relative; z-index: 0` and
+  `.pin .fv` takes 2. **The `position` is not decoration** — an unpositioned box cannot take a
+  `z-index` at all, so the station mark had to be positioned before it could be pushed down a rung.
+  Do not delete either declaration as redundant on the strength of the spec. It reads redundant and
+  is not. Two other explanations were chased first and both are wrong: a `filter` on `.pin` creates a
+  containing block but not a z-order change, and the heart's own `drop-shadow` is about lifting it
+  off the glyph, not about which one paints first.
 - **There is no icon font any more, and there must not be one again.** Icons are SVG masks in
   `css/icons.css` (`<i class="i i-warning">`, or `--i: var(--i-warning)` on a pseudo-element).
   A ligature font renders *text* that only becomes a picture if shaping cooperates, so a stray
