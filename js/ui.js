@@ -27,10 +27,17 @@ el('theme').onclick = () =>
 // click on the backdrop as a close, which the element does not do on its own.
 
 const aboutBox = el('aboutBox');
+/* One handler closes the menu, whichever item was hit. Capture, not bubble: an item's own handler
+   calls showModal(), and a dialog that opens while its opener is still in the top layer is a
+   sequence worth not testing. Capture runs the parent first, so the menu is gone before the dialog
+   arrives. */
+const appMenu = el('appMenu');
+appMenu.addEventListener('click', () => appMenu.hidePopover(), true);
 // The station card closes when a dialog takes the screen — you have gone somewhere else, and coming
 // back to a card you had forgotten was open is a surprise. That, and its own ×, are the only ways it
 // shuts: nothing on the map dismisses it, and a poll never does. See map.js.
-el('about').onclick = () => { closeSide(); paintDev(); aboutBox.showModal(); };
+el('about').onclick = () => { closeSide(); showPane('tabAbout'); aboutBox.showModal(); };
+el('help').onclick  = () => { closeSide(); showPane('tabHelp');  aboutBox.showModal(); };
 aboutBox.onclick = e => { if (e.target === aboutBox) aboutBox.close(); };
 
 /* Two panes, one dialog. `hidden` on the pane and `aria-selected` on the button are the whole state.

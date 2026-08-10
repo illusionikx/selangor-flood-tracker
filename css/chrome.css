@@ -479,6 +479,9 @@ table.data button[data-pop] { cursor: pointer; }
 .mi:hover { background: color-mix(in srgb, var(--accent) 14%, transparent); }
 .mi .i { font-size: 18px; color: var(--muted); margin-top: 1px; }
 .mi small { font-size: 11px; }
+/* The sensor menu's items wrap to two lines and hold a `<small>`. These are one line each, and a
+   label that wrapped in a four-item menu would read as four paragraphs. */
+#appMenu .mi { align-items: center; white-space: nowrap; }
 /* Where the reading came from, above the one action. It reads like the item under it and answers
    to nothing — no pointer, no hover fill — because a block that lit up under the mouse in a list of
    one button would promise a second one. */
