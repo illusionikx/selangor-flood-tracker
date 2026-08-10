@@ -107,13 +107,15 @@ One new dialog in `index.html`, next to `#dataBox`:
       ><i class="i i-close"></i></button></form>
   </div>
   <h2>All cameras</h2>
+  <input id="camFind" type="text" autocomplete="off" placeholder="Filter by name or district…">
   <p class="muted" id="camCount"></p>
   <div id="camGrid"></div>
 </dialog>
 ```
 
-`#camCount` states the count and nothing else: `91 cameras`. It is the same line `#dataCount`
-holds, in the same place, so the two views open the same way.
+`#camCount` states the count and nothing else: `91 cameras`. Under a filter it states both numbers:
+`12 of 91 cameras`. It is the same line `#dataCount` holds, in the same place, so the two views open
+the same way.
 
 Put `display` on `#camBox[open]`, never on `#camBox`. A `<dialog>` that carries `display` on the
 element itself lays out on the page while closed. See the gotcha in `CLAUDE.md`. `#dataBox` shows
@@ -192,15 +194,58 @@ The first screen holds about twelve tiles, so the first screen costs about 10 MB
 `loading="lazy"` on the still is the browser doing the same job for the one image every tile has.
 Use it. Do not write JavaScript for that part.
 
-### A poll repaints, it does not rebuild
+### The filter
+
+`js/ui.js` holds the handler, because that file holds every DOM binding in this app. It also already
+holds the matcher: `squash()`, `termsOf()` and `matches()` at `ui.js:634`. Use those three, not the
+plain substring test in `js/table.js`.
+
+The reason is in the comment above them. JPS writes one place as `I.K.B.N.`, `IKBN` and `I K B N`,
+and `squash()` reads all three as one word. The matcher also ignores word order. It costs nothing
+here, because the handler sits in the same file.
+
+Match against name, district and state. Skip the kind label. Every tile is a camera, so the word
+matches all 91 and answers nothing.
+
+**A filtered tile takes `hidden`. Nothing rebuilds.** The tile keeps its lap, its frame list and its
+warmed images, so clearing the box brings it back where it was. The grid reflows by itself, because
+a hidden item leaves the grid flow.
+
+The observer needs no code for this. The browser reports a `display: none` element as not
+intersecting, so a filtered tile disarms itself and re-arms when it comes back.
+
+Write `.camtile[hidden] { display: none }` in the stylesheet. `.camtile` carries a `display` of its
+own, and any author `display` rule beats the browser rule for `[hidden]`. `CLAUDE.md` records the
+same trap on `.link`.
+
+An empty result must say so. `#camCount` reads `No camera matches that name.` A filter that empties
+a view in silence reads as a broken view.
+
+Do not focus `#camFind` when the dialog opens. The table focuses its box, because a table is a thing
+you filter. This is a wall of pictures, and a focused input opens the keyboard over the pictures on
+a phone.
+
+### A poll paints, it does not rebuild
 
 `js/render.js` rebuilds the open station card and calls `dataTable()` when the table is open. This
 view must not join that list. A rebuild drops every tile to frame 0 in the middle of a lap, which is
-the exact failure `clip.js` exists to prevent.
+the exact failure `clip.js` exists to prevent. It also throws away the frame list and the warmed
+images of every tile on screen.
 
-`render()` calls `repaint()` from `wall.js` instead. `repaint()` walks the tiles that exist, runs
-`camAlert()` again for each one, and swaps the `t-*` class and the `.camsay` text. It tears nothing
-down and touches no `<img>`.
+`render()` calls `paint()` from `wall.js` instead. `paint()` creates and destroys no DOM. It walks
+the tiles that exist, and for each one it does three things:
+
+1. Call `camAlert()` again. The alert near that lens can appear, escalate, clear or go stale between
+   two polls.
+2. Set or clear `t-now` and `t-soon` on the tile.
+3. Write the `.camsay` text, or empty it.
+
+It touches no `<img>`, no frame list and no observer, so the laps run through it.
+
+`paint()` leaves `hidden` alone, so a filter survives a poll with no extra work.
+
+The name matches `paint()` in `js/timeline.js`, which does the same job for the lightbox: rewrite
+the parts of an existing player that changed, rather than build a new one.
 
 A camera that appears between two polls waits for the next open. A camera list that changes
 mid-session is a JPS outage recovering, not weather.
@@ -273,10 +318,9 @@ behind a closed dialog.
   control is one too many, which is the reason `clip.js` has no controls either.
 - **No warning pill on a tile.** The pill states the alert on one frame, and it needs a way to
   score the frame on screen. A tile has no scrubber, so it has no way to ask. The border and the
-  phrase answer the live question, and `repaint()` keeps them current.
-- **No search box.** The table has one. A reader looking for one named camera has a better tool one
-  menu item away.
-- **No sort control, no filter chips, no favorites-only mode.** Add one when a reader asks for it.
+  phrase answer the live question, and `paint()` keeps them current.
+- **No sort control, no filter chips, no favorites-only mode.** The text filter covers the question
+  a reader brings. Add one of these when a reader asks for it.
 - **No server change.** `?shots=` and `?shot=` already answer everything this needs.
 
 ## Files
@@ -285,10 +329,10 @@ behind a closed dialog.
 |---|---|
 | `index.html` | `#apps` button and its menu, `#camBox` dialog, `#data` and `#about` buttons removed |
 | `css/icons.css` | one rule for the `apps` glyph |
-| `css/chrome.css` | `#camBox`, `#camGrid`, `.camtile`, `.camname`, `.camsay`, the hover query |
-| `js/wall.js` | new. Build, arm, tick, repaint, stop |
-| `js/ui.js` | menu item handlers, the delegated tile click, `camBox` open and close |
-| `js/render.js` | one line: call `repaint()` when `#camBox` is open |
+| `css/chrome.css` | `#camBox`, `#camFind`, `#camGrid`, `.camtile`, `.camtile[hidden]`, `.camname`, `.camsay`, the hover query |
+| `js/wall.js` | new. Build, arm, tick, paint, stop |
+| `js/ui.js` | menu item handlers, the filter, the delegated tile click, `camBox` open and close |
+| `js/render.js` | one line: call `paint()` when `#camBox` is open |
 | `CLAUDE.md` | a row for `js/wall.js` in the file table |
 | `docs/FEATURES.md` | a section on this view and the App menu |
 
@@ -324,3 +368,7 @@ By hand, in the browser:
    that does not wrap.
 7. Tab through the grid. Check the focus ring, and check Enter opens the station panel.
 8. Switch the theme with the grid open. Check both borders against the tokens.
+9. Type `ikbn` in the filter, then `I.K.B.N.`, then `bangi kg`. Check all three match.
+10. Filter to one tile and watch its lap. Clear the box. Check the tile keeps its place, and check
+    the tiles that come back do not restart.
+11. Type a word that matches nothing. Check the count line says so.
