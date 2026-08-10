@@ -231,12 +231,12 @@ td:last-child { text-align: right; padding-left: 16px; }
 .chip .hint { margin-left: auto; font-size: 11px; opacity: .7; white-space: nowrap; }
 #shown { margin: 10px 2px 0; font-size: 12px; }
 
-select, #goto, #dataFind {
+select, #goto, #dataFind, #camFind {
   width: 100%; padding: 8px 10px; margin-bottom: 10px; font: inherit; font-size: 13px;
   background: var(--surface); color: var(--on-surface);
   border: 1px solid var(--outline); border-radius: 8px;
 }
-select:focus-visible, #goto:focus-visible, #dataFind:focus-visible,
+select:focus-visible, #goto:focus-visible, #dataFind:focus-visible, #camFind:focus-visible,
 .icon:focus-visible {
   outline: 2px solid var(--accent); outline-offset: 1px;
 }

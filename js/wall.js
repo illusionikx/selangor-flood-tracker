@@ -27,6 +27,67 @@ const laps = new Map();
 let timer = null;
 let io = null;
 
+/* The batch the progress bar tracks — not the whole grid, which is why this is not a count of 90.
+   Tiles arm as they scroll into view (see onSee() below), so `waiting` only ever holds the tiles
+   currently between "started loading its own first picture" and "settled", and `batchTotal` is how
+   many the *current* batch began with — the denominator behind the fraction the bar draws. Both
+   live at module scope, like `laps`, so close() can reset them without a third argument threading
+   through every caller. */
+let waiting = 0, batchTotal = 0;
+
+/* Called once per tile, from onSee() at the moment it first comes into view — see the comment on
+   `L.started` there for why that moment stands in for the image's own (nonexistent) "started
+   fetching" event. A batch that finds nothing already in flight is a new one: the denominator resets
+   before this tile joins it, rather than growing for as long as a reader keeps scrolling. */
+function startBatch() {
+  if (waiting === 0) batchTotal = 0;
+  waiting++;
+  batchTotal++;
+  paintBar();
+}
+
+/* Called once per tile, from onSettle() below, on whichever of load/error reaches it first. Floored
+   at zero rather than trusted to land there on its own: a tile whose image resolves before its own
+   IntersectionObserver callback runs — a cached still, decoding synchronously — would settle before
+   startBatch() ever counted it, and going negative would draw a bar reading past full. */
+function settleBatch() {
+  waiting = Math.max(0, waiting - 1);
+  paintBar();
+}
+
+/* The only place `#camBar`'s DOM is touched. `--p` is a fraction, never a pixel — the bar's own CSS
+   draws it with `transform: scaleX()`. `aria-hidden` and the `.on` class move together, because both
+   answer the same question (is a batch actually running) and neither should lag the other by a
+   frame: one hides the bar from a screen reader, the other from everyone else. */
+function paintBar() {
+  const bar = el('camBar');
+  const running = waiting > 0;
+  bar.classList.toggle('on', running);
+  bar.setAttribute('aria-hidden', String(!running));
+  const pct = batchTotal ? (batchTotal - waiting) / batchTotal : 0;
+  bar.style.setProperty('--p', pct);
+  bar.setAttribute('aria-valuenow', String(Math.round(pct * 100)));
+}
+
+/* The settle signal for both the skeleton (css/chrome.css: `.camtile.done::before`) and the failed
+   state (`.camtile.fail .camfail`). `load` and `error` do not bubble, so a delegated listener has to
+   run in the *capture* phase to see them at all — by the time either would reach this element on the
+   way back up, it has already stopped propagating from the `<img>` itself. Bound once, below, rather
+   than inside open(): `#camGrid` is static markup in index.html and is never recreated, only its
+   children are, so one pair of listeners outlives every open()/close() cycle and needs no rebinding.
+   `tick()` rewrites `img.src` once a second per visible tile once its lap is running, so `load`
+   fires again on every frame after the first — the `.done` check is what stops this counting a tile
+   twice, or marking a tile that loaded fine `.fail` because a later archived frame 404s. */
+function onSettle(e) {
+  const t = e.target.closest('.camtile');
+  if (!t || t.classList.contains('done')) return;
+  t.classList.add('done');
+  if (e.type === 'error') t.classList.add('fail');
+  settleBatch();
+}
+el('camGrid').addEventListener('load', onSettle, true);
+el('camGrid').addEventListener('error', onSettle, true);
+
 /* Sorted by state, then district, then name — three separate comparisons, the same order
    js/table.js groups by, and two views both named "all" must not sort two ways.
    A joined string compared once looked like the same thing and was not: default collation ranks
@@ -62,7 +123,8 @@ const tileHtml = c => {
   return `<button class="camtile${mapped ? '' : ' unmapped'}"${mapped ? ` data-cam="${id}"` : ''
     } data-lap="${id}" data-hay="${squash(`${c.name} ${c.district || ''} ${c.state || ''}`)}"${
     mapped ? '' : ' disabled'}><img loading="lazy" alt="" src="${camSrc(c)}"><span class="camname"
-    >${c.name}</span><span class="camsay"><i class="i i-warning"></i><b></b></span>${
+    >${c.name}</span><span class="camsay"><i class="i i-warning"></i><b></b></span><span
+    class="camfail"><i class="i i-videocam_off"></i><b>No picture</b></span>${
     mapped ? '' : '<span class="camnote">Not on the map</span>'}</button>`;
 };
 
@@ -120,6 +182,14 @@ function onSee(entries) {
     if (!L) continue;
     L.seen = e.isIntersecting;
     if (e.isIntersecting && !L.ready) arm(e.target, L);
+    /* The progress bar's start signal. A tile's own `<img>` has no "began fetching" event to hook —
+       `loading="lazy"` leaves that decision to the browser — so this is the earliest point script
+       can say "this tile's first picture is now expected soon", and it lines up with the browser's
+       own lazy-load trigger closely enough that the bar reads as tracking the real thing. Guarded on
+       `L.started`, not on arm()'s own `L.ready`: a failed `?shots=` fetch retries through this same
+       branch on the next intersection, and a tile must count once for the bar no matter how many
+       times arm() itself is retried. */
+    if (e.isIntersecting && !L.started) { L.started = true; startBatch(); }
   }
 }
 
@@ -148,7 +218,7 @@ export function open() {
   grid.innerHTML = cams.map(tileHtml).join('');
   laps.clear();
   [...grid.children].forEach((t, i) => laps.set(t, {
-    cam: cams[i], live: camSrc(cams[i]), shots: [], at: 0, ready: false, seen: false,
+    cam: cams[i], live: camSrc(cams[i]), shots: [], at: 0, ready: false, seen: false, started: false,
   }));
   count();
   paint();
@@ -166,6 +236,11 @@ export function close() {
   io = null;
   laps.clear();
   el('camGrid').innerHTML = '';
+  // open() calls close() first, so resetting the batch counters here is what gives every fresh grid
+  // a bar that starts hidden rather than carrying over whatever the last session left mid-batch.
+  waiting = 0;
+  batchTotal = 0;
+  paintBar();
 }
 
 /* The count line. `shown` is the number the filter left visible, and it defaults to all of them so

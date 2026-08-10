@@ -5562,3 +5562,107 @@ you filter. This is a wall of pictures, and a focused input opens the keyboard o
 learn one control is one too many. No warning pill on a tile, because a pill states one frame's
 alert and a tile has no way to score the frame on screen. No sort control and no favorites-only
 mode. Add one when a reader asks.
+
+## The wall gets a menu, a tighter grid, and a sense of progress
+
+A second pass over `All cameras`, its entry point, and three findings a review turned up in the
+same files.
+
+**The app-bar menu became a grid, and took its own icon.** `#apps` used to open a plain list —
+Layers, Cameras, Help and About behind a `more_vert` glyph titled "Views," which stopped being true
+the moment Help and About joined it: neither is a view, and a screen reader announced "Views button"
+over a menu that was half view and half everything else. The button is now titled "Menu," and the
+icon is a fresh fetch of Material Symbols' `apps` — the 3x3 dot grid every platform already uses for
+exactly this job. The menu itself lays its four items out 2x2 instead of in a column, each item a
+tile with its glyph above its label: four short destinations scan faster as a grid, and the grid is
+roughly half the panel's old height against a 64px app bar.
+
+*The grid is scoped to `#appMenu`, not a second class on `.menu`.* The sensor ⓘ menu shares `.menu`
+for its popover placement — the delegated handler in `js/ui.js` keys off that class alone and
+measures the box itself — and keeps the row shape, which is right for its own longer, two-line
+items. The id was already there to hang the new layout off.
+
+*A specificity trap surfaced while wiring this up, worth recording so it does not happen again.*
+`.menu { display: none }` and `.menu:popover-open { display: block }` are how every popover on this
+page opens and shuts — the same "the display goes on the state selector, never the bare element"
+rule the two `<dialog>`s already follow, in the gotcha list. Setting `display: grid` on the bare
+`#appMenu` selector looked like the obvious way to switch the menu's layout. It compiles, and it is
+wrong: an ID selector outranks two classes on specificity regardless of source order, so
+`#appMenu { display: grid }` would have beaten *both* of `.menu`'s rules and left the menu on screen
+permanently, popover open or shut. The fix matches the state selector instead of the bare id —
+`#appMenu:popover-open { display: grid }` — the same shape the existing rule already used.
+
+**Five columns, stepping down as the dialog narrows.** The grid used to be
+`repeat(auto-fill, minmax(220px, 1fr))`, which drew as many columns as fit at 220px each — four at
+most widths this dialog reaches, never five, never a round number. It is now
+`repeat(5, minmax(0, 1fr))` at the dialog's own full width, and `minmax(0, …)` is doing real work: a
+bare `1fr` cannot shrink a column below its own content's minimum width, so a station name too long
+to break would have pushed its column past an even fifth and overflowed the dialog. `gap` dropped
+from 10px to a uniform 6px on both axes.
+
+*The column count steps down at two breakpoints*, worked from the dialog's own width formula
+(`min(1060px, calc(100vw - 24px))`) less the grid's 40px of horizontal padding and the gaps between
+columns, aimed at a tile no narrower than about 150px — the point a camera still stops reading as a
+picture and starts reading as a swatch. Five columns cross that floor around 838px of dialog width
+(rounded to an 840px breakpoint), four columns around 682px (rounded to 680px). Below 600px the
+dialog changes shape outright — full viewport width, 12px padding, no `min(1060px, …)` cap — so the
+last step, to two columns, rides the existing phone breakpoint instead of a fresh computed one: two
+columns hold 145–285px across the whole 360–600px range, comfortably inside the target.
+
+**Every tile reserves its space and shows where it stands.** `.camtile` already carried
+`aspect-ratio: 4 / 3`, so the box was never the problem — a scrolling grid of 90-odd cameras with no
+loading state was. Three additions, all keyed off classes `js/wall.js` toggles and nothing more:
+
+- *A skeleton*: a `::before` shimmer over the tile's own idle fill, shown until the tile settles
+  either way (`.camtile.done::before { content: none }` removes it, the same pattern
+  `.shotwrap::after` in `css/base.css` already uses for a spinner). The highlight is `--on-surface`
+  at low opacity through `color-mix()` — never a literal white or black, because this box sits over
+  an empty tile, not a photograph, so it has to move with the theme like everything else that is not
+  a picture. It stops moving under `prefers-reduced-motion: reduce`: a still skeleton still says
+  "waiting," and a moving one is exactly what that setting asks to remove.
+- *A failed state*: `videocam_off` and the sentence "No picture" in place of the browser's own
+  broken-image glyph, which says nothing about what went wrong and looks the same for a 404 as for a
+  slow connection. The markup — `.camfail`, structured the way `.camsay` already is — sits in every
+  tile from the start and is revealed only by class, so `js/wall.js` never builds a node here, only
+  toggles one. It is full-bleed and opaque on purpose, not a corner badge: there is no picture behind
+  it worth leaving visible.
+- *One pair of capture-phase listeners on `#camGrid`*, not an inline handler per tile. `load` and
+  `error` do not bubble, so a delegated listener has to sit in the capture phase to see them at all —
+  by the time either would reach an ancestor in the bubble phase, it has already stopped propagating
+  from the `<img>` itself. Bound once, at import time: `#camGrid` is static markup that is never
+  recreated, only its children are. `tick()` rewrites `img.src` once a second per visible tile once a
+  lap is running, so `load` fires again on every frame after the first — the handler checks for the
+  `done` class before doing anything, so a tile settles once, and a good live still followed by a
+  404'd archive frame does not retroactively mark the tile failed.
+
+**A progress bar for the batch actually in flight, not a counter over 90.** Tiles arm as they scroll
+into view, so a bar keyed to the whole grid would sit near empty for the entire session and read as
+stuck. `js/wall.js` instead tracks `waiting` (tiles that have started loading their own first
+picture and have not yet settled) and `batchTotal` (how many the current batch began with); a tile
+that starts loading while `waiting` is zero begins a fresh batch rather than growing the old one
+forever. The start signal is a tile's first `IntersectionObserver` intersection — an
+`<img loading="lazy">` has no "began fetching" event of its own to hook, and arming lines up with the
+browser's own lazy-load trigger closely enough to read as tracking the real thing.
+
+The bar sits under the dialog's header, inside `#camBox`'s own flex column, and reserves its
+3px-plus-margin box whether or not a batch is running: only `opacity` and `aria-hidden` change,
+never the element's presence, so a batch starting or finishing never resizes `#camGrid` above or
+below it. The fill is drawn by CSS (`transform: scaleX(var(--p))`) off a fraction `js/wall.js`
+writes as a custom property — never a pixel value from script. It carries `role="progressbar"` with
+`aria-valuenow`/`aria-valuemin`/`aria-valuemax`, and drops out of the accessibility tree through
+`aria-hidden` while idle.
+
+**Three findings from the same files, folded in alongside.** `#camFind` was an OS-default text box:
+`css/base.css`'s two shared selector lists for every text input in the app (`select, #goto,
+#dataFind` and its focus-ring twin) never named it, so it shipped with none of the app's own width,
+padding, border, radius or focus ring. Both lists now include it. The camera CSS block sat between
+the two halves of the all-stations-table section — `.shotbtn`, `table.data` and the table's own
+phone media query all ran *after* the camera section header, 180-plus lines from the `#dataBox`
+rules they belong beside — so the whole block moved to sit after the table section ends, media
+queries included, and the two sibling dialogs now keep their phone rules together instead of split
+across an unrelated header. And `.camsay .i` carried a `filter: drop-shadow(...)` that had never
+once rendered: `filter` runs before `mask` in the paint order, and `.i` is a box of `currentColor`
+with the glyph masked out of it, so the shadow is computed against the box and clipped away by the
+mask that follows it. Deleted, with a comment recording why nothing replaces it — `.camwarn .i` in
+`css/map.css` carries the identical dead rule and is left alone, since fixing it belongs to whatever
+change next touches that file.
