@@ -20,9 +20,14 @@ const rank = s => KIND_RANK.indexOf(s.kind);
    omitted the districts you switched off on the map would be the same trap as the empty map. The
    search box is the only filter here, and what it hides it hides in front of you.
 
-   That also makes this the only place the 11 cameras JPS publishes with zero coordinates appear at
-   all — they can't be drawn, but they exist, and a row is better than silence. Those rows carry no
-   `data-mast`, so they don't offer a jump that would fly the map into the Atlantic. */
+   That used to make this the only place the cameras JPS publishes with no coordinate appeared at
+   all, and it is not any more — the camera wall now draws a tile for every camera with a picture,
+   these included. They are not unmappable either: `CAM_FIX` in `api.php` supplies a coordinate for
+   eleven of them, so each gets a pin like any other camera. What a missing coordinate still costs is
+   the jump, not the row — a station this app has no usable coordinate for gets no `data-mast` here
+   and no equivalent on the wall, because a jump to it would fly the map into the Atlantic. `CAM_FIX`
+   only covers the eleven JPS publishes at zero today; the next camera it publishes that way arrives
+   with no entry, and needs the same guard. */
 /* Sorting happens *within* each district, not across them. The district grouping is the point of
    this table — a flat 450-row list sorted by water level would answer a question the alert panel
    already answers better, and lose the one this view exists for ("what is there, and where"). */
