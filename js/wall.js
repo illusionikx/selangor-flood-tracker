@@ -41,6 +41,63 @@ const tileHtml = c => `<button class="camtile" data-cam="${c.id.split('-')[1]}" 
   squash(`${c.name} ${c.district || ''} ${c.state || ''}`)}"><img loading="lazy" alt="" src="${
   camSrc(c)}"><span class="camname">${c.name}</span></button>`;
 
+/* A tile is armed the first time it comes into view, and never again. Arming costs one call to
+   ?shots= and one warm-up of the lap. Eager, this page is 91 of those calls and about 80 MB of
+   frames, which is why nothing loads until a reader looks at it.
+   `ready` is set before the first await. Two intersections can arrive before the fetch returns,
+   and the flag is the only thing stopping the second one fetching again. */
+async function arm(t, L) {
+  L.ready = true;
+  let rows = [];
+  try { rows = await (await fetch(`api.php?shots=${t.dataset.cam}`)).json(); } catch { rows = []; }
+  /* `?shots=` returns [ts, tier, stationId] rows and its answer is cached for 60 seconds, so a
+     deploy leaves the old bare-number shape in flight. js/clip.js and js/timeline.js both carry
+     this guard. Do not remove it while that cache header stands.
+     On the GitHub Pages build there is no api.php at all: the fetch fails, `rows` stays empty, and
+     the tile keeps the still it already drew. That is the same answer js/clip.js gives. */
+  if (!Array.isArray(rows)) return;
+  const cut = Date.now() / 1000 - CLIP_WIN;
+  const shots = rows.map(r => Array.isArray(r) ? r[0] : r).filter(ts => ts >= cut);
+  /* Fewer than two frames is not a lap. Keep the live still the tile already drew — an empty
+     window means this server did not capture, not that the camera stopped, and reaching further
+     back would replace a live picture with a stale one. */
+  if (shots.length < 2) return;
+  // Warm the whole lap before it starts. The frames come off local disk and the server marks them
+  // immutable for a year, so every lap after the first costs nothing and the first does not flicker.
+  await Promise.all(shots.map(ts => {
+    const im = new Image();
+    im.src = `api.php?shot=${t.dataset.cam}&t=${ts}`;
+    return im.decode().catch(() => {});
+  }));
+  // close() clears the map, so this is the whole generation guard: the tile the fetch started for
+  // is gone, and so is the reader who asked for it.
+  if (!laps.has(t)) return;
+  L.shots = shots;
+}
+
+function onSee(entries) {
+  for (const e of entries) {
+    const L = laps.get(e.target);
+    if (!L) continue;
+    L.seen = e.isIntersecting;
+    if (e.isIntersecting && !L.ready) arm(e.target, L);
+  }
+}
+
+/* The live still is the last position, the same way js/clip.js and the lightbox scrubber treat it:
+   the lap is "how did it get to this", and one that stopped short of now never showed the this.
+   A tile the filter hid reports as not intersecting, so `seen` goes false and its place freezes.
+   The browser does that part — there is no filter check here. */
+function tick() {
+  for (const [t, L] of laps) {
+    if (!L.seen || L.shots.length < 2) continue;
+    L.at = (L.at + 1) % (L.shots.length + 1);
+    const img = t.firstElementChild;
+    if (img) img.src = L.at >= L.shots.length
+      ? L.live : `api.php?shot=${t.dataset.cam}&t=${L.shots[L.at]}`;
+  }
+}
+
 export function open() {
   const cams = cameras();
   const grid = el('camGrid');
@@ -50,6 +107,11 @@ export function open() {
     cam: cams[i], live: camSrc(cams[i]), shots: [], at: 0, ready: false, seen: false,
   }));
   count();
+  /* `root` is the grid, because the grid scrolls and the page behind it does not. The margin arms
+     a tile just before it arrives, so a lap is warm by the time a reader reaches it. */
+  io = new IntersectionObserver(onSee, { root: grid, rootMargin: '200px' });
+  for (const t of laps.keys()) io.observe(t);
+  timer = setInterval(tick, CLIP_MS);
 }
 
 export function close() {
