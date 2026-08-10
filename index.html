@@ -345,9 +345,9 @@
        graph", "Install it") that are not controls at all — a gesture and a platform feature. Both
        are gone from this list: the graph gesture moved to the station panel, the install prompt
        is the browser's own and this page never draws it. It also
-       reused the ⓘ for two different meanings: this dialog opens from an ⓘ in the app bar, and the
-       same glyph sat on the station card's "Details" button one section down. A reader who had just
-       pressed ⓘ to get here saw ⓘ again meaning something else. The fix never shows ⓘ in this pane —
+       reused the ⓘ for two different meanings: this dialog opens from an ⓘ in the app-bar menu, and
+       the same glyph sits on the station card's "Details" button one section down. A reader who had
+       just pressed ⓘ to get here saw ⓘ again meaning something else. The fix never shows ⓘ in this pane —
        the Details row leads with the button's name instead — and never shows ▶ as a way to open the
        camera, because there is no play button until the picture is already open.
        Every row still leads with the glyph the reader is hunting for, where that glyph is the one on
@@ -364,8 +364,16 @@
     <span class="ctl"><i class="i i-warning"></i><b>On alert</b></span>
     <span>Opens the list of stations on alert now. The badge shows how many.</span>
 
-    <span class="ctl"><i class="i i-list_alt"></i><b>All stations as a table</b></span>
+    <span class="ctl"><i class="i i-apps"></i><b>Menu</b></span>
+    <span>Opens the station table, all cameras, help and about.</span>
+
+    <span class="ctl"><i class="i i-list_alt"></i><b>Station table</b></span>
     <span>Lists every station, grouped by district. Sort the list, or filter it.</span>
+
+    <span class="ctl"><i class="i i-photo_camera"></i><b>All cameras</b></span>
+    <span>Every camera in one grid, each picture replaying its last three hours. Click one to open
+       its station panel. A camera with no location on file still shows a picture, but does not
+       answer a click.</span>
 
     <span class="ctl"><i class="i i-my_location"></i><b>Show my location</b></span>
     <span>Puts you on the map, and offers the nearest sensor of each kind. The glyph becomes an

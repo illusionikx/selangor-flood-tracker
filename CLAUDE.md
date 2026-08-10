@@ -266,6 +266,14 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   by more than 2 km. The day JPS corrects a station, the feed wins again, and no line here waits for
   somebody to delete it. Do not extend this to another kind without the same evidence — the shuffle
   touched cameras only.
+  **A second and unrelated fault sits beside the shuffle.** JPS also publishes some cameras with no
+  coordinate at all, `lat: 0, lng: 0` rather than a wrong one, and `CAM_FIX` now carries entries for
+  those too. Nine of the eleven came in by the route this entry already calls strongest — a station of
+  another kind, already in the payload, carrying the same name. The other two, cameras 244 and 246,
+  carry the median of their district's non-camera stations instead, which is a coordinate this file
+  invented, and the rule above says to delete an invented coordinate rather than keep it if nobody can
+  confirm where the camera actually stands. Anything that draws a station from this payload must still
+  tolerate a camera with no coordinate — the next one JPS publishes that way has no entry here yet.
 - **A `(string)` cast on `$_GET[...]` does not throw on an array — it emits a warning and coerces
   silently.** `?place[]=x` makes `$_GET['place']` an array. `(string)` on it prints
   `Warning: Array to string conversion` and yields the literal string `"Array"`, five characters that

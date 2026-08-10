@@ -133,10 +133,18 @@ re-teach you the shape of the data. Clicking a row closes the dialog and flies t
 omitted the districts you switched off on the map would be the same trap as the silently-empty map.
 Its search box is the only filter, and what that hides, it hides in front of you.
 
-*It is also the only place the unmappable stations appear.* 11 cameras are published by JPS with
-zero coordinates, so the map has always dropped them silently — 446 rows against 435 pins. They get
-a row marked `not on the map · no coordinates` and, deliberately, no `data-mast`, so they offer no
-jump. A clickable row for a station at 0°, 0° would fly the map into the Atlantic.
+*A row with no coordinate still carries no jump, but this is no longer the only place one shows up.*
+Not every camera JPS publishes carries a usable coordinate — some arrive at `lat: 0, lng: 0` rather
+than a wrong point, and until recently every one of those was unmappable outright. `CAM_FIX` in
+`api.php` now supplies a real coordinate for eleven of them, most from a station of another kind JPS
+already places under the same name. The camera gotcha in `CLAUDE.md` walks through how each one got
+its coordinate, and names the two that still rest on an unconfirmed district median. A camera that
+`CAM_FIX` has not reached still lands at 0°, 0°. Its row here is still marked `not on the map · no
+coordinates` with, deliberately, no `data-mast` — a clickable row for a station at 0°, 0° would fly
+the map into the Atlantic. `All cameras` (see below) makes the identical call on a tile instead of a
+row: the picture still shows, the click does not. How many cameras that still leaves without a
+coordinate is not a number worth pinning here — it is a live figure that moves with what JPS
+publishes, and this file already went stale once quoting one.
 
 *The icon for it is what finally killed the icon font* — see below.
 
@@ -5557,6 +5565,17 @@ would match every tile.
 
 **The filter does not take focus on open.** The table focuses its box, because a table is a thing
 you filter. This is a wall of pictures, and a focused input opens the keyboard over them on a phone.
+
+**A camera with no coordinate keeps its picture and loses its jump.** JPS publishes some cameras at
+`lat: 0, lng: 0` rather than a wrong point, and the picture is still the reason this page exists, so
+the tile still draws. A click is the part that has to give: `js/map.js` falls through a missing
+coordinate to `focusOn([0, 0], 13)`, which is the Gulf of Guinea, and the first version of this wall
+sent a click there anyway, to a panel that never opened. `js/table.js` had already made this decision
+for the same stations — its row for one of them carries no `data-mast`, so it offers no jump — but
+`js/wall.js` built its tile from the same row shape as the table, without carrying the one attribute
+that held the decision, so every tile answered a click whether it had somewhere to send one or not. A
+tile now matches the table: no `data-cam`, `disabled`, and `Not on the map` printed across it, the
+same judgment the table already made in its own row.
 
 **Not built:** no compare, no scrubber, no transport — the lightbox holds those, and two places to
 learn one control is one too many. No warning pill on a tile, because a pill states one frame's
