@@ -50,6 +50,12 @@ async function arm(t, L) {
   L.ready = true;
   let rows = [];
   try { rows = await (await fetch(`api.php?shots=${t.dataset.cam}`)).json(); } catch { rows = []; }
+  /* close() clears the map on every tear-down, and a fetch already in flight outlives the dialog
+     it was started for. The check therefore repeats after every await in this function, not once
+     at the end: a reader can close the wall between any two of them, and the warm-up below is the
+     expensive half — one real ?shot= request per frame — so it is the one this guard must never
+     let run for a tile that no longer exists. */
+  if (!laps.has(t)) return;
   /* `?shots=` returns [ts, tier, stationId] rows and its answer is cached for 60 seconds, so a
      deploy leaves the old bare-number shape in flight. js/clip.js and js/timeline.js both carry
      this guard. Do not remove it while that cache header stands.
@@ -69,8 +75,8 @@ async function arm(t, L) {
     im.src = `api.php?shot=${t.dataset.cam}&t=${ts}`;
     return im.decode().catch(() => {});
   }));
-  // close() clears the map, so this is the whole generation guard: the tile the fetch started for
-  // is gone, and so is the reader who asked for it.
+  // Repeated once more: the warm-up above is itself an await, and the dialog can close while it
+  // is still fetching frames for a tile that is already gone.
   if (!laps.has(t)) return;
   L.shots = shots;
 }
