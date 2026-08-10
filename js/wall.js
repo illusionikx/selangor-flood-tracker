@@ -1,17 +1,17 @@
 /* Every camera the feeds publish, on one page.
  *
- * The station panel answers one camera at a time. 91 of the 93 cameras publish a picture, and
- * nobody scans a state by opening 91 cards. A camera is also the one sensor that needs no mark to
- * compare against — a picture of a flooded road answers by itself — so a page of pictures is the
- * fastest read this data supports.
+ * The station panel answers one camera at a time. Almost every one of the 93 cameras publishes a
+ * picture, and nobody scans a state by opening one card per camera. A camera is also the one
+ * sensor that needs no mark to compare against — a picture of a flooded road answers by itself —
+ * so a page of pictures is the fastest read this data supports.
  *
  * The grid is built once, on open. It is never rebuilt, and js/render.js calls paint() instead of
  * rebuilding it. A tile holds four things the payload does not: the frame it is showing, the frame
  * list it fetched, the images it warmed, and whether the observer reached it yet. A rebuild throws
  * all four away, which drops every visible tile back to the start of its lap.
  *
- * ponytail: one timer for the whole page, not one per tile. 91 timers at 1 Hz is 91 wakeups a
- * second where one will do, and tiles that step together read as one thing rather than as 91
+ * ponytail: one timer for the whole page, not one per tile. A timer per tile is a wakeup per tile
+ * every second where one will do, and tiles that step together read as one thing rather than as
  * pictures out of phase. If a tile ever needs its own rate, this is the line to revisit.
  */
 import { CLIP_WIN, CLIP_MS, camSrc } from './config.js';
@@ -45,8 +45,8 @@ const tileHtml = c => `<button class="camtile" data-cam="${c.id.split('-')[1]}" 
   ></i><b></b></span></button>`;
 
 /* A tile is armed the first time it comes into view, and never again. Arming costs one call to
-   ?shots= and one warm-up of the lap. Eager, this page is 91 of those calls and about 80 MB of
-   frames, which is why nothing loads until a reader looks at it.
+   ?shots= and one warm-up of the lap. Eager, this page is one of those calls per camera and about
+   80 MB of frames, which is why nothing loads until a reader looks at it.
    `ready` is set before the first await. Two intersections can arrive before the fetch returns,
    and the flag is the only thing stopping the second one fetching again. */
 async function arm(t, L) {
