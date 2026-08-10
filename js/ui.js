@@ -203,7 +203,12 @@ camBox.onclick = e => { if (e.target === camBox) camBox.close(); };
    gone. `onclose` catches Esc, the ×, and the backdrop click above, which is every way out. */
 camBox.onclose = () => wall.close();
 /* One delegated listener. 91 listeners for one behavior is the thing delegation exists to stop.
-   Read the id before closing: close() empties the grid, so the element is gone by the next line. */
+   Read the id before closing, though not because close() empties the grid before the next line
+   runs: HTMLDialogElement.close() clears `open` synchronously but only queues a task to fire the
+   `close` event, so wall.close() — bound to that event in camBox.onclose — has not run yet, and
+   this handler has no await for that queued task to land ahead of anyway. The order costs nothing,
+   and it means this handler never has to reason about whether some later change ties the grid's
+   teardown to something less deferred than an event a queued task fires. */
 el('camGrid').onclick = e => {
   const t = e.target.closest('[data-cam]');
   if (!t) return;

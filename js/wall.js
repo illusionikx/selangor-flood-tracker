@@ -27,37 +27,67 @@ const laps = new Map();
 let timer = null;
 let io = null;
 
-/* Sorted by state, then district, then name. That is the order js/table.js groups by, and two
-   views both named "all" must not sort two ways. */
+/* Sorted by state, then district, then name — three separate comparisons, the same order
+   js/table.js groups by, and two views both named "all" must not sort two ways.
+   A joined string compared once looked like the same thing and was not: default collation ranks
+   a space below `|`, so the day a "Petaling Jaya" sits beside a "Petaling", the joined strings
+   would order on where that character falls rather than on the state and district each one names.
+   `|| '—'` and `|| 'Unknown'` are js/table.js's own stand-ins for a missing state or district —
+   without them a station with no state stringified to the literal word "undefined" and sorted on
+   that instead. */
 const cameras = () => state.data
   .filter(s => s.kind === 'camera' && s.image)
-  .sort((a, b) => `${a.state}|${a.district}|${a.name}`
-    .localeCompare(`${b.state}|${b.district}|${b.name}`));
+  .sort((a, b) => (a.state || '—').localeCompare(b.state || '—')
+    || (a.district || 'Unknown').localeCompare(b.district || 'Unknown')
+    || a.name.localeCompare(b.name));
 
-/* `data-cam` is the numeric id the proxy takes, the same value `data-clip` carries in camImg().
+/* `data-cam` is the numeric id the proxy takes, the same value `data-clip` carries in camImg() —
+   present only on a tile whose coordinate is real, because js/ui.js's delegated click matches on
+   that attribute and nothing else. `data-lap` carries the same id on every tile, mapped or not,
+   because arm() and tick() still need it to keep a lap playing once the click path stops seeing it.
    `data-hay` is squashed here rather than at match time: it never changes, and the filter in
    js/ui.js runs on every keystroke.
    ponytail: no `data-mast`. js/table.js puts a site key on a row because a row is a mast. A tile
    is one camera, and the click resolves it by its own id. */
-const tileHtml = c => `<button class="camtile" data-cam="${c.id.split('-')[1]}" data-hay="${
-  squash(`${c.name} ${c.district || ''} ${c.state || ''}`)}"><img loading="lazy" alt="" src="${
-  camSrc(c)}"><span class="camname">${c.name}</span><span class="camsay"><i class="i i-warning"
-  ></i><b></b></span></button>`;
+
+/* JPS publishes some cameras with no coordinate at all — `lat: 0, lng: 0` — and the picture is
+   still the reason this page exists, so the tile still draws. What it must not do is answer a
+   click: js/map.js falls through a missing coordinate to `focusOn([0, 0], 13)`, which is the
+   Gulf of Guinea, and js/table.js already withholds its own jump attribute (`data-mast`) from the
+   same stations for the same reason — see the "not on the map" row in docs/FEATURES.md. `disabled`
+   keeps a keyboard reader from landing on a control that does nothing, and `.unmapped` gives the
+   second wave a hook to stop the tile looking pressable in the first place. */
+const tileHtml = c => {
+  const id = c.id.split('-')[1], mapped = !!(c.lat && c.lng);
+  return `<button class="camtile${mapped ? '' : ' unmapped'}"${mapped ? ` data-cam="${id}"` : ''
+    } data-lap="${id}" data-hay="${squash(`${c.name} ${c.district || ''} ${c.state || ''}`)}"${
+    mapped ? '' : ' disabled'}><img loading="lazy" alt="" src="${camSrc(c)}"><span class="camname"
+    >${c.name}</span><span class="camsay"><i class="i i-warning"></i><b></b></span>${
+    mapped ? '' : '<span class="camnote">Not on the map</span>'}</button>`;
+};
 
 /* A tile is armed the first time it comes into view, and never again. Arming costs one call to
    ?shots= and one warm-up of the lap. Eager, this page is one of those calls per camera and about
    80 MB of frames, which is why nothing loads until a reader looks at it.
    `ready` is set before the first await. Two intersections can arrive before the fetch returns,
-   and the flag is the only thing stopping the second one fetching again. */
+   and the flag is the only thing stopping the second one fetching again.
+   It also has to come back off on a failed fetch, or one dropped request latches a tile on its
+   live still for the rest of the session: the catch below sets `rows = []`, which reads exactly
+   like a camera the server never captured, and nothing past it can tell the two cases apart.
+   js/clip.js clears its own `id` on the matching branch so the next poll checks the archive again
+   — see the comment on that line. There is no poll to retry on here, so the observer has to be
+   the one that tries again, and it only retries a tile whose `ready` is still false. */
 async function arm(t, L) {
   L.ready = true;
   let rows = [];
-  try { rows = await (await fetch(`api.php?shots=${t.dataset.cam}`)).json(); } catch { rows = []; }
+  try { rows = await (await fetch(`api.php?shots=${t.dataset.lap}`)).json(); }
+  catch { rows = []; L.ready = false; }
   /* close() clears the map on every tear-down, and a fetch already in flight outlives the dialog
-     it was started for. The check therefore repeats after every await in this function, not once
-     at the end: a reader can close the wall between any two of them, and the warm-up below is the
-     expensive half — one real ?shot= request per frame — so it is the one this guard must never
-     let run for a tile that no longer exists. */
+     it was started for. The guard below therefore repeats after each fetch stage, not once at the
+     end: a reader can close the wall while the request is in flight, or during the warm-up that
+     follows it — the expensive half, one real ?shot= request per frame — so it is the one guard
+     that must never let a warm-up run for a tile that no longer exists. One guard covers both
+     awaits above: they share a try block, so no teardown can land between them. */
   if (!laps.has(t)) return;
   /* `?shots=` returns [ts, tier, stationId] rows and its answer is cached for 60 seconds, so a
      deploy leaves the old bare-number shape in flight. js/clip.js and js/timeline.js both carry
@@ -75,7 +105,7 @@ async function arm(t, L) {
   // immutable for a year, so every lap after the first costs nothing and the first does not flicker.
   await Promise.all(shots.map(ts => {
     const im = new Image();
-    im.src = `api.php?shot=${t.dataset.cam}&t=${ts}`;
+    im.src = `api.php?shot=${t.dataset.lap}&t=${ts}`;
     return im.decode().catch(() => {});
   }));
   // Repeated once more: the warm-up above is itself an await, and the dialog can close while it
@@ -103,11 +133,16 @@ function tick() {
     L.at = (L.at + 1) % (L.shots.length + 1);
     const img = t.firstElementChild;
     if (img) img.src = L.at >= L.shots.length
-      ? L.live : `api.php?shot=${t.dataset.cam}&t=${L.shots[L.at]}`;
+      ? L.live : `api.php?shot=${t.dataset.lap}&t=${L.shots[L.at]}`;
   }
 }
 
+/* close() first. open() has no second entry point today — the menu that reaches it sits behind
+   this dialog's own modal backdrop — but nothing in the function says so, and a second one added
+   later (a deep link, a keyboard shortcut) would otherwise leak the interval and the observer of
+   whatever grid was already running. One line makes the function safe to call twice. */
 export function open() {
+  close();
   const cams = cameras();
   const grid = el('camGrid');
   grid.innerHTML = cams.map(tileHtml).join('');
@@ -152,8 +187,12 @@ export function count(shown = laps.size) {
  * the parts of an existing player that changed, rather than build a new one.
  *
  * `L.cam` is the station object from the payload the grid was built on, and a poll replaces that
- * object. It stays correct anyway: the only fields read here are the coordinate and the id, and a
- * camera does not move. camAlert() reduces over the live `state.data` for everything else.
+ * object. It stays correct anyway: the only field read here is the coordinate, off camAlert()'s
+ * own distance check, and a camera does not move. That holds only as long as camPhrase() below
+ * keeps taking its second argument: passed `a`, it never touches the `cam` parameter it also
+ * receives. Call it camPhrase(L.cam) instead and its own default parameter fires, deriving a
+ * second, independent alert from this same stale object through a fresh camAlert() call.
+ * camAlert() reduces over the live `state.data` for everything else.
  *
  * `hidden` is left alone, so a filter survives a poll with no work.
  *
@@ -165,6 +204,9 @@ export function paint() {
     const a = camAlert(L.cam);
     t.classList.toggle('t-now', a?.tier === 'now');
     t.classList.toggle('t-soon', a?.tier === 'soon');
-    t.querySelector('.camsay b').textContent = a ? camPhrase(L.cam, a) : '';
+    // paint() runs on every poll, so a tile shape that ever ships without this element must not
+    // throw here and stop every other tile behind it from getting its own update.
+    const b = t.querySelector('.camsay b');
+    if (b) b.textContent = a ? camPhrase(L.cam, a) : '';
   }
 }
