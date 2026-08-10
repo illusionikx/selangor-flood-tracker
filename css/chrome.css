@@ -348,6 +348,7 @@ body.testmode #testbadge, body.rising #risebadge { display: flex; }
   border-bottom: 1px solid var(--outline); background: var(--surface);
 }
 #camBox h2 { font-size: 18px; font-weight: 500; }
+#camBox #camFind { margin-bottom: 6px; }
 
 /* One declaration answers the whole responsive question: one column at 360px, four or five in the
    dialog. No script measures anything. */

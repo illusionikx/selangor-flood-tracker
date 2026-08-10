@@ -219,3 +219,8 @@ export const leads = (a, b) =>
    Two callers now: the go-to box's matcher in js/ui.js, and the camera filter's haystack in
    js/wall.js. */
 export const squash = t => t.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+/* Split on whitespace *only*, then strip punctuation inside each word. Splitting the query on
+   punctuation instead turned `I.K.B.N` into four single-letter terms and matched 294 stations. */
+export const termsOf = q => q.trim().split(/\s+/).map(squash).filter(Boolean);
+export const matches = (text, terms) => terms.every(t => text.includes(t));

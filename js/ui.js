@@ -2,7 +2,8 @@
 
 import { KINDS, MAST, camSrc, FEED, STATIC, NEAR_MAX_KM } from './config.js';
 import { state, PREFS, PREFS_KEY, save } from './state.js';
-import { el, distKm, dkey, ignoredIds, leads, favIds, isFav, squash } from './util.js';
+import { el, distKm, dkey, ignoredIds, leads, favIds, isFav, squash, termsOf, matches
+       } from './util.js';
 import { map, setTheme, flashTo, closeSide, showPlace } from './map.js';
 import { heatOpacity, syncHeat } from './heat.js';
 import { byId } from './stations.js';
@@ -191,7 +192,12 @@ el('dataFind').oninput = dataTable;
 // --- all cameras ---------------------------------------------------------------------------
 
 const camBox = el('camBox');
-el('cams').onclick = () => { closeSide(); wall.open(); camBox.showModal(); };
+el('cams').onclick = () => {
+  closeSide();
+  el('camFind').value = '';
+  wall.open();
+  camBox.showModal();
+};
 camBox.onclick = e => { if (e.target === camBox) camBox.close(); };
 /* Nothing ticks behind a closed dialog, and nothing holds 91 decoded frames after the reader has
    gone. `onclose` catches Esc, the ×, and the backdrop click above, which is every way out. */
@@ -205,6 +211,29 @@ el('camGrid').onclick = e => {
   camBox.close();
   if (s) flashTo(s);
 };
+
+/* The matcher is the go-to box's, which reads `I.K.B.N.`, `IKBN` and `I K B N` as one word and
+   ignores word order. The plain substring test in js/table.js does neither, and this costs nothing
+   extra because both live in js/util.js now.
+ *
+ * A filtered tile takes `hidden` and stays in the grid. It keeps its lap, its frame list and its
+ * warmed images, so clearing the box brings it back where it was. The observer needs no code for
+ * it either: the browser reports a `display: none` element as not intersecting, so the tile stops
+ * ticking by itself and starts again when it returns.
+ *
+ * The kind label is deliberately not in the haystack. Every tile is a camera, so `camera` would
+ * match all 91 and answer nothing. */
+function camFilter() {
+  const terms = termsOf(el('camFind').value);
+  let shown = 0;
+  for (const t of el('camGrid').children) {
+    const ok = matches(t.dataset.hay, terms);
+    t.hidden = !ok;
+    if (ok) shown++;
+  }
+  wall.count(shown);
+}
+el('camFind').oninput = camFilter;
 
 // --- drawer ------------------------------------------------------------------------------------
 
@@ -658,10 +687,6 @@ const nearest = () => state.hereAt && state.data.reduce((best, s) =>
    letters. No scoring either; the list is grouped under district headings, and a relevance order
    would fight the grouping rather than help it. */
 const hay = s => squash(`${s.name} ${s.district || ''} ${s.state || ''} ${KINDS[s.kind].label}`);
-// Split on whitespace *only*, then strip punctuation inside each word. Splitting the query on
-// punctuation instead turned `I.K.B.N` into four single-letter terms and matched 294 stations.
-const termsOf = q => q.trim().split(/\s+/).map(squash).filter(Boolean);
-const matches = (text, terms) => terms.every(t => text.includes(t));
 
 /* One row per site, the same grouping `render()` draws pins from. The list used to show one row per
    sensor, so a six-sensor mast filled six rows and one pin, and a reader comparing the two had no
