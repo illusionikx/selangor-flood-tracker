@@ -480,15 +480,18 @@ table.data button[data-pop] { cursor: pointer; }
 .mi .i { font-size: 18px; color: var(--muted); margin-top: 1px; }
 .mi small { font-size: 11px; }
 /* The app menu is the one `.menu` user shaped as a 2x2 grid of tiles rather than a row list — four
-   short destinations scan faster as a grid, and a grid halves the panel's height against the app
-   bar. Scoped to the id, not a second class: the sensor ⓘ menu shares `.menu` for its popover
-   mechanics (see js/ui.js's delegated placement handler, which keys off that class alone) and keeps
-   the row shape, which is right for its longer, two-line items.
+   short destinations scan faster as a grid. It does not save height: measured, the old four-row list
+   came to about 148px including the menu's own padding, and this 2x2 grid comes to about 157px, a
+   little more rather than less. The grid earns its place on scan speed, not on size. Scoped to the
+   id, not a second class: the sensor ⓘ menu shares `.menu` for its popover mechanics (see js/ui.js's
+   delegated placement handler, which keys off that class alone) and keeps the row shape, which is
+   right for its longer, two-line items.
    The width is stated here rather than left to `.menu`'s own `min-width: 210px`: a 2x2 grid divides
    its box across two columns, and "Station table" — the longest label — needs a column wide enough
    to hold it on one line at this padding, which 210px halved is not. 260px was sized to that label
-   with a little slack either side; `max-width` still caps the box at 360px, where `#apps` sits at
-   the end of a bar already fighting for room.
+   with a little slack either side. `.menu`'s own `max-width: calc(100vw - 16px)` is a shared safety
+   net for every popover this class draws, not a cap that ever binds on this one: it only shrinks a
+   box narrower than its declared width below a 276px viewport, well under anything this app targets.
    `display: grid` is on `#appMenu:popover-open`, not on the bare selector, for the same reason a
    dialog's own `display` has to be on `[open]` — see the gotcha list in CLAUDE.md. An ID beats two
    classes on specificity, so `#appMenu { display: grid }` would have outranked *both*
@@ -615,6 +618,14 @@ table.data .dash { color: var(--outline); }
   aspect-ratio: 4 / 3; border: 2px solid var(--outline); border-radius: 10px;
   background: var(--hover); color: var(--on-surface); text-align: left;
 }
+/* A camera JPS publishes with no coordinate at all — see js/wall.js's tileHtml() and CAM_FIX's own
+   comment in api.php for how rare this is meant to stay. `disabled` on the element already stops
+   keyboard reach and a click, but a mouse reader judges pressability by look before they ever try —
+   `cursor: pointer` above and this tile's own border were no different from one that answers. The
+   dashed border and the slight dimming say "not a control" the way a native disabled control does,
+   without reaching for a status hue: this app reserves green, amber, orange and red for what a
+   sensor is reporting, and "we do not know where this camera is" is not a reading of anything. */
+.camtile.unmapped { cursor: default; border-style: dashed; opacity: .75; }
 .camtile > img { display: block; width: 100%; height: 100%; object-fit: cover; }
 /* `display: block` above beats the browser's own `[hidden]` rule, so it has to be said again. The
    filter in js/ui.js sets `hidden`, and `.link` and `.camwarn` both carry the same restatement. */
@@ -695,7 +706,22 @@ table.data .dash { color: var(--outline); }
    beat it with — a quiet tile simply has no tier class. */
 .camtile:not(.t-now):not(.t-soon) .camsay { display: none; }
 /* The phrase owns the foot of an alerting tile, so the name steps up out of its way. */
-.camtile.t-now .camname, .camtile.t-soon .camname { bottom: 26px; }
+.camtile.t-now .camname, .camtile.t-soon .camname, .camtile.unmapped .camname { bottom: 26px; }
+
+/* The caption on a tile with no coordinate on file — see tileHtml() in js/wall.js. Shaped like
+   `.camsay`, not like `.camname`'s fading gradient: this is a fact about the tile, not a caption
+   fading into the photograph, so it reads as a solid strip the same way an alert phrase does. In
+   flow it would either crowd the picture or vanish under this box's own `overflow: hidden`, the same
+   trap `.camname` was already written to avoid — it is not decoration, it is what stops the tile's
+   only other in-flow child (its name) landing wherever default layout happens to put it. */
+.camnote {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 1;
+  padding: 5px 8px;
+  font: 500 11px/1.25 Roboto, sans-serif; color: #fff;
+  background: rgb(0 0 0 / .62); backdrop-filter: blur(3px);
+  text-shadow: 0 1px 3px rgb(0 0 0 / .95);
+  pointer-events: none;
+}
 
 /* The failed state. `videocam_off` and a plain sentence stand in for the browser's own broken-image
    glyph, which says nothing about what happened and looks the same for a 404 as for a slow network.

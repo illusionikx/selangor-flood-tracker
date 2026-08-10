@@ -38,7 +38,9 @@ let waiting = 0, batchTotal = 0;
 /* Called once per tile, from onSee() at the moment it first comes into view — see the comment on
    `L.started` there for why that moment stands in for the image's own (nonexistent) "started
    fetching" event. A batch that finds nothing already in flight is a new one: the denominator resets
-   before this tile joins it, rather than growing for as long as a reader keeps scrolling. */
+   before this tile joins it, rather than growing for as long as a reader keeps scrolling.
+   Only ever called for a tile onSee has confirmed has not already settled — see the `.done` check
+   guarding the call site there — so every increment this makes has a decrement to look forward to. */
 function startBatch() {
   if (waiting === 0) batchTotal = 0;
   waiting++;
@@ -46,10 +48,13 @@ function startBatch() {
   paintBar();
 }
 
-/* Called once per tile, from onSettle() below, on whichever of load/error reaches it first. Floored
-   at zero rather than trusted to land there on its own: a tile whose image resolves before its own
-   IntersectionObserver callback runs — a cached still, decoding synchronously — would settle before
-   startBatch() ever counted it, and going negative would draw a bar reading past full. */
+/* Called once per tile that actually started — see the guard in onSettle() below, which is what
+   pairs this with startBatch() now. `Math.max(0, …)` stays as a backstop for a genuine race between
+   two settle events, not as the mechanism: it used to be the only thing standing between a tile
+   whose image resolved before its own first IntersectionObserver callback ran — a cached still,
+   decoding synchronously, which api.php?cam='s 5-minute cache makes routine on a dialog reopened
+   within the window — and a `waiting` count that never came back down. That tile used to settle for
+   free, with nothing for the floor to swallow; onSettle() now simply does not call this for it. */
 function settleBatch() {
   waiting = Math.max(0, waiting - 1);
   paintBar();
@@ -76,14 +81,36 @@ function paintBar() {
    than inside open(): `#camGrid` is static markup in index.html and is never recreated, only its
    children are, so one pair of listeners outlives every open()/close() cycle and needs no rebinding.
    `tick()` rewrites `img.src` once a second per visible tile once its lap is running, so `load`
-   fires again on every frame after the first — the `.done` check is what stops this counting a tile
-   twice, or marking a tile that loaded fine `.fail` because a later archived frame 404s. */
+   fires again on every frame after the first — the first branch below is what stops this counting a
+   tile twice.
+   A tile settles once, but the picture on it can still change afterwards, and the two halves below
+   answer two different questions because of that. The first branch below decides whether `waiting`
+   moves at all, and runs only on the tile's first load/error. The second decides what covers the
+   `<img>` right now, and keeps running after that: api.php?cam= returns 502 on a failed upstream
+   fetch (see CLAUDE.md's curl gotcha), so a camera whose *first* still fails this way would otherwise
+   carry an opaque "No picture" cover for the rest of the session while the lap loop went on swapping
+   perfectly good archived frames into the `<img>` underneath it, unseen. A later `load` clears that
+   cover. A later `error` — one archived frame 404ing mid-lap, on an otherwise working camera — must
+   not set it, which is the case the first branch already protects by only looking at the first
+   event; letting a later `error` re-add `.fail` here would undo that. */
 function onSettle(e) {
   const t = e.target.closest('.camtile');
-  if (!t || t.classList.contains('done')) return;
-  t.classList.add('done');
-  if (e.type === 'error') t.classList.add('fail');
-  settleBatch();
+  if (!t) return;
+  if (!t.classList.contains('done')) {
+    t.classList.add('done');
+    /* Pairs with startBatch(): only a tile onSee actually started may decrement `waiting`. A tile
+       whose image resolves before its own first IntersectionObserver callback runs reaches here with
+       `L.started` still false — see the comment on startBatch() and on the guard in onSee() below.
+       Calling settleBatch() for it anyway is exactly the bug this pairing exists to close: the
+       decrement would land with nothing to cancel, the floor in settleBatch() would swallow it
+       silently, and the tile's own `.done` class (set just above) is what then stops onSee() ever
+       starting — and therefore ever properly settling — it later. */
+    const L = laps.get(t);
+    if (L?.started) settleBatch();
+    if (e.type === 'error') t.classList.add('fail');
+    return;
+  }
+  if (e.type === 'load') t.classList.remove('fail');
 }
 el('camGrid').addEventListener('load', onSettle, true);
 el('camGrid').addEventListener('error', onSettle, true);
@@ -102,9 +129,17 @@ const cameras = () => state.data
     || (a.district || 'Unknown').localeCompare(b.district || 'Unknown')
     || a.name.localeCompare(b.name));
 
-/* `data-cam` is the numeric id the proxy takes, the same value `data-clip` carries in camImg() —
-   present only on a tile whose coordinate is real, because js/ui.js's delegated click matches on
-   that attribute and nothing else. `data-lap` carries the same id on every tile, mapped or not,
+/* `data-cam` is the numeric id the proxy takes, present only on a tile whose coordinate is real.
+   Two delegated handlers in js/ui.js read this attribute, and they read two different shapes of it.
+   `el('camGrid').onclick` is this grid's own handler: it takes the bare number this tile writes and
+   builds the station id itself before opening the panel. The other, a document-wide click listener,
+   exists for js/popup.js's own `data-cam`, which already writes the full station id (`camera-1279`,
+   not `1279`) and hands it straight to `byId()`. A click on a wall tile reaches both, because neither
+   stops the event — the grid handler opens the right camera, and the document one calls `byId()` on
+   the bare number, finds nothing and no-ops. That costs nothing today, but it means the two writers
+   of `data-cam` cannot be brought into line with each other by changing only one of them: doing so
+   would make the grid handler's own jump wrong, or wake the second handler into firing a jump of its
+   own alongside the first. `data-lap` carries the same id on every tile, mapped or not,
    because arm() and tick() still need it to keep a lap playing once the click path stops seeing it.
    `data-hay` is squashed here rather than at match time: it never changes, and the filter in
    js/ui.js runs on every keystroke.
@@ -188,8 +223,20 @@ function onSee(entries) {
        own lazy-load trigger closely enough that the bar reads as tracking the real thing. Guarded on
        `L.started`, not on arm()'s own `L.ready`: a failed `?shots=` fetch retries through this same
        branch on the next intersection, and a tile must count once for the bar no matter how many
-       times arm() itself is retried. */
-    if (e.isIntersecting && !L.started) { L.started = true; startBatch(); }
+       times arm() itself is retried.
+       The second guard, `.done`, pairs this with onSettle(). A tile's image can resolve — load or
+       error — before this callback ever runs for it: a cached still decodes synchronously, and
+       api.php?cam= is served `max-age=300`, so reopening this dialog inside five minutes of closing
+       it makes that the common case, not the rare one. onSettle() marks that tile `.done` without
+       touching `waiting`, because nothing here has counted it yet — see the guard there. Without this
+       check, this branch would still see `L.started` false on the tile's first intersection and add
+       an increment that onSettle() can never cancel: every later load/error on that tile returns
+       immediately once it is `.done`, so `waiting` would carry that one increment for the life of the
+       dialog, and every further already-settled tile scrolling into view would add another. */
+    if (e.isIntersecting && !L.started && !e.target.classList.contains('done')) {
+      L.started = true;
+      startBatch();
+    }
   }
 }
 
