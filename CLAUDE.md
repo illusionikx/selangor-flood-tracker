@@ -147,9 +147,10 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
 - Merge order: Selangor API → KL (skipping any station within ~200 m of one we already have, since
   the two feeds share no station codes) → national override by code → trend pass over the winner.
 - Every station carries `source` (`selangor` / `kl` / `national`) and, where known, `code`.
-- **`camFix()` corrects nine camera coordinates that JPS publishes against the wrong camera.** It is
-  the only place this app overrides a value the feed states. See the gotcha below for the rule that
-  admits an entry to `CAM_FIX`, and for the seven stations left wrong on purpose.
+- **`camFix()` corrects or supplies twenty-five camera coordinates, across two faults in JPS's feed:**
+  fourteen swapped between cameras, and eleven published with no coordinate at all. It is the only
+  place this app overrides a value the feed states. See the gotcha below for the rule that admits an
+  entry to `CAM_FIX`, and for the seven cameras confirmed correct and deliberately left out of it.
 - `?cam=<id>` streams a camera still. Validates the id is an integer, looks the URL up in the
   cached payload, and rejects any host that isn't JPS. Never proxies an arbitrary URL.
 - `?force=1` treats the 5-minute file cache as expired, inside the existing `flock` on
