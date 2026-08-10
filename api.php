@@ -97,7 +97,39 @@ const SITE_M = 50;   // metres — stations this close are sensors on one mast, 
    CAM_FIX_KM makes the table retire itself: an override is applied only while the published value is
    still far from it, so the day JPS corrects a station we go back to following the feed. */
 const CAM_FIX_KM = 2.0;
+/* Eleven more cameras — 239, 240, 241, 242, 244, 245, 246, 247, 1249, 1250 and 1261 — carry a
+   second fault, and a different one from the shuffle above. JPS publishes each with no coordinate
+   at all, lat 0 and lng 0, rather than a wrong one. There is nothing to swap and no cycle to solve:
+   the shuffle corrects real points that were each assigned to the wrong camera, and this batch has
+   no point assigned to any camera at all.
+   Nine of the eleven — every one but 244 and 246 — took the strongest route into this table: a
+   station of another kind, already in the payload, carrying the same name. A rainfall gauge, a
+   river mast, a flood gauge or a siren site that JPS itself already places on the map is upstream
+   stating where the camera stands, the same evidence the shuffle entries above lean on for several
+   of their own.
+   Two did not. Taman Selat Damai (244) and Bukit Hijau (246) carry the median of the non-camera
+   stations in the district JPS files them under, because no station of either name exists anywhere
+   in the payload. A district median is a coordinate this file invented, and the rule above is
+   explicit that an invented coordinate is worse than one we can show belongs to upstream. These two
+   entries exist to be checked by hand, not to be trusted on the strength of this comment: delete
+   them rather than keep them if nobody can confirm where the camera actually stands.
+   CAM_FIX_KM retires all eleven the same way it already retires the fourteen above, with nothing
+   extra to write here. A camera published at 0, 0 disagrees with any point in this state by
+   thousands of kilometres, so the override holds until JPS publishes a real coordinate — and the day
+   that coordinate lands within 2 km of ours, the feed wins again, exactly as the rule above already
+   describes. */
 const CAM_FIX = [
+    239  => [3.17862, 101.42951],     // Jalan Sebaya              — the SIREN JALAN SEBAYA site, Klang, LOCATION CONFIRMED
+    240  => [3.18646, 101.41317],     // Jalan Bukit Payung        — the SIREN JALAN BUKIT PAYUNG site, Klang, LOCATION CONFIRMED
+    241  => [3.13646, 101.43895],     // Taman Daya Meru           — the PEKAN MERU rainfall and river mast, Klang, SOMEWHAT CONFIRMED
+    242  => [3.02880, 101.47849],     // Taman Maznah              — the TAMAN MAZNAH flood gauge, Klang, LOCATION CONFIRMED
+    244  => [3.02939, 101.46263],     // Taman Selat Damai         — the median of the 105 non-camera stations in Klang, UNCONFIRMED
+    245  => [3.15525, 101.47284],     // Kg Budiman                — the KG BUDIMAN rainfall and river mast, Petaling, LOCATION CONFIRMED
+    246  => [3.33837, 101.36090],     // Bukit Hijau               — the median of the 42 non-camera stations in Kuala Selangor, UNCONFIRMED
+    247  => [2.91654, 101.32121],     // Taman Teluk Gedung Indah  — the SG. KEMBONG DI PULAU INDAH mast, Klang, SOMEWHAT CONFIRMED
+    1249 => [3.02427, 101.53335],     // Jalan Jitu                — the SIREN JLN JITU TSM site, Klang, LOCATION CONFIRMED
+    1250 => [3.03525, 101.52778],     // Kolam Takungan TSM        — the SIREN KOLAM TSM site, Klang, LOCATION CONFIRMED
+    1261 => [3.02963, 101.52589],     // Kunci Air TSM             — the SIREN KUNCI AIR TSM site, Klang, LOCATION CONFIRMED
     1276 => [3.093060, 101.406711],     // Sg. Puluh Aman Perdana   — the point 1283 was published at, LOCATION CONFIRMED
     1277 => [3.02151, 101.52422],       // Taman Desa Kemuning      — the mast of that name, LOCATION CONFIRMED
     1278 => [3.194995, 101.533625],       // Paya Jaras               — published 33 km away, in Serdang, LOCATION CONFIRMED
