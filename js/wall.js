@@ -17,6 +17,8 @@
 import { CLIP_WIN, CLIP_MS, camSrc } from './config.js';
 import { state } from './state.js';
 import { el, squash } from './util.js';
+import { camAlert } from './stations.js';
+import { camPhrase } from './popup.js';
 
 /* Per-tile state, keyed by the element. Not in `dataset`: `at` moves once a second on every tile
    on screen, and a dataset write is a string round trip through the DOM for a number nothing
@@ -39,7 +41,8 @@ const cameras = () => state.data
    is one camera, and the click resolves it by its own id. */
 const tileHtml = c => `<button class="camtile" data-cam="${c.id.split('-')[1]}" data-hay="${
   squash(`${c.name} ${c.district || ''} ${c.state || ''}`)}"><img loading="lazy" alt="" src="${
-  camSrc(c)}"><span class="camname">${c.name}</span></button>`;
+  camSrc(c)}"><span class="camname">${c.name}</span><span class="camsay"><i class="i i-warning"
+  ></i><b></b></span></button>`;
 
 /* A tile is armed the first time it comes into view, and never again. Arming costs one call to
    ?shots= and one warm-up of the lap. Eager, this page is 91 of those calls and about 80 MB of
@@ -113,6 +116,7 @@ export function open() {
     cam: cams[i], live: camSrc(cams[i]), shots: [], at: 0, ready: false, seen: false,
   }));
   count();
+  paint();
   /* `root` is the grid, because the grid scrolls and the page behind it does not. The margin arms
      a tile just before it arrives, so a lap is warm by the time a reader reaches it. */
   io = new IntersectionObserver(onSee, { root: grid, rootMargin: '200px' });
@@ -138,4 +142,29 @@ export function count(shown = laps.size) {
     : !shown ? 'No camera matches that name.'
     : shown === total ? `${total} cameras`
     : `${shown} of ${total} cameras`;
+}
+
+/* What a poll changes, and nothing else. js/render.js calls this instead of rebuilding the grid,
+   because a rebuild drops every visible tile back to the first frame of its lap and throws away
+   the frames it warmed. It creates and destroys no element, and it touches no <img>.
+ *
+ * The name matches paint() in js/timeline.js, which does the same job for the lightbox: rewrite
+ * the parts of an existing player that changed, rather than build a new one.
+ *
+ * `L.cam` is the station object from the payload the grid was built on, and a poll replaces that
+ * object. It stays correct anyway: the only fields read here are the coordinate and the id, and a
+ * camera does not move. camAlert() reduces over the live `state.data` for everything else.
+ *
+ * `hidden` is left alone, so a filter survives a poll with no work.
+ *
+ * The threshold is camAlert()'s, which is the lightbox pill's. Same 2 km, same isIgnored(), same
+ * exclusion of stale stations. This surface makes no new claim and widens no alert set, so it does
+ * not go through the alert design standard as a fifth surface. Widening camAlert() would. */
+export function paint() {
+  for (const [t, L] of laps) {
+    const a = camAlert(L.cam);
+    t.classList.toggle('t-now', a?.tier === 'now');
+    t.classList.toggle('t-soon', a?.tier === 'soon');
+    t.querySelector('.camsay b').textContent = a ? camPhrase(L.cam, a) : '';
+  }
 }

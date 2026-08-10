@@ -389,6 +389,32 @@ body.testmode #testbadge, body.rising #risebadge { display: flex; }
   .camtile:hover .camname, .camtile:focus-visible .camname { opacity: 1; }
 }
 
+/* The same two tokens the ticker and the alert panel use, through the same two class names. Never
+   a hex here — the palette has moved four times and every copy of it went stale. */
+.camtile.t-now  { border-color: var(--s-danger); }
+.camtile.t-soon { border-color: var(--s-warning); }
+
+/* Under the name, and only on a tile with something to say. A border with no words is the
+   ambiguity the lightbox pill was rewritten to remove: red against amber carrying the whole
+   message. See js/popup.js. */
+.camsay {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 1;
+  display: flex; align-items: center; gap: 5px; padding: 5px 8px;
+  font: 500 11px/1.25 Roboto, sans-serif; color: #fff;
+  background: rgb(0 0 0 / .62); backdrop-filter: blur(3px);
+  text-shadow: 0 1px 3px rgb(0 0 0 / .95);
+  pointer-events: none;
+}
+.camsay b { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.camsay .i { flex: none; font-size: 15px; filter: drop-shadow(0 1px 3px rgb(0 0 0 / .95)); }
+.camtile.t-now  .camsay .i { color: var(--s-danger); }
+.camtile.t-soon .camsay .i { color: var(--s-warning); }
+/* `display: flex` above beats the browser's `[hidden]` rule, and there is no `hidden` here to
+   beat it with — a quiet tile simply has no tier class. */
+.camtile:not(.t-now):not(.t-soon) .camsay { display: none; }
+/* The phrase owns the foot of an alerting tile, so the name steps up out of its way. */
+.camtile.t-now .camname, .camtile.t-soon .camname { bottom: 26px; }
+
 @media (max-width: 600px) {
   #camBox { width: 100vw; height: 100dvh; max-width: none; border-radius: 0; border: 0; }
   #camGrid { padding: 12px; }

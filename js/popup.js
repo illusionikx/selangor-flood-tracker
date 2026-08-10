@@ -42,16 +42,24 @@ const CAM_READ = {
   rainfall: ['hourly', ' mm/h'],
 };
 
-export const camWarn = (cam, a = camAlert(cam)) => {
+/* The words, with no markup around them. Two surfaces want them and they draw differently: the
+   lightbox pill sits on the photograph, and a camera tile on the wall carries them under it. The
+   phrase itself must stay one string in one place, or one river makes two claims. */
+export const camPhrase = (cam, a = camAlert(cam)) => {
   if (!a) return '';
   const s = a.station;
   const [field, unit] = CAM_READ[s.kind] || [];
   // Gated on the kind having a reading at all, not on what was handed in: a siren's samples are 0
-  // and 1, so an archive frame passes `level: 1` and a pill that trusted it would print "1".
+  // and 1, so an archive frame passes `level: 1` and a phrase that trusted it would print "1".
   const lv = !field ? null : 'level' in a ? a.level : s[field];
   const what = ALERT_TITLE[`${s.kind}|${a.tier}`]?.[0] || KINDS[s.kind].label;
-  return `<span class="camwarn t-${a.tier}"><i class="i i-warning"></i><b>${
-    what}${lv == null ? '' : `, ${lv}${unit}`}</b></span>`;
+  return `${what}${lv == null ? '' : `, ${lv}${unit}`}`;
+};
+
+export const camWarn = (cam, a = camAlert(cam)) => {
+  const words = camPhrase(cam, a);
+  return words
+    ? `<span class="camwarn t-${a.tier}"><i class="i i-warning"></i><b>${words}</b></span>` : '';
 };
 
 /* Spinner lives on the wrapper; the img clears it on load, or swaps itself out on failure.

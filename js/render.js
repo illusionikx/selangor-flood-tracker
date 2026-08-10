@@ -9,6 +9,7 @@ import { marks, siteMark, shown, syncCluster, focusOn, side, openSide,
 import { heat, rainHeat, syncHeat, thinHeat } from './heat.js';
 import { sitePopup } from './popup.js';
 import { dataTable } from './table.js';
+import * as wall from './wall.js';
 
 state.rerender = () => render();
 
@@ -198,6 +199,8 @@ export function render() {
   // Every poll rebuilds the map; the table has to follow or it sits on readings the map has already
   // replaced. Only while it is open — no point rendering 435 rows into a closed dialog.
   if (el('dataBox').open) dataTable();
+  // The wall is painted, never rebuilt. See paint() in js/wall.js for what a rebuild costs.
+  if (el('camBox').open) wall.paint();
 }
 
 /* The district filter: every district the feeds returned, grouped under its state, each with the
