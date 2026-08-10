@@ -214,3 +214,8 @@ export const TIER_RANK = { now: 0, soon: 1, stale: 2 };
 export const leads = (a, b) =>
   atDanger(b) - atDanger(a) || !!b.rising - !!a.rising ||
   KIND_RANK.indexOf(a.kind) - KIND_RANK.indexOf(b.kind);
+
+/* JPS writes one place as `I.K.B.N.`, `IKBN` and `I K B N`. Squashing reads all three as one word.
+   Two callers now: the go-to box's matcher in js/ui.js, and the camera filter's haystack in
+   js/wall.js. */
+export const squash = t => t.toLowerCase().replace(/[^a-z0-9]/g, '');

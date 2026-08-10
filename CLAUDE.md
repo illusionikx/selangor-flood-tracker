@@ -43,6 +43,7 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `js/test.js` | test mode: fakes a flood in the client's copy of the payload |
 | `js/net.js` | `load()` poll loop and the status dot on the logo |
 | `js/ui.js` | all DOM wiring: drawer, filters, chips, panels, lightbox, delegated jumps |
+| `js/wall.js` | the camera wall: every camera on one page, one timer for all of them |
 | `manifest.json` | PWA manifest. `.json`, not `.webmanifest` — see the gotcha below |
 | `sw.js` | service worker: network-first shell cache, and the reason Chrome offers "Install app" |
 | `icon.svg` | the app mark: bare glyph, no fill. Source for the PNGs *and* the `--i-flood` mask |

@@ -330,6 +330,70 @@ body.testmode #testbadge, body.rising #risebadge { display: flex; }
 #dataBox h2 { font-size: 18px; font-weight: 500; }
 #dataBox #dataFind { margin-bottom: 6px; }
 
+/* --- all cameras ----------------------------------------------------------------------------- */
+
+/* The same shell as #dataBox. This one is for scanning too, so it takes the screen. */
+#camBox {
+  width: min(1060px, calc(100vw - 24px)); height: min(88vh, 900px); padding: 0;
+  flex-direction: column; overflow: hidden;
+  border: 1px solid var(--outline); border-radius: 12px;
+  background: var(--surface); color: var(--on-surface); box-shadow: var(--shadow);
+}
+/* On `[open]`, never on the element. #dataBox above carries the full account of what a `display`
+   on the element itself does to a closed dialog. */
+#camBox[open] { display: flex; }
+#camBox::backdrop { background: #0009; }
+#camBox .dtop {
+  flex: none; padding: 16px 20px 12px;
+  border-bottom: 1px solid var(--outline); background: var(--surface);
+}
+#camBox h2 { font-size: 18px; font-weight: 500; }
+
+/* One declaration answers the whole responsive question: one column at 360px, four or five in the
+   dialog. No script measures anything. */
+#camGrid {
+  flex: 1; overflow: auto; padding: 12px 20px 20px;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px;
+}
+
+/* A <button>, so keyboard reach, Enter, Space and the focus ring all come free. */
+.camtile {
+  position: relative; display: block; padding: 0; overflow: hidden; cursor: pointer;
+  aspect-ratio: 4 / 3; border: 2px solid var(--outline); border-radius: 10px;
+  background: var(--hover); color: var(--on-surface); text-align: left;
+}
+.camtile > img { display: block; width: 100%; height: 100%; object-fit: cover; }
+/* `display: block` above beats the browser's own `[hidden]` rule, so it has to be said again. The
+   filter in js/ui.js sets `hidden`, and `.link` and `.camwarn` both carry the same restatement. */
+.camtile[hidden] { display: none; }
+
+/* Over the foot of the picture, on a gradient. In flow under it, the name would cost a row of
+   height on every tile to label the quiet ones.
+   The white is literal, like `.camwarn`'s. A token flips with the theme and the photograph does
+   not. */
+.camname {
+  position: absolute; left: 0; right: 0; bottom: 0; padding: 14px 8px 6px;
+  font: 500 12px/1.3 Roboto, sans-serif; color: #fff;
+  background: linear-gradient(transparent, rgb(0 0 0 / .72));
+  text-shadow: 0 1px 3px rgb(0 0 0 / .95);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  pointer-events: none;
+}
+
+/* Hover-to-reveal is the special case and lives behind both halves of the query, exactly as
+   PLAYER_OVERLAY does and for the same reason. Outside it the name stays on. A device that reports
+   `hover: hover` wrongly then shows too much, which is a failure a reader can still work with.
+   `:focus-visible` too, or a keyboard reader tabs through 91 unnamed pictures. */
+@media (hover: hover) and (min-width: 601px) {
+  .camname { opacity: 0; transition: opacity .15s; }
+  .camtile:hover .camname, .camtile:focus-visible .camname { opacity: 1; }
+}
+
+@media (max-width: 600px) {
+  #camBox { width: 100vw; height: 100dvh; max-width: none; border-radius: 0; border: 0; }
+  #camGrid { padding: 12px; }
+}
+
 /* The table's stand-in for a popup's still: no room for the image itself in a row, so it opens the
    same lightbox the popup image does. */
 .shotbtn {

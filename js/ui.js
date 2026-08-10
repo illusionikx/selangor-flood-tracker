@@ -2,7 +2,7 @@
 
 import { KINDS, MAST, camSrc, FEED, STATIC, NEAR_MAX_KM } from './config.js';
 import { state, PREFS, PREFS_KEY, save } from './state.js';
-import { el, distKm, dkey, ignoredIds, leads, favIds, isFav } from './util.js';
+import { el, distKm, dkey, ignoredIds, leads, favIds, isFav, squash } from './util.js';
 import { map, setTheme, flashTo, closeSide, showPlace } from './map.js';
 import { heatOpacity, syncHeat } from './heat.js';
 import { byId } from './stations.js';
@@ -14,6 +14,7 @@ import { ticker } from './ticker.js';
 import { openTimeline, reset } from './timeline.js';
 import { load, feedRows, sourceRows, lastPayload } from './net.js';
 import { paintTestChrome } from './test.js';
+import * as wall from './wall.js';
 import './sparktip.js';   // side effect only: one delegated readout for every graph on the page
 
 // --- theme ---------------------------------------------------------------------------------------
@@ -186,6 +187,24 @@ const dataBox = el('dataBox');
 el('data').onclick = () => { closeSide(); dataTable(); dataBox.showModal(); el('dataFind').focus(); };
 dataBox.onclick = e => { if (e.target === dataBox) dataBox.close(); };
 el('dataFind').oninput = dataTable;
+
+// --- all cameras ---------------------------------------------------------------------------
+
+const camBox = el('camBox');
+el('cams').onclick = () => { closeSide(); wall.open(); camBox.showModal(); };
+camBox.onclick = e => { if (e.target === camBox) camBox.close(); };
+/* Nothing ticks behind a closed dialog, and nothing holds 91 decoded frames after the reader has
+   gone. `onclose` catches Esc, the ×, and the backdrop click above, which is every way out. */
+camBox.onclose = () => wall.close();
+/* One delegated listener. 91 listeners for one behavior is the thing delegation exists to stop.
+   Read the id before closing: close() empties the grid, so the element is gone by the next line. */
+el('camGrid').onclick = e => {
+  const t = e.target.closest('[data-cam]');
+  if (!t) return;
+  const s = byId(`camera-${t.dataset.cam}`);
+  camBox.close();
+  if (s) flashTo(s);
+};
 
 // --- drawer ------------------------------------------------------------------------------------
 
@@ -638,7 +657,6 @@ const nearest = () => state.hereAt && state.data.reduce((best, s) =>
    this map those are different places — and it doesn't, since squashing removes spaces but never
    letters. No scoring either; the list is grouped under district headings, and a relevance order
    would fight the grouping rather than help it. */
-const squash = t => t.toLowerCase().replace(/[^a-z0-9]/g, '');
 const hay = s => squash(`${s.name} ${s.district || ''} ${s.state || ''} ${KINDS[s.kind].label}`);
 // Split on whitespace *only*, then strip punctuation inside each word. Splitting the query on
 // punctuation instead turned `I.K.B.N` into four single-letter terms and matched 294 stations.

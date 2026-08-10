@@ -184,6 +184,7 @@
             popovertarget="appMenu"><i class="i i-more_vert"></i></button>
     <div id="appMenu" class="menu surface" popover>
       <button class="mi" id="data"><i class="i i-list_alt"></i>All stations as a table</button>
+      <button class="mi" id="cams"><i class="i i-photo_camera"></i>All cameras</button>
       <button class="mi" id="help"><i class="i i-info"></i>Help</button>
       <button class="mi" id="about"><i class="i i-flood"></i>About</button>
     </div>
@@ -620,6 +621,19 @@
     <p id="dataCount" class="muted"></p>
   </div>
   <table class="data"><thead id="dataHead"></thead><tbody id="dataBody"></tbody></table>
+</dialog>
+<!-- Every camera on one page. The same shell as #dataBox: a top that stays put, then the thing you
+     came for. The filter and its count arrive with the filter itself. -->
+<dialog id="camBox">
+  <div class="dtop">
+    <div class="modalhead">
+      <h2>All cameras</h2>
+      <form method="dialog"><button class="icon dclose" title="Close" aria-label="Close"
+      ><i class="i i-close"></i></button></form>
+    </div>
+    <p id="camCount" class="muted"></p>
+  </div>
+  <div id="camGrid"></div>
 </dialog>
 <div id="map"></div>
 <!-- Station detail, fixed to the right edge of the viewport. It was a Leaflet popup, which is
