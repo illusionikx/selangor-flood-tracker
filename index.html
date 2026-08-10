@@ -340,7 +340,7 @@
   <p id="devMsg" class="muted" role="status"></p>
   </div>
   <div id="paneHelp" role="tabpanel" aria-labelledby="tabHelp" tabindex="0" hidden>
-  <!-- Four sections, not one. The old single list mixed three different things: one header button,
+  <!-- Five sections, not one. The old single list mixed three different things: one header button,
        the whole filters drawer summarised in one line, and two lines ("Read a point on a
        graph", "Install it") that are not controls at all — a gesture and a platform feature. Both
        are gone from this list: the graph gesture moved to the station panel, the install prompt
@@ -367,14 +367,6 @@
     <span class="ctl"><i class="i i-apps"></i><b>Menu</b></span>
     <span>Opens the station table, all cameras, help and about.</span>
 
-    <span class="ctl"><i class="i i-list_alt"></i><b>Station table</b></span>
-    <span>Lists every station, grouped by district. Sort the list, or filter it.</span>
-
-    <span class="ctl"><i class="i i-photo_camera"></i><b>All cameras</b></span>
-    <span>Every camera in one grid, each picture replaying its last three hours. Click one to open
-       its station panel. A camera with no location on file still shows a picture, but does not
-       answer a click.</span>
-
     <span class="ctl"><i class="i i-my_location"></i><b>Show my location</b></span>
     <span>Puts you on the map, and offers the nearest sensor of each kind. The glyph becomes an
        arrow while your location is showing.</span>
@@ -382,6 +374,21 @@
     <span class="ctl"><i class="i i-dark_mode"></i><b>Toggle theme</b></span>
     <span>Switches the map and the page between light and dark. The glyph names the theme it will
        switch to.</span>
+  </div>
+  <!-- Station table and All cameras used to sit in the list above, under a heading that no longer
+       covered them: they open from the Menu button's own popover, not from a button along the top.
+       Their own heading, rather than a reword of the one above, because the six rows that stay there
+       are still literally that — buttons in the header — and folding two menu items into the same
+       sentence would make the heading true again only by saying less. -->
+  <h3>The menu</h3>
+  <div class="key">
+    <span class="ctl"><i class="i i-list_alt"></i><b>Station table</b></span>
+    <span>Lists every station, grouped by district. Sort the list, or filter it.</span>
+
+    <span class="ctl"><i class="i i-photo_camera"></i><b>All cameras</b></span>
+    <span>Every camera in one grid, each picture replaying its last three hours. Click one to open
+       its station panel. A camera with no location on file still shows a picture, but does not
+       answer a click.</span>
   </div>
   <h3>Filters</h3>
   <div class="key">

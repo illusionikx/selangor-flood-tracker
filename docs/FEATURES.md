@@ -5574,8 +5574,10 @@ sent a click there anyway, to a panel that never opened. `js/table.js` had alrea
 for the same stations — its row for one of them carries no `data-mast`, so it offers no jump — but
 `js/wall.js` built its tile from the same row shape as the table, without carrying the one attribute
 that held the decision, so every tile answered a click whether it had somewhere to send one or not. A
-tile now matches the table: no `data-cam`, `disabled`, and `Not on the map` printed across it, the
-same judgment the table already made in its own row.
+tile now matches the table: no `data-cam`, `disabled`, and a `Not on the map` caption over the foot
+of the picture, shaped like `.camsay`'s alert phrase rather than printed across the frame. `.unmapped`
+on the tile itself drops the pointer cursor and dashes the border, so the judgment reads before a
+reader tries the tile, the same one the table already made in its own row.
 
 **Not built:** no compare, no scrubber, no transport — the lightbox holds those, and two places to
 learn one control is one too many. No warning pill on a tile, because a pill states one frame's
@@ -5588,13 +5590,15 @@ A second pass over `All cameras`, its entry point, and three findings a review t
 same files.
 
 **The app-bar menu became a grid, and took its own icon.** `#apps` used to open a plain list —
-Layers, Cameras, Help and About behind a `more_vert` glyph titled "Views," which stopped being true
-the moment Help and About joined it: neither is a view, and a screen reader announced "Views button"
-over a menu that was half view and half everything else. The button is now titled "Menu," and the
-icon is a fresh fetch of Material Symbols' `apps` — the 3x3 dot grid every platform already uses for
-exactly this job. The menu itself lays its four items out 2x2 instead of in a column, each item a
-tile with its glyph above its label: four short destinations scan faster as a grid, and the grid is
-roughly half the panel's old height against a 64px app bar.
+Station table, All cameras, Help and About behind a `more_vert` glyph titled "Views," which stopped
+being true the moment Help and About joined it: neither is a view, and a screen reader announced
+"Views button" over a menu that was half view and half everything else. The button is now titled
+"Menu," and the icon is a fresh fetch of Material Symbols' `apps` — the 3x3 dot grid every platform
+already uses for exactly this job. The menu itself lays its four items out 2x2 instead of in a
+column, each item a tile with its glyph above its label: four short destinations scan faster as a
+grid. Measured, the grid does not save height — the old four-row list came to about 148px including
+the menu's own padding, and the 2x2 grid comes to about 157px, a little more rather than less — and
+it earns its place on scan speed instead.
 
 *The grid is scoped to `#appMenu`, not a second class on `.menu`.* The sensor ⓘ menu shares `.menu`
 for its popover placement — the delegated handler in `js/ui.js` keys off that class alone and
@@ -5626,7 +5630,7 @@ picture and starts reading as a swatch. Five columns cross that floor around 838
 (rounded to an 840px breakpoint), four columns around 682px (rounded to 680px). Below 600px the
 dialog changes shape outright — full viewport width, 12px padding, no `min(1060px, …)` cap — so the
 last step, to two columns, rides the existing phone breakpoint instead of a fresh computed one: two
-columns hold 145–285px across the whole 360–600px range, comfortably inside the target.
+columns hold 165–285px across the whole 360–600px range, comfortably inside the target.
 
 **Every tile reserves its space and shows where it stands.** `.camtile` already carried
 `aspect-ratio: 4 / 3`, so the box was never the problem — a scrolling grid of 90-odd cameras with no

@@ -268,12 +268,17 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   touched cameras only.
   **A second and unrelated fault sits beside the shuffle.** JPS also publishes some cameras with no
   coordinate at all, `lat: 0, lng: 0` rather than a wrong one, and `CAM_FIX` now carries entries for
-  those too. Nine of the eleven came in by the route this entry already calls strongest — a station of
-  another kind, already in the payload, carrying the same name. The other two, cameras 244 and 246,
-  carry the median of their district's non-camera stations instead, which is a coordinate this file
-  invented, and the rule above says to delete an invented coordinate rather than keep it if nobody can
-  confirm where the camera actually stands. Anything that draws a station from this payload must still
-  tolerate a camera with no coordinate — the next one JPS publishes that way has no entry here yet.
+  those too. Seven of the eleven came in by the route this entry already calls strongest — a station
+  of another kind, already in the payload, carrying the same name. Two more, cameras 241 and 247,
+  carry a name only close to a station JPS already publishes rather than an equal one, and a near
+  name is weaker evidence than an equal one, the same rule camera 1282 states above — what carries
+  each of those two is the district, since the near-named station sits inside the district JPS files
+  the camera under, and both are marked `SOMEWHAT CONFIRMED` in the table for it. The other two,
+  cameras 244 and 246, carry the median of their district's non-camera stations instead, which is a
+  coordinate this file invented, and the rule above says to delete an invented coordinate rather than
+  keep it if nobody can confirm where the camera actually stands. Anything that draws a station from
+  this payload must still tolerate a camera with no coordinate — the next one JPS publishes that way
+  has no entry here yet.
 - **A `(string)` cast on `$_GET[...]` does not throw on an array — it emits a warning and coerces
   silently.** `?place[]=x` makes `$_GET['place']` an array. `(string)` on it prints
   `Warning: Array to string conversion` and yields the literal string `"Array"`, five characters that

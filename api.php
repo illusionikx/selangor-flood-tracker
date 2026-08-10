@@ -102,17 +102,24 @@ const CAM_FIX_KM = 2.0;
    at all, lat 0 and lng 0, rather than a wrong one. There is nothing to swap and no cycle to solve:
    the shuffle corrects real points that were each assigned to the wrong camera, and this batch has
    no point assigned to any camera at all.
-   Nine of the eleven — every one but 244 and 246 — took the strongest route into this table: a
-   station of another kind, already in the payload, carrying the same name. A rainfall gauge, a
-   river mast, a flood gauge or a siren site that JPS itself already places on the map is upstream
-   stating where the camera stands, the same evidence the shuffle entries above lean on for several
-   of their own.
-   Two did not. Taman Selat Damai (244) and Bukit Hijau (246) carry the median of the non-camera
-   stations in the district JPS files them under, because no station of either name exists anywhere
-   in the payload. A district median is a coordinate this file invented, and the rule above is
-   explicit that an invented coordinate is worse than one we can show belongs to upstream. These two
-   entries exist to be checked by hand, not to be trusted on the strength of this comment: delete
-   them rather than keep them if nobody can confirm where the camera actually stands.
+   Seven of the eleven — 239, 240, 242, 245, 1249, 1250 and 1261 — took the strongest route into this
+   table: a station of another kind, already in the payload, carrying the same name. A rainfall
+   gauge, a river mast, a flood gauge or a siren site that JPS itself already places on the map is
+   upstream stating where the camera stands, the same evidence the shuffle entries above lean on for
+   several of their own.
+   Two more, 241 and 247, only had a near name to lean on, not an equal one — Taman Daya Meru reads
+   close to PEKAN MERU and Taman Teluk Gedung Indah close to SG. KEMBONG DI PULAU INDAH, and a near
+   name is weaker evidence than an equal one, the same rule 1282 above states. What carries each of
+   these two is the district: the near-named station sits inside the district JPS files the camera
+   under, and the table below marks both entries SOMEWHAT CONFIRMED for exactly that reason. A near
+   name never gets in on its own.
+   The remaining two had neither. Taman Selat Damai (244) and Bukit Hijau (246) carry the median of
+   the non-camera stations in the district JPS files them under, because no station of either name —
+   equal or near — exists anywhere in the payload. A district median is a coordinate this file
+   invented, and the rule above is explicit that an invented coordinate is worse than one we can show
+   belongs to upstream. These two entries exist to be checked by hand, not to be trusted on the
+   strength of this comment: delete them rather than keep them if nobody can confirm where the camera
+   actually stands.
    CAM_FIX_KM retires all eleven the same way it already retires the fourteen above, with nothing
    extra to write here. A camera published at 0, 0 disagrees with any point in this state by
    thousands of kilometres, so the override holds until JPS publishes a real coordinate — and the day
