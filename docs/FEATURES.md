@@ -5504,3 +5504,60 @@ renders. An icon in this app cannot take a filter for that exact reason.
 The width cap and the ellipsis went at the same time. Both need `overflow: hidden`, and the tail is a
 child, so any clip on the chip cuts the tail off. A station name is around 30 characters and the chip
 lives for 2.4 seconds over a point the map has just centred.
+
+## Every camera on one page, and four buttons behind one
+
+91 of the 93 cameras publish a picture, and the station panel answers one at a time. A camera is
+also the one sensor that needs no mark to read it — a picture of a flooded road answers by itself —
+so a page of pictures is the fastest read this data supports. `All cameras` is that page.
+
+**The app bar had no room for it.** The right group held seven buttons and filled the bar at 360
+pixels. Two of them opened a dialog, so both moved into one ⋮ menu with the new view and a Help
+entry of its own. The menu is `.menu`, the component the sensor ⓘ already uses, and the delegated
+handler in `js/ui.js` places every popover carrying that class — so the menu needed no positioning
+code, no library and no new icon. `i-more_vert` was already in `css/icons.css` with no user.
+
+**Help and About stay one dialog with two tabs.** Splitting the entry points is not splitting the
+dialog. The panes cross-reference each other, and a reader who opens Help and then wants About must
+not have to close and reopen.
+
+**One timer drives 91 tiles, not 91 timers.** `js/clip.js` carries a generation counter and a
+rebind path because `render()` replaces the open card's `<img>` under it on every poll. The wall is
+built once and painted in place, so that whole class of problem never arises and none of that
+machinery was copied. 91 timers at 1 Hz is also 91 wakeups a second where one will do, and tiles
+that step together read as one deliberate thing rather than as 91 pictures out of phase.
+
+**A tile costs nothing until a reader scrolls to it.** Eager, the page is 91 calls to `?shots=` and
+about 550 frames, roughly 80 MB. An `IntersectionObserver` arms a tile the first time it comes into
+view: fetch the list, warm the lap with `Image().decode()`, join the tick. Leaving view drops it out
+and keeps its place. The first screen is about a dozen tiles and about 10 MB. `loading="lazy"` on
+the still is the browser doing the same job for the one image every tile has.
+
+**A poll paints, it does not rebuild.** `render()` calls `paint()`, which re-runs `camAlert()` per
+tile and swaps the tier class and the phrase. It creates and destroys no element and touches no
+`<img>`, so nothing jumps mid-lap. The name matches `paint()` in `js/timeline.js`, which does the
+same job for the lightbox.
+
+**The border makes no new claim.** `camAlert()` is the call the lightbox pill already makes — same
+2 km, same `isIgnored()`, same exclusion of stale stations — so this is one existing claim on a new
+screen rather than a fifth alert surface. Widening `camAlert()` would go through the alert design
+standard. Adding a screen that reads it does not.
+
+**The border alone was not enough.** Color alone is not a message, which is the finding that
+rewrote the lightbox pill. So an alerting tile also prints the phrase, from `ALERT_TITLE` through
+`camPhrase()` — the function the pill now calls too. One river cannot make two claims, because
+there is one string.
+
+**A filtered tile takes `hidden` and stays in the grid.** It keeps its lap, its frame list and its
+warmed images, so clearing the box brings it back where it was. The observer needs no code for it:
+the browser reports a `display: none` element as not intersecting, so the tile stops ticking by
+itself. The kind label is left out of the haystack, because every tile is a camera and `camera`
+would match all 91.
+
+**The filter does not take focus on open.** The table focuses its box, because a table is a thing
+you filter. This is a wall of pictures, and a focused input opens the keyboard over them on a phone.
+
+**Not built:** no compare, no scrubber, no transport — the lightbox holds those, and two places to
+learn one control is one too many. No warning pill on a tile, because a pill states one frame's
+alert and a tile has no way to score the frame on screen. No sort control and no favorites-only
+mode. Add one when a reader asks.

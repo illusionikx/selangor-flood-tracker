@@ -815,6 +815,14 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   `oninput`. `lookup()` carries a generation counter for the same reason `clip.js` does. Do not
   "improve" this into a debounced auto-search: every abandoned query would still leave the machine,
   and a fast typist would fire several.
+- **The camera wall is painted on a poll, never rebuilt.** `render()` calls `paint()` in
+  `js/wall.js`, which swaps the tier class and the phrase on the tiles that already exist. A tile
+  holds four things the payload does not: the frame it is showing, the frame list it fetched, the
+  images it warmed, and whether the observer reached it. A rebuild throws all four away and drops
+  every visible tile back to the start of its lap, which is the failure `js/clip.js` was written to
+  prevent on one camera, arriving a dozen at a time. The filter obeys the same rule: a hidden tile
+  stays in the grid. **Do not add `wall.open()` to the poll path** beside `dataTable()` — the table
+  is safe to rebuild because a row is a pure function of the payload, and a tile is not.
 
 ## Conventions
 
