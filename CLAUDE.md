@@ -1027,6 +1027,20 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   drawer went on showing both. The test is on the pair now, whoever fired the event.
   **The theme control is the same rule at a second site.** It lives in `#appMenu` as `#themeRow`,
   three `<input type="radio" name="theme">` in a segmented pill, none of them carrying `checked`.
+  **That pill is the lightbox range selector's shape, shared and not copied** — `.seg` and
+  `.seg label` are grouped into the `.tlranges` and `.tlr` rules, so a change there restyles the
+  theme picker too. The `PLAYER_OVERLAY` block is the safe half: it names `.tlranges` and `.tlr`
+  alone, in literal whites for a photograph, and none of that must ever be widened to `.seg`.
+  **`label` is a styled element in `css/base.css`, and it carries a margin.** `label { display: flex;
+  align-items: center; gap: 8px; margin: 6px 0 }` is written for the drawer's stacked filter rows.
+  It lands on every `<label>` in the app. Measured on the theme picker, that margin made the track
+  37px tall around 21px pills — 6px of dead air above and below each one, inside a shape whose whole
+  point is that the fill hugs the segment. The lightbox's own pills are `<button>`s and never met it.
+  **Any `<label>` used as a compact control needs `margin: 0` stated**, and the symptom is spacing
+  around the control rather than in it, which reads as a padding mistake on the parent. Three other
+  explanations were measured first and all three were wrong: the row's own padding (symmetric at 8px),
+  `align-items` on the row (already `center`), and the flex item stretching (`align-self: auto` on a
+  centred row cannot stretch).
   `applyTheme()` in `map.js` returns the stored pick and `ui.js` checks the matching radio from that
   return value, which is also what corrects a browser that restored a different one.
 - **The theme has three states and two of them are the same colour.** `PREFS.theme` holds the

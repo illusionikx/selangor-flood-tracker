@@ -519,21 +519,31 @@ table.data button[data-pop] { cursor: pointer; }
 }
 /* Three positions, because the theme has three answers and one of them is "ask the system". A
    two-state switch was here first and could not hold the third.
-   Real radios, hidden rather than replaced: the browser keeps the group exclusive, walks it with the
-   arrow keys and reads the label out, none of which a set of styled buttons gets for free. They are
-   clipped to a pixel rather than `display: none`, which would take them out of the tab order and
-   leave the control mouse-only. Each one is inside its own `<label>`, so the segment is the hit area
-   and `:has(:checked)` can paint it. */
-.seg {
-  display: flex; flex: none; margin-left: auto; position: relative;
-  border: 1px solid var(--outline); border-radius: 999px; overflow: hidden;
-}
-.seg label { padding: 3px 8px; font-size: 11px; line-height: 1.45; color: var(--muted); cursor: pointer; }
-.seg label:hover { background: var(--hover); }
+   **The shape is the lightbox range selector's**, and it is shared rather than copied: `.seg` and
+   `.seg label` are grouped into `.tlranges` and `.tlr` at those rules, further down. A sunken track
+   with the chosen segment filled — no outer border, no dividers. Written as a bordered box first,
+   and it read as three buttons in a frame rather than as one control with a selection inside it.
+   The PLAYER_OVERLAY block near the bottom restyles `.tlranges` and `.tlr` in literal whites for a
+   photograph, and names those two selectors only, so none of that reaches this menu.
+   What stays here is only what makes it a form control instead of a row of buttons. Real radios,
+   hidden rather than replaced: the browser keeps the group exclusive, walks it with the arrow keys
+   and reads the label out, none of which a set of styled buttons gets for free. The CSS clips each
+   input to a pixel rather than hiding it with `display: none`, which would take it out of the tab
+   order and leave the control mouse-only. Each input sits in its own `<label>`, so the segment is
+   the hit area and `:has(:checked)` can paint it. */
+.seg { flex: none; margin-left: auto; position: relative; }
+/* `.mi .i` nudges a tile's glyph down 1px to sit with a label under it. This one sits beside its
+   label instead, and the crescent's mass is low in its own box, so centring the box leaves the shape
+   reading low. 2px up from the tile value. */
+#themeRow .i { margin-top: -1px; }
+/* `label { margin: 6px 0 }` in base.css is written for the drawer's stacked filter rows, and it lands
+   on these three as well. Measured, it made the track 37px around 21px pills — 6px of dead air above
+   and below each one, inside a shape whose whole point is that the fill hugs the segment. The pills
+   in the lightbox are `<button>`s and never met it. Zero it here, not in the shared rule: `.tlr` has
+   no margin to clear. */
+.seg label { margin: 0; }
 .seg input { position: absolute; width: 1px; height: 1px; margin: -1px; border: 0; clip-path: inset(50%); }
-/* The same pair the range pill uses when it is the chosen one — see `.tlr.on` below. */
-.seg label:has(:checked) { color: var(--surface); background: var(--accent); }
-.seg label:has(:focus-visible) { outline: 2px solid var(--accent); outline-offset: -2px; }
+.seg label:has(:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
 /* Where the reading came from, above the one action. It reads like the item under it and answers
    to nothing — no pointer, no hover fill — because a block that lit up under the mouse in a list of
    one button would promise a second one. */
@@ -1475,12 +1485,15 @@ body.finding #find { display: none; }
    shape: the selection moves *along* the control rather than lighting up one of five. Sized to its
    content rather than stretched, so it reads as one object rather than a row the width of the
    dialog. The chosen segment grows to hold its pace — `24 hours, 30 minutes per frame` — so the
-   control changes width as it is used, which is also what says the selection is inside it. */
-.tlranges {
+   control changes width as it is used, which is also what says the selection is inside it.
+   The app menu's theme picker is the same control with the same argument — three exclusive choices,
+   one of which is on — so `.seg` and `.seg label` are grouped in here rather than given a second set
+   of numbers to drift from. See the `.seg` block up in the app-menu section for what it adds. */
+.tlranges, .seg {
   display: flex; align-items: center; width: auto; max-width: 100%; gap: 2px; padding: 2px;
   background: var(--hover); border-radius: 999px;
 }
-.tlr {
+.tlr, .seg label {
   padding: 4px 11px; cursor: pointer; font: 500 11px Roboto, sans-serif; white-space: nowrap;
   color: var(--muted); background: none; border: 0; border-radius: 999px;
   -webkit-user-select: none; user-select: none;   /* clicked repeatedly while hunting a range */
@@ -1496,12 +1509,12 @@ body.finding #find { display: none; }
 }
 .tls, .tlr.on .tll { width: auto; opacity: 1; }
 .tll, .tlr.on .tls { width: 0;    opacity: 0; }
-.tlr:hover:not(.on) { color: var(--on-surface); }
+.tlr:hover:not(.on), .seg label:hover:not(:has(:checked)) { color: var(--on-surface); }
 /* Text on the accent is `--surface`, never `#fff`. The accent flips to a pale blue (#8ab4f8) in the
    dark theme, where white on it is a contrast failure — the token is already near-black there and
    already white in the light theme, so one declaration is correct in both. */
-.tlr.on { color: var(--surface); background: var(--accent); }
-@media (prefers-reduced-motion: reduce) { .tlr, .tls, .tll { transition: none; } }
+.tlr.on, .seg label:has(:checked) { color: var(--surface); background: var(--accent); }
+@media (prefers-reduced-motion: reduce) { .tlr, .tls, .tll, .seg label { transition: none; } }
 
 /* --- PLAYER_OVERLAY: the same controls, laid over the picture -----------------------------------
    Both halves of the query are required, and each rules out a different failure.
