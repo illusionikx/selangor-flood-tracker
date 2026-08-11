@@ -4,7 +4,7 @@ import { KINDS, MAST, camSrc, FEED, STATIC, NEAR_MAX_KM } from './config.js';
 import { state, PREFS, PREFS_KEY, save } from './state.js';
 import { el, distKm, dkey, ignoredIds, leads, favIds, isFav, squash, termsOf, matches
        } from './util.js';
-import { map, setTheme, flashTo, closeSide, showPlace } from './map.js';
+import { map, setTheme, applyTheme, flashTo, closeSide, showPlace } from './map.js';
 import { heatOpacity, syncHeat } from './heat.js';
 import { byId } from './stations.js';
 import { camWarn } from './popup.js';
@@ -20,9 +20,11 @@ import './sparktip.js';   // side effect only: one delegated readout for every g
 
 // --- theme ---------------------------------------------------------------------------------------
 
-setTheme(PREFS.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
-el('theme').onclick = () =>
-  setTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
+// applyTheme() returns the stored pick, which is what checks the matching radio. The markup carries
+// no `checked` attribute — the pref is the state, and see the gotcha list in CLAUDE.md.
+const themeRow = el('themeRow');
+themeRow.querySelector(`input[value="${applyTheme()}"]`).checked = true;
+themeRow.onchange = e => setTheme(e.target.value);
 
 // --- about dialog ------------------------------------------------------------------------------
 // <dialog> handles the backdrop, Esc and focus; the only wiring needed is opening it and treating a
@@ -32,9 +34,13 @@ const aboutBox = el('aboutBox');
 /* One handler closes the menu, whichever item was hit. Capture, not bubble: an item's own handler
    calls showModal(), and a dialog that opens while its opener is still in the top layer is a
    sequence worth not testing. Capture runs the parent first, so the menu is gone before the dialog
-   arrives. */
+   arrives.
+   The theme switch is the exception: it is a setting, not a destination, and closing the menu on it
+   would take the control off screen at the moment you want to see what it did — and put it back. */
 const appMenu = el('appMenu');
-appMenu.addEventListener('click', () => appMenu.hidePopover(), true);
+appMenu.addEventListener('click', e => {
+  if (!e.target.closest('.swrow')) appMenu.hidePopover();
+}, true);
 // The station card closes when a dialog takes the screen — you have gone somewhere else, and coming
 // back to a card you had forgotten was open is a surprise. That, and its own ×, are the only ways it
 // shuts: nothing on the map dismisses it, and a poll never does. See map.js.

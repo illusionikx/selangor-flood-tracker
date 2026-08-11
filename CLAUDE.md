@@ -48,6 +48,8 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `sw.js` | service worker: network-first shell cache, and the reason Chrome offers "Install app" |
 | `icon.svg` | the app mark: bare glyph, no fill. Source for the PNGs *and* the `--i-flood` mask |
 | `icon-build.php` | `php icon-build.php` — rebakes the two icons and prints the mask rule to paste |
+| `river-build.php` | `php river-build.php` — rebakes `rivers.json` from OpenStreetMap. Run by hand, never in a request |
+| `rivers.json` | the rivers the dark basemap draws. 2,775 lines, baked and committed — see the gotcha below |
 | `icon-192.png`, `icon-512.png` | manifest icons (`any`) and the favicon — the glyph on transparency |
 | `icon-180.png` | `apple-touch-icon`. Opaque, because iOS flattens alpha onto a colour of its own |
 | `img/` | optional. Only `egg.webp` (the About easter egg). Absent is a supported state — see below |
@@ -910,6 +912,46 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   `align-items: start` on the grid, `position: absolute` on the tile's `<img>`, and a wider tile
   ratio. Each left the row exactly where it was.
 
+- **The dark basemap is greyscale, and its *filled* water is the brighter tone, not the darker one.**
+  All 18 colors in CARTO `dark_all` have a chroma of zero, so `saturate()` and `hue-rotate()` have
+  nothing to act on. Filled water is luminance 38 and land is luminance 9. Read the river gotcha
+  below before assuming this covers every river on screen. It does not. Two guesses got both facts wrong before any
+  measurement. The first reached for `saturate()`. The second assumed water was the dark tone. Draw a tile as ASCII art, one character per tone, and the coastline names itself — the
+  Straits of Malacca is a solid block of 38 on the west edge of tile `dark_all/10/800/503`.
+  `#watertint` in `index.html` keys on that one value. **Four rules hold it together and each one
+  fails silently.** The band table has **64 entries** because 64 is the smallest count that isolates
+  38 from 34 and 42, the road and boundary tones. At 32 bands 34 and 38 merge. At 48 bands 38 and
+  42 merge. The filter carries **`color-interpolation-filters="sRGB"`**, because SVG filters run in
+  linearRGB by default and move every tone into a different band before the table reads it.
+  The tint and the existing `brightness(1.75) contrast(.92)` lift are **one `filter` declaration in
+  `css/map.css`, tint first** — a second rule setting `filter` on the same element replaces this
+  value rather than adding to it, and the tint has to read the raw tones before the lift moves them.
+  And the emitted color is **darker than what lands on screen**, because that lift multiplies it:
+  `#071b2a` draws as about `#2e6086`. Preview the whole chain against a real tile, never the tint
+  alone. CARTO owns this tone, so a restyle upstream aims the tint at nothing and errors nowhere.
+- **Nothing can reference an SVG filter inside a `display: none` subtree.** `#mapfx` in `index.html`
+  holds `#watertint` and must stay in the render tree. `css/map.css` takes it out of the flow with
+  `position: absolute; width: 0; height: 0` instead. The rule is in the stylesheet and not on the
+  element, because `index.html` carries no inline CSS.
+
+- **The dark basemap antialiases a river into the road tones, so no filter can reach it.**
+  `#watertint` gets the sea and the lakes because CARTO fills those with one exact tone. A river is
+  one pixel wide, so CARTO draws it as a line that blends toward the land tone by however much of
+  each pixel it covers. **Measure before assuming a tone means what it looks like.** Mark every
+  pixel Voyager paints as water, then read the dark tile at those same positions. At zoom 10 the sea
+  maps to tone 38 for 80% of its pixels. At zoom 12 and 13 over Kuala Lumpur, tone 38 is not in the
+  tile at all, and the river pixels spread over tones 33 to 50. Tone 37 is the peak and is only 20%
+  to 27% river — the rest is roads and buildings, so keying it paints three wrong pixels per right
+  one. The tones that reach 71% to 100% river hold 50 to 165 pixels each and draw a dotted fragment.
+  So `js/map.js` draws rivers from `rivers.json` instead, on the dark theme alone. **Four things
+  about that layer are load-bearing.** It uses a **canvas** renderer, because 2,775 lines through
+  the default one is 2,775 DOM nodes carried through every pan. It has **its own pane at z-index
+  250**, between the tiles at 200 and the overlays at 400, so heat, pins and the accuracy circle
+  draw over the water. It reads **`--water` from `css/base.css` at the moment it builds the layer**,
+  not when the fetch returns, because that token exists on the dark theme only. And the fetch stays **lazy and
+  swallows its own failure** — a light-theme reader never pays the 107 KB, and a failure leaves a
+  plainer map rather than a broken one. `rivers.json` has no `?v=`, so a rebake needs a hard reload.
+
 ## Conventions
 
 - **Anything that alerts is checked against the alert design standard** in
@@ -966,6 +1008,31 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   one of those two boxes was what changed. A pair that arrived already both-on survived every toggle
   of the two pin filters that share that handler, while `PREFS.heatLayer` saved `water` and the
   drawer went on showing both. The test is on the pair now, whoever fired the event.
+  **The theme control is the same rule at a second site.** It lives in `#appMenu` as `#themeRow`,
+  three `<input type="radio" name="theme">` in a segmented pill, none of them carrying `checked`.
+  `applyTheme()` in `map.js` returns the stored pick and `ui.js` checks the matching radio from that
+  return value, which is also what corrects a browser that restored a different one.
+- **The theme has three states and two of them are the same colour.** `PREFS.theme` holds the
+  *pick* — `system`, `light` or `dark` — and `applyTheme()` resolves it to one of the two real
+  themes. Anything that is not `light` or `dark` means system, so an absent pref needs no special
+  case and `system` is the default. **`setTheme()` no longer applies anything**: it stores the pick
+  and calls `applyTheme()`, which is also the `change` listener on
+  `matchMedia('(prefers-color-scheme: dark)')` — the system can move the answer with nobody picking
+  anything, and that listener needs no test of its own because `applyTheme()` re-reads the pref every
+  time. Anything that wants to know the theme on screen reads `document.documentElement.dataset.theme`
+  as before. **Never read `PREFS.theme` as if it were a theme** — on the default it is not one.
+  A one-time clear in `map.js` guards `themePick`: the old two-state toggle wrote a *resolved*
+  `light`/`dark` back on every load, so every stored value predating this control was the system's
+  answer rather than a reader's, and honouring it would have left Auto reachable by new visitors
+  alone. Do not delete that line until nobody can still be carrying a pre-Auto `prefs` blob.
+- **`#appMenu` closes itself on any click inside it, in the capture phase, and a setting must opt
+  out.** The handler in `ui.js` exists so a menu item's `showModal()` never runs while its opener is
+  still in the top layer. That is right for the four tiles, which are destinations, and wrong for the
+  theme row, which is a setting — closing the menu takes the control off screen at the moment you
+  want to see what it did and try another one. The guard is `e.target.closest('.swrow')`. **Anything else
+  added to that menu that is not a destination needs `.swrow` or its own exemption**, or it will
+  fire once and vanish. `.swrow` also carries `grid-column: 1 / -1`, as does the `<hr>` above it:
+  `#appMenu` is a two-column grid and a row that does not span both lands in a tile slot.
 - **A river's sparkline draws every mark it publishes, and the axis grows to hold them.** This
   reverses the earlier rule, which drew a mark only within one *data span* of the readings so the
   readings kept half the graph's height. That rule left 89 of 105 rivers with no mark at all on a

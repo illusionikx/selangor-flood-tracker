@@ -508,6 +508,32 @@ table.data button[data-pop] { cursor: pointer; }
   flex-direction: column; align-items: center; justify-content: center; gap: 6px;
   padding: 16px 8px; text-align: center; white-space: nowrap;
 }
+/* The one row in this grid that is not a tile. It spans both columns and goes back to the shared
+   `.mi` shape — glyph, label, control on one line — because a setting reads as a line of text with
+   its state at the end, and the column layout above has nowhere to put a state. `grid-column` is on
+   the rule below rather than on `.mi` itself, so the four tiles keep the auto placement they had. */
+#appMenu hr, #appMenu .swrow { grid-column: 1 / -1; }
+#appMenu .swrow {
+  flex-direction: row; align-items: center; justify-content: flex-start;
+  padding: 8px 10px; text-align: left;
+}
+/* Three positions, because the theme has three answers and one of them is "ask the system". A
+   two-state switch was here first and could not hold the third.
+   Real radios, hidden rather than replaced: the browser keeps the group exclusive, walks it with the
+   arrow keys and reads the label out, none of which a set of styled buttons gets for free. They are
+   clipped to a pixel rather than `display: none`, which would take them out of the tab order and
+   leave the control mouse-only. Each one is inside its own `<label>`, so the segment is the hit area
+   and `:has(:checked)` can paint it. */
+.seg {
+  display: flex; flex: none; margin-left: auto; position: relative;
+  border: 1px solid var(--outline); border-radius: 999px; overflow: hidden;
+}
+.seg label { padding: 3px 8px; font-size: 11px; line-height: 1.45; color: var(--muted); cursor: pointer; }
+.seg label:hover { background: var(--hover); }
+.seg input { position: absolute; width: 1px; height: 1px; margin: -1px; border: 0; clip-path: inset(50%); }
+/* The same pair the range pill uses when it is the chosen one — see `.tlr.on` below. */
+.seg label:has(:checked) { color: var(--surface); background: var(--accent); }
+.seg label:has(:focus-visible) { outline: 2px solid var(--accent); outline-offset: -2px; }
 /* Where the reading came from, above the one action. It reads like the item under it and answers
    to nothing — no pointer, no hover fill — because a block that lit up under the mouse in a list of
    one button would promise a second one. */

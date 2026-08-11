@@ -4,9 +4,10 @@
 <title>Klang Valley Flood Watch</title>
 <!-- Installable: Chrome's "Install app", and standalone from the iOS home screen. All paths here are
      relative, because this ships to both the root of a Herd host and a GitHub Pages sub-path.
-     `theme-color` tints the standalone title bar and is kept in step with the theme toggle by
-     setTheme() in js/map.js — the toggle is a stored preference, so a prefers-color-scheme media
-     query on this tag would be wrong for anyone who overrode it. -->
+     `theme-color` tints the standalone title bar. applyTheme() in js/map.js keeps it in step, and
+     that function is the only thing that may set it: the theme control offers Auto, Light and Dark,
+     so a bare prefers-color-scheme media query on this tag would be wrong for the two picks that
+     override the system. -->
 <meta name="theme-color" content="#ffffff">
 <!-- There is deliberately no `apple-mobile-web-app-capable` here, and no `mobile-web-app-capable`
      either. Both are the pre-manifest way of asking for standalone, and Chrome's console suggests
@@ -29,10 +30,47 @@
 <link rel="stylesheet" href="vendor/leaflet.css">
 <link rel="stylesheet" href="vendor/markercluster.css">
 <link rel="stylesheet" href="vendor/fonts.css?v=49">
-<link rel="stylesheet" href="css/icons.css?v=76">
-<link rel="stylesheet" href="css/base.css?v=104">
-<link rel="stylesheet" href="css/chrome.css?v=134">
-<link rel="stylesheet" href="css/map.css?v=125">
+<link rel="stylesheet" href="css/icons.css?v=77">
+<link rel="stylesheet" href="css/base.css?v=105">
+<link rel="stylesheet" href="css/chrome.css?v=136">
+<link rel="stylesheet" href="css/map.css?v=126">
+
+<!-- Water tint for the dark basemap. CARTO's dark_all is greyscale — all 18 of its tones have zero
+     chroma — so no saturate() or hue-rotate() can pull water out of it. What it does have is one
+     tone for *filled* water: the sea and the lakes are painted #262626 (luminance 38) while land
+     is #090909 (9). So this keys on that one value and paints it blue, and every other tone passes
+     through unchanged.
+     This reaches the sea and the lakes and stops there. A river is one pixel wide, so from zoom 12
+     it antialiases into the tones roads and buildings use, and no filter can separate it. js/map.js
+     draws rivers from vendored geometry instead.
+     64 bands is the minimum that works: it puts 38 in a band of its own, between 34 and 42, which
+     are road and boundary tones that must not take the colour. 32 bands merges 34 with 38 and 48
+     merges 38 with 42. The other 63 entries are their own band's centre, so they are an identity
+     map to within one level.
+     `color-interpolation-filters="sRGB"` is not optional. SVG filters default to linearRGB, which
+     would move every tone before this table reads it and key on the wrong band.
+     See docs/FEATURES.md for how the tone was identified and why an overlay was not used. -->
+<svg id="mapfx" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <filter id="watertint" color-interpolation-filters="sRGB">
+    <feComponentTransfer>
+      <feFuncR type="discrete" tableValues="0.0078 0.0234 0.0391 0.0547 0.0703 0.0859 0.1016 0.1172 0.1328 0.0275 0.1641 0.1797 0.1953
+            0.2109 0.2266 0.2422 0.2578 0.2734 0.2891 0.3047 0.3203 0.3359 0.3516 0.3672 0.3828 0.3984
+            0.4141 0.4297 0.4453 0.4609 0.4766 0.4922 0.5078 0.5234 0.5391 0.5547 0.5703 0.5859 0.6016
+            0.6172 0.6328 0.6484 0.6641 0.6797 0.6953 0.7109 0.7266 0.7422 0.7578 0.7734 0.7891 0.8047
+            0.8203 0.8359 0.8516 0.8672 0.8828 0.8984 0.9141 0.9297 0.9453 0.9609 0.9766 0.9922"/>
+      <feFuncG type="discrete" tableValues="0.0078 0.0234 0.0391 0.0547 0.0703 0.0859 0.1016 0.1172 0.1328 0.1059 0.1641 0.1797 0.1953
+            0.2109 0.2266 0.2422 0.2578 0.2734 0.2891 0.3047 0.3203 0.3359 0.3516 0.3672 0.3828 0.3984
+            0.4141 0.4297 0.4453 0.4609 0.4766 0.4922 0.5078 0.5234 0.5391 0.5547 0.5703 0.5859 0.6016
+            0.6172 0.6328 0.6484 0.6641 0.6797 0.6953 0.7109 0.7266 0.7422 0.7578 0.7734 0.7891 0.8047
+            0.8203 0.8359 0.8516 0.8672 0.8828 0.8984 0.9141 0.9297 0.9453 0.9609 0.9766 0.9922"/>
+      <feFuncB type="discrete" tableValues="0.0078 0.0234 0.0391 0.0547 0.0703 0.0859 0.1016 0.1172 0.1328 0.1647 0.1641 0.1797 0.1953
+            0.2109 0.2266 0.2422 0.2578 0.2734 0.2891 0.3047 0.3203 0.3359 0.3516 0.3672 0.3828 0.3984
+            0.4141 0.4297 0.4453 0.4609 0.4766 0.4922 0.5078 0.5234 0.5391 0.5547 0.5703 0.5859 0.6016
+            0.6172 0.6328 0.6484 0.6641 0.6797 0.6953 0.7109 0.7266 0.7422 0.7578 0.7734 0.7891 0.8047
+            0.8203 0.8359 0.8516 0.8672 0.8828 0.8984 0.9141 0.9297 0.9453 0.9609 0.9766 0.9922"/>
+    </feComponentTransfer>
+  </filter>
+</svg>
 
 <!-- A camera still. A <dialog>, not a div: it opens from the all-stations table, which is itself a
      modal dialog, and only the top layer can paint over one — Esc, the backdrop and focus trapping
@@ -180,6 +218,10 @@
          `.menu` is the component the sensor menu uses, and the delegated handler in js/ui.js places
          every popover carrying that class, so this needs no positioning code of its own.
          `position: fixed` on `.menu` keeps the panel out of this flex row. -->
+    <button id="locate" class="icon" title="Show my location" aria-label="Show my location"></button>
+    <!-- Last in the row on purpose: it is the only control here that opens a panel of its own, and a
+         panel is placed against the button that opened it. Between two icon buttons the popover had
+         controls on both sides of it. -->
     <button id="apps" class="icon" title="Menu" aria-label="Menu"
             popovertarget="appMenu"><i class="i i-apps"></i></button>
     <!-- Still `.menu`, so the delegated popover-placement handler in js/ui.js — which keys off that
@@ -191,9 +233,21 @@
       <button class="mi" id="cams"><i class="i i-photo_camera"></i>All cameras</button>
       <button class="mi" id="help"><i class="i i-info"></i>Help</button>
       <button class="mi" id="about"><i class="i i-flood"></i>About</button>
+      <!-- Below the grid and below a rule, because the four tiles above are destinations and this is
+           a setting. Three radios rather than a switch: "follow the system" is a third choice, not a
+           shade of the other two, and the browser owns the group, the arrow keys and the name it
+           reads out. `.info` for the same reason the sensor menu uses it — the row itself answers to
+           nothing, the three labels inside it do. No `checked` here; js/ui.js writes it. -->
+      <hr>
+      <div class="mi info swrow" id="themeRow" role="radiogroup" aria-label="Theme">
+        <i class="i i-dark_mode"></i>Theme
+        <span class="seg">
+          <label><input type="radio" name="theme" value="system">Auto</label>
+          <label><input type="radio" name="theme" value="light">Light</label>
+          <label><input type="radio" name="theme" value="dark">Dark</label>
+        </span>
+      </div>
     </div>
-    <button id="locate" class="icon" title="Show my location" aria-label="Show my location"></button>
-    <button id="theme" class="icon" title="Toggle theme" aria-label="Toggle theme"><i class="i"></i></button>
   </div>
 </header>
 <!-- Native <dialog>: modal behaviour, backdrop, Esc-to-close and focus trapping come free. -->
@@ -370,10 +424,6 @@
     <span class="ctl"><i class="i i-my_location"></i><b>Show my location</b></span>
     <span>Puts you on the map, and offers the nearest sensor of each kind. The glyph becomes an
        arrow while your location is showing.</span>
-
-    <span class="ctl"><i class="i i-dark_mode"></i><b>Toggle theme</b></span>
-    <span>Switches the map and the page between light and dark. The glyph names the theme it will
-       switch to.</span>
   </div>
   <!-- Station table and All cameras used to sit in the list above, under a heading that no longer
        covered them: they open from the Menu button's own popover, not from a button along the top.
@@ -389,6 +439,11 @@
     <span>Every camera in one grid, each picture replaying its last three hours. Click one to open
        its station panel. A camera with no location on file still shows a picture, but does not
        answer a click.</span>
+
+    <span class="ctl"><i class="i i-dark_mode"></i><b>Theme</b></span>
+    <span>Auto follows your device, and is what you get until you pick something else. Light and
+       Dark override it and stay picked. The menu stays open, so you can see the change and put it
+       back.</span>
   </div>
   <h3>Filters</h3>
   <div class="key">

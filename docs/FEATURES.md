@@ -6070,3 +6070,266 @@ states the movement in m/h for anyone who needs the centimetres.
 **A flood gauge keeps the old rule.** Its two marks are 0.15 m and 0.3 m of depth over a spot, so
 they are never far from the readings, and its axis crosses zero where a river's does not. There is no
 distant mark to reach for and nothing to gain.
+
+## Water reads as water on the dark basemap
+
+The dark map made a flood map that hid its water. CARTO's `dark_all` paints water and land in two
+grays that sit close together, so the sea and the lakes disappeared into the ground around them.
+A station reading means more when the reader can see the water it stands on.
+
+This section covers the sea and the lakes. Rivers needed a second and different answer, and the
+section below this one covers that.
+
+The fix tints one color. `index.html` holds an SVG `feComponentTransfer` filter, and `css/map.css`
+adds it to the tile pane filter the dark theme already runs.
+
+### Why a filter, and not an overlay
+
+This section covers three routes. Two of them lost.
+
+**Draw the water from OpenStreetMap data.** A query over the coverage box returns 9,319 water
+features and 23 MB of raw geometry. Trimmed to rivers plus bodies above 0.1 square kilometers, and
+simplified to 33 meters with Douglas-Peucker, that falls to 2,775 lines and 438 polygons, 553 KB of
+GeoJSON and 147 KB over the wire.
+
+The size is affordable. The cost is a data file to bake, a bake
+script to keep, an attribution line to add, and a canvas renderer for 3,200 new paths. Rejected as
+too much machinery for a tint. The measurements stand if this is ever wanted at higher fidelity.
+
+**Add a third-party water tile overlay.** One line of code. It also puts a second outside host in
+the browser. This repo vendors every asset for that reason, and CARTO is the single exception
+already named in the Credits block. Rejected, and the user rejected it first.
+
+**Tint the basemap.** No new data, no new host, no new dependency. Dark theme only, which is where
+the problem is. This is what shipped.
+
+### Finding the tone
+
+The first attempt guessed that a `saturate()` boost lifts water. Water is usually the one blue
+thing on a map. Measurement killed that.
+
+A histogram of a Klang coast tile returns 18
+distinct colors and every one of them has a chroma of zero. The dark basemap is pure greyscale, so
+`saturate()` and `hue-rotate()` have nothing to act on.
+
+The second attempt guessed that water was the darker of the two dominant tones. Measurement killed
+that too. Drawing the tile as ASCII art, one character per tone, shows the Straits of Malacca as a
+solid block on the west edge in the *brighter* tone. Water is luminance 38 and land is luminance 9.
+
+Filled water is therefore one exact value, which is what makes a filter possible at all. The tone
+holds at zoom 10, zoom 12 and zoom 14, and on the retina tiles, which carry the same 18 colors.
+
+A river is not filled water. That limit is the next section.
+
+### Why 64 bands
+
+`feComponentTransfer` with `type="discrete"` splits the input range into equal bands. The table has
+64 entries because 64 is the smallest count that gives luminance 38 a band to itself.
+
+Luminance 34
+falls in band 8, 38 in band 9, and 42 in band 10. Those neighbors are road and boundary tones, and
+they must not take the color. At 32 bands, 34 and 38 share a band. At 48 bands, 38 and 42 share one.
+
+The other 63 entries hold their own band's center, so they pass a tone through to within one level.
+
+### The color, and the order the filters run in
+
+The filter emits `#071b2a`, which is darker than what appears on screen. The dark theme already runs
+`brightness(1.75) contrast(.92)` on the same pane, and that chain lifts the tint to about `#2e6086`.
+
+The value comes from rendering the whole chain against real tiles. A color that looks right on its
+own is a different color. A first pass previewed the tint alone and read far too bright.
+
+The two filters are one declaration, and the tint comes first. Two rules cannot each set `filter` on
+the same element, because the second replaces the first rather than adding to it. And the tint keys
+on the raw tile tones, so it must read them before `brightness()` moves every tone into a new band.
+
+`color-interpolation-filters="sRGB"` is on the filter for the same reason. SVG filters work in
+linearRGB by default, which moves every tone before the table reads it.
+
+### Deliberately not built
+
+- **No light-theme tint.** Voyager already paints water in a pale blue with real chroma, so
+  `data-lift="no"` keeps the filter off.
+- **No control.** The tint is part of the dark basemap, the same as the lift it rides with.
+- **No river highlight from station data.** The app knows where its river stations are. It does not
+  know where the rivers go, and a line between stations is not a river.
+
+### What breaks it
+
+CARTO owns this tone. If CARTO restyles `dark_all`, water stops being luminance 38, and the tint
+lands on nothing or on the wrong thing. Nothing errors. The check is the histogram in this section.
+This is the accepted cost of tinting somebody else's picture instead of drawing our own.
+
+## The theme control moves into the menu, and gains Auto
+
+The theme toggle was the last button in the app bar. It was an icon button. Its glyph named the
+theme of the next press. Two problems came with that shape.
+
+A glyph alone cannot state a state. `dark_mode` on the button meant "press this to go dark". So one
+picture had to say what will happen and what is true now. A reader had to guess which reading
+applied.
+
+The app bar also carried seven controls. A reader sets the theme one time and then leaves it alone.
+A control used one time does not need permanent space.
+
+**The control is now a row in the app menu, under the four tiles and under a rule.** The four tiles
+above it are destinations. This row is a setting. The rule and the row shape mark the difference.
+
+The row goes back to the shared `.mi` layout: glyph, label, control on one line. A setting reads as a
+line of text with its state at the end. The column layout the tiles use has nowhere to put a state.
+`#appMenu hr, #appMenu .swrow { grid-column: 1 / -1 }` spans both columns. It leaves the auto
+placement of the tiles alone. The row carries `.info` as well, the class the sensor menu already uses
+for a row that is not itself a button.
+
+### Three choices, not two
+
+A switch went in first. It has two positions and the theme has three answers. "Follow the system"
+is a third choice, not a shade of light or of dark. So the control is a segmented pill of three: Auto, Light and Dark.
+
+**Auto is the default.** `PREFS.theme` holds the pick. Anything that is not `light` or `dark` means
+system, so an absent pref needs no special case.
+
+**The segments are real radio inputs, hidden rather than replaced.** The browser keeps the group
+exclusive, walks it with the arrow keys and reads the label out. A set of styled buttons gets none
+of that for free. The CSS clips each input to one pixel rather than
+hiding it with `display: none`, which drops an input out of the tab order and leaves the control
+mouse-only. Each input sits in its own
+`<label>`, so the segment is the hit area and `:has(:checked)` paints it.
+
+### One resolve step, two ways in
+
+`setTheme(t)` stores the pick and calls `applyTheme()`. `applyTheme()` resolves the pick to a real
+theme, writes `dataset.theme`, writes the `theme-color` meta tag and rebuilds the basemap.
+
+The two functions are separate because the system can change the answer with nobody picking
+anything. `matchMedia('(prefers-color-scheme: dark)')` fires `change`, and `applyTheme` is the
+listener. It reads the pref every time, so it is a no-op on `light` or `dark` and needs no test of
+its own.
+
+`applyTheme()` returns the pick rather than the resolved theme. `js/ui.js` uses the return value to
+check the matching radio at load. The control shows what the reader chose, not what that resolved to
+today. The markup carries no `checked` attribute, for the reason `#heat` carries none either. See
+the gotcha list in CLAUDE.md.
+
+### The one-time clear
+
+The old toggle wrote a resolved `light` or `dark` back to `PREFS` on every single load. So every
+stored value that predates this control came from the system, not from a reader. Those values leave
+Auto reachable by new visitors alone, which is not what a default means.
+
+`if (!PREFS.themePick) { delete PREFS.theme; PREFS.themePick = 1; save(); }` in `js/map.js` clears
+the pref one time and marks it. A reader who had deliberately set dark under the old build loses
+that once. The control is now on screen, and putting it back is one tap.
+
+### The menu stays open
+
+`js/ui.js` closes `#appMenu` on any click inside it, in the capture phase. That keeps a menu item
+from calling `showModal()` while its own opener is still in the top layer. The theme row is the one
+exception, gated on `.swrow`.
+
+A menu that closes on a theme change hides the control. It hides it at the moment you want to see
+the result, and try another one.
+
+### `#apps` is now the last control in the app bar
+
+It is the only control there that opens a panel of its own. A panel sits against the button that
+opened it. Between `#alertBtn` and two icon buttons, its popover had controls on both sides.
+
+The `light_mode` icon leaves `css/icons.css`. Nothing referenced it after the glyph stopped swapping.
+
+### Deliberately not built
+
+- **No theme row in the drawer.** The drawer holds filters, which change what the map shows. The
+  theme changes how it looks.
+- **No scheduled theme.** A clock-driven switch is a fourth state, and the system already offers one
+  on every platform this runs on. Auto inherits it.
+- **No fade on the theme change.** `applyTheme()` rebuilds the basemap as a new tile layer. A page
+  that cross-fades over a map that pops is worse than one that changes at once.
+
+## The map draws its own rivers, because the tint cannot reach them
+
+The water tint above gets the sea and the lakes. It does nothing for a river, and a river is what
+this app is about. The dark map still hid the one feature every station stands on.
+
+### Why the tint fails on a river
+
+A river is one pixel wide. CARTO draws it as an antialiased line, so its pixels blend toward the
+land tone by however much of each pixel the line covers. The single fill tone the filter keys on
+never appears.
+
+Measurement settles it. Take a Voyager tile, mark every pixel that light mode paints as water, then
+read the dark tile at those same positions.
+
+At zoom 10 the sea maps to tone 38 for 80% of its
+pixels, which is why the tint works there. At zoom 12 and 13 over Kuala Lumpur, tone 38 is absent
+from the tile entirely.
+
+The river pixels land on tones 33 through 50 instead. Tone 37 is the peak, and only 20% to 27% of
+tone 37 is river. The rest is roads and buildings. Tinting it paints three wrong pixels for every
+right one.
+
+Some tones do reach 71% to 100% river. Those hold 50 to 165 pixels each, and they are the bright
+core of the widest channels. Keying them draws a dotted fragment.
+
+No filter recovers this. Antialiasing threw the information away before the tile arrived.
+
+### What ships instead
+
+`river-build.php` bakes `rivers.json` from OpenStreetMap, and `js/map.js` draws it over the dark
+basemap. The file holds 2,775 rivers as one `MultiLineString`, simplified to 33 meters with
+Douglas-Peucker and rounded to four decimals. That is 391 KB on disk and 107 KB on the wire.
+
+The bake runs by hand. Overpass is a free service, the data changes about as often as a river moves,
+and nothing in a request path depends on a third party this app does not control. A 504 from
+Overpass is routine under load. The script fails loudly and writes nothing, so a retry is the answer.
+
+`river-build.php` reads the coverage box straight out of `api.php` with a regular expression, so the
+two cannot drift apart. Overpass returns whole ways that cross the box, so a few rivers run past its
+edge. That is correct. Clipping them costs more than the coordinates it saves.
+
+### The layer
+
+Four choices, each for a reason.
+
+**Dark theme only.** Voyager paints water in a pale blue with real chroma, so light mode already
+reads well. The layer is never added on light, and the file is never fetched there.
+
+**Fetched once, and lazily.** The first dark theme of a session asks for `rivers.json`. A reader who
+stays on light never pays the 107 KB. The code swallows a failed fetch. No rivers is a plainer map, and every
+reading still draws.
+
+**Canvas, not SVG.** 2,775 lines through the default renderer is 2,775 DOM nodes to carry through
+every pan and every zoom.
+
+**Its own pane at z-index 250.** That sits between the tiles at 200 and the overlays at 400. Heat
+blobs, station pins and the accuracy circle all draw over the water rather than under it.
+
+### The color
+
+`--water` lives in the dark block of `css/base.css` and `js/map.js` reads it by name, so no hex
+lands in a JS file. `js/map.js` reads it at the moment it builds the layer, not when the fetch
+returns, because the token exists on the dark theme alone.
+
+The value is `#3d7ea8`. It is brighter than the water the tint paints, which lands near `#2e6086`.
+A 1.4 pixel line needs more contrast than a filled sea to read the same.
+
+The value is well below
+`--k-river` at `#66b2ff`. That is the river *station* color, and a pin has to win over the water it
+stands in.
+
+### Deliberately not built
+
+- **No streams.** The query takes `waterway=river` only. Streams triple the line count for channels
+  no station reports on.
+- **No lake or coast geometry.** The tint already draws those, and shipping both puts two mechanisms
+  on one job.
+- **No control.** The layer is part of the dark basemap, the same as the tint and the lift.
+- **No zoom cutoff.** Leaflet redraws the visible part of the one canvas layer, and hiding rivers
+  when zoomed out loses the shape of the basin.
+
+### What breaks it
+
+Deleting `rivers.json` leaves the dark map without rivers and no error anywhere. The Pages workflow
+copies it unconditionally, next to the PWA set, for that reason. A missing river layer is a worse
+map, so it must not be able to fail a bake either way.

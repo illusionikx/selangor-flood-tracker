@@ -108,6 +108,12 @@
   --surface: #202124; --on-surface: #e8eaed; --muted: #9aa0a6; --outline: #3c4043;
   --hover: #303134; --accent: #8ab4f8;
   --shadow: 0 1px 2px rgba(0,0,0,.6), 0 2px 6px 2px rgba(0,0,0,.3);
+  /* The river lines js/map.js draws over the dark basemap, read from here by name so no hex lands
+     in a JS file. Brighter than the water the tint paints (about #2e6086 after the lift), because a
+     1.4px line needs more contrast than a filled sea to read the same. Well below `--k-river`
+     #66b2ff, which is the river *station* colour — the pin has to win over the water it stands in.
+     Light has no value here on purpose. Voyager draws its own water, so nothing reads this. */
+  --water: #3d7ea8;
 }
 /* **The map palette, and it is this set on both themes.** The selector is the whole of the change:
    the values below are the dark theme's, and `.pin` takes them whatever the theme is, so a station

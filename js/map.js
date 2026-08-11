@@ -24,24 +24,94 @@ map.on('moveend zoomend', () => {
 const tileURL = k => `https://{s}.basemaps.cartocdn.com/${TILES[k]}/{z}/{x}/{y}{r}.png`;
 let tiles;
 
+const isDark = () => document.documentElement.dataset.theme === 'dark';
+
+// The rivers the basemap cannot draw. The water tint in index.html recolours CARTO's one water
+// tone, which gets the sea and the lakes — but a river is a one-pixel antialiased line, and from
+// zoom 12 its pixels land in the same tones as roads and buildings. Measured: the tone a river
+// peaks at is only 20-27% river. No filter can separate that, so the geometry is vendored instead.
+// `rivers.json` is baked by river-build.php from OpenStreetMap. See docs/FEATURES.md.
+//
+// Its own pane, between the tiles (200) and the overlays (400), so heat blobs, pins and the "you
+// are here" circle all still draw over the water rather than under it.
+map.createPane('rivers');
+map.getPane('rivers').style.zIndex = 250;
+
+let riverGeo, rivers, asking;
+
+function setRivers(on) {
+  if (!on) { if (rivers) map.removeLayer(rivers); return; }
+  if (rivers) { rivers.addTo(map); return; }
+
+  // Fetched once, on the first dark theme of the session, and never at all on a light one.
+  if (!riverGeo) {
+    if (asking) return;
+    asking = true;
+    fetch('rivers.json')
+      .then(r => r.ok ? r.json() : Promise.reject(r.status))
+      .then(g => { riverGeo = g; if (isDark()) setRivers(true); })
+      .catch(() => {});   // No rivers is a plainer map, not a broken one. Every reading still draws.
+    return;
+  }
+
+  // Built here rather than in the fetch, so `--water` is read at the moment the layer is drawn.
+  // The token exists on the dark theme only, and this line is only ever reached on it.
+  // Canvas rather than SVG: 2,775 lines is 2,775 DOM nodes to carry through every pan and zoom.
+  rivers = L.geoJSON(riverGeo, {
+    renderer: L.canvas({ pane: 'rivers' }),
+    interactive: false,
+    style: {
+      color: getComputedStyle(document.documentElement).getPropertyValue('--water').trim(),
+      weight: 1.4, opacity: .9,
+    },
+  }).addTo(map);
+}
+
 function setBasemap() {
-  const key = document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light';
+  const key = isDark() ? 'dark' : 'light';
   // Only the dark basemap needs lifting; the light one would wash out.
   document.documentElement.dataset.lift = key === 'dark' ? 'yes' : 'no';
   if (tiles) map.removeLayer(tiles);
   tiles = L.tileLayer(tileURL(key), { maxZoom: 18 }).addTo(map);
+  setRivers(key === 'dark');
 }
 
+// Three choices, two themes. PREFS.theme holds what the reader picked — 'system', 'light' or 'dark'
+// — and applyTheme() resolves it to one of the two. Anything that is not 'light' or 'dark' means
+// system, so an absent pref is the default and a stored one from before this control existed still
+// works.
+const sysDark = matchMedia('(prefers-color-scheme: dark)');
+
+// One-time clear, and the only thing that makes 'system' the default for a reader who has been here
+// before. The old two-state toggle wrote a resolved 'light' or 'dark' back on every single load, so
+// every stored value predating this control was copied from the system rather than chosen — and
+// honouring it would leave Auto reachable by new visitors alone. `themePick` marks the pref as one
+// somebody actually picked. A reader who had deliberately set dark under the old build loses that
+// once, which is one tap in a control that is now on screen.
+if (!PREFS.themePick) { delete PREFS.theme; PREFS.themePick = 1; save(); }
+
 export function setTheme(t) {
+  PREFS.theme = t;
+  save();
+  applyTheme();
+}
+
+// Separate from setTheme(), because the system can change the answer without the reader picking
+// anything. It reads the pref every time, so the listener below is a no-op on 'light' or 'dark' and
+// needs no test of its own. Returns the pick rather than the resolved theme: the control shows what
+// was chosen, not what that resolved to today.
+export function applyTheme() {
+  const pick = PREFS.theme === 'light' || PREFS.theme === 'dark' ? PREFS.theme : 'system';
+  const t = pick === 'system' ? (sysDark.matches ? 'dark' : 'light') : pick;
   document.documentElement.dataset.theme = t;
-  el('theme').firstElementChild.className = `i i-${t === 'dark' ? 'light_mode' : 'dark_mode'}`;
   // The standalone window's title bar. Same value the header paints itself, so an installed app
   // has no seam above its own header — see the --surface tokens in css/base.css.
   document.querySelector('meta[name=theme-color]').content = t === 'dark' ? '#202124' : '#ffffff';
-  PREFS.theme = t;
-  save();
   setBasemap();
+  return pick;
 }
+
+sysDark.addEventListener('change', applyTheme);
 
 // --- clustering --------------------------------------------------------------------------------
 
