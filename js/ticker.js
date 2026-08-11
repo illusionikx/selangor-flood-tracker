@@ -1,4 +1,4 @@
-/* The header ticker: everything currently on alert, scrolling continuously, left of the status chip.
+/* The header ticker: everything on alert, scrolling continuously, centred in the app bar.
  *
  * Why a ticker at all, when the alert panel already lists these: the panel is on the map, and the
  * map is the thing you cover with a popup, a table, a drawer or a lightbox. The header is the one

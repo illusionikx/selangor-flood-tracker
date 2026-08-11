@@ -9,8 +9,14 @@ header {
   display: flex; align-items: center; gap: 12px; padding: 0 16px 0 8px;
   background: var(--surface); border-bottom: 1px solid var(--outline);
 }
+/* `flex: 1 1 0` here and the same on `.hactions` is what centres the ticker on the viewport rather
+   than between the two clusters: a zero basis with equal grow gives the two rails the same width
+   whatever their contents measure, so the strip between them lands on the middle of the bar. It also
+   fails safely. `min-width` is `auto` on both rails, so neither can be squeezed under its own
+   content — a rail short of room takes what it needs and the strip goes off centre instead of
+   running under the title. The wordmark ellipsises before that, which it already did. */
 header h1 {
-  display: flex; align-items: center; gap: 8px;
+  display: flex; align-items: center; gap: 8px; flex: 1 1 0;
   font-size: 22px; font-weight: 400; letter-spacing: 0; min-width: 0;
 }
 header h1 .word { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -19,15 +25,20 @@ header h1 .brand { font-size: 24px; color: var(--accent); flex: none; }
 /* Just the glyph's own box, so the status dot has a corner to hang off. `cursor: help` and the hover
    target are on the mark rather than the whole h1: the wordmark is a title, not a control. */
 header h1 .mark { position: relative; display: flex; flex: none; cursor: help; }
-/* Everything that is not the menu or the mark, kept together and pushed to the right edge. */
-header .hactions { display: flex; align-items: center; gap: 4px; margin-left: auto; flex: none; }
+/* Everything that is not the menu or the mark, kept together. The right rail — see the h1 rule above
+   for why both rails carry the same `flex`. It carries no `margin-left: auto`: an auto margin
+   absorbs free space *before* flex-grow does, so one here would leave the two rails nothing to grow
+   into and the centring would never happen. `justify-content: flex-end` is what holds the controls
+   against the right edge instead, now that the rail is wider than they are. */
+header .hactions {
+  display: flex; align-items: center; justify-content: flex-end; gap: 4px; flex: 1 1 0;
+}
 
 /* --- alert ticker ----------------------------------------------------------------------------- */
 
-/* Sits hard against the status chip: `margin-left: auto` eats the slack to its left, so the two
-   read as one live-status cluster on the right rather than a strip floating in the middle. It only
-   *shrinks* (`flex: 0 1 auto`, capped) — growing to fill the bar would drag it back off towards
-   the title, which is the thing being avoided.
+/* Centred on the viewport, between two rails of equal width — see the `header h1` rule for the
+   mechanism. The strip stays a flex item and is never taken out of the flow: an absolutely centred
+   one holds its width whatever else is on the bar, so at about 1024px it draws over the title.
 
    `min-width: 0` because a flex item defaults to min-content: without it a long station name would
    push the buttons off the right edge instead of being clipped inside the ticker. */
@@ -36,9 +47,11 @@ header .hactions { display: flex; align-items: center; gap: 4px; margin-left: au
      so the header re-laid itself out every poll and the bar was a different shape in a flood than on
      a calm day. It is a window onto the news, and a window does not change size with the news. */
   flex: 0 1 min(58vw, 656px); min-width: 0;
-  /* 10px of its own on top of the header's 12px gap: the strip is always mid-item at its right
-     edge, and an item dissolving right up against the status chip reads as the two colliding. */
-  margin-left: auto; margin-right: 10px; height: 30px; overflow: hidden;
+  /* The header's own padding is 8px on the left and 16px on the right, because the logo sits closer
+     to the edge than the buttons do. Equal rails therefore centre the strip in that box, which is
+     4px left of the viewport's middle. This 8px splits between the two rails and moves the strip
+     back the 4px. Move it whenever the header's padding changes. */
+  margin-left: 8px; height: 30px; overflow: hidden;
   flex-shrink: 1;
   display: flex; align-items: center;
   /* Both edges fade, so an item entering or leaving dissolves instead of appearing at a hard cut.
@@ -1726,6 +1739,9 @@ body.finding #find { display: none; }
   header > :not(#ticker) { order: 0; }
   /* Tighter controls so the mark, the chip and four buttons fit one line at 360px with room over. */
   header .icon { width: 36px; height: 36px; font-size: 20px; }
+  /* The ticker holds a row of its own here, so the two rails share line one between them. They keep
+     the `flex` the wide layout gives them, and `justify-content: flex-end` still holds the controls
+     against the right edge — no auto margin, the same reason as up there. */
   header .hactions { gap: 0; }
   #ticker {
     order: 1; flex: 1 0 100%; max-width: none; justify-content: flex-start;

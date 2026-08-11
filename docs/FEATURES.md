@@ -1709,7 +1709,7 @@ per-camera opt-in recording; and exporting a range as a video.
 
 ## The header alert ticker
 
-`js/ticker.js`, `#ticker` in the header, left of the status chip. Everything currently on alert,
+`js/ticker.js`, `#ticker` in the header, centred between the title and the controls. Everything currently on alert,
 scrolling right-to-left on the stock-ticker convention, rebuilt on every poll.
 
 **Why, when the alert panel already lists these:** the panel lives on the map, and the map is the
@@ -1759,8 +1759,34 @@ Decisions:
   `PX_PER_SEC` from 45 upward once the count passes `FAST_FROM` (5), capped at 2×: past that the
   names stop being readable and the ticker is just motion.
 - **Fades, not hard edges.** 56px `mask` ramps on both sides, so items dissolve rather than being
-  guillotined by the box, plus 10px of its own margin before the status chip — the strip is always
-  mid-item at its right edge, and an item dissolving up against the chip reads as the two colliding.
+  guillotined by the box. A marquee is always mid-item at both edges, so a short ramp there reads as
+  a clipped word rather than one still coming into view.
+- **Centred on the viewport**, by two rails of equal width. This replaced a right-aligned strip that
+  sat against the status chip. That version made the header read as a title on the left and one wide
+  cluster on the right, and the news was the least prominent thing in the bar.
+
+  The mechanism is `flex: 1 1 0` on `header h1` *and* on `header .hactions`. A zero basis with equal
+  grow gives the two rails the same width whatever their contents measure, so the strip between them
+  lands on the middle of the bar. Three things hold it up, and each one was a wrong turn first:
+
+  - **The strip stays in the flow.** `position: absolute; left: 50%` centres it too, and it holds its
+    width whatever else is on the bar — so at about 1024px it draws over the title, because 58vw of
+    ticker leaves 21vw a side and the wordmark needs more than that. A flex item gives way instead.
+  - **Neither rail carries `margin-left: auto`.** An auto margin absorbs free space *before*
+    flex-grow does, so one on `.hactions` leaves the rails nothing to grow into and the centring
+    never happens. `justify-content: flex-end` holds the controls against the right edge instead,
+    now that the rail is wider than they are. That is true on a phone as well, where the two rails
+    share line one and the strip has a row of its own.
+  - **The strip carries `margin-left: 8px`.** The header pads 8px on the left and 16px on the right,
+    because the logo sits closer to the edge than the buttons do. Equal rails centre the strip in
+    that box, which is 4px left of the viewport's middle. The 8px splits between the two rails and
+    moves the strip back the 4px. Move it whenever the header's padding changes.
+
+  It fails safely at every width. `min-width` is `auto` on both rails, so neither rail drops under
+  its own content — a rail short of room takes what it needs and the strip goes off centre
+  rather than running under the title. And a rail with a zero basis has zero shrink weight, so the
+  strip (`flex: 0 1 min(58vw, 656px)`) is the only thing a narrow window takes from. It clips before
+  anything else moves. The wordmark ellipsises after that, which it already did.
 - **Hover pauses it** and the items are buttons that jump to the station. A moving target you cannot
   catch is a link that isn't one. Clicks are delegated once, because the strip is rebuilt every poll
   and holds several copies of every station.
