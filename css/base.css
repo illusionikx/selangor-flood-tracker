@@ -172,7 +172,6 @@ td:last-child { text-align: right; padding-left: 16px; }
   border: 2px solid transparent; background-clip: content-box; border-radius: 999px;
 }
 .muted { color: var(--muted); font-size: 12px; }
-.swatch { display: inline-block; width: 10px; height: 10px; border-radius: 50%; }
 .glyph { font-size: 18px; }
 .up { color: var(--s-danger); } .down { color: var(--s-normal); }
 /* Rate of rise. The arrow travels the way the water is going: in from one side, half a second still

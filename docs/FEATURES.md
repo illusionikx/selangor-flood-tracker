@@ -5835,3 +5835,50 @@ against the real page: open the wall through its own buttons, then print
 `getBoundingClientRect()` for the tiles beside `getComputedStyle(grid).gridTemplateRows`. Two numbers
 that had to match did not, and the distance between them named the property to change. **Measure a
 layout bug before you explain it.**
+
+## Six dead payload fields, and two diagnostics kept on purpose
+
+A repo-wide audit for over-engineering found sixteen cuts. This change makes twelve of them. It
+rejects two. The record covers both, because the rejections carry the rule.
+
+**What went, on the server.** The payload carried a `hotspots` array of 53 entries and a `district`
+rollup of 23. No client script read either one. `hotspots` also cost one upstream request on every
+cold rebuild, so the list endpoint went with it. `district` counted alerts and rising stations per
+district. `districts()` in `js/render.js` now tallies the same numbers from `state.data`.
+
+Every station carried `reading`, which is the Selangor list's `lastReading`. That field is null on
+the gauges this app cares about. Twenty-five KL rivers carried `srcTrend`, the SPHTN trend arrow.
+`CLAUDE.md` already recorded that field as unused. `klTrend()` in `sources.php` went with it. So did
+the `normal` column, which `klStations()` parsed and then dropped at the merge.
+
+**What went, on the client.** `SOURCES` in `js/config.js` held a `short` and a `url` for each of the
+three feeds. Only `name` ever reaches a screen. `NEAREST` was an object of three fields for one
+string, and that string appeared a second time in lower case as a search haystack. It is one constant
+now. `squash()` lowercases, so the matcher needs no copy.
+
+`js/test.js` exports `stationsFaked()`. No module imports it. Four more functions carry an `export`
+that no module imports: `favPanel`, `ignoredPanel`, `counts` and `heatScale`.
+
+**What went, in CSS.** Three Material glyphs had no user: `--i-more_vert`, `--i-person` and
+`--i-visibility`. This file already records the first one as user-less, from the change that turned
+the ⋮ into an ⓘ. Do not confuse `--i-visibility` with `--i-visibility_off`, which the ignore control
+uses. `.i-history` went too, but its token stayed, because `.spark::before` reads it. `.swatch` in
+`css/base.css` matched no markup. The CSS cut is 1.4 KB.
+
+**What stayed, and why.** `endpoints` and `box` are unread by any script. They stay.
+
+The payload is a diagnostic surface. The About dialog's Developer section links to it as **Raw
+payload**. A person reading that response is a reader. `box` states this in its own comment, and
+`ttl` is unread on the same terms.
+
+`endpoints` holds the only per-list station count in the response. If `StationSirens` comes back
+empty, `details.requested` drops, and nothing else names which list moved. That is the alarm
+`sources.parsed` already gives for the two scraped feeds.
+
+**The rule this draws.** A stated diagnostic stays. A superseded computation goes. `district` claimed
+no diagnostic role, and a client feature had already replaced it. `box` and `endpoints` answer a
+question a person asks of the raw response. An audit that asks only "does code read this" cannot tell
+the two apart. Ask what a field is for before you delete it.
+
+**Trade-off accepted.** `hotspots` was real data, at 53 entries per poll. Nothing plotted it. It
+returns in one line the day something does.
