@@ -631,7 +631,9 @@ document.addEventListener('click', () => {
 // headings and can't carry a synthetic "nearest to me" row. Matching is a plain substring over
 // "name district state kind", so typing a district or a state lists it whole.
 
-const NEAREST = { id: '@nearest', name: 'Nearest station to me', state: 'Your location' };
+// One spelling, read twice: the row's own label, and the haystack the query is matched against
+// below. `squash()` lowercases, so the matcher needs no second copy in lower case.
+const NEAREST = 'Nearest station to me';
 const gotoIn = el('goto'), gotoHits = el('gotoHits'), findBtn = el('find');
 let hits = [], sel = -1;
 
@@ -863,7 +865,7 @@ function search() {
 
   // Below the favorites, not above: `unshift` would put "Nearest station to me" ahead of them, and a
   // permanent group belongs above a positional one.
-  if (state.hereAt && (!terms.length || matches(squash('nearest station to me'), terms))) {
+  if (state.hereAt && (!terms.length || matches(squash(NEAREST), terms))) {
     const at = hits.findIndex(r => r.g !== 'FAVORITES');
     hits.splice(at < 0 ? hits.length : at, 0, { t: 'near', g: 'Your location' });
   }
@@ -928,7 +930,7 @@ function rowHtml(r, i) {
 
   if (r.t === 'near') return `<li role="option" data-i="${i}"${cls}
       ><i class="glyph i i-my_location" style="color:var(--accent)"></i
-      ><span class="nm">${NEAREST.name}</span></li>`;
+      ><span class="nm">${NEAREST}</span></li>`;
 
   /* A sensor inside an open mast. Its own glyph and its own kind, because "which of the six" is the
      only question this row exists to answer. */

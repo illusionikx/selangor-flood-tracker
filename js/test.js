@@ -213,4 +213,3 @@ document.getElementById('pills').insertAdjacentHTML('beforeend',
      <span>Every alert on this map is fake</span>
      <button id="testOff">Turn off</button></div>`);
 
-export const stationsFaked = () => state.data.filter(s => s.rising || s.status >= 3).length;

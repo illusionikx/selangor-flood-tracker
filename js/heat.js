@@ -68,7 +68,7 @@ let fade = 1;   // extra dimming once the blob can no longer cover its ground di
 
 // leaflet.heat sizes blobs in screen pixels, which makes them cover less ground the further you
 // zoom in. Recomputing the radius per zoom pins each blob to a fixed distance on the ground.
-export function heatScale() {
+function heatScale() {
   if (!layers.some(l => map.hasLayer(l))) return;   // nothing to size while both layers are off
   const c = map.getCenter();
   const east = L.latLng(c.lat, c.lng + HEAT_KM / (111 * Math.cos(c.lat * Math.PI / 180)));

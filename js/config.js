@@ -40,12 +40,9 @@ export const ALERT_TITLE = {
 // a popup can always say where its number came from — three feeds disagreeing by a few centimetres
 // is normal, and unattributed numbers would make that look like a bug in the map.
 export const SOURCES = {
-  selangor: { short: 'JPS Selangor',  name: 'JPS Selangor Infobanjir',
-              url: 'https://infobanjirjps.selangor.gov.my/' },
-  national: { short: 'Public Infobanjir', name: 'JPS Malaysia · Public Infobanjir',
-              url: 'https://publicinfobanjir.water.gov.my/' },
-  kl:       { short: 'JPS WP Kuala Lumpur', name: 'JPS Wilayah Persekutuan (SPHTN)',
-              url: 'https://infobanjirjpskl.water.gov.my/' },
+  selangor: { name: 'JPS Selangor Infobanjir' },
+  national: { name: 'JPS Malaysia · Public Infobanjir' },
+  kl:       { name: 'JPS Wilayah Persekutuan (SPHTN)' },
 };
 
 // Upstream status codes: river -1 offline, 0 normal, 1 alert, 2 warning, 3 danger. A river above its

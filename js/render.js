@@ -253,7 +253,7 @@ export function districts() {
    load-bearing, not defensive filler: the feeds drop and restore stations between polls, and
    `PREFS` deliberately keeps an id through a poll where it is missing, so `find()` returning
    `undefined` here is routine, not a bug. */
-export function ignoredPanel() {
+function ignoredPanel() {
   const ids = ignoredIds();
   const rows = [...ids].map(id => state.data.find(s => s.id === id)).filter(Boolean);
 
@@ -278,7 +278,7 @@ export function ignoredPanel() {
    payload order, arbitrary from a reader's chair). `.filter(Boolean)` drops any id the current
    payload does not carry — a normal state, not an error, since a station can be missing from one
    poll and back on the next. */
-export function favPanel() {
+function favPanel() {
   const ids = favIds();
   const rows = [...ids].map(id => state.data.find(s => s.id === id)).filter(Boolean);
 
@@ -300,7 +300,7 @@ export function favPanel() {
 // now share one pin, and a chip reading "1" for a mast holding three sirens would be wrong about the
 // thing the chip controls. state.perKind is the filtered tally, minus the layer switches themselves,
 // so each chip's number is "what this layer would add".
-export function counts() {
+function counts() {
   const perKind = state.perKind || {};
   let total = 0;
   for (const k of Object.keys(marks)) {
