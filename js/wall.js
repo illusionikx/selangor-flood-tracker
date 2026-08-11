@@ -6,15 +6,22 @@
  * so a page of pictures is the fastest read this data supports.
  *
  * The grid is built once, on open. It is never rebuilt, and js/render.js calls paint() instead of
- * rebuilding it. A tile holds four things the payload does not: the frame it is showing, the frame
- * list it fetched, the images it warmed, and whether the observer reached it yet. A rebuild throws
- * all four away, which drops every visible tile back to the start of its lap.
+ * rebuilding it. A tile holds three things the payload does not: which cell of its strip it is
+ * showing, how many cells that strip has, and whether the observer reached it yet. A rebuild throws
+ * all three away, which drops every visible tile back to the start of its lap.
+ *
+ * A tile used to arm by fetching a frame list from ?shots= and warming six or seven individual
+ * ?shot= requests — over 600 requests and several hundred megabytes for one scroll of this grid. It
+ * now arms with one request: shots.php builds a strip, one derived image holding the whole lap
+ * side by side, and the tile reads how many frames that strip carries straight off the decoded
+ * picture's own width — `naturalWidth / SHEET_W` — with no frame list and no manifest. See the
+ * comment above buildSheet() in shots.php for the shape of the strip itself.
  *
  * ponytail: one timer for the whole page, not one per tile. A timer per tile is a wakeup per tile
  * every second where one will do, and tiles that step together read as one thing rather than as
  * pictures out of phase. If a tile ever needs its own rate, this is the line to revisit.
  */
-import { CLIP_WIN, CLIP_MS, camSrc } from './config.js';
+import { CLIP_MS, SHEET_W, camSrc } from './config.js';
 import { state } from './state.js';
 import { el, squash } from './util.js';
 import { camAlert } from './stations.js';
@@ -80,19 +87,21 @@ function paintBar() {
    way back up, it has already stopped propagating from the `<img>` itself. Bound once, below, rather
    than inside open(): `#camGrid` is static markup in index.html and is never recreated, only its
    children are, so one pair of listeners outlives every open()/close() cycle and needs no rebinding.
-   `tick()` rewrites `img.src` once a second per visible tile once its lap is running, so `load`
-   fires again on every frame after the first — the first branch below is what stops this counting a
-   tile twice.
+   `arm()` succeeding rewrites `img.src` once, from the live still to the strip, so a second `load`
+   can still arrive on this same `<img>` after the first — the first branch below is what stops this
+   counting a tile twice. Nothing else touches the visible `<img>` again after that: `tick()` only
+   ever writes the `--i` custom property css/chrome.css reads, and arm()'s own probe is a detached
+   `Image()` that never joins `#camGrid`'s tree at all, so a probe that comes back 404 fires no event
+   this delegated listener can see — see the comment on arm() for why a failed probe is silent by
+   design rather than routed through here.
    A tile settles once, but the picture on it can still change afterwards, and the two halves below
    answer two different questions because of that. The first branch below decides whether `waiting`
    moves at all, and runs only on the tile's first load/error. The second decides what covers the
    `<img>` right now, and keeps running after that: api.php?cam= returns 502 on a failed upstream
    fetch (see CLAUDE.md's curl gotcha), so a camera whose *first* still fails this way would otherwise
-   carry an opaque "No picture" cover for the rest of the session while the lap loop went on swapping
-   perfectly good archived frames into the `<img>` underneath it, unseen. A later `load` clears that
-   cover. A later `error` — one archived frame 404ing mid-lap, on an otherwise working camera — must
-   not set it, which is the case the first branch already protects by only looking at the first
-   event; letting a later `error` re-add `.fail` here would undo that. */
+   carry an opaque "No picture" cover for the rest of the session even after a strip loads clean
+   behind it. That later `load` — the strip arriving — clears the cover, which is the one case the
+   second branch exists for. */
 function onSettle(e) {
   const t = e.target.closest('.camtile');
   if (!t) return;
@@ -163,52 +172,39 @@ const tileHtml = c => {
     mapped ? '' : '<span class="camnote">Not on the map</span>'}</button>`;
 };
 
-/* A tile is armed the first time it comes into view, and never again. Arming costs one call to
-   ?shots= and one warm-up of the lap. Eager, this page is one of those calls per camera and about
-   80 MB of frames, which is why nothing loads until a reader looks at it.
-   `ready` is set before the first await. Two intersections can arrive before the fetch returns,
-   and the flag is the only thing stopping the second one fetching again.
-   It also has to come back off on a failed fetch, or one dropped request latches a tile on its
-   live still for the rest of the session: the catch below sets `rows = []`, which reads exactly
-   like a camera the server never captured, and nothing past it can tell the two cases apart.
-   js/clip.js clears its own `id` on the matching branch so the next poll checks the archive again
-   — see the comment on that line. There is no poll to retry on here, so the observer has to be
-   the one that tries again, and it only retries a tile whose `ready` is still false. */
-async function arm(t, L) {
+/* A tile is armed the first time it comes into view, and never again. Arming is one request: the
+   strip itself, read through a detached Image() rather than the tile's own — a missing or too-thin
+   strip must never touch the tile's own `<img>`, which is already showing the live still
+   tileHtml() gave it, and a probe that comes back empty has to leave that exactly as it is.
+   `ready` is set before the request starts. Two intersections can arrive before it settles, and
+   the flag is the only thing stopping the second one probing again.
+   shots.php never serves a strip under two cells — buildSheet() there returns null and the ?sheet=
+   handler answers 404 below that floor — so the only two outcomes here are a real, playable strip
+   or nothing at all. There is no one-cell case to filter out on this side.
+   `ready` does not come back off on a 404 or a too-thin strip, the same as the old fetch-based
+   arm() left it set after a confirmed `shots.length < 2` — a camera this server has not built a
+   strip for yet is not re-probed on every scroll into view. It also cannot come back off on a
+   plain network failure the way the old code's `catch` did: an `<img>` error event fires the same
+   way for a 404 and for a dropped connection, and telling the two apart would need the very
+   frame-list fetch this change removes. A tile that misses one probe on a genuine hiccup keeps its
+   live still until the reader scrolls away and back. */
+function arm(t, L) {
   L.ready = true;
-  let rows = [];
-  try { rows = await (await fetch(`api.php?shots=${t.dataset.lap}`)).json(); }
-  catch { rows = []; L.ready = false; }
-  /* close() clears the map on every tear-down, and a fetch already in flight outlives the dialog
-     it was started for. The guard below therefore repeats after each fetch stage, not once at the
-     end: a reader can close the wall while the request is in flight, or during the warm-up that
-     follows it — the expensive half, one real ?shot= request per frame — so it is the one guard
-     that must never let a warm-up run for a tile that no longer exists. One guard covers both
-     awaits above: they share a try block, so no teardown can land between them. */
-  if (!laps.has(t)) return;
-  /* `?shots=` returns [ts, tier, stationId] rows and its answer is cached for 60 seconds, so a
-     deploy leaves the old bare-number shape in flight. js/clip.js and js/timeline.js both carry
-     this guard. Do not remove it while that cache header stands.
-     On the GitHub Pages build there is no api.php at all: the fetch fails, `rows` stays empty, and
-     the tile keeps the still it already drew. That is the same answer js/clip.js gives. */
-  if (!Array.isArray(rows)) return;
-  const cut = Date.now() / 1000 - CLIP_WIN;
-  const shots = rows.map(r => Array.isArray(r) ? r[0] : r).filter(ts => ts >= cut);
-  /* Fewer than two frames is not a lap. Keep the live still the tile already drew — an empty
-     window means this server did not capture, not that the camera stopped, and reaching further
-     back would replace a live picture with a stale one. */
-  if (shots.length < 2) return;
-  // Warm the whole lap before it starts. The frames come off local disk and the server marks them
-  // immutable for a year, so every lap after the first costs nothing and the first does not flicker.
-  await Promise.all(shots.map(ts => {
-    const im = new Image();
-    im.src = `api.php?shot=${t.dataset.lap}&t=${ts}`;
-    return im.decode().catch(() => {});
-  }));
-  // Repeated once more: the warm-up above is itself an await, and the dialog can close while it
-  // is still fetching frames for a tile that is already gone.
-  if (!laps.has(t)) return;
-  L.shots = shots;
+  const probe = new Image();
+  probe.onload = () => {
+    // close() clears the map on every tear-down, and a probe already in flight outlives the
+    // dialog it was started for.
+    if (!laps.has(t)) return;
+    const n = Math.round(probe.naturalWidth / SHEET_W);
+    if (n < 2) return;   // defensive only — see the comment above; shots.php never actually sends this
+    L.n = n;
+    const img = t.firstElementChild;
+    if (!img) return;
+    img.src = probe.src;   // already decoded and cached — this paints, it does not fetch again
+    t.classList.add('strip');
+    img.style.setProperty('--n', n);
+  };
+  probe.src = `api.php?sheet=${t.dataset.lap}`;
 }
 
 function onSee(entries) {
@@ -221,9 +217,9 @@ function onSee(entries) {
        `loading="lazy"` leaves that decision to the browser — so this is the earliest point script
        can say "this tile's first picture is now expected soon", and it lines up with the browser's
        own lazy-load trigger closely enough that the bar reads as tracking the real thing. Guarded on
-       `L.started`, not on arm()'s own `L.ready`: a failed `?shots=` fetch retries through this same
-       branch on the next intersection, and a tile must count once for the bar no matter how many
-       times arm() itself is retried.
+       `L.started`, not on arm()'s own `L.ready`: `L.ready` stays true once a probe has been sent,
+       even when the strip comes back too thin to play, and a tile must count once for the bar no
+       matter what arm() eventually finds.
        The second guard, `.done`, pairs this with onSettle(). A tile's image can resolve — load or
        error — before this callback ever runs for it: a cached still decodes synchronously, and
        api.php?cam= is served `max-age=300`, so reopening this dialog inside five minutes of closing
@@ -240,17 +236,22 @@ function onSee(entries) {
   }
 }
 
-/* The live still is the last position, the same way js/clip.js and the lightbox scrubber treat it:
-   the lap is "how did it get to this", and one that stopped short of now never showed the this.
+/* One custom property per tick, not a `src` rewrite: `--i` is the only thing this function ever
+   touches, and `.camtile.strip > img` in css/chrome.css is what turns that number into a position —
+   see the comment there for why the strip needs `object-fit: fill` to make that arithmetic land on
+   real cell boundaries. No live still spliced onto the end of the lap any more: the old per-frame
+   version ended every lap on a fresh ?cam= fetch so a reader never watched a picture that stopped
+   short of now, and a strip has no cheap way to reproduce that — its last cell is only ever as fresh
+   as the capture that built it, up to SHOT_EVERY (30 min) old. Trading that guarantee for one request
+   a lap instead of one request a frame is the whole point of this change; see docs/FEATURES.md.
    A tile the filter hid reports as not intersecting, so `seen` goes false and its place freezes.
    The browser does that part — there is no filter check here. */
 function tick() {
   for (const [t, L] of laps) {
-    if (!L.seen || L.shots.length < 2) continue;
-    L.at = (L.at + 1) % (L.shots.length + 1);
+    if (!L.seen || L.n < 2) continue;
+    L.at = (L.at + 1) % L.n;
     const img = t.firstElementChild;
-    if (img) img.src = L.at >= L.shots.length
-      ? L.live : `api.php?shot=${t.dataset.lap}&t=${L.shots[L.at]}`;
+    if (img) img.style.setProperty('--i', L.at);
   }
 }
 
@@ -264,8 +265,10 @@ export function open() {
   const grid = el('camGrid');
   grid.innerHTML = cams.map(tileHtml).join('');
   laps.clear();
+  // No `live` field any more: the old tick() kept a still's URL to splice onto the end of the lap,
+  // and the strip has nothing to splice — see the comment on tick() above.
   [...grid.children].forEach((t, i) => laps.set(t, {
-    cam: cams[i], live: camSrc(cams[i]), shots: [], at: 0, ready: false, seen: false, started: false,
+    cam: cams[i], n: 0, at: 0, ready: false, seen: false, started: false,
   }));
   count();
   paint();

@@ -16,7 +16,7 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 |---|---|
 | `api.php` | server-side proxy + cache + source merge + poll history + camera image proxy + rate-limited `?force=1` + place lookup (`?place=`, proxies Nominatim) |
 | `sources.php` | scrapers for the two HTML-only upstreams (national portal, JPS WP) |
-| `shots.php` | camera archive: capture, retention tiers, lookup. Required by `api.php` |
+| `shots.php` | camera archive: capture, retention tiers, lookup, and the on-request strip (`buildSheet()`) the wall and the clip play. Required by `api.php` |
 | `shots-test.php` | `php shots-test.php` — one of two runnable checks. Guards retention. Exercises `pruneShots()` |
 | `index.html` | markup only — no inline CSS or JS |
 | `css/icons.css` | every icon, as an SVG mask. Generated — see docs/FEATURES.md for the fetch |
@@ -696,10 +696,24 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   off-canvas and offsets the shadow back on. Stock offset is 200, so any blob wider than that puts
   the *source* arc back on the canvas — a hard-edged circle clipped by the corner. Our vendored
   copy patches the offset to `1e4`. Second reason not to overwrite `leaflet-heat.js`.
-- **`?shots=` returns `[ts, tier, stationId]`, not a bare timestamp.** Both readers still accept a
-  bare number. `timeline.js` and `clip.js` each guard with `Array.isArray(r)`. The response is
-  cached for 60 seconds, so a deploy leaves the old shape in flight. Do not remove that fallback
-  while the cache header stands.
+- **`?shots=` returns `[ts, tier, stationId]`, not a bare timestamp.** The reader still accepts a
+  bare number: `timeline.js` guards with `Array.isArray(r)`. The response is cached for 60 seconds,
+  so a deploy leaves the old shape in flight. Do not remove that fallback while the cache header
+  stands. `wall.js` and `clip.js` no longer call `?shots=` at all — see the strip gotcha below —
+  so `timeline.js`'s lightbox is the only reader left with this shape to guard against.
+- **Two image endpoints answer for one camera, `?shot=` and `?sheet=`, and they deliberately
+  disagree about how long a browser may cache them.** `?shot=<id>&t=<ts>` names one immutable,
+  already-captured frame, so `Cache-Control: public, max-age=31536000, immutable` is honest — that
+  exact file never changes again. `?sheet=<id>` names the strip `buildSheet()` in `shots.php`
+  builds on request — every frame inside the clip window, laid out side by side in one WebP, which
+  is what `js/wall.js` and `js/clip.js` play instead of fetching a frame at a time (see
+  `docs/FEATURES.md`). The same URL's *bytes* change under it every time `captureShots()` lays a
+  new frame and the strip goes stale, up to once every `SHOT_EVERY` (30 min), so `?sheet=` carries
+  `public, max-age=900` instead — half of `SHOT_EVERY`, so a reopen inside that window is free and a
+  cached strip can never outlive one capture cycle by more than that same margin. Copy `immutable`
+  onto `?sheet=` and a reader who opens a camera twice in one capture window keeps seeing the strip
+  from before it, for up to a year, with nothing to tell them it went stale — the exact failure the
+  frame endpoint's own header is right to invite and the strip endpoint exists to avoid.
 - **`clip.start()` must stay idempotent by camera id *and* by generation.** `render()` calls
   `openSide()` on every poll for the card on screen. A clip that restarted there would jump back to
   frame 0 while somebody watched. So `start()` rebinds to the fresh nodes and keeps its place. The
@@ -708,9 +722,12 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   match. `gen` catches that case. `stop()` bumps it on every call, so a stale run can never match
   again.
 - **The lightbox reads its camera from `data-clip`, not from the clicked image's `src`.** The panel
-  clip rewrites `img.src` to an archived frame every second. Matching `?cam=` against that src
-  fails on five frames in six. That opened a lightbox with no scrubber, no compare and no warning
-  glyph. Only the table's "show image" button has no such wrapper, and it keeps the old path.
+  clip plays a strip (see the `?sheet=` gotcha above): once a lap is running, `img.src` is the
+  strip's own URL, `api.php?sheet=<id>`, for as long as the card stays open — never a `?cam=` URL at
+  all. Matching `?cam=` against that src does not merely fail most of the time, as it did when the
+  clip rewrote `src` to an archived frame every second; it fails every time a strip is playing. That
+  opened a lightbox with no scrubber, no compare and no warning glyph. Only the table's "show image"
+  button has no such wrapper, and it keeps the old path.
 - **`.stage` is exactly the picture's box, and nothing that sits beside the picture may live in it.**
   `.ab` is `inset: 0` of `.stage` and `.abgrip` spans its full height — that is what lines the two
   A/B halves up pixel for pixel, and it holds only while `.stage` is the frame and nothing else. The
@@ -831,8 +848,8 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   and a fast typist would fire several.
 - **The camera wall is painted on a poll, never rebuilt.** `render()` calls `paint()` in
   `js/wall.js`, which swaps the tier class and the phrase on the tiles that already exist. A tile
-  holds four things the payload does not: the frame it is showing, the frame list it fetched, the
-  images it warmed, and whether the observer reached it. A rebuild throws all four away and drops
+  holds three things the payload does not: which cell of its strip it is showing, how many cells
+  that strip has, and whether the observer reached it. A rebuild throws all three away and drops
   every visible tile back to the start of its lap, which is the failure `js/clip.js` was written to
   prevent on one camera, arriving a dozen at a time. The filter obeys the same rule: a hidden tile
   stays in the grid. **Do not add `wall.open()` to the poll path** beside `dataTable()` — the table

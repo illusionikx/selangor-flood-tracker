@@ -164,6 +164,12 @@ export const NEAR_MAX_KM = 10;
 export const CLIP_WIN = 3 * 3600;
 export const CLIP_MS  = 1000;
 
+/* A strip's cell width, in lockstep with SHEET_W in shots.php — the two move together, the same
+   pairing CLIP_WIN itself already holds against shots.php's own copy. `img.naturalWidth / SHEET_W`
+   recovers how many cells a loaded strip carries with no header, no manifest and no separate fetch:
+   the picture tells you how many frames it holds just by how wide it decoded. */
+export const SHEET_W = 480;
+
 export const FLASH_MS    = 2400;   // how long the jump-to ripple runs
 export const POLL_MS     = 300000; // matches the proxy's cache TTL
 

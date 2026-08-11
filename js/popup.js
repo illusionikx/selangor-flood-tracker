@@ -64,7 +64,7 @@ export const camWarn = (cam, a = camAlert(cam)) => {
 
 /* Spinner lives on the wrapper; the img clears it on load, or swaps itself out on failure.
    `data-clip` is the hook js/clip.js looks for — it carries the numeric camera id the proxy uses,
-   not the station id, because that is what ?shots= and ?shot= both take.
+   not the station id, because that is what ?sheet=, ?shots= and ?shot= all take.
    No warning pill here any more. This still is a 3-hour clip that plays itself (see js/clip.js), so
    the pill stated the live alert over a frame from hours ago — the same wrong claim the lightbox was
    just fixed for, and this one has no scrubber, no seek bar and no room to answer it per frame. The

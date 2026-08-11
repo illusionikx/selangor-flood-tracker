@@ -615,9 +615,12 @@ dialog:focus, dialog:focus-visible { outline: none; }
 .place { font-weight: 500; cursor: pointer; }
 .place:hover { color: var(--accent); text-decoration: underline; }
 
-/* Camera still. Spinner lives on the wrapper; the img clears it on load. */
+/* Camera still. Spinner lives on the wrapper; the img clears it on load.
+   `overflow: hidden` earns its place only once js/clip.js plays a strip (below) — a quiet `.shot`
+   is never wider than this box, so it clips nothing for the common case and is here so the strip
+   case does not need a second rule to add it. */
 .shotwrap {
-  position: relative; margin: 8px 0 6px; border-radius: 8px;
+  position: relative; margin: 8px 0 6px; border-radius: 8px; overflow: hidden;
   background: var(--hover); aspect-ratio: 16 / 9;
 }
 .shotwrap::after {
@@ -632,6 +635,31 @@ dialog:focus, dialog:focus-visible { outline: none; }
 .shot {
   display: block; width: 100%; border-radius: 8px; aspect-ratio: 16 / 9; object-fit: cover;
   opacity: 0; cursor: zoom-in; transition: opacity .2s;
+}
+
+/* js/clip.js plays a strip: one wide image, `--n` cells, stepped by moving `--i` of them past the
+   left edge. `.done` above relaxes the wrapper to `aspect-ratio: auto` once the first picture loads
+   and lets it size off the `<img>` instead — fine for one frame, but a strip's `<img>` is about to
+   go `--n` times wider, and if its own height stayed `auto` too, `.shot`'s `aspect-ratio: 16/9`
+   would compute that height off the *widened* width and grow the frame taller with every extra
+   cell. Reinstating a fixed ratio here gives the strip image a definite box to resolve its own
+   `height: 100%` against, which is what holds the height constant instead. */
+.shotwrap.strip { aspect-ratio: 16 / 9; }
+.shotwrap.strip .shot {
+  width: calc(var(--n, 1) * 100%); height: 100%;
+  transform: translateX(calc(var(--i, 0) / var(--n, 1) * -100%));
+  /* `cover` scales the whole wide strip by one factor and crops whatever is left over off its two
+     outer edges — checked by the numbers, not by eye: with the strip several cells wide, that crop
+     falls near the strip's own ends rather than at each cell's edges, so the two outermost frames
+     lose most of their width and a neighbour's pixels bleed into the frame beside it everywhere
+     else. `fill` scales width and height independently with no crop at all, and because the box and
+     the bitmap both widen by exactly `--n` together, that scale factor is the same for every cell —
+     the one object-fit value the width/transform arithmetic above actually lines up against real
+     cell boundaries under. `.shotwrap` and `.shot` already agree at 16 / 9, the same ratio as
+     shots.php's SHEET_W x SHEET_H, so this is a plain unscaled fit here — the distortion this
+     enables only shows up on a box whose own ratio disagrees with a cell's, which is `.camtile`'s
+     case in css/chrome.css and not this one. */
+  object-fit: fill;
 }
 
 /* --- motion --------------------------------------------------------------------------------- */

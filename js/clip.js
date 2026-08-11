@@ -12,54 +12,65 @@
  * would jump back to frame 0 while someone watched, so `start()` rebinds to the new nodes and keeps
  * its place instead. That is the whole reason this is a module with state rather than four lines in
  * popup.js.
+ *
+ * The clip plays a strip now, not a list of individually-fetched frames. shots.php builds one
+ * derived image holding the whole window side by side (see the comment above buildSheet() there),
+ * and this module reads how many cells it holds straight off the decoded picture's own width —
+ * `naturalWidth / SHEET_W` — the same trick js/wall.js uses for the camera wall. One request per
+ * open card instead of six or seven, and no per-frame src rewrite once it is playing.
  */
-import { CLIP_WIN, CLIP_MS, camSrc } from './config.js';
+import { CLIP_WIN, CLIP_MS, SHEET_W } from './config.js';
 import { noSec, parseMY, ago } from './util.js';
 
 const CLIP_HOURS = CLIP_WIN / 3600;   // the caption names the window; keep the two numbers tied
 
 let id = null;      // camera id the running loop belongs to, or null
 let gen = 0;        // bumped on every stop(); a stale await compares against this, not against id
-let shots = [];     // frame timestamps inside the window, ascending
-let at = 0;         // position in `shots`; shots.length is the live still
+let n = 0;          // cells in the current strip; 0 means no strip is playing
+let at = 0;         // position in the strip, 0..n-1
 let timer = null;
-let img = null, cap = null, live = '', capText = '';
+let img = null, cap = null, capText = '';
 
 export function stop() {
   clearInterval(timer);
   timer = null;
   id = null;
   gen += 1;
-  shots = [];
+  n = 0;
   at = 0;
   img = cap = null;
   capText = '';
 }
 
-// The live still is the last position, the same way the lightbox scrubber treats it: the clip is
-// "how did it get to this", and a lap that stopped 30 minutes short of now never showed the this.
-const srcAt = i => i >= shots.length ? live : `api.php?shot=${id}&t=${shots[i]}`;
-
 function tick() {
   /* A frame can fail. camImg()'s onerror replaces the failed <img> with a plain div, so the node
-     this loop writes to can vanish between one tick and the next — most likely at the live
-     position, where a 60-second-old proxy response can go stale mid-lap. Writing to a detached
-     element does nothing useful and never recovers on its own, so stop and let the next
-     openSide() rebuild the card and start a clean loop. */
+     this loop writes to can vanish between one tick and the next. Writing to a detached element
+     does nothing useful and never recovers on its own, so stop and let the next openSide() rebuild
+     the card and start a clean loop. */
   if (!img || !img.isConnected) return stop();
-  at = (at + 1) % (shots.length + 1);
-  img.src = srcAt(at);
+  at = (at + 1) % n;
+  img.style.setProperty('--i', at);
 }
 
 /* Bind to whatever nodes the card holds right now. Called on a fresh card and on every rebuild of
-   the same card, so it must never reset `at`.
+   the same card, so it must never reset `at` or `n` — those live at module scope precisely so a
+   rebuild can be repainted rather than restarted.
    `capText` is the caption's own state, kept here for the same reason `at` is: `render()` swaps in
    a blank `<p class="clipcap">` on every poll, and without this the caption would read for one
-   poll and then go empty for as long as the card stayed open. */
+   poll and then go empty for as long as the card stayed open.
+   A rebuild hands this a brand new `<img>` with none of the strip machinery on it — `render()`
+   replaces the card's markup wholesale, so `img.src`, the `.strip` class and the `--n`/`--i` custom
+   properties all have to be repainted here, not just the frame position. */
 function bind(box) {
   img = box.querySelector('img.shot');
   cap = box.querySelector('.clipcap');
-  if (img && timer) img.src = srcAt(at);
+  if (img && n >= 2) {
+    img.src = `api.php?sheet=${id}`;   // cached from the strip that got us here — this paints, it
+                                        // does not cost a real fetch inside SHEET's 900s window
+    box.classList.add('strip');
+    img.style.setProperty('--n', n);
+    img.style.setProperty('--i', at);
+  }
   if (cap) cap.textContent = capText;
 }
 
@@ -71,53 +82,56 @@ export async function start(root, cam) {
   stop();
   id = want;
   const myGen = gen;   // this run's generation; stop() bumps gen, id alone cannot tell two runs apart
-  live = camSrc(cam);
-  bind(box);
+  bind(box);            // paints nothing yet — n is still 0 here — but wires up img/cap for idle()
 
-  let rows = [];
+  /* A detached probe, never the card's own `<img>`. camImg()'s template wires that element's
+     `onerror` to replace itself with "image unavailable" on ANY failed load, which is right for a
+     dead live still and wrong for a thin archive: setting the real `<img>`'s src straight to
+     ?sheet= and letting a 404 hit that handler would swap a perfectly good live picture for an
+     error placeholder just because this camera has not built three hours of history yet. Probing
+     off to the side keeps a failure silent and leaves the still exactly as it was. */
+  const probe = new Image();
+  probe.src = `api.php?sheet=${id}`;
   try {
-    rows = await (await fetch(`api.php?shots=${id}`)).json();
-  } catch { rows = []; }
+    await probe.decode();
+  } catch {
+    return finishEmpty(cam);
+  }
   /* `id !== want` alone missed the case where the reader closed the card and reopened the same
-     camera before this fetch returned: stop() clears id, the second start() sets id back to the
+     camera before this decode returned: stop() clears id, the second start() sets id back to the
      same value, and both continuations would then read id === want as true. `gen` catches it —
      stop() bumps it on every call, so a stale run's captured `myGen` can never match again. */
-  if (myGen !== gen || !Array.isArray(rows)) return;
-
-  const cut = Date.now() / 1000 - CLIP_WIN;
-  shots = rows.map(r => Array.isArray(r) ? r[0] : r).filter(ts => ts >= cut);
-
-  /* Fewer than two frames is not a clip. Keep the live still the card already drew — it came from
-     JPS when the card opened, and an empty window means this server did not capture, not that the
-     camera stopped. Reaching into the archive for an older frame here would replace a live picture
-     with a stale one. */
-  if (shots.length < 2) {
-    shots = [];
-    capText = idle(cam);
-    if (cap) cap.textContent = capText;
-    /* Clear `id` rather than park on this camera. A card can stay open for hours, and the archive
-       can cross the two-frame line while it does — clearing `id` makes the next poll's start()
-       treat this as a fresh camera and check the archive again, instead of parking here in the
-       idle state for as long as the card stays open. */
-    id = null;
-    return;
-  }
-
-  // The window, and nothing else. The frame count was ours, not the reader's: six frames or four is
-  // a fact about when this server happened to be running, and it answers no question anyone has.
-  capText = `Last ${CLIP_HOURS} hours`;
-  if (cap) cap.textContent = capText;
-  // Warm the whole lap before it starts. Six frames off local disk, served immutable for a year, so
-  // every lap after the first is free — and without this the first lap flickers on every swap.
-  await Promise.all(shots.map(ts => {
-    const im = new Image();
-    im.src = `api.php?shot=${id}&t=${ts}`;
-    return im.decode().catch(() => {});
-  }));
   if (myGen !== gen) return;
+
+  const cells = Math.round(probe.naturalWidth / SHEET_W);
+  /* Fewer than two cells is not a clip. shots.php never actually serves this — a strip under two
+     frames 404s instead of shipping a useless one, so this floor is defensive rather than the
+     common path. Keep the live still the card already drew — it came from JPS when the card
+     opened, and no playable strip means this server did not capture, not that the camera stopped. */
+  if (cells < 2) return finishEmpty(cam);
+
+  n = cells;
   at = 0;
-  if (img) img.src = srcAt(0);
+  capText = `Last ${CLIP_HOURS} hours`;
+  if (img) {
+    img.src = probe.src;   // already decoded and cached — this paints, it does not fetch again
+    box.classList.add('strip');
+    img.style.setProperty('--n', n);
+    img.style.setProperty('--i', 0);
+  }
+  if (cap) cap.textContent = capText;
   timer = setInterval(tick, CLIP_MS);
+}
+
+/* The no-strip ending, shared by a 404 and a too-thin strip: park on the live still the card already
+   drew, set the idle caption, and clear `id` rather than parking on this camera. A card can stay
+   open for hours, and the archive can cross the two-cell line while it does — clearing `id` makes
+   the next poll's start() treat this as a fresh camera and check the strip again, instead of
+   parking here in the idle state for as long as the card stays open. */
+function finishEmpty(cam) {
+  capText = idle(cam);
+  if (cap) cap.textContent = capText;
+  id = null;
 }
 
 /* Now, as Malaysian wall-clock components, parsed back through the same function that reads a JPS

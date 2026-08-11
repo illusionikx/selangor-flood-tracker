@@ -612,10 +612,15 @@ table.data .dash { color: var(--outline); }
   #camGrid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 
-/* A <button>, so keyboard reach, Enter, Space and the focus ring all come free. */
+/* A <button>, so keyboard reach, Enter, Space and the focus ring all come free.
+   The border is transparent, not `var(--outline)`: a coloured 2px box drawn around a tile that is
+   still shimmering its skeleton, or has settled quiet with nothing to report, reads as a frame
+   around empty space rather than as a picture. `transparent` keeps the 2px reserved — so nothing
+   shifts once a picture or a `.t-now`/`.t-soon` colour arrives — while showing nothing until one of
+   those two classes actually has something to say. */
 .camtile {
   position: relative; display: block; padding: 0; overflow: hidden; cursor: pointer;
-  aspect-ratio: 4 / 3; border: 2px solid var(--outline); border-radius: 10px;
+  aspect-ratio: 4 / 3; border: 2px solid transparent; border-radius: 10px;
   background: var(--hover); color: var(--on-surface); text-align: left;
 }
 /* A camera JPS publishes with no coordinate at all — see js/wall.js's tileHtml() and CAM_FIX's own
@@ -627,6 +632,20 @@ table.data .dash { color: var(--outline); }
    sensor is reporting, and "we do not know where this camera is" is not a reading of anything. */
 .camtile.unmapped { cursor: default; border-style: dashed; opacity: .75; }
 .camtile > img { display: block; width: 100%; height: 100%; object-fit: cover; }
+/* js/wall.js swaps a tile's still for a strip once it is armed: one wide image, `--n` cells, and
+   `--i` of them moved past the left edge to show cell `--i`. `height: 100%` above still applies —
+   only `width` grows, so nothing here needs the aspect-ratio fix css/base.css's matching rule
+   carries for js/clip.js, since `.camtile > img` never relied on `aspect-ratio` for its height in
+   the first place. `object-fit: fill` is not decorative: see the long comment beside
+   `.shotwrap.strip .shot` in css/base.css for why `cover` bleeds neighbouring cells into each other
+   on a widened strip. Cells here are 16:9 (SHEET_W x SHEET_H in shots.php) inside a 4:3 tile, so
+   `fill` shows every cell as a plain non-uniform stretch of itself — a real, accepted trade-off,
+   not a bug, and the reason to check by eye once this ships. */
+.camtile.strip > img {
+  width: calc(var(--n, 1) * 100%);
+  transform: translateX(calc(var(--i, 0) / var(--n, 1) * -100%));
+  object-fit: fill;
+}
 /* `display: block` above beats the browser's own `[hidden]` rule, so it has to be said again. The
    filter in js/ui.js sets `hidden`, and `.link` and `.camwarn` both carry the same restatement. */
 .camtile[hidden] { display: none; }

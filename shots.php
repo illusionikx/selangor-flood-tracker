@@ -45,6 +45,38 @@ const SHOT_W     = 1280;    // 720p — the native width of every camera measure
    for no extra detail. 720p *is* the ceiling here, so quality is the only axis left. */
 const SHOT_Q     = 82;
 const SHOT_MIN   = 4096;    // bytes: JPS answers a dead camera with a ~2 KB placeholder, not a 404
+
+/* The clip window a strip covers — see buildSheet() further down for what a strip is. The same
+   three hours js/config.js calls CLIP_WIN for the client. Two files carry this number and it has to
+   move in both together, the same pairing CAM_ALERT_KM and SIREN_KM already hold between api.php
+   and js/config.js, and the retention anchors hold between here and js/timeline.js. */
+const CLIP_WIN = 3 * 3600;
+
+/* --- the strip -------------------------------------------------------------------------------
+ * A tile on the wall paints into a box about 200px wide. A card in the station panel paints into a
+ * box about 340px wide. Both used to warm six or seven full 1280-wide frames per camera to do
+ * that — ~214 KB each — which is over 600 requests and several hundred megabytes for one scroll of
+ * the wall, and a page's worth of frames for one open card. Video players solve this with a sprite
+ * sheet; NVRs solve it with a low-resolution sub stream for grid views. A strip is both at once: one
+ * derived file per camera, every frame inside CLIP_WIN laid out side by side in one image, each cell
+ * scaled down before it is placed. A caller reads that one picture and steps through it by moving a
+ * CSS transform — no frame list, no per-frame request, and no request at all after the first.
+ *
+ * SHEET_W x SHEET_H is 480x270, the same 16:9 every camera measured publishes, at three-eighths of
+ * SHOT_W. The widest consumer is the panel clip, whose box is about 340px — 480 is roughly 1.4x
+ * that. The wall tile is narrower still, about 200px, so the same cell is roughly 2.4x there.
+ * Going wider costs real memory in a reader's browser, which is the reason not to: a decoded strip
+ * is roughly SHEET_W * cells * SHEET_H * 4 bytes (RGBA) once the compositor unpacks it, and a
+ * seven-cell strip at 480x270 is already about 2.6 MB decoded — times up to sixteen tiles live at
+ * once on a five-column desktop grid, which is the ceiling this size was chosen against. */
+const SHEET_W = 480;
+const SHEET_H = 270;
+
+/* Lower than SHOT_Q's 82. A stored frame is the archive's one copy of that moment — the record — and
+   it is worth spending bytes to keep it faithful. A strip is a cache, rebuilt from those frames on
+   demand whenever it goes stale, so a softer q70 costs nothing that cannot be regenerated, and it
+   buys a real cut in the bytes a scrolling wall has to move. */
+const SHEET_Q = 70;
 /* Retention, as [frames younger than this, keep one per, the clock time the bucket aims at]. `0` in
  * the second slot means keep every frame. Applied on age, so a frame thins itself as it gets older —
  * kept every 30 min for a day, then three-hourly for a week, and so on down to weekly for a year.
@@ -96,6 +128,61 @@ function shotList(int $id): array {
     foreach (scandir($d) ?: [] as $f) if (preg_match('/^(\d+)\.(webp|jpg)$/', $f, $m)) $out[] = (int)$m[1];
     sort($out);
     return $out;
+}
+
+function sheetPath(int $id): string { return shotDir($id) . '/sheet.webp'; }
+
+/* Build the strip for one camera, or reuse the one already on disk. Returns the path, or null when
+   there is nothing worth building: fewer than two frames inside CLIP_WIN — the same floor the live
+   clip and the wall already apply to a lap, since one frame is not a lap — or no WebP encoder on
+   this PHP. Always WebP: there is no second-format fallback the way a captured frame has one,
+   because unlike a capture this is never the only copy of anything, so if imagewebp is missing the
+   right answer is to build no strip at all and let the callers fall back to what they already do
+   when an archive is too thin.
+ *
+ * Rebuild only when stale. A strip whose own mtime is at or after the newest frame inside the
+ * window is already showing everything that frame set can show, and re-encoding it would spend a
+ * real decode-resize-encode pass across every cell to produce the same bytes. That cost lands once
+ * per camera per capture cycle — the first open after captureShots() lays down a new frame — and
+ * every open before the next capture is a plain file read.
+ *
+ * This runs from the ?sheet= handler in api.php, on request, and never from captureShots(). That
+ * function holds the flock on .refresh.lock the whole app depends on — see the gotcha in
+ * CLAUDE.md — and a strip build is a decode, a resize and a re-encode per frame; doing that for
+ * ninety cameras inside the lock would hold it for the better part of a minute on every single
+ * capture, which is the stampede the lock exists to prevent, in slow motion, again. Building lazily
+ * costs at most one build per camera per thirty minutes, and only for a camera someone actually
+ * opens. */
+function buildSheet(int $id, int $now): ?string {
+    if (!function_exists('imagewebp')) return null;
+    $cut = $now - CLIP_WIN;
+    $frames = array_values(array_filter(shotList($id), fn($ts) => $ts >= $cut));
+    if (count($frames) < 2) return null;
+
+    $path = sheetPath($id);
+    if (is_file($path) && filemtime($path) >= end($frames)) return $path;
+
+    $n = count($frames);
+    $canvas = imagecreatetruecolor(SHEET_W * $n, SHEET_H);
+    if (!$canvas) return null;
+    // A frame that fails to decode leaves its cell whatever imagecreatetruecolor() filled it with —
+    // black. Nothing here paints a placeholder over it: the failure is rare (a truncated file on
+    // disk) and a black cell for one frame in a lap is not worth a second code path to explain.
+    foreach ($frames as $i => $ts) {
+        $f = shotFile($id, $ts);
+        $im = $f ? @imagecreatefromstring(file_get_contents($f)) : false;
+        if (!$im) continue;
+        imagecopyresampled($canvas, $im, $i * SHEET_W, 0, 0, 0, SHEET_W, SHEET_H, imagesx($im), imagesy($im));
+        imagedestroy($im);
+    }
+
+    ob_start();
+    imagewebp($canvas, null, SHEET_Q);
+    $bytes = ob_get_clean();
+    imagedestroy($canvas);
+    if (!$bytes) return null;
+    file_put_contents($path, $bytes);
+    return $path;
 }
 
 /* How a frame gets stored: [bytes, extension], or null if the bytes are not a decodable image.

@@ -130,9 +130,9 @@ const CAM_FIX = [
     240  => [3.18646, 101.41317],     // Jalan Bukit Payung        — the SIREN JALAN BUKIT PAYUNG site, Klang, LOCATION CONFIRMED
     241  => [3.13646, 101.43895],     // Taman Daya Meru           — the PEKAN MERU rainfall and river mast, Klang, SOMEWHAT CONFIRMED
     242  => [3.02880, 101.47849],     // Taman Maznah              — the TAMAN MAZNAH flood gauge, Klang, LOCATION CONFIRMED
-    244  => [3.02939, 101.46263],     // Taman Selat Damai         — the median of the 105 non-camera stations in Klang, UNCONFIRMED
+    244  => [2.995089, 101.410330],     // Taman Selat Damai       — physically found in Klang, LOCATION CONFIRMED
     245  => [3.15525, 101.47284],     // Kg Budiman                — the KG BUDIMAN rainfall and river mast, Petaling, LOCATION CONFIRMED
-    246  => [3.33837, 101.36090],     // Bukit Hijau               — the median of the 42 non-camera stations in Kuala Selangor, UNCONFIRMED
+    246  => [3.243218, 101.391635],     // Bukit Hijau               — physically found at Jeram, LOCATION CONFIRMED
     247  => [2.91654, 101.32121],     // Taman Teluk Gedung Indah  — the SG. KEMBONG DI PULAU INDAH mast, Klang, SOMEWHAT CONFIRMED
     1249 => [3.02427, 101.53335],     // Jalan Jitu                — the SIREN JLN JITU TSM site, Klang, LOCATION CONFIRMED
     1250 => [3.03525, 101.52778],     // Kolam Takungan TSM        — the SIREN KOLAM TSM site, Klang, LOCATION CONFIRMED
@@ -570,6 +570,29 @@ if (isset($_GET['shot'])) {
     header('Content-Type: ' . (str_ends_with($f, '.webp') ? 'image/webp' : 'image/jpeg'));
     header('Cache-Control: public, max-age=31536000, immutable');
     readfile($f);
+    exit;
+}
+
+/* ?sheet=<id> — the strip: every frame inside the archive's clip window, side by side in one WebP,
+   at SHEET_W x SHEET_H a cell. See buildSheet() in shots.php for how it is built, and why it is
+   built here, on request, rather than inside captureShots(). Same integer-only intake as ?cam=,
+   ?shot= and ?shots= — no second, string parameter belongs on this handler. Read the (string) cast
+   gotcha in CLAUDE.md before that ever changes: (int) is silent on an array, which is the whole
+   reason those three endpoints never had the problem ?place= did. */
+if (isset($_GET['sheet'])) {
+    $path = buildSheet((int)$_GET['sheet'], time());
+    if (!$path) { http_response_code(404); exit; }
+    header('Content-Type: image/webp');
+    /* Not `immutable`, unlike the frame above. A stored frame at ?shot= never changes once written,
+       so a year-long cache is honest. A strip's bytes at this same URL change every time
+       captureShots() lays down a new frame and this cache goes stale — up to once every SHOT_EVERY
+       (30 min) — so an `immutable` header here would be a lie a browser could hold onto for a year:
+       a reader who reopens a camera after one capture cycle would keep seeing the strip from before
+       it, with no way to notice. max-age=900 is half of SHOT_EVERY, so a reopen inside that window
+       costs nothing and a cached strip can never outlive one capture cycle by more than the same
+       margin the file cache elsewhere in this file already accepts. */
+    header('Cache-Control: public, max-age=900');
+    readfile($path);
     exit;
 }
 

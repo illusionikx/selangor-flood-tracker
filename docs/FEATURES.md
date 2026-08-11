@@ -5689,3 +5689,103 @@ with the glyph masked out of it, so the shadow is computed against the box and c
 mask that follows it. Deleted, with a comment recording why nothing replaces it — `.camwarn .i` in
 `css/map.css` carries the identical dead rule and is left alone, since fixing it belongs to whatever
 change next touches that file.
+
+## The wall and the clip play a strip, not a frame at a time
+
+The wall arms about sixteen tiles at once. Each one fetched a frame list from `?shots=` and then
+warmed six or seven individual 1280-wide frames at roughly 214 KB apiece, to paint a tile about
+200 px wide. One scroll of the grid was over 600 requests and several hundred megabytes. The
+station panel's clip did the same thing for one camera into a box about 340 px wide — smaller in
+scale, but the same shape of waste: a full 720p frame fetched once a second to draw a picture nobody
+was viewing at more than a third of that width.
+
+Video players solve this with a sprite sheet. NVRs solve it with a low-resolution sub stream for
+grid views. A strip is both at once: one derived WebP per camera, holding every frame inside the
+clip window laid out side by side, each cell already scaled down to the size a tile or a card
+actually needs. A caller fetches that one picture and steps through it with a CSS transform. No
+frame list, no per-frame request, and — past the first fetch — no request at all.
+
+**`SHEET_W` x `SHEET_H` is 480x270.** Every camera measured publishes 1280x720, so 480x270 is the
+same 16:9 at three-eighths scale. The widest consumer is the panel clip, whose box is about 340 px —
+480 is roughly 1.4x that, sharp without being wasteful. The wall tile is narrower still, about
+200 px, so the same cell is about 2.4x there. Going wider was rejected on memory, not bandwidth: a
+decoded strip costs roughly `SHEET_W * cells * SHEET_H * 4` bytes once a browser's compositor
+unpacks it, and a seven-cell strip at 480x270 is already about 2.6 MB decoded — times up to sixteen
+tiles live at once on a five-column desktop grid, which is the ceiling this size was chosen against.
+
+**`SHEET_Q` is 70, lower than the stored frame's own 82.** A stored frame is the archive's one copy
+of that moment — the record — and it is worth spending bytes to keep it faithful. A strip is a
+cache, rebuilt from those frames on demand whenever it goes stale, so a softer quality costs nothing
+that cannot be regenerated, and it buys a real cut in the bytes a scrolling wall has to move.
+
+**Built on request, never inside `captureShots()`.** That function runs holding the `flock` on
+`.refresh.lock` the whole app depends on — see the gotcha in `CLAUDE.md`. Encoding a strip is a
+decode, a resize and a re-encode per frame; doing that for ninety cameras inside that lock would
+hold it for the better part of a minute on every single capture, which is the stampede the lock
+exists to prevent, in slow motion, again. `buildSheet()` in `shots.php` runs instead from the
+`?sheet=` handler in `api.php`, the first time somebody actually opens that camera, and rebuilds
+only when the strip on disk is older than the newest frame inside the window — so the real cost is
+at most one build per camera per `SHOT_EVERY` (30 min), and only for a camera somebody looks at.
+Measured against a strip built with three frames in its window: a cold build took 0.36s and 71 862
+bytes; the same request immediately after, still inside the window, took 0.06s off the file already
+on disk — the rebuild-only-when-stale rule paying for itself on the very next open.
+
+**`img.naturalWidth / SHEET_W` is the cell count.** Nothing else needs to know how many frames a
+strip holds — no header, no manifest, no frame list fetched at one moment while the strip itself was
+built at another and might disagree with it. The picture answers the question by how wide it decoded.
+`js/wall.js` and `js/clip.js` both probe a strip through a detached `Image()` before touching the
+card or tile's own `<img>`: `camImg()`'s template wires that element's `onerror` to swap itself for
+an "image unavailable" placeholder on any failed load, which is right for a dead live still and wrong
+for a thin archive — routing a `?sheet=` 404 straight into that handler would destroy a perfectly
+good live picture just because this camera has not built three hours of history yet. A camera with a
+strip under two cells never reaches either module: `buildSheet()` returns null below that floor and
+the endpoint answers 404, the same as no strip at all, so the client only ever has two outcomes to
+handle — a real, playable strip, or nothing — never a one-cell edge case to filter out.
+
+**The cache header is `public, max-age=900`, not the year-long `immutable` a stored frame carries at
+`?shot=`.** A stored frame never changes once written, so an immutable, year-long cache is honest. A
+strip's bytes at the very same `?sheet=<id>` URL change every time `captureShots()` lays a fresh
+frame under it and the strip goes stale — up to once every `SHOT_EVERY`. `immutable` there would be
+a lie a browser could hold for a year: a reader who reopens a camera after one capture cycle would
+keep seeing the strip from before it, with no way to notice. `max-age=900` is half of `SHOT_EVERY`,
+so a reopen inside that window costs nothing and a cached strip can never outlive one capture cycle
+by more than that same margin.
+
+**The lightbox and its scrubber (`js/timeline.js`) are untouched, and stay on `?shots=` and full-size
+`?shot=` frames on purpose.** That view scrubs the whole archive by the clock, needs a timestamp and
+an alert tier per frame to paint the seek bar and the compare divider, and opens far enough back that
+a 480x270 strip would be a visible downgrade on a picture someone deliberately zoomed into. The wall
+and the clip both answer "what does this look like, roughly, right now" — the lightbox answers "show
+me exactly this moment," and a strip cannot serve that second question at the resolution it deserves.
+
+**Two trade-offs, both accepted rather than solved.** First, the clip's lap no longer ends on a
+freshly fetched live still. The old per-frame version appended one extra position that swapped in a
+brand new `?cam=` fetch, so a lap always finished on a picture no older than the moment the card
+opened. A strip has nothing to splice onto — its last cell is only ever as fresh as the capture that
+built it, up to `SHOT_EVERY` old — and reproducing the old guarantee would mean carrying the
+per-frame fetch machinery this change exists to remove. One request a lap instead of one request a
+frame is the trade being made.
+
+Second, `.camtile > img` needs `object-fit: fill` while a strip plays, not the `cover` it uses for a
+single still. A strip is one wide bitmap; `cover` scales it by a single factor and crops whatever is
+left over off its two outer edges — checked against the arithmetic, not by eye, that crop lands near
+the strip's own ends rather than at each cell's boundary once the strip holds more than one cell, so
+the two outermost frames lose most of their width and a neighbour's pixels bleed into the frame
+beside it everywhere else. `fill` scales width and height independently with no crop, and because
+the tile's box and the strip's bitmap both widen by the same cell count together, that scale factor
+repeats identically for every cell — the one `object-fit` value the width/transform stepping actually
+lines up against real cell boundaries under. The camera wall's tile is 4:3 while a cell is 16:9
+(`SHEET_W` x `SHEET_H`), so `fill` there is a real, visible trade: every frame in a playing lap is a
+mild, uniform horizontal stretch of itself rather than the clean crop a single still gets. The
+station panel's clip does not pay this cost — `.shotwrap` and `.shot` already agree with the strip at
+16:9, so `fill` and `cover` produce the identical picture there, and `fill` is used anyway for
+symmetry with the wall and so neither box depends on that coincidence continuing to hold. This is a
+human-eyes check, noted here for whoever looks at the wall next: a played lap should read as a
+picture that moves, not as a picture that visibly stretches sideways twelve times a minute.
+
+**`.camtile`'s border went from `var(--outline)` to `transparent`, unrelated to the strip itself.**
+Colouring the border while a tile's skeleton is still shimmering, or once it has settled on nothing
+to report, reads as a frame drawn around empty space. `transparent` keeps the same 2 px reserved —
+nothing shifts once a picture or a `.t-now`/`.t-soon` colour arrives — while showing no colour until
+one of those two classes actually has something to say. Same specificity as before, so `.t-now` and
+`.t-soon` still win over the default exactly as they did.
