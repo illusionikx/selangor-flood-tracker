@@ -763,6 +763,44 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
     $ok('an unreadable rung drops the marker', $bad === []);
     $ok('an empty page parses to nothing',     metPoints('') === []);
 
+    /* The span is what the card sentence is built from, and it is the one piece of logic here that
+       can be quietly wrong. It runs first-to-last, not first-unbroken-run: 17 of 137 wet markers on
+       one live page held the worst rung in more than one block, and reporting only the first block
+       hides a return of the rain. */
+    echo "\nmetSpan():\n";
+    $ck = [null, '15:10', '15:40', '16:10', '16:40', '17:10', '17:40'];
+
+    $ok('all clear says nothing',
+        metSpan([0, 0, 0, 0, 0, 0, 0], $ck) === null);
+
+    $a = metSpan([0, 0, 0, 2, 2, 0, 0], $ck);
+    $ok('a later block reports its start',   $a['from'] === '16:10');
+    $ok('and the first dry step after it',   $a['to'] === '17:10');
+    $ok('and is not open',                   $a['open'] === false);
+    $ok('and carries the worst rung',        $a['rung'] === 2);
+    $ok('and the rung now',                  $a['now'] === 0);
+    $ok('and the rung one hour out',         $a['hr1'] === 0);
+
+    $b = metSpan([2, 2, 0, 0, 0, 0, 0], $ck);
+    $ok('rain now carries no start',         $b['from'] === null);
+    $ok('and ends at the first dry step',    $b['to'] === '15:40');
+
+    $c = metSpan([2, 2, 2, 2, 2, 2, 2], $ck);
+    $ok('rain to the last step is open',     $c['open'] === true);
+    $ok('and reports the final clock',       $c['to'] === '17:40');
+    $ok('and still carries no start',        $c['from'] === null);
+
+    /* The broken pattern. Rain at 16:10, dry at 16:40, raining again and still raining at the end. */
+    $d = metSpan([0, 0, 0, 1, 0, 1, 1], $ck);
+    $ok('a broken block spans first to last', $d['from'] === '16:10');
+    $ok('and stays open past the window',     $d['open'] === true);
+    $ok('and reports the final clock',        $d['to'] === '17:40');
+
+    /* hr1 is step index 2, which is one hour out, and it is its own column on the card. */
+    $e = metSpan([0, 0, 1, 2, 2, 0, 0], $ck);
+    $ok('hr1 reads step index 2',            $e['hr1'] === 1);
+    $ok('and does not change the worst rung', $e['rung'] === 2);
+
     echo $fail ? "\n$fail FAILED\n" : "\nall ok\n";
     exit($fail ? 1 : 0);
 }

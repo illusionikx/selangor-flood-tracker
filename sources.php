@@ -264,3 +264,38 @@ function metPoints(string $html): array {
     }
     return $out;
 }
+
+/**
+ * The two facts the card sentence needs, out of seven values.
+ *
+ * The span runs from the FIRST occurrence of the worst rung to the LAST, not across the first
+ * unbroken run of it. Measured on one live page, 17 of 137 wet markers hold the worst rung in more
+ * than one block — `[0,0,0,1,0,1,1]` is real. First-run logic reports "Rain 16:10 until 16:40" and
+ * hides the return. Spanning first to last overstates one dry half hour and understates nothing,
+ * which is the direction a flood app must be wrong in.
+ *
+ * `to` names the step AFTER the last wet one, because MET labels instants and the rain stops
+ * somewhere between the two. Naming the later one has the reader wait slightly too long. Naming the
+ * earlier one has them stop too early.
+ *
+ * `open` is true when the worst rung still holds at the final MET step. `to` then carries that final
+ * clock, and the card says "past" rather than "until" — the outlook ended, not the rain.
+ */
+function metSpan(array $rungs, array $clocks): ?array {
+    $worst = max($rungs);
+    if ($worst < 1) return null;
+
+    $at    = array_keys($rungs, $worst, true);
+    $first = $at[0];
+    $last  = end($at);
+    $open  = $last === count($rungs) - 1;
+
+    return [
+        'now'  => $rungs[0],
+        'hr1'  => $rungs[2],
+        'rung' => $worst,
+        'from' => $first === 0 ? null : $clocks[$first],
+        'to'   => $open ? $clocks[$last] : $clocks[$last + 1],
+        'open' => $open,
+    ];
+}
