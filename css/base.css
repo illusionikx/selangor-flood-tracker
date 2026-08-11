@@ -59,7 +59,10 @@
    be the one rung where the light and dark themes agree, and that is worth keeping. */
 :root {
   --k-river: #3a88ff; --k-rainfall: #8964ff; --k-siren: #ff3c7e;
-  --k-gauge: #a06f5d; --k-camera: #23a3b1; --k-mast: #5d6deb;
+  /* --k-weather is not a station kind. It colours the MET section on a card, which describes the
+     place and not a sensor at it. It sits in this block because every colour value in this app
+     does, and it must never take a traffic-light hue. */
+  --k-gauge: #a06f5d; --k-camera: #23a3b1; --k-mast: #5d6deb; --k-weather: #4a7f8c;
   /* Rainfall's own ramp: dry, then the two mid classes wear the kind colour, then heavy. Very heavy
      is --s-danger, like every other "this is now an emergency". */
   --k-rain-dry: #6a70ca; --k-rain-heavy: #c069ff;
@@ -137,7 +140,7 @@
    `--me` and `--fav` are here for the two marks inside `.pin` that read them. */
 :root[data-theme="dark"], .pin {
   --k-river: #66b2ff; --k-rainfall: #a893ff; --k-siren: #ff7aa4;
-  --k-gauge: #d4a48f; --k-camera: #2fd6e8; --k-mast: #96a4ee;
+  --k-gauge: #d4a48f; --k-camera: #2fd6e8; --k-mast: #96a4ee; --k-weather: #7fb3c0;
   --k-rain-dry: #8e95f0; --k-rain-heavy: #d488ff;
   /* Third pass: chroma to the sRGB edge on each hue, which for the three warm rungs meant dropping a
      little lightness — they were already at the edge where they sat. The floor here is 4.5 on the

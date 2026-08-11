@@ -92,6 +92,18 @@
 .sensorhead .muted { flex: 1; min-width: 0; text-align: right; overflow: hidden;
   text-overflow: ellipsis; white-space: nowrap; }
 
+/* The MET section. Three columns: the range for today, the weather now, then the hour ahead with
+   the worst-rung line under it. `min-width: 0` sits on every cell. A grid item defaults to
+   `min-width: auto`, which refuses to shrink below its content. Without it, a long word in the
+   wide column pushes the two narrow columns out of shape. */
+.wx { display: grid; grid-template-columns: 1fr 1fr 3fr; gap: 8px; align-items: start; }
+.wx > * { min-width: 0; }
+.wxcol { display: flex; flex-direction: column; gap: 2px; font-size: 12px; line-height: 1.35; }
+.wxcol .i { font-size: 15px; color: var(--k-weather); }
+.wxnow { align-items: center; text-align: center; }
+.wxout .wxline { color: var(--on-surface); }
+.wx .muted { font-size: 11px; }
+
 /* --- markers -------------------------------------------------------------------------------- */
 
 /* The glyph alone, in the station's own colour. It has been a filled disc, and before that a white
