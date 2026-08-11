@@ -2,7 +2,7 @@
 // status footer. The same meter/state blocks are reused by the alert panel.
 
 import { KINDS, SOURCES, SPARK_H, NO_INFO, ALERT_TITLE, RIVER_COLOR, RAIN_COLOR,
-         GAUGE_COLOR, RAIN_STOPS, NEAR_MAX_KM, camSrc } from './config.js';
+         GAUGE_COLOR, RAIN_STOPS, NEAR_MAX_KM, camSrc, WEATHER } from './config.js';
 import { num, ago, noSec, parseMY, distKm, hasInfo, isStale, statusColor, scalePos,
          levelStops, gaugeStops, gaugeColor, color, isFav } from './util.js';
 import { nearestOf, nearestCam, nearestLevel, camAlert } from './stations.js';
@@ -419,6 +419,49 @@ const favMark = (ids, set) => {
 const goName = s =>
   `<div class="popname" data-go="${s.id}" title="Show ${s.name} on the map">${s.name}</div>`;
 
+/* The MET section. One row of three columns, drawn once per card and never once per sensor — rain
+   over a place is one fact, and sourceInfo() already taught this app what a per-place fact costs
+   when it repeats down a six-sensor mast.
+   This is not a sensor at this place. The head carries the point name and how far away it is, which
+   is what lets a reader weigh a 14 km claim. */
+function metSection(s) {
+  const m = s.met;
+  if (!m) return '';
+
+  const w = r => WEATHER[r] || WEATHER[0];
+  const head = w(m.rung ?? m.now ?? 0);
+
+  /* Four shapes, and every one names both ends. `until` says the rain ends. `past` says the MET
+     outlook ended, and never that the rain did.
+     There is no "Raining now," prefix. The middle column states the weather now on every card, so
+     the prefix repeated the cell beside it and cost the line a second row. */
+  const rain = m.rung == null ? '' :
+    `${w(m.rung).line}${m.from ? ` ${m.from}${m.open ? ',' : ''}` : ''} `
+    + `${m.open ? 'past' : 'until'} ${m.to}`;
+
+  const temp = m.tmax == null ? '' :
+    `<div class="wxcol"><span><i class="i i-thermostat"></i> Today</span>
+       <span>${m.tmin}–${m.tmax}°</span></div>`;
+
+  const now = m.now == null ? '' :
+    `<div class="wxcol wxnow"><i class="i i-${w(m.now).icon}"></i>
+       <span>${w(m.now).word}</span></div>`;
+
+  const out = m.hr1 == null ? '' :
+    `<div class="wxcol wxout">
+       <span><i class="i i-${w(m.hr1).icon}"></i> In 1 hour: ${w(m.hr1).word}</span>
+       <span class="wxline">${rain}</span></div>`;
+
+  return `<div class="sensor" data-sensor="@met">
+      <div class="sensorhead">
+        <i class="glyph i i-${head.icon}" style="color:var(--k-weather)"></i>
+        <b>Weather</b>
+        ${m.at ? `<span class="muted">${m.at} · ${m.km} km</span>` : ''}
+      </div>
+      <div class="wx">${temp}${now}${out}</div>
+    </div>`;
+}
+
 export function popup(s) {
   const kind = KINDS[s.kind];
   const tone = hasInfo(s) ? kind.color : 'var(--muted)';
@@ -440,6 +483,7 @@ export function popup(s) {
         ${dots(s)}
       </div>
     </div>
+    ${metSection(s)}
     ${sensorBody(s)}`;
 }
 
@@ -478,6 +522,7 @@ export function sitePopup(members) {
                 ><i class="i i-${k.icon}"></i>${k.one || k.label}</span>`;
       }).join('')}</div>
     </div>
+    ${metSection(lead)}
     ${hasCam ? '' : camLink(lead, nearestCam(lead))}
     ${camFirst(members).map(m => `<div class="sensor" data-sensor="${m.id}">
       <div class="sensorhead">

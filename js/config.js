@@ -171,3 +171,11 @@ export const STATIC = false;
 export const FEED   = STATIC ? 'api.json' : 'api.php';
 export const camSrc = s =>
   STATIC ? s.image.replace(/^http:/i, 'https:') : `api.php?cam=${s.id.split('-')[1]}`;
+
+/* The three rungs MET publishes. `word` fills the narrow "now" column, so it has to be one word at
+   about 64px. `line` opens the worst-rung sentence, which is why the two differ. */
+export const WEATHER = [
+  { icon: 'sunny',       word: 'Clear', line: '' },
+  { icon: 'rainy',       word: 'Rain',  line: 'Rain' },
+  { icon: 'rainy_heavy', word: 'Heavy', line: 'Heavy rain' },
+];
