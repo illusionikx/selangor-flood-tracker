@@ -246,7 +246,7 @@ function metPoints(string $html): array {
             $rungs[]  = metRung($what);
             $clocks[] = metClock($when);
         }
-        // Index 0 is deliberately null — now has no clock — so only steps 1 to 6 are tested.
+        // Index 0 holds null on purpose, because now has no clock. So this test covers steps 1 to 6.
         if (in_array(-1, $rungs, true) || in_array(null, array_slice($clocks, 1), true)) continue;
 
         $stamp = DateTime::createFromFormat('d/m/Y h:i A', preg_replace('/\s+/', ' ', trim($st[1])),
