@@ -234,6 +234,30 @@ function sirenBacked(float $lat, float $lng, array $rivers): ?bool {
 }
 
 /**
+ * The MET point nearest a station, or null when none is within MET_KM.
+ *
+ * This is Thiessen assignment, which is the same answer a Voronoi tessellation over the MET points
+ * gives — a Voronoi cell holds exactly the area nearer its own seed than any other. So the polygons
+ * are not built. `argmin` gives the identical result.
+ *
+ * Interpolation is not an option here and that is not a compromise. MET publishes a CATEGORY, and an
+ * average of "Tiada Hujan" and "Hujan Lebat" is "Hujan", a reading MET never made. Kriging and
+ * inverse distance weighting both beat Thiessen for areal rainfall in millimetres, and neither can
+ * touch a category.
+ *
+ * Returns [point, km]. Equirectangular, like every other distance in this file.
+ */
+function metNearest(float $lat, float $lng, array $points): ?array {
+    $best = null;
+    $bestKm = INF;
+    foreach ($points as $p) {
+        $km = hypot($p['lat'] - $lat, ($p['lng'] - $lng) * cos(deg2rad($lat))) * 111;
+        if ($km < $bestKm) { $bestKm = $km; $best = $p; }
+    }
+    return ($best !== null && $bestKm <= MET_KM) ? [$best, $bestKm] : null;
+}
+
+/**
  * The published position of a camera, or the corrected one where JPS shuffled a batch. See CAM_FIX.
  * Cameras only, because the shuffle touched no other kind, and only while the feed disagrees by
  * more than CAM_FIX_KM. That last test stops the table going stale: once JPS publishes the right
@@ -839,6 +863,22 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
     $ok('rubbish parses to nothing',        metDaily('not json') === []);
     $ok('an empty body parses to nothing',  metDaily('') === []);
 
+    /* The radius is the whole claim. A point inside it speaks for the station, a point outside it
+       says nothing at all, and no station takes a value from a point it cannot reach. */
+    echo "\nmetNearest():\n";
+    $pts = [
+        ['name' => 'Shah Alam',   'lat' => 3.0719, 'lng' => 101.5170],
+        ['name' => 'Kuala Lumpur','lat' => 3.1593, 'lng' => 101.7114],
+    ];
+    // TAMAN SRI MUDA, 3.037984 / 101.534493 — about 4 km from Shah Alam.
+    $near = metNearest(3.037984, 101.534493, $pts);
+    $ok('the nearer point wins',       ($near[0]['name'] ?? '') === 'Shah Alam');
+    $ok('the distance comes back',     $near[1] > 3.0 && $near[1] < 5.0);
+
+    // F.D.C SEKINCHAN, 3.5 / 101.1 — far outside MET_KM of either point.
+    $ok('a point out of reach gets nothing', metNearest(3.5, 101.1, $pts) === null);
+    $ok('an empty list gets nothing',        metNearest(3.0379, 101.5344, []) === null);
+
     echo $fail ? "\n$fail FAILED\n" : "\nall ok\n";
     exit($fail ? 1 : 0);
 }
@@ -1431,6 +1471,45 @@ foreach ($stations as $s) {
     if ($d) $sourceTs = max($sourceTs, $d->getTimestamp());
 }
 
+/* Weather onto stations. Two joins, because the two feeds key differently. The nowcast joins by
+   distance, since MET places its points by town and nothing links them to a station code. The
+   forecast joins by district, which needs no coordinates at all.
+   This adds no alert surface. Nothing here touches a status, a colour or a count. */
+$metMatched = $metDayMatched = 0;
+
+foreach ($stations as &$s) {
+    $met = [];
+
+    if ($metPts && $s['lat'] && $s['lng']) {
+        $hit = metNearest($s['lat'], $s['lng'], $metPts);
+        if ($hit) {
+            [$p, $km] = $hit;
+            /* The join carries `now` and `hr1` whenever a point is in reach, because the card gives
+               each of them a column and "clear" is an answer. Only the span keys — rung, from, to,
+               open — depend on there being rain to describe, and metSpan() returns null when there
+               is not. The `+` operator keeps the left side, so the two copies of `now` agree by
+               construction. */
+            $span = metSpan($p['rungs'], $p['clocks']);
+            $met = ['at'  => $p['name'], 'km'  => round($km, 1),
+                    'now' => $p['rungs'][0], 'hr1' => $p['rungs'][2]] + ($span ?: []);
+            $metMatched++;
+        }
+    }
+
+    /* Kuala Lumpur is one district to MET and thirteen constituencies to JPS — Segambut, Batu,
+       Setiawangsa and the rest. Every one of them carries state "Kuala Lumpur", so the state is
+       the key there. Match on state and district together everywhere else: district names repeat
+       across states, which is the whole reason dkey() exists in js/util.js. */
+    $dk = $s['state'] === 'Kuala Lumpur' ? 'kuala lumpur' : strtolower(trim((string)$s['district']));
+    if (isset($metDay[$dk])) {
+        $met += $metDay[$dk];
+        $metDayMatched++;
+    }
+
+    if ($met) $s['met'] = $met;
+}
+unset($s);
+
 $payload = json_encode([
     'fetched'  => date('c'),
     'stations' => $stations,
@@ -1465,6 +1544,8 @@ $payload = json_encode([
         'kl'       => ['parsed' => count($kl), 'added' => $klAdded, 'merged' => $klDupes],
         'national' => ['parsed' => count($nat), 'applied' => count($natUsed),
                        'unmapped' => count($nat) - count($natUsed)],
+        'met'      => ['parsed' => count($metPts), 'matched' => $metMatched],
+        'metday'   => ['parsed' => count($metDay), 'matched' => $metDayMatched],
     ],
     'offline'  => count(array_filter($stations, fn($s) => !$s['online'])),
 ], JSON_UNESCAPED_SLASHES);
