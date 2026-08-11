@@ -8,3 +8,4 @@ lib/
 .place.stamp
 .place.lock
 shots/
+.superpowers/
