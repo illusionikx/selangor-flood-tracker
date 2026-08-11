@@ -978,7 +978,6 @@ $lists = fetchAll([
     'siren'    => API . 'StationSirens',
     'gauge'    => API . 'StationFloodGauges',
     'camera'   => API . 'CCTVS',
-    'hotspot'  => API . 'Hotspots/GetHotspots',
 ]);
 $get = fn($k) => $lists[API . $k] ?? [];
 
@@ -1150,7 +1149,6 @@ foreach ([['siren', 'StationSirens'], ['gauge', 'StationFloodGauges'], ['camera'
             'lng'      => $lng,
             'status'   => (int)($fg['status'] ?? $s['status'] ?? 0),
             'online'   => !$stale && (bool)($s['isOnline'] ?? ((int)($s['stationStatus'] ?? 0) === 1)),
-            'reading'  => $s['lastReading'] ?? null,
             'source'   => 'selangor',
             'updated'  => $updated,
         ];
@@ -1184,7 +1182,7 @@ foreach ($kl as $s) {
         'online' => $s['level'] !== null,
         'level' => $s['level'], 'alert' => $s['alert'], 'warning' => $s['warning'], 'danger' => $s['danger'],
         'code' => $s['code'], 'source' => 'kl', 'state' => klState($s['district']),
-        'srcTrend' => $s['srcTrend'], 'updated' => $s['updated'],
+        'updated' => $s['updated'],
     ] : [
         'kind' => 'rainfall', 'id' => 'kl-rf-' . $s['code'], 'name' => $s['name'],
         'district' => $s['district'], 'basin' => null, 'lat' => $s['lat'], 'lng' => $s['lng'],
@@ -1370,14 +1368,6 @@ foreach ($stations as &$s) {
 }
 unset($s);
 
-$byDistrict = [];
-foreach ($stations as $s) {
-    $d = $s['district'] ?: 'UNKNOWN';
-    $byDistrict[$d]['total'] = ($byDistrict[$d]['total'] ?? 0) + 1;
-    if ($s['kind'] === 'river' && $s['status'] > 0) $byDistrict[$d]['alerts'] = ($byDistrict[$d]['alerts'] ?? 0) + 1;
-    if (!empty($s['rising'])) $byDistrict[$d]['rising'] = ($byDistrict[$d]['rising'] ?? 0) + 1;
-}
-
 // Freshness of the readings themselves (upstream stamps them "d/m/Y H:i:s"), not just of our fetch.
 $sourceTs = 0;
 foreach ($stations as $s) {
@@ -1389,8 +1379,6 @@ foreach ($stations as $s) {
 $payload = json_encode([
     'fetched'  => date('c'),
     'stations' => $stations,
-    'hotspots' => $get('Hotspots/GetHotspots') ?: [],
-    'district' => $byDistrict,
     'cacheAge' => 0,
     'ttl'      => TTL,
     'upstreamOk' => true,

@@ -89,8 +89,9 @@ Base: `https://infobanjirjps.selangor.gov.my/JPSAPI/api/` — public, no auth, *
 (hence the proxy). Discovered from `data/config.json` + `jpsFunction/map1.js` on the JPS site.
 
 **List endpoints** (all stations, coordinates, status codes — but *no readings*):
-`StationRainfalls`, `StationRiverLevels`, `StationSirens`, `StationFloodGauges`, `CCTVS`,
-`Hotspots/GetHotspots`.
+`StationRainfalls`, `StationRiverLevels`, `StationSirens`, `StationFloodGauges`, `CCTVS`.
+`Hotspots/GetHotspots` exists and is **not** fetched: it published 53 entries into the payload and no
+client script ever read one. Add the URL back to `$lists` the day something plots them.
 
 **Detail endpoints** `…/{id}` carry the actual values. Fetched for rainfall, river, gauge, camera
 via `curl_multi` (~270 requests, ~3s cold). **The lists alone are not enough** — e.g. flood gauges
@@ -131,8 +132,10 @@ so columns are read by **position, guarded on row width** (14 cells for both). C
 only inside the row's `onclick="loadMapPage(lat, lng, …)"`.
 
 Also publishes its own trend arrow (`<img trend="Rising|Receding|No Change">`) — the only feed that
-does. Parsed into `srcTrend` but **no longer used**: `rising` is now a claim about reaching a danger
-mark within hours, and a bare direction arrow is no evidence for that.
+does. **Not parsed.** It was read into `srcTrend` and never used, and both the parser and the field
+are gone. `rising` is a claim about reaching a danger mark within hours, and a bare direction arrow
+is no evidence for that. Column 13 is still in the layout comment in `sources.php`, because the
+14-cell row guard counts it.
 
 Sirens are skipped: 11 stations with ragged column counts, and the state cell is the one that goes
 missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.

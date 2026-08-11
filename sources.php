@@ -109,13 +109,9 @@ function klStations(array $pages): array {
         $out[] = [
             'kind' => 'river', 'code' => $c[1], 'name' => $c[3], 'district' => $c[4], 'basin' => $c[5],
             'lat' => $lat, 'lng' => $lng,
-            'level' => numOrNull($c[8]), 'normal' => numOrNull($c[9]), 'alert' => numOrNull($c[10]),
+            'level' => numOrNull($c[8]), 'alert' => numOrNull($c[10]),
             'warning' => numOrNull($c[11]), 'danger' => numOrNull($c[12]),
             'updated' => myTime($c[7]),
-            // SPHTN publishes its own arrow ("Rising" / "Receding" / "No Change"). We keep it only
-            // as a cold-start fallback: our own m/h rate needs an hour of samples this feed can't
-            // give us retroactively.
-            'srcTrend' => klTrend($tds->eq(13)),
         ];
     }
 
@@ -153,11 +149,6 @@ function klLatLng(Crawler $nameCell): array {
         }
     }
     return [null, null];
-}
-
-function klTrend(Crawler $td): ?string {
-    $img = $td->filter('img[trend]');
-    return count($img) ? ($img->attr('trend') ?: null) : null;
 }
 
 /** Water-level status from thresholds: the scraped feeds publish values, not a status code. */
