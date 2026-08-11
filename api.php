@@ -156,6 +156,19 @@ const NOMINATIM   = 'https://nominatim.openstreetmap.org/search';
    `siteM` and `ttl` below. No client script reads it today. */
 const BOX = [100.72, 3.95, 102.02, 2.50];
 
+/* MET Malaysia. Two products, two hosts, both reached from PHP only — the browser still talks to
+   this origin and to CARTO and to nothing else.
+   MET_KM is the radius a nowcast point speaks across. It comes from the decorrelation distance
+   for rainfall, which grows with the period measured: about 7.8 km at 10 minutes and about 26.5 km
+   at 3 hours. The card states a claim about a 3-hour window, so 15 km sits well inside it. A line
+   that ever claims rain is falling AT THIS MOMENT needs a much tighter radius, near 3 km. Do not
+   reuse this constant for one. */
+const MET_URL     = 'https://www.met.gov.my/nowcasting/';
+const MET_DAY_URL = 'https://api.data.gov.my/weather/forecast/';
+const MET_KM      = 15.0;
+const MET_STALE   = 7200;    // 2 h — an old projection is worse than none
+const MET_DAY_TTL = 21600;   // 6 h — the forecast changes once a day
+
 date_default_timezone_set('Asia/Kuala_Lumpur'); // upstream timestamps are local MYT, unlabelled
 
 const HOST = 'infobanjirjps.selangor.gov.my';
@@ -1048,10 +1061,15 @@ $db->exec('CREATE TABLE IF NOT EXISTS page (url TEXT PRIMARY KEY, ts INTEGER, bo
 // updates faster than a quarter hour. Refetching them every 5 minutes would triple the cost of a
 // poll for data that cannot have changed. A page that fails to fetch falls back to the last copy we
 // stored — a slow upstream should cost freshness, never a whole region's worth of pins.
-$extraUrls = nationalUrls() + klUrls();
+$extraUrls = nationalUrls() + klUrls() + metUrls($now);
 $stored = [];
 foreach ($db->query('SELECT url, ts, body FROM page') as $r) $stored[$r['url']] = $r;
-$want = array_filter($extraUrls, fn($u) => ($stored[$u]['ts'] ?? 0) < $now - SCRAPE_TTL);
+// The daily forecast changes once a day, so it gets its own clock. Everything else keeps SCRAPE_TTL.
+$ttlFor = fn(string $k) => $k === 'met-day' ? MET_DAY_TTL : SCRAPE_TTL;
+$want = [];
+foreach ($extraUrls as $k => $u) {
+    if (($stored[$u]['ts'] ?? 0) < $now - $ttlFor($k)) $want[$k] = $u;
+}
 
 $raw = fetchAll($detailUrls + $want, 20, false);
 $details = [];
@@ -1065,6 +1083,19 @@ foreach ($extraUrls as $k => $u) {
     $pages[$k] = $body !== '' ? $body : ($stored[$u]['body'] ?? '');
 }
 $page = fn(string $k) => $pages[$k] ?? '';
+
+// The forecast URL carries the current date, so no later request reads a row a day old again. Two
+// days of slack cover a clock that slips backward, so the delete never removes a row this code wants.
+$db->prepare('DELETE FROM page WHERE url LIKE ? AND ts < ?')
+   ->execute([MET_DAY_URL . '%', $now - 2 * 86400]);
+
+/* MET publishes its own stamp, and that stamp decides whether the nowcast is worth keeping. A
+   projection more than MET_STALE old describes weather that has already happened, and a card stating
+   old weather is worse than a card stating nothing — the same rule that renders an offline gauge grey
+   rather than steady. */
+$metPts = metPoints($page('met-now'));
+$metPts = array_values(array_filter($metPts, fn($p) => $p['stamp'] >= $now - MET_STALE));
+$metDay = metDaily($page('met-day'));
 
 // One-off carry-over from the flat file, so trends survive the switch instead of going null for an
 // hour. Deletes itself; drop this block once no deployment has a .history.json left.

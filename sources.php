@@ -327,3 +327,17 @@ function metDaily(string $json): array {
     }
     return $out;
 }
+
+/**
+ * Both MET URLs, keyed for the page cache.
+ *
+ * The filter limits the forecast to one day, which cuts the response from 585 KB to 103 KB. That
+ * puts a date inside the cache key, so the row from the day before dies the moment the date rolls.
+ * api.php prunes those, the same way it prunes stale `place:` rows.
+ */
+function metUrls(int $now): array {
+    return [
+        'met-now' => MET_URL,
+        'met-day' => MET_DAY_URL . '?filter=' . date('Y-m-d', $now) . '@date',
+    ];
+}
