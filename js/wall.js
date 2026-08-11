@@ -138,6 +138,16 @@ const cameras = () => state.data
     || (a.district || 'Unknown').localeCompare(b.district || 'Unknown')
     || a.name.localeCompare(b.name));
 
+/* Cameras the feeds publish with no picture to show. They are the ones `cameras()` above filters
+   out, and until the footer named them the grid simply drew three fewer tiles than there are
+   cameras and said nothing — which reads as ninety cameras existing rather than as ninety of
+   ninety-three answering. A tile that fails to *load* is a different thing and is not counted here:
+   that number depends on how far a reader has scrolled, because tiles arm on view, so it would
+   climb as you moved and read as the wall breaking under you. This one is a fact about the payload
+   and holds still. Fixed at open(), like the grid itself — see paint() for why neither is rebuilt
+   on a poll, and a count that moved while the tiles it counts did not would disagree with them. */
+let offline = 0;
+
 /* `data-cam` is the numeric id the proxy takes, present only on a tile whose coordinate is real.
    Two delegated handlers in js/ui.js read this attribute, and they read two different shapes of it.
    `el('camGrid').onclick` is this grid's own handler: it takes the bare number this tile writes and
@@ -262,6 +272,7 @@ function tick() {
 export function open() {
   close();
   const cams = cameras();
+  offline = state.data.filter(s => s.kind === 'camera').length - cams.length;
   const grid = el('camGrid');
   grid.innerHTML = cams.map(tileHtml).join('');
   laps.clear();
@@ -295,13 +306,16 @@ export function close() {
 
 /* The count line. `shown` is the number the filter left visible, and it defaults to all of them so
    open() and the filter write the same line through the same function.
-   A filter that empties a view in silence reads as a broken view, so the empty case says so. */
+   A filter that empties a view in silence reads as a broken view, so the empty case says so.
+   The offline tail is appended only to the lines that carry a total. On "No camera matches that
+   name." it would answer a question nobody asked, about cameras the filter is not talking about. */
 export function count(shown = laps.size) {
   const total = laps.size;
+  const tail = offline ? ` · ${offline} offline` : '';
   el('camCount').textContent = !total ? 'No cameras'
     : !shown ? 'No camera matches that name.'
-    : shown === total ? `${total} cameras`
-    : `${shown} of ${total} cameras`;
+    : shown === total ? `${total} cameras${tail}`
+    : `${shown} of ${total} cameras${tail}`;
 }
 
 /* What a poll changes, and nothing else. js/render.js calls this instead of rebuilding the grid,

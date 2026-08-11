@@ -724,6 +724,23 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   returns. `stop()` clears the id and the second `start()` sets it back, so both continuations
   match. `gen` catches that case. `stop()` bumps it on every call, so a stale run can never match
   again.
+- **`.shotwrap` clips its overflow and holds two children, so nothing may pin its height to one of
+  them.** The box carries the picture *and* the `<p class="clipcap">` caption under it. `.done`
+  relaxes it to `aspect-ratio: auto` so it measures both. `.shotwrap.strip` used to pin it back to
+  `16 / 9` — giving the strip `<img>` a definite box to resolve `height: 100%` against — which made
+  the box exactly the picture's height, started the caption on its bottom edge and cut it off.
+  `tick()` toggles `.strip` once a lap, so the caption flashed on for the one second a lap spends on
+  the live still and vanished for the other six. **Nothing in `js/clip.js` was wrong**: `capText` is
+  held at module scope precisely so a rebuild repaints it, and the text never changed — two JS
+  explanations were chased first (`stop()` blanking `capText`, `finishEmpty()`'s `id = null` forcing
+  a re-probe) and neither fires, because every camera serves a strip. The ratio still has to be
+  stated, or `.shot`'s own `16 / 9` computes a height off the `--n`-times-wider width and grows the
+  picture taller per cell — so state it **on the image**, `aspect-ratio: calc(var(--n, 1) * 16 / 9)`,
+  where widening the ratio by the same factor as the width holds one cell at a single frame's height
+  and leaves the wrapper free. `.shotwrap.strip { aspect-ratio: auto }` is then explicit rather than
+  left to `.done`: `bind()` re-adds `.strip` to a fresh `<img>` on every poll, before that image has
+  fired `load`, and the base rule would otherwise clip the caption once per poll instead of once per
+  lap. Anything added to that box gets the same treatment.
 - **The lightbox reads its camera from `data-clip`, not from the clicked image's `src`.** The panel
   clip plays a strip for its archived cells (see the `?sheet=` gotcha above) but still ends every
   lap on a fresh live still, so `img.src` cycles between the strip's own URL and a `?cam=<id>` one

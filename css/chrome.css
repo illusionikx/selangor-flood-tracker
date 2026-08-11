@@ -562,7 +562,13 @@ table.data .dash { color: var(--outline); }
   border-bottom: 1px solid var(--outline); background: var(--surface);
 }
 #camBox h2 { font-size: 18px; font-weight: 500; }
-#camBox #camFind { margin-bottom: 6px; }
+
+/* The tally, in the footer under the grid. Same shell rule as `.dtop` in reverse: `flex: none` so
+   it keeps its own height while `#camGrid` takes the rest, and a border on the edge it faces. */
+#camBox #camCount {
+  flex: none; margin: 0; padding: 10px 20px;
+  border-top: 1px solid var(--outline); background: var(--surface);
+}
 
 /* --- loading progress ------------------------------------------------------------------------- */
 
@@ -570,12 +576,24 @@ table.data .dash { color: var(--outline); }
    would sit near empty for the whole session and read as stuck. This one tracks the batch actually
    in flight instead — the tiles that have started loading their own first picture and have not yet
    settled — and hides between batches rather than idling at a number nobody is waiting on.
-   The track's own box, height plus margin, stays in `#camBox`'s flex column always, whether a batch
-   is running or not — so toggling it never resizes `#camGrid` above or below it. Only `opacity` and
-   `aria-hidden` change; the space they change inside does not. */
+
+   Shape: the seam between the header and the content it is loading, edge to edge, 4px, square. That
+   is where every determinate progress indicator on a loading region belongs, and it is what makes
+   this one read as "the panel below is filling" rather than as an object of its own. The inset,
+   fully-rounded pill on a grey track it replaced is a component sitting *in* the layout — it needs
+   its own margins to look deliberate, its own row so it does not shove the grid, and it still reads
+   as a widget somebody parked there. This one is a state of the boundary.
+   `margin-bottom: -4px` is what buys the boundary. The bar keeps its 4px of paint and gives the
+   same 4px back to the column, so it contributes no height at all and `#camGrid` cannot be resized
+   by anything this element does — the guarantee the reserved row used to provide, with no row. It
+   lands on the grid's own top padding, so it never covers a tile. `z-index` because the grid that
+   now starts underneath it would otherwise paint over it.
+   The track is the indicator's own colour at low weight rather than `--outline`: the two halves of
+   one bar should be one hue at two strengths, and a neutral grey track reads as a groove the fill
+   travels along instead. */
 #camBar {
-  position: relative; flex: none; height: 3px; margin: 0 20px;
-  border-radius: 999px; background: var(--outline);
+  position: relative; z-index: 1; flex: none; height: 4px; margin-bottom: -4px;
+  background: color-mix(in srgb, var(--accent) 20%, transparent);
   opacity: 0; transition: opacity .15s;
 }
 #camBar.on { opacity: 1; }
@@ -584,7 +602,7 @@ table.data .dash { color: var(--outline); }
    left edge, so the fraction reads as filling the bar rather than growing from its centre. */
 #camBar::after {
   content: ''; position: absolute; inset: 0; transform-origin: 0 50%;
-  background: var(--accent); border-radius: inherit;
+  background: var(--accent);
   transform: scaleX(var(--p, 0)); transition: transform .2s ease;
 }
 @media (prefers-reduced-motion: reduce) { #camBar, #camBar::after { transition: none; } }
@@ -777,6 +795,7 @@ table.data .dash { color: var(--outline); }
 @media (max-width: 600px) {
   #camBox { width: 100vw; height: 100dvh; max-width: none; border-radius: 0; border: 0; }
   #camGrid { padding: 12px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  #camBox #camCount { padding: 10px 12px; }   /* follows the grid's own inset in */
 }
 
 /* --- live status dot + its popover ---------------------------------------------------------- */

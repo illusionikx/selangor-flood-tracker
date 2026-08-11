@@ -30,8 +30,8 @@
 <link rel="stylesheet" href="vendor/markercluster.css">
 <link rel="stylesheet" href="vendor/fonts.css?v=49">
 <link rel="stylesheet" href="css/icons.css?v=76">
-<link rel="stylesheet" href="css/base.css?v=103">
-<link rel="stylesheet" href="css/chrome.css?v=131">
+<link rel="stylesheet" href="css/base.css?v=104">
+<link rel="stylesheet" href="css/chrome.css?v=132">
 <link rel="stylesheet" href="css/map.css?v=125">
 
 <!-- A camera still. A <dialog>, not a div: it opens from the all-stations table, which is itself a
@@ -652,14 +652,16 @@
     </div>
     <input id="camFind" type="text" autocomplete="off" placeholder="Filter by name or district…"
            aria-label="Filter cameras">
-    <p id="camCount" class="muted"></p>
   </div>
-  <!-- The batch-in-flight bar. Reserves its own row in #camBox's column layout always — see the
-       comment in css/chrome.css on why that has to hold whether or not a batch is running — so
-       js/wall.js only ever toggles `.on` and the aria attributes, never the element's presence. -->
+  <!-- The batch-in-flight bar, on the seam between the header and the grid. It takes no height of
+       its own — see the comment in css/chrome.css — so js/wall.js only ever toggles `.on` and the
+       aria attributes, never the element's presence. -->
   <div id="camBar" role="progressbar" aria-label="Loading camera pictures"
        aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-hidden="true"></div>
   <div id="camGrid"></div>
+  <!-- The tally, under the thing it counts. A total belongs after the list, where a reader arrives
+       at it having seen what it is totalling, rather than above one as a claim to check. -->
+  <p id="camCount" class="muted"></p>
 </dialog>
 <div id="map"></div>
 <!-- Station detail, fixed to the right edge of the viewport. It was a Leaflet popup, which is

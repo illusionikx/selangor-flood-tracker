@@ -641,11 +641,24 @@ dialog:focus, dialog:focus-visible { outline: none; }
    and lets it size off the `<img>` instead — fine for one frame, but a strip's `<img>` is about to
    go `--n` times wider, and if its own height stayed `auto` too, `.shot`'s `aspect-ratio: 16/9`
    would compute that height off the *widened* width and grow the frame taller with every extra
-   cell. Reinstating a fixed ratio here gives the strip image a definite box to resolve its own
-   `height: 100%` against, which is what holds the height constant instead. */
-.shotwrap.strip { aspect-ratio: 16 / 9; }
+   cell. The ratio therefore has to be stated somewhere, and it must be **on the image, not on the
+   wrapper**. Widening the picture by `--n` widens its ratio by `--n` as well, so one cell resolves
+   to the same height a single frame had, and the wrapper is free to stay `auto` and size to its
+   whole content.
+   Pinning the *wrapper* back to 16/9 does the same arithmetic and clips the caption. `.shotwrap`
+   holds the `<p class="clipcap">` as well as the picture, and it is `overflow: hidden`, so a
+   wrapper measured at exactly the picture's height starts the caption on its bottom edge and cuts
+   it off. tick() toggles `.strip` once a lap, which made the caption flash on for the one second a
+   lap spends on the live still and vanish for the rest. Nothing in js/clip.js was involved: the
+   text it writes never changed. Keep the ratio on `.shot` and the wrapper measures both children.
+   `auto` is stated rather than left to `.done`, because a strip can be playing before `.done` is on
+   the box: render() rebuilds the open card on every poll and bind() re-adds `.strip` to a brand new
+   `<img>` that has not fired `load` yet, so for that moment the wrapper would fall back to the base
+   16/9 above and clip the caption once per poll. The `<img>`'s own width and ratio both resolve off
+   `--n` alone, with no loaded picture needed, so there is nothing for the wrapper to hold open. */
+.shotwrap.strip { aspect-ratio: auto; }
 .shotwrap.strip .shot {
-  width: calc(var(--n, 1) * 100%); height: 100%;
+  width: calc(var(--n, 1) * 100%); aspect-ratio: calc(var(--n, 1) * 16 / 9);
   transform: translateX(calc(var(--i, 0) / var(--n, 1) * -100%));
   /* `cover` scales the whole wide strip by one factor and crops whatever is left over off its two
      outer edges — checked by the numbers, not by eye: with the strip several cells wide, that crop
@@ -654,10 +667,10 @@ dialog:focus, dialog:focus-visible { outline: none; }
      else. `fill` scales width and height independently with no crop at all, and because the box and
      the bitmap both widen by exactly `--n` together, that scale factor is the same for every cell —
      the one object-fit value the width/transform arithmetic above actually lines up against real
-     cell boundaries under. `.shotwrap` and `.shot` already agree at 16 / 9, the same ratio as
-     shots.php's SHEET_W x SHEET_H, so this is a plain unscaled fit here — the distortion this
-     enables only shows up on a box whose own ratio disagrees with a cell's, which is `.camtile`'s
-     case in css/chrome.css and not this one. */
+     cell boundaries under. The box this `.shot` gets is `--n * 16 / 9`, and a strip of `--n` cells
+     at shots.php's SHEET_W x SHEET_H is that exact ratio, so `fill` scales nothing here at all —
+     the distortion it permits only shows up on a box whose ratio disagrees with the bitmap's, which
+     is `.camtile`'s case in css/chrome.css and not this one. */
   object-fit: fill;
 }
 

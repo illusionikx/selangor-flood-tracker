@@ -5882,3 +5882,103 @@ the two apart. Ask what a field is for before you delete it.
 
 **Trade-off accepted.** `hotspots` was real data, at 53 entries per poll. Nothing plotted it. It
 returns in one line the day something does.
+
+---
+
+## The clip caption was clipped by the box that holds it
+
+The station panel's camera card prints one line under the picture: `Last 3 hours` while a clip
+plays, or when the still was taken when there is no clip. That line disappeared and came back, over
+and over, for as long as the card stayed open.
+
+`js/clip.js` was not involved. It keeps the caption's text in `capText` at module scope for exactly
+this reason, and `bind()` writes it back on every rebuild. The text it held never changed.
+
+The fault was one CSS rule and the element tree under it. `camImg()` in `js/popup.js` puts the
+picture and the caption in one box:
+
+```html
+<div class="shotwrap" data-clip="1279"><img class="shot"><p class="clipcap"></p></div>
+```
+
+`.shotwrap` carries `overflow: hidden`. `.shotwrap.done` relaxes it to `aspect-ratio: auto` once the
+first picture loads, so the box measures the image **and** the caption. `.shotwrap.strip` then pinned
+it back to `16 / 9`, and the strip's own image took `height: 100%` of that. So the box was exactly
+the height of the picture, the caption started on its bottom edge, and `overflow: hidden` cut it off.
+
+`tick()` toggles `.strip` once per lap: off at the live position, on at cell 0. The caption was
+therefore visible for the one second a lap spends on the live still and hidden for the rest of it.
+At six cells that is one second on and six off, forever.
+
+**The fix is where the ratio lives, not whether it exists.** The ratio has to be stated — a strip is
+`--n` times wider than a frame, and `.shot`'s own `16 / 9` would compute its height off that widened
+width and grow the picture taller with every extra cell. Stating it on the **image** instead solves
+the same problem without measuring the box: `aspect-ratio: calc(var(--n, 1) * 16 / 9)` widens the
+ratio by the same factor the width widens by, so one cell resolves to the height a single frame had,
+and the wrapper is left free to size to both its children.
+
+`.shotwrap.strip { aspect-ratio: auto }` is then stated rather than inherited from `.done`. A strip
+can be playing before `.done` is on the box: `render()` rebuilds the open card on every poll and
+`bind()` re-adds `.strip` to a new `<img>` that has not fired `load` yet. Without the explicit
+`auto`, the base `16 / 9` would take over for that moment and clip the caption once per poll — the
+same bug, at a slower rate, which is the harder one to see.
+
+**The rule this draws.** A box that clips its overflow, and holds more than one thing, must not have
+its height pinned by one of them. Two other explanations were considered first and both were wrong:
+that `stop()` was blanking `capText` on a re-probe, and that `finishEmpty()`'s `id = null` forced a
+re-probe on every poll. Both are real code paths and neither fires here — every camera serves a
+strip, so `finishEmpty()` is not on the common path at all. Checking that (`?sheet=` returns 200 for
+every camera) is what ruled the JS out and sent the search to the stylesheet.
+
+## The camera wall states its total at the foot, and how many are not answering
+
+Two changes to `#camBox`, and one number that was missing.
+
+**The count moved to the foot of the dialog.** It sat under the filter box, above the grid, where a
+total is a claim a reader has to take on trust before seeing anything. Under the grid it is what a
+reader arrives at. `#camCount` is now the last child of the dialog, with `flex: none` and a
+`border-top`, the same shell `.dtop` uses on the edge it faces.
+
+**It names the cameras that publish no picture.** `cameras()` in `js/wall.js` filters on `s.image`,
+so a camera with nothing to show has always been dropped from the grid in silence. On the payload
+this was built against that is 3 of 93, and the dialog drew 90 tiles and said `90 cameras` — true,
+and it left the reader with no way to know the other three exist. The line now reads
+`90 cameras · 3 offline`.
+
+The number counts the payload, not failed loads. A tile that fails to fetch its picture is a
+different thing and is deliberately not in it: tiles arm as they scroll into view, so a count of
+failures would start at zero and climb as a reader moved down the wall, which reads as the page
+breaking under them. `offline` is fixed at `open()`, like the grid itself — `paint()` deliberately
+does not rebuild the grid on a poll, and a total that moved while the tiles it counts did not would
+disagree with them.
+
+The tail is appended only to the lines that carry a total. `No camera matches that name.` does not
+take it: the filter is not talking about those cameras, and answering an unasked question there is
+the padding the message standard already bans.
+
+## The loading bar is the seam, not a widget parked above it
+
+`#camBar` was an inset pill: `margin: 0 20px`, `border-radius: 999px`, 3px tall, on a grey
+`--outline` track, holding a reserved row of its own in the dialog's flex column so that toggling it
+could never resize the grid.
+
+That shape is a component *in* the layout. It needs its own margins to look deliberate, its own row
+so it does not shove anything, and it still reads as an object somebody placed there rather than as
+the state of the thing it describes. It is now the boundary between the header and the grid: edge to
+edge, 4px, square, no margins.
+
+**`margin-bottom: -4px` is what buys that.** The bar keeps its 4px of paint and returns the same 4px
+to the column, so it contributes no height at all. That is the identical guarantee the reserved row
+gave — `#camGrid` cannot be resized by anything this element does — with no row to reserve. It lands
+on the grid's own top padding, so it never covers a tile, and it takes a `z-index` because the grid
+now starts underneath it.
+
+**The track is the indicator's own colour at low weight**, `color-mix(in srgb, var(--accent) 20%,
+transparent)`, not `--outline`. Two halves of one bar should be one hue at two strengths. A neutral
+grey track reads as a groove that a separate coloured thing slides along, which is the widget
+reading this change is getting rid of. `border-radius: inherit` came off `#camBar::after` with the
+radius it was inheriting.
+
+**Not changed.** The bar still tracks the batch in flight rather than all ~90 cameras, for the reason
+already recorded above it: tiles arm on view, so a bar counting every camera would sit near empty all
+session and read as stuck.
