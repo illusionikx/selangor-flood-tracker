@@ -6024,3 +6024,49 @@ overlay that fades itself out needs `pointer-events: none` stated on the faded s
 files this beside the `#gotoBox` focus trap, which is the same sentence of the spec seen from the
 other end: there a transitioned `visibility` refused a `focus()` on something already on screen,
 here it accepted a click on something already gone.
+
+## Two heatmaps could both be on, which the drawer says is impossible
+
+The Heatmap section states one choice: water level, rainfall, or neither. `PREFS.heatLayer` stores
+exactly that, as `'water'`, `'rain'` or `''`. The pair could still end up both on, by two routes,
+and once there it stayed.
+
+**The markup carried a second source of truth.** `#heat` had a `checked` attribute and `#rainHeat`
+did not. `js/ui.js` writes both boxes from the pref, but it is a deferred module, so between parse
+and run the DOM held a state the pref could not express. A browser restoring form state across a
+reload puts `#rainHeat` back on top of that, and both are lit. Neither box carries `checked` now.
+The pref is the only writer.
+
+**The repair was gated on which box was clicked.** The handler read
+`e.target === el('heat') && el('heat').checked` before switching the other off, so it only ever
+fixed the pair when one of these two boxes was the thing that changed. A pair that arrived already
+both-on survived every toggle of the two pin filters that share the handler, while `PREFS.heatLayer`
+saved `water` and the drawer went on showing both. The test is on the pair now, whoever fired the
+event. Water wins the tie, for the same reason it is the default.
+
+**The rule this draws.** A control whose state is owned by a preference must not also state that
+state in the markup. And an invariant repaired on one path through a shared handler is repaired on
+none of the others.
+
+## A river's sparkline always draws its marks now
+
+The graph drew a mark only when it sat within one *data span* of the readings. The reason was the
+shape: the y axis spanned the readings alone, so a river that moved 8 cm in twelve hours drew those
+8 cm as a real shape, and stretching the axis to a danger mark three metres up would flatten it.
+Measured on the payload at the time, 10 of 105 rivers drew a mark on a quiet day.
+
+That is now reversed for rivers. Every mark a river publishes is drawn, and the axis grows to hold
+it.
+
+**Why.** The question a reader brings to a river graph is how far this is from trouble. A graph that
+answers it only once the river is close answers it exactly when it has stopped being the interesting
+question. The marks are the scale. Without them the shape is 8 cm of movement with nothing to measure
+against, and the reader has to carry three numbers down from the meter by eye.
+
+**The cost, accepted.** A calm river draws as a near-flat line along the foot of the graph. That is a
+true picture — the river is flat, three metres under its mark — and the trend figure beside the graph
+states the movement in m/h for anyone who needs the centimetres.
+
+**A flood gauge keeps the old rule.** Its two marks are 0.15 m and 0.3 m of depth over a spot, so
+they are never far from the readings, and its axis crosses zero where a river's does not. There is no
+distant mark to reach for and nothing to gain.

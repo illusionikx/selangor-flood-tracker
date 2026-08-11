@@ -737,7 +737,11 @@
          to say what it is holding. -->
     <details id="heatsect" class="sect" open>
       <summary><i class="i i-water_drop"></i>Heatmap<b id="heatN"></b></summary>
-      <label class="chip"><input type="checkbox" id="heat" checked>
+      <!-- No `checked` attribute on either box. `PREFS.heatLayer` is the one source of truth and
+           js/ui.js writes both from it, so a hard-coded state here is a second source that can only
+           ever disagree — and it disagrees during the window before the deferred module runs, which
+           is the one state the pair is not allowed to be in: both on at once. -->
+      <label class="chip"><input type="checkbox" id="heat">
         <i class="glyph i i-water_drop"></i>Water-level heatmap</label>
       <label class="chip"><input type="checkbox" id="rainHeat">
         <i class="glyph i i-rainy"></i>Rainfall heatmap</label>

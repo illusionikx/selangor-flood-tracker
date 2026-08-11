@@ -406,9 +406,16 @@ el('heat').onchange = el('rainHeat').onchange = el('risingOnly').onchange =
      that belongs to neither scale and reads as an intensity neither reading supports.
      Checkboxes rather than radios because "neither" has to stay reachable, and a radio group cannot
      be cleared by clicking. Switching one on switches the other off; switching the live one off
-     leaves the map clean. */
-  if (e.target === el('heat') && el('heat').checked) el('rainHeat').checked = false;
-  if (e.target === el('rainHeat') && el('rainHeat').checked) el('heat').checked = false;
+     leaves the map clean.
+     The test is on the *pair*, not on which box was clicked. Gated on `e.target` it only repaired
+     the state when one of these two boxes was the thing that changed — so a pair that arrived here
+     already both-on (the browser restoring form state across a reload, an older build's stray
+     `checked` attribute) survived every toggle of the two filters below it, and `PREFS.heatLayer`
+     then saved `water` while the drawer went on showing both. Repairing it whoever fired the event
+     means the invariant holds on every path through this handler rather than on two of them.
+     Water wins the tie for the same reason it is the default: it is what this page is for. */
+  if (el('heat').checked && el('rainHeat').checked)
+    (e.target === el('rainHeat') ? el('heat') : el('rainHeat')).checked = false;
 
   PREFS.heatLayer = el('heat').checked ? 'water' : el('rainHeat').checked ? 'rain' : '';
   PREFS.risingOnly = el('risingOnly').checked;

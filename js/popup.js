@@ -683,21 +683,21 @@ export function sparkline(points, kind = 'river', st = null) {
   const vals = inWin.map(([, v]) => v);
   const lo0 = Math.min(...vals), hi0 = Math.max(...vals);
 
-  /* The station's own marks, drawn across the graph — but only the ones the water is anywhere near.
-     The y axis spans the readings and nothing else, because the readings are the point: a river that
-     moved 8 cm in twelve hours has to draw those 8 cm as a shape. Stretching the axis up to a danger
-     mark three metres above would flatten that shape to a flat line under a red rule, which says
-     less than the graph did before, on the 89 of 105 rivers that are nowhere near their marks.
-     So a mark is drawn only when it is within one *data span* of the readings, and the axis grows
-     only that far. That is the rule stated as a guarantee: the readings always keep at least half
-     the height of the graph, so the shape survives every mark that is ever drawn. A mark further
-     away than the river has moved all day is not something this graph can show without becoming a
-     worse graph, and the meter directly above states all three with their values anyway.
-     Perfectly flat readings have no shape to protect, so they fall back to the alert→danger gap —
-     the unit `levelStops()` uses for the foot of the meter, and the only thing the feed publishes
-     about how far this river travels when it matters.
-     On the payload this was measured: 10 of 105 rivers draw a mark on a quiet day, and any station
-     climbing into trouble draws them all the way up, which is when they are worth having.
+  /* The station's own marks, drawn across the graph.
+     **A river draws every mark it publishes, always.** The question a reader brings to a river graph
+     is "how far is this from trouble", and a graph that answers it only once the river is already
+     close answers it exactly when it has stopped being the interesting question. The marks are the
+     scale. Without them the shape is 8 cm of movement with nothing to measure it against, and the
+     reader has to carry the numbers down from the meter by eye.
+     The cost is real and is accepted: the y axis has to grow to hold a danger mark three metres up,
+     so a calm river draws as a near-flat line along the foot of the graph. That is a true picture —
+     the river *is* flat, three metres under its mark — and the trend figure beside the graph states
+     the movement in m/h for anyone who needs the centimetres. This reverses the earlier rule, which
+     drew a mark only within one *data span* of the readings to protect the shape, and left 89 of 105
+     rivers with no mark at all on a quiet day.
+     A flood gauge keeps the proximity rule. Its two marks sit at 0.15 m and 0.3 m of *depth over a
+     spot*, so they are never far from the readings in the first place, and its axis crosses zero
+     where a river's does not — there is no distant mark to reach for and nothing to gain.
      No labels on them. Text in a stretched viewBox distorts, and the meter directly above names all
      three marks with their values, in these exact colours. */
   const named = kind === 'gauge' ? ['warning', 'danger'] : ['alert', 'warning', 'danger'];
@@ -705,7 +705,7 @@ export function sparkline(points, kind = 'river', st = null) {
   const first = st?.alert ?? st?.warning ?? top;
   const reach = (hi0 - lo0) || (top > first ? top - first : 1);
   const marks = !st ? [] : named.map(n => [n, st[n]])
-    .filter(([, v]) => v != null && v <= hi0 + reach && v >= lo0 - reach);
+    .filter(([, v]) => v != null && (kind !== 'gauge' || (v <= hi0 + reach && v >= lo0 - reach)));
 
   const lo = Math.min(lo0, ...marks.map(m => m[1]));
   const hi = Math.max(hi0, ...marks.map(m => m[1]));

@@ -956,6 +956,24 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   rather than counting up from zero. Light rain is most of the rain most of the time — 10 of 233
   gauges reporting and none above 4 mm/h on the day it was built — so a scale from zero would have
   shipped an empty-looking layer. Any new heat layer needs a floor chosen the same way.
+- **A control owned by a preference must not also state that state in the markup.** `#heat` carried
+  a `checked` attribute while `PREFS.heatLayer` was the source of truth. `js/ui.js` writes both heat
+  boxes from that pref, but it is a **deferred module**, so between parse and run the DOM held both
+  boxes on — the one state the pair is not allowed to be in, since the two heatmaps are one choice.
+  A browser restoring form state across a reload stacks on top of that. Neither box carries `checked`
+  now. **And an invariant repaired on one path through a shared handler is repaired on none of the
+  others**: the exclusivity guard read `e.target === el('heat') && …`, so it only fixed the pair when
+  one of those two boxes was what changed. A pair that arrived already both-on survived every toggle
+  of the two pin filters that share that handler, while `PREFS.heatLayer` saved `water` and the
+  drawer went on showing both. The test is on the pair now, whoever fired the event.
+- **A river's sparkline draws every mark it publishes, and the axis grows to hold them.** This
+  reverses the earlier rule, which drew a mark only within one *data span* of the readings so the
+  readings kept half the graph's height. That rule left 89 of 105 rivers with no mark at all on a
+  quiet day, and "how far is this from trouble" is the question a river graph is opened with. The
+  accepted cost is that a calm river draws as a near-flat line at the foot of the graph — a true
+  picture, with the trend figure beside it stating the movement in m/h. **A flood gauge keeps the
+  proximity rule**: its marks are 0.15 m and 0.3 m of depth over a spot, never far from the readings,
+  and its axis crosses zero where a river's does not.
 - **Rainfall is an interval quantity, not a level.** It gets `rainBars()`, never `sparkline()` — a
   line between two rain readings claims a value in between that never existed. And `hourlyRainfall`
   is a *rolling* hour, so it buckets by `RAIN_BUCKET` (1 h): finer buckets show the same rain twice.
