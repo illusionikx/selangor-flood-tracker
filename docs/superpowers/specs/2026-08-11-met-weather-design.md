@@ -196,7 +196,7 @@ One object per station. `api.php` omits it when it has nothing to say.
 ```json
 "met": {
   "at": "Shah Alam", "km": 3.1,
-  "now": 0, "rung": 2, "from": "16:10", "to": "17:10", "open": false,
+  "now": 0, "hr1": 1, "rung": 2, "from": "16:10", "to": "17:10", "open": false,
   "tmin": 24, "tmax": 34
 }
 ```
@@ -206,6 +206,7 @@ One object per station. `api.php` omits it when it has nothing to say.
 | `at` | name of the MET point |
 | `km` | distance from the station to that point |
 | `now` | the rung at this moment, 0 clear, 1 rain, 2 heavy rain |
+| `hr1` | the rung one hour out, which is step index 2 |
 | `rung` | the worst rung across all seven steps |
 | `from` | clock time the worst rung starts, or `null` when it starts now |
 | `to` | clock time the worst rung ends |
@@ -252,45 +253,75 @@ Both card builders emit it. `sitePopup()` reads `members[0]`. `popup()` reads it
 
 ### What it says
 
+A head line, then one row of three columns.
+
 ```
  ♥  TAMAN SRI MUDA                    [×]
     Klang · Selangor
     [river] [rainfall] [camera]
  ────────────────────────────────────────
- ☂  Weather
-    Heavy rain 16:10 until 17:10
-    Shah Alam · 3.1 km
-    🌡 24 – 34 °C today
+ ☁  Weather          Shah Alam · 3.1 km
+ ┌───────┬───────┬──────────────────────┐
+ │ 🌡 Today│  ☀    │ 🌧 In 1 hour: Rain   │
+ │ 24–34° │ Clear │ Heavy rain 16:10     │
+ │        │       │ until 17:10          │
+ └───────┴───────┴──────────────────────┘
  ────────────────────────────────────────
  ▲  River            0.42 m
 ```
 
-The rain line takes one of five shapes. `Rain` renders for rung 1 and `Heavy rain` for rung 2.
+| column | width | holds |
+|---|---|---|
+| 1 | 1/5 | the temperature range for today, two lines, with `thermostat` |
+| 2 | 1/5 | the weather now, two lines, glyph over one word |
+| 3 | 3/5 | the weather in one hour, then the worst-rung line, two lines at most |
 
-| `now` | starts | outlook | line |
-|---|---|---|---|
-| worst | now | ends | `Heavy rain until 16:10` |
-| worst | now | runs out | `Heavy rain past 17:40` |
-| clear | later | ends | `Heavy rain 16:10 until 17:10` |
-| clear | later | runs out | `Heavy rain from 16:10, past 17:40` |
-| rain, worse later | later | either | `Raining now, heavy rain 16:10 until 17:10` |
+The grid is `grid-template-columns: 1fr 1fr 3fr`. Every cell takes `min-width: 0`, or a long word in
+column 3 pushes the two narrow columns out of shape.
 
-`past` states that the MET outlook ended, not that the rain ended. The two words carry the difference,
-so no line ever claims an end that MET did not publish.
+`--side` is 360px, so column 1 holds about 64px after padding. That fits `24–34°` on its own line and
+nothing beside it. The word `Today` therefore sits on the first line, next to the glyph. Column 2
+holds one word for the same reason. The words are `Clear`, `Rain` and `Heavy`.
 
-The muted second line always prints the point and the distance. A reader can then weigh a 14 km claim
-for themselves. This is also the line that keeps the section honest about what it is. The section is
-not a sensor at this place.
+### The worst-rung line
 
-The temperature line prints `24 – 34 °C today`. The line must keep the word `today`. Without it the range
-reads as a thermometer, and it is a forecast.
+Column 3 gives the line one row, so it must fit about 30 characters at 216px. Four shapes do:
 
-Each line stands or falls on its own. A station with no `met` object renders no section at all. A
-station with a temperature and no rain renders the section, the head, and the temperature line only.
+| starts | outlook | line |
+|---|---|---|
+| now | ends | `Heavy rain until 16:10` |
+| now | runs out | `Heavy rain past 17:40` |
+| later | ends | `Heavy rain 16:10 until 17:10` |
+| later | runs out | `Heavy rain 16:10, past 17:40` |
 
-So the section shows on most cards, because a district row nearly always exists. **The rain line is
-the part that comes and goes.** A calm place carries the head and one temperature, and states no
+`Rain` renders for rung 1 and `Heavy rain` for rung 2. Every shape names both ends. `until` states
+that the rain ends. `past` states that the MET outlook ended, and never that the rain did.
+
+**The three columns removed a fifth shape.** An earlier draft prefixed `Raining now,` when rain fell
+already and worse came later. Column 2 now states the weather now, on every card, so the prefix
+repeated the cell beside it and cost the line a second row.
+
+### The head and the columns
+
+The head carries the point and the distance in `.muted`, the same shape a `.sensorhead` already uses
+for a sensor name. A reader can then weigh a 14 km claim. The head is also what keeps the section
+honest. This section is not a sensor at this place.
+
+Column 1 must keep the word `Today`. Without it the range reads as a thermometer, and it is a
+forecast.
+
+Each part stands or falls on its own. A station with no `met` object renders no section. A station
+with a temperature and no rain renders the head and column 1, and leaves columns 2 and 3 empty.
+
+So the section shows on most cards, because a district row nearly always exists. **The rain columns
+are the part that comes and goes.** A calm place carries the head and one temperature, and states no
 weather it cannot support.
+
+### Below 600px
+
+`--side` becomes 84vw. On a 360px phone that leaves about 302px, so column 1 falls to about 52px.
+The three columns hold at that width with a smaller font. Measure it before shipping. If `24–34°`
+wraps, the row breaks to `1fr 1fr` over two rows, with column 3 spanning the second.
 
 ### Colour
 
@@ -362,7 +393,33 @@ The claim about third parties in the About pane therefore still holds. Re-check 
 **full sweep of every absolute URL in the code**, not a grep for known offenders. A short grep is what
 let `basemaps.cartocdn.com` ship under a false claim.
 
-The Credits block gains MET Malaysia, named once for both products.
+## The About pane
+
+`#paneAbout` in `index.html` states where every number on this page comes from. It must state these
+two as well, or the pane describes an app that no longer exists.
+
+Four changes, all inside that pane.
+
+**1. The sources list gains a fourth entry.** The list holds one block per feed, each an `<a>` over a
+`<span class="muted">` that says what the feed gives. MET Malaysia joins it, with both products named
+in one block. Say plainly that this feed carries weather, and that the other three carry water.
+
+**2. The reading paragraph gains one sentence.** The pane says the station card names the feed each
+reading came from, and that the newest reading wins. That sentence covers water only. Add one
+sentence for weather. The weather does not join, override or compete with the three water feeds.
+
+**3. Credits gains MET Malaysia**, named once for both products. `Material Symbols` is already there,
+so the four new glyphs need no credit change.
+
+**4. The temperature needs a plain sentence somewhere in the pane.** It is a forecast for the day,
+not a reading. The card says `Today`, and the pane is where the reason belongs. This is the one
+number on the whole page that describes something which has not happened yet, other than `rising`.
+
+Write all four for a reader, not for us. No `proxy`, no `nowcast`, no `decorrelation`, no `Thiessen`.
+The pane already holds the model to copy, in the siren paragraph.
+
+The Developer section needs nothing. The `met.parsed` counters ride the same `sources` block the
+per-source `parsed` counters already read from.
 
 ## Documentation
 
