@@ -5969,9 +5969,28 @@ edge, 4px, square, no margins.
 
 **`margin-bottom: -4px` is what buys that.** The bar keeps its 4px of paint and returns the same 4px
 to the column, so it contributes no height at all. That is the identical guarantee the reserved row
-gave — `#camGrid` cannot be resized by anything this element does — with no row to reserve. It lands
-on the grid's own top padding, so it never covers a tile, and it takes a `z-index` because the grid
-now starts underneath it.
+gave — `#camGrid` cannot be resized by anything this element does — with no row to reserve. The grid
+starts underneath it, so a scrolled tile passes behind the bar rather than shunting it.
+
+**Which is where it drew behind ninety tiles.** `#camBar` took `z-index: 1` and still lost. The
+cause was not the number. `.camtile` is `position: relative` with no `z-index`, and a positioned box
+opens a stacking context only when its `z-index` is something other than `auto` — so every number
+inside a tile (`.camsay` 1, `.camtile::before` 2, `.camfail` 3) was resolving against `#camBox`, not
+against its siblings in the tile. Two of the three beat the bar. The shimmer at 2 is the one that
+showed: a tile carries `::before` until its picture settles, which is precisely the state every tile
+is in while the bar is up. The bar drew behind all of them and showed only through the 6px gaps
+between columns.
+
+`.camtile { isolation: isolate }` is the fix, and it is one declaration. The numbers inside a tile
+were always written to mean "inside a tile" — the comment on `::before` says the `2` only has to
+clear `.camsay`'s `1` — and this is what makes them mean it. Raising the bar to `4` was the other
+option and is worse: it wins this race and leaves the leak for the next thing that paints near a
+tile.
+
+**The rule this draws.** `position: relative` does not scope a `z-index`. A component whose parts
+carry small numbers relative to each other has to say so, or those numbers are competing with the
+page. The map pins in `css/map.css` record the mirror of this trap — there, `position` had to be
+*added* before a `z-index` would apply at all.
 
 **The track is the indicator's own colour at low weight**, `color-mix(in srgb, var(--accent) 20%,
 transparent)`, not `--outline`. Two halves of one bar should be one hue at two strengths. A neutral

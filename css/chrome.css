@@ -650,10 +650,20 @@ table.data .dash { color: var(--outline); }
    Every camera measured publishes 1280x720 — `SHOT_W` in shots.php is 1280, and a strip's own cell
    (`SHEET_W` x `SHEET_H`) is 480x270, the same 16:9 at a smaller scale. Matching the box to that
    shape is what lets `.camtile.strip > img` below use `fill` with nothing to reconcile: a mismatched
-   box was forcing a real stretch on a widened strip, and a same-shaped one makes `fill` a no-op. */
+   box was forcing a real stretch on a widened strip, and a same-shaped one makes `fill` a no-op.
+   `isolation: isolate` keeps the tile's own layering inside the tile. `position: relative` alone
+   does **not** open a stacking context — a positioned box needs a `z-index` other than `auto` for
+   that — so every `z-index` below (`.camsay` 1, `::before` 2, `.camfail` 3) was resolving against
+   `#camBox` instead, competing with the dialog's own chrome rather than with its siblings in the
+   tile. `#camBar` at `z-index: 1` therefore lost to the skeleton shimmer on every tile, which is
+   exactly the state a tile is in while that bar is on screen: the bar drew behind ninety shimmers
+   and showed only through the gaps between them. The numbers below were always written to mean
+   "inside a tile" — the comment on `::before` says so — and this is the one declaration that makes
+   them mean it. Prefer this over raising the chrome's own number, which wins one race and leaves
+   the leak for the next thing that paints near a tile. */
 .camtile {
-  position: relative; display: block; padding: 0; overflow: hidden; cursor: pointer;
-  aspect-ratio: 16 / 9; border: 2px solid transparent; border-radius: 10px;
+  position: relative; isolation: isolate; display: block; padding: 0; overflow: hidden;
+  cursor: pointer; aspect-ratio: 16 / 9; border: 2px solid transparent; border-radius: 10px;
   background: var(--hover); color: var(--on-surface); text-align: left;
 }
 /* A camera JPS publishes with no coordinate at all — see js/wall.js's tileHtml() and CAM_FIX's own

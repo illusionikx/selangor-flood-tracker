@@ -741,6 +741,17 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   left to `.done`: `bind()` re-adds `.strip` to a fresh `<img>` on every poll, before that image has
   fired `load`, and the base rule would otherwise clip the caption once per poll instead of once per
   lap. Anything added to that box gets the same treatment.
+- **`position: relative` does not scope a `z-index`, so `.camtile` carries `isolation: isolate`.** A
+  positioned box opens a stacking context only when its `z-index` is something other than `auto`.
+  `.camtile` had `position: relative` and no `z-index`, so the numbers written *inside* a tile
+  (`.camsay` 1, `.camtile::before` 2, `.camfail` 3) resolved against `#camBox` and competed with the
+  dialog's own chrome. `#camBar` at `z-index: 1` therefore drew **behind the skeleton shimmer on
+  every tile** — `::before` at 2 — which is exactly the state a tile is in while that bar is on
+  screen, so the bar showed only through the 6px gaps between columns. The fix is one declaration on
+  the tile, not a bigger number on the chrome: raising `#camBar` to 4 wins one race and leaves the
+  leak for the next thing that paints near a tile. This is the mirror of the map-pin gotcha above,
+  where `position` had to be *added* before a `z-index` would apply at all — same spec sentence,
+  opposite symptom.
 - **The lightbox reads its camera from `data-clip`, not from the clicked image's `src`.** The panel
   clip plays a strip for its archived cells (see the `?sheet=` gotcha above) but still ends every
   lap on a fresh live still, so `img.src` cycles between the strip's own URL and a `?cam=<id>` one
