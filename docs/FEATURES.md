@@ -5802,3 +5802,36 @@ to report, reads as a frame drawn around empty space. `transparent` keeps the sa
 nothing shifts once a picture or a `.t-now`/`.t-soon` colour arrives — while showing no colour until
 one of those two classes actually has something to say. Same specificity as before, so `.t-now` and
 `.t-soon` still win over the default exactly as they did.
+
+## The wall's rows never followed its tiles
+
+`.camtile` carries `aspect-ratio: 16 / 9` and no height of its own. That is the correct way to shape
+a tile, and it worked. Every tile measured exactly 16:9 at every column count. The **rows** did not
+follow. On the live wall of ninety tiles the grid computed a row of **27.86 px** against a tile of
+**110 px**. Each tile drew across the two under it, and the wall looked like a spread hand of cards.
+The same markup cut down to ten tiles computed a **283 px** row against the same 110 px tile. That is
+one fault drawn twice: overlap in one case, wide empty bands in the other.
+
+Neither number is a function of the column width. At 800 px and at 700 px wide, with tiles of 175 px
+and 150 px, the row stayed 186.83 px both times. An automatic row asks each item for a content
+contribution. An item that takes its height from a ratio alone answers that question with something
+else.
+
+`grid-auto-rows: min-content` is the whole fix. It asks the row for what the tile needs, not for what
+the tile holds. A box with a fixed ratio needs the height of that ratio. Every overlay inside a tile
+is absolutely positioned — the name, the alert phrase, the "not on the map" caption and the "no
+picture" cover. So no tile ever needs a taller row than its own shape.
+
+**Three other explanations were tested first, and all three were wrong.** `align-items: start` on the
+grid stops stretch alignment overriding the ratio. The row stayed at 283 px. `position: absolute` on
+the tile's `<img>` leaves no in-flow child to push the row. The row stayed at 283 px. A different
+tile ratio changed the shape of every tile and moved no row at all. Only the row property moved the
+row.
+
+**How this was found matters more than the fix.** The bug arrived as a screenshot, and both readings
+of that screenshot were wrong. The overlap looks like a `z-index` fault. The ten-tile version looks
+like a `gap` fault. Neither guess survived a measurement. What settled it was a headless Chrome run
+against the real page: open the wall through its own buttons, then print
+`getBoundingClientRect()` for the tiles beside `getComputedStyle(grid).gridTemplateRows`. Two numbers
+that had to match did not, and the distance between them named the property to change. **Measure a
+layout bug before you explain it.**

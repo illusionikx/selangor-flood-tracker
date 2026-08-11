@@ -856,6 +856,19 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   prevent on one camera, arriving a dozen at a time. The filter obeys the same rule: a hidden tile
   stays in the grid. **Do not add `wall.open()` to the poll path** beside `dataTable()` — the table
   is safe to rebuild because a row is a pure function of the payload, and a tile is not.
+- **A grid row does not follow its item's `aspect-ratio`, so `#camGrid` sets `grid-auto-rows`.**
+  `.camtile` takes its whole height from `aspect-ratio: 16 / 9`, and an `auto` row measures the item
+  some other way. Measured on the live wall of ninety tiles: a **27.86px row against a 110px tile**,
+  so every tile overlapped the two below it and the wall read as a stack of cards. The same markup
+  with ten tiles gave a **283px row against the same 110px tile** — one fault, drawn twice, once as
+  overlap and once as gaps. Neither number tracks the column width, and neither moves when the
+  breakpoints change the column count. `grid-auto-rows: min-content` in `css/chrome.css` pins the
+  row to what the tile needs. Every overlay inside a tile is absolutely positioned, so no tile can
+  ask for a taller row than its own ratio. **Measure the row against the tile before believing
+  either.** The gap version reads as a spacing mistake and the overlap version reads as a `z-index`
+  mistake, and both are this. Three other explanations were tried first and all three were wrong:
+  `align-items: start` on the grid, `position: absolute` on the tile's `<img>`, and a wider tile
+  ratio. Each left the row exactly where it was.
 
 ## Conventions
 

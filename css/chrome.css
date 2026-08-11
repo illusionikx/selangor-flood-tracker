@@ -593,9 +593,19 @@ table.data .dash { color: var(--outline); }
    cannot shrink below its own content's minimum width, so a station name too long to break would
    have pushed its column wider than its even share and overflowed the dialog. `gap: 6px`, the same
    number on both axes, is the whole of what a uniform, minimal gutter asks for. */
+/* `grid-auto-rows: min-content` is what makes the row the height of the tile in it. A tile takes
+   its height from `aspect-ratio` alone (see `.camtile` below), and an `auto` row does not follow
+   that height — measured on this grid, the row came out 27.86px against a 110px tile, so every
+   tile overlapped the two under it and the wall read as a stack of cards. The same grid with ten
+   tiles instead of ninety produced a 283px row against the same 110px tile, which is the identical
+   fault in the other direction. A row that lands on a plausible number by luck is the trap here:
+   `min-content` asks the row for what the tile actually needs, and an aspect-ratio box needs its
+   own ratio's height. Every tile is a fixed shape, and every overlay in it is absolutely
+   positioned, so no tile can ever want a taller row than that. */
 #camGrid {
   flex: 1; overflow: auto; padding: 12px 20px 20px;
-  display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px;
+  display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); grid-auto-rows: min-content;
+  gap: 6px;
 }
 /* The column count steps down as the dialog narrows, so a tile never falls far short of ~150px —
    the point a camera still stops reading as a picture and starts reading as a swatch. Each
