@@ -801,6 +801,31 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
     $ok('hr1 reads step index 2',            $e['hr1'] === 1);
     $ok('and does not change the worst rung', $e['rung'] === 2);
 
+    /* The forecast call answers for three tiers of place. Only the district tier joins to a station,
+       because api.php already normalizes `district`. A state row named "Selangor" would otherwise
+       overwrite a district of the same name on some other feed's day. */
+    echo "\nmetDaily():\n";
+    $rows = json_encode([
+        ['location' => ['location_id' => 'Ds057', 'location_name' => 'Petaling'],
+         'min_temp' => 24, 'max_temp' => 34],
+        ['location' => ['location_id' => 'St008', 'location_name' => 'Selangor'],
+         'min_temp' => 20, 'max_temp' => 40],
+        ['location' => ['location_id' => 'Tn066', 'location_name' => 'Pelabuhan Klang'],
+         'min_temp' => 21, 'max_temp' => 41],
+        ['location' => ['location_id' => 'Ds058', 'location_name' => 'Kuala Lumpur'],
+         'min_temp' => 25, 'max_temp' => 33],
+    ]);
+    $day = metDaily($rows);
+    $ok('district rows are kept',      isset($day['petaling']));
+    $ok('the key is lowercased',       ($day['petaling']['tmax'] ?? 0) === 34);
+    $ok('the minimum comes through',   ($day['petaling']['tmin'] ?? 0) === 24);
+    $ok('a second district is kept',   ($day['kuala lumpur']['tmax'] ?? 0) === 33);
+    $ok('state rows are dropped',      !isset($day['selangor']));
+    $ok('town rows are dropped',       !isset($day['pelabuhan klang']));
+    $ok('two districts in all',        count($day) === 2);
+    $ok('rubbish parses to nothing',   metDaily('not json') === []);
+    $ok('an empty body parses to nothing', metDaily('') === []);
+
     echo $fail ? "\n$fail FAILED\n" : "\nall ok\n";
     exit($fail ? 1 : 0);
 }

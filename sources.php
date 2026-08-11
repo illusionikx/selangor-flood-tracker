@@ -299,3 +299,31 @@ function metSpan(array $rungs, array $clocks): ?array {
         'open' => $open,
     ];
 }
+
+/* --- MET Malaysia daily forecast ------------------------------------------------------------ */
+
+/**
+ * Forecast temperatures for the day, keyed by lowercase district name.
+ *
+ * The endpoint answers for three tiers of place — `Ds###` district, `St###` state, `Tn###` town.
+ * This parser reads only the district tier. The `api.php` module normalizes a station district
+ * field, which gives a join with no coordinates and no radius. A state row carries a name that
+ * collides with a district on another feed. Keeping it produces a silent wrong answer.
+ *
+ * These two numbers forecast the day. MET publishes no free observed temperature. The card must
+ * print the word "today" beside them for that reason.
+ */
+function metDaily(string $json): array {
+    $rows = json_decode($json, true);
+    if (!is_array($rows)) return [];
+
+    $out = [];
+    foreach ($rows as $r) {
+        $id   = $r['location']['location_id']   ?? '';
+        $name = $r['location']['location_name'] ?? '';
+        if (!str_starts_with($id, 'Ds') || $name === '') continue;
+        if (!isset($r['min_temp'], $r['max_temp'])) continue;
+        $out[strtolower(trim($name))] = ['tmin' => (int)$r['min_temp'], 'tmax' => (int)$r['max_temp']];
+    }
+    return $out;
+}
