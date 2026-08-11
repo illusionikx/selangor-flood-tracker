@@ -48,8 +48,8 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `sw.js` | service worker: network-first shell cache, and the reason Chrome offers "Install app" |
 | `icon.svg` | the app mark: bare glyph, no fill. Source for the PNGs *and* the `--i-flood` mask |
 | `icon-build.php` | `php icon-build.php` — rebakes the two icons and prints the mask rule to paste |
-| `river-build.php` | `php river-build.php` — rebakes `rivers.json` from OpenStreetMap. Run by hand, never in a request |
-| `rivers.json` | the rivers the dark basemap draws. 2,775 lines, baked and committed — see the gotcha below |
+| `water-build.php` | `php water-build.php` — rebakes `water.json` from OpenStreetMap. Run by hand, never in a request |
+| `water.json` | the water the dark basemap will not draw: 2,775 rivers + 3,860 ponds, baked and committed |
 | `icon-192.png`, `icon-512.png` | manifest icons (`any`) and the favicon — the glyph on transparency |
 | `icon-180.png` | `apple-touch-icon`. Opaque, because iOS flattens alpha onto a colour of its own |
 | `img/` | optional. Only `egg.webp` (the About easter egg). Absent is a supported state — see below |
@@ -927,31 +927,48 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   `css/map.css`, tint first** — a second rule setting `filter` on the same element replaces this
   value rather than adding to it, and the tint has to read the raw tones before the lift moves them.
   And the emitted color is **darker than what lands on screen**, because that lift multiplies it:
-  `#071b2a` draws as about `#2e6086`. Preview the whole chain against a real tile, never the tint
+  `#071b2a` draws as `#15364e`. Preview the whole chain against a real tile, never the tint
   alone. CARTO owns this tone, so a restyle upstream aims the tint at nothing and errors nowhere.
 - **Nothing can reference an SVG filter inside a `display: none` subtree.** `#mapfx` in `index.html`
   holds `#watertint` and must stay in the render tree. `css/map.css` takes it out of the flow with
   `position: absolute; width: 0; height: 0` instead. The rule is in the stylesheet and not on the
   element, because `index.html` carries no inline CSS.
 
-- **The dark basemap antialiases a river into the road tones, so no filter can reach it.**
-  `#watertint` gets the sea and the lakes because CARTO fills those with one exact tone. A river is
-  one pixel wide, so CARTO draws it as a line that blends toward the land tone by however much of
-  each pixel it covers. **Measure before assuming a tone means what it looks like.** Mark every
-  pixel Voyager paints as water, then read the dark tile at those same positions. At zoom 10 the sea
-  maps to tone 38 for 80% of its pixels. At zoom 12 and 13 over Kuala Lumpur, tone 38 is not in the
-  tile at all, and the river pixels spread over tones 33 to 50. Tone 37 is the peak and is only 20%
-  to 27% river — the rest is roads and buildings, so keying it paints three wrong pixels per right
-  one. The tones that reach 71% to 100% river hold 50 to 165 pixels each and draw a dotted fragment.
-  So `js/map.js` draws rivers from `rivers.json` instead, on the dark theme alone. **Four things
-  about that layer are load-bearing.** It uses a **canvas** renderer, because 2,775 lines through
-  the default one is 2,775 DOM nodes carried through every pan. It has **its own pane at z-index
-  250**, between the tiles at 200 and the overlays at 400, so heat, pins and the accuracy circle
-  draw over the water. It reads **`--water` from `css/base.css` at the moment it builds the layer**,
-  not when the fetch returns, because that token exists on the dark theme only. And the fetch stays **lazy and
-  swallows its own failure** — a light-theme reader never pays the 107 KB, and a failure leaves a
-  plainer map rather than a broken one. `rivers.json` has no `?v=`, so a rebake needs a hard reload.
-
+- **The dark basemap loses water two different ways, and neither one is fixable with a filter.**
+  `#watertint` gets the sea and the large lakes because CARTO fills those with one exact tone.
+  **CARTO antialiases a river into the road tones.** A river is one pixel wide, so the style draws
+  it as a line that blends toward the land tone by however much of each pixel it covers. **Measure before
+  assuming a tone means what it looks like.** Mark every pixel Voyager paints as water, then read
+  the dark tile at those same positions. At zoom 10 the sea maps to tone 38 for 80% of its pixels.
+  At zoom 12 and 13 over Kuala Lumpur, tone 38 is not in the tile at all. The river pixels
+  spread over tones 33 to 50 instead. Tone 37 is the peak and is only 20% to 27% river — the rest is roads
+  and buildings, so keying it paints three wrong pixels per right one.
+  **A retention pond is not drawn at all.** That is a separate fault with a separate cause: CARTO
+  drops small water on area, not on screen size. Tasik Taman Desa at 0.115 km² holds 2,036 water
+  pixels at zoom 13. A median pond at 0.0017 km² holds **zero** at zoom 13, 14 and 15 alike, and it
+  is 8 screen pixels wide at the last of those. No zoom brings it back, and a filter cannot recolour
+  something absent from the picture. The box holds 6,489 water bodies with a median area of 0.0037
+  km², so this is most of them.
+  So `js/map.js` draws both from `water.json`, on the dark theme alone. **Five things about that
+  layer are load-bearing.** It uses a **canvas** renderer, because 6,635 shapes through the default
+  one is 6,635 DOM nodes carried through every pan. It has **its own pane at z-index 250**, between
+  the tiles at 200 and the overlays at 400, so heat, pins and the accuracy circle draw over the
+  water. It reads **`--water` from `css/base.css` at the moment it builds the layer**, not when the
+  fetch returns, because that token exists on the dark theme only. That token is the **finished**
+  colour and the tint in `index.html` is the raw one, since the tile pane filter cannot reach this
+  pane — move one and move the other. And the fetch stays **lazy and swallows its own failure** — a
+  light-theme reader never pays the 234 KB, and a failure leaves a plainer map rather than a broken
+  one. `water.json` has no `?v=`, so a rebake needs a hard reload.
+- **Tolerance and scope are different knobs on `water-build.php`, and the wrong one costs bytes for
+  nothing.** Douglas-Peucker controls the detail inside a shape the query already returned. Taking
+  the rivers from 33 m to 11 m grows them from 105 KB to 199 KB. It adds no pond, because a pond was
+  never a line in that query. If something is **missing**, change the query. If something looks
+  **crude**, change the tolerance. There is also no area floor, on purpose: a small pond simplifies
+  to a handful of points, so keeping every one costs the same 130 KB as a 0.001 km² cutoff.
+- **A lake's outline is several ways in one relation, so closing each one separately draws wedges.**
+  `rings()` in `water-build.php` chains member ways end to end, flipping one that joins backwards,
+  and keeps only what closes. An open chain means the relation is broken upstream, and the script
+  drops it rather than guess at a shape. Inner rings become holes, so an island stays dry.
 ## Conventions
 
 - **Anything that alerts is checked against the alert design standard** in

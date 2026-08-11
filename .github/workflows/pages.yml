@@ -68,9 +68,9 @@ jobs:
           # The PWA set. Committed, so an unconditional cp is right — unlike img/ below, a missing
           # one of these is a broken install, not a missing decoration, and should fail the bake.
           cp manifest.json sw.js icon-180.png icon-192.png icon-512.png site/
-          # The dark basemap's rivers. Committed and not optional on that theme, so the same
-          # unconditional cp applies — a missing file leaves the dark map without its rivers.
-          cp rivers.json site/
+          # The dark basemap's rivers and ponds. Committed and not optional on that theme, so the
+          # same unconditional cp applies — a missing file leaves the dark map without its water.
+          cp water.json site/
           # img/ is optional — it holds only the About egg, which hides itself when the picture is
           # missing (js/ui.js). Copied conditionally so an absent directory can never fail a bake and
           # leave the map frozen on the last deployment over a decoration.

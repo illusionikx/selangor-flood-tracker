@@ -6135,7 +6135,7 @@ The other 63 entries hold their own band's center, so they pass a tone through t
 ### The color, and the order the filters run in
 
 The filter emits `#071b2a`, which is darker than what appears on screen. The dark theme already runs
-`brightness(1.75) contrast(.92)` on the same pane, and that chain lifts the tint to about `#2e6086`.
+`brightness(1.75) contrast(.92)` on the same pane, and that chain lifts the tint to `#15364e`.
 
 The value comes from rendering the whole chain against real tiles. A color that looks right on its
 own is a different color. A first pass previewed the tint alone and read far too bright.
@@ -6189,6 +6189,30 @@ is a third choice, not a shade of light or of dark. So the control is a segmente
 
 **Auto is the default.** `PREFS.theme` holds the pick. Anything that is not `light` or `dark` means
 system, so an absent pref needs no special case.
+
+**The shape is the lightbox range selector's, shared rather than copied.** `.seg` and `.seg label`
+are grouped into the `.tlranges` and `.tlr` rules. A sunken track holds three pills, and the chosen
+pill fills with the accent. There is no outer border and there are no dividers.
+
+A bordered box went in first and read as three buttons in a frame. The point of this control is that
+the selection sits inside one object and moves along it. That is the same argument the range selector
+already makes for its own five. The `PLAYER_OVERLAY` block restyles `.tlranges` and `.tlr` in literal
+whites for a photograph. It names those two selectors only, so none of that reaches the menu.
+
+**One extra declaration keeps the track tight: `.seg label { margin: 0 }`.** `css/base.css` styles
+the bare `label` element for the drawer's stacked filter rows, and that rule carries `margin: 6px 0`.
+It reaches every label in the app.
+
+Measured, it made the track 37px tall around 21px pills. That is 6px of dead air above and below each
+pill, inside a shape whose whole point is that the fill hugs the segment. The lightbox pills are
+`<button>` elements and never met the rule.
+
+The symptom is space around the control rather than inside it, which reads as a padding mistake on
+the row. Three other explanations came first and a measurement killed all three.
+
+- The row padding. It is symmetric at 8px.
+- `align-items` on the row. It is already `center`.
+- The flex item stretching. `align-self: auto` on a centred row cannot stretch it.
 
 **The segments are real radio inputs, hidden rather than replaced.** The browser keeps the group
 exclusive, walks it with the arrow keys and reads the label out. A set of styled buttons gets none
@@ -6247,10 +6271,10 @@ The `light_mode` icon leaves `css/icons.css`. Nothing referenced it after the gl
 - **No fade on the theme change.** `applyTheme()` rebuilds the basemap as a new tile layer. A page
   that cross-fades over a map that pops is worse than one that changes at once.
 
-## The map draws its own rivers, because the tint cannot reach them
+## The map draws the water the basemap will not
 
-The water tint above gets the sea and the lakes. It does nothing for a river, and a river is what
-this app is about. The dark map still hid the one feature every station stands on.
+The water tint above gets the sea and the large lakes. Two kinds of water it never reaches, and
+both matter to a flood map. Rivers are one. Retention ponds are the other.
 
 ### Why the tint fails on a river
 
@@ -6261,9 +6285,8 @@ never appears.
 Measurement settles it. Take a Voyager tile, mark every pixel that light mode paints as water, then
 read the dark tile at those same positions.
 
-At zoom 10 the sea maps to tone 38 for 80% of its
-pixels, which is why the tint works there. At zoom 12 and 13 over Kuala Lumpur, tone 38 is absent
-from the tile entirely.
+At zoom 10 the sea maps to tone 38 for 80% of its pixels. That is why the tint works there. At zoom
+12 and 13 over Kuala Lumpur, tone 38 is absent from the tile entirely.
 
 The river pixels land on tones 33 through 50 instead. Tone 37 is the peak, and only 20% to 27% of
 tone 37 is river. The rest is roads and buildings. Tinting it paints three wrong pixels for every
@@ -6274,36 +6297,72 @@ core of the widest channels. Keying them draws a dotted fragment.
 
 No filter recovers this. Antialiasing threw the information away before the tile arrived.
 
+### Why the tint fails on a retention pond, for a different reason
+
+A pond is small. The 6,489 water bodies in the coverage box have a median area of 0.0037 square
+kilometers, about 60 meters across, and 97% fall under a tenth of a square kilometer.
+
+The failure is not size on screen. It is that CARTO leaves them out.
+
+Tasik Taman Desa, at 0.115 square kilometers, holds 2,036 water pixels at zoom 13 and 6,509 at zoom
+15, so the tint paints it correctly. A median pond of 0.0017 square kilometers holds **zero** water
+pixels at zoom 13, 14 and 15 alike.
+
+That pond is 41 meters across, which is 8 screen pixels at zoom 15. It is large enough to draw. The
+style drops it on area, so no zoom brings it back, and a filter cannot recolour something absent
+from the picture.
+
 ### What ships instead
 
-`river-build.php` bakes `rivers.json` from OpenStreetMap, and `js/map.js` draws it over the dark
-basemap. The file holds 2,775 rivers as one `MultiLineString`, simplified to 33 meters with
-Douglas-Peucker and rounded to four decimals. That is 391 KB on disk and 107 KB on the wire.
+`water-build.php` bakes `water.json` from OpenStreetMap, and `js/map.js` draws it over the dark
+basemap. The file holds 2,775 rivers as lines and 3,860 water bodies as filled shapes, simplified to
+33 meters with Douglas-Peucker and rounded to four decimals. That is 940 KB on disk and 234 KB on
+the wire.
+
+**Tolerance and scope are separate knobs, and confusing them wastes a lot of bytes.** Douglas-Peucker
+controls the detail inside a shape the query already returned. Dropping from 33 meters to 11 meters
+takes the rivers alone from 105 KB to 199 KB. It adds no pond at all, because a pond was never a
+line in that query.
+
+Reach for the query when something is missing. Reach for the tolerance when something looks crude.
+
+No area floor. Small ponds simplify to a handful of points, so keeping everything costs the same
+130 KB as a 0.001 square kilometer cutoff. A floor that saves nothing is a rule to maintain for no
+reason.
 
 The bake runs by hand. Overpass is a free service, the data changes about as often as a river moves,
 and nothing in a request path depends on a third party this app does not control. A 504 from
 Overpass is routine under load. The script fails loudly and writes nothing, so a retry is the answer.
 
-`river-build.php` reads the coverage box straight out of `api.php` with a regular expression, so the
+`water-build.php` reads the coverage box straight out of `api.php` with a regular expression, so the
 two cannot drift apart. Overpass returns whole ways that cross the box, so a few rivers run past its
 edge. That is correct. Clipping them costs more than the coordinates it saves.
 
-### The layer
+### Rings, and why a lake is not a list of ways
 
-Four choices, each for a reason.
+A large lake's outline is usually several ways in one relation, and each way on its own is an open
+line. Closing each one separately draws the lake as a handful of wedges.
+
+`rings()` walks each chain end to end, flipping a way that joins backwards, and keeps only what
+closes. An open chain means a broken relation upstream, and the script drops it rather than guess.
+Inner rings become holes on the polygon, so an island in a reservoir stays dry.
+
+### The layer
 
 **Dark theme only.** Voyager paints water in a pale blue with real chroma, so light mode already
 reads well. The layer is never added on light, and the file is never fetched there.
 
-**Fetched once, and lazily.** The first dark theme of a session asks for `rivers.json`. A reader who
-stays on light never pays the 107 KB. The code swallows a failed fetch. No rivers is a plainer map, and every
-reading still draws.
+**Fetched once, and lazily.** The first dark theme of a session asks for `water.json`. A reader who
+stays on light never pays the 234 KB. The code swallows a failure. No water is a plainer map, and
+every reading still draws.
 
-**Canvas, not SVG.** 2,775 lines through the default renderer is 2,775 DOM nodes to carry through
+**Canvas, not SVG.** 6,635 shapes through the default renderer is 6,635 DOM nodes to carry through
 every pan and every zoom.
 
 **Its own pane at z-index 250.** That sits between the tiles at 200 and the overlays at 400. Heat
 blobs, station pins and the accuracy circle all draw over the water rather than under it.
+
+**A pond is a fill with no stroke.** An outline on an 8-pixel shape is most of the shape.
 
 ### The color
 
@@ -6311,25 +6370,31 @@ blobs, station pins and the accuracy circle all draw over the water rather than 
 lands in a JS file. `js/map.js` reads it at the moment it builds the layer, not when the fetch
 returns, because the token exists on the dark theme alone.
 
-The value is `#3d7ea8`. It is brighter than the water the tint paints, which lands near `#2e6086`.
-A 1.4 pixel line needs more contrast than a filled sea to read the same.
+The value is `#15364e`, which is exactly what the tint paints the sea and the large lakes. A drawn
+pond sits beside a tinted lake, so the two have to be one water.
 
-The value is well below
-`--k-river` at `#66b2ff`. That is the river *station* color, and a pin has to win over the water it
-stands in.
+A brighter value shipped first, on the theory that a thin line needs more contrast than a filled sea
+to read the same. It does, and that is the problem. The line announced itself as drawn rather than
+sinking into the water around it.
+
+The tile pane filter cannot reach this layer, which sits in a pane of its own. So this value is the
+*finished* color and the tint's is the raw one, and moving either one means moving both.
+
+Both sit well below `--k-river` at `#66b2ff`. That is the river *station* color, and a pin has to
+win over the water it stands in.
 
 ### Deliberately not built
 
 - **No streams.** The query takes `waterway=river` only. Streams triple the line count for channels
   no station reports on.
-- **No lake or coast geometry.** The tint already draws those, and shipping both puts two mechanisms
-  on one job.
+- **No coastline.** The sea is not a `natural=water` polygon, and the tint already paints it. The
+  largest body in this file is 89 square kilometers, so nothing here is the Straits.
 - **No control.** The layer is part of the dark basemap, the same as the tint and the lift.
-- **No zoom cutoff.** Leaflet redraws the visible part of the one canvas layer, and hiding rivers
+- **No zoom cutoff.** Leaflet redraws the visible part of the one canvas layer, and hiding water
   when zoomed out loses the shape of the basin.
 
 ### What breaks it
 
-Deleting `rivers.json` leaves the dark map without rivers and no error anywhere. The Pages workflow
-copies it unconditionally, next to the PWA set, for that reason. A missing river layer is a worse
-map, so it must not be able to fail a bake either way.
+Deleting `water.json` leaves the dark map without rivers or ponds and no error anywhere. The Pages
+workflow copies it unconditionally, next to the PWA set, for that reason. Thin water is a worse map,
+so it must not be able to fail a bake either way.

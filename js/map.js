@@ -26,44 +26,51 @@ let tiles;
 
 const isDark = () => document.documentElement.dataset.theme === 'dark';
 
-// The rivers the basemap cannot draw. The water tint in index.html recolours CARTO's one water
-// tone, which gets the sea and the lakes — but a river is a one-pixel antialiased line, and from
-// zoom 12 its pixels land in the same tones as roads and buildings. Measured: the tone a river
-// peaks at is only 20-27% river. No filter can separate that, so the geometry is vendored instead.
-// `rivers.json` is baked by river-build.php from OpenStreetMap. See docs/FEATURES.md.
+// The water the basemap does not draw, in two parts, for two different reasons.
+//
+// A river is a one-pixel antialiased line, so from zoom 12 its pixels land in the same tones as
+// roads and buildings — measured, the tone a river peaks at is only 20-27% river, so the tint in
+// index.html cannot key on it. And CARTO drops small water from its style outright: a 0.0017 km²
+// retention pond has zero water pixels at zoom 13, 14 and 15 alike, so there is nothing on the
+// tile to recolour at all. The tint still owns the sea and the large lakes, which are neither.
+// `water.json` is baked by water-build.php from OpenStreetMap. See docs/FEATURES.md.
 //
 // Its own pane, between the tiles (200) and the overlays (400), so heat blobs, pins and the "you
 // are here" circle all still draw over the water rather than under it.
-map.createPane('rivers');
-map.getPane('rivers').style.zIndex = 250;
+map.createPane('water');
+map.getPane('water').style.zIndex = 250;
 
-let riverGeo, rivers, asking;
+let waterGeo, water, asking;
 
-function setRivers(on) {
-  if (!on) { if (rivers) map.removeLayer(rivers); return; }
-  if (rivers) { rivers.addTo(map); return; }
+function setWater(on) {
+  if (!on) { if (water) map.removeLayer(water); return; }
+  if (water) { water.addTo(map); return; }
 
   // Fetched once, on the first dark theme of the session, and never at all on a light one.
-  if (!riverGeo) {
+  if (!waterGeo) {
     if (asking) return;
     asking = true;
-    fetch('rivers.json')
+    fetch('water.json')
       .then(r => r.ok ? r.json() : Promise.reject(r.status))
-      .then(g => { riverGeo = g; if (isDark()) setRivers(true); })
-      .catch(() => {});   // No rivers is a plainer map, not a broken one. Every reading still draws.
+      .then(g => { waterGeo = g; if (isDark()) setWater(true); })
+      .catch(() => {});   // No water is a plainer map, not a broken one. Every reading still draws.
     return;
   }
 
   // Built here rather than in the fetch, so `--water` is read at the moment the layer is drawn.
   // The token exists on the dark theme only, and this line is only ever reached on it.
-  // Canvas rather than SVG: 2,775 lines is 2,775 DOM nodes to carry through every pan and zoom.
-  rivers = L.geoJSON(riverGeo, {
-    renderer: L.canvas({ pane: 'rivers' }),
+  const c = getComputedStyle(document.documentElement).getPropertyValue('--water').trim();
+
+  // Canvas rather than SVG: 6,635 shapes is 6,635 DOM nodes to carry through every pan and zoom.
+  // One colour for both parts, and it is the colour the tint paints — a drawn pond beside a tinted
+  // lake has to be the same water. A pond is a fill with no stroke, because an outline on a shape
+  // this small is most of the shape. Opaque for the same reason the two must match exactly.
+  water = L.geoJSON(waterGeo, {
+    renderer: L.canvas({ pane: 'water' }),
     interactive: false,
-    style: {
-      color: getComputedStyle(document.documentElement).getPropertyValue('--water').trim(),
-      weight: 1.4, opacity: .9,
-    },
+    style: f => f.properties.t === 'area'
+      ? { stroke: false, fillColor: c, fillOpacity: 1 }
+      : { color: c, weight: 1.4, opacity: 1 },
   }).addTo(map);
 }
 
@@ -73,7 +80,7 @@ function setBasemap() {
   document.documentElement.dataset.lift = key === 'dark' ? 'yes' : 'no';
   if (tiles) map.removeLayer(tiles);
   tiles = L.tileLayer(tileURL(key), { maxZoom: 18 }).addTo(map);
-  setRivers(key === 'dark');
+  setWater(key === 'dark');
 }
 
 // Three choices, two themes. PREFS.theme holds what the reader picked — 'system', 'light' or 'dark'
