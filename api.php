@@ -717,6 +717,51 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
             $flat >= BOX[3] && $flat <= BOX[1] && $flng >= BOX[0] && $flng <= BOX[2]);
     }
 
+    /* The nowcast page bakes its data into L.marker() calls, so the parser is the only contract we
+       have with it. A wording change must drop the marker, not read as clear weather — that is what
+       the -1 rung is for, and what makes met.parsed fall when MET moves something. */
+    echo "\nmetRung():\n";
+    $ok('tiada hujan is clear',        metRung('Tiada Hujan') === 0);
+    $ok('hujan is rain',               metRung('Hujan') === 1);
+    $ok('hujan lebat is heavy',        metRung('Hujan Lebat') === 2);
+    $ok('case does not matter',        metRung('  tiada   hujan ') === 0);
+    $ok('an unknown word is refused',  metRung('Ribut Petir') === -1);
+
+    echo "\nmetClock():\n";
+    $ok('an afternoon time converts',  metClock('03:10 PM') === '15:10');
+    $ok('a morning time converts',     metClock('09:40 AM') === '09:40');
+    $ok('noon converts',               metClock('12:10 PM') === '12:10');
+    $ok('midnight converts',           metClock('12:40 AM') === '00:40');
+    $ok('rubbish is refused',          metClock('later') === null);
+
+    echo "\nmetPoints():\n";
+    $mk = fn(string $name, string $now, array $six) =>
+        "lov[1] = L.marker([3.10220, 101.64480], {icon: cerahIcon}).addTo(mymap).bindPopup('"
+        . "<span class=\"font-bold\">$name</span><br /><br /><span class=\"cuaca\">Sekarang: $now</span>"
+        . "<br /><br /><span class=\"cuaca2\">Ramalan pada: <br />"
+        . implode('', array_map(
+            fn($v, $i) => '<span class="cuaca2">' . sprintf('%02d:10 PM', 3 + $i) . ": $v</span><br />",
+            $six, array_keys($six)))
+        . "<br /> <small>Tarikh kemaskini : 11/08/2026 02:40 PM</small>');";
+
+    $one = metPoints($mk('Petaling Jaya', 'Tiada Hujan',
+        ['Hujan', 'Hujan', 'Hujan Lebat', 'Tiada Hujan', 'Tiada Hujan', 'Tiada Hujan']));
+    $ok('one marker parses',        count($one) === 1);
+    $ok('the name comes through',   ($one[0]['name'] ?? '') === 'Petaling Jaya');
+    $ok('the coordinate parses',    abs(($one[0]['lat'] ?? 0) - 3.1022) < 1e-6);
+    $ok('seven rungs come out',     count($one[0]['rungs'] ?? []) === 7);
+    $ok('now is the first rung',    ($one[0]['rungs'][0] ?? -9) === 0);
+    $ok('heavy rain is read',       ($one[0]['rungs'][3] ?? -9) === 2);
+    $ok('clocks are 24 hour',       ($one[0]['clocks'][1] ?? '') === '15:10');
+    $ok('now carries no clock',     ($one[0]['clocks'][0] ?? null) === null);
+    $ok('the stamp is a unix time', ($one[0]['stamp'] ?? 0) > 1000000000);
+
+    /* A marker MET words differently must vanish, so the counter falls and somebody looks. */
+    $bad = metPoints($mk('Nowhere', 'Ribut Petir',
+        ['Hujan', 'Hujan', 'Hujan', 'Hujan', 'Hujan', 'Hujan']));
+    $ok('an unreadable rung drops the marker', $bad === []);
+    $ok('an empty page parses to nothing',     metPoints('') === []);
+
     echo $fail ? "\n$fail FAILED\n" : "\nall ok\n";
     exit($fail ? 1 : 0);
 }

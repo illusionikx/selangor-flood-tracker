@@ -189,3 +189,78 @@ function rainStatus(?float $hourly): int {
     if ($hourly > 10) return 2;
     return $hourly > 0 ? 1 : 0;
 }
+
+/* --- MET Malaysia nowcast ------------------------------------------------------------------- */
+
+/**
+ * MET publishes three rungs in Bahasa. Test "tiada hujan" before "hujan", because the first
+ * contains the second and the order is the whole rule.
+ *
+ * -1 means "MET wrote something this parser does not know". The caller drops the whole marker on
+ * it. Reading an unknown word as clear would hide a layout change behind calm weather, which is the
+ * one failure a scraper must not have.
+ */
+function metRung(string $word): int {
+    $w = strtolower(trim(preg_replace('/\s+/', ' ', $word)));
+    if (str_contains($w, 'tiada hujan')) return 0;
+    if (str_contains($w, 'lebat'))       return 2;
+    if (str_contains($w, 'hujan'))       return 1;
+    return -1;
+}
+
+/** "03:10 PM" to "15:10". Everything this app prints is 24-hour and Malaysian. */
+function metClock(string $ampm): ?string {
+    $d = DateTime::createFromFormat('h:i A', trim(preg_replace('/\s+/', ' ', $ampm)));
+    return $d ? $d->format('H:i') : null;
+}
+
+/**
+ * Every point on the nowcast page. The page renders its Leaflet map on the server, so the data is
+ * in 294 `L.marker(...)` statements and there is no second request to intercept.
+ *
+ * Returns one entry per readable marker. `rungs` holds seven values, index 0 being now and index 6
+ * being three hours out. `clocks` is parallel to it, with index 0 null because now has no clock.
+ *
+ * A marker is dropped whole when any of its seven values is unreadable, when it carries fewer than
+ * six forecast steps, or when its stamp will not parse. Dropping shows up as a falling
+ * `sources.met.parsed`, which is the only alarm a silent scraper gets.
+ */
+function metPoints(string $html): array {
+    $out = [];
+    preg_match_all(
+        "/L\.marker\(\[\s*([-\d.]+)\s*,\s*([-\d.]+)\s*\][^)]*\)\s*\.addTo\([^)]*\)\s*\.bindPopup\('(.*?)'\)/s",
+        $html, $ms, PREG_SET_ORDER);
+
+    foreach ($ms as [, $lat, $lng, $pop]) {
+        if (!preg_match('/font-bold[^>]*>([^<]+)</', $pop, $n)) continue;
+        if (!preg_match('/Sekarang:\s*([^<]+)</', $pop, $now)) continue;
+        if (!preg_match('/kemaskini\s*:\s*([\d\/]+\s+[\d:]+\s*[AP]M)/i', $pop, $st)) continue;
+
+        preg_match_all('/(\d\d:\d\d\s*[AP]M)\s*:\s*([^<]+)</i', $pop, $steps, PREG_SET_ORDER);
+        if (count($steps) < 6) continue;
+        $steps = array_slice($steps, 0, 6);
+
+        $rungs  = [metRung($now[1])];
+        $clocks = [null];
+        foreach ($steps as [, $when, $what]) {
+            $rungs[]  = metRung($what);
+            $clocks[] = metClock($when);
+        }
+        // Index 0 is deliberately null — now has no clock — so only steps 1 to 6 are tested.
+        if (in_array(-1, $rungs, true) || in_array(null, array_slice($clocks, 1), true)) continue;
+
+        $stamp = DateTime::createFromFormat('d/m/Y h:i A', preg_replace('/\s+/', ' ', trim($st[1])),
+                                            new DateTimeZone('Asia/Kuala_Lumpur'));
+        if (!$stamp) continue;
+
+        $out[] = [
+            'name'   => trim(preg_replace('/\s+/', ' ', $n[1])),
+            'lat'    => (float)$lat,
+            'lng'    => (float)$lng,
+            'rungs'  => $rungs,
+            'clocks' => $clocks,
+            'stamp'  => $stamp->getTimestamp(),
+        ];
+    }
+    return $out;
+}
