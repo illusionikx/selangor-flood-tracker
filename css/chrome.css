@@ -1563,7 +1563,17 @@ body.finding #find { display: none; }
   justify-items: center; gap: 16px; background: var(--surface); text-align: center;
   transition: opacity .3s ease, visibility .3s;
 }
-#splash.gone { opacity: 0; visibility: hidden; }
+/* `pointer-events` is the load-bearing one here, and it is deliberately not in the transition list
+   above so that it applies the instant `.gone` lands. `visibility` interpolates as a discrete step
+   that holds its *start* value for the whole duration, so on visible→hidden this box stays
+   `visibility: visible` for the full .3s while the opacity runs to 0 — and `opacity: 0` does not
+   stop hit-testing. That left an invisible, viewport-covering, `z-index: 900` sheet swallowing every
+   click for 300ms after the map appeared: the first press of anything in the app bar did nothing,
+   and the second worked, which reads as the button being slow rather than as something on top of
+   it. `visibility: hidden` still earns its place at the end of the fade, for the tab order and for
+   a screen reader. This is the same spec sentence as the `#gotoBox` focus trap in CLAUDE.md, seen
+   from the other end: there a transitioned `visibility` refused a focus, here it accepted a click. */
+#splash.gone { opacity: 0; visibility: hidden; pointer-events: none; }
 #splash .mark { font-size: 48px; color: var(--accent); }
 #splash h1 { font-size: 22px; font-weight: 400; }
 #splash h1 b { font-weight: 500; color: var(--accent); }

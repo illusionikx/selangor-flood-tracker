@@ -542,6 +542,15 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   button that is about to become `display: none`, which returns focus to `<body>` *after* the
   handler returns — so the focus must follow a style flush (`el.offsetWidth`). `requestAnimationFrame`
   does **not** work here: its callbacks run before the frame's style recalc.
+  **The same interpolation eats clicks on the way out, and `#splash` was doing it.** `visibility`
+  holds its *start* value for the whole duration, so `visible → hidden` stays `visible` until the
+  transition ends. Paired with `opacity: 0`, which does not stop hit-testing, `#splash.gone` left an
+  invisible `inset: 0`, `z-index: 900` sheet over the entire viewport for 300ms after the map
+  appeared. The first press of anything in the app bar did nothing and the second worked, which
+  reads as a slow button rather than as something on top of it. The fix is `pointer-events: none` on
+  the `.gone` state, kept **out** of the transition list so it applies at once. Any overlay that
+  fades itself out needs that declaration — `opacity` and a transitioned `visibility` together never
+  stop a click, and both of this app's full-screen fades were written that way.
 - **`focusOn()` centres on the strip of map that is actually visible**, which is now bounded on both
   sides: the drawer takes the left, the panel the right, and the two shifts subtract. Skipped below
   600px, where the panel covers the map outright and there is no strip to aim at.

@@ -6001,3 +6001,26 @@ radius it was inheriting.
 **Not changed.** The bar still tracks the batch in flight rather than all ~90 cameras, for the reason
 already recorded above it: tiles arm on view, so a bar counting every camera would sit near empty all
 session and read as stuck.
+
+## The splash kept catching clicks for 300ms after it disappeared
+
+The app bar's buttons did nothing on the first press after landing, and worked on the second. It read
+as a slow button.
+
+`#splash` covers the viewport at `z-index: 900` and fades out with
+`transition: opacity .3s ease, visibility .3s`, going to `opacity: 0; visibility: hidden` on `.gone`.
+
+**`visibility` interpolates as a discrete step that holds its start value for the whole duration.**
+Going `visible → hidden` it therefore stays `visible` until the transition ends. `opacity: 0` does
+not stop hit-testing. So for the full 300ms the splash was an invisible sheet over the entire page,
+swallowing every click, while the map underneath looked ready to use.
+
+`pointer-events: none` on the `.gone` state is the fix, and it is deliberately not in the transition
+list, so it applies the instant the class lands. `visibility: hidden` stays for the end of the fade,
+where it still does real work for the tab order and for a screen reader.
+
+**The rule this draws.** `opacity: 0` plus a transitioned `visibility` never stops a click. Any
+overlay that fades itself out needs `pointer-events: none` stated on the faded state. `CLAUDE.md`
+files this beside the `#gotoBox` focus trap, which is the same sentence of the spec seen from the
+other end: there a transitioned `visibility` refused a `focus()` on something already on screen,
+here it accepted a click on something already gone.
