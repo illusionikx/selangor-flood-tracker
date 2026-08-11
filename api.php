@@ -607,7 +607,7 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
     $now = 1800000000;
 
     echo "forceAllowed():\n";
-    $ok('no stamp at all is allowed',            forceAllowed($now, null)[0] === true);
+    $ok('stamps with no age pass',               forceAllowed($now, null)[0] === true);
     $ok('a stamp 61s old is allowed',            forceAllowed($now, $now - 61)[0] === true);
     $ok('a stamp exactly 60s old is allowed',    forceAllowed($now, $now - 60)[0] === true);
     $ok('a stamp 59s old is refused',            forceAllowed($now, $now - 59)[0] === false);
@@ -619,7 +619,7 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
     $ok('the window is honored when passed',     forceAllowed($now, $now - 10, 5)[0] === true);
 
     echo "\nserveFromCache():\n";
-    $ok('a fresh cache is served',                 serveFromCache(10, true, false) === true);
+    $ok('the function serves a fresh cache',       serveFromCache(10, true, false) === true);
     $ok('a force rebuilds a fresh cache',          serveFromCache(10, true, true) === false);
     $ok('a force that lost the lock is served',    serveFromCache(10, false, true) === true);
     $ok('a stale cache rebuilds',                  serveFromCache(TTL + 1, true, false) === false);
@@ -630,7 +630,7 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
     echo "\nplaceQuery():\n";
     $ok('a plain query normalizes',    placeQuery('Bandar Utama') === 'bandar utama');
     $ok('runs of space collapse',      placeQuery("  kg.   sg   lui \n") === 'kg. sg lui');
-    $ok('one character is refused',    placeQuery('a') === null);
+    $ok('one character gets rejected',    placeQuery('a') === null);
     $ok('two characters are allowed',  placeQuery('pj') === 'pj');
     $ok('whitespace only is refused',  placeQuery("   \t ") === null);
     $ok('80 characters are allowed',   placeQuery(str_repeat('a', 80)) === str_repeat('a', 80));
@@ -750,9 +750,9 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
     $ok('the name comes through',   ($one[0]['name'] ?? '') === 'Petaling Jaya');
     $ok('the coordinate parses',    abs(($one[0]['lat'] ?? 0) - 3.1022) < 1e-6);
     $ok('seven rungs come out',     count($one[0]['rungs'] ?? []) === 7);
-    $ok('now is the first rung',    ($one[0]['rungs'][0] ?? -9) === 0);
-    $ok('heavy rain is read',       ($one[0]['rungs'][3] ?? -9) === 2);
-    $ok('clocks are 24 hour',       ($one[0]['clocks'][1] ?? '') === '15:10');
+    $ok('now carries the first rung',  ($one[0]['rungs'][0] ?? -9) === 0);
+    $ok('the parser reads heavy rain',   ($one[0]['rungs'][3] ?? -9) === 2);
+    $ok('the parser reads 24 hour clocks',  ($one[0]['clocks'][1] ?? '') === '15:10');
     $ok('now carries no clock',     array_key_exists(0, $one[0]['clocks'] ?? [])
                                     && $one[0]['clocks'][0] === null);
     $ok('the stamp is a unix time', ($one[0]['stamp'] ?? 0) > 1000000000);
@@ -776,7 +776,7 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
     $a = metSpan([0, 0, 0, 2, 2, 0, 0], $ck);
     $ok('a later block reports its start',   $a['from'] === '16:10');
     $ok('and the first dry step after it',   $a['to'] === '17:10');
-    $ok('and is not open',                   $a['open'] === false);
+    $ok('and remains closed',                $a['open'] === false);
     $ok('and carries the worst rung',        $a['rung'] === 2);
     $ok('and the rung now',                  $a['now'] === 0);
     $ok('and the rung one hour out',         $a['hr1'] === 0);
@@ -786,7 +786,7 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
     $ok('and ends at the first dry step',    $b['to'] === '15:40');
 
     $c = metSpan([2, 2, 2, 2, 2, 2, 2], $ck);
-    $ok('rain to the last step is open',     $c['open'] === true);
+    $ok('rain to the last step remains open',  $c['open'] === true);
     $ok('and reports the final clock',       $c['to'] === '17:40');
     $ok('and still carries no start',        $c['from'] === null);
 
@@ -802,8 +802,8 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
     $ok('and does not change the worst rung', $e['rung'] === 2);
 
     /* The forecast call answers for three tiers of place. Only the district tier joins to a station,
-       because api.php already normalizes `district`. A state row named "Selangor" would otherwise
-       overwrite a district of the same name on some other feed's day. */
+       because api.php already normalizes `district`. A state row named "Selangor" otherwise
+       overwrites a district of the same name on a day from another feed. */
     echo "\nmetDaily():\n";
     $rows = json_encode([
         ['location' => ['location_id' => 'Ds057', 'location_name' => 'Petaling'],
@@ -816,15 +816,15 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
          'min_temp' => 25, 'max_temp' => 33],
     ]);
     $day = metDaily($rows);
-    $ok('district rows are kept',      isset($day['petaling']));
-    $ok('the key is lowercased',       ($day['petaling']['tmax'] ?? 0) === 34);
-    $ok('the minimum comes through',   ($day['petaling']['tmin'] ?? 0) === 24);
-    $ok('a second district is kept',   ($day['kuala lumpur']['tmax'] ?? 0) === 33);
-    $ok('state rows are dropped',      !isset($day['selangor']));
-    $ok('town rows are dropped',       !isset($day['pelabuhan klang']));
-    $ok('two districts in all',        count($day) === 2);
-    $ok('rubbish parses to nothing',   metDaily('not json') === []);
-    $ok('an empty body parses to nothing', metDaily('') === []);
+    $ok('the parser keeps district rows',   isset($day['petaling']));
+    $ok('the key comes back lowercase',     ($day['petaling']['tmax'] ?? 0) === 34);
+    $ok('the minimum comes through',        ($day['petaling']['tmin'] ?? 0) === 24);
+    $ok('the parser keeps a second district', ($day['kuala lumpur']['tmax'] ?? 0) === 33);
+    $ok('the parser drops state rows',      !isset($day['selangor']));
+    $ok('the parser drops town rows',       !isset($day['pelabuhan klang']));
+    $ok('two districts come back in all',   count($day) === 2);
+    $ok('rubbish parses to nothing',        metDaily('not json') === []);
+    $ok('an empty body parses to nothing',  metDaily('') === []);
 
     echo $fail ? "\n$fail FAILED\n" : "\nall ok\n";
     exit($fail ? 1 : 0);
