@@ -607,7 +607,7 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
     $now = 1800000000;
 
     echo "forceAllowed():\n";
-    $ok('stamps with no age pass',               forceAllowed($now, null)[0] === true);
+    $ok('no stamp at all is allowed',            forceAllowed($now, null)[0] === true);
     $ok('a stamp 61s old is allowed',            forceAllowed($now, $now - 61)[0] === true);
     $ok('a stamp exactly 60s old is allowed',    forceAllowed($now, $now - 60)[0] === true);
     $ok('a stamp 59s old is refused',            forceAllowed($now, $now - 59)[0] === false);
@@ -619,7 +619,7 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
     $ok('the window is honored when passed',     forceAllowed($now, $now - 10, 5)[0] === true);
 
     echo "\nserveFromCache():\n";
-    $ok('the function serves a fresh cache',       serveFromCache(10, true, false) === true);
+    $ok('a fresh cache is served',                 serveFromCache(10, true, false) === true);
     $ok('a force rebuilds a fresh cache',          serveFromCache(10, true, true) === false);
     $ok('a force that lost the lock is served',    serveFromCache(10, false, true) === true);
     $ok('a stale cache rebuilds',                  serveFromCache(TTL + 1, true, false) === false);
@@ -630,7 +630,7 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
     echo "\nplaceQuery():\n";
     $ok('a plain query normalizes',    placeQuery('Bandar Utama') === 'bandar utama');
     $ok('runs of space collapse',      placeQuery("  kg.   sg   lui \n") === 'kg. sg lui');
-    $ok('one character gets rejected',    placeQuery('a') === null);
+    $ok('one character is refused',    placeQuery('a') === null);
     $ok('two characters are allowed',  placeQuery('pj') === 'pj');
     $ok('whitespace only is refused',  placeQuery("   \t ") === null);
     $ok('80 characters are allowed',   placeQuery(str_repeat('a', 80)) === str_repeat('a', 80));
@@ -725,14 +725,14 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
     $ok('hujan is rain',               metRung('Hujan') === 1);
     $ok('hujan lebat is heavy',        metRung('Hujan Lebat') === 2);
     $ok('case does not matter',        metRung('  tiada   hujan ') === 0);
-    $ok('an unknown word is refused',  metRung('Ribut Petir') === -1);
+    $ok('the parser refuses an unknown word',  metRung('Ribut Petir') === -1);
 
     echo "\nmetClock():\n";
     $ok('an afternoon time converts',  metClock('03:10 PM') === '15:10');
     $ok('a morning time converts',     metClock('09:40 AM') === '09:40');
     $ok('noon converts',               metClock('12:10 PM') === '12:10');
     $ok('midnight converts',           metClock('12:40 AM') === '00:40');
-    $ok('rubbish is refused',          metClock('later') === null);
+    $ok('the parser refuses rubbish',  metClock('later') === null);
 
     echo "\nmetPoints():\n";
     $mk = fn(string $name, string $now, array $six) =>
@@ -763,8 +763,8 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
     $ok('an unreadable rung drops the marker', $bad === []);
     $ok('an empty page parses to nothing',     metPoints('') === []);
 
-    /* The span is what the card sentence is built from, and it is the one piece of logic here that
-       can be quietly wrong. It runs first-to-last, not first-unbroken-run: 17 of 137 wet markers on
+    /* The card sentence reads its two facts from the span. This is the one piece of logic here that
+       can go quietly wrong. It runs first-to-last, not first-unbroken-run: 17 of 137 wet markers on
        one live page held the worst rung in more than one block, and reporting only the first block
        hides a return of the rain. */
     echo "\nmetSpan():\n";
