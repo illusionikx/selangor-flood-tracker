@@ -197,8 +197,8 @@ function rainStatus(?float $hourly): int {
  * contains the second and the order is the whole rule.
  *
  * -1 means "MET wrote something this parser does not know". The caller drops the whole marker on
- * it. Reading an unknown word as clear would hide a layout change behind calm weather, which is the
- * one failure a scraper must not have.
+ * it. Do not read an unknown word as clear. That hides a layout change behind calm weather, which is
+ * the one way a scraper must not fail.
  */
 function metRung(string $word): int {
     $w = strtolower(trim(preg_replace('/\s+/', ' ', $word)));
@@ -221,8 +221,8 @@ function metClock(string $ampm): ?string {
  * Returns one entry per readable marker. `rungs` holds seven values, index 0 being now and index 6
  * being three hours out. `clocks` is parallel to it, with index 0 null because now has no clock.
  *
- * A marker is dropped whole when any of its seven values is unreadable, when it carries fewer than
- * six forecast steps, or when its stamp will not parse. Dropping shows up as a falling
+ * This function drops a marker whole when any of its seven values is unreadable. It drops one that
+ * carries fewer than six forecast steps, and one whose stamp will not parse. A drop lowers
  * `sources.met.parsed`, which is the only alarm a silent scraper gets.
  */
 function metPoints(string $html): array {

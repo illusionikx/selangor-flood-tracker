@@ -753,7 +753,8 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
     $ok('now is the first rung',    ($one[0]['rungs'][0] ?? -9) === 0);
     $ok('heavy rain is read',       ($one[0]['rungs'][3] ?? -9) === 2);
     $ok('clocks are 24 hour',       ($one[0]['clocks'][1] ?? '') === '15:10');
-    $ok('now carries no clock',     ($one[0]['clocks'][0] ?? null) === null);
+    $ok('now carries no clock',     array_key_exists(0, $one[0]['clocks'] ?? [])
+                                    && $one[0]['clocks'][0] === null);
     $ok('the stamp is a unix time', ($one[0]['stamp'] ?? 0) > 1000000000);
 
     /* A marker MET words differently must vanish, so the counter falls and somebody looks. */
