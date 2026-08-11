@@ -1498,8 +1498,12 @@ foreach ($stations as &$s) {
 
     /* Kuala Lumpur is one district to MET and thirteen constituencies to JPS — Segambut, Batu,
        Setiawangsa and the rest. Every one of them carries state "Kuala Lumpur", so the state is
-       the key there. Match on state and district together everywhere else: district names repeat
-       across states, which is the whole reason dkey() exists in js/util.js. */
+       the key there. Every other station keys on district name alone.
+       That is safe here, for two measured reasons. MET publishes 157 district
+       rows and repeats no name among them, so its map cannot collide with itself. Our own station
+       set holds exactly one ambiguous district name, "gombak", which sits in Selangor and in Kuala
+       Lumpur. The branch above already separates those two. Re-measure both counts before you widen
+       this join to another state. */
     $dk = $s['state'] === 'Kuala Lumpur' ? 'kuala lumpur' : strtolower(trim((string)$s['district']));
     if (isset($metDay[$dk])) {
         $met += $metDay[$dk];
