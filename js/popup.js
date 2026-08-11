@@ -419,42 +419,62 @@ const favMark = (ids, set) => {
 const goName = s =>
   `<div class="popname" data-go="${s.id}" title="Show ${s.name} on the map">${s.name}</div>`;
 
-/* The MET section. One row of three columns, drawn once per card and never once per sensor — rain
-   over a place is one fact, and sourceInfo() already taught this app what a per-place fact costs
-   when it repeats down a six-sensor mast.
-   This is not a sensor at this place. The head carries the point name and how far away it is, which
-   is what lets a reader weigh a 14 km claim. */
+/* This code reads the hour in Malaysia. It does not read the hour where the reader sits.
+   Every time on this page is MYT, because JPS stamps its readings that way. A moon beside a
+   reading stamped 14:00 is a contradiction. Night runs 19:00 to 06:59. Near the equator the sun
+   moves by under half an hour across the year. A fixed pair of hours needs no almanac. */
+const MYT_H = new Intl.DateTimeFormat('en-GB', {
+  timeZone: 'Asia/Kuala_Lumpur', hour: '2-digit', hour12: false,
+});
+const night = () => { const h = +MYT_H.format(new Date()); return h >= 19 || h < 7; };
+
+/* One glyph name for a rung. Only a clear sky has a night form. */
+const wxIcon = r => {
+  const w = WEATHER[r] || WEATHER[0];
+  return (night() && w.night) || w.icon;
+};
+
+/* The MET section. Three cells, each carrying a subtitle, a glyph line and a value line, so the
+   three line up across the row.
+   This section appears once per card and never once per sensor. Rain over a place is one fact, and
+   sourceInfo() already taught this app what a per-place fact costs when it repeats down a mast.
+   The header carries the point and the distance, which is what lets a reader weigh a 14 km claim.
+   This section is not a sensor at this place. */
 function metSection(s) {
   const m = s.met;
   if (!m) return '';
 
   const w = r => WEATHER[r] || WEATHER[0];
-  const head = w(m.rung ?? m.now ?? 0);
 
   /* Four shapes, and every one names both ends. `until` says the rain ends. `past` says the MET
-     outlook ended, and never that the rain did.
-     There is no "Raining now," prefix. The middle column states the weather now on every card, so
-     the prefix repeated the cell beside it and cost the line a second row. */
+     outlook ended, and never that the rain did. */
   const rain = m.rung == null ? '' :
     `${w(m.rung).line}${m.from ? ` ${m.from}${m.open ? ',' : ''}` : ''} `
     + `${m.open ? 'past' : 'until'} ${m.to}`;
 
-  const temp = m.tmax == null ? '' :
-    `<div class="wxcol"><span><i class="i i-thermostat"></i> Today</span>
-       <span>${m.tmin}–${m.tmax}°</span></div>`;
+  const cell = (sub, glyph, value, extra = '') => `<div class="wxcol">
+      <span class="wxsub">${sub}</span>
+      ${glyph}
+      <span class="wxval">${value}</span>
+      ${extra}
+    </div>`;
 
-  const now = m.now == null ? '' :
-    `<div class="wxcol wxnow"><i class="i i-${w(m.now).icon}"></i>
-       <span>${w(m.now).word}</span></div>`;
+  /* Two lines with their own arrows. One range in one string made a reader work out which number
+     was the maximum. */
+  const temp = m.tmax == null ? '' : cell('Today',
+    `<span class="wxtemp"><i class="i i-arrow_upward"></i>${m.tmax}°</span>`,
+    `<span class="wxtemp"><i class="i i-arrow_downward"></i>${m.tmin}°</span>`);
 
-  const out = m.hr1 == null ? '' :
-    `<div class="wxcol wxout">
-       <span><i class="i i-${w(m.hr1).icon}"></i> In 1 hour: ${w(m.hr1).word}</span>
-       <span class="wxline">${rain}</span></div>`;
+  const now = m.now == null ? '' : cell('Current',
+    `<i class="i wxbig i-${wxIcon(m.now)}"></i>`, w(m.now).word);
 
-  return `<div class="sensor" data-sensor="@met">
+  const out = m.hr1 == null ? '' : cell('Later',
+    `<i class="i wxbig i-${wxIcon(m.hr1)}"></i>`, w(m.hr1).word,
+    rain ? `<span class="wxline">${rain}</span>` : '');
+
+  return `<div class="sensor wxsec" data-sensor="@met">
       <div class="sensorhead">
-        <i class="glyph i i-${head.icon}" style="color:var(--k-weather)"></i>
+        <i class="glyph i i-${wxIcon(m.rung ?? m.now ?? 0)}" style="color:var(--k-weather)"></i>
         <b>Weather</b>
         ${m.at ? `<span class="muted">${m.at} · ${m.km} km</span>` : ''}
       </div>

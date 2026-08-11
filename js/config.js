@@ -175,7 +175,7 @@ export const camSrc = s =>
 /* The three rungs MET publishes. `word` fills the narrow "now" column, so it has to be one word at
    about 64px. `line` opens the worst-rung sentence, which is why the two differ. */
 export const WEATHER = [
-  { icon: 'sunny',       word: 'Clear', line: '' },
+  { icon: 'sunny', night: 'clear_night', word: 'Clear', line: '' },
   { icon: 'rainy',       word: 'Rain',  line: 'Rain' },
   { icon: 'rainy_heavy', word: 'Heavy', line: 'Heavy rain' },
 ];
