@@ -8,123 +8,92 @@ require_once __DIR__ . '/shots.php';     // the camera archive: capture, retenti
 const API   = 'https://infobanjirjps.selangor.gov.my/JPSAPI/api/';
 const TTL   = 300;   // upstream updates hourly; 5 min is plenty
 const SCRAPE_TTL = 900;  // scraped HTML pages: slow to render, and updated no faster than this
-// The sparkline is drawn on a real time axis, so history is windowed by clock rather than by count.
-// Thinned to one point per bucket: 12h of 5-minute polls would be 144 points on every one of 106
-// river stations, which is a lot of payload for a graph 300px wide.
+// The sparkline draws on a clock axis, so history windows by time, not by count. One point per
+// bucket: 12h of 5-minute polls is 144 points on each of 106 rivers, for a graph 300px wide.
 const SPARK_WIN    = 12 * 3600;
 const SPARK_BUCKET = 900;    // 15 min — 48 points across the window at most
-// Rainfall buckets by the clock hour instead. `hourlyRainfall` is a rolling one-hour total, so two
-// samples 15 minutes apart describe overlapping windows — drawing them as separate periods would
-// show the same rain two, three, four times over.
+// Rainfall buckets by the clock hour. `hourlyRainfall` is a rolling one-hour total, so samples 15
+// minutes apart overlap. Drawn as separate periods they show the same rain four times over.
 const RAIN_BUCKET  = 3600;
-// Trend is a rate of rise (m/hour), the standard hydrological measure — JPS publishes none of its
-// own. It is the MEDIAN OF EVERY PAIRWISE SLOPE in the window (Theil-Sen), not a chord between two
-// samples. A chord is one bad reading away from nonsense: the two-point version reported 9.61 m/h
-// on Sg. Kerayong, and the archive holds 846 steps of 0.5 m or more, 63 of which reverted on the
-// next sample. A median tolerates roughly 29% corrupt points and costs ~200 divisions per station.
+// Trend is a rate of rise in m/hour. JPS publishes none, so we derive it: the MEDIAN OF EVERY
+// PAIRWISE SLOPE in the window (Theil-Sen), not a chord. A chord breaks on one bad reading — the
+// two-point version reported 9.61 m/h on Sg. Kerayong, and the archive holds 846 steps of 0.5 m,
+// 63 of which reverted on the next sample. A median takes 29% bad points for ~200 divisions.
 const TREND_MIN = 600;    // 10 min — the closest two samples may be and still form a usable pair
 const TREND_MAX = 10800;  // 3 h  — older than this says nothing about now
-// "Rising" is not a rate, it is a forecast: at the rate it is climbing now, this station reaches its
-// OWN danger mark within RISE_ETA hours. A fixed m/h can't do that job — 0.2 m/h is a quiet
-// afternoon on a big river 4 m below danger, and an emergency on a drain 30 cm below it.
-// The floor exists because levels are reported to the centimetre: over the shortest pair we accept,
-// a single 1 cm tick is already 0.06 m/h, so anything under 0.1 is rounding.
-// Measured against our own samples in calm weather, 0.05 m/h — an earlier bar — sat on the p90 of
-// ordinary fluctuation and fired on 3 cm of movement, flagging ~1 station-hour in 10 as "rising".
+// "Rising" is a forecast, not a rate: at this climb, the station reaches its OWN danger mark within
+// RISE_ETA hours. A fixed m/h cannot do that. 0.2 m/h is a quiet afternoon on a river 4 m below
+// danger and an emergency on a drain 30 cm below it. The floor exists because levels come to the
+// centimetre: over the shortest pair we accept, one 1 cm tick is 0.06 m/h, so under 0.1 is rounding.
+// Measured in calm weather, 0.05 m/h sat on the p90 of normal movement and flagged 1 hour in 10.
 const RISE_FLOOR = 0.10;  // m/hour — below this the rate is sensor rounding, not a climb
 const RISE_ETA   = 3;     // hours to its own danger mark
-// A tide is a rise. It climbs at 0.5-0.7 m/h twice a day at the gates and jetties (PINTU AIR IJOK,
-// BANDAR KLANG, TELUK PENYAMUN) and reaches danger never, so extrapolating one is a daily false
-// alarm. The level must therefore beat its own 24-hour high: a tide stays inside yesterday's
-// envelope and a flood breaks it. And it must hold for two consecutive polls — ISA-18.2's on-delay,
-// because one poll of climb was 48 on/off flips across 53 firings.
+// A tide is a rise. It climbs 0.5-0.7 m/h twice a day at the gates and jetties (PINTU AIR IJOK,
+// BANDAR KLANG, TELUK PENYAMUN) and never reaches danger, so extrapolating one is a daily false
+// alarm. So the level must beat its own 24-hour high: a tide stays inside yesterday's envelope and
+// a flood breaks it. It must also hold two polls — ISA-18.2's on-delay. One poll gave 48 flips.
 const RISE_DAY = 86400;
 // Sirens report a daily heartbeat (most stamp 08:00). Two missed days is out of contact, not idle.
 const SIREN_STALE = 48 * 3600;
-/* How far from a siren a river may be and still be the water that siren is wired to.
-   JPS publishes what makes a siren sound: one minute at the Amaran mark, repeating every 3 hours
-   while the water stays there, and one minute on a higher note at Bahaya, repeating every 5 hours.
-   So the alarm is a function of a river level we already hold, and a 1 with no river up behind it is
-   a relay stuck on rather than a flood — which is the only reading of it that survives the archive.
-   Measured on the live set: 194 of 212 sirens have a river inside 5 km, 133 inside 2 km, and 9 have
-   none inside 10 km. 5 km is where the curve flattens. It is deliberately generous — asking too wide
-   can only let a doubtful alarm stand, and asking too narrow would silence a real one. */
+/* Range from a siren to the river that siren watches. JPS sounds a siren at the Amaran mark, so the
+   alarm is a claim about a level we already hold. A 1 with no high river behind it is a stuck relay.
+   Measured: 194 of 212 sirens have a river inside 5 km, 133 inside 2 km, 9 have none inside 10 km.
+   5 km is where the curve flattens. Generous on purpose. Too wide only keeps a doubtful alarm
+   standing. Too narrow silences a real one. */
 const SIREN_KM = 5.0;
 const SITE_M = 50;   // metres — stations this close are sensors on one mast, not separate places
-/* JPS shuffled the coordinates inside one batch of cameras. The feed publishes Kayu Ara's position
-   under camera 1285 and Tanjung Karang's under 1287, so 1279 draws in Sepang and 1288 in Bangi —
-   34 km and 83 km from the place each one is named after and filed under. Both the list and the
-   detail endpoint carry the same wrong value, so there is nothing upstream to prefer.
-   An entry gets in one of two ways, and never on a bare guess.
-   Most had to pass two checks that fail in different ways: the station's name geocodes to this point,
-   AND this point sits near the median of the non-camera stations in the district JPS itself assigns.
-   A name alone is not enough — "Bukit Serdang" (1285) geocodes cleanly to Seri Kembangan, 30 km
-   outside the Kuala Langat it is filed under, which is a second station of the same name and not
-   evidence about this one.
-   A station of another kind carrying the same name beats both, and 1277 came in that way. JPS puts
-   a rainfall gauge, a river and a flood gauge on one TAMAN DESA KEMUNING mast, so the camera takes
-   the coordinate JPS already publishes for that place rather than the one a gazetteer guesses. The
-   geocode landed 200 m off, which is outside SITE_M, so the camera drew as a place of its own beside
-   a mast it belongs on. Prefer a same-named station whenever the payload holds one. 1280 is the
-   case that ranks the two: the geocode for "Sungai Lui" lands 2.3 km from the KG. SG. LUI mast, next
-   to a different station on the same river. A gazetteer answers about a river. The mast is upstream
-   stating where the place is. 1283 moved off a geocode the same way, onto the JENDERAM HILIR mast
-   1.9 km from it.
-   1282 is the same route with the name only close, not equal: the camera reads "Kg Simpang Balak"
-   and the siren reads "KG. SG. BALAK", which is Sungai and not Simpang. What carries it is that the
-   published point was not in Hulu Langat at all, and the siren of the near name is. A near name is
-   weaker evidence than an equal one, so this entry is marked SOMEWHAT CONFIRMED and the next reader
-   is free to overrule it. Do not let a near name in on its own.
-   1285 is the other way in, and it is the swap read from the other end. Correcting 1279 orphans the
-   point JPS had published for it, and the five stations nearest that point are all in Kuala Langat —
-   which is the district JPS gives 1285, and 1285 is the only Kuala Langat camera in the batch. So
-   there is exactly one station the orphaned point can belong to. Use this rule only when both halves
-   hold: the neighbours agree on a district, and one uncorrected camera in the batch is filed under it.
-   The strongest way in is that same swap solved for every camera at once. The shuffle is one closed
-   permutation, not a scatter of bad numbers. Take each suspect camera's published point and name the
-   station nearest to it. Thirteen of the fourteen name another camera in the batch, inside 550 m.
-   The cycle runs 1276→1280→1287→1288→1284→1278→1282→1277→1281→1286→1289→1283→1276, with 1279 and
-   1285 swapped as a pair. One camera and one point are then left over, and they can only be each
-   other: 1281 takes the point published for 1277. That is how 1281 got in with no gazetteer hit and
-   no same-named mast, and it is stronger evidence than either. Rebuild the whole map before you
-   argue about one pin.
-   The cycle also names the cameras that are NOT in the shuffle. 1271, 1272, 1273, 1274, 1275, 1315
-   and 1316 all sit near a station of their own name or district, and the cycle closes without them.
-   They are published correctly. 1272 and 1315 were called wrong here for months on the strength of
-   a failed gazetteer lookup alone.
-   1289 says the same thing from the other side: no gazetteer holds Rimba KDR, and JPS publishes a
-   RIMBA KDR mast in the district it files the camera under. Search the payload first.
-   CAM_FIX_KM makes the table retire itself: an override is applied only while the published value is
-   still far from it, so the day JPS corrects a station we go back to following the feed. */
+/* JPS shuffled the coordinates inside one batch of cameras. The feed puts Kayu Ara's position under
+   1285 and Tanjung Karang's under 1287, so 1279 drew in Sepang and 1288 in Bangi, 34 km and 83 km
+   from their own names. List and detail carry the same wrong value, so there is nothing upstream to
+   prefer. Five ways in, weakest first. Never a bare guess.
+
+   1. Geocode AND district median, both required — two checks that fail in different ways. A name
+      alone is not enough: "Bukit Serdang" (1285) geocodes to Seri Kembangan, 30 km outside its own
+      district, because a second place carries that name.
+   2. A same-named station of another kind beats both, because it is upstream stating where the
+      place is. 1277 took the TAMAN DESA KEMUNING mast. Its geocode was 200 m off, outside SITE_M,
+      so the camera drew as a place of its own beside a mast it belongs on. 1280 ranks the two
+      routes: the geocode for "Sungai Lui" lands 2.3 km from the KG. SG. LUI mast, next to another
+      station on the same river. A gazetteer answers about a river. The mast states the place.
+      1283 moved off a geocode the same way, onto the JENDERAM HILIR mast 1.9 km from it.
+   3. A near name never gets in on its own. 1282 reads "Kg Simpang Balak" and the siren reads
+      "KG. SG. BALAK" — Sungai, not Simpang. The district carries it: the published point was not in
+      Hulu Langat and the siren is. Marked SOMEWHAT CONFIRMED, and the next reader can overrule it.
+   4. The swap read from the other end. Correcting 1279 orphans its published point, and the five
+      stations nearest that point are all in Kuala Langat — the district of 1285, the only Kuala
+      Langat camera in the batch. Both halves must hold: the neighbours agree on a district, and one
+      uncorrected camera is filed under it.
+   5. Strongest: that swap solved for the whole batch at once. The shuffle is one closed
+      permutation, not a scatter. Name the station nearest each suspect point, and thirteen of the
+      fourteen name another camera in the batch inside 550 m. The cycle runs
+      1276→1280→1287→1288→1284→1278→1282→1277→1281→1286→1289→1283→1276, with 1279 and 1285 swapped
+      as a pair. One camera and one point are left over and can only be each other, so 1281 takes
+      the point published for 1277 with no gazetteer hit and no same-named mast. Rebuild the whole
+      map before you argue about one pin.
+
+   The cycle also names the cameras NOT in the shuffle. 1271, 1272, 1273, 1274, 1275, 1315 and 1316
+   sit near a station of their own name, and the cycle closes without them. They are correct. 1272
+   and 1315 were called wrong here for months on a failed gazetteer lookup alone. 1289 says it from
+   the other side: no gazetteer holds Rimba KDR, and JPS publishes a RIMBA KDR mast in the district
+   it files the camera under. Search the payload first.
+   CAM_FIX_KM retires the table by itself. An override applies only while the feed still disagrees,
+   so the day JPS corrects a station we follow the feed again. */
 const CAM_FIX_KM = 2.0;
-/* Eleven more cameras — 239, 240, 241, 242, 244, 245, 246, 247, 1249, 1250 and 1261 — carry a
-   second fault, and a different one from the shuffle above. JPS publishes each with no coordinate
-   at all, lat 0 and lng 0, rather than a wrong one. There is nothing to swap and no cycle to solve:
-   the shuffle corrects real points that were each assigned to the wrong camera, and this batch has
-   no point assigned to any camera at all.
-   Seven of the eleven — 239, 240, 242, 245, 1249, 1250 and 1261 — took the strongest route into this
-   table: a station of another kind, already in the payload, carrying the same name. A rainfall
-   gauge, a river mast, a flood gauge or a siren site that JPS itself already places on the map is
-   upstream stating where the camera stands, the same evidence the shuffle entries above lean on for
-   several of their own.
-   Two more, 241 and 247, only had a near name to lean on, not an equal one — Taman Daya Meru reads
-   close to PEKAN MERU and Taman Teluk Gedung Indah close to SG. KEMBONG DI PULAU INDAH, and a near
-   name is weaker evidence than an equal one, the same rule 1282 above states. What carries each of
-   these two is the district: the near-named station sits inside the district JPS files the camera
-   under, and the table below marks both entries SOMEWHAT CONFIRMED for exactly that reason. A near
-   name never gets in on its own.
-   The remaining two had neither. Taman Selat Damai (244) and Bukit Hijau (246) carry the median of
-   the non-camera stations in the district JPS files them under, because no station of either name —
-   equal or near — exists anywhere in the payload. A district median is a coordinate this file
-   invented, and the rule above is explicit that an invented coordinate is worse than one we can show
-   belongs to upstream. These two entries exist to be checked by hand, not to be trusted on the
-   strength of this comment: delete them rather than keep them if nobody can confirm where the camera
-   actually stands.
-   CAM_FIX_KM retires all eleven the same way it already retires the fourteen above, with nothing
-   extra to write here. A camera published at 0, 0 disagrees with any point in this state by
-   thousands of kilometres, so the override holds until JPS publishes a real coordinate — and the day
-   that coordinate lands within 2 km of ours, the feed wins again, exactly as the rule above already
-   describes. */
+/* Eleven more cameras carry a second and unrelated fault: 239, 240, 241, 242, 244, 245, 246, 247,
+   1249, 1250 and 1261 are published at lat 0, lng 0 rather than at a wrong point. Nothing to swap
+   and no cycle to solve — the shuffle misfiles real points, and this batch has no point at all.
+   Seven (239, 240, 242, 245, 1249, 1250, 1261) took route 2 above: a station of another kind,
+   already in the payload, carrying the same name.
+   Two, 241 and 247, had only a near name — Taman Daya Meru reads close to PEKAN MERU, and Taman
+   Teluk Gedung Indah close to SG. KEMBONG DI PULAU INDAH. Route 3 applies, so the district carries
+   each of them and both are marked SOMEWHAT CONFIRMED.
+   The last two had neither. Taman Selat Damai (244) and Bukit Hijau (246) carry the median of their
+   district's non-camera stations, because no station of either name exists in the payload. A median
+   is a coordinate this file invented, and an invented coordinate is worse than one we can show
+   belongs to upstream. Check these two by hand. Delete them rather than keep them if nobody can
+   confirm where the camera stands.
+   CAM_FIX_KM retires all eleven the same way. A camera at 0, 0 disagrees with any point in this
+   state by thousands of kilometres, so the override holds until JPS publishes a real one. */
 const CAM_FIX = [
     239  => [3.17862, 101.42951],     // Jalan Sebaya              — the SIREN JALAN SEBAYA site, Klang, LOCATION CONFIRMED
     240  => [3.18646, 101.41317],     // Jalan Bukit Payung        — the SIREN JALAN BUKIT PAYUNG site, Klang, LOCATION CONFIRMED
@@ -165,30 +134,26 @@ const HIST  = __DIR__ . '/.history.db';
 const READ  = 86400;         // seconds of history loaded per poll (trend + sparkline)
 const RETAIN = 30 * 86400;   // seconds kept on disk; older samples are pruned
 
-/* A forced refresh skips the file cache, so it costs a full ~270-request fan-out at JPS. This
-   button is public, so the guard is here and not in the browser. One force per minute for the
-   whole site caps the worst case at ~4.5 requests a second. A cold rebuild already fires 270 in
-   about three seconds, which is 90 a second. The button cannot make a burst this site does not
-   already make on its own. */
+/* A forced refresh skips the file cache, so it costs a full ~270-request fan-out at JPS. The button
+   is public, so the guard sits here, not in the browser. One force a minute site-wide caps the
+   worst case at ~4.5 requests a second. A cold rebuild already fires 270 in three seconds, which is
+   90 a second, so the button cannot make a burst this site does not already make. */
 const FORCE_EVERY = 60;
 const FORCE_STAMP = __DIR__ . '/.force.stamp';
 
-/* Place search. One uncached lookup per second, site-wide — Nominatim's usage policy asks for no
-   more, and this proxy is a public URL that anyone can call. A cached hit skips the limit, because
-   it costs OpenStreetMap nothing. */
+/* Place search. One uncached lookup a second site-wide: Nominatim's policy asks no more, and this
+   proxy is a public URL. A cached hit skips the limit, because it costs OpenStreetMap nothing. */
 const PLACE_EVERY = 1;
 const PLACE_STAMP = __DIR__ . '/.place.stamp';
-// A lock of its own, not the stamp file: opening the stamp with mode 'c' would create it and stamp
-// it with the current time as a side effect of merely checking it, so the very first request would
-// find a stamp it had just made and read itself as rate-limited.
+// A lock of its own, not the stamp file. Opening the stamp with mode 'c' creates and stamps it as a
+// side effect of the check, so the first request would find a stamp it had just made.
 const PLACE_LOCK  = __DIR__ . '/.place.lock';
 const PLACE_TTL   = 30 * 86400;   // place names do not move
 const NOMINATIM   = 'https://nominatim.openstreetmap.org/search';
-/* The coverage box: Selangor, Kuala Lumpur and Putrajaya. The 683 stations in the payload span
-   latitude 2.6088 to 3.8470 and longitude 100.8229 to 101.9215, and this adds about 0.1 degrees of
-   margin on each side so a place at the edge still resolves. Nominatim reads `viewbox` as
-   west,north,east,south. Published in the payload as `box`, a plain diagnostic alongside `siteM`
-   and `ttl` below — see the note there. No client script derives anything from it today. */
+/* The coverage box: Selangor, Kuala Lumpur and Putrajaya. The 683 stations span latitude 2.6088 to
+   3.8470 and longitude 100.8229 to 101.9215, plus 0.1 degrees of margin so an edge place resolves.
+   Nominatim reads `viewbox` as west,north,east,south. Published as `box`, a diagnostic beside
+   `siteM` and `ttl` below. No client script reads it today. */
 const BOX = [100.72, 3.95, 102.02, 2.50];
 
 date_default_timezone_set('Asia/Kuala_Lumpur'); // upstream timestamps are local MYT, unlabelled
@@ -214,18 +179,15 @@ function slope(array $pts, int $at): ?float {
     return $m % 2 ? $sl[($m - 1) / 2] : ($sl[intdiv($m, 2) - 1] + $sl[intdiv($m, 2)]) / 2;
 }
 
-/**
- * Judge one sample: returns [rate m/h, hours to $mark] with the ETA null unless it is really
- * climbing. Takes an index rather than the latest point so the previous poll can be judged by the
- * same rules — which is the whole on-delay, with nothing persisted to do it.
- */
+/** Judge one sample. Returns [rate m/h, hours to $mark], the ETA null unless it is really climbing.
+ *  Takes an index, not the latest point, so the previous poll faces the same rules. That is the
+ *  whole on-delay, with nothing persisted. */
 function assess(array $pts, int $i, ?float $mark): array {
     [$at, $lvl] = $pts[$i];
     $rate = slope(array_slice($pts, 0, $i + 1), $at);
     if ($rate === null || $rate < RISE_FLOOR || $i < 2 || $mark === null) return [$rate, null];
-    // Strictly higher across three samples. The old test allowed equality at both steps, so a level
-    // that had not moved in five polls still counted as climbing on a rate left over from an
-    // earlier step — which is exactly how a closed water gate kept reporting a 0.9 h ETA.
+    // Strictly higher across three samples. Allowing equality let a level that had not moved in
+    // five polls climb on a rate left over from an earlier step: a closed gate reported 0.9 h.
     if ($lvl <= $pts[$i - 2][1]) return [$rate, null];
     $day = [];
     foreach ($pts as $p) if ($p[0] < $at && $at - $p[0] <= RISE_DAY) $day[] = $p[1];
@@ -236,15 +198,13 @@ function assess(array $pts, int $i, ?float $mark): array {
 /**
  * Is a siren's alarm backed by the water it is wired to?
  *
- * True when a river within SIREN_KM stands at its Amaran mark or above, false when there are rivers
- * in reach and none of them is, and null when there is no river in reach to ask. The three answers
- * are different things and the caller must not collapse them: false is evidence against the alarm,
- * null is no evidence either way, and a siren nobody can check keeps the benefit of the doubt.
+ * True when a river inside SIREN_KM is at its Amaran mark, false when rivers are in reach and none
+ * is, null when there is none to ask. Do not collapse the three: false is evidence against the
+ * alarm, null is no evidence, and a siren nobody can check keeps the benefit of the doubt.
  *
- * Duration was tried first and is wrong in the direction that matters. JPS repeats the alarm every
- * 3 hours at Amaran and every 5 at Bahaya for as long as the water stays up, so a genuine flood
- * holds a siren on for half a day, and any cutoff short enough to catch the stuck ones would have
- * dismissed the real one. The water is what the siren is claiming. Ask the water.
+ * Duration was tried first and fails in the direction that matters. JPS repeats the alarm every
+ * 3 hours at Amaran and every 5 at Bahaya while the water stays up, so a real flood holds a siren
+ * on for half a day. Any cutoff short enough to catch a stuck relay dismisses the real one.
  *
  * $rivers is [[lat, lng, status], …]. Status 2 is Amaran and 3 is Bahaya — see wlStatus().
  */
@@ -261,11 +221,10 @@ function sirenBacked(float $lat, float $lng, array $rivers): ?bool {
 }
 
 /**
- * The published position of a camera, or the corrected one where JPS shuffled a batch — see CAM_FIX.
- * Applies to cameras only, because they are the only kind the shuffle touched, and only while the
- * feed still disagrees by more than CAM_FIX_KM. That last test is what keeps the table from going
- * stale in the one direction that would hurt: once JPS publishes the right coordinate, ours stops
- * being an override and the feed wins again with nothing to edit here.
+ * The published position of a camera, or the corrected one where JPS shuffled a batch. See CAM_FIX.
+ * Cameras only, because the shuffle touched no other kind, and only while the feed disagrees by
+ * more than CAM_FIX_KM. That last test stops the table going stale: once JPS publishes the right
+ * coordinate the feed wins again, with nothing to edit here.
  */
 function camFix(string $kind, int $id, float $lat, float $lng): array {
     if ($kind !== 'camera' || !isset(CAM_FIX[$id])) return [$lat, $lng];
@@ -287,34 +246,31 @@ if (isset($_GET['cam'])) {
         http_response_code(404);
         exit;
     }
-    /* curl, never file_get_contents. JPS publishes two A records for this host and one of them
-       (58.27.97.62) blackholes SYNs. curl races both and lands on the live one in ~10ms; PHP's
-       stream wrapper tries addresses serially with no connect timeout of its own, so it sat out
-       Windows' full 21s TCP timeout on roughly every other still — and the http fallback below
-       made a bad draw 42s. Every other upstream call here already goes through fetchAll, which is
-       the only reason this was the sole slow endpoint.
-       Prefer TLS to upstream; fall back to what it actually advertised. */
+    /* curl, never file_get_contents. JPS publishes two A records for this host and one
+       (58.27.97.62) blackholes SYNs. curl races both and lands on the live one in ~10ms. PHP's
+       stream wrapper tries them serially with no connect timeout, so it ate Windows' full 21s TCP
+       timeout on every other still, and the http fallback below made a bad draw 42s. Every other
+       call here goes through fetchAll, which is why this was the only slow endpoint.
+       Prefer TLS. Fall back to what upstream advertised. */
     $try = fn($u) => fetchAll([$u], 1, false)[$u] ?? '';
     $img = $try(preg_replace('#^http://#i', 'https://', $url)) ?: $try($url);
     if ($img === '') { http_response_code(502); exit; }
     header('Content-Type: image/jpeg');
-    /* 300s = POLL_MS in js/config.js, and the two must move together. A still cannot change faster
-       than the payload that names it, so a shorter life buys nothing and costs a real request at
-       JPS. It costs one per open card per lifetime: js/clip.js re-sets this src on every ~7s lap,
-       and at 60s an open camera card sent a request a minute to the agency. Cards are opened most
-       during a flood, which is when those servers can take it least. */
+    /* 300s = POLL_MS in js/config.js. The two must move together. A still cannot change faster than
+       the payload that names it, so a shorter life buys nothing and costs a real request at JPS.
+       js/clip.js re-sets this src every ~7s lap, so at 60s an open card sent a request a minute to
+       the agency — and cards are opened most during a flood. */
     header('Cache-Control: max-age=300');
     echo $img;
     exit;
 }
 
 /* ?place=<query> — turn a place name into a coordinate, inside the coverage area only.
-   This adds no new third party to the browser: the browser still talks only to this origin and to
-   CARTO's basemap tiles (js/map.js fetches those on every pan and zoom, named in the About pane's
-   Credits block), and Nominatim is reached only from here, server-side. That distinction is what
-   lets the About pane's privacy paragraph stay honest with one added sentence.
-   Explicit, never per keystroke. The client only calls this when the reader picks the search row,
-   which is what Nominatim's usage policy asks for. */
+   This adds no third party to the browser. The browser still talks only to this origin and to
+   CARTO's basemap tiles (js/map.js, named in the About pane's Credits). Nominatim is reached from
+   here, server-side, which is what keeps the About pane's privacy paragraph honest.
+   Explicit, never per keystroke: the client calls this only when the reader picks the search row,
+   as Nominatim's usage policy asks. */
 if (isset($_GET['place'])) {
     header('Content-Type: application/json');
     $q = placeQuery(placeParam($_GET['place']));
@@ -324,17 +280,14 @@ if (isset($_GET['place'])) {
         exit;
     }
 
-    /* The `page` table again, not a new store: this is one more slow upstream read with a long life,
-       which is exactly what that table holds. Created here as well as in the refresh path below,
-       because a place search can be the first thing that ever touches this file.
-       Caught, unlike the connect in the refresh path further down: this handler has already sent
-       Content-Type: application/json above, so an uncaught PDOException here — an unwritable
-       .history.db, a locked file, disk full — would put PHP's fatal-error page inside a response a
-       client expects to parse as JSON. The refresh path's own connect has the same shape of gap but
-       is not this task; this one is fixed because a public, rate-limited endpoint is more exposed.
-       A connect failure only costs the cache: $db stays null, every read/write below is skipped, and
-       the lookup still runs and still passes through the rate limit two blocks down — it is just not
-       remembered for next time. */
+    /* The `page` table again, not a new store: one more slow upstream read with a long life.
+       Created here as well as in the refresh path, because a place search can be the first thing
+       that ever touches this file.
+       Caught, unlike the refresh path's connect. This handler already sent Content-Type:
+       application/json above, so an uncaught PDOException — unwritable .history.db, locked file,
+       disk full — puts PHP's fatal-error page inside a response a client parses as JSON.
+       A connect failure costs only the cache: $db stays null, the reads and writes below are
+       skipped, and the lookup still runs and still passes the rate limit two blocks down. */
     $db = null;
     try {
         $db = new PDO('sqlite:' . HIST, null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
@@ -358,20 +311,17 @@ if (isset($_GET['place'])) {
 
     /* The limit guards the uncached path only. A repeat search costs OpenStreetMap nothing, so
        refusing it would punish the reader for a request that never leaves this box.
-       Read-decide-write has to happen as one atomic step, or two concurrent requests for two
-       *different* uncached queries both read the same stale mtime, both see themselves as the
-       first request this second, and both call Nominatim — two browser tabs or a page-reload race
-       is ordinary traffic on a public endpoint, not an adversary, and is enough to trigger this.
-       Unlike `?force=1`'s expensive path, nothing else here serializes concurrent callers — this
-       mtime check *is* the whole guard, so it has to be correct alone.
-       The lock is taken, used and released here, not held across the fetch below: the fetch takes
-       about a second on a cold query, and holding the lock that long would serialize every reader
-       behind whichever one is slowest, which trades a rare 429 for a queue on every request. */
+       Read-decide-write must be one atomic step. Two concurrent requests for two *different*
+       uncached queries otherwise read the same stale mtime, both see themselves as first this
+       second, and both call Nominatim. Two tabs or a reload race is ordinary traffic here, not an
+       adversary. Nothing else serializes callers on this path, so this mtime check is the whole
+       guard and has to be correct alone.
+       The lock is taken, used and released here, never held across the fetch below. The fetch takes
+       about a second cold, and holding the lock that long queues every reader behind the slowest. */
     $lock = fopen(PLACE_LOCK, 'c');
     flock($lock, LOCK_EX);
-    // filemtime() is cached per request by PHP's stat cache, so a read taken after another process
-    // just touched the file — inside this very lock — would still return the pre-touch value.
-    // Without this the lock serializes the race without fixing it.
+    // PHP's stat cache holds filemtime() per request, so a read after another process touched the
+    // file inside this lock returns the old value. Without this the lock serializes without fixing.
     clearstatcache();
     [$allowed] = forceAllowed(
         time(), is_file(PLACE_STAMP) ? filemtime(PLACE_STAMP) : null, PLACE_EVERY);
@@ -401,11 +351,10 @@ if (isset($_GET['place'])) {
         exit;
     }
 
-    /* Four fields, and nothing else. The raw response is large, its shape moves between versions,
-       and the client must not depend on a schema we do not own.
-       `display_name` is the full comma-separated address. Its first part repeats `name`, so the
-       detail line takes the next three — which is the district, the state and usually the postcode
-       area. */
+    /* Four fields, nothing else. The raw response is large, its shape moves between versions, and
+       the client must not depend on a schema we do not own. `display_name` is the full address.
+       Its first part repeats `name`, so the detail line takes the next three: district, state and
+       usually the postcode area. */
     $places = [];
     foreach ($raw as $r) {
         $name = trim((string)($r['name'] ?? ''));
@@ -425,12 +374,10 @@ if (isset($_GET['place'])) {
     if ($db) {
         $db->prepare('INSERT OR REPLACE INTO page (url, ts, body) VALUES (?, ?, ?)')
            ->execute([$key, time(), $body]);
-        /* The scraper's page rows are a fixed, small set on a 15-minute TTL — they can never grow.
-           A place row is keyed by whatever a reader typed into a public URL, so the table grows
-           without bound unless something prunes it. Scoped to `place:%` only: the scraped rows have
-           their own much shorter TTL and their own fixed keys, and do not need this pass. Runs on
-           the uncached path only, which is already the slow path, so one more statement costs
-           nothing extra felt. */
+        /* The scraper's page rows are a fixed, small set and can never grow. A place row is keyed
+           by whatever a reader typed into a public URL, so the table grows without bound unless
+           something prunes it. Scoped to `place:%`: the scraped rows have their own shorter TTL and
+           fixed keys. Runs on the uncached path only, which is already the slow one. */
         $db->prepare("DELETE FROM page WHERE url LIKE 'place:%' AND ts < ?")
            ->execute([time() - PLACE_TTL]);
     }
@@ -439,15 +386,14 @@ if (isset($_GET['place'])) {
     exit;
 }
 
-/* ?shots=<id> — which frames exist, and what the river beside the camera was doing when each one
-   was taken. The client asks once, when a lightbox opens, and again when a camera card opens.
+/* ?shots=<id> — which frames exist, and what the river beside the camera was doing at each one.
+   The client asks when a lightbox opens and when a camera card opens.
    Shape is [[ts, tier, stationId], …]. `tier` is "now", "soon" or null.
-   Rivers, gauges, sirens and rainfall, each against its own mark — the same four kinds the live
-   warning glyph on a camera picture can name, so the picture and the strip under it agree whichever
-   frame is on screen. Only the river gets `soon`, because only the river has a rate to project.
-   Two things leave a tier null, and both show as an uncolored tick rather than a wrong one: the
-   frame is older than the 30 days of levels we keep, or nothing with a mark sits within
-   CAM_ALERT_KM. */
+   Rivers, gauges, sirens and rainfall, each against its own mark — the four kinds the live warning
+   glyph can name, so the picture and the strip agree on every frame. Only the river gets `soon`,
+   because only the river has a rate to project. Two things leave a tier null, and both draw an
+   uncolored tick: the frame is older than the 30 days of levels we keep, or nothing with a mark
+   sits within CAM_ALERT_KM. */
 if (isset($_GET['shots'])) {
     header('Content-Type: application/json');
     header('Cache-Control: max-age=60');
@@ -476,18 +422,15 @@ if (isset($_GET['shots'])) {
             // a frame near the window's start needs that much history too, or the guard runs short.
             $sel = $db->prepare('SELECT ts, level FROM level WHERE station = ? AND ts >= ? ORDER BY ts');
 
-            /* The same question sirenBacked() asks live, asked of each frame's own moment: was a
-               river within SIREN_KM at its Amaran mark when the shutter went? Without it a relay
-               stuck on paints a month of calm photographs red — measured, before this existed, at 10
-               of 19 frames on the Pekan Banting camera and 4 of 19 on Kg. Melayu Subang, both from
-               sirens whose rivers were metres below their marks the whole time.
-               `frameTiers` against the river's *warning* mark rather than its danger mark is the
-               whole scorer: it returns `now` for exactly the frames that river was at Amaran or
-               above for. The live rule reads today's river; this one cannot, because a picture from
-               last week must be judged by last week's water.
-               Same benefit of the doubt as live: no river in reach to ask leaves the tiers alone.
-               Only ever called for a siren that scored something, so the 189 camera-siren pairs in
-               range cost nothing until one of them actually reads 1. */
+            /* sirenBacked()'s question, asked of each frame's own moment: was a river within
+               SIREN_KM at its Amaran mark when the shutter went? Without it a stuck relay paints a
+               month of calm photographs red — measured at 10 of 19 frames on Pekan Banting and 4 of
+               19 on Kg. Melayu Subang, both with rivers metres below their marks throughout.
+               `frameTiers` against the river's *warning* mark is the whole scorer. It returns `now`
+               for exactly the frames that river was at Amaran for. The live rule reads today's
+               river. This one cannot: a picture from last week is judged by last week's water.
+               Same benefit of the doubt as live — no river in reach leaves the tiers alone. Called
+               only for a siren that scored, so the 189 pairs in range cost nothing until one reads 1. */
             $sirenFrames = function (array $siren, array $tiers) use ($st, $km, $sel, $frames): array {
                 $asked = false;
                 $backedAt = [];
@@ -506,9 +449,9 @@ if (isset($_GET['shots'])) {
 
             $best = [];   // frameTs => [rank, tier, stationId, distKm] — see the tie-break note below
             foreach ($st as $r) {
-                /* Each kind against its own mark. A river and a gauge publish one; a siren is 0 or 1
-                   in this table and 1 is the whole of "sounding"; rainfall is scored on JPS's own
-                   class boundary. Anything else — a camera — has nothing to score. */
+                /* Each kind against its own mark. A river and a gauge publish one. A siren is 0 or 1
+                   here, and 1 is the whole of "sounding". Rainfall takes JPS's own class boundary.
+                   Anything else — a camera — has nothing to score. */
                 $mark = match ($r['kind']) {
                     'river', 'gauge' => empty($r['danger']) ? null : (float)$r['danger'],
                     'siren'          => 1.0,
@@ -520,10 +463,10 @@ if (isset($_GET['shots'])) {
                 if ($d > CAM_ALERT_KM) continue;
                 $sel->execute([$r['id'], $frames[0] - RISE_DAY]);
                 $samples = array_map(fn($x) => [(int)$x['ts'], (float)$x['level']], $sel->fetchAll(PDO::FETCH_ASSOC));
-                /* Only a river carries a forecast. Standing water, a sounding siren and rain falling
-                   now are observed states with no rate to project — so those three are handed an
-                   assess that never answers, which is what turns the `soon` half of frameTiers off.
-                   The same split the live path makes: `isHot()` forecasts rivers and nothing else. */
+                /* Only a river carries a forecast. Standing water, a sounding siren and rain now are
+                   observed states with no rate to project, so those three take an assess that never
+                   answers. That turns the `soon` half of frameTiers off. Same split as live, where
+                   `isHot()` forecasts rivers and nothing else. */
                 $tiers = $r['kind'] === 'river'
                     ? frameTiers($frames, $samples, $mark, RISE_ETA, 'assess')
                     : frameTiers($frames, $samples, $mark, 0, fn() => [null, null]);
@@ -531,20 +474,19 @@ if (isset($_GET['shots'])) {
                 if ($r['kind'] === 'siren' && $tiers) $tiers = $sirenFrames($r, $tiers);
                 foreach ($tiers as $ts => $t) {
                     $rank = $t === 'now' ? 0 : 1;
-                    /* Worse tier wins first. Nearer river breaks a tie. camAlert() in js/stations.js
-                       ranks a camera's live glyph the same way. The two must agree, or a reader can
-                       ignore the river named on screen and the frame's tick stays colored, because
-                       the server named the other river in range. */
+                    /* Worse tier wins, nearer river breaks a tie. camAlert() in js/stations.js ranks
+                       the live glyph the same way. The two must agree, or a reader ignores the river
+                       named on screen and the tick stays colored on another river in range. */
                     if (!isset($best[$ts]) || $rank < $best[$ts][0]
                         || ($rank === $best[$ts][0] && $d < $best[$ts][3])) {
                         $best[$ts] = [$rank, $t, $r['id'], $d];
                     }
                 }
             }
-            /* Only the worst-tier station rides along, so the client can drop a tick raised by a sensor
-               the reader has ignored. It falls to uncolored rather than to the second-worst river.
-               ponytail: two hot rivers within 2 km of one camera is rare. Build the fallback if it is
-               not, which means sending a tier per station and letting the client pick. */
+            /* Only the worst-tier station rides along, so the client can drop a tick raised by an
+               ignored sensor. It falls to uncolored, not to the second-worst river.
+               ponytail: two hot rivers within 2 km of one camera is rare. If that changes, send a
+               tier per station and let the client pick. */
             foreach ($rows as $k => $row) {
                 if (isset($best[$row[0]])) $rows[$k] = [$row[0], $best[$row[0]][1], $best[$row[0]][2]];
             }
@@ -573,24 +515,21 @@ if (isset($_GET['shot'])) {
     exit;
 }
 
-/* ?sheet=<id> — the strip: every frame inside the archive's clip window, side by side in one WebP,
-   at SHEET_W x SHEET_H a cell. See buildSheet() in shots.php for how it is built, and why it is
-   built here, on request, rather than inside captureShots(). Same integer-only intake as ?cam=,
-   ?shot= and ?shots= — no second, string parameter belongs on this handler. Read the (string) cast
-   gotcha in CLAUDE.md before that ever changes: (int) is silent on an array, which is the whole
-   reason those three endpoints never had the problem ?place= did. */
+/* ?sheet=<id> — the strip: every frame inside the clip window, side by side in one WebP, at
+   SHEET_W x SHEET_H a cell. See buildSheet() in shots.php for how and why it is built on request
+   rather than inside captureShots(). Same integer-only intake as ?cam=, ?shot= and ?shots=. No
+   string parameter belongs on this handler: (int) is silent on an array, which is why those three
+   never had the problem ?place= did. See the cast gotcha in CLAUDE.md. */
 if (isset($_GET['sheet'])) {
     $path = buildSheet((int)$_GET['sheet'], time());
     if (!$path) { http_response_code(404); exit; }
     header('Content-Type: image/webp');
-    /* Not `immutable`, unlike the frame above. A stored frame at ?shot= never changes once written,
-       so a year-long cache is honest. A strip's bytes at this same URL change every time
-       captureShots() lays down a new frame and this cache goes stale — up to once every SHOT_EVERY
-       (30 min) — so an `immutable` header here would be a lie a browser could hold onto for a year:
-       a reader who reopens a camera after one capture cycle would keep seeing the strip from before
-       it, with no way to notice. max-age=900 is half of SHOT_EVERY, so a reopen inside that window
-       costs nothing and a cached strip can never outlive one capture cycle by more than the same
-       margin the file cache elsewhere in this file already accepts. */
+    /* Not `immutable`, unlike the frame above. A stored frame never changes once written, so a year
+       is honest there. A strip's bytes at this same URL change every time captureShots() lays a new
+       frame, up to once every SHOT_EVERY (30 min), so `immutable` here is a lie a browser holds for
+       a year: reopen a camera after one capture cycle and you keep the old strip with no way to
+       notice. max-age=900 is half of SHOT_EVERY, so a reopen inside that window is free and a
+       cached strip can never outlive one capture cycle by more than that margin. */
     header('Cache-Control: public, max-age=900');
     readfile($path);
     exit;
@@ -631,10 +570,9 @@ function serveFromCache(int $age, bool $mine, bool $force): bool {
  * are different queries to a geocoder.
  */
 function placeQuery(string $raw): ?string {
-    // preg_replace with /u returns null on invalid UTF-8 rather than passing the bytes through, and
-    // trim(null) is deprecated — which would print a notice into a response whose Content-Type is
-    // already application/json, breaking the parse for a client that sent one bad byte. Reject the
-    // input here instead: the contract belongs to the validator, not to whoever calls it.
+    // preg_replace with /u returns null on invalid UTF-8, and trim(null) is deprecated. The notice
+    // lands in a response already typed application/json, breaking the parse for a client that sent
+    // one bad byte. Reject here: the contract belongs to the validator, not to its caller.
     if (!mb_check_encoding($raw, 'UTF-8')) return null;
     $q = trim(preg_replace('/\s+/u', ' ', $raw));
     $n = mb_strlen($q);
@@ -645,24 +583,21 @@ function placeQuery(string $raw): ?string {
 /**
  * The one call site that turns $_GET['place'] into the string placeQuery() expects.
  *
- * PHP's (string) cast on an array does not throw — it emits `Warning: Array to string conversion`
- * and yields the literal string "Array", five characters that pass placeQuery() clean. A request of
- * ?place[]=x makes $_GET['place'] an array, so that cast would print the warning straight into a
- * response that already declared Content-Type: application/json (corrupting the body for a
- * well-formed client), and then spend the site-wide rate limit on a garbage query. `?cam=` and
- * `?shots=` never had this problem because `(int)` on an array is silent.
- * The fix is here rather than inside placeQuery() because the validator's contract is about the
- * content of a string; whether the value handed to it *is* one is the caller's job, same as the
- * mb_check_encoding() guard already inside placeQuery() draws that line for encoding.
+ * PHP's (string) cast on an array does not throw. It emits `Warning: Array to string conversion`
+ * and yields the literal "Array", five characters that pass placeQuery() clean. ?place[]=x makes
+ * $_GET['place'] an array, so the cast prints that warning into a response already typed
+ * application/json, and then spends the site-wide rate limit on a garbage query. `?cam=` and
+ * `?shots=` escaped this because `(int)` on an array is silent.
+ * The fix sits here, not in placeQuery(). The validator's contract is about the content of a
+ * string. Whether the value handed to it is one is the caller's job.
  */
 function placeParam(mixed $v): string {
     return is_string($v) ? $v : '';
 }
 
-/* `php api.php --selftest` — the guard above, checked offline. It lives here rather than in a
-   second test file because the rule is arithmetic on two integers, and a separate test would need
-   a third file to hold the function so both could import it. CLI only, and it exits before the
-   first header. */
+/* `php api.php --selftest` — the guards above, checked offline. Here rather than in a second test
+   file: the rules are arithmetic on a few integers, and a separate test would need a third file to
+   hold them. CLI only, and it exits before the first header. */
 if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
     $fail = 0;
     $ok = function (string $what, bool $pass) use (&$fail) {
@@ -678,9 +613,8 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
     $ok('a stamp 59s old is refused',            forceAllowed($now, $now - 59)[0] === false);
     $ok('a stamp from this second is refused',   forceAllowed($now, $now)[0] === false);
     $ok('a refusal says why',                    forceAllowed($now, $now)[1] === 'rate limited');
-    /* A stamp in the future would otherwise lock the button out until the clock caught up. Same
-       hazard readTs() already guards against on a JPS reading, for the same reason: a clock we do
-       not own moved. */
+    /* A stamp in the future would lock the button out until the clock caught up. Same hazard
+       readTs() guards on a JPS reading: a clock we do not own moved. */
     $ok('a stamp from the future is allowed',    forceAllowed($now, $now + 3600)[0] === true);
     $ok('the window is honored when passed',     forceAllowed($now, $now - 10, 5)[0] === true);
 
@@ -710,12 +644,11 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
     $ok('null becomes empty string',      placeParam(null) === '');
     $ok('empty string stays refused',     placeQuery(placeParam([])) === null);
 
-    /* The bug this guards is not the return value — the accidental path already returns null. It is
-       that the call *emits* a deprecation, and `?place=` sets Content-Type: application/json before
-       it ever runs. One notice printed ahead of the body and the client gets a parse error instead
-       of a result. So the check counts diagnostics, not answers.
-       An error handler rather than ob_start(): output buffering only sees the notice while
-       display_errors is on, so that check would quietly pass on a box configured otherwise. */
+    /* The bug is not the return value — the accidental path already returns null. It is that the
+       call *emits* a deprecation, and `?place=` sets Content-Type: application/json first. One
+       notice ahead of the body gives the client a parse error, so this counts diagnostics, not
+       answers. An error handler rather than ob_start(): buffering sees the notice only while
+       display_errors is on, so that check would pass on a box configured otherwise. */
     $notices = 0;
     set_error_handler(function ($no) use (&$notices) { $notices++; return true; });
     $bad = placeQuery("bandar \xB1\x31 utama");
@@ -723,20 +656,18 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
     $ok('invalid UTF-8 is refused',       $bad === null);
     $ok('invalid UTF-8 raises no notice', $notices === 0);
 
-    /* The place lookup reuses forceAllowed(): it is the same arithmetic on the same two integers,
-       with its own stamp file and its own window. A second copy would be a second thing to get
-       wrong. */
+    /* The place lookup reuses forceAllowed(): same arithmetic on the same two integers, with its
+       own stamp file and window. A second copy is a second thing to get wrong. */
     echo "\nplace rate limit:\n";
     $ok('a lookup one second later is allowed',
         forceAllowed($now, $now - 1, PLACE_EVERY)[0] === true);
     $ok('a second lookup in one second is refused',
         forceAllowed($now, $now, PLACE_EVERY)[0] === false);
 
-    /* sirenBacked() decides whether a siren that says it is sounding is believed, and a wrong answer
-       is silent in both directions: too strict and a real evacuation alarm never reaches the panel,
-       too loose and the app bar sits red for days on a stuck relay. The coordinates below are the
-       real ones — SIREN PEKAN BANTING and its only river 4.26 km off, and KG. MELAYU SUBANG with its
-       own gauge on the same spot, which is the 127-hour alarm this rule was written for. */
+    /* sirenBacked() decides whether a sounding siren is believed, and a wrong answer is silent both
+       ways: too strict and a real evacuation alarm never reaches the panel, too loose and the app
+       bar sits red for days on a stuck relay. The coordinates are real — SIREN PEKAN BANTING and
+       its only river 4.26 km off, and KG. MELAYU SUBANG, the 127-hour alarm this rule was for. */
     echo "\nsirenBacked():\n";
     [$slat, $slng] = [2.811543, 101.508659];        // SIREN PEKAN BANTING
     $near = [1.68, 2.7];                            // KG. SG. MANGGIS: level, Amaran mark
@@ -796,10 +727,9 @@ $t0 = microtime(true);
 /** Age from when the payload was actually fetched — mtime doubles as a lock and gets touched. */
 function cachedPayload(): array {
     $j = json_decode(@file_get_contents(CACHE), true) ?: [];
-    /* `forced` and `forceWhy` describe the request that built this file, not the request reading
-       it. PHP's array + is left-biased, so the defaults must sit on the LEFT to beat whatever the
-       file holds. Every cached read passes through this function, on every exit, so no exit can
-       replay a stale value again. */
+    /* `forced` and `forceWhy` describe the request that built this file, not the one reading it.
+       PHP's array + is left-biased, so the defaults sit on the LEFT to beat what the file holds.
+       Every cached read passes through here, so no exit can replay a stale value. */
     return ['forced' => false, 'forceWhy' => null] + $j
          + ['cacheAge' => max(0, time() - strtotime($j['fetched'] ?? 'now'))];
 }
@@ -813,30 +743,26 @@ function serveCache(array $extra = []): never {
 
 /* Exactly one rebuild may be in flight at a time, process-wide.
  *
- * A cold rebuild fans out ~270 concurrent requests at JPS. Two visitors arriving on an expired
- * cache is 540, three is 810 — which is not a busy site, it is the shape of a flood from one
- * address, and the fastest way to have this server's IP blocked by the agency whose data the whole
- * page depends on. The window is real and not small: the rebuild takes ~3.5s warm and ~15s cold,
- * and every open tab polls on its own 5-minute timer, so their misses land wherever they land.
+ * A cold rebuild fans out ~270 concurrent requests at JPS. Two visitors on an expired cache is 540,
+ * three is 810. That is not a busy site, it is the shape of a flood from one address, and the
+ * fastest way to have this IP blocked by the agency the whole page depends on. The window is real:
+ * the rebuild takes ~3.5s warm and ~15s cold, and every open tab polls on its own 5-minute timer.
  *
- * `touch(CACHE)` used to claim the refresh, but only inside the `fastcgi_finish_request` branch —
- * and Herd's SAPI is `cgi-fcgi`, which does not have that function. So on the machine this actually
- * runs on, nothing claimed anything and every concurrent miss stampeded. A lock file is the fix
- * that does not depend on the SAPI.
+ * `touch(CACHE)` used to claim the refresh, but only inside the `fastcgi_finish_request` branch,
+ * and Herd's SAPI is `cgi-fcgi`, which lacks that function. So nothing claimed anything and every
+ * concurrent miss stampeded. A lock file does not depend on the SAPI.
  *
- * The loser of the race serves the stale payload rather than waiting: it is at most one poll old,
- * and a caller holding a connection open for 15s to receive data it already has is worse for
- * everyone than data that is five minutes stale. */
+ * The loser serves the stale payload rather than waiting. It is at most one poll old, and holding a
+ * connection open 15s for data the caller already has is worse than data five minutes stale. */
 $lock = fopen(LOCK, 'c');
 $mine = $lock && flock($lock, LOCK_EX | LOCK_NB);
 
-/* The Developer section's "Refresh now". It expires the *file* cache and nothing else — the scraped
-   pages keep their own 15-minute cache in the `page` table. The KL rainfall table takes about ten
-   seconds upstream. Re-scraping it would triple the cost of one button press.
-   It is not a second refresh path. It falls into the same lock. A loser still serves stale cache
-   rather than queueing.
-   GET only, because a cache-busting side effect does not belong on a method that is not idempotent.
-   This does not stop a prefetch, which issues a GET like any other read. The rate limit does. */
+/* The Developer section's "Refresh now". It expires the *file* cache only. The scraped pages keep
+   their own 15-minute cache in the `page` table, and the KL rainfall table takes ten seconds
+   upstream, so re-scraping would triple the cost of one button press.
+   Not a second refresh path: it falls into the same lock, and a loser still serves stale cache.
+   GET only, because a cache-busting side effect does not belong on a non-idempotent method. That
+   does not stop a prefetch, which issues a GET like any read. The rate limit does. */
 $asked = ($_GET['force'] ?? '') === '1';
 $force = $asked && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET';
 $forceWhy = $asked && !$force ? 'not a GET' : '';
@@ -856,15 +782,13 @@ if (is_file(CACHE)) {
                         : 'cache is fresh'));
         serveCache($asked ? ['forced' => false, 'forceWhy' => $why] : []);
     }
-    /* The stamp is spent here and not above, so a force the lock turned away keeps its budget.
-       No fan-out happened, so charging it a minute would be charging it for nothing. */
+    /* The stamp is spent here, not above, so a force the lock turned away keeps its budget. No
+       fan-out happened, so charging it a minute charges it for nothing. */
     if ($force) touch(FORCE_STAMP);
-    // One upstream table takes ~10s to render, so blocking the page on the refresh would mean a
-    // blank map for that long. Hand back the stale payload immediately, then refresh with the
-    // connection already closed.
-    // A force is the one exception. Stale-while-revalidate suits an ordinary poll, because nobody
-    // asked to see the rebuild. Refresh now exists so a reader can see what the rebuild produced,
-    // so a forced request must wait in the foreground and get the real payload back.
+    // One upstream table takes ~10s to render, so blocking the page means a blank map for that
+    // long. Hand back the stale payload, then refresh with the connection closed.
+    // A force is the exception. Nobody asked to see an ordinary poll's rebuild. Refresh now exists
+    // so a reader can see what the rebuild produced, so it waits in the foreground.
     if (!$force && function_exists('fastcgi_finish_request')) {
         echo json_encode(cachedPayload(), JSON_UNESCAPED_SLASHES);
         fastcgi_finish_request();
@@ -879,21 +803,19 @@ if (is_file(CACHE)) {
 }
 
 /**
- * The last SPARK_WIN of samples, one per bucket, as [ts, level]. Keeping the newest sample in each
- * bucket rather than averaging: this is a level graph, and an average would smooth away exactly the
- * short sharp rise the graph exists to show.
+ * The last SPARK_WIN of samples, one per bucket, as [ts, level]. Keeps the newest sample in each
+ * bucket, never an average: this is a level graph, and an average smooths away the short sharp rise
+ * the graph exists to show.
  *
- * $peak keeps the highest value in the bucket instead of the newest — for sirens, where the samples
- * are 0/1 and a trigger that stopped inside one bucket is the single thing the graph exists to show.
+ * $peak keeps the highest value in the bucket instead. For sirens, where samples are 0/1 and a
+ * trigger that stopped inside one bucket is the whole point of the graph.
  *
  * $score, where a kind has one, appends the status that sample was at: [ts, value, code]. The hover
- * readout on the graph colours itself by it and marks anything at the warning rung or above. It is
- * scored HERE and not in the browser for the same reason the live reading is — there is one
- * definition of a status in this app and it is this file's, through the same wlStatus()/rainStatus()
- * the feeds themselves go through. A client comparing a historical value to the marks beside it
- * would be a second definition, and the second one is always the one that drifts.
- * Kinds without a scorer keep the two-element shape, and every reader destructures [ts, value], so
- * the extra element is invisible to all of them.
+ * readout colours by it and marks anything at the warning rung or above. Scored HERE, not in the
+ * browser, for the same reason the live reading is: there is one definition of a status in this app
+ * and it is this file's, through wlStatus()/rainStatus(). A client comparing a historical value to
+ * the marks beside it is a second definition, and the second one always drifts.
+ * Kinds without a scorer keep the two-element shape, and every reader destructures [ts, value].
  */
 function sparkPoints(array $points, int $now, int $bucket = SPARK_BUCKET, bool $peak = false,
                      ?callable $score = null): array {
@@ -912,16 +834,15 @@ function sparkPoints(array $points, int $now, int $bucket = SPARK_BUCKET, bool $
 /**
  * The timestamp a reading was taken, not the one we happened to poll on.
  *
- * These two are not the same clock and the gap is not small. Upstream changes a value every ~25 min
- * (median, measured over the archive) and we poll every ~8.5 min, so a level is a staircase: the
- * same number comes back four or five times, and storing each arrival at `now` puts the step at our
- * poll rather than at the measurement. Both ends of a rate then carry up to a poll interval of
- * error, which over a short baseline is a rate wrong by more than 100% — the source of every
- * phantom climb on a station whose level had not moved in five polls.
+ * Two different clocks, and the gap is not small. Upstream changes a value every ~25 min (median,
+ * over the archive) and we poll every ~8.5 min, so a level is a staircase: the same number arrives
+ * four or five times. Storing each arrival at `now` puts the step at our poll, so both ends of a
+ * rate carry up to a poll interval of error — over a short baseline, a rate wrong by 100%. That is
+ * every phantom climb on a station whose level had not moved in five polls.
  *
- * Using the reading's own stamp also makes the (station, ts) primary key do real work: a repeated
- * reading is one row, not five. JPS stamps a reading to the UPCOMING slot (17:45 at 17:36), so a
- * stamp in the future is normal and is pulled back to now rather than treated as an error.
+ * The reading's own stamp also makes the (station, ts) primary key work: a repeated reading is one
+ * row, not five. JPS stamps to the UPCOMING slot (17:45 at 17:36), so a future stamp is normal and
+ * is pulled back to now rather than treated as an error.
  */
 function readTs(?string $updated, int $now): int {
     $d = $updated ? DateTime::createFromFormat('d/m/Y H:i:s', $updated) : false;
@@ -941,9 +862,8 @@ function fetchAll(array $urls, int $concurrency = 20, bool $json = true): array 
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT        => 25,
             // Contact URL in the UA: this box pulls ~1.1 GB/day off JPS from one residential IP,
-            // which is the most conspicuous shape a web log has. Better their sysadmin can read
-            // what it is than have to guess. Identifying yourself is the polite form and the safe
-            // one; spoofing it would be neither.
+            // the most conspicuous shape a web log has. Better their sysadmin reads what it is than
+            // guesses. Identifying yourself is the polite form and the safe one.
             CURLOPT_USERAGENT      => 'flood-exp/1.0 (+https://github.com/illusionikx/selangor-flood-tracker)',
             CURLOPT_FOLLOWLOCATION => true,   // the national portal 301s to its canonical path
             CURLOPT_MAXREDIRS      => 3,
@@ -1067,10 +987,9 @@ foreach ($rainfallList as $s) {
         'basin'    => $s['mainRiverBasin'],
         'lat'      => (float)$s['latitude'],
         'lng'      => (float)$s['longitude'],
-        // -1 none .. 4 very heavy. The list publishes -1 on stations that are reporting a real
-        // number — 144 of 233 rain gauges — so where there is a reading, the class comes from the
-        // same rainStatus() the two scraped feeds already go through. See the note above the river
-        // block below: one definition of a status, and it is this file's.
+        // -1 none .. 4 very heavy. The list publishes -1 on 144 of 233 gauges that are reporting a
+        // real number, so where there is a reading the class comes from rainStatus(), the same one
+        // the scraped feeds use. One definition of a status, and it is this file's.
         'status'   => (int)$s['status'] < 0 && isset($d['hourlyRainfall'])
                         ? rainStatus((float)$d['hourlyRainfall']) : (int)$s['status'],
         'online'   => (int)$s['stationStatus'] === 1,
@@ -1097,10 +1016,9 @@ foreach ($riverList as $s) {
         'lat'      => (float)$s['latitude'],
         'lng'      => (float)$s['longitude'],
         /* -1 offline, 0 normal, 1 alert, 2 warning, 3 danger. The list carries -1 on 15 stations
-           that are online and reporting a level, so where there is a reading and a mark to measure
-           it against, the code comes from wlStatus() — the same function the national portal's rows
-           already go through, for the same reason: a status the reader can check against the number
-           printed beside it beats one the feed asserts and the number contradicts. */
+           that are online and reporting, so where there is a reading and a mark the code comes from
+           wlStatus(), the same one the national portal's rows use. A status the reader can check
+           against the number beside it beats one the feed asserts and the number contradicts. */
         'status'   => (int)$s['wL1Status'] < 0 && $lvl !== null
           ? wlStatus($lvl, $d['wL1SPAlert'] ?? null, $d['wL1SPWarning'] ?? null, $danger)
           : (int)$s['wL1Status'],
@@ -1232,11 +1150,10 @@ foreach ($stations as &$s) {
 unset($s);
 
 // --- Gauge history -----------------------------------------------------------------------------
-// Depth over a flood-prone spot is a level like any other, so it gets the same table, window and
-// bucket as a river — a line between two readings is honest here, the water really was somewhere in
-// between. No trend or ETA off it though: the thresholds are 0.15 m and 0.3 m, and a rate computed
-// against numbers that small from a sensor rounding to centimetres would be mostly noise. The graph
-// answers the question a gauge is actually asked — is this spot filling or draining.
+// Depth over a flood-prone spot is a level like any other, so it takes the same table, window and
+// bucket as a river. A line between two readings is honest: the water really was in between. No
+// trend or ETA off it — the marks are 0.15 m and 0.3 m, and a rate against numbers that small from
+// a centimetre sensor is mostly noise. The graph answers what a gauge is asked: filling or draining.
 foreach ($stations as &$s) {
     // Offline gauges are frozen on old flood readings — several still hold April's 3.55 m. Sampling
     // one every poll would draw a flat line at a number from months ago, which is the one thing a
@@ -1252,15 +1169,14 @@ foreach ($stations as &$s) {
 unset($s);
 
 // --- Siren history -------------------------------------------------------------------------------
-// A siren is 0 or 1, so this is a log, not a trend — the popup draws it as a band, never a line.
-// Worth keeping anyway: "silent for the last 12 hours" is the answer a siren pin is opened for, and
-// until now the only evidence for it was a heartbeat timestamp. Out-of-contact sirens are skipped
-// for the same reason offline gauges are — a flat IDLE band from a sensor nobody can hear is a lie.
-// ponytail: full-resolution samples like every other kind; bucket to the hour if the table bloats.
+// A siren is 0 or 1, so this is a log, not a trend. The popup draws it as a band, never a line.
+// "Silent for the last 12 hours" is the answer a siren pin is opened for, and the only evidence for
+// it used to be a heartbeat timestamp. Out-of-contact sirens are skipped like offline gauges: a
+// flat IDLE band from a sensor nobody can hear is a lie.
+// ponytail: full-resolution samples. Bucket to the hour if the table bloats.
 //
-// Every placed river, as [lat, lng, status], for sirenBacked() below. Built once: 212 sirens against
-// 109 rivers is 23k distance tests, which is nothing, but rebuilding the list inside the loop is a
-// list built 212 times.
+// Every placed river, as [lat, lng, status], for sirenBacked() below. Built once — 212 sirens
+// against 109 rivers is 23k distance tests, but inside the loop it is a list built 212 times.
 $riverMarks = [];
 foreach ($stations as $r) {
     if ($r['kind'] === 'river' && $r['lat'] && $r['lng']) $riverMarks[] = [$r['lat'], $r['lng'], (int)$r['status']];
@@ -1282,16 +1198,15 @@ unset($s);
 
 // --- Sites -------------------------------------------------------------------------------------
 // A rainfall gauge, a river gauge and sometimes a camera share one mast, and every feed publishes
-// them as separate stations at the same coordinates — 113 coordinate pairs hold two or more, and
-// another 46 pairs sit a few metres apart because two feeds typed the same mast slightly
-// differently. They are one place, so they get one `site` key and the map draws one pin.
+// them as separate stations at the same point. 113 pairs hold two or more, and another 46 sit a few
+// metres apart because two feeds typed the same mast differently. One place, one `site` key, one
+// pin.
 //
-// Grouped greedily in build order, so the first station at a spot defines it. Measured on the live
-// set (671 placed stations): 0 m leaves 546 pins, 25 m leaves 435, 50 m leaves 417, and past that it
-// crawls — 414 at 75 m, 408 at 100 m — until 200 m starts swallowing genuinely separate
-// installations. The distribution is bimodal: sensors are either bolted to one mast or hundreds of
-// metres apart, so almost everything worth merging is already inside 25 m. 50 m buys the 18 masts
-// that straddle a river or sit at opposite ends of one compound, and nothing else.
+// Grouped greedily in build order, so the first station at a spot defines it. Measured on 671
+// placed stations: 0 m leaves 546 pins, 25 m leaves 435, 50 m leaves 417, then it crawls — 414 at
+// 75 m, 408 at 100 m — until 200 m swallows separate installations. The distribution is bimodal:
+// sensors are bolted to one mast or hundreds of metres apart, so almost everything worth merging is
+// inside 25 m. 50 m buys the 18 masts that straddle a river or span one compound.
 $sites = [];
 foreach ($stations as &$s) {
     $s['site'] = null;
@@ -1391,11 +1306,10 @@ $payload = json_encode([
     // Published so the map can draw the mast radius it actually grouped by, rather than keeping a
     // second copy of this number client-side for the two to drift apart.
     'siteM'    => SITE_M,
-    // Diagnostics only, like siteM and ttl above: the box this endpoint actually bounds Nominatim
-    // results to, published so a caller reading this response — curl, the Developer section's Raw
-    // payload link — can see the real numbers without opening the source. No client script reads
-    // this field today; js/ui.js's out-of-area message is a hand-written list of state names, which
-    // a bounding box cannot generate on its own (a box has no idea it covers "Selangor").
+    // Diagnostics only, like siteM and ttl above: the box this endpoint bounds Nominatim results
+    // to, published so curl or the Developer section's Raw payload link shows the real numbers. No
+    // client script reads it. js/ui.js's out-of-area message is a hand-written list of state names,
+    // which a box cannot generate — a box has no idea it covers "Selangor".
     'box'      => BOX,
     'endpoints' => [
         'StationRainfalls'  => count($rainfallList),

@@ -1,13 +1,12 @@
 // Constants shared across modules. No imports here — everything else may depend on this.
 
 /* Station types. Colours are deliberately NOT traffic-light hues: green/amber/orange/red and grey
-   are reserved for status, so a type colour can never be mistaken for an alert level.
-
-   They are `var()` references, not hexes, because each one needs a different value per theme — see
-   the palette block in `css/base.css` for the two sets and the contrast they are held to. Every
-   consumer drops the value into an inline `style` or a `--c`, so a var reference works unchanged,
-   and the theme swap needs no re-render. The one place that cannot take a var is a **canvas**: the
-   heat layer paints pixels, not CSS, so its gradient keeps real values — see RAIN_HEAT below. */
+   are reserved for status, so a type colour can never be read as an alert level.
+   `var()` references, not hexes, because each needs a different value per theme — see the palette
+   block in `css/base.css` for the two sets and the contrast they are held to. Every consumer drops
+   the value into an inline `style` or a `--c`, so the reference works unchanged and the theme swap
+   needs no re-render. A **canvas** is the one thing that cannot take a var: the heat layer paints
+   pixels, not CSS, so its gradient keeps real values — see RAIN_HEAT below. */
 export const KINDS = {
   river:    { label: 'Water level', color: 'var(--k-river)',    icon: 'water_drop' },
   rainfall: { label: 'Rainfall',    color: 'var(--k-rainfall)', icon: 'rainy' },
@@ -76,17 +75,16 @@ export const GAUGE_COLOR = ['var(--s-normal)', 'var(--s-trace)', 'var(--s-warnin
 
 export const NO_INFO = 'var(--s-none)';   // grey: offline or reporting nothing
 
-// "rising" is decided in api.php — a station reaching its own danger mark within its RISE_ETA at the
-// rate it is climbing now. One definition, server-side, so the panel and the filter can never
-// disagree about what counts as an alert. The client never re-derives it: it reads `s.rising`, or
-// the published `eta` where it wants to show the number. Nothing here mirrors the constant any more
-// — the heat ramp was the last thing that did, and it is keyed on thresholds now.
+// "rising" is decided in api.php — a station reaching its own danger mark within RISE_ETA at the
+// rate it is climbing. One definition, server-side, so the panel and the filter cannot disagree
+// about what counts as an alert. The client reads `s.rising`, or the published `eta` where it shows
+// the number, and never re-derives it. Nothing here mirrors the constant.
 
-// A mast carrying several sensors: no single kind's colour or glyph can speak for a mixed stack, so
-// it gets its own indigo and a "layers" glyph. It carried a sensor count too, on a filled disc; both
-// are gone, and the glyph is what says "a stack stands here" now. Indigo because it
-// has to miss every other meaning on the map — the five type hues, the traffic-light statuses, and
-// the offline grey. Only worn while the mast is quiet; anything signalling keeps its status colour.
+// A mast carrying several sensors: no single kind's colour or glyph speaks for a mixed stack, so it
+// gets its own indigo and a "layers" glyph. It carried a sensor count on a filled disc too. Both are
+// gone, and the glyph is what says "a stack stands here". Indigo because it has to miss every other
+// meaning on the map — the five type hues, the traffic-light statuses, the offline grey. Worn only
+// while the mast is quiet. Anything signalling keeps its status colour.
 export const MAST = { color: 'var(--k-mast)', icon: 'layers' };
 
 /* APM's flood emergency line directory — every state's number, kept current by the agency that
@@ -109,30 +107,27 @@ export const SPARK_H     = 12;     // hours on the graph's x axis
 export const LEVEL_FLOOR = 6;
 
 export const HEAT_KM     = 5;      // ground size of one blob
-/* Heat weight is a position on the threshold scale, not a fraction of danger: the popup meter's
-   piecewise slots (alert 38%, warning 68%, danger 100%) keyed straight into the gradient, so a
-   blob's colour names the band a station has crossed. The floor is the alert slot — below its first
-   published mark a station paints nothing, because a map that is warm everywhere says nothing.
-   These three numbers, heat.js's gradient stops and the legend's ramp are one scale in four places;
-   change them together. */
+/* Heat weight is a position on the threshold scale, not a fraction of danger. The popup meter's
+   piecewise slots (alert 38%, warning 68%, danger 100%) key straight into the gradient, so a blob's
+   colour names the band a station crossed. The floor is the alert slot: below its first published
+   mark a station paints nothing, because a map that is warm everywhere says nothing. These three
+   numbers, heat.js's gradient stops and the legend's ramp are one scale in four places. */
 export const HEAT_ALERT   = 0.38;
 export const HEAT_WARNING = 0.68;
 export const HEAT_FLOOR   = HEAT_ALERT;
 export const HEAT_MAX_PX = 220;    // blur cost is quadratic; past this the layer fades instead
 
 /* Rainfall heat, on JPS's own intensity classes (`rainStatus()` in sources.php: >0 light, >10
-   moderate, >30 heavy, >60 very heavy, mm in the last hour). The slots are evenly spaced because the
-   *class* is what the reader is being told — the millimetres between two classes are not a quantity
+   moderate, >30 heavy, >60 very heavy, mm in the last hour). The slots are evenly spaced because
+   the *class* is what the reader is told. The millimetres between two classes are not a quantity
    anyone acts on, exactly as the water scale spaces alert/warning/danger rather than metres.
-   The first class starts at 25, not 0, and that is the whole trick: leaflet.heat uses a point's
-   weight as its alpha, so a scale starting at zero would have drawn real rain as almost nothing.
-   Light rain is most of the rain most of the time — 10 of 233 gauges reporting, none above 4 mm/h,
-   on the day this was written — and an invisible layer is a broken one. The water layer gets this
-   for free because its floor is the alert slot; here the floor has to be built in. Above 60 mm the
-   scale is already full, which is right: the class is open-ended and the blob is as red as it goes.
-   Paired with heat.js's rain gradient (RAIN_HEAT above — the same hues as the rainfall pins, as real
-   values, because a canvas cannot resolve a token) and `.ramp.rain` in chrome.css — change the three
-   together. */
+   The first class starts at 25, not 0, and that is the trick: leaflet.heat uses a point's weight as
+   its alpha, so a scale from zero draws real rain as almost nothing. Light rain is most of the rain
+   most of the time — 10 of 233 gauges reporting, none above 4 mm/h, the day this was written — and
+   an invisible layer is a broken one. The water layer gets this free from its alert-slot floor.
+   Above 60 mm the scale is full, which is right: the class is open-ended.
+   Paired with heat.js's rain gradient (RAIN_HEAT above — the same hues as the rainfall pins, as
+   real values, since a canvas cannot resolve a token) and `.ramp.rain` in chrome.css. */
 export const RAIN_STOPS = [[0, 25], [10, 50], [30, 75], [60, 100]];
 
 /* How far a camera may be and still be offered as this station's nearest view. It reached 24 km
@@ -147,10 +142,9 @@ export const CAM_MAX_KM = 5;
    api.php carries the same 2 for the timeline join. Change both together. */
 export const CAM_ALERT_KM = 2;
 
-/* How far a sensor may be and still answer "what is near this point". The location card had no cap
-   at all, so it would name a siren 60 km away, which is a different weather system and a different
-   catchment. About the width of a district here.
-   The camera keeps CAM_MAX_KM (5), which is a narrower and separate question — whether "the river in
+/* How far a sensor may be and still answer "what is near this point". The location card had no cap,
+   so it named a siren 60 km away — a different weather system and a different catchment. About the
+   width of a district. The camera keeps CAM_MAX_KM (5), a narrower question: whether "the river in
    this picture" is a claim this app can make. */
 export const NEAR_MAX_KM = 10;
 
@@ -161,10 +155,9 @@ export const NEAR_MAX_KM = 10;
 export const CLIP_WIN = 3 * 3600;
 export const CLIP_MS  = 1000;
 
-/* A strip's cell width, in lockstep with SHEET_W in shots.php — the two move together, the same
-   pairing CLIP_WIN itself already holds against shots.php's own copy. `img.naturalWidth / SHEET_W`
-   recovers how many cells a loaded strip carries with no header, no manifest and no separate fetch:
-   the picture tells you how many frames it holds just by how wide it decoded. */
+/* A strip's cell width, in lockstep with SHEET_W in shots.php, the same pairing CLIP_WIN holds.
+   `img.naturalWidth / SHEET_W` recovers how many cells a loaded strip carries with no header, no
+   manifest and no separate fetch — the picture says how many frames it holds by how wide it is. */
 export const SHEET_W = 480;
 
 export const FLASH_MS    = 2400;   // how long the jump-to ripple runs

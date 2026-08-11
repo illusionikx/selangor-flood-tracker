@@ -1,101 +1,91 @@
 <?php
-// The camera archive: capture, retention and lookup. Split out of api.php the way sources.php
-// is — it is the one part of the proxy with a rule complicated enough to be worth a test, and
-// api.php cannot be required without running a refresh. `shots-test.php` exercises pruneShots().
-//
-// Needs HOST and fetchAll() from api.php; it is required from there, never on its own.
+// The camera archive: capture, retention and lookup. Split out of api.php like sources.php, because
+// this is the one rule in the proxy worth a test and api.php cannot be required without running a
+// refresh. `shots-test.php` exercises pruneShots().
+// Needs HOST and fetchAll() from api.php. Required from there, never on its own.
 
 /* --- Camera archive ------------------------------------------------------------------------------
  *
- * A river level has a graph; a camera had only "now". The archive gives it the same thing — what
+ * A river level has a graph. A camera had only "now". The archive gives it the same thing — what
  * this bend looked like six hours ago, and the night before.
  *
- * Every number here is a bandwidth decision, not a preference. JPS serves these stills at 175–390 KB
- * (measured, avg ~250 KB) and there are 90 of them. Pulling all 90 on every 5-minute poll would be
- * ~6.5 GB a day taken from one government server by one address — the same shape as the stampede the
- * refresh lock exists to prevent, and the fastest way to lose access to the feed the whole page runs
- * on. So capture is decoupled from the poll: once every SHOT_EVERY, whoever happens to be refreshing.
- * That is ~1.1 GB/day, and it is the ceiling on how dense the 6-hour tier can be.
+ * Every number here is a bandwidth decision. JPS serves 90 stills at 175–390 KB (avg ~250 KB), so
+ * pulling all 90 every 5-minute poll is ~6.5 GB a day off one government server from one address —
+ * the stampede the refresh lock exists to prevent, and the fastest way to lose the feed. So capture
+ * is decoupled from the poll: once every SHOT_EVERY, by whoever happens to be refreshing. That is
+ * ~1.1 GB/day, and the ceiling on how dense the 6-hour tier can be.
  *
- * Frames are stored at 720p, which is what JPS actually serves: every camera measured came back
- * 1280x720. So SHOT_W is the native width and nothing is normally downscaled — it exists for the day
- * a camera starts publishing something larger.
+ * Frames store at 720p, which is what JPS serves — every camera measured came back 1280x720. So
+ * SHOT_W is the native width and nothing is normally downscaled. It exists for the day a camera
+ * publishes something larger.
  *
- * And at that size the frame is stored as **whichever of the two encodings is smaller**, which at
- * SHOT_Q is usually the original bytes untouched. Re-encoding 1280x720 CCTV to WebP measured
- * *larger* than the JPEG it came from on half the cameras even at q60 — paying a generation loss to
- * grow the file. That is not a fact about WebP, it is a fact about noisy night-time CCTV at this
- * resolution, so the rule compares the two rather than asserting a winner: it stays right if JPS
- * changes its encoder, and it re-derives itself for free if SHOT_W is ever lowered, where the
- * re-encode does win by a wide margin.
+ * At that size the frame stores as **whichever encoding is smaller**, which at SHOT_Q is usually
+ * the original bytes untouched. Re-encoding 1280x720 CCTV to WebP measured *larger* than its source
+ * JPEG on half the cameras even at q60 — a generation loss paid to grow the file. That is a fact
+ * about noisy night-time CCTV, not about WebP, so the rule compares the two rather than naming a
+ * winner. It stays right if JPS changes encoder, and re-derives itself if SHOT_W ever drops, where
+ * the re-encode wins by a wide margin.
  *
- * Source stills measure 245 KB on average (90 cameras, median 219, max 515), so the archive tops out
- * near 3.7 GB — 165 frames a camera, and *flat* from the first year on, because the last tier
- * deletes as fast as capture adds.
+ * Source stills average 245 KB (90 cameras, median 219, max 515), so the archive tops out near
+ * 3.7 GB — 165 frames a camera, and flat from the first year on, because the last tier deletes as
+ * fast as capture adds.
  */
 const SHOTS      = __DIR__ . '/shots';
 const SHOT_EVERY = 1800;    // 30 min between captures — see above
 const SHOT_W     = 1280;    // 720p — the native width of every camera measured
-/* Deliberately high. Combined with the smaller-of-the-two rule below, a quality this close to the
-   source means the re-encode almost never wins, so what actually gets stored is the original JPEG,
-   byte for byte, with no generation loss at all — which is the most faithful thing we can keep and
-   also the cheapest to produce. WebP only takes over where it genuinely beats the original, and at
-   q82 that is a real saving rather than a coin toss.
-   1080p is not on the table and never was: JPS publishes 1280x720. Upscaling would double the file
-   for no extra detail. 720p *is* the ceiling here, so quality is the only axis left. */
+/* Deliberately high. With the smaller-of-the-two rule below, a quality this close to the source
+   means the re-encode almost never wins, so what gets stored is the original JPEG byte for byte,
+   with no generation loss. WebP takes over only where it beats the original, and at q82 that is a
+   real saving rather than a coin toss.
+   1080p was never on the table: JPS publishes 1280x720, so upscaling doubles the file for no extra
+   detail. 720p is the ceiling, so quality is the only axis left. */
 const SHOT_Q     = 82;
 const SHOT_MIN   = 4096;    // bytes: JPS answers a dead camera with a ~2 KB placeholder, not a 404
 
-/* The clip window a strip covers — see buildSheet() further down for what a strip is. The same
-   three hours js/config.js calls CLIP_WIN for the client. Two files carry this number and it has to
-   move in both together, the same pairing CAM_ALERT_KM and SIREN_KM already hold between api.php
-   and js/config.js, and the retention anchors hold between here and js/timeline.js. */
+/* The clip window a strip covers — see buildSheet() below for what a strip is. The same three hours
+   js/config.js calls CLIP_WIN. Two files carry this number and both must move together, like
+   CAM_ALERT_KM and SIREN_KM, and like the retention anchors here and in js/timeline.js. */
 const CLIP_WIN = 3 * 3600;
 
 /* --- the strip -------------------------------------------------------------------------------
- * A tile on the wall paints into a box about 200px wide. A card in the station panel paints into a
- * box about 340px wide. Both used to warm six or seven full 1280-wide frames per camera to do
- * that — ~214 KB each — which is over 600 requests and several hundred megabytes for one scroll of
- * the wall, and a page's worth of frames for one open card. Video players solve this with a sprite
- * sheet; NVRs solve it with a low-resolution sub stream for grid views. A strip is both at once: one
- * derived file per camera, every frame inside CLIP_WIN laid out side by side in one image, each cell
- * scaled down before it is placed. A caller reads that one picture and steps through it by moving a
- * CSS transform — no frame list, no per-frame request, and no request at all after the first.
+ * A wall tile paints into about 200px. A station panel card paints into about 340px. Both used to
+ * warm six or seven full 1280-wide frames per camera at ~214 KB each — over 600 requests and
+ * several hundred megabytes for one scroll of the wall. Video players solve this with a sprite
+ * sheet. NVRs solve it with a low-resolution sub stream for grid views. A strip is both: one
+ * derived file per camera, every frame inside CLIP_WIN side by side in one image, each cell scaled
+ * down first. A caller reads that one picture and steps through it with a CSS transform — no frame
+ * list, no per-frame request, and no request at all after the first.
  *
- * SHEET_W x SHEET_H is 480x270, the same 16:9 every camera measured publishes, at three-eighths of
- * SHOT_W. The widest consumer is the panel clip, whose box is about 340px — 480 is roughly 1.4x
- * that. The wall tile is narrower still, about 200px, so the same cell is roughly 2.4x there.
- * Going wider costs real memory in a reader's browser, which is the reason not to: a decoded strip
- * is roughly SHEET_W * cells * SHEET_H * 4 bytes (RGBA) once the compositor unpacks it, and a
- * seven-cell strip at 480x270 is already about 2.6 MB decoded — times up to sixteen tiles live at
- * once on a five-column desktop grid, which is the ceiling this size was chosen against. */
+ * SHEET_W x SHEET_H is 480x270, the 16:9 every camera publishes, at three-eighths of SHOT_W. The
+ * widest consumer is the panel clip at about 340px, so 480 is roughly 1.4x. A wall tile is about
+ * 200px, so 2.4x. Going wider costs real memory in the reader's browser: a decoded strip is about
+ * SHEET_W * cells * SHEET_H * 4 bytes (RGBA), so a seven-cell strip at 480x270 is 2.6 MB decoded,
+ * times up to sixteen live tiles on a five-column desktop grid. That is the ceiling this size was
+ * chosen against. */
 const SHEET_W = 480;
 const SHEET_H = 270;
 
-/* Lower than SHOT_Q's 82. A stored frame is the archive's one copy of that moment — the record — and
-   it is worth spending bytes to keep it faithful. A strip is a cache, rebuilt from those frames on
-   demand whenever it goes stale, so a softer q70 costs nothing that cannot be regenerated, and it
-   buys a real cut in the bytes a scrolling wall has to move. */
+/* Lower than SHOT_Q's 82. A stored frame is the archive's one copy of that moment, worth bytes to
+   keep faithful. A strip is a cache, rebuilt on demand whenever it goes stale, so a softer q70
+   costs nothing that cannot be regenerated and cuts the bytes a scrolling wall moves. */
 const SHEET_Q = 70;
 /* Retention, as [frames younger than this, keep one per, the clock time the bucket aims at]. `0` in
- * the second slot means keep every frame. Applied on age, so a frame thins itself as it gets older —
- * kept every 30 min for a day, then three-hourly for a week, and so on down to weekly for a year.
- * Anything past the last tier is deleted.
- * The steps are chosen so that each of the scrubber's windows holds roughly the same number of
- * frames — ~50, which is a clip of under a minute at one frame a second. A tier is what a range can
- * play, so a tier twice as coarse as its window needs is a range that is over in half the time and
- * skips half of what happened. The week tier was 6-hourly for that reason and is now 3.
- * The first two tiers are the same density while SHOT_EVERY is 30 min; they are both written out
- * because the tiers are the *policy* and the capture rate is a bandwidth cap that may change.
+ * the second slot keeps every frame. Applied on age, so a frame thins as it ages: every 30 min for
+ * a day, three-hourly for a week, down to weekly for a year. Past the last tier it is deleted.
+ * The steps give each scrubber window roughly the same count, ~50, which is under a minute at one
+ * frame a second. A tier is what a range can play, so a tier twice as coarse as its window ends in
+ * half the time and skips half of what happened — the week tier was 6-hourly for that reason and is
+ * now 3. The first two tiers match in density while SHOT_EVERY is 30 min, and both are written out
+ * because the tiers are the *policy* and the capture rate is a cap that may change.
  *
  * The third number is the **anchor**: the target time in UTC, modulo the step. A slot's target is
- * `anchor + slot * step`, and the frame kept is the last one taken *before* that target. Without it
- * the buckets fall on `floor(ts / step)`, which aligns to UTC midnight — so at +8 the week landed on
- * 01:30, the month on 07:30 and 19:30, and the year on a Thursday, none of which anybody chose. The
- * targets nest: 16:00 is on the 3-hour grid and Monday 16:00 is on the 12-hour grid, so a frame keeps
- * hitting its target as it ages from one tier to the next instead of drifting once per tier.
- * `thin()` in js/timeline.js repeats these numbers and the slot expression. Change one, change both,
- * or the ruler and the clip file the same frame in two different slots. */
+ * `anchor + slot * step`, and the frame kept is the last one taken *before* it. Without the anchor
+ * the buckets fall on `floor(ts / step)`, which aligns to UTC midnight — at +8 that put the week on
+ * 01:30, the month on 07:30 and 19:30, and the year on a Thursday. The targets nest: 16:00 is on
+ * the 3-hour grid and Monday 16:00 on the 12-hour grid, so a frame keeps hitting its target as it
+ * ages between tiers instead of drifting once per tier.
+ * `thin()` in js/timeline.js repeats these numbers and the slot expression. Change one, change
+ * both, or the ruler and the clip file one frame in two slots. */
 const SHOT_TIERS = [
     [6 * 3600,     0,          0],           // 6 hours — every frame we have
     [24 * 3600,    1800,       0],           // a day   — every 30 min
@@ -132,26 +122,23 @@ function shotList(int $id): array {
 
 function sheetPath(int $id): string { return shotDir($id) . '/sheet.webp'; }
 
-/* Build the strip for one camera, or reuse the one already on disk. Returns the path, or null when
-   there is nothing worth building: fewer than two frames inside CLIP_WIN — the same floor the live
-   clip and the wall already apply to a lap, since one frame is not a lap — or no WebP encoder on
-   this PHP. Always WebP: there is no second-format fallback the way a captured frame has one,
-   because unlike a capture this is never the only copy of anything, so if imagewebp is missing the
-   right answer is to build no strip at all and let the callers fall back to what they already do
-   when an archive is too thin.
+/* Build the strip for one camera, or reuse the one on disk. Returns the path, or null when there is
+   nothing worth building: fewer than two frames inside CLIP_WIN (one frame is not a lap, the same
+   floor the live clip and the wall apply), or no WebP encoder on this PHP. Always WebP, with no
+   second-format fallback. Unlike a capture, this is never the only copy of anything, so a missing
+   imagewebp means build no strip and let the callers fall back to what they do on a thin archive.
  *
- * Rebuild only when stale. A strip whose own mtime is at or after the newest frame inside the
- * window is already showing everything that frame set can show, and re-encoding it would spend a
- * real decode-resize-encode pass across every cell to produce the same bytes. That cost lands once
- * per camera per capture cycle — the first open after captureShots() lays down a new frame — and
- * every open before the next capture is a plain file read.
+ * Rebuild only when stale. A strip whose mtime is at or after the newest frame in the window
+ * already shows everything that frame set can show, and re-encoding spends a decode-resize-encode
+ * pass per cell to produce the same bytes. That cost lands once per camera per capture cycle, on
+ * the first open after captureShots() writes a new frame. Every open before the next capture is a
+ * plain file read.
  *
- * This runs from the ?sheet= handler in api.php, on request, and never from captureShots(). That
- * function holds the flock on .refresh.lock the whole app depends on — see the gotcha in
- * CLAUDE.md — and a strip build is a decode, a resize and a re-encode per frame; doing that for
- * ninety cameras inside the lock would hold it for the better part of a minute on every single
- * capture, which is the stampede the lock exists to prevent, in slow motion, again. Building lazily
- * costs at most one build per camera per thirty minutes, and only for a camera someone actually
+ * Runs from the ?sheet= handler in api.php, on request, never from captureShots(). That function
+ * holds the flock on .refresh.lock the whole app depends on, and a strip build is a decode, a
+ * resize and a re-encode per frame. Ninety cameras inside the lock would hold it for most of a
+ * minute on every capture, which is the stampede the lock exists to prevent, in slow motion.
+ * Building lazily costs at most one build per camera per thirty minutes, only for a camera someone
  * opens. */
 function buildSheet(int $id, int $now): ?string {
     if (!function_exists('imagewebp')) return null;
@@ -210,14 +197,13 @@ function encodeShot(string $raw): ?array {
     return $webp && strlen($webp) < strlen($raw) ? [$webp, 'webp'] : [$raw, 'jpg'];
 }
 
-/* Thin one camera's archive down to SHOT_TIERS. Bucket keys carry their step, because two tiers
-   dividing by different numbers could otherwise land on the same integer and silently delete each
-   other's frames. The slot a frame answers for is the **next target at or after it**, so the frame
-   left standing is the last one taken before that target — the state of the river as of 16:00, not
-   the nearest picture to 16:00. Those differ: with frames at 15:24 and 16:10, the nearest to 16:00
-   is 16:10, which is a photograph from after the moment it would be labelled with. The list is
-   ascending and re-setting a key does not move it, so "the last one before the target" is just the
-   last write to win — and that is stable under repetition, which is what keeps this idempotent. */
+/* Thin one camera's archive down to SHOT_TIERS. Bucket keys carry their step, or two tiers dividing
+   by different numbers land on the same integer and delete each other's frames. The slot a frame
+   answers for is the **next target at or after it**, so the frame left standing is the last one
+   taken before that target — the river as of 16:00, not the nearest picture to 16:00. With frames
+   at 15:24 and 16:10 the nearest is 16:10, a photograph from after the moment it is labelled with.
+   The list is ascending and re-setting a key does not move it, so "the last one before the target"
+   is the last write winning. That is stable under repetition, which keeps this idempotent. */
 function pruneShots(int $id, int $now): void {
     $keep = [];
     foreach (shotList($id) as $ts) {
@@ -235,17 +221,15 @@ function pruneShots(int $id, int $now): void {
 
 /* --- the alert tier a frame was taken under ------------------------------------------------------
  * Cameras hold a year of frames. `.history.db` holds 30 days of levels. Where the two overlap, a
- * frame can be scored against what the river was doing at the moment the shutter went.
+ * frame scores against what the river was doing when the shutter went.
  *
- * `$assess` is api.php's own forecast function, passed in rather than copied. That is the whole
- * point: the past has to be judged by the rule the present is judged by, or the timeline and the
- * map disagree about the same river. It is a parameter and not an import because this file must
- * stay loadable by shots-test.php, which has no payload, no database and no network.
- * ponytail: one seam, one parameter. If a third caller ever needs it, move assess() into its own
- * file and import it in both places.
+ * `$assess` is api.php's own forecast function, passed in rather than copied: the past has to be
+ * judged by the rule the present is judged by, or the timeline and the map disagree about one
+ * river. A parameter and not an import, because this file must stay loadable by shots-test.php,
+ * which has no payload, no database and no network.
+ * ponytail: one seam, one parameter. If a third caller needs it, move assess() to its own file.
  *
- * Walks both lists together, so a camera with 170 frames and 1400 samples costs one pass, not
- * 170 searches.
+ * Walks both lists together, so 170 frames against 1400 samples costs one pass, not 170 searches.
  */
 function frameTiers(array $frames, array $samples, ?float $mark, float $riseEta, callable $assess): array
 {
@@ -297,11 +281,10 @@ function captureShots(array $stations): int {
         if (strlen($raw) < SHOT_MIN || !($enc = encodeShot($raw))) continue;
         [$bytes, $ext] = $enc;
         if (!is_dir($dir = shotDir($id)) && !@mkdir($dir, 0777, true)) continue;
-        /* Identical to the frame before it means the camera has not refreshed since the last
-           capture — several of them stall for hours. Storing it anyway would put a frame on the
-           timeline that claims to be a new observation and is not, and would make a dead camera
-           look like a still scene. Encoding is deterministic — the same source picks the same
-           format and produces the same bytes — so hashing the stored file is an exact test. */
+        /* Identical to the frame before means the camera has not refreshed since the last capture.
+           Several stall for hours. Storing it would put a frame on the timeline that claims to be a
+           new observation, and make a dead camera look like a still scene. Encoding is
+           deterministic, so hashing the stored file is an exact test. */
         $have = shotList($id);
         if ($have && md5_file(shotFile($id, end($have))) === md5($bytes)) continue;
         file_put_contents("$dir/$now.$ext", $bytes);

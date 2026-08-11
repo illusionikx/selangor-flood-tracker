@@ -4,23 +4,21 @@
    is filtered — markers, heat and popups sit in other panes and keep their true colours. */
 :root[data-lift="yes"] .leaflet-tile-pane { filter: brightness(1.75) contrast(.92); }
 
-/* What shows where a tile has not arrived yet. Leaflet's own value is `#ddd`, in both themes and
-   whatever the basemap looks like. Zooming out asks for four times the tiles and, outside the area
-   you already had, there is nothing to retain and scale over the gap — so they land one at a time
-   over that grey, and the empty ones read as pale boxes on the dark map.
+/* What shows where a tile has not arrived. Leaflet's own value is `#ddd`, in both themes and under
+   any basemap. Zooming out asks for four times the tiles with nothing to retain over the new area,
+   so they land one at a time over that grey and the empty ones read as pale boxes on a dark map.
    `--surface` rather than a sampled land colour: an unpainted tile is the page showing through, it
-   follows the theme toggle for free, and #fff against Voyager's #fbf8f3 land and #202124 against the
+   follows the theme toggle for free, and #fff against Voyager's #fbf8f3 and #202124 against the
    lifted dark basemap are both close enough that a gap stops announcing itself.
-   This is not what put a table on the map mid-zoom — that was `#dataBox` laid out behind it. See
+   This is not what put a table on the map mid-zoom. That was `#dataBox` laid out behind it — see
    the `[open]` rule in chrome.css. */
 .leaflet-container { background: var(--surface); }
 
 /* Zoom sits bottom-right (Maps-style), clear of the alert panel. */
-/* Leaflet gives its control corners `z-index: 1000`, which is above everything this page has — the
-   splash included, so the zoom buttons floated over a screen that says there is no map yet. 400 puts
-   them in the map-furniture band with the legend, under the panels (450/500), the header (600) and
-   the splash (900). One rule for all four corners, so a control added to any of them lands in the
-   same stack. */
+/* Leaflet gives its control corners `z-index: 1000`, above everything this page has — the splash
+   included, so the zoom buttons floated over a screen saying there is no map yet. 400 puts them in
+   the map-furniture band with the legend, under the panels (450/500), the header (600) and the
+   splash (900). One rule for all four corners, so any control added lands in the same stack. */
 .leaflet-top, .leaflet-bottom { z-index: 400; }
 .leaflet-bottom.leaflet-right { margin-bottom: 26px; }
 .leaflet-control-zoom { border: 0 !important; box-shadow: var(--shadow); border-radius: 8px; overflow: hidden; }
@@ -33,9 +31,8 @@
 /* --- the station card ------------------------------------------------------------------------ */
 
 /* The blocks that fill the panel. The panel's own shell — where it sits, how it slides — is in
-   chrome.css; this is the template that used to be drawn inside a Leaflet popup and is otherwise
-   unchanged. Nothing here reserves room for a close button any more: the panel's sits in its own
-   row above the content, so the header is free to use its full width. */
+   chrome.css. This is the template that used to be drawn inside a Leaflet popup, otherwise
+   unchanged. Nothing reserves room for a close button: the panel's sits in its own row above. */
 #sideBody { font: 400 13px/1.5 Roboto, system-ui, sans-serif; }
 #sideBody hr { border: 0; border-top: 1px solid var(--outline); margin: 8px 0; }
 
@@ -44,16 +41,14 @@
   position: relative;   /* the favorite heart hangs off the top-right corner */
   padding: 0 0 8px; margin-bottom: 8px; border-bottom: 1px solid var(--outline);
 }
-/* The name and the region line clear the panel's close button, which floats over this corner — but
-   only those two. The badge row below them runs the full width, or its Details button would sit
-   inset from the one on every sensor row under it. 34px = the button's 48 from the panel edge, less
-   #sideBody's own 16 of padding. */
+/* The name and the region line clear the panel's close button, which floats over this corner. Only
+   those two — the badge row runs the full width, or its Details button sits inset from the one on
+   every sensor row under it. 34px = the button's 48 from the panel edge, less #sideBody's 16. */
 .pophead .popname, .pophead > .muted { padding-right: 34px; }
-/* The favorite heart, parked on the name's line just inside the close button. It holds the
-   slot a sensor-count chip used to: the badge row under the name lists one badge per sensor, so the
-   count restated what sat an inch below it, and a control for the whole mast had nowhere else to go
-   that was not beside a single sensor's own row.
-   Only the name shares this line, so only the name pays for the room, via the sibling rule below. */
+/* The favorite heart, parked on the name's line just inside the close button. It holds the slot a
+   sensor-count chip used to: the badge row lists one badge per sensor, so the count restated what
+   sat an inch below it, and a control for the whole mast had nowhere else to go.
+   Only the name shares this line, so only the name pays for the room — see the sibling rule below. */
 .pophead .favbtn {
   position: absolute; right: 34px;
   /* Centred on the name's line, which starts 18px down — the sticky header's own padding-top, set
@@ -70,10 +65,9 @@
 /* One mast, several sensors: the place is named once in .pophead, then a section per sensor. */
 .pophead .badges { display: flex; flex-wrap: wrap; gap: 4px; }
 .sensor { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--outline); }
-/* The first sensor draws no rule of its own — the header above it already ends in one, and the two
-   together were a double line. Keyed on `:first-child` in the scrolling box, *not* on
-   `.pophead + .sensor`: the header is lifted out of #sideBody into #sideHead (see map.js), so it is
-   no longer this element's sibling and a sibling selector silently stopped matching. */
+/* The first sensor draws no rule of its own — the header above it ends in one, and the two together
+   were a double line. Keyed on `:first-child`, *not* `.pophead + .sensor`: map.js lifts the header
+   out of #sideBody into #sideHead, so a sibling selector silently stopped matching. */
 #sideBody > .sensor:first-child { margin-top: 0; padding-top: 0; border-top: 0; }
 /* The nearest-webcam link leads every station card, so it needs room under it. The "you are here"
    card has no link — it shows the picture instead, as a section like any other. */
@@ -85,19 +79,18 @@
 
 /* --- markers -------------------------------------------------------------------------------- */
 
-/* The glyph alone, in the station's own colour. It has been a filled disc and, before that, a white
-   disc with a coloured glyph — the white one put camera cyan on white at ~2:1, so the icon was there
-   and unreadable, and the filled one fixed that by making every station a coin on the map: at 400
-   pins the basemap was a field of counters and the *shape* of a water drop, which is the one thing
-   that says what a pin is without being read, was down to 15px inside a 26px chip.
-   Two things hold the pin up and they are the pair the favorite heart has used all along: an edge in
-   `--surface`, and one soft dark shadow under it. The edge is the stroke on the glyph — see
-   `.pinglyph` below — and it is what let the palette stop carrying a value per theme for a pin, so
-   the map set in base.css is now selected by `.pin` on both themes. The shadow is what the edge
-   cannot do: `--surface` is a light plate on the light theme, and a light edge on a pale tile
-   separates nothing. The shadow is the same one `.pin .fv` casts, so the pin and the badge on it
-   sit at one height. `filter`, not `box-shadow` — it follows the glyph's rendered outline rather
-   than its box. */
+/* The glyph alone, in the station's own colour. It has been a filled disc, and before that a white
+   disc with a coloured glyph. The white one put camera cyan on white at ~2:1, present and
+   unreadable. The filled one fixed that by making every station a coin: at 400 pins the basemap was
+   a field of counters, and the *shape* of a water drop — the one thing that says what a pin is
+   without being read — was 15px inside a 26px chip.
+   Two things hold the pin up, the pair the favorite heart has always used: an edge in `--surface`
+   and one soft dark shadow. The edge is the stroke on the glyph (see `.pinglyph` below), and it is
+   what let the palette stop carrying a per-theme value for a pin, so `.pin` selects the map set in
+   base.css on both themes. The shadow does what the edge cannot: `--surface` is a light plate on
+   the light theme, and a light edge on a pale tile separates nothing. It is the same shadow
+   `.pin .fv` casts, so the pin and its badge sit at one height. `filter`, not `box-shadow` — it
+   follows the glyph's rendered outline, not its box. */
 /* 39px, up from 26 — the whole mark and everything hung off it went up by half. The box is repeated
    as `iconSize` in render.js, which is what actually positions the marker, so the two move together
    or the pin stops pointing at its station. */
@@ -114,30 +107,28 @@
    with it in one step, and it leaves the 39px layout box alone — that box is repeated as `iconSize`
    in render.js and is what actually positions the marker over its station. */
 .pin:not(.me, .place) { transform: scale(.8); }
-/* The glyph itself. It is an SVG element, not a mask — see `pinGlyph()` in map.js for why, and read
-   the note below for what that buys. `1em` off the `.pin`'s `font-size`, so every rule that sizes a
-   pin by its font (`.me`, `.place`) still sizes the glyph.
+/* The glyph itself. An SVG element, not a mask — see `pinGlyph()` in map.js for why. `1em` off the
+   `.pin`'s `font-size`, so every rule that sizes a pin by its font (`.me`, `.place`) sizes the
+   glyph too.
    `fill` takes the pin colour the mask took from `color`. The stroke is `--surface`, the page's own
-   plate colour — white on the light theme, near-black on the dark one — so the edge reads as a gap
-   punched in the basemap rather than as a ring drawn on top of it. Three values were tried and the
-   order matters. `--muted` is the inverse pair, dark on light, and a dark ring round every glyph is
-   the second attempt's failure arriving through a better technique. `--outline` is a step softer in
-   the same direction and still reads as a ring. Do not write a hex here, and in particular do not
-   reach for `#fff`/`#000`: that pair is what `--surface` already is either side of a shade, it would
-   not follow the theme toggle, and the palette lives in base.css and nowhere else.
-   `paint-order: stroke` paints the stroke *under* the fill, so a stroke centred on the path shows
-   only its outer half and eats none of the glyph.
-   **`stroke-width` is in screen pixels, not viewBox units, and the thing that makes it so is not
-   here.** `vector-effect: non-scaling-stroke` is one of the few SVG presentation properties that
-   does not inherit, so a rule on this element lands on the outer `<svg>`, which paints nothing, and
-   never reaches the path inside the `<use>` shadow tree. It is stamped on the path by `pinGlyph()`
-   in map.js instead, and the note is there. Everything below inherits into that shadow tree and so
-   belongs here. Two is two pixels at 31px on the map and at 48px on the "you are here" pin alike, and
-   `.pin`'s `scale(.8)` does not thin it.
+   plate colour, so the edge reads as a gap punched in the basemap rather than a ring drawn on top.
+   Three values were tried. `--muted` is the inverse pair, dark on light, and a dark ring round every
+   glyph is the second attempt's failure in a better technique. `--outline` is softer and still reads
+   as a ring. Do not write a hex, and do not reach for `#fff`/`#000`: that pair is what `--surface`
+   already is either side of a shade, it would not follow the theme toggle, and the palette lives in
+   base.css alone.
+   `paint-order: stroke` paints the stroke *under* the fill, so a centred stroke shows only its outer
+   half and eats none of the glyph.
+   **`stroke-width` is in screen pixels, not viewBox units, and what makes it so is not here.**
+   `vector-effect: non-scaling-stroke` is one of the few SVG presentation properties that does not
+   inherit, so a rule here lands on the outer `<svg>`, which paints nothing, and never reaches the
+   path inside the `<use>` shadow tree. `pinGlyph()` in map.js stamps it on the path instead, and the
+   note is there. Everything below inherits into that shadow tree and belongs here. Two is two pixels
+   at 31px on the map and at 48px on the "you are here" pin alike, and `scale(.8)` does not thin it.
    **Two draws a one-pixel edge, not a two-pixel one.** A stroke is centred on the path and
-   `paint-order` hides the inner half under the fill, so what you see is always half the number. One
-   pixel is what `.pin .fv` draws with its four hard shadows, so two here is what makes the heart and
-   the glyph it sits on carry the same edge. Halve or double both together or they drift. */
+   `paint-order` hides the inner half, so what you see is half the number. One pixel is what
+   `.pin .fv` draws with its four hard shadows, so two here makes the heart and the glyph carry the
+   same edge. Halve or double both together or they drift. */
 /* The symbol sprite `pinGlyph()` appends to the body. An `<svg>` with no size defaults to 300×150,
    so without this it is a blank box at the foot of the page. `display: none` on the outer element
    does not stop a `<use>` reaching a `<symbol>` inside it — that is what a symbol is for. */
@@ -161,22 +152,19 @@
   paint-order: stroke; overflow: visible;
 }
 /* **The outline above is the third attempt, and the first two were fakes.** First four hard drop
-   shadows, one per direction. Then the glyph painted twice from the same mask, a copy scaled up in a
-   grey behind the glyph itself. Both were reverted, and the reason each failed is the same reason
-   this one does not.
+   shadows, one per direction. Then the glyph painted twice from the same mask, a copy scaled up in
+   grey behind it. Both were reverted.
    Four shadows cover four directions, so a water drop's diagonals come out thinner than its sides.
-   The scaled copy is even at every angle and is worse for it: a mask has no path to offset, so
-   scaling is the only way to grow it, and a scaled glyph grows away from its own centre rather than
-   outward from its edge. At 400 pins that reads as 400 grey silhouettes with a coloured shape laid
-   on them. Turning the grey down to `--muted` and thickening it only traded one failure for the
-   other.
-   A real `stroke` on a real path is neither. It is one shape, offset along its own outline, so it is
-   the same width at a diagonal as at a side and it adds nothing behind the glyph that the glyph does
-   not already cover. That is what the mask could not do at any width or colour, and it is the whole
-   reason the pins carry an SVG element now. **Do not go back to a second copy of the shape.**
-   Keep it in `--surface` and keep it thin. The job is to separate the mark from the tile so the
-   fill does not have to hold 3:1 against white paper on its own. A stroke wide enough to be read as
-   a border is the 400-blob failure again in a better technique. */
+   The scaled copy is even at every angle and worse for it: a mask has no path to offset, so scaling
+   is the only way to grow it, and a scaled glyph grows away from its own centre rather than outward
+   from its edge. At 400 pins that is 400 grey silhouettes with a coloured shape laid on them.
+   Turning the grey down to `--muted` and thickening it traded one failure for the other.
+   A real `stroke` on a real path is neither. One shape, offset along its own outline, the same width
+   at a diagonal as at a side, adding nothing behind the glyph the glyph does not cover. The mask
+   could not do that at any width or colour, and it is why the pins carry an SVG element now.
+   **Do not go back to a second copy of the shape.** Keep it in `--surface` and keep it thin. The job
+   is to separate the mark from the tile so the fill does not have to hold 3:1 against white paper
+   alone. A stroke wide enough to read as a border is the 400-blob failure in a better technique. */
 /* Colour is already the offline grey here — fading the glyph as well would just hide it again. */
 .pin.off { opacity: .6; }
 /* A mast has no rule of its own any more. It was a filled disc carrying a sensor count, on the
@@ -188,27 +176,25 @@
    `color`/`fillColor` options, which become SVG presentation attributes that cannot take a var().
    Any CSS rule outranks one, so this is both how the token reaches it and what keeps it in step. */
 .mastring { stroke: var(--k-mast); fill: var(--k-mast); }
-/* A favorited place, bottom right of the pin. Solid always — the badge is only drawn when the place
-   is a favorite, so there is no hollow state to show here.
+/* A favorited place, bottom right of the pin. Always solid — the badge is drawn only on a favorite,
+   so there is no hollow state.
    The outline is what makes 15px of pink survive. It sits over a basemap, over another pin's glyph,
    and beside a siren pin that is pink itself, and a blurred halo was not enough at this size.
-   **This is a `.pinglyph` like the station mark, so it carries the same real stroke**, and it needs
-   nothing of its own but a colour and a place to stand. It drew that edge with four hard 1px
-   `drop-shadow`s instead, one per direction, from before a pin glyph was a path — the shadows had to
-   be hard because a blurred one spreads its opacity out and leaves the edge soft exactly where the
-   shape is thin, which on a heart is the two upper curves. Four offsets cover four directions, and
-   the diagonals between them came out thin.
+   **This is a `.pinglyph` like the station mark, so it carries the same real stroke** and needs
+   nothing but a colour and a place to stand. It drew that edge with four hard 1px `drop-shadow`s,
+   from before a pin glyph was a path. The shadows had to be hard, because a blurred one spreads its
+   opacity and leaves the edge soft exactly where the shape is thin — on a heart, the two upper
+   curves. Four offsets cover four directions and the diagonals came out thin.
    **The soft shadow stays, and it is not a duplicate of `.pin`'s.** A `filter` renders its element
-   and every descendant as one image and then casts one shadow from the union silhouette — so `.pin`'s
-   shadow falls on the basemap, and nothing falls from the heart onto the station glyph it overlaps.
-   This filter is what lifts the heart off that glyph. It was removed once on the reasoning that the
-   parent already cast it, and the heart went flat against the mark under it. */
-/* On the corner, overlapping it. It was pushed out to 5 and 6 while the heart looked as though it
-   were painted under the station glyph — the reading was that the overlap was hiding it. That was
-   the wrong diagnosis: the cause was the stacking, fixed on `.pin > .pinglyph` above, and the room
-   bought nothing once the order was right. 3 and 3 puts it back on the corner it belongs on. 17px
-   rather than the 15 it drew at before, which is the one thing kept from that pass — a heart is
-   read by its shape and it is the smallest shape on the map. */
+   and every descendant as one image, then casts one shadow from the union silhouette. So `.pin`'s
+   shadow falls on the basemap and nothing falls from the heart onto the glyph it overlaps. This
+   filter lifts the heart off that glyph. It was removed once because the parent already cast one,
+   and the heart went flat against the mark under it. */
+/* On the corner, overlapping it. It was pushed out to 5 and 6 while the heart looked painted under
+   the station glyph, on the reading that the overlap was hiding it. Wrong diagnosis: the cause was
+   the stacking, fixed on `.pin > .pinglyph` above, and the room bought nothing once the order was
+   right. 3 and 3 puts it back on its corner. 17px rather than 15 is the one thing kept from that
+   pass — a heart is read by its shape, and it is the smallest shape on the map. */
 .pin .fv {
   position: absolute; bottom: -3px; right: -3px; font-size: 17px; line-height: 1;
   color: var(--fav);
@@ -237,41 +223,38 @@
 }
 @media (prefers-reduced-motion: reduce) { .pin.danger::after { animation: none; opacity: .8; } }
 
-/* You are not a station. This mark is bigger than a station pin and it does not shrink with them,
-   because the reader is not a 672nd reading in the set. Its colour and its shape both say so — and
-   the accuracy circle under it is already a mark no station has.
+/* You are not a station. This mark is bigger than a station pin and does not shrink with them,
+   because the reader is not a 672nd reading in the set. Colour and shape both say so, and the
+   accuracy circle under it is already a mark no station has.
    `home_pin` — a pin with a house in it, so the *shape* says "a marker, and it is yours" before the
-   colour says anything. It is anchored at its tip, not its centre; see locate.js.
-   It carries the edge and the shadow every `.pin` does and states neither of its own — its old rule
-   set a slightly heavier shadow, which was a second number for the same job. A white halo was tried
-   here long before either and reads as a glow: on the dark basemap the mark wore a bright fringe,
-   which is a lit object, not a mark on a map. */
+   colour says anything. Anchored at its tip, not its centre. See locate.js.
+   It carries the edge and the shadow every `.pin` does and states neither of its own. Its old rule
+   set a heavier shadow, a second number for the same job. A white halo was tried long before either
+   and reads as a glow: on the dark basemap the mark wore a bright fringe, which is a lit object. */
 .pin.me {
   width: 48px; height: 48px; font-size: 48px;
   background: none; border: 0; box-shadow: none; color: var(--me);
 }
 /* A searched place. Accent rather than the location blue: this is somewhere the reader asked about,
-   not where they are, and the two marks must not be read as the same thing.
-   Same box as .pin.me, for the same reason: showPlace()'s divIcon is iconSize [48, 48], iconAnchor
-   [24, 44], so Leaflet positions the marker so that point lands on the coordinate. The base .pin
-   is a 39px box scaled to .8 by the rule above, which draws a ~31px glyph inside a 48px container —
-   the glyph's own tip then sits nowhere near [24, 44], and the pin points at the wrong spot on the
-   map. Matching iconSize (48px box, 48px font so the glyph fills it, exempted from the scale rule
-   above) is what .pin.me already does for the same divIcon shape; this repeats it rather than
-   inventing a second way to make a 48px pin. */
+   not where they are, and the two marks must not read as the same thing.
+   Same box as .pin.me, for the same reason. showPlace()'s divIcon is iconSize [48, 48], iconAnchor
+   [24, 44], so Leaflet lands that point on the coordinate. The base .pin is a 39px box scaled to .8
+   above, which draws a ~31px glyph inside a 48px container, so the glyph's tip sits nowhere near
+   [24, 44] and the pin points at the wrong spot. Matching iconSize (48px box, 48px font, exempt
+   from the scale rule) is what .pin.me already does for the same divIcon shape. */
 .pin.place { width: 48px; height: 48px; font-size: 48px; color: var(--accent); }
 /* The accuracy circle. Coloured here rather than through Leaflet's path options — those are SVG
    presentation attributes and cannot take a token. Same trick as .mastring above. */
 .mecircle { stroke: var(--me); fill: var(--me); }
 
 /* Just the count, in one neutral chip for every cluster — no kind icon or hue. Fixed slate rather
-   than a token so white text holds on both the light and dark basemaps, and it reads as neither a
-   station type (all saturated) nor offline (lighter grey).
+   than a token, so white text holds on both basemaps and it reads as neither a station type (all
+   saturated) nor offline (lighter grey).
    **The edge and the shadow are the pin's, to the pixel.** A chip and a pin sit side by side at
-   every zoom, so two ways of lifting a mark off the basemap is two marks that do not look like one
-   set. This carried a 2px border and Material's two-layer `--shadow`; the border is 1px, the same
-   width `.pinglyph` strokes at, and the shadow is the single soft one the pins and the favorite
-   heart cast. Anything else drawn onto the map takes this pair too. */
+   every zoom, so two ways of lifting a mark off the basemap is two marks that are not one set. This
+   carried a 2px border and Material's two-layer `--shadow`. The border is 1px, the width
+   `.pinglyph` strokes at, and the shadow is the single soft one the pins and the heart cast.
+   Anything else drawn onto the map takes this pair too. */
 .cluster {
   display: grid; place-items: center;
   /* 30% off 34, with the type and the danger ring taken down with it. The box is repeated as
@@ -288,13 +271,12 @@
   box-shadow: 0 0 0 2px color-mix(in srgb, #d93025 35%, transparent);
 }
 
-/* Ripple played over a station the user jumped to from a panel or link, over a place the user
-   searched for, and over your own position when you ask to be taken to it.
-   `--accent`, not red. A jump is often to something that is alerting, but the ripple is not the
-   thing saying so — the pin under it already carries the status colour, and a red ring is the app's
-   word for danger. Painting one round every arrival spends that word on "look here", which is all
-   this means. `--c` keeps the location ripple in its own amber, since any other colour round your
-   own position reads as a claim about you. */
+/* Ripple played over a station jumped to from a panel or link, over a searched place, and over your
+   own position when you ask to be taken to it.
+   `--accent`, not red. A jump is often to something alerting, but the ripple is not what says so —
+   the pin already carries the status colour, and a red ring is the app's word for danger. Painting
+   one round every arrival spends that word on "look here", which is all this means. `--c` keeps the
+   location ripple in its own amber, since any other colour round your position claims something. */
 .ping, .ping::after {
   position: absolute; left: 0; top: 0; width: 18px; height: 18px; margin: -9px 0 0 -9px;
   border-radius: 50%; border: 3px solid var(--c, var(--accent)); animation: ripple 1.2s ease-out 2;
@@ -302,16 +284,15 @@
 .ping::after { content: ''; margin: -3px 0 0 -3px; animation-delay: .4s; }
 .ping.me { --c: var(--me); }
 
-/* The name of the place the ripple is over, gone when the ripple is. 2.4s is FLASH_MS, the same
-   number `.ping`'s two 1.2s runs already spell out — the marker is removed on that timer, so a
-   longer animation here would be cut off rather than finish. Not interactive: its marker is
-   `interactive: false`, and `pointer-events` keeps it off the pin it is naming.
+/* The name of the place the ripple is over, gone when the ripple is. 2.4s is FLASH_MS, the number
+   `.ping`'s two 1.2s runs already spell out. The marker is removed on that timer, so a longer
+   animation would be cut off. Not interactive: its marker is `interactive: false`, and
+   `pointer-events` keeps it off the pin it names.
    28px clears the pin. A station marker is 39px anchored at its middle, so its glyph reaches about
-   20px above the point, and a chip any lower than this is a chip behind a pin. The 6px tail below
-   the chip eats the first 6px of that gap.
+   20px above the point, and anything lower is a chip behind a pin. The 6px tail eats the first 6px.
    `filter: drop-shadow`, not `box-shadow`: the shadow has to follow the tail, and a box shadow
-   traces the border box, which the tail hangs outside of. The chip is a plain `<b>` and not an
-   `.i`, so it carries no mask and the filter renders — see the mask gotcha in CLAUDE.md. */
+   traces the border box the tail hangs outside of. The chip is a plain `<b>`, not an `.i`, so it
+   carries no mask and the filter renders — see the mask gotcha in CLAUDE.md. */
 .pinglabel {
   position: absolute; left: 0; bottom: 28px; translate: -50% 0; pointer-events: none;
   white-space: nowrap;   /* no clip and no cap: the tail is a child, so any overflow rule cuts it off */
@@ -354,24 +335,23 @@
   .sensor { margin-top: 7px; padding-top: 7px; }
 }
 
-/* The alert marker on a camera picture. Top left, because the bottom carries the timestamp overlay
-   JPS burns into its own frames and the right is where the lightbox close button lands.
-   Absolute inside `.player`, which is the lightbox and the only place this appears. The station
-   panel's still dropped it: that picture is a 3-hour clip playing itself, so a live pill on it was a
-   claim about now over a frame from hours ago, and the card around it already carries the alerting
-   sensor as a section with the reading, the meter and the graph.
+/* The alert marker on a camera picture. Top left, because the bottom carries the timestamp JPS
+   burns into its own frames and the right is where the lightbox close button lands.
+   Absolute inside `.player`, the lightbox and the only place this appears. The station panel's
+   still dropped it: that picture is a 3-hour clip playing itself, so a live pill on it claimed
+   something about now over a frame from hours ago, and the card already carries the alerting sensor
+   as a section with the reading, the meter and the graph.
    It says what is wrong on the picture itself. It was a glyph on a dark disc with the words in a
-   `title`, which is a tooltip that never opens on a phone, opens after a second on a mouse, and
-   cannot be styled — so the marker meant "something" and the something was unreachable on half the
-   devices this runs on. The disc went with it: a chip of furniture in the corner of a photograph,
-   sized for a glyph that is no longer alone there.
+   `title` — a tooltip that never opens on a phone, opens after a second on a mouse, and cannot be
+   styled, so the marker meant "something" and the something was unreachable on half the devices
+   this runs on.
    A translucent pill, not a disc and not bare words. The disc was furniture around a glyph that no
-   longer stands alone; bare words with a heavy `text-shadow` replaced it and held over most footage
-   but not all of it — this is JPS daylight video of wet concrete and bright sky, and a shadow only
-   darkens what is already behind the letters. One box behind the glyph and the words together reads
-   as one label, keeps the shadow as a second line of defence, and lets the blur carry the rest.
-   `pointer-events: none` because the picture under it opens the lightbox, and a dead patch in the
-   corner of it was the old disc's other cost. */
+   longer stands alone. Bare words with a heavy `text-shadow` replaced it and held over most footage
+   but not all: this is JPS daylight video of wet concrete and bright sky, and a shadow only darkens
+   what is already behind the letters. One box behind the glyph and the words reads as one label,
+   keeps the shadow as a second defence, and lets the blur carry the rest.
+   `pointer-events: none` because the picture under it opens the lightbox, and a dead patch in that
+   corner was the old disc's other cost. */
 .camwarn {
   position: absolute; top: 8px; left: 8px; z-index: 2;
   display: flex; align-items: center; gap: 5px; max-width: calc(100% - 16px);
