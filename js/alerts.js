@@ -147,6 +147,28 @@ const favicon = red => {
   }).catch(() => {});                        // no drawing, no repaint — the blue mark stands
 };
 
+/* MET warnings, above every station in the panel.
+   A warning names a region. A station reading names one place. So this section adds nothing to
+   the counts below it: the badge, the tab title, the tally glyphs and the warning glyph still
+   read the station list alone. Merging the two tells a reader that stations are in trouble when
+   none is.
+   The row clips its text with CSS, not by cutting the string. The full sentence stays in the DOM
+   for a screen reader. It stays too for anyone who copies it. The modal holds the whole
+   warning. */
+function warnCard(list) {
+  if (!list || !list.length) return '';
+  return `<div class="alertgrp warngrp">
+      <div class="alerthead">
+        <i class="i i-rainy_heavy" style="--c:var(--k-weather)"></i>
+        <b>Forecast Warning</b>
+      </div>
+      ${list.map((w, i) => `<button class="warnrow" data-warn="${i}">
+        <b>${w.title}</b>
+        <span class="warntext">${w.text}</span>
+      </button>`).join('')}
+    </div>`;
+}
+
 export function alerts() {
   const hidden = new Set(PREFS.hidden || []);
   const hot = state.data.filter(s => !hidden.has(dkey(s)) && !isIgnored(s) && isHot(s));
@@ -220,8 +242,10 @@ export function alerts() {
     hot.length && hereAt ? ' <span class="muted">· nearest first</span>' : ''
   }</div><div class="tally">${tally}</div></div>`;
 
+  // Right after the head, ahead of every station group below — see the comment on warnCard().
+  const warnHtml = warnCard(state.warnings);
   const write = body => {
-    card = head + body;
+    card = head + warnHtml + body;
     if (side.key === KEY) openSide(KEY, card);
   };
 

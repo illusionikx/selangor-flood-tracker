@@ -337,7 +337,83 @@ function metDaily(string $json): array {
  */
 function metUrls(int $now): array {
     return [
-        'met-now' => MET_URL,
-        'met-day' => MET_DAY_URL . '?filter=' . date('Y-m-d', $now) . '@date',
+        'met-now'  => MET_URL,
+        'met-day'  => MET_DAY_URL . '?filter=' . date('Y-m-d', $now) . '@date',
+        'met-warn' => MET_WARN_URL,
     ];
+}
+
+/* --- MET Malaysia warnings ------------------------------------------------------------------ */
+
+/* Rows this map never shows. A seismic warning and an empty advisory say nothing about the weather
+   here. */
+const WARN_DROP = ['earthquake', 'tsunami', 'gempa', 'no advisory', 'tiada'];
+
+/* Rows about the sea. Most name water this map does not reach, so they drop by default. */
+const WARN_SEA = ['rough sea', 'strong wind', 'angin kencang', 'laut bergelora'];
+
+/* The one stretch of sea that counts. The Straits of Melaka is the Selangor coast. Port Klang
+   stands on it, so rough water there reaches the area this map covers. Water off Phuket, Samui,
+   Layang-Layang, Palawan and Sulu does not. A marine row survives only by naming these straits. */
+const WARN_SEA_KEEP = ['straits of melaka', 'straits of malacca', 'selat melaka'];
+
+/* The places this map covers. A warning over land must name one of them.
+   The last pair is wider than the rest on purpose. MET names some warnings by coast, not by
+   state, and Selangor sits on the west coast of the peninsula. A row that reads "the west coast
+   of Peninsular Malaysia" reaches this map without naming it.
+   A warning for the whole peninsula still drops. Add 'semenanjung' and 'peninsular' the day that
+   trade goes the other way, and expect more warnings about other states too. */
+const WARN_HERE = ['selangor', 'kuala lumpur', 'putrajaya', 'lembah klang', 'klang valley',
+                   'wilayah persekutuan', 'west coast', 'pantai barat'];
+
+/**
+ * Every MET warning live at $now, newest first.
+ *
+ * metWarnings() drops a row on five tests. It drops a row whose stamps do not parse. It drops a
+ * row outside its own validity window. It drops a seismic warning or an empty advisory. It drops a
+ * row that names nowhere this map covers. It drops a row that repeats a title and text it already
+ * kept.
+ *
+ * The place test uses one of two word lists. A marine row must name the Straits of Melaka: that
+ * water is the Selangor coast. Every other row must name a state or district here.
+ */
+function metWarnings(string $json, int $now): array {
+    $rows = json_decode($json, true);
+    if (!is_array($rows)) return [];
+
+    $out = [];
+    $seen = [];
+    foreach ($rows as $r) {
+        $title = trim((string)($r['warning_issue']['title_en'] ?? ''));
+        $text  = trim((string)($r['text_en'] ?? ''));
+        if ($title === '' && $text === '') continue;
+
+        $from = strtotime((string)($r['valid_from'] ?? ''));
+        $to   = strtotime((string)($r['valid_to'] ?? ''));
+        if (!$from || !$to || $now < $from || $now > $to) continue;
+
+        $hay = strtolower($title . ' ' . (string)($r['heading_en'] ?? ''));
+        foreach (WARN_DROP as $bad) if (str_contains($hay, $bad)) continue 2;
+
+        $sea = false;
+        foreach (WARN_SEA as $s) if (str_contains($hay, $s)) { $sea = true; break; }
+
+        // One place test, two word lists. The test checks English and Malay text, because MET
+        // writes some rows in one language only.
+        $where = strtolower($text . ' ' . (string)($r['text_bm'] ?? ''));
+        $near = false;
+        foreach ($sea ? WARN_SEA_KEEP : WARN_HERE as $k) {
+            if (str_contains($where, $k)) { $near = true; break; }
+        }
+        if (!$near) continue;
+
+        $key = $title . '|' . $text;
+        if (isset($seen[$key])) continue;
+        $seen[$key] = true;
+
+        $out[] = ['title' => $title, 'text' => $text,
+                  'from' => (string)$r['valid_from'], 'to' => (string)$r['valid_to']];
+    }
+    usort($out, fn($a, $b) => strcmp($b['from'], $a['from']));
+    return $out;
 }

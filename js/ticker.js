@@ -47,11 +47,22 @@ export function ticker() {
     || (b.kind === 'siren') - (a.kind === 'siren')
     || (b.ratio || 0) - (a.ratio || 0));
 
+  /* MET warnings lead the strip. Each tile carries the full sentence, not a clipped one. The
+     strip has one line and nothing under it to crowd, unlike the panel row in alerts.js.
+     A tile carries data-warn and no data-go. A warning is not a station, so it opens no card.
+     The same [data-warn] click in js/ui.js opens the modal for this tile and for the panel row
+     alike. */
+  const warns = state.warnings.map((w, i) => `<button class="tk-i tk-warn" data-warn="${i}" tabindex="-1">
+      <i class="i i-rainy_heavy" style="--c:var(--k-weather)"></i>
+      <b>${w.title}</b><span class="tk-why">${w.text}</span>
+      <span class="tk-dot">•</span>
+    </button>`);
+
   /* Quiet is a state, not an absence: a ticker that empties itself looks broken, and on a flood map
      "broken" and "nothing is happening" must never look the same. All-clear gets its own card —
      centred, grey and perfectly still. Stillness is the message: the strip moves when, and only
-     when, there is something to report. */
-  if (!hot.length) {
+     when, there is something to report. A warning counts as something to report too. */
+  if (!hot.length && !warns.length) {
     box.classList.add('quiet');
     run.style.removeProperty('--dur');
     run.innerHTML = `<span class="tk-i tk-none"><i class="i i-check_circle"></i>No alerts</span>`;
@@ -63,7 +74,7 @@ export function ticker() {
      reserves the traffic-light ramp for status, and a river's blue is what makes it a river. So the
      icon stays blue and the *reason* goes red for what is happening, amber for what is forecast,
      grey for what we can no longer vouch for. */
-  const items = hot.map(s => {
+  const items = warns.concat(hot.map(s => {
     const t = tier(s);
     const why = t === 'stale'      ? 'last known · not current'
       : s.kind === 'siren'         ? 'siren sounding'
@@ -74,7 +85,7 @@ export function ticker() {
       <b>${s.name}</b><span class="tk-why t-${t}">${s.district ? `${s.district} · ` : ''}${why}</span>
       <span class="tk-dot">•</span>
     </button>`;
-  });
+  }));
 
   /* What to do, on the strip that is never covered. It appears on exactly the condition that already
      winds the strip up — `pace()` leaving its base speed, i.e. more than FAST_FROM alerts at once.
@@ -111,16 +122,18 @@ export function ticker() {
   run.style.removeProperty('--dur');
   run.innerHTML = set;
   const one = run.scrollWidth;
+  // items.length, not hot.length: a warning with no hot station still fills the strip and needs
+  // a real pace. hot.length alone divides by zero on a warning-only poll.
   const reps = Math.max(
     one > 0 ? Math.ceil(box.clientWidth / one) : 2,
-    Math.ceil(MIN_TILES / hot.length),
+    Math.ceil(MIN_TILES / items.length),
   );
 
   run.innerHTML = set.repeat(reps * 2);
   // Floored: measured before the webfont lands, `scrollWidth` can come back tiny, and a near-zero
   // duration is a strip that flickers rather than scrolls. The next poll re-measures anyway.
   run.style.setProperty('--dur',
-    `${Math.max(8, Math.round(one * reps / pace(hot.length)))}s`);
+    `${Math.max(8, Math.round(one * reps / pace(items.length)))}s`);
 }
 
 // Delegated once: the strip is rebuilt on every poll and holds several copies of every station, so

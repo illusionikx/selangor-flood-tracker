@@ -1102,6 +1102,24 @@ document.addEventListener('click', e => {
   if (t) flashTo(t);
 });
 
+// --- MET warnings ------------------------------------------------------------------------------
+
+const warnBox = el('warnBox');
+// One click handler for both surfaces. The panel row and the ticker tile both carry data-warn,
+// the index into state.warnings. Neither carries data-go: a warning is not a station, and opens
+// no card.
+document.addEventListener('click', e => {
+  const w = e.target.closest('[data-warn]');
+  if (!w) return;
+  const it = state.warnings[+w.dataset.warn];
+  if (!it) return;
+  el('warnBody').innerHTML = `<h3>${it.title}</h3><p>${it.text}</p>
+    <p class="muted">Valid ${it.from} to ${it.to}</p>`;
+  warnBox.showModal();
+});
+// Backdrop closes it, like every other dialog here. The × and Esc do the rest.
+warnBox.onclick = e => { if (e.target === warnBox) warnBox.close(); };
+
 // --- lightbox --------------------------------------------------------------------------------------
 
 // Two ways in: the still inside a popup, and the table's "show image" button, which has no <img>

@@ -169,6 +169,11 @@ const MET_KM      = 15.0;
 const MET_STALE   = 7200;    // 2 h — an old projection is worse than none
 const MET_DAY_TTL = 21600;   // 6 h — the forecast changes once a day
 
+/* MET warnings. A warning is worth having late and worthless stale, so the cache holds it a short
+   time only. */
+const MET_WARN_URL = 'https://api.data.gov.my/weather/warning';
+const MET_WARN_TTL = 900;    // 15 min
+
 date_default_timezone_set('Asia/Kuala_Lumpur'); // upstream timestamps are local MYT, unlabelled
 
 const HOST = 'infobanjirjps.selangor.gov.my';
@@ -879,6 +884,94 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
     $ok('a point out of reach gets nothing', metNearest(3.5, 101.1, $pts) === null);
     $ok('an empty list gets nothing',        metNearest(3.0379, 101.5344, []) === null);
 
+    /* The warning feed publishes no location at all. This test dates from one live fetch. Every
+       live row that day named waters near Phuket and Samui: real weather, and useless on this
+       map. So the kind filter works as an exclude list. An include list drops a warning MET
+       rewords. A dropped flood warning is the one failure this test must catch. */
+    echo "\nmetWarnings():\n";
+    $wnow = 1786400000;
+    $row = fn(string $title, string $text, int $from, int $to) => [
+        'warning_issue' => ['title_en' => $title, 'issued' => ''],
+        'valid_from' => date('Y-m-d\TH:i:s', $from),
+        'valid_to'   => date('Y-m-d\TH:i:s', $to),
+        'heading_en' => $title, 'text_en' => $text,
+    ];
+    $rain = $row('Thunderstorms Warning', 'Thunderstorms over Selangor', $wnow - 60, $wnow + 3600);
+    $sea  = $row('Third Category Warning on Strong Winds and Rough Seas',
+                 'Waves over the waters of Phuket', $wnow - 60, $wnow + 3600);
+    $old  = $row('Thunderstorms Warning', 'Yesterday', $wnow - 7200, $wnow - 3600);
+    $soon = $row('Thunderstorms Warning', 'Tomorrow', $wnow + 3600, $wnow + 7200);
+
+    $w = metWarnings(json_encode([$rain, $sea, $old, $soon]), $wnow);
+    $ok('a live rain warning survives',    count($w) === 1);
+    $ok('and it carries its text',         ($w[0]['text'] ?? '') === 'Thunderstorms over Selangor');
+    $ok('the parser drops a far sea warning', !array_filter($w, fn($x) => str_contains($x['text'], 'Phuket')));
+    $ok('the parser drops an expired row', !array_filter($w, fn($x) => $x['text'] === 'Yesterday'));
+    $ok('the parser drops a future row',   !array_filter($w, fn($x) => $x['text'] === 'Tomorrow'));
+
+    /* The Straits of Melaka is the Selangor coast. Port Klang stands on it, so a marine warning
+       naming those straits stays. One of the three live marine rows read Northern Straits of
+       Melaka and Samui, and belongs here. The other two named only distant waters. Both halves of
+       that split need a test. One wrong edit silently drops the coast, or silently admits the
+       whole region. */
+    $near = $row('Third Category Warning on Strong Winds and Rough Seas',
+                 'Waves over the waters of Northern Straits of Melaka and Samui',
+                 $wnow - 60, $wnow + 3600);
+    $nearBm = $row('Amaran Angin Kencang dan Laut Bergelora', '', $wnow - 60, $wnow + 3600);
+    $nearBm['text_bm'] = 'Ombak di perairan Utara Selat Melaka';
+
+    $ok('a Straits of Melaka sea warning stays',
+        count(metWarnings(json_encode([$near]), $wnow)) === 1);
+    $ok('the Malay wording matches too',
+        count(metWarnings(json_encode([$nearBm]), $wnow)) === 1);
+    $ok('a sea warning for other waters still drops',
+        metWarnings(json_encode([$sea]), $wnow) === []);
+
+    $dupe = metWarnings(json_encode([$rain, $rain, $rain]), $wnow);
+    $ok('three identical rows collapse to one', count($dupe) === 1);
+
+    $none = $row('No Advisory', '', $wnow, $wnow);
+    $none['valid_from'] = '';
+    $none['valid_to']   = '';
+    $ok('a row with no validity drops',      metWarnings(json_encode([$none]), $wnow) === []);
+    $ok('rubbish parses to nothing',         metWarnings('not json', $wnow) === []);
+    $ok('an empty body parses to nothing',   metWarnings('', $wnow) === []);
+
+    /* A kind MET has not published before must still show, so long as it names somewhere here.
+       The kind is not on any list. The place is what admits it. */
+    $odd = $row('Flash Flood Warning', 'Flooding expected in Klang, Selangor', $wnow - 60, $wnow + 3600);
+    $ok('an unknown kind still shows', count(metWarnings(json_encode([$odd]), $wnow)) === 1);
+
+    /* The place test on a land row, checked both ways. One half admits every state in the
+       country. The other half silences the one this map serves. Both need a check, or a wrong
+       edit hides in either one. */
+    $away = $row('Thunderstorms Warning', 'Thunderstorms over Kelantan and Terengganu',
+                 $wnow - 60, $wnow + 3600);
+    $ok('a land warning naming nowhere here drops',
+        metWarnings(json_encode([$away]), $wnow) === []);
+
+    $kl = $row('Thunderstorms Warning', 'Thunderstorms over Kuala Lumpur', $wnow - 60, $wnow + 3600);
+    $pj = $row('Thunderstorms Warning', 'Ribut petir di Putrajaya', $wnow - 60, $wnow + 3600);
+    $lk = $row('Thunderstorms Warning', 'Hujan lebat di Lembah Klang', $wnow - 60, $wnow + 3600);
+    $ok('Kuala Lumpur matches',   count(metWarnings(json_encode([$kl]), $wnow)) === 1);
+    $ok('Putrajaya matches',      count(metWarnings(json_encode([$pj]), $wnow)) === 1);
+    $ok('Lembah Klang matches',   count(metWarnings(json_encode([$lk]), $wnow)) === 1);
+
+    /* MET words some warnings by coast rather than by state, and Selangor is on the west coast.
+       A row worded that way covers this map without naming it, so it has to pass. The
+       peninsula-wide wording deliberately does not, and both halves need a test to hold that
+       line. */
+    $wc = $row('Continuous Rain Warning', 'Heavy rain over the west coast of Peninsular Malaysia',
+               $wnow - 60, $wnow + 3600);
+    $wcBm = $row('Amaran Hujan Berterusan', '', $wnow - 60, $wnow + 3600);
+    $wcBm['text_bm'] = 'Hujan lebat di pantai barat Semenanjung Malaysia';
+    $pen = $row('Continuous Rain Warning', 'Heavy rain over Peninsular Malaysia',
+                $wnow - 60, $wnow + 3600);
+
+    $ok('a west coast warning matches',    count(metWarnings(json_encode([$wc]), $wnow)) === 1);
+    $ok('pantai barat matches too',        count(metWarnings(json_encode([$wcBm]), $wnow)) === 1);
+    $ok('a peninsula wide warning still drops', metWarnings(json_encode([$pen]), $wnow) === []);
+
     echo $fail ? "\n$fail FAILED\n" : "\nall ok\n";
     exit($fail ? 1 : 0);
 }
@@ -1104,8 +1197,12 @@ $db->exec('CREATE TABLE IF NOT EXISTS page (url TEXT PRIMARY KEY, ts INTEGER, bo
 $extraUrls = nationalUrls() + klUrls() + metUrls($now);
 $stored = [];
 foreach ($db->query('SELECT url, ts, body FROM page') as $r) $stored[$r['url']] = $r;
-// The daily forecast changes once a day, so it gets its own clock. Everything else keeps SCRAPE_TTL.
-$ttlFor = fn(string $k) => $k === 'met-day' ? MET_DAY_TTL : SCRAPE_TTL;
+// The daily forecast and the warning feed each keep their own clock. Everything else keeps SCRAPE_TTL.
+$ttlFor = fn(string $k) => match ($k) {
+    'met-day'  => MET_DAY_TTL,
+    'met-warn' => MET_WARN_TTL,
+    default    => SCRAPE_TTL,
+};
 $want = [];
 foreach ($extraUrls as $k => $u) {
     if (($stored[$u]['ts'] ?? 0) < $now - $ttlFor($k)) $want[$k] = $u;
@@ -1136,6 +1233,7 @@ $db->prepare('DELETE FROM page WHERE url LIKE ? AND ts < ?')
 $metPts = metPoints($page('met-now'));
 $metPts = array_values(array_filter($metPts, fn($p) => $p['stamp'] >= $now - MET_STALE));
 $metDay = metDaily($page('met-day'));
+$metWarn = metWarnings($page('met-warn'), $now);
 
 // One-off carry-over from the flat file, so trends survive the switch instead of going null for an
 // hour. Deletes itself; drop this block once no deployment has a .history.json left.
@@ -1550,7 +1648,11 @@ $payload = json_encode([
                        'unmapped' => count($nat) - count($natUsed)],
         'met'      => ['parsed' => count($metPts), 'matched' => $metMatched],
         'metday'   => ['parsed' => count($metDay), 'matched' => $metDayMatched],
+        'metwarn'  => ['parsed' => count($metWarn)],
     ],
+    // A regional notice, not a station reading. isHot() and every count in alerts() read the
+    // station list alone, and this key feeds neither — see js/alerts.js for the rule.
+    'warnings' => $metWarn,
     'offline'  => count(array_filter($stations, fn($s) => !$s['online'])),
 ], JSON_UNESCAPED_SLASHES);
 

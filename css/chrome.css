@@ -77,6 +77,9 @@ header .hactions { display: flex; align-items: center; gap: 4px; margin-left: au
 /* Underlined, not just tinted: this is the one thing on the strip you are meant to *go to*, and on a
    moving line "that word is a slightly different colour" is not a discoverable affordance. */
 #ticker .tk-say a { color: var(--accent); text-decoration: underline; }
+/* A MET warning tile. It shares the shape of .tk-i. Its colour comes through --c, set inline in
+   js/ticker.js to --k-weather, not a kind colour. */
+#ticker .tk-warn .i { color: var(--c); }
 #ticker .tk-dot { color: var(--outline); margin: 0 16px; }
 /* All-clear: centred, grey, still. It is the one card that is not a link and not news, so it reads
    as a label rather than an item that happens to be showing — and stillness is the message. */
@@ -605,6 +608,25 @@ table.data .dash { color: var(--outline); }
   flex: none; margin: 0; padding: 10px 20px;
   border-top: 1px solid var(--outline); background: var(--surface);
 }
+
+/* --- warning modal ------------------------------------------------------------------------------ */
+
+/* One warning, read in full. Small on purpose: a title, a paragraph and a validity line,
+   nothing to scroll. */
+#warnBox {
+  max-width: min(480px, calc(100vw - 32px)); padding: 20px;
+  border: 1px solid var(--outline); border-radius: 12px;
+  background: var(--surface); color: var(--on-surface); box-shadow: var(--shadow);
+}
+/* `[open]`, never the bare element. A display on the element itself beats the browser default
+   `dialog:not([open]) { display: none }`. It lays the closed dialog out on the page. #dataBox
+   above carries the full account of that bug. */
+#warnBox[open] { display: flex; flex-direction: column; }
+#warnBox::backdrop { background: #0009; }
+#warnBox .modalhead .i { font-size: 22px; }
+#warnBox h2 { font-size: 18px; font-weight: 500; }
+#warnBox #warnBody h3 { margin: 0 0 8px; font-size: 15px; font-weight: 500; }
+#warnBox #warnBody p { margin: 0 0 8px; line-height: 1.5; }
 
 /* --- loading progress ------------------------------------------------------------------------- */
 
@@ -1189,6 +1211,31 @@ body.finding #find { display: none; }
 .alert.t-soon  .slist .i { color: var(--s-warning); }
 .alert.t-stale .slist .i { color: var(--muted); }
 .alert.grouped p { margin: 8px 0 0; }
+
+/* --- MET warnings (panel section) --------------------------------------------------------------- */
+
+/* A regional notice, not a station reading — see the comment on warnCard() in js/alerts.js.
+   Same box shape as an .alert card, so the two read as one list. The left rule takes
+   --k-weather instead of a status colour: nothing here stands at a published threshold. */
+.warngrp {
+  padding: 14px 0 14px 10px; border-top: 1px solid var(--outline);
+  border-left: 3px solid var(--k-weather);
+}
+#sideBody > .warngrp:first-child { border-top: 0; padding-top: 4px; }
+.warngrp .alerthead { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.warngrp .alerthead .i { color: var(--c); font-size: 18px; }
+.warngrp .alerthead b { font-weight: 500; }
+.warnrow {
+  display: block; width: 100%; margin-top: 6px; padding: 7px 8px; text-align: left;
+  background: none; border: 0; border-radius: 6px; cursor: pointer; color: var(--on-surface);
+  font: inherit; line-height: 1.35;
+}
+.warnrow:hover { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.warnrow b { display: block; font-weight: 500; font-size: 13px; }
+/* The one-line clip. CSS trims the row here. The full sentence still reaches a screen reader.
+   It stays whole in the modal this row opens. */
+.warnrow .warntext { display: block; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; font-size: 12px; color: var(--muted); }
 
 /* --- credit --------------------------------------------------------------------------------- */
 

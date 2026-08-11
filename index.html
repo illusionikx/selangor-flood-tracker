@@ -32,7 +32,7 @@
 <link rel="stylesheet" href="vendor/fonts.css?v=49">
 <link rel="stylesheet" href="css/icons.css?v=78">
 <link rel="stylesheet" href="css/base.css?v=106">
-<link rel="stylesheet" href="css/chrome.css?v=139">
+<link rel="stylesheet" href="css/chrome.css?v=140">
 <link rel="stylesheet" href="css/map.css?v=127">
 
 <!-- Water tint for the dark basemap. CARTO's dark_all is greyscale — all 18 of its tones have zero
@@ -717,6 +717,18 @@
   <!-- The tally, under the thing it counts. A total belongs after the list, where a reader arrives
        at it having seen what it is totalling, rather than above one as a claim to check. -->
   <p id="camCount" class="muted"></p>
+</dialog>
+<!-- A MET Malaysia warning, read in full. The panel row and the ticker tile both open this dialog
+     with the same [data-warn] index — see js/alerts.js and js/ticker.js. Same shell as the other
+     dialogs: a form/dclose pair for the native close, and ui.js closes it on a backdrop click too. -->
+<dialog id="warnBox" aria-labelledby="warnBoxTitle">
+  <div class="modalhead">
+    <i class="i i-rainy_heavy" style="color:var(--k-weather)"></i>
+    <h2 id="warnBoxTitle">Forecast Warning</h2>
+    <form method="dialog"><button class="icon dclose" title="Close" aria-label="Close"
+      ><i class="i i-close"></i></button></form>
+  </div>
+  <div id="warnBody"></div>
 </dialog>
 <div id="map"></div>
 <!-- Station detail, fixed to the right edge of the viewport. It was a Leaflet popup, which is
