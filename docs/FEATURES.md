@@ -5713,6 +5713,15 @@ decoded strip costs roughly `SHEET_W * cells * SHEET_H * 4` bytes once a browser
 unpacks it, and a seven-cell strip at 480x270 is already about 2.6 MB decoded — times up to sixteen
 tiles live at once on a five-column desktop grid, which is the ceiling this size was chosen against.
 
+**`.camtile` is `aspect-ratio: 16 / 9`, the cell's own shape, not the `4 / 3` it carried while a
+tile only ever held one still.** That earlier ratio was a choice made for a single picture, not for
+a strip: `SHOT_W` and every measured camera are already 16:9, so a strip cell is too, and asking a
+4:3 box to display a 16:9 cell only ever meant a crop or a stretch either way. Matching the box to
+the cell removes the question rather than answering it — a strip's width/transform stepping (below)
+lines up with real cell boundaries regardless of `object-fit`, because there is nothing left for
+`object-fit` to reconcile. The station panel's clip box (`.shotwrap`/`.shot` in `css/base.css`) was
+already 16:9 from the start, for the same underlying reason.
+
 **`SHEET_Q` is 70, lower than the stored frame's own 82.** A stored frame is the archive's one copy
 of that moment — the record — and it is worth spending bytes to keep it faithful. A strip is a
 cache, rebuilt from those frames on demand whenever it goes stale, so a softer quality costs nothing
@@ -5758,30 +5767,34 @@ a 480x270 strip would be a visible downgrade on a picture someone deliberately z
 and the clip both answer "what does this look like, roughly, right now" — the lightbox answers "show
 me exactly this moment," and a strip cannot serve that second question at the resolution it deserves.
 
-**Two trade-offs, both accepted rather than solved.** First, the clip's lap no longer ends on a
-freshly fetched live still. The old per-frame version appended one extra position that swapped in a
-brand new `?cam=` fetch, so a lap always finished on a picture no older than the moment the card
-opened. A strip has nothing to splice onto — its last cell is only ever as fresh as the capture that
-built it, up to `SHOT_EVERY` old — and reproducing the old guarantee would mean carrying the
-per-frame fetch machinery this change exists to remove. One request a lap instead of one request a
-frame is the trade being made.
+**The clip's lap still ends on a freshly fetched live still — that guarantee was never given up,
+only reworked around the strip.** `js/clip.js`'s own header comment states the reason and it did not
+change: a card is opened to answer "is it like this now", and a lap that stopped on the strip's own
+newest cell would answer with a picture up to `SHOT_EVERY` (30 min) old, not with now. The lap is
+`n + 1` positions — cells `0..n-1` off the strip, then position `n`, the live still — the same shape
+the old per-frame version gave it before the strip existed. Entering position `n` drops the tile's
+`.strip` class, which clears the strip's own `width` and `transform` along with it, so the live
+still draws at its own natural size rather than at strip scale and offset; leaving it restores both,
+and the `<img>`'s `src`. The strip is still the exact bytes the lap decoded when it started, cached
+under `?sheet=`'s own 900s window, so returning to it costs nothing. **This is the camera wall's one
+real trade-off, not the clip's.** `js/wall.js` dropped the live position on purpose: ninety tiles
+cannot each pay for a fresh `?cam=` fetch a second, and `paint()` keeps a tile's alert state current
+on every poll regardless, so a wall lap now ends on the strip's own newest cell rather than on a
+guaranteed-fresh picture. A station panel shows one camera, and one live still a second is one
+request — cheap enough to keep paying for.
 
-Second, `.camtile > img` needs `object-fit: fill` while a strip plays, not the `cover` it uses for a
-single still. A strip is one wide bitmap; `cover` scales it by a single factor and crops whatever is
-left over off its two outer edges — checked against the arithmetic, not by eye, that crop lands near
-the strip's own ends rather than at each cell's boundary once the strip holds more than one cell, so
-the two outermost frames lose most of their width and a neighbour's pixels bleed into the frame
-beside it everywhere else. `fill` scales width and height independently with no crop, and because
-the tile's box and the strip's bitmap both widen by the same cell count together, that scale factor
-repeats identically for every cell — the one `object-fit` value the width/transform stepping actually
-lines up against real cell boundaries under. The camera wall's tile is 4:3 while a cell is 16:9
-(`SHEET_W` x `SHEET_H`), so `fill` there is a real, visible trade: every frame in a playing lap is a
-mild, uniform horizontal stretch of itself rather than the clean crop a single still gets. The
-station panel's clip does not pay this cost — `.shotwrap` and `.shot` already agree with the strip at
-16:9, so `fill` and `cover` produce the identical picture there, and `fill` is used anyway for
-symmetry with the wall and so neither box depends on that coincidence continuing to hold. This is a
-human-eyes check, noted here for whoever looks at the wall next: a played lap should read as a
-picture that moves, not as a picture that visibly stretches sideways twelve times a minute.
+**`object-fit: fill` is still what a strip needs while it plays, on both the wall and the clip, even
+though `.camtile` now matches a cell's own 16:9 shape.** A strip is one wide bitmap; `cover` scales
+it by a single factor and crops whatever is left over off its two outer edges — checked against the
+arithmetic, not by eye, that crop lands near the strip's own ends rather than at each cell's
+boundary once the strip holds more than one cell, so the two outermost frames lose most of their
+width and a neighbour's pixels bleed into the frame beside it everywhere else. `fill` scales width
+and height independently with no crop, and because the box and the bitmap both widen by the same
+cell count together, that scale factor repeats identically for every cell — the one `object-fit`
+value the width/transform stepping actually lines up against real cell boundaries under. With the
+wall tile now the same 16:9 as a cell, `fill` has nothing left to stretch and is a plain no-op there,
+same as it already was on the clip's own box — but the reasoning above is what makes that hold
+regardless of whether the two shapes happen to agree, not the agreement itself, so `fill` stays.
 
 **`.camtile`'s border went from `var(--outline)` to `transparent`, unrelated to the strip itself.**
 Colouring the border while a tile's skeleton is still shimmering, or once it has settled on nothing

@@ -722,12 +722,14 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   match. `gen` catches that case. `stop()` bumps it on every call, so a stale run can never match
   again.
 - **The lightbox reads its camera from `data-clip`, not from the clicked image's `src`.** The panel
-  clip plays a strip (see the `?sheet=` gotcha above): once a lap is running, `img.src` is the
-  strip's own URL, `api.php?sheet=<id>`, for as long as the card stays open — never a `?cam=` URL at
-  all. Matching `?cam=` against that src does not merely fail most of the time, as it did when the
-  clip rewrote `src` to an archived frame every second; it fails every time a strip is playing. That
-  opened a lightbox with no scrubber, no compare and no warning glyph. Only the table's "show image"
-  button has no such wrapper, and it keeps the old path.
+  clip plays a strip for its archived cells (see the `?sheet=` gotcha above) but still ends every
+  lap on a fresh live still, so `img.src` cycles between the strip's own URL and a `?cam=<id>` one
+  every few seconds for as long as the card stays open — matching `?cam=` against whatever `src`
+  happens to be showing catches the camera on some ticks and misses it on others, which is worse
+  than failing outright: a match that sometimes works reads as a bug in the lightbox, not as a wrong
+  approach. That is what opened a lightbox with no scrubber, no compare and no warning glyph before
+  `data-clip` replaced it. Only the table's "show image" button has no such wrapper, and it keeps
+  the old path.
 - **`.stage` is exactly the picture's box, and nothing that sits beside the picture may live in it.**
   `.ab` is `inset: 0` of `.stage` and `.abgrip` spans its full height — that is what lines the two
   A/B halves up pixel for pixel, and it holds only while `.stage` is the frame and nothing else. The

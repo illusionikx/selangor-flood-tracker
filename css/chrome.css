@@ -617,10 +617,15 @@ table.data .dash { color: var(--outline); }
    still shimmering its skeleton, or has settled quiet with nothing to report, reads as a frame
    around empty space rather than as a picture. `transparent` keeps the 2px reserved — so nothing
    shifts once a picture or a `.t-now`/`.t-soon` colour arrives — while showing nothing until one of
-   those two classes actually has something to say. */
+   those two classes actually has something to say.
+   `aspect-ratio: 16 / 9`, not the `4 / 3` this carried while a tile only ever held a single still.
+   Every camera measured publishes 1280x720 — `SHOT_W` in shots.php is 1280, and a strip's own cell
+   (`SHEET_W` x `SHEET_H`) is 480x270, the same 16:9 at a smaller scale. Matching the box to that
+   shape is what lets `.camtile.strip > img` below use `fill` with nothing to reconcile: a mismatched
+   box was forcing a real stretch on a widened strip, and a same-shaped one makes `fill` a no-op. */
 .camtile {
   position: relative; display: block; padding: 0; overflow: hidden; cursor: pointer;
-  aspect-ratio: 4 / 3; border: 2px solid transparent; border-radius: 10px;
+  aspect-ratio: 16 / 9; border: 2px solid transparent; border-radius: 10px;
   background: var(--hover); color: var(--on-surface); text-align: left;
 }
 /* A camera JPS publishes with no coordinate at all — see js/wall.js's tileHtml() and CAM_FIX's own
@@ -636,11 +641,12 @@ table.data .dash { color: var(--outline); }
    `--i` of them moved past the left edge to show cell `--i`. `height: 100%` above still applies —
    only `width` grows, so nothing here needs the aspect-ratio fix css/base.css's matching rule
    carries for js/clip.js, since `.camtile > img` never relied on `aspect-ratio` for its height in
-   the first place. `object-fit: fill` is not decorative: see the long comment beside
-   `.shotwrap.strip .shot` in css/base.css for why `cover` bleeds neighbouring cells into each other
-   on a widened strip. Cells here are 16:9 (SHEET_W x SHEET_H in shots.php) inside a 4:3 tile, so
-   `fill` shows every cell as a plain non-uniform stretch of itself — a real, accepted trade-off,
-   not a bug, and the reason to check by eye once this ships. */
+   the first place. `object-fit: fill` is not decorative, even though `.camtile` is now 16:9 and a
+   cell (`SHEET_W` x `SHEET_H` in shots.php) already is too, which makes `fill` a no-op here rather
+   than a visible stretch: see the long comment beside `.shotwrap.strip .shot` in css/base.css for
+   why `cover` bleeds neighbouring cells into each other on a widened strip regardless of whether the
+   box happens to match a cell's shape today. Keeping `fill` is what makes that true independent of
+   `.camtile`'s own ratio, rather than leaning on the two currently agreeing. */
 .camtile.strip > img {
   width: calc(var(--n, 1) * 100%);
   transform: translateX(calc(var(--i, 0) / var(--n, 1) * -100%));

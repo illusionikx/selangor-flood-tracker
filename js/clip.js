@@ -2,7 +2,11 @@
  *
  * A card used to show one still and call it current at any age. Three hours is the line, because
  * that is the question a flood camera is opened with — "is it like this now" — and a picture from
- * yesterday answers a different one.
+ * yesterday answers a different one. That question is also why a lap never stops on an archived
+ * frame: the last position in every lap is a fresh live still, not the newest cell of the strip,
+ * because the strip's own newest cell is only ever as fresh as the last capture — up to SHOT_EVERY
+ * (30 min) old in shots.php — and a lap that stopped there never showed the "now" the card was
+ * opened to answer.
  *
  * No controls. The lightbox holds the transport, the scrubber and the compare divider, and two
  * places to learn one control is one too many. This is a picture that moves.
@@ -13,13 +17,17 @@
  * its place instead. That is the whole reason this is a module with state rather than four lines in
  * popup.js.
  *
- * The clip plays a strip now, not a list of individually-fetched frames. shots.php builds one
- * derived image holding the whole window side by side (see the comment above buildSheet() there),
- * and this module reads how many cells it holds straight off the decoded picture's own width —
- * `naturalWidth / SHEET_W` — the same trick js/wall.js uses for the camera wall. One request per
- * open card instead of six or seven, and no per-frame src rewrite once it is playing.
+ * The clip plays a strip for its archived cells, not a list of individually-fetched frames.
+ * shots.php builds one derived image holding the whole window side by side (see the comment above
+ * buildSheet() there), and this module reads how many cells it holds straight off the decoded
+ * picture's own width — `naturalWidth / SHEET_W` — the same trick js/wall.js uses for the camera
+ * wall. One request for the whole archived stretch of the lap, not six or seven — plus the one live
+ * request every lap always paid, at the position that answers "now". js/wall.js dropped that live
+ * position on purpose: ninety tiles cannot each pay for a fresh still, and paint() over a poll is
+ * fresh enough for a wall. A station panel shows one camera, and one live still is one request — so
+ * this module keeps paying it.
  */
-import { CLIP_WIN, CLIP_MS, SHEET_W } from './config.js';
+import { CLIP_WIN, CLIP_MS, SHEET_W, camSrc } from './config.js';
 import { noSec, parseMY, ago } from './util.js';
 
 const CLIP_HOURS = CLIP_WIN / 3600;   // the caption names the window; keep the two numbers tied
@@ -27,9 +35,12 @@ const CLIP_HOURS = CLIP_WIN / 3600;   // the caption names the window; keep the 
 let id = null;      // camera id the running loop belongs to, or null
 let gen = 0;        // bumped on every stop(); a stale await compares against this, not against id
 let n = 0;          // cells in the current strip; 0 means no strip is playing
-let at = 0;         // position in the strip, 0..n-1
+let at = 0;         // position in the lap, 0..n-1 a strip cell, n the live still
+let live = '';      // the live still's URL for this camera, fixed for the life of the loop
 let timer = null;
 let img = null, cap = null, capText = '';
+
+const sheetUrl = () => `api.php?sheet=${id}`;
 
 export function stop() {
   clearInterval(timer);
@@ -38,17 +49,39 @@ export function stop() {
   gen += 1;
   n = 0;
   at = 0;
+  live = '';
   img = cap = null;
   capText = '';
 }
 
+/* One lap is n+1 positions: cells 0..n-1 off the strip, then position n, the live still — the same
+   shape `srcAt()` gave this module before the strip existed, kept because the reason for it did not
+   change. Two branches do real work; every other step is just `--i`.
+   Entering the live position (`at === n`) clears `.strip`, which clears the strip's own `width` and
+   `transform` along with it — css/chrome.css's and css/base.css's `.strip` rules are the only place
+   either is set, so removing the class is the whole of "restore the live still to its own size and
+   position" and there is nothing left over to reset by hand.
+   Leaving it (`at === 0`, which by construction only ever follows `at === n`) restores both: the
+   class, and the `<img>`'s own `src`. The strip itself is still the exact bytes this loop decoded
+   when the lap started — `?sheet=` is cached, not re-encoded, inside its own 900s window (see
+   CLAUDE.md) — so coming back to it costs nothing. */
 function tick() {
   /* A frame can fail. camImg()'s onerror replaces the failed <img> with a plain div, so the node
      this loop writes to can vanish between one tick and the next. Writing to a detached element
      does nothing useful and never recovers on its own, so stop and let the next openSide() rebuild
      the card and start a clean loop. */
   if (!img || !img.isConnected) return stop();
-  at = (at + 1) % n;
+  const wrap = img.parentNode;
+  at = (at + 1) % (n + 1);
+  if (at === n) {
+    wrap?.classList.remove('strip');
+    img.src = live;
+    return;
+  }
+  if (at === 0) {
+    wrap?.classList.add('strip');
+    img.src = sheetUrl();
+  }
   img.style.setProperty('--i', at);
 }
 
@@ -60,16 +93,22 @@ function tick() {
    poll and then go empty for as long as the card stayed open.
    A rebuild hands this a brand new `<img>` with none of the strip machinery on it — `render()`
    replaces the card's markup wholesale, so `img.src`, the `.strip` class and the `--n`/`--i` custom
-   properties all have to be repainted here, not just the frame position. */
+   properties all have to be repainted here, not just the frame position. The fresh node carries no
+   `.strip` class of its own, which is already the right state for a rebind that lands on the live
+   position (`at === n`) — only the archived-cell branch below has anything to add. */
 function bind(box) {
   img = box.querySelector('img.shot');
   cap = box.querySelector('.clipcap');
   if (img && n >= 2) {
-    img.src = `api.php?sheet=${id}`;   // cached from the strip that got us here — this paints, it
-                                        // does not cost a real fetch inside SHEET's 900s window
-    box.classList.add('strip');
-    img.style.setProperty('--n', n);
-    img.style.setProperty('--i', at);
+    if (at === n) {
+      img.src = live;
+    } else {
+      img.src = sheetUrl();   // cached from the strip that got us here — this paints, it does not
+                               // cost a real fetch inside SHEET's 900s window
+      box.classList.add('strip');
+      img.style.setProperty('--n', n);
+      img.style.setProperty('--i', at);
+    }
   }
   if (cap) cap.textContent = capText;
 }
@@ -82,6 +121,7 @@ export async function start(root, cam) {
   stop();
   id = want;
   const myGen = gen;   // this run's generation; stop() bumps gen, id alone cannot tell two runs apart
+  live = camSrc(cam);
   bind(box);            // paints nothing yet — n is still 0 here — but wires up img/cap for idle()
 
   /* A detached probe, never the card's own `<img>`. camImg()'s template wires that element's
@@ -91,7 +131,7 @@ export async function start(root, cam) {
      error placeholder just because this camera has not built three hours of history yet. Probing
      off to the side keeps a failure silent and leaves the still exactly as it was. */
   const probe = new Image();
-  probe.src = `api.php?sheet=${id}`;
+  probe.src = sheetUrl();
   try {
     await probe.decode();
   } catch {
