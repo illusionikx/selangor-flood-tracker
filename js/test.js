@@ -40,6 +40,11 @@ const STORM_BANDS = [[10, 75], [20, 42], [35, 18], [55, 4]];  // ≤ km → mm/h
 // decided — see the site pass at the foot of seedTest() for why the camera path needs its own knob.
 const CAM_EVERY = 3;
 
+/* Test mode fakes an outage too. Anything that alerts needs a knob here or it ships unseen, and this
+   one is otherwise visible only while JPS is actually down — which is a few hours a year, and never
+   when somebody is looking at the panel on purpose. The id must be a key of NOTICE in config.js. */
+const TEST_NOTICE = { id: 'publicinfobanjir', regions: ['Kuala Lumpur', 'Putrajaya'] };
+
 /* Every fake sample carries the status it was at, the third element real samples get from
    `sparkPoints()` in api.php. Without it the graph's hover readout printed a faked flood in plain
    ink, because the readout colours a sample by its own code and a two-element sample has none —
@@ -105,6 +110,11 @@ function drown(s) {
 
 export function seedTest(data) {
   let rivers = 0, sirens = 0, rains = 0, gauges = 0, offline = 0;
+
+  /* The client's copy only, exactly like every other fake here. `state.notices` is overwritten and
+     not appended to, so a real outage during a drill is replaced rather than doubled. The next poll
+     with the switch off restores whatever the payload actually said. */
+  state.notices = [TEST_NOTICE];
 
   /* Knock stations off the network first, not last. Every branch below requires `s.online`, so an
      offlined station simply falls through and stays offline — which means the two fakes can never
