@@ -6813,6 +6813,102 @@ and the weather block states no river level.
 - No screenshots. Every row leads with the live glyph or the live pin. Neither can go stale the
   way a picture of an old app bar can.
 
+## Weather joins the station card, and MET warnings join the alert surfaces
+
+### The card section
+
+Every station card now carries a weather section: three cells above the sensor list. The first cell
+gives the high and low for the day. The second gives the current sky. The third gives the outlook
+for the next three hours. The section appears on every card, not on rivers alone, because the same
+sky sits over a rain gauge, a siren and a camera alike.
+
+232 rain gauges already measure the rain that fell. None of them says what arrives next. A reading
+states the past. A forecast is the one part of this section a sensor cannot give, and lead time is
+the reason to build it.
+
+### Nearest point, not an average
+
+MET publishes a category — clear, rain, or heavy rain — not a number. A category cannot take an
+average. Kriging three categories invents a reading nobody published, so `metNearest()` in
+`api.php` picks the single nearest point instead. That is Thiessen assignment: the same answer a
+Voronoi tessellation gives, without building the polygons.
+
+### A flat radius, not a cell-scaled one
+
+`MET_KM` caps the join at a flat 15 km. A cutoff scaled to the coverage cell around each point came
+first, and it failed in both directions: it accepted a station 22.8 km from its point in a sparse
+district, and it silenced stations 3 km from a dense cluster of points in central Kuala Lumpur.
+Point density records where MET chose to build, not how far its weather reaches. 15 km comes from
+the decorrelation distance for a 3-hour rainfall field, and sits well inside it. See the gotcha in
+`CLAUDE.md` for the full measurement.
+
+### The span runs first to last
+
+`metSpan()` in `sources.php` finds the worst rung MET publishes across the three-hour window and
+reports the first step it appears in and the last. 12% of wet markers hold the worst rung in more
+than one block on a live page. A span built from the first unbroken run alone ends the rain too
+early.
+
+### The Later cell follows the span
+
+The third cell on the card once read the one-hour step (`hr1`) alone, while the span still drove the
+sentence under it. That put `Later: Clear` above the words `Rain 12:00, past 13:00` on the same
+card, one cell arguing with its own sentence. The cell now reads the same rung the span reports, so
+the cell and the sentence describe one window and agree.
+
+### The dropped attribution
+
+The header once printed the MET point and the distance to it: `Subang Jaya · 3.4 km`. It is gone,
+at the request of the person reading it, after they saw it on screen. The cost is real: the card now
+states a local forecast from a point up to 15 km away, with nothing on screen to weigh that claim
+against. The point for ULU YAM sits 11.7 km off, over high ground. `at` and `km` still ride in the
+payload, so the line can return in one line of markup. Record this as a trade made on purpose, not
+as a gap nobody noticed.
+
+### A moon after dark, MYT
+
+A clear sky after 19:00 draws a moon rather than a sun. The hour that decides it is Malaysian, never
+the hour where the reader sits, because every other time on this page already reads that way. A moon
+next to a reading stamped 14:00 contradicts it.
+
+### A forecast, not a thermometer
+
+The two temperatures on the card are the forecast high and low for the day, not a live reading. MET
+publishes no free observed temperature for these districts, so the card cannot show one. The word
+"today" belongs beside the numbers for that reason.
+
+### Warnings from MET
+
+A warning feed now sits above the station list in `#side`, and its tiles lead the header ticker.
+Both surfaces open the same modal with the full text. The panel row clips to one line. The ticker
+tile carries the whole sentence, because the strip has no line under it to crowd.
+
+The feed carries nine fields and not one of them is a coordinate. The only way to place a warning
+is to read its own text, so `metWarnings()` in `sources.php` does. A marine row survives only by
+naming the Straits of Melaka, the stretch of sea this coast sits on. A land row survives only by
+naming a place this map covers, including `west coast` and `pantai barat`, since MET sometimes
+names a warning by coast rather than by state.
+
+A warning for the whole peninsula still drops. That gap stays open on purpose: widening the match
+to `semenanjung` or `peninsular` also opens the door to warnings about every other state on the
+peninsula.
+
+A warning moves no count: not the alert number, the icon badge, the app-bar glyph colour, or the
+toast. That separation is what let this surface pass the alert design standard. A warning is a
+claim MET makes about an area. A station reading is a claim this app makes about a sensor. Merging
+the two asserts something the app cannot observe.
+
+`data.gov.my` publishes three weather endpoints: `forecast`, `warning` and `warning/earthquake`,
+and no nowcast endpoint at all. This app never calls `warning/earthquake`. `WARN_DROP` also drops
+any seismic row that turns up inside `warning` itself. A seismic row says nothing about a flood.
+
+### Not built
+
+- No map layer and no heat layer for weather. The map already carries two heat layers that are one
+  choice between them, and a third layer over the same sky adds noise, not information.
+- Nothing on a station card alerts from weather. No sensor count, badge or ticker entry reads the
+  weather section. That question has not gone through the alert design standard yet.
+
 ## Monitoring Station and Monitoring Node replace "mast"
 
 A place that carries several sensors was a `mast`. The word names a pole. The hardware is usually a
@@ -6857,3 +6953,42 @@ of view. A manual row for a sentence that reads itself is a row that can go stal
 The line stays on screen. Only the row about it is gone. This change touches no part of the rule that a silenced alarm keeps
 two always-visible indications. The `Ignored sensors` panel in the drawer and that count line are
 both still there, and Help still describes the panel.
+
+## About takes the same voice as Help
+
+Help became a manual. About kept a second voice for one more change, and that was the fault. One
+pane held two registers. It joked in the first half and stated facts in the second. A reader cannot
+tell which half is careful. The jokes went. Every fact stayed.
+
+The `Origin` section holds the story. One question, and three government websites. An AI that wrote
+most of the code. Selangor first and Kuala Lumpur second. A shuffled batch of camera coordinates
+that took a visit, or a read of the picture, to settle. Each of those facts is still on the page,
+in plain sentences.
+
+### Headings
+
+Four headings became seven, and each one names a thing rather than asking about it.
+
+| before | after |
+|---|---|
+| `How this was built` | `Origin` |
+| (no heading) | `Warranty` |
+| (no heading) | `Privacy` |
+| (no heading) | `Repository` |
+| `Where this data comes from` | `Data sources` |
+| `Credits` | `Credits` |
+| `Developer` | `Developer` |
+
+The warranty, the privacy statement and the two repository links sat under no heading at all. A
+reader scanning for the privacy statement had to read the pane to find it.
+
+### One stale sentence
+
+`Each station popup names the feed its reading came from` outlived the popup by several changes.
+There is no map popup in this app. The sentence names `Details` now, the same control Help names.
+
+### Trade-offs accepted
+
+- The pane reads flatter. `This site is vibe coded` and `The rest I geoguessed` were the two lines
+  people remembered, and neither survives a manual register.
+- Seven headings on a pane that had four. The three new ones cover text that was already there.

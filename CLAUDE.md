@@ -15,7 +15,7 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | file | role |
 |---|---|
 | `api.php` | server-side proxy + cache + source merge + poll history + camera image proxy + rate-limited `?force=1` + place lookup (`?place=`, proxies Nominatim) |
-| `sources.php` | scrapers for the two HTML-only upstreams (national portal, JPS WP) |
+| `sources.php` | scrapers for the two HTML-only upstreams (national portal, JPS WP) and the three MET feeds (nowcast, forecast, warning) |
 | `shots.php` | camera archive: capture, retention tiers, lookup, and the on-request strip (`buildSheet()`) the wall and the clip play. Required by `api.php` |
 | `shots-test.php` | `php shots-test.php` — one of two runnable checks. Guards retention. Exercises `pruneShots()` |
 | `index.html` | markup only — no inline CSS or JS |
@@ -24,7 +24,7 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `css/chrome.css` | page furniture: app bar, status dot, drawer, legend, splash |
 | `css/map.css` | Leaflet overrides, pins, cluster badges, popup template |
 | `js/app.js` | entry point — decides what happens on landing, nothing else |
-| `js/config.js` | constants (kinds, palettes, thresholds, tile styles). No imports. |
+| `js/config.js` | constants (kinds, palettes, thresholds, tile styles, `WEATHER`). No imports. |
 | `js/state.js` | `state` (data + hereAt) and the `PREFS` blob. Breaks module cycles. |
 | `js/util.js` | pure helpers + `hasInfo()` / `color()` / `isIgnored()` |
 | `js/stations.js` | queries over the station set (`nearestOf`, `nearestCam`, `byId`) |
@@ -33,10 +33,10 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `js/popup.js` | popup + meter + gauge + sparkline templates |
 | `js/sparktip.js` | the hover/tap readout on every graph. One delegated listener, no imports |
 | `js/render.js` | rebuilds markers and heat points; drawer summary table |
-| `js/alerts.js` | "On alert": the app bar's warning glyph, the list it opens in `#side`, the icon badge, the red favicon |
+| `js/alerts.js` | "On alert": the app bar's warning glyph, the list it opens in `#side`, the icon badge, the red favicon, and the MET warning cards above that list |
 | `js/table.js` | the all-stations table dialog, grouped district → mast → sensor |
 | `js/locate.js` | geolocation and the "You are here" marker |
-| `js/ticker.js` | header alert marquee — measured, seamless, speed scales with the alert count |
+| `js/ticker.js` | header alert marquee — measured, seamless, speed scales with the alert count, and draws the MET warning tiles into the strip |
 | `js/timeline.js` | camera archive replay + A/B compare, inside the lightbox and nowhere else |
 | `js/clip.js` | the station panel's 3-hour camera clip — no controls, that is the lightbox's job |
 | `js/toast.js` | desktop-only "new alert since last poll" toast |
@@ -84,6 +84,20 @@ that one is not a flood-data source and joins nothing here; see the `## api.php`
 | `infobanjirjps.selangor.gov.my/JPSAPI/api/` | Selangor: everything, incl. the only cameras, sirens and gauges | JSON |
 | `publicinfobanjir.water.gov.my` | national water levels + thresholds; **authoritative reading** | HTML table |
 | `infobanjirjpskl.water.gov.my` (SPHTN) | KL + Putrajaya water level and rainfall | HTML table |
+| `met.gov.my/nowcasting` | rain now and every 30 min to +3 h, 294 points | HTML with baked-in JS |
+| `api.data.gov.my/weather/forecast` | daily lowest and highest temperature, by district | JSON |
+| `api.data.gov.my/weather/warning` | warnings from MET, with a validity window | JSON |
+
+MET Malaysia adds three more feeds, all weather rather than water. They join no water reading and
+override no station.
+
+The nowcast and the forecast each attach to a station. The nowcast attaches by nearest point. The
+forecast attaches by district name.
+
+The warning feed attaches to nothing. It is a claim about an area, not about one station. It sits
+above the alert list and on the moving headline. It never sits on a card.
+
+All three requests run from PHP. The browser never contacts a MET host.
 
 ### 1. JPS Selangor API
 
@@ -1027,6 +1041,44 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   `rings()` in `water-build.php` chains member ways end to end, flipping one that joins backwards,
   and keeps only what closes. An open chain means the relation is broken upstream, and the script
   drops it rather than guess at a shape. Inner rings become holes, so an island stays dry.
+- **The MET nowcast page has no endpoint to find.** It renders its Leaflet map on the server and
+  bakes all 294 points into `L.marker(...)` statements. There is no request to intercept, so
+  `metPoints()` parses the JavaScript source with a regex. `data.gov.my` publishes three weather
+  endpoints — `forecast`, `warning` and `warning/earthquake` — and **no nowcast**, so this scrape is
+  not a shortcut around a clean API. Nobody needs to search for that endpoint again.
+  A marker whose wording this parser does not know is **dropped whole**, and never read as clear
+  weather: `metRung()` returns -1 and the marker vanishes, so `sources.met.parsed` falls and somebody
+  looks. Reading an unknown word as "no rain" would hide a layout change behind calm weather, which
+  is the one way a scraper must not fail.
+- **`MET_KM` is a flat 15 km, not a radius scaled to how far each point reaches.** A cell-scaled cutoff
+  came first, sized to the area a point covers, and it failed in both directions. Sabak Bernam sits
+  in a 28.5 km cell. A cell-scaled rule there accepts a station 22.8 km from its point — the weakest
+  claim on the map, admitted only because MET built nothing nearby. Central Kuala Lumpur holds
+  points 0.1 km apart, two MET offices and a convention centre. The same rule silences stations 3 km
+  out, where the reading is most reliable. Point density records where MET chose to build. It says
+  nothing about weather. 15 km comes from the decorrelation distance for a 3-hour rainfall field,
+  about 26 km, and sits safely inside it. **A line that claims rain falls at this moment needs about
+  3 km instead.** Decorrelation distance falls with the period measured. Reusing `MET_KM` for an
+  instant claim overstates it by about five times.
+- **The warning feed carries no coordinates.** Nine fields, and none of them is geographic. The only
+  way to place a warning is to read its text, so `metWarnings()` in `sources.php` does exactly that.
+  A marine row drops unless it names the Straits of Melaka (`WARN_SEA_KEEP`). Port Klang stands on
+  those straits, so rough water there reaches this map. Water off Phuket, Samui, Layang-Layang,
+  Palawan and Sulu does not. Measured on the live feed: three live warnings, all marine, and the
+  rule kept exactly one. A land row must name a place this map covers (`WARN_HERE`). That list
+  includes `west coast` and `pantai barat`. MET names some warnings by coast rather than by state,
+  and Selangor sits on the west coast. **A warning for the whole peninsula still drops.** That gap
+  is open on purpose: adding `semenanjung` and `peninsular` also lets in warnings about every other
+  state. Name the gap so the next reader sees a decision, not a bug. The filter reads English and
+  Malay text alike, because MET writes some rows in one language only.
+- **A MET warning counts toward nothing.** It draws two surfaces: a section above the station list
+  in `#side`, and tiles on the ticker. Both open the same modal, with the full text. Neither surface
+  moves a count: not the alert number, the icon badge, the app-bar glyph colour, or the toast. The
+  panel shows a warning with no tally beside it claiming a station is in trouble. That separation is
+  the whole reason this surface passed the alert design standard in `docs/FEATURES.md`. A warning is
+  a claim MET makes about an area. A station count is a claim this app makes about a sensor. Merging
+  the two makes the app assert something it cannot observe. Anything that later wants a warning to
+  raise the count goes through the alert design standard first.
 ## Conventions
 
 - **Anything that alerts is checked against the alert design standard** in
@@ -1238,6 +1290,20 @@ curl -sk -o /dev/null -w '%{http_code} %{content_type}\n' \
 # non-empty `places` array on a real place name.
 curl -sk "https://flood-exp.test/api.php?place=Bandar+Utama" \
      | php -r 'echo json_encode(json_decode(stream_get_contents(STDIN),true)),"\n";'
+```
+
+```bash
+# Are all three weather feeds contributing? parsed:0 means MET moved something.
+curl -sk https://flood-exp.test/api.php | php -r '$s=json_decode(stream_get_contents(STDIN),true)["sources"];
+echo json_encode(["met"=>$s["met"],"metday"=>$s["metday"],"metwarn"=>$s["metwarn"]]),"\n";'
+
+# No station may hold a MET point beyond MET_KM.
+php -r '$p=json_decode(file_get_contents(".cache.json"),true);
+echo count(array_filter($p["stations"],fn($s)=>($s["met"]["km"]??0)>15))," beyond MET_KM\n";'
+
+# Which warnings survive the geography filter, and how many the feed offered.
+curl -sk https://flood-exp.test/api.php | php -r '$p=json_decode(stream_get_contents(STDIN),true);
+foreach($p["warnings"] as $w) echo substr($w["title"],0,70),"\n";'
 ```
 
 There is otherwise no test suite. Changes are verified by linting, syntax-checking the modules,
