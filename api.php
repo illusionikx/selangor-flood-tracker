@@ -602,6 +602,49 @@ function serveFromCache(int $age, bool $mine, bool $force): bool {
 }
 
 /**
+ * What a page-cache row becomes after a fetch attempt. Returns [write the row, the body to write].
+ *
+ * This server stamps every page it asked for, whether or not that page answered. A failure keeps the
+ * copy already stored. Stamping only a success leaves a dead upstream stuck. Its ts never advances,
+ * so $want selects it on every rebuild, and each rebuild pays the full CURLOPT_TIMEOUT for an answer
+ * that is not coming. The KL rainfall table hung that way for four days and put 25 seconds on every
+ * poll, which is most of what a reader waited for.
+ *
+ * This server never stamps a page it did not ask for. A new stamp on a fresh row would push its next
+ * fetch out forever.
+ *
+ * Offline like forceAllowed() and serveFromCache(), and for the same reason. It decides how often
+ * this server contacts an upstream.
+ */
+function pageRow(bool $asked, string $got, string $had): array {
+    return [$asked, $got !== '' ? $got : $had];
+}
+
+/**
+ * Does this body carry the kind of document the key names?
+ *
+ * A status code cannot answer that. The national portal serves a maintenance window as a 320-byte
+ * `Notis Gangguan` notice under HTTP 200, and pageRow() stores whatever it is handed. So the notice
+ * replaced two good tables, the readings for KL and Putrajaya went with them, and every counter
+ * stayed quiet because the fetch had in fact succeeded.
+ *
+ * A body that fails here is treated as a fetch that never answered. The stored copy stays, the row
+ * is stamped so the retry backs off, and the key lands in sources.stale where a reader can see it.
+ *
+ * Each test asks only what kind of document arrived. The parsers still do the reading. `met-now` is
+ * tested on the map scaffolding rather than on a marker, because a nowcast with nothing to report is
+ * a real state and must not read as an outage.
+ */
+function pageHasData(string $key, string $body): bool {
+    if ($body === '') return false;
+    return match ($key) {
+        'met-day', 'met-warn' => json_decode($body) !== null,
+        'met-now'             => str_contains($body, 'map.setView'),
+        default               => str_contains($body, '<tr'),   // the national and KL tables
+    };
+}
+
+/**
  * Normalize and validate a place query. Returns the normalized string, or null when it is unusable.
  *
  * Separate from the endpoint so the self-check can exercise it without a network call, exactly as
@@ -668,6 +711,25 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
     $ok('a cache at exactly TTL rebuilds',         serveFromCache(TTL, true, false) === false);
     $ok('a stale cache that lost the lock waits',  serveFromCache(TTL + 1, false, false) === true);
     $ok('a forced loser never rebuilds',           serveFromCache(TTL + 1, false, true) === true);
+
+    echo "\npageRow():\n";
+    $ok('a page that answered is stored',          pageRow(true, 'new', 'old') === [true, 'new']);
+    $ok('a page that failed is stamped, old copy', pageRow(true, '', 'old') === [true, 'old']);
+    $ok('a first fetch that failed is stamped',    pageRow(true, '', '') === [true, '']);
+    $ok('an unasked page is never stamped',        pageRow(false, '', 'old')[0] === false);
+
+    echo "\npageHasData():\n";
+    $ok('a table page is data',          pageHasData('nat-SEL', "<table><tr class='item'><td>1</td></tr>") === true);
+    // The 320-byte Notis Gangguan the national portal serves under HTTP 200 while it is down.
+    $ok('a notice page is not data',     pageHasData('nat-SEL', '<html><title>Notis Gangguan</title></html>') === false);
+    $ok('an empty body is not data',     pageHasData('nat-SEL', '') === false);
+    $ok('valid JSON is data',            pageHasData('met-warn', '[{"a":1}]') === true);
+    $ok('an empty JSON list is data',    pageHasData('met-day', '[]') === true);
+    $ok('a notice is not JSON',          pageHasData('met-day', '<html>Notis Gangguan</html>') === false);
+    $ok('the nowcast map is data',       pageHasData('met-now', '<script>map.setView([3,101],8)</script>') === true);
+    // A quiet nowcast publishes the map and no markers. That is weather, not an outage.
+    $ok('a nowcast with no markers is data', pageHasData('met-now', 'map.setView([3,101],8)') === true);
+    $ok('a nowcast notice is not data',  pageHasData('met-now', '<html>Notis Gangguan</html>') === false);
 
     echo "\nplaceQuery():\n";
     $ok('a plain query normalizes',    placeQuery('Bandar Utama') === 'bandar utama');
@@ -1134,6 +1196,11 @@ function fetchAll(array $urls, int $concurrency = 20, bool $json = true): array 
         while ($info = curl_multi_info_read($mh)) {
             $ch = $info['handle'];
             $body = curl_multi_getcontent($ch);
+            /* An error page is not data. Upstream answers 404 and 500 with a full HTML page, and
+               without this the page cache stores one under the name of a table, `?cam=` serves one
+               as image/jpeg, and pageRow() writes it over the good copy it already had. Every caller
+               here already treats an empty body as a failed fetch, so this reuses that path. */
+            if (curl_getinfo($ch, CURLINFO_HTTP_CODE) >= 400) $body = '';
             $out[$handles[(int)$ch]] = $json ? json_decode($body, true) : $body;
             curl_multi_remove_handle($mh, $ch);
             curl_close($ch);
@@ -1214,10 +1281,21 @@ foreach ($detailUrls as $u) $details[$u] = json_decode($raw[$u] ?? '', true);
 
 $keep = $db->prepare('INSERT OR REPLACE INTO page (url, ts, body) VALUES (?, ?, ?)');
 $pages = [];
+/* Which pages this server asked for and did not get. pageRow() stamps a failure, so the `ts` column
+   no longer shows a dead upstream — it advances on every attempt whether or not the page answered.
+   That is the point of the stamp and it costs the one signal a reader had. This list is the
+   replacement, and it rides in `sources` next to the parse counters for the same reason: a scraped
+   feed fails silently, so the diagnostics have to say so. A key here means the map is drawing a
+   stored copy of that table. `kl.parsed` cannot say it, because a stored copy parses as well as a
+   fresh one. */
+$pagesStale = [];
 foreach ($extraUrls as $k => $u) {
-    $body = $raw[$u] ?? '';
-    if ($body !== '') $keep->execute([$u, $now, $body]);
-    $pages[$k] = $body !== '' ? $body : ($stored[$u]['body'] ?? '');
+    $got = $raw[$u] ?? '';
+    if (!pageHasData($k, $got)) $got = '';        // a notice page is not a table — see above
+    [$write, $body] = pageRow(isset($want[$k]), $got, $stored[$u]['body'] ?? '');
+    if (isset($want[$k]) && $got === '') $pagesStale[] = $k;
+    if ($write) $keep->execute([$u, $now, $body]);
+    $pages[$k] = $body;
 }
 $page = fn(string $k) => $pages[$k] ?? '';
 
@@ -1360,7 +1438,9 @@ function klState(?string $district): string {
 // Adds Kuala Lumpur, which the Selangor API does not cover. Its catchment reaches into Selangor, so
 // some of its stations are ones we already hold: same mast, different id space (the two feeds share
 // no station codes at all), which is why the de-duplication is by position rather than by key.
-$kl = klStations(['kl-wl' => $page('kl-wl'), 'kl-rf' => $page('kl-rf')]);
+// The whole page set, because rainfall now arrives as one page per district and klStations() picks
+// its own keys out by prefix. See KL_RAIN in sources.php.
+$kl = klStations($pages);
 $klAdded = $klDupes = 0;
 foreach ($kl as $s) {
     foreach ($stations as $have) {
@@ -1649,6 +1729,8 @@ $payload = json_encode([
         'met'      => ['parsed' => count($metPts), 'matched' => $metMatched],
         'metday'   => ['parsed' => count($metDay), 'matched' => $metDayMatched],
         'metwarn'  => ['parsed' => count($metWarn)],
+        // Empty on a healthy poll. A key here names a table the map is drawing from a stored copy.
+        'stale'    => $pagesStale,
     ],
     // A regional notice, not a station reading. isHot() and every count in alerts() read the
     // station list alone, and this key feeds neither — see js/alerts.js for the rule.

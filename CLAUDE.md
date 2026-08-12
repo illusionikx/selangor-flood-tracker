@@ -129,9 +129,19 @@ every parameter combination tried. Not wired up; rainfall comes from the other t
 
 ### 3. JPS Wilayah Persekutuan / SPHTN — `sources.php`
 
-`WaterLevel/LatestData/All` and `Rainfall/LatestData/All` return HTML fragments. No `data-th` here,
-so columns are read by **position, guarded on row width** (14 cells for both). Coordinates appear
-only inside the row's `onclick="loadMapPage(lat, lng, …)"`.
+`WaterLevel/LatestData/All` and `Rainfall/LatestData/<district>` return HTML fragments. No `data-th`
+here, so columns are read by **position, guarded on row width** (14 cells for both). Coordinates
+appear only inside the row's `onclick="loadMapPage(lat, lng, …)"`.
+
+**Rainfall has no working `All` route, and must be fetched one district at a time.** That handler
+holds the connection open until the client gives up, and it has done so since 07/08/2026, while its
+water-level twin answers in 3.9 s on the same host. `KL_RAIN` in `sources.php` holds the ids, and
+`klStations()` merges the rows of every `kl-rain-*` page before it reads them. **The ids are not a
+range**: 1 to 11 are what the site's own dropdown offers, and 23, 24, 25 and 27 carry seven more
+stations — in Gombak, Pandan, Ampang and Bentong — that the dropdown never lists. Measured
+2026-08-12: 12 to 22, 28 and 30 answer 500, 26 and 29 answer 200 with no rows, and nothing from 31
+to 60 carries a row. Do not restore the `All` URL because it is one request rather than fifteen. It
+cost 25 s on every rebuild, which is the gotcha below.
 
 Also publishes its own trend arrow (`<img trend="Rising|Receding|No Change">`) — the only feed that
 does. **Not parsed.** It was read into `srcTrend` and never used, and both the parser and the field
@@ -350,6 +360,32 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
 - **The scrapers fail silently by design** — a layout change yields zero rows, not an error. The
   payload's `sources` counters (`kl.parsed/added`, `national.parsed/applied`) are the alarm: if
   `parsed` hits 0, a table moved. Check those before believing "the rivers went quiet".
+- **A page-cache row that never answers can never advance its own timestamp.** `$want` selects a page
+  whose stored `ts` is older than its TTL. The write used to run only on a non-empty body. So a dead
+  upstream re-entered `$want` on every rebuild. It then held a slot in the shared `curl_multi` batch
+  for the full `CURLOPT_TIMEOUT` of 25 s. A batch finishes no sooner than its slowest member, so one
+  hung page put 25 s on every cache miss. Measured: 0.13 s for a cached poll, 28.6 s for a rebuild,
+  and 45.1 s when the half-hourly camera capture landed in the same request.
+  `infobanjirjpskl.water.gov.my/Rainfall/LatestData/All` hung that way for four days.
+  `WaterLevel/LatestData/All` answered in 3.9 s on the same host through all of it. `pageRow()` stamps
+  every page the server asked for, answer or not, and keeps the stored copy on a failure. A dead page
+  now costs the timeout once per `SCRAPE_TTL` rather than once per rebuild. **Never stamp a page the
+  server did not ask for** — a stamp on a fresh row pushes its next fetch out forever. The stamp then
+  costs the one signal a reader had, because the `ts` column now advances whether or not the page
+  answered. **`sources.stale` is the replacement, and it is the alarm to read.** It lists the page
+  keys this server asked for and did not get, so a key there means the map is drawing a stored copy
+  of that table. The parse counters cannot say it — a stored copy parses as well as a fresh one, so
+  `kl.parsed` stayed above zero through the whole outage. `sources.stale` is empty on a healthy poll.
+  **A status code cannot decide what a body is, so `pageHasData()` decides it.** The national portal
+  serves a maintenance window as a 320-byte `Notis Gangguan` notice under **HTTP 200**, and that
+  notice overwrote the stored tables for KL and Putrajaya while this work was measured.
+  `national.applied` fell from 71 to 47 and nothing said why, because the fetch had succeeded. A
+  table page must hold a `<tr`, `met-day` and `met-warn` must decode as JSON, and `met-now` must hold
+  `map.setView`. **`met-now` is tested on the map scaffolding and never on a marker** — a nowcast
+  with nothing to report is weather, not an outage. `fetchAll()` covers the other shape and blanks
+  any status at 400 or above, which also stops `?cam=` serving an HTML error page as `image/jpeg`.
+  The first guess named the camera strips and was wrong. `buildSheet()` runs from `?sheet=` alone,
+  never from the payload route, and one strip takes 0.054 s.
 - **No `fastcgi_finish_request` under Herd** — the SAPI is `cgi-fcgi`, so there is no way to close
   the connection and keep working. Stale-while-revalidate is impossible in-process; the page cache
   is the workaround. A cron hitting `api.php` every 5 min would keep the cache warm for good.
@@ -502,11 +538,25 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   reshapes `sitePopup()` must keep `.pophead` as its first element** — that is the seam.
 - **Three numbers put the place name on the close button's line and move together:** `#sideClose`'s
   `top: 8px`, `#sideHead .pophead`'s `padding-top: 18px` (8 + half the button's 40 − half a 15px/1.3
-  line) and `.pophead .favbtn`'s `top: 14px` (18 + half that line − half the button's 28). The
-  favorite heart holds that corner. A sensor-count chip held it first, at `top: 19px` for an 18px
-  height — if anything is ever parked there again, it is the same arithmetic with its own height.
-  **Only one thing fits.** `.pophead .favbtn + .popname` reserves the room with an adjacent-sibling
-  rule, so a second chip in that corner would sit on the place name rather than beside it.
+  line) and `.pophead > .dots`'s `top: 8px` (18 + half that line − half the button's 40 = 7.75, which
+  is `#sideClose`'s own number). **That ⓘ takes the full `.icon` box, not `.dots`'s 28px one** — it
+  stands beside the ×, and `.icon` paints a round `--hover` disc the width of its box, so the smaller
+  shape drew two discs of two sizes under two glyphs of two sizes. `.dots` stays 28px everywhere it
+  is alone on a row. `right: 32px` puts the two boxes edge to edge, the way two toolbar icons meet.
+  **That corner holds exactly one control besides the ×, and it is the ⋮.** A sensor-count chip held
+  the slot first, then the favorite heart, then the heart and a nearest-webcam glyph together — and
+  the pair reserved `padding-right: 108px` of a 328px line and stood 4.5px into the district line
+  below, which is what a reader sees as a collision. **Every card control is a row inside that one
+  menu now.** `dots(s, extra)` takes the nearest webcam or water level as its optional row, and a
+  mast gets `siteDots()`, which holds the favorite that acts on all its sensors. The rows state the
+  station name, the distance and the reading in visible text, which a glyph could only put in a
+  `title`. One control costs the title 68px instead of 108, and the card loses a glance at the
+  favorite state — the map pin still draws a heart on a favorited site.
+  **The reservation is `~`, not `+`**: `dots()` emits the button *and* the popover it targets, so the
+  menu div sits between the button and `.popname`. **The region line takes the same 78px as the
+  name** — it is a line lower, but a 40px button reaches 48px down and the region starts at 37.5.
+  **A menu row's `[data-fav]` may hold a comma list**, so anything reading it back tests every id
+  (see the still-open branch in ui.js). `ids.has('a,b,c')` is false forever.
 - **`render()` refreshes the open card in place, so `openSide()` must stay idempotent.** It runs on
   every poll for the site currently on screen. It resets `scrollTop` **only** when the key changes —
   otherwise a poll would throw you back to the top of a card you were reading. Anything stateful
@@ -660,15 +710,23 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   3.42 m`), why the table uses a `popover` panel instead, and why a new affordance that needs
   explaining needs it *on screen*. A `title` is acceptable only as a duplicate of something already
   visible — the jump hint on an alert row, the count on a chip.
-- **`sourceInfo()` is the only place a timestamp is printed, and it lives inside the ⓘ menu.** Three
+  **The nearest-webcam offer tested this rule and lost.** It spent one revision as a corner glyph
+  with the camera name and distance in a `title` alone. That is a fact a phone cannot reach, and the
+  fix was not a better tooltip but a different control: a menu row, which states the name, the
+  distance and the reading as text. Reach for the row shape before the glyph shape.
+- **`sourceInfo()` is the only place a timestamp is printed, and it lives inside the ⋮ menu.** Three
   facts, all about the plumbing: are we hearing from this station, what was the stamp on the last
   thing it sent, which of the three feeds won. None of them changes what the water is doing, and as a
   footer line they repeated per sensor down a six-sensor mast. They are what you check when you doubt
   the number, so they sit where you go to look. The stale state blocks (siren, rainfall, gauge) print
   no time at all. Elapsed time is appended only when the station is offline or stale, because on a
   live one the date is the answer and `· 4m ago` is padding. Seconds are trimmed for display by
-  `noSec()`; the underlying string stays verbatim, so `parseMY()` is unaffected. **The ⋮ is an ⓘ** —
-  the glyph promised actions and held exactly one.
+  `noSec()`; the underlying string stays verbatim, so `parseMY()` is unaffected. **The glyph names
+  what is in the menu, and it has changed twice on that one rule.** It was a ⋮ over a single "ignore"
+  item, which promised actions and held one, so it became an ⓘ when the provenance moved in. It is a
+  `more_vert` ⋮ now that the menu also carries the favorite, the nearest webcam or water level, the
+  map link and the ignore — four actions is not an information glyph. Count the actions before
+  changing it again.
 - **A marquee needs three things measured, not guessed.** `js/ticker.js` renders the item set twice
   and translates `-50%`, which is only seamless if one copy is at least as wide as the box — so it
   repeats the set to cover the box *before* doubling. Width alone isn't enough: a single wide item
@@ -866,9 +924,9 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
 - **Moving an element to a new parent can change which flex rule governs it, even when the
   element's own rules stay the same.** `.testtog` was a flex item inside `.modalhead`. There,
   `flex: none` sized it to its own content, and it drew as a pill. Moved to sit as a block child of
-  `#paneAbout`, its own `display: flex` made it a flex container instead, one that stretches to the
+  `#aboutBox`, its own `display: flex` made it a flex container instead, one that stretches to the
   width of its new parent. Left as is, `.testtog:has(:checked)` paints a full-width amber bar across
-  the pane. `#paneAbout .testtog { width: fit-content }` pins it back down at the new site. A
+  the pane. `#aboutBox .testtog { width: fit-content }` pins it back down at the new site. A
   component moved between a flex-item role and a flex-container role needs its sizing rule restated.
   The old rule does not travel with it.
 - **The go-to box lists sites, and `hits` holds row objects rather than stations.** Six row shapes
@@ -995,6 +1053,16 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   sensor, so it holds there too. Anything that suppresses an alert must keep both always-visible
   indications — the drawer's "Ignored sensors" panel (drawn even when empty) and the `· N ignored`
   count in `#shown` — and the all-clear must keep saying when a silenced sensor is itself on alert.
+- **A place with several sensors is a Monitoring Station. A place with one sensor is a Monitoring
+  Node, or the name of its kind** — Water level, Rainfall, Siren, Flood gauge, Camera. The word
+  *mast* is gone from every rendered string: the hardware is usually a small gated shed, so the
+  word described a pole that is not there. The kind names come from `KINDS[...].label` and
+  `.one` in `config.js`, so a card, a chip and the glossary cannot spell one kind three ways —
+  `flood-depth gauge` was the drift this rule caught, on six lines of Help against a badge reading
+  `Flood gauge`. **The code still spells the concept `mast`**: `MAST` in `config.js`, `--k-mast`,
+  `showMast()` / `hideMast()` / `.mastring` in `map.js`, `data-mast` in `table.js`. Renaming those
+  moves no pixel and touches ten files, so they keep the old spelling on purpose. Read `mast` in
+  code as *Monitoring Station*, and never print it.
 - **All times are 24-hour, and Malaysian.** JPS stamps readings MYT with no offset and we print them
   verbatim, so anything computed from a unix timestamp must be formatted with
   `timeZone: 'Asia/Kuala_Lumpur'` (see `MYT_HOUR` in `popup.js`) or it will disagree with the

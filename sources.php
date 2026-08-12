@@ -87,8 +87,21 @@ function nationalUrls(array $states = ['SEL', 'WLH', 'PTJ']): array {
     return $u;
 }
 
+/* The rainfall district ids, because that table has no working All route.
+   `Rainfall/LatestData/All` holds the connection open until the client gives up, and it has done so
+   since 07/08/2026. Its water-level twin answers in 3.9 s on the same host, so the host is up and
+   one handler on it is not. Each district answers in about a second, so this asks for them one at a
+   time. The ids are not a range. 1 to 11 are the districts the site's own dropdown offers. 23, 24,
+   25 and 27 carry seven more stations, in Gombak, Pandan, Ampang and Bentong, that the dropdown
+   never lists. Measured 2026-08-12: ids 12 to 22, 28 and 30 answer 500, ids 26 and 29 answer 200
+   with no rows, and nothing from 31 to 60 carries a row. A fall in `kl.parsed` is the alarm the day
+   JPS moves an id. */
+const KL_RAIN = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 23, 24, 25, 27];
+
 function klUrls(): array {
-    return ['kl-wl' => KL . 'WaterLevel/LatestData/All', 'kl-rf' => KL . 'Rainfall/LatestData/All'];
+    $u = ['kl-wl' => KL . 'WaterLevel/LatestData/All'];
+    foreach (KL_RAIN as $d) $u["kl-rain-$d"] = KL . 'Rainfall/LatestData/' . $d;
+    return $u;
 }
 
 /**
@@ -115,8 +128,17 @@ function klStations(array $pages): array {
         ];
     }
 
+    /* Rainfall arrives one district per page, so the rows are merged before they are read. See
+       KL_RAIN above for why there is no single page to read instead. Each page is a whole document,
+       so the rows are merged and not the markup. A station belongs to one district, and the codes
+       were measured to be unique across every page, so this needs no dedupe. */
+    $rain = [];
+    foreach ($pages as $k => $html) {
+        if (str_starts_with($k, 'kl-rain-')) $rain = array_merge($rain, klRows($html));
+    }
+
     // 0 no. · 1 code · 2 status · 3 name · 4 district · 5 updated · 6-11 last six days · 12 today · 13 last hour
-    foreach (klRows($pages['kl-rf'] ?? '') as [$c, $tds]) {
+    foreach ($rain as [$c, $tds]) {
         [$lat, $lng] = klLatLng($tds->eq(3));
         if ($lat === null) continue;
         $out[] = [

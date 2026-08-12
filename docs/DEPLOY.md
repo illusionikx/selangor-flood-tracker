@@ -292,6 +292,62 @@ this is automatic; on a desktop that sleeps, disable sleep or the archive is onl
 the machine is. (`systemd` timers work equally well if you prefer them to `cron.d` — the requirement
 is a call every five minutes, not the mechanism.)
 
+#### The same job on Herd, under Windows
+
+A development box needs this as much as a server does, and for the third reason above. Herd has no
+`fastcgi_finish_request`, so a rebuild runs inside a reader request and that reader waits for it.
+Measured on this machine: a cached poll answers in 0.1 seconds, a rebuild takes 4.2 seconds, and a
+rebuild that also runs the camera capture takes 23.7 seconds. A reader who lands on the last of
+those waits all of it.
+
+Windows has no `cron`. Task Scheduler does the same job. Run this once, in PowerShell, as the
+account that uses the site:
+
+```powershell
+$n = 'flood-exp-warm'
+Unregister-ScheduledTask -TaskName $n -Confirm:$false -ErrorAction SilentlyContinue
+$a = New-ScheduledTaskAction -Execute 'curl.exe' `
+     -Argument '-fsS --ssl-no-revoke --max-time 240 -o NUL https://flood-exp.test/api.php'
+$t = New-ScheduledTaskTrigger -Once -At (Get-Date).Date `
+     -RepetitionInterval (New-TimeSpan -Minutes 5)
+$s = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
+     -StartWhenAvailable -MultipleInstances IgnoreNew `
+     -ExecutionTimeLimit (New-TimeSpan -Minutes 10)
+$p = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType S4U -RunLevel Limited
+Register-ScheduledTask -TaskName $n -Action $a -Trigger $t -Settings $s -Principal $p `
+     -Description 'Keeps api.php warm, the camera archive filling and the trend history unbroken.'
+```
+
+Four of those arguments carry a reason:
+
+- **`--ssl-no-revoke`.** Windows curl uses schannel, and schannel asks the certificate for a
+  revocation endpoint. Herd signs its own certificate with a local authority, which publishes none,
+  so the check fails with `CRYPT_E_NO_REVOCATION_CHECK` and curl exits 35. The flag drops that one
+  check on a request to your own machine. Do not reach for plain `http://` instead. Herd answers
+  that with a 301.
+- **`-LogonType S4U`.** The task then runs in session 0 and opens no console window every five
+  minutes. It needs no stored password. Windows refuses S4U to some accounts. If
+  `Register-ScheduledTask` reports an access error, change it to `-LogonType Interactive`. The task
+  then runs only inside your login session, and a console window appears for a second each time.
+- **`-MultipleInstances IgnoreNew`.** A capture round can outlast the five-minute gap. The `flock`
+  on `.refresh.lock` already stops two rebuilds at once, so a second task run only waits and
+  then serves a cache. Skipping it costs less.
+- **`-StartWhenAvailable`.** A laptop that slept through a run makes the next one up as soon as it
+  wakes, rather than waiting for the following slot.
+
+Check it and remove it with:
+
+```powershell
+Get-ScheduledTask flood-exp-warm | Get-ScheduledTaskInfo   # LastRunTime, LastTaskResult 0
+Unregister-ScheduledTask -TaskName flood-exp-warm -Confirm:$false
+```
+
+`LastTaskResult` holds the exit code from curl. 0 is a fetch, 35 is the certificate check above, and 28 is a
+timeout.
+
+The machine must stay awake for any of this, the same requirement the Debian box has. A Windows
+desktop that sleeps keeps no archive while it sleeps.
+
 ### HTTPS, from a home connection
 
 Two answers, and the choice is *who should be able to see it*, not which is better.

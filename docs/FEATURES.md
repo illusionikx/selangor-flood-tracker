@@ -4866,7 +4866,7 @@ all.
 - The Developer section is public. Anyone who opens the dialog can press Refresh now. The rate
   limit is the whole defense. A password or a hidden query flag adds an auth surface to a site
   that has none anywhere else.
-- Test mode sits one scroll further from the close button than it did before the tabs existed.
+- Test mode sits one scroll further from the close button than it did in the close-button row.
 - The Help pane holds a mixed prose register. The moved sections read as they always did. This
   change did not ask for a rewrite, and none happened.
 
@@ -4874,8 +4874,6 @@ all.
 
 - No version number, no changelog, and no uptime claim. Nothing in this project can back any of the
   three.
-- No roving tabindex on the tab strip. Two tabs make the arrow-key convention slower than a plain
-  Tab press.
 - No memory of the last pane a reader had open.
 - No `?` keyboard shortcut sheet. The four bindings already print on the buttons that use them.
 - No URL fragment that opens a pane directly.
@@ -5552,9 +5550,9 @@ entry of its own. The menu is `.menu`, the component the sensor ⓘ already uses
 handler in `js/ui.js` places every popover carrying that class — so the menu needed no positioning
 code, no library and no new icon. `i-more_vert` was already in `css/icons.css` with no user.
 
-**Help and About stay one dialog with two tabs.** Splitting the entry points is not splitting the
-dialog. The panes cross-reference each other, and a reader who opens Help and then wants About must
-not have to close and reopen.
+**Help and About started as one dialog with two tabs.** Splitting the entry points was not
+splitting the dialog. That held until the tab strip read as a control offering the page the reader
+had just declined. They are two dialogs now — see "Help and About split into two dialogs" below.
 
 **One timer drives the whole grid, not one timer per tile.** `js/clip.js` carries a generation
 counter and a rebind path because `render()` replaces the open card's `<img>` under it on every
@@ -6424,3 +6422,438 @@ win over the water it stands in.
 Deleting `water.json` leaves the dark map without rivers or ponds and no error anywhere. The Pages
 workflow copies it unconditionally, next to the PWA set, for that reason. Thin water is a worse map,
 so it must not be able to fail a bake either way.
+
+## A dead upstream page cost 25 seconds on every rebuild
+
+A reader reported that the map timed out on load. The server runs on the same machine as the
+browser, so the network between them was not the cause.
+
+Measured on the live install: a cached poll answered in 0.13 seconds. A poll that rebuilt the cache
+took 28.6 seconds. It took 45.1 seconds when the half-hourly camera capture landed in the same
+request.
+
+The first guess named the camera strips. `buildSheet()` builds a strip when a browser asks for
+`?sheet=`. Measured, a strip build takes 0.054 seconds, and the payload route never calls it. That
+guess was wrong.
+
+### What it was
+
+`infobanjirjpskl.water.gov.my/Rainfall/LatestData/All` stopped answering. A direct curl holds the
+connection open and returns nothing. Its sibling `WaterLevel/LatestData/All` answers in 3.9 seconds
+on the same host. The host is up and one route on it is not.
+
+The page cache held that table under a timestamp four days old. Two rules made that timestamp
+permanent:
+
+- `$want` selects a page whose stored timestamp is older than its TTL.
+- The old write ran only when the fetch returned a body.
+
+A page that never answers never advances its timestamp. So `$want` selected it on every rebuild.
+The fetch then held a slot in the shared `curl_multi` batch for the full `CURLOPT_TIMEOUT` of 25
+seconds. A batch cannot finish before its slowest member, so the whole fan-out waited on it.
+
+25 seconds of timeout plus 3.5 seconds of real work makes the 28.6 seconds on the clock.
+
+### The fix
+
+`pageRow()` decides what a cached row becomes after a fetch attempt. It stamps every page the server
+asked for, whether or not that page answered. A failure keeps the copy already stored.
+
+The function refuses to stamp a page the server did not ask for. A stamp on a fresh row pushes
+its next fetch out forever. The page then goes stale with nothing to say so.
+
+A dead page now costs 25 seconds once per `SCRAPE_TTL`, not once per rebuild. The page cache already
+accepts that shape. One poll per quarter hour pays for the slow tables, and the rest read the stored
+copy.
+
+`php api.php --selftest` covers the four cases. The rule joins `forceAllowed()` and
+`serveFromCache()` there for the same reason. All three decide how often this server contacts an
+upstream.
+
+### Deliberately not built
+
+- **No shorter timeout.** The KL rainfall table takes about 10 seconds to render when it is alive.
+  A cut deep enough to help a dead page also drops a live one.
+- **No blocklist.** A dead upstream comes back. The backoff retires itself the day the page answers.
+- **No retry.** A page that answers nothing after 25 seconds owes a second attempt nothing.
+
+### What it left open
+
+Two things, and the next section closes both.
+
+The stored copy still fed the map. KL rainfall readings came from a four-day-old table, and the
+`sources` counters did not report it. Those counters read how many rows a page parsed. A stored copy
+parses as well as a fresh one, so `kl.parsed` stayed above zero through the whole outage.
+
+A rebuild still blocked the reader who triggered it. Herd has no `fastcgi_finish_request`, so this
+server cannot answer and keep working.
+
+## The nearest webcam and the nearest water level move into the card header
+
+Two offers sat under the station panel's header as full-width buttons. `camLink()` named the nearest
+camera and its distance. `levelLink()` did the same for the nearest river on a camera card, and it
+added the reading.
+
+Each button carried a place name in bold on its own line. The card header above it already carries
+a place name in bold. A reader met two titles before the first reading. On a phone the button pushed
+the meter and the graph below the fold. A reader opens this card for the reading.
+
+Both are now one glyph in the header's top-right corner, next to the favorite heart and the close
+button. The camera glyph opens the lightbox. The river glyph jumps to that station.
+
+A card carries at most one of the two. A camera card offers a water level. Every other card offers a
+camera. A mast that already holds a camera offers nothing, because the picture is a section on the
+same card.
+
+### Where the corner puts it
+
+Three controls now share one line. The close button holds 8 to 48 pixels from the panel edge. The
+heart holds 50 to 78. The new button holds 90 to 118.
+
+The gap between the heart and the new button is 12 pixels. Each button grows a 6-pixel hit area past
+its own box, so a smaller gap puts one finger target over the other.
+
+`.pophead .headbtn ~ .popname` reserves 108 pixels of padding. The station name keeps 220 pixels of
+the panel's 360. A name over about 29 characters wraps to a second line. It cannot run under a
+control.
+
+The markup writes the new button before the heart. The heart keeps its slot through the
+`.favbtn + .popname` rule, which still matches.
+
+### What the trade costs
+
+The place name, the distance and the reading move into the `title` attribute. A phone never opens a
+`title`, so a touch reader sees a camera glyph and learns which camera only after the press.
+
+This project's rule allows a `title` only as a repeat of something already on screen. This is the
+first place that breaks the rule.
+
+Two things reduce the cost. The lightbox titles itself with the camera name, so one press answers
+the question. The alternative is the full-width button, and its cost fell on every reader of every
+card.
+
+The reading lost its colour. `levelLink()` painted the metre figure with `color()`, so a glance said
+whether 1.74 m was a quiet river or a flood. A tooltip carries no colour. The button jumps to the
+station, where the meter states it against the marks.
+
+### Deliberately not built
+
+- **No visible label beside the glyph.** A label is the full-width button again, in a smaller font.
+- **No second offer on one card.** The corner holds one more control and no more. A third button
+  takes the name below 190 pixels on a phone.
+- **No popover instead of a `title`.** The table's hover panel shows what that costs. The button
+  opens the answer in one press, and a panel that explains a press is slower than the press.
+
+### The region line drops 6 pixels
+
+The district and basin line sits under the name. It reserves 34 pixels for the close button and
+nothing for the heart, so its text ended where the heart began. The two new buttons made that gap
+read as a collision.
+
+The line is one row below the buttons. It shares 4.5 pixels of its own line box with them, and
+nothing else. So it moves down 6 pixels rather than reserving 108 to the right.
+
+The measured cost of the other choice: region strings run to 53 characters, and a 220-pixel box
+wraps the longest tenth of them onto a second line. Six pixels of header buys the same clearance.
+
+The district stays on the face of the card. It is how a reader tells two stations of one name apart,
+and the card names the place before it reads it.
+
+## The KL rainfall table arrives one district at a time
+
+The page before this one stopped a dead upstream from costing 25 seconds on every rebuild. It did
+not make the rainfall readings current. The map still drew a table from 07/08/2026, and nothing on
+screen or in the diagnostics said so.
+
+### The route that works
+
+`Rainfall/LatestData/All` hangs. Its sibling `WaterLevel/LatestData/All` answers in 3.9 seconds on
+the same host, so the host is up and one handler on it is not.
+
+The same route with a number answers in about a second. Each district returns the same 14-cell rows
+the parser already reads, every row carries its coordinates, and no station code repeats across
+districts.
+
+The ids are not a range. Reading their own dropdown gives 1 to 11. That set returns 31 stations and
+loses 9 that the old table held. Seven of those 9 sit on ids 23, 24, 25 and 27, in Gombak, Pandan,
+Ampang and Bentong, which the dropdown never offers. Measured across ids 1 to 60: 12 to 22, 28 and
+30 answer 500, 26 and 29 answer 200 with no rows, and nothing above 30 carries a row.
+
+`KL_RAIN` in `sources.php` holds the 15 ids that carry stations. `klUrls()` emits one page key per
+id, and `klStations()` merges the rows of every `kl-rain-*` page before it reads them. Each page is
+a whole document, so the code merges rows and never markup.
+
+The result: 37 gauges on the map, every one stamped today, against 39 frozen five days back.
+
+### `sources.stale`, because the fix above removed an alarm
+
+`pageRow()` stamps a page it asked for whether or not that page answered. So the `ts` column no
+longer shows a dead upstream. That is the point of the stamp, and it costs the one signal a reader
+had.
+
+`sources.stale` lists the page keys this server asked for and did not get. A key there means the map
+draws a stored copy of that table. It is empty on a healthy poll.
+
+The parse counters cannot carry this. A stored copy parses as well as a fresh one, so `kl.parsed`
+read 65 through a four-day outage.
+
+### An error page is not data, and neither is a maintenance notice
+
+Two guards, because upstream fails in two shapes.
+
+`fetchAll()` returns an empty body for any status at 400 or above. Upstream answers 404 and 500 with
+a full HTML page. Without this, the page cache stores one under the name of a table, `?cam=` serves
+one as `image/jpeg`, and `pageRow()` writes it over the good copy it already had. `?cam=` now gets a
+clean 502 where it used to serve an error page as a picture.
+
+A status code is not enough. The national portal serves a maintenance window as a 320-byte
+`Notis Gangguan` notice **under HTTP 200**. This was live while the work above was measured. That
+notice replaced the stored tables for KL and Putrajaya, `national.applied` fell from 71 to 47, and
+every counter stayed quiet because the fetch had in fact succeeded.
+
+`pageHasData()` asks what kind of document arrived. A table page must hold a `<tr`, the two JSON
+feeds must decode, and the nowcast page must hold its map scaffolding. A body that fails is treated
+as a fetch that never answered: the stored copy stays, the row is stamped so the retry backs off,
+and the key lands in `sources.stale`.
+
+The nowcast is tested on `map.setView` rather than on a marker on purpose. A nowcast with nothing to
+report is weather, not an outage, and a marker count would read the two as one thing.
+
+Every caller already treats an empty body as a failed fetch, so both guards reuse that path rather
+than adding one.
+
+### The numbers
+
+| | before | after |
+|---|---|---|
+| cached poll | 0.13 s | 0.10 s |
+| rebuild | 28.6 s | 4.2 s |
+| rebuild plus camera capture | 45.1 s | 23.7 s |
+| KL rainfall gauges | 39, all 5 days old | 37, all stamped today |
+
+The camera capture is ~19 s of real image pulls, once per `SHOT_EVERY`. This change does not touch
+it, and it is not a fault.
+
+### The warm task
+
+A rebuild runs inside a reader request, because Herd has no `fastcgi_finish_request`. `docs/DEPLOY.md`
+already puts a five-minute `cron` on the Debian target for that reason, and the same section now
+carries the Task Scheduler equivalent for a Herd box under Windows.
+
+Two arguments there are not obvious. Windows curl uses schannel, which asks the certificate for a
+revocation endpoint. The local authority Herd signs with publishes none, so the call needs
+`--ssl-no-revoke` or it exits 35. And `-LogonType S4U` runs the task in session 0, which keeps a
+console window off the screen every five minutes.
+
+### Deliberately not built
+
+- **No probe of the whole id range on every poll.** Ids 12 to 22 answer 500 in 0.14 s, which is
+  cheap. But each one then lands in `sources.stale` forever and drowns the signal.
+- **No `All` fallback.** One request instead of fifteen is the trade that cost 25 seconds a rebuild.
+- **No client change.** A gauge with an old stamp already renders grey through the existing rule.
+
+### What breaks it
+
+JPS moving a district id. `kl.parsed` falls, and `sources.stale` stays empty because the pages
+still answer. Read that pair as an id that moved. An upstream that died marks itself stale instead.
+
+### Both controls move into the card menu
+
+The corner held the close button, the favorite heart and the webcam glyph. Three controls on one line reserved 108 pixels of a
+328-pixel title. The two 28-pixel buttons also stood 4.5 pixels above the district line.
+
+The heart and the glyph are rows in the ⓘ menu now, and the ⓘ takes the corner slot. One control
+there costs the title 68 pixels instead of 108, and it clears the district line by 6.
+
+A single-sensor card already had that menu, and the menu already held the favorite. So the card
+loses a second way to one switch. It gains no new way. A mast gets `siteDots()`, which holds the
+favorite that acts on all of its sensors, and the nearest webcam.
+
+`.pophead > .dots` uses `~` to reserve the room, not `+`. `dots()` writes the button and the popover
+it opens, so the menu element sits between the button and the name.
+
+### What the row shape fixes
+
+A menu row states the station name, the distance and the reading as text. The corner glyph had one place for them, the
+`title`, and a phone never opens a `title`.
+
+So the tooltip trade from the last revision is off the table. The reading also takes `color()` again.
+A row has space for a number on the right, and 1.74 m reads as a quiet river or a flood by its
+colour alone.
+
+`.menu` gains a `max-width` of 340 pixels. A menu sizes to its content. One station name runs to 50 characters, and it drew a menu half the
+width of a desktop window.
+
+### What it costs
+
+The favorite state left the face of the card. A reader who wants it opens the menu. The map pin also
+draws a heart on a favorited site.
+
+### Deliberately not built
+
+- **No heart in the corner as an indicator only.** A mark that looks like a button and does nothing
+  is worse than no mark.
+- **No favorite state on the ⓘ glyph.** The glyph means "there is more here". A colour for one of the
+  rows inside makes it mean two things.
+
+### The ⓘ takes the close button's box
+
+`.dots` is 28 pixels with an 18-pixel glyph, and it was written for a sensor row where nothing sits
+beside it. `.icon` is 40 pixels with a 22-pixel glyph, and `#sideClose` is one.
+
+Side by side in the corner, `.icon` paints a round hover disc the width of its box. So the two
+buttons drew two discs of two sizes, under two glyphs of two sizes.
+
+`.pophead > .dots` restates all three numbers. `top: 8px` is `#sideClose`'s own number, and it is
+also the arithmetic: 18 + half a 15px/1.3 line − half 40 is 7.75. `right: 32px` puts this button's
+right edge on the ×'s left edge, which is how two toolbar icons meet. Each `.icon` already carries
+about 9 pixels of padding, and that is the gap between the glyphs.
+
+The title and the district each reserve 78 pixels now, which is 32 + the button's 40 + 6 of air.
+Both lines stop at the same place.
+
+That retires the 6-pixel drop above. The region needed it while a 28-pixel button reserved no room
+beside it. A 40-pixel button reserves the room, so the district clears it horizontally and the name
+and the region sit flush again.
+
+### The glyph becomes a kebab
+
+The button opens a menu of four actions: the favorite, the nearest webcam or water level, the map
+link and the ignore. It also states where the reading came from. An information glyph names the
+last of those and none of the first four.
+
+`--i-more_vert` is a fresh fetch of Material Symbols at `fill1`, added to `css/icons.css` the way
+every other glyph there arrives. `icons.css?v=` goes to 80.
+
+The glyph has changed twice on one rule. It was a ⋮ over a single "ignore" item, which promised
+actions and held one. It became an ⓘ when the provenance moved in from a footer line. It is a ⋮ again now that
+the menu holds four things to do. The first ⋮ was wrong because it held one action, not because it
+was a ⋮.
+
+`.i-info` stays in the About dialog and the Help item, which are information and nothing else.
+
+## Help and About split into two dialogs
+
+The menu opens Help and About as separate entries and always did. Behind them stood one dialog with
+a tab strip, so a reader who picked Help arrived on a page with a control offering the page they
+had just declined. The strip was one click between the reader and a destination they had already
+named.
+
+`#helpBox` is now its own `<dialog>`. Both dialogs carry `.docbox`, which holds the box, the
+prose, the `.key` grid and the pin legend — the rules both of them need. What belongs to one stays
+on its id: the logo lockup, the amber notice, the source links and the whole Developer section are
+`#aboutBox` alone.
+
+The reason the tabs existed is gone. The app bar had no room for a second open button when this
+project had seven buttons in the right group. The menu holds both entries now, so a second dialog
+costs no bar space.
+
+Help takes a title in `.modalhead`, the same shape the station table and the camera wall use. About
+keeps a close button on its own, because its logo lockup is its heading.
+
+### What this cost
+
+The dialogs no longer cross-reference each other by a click. A reader in Help who wants About must
+close one and open the other from the menu. That is two clicks where there was one, on a path
+nobody measured.
+
+This change deletes `showPane()`, the `PANES` map, the tab-strip click handler and the reset on
+close. `paintDev()` now runs when About opens rather than when the About tab returns.
+
+### Not built
+
+- No shared scroll memory. Each dialog opens at the top, which is what the tab strip did too.
+- No link from one dialog to the other. The menu is two clicks away from either.
+
+## Help rewritten as a manual
+
+Help held ten sections and described the app as it stood several changes ago. Six of its headings
+asked a question: `Why it does that`, `What it cannot tell you`, `How to read the map`, `Words on
+this map`, `What puts a station on alert`, `The buttons along the top`. A question heading sorts
+nothing. A reader hunting for the seek bar cannot tell which question holds it.
+
+Every heading now names a surface: App bar, Menu, Filters, Go to a station, Station panel, Camera
+viewer, All cameras, Map symbols, Alert criteria, Glossary, Expected behavior, Limits. The order
+follows the order a reader meets the app. The reference sections come last.
+
+### Gaps this closed
+
+Seven surfaces shipped with no entry in Help.
+
+- The status dot on the app mark, and the four states it reports.
+- The moving strip, and the two kinds of tile in it.
+- The favorites panel, the star row in Details, and the `Favorites only` filter.
+- The place search, and the 10 km list it answers with.
+- The weather block on a station card.
+- Every row of the Details menu except the ignore.
+- The camera wall filter and its count line.
+
+### What was wrong
+
+`Details` named a button. It has been a ⋮ menu of four or five rows since the provenance moved into
+it. Help now names the control `Details`, the same word the tooltip and the two drawer
+panels use, and lists each row under it.
+
+`A rain forecast` sat under `What it cannot tell you`. It claimed that a sensor measured every
+number on the map. MET weather landed after that line. The map now carries a nowcast, a
+three-hour outlook and a temperature range, and all three are forecasts. The row is `A water
+forecast` now, and it draws the line where the code draws it: a sensor measured every water figure,
+and the weather block states no river level.
+
+### Trade-offs accepted
+
+- Help is longer. Twelve sections against ten, and about 400 more words. A manual that omits a control to stay short fails at
+  the one job it has.
+- The About pane keeps its own voice. It tells the story of the project, and this change did not
+  ask for a rewrite of it.
+
+### Not built
+
+- No search inside Help. Twelve headings fit on one scroll of a wide dialog.
+- No screenshots. Every row leads with the live glyph or the live pin. Neither can go stale the
+  way a picture of an old app bar can.
+
+## Monitoring Station and Monitoring Node replace "mast"
+
+A place that carries several sensors was a `mast`. The word names a pole. The hardware is usually a
+small gated shed, so the word described something that is not there. Two names replace it.
+
+- **Monitoring Station** — a place that carries more than one sensor. Sensors within 50 m of each
+  other are one station, and the map draws one pin for it.
+- **Monitoring Node** — a place that carries one sensor. A card names the kind instead: Water
+  level, Rainfall, Siren, Flood gauge or Camera.
+
+The kind names are `KINDS[...].label` and `.one` in `js/config.js`, which every badge already
+reads. Help spelled one of them `flood-depth gauge` on six lines while the badge beside it read
+`Flood gauge`. Help now uses the spelling on that badge.
+
+Two rendered strings held the old word, and both changed: the Help glossary with the rows around
+it, and the empty state of the favorites panel in `js/render.js`.
+
+The code keeps the old spelling. `MAST`, `--k-mast`, `showMast()`, `.mastring` and `data-mast` are
+identifiers in ten files, and renaming them moves no pixel on screen. `CLAUDE.md` carries the rule
+that ties the two spellings together.
+
+### Trade-offs accepted
+
+- One concept, two spellings: `Monitoring Station` on screen and `mast` in the source. A reader of
+  the code needs the rule in `CLAUDE.md` to connect them.
+- The term is longer than the word it replaces. `Monitoring Station` costs a glossary row and a
+  wider label wherever a card ever states it.
+
+### Not built
+
+- No label on the card head. A Monitoring Station card already carries one badge per sensor, which
+  states what stands there. A second line naming the place type repeats what the badges show.
+- No rename of `--k-mast`. The token paints the indigo of a Monitoring Station pin, and the colour
+  block in `css/base.css` is the one place that value lives.
+
+## The count row left Help
+
+`The count under the filters` had a row of its own under Filters. The line it describes states
+`417 stations · 2 ignored` in plain words, under the controls it counts, and it never collapses out
+of view. A manual row for a sentence that reads itself is a row that can go stale on its own.
+
+The line stays on screen. Only the row about it is gone. This change touches no part of the rule that a silenced alarm keeps
+two always-visible indications. The `Ignored sensors` panel in the drawer and that count line are
+both still there, and Help still describes the panel.
