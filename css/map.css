@@ -101,27 +101,36 @@
   text-overflow: ellipsis; white-space: nowrap; }
 
 /* The MET section. Two cells, each one a glyph, the words that belong to it, and its own title on
-   the bottom edge. `Now` takes the width it needs and `Later` takes the rest, because the two hold
-   a temperature pair and a sentence. It was three cells of equal width, which read as two thin
-   cells beside a full one.
+   the bottom edge. The split is 1:3, because `Now` holds two short numbers and `Later` holds a
+   sentence. It was three cells of equal width, which read as two thin cells beside a full one.
    Nothing sets `align-items` on the grid, so the two cells stretch to one height. `margin-top: auto`
    on the title then parks both titles on the same line, whatever is above them.
-   `min-width: 0` sits on every cell and on every row item. A grid or flex item defaults to
-   `min-width: auto`, which refuses to shrink below its content. Without it, a long forecast line
-   pushes the other cell out of shape. */
-.wx { display: grid; grid-template-columns: auto 1fr; gap: 10px; --g: 28px; }
-.wx > * { min-width: 0; }
+   **Nothing sets `min-width: 0` on a cell, and that is what holds 1:3 up.** A `1fr` track is
+   `minmax(auto, 1fr)`, so a cell never goes under its own content unless something zeroes that
+   floor. `Now` needs about 81px and its quarter share is about 79px on a 360px panel, so the two
+   are within a hair on this screen and the floor is the whole story on a narrower one: at 84vw the
+   quarter share falls to about 65px and the glyph would stand outside its own cell. `Later` gives up
+   those pixels instead, and its sentence wraps, which is what a sentence does. The floor is still
+   off every item inside a cell — see `.wxrow > *` below, where a forecast line does have to shrink. */
+.wx { display: grid; grid-template-columns: 1fr 3fr; gap: 10px; --g: 28px; }
+/* 12px of side padding rather than 10. At 1:3 the `Now` cell is about the width of its own content,
+   so the padding is the whole of what centres the pair inside it. */
 .wxcol { display: flex; flex-direction: column; gap: 6px; font-size: 12px; line-height: 1.35;
-  padding: 8px 10px; border-radius: 8px; background: var(--hover); }
-.wxrow { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  padding: 8px 12px; border-radius: 8px; background: var(--hover); }
+/* One gap for both cells. `space-between` spent `Now`'s slack between the glyph and the numbers
+   first, which put a 30px gap in one cell beside a small one in the other — the same distance stated
+   twice, differently, on one row. */
+.wxrow { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .wxrow > * { min-width: 0; }
+.wxrow > .wxline { flex: 1; }
 /* The title sits under the glyph and centres on it, so `--g` is the glyph box and both read it. The
    two titles are narrower than the box, so nothing spills. `nowrap` is the guard for the day one is
    not: a title wider than `--g` overhangs evenly instead of breaking into two lines. */
 .wxsub { font-size: 11px; color: var(--muted); margin-top: auto;
   width: var(--g); text-align: center; white-space: nowrap; }
-/* High over low, so the column stays about a third of the row and the forecast sentence gets the
-   rest. `cursor: help` because the pair carries a `data-tip` that names both ends. */
+/* High over low, so the cell stays a third of the row and the forecast sentence gets the rest. The
+   pair sits against the glyph, so it aligns left like the sentence in the other cell.
+   `cursor: help` because it carries a `data-tip` that names both ends. */
 .wxtemp { display: flex; flex-direction: column; font-size: 11px; line-height: 1.4; cursor: help; }
 /* The weather glyph carries the state, so it is the largest thing in the column and nothing writes
    that state out again underneath it — the word is on `data-tip`, and `js/sparktip.js` opens it on

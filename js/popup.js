@@ -2,7 +2,7 @@
 // status footer. The same meter/state blocks are reused by the alert panel.
 
 import { KINDS, SOURCES, SPARK_H, NO_INFO, ALERT_TITLE, RIVER_COLOR, RAIN_COLOR,
-         GAUGE_COLOR, RAIN_STOPS, NEAR_MAX_KM, camSrc, WEATHER } from './config.js';
+         GAUGE_COLOR, RAIN_STOPS, NEAR_MAX_KM, camSrc, WEATHER, MET_NAME } from './config.js';
 import { num, ago, noSec, parseMY, distKm, hasInfo, isStale, statusColor, scalePos,
          levelStops, gaugeStops, gaugeColor, color, isFav } from './util.js';
 import { nearestOf, nearestCam, nearestLevel, camAlert } from './stations.js';
@@ -430,6 +430,28 @@ const wxIcon = r => {
   return (night() && w.night) || w.icon;
 };
 
+/* The weather section's ⋮, and it holds provenance alone. Every other ⋮ on a card carries actions
+   under the same block — favorite, map link, ignore — and not one of them applies here. A favorite
+   is a place, a map link is a coordinate, and `PREFS.ignored` silences a sensor. The weather is none
+   of those, and an action that acts on nothing is worse than an absent one.
+   Two facts, the same two `sourceInfo()` gives a sensor: when the reading was made, and who made it.
+   `stamp` is MET's own issue time and never our poll time, so the clock is the one MET published.
+   Elapsed time is printed beside it always, where `sourceInfo()` prints it only on a stale station:
+   a station card states a full date and this states a clock, and `14:50` alone cannot say whether
+   MET has been quiet since yesterday.
+   The nearest point and its distance stay out of the header, where the owner asked for them to go,
+   and answer "who made this" here instead — a claim from 14 km away is a different claim from one
+   made next door, and the ⋮ is where this app already puts that kind of doubt. */
+const wxDots = m => `<button class="icon dots" popovertarget="mnu-met"
+    title="Details" aria-label="Details about this weather"><i class="i i-more_vert"></i></button>
+  <div id="mnu-met" class="menu surface" popover>
+    <div class="mi info"><span>
+      ${!m.stamp ? '' : `<small class="muted">Updated ${
+        MYT_CLOCK.format(m.stamp * 1000)} · ${ago(m.stamp * 1000)}</small><br>`}
+      <small class="muted">Via ${MET_NAME}${m.at ? ` · ${m.at}, ${m.km} km away` : ''}</small>
+    </span></div>
+  </div>`;
+
 /* The MET section. Two cells, `Now` and `Later`, each one glyph beside the words that belong to it.
    This section appears once per card and never once per sensor. Rain over a place is one fact, and
    sourceInfo() already taught this app what a per-place fact costs when it repeats down a mast.
@@ -490,6 +512,7 @@ function metSection(s) {
       <div class="sensorhead">
         <i class="glyph i i-${wxIcon(m.rung ?? m.now ?? 0)}" style="color:var(--k-weather)"></i>
         <b>Weather</b>
+        ${wxDots(m)}
       </div>
       <div class="wx">${now}${out}</div>
     </div>`;

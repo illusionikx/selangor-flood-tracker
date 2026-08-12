@@ -44,6 +44,11 @@ export const SOURCES = {
   kl:       { name: 'JPS Wilayah Persekutuan (SPHTN)' },
 };
 
+/* The department behind the weather section, named once. It is not in SOURCES, because that table
+   answers "who published this station's water reading" and MET publishes none. The About dialog
+   spells it the same way. */
+export const MET_NAME = 'MET Malaysia';
+
 // Upstream status codes: river -1 offline, 0 normal, 1 alert, 2 warning, 3 danger. A river above its
 // first mark is wearing the traffic light, so it uses the status tokens themselves — there was never
 // a second amber, only a second spelling of one.
