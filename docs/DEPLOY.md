@@ -329,6 +329,12 @@ Four of those arguments carry a reason:
   minutes. It needs no stored password. Windows refuses S4U to some accounts. If
   `Register-ScheduledTask` reports an access error, change it to `-LogonType Interactive`. The task
   then runs only inside your login session, and a console window appears for a second each time.
+  Windows refused S4U on the machine that runs this app. `-LogonType Password` is the third choice.
+  It runs the task in session 0 and opens no window. It needs a stored password on the prompt. The
+  flashing window is a fair reason to turn the task off on a development box.
+  `Disable-ScheduledTask flood-exp-warm` stops it and keeps the registration.
+  `Enable-ScheduledTask` starts it again. A development box loses only its own archive and history
+  while the task is off. A server must never run this way, because there the timer is the app.
 - **`-MultipleInstances IgnoreNew`.** A capture round can outlast the five-minute gap. The `flock`
   on `.refresh.lock` already stops two rebuilds at once, so a second task run only waits and
   then serves a cache. Skipping it costs less.
