@@ -96,7 +96,7 @@
    line up across all three. `min-width: 0` sits on every cell. A grid item defaults to
    `min-width: auto`, which refuses to shrink below its content. Without it, a long word in the wide
    cell pushes the two narrow cells out of shape. */
-.wx { display: grid; grid-template-columns: 1fr 1fr 3fr; gap: 10px; align-items: start; }
+.wx { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; align-items: start; }
 .wx > * { min-width: 0; }
 .wxcol { display: flex; flex-direction: column; align-items: center; gap: 3px;
   font-size: 12px; line-height: 1.35; text-align: center; }

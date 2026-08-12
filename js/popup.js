@@ -476,7 +476,6 @@ function metSection(s) {
       <div class="sensorhead">
         <i class="glyph i i-${wxIcon(m.rung ?? m.now ?? 0)}" style="color:var(--k-weather)"></i>
         <b>Weather</b>
-        ${m.at ? `<span class="muted">${m.at} · ${m.km} km</span>` : ''}
       </div>
       <div class="wx">${temp}${now}${out}</div>
     </div>`;
