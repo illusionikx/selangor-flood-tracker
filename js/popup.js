@@ -439,7 +439,9 @@ const wxIcon = r => {
    This section appears once per card and never once per sensor. Rain over a place is one fact, and
    sourceInfo() already taught this app what a per-place fact costs when it repeats down a mast.
    The header carries the point and the distance, which is what lets a reader weigh a 14 km claim.
-   This section is not a sensor at this place. */
+   The third cell reads rung, the worst rain in the three-hour window. It matches its own
+   sentence underneath and stops contradicting it. hr1 stays in the payload to answer a different
+   question: will it rain in one hour. The code renders rung only. */
 function metSection(s) {
   const m = s.met;
   if (!m) return '';
@@ -468,8 +470,9 @@ function metSection(s) {
   const now = m.now == null ? '' : cell('Current',
     `<i class="i wxbig i-${wxIcon(m.now)}"></i>`, w(m.now).word);
 
+  const later = m.rung ?? 0;
   const out = m.hr1 == null ? '' : cell('Later',
-    `<i class="i wxbig i-${wxIcon(m.hr1)}"></i>`, w(m.hr1).word,
+    `<i class="i wxbig i-${wxIcon(later)}"></i>`, w(later).word,
     rain ? `<span class="wxline">${rain}</span>` : '');
 
   return `<div class="sensor wxsec" data-sensor="@met">
