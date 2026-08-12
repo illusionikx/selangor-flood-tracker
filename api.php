@@ -644,6 +644,32 @@ function pageHasData(string $key, string $body): bool {
     };
 }
 
+/* Which region each page speaks for. Only the national portal is known to publish a notice, so only
+   its keys are here. A key absent from this table can still be recognised as a notice, and it simply
+   contributes no region — the reader is told the source is down without a claim about where. */
+const NOTICE_REGION = [
+    'nat-SEL' => 'Selangor',
+    'nat-WLH' => 'Kuala Lumpur',
+    'nat-PTJ' => 'Putrajaya',
+];
+
+/**
+ * Which known outage notice is this body, if any?
+ *
+ * The national portal answers a service outage with a page titled `Notis Gangguan`, under HTTP 200.
+ * pageHasData() already refuses it, which keeps the stored table on the map. This function reads the
+ * same body one step further and asks whether the source stated its own failure, because a source
+ * that says it is down is worth repeating to a reader and a timeout is not.
+ *
+ * The test is the title, never the body text and never the image path. A table that prints these two
+ * words in a cell is still a table, and a file name is something JPS can rename without telling
+ * anyone.
+ */
+function noticeOf(string $body): ?string {
+    if ($body === '') return null;
+    return preg_match('~<title>\s*Notis\s+Gangguan~i', $body) ? 'publicinfobanjir' : null;
+}
+
 /**
  * Normalize and validate a place query. Returns the normalized string, or null when it is unusable.
  *
@@ -730,6 +756,15 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
     // A quiet nowcast publishes the map and no markers. That is weather, not an outage.
     $ok('a nowcast with no markers is data', pageHasData('met-now', 'map.setView([3,101],8)') === true);
     $ok('a nowcast notice is not data',  pageHasData('met-now', '<html>Notis Gangguan</html>') === false);
+
+    echo "\nnoticeOf():\n";
+    $ok('the notice page returns its id',  noticeOf('<html><title> Notis Gangguan </title><body></body></html>') === 'publicinfobanjir');
+    $ok('a real table is not a notice',    noticeOf("<table><tr class='item'><td>1</td></tr></table>") === null);
+    $ok('an empty body is not a notice',   noticeOf('') === null);
+    // The match is on the title, not on the body. A table that happens to print the words in a cell
+    // is still a table, and treating it as an outage would take a working feed off the map.
+    $ok('the words in body text do not match', noticeOf('<html><title>Aras Air</title><body>Notis Gangguan</body></html>') === null);
+    $ok('case and spacing do not matter',  noticeOf('<TITLE>notis   gangguan</TITLE>') === 'publicinfobanjir');
 
     echo "\nplaceQuery():\n";
     $ok('a plain query normalizes',    placeQuery('Bandar Utama') === 'bandar utama');
@@ -1346,13 +1381,28 @@ $pages = [];
    stored copy of that table. `kl.parsed` cannot say it, because a stored copy parses as well as a
    fresh one. */
 $pagesStale = [];
+$noticeHits = [];      // notice id => [region, …]
 foreach ($extraUrls as $k => $u) {
     $got = $raw[$u] ?? '';
-    if (!pageHasData($k, $got)) $got = '';        // a notice page is not a table — see above
+    if (!pageHasData($k, $got)) {
+        /* Read the raw body before the next line clears it. A notice is the one failure that states
+           its own cause, so it is the only one a reader hears about. Everything else stays in
+           $pagesStale, which the status popover already carries. */
+        $id = noticeOf($got);
+        if ($id !== null && isset(NOTICE_REGION[$k])) $noticeHits[$id][] = NOTICE_REGION[$k];
+        $got = '';
+    }
     [$write, $body] = pageRow(isset($want[$k]), $got, $stored[$u]['body'] ?? '');
     if (isset($want[$k]) && $got === '') $pagesStale[] = $k;
     if ($write) $keep->execute([$u, $now, $body]);
     $pages[$k] = $body;
+}
+
+/* One entry per notice, never one per page. Three national pages carry the same notice, and three
+   identical tiles on the strip claim one outage three times. */
+$notices = [];
+foreach ($noticeHits as $id => $regions) {
+    $notices[] = ['id' => $id, 'regions' => array_values(array_unique($regions))];
 }
 $page = fn(string $k) => $pages[$k] ?? '';
 
@@ -1805,6 +1855,8 @@ $payload = json_encode([
     // A regional notice, not a station reading. isHot() and every count in alerts() read the
     // station list alone, and this key feeds neither — see js/alerts.js for the rule.
     'warnings' => $metWarn,
+    // Empty on a healthy poll, so a reader of this key needs no special case. See noticeOf().
+    'notices'  => $notices,
     'offline'  => count(array_filter($stations, fn($s) => !$s['online'])),
 ], JSON_UNESCAPED_SLASHES);
 
