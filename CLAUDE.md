@@ -1048,8 +1048,8 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   not a shortcut around a clean API. Nobody needs to search for that endpoint again.
   A marker whose wording this parser does not know is **dropped whole**, and never read as clear
   weather: `metRung()` returns -1 and the marker vanishes, so `sources.met.parsed` falls and somebody
-  looks. Reading an unknown word as "no rain" would hide a layout change behind calm weather, which
-  is the one way a scraper must not fail.
+  looks. Reading an unknown word as "no rain" hides a layout change behind calm weather. That is the
+  one way a scraper must not fail.
 - **`MET_KM` is a flat 15 km, not a radius scaled to how far each point reaches.** A cell-scaled cutoff
   came first, sized to the area a point covers, and it failed in both directions. Sabak Bernam sits
   in a 28.5 km cell. A cell-scaled rule there accepts a station 22.8 km from its point — the weakest
