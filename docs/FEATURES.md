@@ -7401,3 +7401,32 @@ declaration answers both.
   the dialog, so the arrows and `End` still answer.
 - **No speed control on the station panel clip.** `js/clip.js` carries no controls by design. The
   lightbox is where a reader sits with a camera.
+
+## No picture, on a station card as well as on a wall tile
+
+Three of the 93 cameras JPS publishes carry no feed URL. The station panel drew a muted line for
+those, `No camera feed`, where every other camera card holds a picture. A card was a line of text
+with nothing to look at.
+
+The camera wall already had the shape for this. A tile whose picture fails to load shows `.camfail`:
+the `videocam_off` glyph and the words `No picture`, full bleed on the tile's own idle fill. The card
+now draws the same box, in the still's own place.
+
+**The look moved to `css/base.css`, and only the placement stayed in `css/chrome.css`.** The wall
+puts the box over a tile with `position: absolute` and `inset: 0`. The card puts it in flow. So the
+shared half is the flex column, the fill and the type. The tile keeps the two lines that place it.
+One fact must not get two looks.
+
+**That placement rule names `.camtile` in its selector, and that scope is load-bearing.** It carries
+`display: none`, because a tile holds the box in its markup at all times and reveals it by class.
+Unscoped, the same declaration reaches the card and hides the box there for good.
+
+`.shotnone` is the card's half. It takes the margin `.shotwrap` uses, the same 8px radius, and
+`aspect-ratio: 16 / 9`. The ratio holds the card at one height, with a feed or without one.
+
+### Deliberately not built
+
+- **A card whose picture fails to load still prints `image unavailable`.** That is a different
+  question from this one. The feed exists and the fetch failed. `camImg()`'s `onerror` also replaces
+  the `<img>` with a plain node that `js/clip.js` watches for. See the comment above `tick()` there.
+  Move the two together or leave both.

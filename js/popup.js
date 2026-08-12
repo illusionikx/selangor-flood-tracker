@@ -78,6 +78,12 @@ export const camImg = (c, alt) => `<div class="shotwrap" data-clip="${c.id.split
                   {className:'muted',textContent:'image unavailable'}))">
   <p class="clipcap"></p></div>`;
 
+/* JPS publishes no feed for this camera. A muted line stood here, which left the card a line of text
+   where every other camera card holds a picture. The wall already had the shape for it — its own
+   failed tile — so this is that box, in flow, with the same words. One fact, one look: see
+   `.camfail` in css/base.css. */
+const camNone = '<div class="camfail shotnone"><i class="i i-videocam_off"></i><b>No picture</b></div>';
+
 /* The favorite, as a menu row. `ids` is comma separated: ui.js's handler reads a full list as
    "remove every one" and anything short of full as "add every one", which is what lets one press on
    a mast act on all of its sensors. The glyph fills and turns `--fav` on the set state, the same two
@@ -369,7 +375,7 @@ function sensorBody(s) {
   // A camera shows its own view. The offer of the nearest one, and a camera card's offer of the
   // nearest water level, are both in the card header now — see nearBtn() above.
   const still = s.kind !== 'camera' ? ''
-    : s.image ? camImg(s, `Latest still from ${s.name}`) : '<div class="muted">No camera feed</div>';
+    : s.image ? camImg(s, `Latest still from ${s.name}`) : camNone;
 
   return `${still}${siren}${gauge}${wet}
     ${s.kind === 'river' ? meter(s) : ''}
