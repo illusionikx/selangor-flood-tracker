@@ -9,6 +9,11 @@
 // table's hover panels — because they are all the same markup wherever they are drawn. Each graph
 // ships its own samples in `data-pts`: `[x%, label]` per sample, worded by the function that drew
 // it (see `readout()` in popup.js). So nothing here knows a unit, a clock or a kind of sensor.
+//
+// The same box also names anything carrying `data-tip`, as a plain label with no crosshair. That is
+// what the weather glyph on a station card uses. A `title` is the obvious way to do it and is wrong
+// here: it never opens on touch, so the meaning would be missing on half the devices this runs on.
+// This module already had to solve the touch half for the graphs.
 
 let tip;                 // the readout itself, made on first use and then moved around
 let last, pts;           // the graph it is currently reading, and that graph's parsed samples
@@ -45,7 +50,33 @@ function crosshair(svg, x) {
   xh.setAttribute('x2', x);
 }
 
+/* Over the thing it names, clamped to the viewport: a graph runs to the edge of a phone. Measured
+   after the box is shown, because a closed popover has no width to clamp against, and flipped under
+   its anchor when there is no room above — the table's panels open near the top of the screen. */
+function place(t, r, cx) {
+  const above = r.top > t.offsetHeight + 10;
+  t.classList.toggle('below', !above);
+  t.style.top = `${above ? r.top - 6 : r.bottom + 6}px`;
+  const half = t.offsetWidth / 2;
+  t.style.left = `${Math.min(Math.max(cx, half + 4), innerWidth - half - 4)}px`;
+}
+
 function show(e) {
+  /* A plain label on anything carrying `data-tip`. It rides here rather than on a `title` because
+     `title` never opens on touch, and half this app's readers are on a phone — the same reason the
+     graphs needed this module. The listeners below already do the touch half. */
+  const lab = e.target.closest?.('[data-tip]');
+  if (lab) {
+    xh?.remove(); xh = null;
+    const t = box();
+    t.textContent = lab.dataset.tip;
+    t.style.color = '';
+    t.classList.remove('warn');
+    if (!t.matches(':popover-open')) t.showPopover();
+    const r = lab.getBoundingClientRect();
+    return place(t, r, r.left + r.width / 2);
+  }
+
   const spark = e.target.closest?.('.spark[data-pts]');
   const svg = spark?.querySelector('svg');
   if (!svg) return hide();
@@ -80,21 +111,19 @@ function show(e) {
   t.style.color = tone || '';
   t.classList.toggle('warn', !!warn);
   if (!t.matches(':popover-open')) t.showPopover();
-  // Above the graph, unless there is no room — the table's panels open near the top of the screen.
-  // Measured after it is shown, because a popover that is closed has no width to clamp against.
-  const above = r.top > t.offsetHeight + 10;
-  t.classList.toggle('below', !above);
-  t.style.top = `${above ? r.top - 6 : r.bottom + 6}px`;
-  // Over the crosshair, and clamped to the viewport: the graph runs to the edge of a phone.
-  const half = t.offsetWidth / 2;
-  t.style.left = `${Math.min(Math.max(r.left + at / 100 * r.width, half + 4), innerWidth - half - 4)}px`;
+  place(t, r, r.left + at / 100 * r.width);   // over the crosshair
 }
 
 addEventListener('pointermove', show);
 // Touch has no hover, and a graph is exactly the kind of thing a thumb wants to drag along: a tap
 // reads one sample, a drag scrubs, letting go puts the readout away.
 addEventListener('pointerdown', show);
-addEventListener('pointerup', e => { if (e.pointerType !== 'mouse') hide(); });
+/* A label is the opposite case: a tap on it is a request to read it, so letting go must not take it
+   away again. It stays until the next press lands somewhere else, which reaches `show()` and finds
+   nothing to name. */
+addEventListener('pointerup', e => {
+  if (e.pointerType !== 'mouse' && !e.target.closest?.('[data-tip]')) hide();
+});
 addEventListener('pointercancel', hide);
 // The card and the table both scroll under a pointer that has not moved, which would leave the
 // readout naming a sample that is no longer under it.

@@ -14,7 +14,7 @@
 
 import { KINDS, HOTLINES } from './config.js';
 import { state } from './state.js';
-import { el, isHot, dkey, tier, isIgnored } from './util.js';
+import { el, isHot, dkey, tier, isIgnored, esc } from './util.js';
 import { flashTo } from './map.js';
 import { byId } from './stations.js';
 
@@ -54,7 +54,7 @@ export function ticker() {
      alike. */
   const warns = state.warnings.map((w, i) => `<button class="tk-i tk-warn" data-warn="${i}" tabindex="-1">
       <i class="i i-rainy_heavy" style="--c:var(--k-weather)"></i>
-      <b>${w.title}</b><span class="tk-why">${w.text}</span>
+      <b>${esc(w.title)}</b><span class="tk-why">${esc(w.text)}</span>
       <span class="tk-dot">•</span>
     </button>`);
 
@@ -87,13 +87,15 @@ export function ticker() {
     </button>`;
   }));
 
-  /* What to do, on the strip that is never covered. It appears on exactly the condition that already
-     winds the strip up — `pace()` leaving its base speed, i.e. more than FAST_FROM alerts at once.
-     That threshold is not arbitrary twice over: the speed-up exists because the list has got long
-     enough that one lap is a wait, and a list that long is also the point at which "which of these
-     is about me" stops being obvious and a phone number starts being the useful thing on screen.
-     Below it the strip is calm and a standing hotline banner would be the sort of permanent warning
-     nobody reads by the second day. */
+  /* What to do, on the strip that is never covered. The threshold is not arbitrary: below it the
+     strip is calm, and a standing hotline banner would be the sort of permanent warning nobody
+     reads by the second day. Above it the list is long enough that "which of these is about me"
+     stops being obvious, and a phone number starts being the useful thing on screen.
+     It counts `hot`, and `pace()` counts `items`, so the two no longer move together — they did
+     once, and the comment here said so. A MET warning fills the strip and earns the faster lap,
+     but it is not a flood: this line tells somebody to call the flood emergency number, and rough
+     seas in the straits are no reason to say that to anybody. A response instruction belongs to
+     the thing that needs the response. Do not re-couple these two by counting `items` here. */
   const advise = hot.length > FAST_FROM
     ? `<span class="tk-i tk-say"><i class="i i-campaign"></i>
          <b>In danger? Call 999</b><span class="tk-why">flood emergency lines:

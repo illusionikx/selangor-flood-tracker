@@ -100,21 +100,30 @@
 .sensorhead .muted { flex: 1; min-width: 0; text-align: right; overflow: hidden;
   text-overflow: ellipsis; white-space: nowrap; }
 
-/* The MET section. Three cells, each with a subtitle, a glyph line and a value line, so the rows
-   line up across all three. `min-width: 0` sits on every cell. A grid item defaults to
-   `min-width: auto`, which refuses to shrink below its content. Without it, a long word in the wide
-   cell pushes the two narrow cells out of shape. */
-.wx { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; align-items: start; }
+/* The MET section. Two cells, each one a glyph, the words that belong to it, and its own title on
+   the bottom edge. `Now` takes the width it needs and `Later` takes the rest, because the two hold
+   a temperature pair and a sentence. It was three cells of equal width, which read as two thin
+   cells beside a full one.
+   Nothing sets `align-items` on the grid, so the two cells stretch to one height. `margin-top: auto`
+   on the title then parks both titles on the same line, whatever is above them.
+   `min-width: 0` sits on every cell and on every row item. A grid or flex item defaults to
+   `min-width: auto`, which refuses to shrink below its content. Without it, a long forecast line
+   pushes the other cell out of shape. */
+.wx { display: grid; grid-template-columns: auto 1fr; gap: 10px; }
 .wx > * { min-width: 0; }
-.wxcol { display: flex; flex-direction: column; align-items: center; gap: 3px;
-  font-size: 12px; line-height: 1.35; text-align: center; }
-.wxsub { font-size: 11px; color: var(--muted); }
-.wxval { font-weight: 500; }
-/* The weather glyph carries the state, so it is the largest thing in the cell. The arrows only
-   label a number and stay small. */
-.wxbig { font-size: 26px; color: var(--k-weather); }
-.wxcol .i { font-size: 14px; color: var(--k-weather); }
-.wxtemp { display: inline-flex; align-items: center; gap: 3px; }
+.wxcol { display: flex; flex-direction: column; gap: 6px; font-size: 12px; line-height: 1.35;
+  padding: 8px 10px; border-radius: 8px; background: var(--hover); }
+.wxrow { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.wxrow > * { min-width: 0; }
+.wxsub { font-size: 11px; color: var(--muted); margin-top: auto; }
+/* High over low, so the column stays about a third of the row and the forecast sentence gets the
+   rest. `cursor: help` because the pair carries a `data-tip` that names both ends. */
+.wxtemp { display: flex; flex-direction: column; font-size: 11px; line-height: 1.4; cursor: help; }
+/* The weather glyph carries the state, so it is the largest thing in the column and nothing writes
+   that state out again underneath it — the word is on `data-tip`, and `js/sparktip.js` opens it on
+   hover and on a tap. There is no `.wxcol .i` rule any more. Two classes beat one, so that rule
+   held this glyph at 14px and the large one never drew large. */
+.wxbig { font-size: 28px; color: var(--k-weather); flex: none; cursor: help; }
 .wxline { color: var(--on-surface); font-size: 11px; }
 /* A real seam. Without it the camera card below runs straight into this section and the two read
    as one block. */

@@ -972,22 +972,65 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
     $ok('the parser drops a future row',   !array_filter($w, fn($x) => $x['text'] === 'Tomorrow'));
 
     /* The Straits of Melaka is the Selangor coast. Port Klang stands on it, so a marine warning
-       naming those straits stays. One of the three live marine rows read Northern Straits of
-       Melaka and Samui, and belongs here. The other two named only distant waters. Both halves of
-       that split need a test. One wrong edit silently drops the coast, or silently admits the
-       whole region. */
+       naming those straits stays, and one naming only distant water drops.
+       These four assertions replace two that asserted the opposite. They used
+       "Northern Straits of Melaka and Samui" as the row that belongs here, and it does not: that
+       water is off Kedah, Penang and Thailand, about 300 km from Port Klang. The straits run about
+       800 km, so the name alone does not place a row on our stretch of them. The bug was written
+       into the test that was meant to catch it, which is why the far case now has a test of its
+       own in both languages. */
     $near = $row('Third Category Warning on Strong Winds and Rough Seas',
+                 'Waves over the waters of Straits of Melaka', $wnow - 60, $wnow + 3600);
+    $far  = $row('Third Category Warning on Strong Winds and Rough Seas',
                  'Waves over the waters of Northern Straits of Melaka and Samui',
                  $wnow - 60, $wnow + 3600);
     $nearBm = $row('Amaran Angin Kencang dan Laut Bergelora', '', $wnow - 60, $wnow + 3600);
-    $nearBm['text_bm'] = 'Ombak di perairan Utara Selat Melaka';
+    $nearBm['text_bm'] = 'Ombak di perairan Selat Melaka';
+    $farBm  = $row('Amaran Angin Kencang dan Laut Bergelora', '', $wnow - 60, $wnow + 3600);
+    $farBm['text_bm'] = 'Ombak di perairan Utara Selat Melaka';
+
+    /* Both stretches at once. Cutting the far name out rather than testing for it is what keeps
+       this row: the central mention still answers after the northern one is gone. */
+    $both = $row('Third Category Warning on Strong Winds and Rough Seas',
+                 'Waves over the waters of Northern Straits of Melaka and Central Straits of Melaka',
+                 $wnow - 60, $wnow + 3600);
+
+    /* MET files a storm over water as "Warning on Thunderstorms", the same words it uses over
+       land, so the heading cannot say which it is. The text can: it names the waters. */
+    $wet = $row('Warning on Thunderstorms',
+                'Thunderstorms over the waters of Selangor', $wnow - 60, $wnow + 3600);
 
     $ok('a Straits of Melaka sea warning stays',
         count(metWarnings(json_encode([$near]), $wnow)) === 1);
     $ok('the Malay wording matches too',
         count(metWarnings(json_encode([$nearBm]), $wnow)) === 1);
+    $ok('the northern straits are not our straits',
+        metWarnings(json_encode([$far]), $wnow) === []);
+    $ok('the Malay northern wording drops too',
+        metWarnings(json_encode([$farBm]), $wnow) === []);
+    $ok('a row naming both stretches stays',
+        count(metWarnings(json_encode([$both]), $wnow)) === 1);
+    $ok('a storm over our waters is not judged as land',
+        count(metWarnings(json_encode([$wet]), $wnow)) === 1);
     $ok('a sea warning for other waters still drops',
         metWarnings(json_encode([$sea]), $wnow) === []);
+
+    /* The row's own heading, never the bulletin it arrived in. One bulletin carries rows of
+       different severities: five rows of one live sample all read "Third Category Warning on
+       Strong Winds and Rough Seas" while their own headings read Third Category, Second Category,
+       First Category, and twice a thunderstorm warning. Printing the bulletin title states a
+       severity MET did not give this row. */
+    $mixed = $row('Bulletin title', 'Thunderstorms over Selangor', $wnow - 60, $wnow + 3600);
+    $mixed['heading_en'] = 'Warning on Strong Wind and Rough Seas (First Category)';
+    $ok('the row heading wins over the bulletin title',
+        metWarnings(json_encode([$mixed]), $wnow)[0]['title']
+            === 'Warning on Strong Wind and Rough Seas (First Category)');
+
+    /* A row with no heading still needs a name, so the bulletin title is the fallback. */
+    $noHead = $row('Bulletin title', 'Thunderstorms over Selangor', $wnow - 60, $wnow + 3600);
+    $noHead['heading_en'] = '';
+    $ok('the bulletin title is the fallback',
+        metWarnings(json_encode([$noHead]), $wnow)[0]['title'] === 'Bulletin title');
 
     $dupe = metWarnings(json_encode([$rain, $rain, $rain]), $wnow);
     $ok('three identical rows collapse to one', count($dupe) === 1);

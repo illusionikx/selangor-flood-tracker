@@ -418,14 +418,19 @@ const wxIcon = r => {
   return (night() && w.night) || w.icon;
 };
 
-/* The MET section. Three cells, each carrying a subtitle, a glyph line and a value line, so the
-   three line up across the row.
+/* The MET section. Two cells, `Now` and `Later`, each one glyph beside the words that belong to it.
    This section appears once per card and never once per sensor. Rain over a place is one fact, and
    sourceInfo() already taught this app what a per-place fact costs when it repeats down a mast.
-   The header carries the point and the distance, which is what lets a reader weigh a 14 km claim.
-   The third cell reads rung, the worst rain in the three-hour window. It matches its own
-   sentence underneath and stops contradicting it. hr1 stays in the payload to answer a different
-   question: will it rain in one hour. The code renders rung only. */
+   The header carries no point name and no distance. It did, and the owner asked for both to go
+   after seeing them on screen. The cost was accepted knowingly: the card states weather from a
+   point up to MET_KM away and shows nothing a reader can weigh that against. `at` and `km` stay
+   in the payload, so restoring the line is one span here and nothing else.
+   `Later` reads rung, the worst rain in the three-hour window, so the glyph and the sentence beside
+   it describe one window. It read hr1 once, which drew a clear sky next to the words `Rain 12:00`.
+   hr1 stays in the payload to answer a different question: will it rain in one hour.
+   Either cell can be absent. 53 of 677 stations sit inside a forecast district but outside
+   MET_KM of any nowcast point, so they carry a temperature and no rain at all. The grid's first
+   column is `auto` for that reason — one cell left alone sizes to itself rather than stretching. */
 function metSection(s) {
   const m = s.met;
   if (!m) return '';
@@ -433,38 +438,48 @@ function metSection(s) {
   const w = r => WEATHER[r] || WEATHER[0];
 
   /* Four shapes, and every one names both ends. `until` says the rain ends. `past` says the MET
-     outlook ended, and never that the rain did. */
-  const rain = m.rung == null ? '' :
+     outlook ended, and never that the rain did. A fifth shape for the dry case: `metSpan()` returns
+     null when no step in the window is wet, so there is no span to word. The cell said nothing at
+     all then, and a glyph on its own is not an answer to "what happens next". */
+  const rain = m.rung == null ? 'No rain in the next 3 hours' :
     `${w(m.rung).line}${m.from ? ` ${m.from}${m.open ? ',' : ''}` : ''} `
     + `${m.open ? 'past' : 'until'} ${m.to}`;
 
-  const cell = (sub, glyph, value, extra = '') => `<div class="wxcol">
-      <span class="wxsub">${sub}</span>
-      ${glyph}
-      <span class="wxval">${value}</span>
-      ${extra}
+  /* The glyph is the state, so the state is not also written under it. The word rides on `data-tip`,
+     which `js/sparktip.js` opens on hover and on a tap — a `title` would say nothing to a thumb.
+     `aria-label` carries the same word for a reader who hears the card instead. */
+  const big = r => `<i class="i wxbig i-${wxIcon(r)}" role="img"`
+    + ` aria-label="${w(r).word}" data-tip="${w(r).word}"></i>`;
+
+  /* Two columns, each one glyph and the words that belong to it. The two temperatures stack, high
+     over low, and neither one is labelled — the order says which is which, and the same pair in
+     one line made a reader work it out. `data-tip` names both ends for anyone the order does not
+     answer, on the same hover and the same tap as the glyph beside it. */
+  const now = m.now == null && m.tmax == null ? '' : `<div class="wxcol">
+      <div class="wxrow">
+        ${m.now == null ? '' : big(m.now)}
+        ${m.tmax == null ? '' : `<span class="wxtemp" data-tip="Max ${m.tmax}° · Min ${m.tmin}°">
+          <span>${m.tmax}°</span><span>${m.tmin}°</span>
+        </span>`}
+      </div>
+      <span class="wxsub">Now</span>
     </div>`;
 
-  /* Two lines with their own arrows. One range in one string made a reader work out which number
-     was the maximum. */
-  const temp = m.tmax == null ? '' : cell('Today',
-    `<span class="wxtemp"><i class="i i-arrow_upward"></i>${m.tmax}°</span>`,
-    `<span class="wxtemp"><i class="i i-arrow_downward"></i>${m.tmin}°</span>`);
-
-  const now = m.now == null ? '' : cell('Current',
-    `<i class="i wxbig i-${wxIcon(m.now)}"></i>`, w(m.now).word);
-
   const later = m.rung ?? 0;
-  const out = m.hr1 == null ? '' : cell('Later',
-    `<i class="i wxbig i-${wxIcon(later)}"></i>`, w(later).word,
-    rain ? `<span class="wxline">${rain}</span>` : '');
+  const out = m.hr1 == null ? '' : `<div class="wxcol">
+      <div class="wxrow">
+        ${big(later)}
+        <span class="wxline">${rain}</span>
+      </div>
+      <span class="wxsub">Later</span>
+    </div>`;
 
   return `<div class="sensor wxsec" data-sensor="@met">
       <div class="sensorhead">
         <i class="glyph i i-${wxIcon(m.rung ?? m.now ?? 0)}" style="color:var(--k-weather)"></i>
         <b>Weather</b>
       </div>
-      <div class="wx">${temp}${now}${out}</div>
+      <div class="wx">${now}${out}</div>
     </div>`;
 }
 

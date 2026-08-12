@@ -40,6 +40,16 @@ export const isFav = s => (PREFS.favs || []).includes(s.id);
 export const dkey = s => `${s.state || '—'}|${s.district || 'Unknown'}`;
 export const num = (v, u) => (v === null || v === undefined) ? '—' : v + u;
 
+/* Text from an upstream, on its way into a template string.
+   Every other string this app interpolates is one of ours: a station name from JPS, a number, a
+   word out of a table in config.js. A MET warning is the first free prose we render, written by a
+   department that owns its own publishing and never promised us any escaping. It happens to send
+   entities today. That is an upstream choice, not a contract, and it can change without telling us.
+   The service worker on this origin makes the cost of being wrong higher than the cost of the call,
+   so warning text goes through here at every site that renders it. */
+export const esc = s => String(s ?? '').replace(/[&<>"']/g,
+  c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
 export const parseMY = t => {                // "21/07/2026 17:45:00" → Date
   const m = /^(\d\d)\/(\d\d)\/(\d{4}) (\d\d):(\d\d)/.exec(t || '');
   return m ? new Date(m[3], m[2] - 1, m[1], m[4], m[5]) : null;

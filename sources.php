@@ -374,10 +374,25 @@ const WARN_DROP = ['earthquake', 'tsunami', 'gempa', 'no advisory', 'tiada'];
 /* Rows about the sea. Most name water this map does not reach, so they drop by default. */
 const WARN_SEA = ['rough sea', 'strong wind', 'angin kencang', 'laut bergelora'];
 
+/* The words MET uses when a warning is about water rather than land. The heading alone misses
+   these rows: a storm at sea and a storm over a town are both "Warning on Thunderstorms". */
+const WARN_WATER = ['waters of', 'perairan'];
+
 /* The one stretch of sea that counts. The Straits of Melaka is the Selangor coast. Port Klang
    stands on it, so rough water there reaches the area this map covers. Water off Phuket, Samui,
    Layang-Layang, Palawan and Sulu does not. A marine row survives only by naming these straits. */
 const WARN_SEA_KEEP = ['straits of melaka', 'straits of malacca', 'selat melaka'];
+
+/* The straits run about 800 km, and naming them is not the same as naming our stretch of them.
+   MET writes "the waters of Northern Straits of Melaka and Samui" for water off Kedah, Penang and
+   Thailand, roughly 300 km from Port Klang. That row contains "straits of melaka" and passed the
+   list above on those three words alone, which put a warning about Thai water on the ticker.
+   So a far stretch is cut out of the text before the keep test reads it, rather than blocked by a
+   test of its own. Cutting rather than blocking is what keeps a row naming two stretches: strip
+   the northern mention from "Northern Straits of Melaka and Central Straits of Melaka" and the
+   central one still answers. A row that names only the far stretch has nothing left to match. */
+const WARN_SEA_FAR = ['northern straits of melaka', 'northern straits of malacca',
+                      'utara selat melaka', 'selat melaka utara'];
 
 /* The places this map covers. A warning over land must name one of them.
    The last pair is wider than the rest on purpose. MET names some warnings by coast, not by
@@ -406,7 +421,15 @@ function metWarnings(string $json, int $now): array {
     $out = [];
     $seen = [];
     foreach ($rows as $r) {
-        $title = trim((string)($r['warning_issue']['title_en'] ?? ''));
+        /* `heading_en` is this row's own heading. `warning_issue.title_en` is the bulletin it
+           arrived in, and one bulletin carries rows of different severities: five rows of one
+           sample all read "Third Category Warning on Strong Winds and Rough Seas" while their own
+           headings read Third Category, Second Category, First Category and, twice, a thunderstorm
+           warning. Printing the bulletin title states a severity MET did not give this row, which
+           is the one thing an alert surface must never invent. The bulletin title is the fallback,
+           because a row with no heading still needs a name. */
+        $title = trim((string)($r['heading_en'] ?? ''));
+        if ($title === '') $title = trim((string)($r['warning_issue']['title_en'] ?? ''));
         $text  = trim((string)($r['text_en'] ?? ''));
         if ($title === '' && $text === '') continue;
 
@@ -417,15 +440,27 @@ function metWarnings(string $json, int $now): array {
         $hay = strtolower($title . ' ' . (string)($r['heading_en'] ?? ''));
         foreach (WARN_DROP as $bad) if (str_contains($hay, $bad)) continue 2;
 
+        /* The place test reads English and Malay text, because MET writes some rows in one
+           language only. */
+        $where = strtolower($text . ' ' . (string)($r['text_bm'] ?? ''));
+
+        /* Is this row about water? The heading is not enough on its own. MET files a storm over
+           the sea as "Warning on Thunderstorms", the same words it uses over land, so a heading
+           test alone reads a marine row as a land one and judges it by the wrong list. The text
+           says which it is: MET writes "over the waters of" for a marine row every time. */
         $sea = false;
         foreach (WARN_SEA as $s) if (str_contains($hay, $s)) { $sea = true; break; }
+        if (!$sea) foreach (WARN_WATER as $s) if (str_contains($where, $s)) { $sea = true; break; }
 
-        // One place test, two word lists. The test checks English and Malay text, because MET
-        // writes some rows in one language only.
-        $where = strtolower($text . ' ' . (string)($r['text_bm'] ?? ''));
+        /* A row survives by naming somewhere this map covers. A marine row has a second way in:
+           our stretch of the straits, with the far stretch cut out first. Both ways are open to a
+           marine row on purpose — "the waters of Selangor" names the coast without naming the
+           straits, and it is as much our weather as the straits are. */
         $near = false;
-        foreach ($sea ? WARN_SEA_KEEP : WARN_HERE as $k) {
-            if (str_contains($where, $k)) { $near = true; break; }
+        foreach (WARN_HERE as $k) if (str_contains($where, $k)) { $near = true; break; }
+        if (!$near && $sea) {
+            foreach (WARN_SEA_FAR as $f) $where = str_replace($f, '', $where);
+            foreach (WARN_SEA_KEEP as $k) if (str_contains($where, $k)) { $near = true; break; }
         }
         if (!$near) continue;
 

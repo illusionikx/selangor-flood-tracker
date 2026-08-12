@@ -6817,10 +6817,33 @@ and the weather block states no river level.
 
 ### The card section
 
-Every station card now carries a weather section: three cells above the sensor list. The first cell
-gives the high and low for the day. The second gives the current sky. The third gives the outlook
-for the next three hours. The section appears on every card, not on rivers alone, because the same
-sky sits over a rain gauge, a siren and a camera alike.
+Every station card now carries a weather section above the sensor list. It holds two cells, `Now`
+and `Later`. `Now` gives the current sky and the high and low for the day. `Later` gives the outlook
+for the next three hours. Each cell is a filled box with its title on the bottom edge, so the two
+read as two answers rather than as one row of parts. The section appears on every card, not on
+rivers alone, because the same sky sits over a rain gauge, a siren and a camera alike.
+
+`Later` always carries a sentence. `metSpan()` returns null when no step in the three-hour window is
+wet, so there is no span to word, and the cell held a glyph and nothing else. A glyph on its own
+does not answer "what happens next". The dry case now reads `No rain in the next 3 hours`.
+
+The sky itself is a glyph, and no line writes the state out under it. The word rides on `data-tip`,
+which `js/sparktip.js` opens on hover and on a tap. The graphs' readout already had to solve the
+touch half, so a label costs one branch in a module that is on the page anyway. A `title` is the
+obvious way to do this and is the wrong way. It never opens on touch, so the word goes missing on
+half the devices this runs on. See the `title` gotcha in `CLAUDE.md`. The glyph also carries an
+`aria-label` with the same word, for a reader who hears the card.
+
+The section was three cells of equal width: a temperature pair, the current sky, and the outlook.
+The outlook cell carries a sentence. The other two carry a word each. So one cell filled its column
+and the other two stood nearly empty. Two columns give the sentence the room it needs. `Now` takes
+the width its two temperatures need, and `Later` takes the rest.
+
+Two smaller changes came with it. The glyph is 28px, because the sky is the state and the words
+beside it are the detail. The old rule set 26px on `.wxbig` and 14px on `.wxcol .i`. Two classes
+beat one, so the large glyph drew at 14px for as long as the section existed. The temperatures also
+stack, high over low, in place of an up arrow and a down arrow. The order says which is which. Their
+`data-tip` says it in words, `Max 34° · Min 25°`, for anyone the order does not answer.
 
 232 rain gauges already measure the rain that fell. None of them says what arrives next. A reading
 states the past. A forecast is the one part of this section a sensor cannot give, and lead time is
@@ -6884,10 +6907,31 @@ Both surfaces open the same modal with the full text. The panel row clips to one
 tile carries the whole sentence, because the strip has no line under it to crowd.
 
 The feed carries nine fields and not one of them is a coordinate. The only way to place a warning
-is to read its own text, so `metWarnings()` in `sources.php` does. A marine row survives only by
-naming the Straits of Melaka, the stretch of sea this coast sits on. A land row survives only by
-naming a place this map covers, including `west coast` and `pantai barat`, since MET sometimes
-names a warning by coast rather than by state.
+is to read its own text, so `metWarnings()` in `sources.php` does. Every row survives by naming a
+place this map covers, including `west coast` and `pantai barat`, since MET sometimes names a
+warning by coast rather than by state. A marine row gets a second way in: the Straits of Melaka,
+the stretch of sea this coast sits on.
+
+Two rules took a second pass, and the review that found them was right to.
+
+The straits run about 800 km, so naming them is not the same as naming our stretch of them. MET
+publishes "the waters of Northern Straits of Melaka and Samui" for water off Kedah, Penang and
+Thailand. Port Klang is about 300 km away. That row holds the three words `straits of melaka`, and
+it passed on those words alone. A warning about Thai water reached the ticker.
+
+`WARN_SEA_FAR` is cut out of the text before the keep test reads it. Cutting beats testing here,
+because a row can name two stretches at once. Strip the northern mention from "Northern Straits of
+Melaka and Central Straits of Melaka" and the central one still answers. A row that names only the
+far stretch has nothing left to match on.
+
+The sea test also read the wrong field. MET files a storm over water as "Warning on Thunderstorms",
+which is what it calls a storm over a town, so the heading alone cannot separate them. A marine row
+was read as a land row and judged by the land list. `WARN_WATER` reads the text instead, for
+"waters of" or "perairan", which MET writes on every marine row. This matters in both directions:
+it also lets in "the waters of Selangor", which names our coast without naming the straits.
+
+Measured on a seven-row live feed: one row survived before these two rules and none after. The one
+that survived was the Thai-water row.
 
 A warning for the whole peninsula still drops. That gap stays open on purpose: widening the match
 to `semenanjung` or `peninsular` also opens the door to warnings about every other state on the

@@ -4,7 +4,7 @@
 
 import { KINDS, STATUS_COLOR, NO_INFO, ALERT_TITLE } from './config.js';
 import { state, PREFS } from './state.js';
-import { el, distKm, dkey, isHot, tier, TIER_RANK, isIgnored, noSec, isFav } from './util.js';
+import { el, distKm, dkey, isHot, tier, TIER_RANK, isIgnored, noSec, isFav, esc } from './util.js';
 import { side, openSide, closeSide } from './map.js';
 import { etaText } from './popup.js';
 
@@ -163,8 +163,8 @@ function warnCard(list) {
         <b>Forecast Warning</b>
       </div>
       ${list.map((w, i) => `<button class="warnrow" data-warn="${i}">
-        <b>${w.title}</b>
-        <span class="warntext">${w.text}</span>
+        <b>${esc(w.title)}</b>
+        <span class="warntext">${esc(w.text)}</span>
       </button>`).join('')}
     </div>`;
 }

@@ -1,8 +1,10 @@
 # Klang Valley Flood Watch
 
 Single-page map of live flood telemetry for Selangor, Kuala Lumpur and Putrajaya, from three JPS
-sources. `api.php` also proxies OpenStreetMap Nominatim server-side for the go-to box's place search
-(`?place=`) — a fourth upstream host, contacted only from PHP, never from the browser.
+sources. `api.php` reaches three more hosts server-side, and each one answers a different question:
+OpenStreetMap Nominatim for the go-to box's place search (`?place=`), `met.gov.my` for the rain
+outlook, and `api.data.gov.my` for the day's temperature and MET's own warnings. Six upstream hosts
+in all. **PHP contacts every one of them. The browser contacts none.**
 No auth, no build step, no framework. Served by Laravel Herd at `https://flood-exp.test`.
 
 > **Keep the docs current.** When a feature lands or a decision is made, append it to
@@ -31,7 +33,7 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `js/map.js` | map instance, basemap/theme, cluster, the station panel (`openSide`), `focusOn` / `flashTo` |
 | `js/heat.js` | both heat layers (water level, rainfall), ground-fixed sizing, shared opacity |
 | `js/popup.js` | popup + meter + gauge + sparkline templates |
-| `js/sparktip.js` | the hover/tap readout on every graph. One delegated listener, no imports |
+| `js/sparktip.js` | the hover/tap readout on every graph, and the label on any `data-tip`. One delegated listener, no imports |
 | `js/render.js` | rebuilds markers and heat points; drawer summary table |
 | `js/alerts.js` | "On alert": the app bar's warning glyph, the list it opens in `#side`, the icon badge, the red favicon, and the MET warning cards above that list |
 | `js/table.js` | the all-stations table dialog, grouped district → mast → sensor |
@@ -76,8 +78,9 @@ Dependencies must stay acyclic; anything two modules both need lives in `state.j
 Three JPS feeds, joined on the national station code (`station_Id` in the Selangor API, `Station ID`
 in both HTML tables). Priority for a *reading* is national → whichever feed placed the pin.
 Coordinates only ever come from Selangor or WP; the national portal publishes none.
-(`api.php` also proxies a fourth, unrelated upstream — OpenStreetMap Nominatim, for `?place=` — but
-that one is not a flood-data source and joins nothing here; see the `## api.php` section below.)
+Only these three carry water. The other three hosts in the table below are not flood-data sources.
+Nominatim answers `?place=` and joins nothing at all. The two MET hosts join a station by nearest
+point and by district name, and they never touch a reading. See the `## api.php` section below.
 
 | source | gives | shape |
 |---|---|---|
@@ -1062,10 +1065,22 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   instant claim overstates it by about five times.
 - **The warning feed carries no coordinates.** Nine fields, and none of them is geographic. The only
   way to place a warning is to read its text, so `metWarnings()` in `sources.php` does exactly that.
-  A marine row drops unless it names the Straits of Melaka (`WARN_SEA_KEEP`). Port Klang stands on
-  those straits, so rough water there reaches this map. Water off Phuket, Samui, Layang-Layang,
-  Palawan and Sulu does not. Measured on the live feed: three live warnings, all marine, and the
-  rule kept exactly one. A land row must name a place this map covers (`WARN_HERE`). That list
+  Every row must name a place this map covers (`WARN_HERE`). A marine row gets a second way in: our
+  stretch of the Straits of Melaka (`WARN_SEA_KEEP`). Port Klang stands on those straits, so rough
+  water there reaches this map. Water off Phuket, Samui, Layang-Layang, Palawan and Sulu does not.
+  **Naming the straits is not the same as naming our stretch of them.** They run about 800 km. MET
+  writes "the waters of Northern Straits of Melaka and Samui" for water off Kedah, Penang and
+  Thailand, about 300 km from Port Klang, and that row holds the three words `straits of melaka`. It
+  passed on them alone and put Thai water on the ticker. `WARN_SEA_FAR` is **cut out of the text**
+  before the keep test reads it, rather than tested for. Cutting is what keeps a row that names two
+  stretches: strip the northern mention from "Northern Straits of Melaka and Central Straits of
+  Melaka" and the central one still answers. A row naming only the far stretch has nothing left.
+  **The sea test cannot read the heading alone.** MET files a storm over water as "Warning on
+  Thunderstorms", the same words it uses over land, so a heading test read a marine row as a land
+  one and judged it by the wrong list. `WARN_WATER` reads the text for "waters of" or "perairan",
+  which MET writes on every marine row. Measured on a seven-row feed: one row survived before these
+  two rules and none after, and the one that survived was the Thai-water row.
+  A land row must name a place this map covers (`WARN_HERE`). That list
   includes `west coast` and `pantai barat`. MET names some warnings by coast rather than by state,
   and Selangor sits on the west coast. **A warning for the whole peninsula still drops.** That gap
   is open on purpose: adding `semenanjung` and `peninsular` also lets in warnings about every other

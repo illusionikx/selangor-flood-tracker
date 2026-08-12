@@ -2,7 +2,7 @@
 
 import { KINDS, MAST, camSrc, FEED, STATIC, NEAR_MAX_KM } from './config.js';
 import { state, PREFS, PREFS_KEY, save } from './state.js';
-import { el, distKm, dkey, ignoredIds, leads, favIds, isFav, squash, termsOf, matches
+import { el, distKm, dkey, ignoredIds, leads, favIds, isFav, squash, termsOf, matches, esc
        } from './util.js';
 import { map, setTheme, applyTheme, flashTo, closeSide, showPlace } from './map.js';
 import { heatOpacity, syncHeat } from './heat.js';
@@ -1092,6 +1092,17 @@ document.addEventListener('click', e => {
 // --- MET warnings ------------------------------------------------------------------------------
 
 const warnBox = el('warnBox');
+
+/* MET stamps a validity window "2026-08-10T09:00:00", Malaysian wall clock with no offset — the
+   same shape JPS uses, and the same trap. `new Date()` on a string with no offset reads it as the
+   reader's own zone, so a viewer outside Malaysia would see the window slide by their offset. This
+   rearranges the characters and does no time arithmetic at all, which is what `noSec()` does to a
+   JPS stamp for the same reason. 24-hour, because every clock in this app is. */
+const warnWhen = s => {
+  const m = /^(\d{4})-(\d\d)-(\d\d)T(\d\d:\d\d)/.exec(String(s || ''));
+  return m ? `${m[3]}/${m[2]}/${m[1]} ${m[4]}` : String(s || '');
+};
+
 // One click handler for both surfaces. The panel row and the ticker tile both carry data-warn,
 // the index into state.warnings. Neither carries data-go: a warning is not a station, and opens
 // no card.
@@ -1100,8 +1111,8 @@ document.addEventListener('click', e => {
   if (!w) return;
   const it = state.warnings[+w.dataset.warn];
   if (!it) return;
-  el('warnBody').innerHTML = `<h3>${it.title}</h3><p>${it.text}</p>
-    <p class="muted">Valid ${it.from} to ${it.to}</p>`;
+  el('warnBody').innerHTML = `<h3>${esc(it.title)}</h3><p>${esc(it.text)}</p>
+    <p class="muted">Valid ${warnWhen(it.from)} to ${warnWhen(it.to)}</p>`;
   warnBox.showModal();
 });
 // Backdrop closes it, like every other dialog here. The × and Esc do the rest.
