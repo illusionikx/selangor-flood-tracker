@@ -475,6 +475,11 @@ table.data button[data-pop] { cursor: pointer; }
   text-decoration: none;   /* one item is an <a> — see mapLink() in popup.js */
 }
 .mi:hover { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+/* A row that reports there is nothing to offer. `:disabled` covers the pointer and the keyboard for
+   free, so the only thing left is to stop it looking pressable — the hover wash included, which the
+   rule above would otherwise still paint under a cursor that can do nothing there. */
+.mi:disabled { color: var(--muted); cursor: default; }
+.mi:disabled:hover { background: none; }
 .mi .i { font-size: 18px; color: var(--muted); margin-top: 1px; }
 .mi small { font-size: 11px; }
 /* The label takes the slack, so a row that also carries a number on the right keeps the number

@@ -6732,6 +6732,27 @@ was a ⋮.
 
 `.i-info` stays in the About dialog and the Help item, which are information and nothing else.
 
+### The nearest offer is always a row, and says so when there is none
+
+`CAM_MAX_KM` caps the nearest webcam and the nearest water level. Past that cap the code drew no
+row. So the menu held five items on one station and four on the next. A reader who had seen the
+offer once then had no way to tell "there is none here" from "the app forgot". The row is always
+there now. With nothing inside the cap it draws `disabled`.
+
+Both rows also swapped their two lines. The station name led, with `Nearest webcam · 2.3 km away`
+underneath, which named a place before it said why that place was on the menu. It also left the row
+with no fixed first line, so the empty case had nothing to be the short version of. A row now leads
+with `Nearest webcam` or `Nearest water level`. Under it comes the place and the distance, or
+`No webcam nearby` and `No water level nearby`.
+
+`disabled` covers the pointer and the keyboard on its own, so the CSS only stops the row looking
+pressable — muted ink, the default cursor, and no hover wash. The row states no distance. The cap is
+ours, and a reader wants the verdict rather than our arithmetic.
+
+A Monitoring Station that carries its own camera still passes no row at all. The card lists that
+camera as a section below, and an offer to go somewhere else for a picture that is already on screen
+is not an answer to anything.
+
 ## Help and About split into two dialogs
 
 The menu opens Help and About as separate entries and always did. Behind them stood one dialog with
@@ -6819,8 +6840,10 @@ and the weather block states no river level.
 
 Every station card now carries a weather section above the sensor list. It holds two cells, `Now`
 and `Later`. `Now` gives the current sky and the high and low for the day. `Later` gives the outlook
-for the next three hours. Each cell is a filled box with its title on the bottom edge, so the two
-read as two answers rather than as one row of parts. The section appears on every card, not on
+for the next three hours. Each cell is a filled box with its title on the bottom
+edge, centred under the glyph, so the two read as two answers rather than as one row of parts. `--g`
+in `css/map.css` is the glyph box, and the glyph and the title both read it, so one number keeps them
+lined up. The section appears on every card, not on
 rivers alone, because the same sky sits over a rain gauge, a siren and a camera alike.
 
 `Later` always carries a sentence. `metSpan()` returns null when no step in the three-hour window is
@@ -6966,6 +6989,21 @@ small gated shed, so the word described something that is not there. Two names r
 The kind names are `KINDS[...].label` and `.one` in `js/config.js`, which every badge already
 reads. Help spelled one of them `flood-depth gauge` on six lines while the badge beside it read
 `Flood gauge`. Help now uses the spelling on that badge.
+
+A node's card draws like a station's card. The reading sat loose under the header with no heading of
+its own. It is a `.sensor` section now, headed by the glyph and the kind, which is the same section
+a station gives each of its sensors. So the reading always arrives under a heading that names what
+it measures. The section head carries no ⋮, because the header already holds the card's one menu. A
+station needs one menu per sensor, and a node has one sensor.
+
+The header keeps its kind badge, so the kind is on the card twice. The two answer two questions. The
+badge answers "what is this place" at a glance, which is the job a station's row of badges does. The
+heading answers "what am I looking at" over the reading itself.
+
+`.wxsec` went with it. The weather section drew a rule under itself because the body below it had no
+head. Now that body is a `.sensor`, which draws its own rule above itself, and the two together made
+a double line. That is the same double line `#sideBody > .sensor:first-child` removes at the top of
+the card.
 
 Two rendered strings held the old word, and both changed: the Help glossary with the rows around
 it, and the empty state of the favorites panel in `js/render.js`.

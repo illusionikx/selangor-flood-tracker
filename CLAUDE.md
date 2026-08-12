@@ -1222,7 +1222,10 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   plot against the clock, not against sample index. Windowed to `SPARK_WIN` (12h) and thinned to one point per `SPARK_BUCKET` (15 min)
   server-side; `SPARK_H` in `config.js` is a **cap**, not a fixed frame — the axis spans the points
   actually held and only starts sliding once they exceed it. It must not exceed `SPARK_WIN`.
-- Station cards share one template: badge → name → region → body → still/link → footer. `meter()` renders
+- Station cards share one template: name → region → one badge per sensor in `.pophead`, then one
+  `.sensor` section per sensor, each headed by its glyph and kind. A place with one sensor draws the
+  same way as a place with four. The kind is on the card twice on purpose: the badge answers what
+  the place is, and the heading names the reading under it. `meter()` renders
   water level on a **piecewise** scale (alert 38%, warning 68%, danger 100%) because real
   thresholds bunch above 88% on a linear bar. **The scale does not start at 0 m** — most stations read
   against an absolute datum (SERENDAH alerts at 35.80 m), so a bar from zero put every calm one hard

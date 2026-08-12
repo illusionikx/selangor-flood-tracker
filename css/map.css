@@ -109,13 +109,17 @@
    `min-width: 0` sits on every cell and on every row item. A grid or flex item defaults to
    `min-width: auto`, which refuses to shrink below its content. Without it, a long forecast line
    pushes the other cell out of shape. */
-.wx { display: grid; grid-template-columns: auto 1fr; gap: 10px; }
+.wx { display: grid; grid-template-columns: auto 1fr; gap: 10px; --g: 28px; }
 .wx > * { min-width: 0; }
 .wxcol { display: flex; flex-direction: column; gap: 6px; font-size: 12px; line-height: 1.35;
   padding: 8px 10px; border-radius: 8px; background: var(--hover); }
 .wxrow { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .wxrow > * { min-width: 0; }
-.wxsub { font-size: 11px; color: var(--muted); margin-top: auto; }
+/* The title sits under the glyph and centres on it, so `--g` is the glyph box and both read it. The
+   two titles are narrower than the box, so nothing spills. `nowrap` is the guard for the day one is
+   not: a title wider than `--g` overhangs evenly instead of breaking into two lines. */
+.wxsub { font-size: 11px; color: var(--muted); margin-top: auto;
+  width: var(--g); text-align: center; white-space: nowrap; }
 /* High over low, so the column stays about a third of the row and the forecast sentence gets the
    rest. `cursor: help` because the pair carries a `data-tip` that names both ends. */
 .wxtemp { display: flex; flex-direction: column; font-size: 11px; line-height: 1.4; cursor: help; }
@@ -123,11 +127,12 @@
    that state out again underneath it — the word is on `data-tip`, and `js/sparktip.js` opens it on
    hover and on a tap. There is no `.wxcol .i` rule any more. Two classes beat one, so that rule
    held this glyph at 14px and the large one never drew large. */
-.wxbig { font-size: 28px; color: var(--k-weather); flex: none; cursor: help; }
+.wxbig { font-size: var(--g); color: var(--k-weather); flex: none; cursor: help; }
 .wxline { color: var(--on-surface); font-size: 11px; }
-/* A real seam. Without it the camera card below runs straight into this section and the two read
-   as one block. */
-.wxsec { padding-bottom: 12px; border-bottom: 1px solid var(--outline); }
+/* The weather section needs no seam of its own, and `.wxsec` is gone. It carried a bottom rule while
+   the sensor under it was a loose body with no head. Every card wraps its sensor in a `.sensor` now,
+   which draws its own top rule, so the two together were the double line that
+   `#sideBody > .sensor:first-child` exists to stop at the other end. */
 
 /* --- markers -------------------------------------------------------------------------------- */
 

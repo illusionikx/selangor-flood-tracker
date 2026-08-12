@@ -198,20 +198,31 @@ export function camNear(from, cam) {
    `title` — which a phone never opens. A menu row is the shape that states the name, the distance
    and the reading in plain text and still costs the card no height.
    `.mi`, the same row the menu's other items use. The glyph names the kind, so a reader who opens
-   the menu for the favorite reads what else is here without a legend. */
+   the menu for the favorite reads what else is here without a legend.
+   What the row *is* leads, and what it found follows. The station name led first, with the label and
+   the distance underneath, which named a place before saying why it was on the menu. It also gave
+   the row no fixed first line, so the empty case had nothing to be the short version of. Both rows
+   now read `Nearest webcam` or `Nearest water level`, then the place and the distance, or the reason
+   there is neither. */
 const nearItem = (icon, attr, what, note, right = '') =>
   `<button class="mi" ${attr}><i class="i i-${icon}"></i>
      <span>${what}<br><small class="muted">${note}</small></span>${right}</button>`;
 
 /* A camera on the *same mast* is not a nearest-anything. It is this station's own view, so it names
    no place and drops the distance, which would read "0.0 km". `from` may be a bare latlng from a map
-   click, which has no `site` — hence the guard rather than a plain comparison. */
-export const camLink = (from, cam) => !cam ? ''
+   click, which has no `site` — hence the guard rather than a plain comparison.
+   With nothing inside the cap the row is still drawn, `disabled`, saying so. It used to print
+   nothing at all, so the menu on one station held five items and the menu on the next held four,
+   and a reader who had seen the offer once had no way to tell "there is none" from "the app forgot".
+   The empty row states no distance: the cap is ours, and a reader wants the verdict rather than our
+   arithmetic. */
+export const camLink = (from, cam) => !cam
+  ? nearItem('photo_camera', 'disabled', 'Nearest webcam', 'No webcam nearby')
   : from.site && from.site === cam.site
     ? `<button class="mi" data-cam="${cam.id}"><i class="i i-photo_camera"></i>
          <span>Show webcam</span></button>`
-    : nearItem('photo_camera', `data-cam="${cam.id}"`, cam.name,
-        `Nearest webcam · ${distKm(from, cam).toFixed(1)} km away`);
+    : nearItem('photo_camera', `data-cam="${cam.id}"`, 'Nearest webcam',
+        `${cam.name} · ${distKm(from, cam).toFixed(1)} km away`);
 
 /* The reverse, for a camera standing on its own. Every other card offers the nearest picture. A
    camera card offered nothing, and a picture of water is a question about a number — "is that high?"
@@ -221,9 +232,10 @@ export const camLink = (from, cam) => !cam ? ''
    The row jumps to that station, where the meter states it properly.
    Only on a camera that is not on a mast with a river. Where they share a mast the card already
    shows both, and this would point at the section under it. */
-export const levelLink = (from, s) => !s ? ''
-  : nearItem(KINDS.river.icon, `data-go="${s.id}"`, s.name,
-      `Nearest water level · ${distKm(from, s).toFixed(1)} km away`,
+export const levelLink = (from, s) => !s
+  ? nearItem(KINDS.river.icon, 'disabled', 'Nearest water level', 'No water level nearby')
+  : nearItem(KINDS.river.icon, `data-go="${s.id}"`, 'Nearest water level',
+      `${s.name} · ${distKm(from, s).toFixed(1)} km away`,
       `<b class="mv" style="color:${color(s)}">${s.level} m</b>`);
 
 export function meter(s) {
@@ -474,7 +486,7 @@ function metSection(s) {
       <span class="wxsub">Later</span>
     </div>`;
 
-  return `<div class="sensor wxsec" data-sensor="@met">
+  return `<div class="sensor" data-sensor="@met">
       <div class="sensorhead">
         <i class="glyph i i-${wxIcon(m.rung ?? m.now ?? 0)}" style="color:var(--k-weather)"></i>
         <b>Weather</b>
@@ -486,8 +498,13 @@ function metSection(s) {
 export function popup(s) {
   const kind = KINDS[s.kind];
   const tone = hasInfo(s) ? kind.color : 'var(--muted)';
-  /* Place first, sensor second: you look up a popup by where it is, and the badge answers the
+  /* Place first, sensor second: you look up a popup by where it is, and the kind answers the
      follow-up question ("what is this reading?") rather than the opening one.
+     The kind is said twice, and the two say it to two readers. The badge in the header answers
+     "what is this place" at a glance, which is what a Monitoring Station's row of badges answers on
+     the other card. The section heading below answers "what am I looking at" over the reading
+     itself, which is the section a Monitoring Station gives each of its sensors. A node card and a
+     station card now draw the reading the same way.
      One control in the corner, on the close button's line, and it is the ⋮. A favorite heart held
      that slot, and then a webcam glyph beside the heart — two controls owing the title 108px of a
      328px line, and standing a hair above the district under them. Both are rows in this menu now,
@@ -506,7 +523,13 @@ export function popup(s) {
       </span>
     </div>
     ${metSection(s)}
-    ${sensorBody(s)}`;
+    <div class="sensor" data-sensor="${s.id}">
+      <div class="sensorhead">
+        <i class="glyph i i-${kind.icon}" style="color:${tone}"></i>
+        <b>${kind.one || kind.label}</b>
+      </div>
+      ${sensorBody(s)}
+    </div>`;
 }
 
 /* One mast, several sensors: a rainfall gauge, a river gauge, a siren and a camera are published as
