@@ -12,7 +12,7 @@
  * edge and leave at the left, and a name is read in the same direction it is written.
  */
 
-import { KINDS, HOTLINES } from './config.js';
+import { KINDS, HOTLINES, NOTICE } from './config.js';
 import { state } from './state.js';
 import { el, isHot, dkey, tier, isIgnored, esc } from './util.js';
 import { flashTo } from './map.js';
@@ -47,31 +47,48 @@ export function ticker() {
     || (b.kind === 'siren') - (a.kind === 'siren')
     || (b.ratio || 0) - (a.ratio || 0));
 
-  /* MET warnings lead the strip. Each tile carries the full sentence, not a clipped one. The
-     strip has one line and nothing under it to crowd, unlike the panel row in alerts.js.
-     A tile carries data-warn and no data-go. A warning is not a station, so it opens no card.
-     The same [data-warn] click in js/ui.js opens the modal for this tile and for the panel row
-     alike.
-     Only while `fresh` — the first WARN_FRESH hours of a warning's own validity, scored in
-     sources.php because MET stamps Malaysian wall clock with no offset. The panel keeps listing it
-     for the whole window. A warning valid for three days would otherwise repeat here for three
-     days, which is the standing banner the alert design standard exists to prevent.
-     `data-warn` is the index into `state.warnings`, so the pair survives the filter and the tiles
-     are numbered before it. Renumbering after would open the wrong warning, or none. */
+  /* Regional notices lead the strip, an outage ahead of a weather warning. Each tile carries the
+     full sentence, not a clipped one: the strip has one line and nothing under it to crowd, unlike
+     the panel row in alerts.js.
+     A tile carries data-banner and no data-go. Neither kind is a station, so neither opens a card.
+     The same [data-banner] click in js/ui.js serves this tile and the panel row alike.
+
+     A warning rides here only while `fresh` — the first WARN_FRESH hours of its own validity,
+     scored in sources.php because MET stamps Malaysian wall clock with no offset. The panel keeps
+     listing it for the whole window. A warning valid for three days would otherwise repeat here for
+     three days, which is the standing banner the alert design standard exists to prevent.
+
+     An outage carries no such filter and needs none. This server re-detects it on every poll, so it
+     rides here only while the source is still serving its notice, and it leaves the poll the tables
+     parse again. A timer would take it off the one surface that is never covered, while the map is
+     still degraded.
+
+     Each index is captured before its filter, so it stays the index into the list the click handler
+     reads. Renumbering after would open the wrong item, or none. */
+  const tile = (kind, icon, c, title, why, i) =>
+    `<button class="tk-i tk-warn" data-banner="${kind}:${i}" tabindex="-1">
+      <i class="i i-${icon}" style="--c:${c}"></i>
+      <b>${esc(title)}</b><span class="tk-why">${esc(why)}</span>
+      <span class="tk-dot">•</span>
+    </button>`;
+
+  const notes = state.notices
+    .map((n, i) => [NOTICE[n.id], i])
+    .filter(([t]) => t)                   // an id this build has no words for says nothing
+    .map(([t, i]) => tile('notice', 'public_off', 'var(--k-source)', t.title, t.line, i));
+
   const warns = state.warnings
     .map((w, i) => [w, i])
     .filter(([w]) => w.fresh)
-    .map(([w, i]) => `<button class="tk-i tk-warn" data-warn="${i}" tabindex="-1">
-      <i class="i i-rainy_heavy" style="--c:var(--k-weather)"></i>
-      <b>${esc(w.title)}</b><span class="tk-why">${esc(w.text)}</span>
-      <span class="tk-dot">•</span>
-    </button>`);
+    .map(([w, i]) => tile('warn', 'rainy_heavy', 'var(--k-weather)', w.title, w.text, i));
+
+  const banners = notes.concat(warns);
 
   /* Quiet is a state, not an absence: a ticker that empties itself looks broken, and on a flood map
      "broken" and "nothing is happening" must never look the same. All-clear gets its own card —
      centred, grey and perfectly still. Stillness is the message: the strip moves when, and only
      when, there is something to report. A warning counts as something to report too. */
-  if (!hot.length && !warns.length) {
+  if (!hot.length && !banners.length) {
     box.classList.add('quiet');
     run.style.removeProperty('--dur');
     run.innerHTML = `<span class="tk-i tk-none"><i class="i i-check_circle"></i>No alerts</span>`;
@@ -83,7 +100,7 @@ export function ticker() {
      reserves the traffic-light ramp for status, and a river's blue is what makes it a river. So the
      icon stays blue and the *reason* goes red for what is happening, amber for what is forecast,
      grey for what we can no longer vouch for. */
-  const items = warns.concat(hot.map(s => {
+  const items = banners.concat(hot.map(s => {
     const t = tier(s);
     const why = t === 'stale'      ? 'last known · not current'
       : s.kind === 'siren'         ? 'siren sounding'
@@ -133,8 +150,8 @@ export function ticker() {
   run.style.removeProperty('--dur');
   run.innerHTML = set;
   const one = run.scrollWidth;
-  // items.length, not hot.length: a warning with no hot station still fills the strip and needs
-  // a real pace. hot.length alone divides by zero on a warning-only poll.
+  // items.length, not hot.length: a banner with no hot station still fills the strip and needs
+  // a real pace. hot.length alone divides by zero on a banner-only poll.
   const reps = Math.max(
     one > 0 ? Math.ceil(box.clientWidth / one) : 2,
     Math.ceil(MIN_TILES / items.length),
