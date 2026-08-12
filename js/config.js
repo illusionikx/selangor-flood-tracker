@@ -106,15 +106,21 @@ export const HOTLINES = 'https://www.civildefence.gov.my/talian-kecemasan-bencan
    they read as one sentence, the same shape a weather warning tile already takes. Neither repeats
    the other, because a tile that prints the agency name twice reads as a bug.
 
+   `text` and `effect` are the modal, and they are written as a notice rather than as an account of
+   one. An earlier draft opened both sentences with `JPS says`, which reports speech and puts this
+   app between the reader and the agency. A notice states the fact and names its source at the foot.
+   The labels carry the attribution instead. `Reported cause` says whose claim it is in two words.
+
    One link, and it names the source. An earlier draft listed the app, Facebook and X under the words
    `Where JPS says to look instead`. That heading narrates rather than states, and the list turned a
    two-line notice into a directory. A reader who wants the agency can reach the rest from it. */
 export const NOTICE = {
   publicinfobanjir: {
-    title: 'JPS PublicInfoBanjir is down',
-    line:  'Some readings are not current.',
-    text:  'JPS says heavy traffic overloaded the site. JPS gave no end time.',
-    link:  ['publicinfobanjir.water.gov.my', 'https://publicinfobanjir.water.gov.my/'],
+    title:  'JPS PublicInfoBanjir is unavailable',
+    line:   'Some readings are not current.',
+    text:   'Reported cause: heavy traffic. Expected end: not stated.',
+    effect: 'Water levels for these areas are not current. Stations show their last recorded reading.',
+    link:   ['publicinfobanjir.water.gov.my', 'https://publicinfobanjir.water.gov.my/'],
   },
 };
 

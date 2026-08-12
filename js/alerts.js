@@ -183,7 +183,7 @@ function bannerCard(list, kind) {
     if (!t) return '';                    // an id this build has no words for says nothing
     return `<button class="warnrow" data-banner="${kind}:${i}">
         <b>${esc(t.title)}</b>
-        <span class="warntext">${esc(t.text)}</span>
+        <span class="warntext">${esc(kind === 'notice' ? t.line : t.text)}</span>
       </button>`;
   }).join('');
   // Every row unknown means an empty card shell, which draws a heading over nothing.

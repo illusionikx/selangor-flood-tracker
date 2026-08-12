@@ -1127,11 +1127,11 @@ document.addEventListener('click', e => {
        still reporting. The link names the source and nothing else — see NOTICE in config.js for why
        the list of channels went. It is outbound, so the browser fetches nothing new. */
     const where = it.regions && it.regions.length
-      ? `<p>This map cannot reach JPS for ${esc(andList(it.regions))}. Stations show the last reading they had.</p>`
+      ? `<p>Affected: ${esc(andList(it.regions))}.</p><p>${esc(t.effect)}</p>`
       : '';
     const [label, url] = t.link;
     el('warnBody').innerHTML = `<h3>${esc(t.title)}</h3><p>${esc(t.text)}</p>${where}
-      <p><a href="${esc(url)}" target="_blank" rel="noopener">${esc(label)}</a></p>`;
+      <p>Source: <a href="${esc(url)}" target="_blank" rel="noopener">${esc(label)}</a></p>`;
   } else {
     icon.className = 'i i-rainy_heavy';
     icon.style.color = 'var(--k-weather)';
