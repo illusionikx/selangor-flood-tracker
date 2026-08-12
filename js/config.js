@@ -107,9 +107,10 @@ export const HOTLINES = 'https://www.civildefence.gov.my/talian-kecemasan-bencan
    the other, because a tile that prints the agency name twice reads as a bug.
 
    `text` and `effect` are the modal, and they are written as a notice rather than as an account of
-   one. An earlier draft opened both sentences with `JPS says`, which reports speech and puts this
-   app between the reader and the agency. A notice states the fact and names its source at the foot.
-   The labels carry the attribution instead. `Reported cause` says whose claim it is in two words.
+   one. Two drafts failed before this one. The first opened both sentences with `JPS says`, which
+   reports speech and puts this app between the reader and the agency. The second cut them to
+   `Reported cause: heavy traffic. Expected end: not stated.`, which reads as a log line and not as
+   a notice. A notice uses whole sentences and names its source at the foot.
 
    One link, and it names the source. An earlier draft listed the app, Facebook and X under the words
    `Where JPS says to look instead`. That heading narrates rather than states, and the list turned a
@@ -118,7 +119,7 @@ export const NOTICE = {
   publicinfobanjir: {
     title:  'JPS PublicInfoBanjir is unavailable',
     line:   'Some readings are not current.',
-    text:   'Reported cause: heavy traffic. Expected end: not stated.',
+    text:   'Heavy traffic has overloaded the portal. JPS has not announced a restoration time.',
     effect: 'Water levels for these areas are not current. Stations show their last recorded reading.',
     link:   ['publicinfobanjir.water.gov.my', 'https://publicinfobanjir.water.gov.my/'],
   },

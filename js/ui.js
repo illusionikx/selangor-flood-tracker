@@ -1127,7 +1127,7 @@ document.addEventListener('click', e => {
        still reporting. The link names the source and nothing else — see NOTICE in config.js for why
        the list of channels went. It is outbound, so the browser fetches nothing new. */
     const where = it.regions && it.regions.length
-      ? `<p>Affected: ${esc(andList(it.regions))}.</p><p>${esc(t.effect)}</p>`
+      ? `<p>The outage affects ${esc(andList(it.regions))}.</p><p>${esc(t.effect)}</p>`
       : '';
     const [label, url] = t.link;
     el('warnBody').innerHTML = `<h3>${esc(t.title)}</h3><p>${esc(t.text)}</p>${where}
