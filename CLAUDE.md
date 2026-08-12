@@ -614,9 +614,12 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   "you are here" card was hit hardest: locate.js draws an accuracy circle, and `L.Path` bubbles its
   clicks to the map where `L.Marker` does not (`bubblingMouseEvents: false`), so at a coarse fix most
   of the viewport closed it. `render()` no longer closes it either when the site leaves `sites`.
-  The three ways out are the ×, a dialog taking the screen (About, the table — both call
-  `closeSide()` in ui.js), and ⋮ → ignore. **Do not add a fourth without a reason that survives
-  "it vanished while I was reading it".**
+  The ways out are the ×, a dialog taking the screen (About, the table — both call `closeSide()` in
+  ui.js), ⋮ → ignore, and at phone width the two gestures a modal drawer owes a reader: a swipe
+  toward the right edge, and a tap on `#scrim`. **Do not add another without a reason that survives
+  "it vanished while I was reading it".** The last two carry theirs. Both exist only below 600px,
+  where the panel takes 84vw and there is nothing behind it left to read, and the scrim is a real box
+  over the map rather than a map click — so no pan, no marker and no accuracy circle can fire it.
 - **The alert list is a tenant of `#side`, under the key `@alerts`.** It is not a panel of its own
   any more, so there is nothing to place, slide past the drawer or collapse on a phone — and a
   station picked out of the list *replaces* the list, which is why nothing binds the rows any more
@@ -1154,6 +1157,14 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   certainty axes, ISA-18.2's "an alarm requires a response" and its 10-in-10-minutes flood
   threshold, and the cry-wolf finding that false alarms cost more trust than they buy attention.
   Four gaps are open there; raise them when alert work comes up rather than adding a fifth surface.
+- **Material Design 3 is the reference for every UI decision.** Where M3 names a component, take its
+  behaviour from the spec instead of inventing one — a reader already knows the platform convention,
+  and a hand-made control costs them that knowledge. The modal drawer is the worked example: both
+  panels dismiss on a tap on `#scrim` or a swipe toward the edge they are anchored to, and the edge
+  tab that did the job before is gone. This does **not** override the two rules below it. The colour
+  language here is a status language, so M3's tonal palette never gets to paint a station kind, and
+  the writing standard still governs every word on screen. Where the spec and this file disagree,
+  this file wins and the disagreement is written down.
 - Responsive is a standing requirement (breakpoint 600px), including touch equivalents for every
   hover-only affordance.
 - **A message on screen is written for the reader, not for the system.** Three rules, and the whole

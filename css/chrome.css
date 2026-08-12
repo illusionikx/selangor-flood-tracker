@@ -1013,39 +1013,23 @@ body.drawer #legend { transform: translateX(var(--drawer)); }
 }
 body.side #side { transform: none; visibility: visible; }
 body:not(.ready) #side { transition: none; }
-/* --- panel edge tabs -------------------------------------------------------------------------- */
 
-/* One per panel, on the edge where that panel meets the map, sliding with it. That is the edge a
-   dismissing swipe starts from on a phone, so the button and the gesture are the same place — and on
-   a desktop it is a close control at the seam rather than only in a far corner.
-   `position: fixed` and a sibling of the panel, not a child: #bar and #side both scroll, and a child
-   sticking out of a scrolling box is clipped. Fixed to the *viewport* centre — half the viewport,
-   less half the tab — so it holds still while the panel behind it scrolls. */
-.ptab {
-  display: flex; align-items: center; justify-content: center;
-  /* `50dvh`, not `50%`: a fixed box's percentage resolves against the large viewport, so on a phone
-     the tab was centred on a screen taller than the one in front of you and sat low. */
-  position: fixed; top: calc(50dvh - 30px); height: 60px; width: 26px; padding: 0;
-  /* Grey plate, accent glyph. A solid accent tab was the loudest thing on the map, competing with
-     the status colours, which are the only hues on this page allowed to demand attention. The
-     accent is now only on the glyph, which is enough to read as a control — the shadow and the
-     `--hover` grey do the rest, the same way every other floating box here is drawn. */
-  border: 0; color: var(--accent); background: var(--hover);
-  box-shadow: var(--shadow); visibility: hidden;
-  transition: transform var(--slide), translate var(--slide), visibility var(--slide);
+/* --- scrim ------------------------------------------------------------------------------------ */
+
+/* One box for both panels. z-index 440 puts it over the map furniture (400) and under #side (450)
+   and #bar (500), so each panel stands clear of its own scrim. It starts below the app bar, because
+   the bar holds the hamburger that opens the drawer and the map's own controls sit under it.
+   No `visibility` here, and no transition on `pointer-events`. A transitioned `visibility` holds its
+   start value for the whole duration, so a fading-out scrim would go on eating taps for 250ms after
+   the panel left — the failure `#splash` had. `opacity` alone never stops a tap either, so the
+   `pointer-events` switch is what makes the scrim inert, and it must apply at once. */
+#scrim {
+  position: fixed; z-index: 440; inset: var(--hdr) 0 0 0;
+  background: #0009; opacity: 0; pointer-events: none;
+  transition: opacity var(--slide);
 }
-body:not(.ready) .ptab { transition: none; }
-/* expand_more turned to point the way the tab sends its panel — there is no chevron mask, and one
-   rotation costs less than two more icons. */
-.ptab .i { font-size: 20px; }
-#barTab .i { transform: rotate(90deg); }
-#sideTab .i { transform: rotate(-90deg); }
-/* Each tab sits one above its own panel's z-index, so it is over the map and never over the panel it
-   belongs to. Parked off screen with the panel, and pushed out by that panel's width. */
-#barTab { z-index: 501; left: 0; border-radius: 0 10px 10px 0; transform: translateX(-100%); }
-#sideTab { z-index: 451; right: 0; border-radius: 10px 0 0 10px; transform: translateX(100%); }
-body.drawer #barTab { transform: translateX(var(--drawer)); visibility: visible; }
-body.side #sideTab { transform: translateX(calc(-1 * var(--side))); visibility: visible; }
+body:not(.ready) #scrim { transition: none; }
+
 /* The close button floats over the card's top-right corner rather than sitting on a row of its own:
    on its own row it was a whole line clear of the name it closes, above an empty strip the width of
    the panel.
@@ -1767,9 +1751,12 @@ body.finding #find { display: none; }
   /* 6 (header pad) + 36 (controls) + 5 (gap) + 36 (ticker) = 83. Measured, not guessed: any slack
      here is dead white space between the ticker and the map. */
   /* Both panels stop short of the far edge. A panel that covers the map completely reads as a new
-     page, and the strip it leaves is what says the map is still under there — plus it is where the
-     hide tab lives. 84vw is 58px of map at 360px, of which the tab takes 26. */
+     page, and the strip it leaves is what says the map is still under there. 84vw is 58px of map at
+     360px, and that strip is the scrim you tap to dismiss the panel. */
   :root { --drawer: 84vw; --side: 84vw; --hdr: 85px; }
+  /* Only here is either panel modal. On a wider screen the drawer and the station panel stand on
+     opposite edges with map between them, so there is nothing to dim and nothing to tap through. */
+  body.drawer #scrim, body.side #scrim { opacity: 1; pointer-events: auto; }
   header { gap: 4px; flex-wrap: wrap; align-content: flex-start; padding: 6px 8px 0 4px; }
   header > :not(#ticker) { order: 0; }
   /* Tighter controls so the mark, the chip and four buttons fit one line at 360px with room over. */

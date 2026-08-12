@@ -3051,47 +3051,55 @@ would otherwise eat every click under it.
 keys off `e.target` to work out which of the three controls moved, and it is the one place that
 persists the preference, re-filters and closes the drawer on a phone.
 
-## Both panels leave a peek of map, and both close from their outer edge
+## Both panels leave a peek of map, and on a phone that peek is the scrim
 
 At phone width the drawer and the station panel each covered the screen. A panel that covers the map
 completely reads as a new page, and the only way out was a control in a far corner — the × at the top
 of `#side`, and for the drawer the hamburger in the app bar, which is not on the panel at all.
 
 Both are now **84vw**, so a strip of map stays on screen beside each one. That strip is 58px at
-360px, and it does two jobs: it says the map is still under there, and it holds the hide tab.
+360px, and it does two jobs: it says the map is still under there, and it is where the panel is
+dismissed.
 
-**The tab is on the edge where the panel meets the map** — `#barTab` on the drawer's right,
-`#sideTab` on the panel's left. That is also the edge a dismissing swipe starts from, so the button
-and the gesture are the same place. **It runs at every width**, not only on a phone: on a desktop it
-is a close control at the seam instead of only in a far corner, and the panels already slide the same
-way there, so it is the same rules with different offsets.
+**At that width each panel is a modal drawer**, and Material's rule for one is the rule this app
+follows: a modal drawer closes on a tap on its scrim, or on a swipe toward the edge it is anchored
+to. `#scrim` is one box for both panels. It is a sibling of each, at `z-index: 440` — over the map
+furniture at 400 and under `#side` at 450 and `#bar` at 500 — so each panel stands clear of its own
+scrim. Its top is `var(--hdr)`, because the app bar holds the hamburger that opens the drawer.
+The tap closes both panels, since only one of the two is ever open here.
 
-It is fixed to the **centre of the viewport** — `top: calc(50% - 30px)` against its 60px height — so
-it holds still while the panel behind it scrolls. It is a **`--hover` grey plate with an accent
-glyph**. A solid accent tab was tried first and was the loudest thing on the map, competing with the
-status colours — the only hues on this page allowed to demand attention. The accent on the glyph
-alone still reads as a control, and the shadow draws the plate the same way every other floating box
-here is drawn.
+**Above 600px the scrim is inert.** Neither panel is modal there. The drawer and the station panel
+stand on opposite edges with map between them, so there is nothing to dim and nothing to tap through.
+The × closes the card and the hamburger closes the drawer, which is where each control belongs on a
+screen with room for both.
 
-Each tab is `position: fixed` and a **sibling** of its panel, not a child: `#bar` and `#side` both
-scroll, and a child that sticks out of a scrolling box is clipped. The glyph is `expand_more` rotated
-a quarter turn, because there is no chevron mask and one rotation costs less than two more icons.
+*An edge tab held this job first, and it is gone.* `#barTab` and `#sideTab` were 26px chevron plates
+fixed to the seam where each panel met the map, at every width. Three things were wrong with it. It
+drew a second object on the map for something the panel's own scrim already says. It reserved 26px of
+the 58px peek, so the strip that was there to show the map mostly showed a button. And it invented a
+control where the platform has a convention, which cost a reader the one gesture they already knew.
+The swipe stays and the scrim replaces the plate.
 
-**Swipe to dismiss** — `swipeOff()` in `js/ui.js`, touch events only. A mouse has the tab and the ×,
-and a drag with one is a text selection.
+*Two rules the scrim depends on, and both fail silently.* It carries **no `visibility`**, and
+**`pointer-events` is outside the transition**. A transitioned `visibility` holds its start value for
+the whole duration, so a fading-out scrim would go on taking taps for 250 ms after the panel left —
+the exact failure `#splash` had. `opacity` alone never stops a tap either. The `pointer-events`
+switch is the whole of what makes the scrim inert, so it must apply at once.
+
+**Swipe to dismiss** — `swipeOff()` in `js/ui.js`, touch events only. A mouse has the × and the
+hamburger, and a drag with one is a text selection.
 
 *Two things it has to get right.* **The first 8px decide the axis**, and nothing moves before that:
 both panels scroll vertically, and a swipe that stole a scroll would cost more than the swipe is
 worth. A drag that starts on a range input is skipped outright, so the heat opacity slider keeps its
-own. **The drag is written to the `translate` property, not to `transform`.** Both the panel and its
-tab already carry a `transform` that places them — the open/shut slide, and the tab's offset by the
-panel width — and an inline `transform` would throw that away for the length of the drag. `translate`
-is a separate property that composes with it, so the finger only ever adds to where the box already
-is. Every rule that transitions `transform` on these three elements transitions `translate` too, and
-that is what carries a half-swiped panel home.
+own. **The drag is written to the `translate` property, not to `transform`.** The panel already
+carries a `transform` that places it — the open/shut slide — and an inline `transform` would throw
+that away for the length of the drag. `translate` is a separate property that composes with it, so
+the finger only ever adds to where the box already is. Every rule that transitions `transform` on
+these boxes transitions `translate` too, and that is what carries a half-swiped panel home.
 
 Released under a third of the panel's width, it goes back. Past that, it closes through the same
-close path the tab uses, so nothing has a second way to shut.
+close path the scrim uses, so nothing has a second way to shut.
 
 **One panel at a time, at phone width only.** Both are 84vw there and the drawer (z-index 500) is
 painted over the station panel (450), so a second one opening lands on the first. Each now closes the
@@ -3106,7 +3114,7 @@ poll to refresh the card in place. Both auto-closes pass `remember: false`, so a
 preference survives a visit on a phone.
 
 **Gotcha, and the reason only one panel had it:** `#bar` had no `overscroll-behavior`. Scrolling past
-the end of the drawer chained to the document and carried the whole page up with it, tab included.
+the end of the drawer chained to the document and carried the whole page up with it.
 `#sideBody` has carried `contain` since it was built, so the station panel never showed the fault.
 Any new scrolling panel over the map needs the same rule.
 
@@ -3122,10 +3130,9 @@ the same on its children.
 `bottom` against the *large* viewport — the one with the address bar retracted — so both panels were
 taller than the strip actually on screen. The drawer's content fitted inside that taller box, which
 is a second way to get no scrollbar, with the last section parked behind the browser chrome. Both
-panels now take `height: calc(100dvh - var(--hdr))`, and the tab is centred on `50dvh` rather than
-`50%` for the same reason — on `50%` it was centred on a screen taller than the one in front of you
-and sat low. `dvh` is the viewport as it stands, and it follows the bar in and out. `#dataBox`
-already used the unit; this is the same rule, applied to the rest of the furniture.
+panels now take `height: calc(100dvh - var(--hdr))`. `dvh` is the viewport as it stands, and it
+follows the bar in and out. `#dataBox` already used the unit; this is the same rule, applied to the
+rest of the furniture.
 
 ## Leaflet's controls join this page's stack
 
