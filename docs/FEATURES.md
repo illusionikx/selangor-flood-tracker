@@ -7152,9 +7152,13 @@ instead.
 The page carries no text of its own. It carries one picture, a screenshot of Malay text, at
 `/maintenance-files/MaintenancePublicinfobanjir/notifikasi.png`. Translated, it reads:
 
-> We will be back shortly. The PublicinfoBanjir website has very high traffic right now. This can
-> affect your access. Our team works to restore access. In the meantime, find information through
-> the MyPublicInfoBanjir app, on the App Store and Google Play Store.
+> **NOTIS GANGGUAN PERKHIDMATAN SISTEM PUBLIC INFOBANJIR**
+>
+> We will be back shortly. We greatly appreciate your patience. The PublicinfoBanjir website is
+> currently receiving very high traffic, and this may affect your access. Our team is working to
+> restore access and to return the service to normal as soon as possible. In the meantime you can
+> get important information through the **MyPublicInfoBanjir** app, available on the **App Store**
+> and **Google Play Store**. We regret any inconvenience.
 
 Three facts in that message shaped the design.
 
@@ -7220,7 +7224,7 @@ notice states that the system, not the weather, is the problem right now.
 - **No toast.** A toast interrupts for news that needs action now. This notice does not need one.
 - **No all-clear.** A MET warning set that precedent. A source coming back online is not an event
   worth an interruption.
-- **No second recogniser.** Only the national portal publishes a notice today. The KL host or MET
+- **No second recognizer.** Only the national portal publishes a notice today. The KL host or MET
   can start the same. Each one needs its own evidence before it gets a rule.
 - **No App Store link.** Apple publishes no working web search URL for its store. A guessed app id
   points a worried reader at the wrong software. This app links Google Play search instead, because
