@@ -1328,6 +1328,17 @@ body.finding #find { display: none; }
    the same screen. PLAYER_OVERLAY raises it to 74vh, where the bar is laid over the picture and
    costs it nothing. */
 #lightbox img { max-width: min(968px, calc(100vw - 64px)); max-height: 58vh; border-radius: 8px; }
+/* A camera with no feed. A failed <img> has no intrinsic size, so it lays out at 0×0 — and `.stage`
+   and `.player` are both shrink-to-fit around it, so the frame, the control bar and the warning pill
+   collapsed together and the dialog closed up around its title. `.nopic` states the box the picture
+   would have taken. **Only in this state**: everywhere else `.stage` is exactly the picture's box,
+   which is what lines the two A/B halves up, so a floor on it would misalign every small frame.
+   The panel is the camera wall's, so one fact keeps one look. */
+#lightbox .camfail { position: absolute; inset: 0; z-index: 1; display: none; border-radius: 8px; }
+#lightbox.nopic .camfail { display: flex; }
+#lightbox.nopic .stage {
+  width: min(968px, calc(100vw - 64px)); aspect-ratio: 16 / 9; max-height: 58vh;
+}
 /* The picture plays and pauses the clip, so it says so — but only when there is a clip behind it
    (`#tl` carries `hidden` otherwise) and only when the divider is down, where the same press is the
    start of a drag. `:has()` rather than a class set from JS: the state is already in the DOM. */
@@ -1341,7 +1352,13 @@ body.finding #find { display: none; }
 #lightbox.cmp .stage { cursor: ew-resize; touch-action: none; }
 /* The older frame, clipped to the divider. `height: 100%` alone lines the two up: both frames come
    from one camera, so they share an aspect ratio — matching one axis matches the other. */
-#lightbox .ab { position: absolute; inset: 0; width: var(--ab); overflow: hidden; }
+/* The fill is what an archived frame that fails to load leaves behind. `.ab` is clipped to the
+   divider and holds nothing else, so a failed A frame let the B frame show straight through it —
+   compare then drew one picture twice, with an A timestamp on half of it, which is a wrong claim
+   rather than a missing one. The left corners are rounded to the frame's; the right edge is the
+   divider's cut and stays square. A loaded frame is opaque and covers all of it. */
+#lightbox .ab { position: absolute; inset: 0; width: var(--ab); overflow: hidden;
+  background: var(--hover); border-radius: 8px 0 0 8px; }
 #lightbox .ab img { position: absolute; left: 0; top: 0; height: 100%; max-width: none;
   border-radius: 8px 0 0 8px; }
 #lightbox .abgrip {
@@ -1655,7 +1672,7 @@ body.finding #find { display: none; }
   #lightbox .player:has(.camwarn) { padding-top: 0; }
   #lightbox .camwarn { top: 8px; left: 8px; max-width: calc(100% - 16px); }
   /* The frame takes back what the footer would have cost it. */
-  #lightbox img { max-height: 74vh; }
+  #lightbox img, #lightbox.nopic .stage { max-height: 74vh; }
 }
 
 /* Phones: the dialog drops its width floor — at 360px a 460px minimum is a horizontal scrollbar. */

@@ -7446,10 +7446,8 @@ Unscoped, the same declaration reaches the card and hides the box there for good
 
 ### Deliberately not built
 
-- **A card whose picture fails to load still prints `image unavailable`.** That is a different
-  question from this one. The feed exists and the fetch failed. `camImg()`'s `onerror` also replaces
-  the `<img>` with a plain node that `js/clip.js` watches for. See the comment above `tick()` there.
-  Move the two together or leave both.
+- ~~**A card whose picture fails to load still prints `image unavailable`.**~~ Built. See *Every
+  picture in the app now fails into a box* below.
 
 ## The app menu grew to the height of an iPhone
 
@@ -7481,3 +7479,63 @@ the height.
 - **No sweep of the other popovers.** `.sparktip` and the table's `.tipbox` set their own height paths
   and neither reads `fit-content` from the UA sheet. A future popover that restates part of that rule
   needs the whole of it, and this entry is the record of which declaration is easy to miss.
+
+## The lightbox holds its frame when the picture does not arrive
+
+Open a camera whose feed is dead and the dialog folded up around its own title. The control bar, the
+warning pill and the frame all went with it.
+
+**Why.** A failed `<img>` has no intrinsic size, so it lays out at 0×0. `.stage` and `.player` are
+both `inline-block`, which is shrink-to-fit, so each measured the nothing inside it. The control bar
+is absolutely positioned against `.player` on a mouse, so it had no box to sit in either. Only
+`.lbbody`'s `min-height: 140px` survived, and that holds the dialog body rather than the player.
+
+**The fix states the box in that state and in no other.** `#lightbox.nopic .stage` takes the width
+and the ratio a frame would have taken. Everywhere else `.stage` stays exactly the picture's box,
+because `.ab` is `inset: 0` of it and that is what lines the two A/B halves up pixel for pixel — a
+floor on `.stage` would misalign every frame smaller than it.
+
+**The empty box is the camera wall's `No picture` panel**, the third surface to wear it. A held box
+with nothing in it reads as a fault in the dialog. This one names the fault.
+
+**`naturalWidth` decides it, not which event fired.** `js/ui.js` runs one handler for `load` and
+`error` and tests the width both ways, so the panel lifts again the moment a later frame loads —
+`js/timeline.js` drives the same `<img>` for every archived frame. Opening a camera clears the class
+first, so a dead feed cannot be inherited by the next camera. A cached picture fires no event at all,
+so the opener calls the handler directly when `complete` is already true. That covers a cached
+*failure* as well, which the old spinner-only line did not.
+
+### Deliberately not built
+
+- ~~**The compare frame gets no such box.**~~ Built. See the next entry.
+
+## Every picture in the app now fails into a box
+
+The lightbox fix above raised the question for the other seven image surfaces. This is the sweep.
+
+| surface | on failure |
+|---|---|
+| lightbox frame, `.stage > img` | `.nopic` states the box, `No picture` panel — the entry above |
+| lightbox compare frame, `.abimg` | **fixed here**: `.ab` carries a fill |
+| station card still, `img.shot` | **fixed here**: the same `No picture` panel |
+| camera wall tile | already `.camtile.fail`, the panel this repo standardised on |
+| wall strip probe (`?sheet=`) | already silent by design — the tile keeps its live still |
+| clip strip probe | already `decode()` in a `try`, falling back to the live still |
+| lightbox frame prefetch | nothing to fail into. It warms the cache and paints nothing |
+| red favicon, `icon.svg` | already `.catch()`. The blue mark stands |
+| About easter egg, `img/egg.webp` | already `onerror`. The gesture goes dead, which is the point |
+
+**The compare frame showed the wrong thing rather than nothing.** `.ab` is the older frame clipped
+to the divider, and it held no fill. So a frame that failed to load let the newer frame show straight
+through it, and compare drew one picture twice with an A timestamp over half of it. A false match is
+worse than a visible gap. `.ab` now carries `var(--hover)` and the frame's left corner radius. A
+loaded frame is opaque and covers all of it.
+
+**The station card printed a line of text.** `camImg()`'s `onerror` replaced the `<img>` with
+`image unavailable`, which collapsed the still's 16/9 box to the height of one line and gave a third
+wording to a fact the wall and the no-feed card already name. It now leaves the same `No picture`
+panel, which holds the box. The box ships inside every still wrapper and `css/base.css` hides it
+while the picture is there, so the inline handler stays one expression.
+
+**The picture is removed, not hidden**, and that is load-bearing: `tick()` in `js/clip.js` reads
+`isConnected` on that element to know a clip's frames have started failing and stop the loop.

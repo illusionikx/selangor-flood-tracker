@@ -31,8 +31,8 @@
 <link rel="stylesheet" href="vendor/markercluster.css">
 <link rel="stylesheet" href="vendor/fonts.css?v=49">
 <link rel="stylesheet" href="css/icons.css?v=84">
-<link rel="stylesheet" href="css/base.css?v=111">
-<link rel="stylesheet" href="css/chrome.css?v=152">
+<link rel="stylesheet" href="css/base.css?v=113">
+<link rel="stylesheet" href="css/chrome.css?v=154">
 <link rel="stylesheet" href="css/map.css?v=145">
 
 <!-- Water tint for the dark basemap. CARTO's dark_all is greyscale — all 18 of its tones have zero
@@ -98,6 +98,11 @@
            enough to line them up pixel for pixel. -->
       <div class="stage">
         <img alt="">
+        <!-- A camera with no feed, and the thing that holds this box open. A failed <img> has no
+             intrinsic size, and `.stage` and `.player` are both shrink-to-fit around it, so the
+             frame, the control bar and the warning pill collapsed to nothing together. Same panel
+             the wall's failed tile and the station card draw — one fact keeps one look. -->
+        <div class="camfail"><i class="i i-videocam_off"></i><b>No picture</b></div>
         <div class="ab" hidden><img class="abimg" alt=""></div>
         <!-- The divider. The knob holds two arrows, because a bare ring on a photograph says a circle
              is there and nothing about what to do with it. -->

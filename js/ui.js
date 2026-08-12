@@ -1163,6 +1163,7 @@ document.addEventListener('click', e => {
   // Spin until it lands. `complete` covers the popup's already-cached still, which fires no load
   // event — without that check the spinner would sit there for ever over a picture that is ready.
   lightbox.classList.add('loading');
+  lightbox.classList.remove('nopic');   // never inherit the last camera's dead feed
   /* A clip frame's `src` names an archived shot, not the live picture, and the lightbox always
      opens on live. The wrapper carries `data-clip` with the camera's proxy id for exactly this:
      look the camera up and rebuild its live URL, rather than reading the clicked <img>'s current
@@ -1171,7 +1172,10 @@ document.addEventListener('click', e => {
   const clipCam = clipId ? byId(`camera-${clipId}`) : null;
   const src = clipCam ? camSrc(clipCam) : img ? img.src : btn.dataset.shot;
   full.src = src;
-  if (full.complete) lightbox.classList.remove('loading');
+  // `complete` is true for a cached still *and* for a cached failure, and neither fires an event —
+  // so run the same handler rather than only clearing the spinner, or a dead camera would open on
+  // the last camera's `.nopic` state.
+  if (full.complete) full.onload();
   // The place, as the dialog's title. Both openers carry it as `data-name` rather than having this
   // strip a prefix off the alt text — "Latest still from X" is a caption, and parsing a caption back
   // into a name is a rule that breaks the day the caption is reworded.
@@ -1200,10 +1204,16 @@ document.addEventListener('click', e => {
   lightbox.showModal();
   openTimeline(src);   // no-op unless this is a proxied camera with an archive behind it
 });
-// A dead camera stops the spinner too — the broken image and its alt text say more than a spinner
-// that never ends, which reads as "still trying".
-lightbox.querySelector('.stage > img').onload =
-lightbox.querySelector('.stage > img').onerror = () => lightbox.classList.remove('loading');
+/* A dead camera stops the spinner too — a spinner that never ends reads as "still trying".
+   `naturalWidth`, not which event fired: a frame that failed leaves the image at 0×0, and `.stage`
+   and `.player` are shrink-to-fit around it, so the whole player folded up and took the control bar
+   with it. `.nopic` states the box instead and uncovers the wall's "No picture" panel. One test both
+   ways, so the panel lifts again the moment a later frame loads. */
+const lbShot = lightbox.querySelector('.stage > img');
+lbShot.onload = lbShot.onerror = () => {
+  lightbox.classList.remove('loading');
+  lightbox.classList.toggle('nopic', !lbShot.naturalWidth);
+};
 
 // Backdrop closes, like the other two dialogs; the × and Esc do the rest. Nothing inside needs an
 // exemption any more — that was the price of the old tap-anywhere overlay, which could not tell a

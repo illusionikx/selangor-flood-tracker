@@ -661,11 +661,11 @@ dialog:focus, dialog:focus-visible { outline: none; }
 }
 
 /* No picture. `videocam_off` and a plain sentence, because the browser's own broken-image glyph says
-   nothing about what happened. Two surfaces wear it and they must not drift into two looks for one
-   fact: the camera wall's failed tile (css/chrome.css adds only the place it takes over that tile)
-   and a station card for a camera JPS publishes no feed for. `.shotnone` is the card's half — in
-   flow, in the still's own place, holding the still's own 16/9 so the card is the same height with a
-   picture and without one. */
+   nothing about what happened. Three surfaces wear it and they must not drift into three looks for
+   one fact: the camera wall's failed tile, the lightbox's frame (css/chrome.css adds only the place
+   it takes over in each) and a station card for a camera JPS publishes no feed for. `.shotnone` is
+   the card's half — in flow, in the still's own place, holding the still's own 16/9 so the card is
+   the same height with a picture and without one. */
 .camfail {
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
   padding: 8px; background: var(--hover); color: var(--muted); text-align: center;
@@ -674,6 +674,12 @@ dialog:focus, dialog:focus-visible { outline: none; }
 .camfail .i { font-size: 22px; }
 .shotnone { margin: 8px 0 6px; border-radius: 8px; aspect-ratio: 16 / 9; }
 .shotnone:first-child { margin-top: 0; }   /* it leads a camera card — the rule `.shotwrap` obeys */
+/* The card ships the box inside every still wrapper and reveals it when the picture removes itself,
+   the way a wall tile ships one and reveals it by class. It stood as a `image unavailable` line
+   before, which collapsed the still's box to the height of one line and gave a second wording to the
+   fact the other two surfaces already name. `js/clip.js` reads that same removal as its stop signal —
+   see `img.isConnected` in `tick()`, which is why the picture goes rather than merely hides. */
+.shotwrap:has(.shot) .camfail { display: none; }
 
 /* --- motion --------------------------------------------------------------------------------- */
 

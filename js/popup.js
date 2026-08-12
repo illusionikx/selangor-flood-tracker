@@ -62,27 +62,32 @@ export const camWarn = (cam, a = camAlert(cam)) => {
     ? `<span class="camwarn t-${a.tier}"><i class="i i-warning"></i><b>${words}</b></span>` : '';
 };
 
-/* Spinner lives on the wrapper; the img clears it on load, or swaps itself out on failure.
+/* JPS publishes no feed for this camera. A muted line stood here, which left the card a line of text
+   where every other camera card holds a picture. The wall already had the shape for it — its own
+   failed tile — so this is that box, in flow, with the same words. One fact, one look: see
+   `.camfail` in css/base.css. `camImg()` below ships the same box for a feed that fails to load. */
+const camNone = '<div class="camfail shotnone"><i class="i i-videocam_off"></i><b>No picture</b></div>';
+
+/* Spinner lives on the wrapper; the img clears it on load, or takes itself off the card on failure.
    `data-clip` is the hook js/clip.js looks for — it carries the numeric camera id the proxy uses,
    not the station id, because that is what ?sheet=, ?shots= and ?shot= all take.
    No warning pill here any more. This still is a 3-hour clip that plays itself (see js/clip.js), so
    the pill stated the live alert over a frame from hours ago — the same wrong claim the lightbox was
    just fixed for, and this one has no scrubber, no seek bar and no room to answer it per frame. The
    card around the picture already carries the alerting sensor as a section of its own, with the
-   reading, the meter and the graph. The lightbox keeps its pill, where every frame is scored. */
+   reading, the meter and the graph. The lightbox keeps its pill, where every frame is scored.
+   A failed picture leaves the same `No picture` box a camera with no feed at all gets, rather than
+   the `image unavailable` line it printed before — that line collapsed the still's box to one line
+   of text, and named in a third way a fact the wall and the no-feed card already name. The box ships
+   with every card and css/base.css hides it while the picture is there, so the handler stays one
+   expression. The picture is **removed**, not hidden: `tick()` in js/clip.js reads `isConnected` on
+   that element as its signal to stop a clip whose frames have started failing. */
 export const camImg = (c, alt) => `<div class="shotwrap" data-clip="${c.id.split('-')[1]}">
   <img class="shot" src="${camSrc(c)}" alt="${alt}" data-name="${c.name}"
        onload="this.parentNode.classList.add('done')"
-       onerror="this.parentNode.classList.add('done');
-                this.replaceWith(Object.assign(document.createElement('div'),
-                  {className:'muted',textContent:'image unavailable'}))">
+       onerror="this.parentNode.classList.add('done'); this.remove()">
+  ${camNone}
   <p class="clipcap"></p></div>`;
-
-/* JPS publishes no feed for this camera. A muted line stood here, which left the card a line of text
-   where every other camera card holds a picture. The wall already had the shape for it — its own
-   failed tile — so this is that box, in flow, with the same words. One fact, one look: see
-   `.camfail` in css/base.css. */
-const camNone = '<div class="camfail shotnone"><i class="i i-videocam_off"></i><b>No picture</b></div>';
 
 /* The favorite, as a menu row. `ids` is comma separated: ui.js's handler reads a full list as
    "remove every one" and anything short of full as "add every one", which is what lets one press on

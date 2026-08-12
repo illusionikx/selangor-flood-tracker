@@ -338,6 +338,20 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   therefore the only slow endpoint: ~21 s per still, 42 s when the https attempt lost and the http
   fallback lost too. Stills now take ~0.8 s. The dead record may be removed or may move to the other
   IP; the rule is about the mechanism, not that address.
+- **Every picture in this app fails into `.camfail`, and a failed `<img>` must never be left to size
+  its own box.** Four surfaces draw a picture — the lightbox frame, the lightbox's compare frame, the
+  station card still and a camera wall tile — and each one keeps the box the picture would have taken
+  and puts the same `videocam_off` / `No picture` panel in it. The look is `.camfail` in
+  `css/base.css` and only the placement belongs to each surface. **One fact must not get two looks**:
+  the card printed `image unavailable` instead, on a box that collapsed to the height of that line.
+  The compare frame is the exception that shows why an empty box is not enough on its own — it is
+  clipped to the divider and held no fill, so a failed frame let the *other* frame show through and
+  compare drew one picture twice under two timestamps. A false match is worse than a visible gap.
+  Three image paths are deliberately silent instead, and all three have a picture already on screen
+  to fall back to: the wall's strip probe, the clip's strip probe, and the lightbox's frame prefetch.
+  **Anything new that draws a picture picks one of those two shapes** — the panel, or a silent
+  fallback to something already visible. Never a bare broken image, and never a handler that lets the
+  box shrink to nothing.
 - **`rm -rf shots/` is a year of camera history**, and unlike `.history.db` it cannot rebuild —
   the frames only exist because we were running when they were taken. To re-test the capture path,
   `rm shots/.last` (the 30-minute stamp), not the directory.
@@ -870,6 +884,14 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   control bar and the warning pill are therefore siblings of it inside **`.player`**, which is the
   box both overlays are positioned against. `ui.js` injects `camWarn()` into `.player`, not
   `.stage`, for the same reason.
+  **`.camfail` is the one child that is allowed, because it stands *instead of* the picture rather
+  than beside it** — `inset: 0`, drawn only under `#lightbox.nopic`. That class is also the only
+  thing that may give `.stage` a size of its own. A failed `<img>` lays out at 0×0, and `.stage` and
+  `.player` are both shrink-to-fit, so a dead feed folded the frame, the control bar and the warning
+  pill up together and left the dialog wrapped around its title. **Do not fix that with a floor on
+  `.stage`** — the box has to keep matching the picture, or every frame narrower than the floor draws
+  its A/B halves out of line. `ui.js` sets the class from `naturalWidth` in one handler for `load`
+  and `error`, so it lifts again the moment a later frame loads.
 - **The overlay bar is the special case and lives behind a query; the in-flow bar is the default.**
   `@media (hover: hover) and (min-width: 601px)` — marked `PLAYER_OVERLAY` in `chrome.css` — is the
   only place `#tl` is absolute, white, scrimmed and self-hiding. Everything outside it is the plain
