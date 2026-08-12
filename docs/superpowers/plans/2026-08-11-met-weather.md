@@ -440,7 +440,7 @@ git commit -m "The district tier of the daily forecast, and the two tiers it ref
 ### Task 4: Fetch both feeds through the page cache
 
 **Files:**
-- Modify: `api.php:8-45` (constants), `api.php:942-957` (the page-cache block)
+- Modify: `api.php` constants block (after line 157), `api.php:1051-1066` (the page-cache block)
 - Modify: `sources.php` (append `metUrls()`)
 
 **Interfaces:**
@@ -490,7 +490,7 @@ function metUrls(int $now): array {
 
 - [ ] **Step 3: Wire both into the existing page cache**
 
-In `api.php`, replace lines 942 to 945:
+In `api.php`, replace lines 1051 to 1054:
 
 ```php
 $extraUrls = nationalUrls() + klUrls();
@@ -517,7 +517,7 @@ foreach ($extraUrls as $k => $u) {
 
 - [ ] **Step 4: Prune yesterday's forecast row**
 
-In `api.php`, insert **after** the `$page = fn(string $k) => $pages[$k] ?? '';` line at 958. Not before it — the next step reads through that closure, and `$page` does not exist above this line.
+In `api.php`, insert **after** the `$page = fn(string $k) => $pages[$k] ?? '';` line at 1067. Not before it — the next step reads through that closure, and `$page` does not exist above this line.
 
 ```php
 // The forecast URL carries today's date, so a row a day old can never be read again. Two days of
@@ -569,15 +569,18 @@ git commit -m "Both MET feeds ride the page cache, on two clocks and with the st
 ### Task 5: Join the feeds onto stations
 
 **Files:**
-- Modify: `api.php` — add `metNearest()` near `sirenBacked()` at line 211, and a join pass before the payload is built at line 1300
-- Modify: `api.php:1324-1328` (the `sources` counters)
+- Modify: `api.php` — add `metNearest()` after `sirenBacked()` ends at line 234, and a join pass before the payload is built at line 1434
+- Modify: `api.php:1464-1468` (the `sources` counters)
 - Test: `api.php` `--selftest` block
 
 **Interfaces:**
 - Consumes: `$metPts`, `$metDay` from Task 4. `metSpan()` from Task 2.
 - Produces: a `met` key on each station in `$stations`, shaped
   `['at'=>string, 'km'=>float, 'now'=>int, 'hr1'=>int, 'rung'=>int, 'from'=>?string, 'to'=>string, 'open'=>bool, 'tmin'=>int, 'tmax'=>int]`.
-  Every key except `at` and `km` is optional. The whole key is absent when there is nothing to say.
+  **Every key is optional, including `at` and `km`.** A station beyond `MET_KM` still matches a
+  district row, so it carries `tmin` and `tmax` with no point and no distance. Measured on live data:
+  53 of 679 stations are in that state. Any reader of `met.at` must guard it. The whole key is absent
+  only when there is nothing at all to say.
 - Produces: `$metMatched` and `$metDayMatched` counters for the `sources` block.
 
 - [ ] **Step 1: Write the failing test**
@@ -609,7 +612,7 @@ Expected: `Call to undefined function metNearest()`
 
 - [ ] **Step 3: Write the nearest-point join**
 
-In `api.php`, insert after `sirenBacked()` ends at line 221:
+In `api.php`, insert after `sirenBacked()` ends at line 234:
 
 ```php
 /**
@@ -644,7 +647,7 @@ Expected: every new line reading `ok`, and the run exiting 0.
 
 - [ ] **Step 5: Stamp the stations**
 
-In `api.php`, find where `$payload = json_encode([` begins near line 1300. Insert this block immediately before it:
+In `api.php`, find where `$payload = json_encode([` begins at line 1434. Insert this block immediately before it:
 
 ```php
 /* Weather onto stations. Two joins, because the two feeds key differently. The nowcast joins by
@@ -690,7 +693,7 @@ The `+` operator on arrays keeps the left side, so `at` and `km` survive and the
 
 - [ ] **Step 6: Add the counters**
 
-In `api.php`, replace the `sources` block at lines 1324 to 1328:
+In `api.php`, replace the `sources` block at lines 1464 to 1468:
 
 ```php
     'sources'  => [
@@ -758,9 +761,9 @@ git commit -m "Weather lands on a station by distance and by district, and count
 
 **Files:**
 - Modify: `css/icons.css` (append to the token block, near line 67 where `--i-rainy` already sits)
-- Modify: `css/base.css:61-62` and `css/base.css:128-129` (the `--k-*` blocks)
-- Modify: `css/map.css` (append after the `.sensorhead` rules at line 91)
-- Modify: `index.html:32-35` (three `?v=` bumps)
+- Modify: `css/base.css:62` and `css/base.css:140` (the `--k-*` blocks)
+- Modify: `css/map.css` (append after the `.sensorhead` rules that end at line 93)
+- Modify: `index.html:33-36` (three `?v=` bumps)
 
 **Interfaces:**
 - Consumes: nothing.
@@ -794,7 +797,7 @@ In `css/base.css`, extend line 62 (the light theme) to read:
   --k-gauge: #a06f5d; --k-camera: #23a3b1; --k-mast: #5d6deb; --k-weather: #4a7f8c;
 ```
 
-and line 129 (the dark theme) to read:
+and line 140 (the dark theme) to read:
 
 ```css
   --k-gauge: #d4a48f; --k-camera: #2fd6e8; --k-mast: #96a4ee; --k-weather: #7fb3c0;
@@ -812,7 +815,7 @@ Add a comment above the light-theme line:
 
 - [ ] **Step 3: Add the grid**
 
-Append to `css/map.css`, after the `.sensorhead` rules that end at line 91:
+Append to `css/map.css`, after the `.sensorhead` rules that end at line 93:
 
 ```css
 /* The MET section. Three columns: the range for today, the weather now, then the hour ahead with
@@ -832,15 +835,15 @@ Append to `css/map.css`, after the `.sensorhead` rules that end at line 91:
 
 - [ ] **Step 4: Bump the three versions**
 
-In `index.html`, change lines 32, 33 and 35:
+In `index.html`, change lines 33, 34 and 36:
 
 ```html
 <link rel="stylesheet" href="css/icons.css?v=78">
-<link rel="stylesheet" href="css/base.css?v=105">
+<link rel="stylesheet" href="css/base.css?v=106">
 <link rel="stylesheet" href="css/map.css?v=127">
 ```
 
-Leave `css/chrome.css?v=135` alone. This task does not edit it.
+Leave `css/chrome.css?v=139` alone. This task does not edit it.
 
 - [ ] **Step 5: Verify every file still serves**
 
@@ -928,7 +931,7 @@ function metSection(s) {
       <div class="sensorhead">
         <i class="glyph i i-${head.icon}" style="color:var(--k-weather)"></i>
         <b>Weather</b>
-        <span class="muted">${m.at} · ${m.km} km</span>
+        ${m.at ? `<span class="muted">${m.at} · ${m.km} km</span>` : ''}
       </div>
       <div class="wx">${temp}${now}${out}</div>
     </div>`;
@@ -1015,6 +1018,855 @@ Open one of those stations on the map and read the third column. If nothing is r
 ```bash
 git add js/config.js js/popup.js
 git commit -m "Three columns on the card, and a sentence that never claims an end MET did not publish"
+```
+
+---
+
+### Task 7B: Forecast warnings in the alert panel, the ticker and a modal
+
+**This task creates a new alert surface.** Everything else in this plan is passive information on a
+card. This one puts MET warnings at the top of the alert panel and into the scrolling ticker. Read
+the alert design standard in `docs/FEATURES.md` before you start. The rules below apply it.
+
+**Files:**
+- Modify: `sources.php` — add `metWarnings()`
+- Modify: `api.php` — add two constants, fetch the feed, publish `warnings`
+- Modify: `index.html` — a new `<dialog id="warnBox">`, and a `?v=` bump
+- Modify: `js/alerts.js` — a section at the top of the `@alerts` panel
+- Modify: `js/ticker.js` — warning tiles ahead of the station tiles
+- Modify: `js/ui.js` — the delegated click that opens the modal
+- Modify: `css/chrome.css` — styles for the section, the tile and the dialog
+
+**Interfaces:**
+- Consumes: the page-cache pattern from Task 4, and `metUrls()` in `sources.php`.
+- Produces:
+  - `metWarnings(string $json, int $now): array` — a list of
+    `['title'=>string, 'text'=>string, 'from'=>string, 'to'=>string]`, newest first.
+  - In the payload: a top-level `warnings` array, empty when nothing is live.
+  - In `js/alerts.js`: `warnCard(list)` returning section HTML, or an empty string for an empty list.
+
+#### What the feed is, measured
+
+`https://api.data.gov.my/weather/warning` returns rows with exactly nine fields:
+
+```
+warning_issue{issued,title_bm,title_en}, valid_from, valid_to,
+heading_en, text_en, instruction_en, heading_bm, text_bm, instruction_bm
+```
+
+**There is no geographic field.** The only place information sits inside `text_en` as free prose. A
+live sample read `Strong southwesterly winds over 60 kmph with waves exceeding 4.5 metres are
+expected over the waters of Phuket`. That warning is real, current, and useless on a Klang Valley
+flood map.
+
+Three more facts, measured on one live fetch. The feed carried seven rows and three were live. All
+three were marine warnings. Two of the three repeated the first almost word for word. One row read
+`No Advisory` and carried empty `valid_from` and `valid_to`.
+
+#### The two filters, and the direction each one fails in
+
+**Validity.** Keep a row only when both stamps parse and `valid_from <= now <= valid_to`. The
+`No Advisory` row fails this and disappears, which is correct.
+
+**Kind, in three tiers.** Match case-insensitively against `title_en` and `heading_en` joined.
+
+*Tier one — always dropped.* Seismic rows and empty advisories say nothing about weather here:
+
+```
+earthquake   tsunami   gempa   no advisory   tiada
+```
+
+*Tier two — marine, kept only for the Straits of Melaka.* A row is marine when it names any of:
+
+```
+rough sea   strong wind   angin kencang   laut bergelora
+```
+
+A marine row survives **only** when its `text_en` or `text_bm` names the Straits of Melaka:
+
+```
+straits of melaka   straits of malacca   selat melaka
+```
+
+The reason is geography, not preference. **The Straits of Melaka is the Selangor coast, and Port
+Klang stands on it**, so rough seas there reach the area this map covers. Waters off Phuket, Samui,
+Condore, Layang-Layang, Palawan and Sulu do not. Measured against the live feed, this keeps one of
+the three live marine warnings — the one reading `Northern Straits of Melaka` — and drops the other
+two.
+
+*Tier three — everything over land, kept only when it names somewhere this map covers.* Rain,
+thunderstorm, flood and cyclone rows all reach this tier, and each must name one of:
+
+```
+selangor   kuala lumpur   putrajaya   lembah klang   klang valley   wilayah persekutuan
+west coast   pantai barat
+```
+
+So both tiers end in the same shape: a marine row must name the Straits of Melaka, and a land row
+must name one of these eight. One test, two word lists.
+
+**The last pair is wider than the rest on purpose.** MET words some warnings by coast rather than by
+state, and Selangor sits on the west coast of the peninsula. Without `west coast` a row reading
+`heavy rain over the west coast of Peninsular Malaysia` covers this map and gets dropped silently —
+the dangerous failure direction for an alert surface. The cost is a warning that also covers Perak
+or Melaka now reaches the panel, which is the correct trade for a flood map.
+
+**One gap remains, and it is deliberate.** A warning for the whole peninsula, worded `Peninsular
+Malaysia` or `Semenanjung Malaysia` with no coast named, is still dropped. Record that in
+`docs/FEATURES.md` as a known limitation, with the fix — add those two words — and the reason to
+think before doing it: a peninsula-wide warning is usually about somewhere else.
+
+**Dedupe.** Two rows are one warning when `title_en` and `text_en` both match. Keep the first.
+
+#### Where the full text goes, and where the short text goes
+
+Three surfaces, and they deliberately carry different amounts.
+
+| surface | shows | on click |
+|---|---|---|
+| alert panel row | title, then the text shortened to one line | opens the modal |
+| ticker tile | title, then the **full** text | opens the modal |
+| modal | title, full text, and the validity window | closes |
+
+The panel is a directory and its rows are scanned, so a row there gives a title and a clipped line.
+The ticker has one line of its own and nothing below it to crowd, so it carries the whole sentence.
+The modal is where a reader goes to read.
+
+Shorten with CSS, never by cutting the string in JavaScript. `text-overflow: ellipsis` keeps the
+whole sentence in the DOM for a screen reader and for anyone who copies it.
+
+#### What must NOT change
+
+The station alert path is untouched. `isHot()`, `isCritical()`, `atDanger()`, `tier()` and every
+count in `alerts()` stay exactly as they are. A MET warning is not a station and must not enter
+`live`, `hot`, `rising`, `danger`, `sirens` or `stale`.
+
+All four of these keep reading the station count alone: `navigator.setAppBadge()`, `document.title`,
+the tally glyphs, and the warning glyph colour.
+
+A MET warning is a regional notice. A station reading is a measurement at a place. Merging the two
+counts tells a reader that stations are in trouble when none is.
+
+- [ ] **Step 1: Add the constants**
+
+In `api.php`, beside the other MET constants:
+
+```php
+/* MET warnings. Short life, because a warning is worth having late and worthless stale. */
+const MET_WARN_URL = 'https://api.data.gov.my/weather/warning';
+const MET_WARN_TTL = 900;   // 15 min
+```
+
+In `sources.php`, add a third entry to `metUrls()`:
+
+```php
+        'met-warn' => MET_WARN_URL,
+```
+
+- [ ] **Step 2: Write the failing test**
+
+Append to the `--selftest` block in `api.php`, before its final `exit(...)`:
+
+```php
+    /* The warning feed publishes no location at all. Every live row on the day this shipped was a
+       marine warning for waters near Phuket and Samui, which is real weather and useless on this
+       map. So the kind filter carries this surface, and it is an exclude list: an include list
+       drops a warning MET rewords, and a dropped flood warning is the one failure this must never
+       have. */
+    echo "\nmetWarnings():\n";
+    $wnow = 1786400000;
+    $row = fn(string $title, string $text, int $from, int $to) => [
+        'warning_issue' => ['title_en' => $title, 'issued' => ''],
+        'valid_from' => date('Y-m-d\TH:i:s', $from),
+        'valid_to'   => date('Y-m-d\TH:i:s', $to),
+        'heading_en' => $title, 'text_en' => $text,
+    ];
+    $rain = $row('Thunderstorms Warning', 'Thunderstorms over Selangor', $wnow - 60, $wnow + 3600);
+    $sea  = $row('Third Category Warning on Strong Winds and Rough Seas',
+                 'Waves over the waters of Phuket', $wnow - 60, $wnow + 3600);
+    $old  = $row('Thunderstorms Warning', 'Yesterday', $wnow - 7200, $wnow - 3600);
+    $soon = $row('Thunderstorms Warning', 'Tomorrow', $wnow + 3600, $wnow + 7200);
+
+    $w = metWarnings(json_encode([$rain, $sea, $old, $soon]), $wnow);
+    $ok('a live rain warning survives',    count($w) === 1);
+    $ok('and it carries its text',         ($w[0]['text'] ?? '') === 'Thunderstorms over Selangor');
+    $ok('the parser drops a far sea warning', !array_filter($w, fn($x) => str_contains($x['text'], 'Phuket')));
+    $ok('the parser drops an expired row', !array_filter($w, fn($x) => $x['text'] === 'Yesterday'));
+    $ok('the parser drops a future row',   !array_filter($w, fn($x) => $x['text'] === 'Tomorrow'));
+
+    /* The Straits of Melaka is the Selangor coast and Port Klang stands on it, so a marine warning
+       naming those straits stays. One of the three live marine rows on the day this shipped read
+       "Northern Straits of Melaka and Samui" and belongs here. The other two named only distant
+       waters. Both halves of that split need a test, or the rule is one edit from silently
+       dropping the coast or silently admitting the whole region. */
+    $near = $row('Third Category Warning on Strong Winds and Rough Seas',
+                 'Waves over the waters of Northern Straits of Melaka and Samui',
+                 $wnow - 60, $wnow + 3600);
+    $nearBm = $row('Amaran Angin Kencang dan Laut Bergelora', '', $wnow - 60, $wnow + 3600);
+    $nearBm['text_bm'] = 'Ombak di perairan Utara Selat Melaka';
+
+    $ok('a Straits of Melaka sea warning stays',
+        count(metWarnings(json_encode([$near]), $wnow)) === 1);
+    $ok('the Malay wording is matched too',
+        count(metWarnings(json_encode([$nearBm]), $wnow)) === 1);
+    $ok('a sea warning for other waters still drops',
+        metWarnings(json_encode([$sea]), $wnow) === []);
+
+    $dupe = metWarnings(json_encode([$rain, $rain, $rain]), $wnow);
+    $ok('three identical rows collapse to one', count($dupe) === 1);
+
+    $none = $row('No Advisory', '', $wnow, $wnow);
+    $none['valid_from'] = '';
+    $none['valid_to']   = '';
+    $ok('a row with no validity is dropped', metWarnings(json_encode([$none]), $wnow) === []);
+    $ok('rubbish parses to nothing',         metWarnings('not json', $wnow) === []);
+    $ok('an empty body parses to nothing',   metWarnings('', $wnow) === []);
+
+    /* A kind MET has not published before must still show, so long as it names somewhere here.
+       The kind is not on any list. The place is what admits it. */
+    $odd = $row('Flash Flood Warning', 'Flooding expected in Klang, Selangor', $wnow - 60, $wnow + 3600);
+    $ok('an unknown kind still shows', count(metWarnings(json_encode([$odd]), $wnow)) === 1);
+
+    /* The place test on a land row, both ways. This is the pair that would go unnoticed if the
+       filter were edited: one half admits every state in the country, the other silences our own. */
+    $away = $row('Thunderstorms Warning', 'Thunderstorms over Kelantan and Terengganu',
+                 $wnow - 60, $wnow + 3600);
+    $ok('a land warning naming nowhere here drops',
+        metWarnings(json_encode([$away]), $wnow) === []);
+
+    $kl = $row('Thunderstorms Warning', 'Thunderstorms over Kuala Lumpur', $wnow - 60, $wnow + 3600);
+    $pj = $row('Thunderstorms Warning', 'Ribut petir di Putrajaya', $wnow - 60, $wnow + 3600);
+    $lk = $row('Thunderstorms Warning', 'Hujan lebat di Lembah Klang', $wnow - 60, $wnow + 3600);
+    $ok('Kuala Lumpur is matched', count(metWarnings(json_encode([$kl]), $wnow)) === 1);
+    $ok('Putrajaya is matched',    count(metWarnings(json_encode([$pj]), $wnow)) === 1);
+    $ok('Lembah Klang is matched', count(metWarnings(json_encode([$lk]), $wnow)) === 1);
+
+    /* MET words some warnings by coast rather than by state, and Selangor is on the west coast.
+       A row worded that way covers this map without naming it, so it has to pass. The peninsula-wide
+       wording deliberately does not, and both halves need a test to hold that line. */
+    $wc = $row('Continuous Rain Warning', 'Heavy rain over the west coast of Peninsular Malaysia',
+               $wnow - 60, $wnow + 3600);
+    $wcBm = $row('Amaran Hujan Berterusan', '', $wnow - 60, $wnow + 3600);
+    $wcBm['text_bm'] = 'Hujan lebat di pantai barat Semenanjung Malaysia';
+    $pen = $row('Continuous Rain Warning', 'Heavy rain over Peninsular Malaysia',
+                $wnow - 60, $wnow + 3600);
+
+    $ok('a west coast warning is matched',    count(metWarnings(json_encode([$wc]), $wnow)) === 1);
+    $ok('pantai barat is matched too',        count(metWarnings(json_encode([$wcBm]), $wnow)) === 1);
+    $ok('a peninsula wide warning still drops', metWarnings(json_encode([$pen]), $wnow) === []);
+```
+
+- [ ] **Step 3: Run it and watch it fail**
+
+Run: `php api.php --selftest`
+Expected: `Call to undefined function metWarnings()`
+
+- [ ] **Step 4: Write the parser**
+
+Append to `sources.php`:
+
+```php
+/* --- MET Malaysia warnings ------------------------------------------------------------------ */
+
+/* Rows this map never shows. Seismic events and empty advisories say nothing about weather here. */
+const WARN_DROP = ['earthquake', 'tsunami', 'gempa', 'no advisory', 'tiada'];
+
+/* Rows about the sea. Most cover waters this map does not overlook, so they drop by default. */
+const WARN_SEA = ['rough sea', 'strong wind', 'angin kencang', 'laut bergelora'];
+
+/* The one stretch of sea that counts. The Straits of Melaka is the Selangor coast and Port Klang
+   stands on it, so rough water there reaches the area this map covers. Waters off Phuket, Samui,
+   Layang-Layang, Palawan and Sulu do not. A marine row survives only by naming these straits. */
+const WARN_SEA_KEEP = ['straits of melaka', 'straits of malacca', 'selat melaka'];
+
+/* The places this map covers. A warning over land must name one of them.
+   The last pair is wider than the rest on purpose. MET words some warnings by coast rather than by
+   state, and the west coast of the peninsula is where Selangor sits, so a row reading "the west
+   coast of Peninsular Malaysia" reaches this map without naming it.
+   A warning for the whole peninsula is still dropped. Add 'semenanjung' and 'peninsular' the day
+   that trade goes the other way, and expect more warnings about other states when you do. */
+const WARN_HERE = ['selangor', 'kuala lumpur', 'putrajaya', 'lembah klang', 'klang valley',
+                   'wilayah persekutuan', 'west coast', 'pantai barat'];
+
+/**
+ * MET warnings that are live at $now, newest first.
+ *
+ * This function drops a row on any of five tests. It drops a row whose stamps do not parse. It
+ * drops a row outside its own validity window. It drops a seismic row or an empty advisory. It
+ * drops a row that names nowhere this map covers. It drops a row that repeats a title and text it
+ * already kept.
+ *
+ * The place test uses one of two word lists. A marine row must name the Straits of Melaka, because
+ * that water is the Selangor coast. Every other row must name a state or district here.
+ */
+function metWarnings(string $json, int $now): array {
+    $rows = json_decode($json, true);
+    if (!is_array($rows)) return [];
+
+    $out = [];
+    $seen = [];
+    foreach ($rows as $r) {
+        $title = trim((string)($r['warning_issue']['title_en'] ?? ''));
+        $text  = trim((string)($r['text_en'] ?? ''));
+        if ($title === '' && $text === '') continue;
+
+        $from = strtotime((string)($r['valid_from'] ?? ''));
+        $to   = strtotime((string)($r['valid_to'] ?? ''));
+        if (!$from || !$to || $now < $from || $now > $to) continue;
+
+        $hay = strtolower($title . ' ' . (string)($r['heading_en'] ?? ''));
+        foreach (WARN_DROP as $bad) if (str_contains($hay, $bad)) continue 2;
+
+        $sea = false;
+        foreach (WARN_SEA as $s) if (str_contains($hay, $s)) { $sea = true; break; }
+
+        // One place test, two word lists. Both English and Malay text are searched, because MET
+        // words some rows in one language only.
+        $where = strtolower($text . ' ' . (string)($r['text_bm'] ?? ''));
+        $near = false;
+        foreach ($sea ? WARN_SEA_KEEP : WARN_HERE as $k) {
+            if (str_contains($where, $k)) { $near = true; break; }
+        }
+        if (!$near) continue;
+
+        $key = $title . '|' . $text;
+        if (isset($seen[$key])) continue;
+        $seen[$key] = true;
+
+        $out[] = ['title' => $title, 'text' => $text,
+                  'from' => (string)$r['valid_from'], 'to' => (string)$r['valid_to']];
+    }
+    usort($out, fn($a, $b) => strcmp($b['from'], $a['from']));
+    return $out;
+}
+```
+
+- [ ] **Step 5: Run it and watch it pass**
+
+Run: `php -l sources.php && php api.php --selftest`
+Expected: every new line reading `ok`, and the run exiting 0.
+
+- [ ] **Step 6: Fetch it and publish it**
+
+In `api.php`, give the warning URL its own clock in the `$ttlFor` closure:
+
+```php
+$ttlFor = fn(string $k) => match ($k) {
+    'met-day'  => MET_DAY_TTL,
+    'met-warn' => MET_WARN_TTL,
+    default    => SCRAPE_TTL,
+};
+```
+
+Beside where `$metPts` and `$metDay` are parsed:
+
+```php
+$metWarn = metWarnings($page('met-warn'), $now);
+```
+
+In the payload, one new top-level key beside `sources`:
+
+```php
+    'warnings' => $metWarn,
+```
+
+and one more counter inside `sources`:
+
+```php
+        'metwarn'  => ['parsed' => count($metWarn)],
+```
+
+- [ ] **Step 7: The modal**
+
+In `index.html`, beside the other dialogs, add:
+
+```html
+<dialog id="warnBox" aria-labelledby="warnBoxTitle">
+  <div class="modalhead">
+    <i class="i i-rainy_heavy" style="color:var(--k-weather)"></i>
+    <h2 id="warnBoxTitle">Forecast Warning</h2>
+    <button class="iconbtn" id="warnClose" aria-label="Close"><i class="i i-close"></i></button>
+  </div>
+  <div id="warnBody"></div>
+</dialog>
+```
+
+Match the markup of the dialogs already in that file. Read one of them first and copy its shape,
+including how its close button is wired.
+
+**A `<dialog>`'s `display` goes on `[open]`, never on the element.** The browser hides a closed
+dialog with `dialog:not([open]) { display: none }` in its own stylesheet, and any author rule that
+sets `display` on the bare selector beats it — which lays the closed dialog out on the page, in the
+tab order and read by screen readers, invisible only because the map paints over it. Write
+`#warnBox[open] { display: flex }`, never `#warnBox { display: flex }`.
+
+- [ ] **Step 8: The alert panel section**
+
+In `js/alerts.js`, above `alerts()`:
+
+```js
+/* MET warnings, above every station in the panel.
+   A warning is regional and a station reading is a measurement at one place. So this section is
+   counted nowhere: the badge, the document title, the tally glyphs and the warning glyph all still
+   read the station count alone. Merging them tells a reader that stations are in trouble when none
+   is.
+   The row clips its text with CSS rather than cutting the string, so the whole sentence stays in
+   the DOM for a screen reader and for anyone who copies it. The modal is where it is read. */
+function warnCard(list) {
+  if (!list || !list.length) return '';
+  return `<div class="alertgrp warngrp">
+      <div class="alerthead">
+        <i class="i i-rainy_heavy" style="--c:var(--k-weather)"></i>
+        <b>Forecast Warning</b>
+      </div>
+      ${list.map((w, i) => `<button class="warnrow" data-warn="${i}">
+        <b>${w.title}</b>
+        <span class="warntext">${w.text}</span>
+      </button>`).join('')}
+    </div>`;
+}
+```
+
+In `alerts()`, emit `warnCard(...)` as the **first element after the panel's `.pophead`**. The head
+must stay first, because `openSide()` lifts it into `#sideHead` and that seam must not move.
+
+**Find where the poll stores the raw payload before you write that line.** `state.data` is the
+station array, not the payload. Read `js/state.js` and `js/net.js` and use whatever field holds the
+whole response. If no such field exists, add one in `js/net.js` where the payload is unpacked, and
+say so in your report.
+
+- [ ] **Step 9: The ticker**
+
+In `js/ticker.js`, build warning tiles carrying the **full** text and put them first:
+
+```js
+  const warns = warnList().map((w, i) => `<button class="tk-i tk-warn" data-warn="${i}" tabindex="-1">
+      <i class="i i-rainy_heavy" style="--c:var(--k-weather)"></i>
+      <b>${w.title}</b><span class="tk-why t-soon">${w.text}</span>
+      <span class="tk-dot">•</span>
+    </button>`);
+```
+
+Then `const items = warns.concat(hot.map(...))`.
+
+The strip currently runs only when stations are hot. It must also run when there are no hot stations
+and at least one warning. Find the guard that adds the `quiet` class and include the warning count.
+
+A warning tile carries `data-warn` and no `data-go`, because a warning is not a station and there is
+nowhere to jump. Confirm the delegated `[data-go]` handler in `js/ui.js` tolerates a `.tk-i` without
+one.
+
+- [ ] **Step 10: One delegated click for both surfaces**
+
+In `js/ui.js`, add one delegated handler for `[data-warn]`. It serves the panel row and the ticker
+tile alike, because both carry the same attribute:
+
+```js
+  const w = e.target.closest('[data-warn]');
+  if (w) {
+    const list = warnList();
+    const it = list[+w.dataset.warn];
+    if (it) {
+      el('warnBody').innerHTML = `<h3>${it.title}</h3><p>${it.text}</p>
+        <p class="muted">Valid ${it.from} to ${it.to}</p>`;
+      el('warnBox').showModal();
+    }
+    return;
+  }
+```
+
+Place it beside the other delegated handlers in that file and follow their shape. Wire `#warnClose`
+to close the dialog the same way the other dialogs in this project do.
+
+- [ ] **Step 11: The styles**
+
+Add `.warngrp`, `.warnrow`, `.warntext`, `.tk-warn` and `#warnBox[open]` to `css/chrome.css`,
+matching the shape of the existing `.alertgrp` and `.tk-i` rules.
+
+`.warntext` gets the one-line clip:
+
+```css
+.warnrow .warntext { display: block; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; }
+```
+
+The ticker tile gets **no** clip — it carries the full sentence by design.
+
+Use `var(--k-weather)` for every glyph here. **Do not use a status colour.** The traffic-light ramp
+in this project means a reading stands at a published threshold. A regional notice is not that.
+
+Bump `css/chrome.css`'s `?v=` in `index.html`.
+
+- [ ] **Step 12: Verify**
+
+```bash
+php -l api.php && php -l sources.php
+php api.php --selftest
+T=$(mktemp -d); for f in js/*.js; do cp "$f" "$T/$(basename ${f%.js}).mjs"; done
+for f in "$T"/*.mjs; do node --check "$f" || echo "FAIL $f"; done
+curl -sk https://flood-exp.test/api.php | php -r '$p=json_decode(stream_get_contents(STDIN),true);
+  echo count($p["warnings"]), " live warnings\n"; print_r($p["warnings"]);'
+```
+
+On the day this was written the live feed held three marine warnings and no rain warning, and the
+filter kept exactly one — the row naming the Northern Straits of Melaka. Expect a small number, and
+expect zero on a calm day. **Zero is a correct result, not a broken feature.** Read the text of
+whatever survives and confirm it names either the Straits of Melaka or the weather over land.
+
+If nothing is live, hand-edit a row into `.cache.json` with a `valid_to` in the future to see all
+three surfaces.
+
+Confirm on screen, with a warning present:
+- The section sits at the top of the alert panel, above the station groups.
+- The panel row clips to one line and the ticker tile shows the whole sentence.
+- Clicking either one opens the modal with the full text and the validity window.
+- The station counts, the icon badge and the tab title are **unchanged** by the warning.
+
+- [ ] **Step 13: Commit**
+
+```bash
+git add sources.php api.php index.html js/alerts.js js/ticker.js js/ui.js css/chrome.css
+git commit -m "MET warnings lead the alert panel and the ticker, and count toward neither"
+```
+
+---
+
+### Task 7C: Rebuild the weather cells
+
+Task 7 shipped the section and it reads badly on screen. The three cells carry different amounts of
+furniture, so nothing lines up. The temperature range crowds into one string. The glyphs are 15px
+and lose to the text beside them. And the camera link below runs straight into the section with no
+seam, so the weather and the nearest webcam read as one block.
+
+This task rebuilds the three cells. It changes no data and no server code.
+
+**Files:**
+- Modify: `css/icons.css` — one new glyph
+- Modify: `css/map.css` — the `.wx` rules, replaced
+- Modify: `js/config.js` — `WEATHER` gains a night icon
+- Modify: `js/popup.js` — `metSection()`, rebuilt
+- Modify: `index.html` — two `?v=` bumps
+
+**Interfaces:**
+- Consumes: the `met` object from Task 5. Unchanged.
+- Produces: no new export. `metSection(s)` keeps its signature and stays pure.
+
+#### The shape
+
+Every cell carries the same three parts, in the same order, so the rows line up across all three:
+a subtitle, then a glyph line, then a value line.
+
+```
+ ☀  Weather                        Subang Jaya · 3.4 km
+ ┌───────────────┬───────────────┬────────────────────────┐
+ │ Today         │ Current       │ Later                  │  <- .wxsub, muted, 11px
+ │  ↑ 34°        │      ☀        │      ☀                 │  <- glyph line, 26px weather glyph
+ │  ↓ 24°        │    Clear      │    Clear, in 1 hour    │  <- value line
+ │               │               │  Rain 18:40 until 19:10│  <- .wxline, only when rain is coming
+ └───────────────┴───────────────┴────────────────────────┘
+ ──────────────────────────────────────────────────────────  <- a real seam
+   [camera] Bt.3, Shah Alam
+            Nearest webcam · 0.6 km away
+```
+
+**Subtitles are `Today`, `Current` and `Later`**, one per cell, in `.muted` at 11px. They replace
+the inline `In 1 hour:` prefix, which put a label inside a value and made the third cell wider than
+the other two for no reason.
+
+**The temperature splits into two lines**, each with its own arrow glyph. `arrow_upward` with the
+maximum, `arrow_downward` with the minimum. Both already exist in `css/icons.css`. The en-dash range
+`24–34°` is gone: two numbers with no labels made the reader work out which was which.
+
+**The weather glyphs go to 26px.** The arrows stay small, at 14px, because they label a number
+rather than carry a state. Add `.wxbig` for the weather glyph and leave `.wxcol .i` for the arrows.
+
+#### Night
+
+A clear sky at 22:00 must not draw a sun.
+
+Add `clear_night` to `css/icons.css`, then pick between it and `sunny` at render time. This is the
+only rung that changes: rain looks the same at every hour.
+
+The hour is **Malaysian**, not the viewer's. Everything on this page is MYT because JPS stamps its
+readings that way, and a reader in another timezone must not see a moon beside a reading stamped
+14:00. `js/popup.js` already holds `MYT_CLOCK` for exactly this reason. Follow it.
+
+Night runs from 19:00 to 06:59. Peninsular Malaysia sits near the equator, so sunrise and sunset
+move by under half an hour across the year. A fixed pair of hours is honest here and needs no
+almanac.
+
+#### The seam
+
+`metSection()` returns a `.sensor` block, and `camLink()` draws its card directly below with nothing
+between them. Give the section its own class and a bottom rule.
+
+- [ ] **Step 1: Add the night glyph**
+
+In `css/icons.css`, beside the other weather tokens near line 68:
+
+```css
+  --i-clear_night: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 -960 960 960'><path d='M484-80q-84 0-157.5-32t-128-86.5Q144-253 112-326.5T80-484q0-146 93-257.5T410-880q-18 99 11 193.5T521-521q71 71 165.5 100T880-410q-26 144-138 237T484-80Z'/></svg>");
+```
+
+and beside the other mask classes near line 127:
+
+```css
+.i-clear_night { --i: var(--i-clear_night); }
+```
+
+- [ ] **Step 2: Give `WEATHER` a night icon**
+
+In `js/config.js`, extend the rung-0 entry only. The other two rungs need no night form, because
+rain looks the same at every hour:
+
+```js
+export const WEATHER = [
+  { icon: 'sunny', night: 'clear_night', word: 'Clear', line: '' },
+  { icon: 'rainy',       word: 'Rain',  line: 'Rain' },
+  { icon: 'rainy_heavy', word: 'Heavy', line: 'Heavy rain' },
+];
+```
+
+- [ ] **Step 3: Rebuild `metSection()`**
+
+Replace the body of `metSection()` in `js/popup.js`. Keep the function name, the signature and the
+early return.
+
+```js
+/* The hour in Malaysia, not the reader's. Every time on this page is MYT, because JPS stamps its
+   readings that way, and a moon beside a reading stamped 14:00 is a contradiction. Night runs 19:00
+   to 06:59 — near the equator the sun moves by under half an hour across the year, so a fixed pair
+   of hours needs no almanac. */
+const MYT_H = new Intl.DateTimeFormat('en-GB', {
+  timeZone: 'Asia/Kuala_Lumpur', hour: '2-digit', hour12: false,
+});
+const night = () => { const h = +MYT_H.format(new Date()); return h >= 19 || h < 7; };
+
+/* One glyph name for a rung. Only a clear sky has a night form. */
+const wxIcon = r => {
+  const w = WEATHER[r] || WEATHER[0];
+  return (night() && w.night) || w.icon;
+};
+
+/* The MET section. Three cells, each carrying a subtitle, a glyph line and a value line, so the
+   three line up across the row.
+   This is drawn once per card and never once per sensor. Rain over a place is one fact, and
+   sourceInfo() already taught this app what a per-place fact costs when it repeats down a mast.
+   The header carries the point and the distance, which is what lets a reader weigh a 14 km claim.
+   This section is not a sensor at this place. */
+function metSection(s) {
+  const m = s.met;
+  if (!m) return '';
+
+  const w = r => WEATHER[r] || WEATHER[0];
+
+  /* Four shapes, and every one names both ends. `until` says the rain ends. `past` says the MET
+     outlook ended, and never that the rain did. */
+  const rain = m.rung == null ? '' :
+    `${w(m.rung).line}${m.from ? ` ${m.from}${m.open ? ',' : ''}` : ''} `
+    + `${m.open ? 'past' : 'until'} ${m.to}`;
+
+  const cell = (sub, glyph, value, extra = '') => `<div class="wxcol">
+      <span class="wxsub">${sub}</span>
+      ${glyph}
+      <span class="wxval">${value}</span>
+      ${extra}
+    </div>`;
+
+  /* Two lines with their own arrows. One range in one string made a reader work out which number
+     was the maximum. */
+  const temp = m.tmax == null ? '' : cell('Today',
+    `<span class="wxtemp"><i class="i i-arrow_upward"></i>${m.tmax}°</span>`,
+    `<span class="wxtemp"><i class="i i-arrow_downward"></i>${m.tmin}°</span>`);
+
+  const now = m.now == null ? '' : cell('Current',
+    `<i class="i wxbig i-${wxIcon(m.now)}"></i>`, w(m.now).word);
+
+  const out = m.hr1 == null ? '' : cell('Later',
+    `<i class="i wxbig i-${wxIcon(m.hr1)}"></i>`, w(m.hr1).word,
+    rain ? `<span class="wxline">${rain}</span>` : '');
+
+  return `<div class="sensor wxsec" data-sensor="@met">
+      <div class="sensorhead">
+        <i class="glyph i i-${wxIcon(m.rung ?? m.now ?? 0)}" style="color:var(--k-weather)"></i>
+        <b>Weather</b>
+        ${m.at ? `<span class="muted">${m.at} · ${m.km} km</span>` : ''}
+      </div>
+      <div class="wx">${temp}${now}${out}</div>
+    </div>`;
+}
+```
+
+Note `wxIcon(m.rung ?? m.now ?? 0)` on the header: a rainy header stays rainy, and a clear header
+turns into a moon after dark.
+
+- [ ] **Step 4: Replace the grid rules**
+
+In `css/map.css`, replace the whole `.wx` block Task 6 added with this:
+
+```css
+/* The MET section. Three cells, each with a subtitle, a glyph line and a value line, so the rows
+   line up across all three. `min-width: 0` sits on every cell. A grid item defaults to
+   `min-width: auto`, which refuses to shrink below its content. Without it, a long word in the wide
+   cell pushes the two narrow cells out of shape. */
+.wx { display: grid; grid-template-columns: 1fr 1fr 3fr; gap: 10px; align-items: start; }
+.wx > * { min-width: 0; }
+.wxcol { display: flex; flex-direction: column; align-items: center; gap: 3px;
+  font-size: 12px; line-height: 1.35; text-align: center; }
+.wxsub { font-size: 11px; color: var(--muted); }
+.wxval { font-weight: 500; }
+/* The weather glyph carries the state, so it is the largest thing in the cell. The arrows only
+   label a number and stay small. */
+.wxbig { font-size: 26px; color: var(--k-weather); }
+.wxcol .i { font-size: 14px; color: var(--k-weather); }
+.wxtemp { display: inline-flex; align-items: center; gap: 3px; }
+.wxline { color: var(--on-surface); font-size: 11px; }
+/* A real seam. Without it the camera card below runs straight into this section and the two read
+   as one block. */
+.wxsec { padding-bottom: 12px; border-bottom: 1px solid var(--outline); }
+```
+
+Delete the old `.wxnow` and `.wxout` rules. Nothing emits those classes any more. Confirm with
+`grep -rn "wxnow\|wxout" js/ css/` before you commit, and again after.
+
+- [ ] **Step 5: Bump the versions**
+
+In `index.html`, `css/icons.css` and `css/map.css` each move up by one. Read the current values
+first and add one to each — do not assume. Leave `css/base.css` and `css/chrome.css` alone.
+
+- [ ] **Step 6: Verify**
+
+```bash
+T=$(mktemp -d); for f in js/*.js; do cp "$f" "$T/$(basename ${f%.js}).mjs"; done
+for f in "$T"/*.mjs; do node --check "$f" || echo "FAIL $f"; done
+grep -rn "wxnow\|wxout" js/ css/ || echo "old classes gone"
+for f in css/icons.css css/map.css; do
+  curl -sk -o /dev/null -w "%{content_type} $f\n" "https://flood-exp.test/$f"; done
+```
+
+Then look at it. A browser is the only thing that can judge this task, because the whole task is
+about how it reads. Confirm:
+
+- The three subtitles sit on one line across the row.
+- The two temperature lines each carry an arrow and line up under `Today`.
+- The weather glyphs are clearly larger than the arrows.
+- A rule separates the section from the camera card below it.
+- The rain line, where present, sits under the `Later` value and is not clipped.
+
+Check the night path by forcing it: temporarily make `night()` return `true`, reload, confirm the
+moon draws in both the header and the clear cells, then put it back.
+
+Check it under 600px as well. `--side` becomes 84vw there.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add css/icons.css css/map.css js/config.js js/popup.js index.html
+git commit -m "The weather cells line up, name themselves, and know it is night"
+```
+
+---
+
+### Task 7D: Even cells, and no attribution line
+
+Two changes the user asked for after seeing Task 7C on screen.
+
+**Files:** `css/map.css`, `js/popup.js`, `index.html` (one `?v=` bump).
+
+**1. The grid becomes even thirds.** `1fr 1fr 3fr` was set when the rain sentence ran inline. It now
+wraps under the value, so the third cell floats in dead space on a clear day. Change the one rule:
+
+```css
+.wx { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; align-items: start; }
+```
+
+The rain sentence stays inside its own cell and wraps there. That is accepted.
+
+**2. The header drops the point name and the distance.** Remove this from `metSection()`:
+
+```js
+        ${m.at ? `<span class="muted">${m.at} · ${m.km} km</span>` : ''}
+```
+
+The header then reads a glyph and the word `Weather`, and nothing else.
+
+**The cost, recorded so it stays a decision and not an accident.** The section states the weather at
+a station using the nearest MET point, which may be up to `MET_KM` away — 15 km. ULU YAM takes its
+reading from a point 11.7 km off, over high ground. With the attribution gone, the card makes a
+local claim and shows nothing a reader could weigh it against. The user chose this after the cost
+was stated.
+
+`at` and `km` stay in the payload. Nothing reads them now. Putting the line back is one template
+line, which is why they are worth keeping.
+
+**Do not** touch `js/alerts.js`, `js/ticker.js`, `js/toast.js`, or any server file. `metSection()`
+stays pure.
+
+**Prose gate:** hold `css/map.css`, `js/popup.js` and `index.html` at their current five numbers
+(`passive_voice`, `banned_modal`, `contraction`, `long_sentence`, `nominalization`). Measure before
+and after. Ignore `semicolon` and `long_paragraph`.
+
+- [ ] **Step 1:** Change the one grid rule in `css/map.css`.
+- [ ] **Step 2:** Delete the attribution span from `metSection()` in `js/popup.js`.
+- [ ] **Step 3:** Bump `css/map.css`'s `?v=` in `index.html` by one. Read the current value first.
+- [ ] **Step 4:** Syntax-check every module, then drive a browser and look at it. Confirm the three
+  cells are even, the rain sentence wraps inside its cell without clipping, and the header carries
+  no place name. Check a clear station and a rainy one, and check under 600px.
+- [ ] **Step 5:** Commit.
+
+```bash
+git add css/map.css js/popup.js index.html
+git commit -m "Three even cells, and a header that no longer names the point"
+```
+
+---
+
+### Task 7E: The Later cell follows the rung
+
+**Files:** `js/popup.js` only.
+
+The third cell drew the rung one hour out, `hr1`, while the sentence under it described the worst
+rain in the whole three-hour window. On BUKIT FRASER that put `Clear` directly above
+`Rain 12:00, past 13:00`. Both statements were true — the sky is clear at the one-hour mark and the
+rain arrives at noon — but a cell that argues with the line beneath it is the defect, not the data.
+
+**The third cell now follows `rung`.** It then describes the same thing its own sentence does, so
+the two cannot disagree. A station with no rain coming carries no `rung`, and the cell falls back to
+clear, which is correct.
+
+In `metSection()`, the `out` cell changes from `m.hr1` to `m.rung ?? 0` for both the glyph and the
+word. The guard stays on `m.hr1`, because that field is what tells us a MET point is in reach at
+all. Only what the cell displays changes.
+
+```js
+  const later = m.rung ?? 0;
+  const out = m.hr1 == null ? '' : cell('Later',
+    `<i class="i wxbig i-${wxIcon(later)}"></i>`, w(later).word,
+    rain ? `<span class="wxline">${rain}</span>` : '');
+```
+
+Update the comment above `metSection()` to say the third cell reads the worst rung in the window,
+and why. A comment describing `hr1` after the code reads `rung` is worse than no comment.
+
+`hr1` stays in the payload. Nothing displays it now. It is the one field that answers "is it raining
+in an hour" rather than "does it rain at all in three", and republishing it costs nothing.
+
+**Do not** touch any other file, any server code, `js/alerts.js`, `js/ticker.js` or `js/toast.js`.
+`metSection()` stays pure.
+
+**Prose gate:** hold `js/popup.js` at passive 42, modal 19, contraction 43, long_sentence 11,
+nominalization 2. Ignore `semicolon` and `long_paragraph`.
+
+- [ ] **Step 1:** Make the change in `js/popup.js`.
+- [ ] **Step 2:** Update the comment to match.
+- [ ] **Step 3:** Syntax-check every module.
+- [ ] **Step 4:** Drive a browser. Confirm on BUKIT FRASER that `Later` now reads `Rain` above
+  `Rain 12:00, past 13:00`, and on a clear station that `Later` reads `Clear` with no sentence.
+- [ ] **Step 5:** Commit.
+
+```bash
+git add js/popup.js
+git commit -m "The Later cell reads the rung it is describing, so it stops arguing with its own line"
 ```
 
 ---
@@ -1159,6 +2011,16 @@ Append an entry to `docs/FEATURES.md`. Cover each of these, one short section pe
 - Why the span runs first to last. 12% of wet markers hold the worst rung in more than one block.
 - Why there is no alert surface and no map layer.
 - That the temperature is a forecast, and that no free observed one exists.
+- **What data.gov.my does and does not offer.** It publishes three weather endpoints: `forecast`,
+  `warning` and `warning/earthquake`. It publishes **no nowcast**, which is why the 0-3 hour rain
+  still comes from an HTML scrape of `met.gov.my/nowcasting` rather than from a clean JSON API.
+  Record this so nobody re-searches for an endpoint that does not exist.
+- **The `warning` endpoint, considered and declined.** `https://api.data.gov.my/weather/warning`
+  returns real MET warnings with `valid_from`, `valid_to` and bilingual heading, text and
+  instruction. Two reasons it is not wired up. It carries no coordinates, so nothing joins it to a
+  station — one live sample covered "the waters of Phuket". And it would be a new alert surface,
+  which goes through the alert design standard in this file before anything else. Raise it there
+  the day somebody wants MET warnings on this map.
 
 - [ ] **Step 6: Check the prose**
 
