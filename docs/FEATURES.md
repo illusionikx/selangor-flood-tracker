@@ -7198,6 +7198,52 @@ A quiet panel can still be false. A silent source, not a calm river, is the reas
 EEMUA states this exact point. A reader must be able to tell no alarms from a dead alarm system. A
 notice states that the system, not the weather, is the problem right now.
 
+### The banner has to be remembered, not re-derived
+
+A whole-branch review caught this. No per-task review had the range to see it.
+
+The first build read the notice out of the bodies fetched on that poll. Those bodies exist only for
+the pages the poll actually asked for. `pageRow()` stamps a page that failed, so a dead source backs
+off for `SCRAPE_TTL`, which is 900 seconds. The payload rebuilds every `TTL`, which is 300 seconds.
+
+So two rebuilds in three asked for nothing, found nothing, and published an empty list. The banner
+appeared for one poll, vanished for two, and returned. The source never moved. The ticker fell back
+to `No alerts` while the portal was still down.
+
+That is the cry-wolf failure this feature exists to prevent, built into the feature itself.
+
+`noticeRow()` decides what to do with the memory after a fetch attempt. It returns `set` to remember
+an id, `clear` to forget one, and `keep` when the poll asked for nothing. Only a fetch carries news.
+A poll that did not ask must leave the memory alone.
+
+The memory lives in the `page` table under a `notice:` key prefix, so it survives a restart. A key
+this build no longer asks for contributes nothing, which leaves a stale row inert.
+
+Four self-check assertions cover the four inputs. The live proof is a poll where `sources.stale` is
+empty and `national.applied` reads 71, and the banner is still up: that poll fetched nothing and
+still knew.
+
+### The words took three drafts
+
+The first draft opened two sentences with `JPS says`. That reports speech. It puts this app between
+the reader and the agency, and it reads as a story about an outage rather than a notice of one.
+
+The second draft cut them to `Reported cause: heavy traffic. Expected end: not stated.` That is how
+a machine records an incident. A notice writes it out.
+
+The third stands: `Heavy traffic has overloaded the portal. JPS has not announced a restoration
+time.` Both sentences name their actor. Neither reports what anybody said.
+
+One link, and it names the source. An earlier draft listed the app, Facebook and X under the words
+`Where JPS says to look instead`. That heading narrates rather than states, and five links turned a
+short notice into a directory. The trade is real: the alert standard calls the search for a second
+opinion milling, and those channels served it. A reader reaches them from the portal in one more
+step.
+
+The strip and the panel row carry `title` and `line`. The two halves read as one sentence and
+neither repeats the other. An early tile printed the agency name twice, because both halves opened
+with it.
+
 ### Against the alert design standard
 
 | rule | how it lands |

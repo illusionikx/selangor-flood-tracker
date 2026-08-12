@@ -1100,6 +1100,8 @@ const warnBox = el('warnBox');
    JPS stamp for the same reason. 24-hour, because every clock in this app is. */
 const warnWhen = s => {
   const m = /^(\d{4})-(\d\d)-(\d\d)T(\d\d:\d\d)/.exec(String(s || ''));
+  // The fallback hands back whatever arrived. That is upstream text, so the caller escapes it. Only
+  // strtotime() in sources.php keeps a hostile stamp out today, and that guard lives in another file.
   return m ? `${m[3]}/${m[2]}/${m[1]} ${m[4]}` : String(s || '');
 };
 
@@ -1137,7 +1139,7 @@ document.addEventListener('click', e => {
     icon.style.color = 'var(--k-weather)';
     el('warnBoxTitle').textContent = 'Forecast Warning';
     el('warnBody').innerHTML = `<h3>${esc(it.title)}</h3><p>${esc(it.text)}</p>
-      <p class="muted">Valid ${warnWhen(it.from)} to ${warnWhen(it.to)}</p>`;
+      <p class="muted">Valid ${esc(warnWhen(it.from))} to ${esc(warnWhen(it.to))}</p>`;
   }
   warnBox.showModal();
 });
