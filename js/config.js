@@ -102,28 +102,19 @@ export const HOTLINES = 'https://www.civildefence.gov.my/talian-kecemasan-bencan
    reader sees is here, beside ALERT_TITLE and HOTLINES, because that is where this app keeps its
    strings. A payload that reships this paragraph every five minutes pays for it on every poll.
 
-   `line` is the whole of the ticker tile and the panel row. CAP caps a headline at 160 characters
-   and this one is 62.
+   `title` is the bold half of the ticker tile and the panel row. `line` is the muted half. Together
+   they read as one sentence, the same shape a weather warning tile already takes. Neither repeats
+   the other, because a tile that prints the agency name twice reads as a bug.
 
-   The links are the channels the notice itself names. A reader who doubts a flood map goes looking
-   for a second opinion, and the alert standard calls that milling. The links are the feature.
-
-   MyPublicInfoBanjir has no App Store link. Apple publishes no working web search for the store, and
-   a guessed app id on a flood app points a worried reader at the wrong software. Google Play search
-   is correct by construction, so Android gets a link and iOS gets the name. */
+   One link, and it names the source. An earlier draft listed the app, Facebook and X under the words
+   `Where JPS says to look instead`. That heading narrates rather than states, and the list turned a
+   two-line notice into a directory. A reader who wants the agency can reach the rest from it. */
 export const NOTICE = {
   publicinfobanjir: {
-    source: 'JPS PublicInfoBanjir',
-    title:  'JPS PublicInfoBanjir is down',
-    line:   'JPS PublicInfoBanjir is down. Some water levels may be behind.',
-    text:   'JPS says the site is overloaded by high traffic. No end time was given.',
-    links: [
-      ['MyPublicInfoBanjir on Google Play', 'https://play.google.com/store/search?q=MyPublicInfoBanjir&c=apps'],
-      ['PublicInfoBanjir on Facebook',      'https://www.facebook.com/PublicInfoBanjir'],
-      ['JPS_InfoBanjir on X',               'https://x.com/JPS_InfoBanjir'],
-      ['publicinfobanjir.water.gov.my',     'https://publicinfobanjir.water.gov.my/'],
-      ['Read the notice from JPS',          'https://publicinfobanjir.water.gov.my/maintenance-files/MaintenancePublicinfobanjir/notifikasi.png'],
-    ],
+    title: 'JPS PublicInfoBanjir is down',
+    line:  'Some readings are not current.',
+    text:  'JPS says heavy traffic overloaded the site. JPS gave no end time.',
+    link:  ['publicinfobanjir.water.gov.my', 'https://publicinfobanjir.water.gov.my/'],
   },
 };
 

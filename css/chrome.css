@@ -1256,9 +1256,6 @@ body.finding #find { display: none; }
 .noticegrp .alerthead { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
 .noticegrp .alerthead .i { color: var(--c); font-size: 18px; }
 .noticegrp .alerthead b { font-weight: 500; }
-/* The links are the point of this modal, so they are a list and not a paragraph of commas. */
-.noticelinks { margin: 6px 0 0; padding-left: 18px; }
-.noticelinks li { margin: 4px 0; }
 
 /* --- credit --------------------------------------------------------------------------------- */
 

@@ -77,7 +77,7 @@ export function ticker() {
     .filter(([t]) => t)                   // an id this build has no words for says nothing
     // `source` is the bare name of the feed, and `line` already states that it is down. `title` is
     // the whole of that sentence, so the tile printed it twice over.
-    .map(([t, i]) => tile('notice', 'public_off', 'var(--k-source)', t.source, t.line, i));
+    .map(([t, i]) => tile('notice', 'public_off', 'var(--k-source)', t.title, t.line, i));
 
   const warns = state.warnings
     .map((w, i) => [w, i])

@@ -1123,16 +1123,15 @@ document.addEventListener('click', e => {
     icon.className = 'i i-public_off';
     icon.style.color = 'var(--k-source)';
     el('warnBoxTitle').textContent = 'Service Notice';
-    /* The regions sentence is built from what the outage actually hit, so it never claims a region
-       that is still reporting. The links are the reason this modal exists — see NOTICE in
-       config.js. Every one is outbound, so the browser fetches nothing new. */
+    /* The scope sentence names what the outage actually hit, so it never claims a region that is
+       still reporting. The link names the source and nothing else — see NOTICE in config.js for why
+       the list of channels went. It is outbound, so the browser fetches nothing new. */
     const where = it.regions && it.regions.length
-      ? `<p>${esc(andList(it.regions))} water levels may be behind. Stations still show their last known reading.</p>`
+      ? `<p>This map cannot reach JPS for ${esc(andList(it.regions))}. Stations show the last reading they had.</p>`
       : '';
+    const [label, url] = t.link;
     el('warnBody').innerHTML = `<h3>${esc(t.title)}</h3><p>${esc(t.text)}</p>${where}
-      <p class="muted">Where JPS says to look instead:</p>
-      <ul class="noticelinks">${t.links.map(([label, url]) =>
-        `<li><a href="${esc(url)}" target="_blank" rel="noopener">${esc(label)}</a></li>`).join('')}</ul>`;
+      <p><a href="${esc(url)}" target="_blank" rel="noopener">${esc(label)}</a></p>`;
   } else {
     icon.className = 'i i-rainy_heavy';
     icon.style.color = 'var(--k-weather)';
