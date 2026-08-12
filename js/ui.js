@@ -1,6 +1,6 @@
 // DOM wiring: drawer, theme, filters, layer chips, panels, lightbox and the delegated jumps.
 
-import { KINDS, MAST, camSrc, FEED, STATIC, NEAR_MAX_KM } from './config.js';
+import { KINDS, MAST, camSrc, FEED, STATIC, NEAR_MAX_KM, NOTICE } from './config.js';
 import { state, PREFS, PREFS_KEY, save } from './state.js';
 import { el, distKm, dkey, ignoredIds, leads, favIds, isFav, squash, termsOf, matches, esc
        } from './util.js';
@@ -1103,16 +1103,43 @@ const warnWhen = s => {
   return m ? `${m[3]}/${m[2]}/${m[1]} ${m[4]}` : String(s || '');
 };
 
-// One click handler for both surfaces. The panel row and the ticker tile both carry data-warn,
-// the index into state.warnings. Neither carries data-go: a warning is not a station, and opens
-// no card.
+// "Kuala Lumpur and Putrajaya", not "Kuala Lumpur, Putrajaya". One region reads as one region.
+// Not called `list`: this file already binds that name at lines 507 and 702.
+const andList = a => a.length < 2 ? (a[0] || '') : `${a.slice(0, -1).join(', ')} and ${a.at(-1)}`;
+
+// One click handler for both surfaces and both kinds. A panel row and a ticker tile both carry
+// data-banner, which is the kind and the index into the matching list. Neither carries data-go: a
+// regional notice is not a station, and opens no card.
 document.addEventListener('click', e => {
-  const w = e.target.closest('[data-warn]');
+  const w = e.target.closest('[data-banner]');
   if (!w) return;
-  const it = state.warnings[+w.dataset.warn];
+  const [kind, i] = w.dataset.banner.split(':');
+  const it = (kind === 'notice' ? state.notices : state.warnings)[+i];
   if (!it) return;
-  el('warnBody').innerHTML = `<h3>${esc(it.title)}</h3><p>${esc(it.text)}</p>
-    <p class="muted">Valid ${warnWhen(it.from)} to ${warnWhen(it.to)}</p>`;
+  const icon = el('warnBoxIcon');
+  if (kind === 'notice') {
+    const t = NOTICE[it.id];
+    if (!t) return;
+    icon.className = 'i i-public_off';
+    icon.style.color = 'var(--k-source)';
+    el('warnBoxTitle').textContent = 'Service Notice';
+    /* The regions sentence is built from what the outage actually hit, so it never claims a region
+       that is still reporting. The links are the reason this modal exists — see NOTICE in
+       config.js. Every one is outbound, so the browser fetches nothing new. */
+    const where = it.regions && it.regions.length
+      ? `<p>${esc(andList(it.regions))} water levels may be behind. Stations still show their last known reading.</p>`
+      : '';
+    el('warnBody').innerHTML = `<h3>${esc(t.title)}</h3><p>${esc(t.text)}</p>${where}
+      <p class="muted">Where JPS says to look instead:</p>
+      <ul class="noticelinks">${t.links.map(([label, url]) =>
+        `<li><a href="${esc(url)}" target="_blank" rel="noopener">${esc(label)}</a></li>`).join('')}</ul>`;
+  } else {
+    icon.className = 'i i-rainy_heavy';
+    icon.style.color = 'var(--k-weather)';
+    el('warnBoxTitle').textContent = 'Forecast Warning';
+    el('warnBody').innerHTML = `<h3>${esc(it.title)}</h3><p>${esc(it.text)}</p>
+      <p class="muted">Valid ${warnWhen(it.from)} to ${warnWhen(it.to)}</p>`;
+  }
   warnBox.showModal();
 });
 // Backdrop closes it, like every other dialog here. The × and Esc do the rest.

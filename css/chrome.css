@@ -1246,6 +1246,20 @@ body.finding #find { display: none; }
 .warnrow .warntext { display: block; overflow: hidden; text-overflow: ellipsis;
   white-space: nowrap; font-size: 12px; color: var(--muted); }
 
+/* Same box as .warngrp, one rung above it in the panel, and its own left rule. A source that is down
+   is not a status, so this colour is a kind colour and never a traffic light. */
+.noticegrp {
+  padding: 14px 0 14px 10px; border-top: 1px solid var(--outline);
+  border-left: 3px solid var(--k-source);
+}
+#sideBody > .noticegrp:first-child { border-top: 0; padding-top: 4px; }
+.noticegrp .alerthead { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.noticegrp .alerthead .i { color: var(--c); font-size: 18px; }
+.noticegrp .alerthead b { font-weight: 500; }
+/* The links are the point of this modal, so they are a list and not a paragraph of commas. */
+.noticelinks { margin: 6px 0 0; padding-left: 18px; }
+.noticelinks li { margin: 4px 0; }
+
 /* --- credit --------------------------------------------------------------------------------- */
 
 /* Leaflet's own attribution box is disabled; we render the credit ourselves, out of the way. */

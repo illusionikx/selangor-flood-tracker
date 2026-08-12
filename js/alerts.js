@@ -2,7 +2,7 @@
 // well is indistinguishable from one that broke, so quiet is stated rather than implied — and the
 // list itself in the station panel, which is the same popout a pin opens.
 
-import { KINDS, STATUS_COLOR, NO_INFO, ALERT_TITLE } from './config.js';
+import { KINDS, STATUS_COLOR, NO_INFO, ALERT_TITLE, NOTICE } from './config.js';
 import { state, PREFS } from './state.js';
 import { el, distKm, dkey, isHot, tier, TIER_RANK, isIgnored, noSec, isFav, esc } from './util.js';
 import { side, openSide, closeSide } from './map.js';
@@ -147,31 +147,53 @@ const favicon = red => {
   }).catch(() => {});                        // no drawing, no repaint — the blue mark stands
 };
 
-/* MET warnings, under HAPPENING NOW and above everything else.
-   They led the panel first. A forecast about a region then sat above a river already over its
-   danger mark, and only one of those is happening — which is the same argument the tier sort
-   below already makes about a forecast two streets away. So the section takes a place in that
-   order rather than standing outside it: after the `now` groups, before `soon` and `stale`.
-   With nothing happening now it is still the first thing under the head, which is where a warning
-   belongs when there is no observation to outrank it.
-   A warning names a region. A station reading names one place. So this section adds nothing to
-   the counts below it: the badge, the tab title, the tally glyphs and the warning glyph still
-   read the station list alone. Merging the two tells a reader that stations are in trouble when
-   none is.
+/* Two kinds of regional notice, and they do not take the same rank.
+
+   A MET warning sits under HAPPENING NOW and above everything else. It led the panel first, and a
+   forecast about a region then sat above a river already over its danger mark. Only one of those is
+   happening, which is the same argument the tier sort below makes about a forecast two streets
+   away. So it takes a place in that order: after the `now` groups, before `soon` and `stale`. With
+   nothing happening now it is still the first thing under the head.
+
+   An outage notice sits above all of it, including HAPPENING NOW. It is not another item in the
+   list. It is a caveat on the list itself, and it says the list may be incomplete. The all-clear is
+   why. "All clear. Nothing rising or in danger" can be false precisely because a source stopped
+   answering, and EEMUA's point is that a reader must be able to tell no alarms from a dead alarm
+   system.
+
+   Neither adds anything to the counts below. The badge, the tab title, the tally glyphs and the
+   warning glyph still read the station list alone. Merging the two tells a reader that stations are
+   in trouble when none is.
+
    The row clips its text with CSS, not by cutting the string. The full sentence stays in the DOM
-   for a screen reader. It stays too for anyone who copies it. The modal holds the whole
-   warning. */
-function warnCard(list) {
+   for a screen reader. It stays too for anyone who copies it. The modal holds all of it. */
+const BANNER = {
+  warn:   { cls: 'warngrp',   icon: 'rainy_heavy', c: 'var(--k-weather)', head: 'Forecast Warning' },
+  notice: { cls: 'noticegrp', icon: 'public_off',  c: 'var(--k-source)',  head: 'Service Notice' },
+};
+
+/* One card for both kinds. `kind` picks the shell. The row text comes from the payload item for a
+   warning, and from NOTICE in config.js for an outage, because an outage publishes an id rather
+   than prose. */
+function bannerCard(list, kind) {
   if (!list || !list.length) return '';
-  return `<div class="alertgrp warngrp">
+  const b = BANNER[kind];
+  const rows = list.map((w, i) => {
+    const t = kind === 'notice' ? NOTICE[w.id] : w;
+    if (!t) return '';                    // an id this build has no words for says nothing
+    return `<button class="warnrow" data-banner="${kind}:${i}">
+        <b>${esc(t.title)}</b>
+        <span class="warntext">${esc(t.text)}</span>
+      </button>`;
+  }).join('');
+  // Every row unknown means an empty card shell, which draws a heading over nothing.
+  if (!rows) return '';
+  return `<div class="alertgrp ${b.cls}">
       <div class="alerthead">
-        <i class="i i-rainy_heavy" style="--c:var(--k-weather)"></i>
-        <b>Forecast Warning</b>
+        <i class="i i-${b.icon}" style="--c:${b.c}"></i>
+        <b>${b.head}</b>
       </div>
-      ${list.map((w, i) => `<button class="warnrow" data-warn="${i}">
-        <b>${esc(w.title)}</b>
-        <span class="warntext">${esc(w.text)}</span>
-      </button>`).join('')}
+      ${rows}
     </div>`;
 }
 
@@ -249,10 +271,13 @@ export function alerts() {
   }</div><div class="tally">${tally}</div></div>`;
 
   // Placed by the caller, not by write() — it sits after the `now` groups, and only the group list
-  // below knows where those end. See the comment on warnCard().
-  const warnHtml = warnCard(state.warnings);
+  // below knows where those end. See the comment on bannerCard().
+  const warnHtml = bannerCard(state.warnings, 'warn');
+  /* The outage notice is not placed by the group list. It goes above everything, so it rides inside
+     write() and covers the all-clear path and the grouped path with one line rather than two. */
+  const noticeHtml = bannerCard(state.notices, 'notice');
   const write = body => {
-    card = head + body;
+    card = head + noticeHtml + body;
     if (side.key === KEY) openSide(KEY, card);
   };
 
