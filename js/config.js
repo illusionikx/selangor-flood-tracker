@@ -98,6 +98,35 @@ export const MAST = { color: 'var(--k-mast)', icon: 'layers' };
    must never drift to two different numbers. */
 export const HOTLINES = 'https://www.civildefence.gov.my/talian-kecemasan-bencana-banjir/';
 
+/* Upstream outage notices. `api.php` publishes an id and the regions the outage hit. Every word a
+   reader sees is here, beside ALERT_TITLE and HOTLINES, because that is where this app keeps its
+   strings. A payload that reships this paragraph every five minutes pays for it on every poll.
+
+   `line` is the whole of the ticker tile and the panel row. CAP caps a headline at 160 characters
+   and this one is 62.
+
+   The links are the channels the notice itself names. A reader who doubts a flood map goes looking
+   for a second opinion, and the alert standard calls that milling. The links are the feature.
+
+   MyPublicInfoBanjir has no App Store link. Apple publishes no working web search for the store, and
+   a guessed app id on a flood app points a worried reader at the wrong software. Google Play search
+   is correct by construction, so Android gets a link and iOS gets the name. */
+export const NOTICE = {
+  publicinfobanjir: {
+    source: 'JPS PublicInfoBanjir',
+    title:  'JPS PublicInfoBanjir is down',
+    line:   'JPS PublicInfoBanjir is down. Some water levels may be behind.',
+    text:   'JPS says the site is overloaded by high traffic. No end time was given.',
+    links: [
+      ['MyPublicInfoBanjir on Google Play', 'https://play.google.com/store/search?q=MyPublicInfoBanjir&c=apps'],
+      ['PublicInfoBanjir on Facebook',      'https://www.facebook.com/PublicInfoBanjir'],
+      ['JPS_InfoBanjir on X',               'https://x.com/JPS_InfoBanjir'],
+      ['publicinfobanjir.water.gov.my',     'https://publicinfobanjir.water.gov.my/'],
+      ['Read the notice from JPS',          'https://publicinfobanjir.water.gov.my/maintenance-files/MaintenancePublicinfobanjir/notifikasi.png'],
+    ],
+  },
+};
+
 // CARTO styles. 'auto' follows the theme; the rest are an explicit choice in the drawer.
 // One basemap per theme. ponytail: a picker existed and nobody needs three flavours of grey.
 export const TILES = { light: 'rastertiles/voyager', dark: 'dark_all' };

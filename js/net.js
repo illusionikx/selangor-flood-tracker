@@ -109,6 +109,7 @@ export async function load() {
     state.data = j.stations;
     // Read before network()/alerts()/ticker() run below, in the same order every poll takes.
     state.warnings = j.warnings || [];
+    state.notices = j.notices || [];
     if (j.siteM) state.siteM = j.siteM;   // the radius api.php actually grouped these by
     // Before anything reads it, and only in the client's copy — see test.js. Nothing downstream
     // needs to know it is looking at a drill, which is the point: the drill exercises the real code.

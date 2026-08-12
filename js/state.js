@@ -5,6 +5,7 @@
 export const state = {
   data: [],        // stations from the last successful poll
   warnings: [],    // MET warnings from the last successful poll, already filtered server-side
+  notices: [],     // upstream outages JPS states itself — see NOTICE in config.js
   hereAt: null,    // L.LatLng of the user's fix, once we have one
   // Test mode lives here, not in PREFS: a saved fake flood is one a later visitor inherits without
   // having asked for it, and the badge explaining why the map is on fire is easy to dismiss as
