@@ -595,9 +595,14 @@ document.addEventListener('toggle', e => {
   const r = btn.getBoundingClientRect();
   box.style.left = `${Math.max(8,
     Math.min(r.right - box.offsetWidth, innerWidth - box.offsetWidth - 8))}px`;
-  // Below the button unless that runs off the bottom — popups near the foot of the map are common.
-  box.style.top = r.bottom + box.offsetHeight + 8 < innerHeight
-    ? `${r.bottom + 4}px` : `${r.top - box.offsetHeight - 4}px`;
+  /* Always below the button, then slid up only as far as the viewport needs. It used to flip above
+     the button when the space below ran short, and a phone has short space below almost everywhere.
+     The ⋮ on a station card sits near the top of `#side`, so the flip put the menu above the top
+     edge of the screen, where a reader could not reach it. The slide keeps the whole box on screen
+     and can overlap the button, which is the lesser fault — an overlapped button is still a menu
+     you can read. The clamp is the same shape as the one on the left axis above. */
+  box.style.top = `${Math.max(8,
+    Math.min(r.bottom + 4, innerHeight - box.offsetHeight - 8))}px`;
 }, true);
 
 // --- alert list ------------------------------------------------------------------------------

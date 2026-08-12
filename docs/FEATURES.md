@@ -7284,3 +7284,31 @@ shows, just not on the banner.
 
 The failure is silence, not a wrong claim. That is the correct direction for this feature to fail
 in.
+
+## The card menu always opens downward
+
+The ⋮ menu on a station card is a popover. CSS anchor positioning is Chromium-only, so `js/ui.js`
+places the box by hand on the `toggle` event.
+
+The old rule put the menu below the button, and flipped it above the button when the space below ran
+short. That flip is correct on a desktop map, where a pin near the foot of the window has room above
+it. It is wrong on a phone. A phone screen is short, so the space below runs out almost everywhere.
+The ⋮ on a station card sits near the top of `#side`, a few pixels under the app bar. The flip
+therefore drew the menu above the top edge of the screen. The reader saw nothing to tap.
+
+The menu now always opens below the button. It slides up only as far as the viewport needs, with the
+same clamp the left axis already used. A menu that has to slide can cover its own button. That is
+the lesser fault. A covered button is still a menu you can read, and the reader closes it the same
+way as before.
+
+`.menu` in `css/chrome.css` takes `max-height: calc(100dvh - 16px)` and `overflow-y: auto` to hold
+up the new rule. The slide cannot fit a box taller than the screen, so such a box must scroll. The
+unit is `dvh` and not `vh`, because a phone browser counts its own address bar in `vh`. With `vh`
+the last row of a full-height menu sits under that bar.
+
+### Deliberately not built
+
+- **No flip on any screen.** A rule that applies on one screen size and not another is a rule with
+  two failure modes to test. One rule is enough here.
+- **No anchor positioning.** `position-area` states this in one declaration and drops the handler.
+  Firefox and Safari do not support it yet. The hand placement stays until they do.

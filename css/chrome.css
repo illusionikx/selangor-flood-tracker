@@ -465,6 +465,10 @@ table.data button[data-pop] { cursor: pointer; }
      station name that runs to 50 characters. Without a cap that one row drew a menu half the width
      of a desktop window. The name wraps inside 340 instead. */
   min-width: 210px; max-width: min(340px, calc(100vw - 16px));
+  /* The placement handler in js/ui.js always opens this menu downward and slides it up to fit. A box
+     taller than the screen cannot fit, so it must scroll instead. `dvh`, because a phone browser
+     counts its own address bar in `vh` and would leave the last row under it. */
+  max-height: calc(100dvh - 16px); overflow-y: auto;
   padding: 4px; border: 1px solid var(--outline); border-radius: 10px; color: var(--on-surface);
 }
 .menu:popover-open { display: block; }
