@@ -51,8 +51,17 @@ export function ticker() {
      strip has one line and nothing under it to crowd, unlike the panel row in alerts.js.
      A tile carries data-warn and no data-go. A warning is not a station, so it opens no card.
      The same [data-warn] click in js/ui.js opens the modal for this tile and for the panel row
-     alike. */
-  const warns = state.warnings.map((w, i) => `<button class="tk-i tk-warn" data-warn="${i}" tabindex="-1">
+     alike.
+     Only while `fresh` — the first WARN_FRESH hours of a warning's own validity, scored in
+     sources.php because MET stamps Malaysian wall clock with no offset. The panel keeps listing it
+     for the whole window. A warning valid for three days would otherwise repeat here for three
+     days, which is the standing banner the alert design standard exists to prevent.
+     `data-warn` is the index into `state.warnings`, so the pair survives the filter and the tiles
+     are numbered before it. Renumbering after would open the wrong warning, or none. */
+  const warns = state.warnings
+    .map((w, i) => [w, i])
+    .filter(([w]) => w.fresh)
+    .map(([w, i]) => `<button class="tk-i tk-warn" data-warn="${i}" tabindex="-1">
       <i class="i i-rainy_heavy" style="--c:var(--k-weather)"></i>
       <b>${esc(w.title)}</b><span class="tk-why">${esc(w.text)}</span>
       <span class="tk-dot">•</span>

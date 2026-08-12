@@ -147,7 +147,13 @@ const favicon = red => {
   }).catch(() => {});                        // no drawing, no repaint — the blue mark stands
 };
 
-/* MET warnings, above every station in the panel.
+/* MET warnings, under HAPPENING NOW and above everything else.
+   They led the panel first. A forecast about a region then sat above a river already over its
+   danger mark, and only one of those is happening — which is the same argument the tier sort
+   below already makes about a forecast two streets away. So the section takes a place in that
+   order rather than standing outside it: after the `now` groups, before `soon` and `stale`.
+   With nothing happening now it is still the first thing under the head, which is where a warning
+   belongs when there is no observation to outrank it.
    A warning names a region. A station reading names one place. So this section adds nothing to
    the counts below it: the badge, the tab title, the tally glyphs and the warning glyph still
    read the station list alone. Merging the two tells a reader that stations are in trouble when
@@ -242,10 +248,11 @@ export function alerts() {
     hot.length && hereAt ? ' <span class="muted">· nearest first</span>' : ''
   }</div><div class="tally">${tally}</div></div>`;
 
-  // Right after the head, ahead of every station group below — see the comment on warnCard().
+  // Placed by the caller, not by write() — it sits after the `now` groups, and only the group list
+  // below knows where those end. See the comment on warnCard().
   const warnHtml = warnCard(state.warnings);
   const write = body => {
-    card = head + warnHtml + body;
+    card = head + body;
     if (side.key === KEY) openSide(KEY, card);
   };
 
@@ -260,7 +267,8 @@ export function alerts() {
        but counted, so the all-clear is one the reader can weigh. The number they need is the ignored
        sensors that are hot right now, not how many are ignored in total. */
     const muted = state.data.filter(s => isIgnored(s) && isHot(s)).length;
-    write(`<p class="empty muted">All clear${where}. Nothing rising or in danger.</p>${
+    // Nothing is happening, so there is nothing for a warning to sit under. It leads.
+    write(warnHtml + `<p class="empty muted">All clear${where}. Nothing rising or in danger.</p>${
       muted ? `<p class="empty muted"><i class="i i-visibility_off"></i> ${muted} ignored sensor${
         muted > 1 ? 's are' : ' is'} on alert — restore ${
         muted > 1 ? 'them' : 'it'} under Ignored sensors in the filters.</p>` : ''}`);
@@ -281,15 +289,25 @@ export function alerts() {
     const key = `${tier(s)}|${s.kind}`;
     groups.has(key) ? groups.get(key).push(s) : groups.set(key, [s]);
   }
-  write([...groups.entries()]
+  const cards = [...groups.entries()]
     .sort(([a], [b]) => {
       const [ta, ka] = a.split('|'), [tb, kb] = b.split('|');
       return TIER_RANK[ta] - TIER_RANK[tb] || (kb === 'siren') - (ka === 'siren');
     })
     .map(([key, items]) => {
       const [t, kind] = key.split('|');
-      return groupCard(items, kind, t, hereAt);
-    }).join(''));
+      return [t, groupCard(items, kind, t, hereAt)];
+    });
+
+  /* The warning section takes its place in the tier order: after the last `now` group, before the
+     first `soon` one. `findIndex` on the sorted list is the whole rule — the groups are already in
+     tier order, so the first entry that is not `now` is the seam. No `now` group at all and the
+     index is 0, which puts the warning first, under the head. Every group is `now` and there is no
+     seam, so it goes last. */
+  const seam = cards.findIndex(([t]) => t !== 'now');
+  const body = cards.map(([, html]) => html);
+  body.splice(seam < 0 ? body.length : seam, 0, warnHtml);
+  write(body.join(''));
   // No advisory here. It lives on the ticker, which is the strip that stays visible while this list
   // is closed or covered — and repeating it in both would make it furniture.
   // Nor is anything bound to the rows: the list is in #side now, so ui.js's delegated [data-go]

@@ -403,6 +403,11 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   any status at 400 or above, which also stops `?cam=` serving an HTML error page as `image/jpeg`.
   The first guess named the camera strips and was wrong. `buildSheet()` runs from `?sheet=` alone,
   never from the payload route, and one strip takes 0.054 s.
+  **The weather section prints MET's own issue time, `met.stamp`, and never our poll time.** The
+  nowcast page is cached for `SCRAPE_TTL` and MET issues about every 30 minutes, so the two are
+  different by up to 45 minutes. Printing the poll time would tell a reader a forecast was fresh
+  when it was three quarters of an hour old. `metPoints()` drops any marker whose stamp fails to
+  parse, so a point that reaches the payload always carries one.
 - **No `fastcgi_finish_request` under Herd** — the SAPI is `cgi-fcgi`, so there is no way to close
   the connection and keep working. Stale-while-revalidate is impossible in-process; the page cache
   is the workaround. A cron hitting `api.php` every 5 min would keep the cache warm for good.
@@ -731,7 +736,8 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   with the camera name and distance in a `title` alone. That is a fact a phone cannot reach, and the
   fix was not a better tooltip but a different control: a menu row, which states the name, the
   distance and the reading as text. Reach for the row shape before the glyph shape.
-- **`sourceInfo()` is the only place a timestamp is printed, and it lives inside the ⋮ menu.** Three
+- **A timestamp is printed inside a ⋮ menu and nowhere else.** `sourceInfo()` does it for a sensor
+  and `wxDots()` does it for the weather section, which is the only other reading on a card. Three
   facts, all about the plumbing: are we hearing from this station, what was the stamp on the last
   thing it sent, which of the three feeds won. None of them changes what the water is doing, and as a
   footer line they repeated per sensor down a six-sensor mast. They are what you check when you doubt
@@ -1086,7 +1092,21 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   is open on purpose: adding `semenanjung` and `peninsular` also lets in warnings about every other
   state. Name the gap so the next reader sees a decision, not a bug. The filter reads English and
   Malay text alike, because MET writes some rows in one language only.
-- **A MET warning counts toward nothing.** It draws two surfaces: a section above the station list
+- **The two warning surfaces disagree about time on purpose, and `fresh` is the seam.** The panel
+  lists a warning for its whole validity. The ticker carries it only while `fresh` — the first
+  `WARN_FRESH` (6 h) of that validity, measured from the warning's own start and **not** from when
+  we first read it. A sample valid for three days would otherwise scroll for three days, which is
+  the standing banner the alert design standard rejects. The panel is a directory somebody opens.
+  The ticker is an interruption nobody asked for, and an interruption has to end.
+  `fresh` is scored in `sources.php` because MET stamps Malaysian wall clock with no offset, so a
+  browser would age it by the reader's clock. **The ticker numbers its tiles before it filters**:
+  `data-warn` indexes `state.warnings`, which the panel and the modal share, so renumbering after
+  the filter opens the wrong warning.
+  The panel section sits **under the `HAPPENING NOW` groups**, not above them. It led once, which
+  put a regional forecast above a river over its danger mark — the same thing the tier sort already
+  refuses to do to a forecast two streets away. `alerts()` splices it at the first group that is not
+  `now`, so with nothing happening it still leads.
+- **A MET warning counts toward nothing.** It draws two surfaces: a section in the station list
   in `#side`, and tiles on the ticker. Both open the same modal, with the full text. Neither surface
   moves a count: not the alert number, the icon badge, the app-bar glyph colour, or the toast. The
   panel shows a warning with no tally beside it claiming a station is in trouble. That separation is
@@ -1311,7 +1331,9 @@ curl -sk "https://flood-exp.test/api.php?place=Bandar+Utama" \
 ```
 
 ```bash
-# Are all three weather feeds contributing? parsed:0 means MET moved something.
+# Are all three weather feeds contributing? Read met.parsed and met.fresh as a pair. parsed:0 means
+# MET moved something and the scrape found nothing. parsed high with fresh:0 means the scrape works
+# and the upstream has stopped updating, which is a different fault. Never read fresh alone.
 curl -sk https://flood-exp.test/api.php | php -r '$s=json_decode(stream_get_contents(STDIN),true)["sources"];
 echo json_encode(["met"=>$s["met"],"metday"=>$s["metday"],"metwarn"=>$s["metwarn"]]),"\n";'
 

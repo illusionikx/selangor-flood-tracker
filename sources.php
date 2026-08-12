@@ -378,6 +378,13 @@ const WARN_SEA = ['rough sea', 'strong wind', 'angin kencang', 'laut bergelora']
    these rows: a storm at sea and a storm over a town are both "Warning on Thunderstorms". */
 const WARN_WATER = ['waters of', 'perairan'];
 
+/* How long a warning keeps interrupting. Measured from the start of its own validity, not from
+   when we first read it — a warning issued overnight is already old when somebody opens the page
+   at eight, and stamping it fresh then would restart a clock MET has already run down.
+   Six hours, because MET issues these with hours of lead and the useful window is the early one.
+   The panel is unaffected and lists a warning for its whole validity. Only the ticker reads this. */
+const WARN_FRESH = 21600;
+
 /* The one stretch of sea that counts. The Straits of Melaka is the Selangor coast. Port Klang
    stands on it, so rough water there reaches the area this map covers. Water off Phuket, Samui,
    Layang-Layang, Palawan and Sulu does not. A marine row survives only by naming these straits. */
@@ -468,8 +475,19 @@ function metWarnings(string $json, int $now): array {
         if (isset($seen[$key])) continue;
         $seen[$key] = true;
 
+        /* `fresh` is how long this warning still interrupts, and it is scored here rather than in
+           the browser for the same reason a status is: MET stamps Malaysian wall clock with no
+           offset, so a reader in another zone would age it by their own clock and get a different
+           answer. This file already runs pinned to Asia/Kuala_Lumpur.
+           The alert panel lists a warning for its whole validity. The ticker carries it only while
+           `fresh`. One live sample was valid for three days, and a strip that repeats the same
+           sentence for three days is the standing banner nobody reads by the second — the exact
+           thing the alert design standard warns about. The split follows what the two surfaces are
+           for: the panel is a directory you open, the ticker is an interruption you did not ask
+           for. An interruption has to end. The directory does not. */
         $out[] = ['title' => $title, 'text' => $text,
-                  'from' => (string)$r['valid_from'], 'to' => (string)$r['valid_to']];
+                  'from' => (string)$r['valid_from'], 'to' => (string)$r['valid_to'],
+                  'fresh' => ($now - $from) < WARN_FRESH];
     }
     usort($out, fn($a, $b) => strcmp($b['from'], $a['from']));
     return $out;

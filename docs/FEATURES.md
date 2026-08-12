@@ -6846,6 +6846,19 @@ in `css/map.css` is the glyph box, and the glyph and the title both read it, so 
 lined up. The section appears on every card, not on
 rivers alone, because the same sky sits over a rain gauge, a siren and a camera alike.
 
+The section carries a ⋮ of its own, and it holds provenance alone. Every other ⋮ on a card carries
+actions under the same block — the favorite, the map link, the ignore — and not one of them applies
+here. A favorite is a place. A map link is a coordinate. `PREFS.ignored` silences a sensor. The
+weather is none of those, and an action that acts on nothing is worse than an absent one.
+
+It states the two facts `sourceInfo()` states for a sensor. When the reading was made, and who made
+it. `met.stamp` is MET's own issue time, so the clock is the one MET published. Elapsed time sits
+beside it always, where `sourceInfo()` prints it only on a stale station. A station card states a
+full date and this states a clock, and `12:40` alone cannot say whether MET has been quiet since
+yesterday. The nearest point and its distance answer "who made this" on the second line. They stay
+out of the header, where the owner asked for them to go. A claim from 14 km away is a different
+claim from one made next door, and the ⋮ is where this app already puts that kind of doubt.
+
 `Later` always carries a sentence. `metSpan()` returns null when no step in the three-hour window is
 wet, so there is no span to word, and the cell held a glyph and nothing else. A glyph on its own
 does not answer "what happens next". The dry case now reads `No rain in the next 3 hours`.
@@ -6859,8 +6872,19 @@ half the devices this runs on. See the `title` gotcha in `CLAUDE.md`. The glyph 
 
 The section was three cells of equal width: a temperature pair, the current sky, and the outlook.
 The outlook cell carries a sentence. The other two carry a word each. So one cell filled its column
-and the other two stood nearly empty. Two columns give the sentence the room it needs. `Now` takes
-the width its two temperatures need, and `Later` takes the rest.
+and the other two stood nearly empty. Two columns give the sentence the room it needs. The split is 1:3. `Later` holds a sentence and `Now`
+holds two short numbers, so an even split left one cell full and the other half empty. Both cells
+keep one 12px gap between the glyph and the words, and 12px of side padding centres the pair inside
+`Now`. Pushing the numbers to the far edge instead put a 30px gap in one cell beside a small one in
+the other. That is one distance, stated twice, on one row.
+
+No cell carries `min-width: 0`, and that is what holds the 1:3 up. A `1fr` track is
+`minmax(auto, 1fr)`, so a cell never goes under its own content unless something zeroes that floor.
+`Now` needs about 81px, and a quarter of a 360px panel is about 79px. The two are within a hair on
+that screen. On a phone the panel is 84vw, the quarter share falls to about 65px, and the glyph would
+stand outside its own cell. `Later` gives up those pixels instead, and its sentence wraps, which is
+what a sentence does. The floor stays off every item inside a cell, where a forecast line does have
+to shrink.
 
 Two smaller changes came with it. The glyph is 28px, because the sky is the state and the words
 beside it are the detail. The old rule set 26px on `.wxbig` and 14px on `.wxcol .i`. Two classes
@@ -6959,6 +6983,32 @@ that survived was the Thai-water row.
 A warning for the whole peninsula still drops. That gap stays open on purpose: widening the match
 to `semenanjung` or `peninsular` also opens the door to warnings about every other state on the
 peninsula.
+
+### Where a warning sits, and how long it interrupts
+
+Warnings led the panel first, and that put a forecast about a region above a river already over its
+danger mark. Only one of those is happening. The panel already makes that argument in its tier sort,
+where a forecast two streets away ranks under an observed danger. So the warning section takes a
+place in that order rather than standing outside it: after the `HAPPENING NOW` groups, before
+`soon` and `stale`. With nothing happening now it leads, which is where a warning belongs when no
+observation outranks it.
+
+The two surfaces then part company on time. The panel lists a warning for its whole validity. The
+ticker carries it for the first six hours of that validity and then drops it.
+
+One live sample was valid for nearly three days. A strip repeating the same sentence for three days
+is the standing banner nobody reads by the second, which the alert design standard names directly.
+The split follows what each surface is for. The panel is a directory a reader opens. The ticker is
+an interruption nobody asked for, and an interruption has to end. The directory does not.
+
+`fresh` is scored in `sources.php`, not in the browser. MET stamps Malaysian wall clock with no
+offset, so a reader in another zone would age the warning by their own clock. It is measured from
+the start of the warning's own validity rather than from when this app first read it, or a warning
+issued overnight would restart its clock when somebody opens the page at eight.
+
+The ticker filters on `fresh` **after** numbering its tiles. `data-warn` is an index into
+`state.warnings`, which the panel and the modal share, so renumbering after the filter would open
+the wrong warning.
 
 A warning moves no count: not the alert number, the icon badge, the app-bar glyph colour, or the
 toast. That separation is what let this surface pass the alert design standard. A warning is a

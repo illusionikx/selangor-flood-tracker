@@ -1032,6 +1032,20 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
     $ok('the bulletin title is the fallback',
         metWarnings(json_encode([$noHead]), $wnow)[0]['title'] === 'Bulletin title');
 
+    /* `fresh` gates the ticker and nothing else. A warning stays listed for its whole validity and
+       stops interrupting after WARN_FRESH. Both halves need a test: one wrong edit either drops a
+       live warning from the panel, or leaves a three-day advisory scrolling for three days. */
+    $new = $row('Thunderstorms Warning', 'Storms over Selangor', $wnow - 60, $wnow + 86400);
+    $old2 = $row('Thunderstorms Warning', 'Storms over Selangor',
+                 $wnow - WARN_FRESH - 60, $wnow + 86400);
+    $ok('a new warning is fresh',        metWarnings(json_encode([$new]),  $wnow)[0]['fresh'] === true);
+    $ok('an old warning is still listed', count(metWarnings(json_encode([$old2]), $wnow)) === 1);
+    $ok('an old warning stops being fresh',
+        metWarnings(json_encode([$old2]), $wnow)[0]['fresh'] === false);
+    $ok('fresh is measured from validity, not from now',
+        metWarnings(json_encode([$row('Thunderstorms Warning', 'Storms over Selangor',
+            $wnow - WARN_FRESH + 600, $wnow + 86400)]), $wnow)[0]['fresh'] === true);
+
     $dupe = metWarnings(json_encode([$rain, $rain, $rain]), $wnow);
     $ok('three identical rows collapse to one', count($dupe) === 1);
 
@@ -1352,6 +1366,14 @@ $db->prepare('DELETE FROM page WHERE url LIKE ? AND ts < ?')
    old weather is worse than a card stating nothing — the same rule that renders an offline gauge grey
    rather than steady. */
 $metPts = metPoints($page('met-now'));
+/* Two counts, because one cannot answer two questions. `parsed` is what the page yielded and is
+   the alarm for a layout change: MET moves something and it falls to 0. `fresh` is what survived
+   the stamp test and is what the map actually drew from. Publishing only the survivors made a
+   quiet upstream look exactly like a broken parser — both report 0 — and the Verify line in
+   CLAUDE.md tells a reader that 0 means MET moved something. It only means that when `parsed` is
+   0. `parsed` high and `fresh` 0 is an upstream that has stopped updating, which is a different
+   fault with a different fix. */
+$metParsed = count($metPts);
 $metPts = array_values(array_filter($metPts, fn($p) => $p['stamp'] >= $now - MET_STALE));
 $metDay = metDaily($page('met-day'));
 $metWarn = metWarnings($page('met-warn'), $now);
@@ -1709,9 +1731,14 @@ foreach ($stations as &$s) {
                each of them a column and "clear" is an answer. Only the span keys — rung, from, to,
                open — depend on there being rain to describe, and metSpan() returns null when there
                is not. The `+` operator keeps the left side, so the two copies of `now` agree by
-               construction. */
+               construction.
+               `stamp` is MET's own issue time for this nowcast, which the card's ⋮ menu prints. It
+               is not our poll time and must not become one: this page is cached for SCRAPE_TTL, so a
+               reader would otherwise be told a forecast was minutes old when MET issued it an hour
+               ago. metPoints() drops any marker whose stamp will not parse, so a point that reaches
+               here always has one. */
             $span = metSpan($p['rungs'], $p['clocks']);
-            $met = ['at'  => $p['name'], 'km'  => round($km, 1),
+            $met = ['at'  => $p['name'], 'km'  => round($km, 1), 'stamp' => $p['stamp'],
                     'now' => $p['rungs'][0], 'hr1' => $p['rungs'][2]] + ($span ?: []);
             $metMatched++;
         }
@@ -1769,7 +1796,7 @@ $payload = json_encode([
         'kl'       => ['parsed' => count($kl), 'added' => $klAdded, 'merged' => $klDupes],
         'national' => ['parsed' => count($nat), 'applied' => count($natUsed),
                        'unmapped' => count($nat) - count($natUsed)],
-        'met'      => ['parsed' => count($metPts), 'matched' => $metMatched],
+        'met'      => ['parsed' => $metParsed, 'fresh' => count($metPts), 'matched' => $metMatched],
         'metday'   => ['parsed' => count($metDay), 'matched' => $metDayMatched],
         'metwarn'  => ['parsed' => count($metWarn)],
         // Empty on a healthy poll. A key here names a table the map is drawing from a stored copy.
