@@ -58,10 +58,10 @@ export function ticker() {
      listing it for the whole window. A warning valid for three days would otherwise repeat here for
      three days, which is the standing banner the alert design standard exists to prevent.
 
-     An outage carries no such filter and needs none. This server re-detects it on every poll, so it
-     rides here only while the source is still serving its notice, and it leaves the poll the tables
-     parse again. A timer would take it off the one surface that is never covered, while the map is
-     still degraded.
+     An outage carries no such filter and needs none. The server remembers the notice between the
+     polls that refetch nothing, so it rides here for as long as the source serves it, and it leaves
+     the poll the tables parse again. See noticeRow() in api.php. A timer would take it off the one
+     surface that is never covered, while the map is still degraded.
 
      Each index is captured before its filter, so it stays the index into the list the click handler
      reads. Renumbering after would open the wrong item, or none. */
@@ -75,7 +75,9 @@ export function ticker() {
   const notes = state.notices
     .map((n, i) => [NOTICE[n.id], i])
     .filter(([t]) => t)                   // an id this build has no words for says nothing
-    .map(([t, i]) => tile('notice', 'public_off', 'var(--k-source)', t.title, t.line, i));
+    // `source` is the bare name of the feed, and `line` already states that it is down. `title` is
+    // the whole of that sentence, so the tile printed it twice over.
+    .map(([t, i]) => tile('notice', 'public_off', 'var(--k-source)', t.source, t.line, i));
 
   const warns = state.warnings
     .map((w, i) => [w, i])

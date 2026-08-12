@@ -670,6 +670,28 @@ function noticeOf(string $body): ?string {
     return preg_match('~<title>\s*Notis\s+Gangguan~i', $body) ? 'publicinfobanjir' : null;
 }
 
+/* The `page` table also remembers the notice found on each page, under this reserved key prefix. The
+   `place:` cache reserves a prefix in the same table for the same reason. No scraped URL can collide
+   with either one. */
+const NOTICE_KEY = 'notice:';
+
+/**
+ * What to do with a page's remembered notice after a fetch attempt.
+ *
+ * The memory exists because the page cache does not refetch every poll. pageRow() stamps a page that
+ * failed, so a dead source backs off for SCRAPE_TTL while the payload rebuilds every TTL. Reading
+ * this poll's fetch alone therefore found the notice on one rebuild in three. The banner appeared
+ * and vanished every five minutes while the source stayed down.
+ *
+ * Only a fetch carries news. A poll that did not ask learns nothing and must leave the memory alone.
+ *
+ * Returns 'set' to remember this id, 'clear' to forget, and 'keep' to leave the memory as it is.
+ */
+function noticeRow(bool $asked, ?string $id): string {
+    if (!$asked) return 'keep';
+    return $id === null ? 'clear' : 'set';
+}
+
 /**
  * Normalize and validate a place query. Returns the normalized string, or null when it is unusable.
  *
@@ -765,6 +787,14 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
     // is still a table, and treating it as an outage would take a working feed off the map.
     $ok('the words in body text do not match', noticeOf('<html><title>Aras Air</title><body>Notis Gangguan</body></html>') === null);
     $ok('case and spacing do not matter',  noticeOf('<TITLE>notis   gangguan</TITLE>') === 'publicinfobanjir');
+
+    echo "\nnoticeRow():\n";
+    /* The first two are the whole point of the memory. Two rebuilds in three refetch no page, and on
+       those the banner has to stand on what the last fetch found. */
+    $ok('an unasked page keeps the memory',   noticeRow(false, 'publicinfobanjir') === 'keep');
+    $ok('an unasked clean page keeps it too', noticeRow(false, null) === 'keep');
+    $ok('a fetched notice is remembered',     noticeRow(true, 'publicinfobanjir') === 'set');
+    $ok('a fetched page with no notice ends it', noticeRow(true, null) === 'clear');
 
     echo "\nplaceQuery():\n";
     $ok('a plain query normalizes',    placeQuery('Bandar Utama') === 'bandar utama');
@@ -1372,6 +1402,7 @@ $details = [];
 foreach ($detailUrls as $u) $details[$u] = json_decode($raw[$u] ?? '', true);
 
 $keep = $db->prepare('INSERT OR REPLACE INTO page (url, ts, body) VALUES (?, ?, ?)');
+$drop = $db->prepare('DELETE FROM page WHERE url = ?');
 $pages = [];
 /* Which pages this server asked for and did not get. pageRow() stamps a failure, so the `ts` column
    no longer shows a dead upstream — it advances on every attempt whether or not the page answered.
@@ -1381,21 +1412,49 @@ $pages = [];
    stored copy of that table. `kl.parsed` cannot say it, because a stored copy parses as well as a
    fresh one. */
 $pagesStale = [];
-$noticeHits = [];      // notice id => [region, …]
+/* The notice each page last showed the server, page key => notice id. $stored already holds every
+   row of the table, so the memory costs no second query. See noticeRow() for why it is remembered at
+   all. */
+$seen = [];
+foreach ($stored as $su => $sr) {
+    if (str_starts_with($su, NOTICE_KEY)) $seen[substr($su, strlen(NOTICE_KEY))] = $sr['body'];
+}
 foreach ($extraUrls as $k => $u) {
     $got = $raw[$u] ?? '';
+    $id  = null;
     if (!pageHasData($k, $got)) {
         /* Read the raw body before the next line clears it. A notice is the one failure that states
            its own cause, so it is the only one a reader hears about. Everything else stays in
            $pagesStale, which the status popover already carries. */
         $id = noticeOf($got);
-        if ($id !== null && isset(NOTICE_REGION[$k])) $noticeHits[$id][] = NOTICE_REGION[$k];
         $got = '';
+    }
+    switch (noticeRow(isset($want[$k]), $id)) {
+        case 'set':
+            $keep->execute([NOTICE_KEY . $k, $now, $id]);
+            $seen[$k] = $id;
+            break;
+        case 'clear':
+            $drop->execute([NOTICE_KEY . $k]);
+            unset($seen[$k]);
+            break;
     }
     [$write, $body] = pageRow(isset($want[$k]), $got, $stored[$u]['body'] ?? '');
     if (isset($want[$k]) && $got === '') $pagesStale[] = $k;
     if ($write) $keep->execute([$u, $now, $body]);
     $pages[$k] = $body;
+}
+
+/* Built from the memory, never from the loop above. A poll that refetched nothing still states the
+   outage it was told about last time.
+   Walked in $extraUrls order rather than in $seen order. The regions become a sentence a reader
+   reads, so they keep the order the source list declares. Walking the memory instead hands that
+   sentence the order sqlite returns rows in, and the region names move for no reason.
+   A key this build no longer asks for contributes nothing, so a row left over from an older build is
+   inert and no reader has to clean it up. */
+$noticeHits = [];      // notice id => [region, …]
+foreach ($extraUrls as $k => $u) {
+    if (isset($seen[$k], NOTICE_REGION[$k])) $noticeHits[$seen[$k]][] = NOTICE_REGION[$k];
 }
 
 /* One entry per notice, never one per page. Three national pages carry the same notice, and three
