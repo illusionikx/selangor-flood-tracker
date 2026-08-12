@@ -26,11 +26,11 @@ const themeRow = el('themeRow');
 themeRow.querySelector(`input[value="${applyTheme()}"]`).checked = true;
 themeRow.onchange = e => setTheme(e.target.value);
 
-// --- about dialog ------------------------------------------------------------------------------
+// --- about and help dialogs ----------------------------------------------------------------------
 // <dialog> handles the backdrop, Esc and focus; the only wiring needed is opening it and treating a
 // click on the backdrop as a close, which the element does not do on its own.
 
-const aboutBox = el('aboutBox');
+const aboutBox = el('aboutBox'), helpBox = el('helpBox');
 /* One handler closes the menu, whichever item was hit. Capture, not bubble: an item's own handler
    calls showModal(), and a dialog that opens while its opener is still in the top layer is a
    sequence worth not testing. Capture runs the parent first, so the menu is gone before the dialog
@@ -44,37 +44,21 @@ appMenu.addEventListener('click', e => {
 // The station card closes when a dialog takes the screen — you have gone somewhere else, and coming
 // back to a card you had forgotten was open is a surprise. That, and its own ×, are the only ways it
 // shuts: nothing on the map dismisses it, and a poll never does. See map.js.
-el('about').onclick = () => { closeSide(); showPane('tabAbout'); aboutBox.showModal(); };
-el('help').onclick  = () => { closeSide(); showPane('tabHelp');  aboutBox.showModal(); };
+// Each menu entry opens its own dialog. Both scroll, so both are parked at the top on open: a
+// reopened dialog that keeps the last reader's scroll position starts mid-sentence.
+el('about').onclick = () => { closeSide(); aboutBox.scrollTop = 0; aboutBox.showModal(); paintDev(); };
+el('help').onclick  = () => { closeSide(); helpBox.scrollTop  = 0; helpBox.showModal(); };
 aboutBox.onclick = e => { if (e.target === aboutBox) aboutBox.close(); };
+helpBox.onclick  = e => { if (e.target === helpBox)  helpBox.close(); };
 
-/* Two panes, one dialog. `hidden` on the pane and `aria-selected` on the button are the whole state.
-   Nothing is stored: the dialog resets to About on close, so it always opens where the design says.
-   The scroll reset is not cosmetic — the panes are different lengths, and switching from the foot of
-   About into Help would drop you into the middle of a sentence.
-   ponytail: no roving tabindex. The ARIA practice makes a tab list one Tab stop and moves between
-   tabs with the arrow keys; with exactly two tabs that only makes the second one harder to reach. */
-const PANES = { tabAbout: 'paneAbout', tabHelp: 'paneHelp' };
-function showPane(tabId) {
-  for (const [t, p] of Object.entries(PANES)) {
-    el(t).setAttribute('aria-selected', String(t === tabId));
-    el(p).hidden = t !== tabId;
-  }
-  aboutBox.scrollTop = 0;
-  if (tabId === 'tabAbout') paintDev();
-}
-aboutBox.querySelector('.tabs').onclick = e => {
-  const b = e.target.closest('[role=tab]');
-  if (b) showPane(b.id);
-};
 // The message a force leaves in #devMsg belongs to the dialog session that produced it, not to any
 // one repaint — clearing it here, not in paintDev(), is what stops a poll landing mid-read from
 // wiping a result nobody has seen yet. Close the dialog and it is gone; reopen and force a fresh one.
-aboutBox.onclose = () => { showPane('tabAbout'); el('devMsg').textContent = ''; };
+aboutBox.onclose = () => { el('devMsg').textContent = ''; };
 
 /* The same numbers the status dot shows, plus the ones it has no room for. Painted when the dialog
-   opens and when the About pane comes back, because a poll may have landed while Help was on
-   screen. There is nothing to tear down, so re-painting is the whole update. */
+   opens, and again on every poll while it stays open. There is nothing to tear down, so re-painting
+   is the whole update. */
 function paintDev() {
   const j = lastPayload();
   // net.js sets `last` to null on any fetch error, so a missing payload here can mean two different
@@ -524,7 +508,7 @@ document.addEventListener('click', e => {
   const ids = favIds();
   const full = list.every(id => ids.has(id));
   for (const id of list) full ? ids.delete(id) : ids.add(id);
-  /* The sensor's star lives inside its own ⓘ menu — a `popover` — and `setFavs()` calls `render()`,
+  /* The sensor's star lives inside its own ⋮ menu — a `popover` — and `setFavs()` calls `render()`,
      which rebuilds the open card by replacing #sideBody wholesale (see openSide() in map.js). That
      destroys the open popover along with everything else on the card and mints a fresh, closed one
      with the same id. Left alone, the reader never sees the label flip to "Remove from favorites" —
@@ -566,7 +550,10 @@ document.addEventListener('click', e => {
   if (!menu) return;
   if (menu.matches(':popover-open')) {
     const item = menu.querySelector('[data-fav]');
-    const on = item && ids.has(item.dataset.fav);
+    // The same rule the press itself used: a mast's row carries every sensor's id, and it reads as
+    // set only when all of them are. `ids.has()` on the raw attribute asks whether one station is
+    // called "a,b,c" and answers no forever.
+    const on = item && item.dataset.fav.split(',').every(id => ids.has(id));
     const heart = item?.querySelector('.i-favorite, .i-favorite_outline');
     if (heart) {
       heart.className = `i i-favorite${on ? '' : '_outline'}`;

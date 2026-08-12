@@ -116,13 +116,13 @@ header .hactions {
 
 /* Wider than a plain dialog: this one carries the logo lockup, three source entries and a credits
    block, and at 440px the source descriptions ran to four lines each. */
-#aboutBox {
+.docbox {
   max-width: min(820px, calc(100vw - 32px)); padding: 24px;
   border: 1px solid var(--outline); border-radius: 12px;
   background: var(--surface); color: var(--on-surface); box-shadow: var(--shadow);
 }
-#aboutBox::backdrop { background: #0009; }
-#aboutBox h2 { font-size: 18px; font-weight: 500; }
+.docbox::backdrop { background: #0009; }
+.docbox h2 { font-size: 18px; font-weight: 500; }
 
 /* Title and close on one line, both dialogs. In the header rather than a footer button: these
    dialogs scroll, and a close pinned below the content is one more thing to travel to from the top
@@ -153,7 +153,7 @@ header .hactions {
    the `.key` grid next to it ran the full width, and the ragged gutter read as a layout fault. One
    edge for everything beats a comfortable measure here. Anything that wants a narrower line has to
    narrow the whole pane, grid included. */
-#aboutBox p { margin: 10px 0; line-height: 1.5; }
+.docbox p { margin: 10px 0; line-height: 1.5; }
 /* Nothing left in this row but the close button, pushed to the corner. */
 #aboutBox .modalhead { justify-content: flex-end; margin-bottom: 0; }
 
@@ -170,34 +170,13 @@ header .hactions {
 }
 #aboutBox .notice .i { color: #e8710a; font-size: 20px; flex: none; margin-top: 1px; }
 #aboutBox .notice b { font-weight: 500; }
-#aboutBox h3 {
+.docbox h3 {
   margin: 22px 0 8px; font-size: 11px; font-weight: 500; letter-spacing: .08em;
   text-transform: uppercase; color: var(--muted);
 }
-/* Scoped to the About pane only. :first-of-type matches per parent, so with two panes the
-   unscoped rule painted a rule on the first h3 of each — "How this was built" in About, and also
-   "How to use the map" in Help, landing just under the tab strip's own border-bottom. */
-#paneAbout h3:first-of-type { border-top: 1px solid var(--outline); padding-top: 18px; }
-
-/* The tab strip. A row of two text buttons with an underline on the selected one — the same shape
-   every browser and editor uses, so it needs no label saying it is a tab strip. Tokens only: this
-   sits on the dialog surface, which flips with the theme. */
-#aboutBox .tabs {
-  display: flex; gap: 4px;
-  border-bottom: 1px solid var(--outline);
-  margin-top: 4px;
-}
-#aboutBox .tabs button {
-  appearance: none; background: none; border: 0; cursor: pointer;
-  padding: 10px 14px; margin-bottom: -1px;
-  font: inherit; font-size: 14px; color: var(--muted);
-  border-bottom: 2px solid transparent;
-}
-#aboutBox .tabs button:hover { color: var(--on-surface); }
-#aboutBox .tabs button[aria-selected="true"] {
-  color: var(--on-surface); border-bottom-color: var(--accent);
-}
-#aboutBox .tabs button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+/* About only. The rule separates the logo lockup from the prose under it, and Help opens on a
+   heading of its own with nothing above it to divide. */
+#aboutBox h3:first-of-type { border-top: 1px solid var(--outline); padding-top: 18px; }
 
 /* --- test mode --------------------------------------------------------------------------------- */
 
@@ -253,15 +232,15 @@ body.testmode #testbadge, body.rising #risebadge { display: flex; }
   /* The sentence is the first thing to lose: the label and the way out are what matter. */
   #testbadge span, #risebadge span { display: none; }
   /* The logo already has its own line, so nothing needs to wrap here — just less of everything. */
-  #aboutBox { padding: 18px; }
+  .docbox { padding: 18px; }
   #aboutBox .logo { margin-bottom: 12px; padding: 30px 0 8px; }
   #aboutBox .logo .i { font-size: 34px; }
   #aboutBox .logo span { font-size: 18px; }
   /* Two columns would be 219px of pins against 105px of prose at 360px wide — and that is the pin
      row after it grew by half. Stack instead — the thing above what it means is the same reading
      order, just turned a corner. */
-  #aboutBox .key { grid-template-columns: 1fr; gap: 6px 0; }
-  #aboutBox .key > span:nth-child(even) { margin-bottom: 12px; }
+  .docbox .key { grid-template-columns: 1fr; gap: 6px 0; }
+  .docbox .key > span:nth-child(even) { margin-bottom: 12px; }
 }
 #aboutBox .src { margin: 14px 0; display: grid; gap: 2px; }
 #aboutBox .src a { font-weight: 500; }
@@ -270,24 +249,24 @@ body.testmode #testbadge, body.rising #risebadge { display: flex; }
 /* Two-column key: the thing itself on the left, what it means on the right. `align-items: start`
    so a one-line pin doesn't centre itself against four lines of prose. The left column sizes to its
    content, which is a row of real pins in one case and a single tag in another. */
-#aboutBox .key {
+.docbox .key {
   display: grid; grid-template-columns: auto 1fr; gap: 12px 12px;
   margin: 14px 0; align-items: start; font-size: 13px;
 }
-#aboutBox .key > span:nth-child(odd) { padding-top: 1px; }
-#aboutBox .key .tg { margin-left: 0; }        /* the panel indents it after a badge; here it leads */
-#aboutBox .pins { display: flex; gap: 6px; }
+.docbox .key > span:nth-child(odd) { padding-top: 1px; }
+.docbox .key .tg { margin-left: 0; }        /* the panel indents it after a badge; here it leads */
+.docbox .pins { display: flex; gap: 6px; }
 /* The pins are the map's own `.pin` / `.cluster`, at the size they are drawn — a legend redrawn in
    a second style is a legend that can disagree with the map. Scale the cluster chip down to sit in
    a text column rather than dominate it. */
-#aboutBox .pins .cluster { width: 28px; height: 28px; font-size: 12px; }
+.docbox .pins .cluster { width: 28px; height: 28px; font-size: 12px; }
 
 /* The left cell of a how-to row: the control's own glyph, then its own name. Aligned to the first
    line, because a name can wrap to two and the glyph belongs beside the first. */
-#aboutBox .ctl { display: flex; align-items: flex-start; gap: 8px; }
-#aboutBox .ctl .i { font-size: 18px; flex: none; color: var(--muted); }
+.docbox .ctl { display: flex; align-items: flex-start; gap: 8px; }
+.docbox .ctl .i { font-size: 18px; flex: none; color: var(--muted); }
 
-#aboutBox kbd {
+.docbox kbd {
   font: inherit; font-size: 12px; padding: 1px 6px;
   border: 1px solid var(--outline); border-radius: 4px; background: var(--hover);
 }
@@ -312,11 +291,11 @@ body.testmode #testbadge, body.rising #risebadge { display: flex; }
 
 /* .testtog was a flex item in .modalhead, where `flex: none` sized it to its content. Here it is a
    block-level flex container and would stretch the full pane, so the pill has to claim its width. */
-#paneAbout .testtog { width: fit-content; }
+#aboutBox .testtog { width: fit-content; }
 
 /* Three controls, not the drawer's two. They wrap rather than shrink past their own text. */
-#paneAbout .rowbtns { flex-wrap: wrap; }
-#paneAbout .rowbtns .link { width: auto; flex: 1 1 auto; }
+#aboutBox .rowbtns { flex-wrap: wrap; }
+#aboutBox .rowbtns .link { width: auto; flex: 1 1 auto; }
 
 /* --- all-stations table ----------------------------------------------------------------------- */
 
@@ -482,7 +461,10 @@ table.data button[data-pop] { cursor: pointer; }
    `popover` is unsupported. */
 .menu {
   position: fixed; margin: 0; inset: auto; display: none;
-  min-width: 210px; max-width: calc(100vw - 16px);
+  /* 340, not the viewport: a menu sizes to `fit-content`, and the nearest-webcam row now carries a
+     station name that runs to 50 characters. Without a cap that one row drew a menu half the width
+     of a desktop window. The name wraps inside 340 instead. */
+  min-width: 210px; max-width: min(340px, calc(100vw - 16px));
   padding: 4px; border: 1px solid var(--outline); border-radius: 10px; color: var(--on-surface);
 }
 .menu:popover-open { display: block; }
@@ -495,11 +477,19 @@ table.data button[data-pop] { cursor: pointer; }
 .mi:hover { background: color-mix(in srgb, var(--accent) 14%, transparent); }
 .mi .i { font-size: 18px; color: var(--muted); margin-top: 1px; }
 .mi small { font-size: 11px; }
+/* The label takes the slack, so a row that also carries a number on the right keeps the number
+   whole and wraps the station name instead. Every other row has one child and looks the same
+   either way. `min-width: 0` because a flex item refuses to shrink below its content without it. */
+.mi > span { flex: 1; min-width: 0; }
+/* The nearest water level's reading, on the right of its row in the card menu. `color()` paints it,
+   the same function the pin and the card use — 1.74 m is a quiet river or a flood, and the mark it
+   is measured against is not on this row. */
+.mi .mv { flex: none; font-size: 13px; font-weight: 500; }
 /* The app menu is the one `.menu` user shaped as a 2x2 grid of tiles rather than a row list — four
    short destinations scan faster as a grid. It does not save height: measured, the old four-row list
    came to about 148px including the menu's own padding, and this 2x2 grid comes to about 157px, a
    little more rather than less. The grid earns its place on scan speed, not on size. Scoped to the
-   id, not a second class: the sensor ⓘ menu shares `.menu` for its popover mechanics (see js/ui.js's
+   id, not a second class: the sensor ⋮ menu shares `.menu` for its popover mechanics (see js/ui.js's
    delegated placement handler, which keys off that class alone) and keeps the row shape, which is
    right for its longer, two-line items.
    The width is stated here rather than left to `.menu`'s own `min-width: 210px`: a 2x2 grid divides
@@ -566,10 +556,9 @@ table.data button[data-pop] { cursor: pointer; }
 .mi.info { cursor: default; }
 .mi.info:hover { background: none; }
 .menu hr { margin: 4px 6px; border: 0; border-top: 1px solid var(--outline); }
-/* Smaller than the app-bar buttons: this one sits inside a 300px popup beside a badge. */
+/* Smaller than the app-bar buttons: this one sits inside a 360px panel, in the card's own corner
+   beside the close button, or at the end of a sensor row. Positioned in map.css for the first. */
 .dots { width: 28px; height: 28px; font-size: 18px; margin-left: auto; }
-.popact { display: flex; align-items: center; gap: 6px; margin: 6px 0 0; }
-.popact .badge { margin: 0 !important; }
 .sensorhead .dots { margin-left: auto; }
 
 /* The panel sits inside a cell in the DOM, so the cell's badge rules reach it — top layer changes
@@ -1056,8 +1045,10 @@ body.side #sideTab { transform: translateX(calc(-1 * var(--side))); visibility: 
 #sideHead { flex: none; padding: 0 16px 8px; }
 #sideHead:empty { display: none; }
 /* 18px = the close button's 8px top + half its 40px height − half the name's 15px/1.3 line, so the
-   place and the × sit on one line. The three numbers move together — see `.pophead .favbtn` in
-   map.css, which centres the mast's star on this same line. */
+   place and the × sit on one line. The three numbers move together — see `.pophead > .dots` in
+   map.css, which centres the card's ⋮ on this same line. That corner holds one control, and the ⋮
+   is it: a favorite heart held the slot once, and then a webcam glyph beside the heart, and the pair
+   owed the title 108px of a 328px line. Both are rows inside the menu now. */
 #sideHead .pophead { padding-top: 18px; margin-bottom: 0; }
 #sideClose { position: absolute; z-index: 2; top: 8px; right: 8px; }
 #sideBody { flex: 1; overflow: auto; overscroll-behavior: contain; padding: 0 16px 16px; }

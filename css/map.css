@@ -53,24 +53,35 @@
 
 /* Standard card: header (name / region / badge) → body metrics → still → footer. */
 .pophead {
-  position: relative;   /* the favorite heart hangs off the top-right corner */
+  position: relative;   /* the card's ⋮ hangs off the top-right corner */
   padding: 0 0 8px; margin-bottom: 8px; border-bottom: 1px solid var(--outline);
 }
 /* The name and the region line clear the panel's close button, which floats over this corner. Only
-   those two — the badge row runs the full width, or its Details button sits inset from the one on
-   every sensor row under it. 34px = the button's 48 from the panel edge, less #sideBody's 16. */
+   those two — the badge row runs the full width. 34px = the button's 48 from the panel edge, less
+   #sideBody's 16. */
 .pophead .popname, .pophead > .muted { padding-right: 34px; }
-/* The favorite heart, parked on the name's line just inside the close button. It holds the slot a
-   sensor-count chip used to: the badge row lists one badge per sensor, so the count restated what
-   sat an inch below it, and a control for the whole mast had nowhere else to go.
-   Only the name shares this line, so only the name pays for the room — see the sibling rule below. */
-.pophead .favbtn {
-  position: absolute; right: 34px;
-  /* Centred on the name's line, which starts 18px down — the sticky header's own padding-top, set
-     in chrome.css. 18 + half a 15px/1.3 line − half this button's 28px = 14. Moves with it. */
-  top: 14px;
+/* The card's one control, sitting against the close button. It is the ⋮, and it is the only thing
+   that goes here. A favorite heart held this slot, and then a webcam glyph beside the heart, and the
+   pair owed the title 108px of a 328px line. Both are rows inside this menu now.
+   It takes the full `.icon` box and not `.dots`'s 28px one. The two buttons stand side by side, and
+   `.icon` paints a round `--hover` disc the width of its box. A 28px ⋮ beside a 40px × drew two
+   discs of two sizes, under two glyphs of two sizes. `.dots` is small for a sensor row, where it
+   stands alone. So this rule restates all three of the numbers that shape it.
+   `top: 8px` is `#sideClose`'s own number, and it is also the arithmetic. The name's line starts
+   18px down, which is the header's padding-top in chrome.css. 18 + half a 15px/1.3 line − half 40
+   is 7.75. The three numbers move together.
+   `right: 32px` puts this button's right edge on the ×'s left edge. The × sits 8 + 40 from the panel
+   edge, and this box starts 16 inside it. Two `.icon` boxes abut by design. Each one already carries
+   about 9px of its own padding, and that is the gap. */
+.pophead > .dots {
+  position: absolute; right: 32px; top: 8px; margin: 0;
+  width: 40px; height: 40px; font-size: 22px;
 }
-.pophead .favbtn + .popname { padding-right: 68px; }   /* the close button's 34, plus this one's 28 and a gap */
+/* Both lines stop 6px clear of the ⋮'s left edge, at 32 + its 40. The region line needs the room as
+   much as the name does. It is one line lower, and a 40px button reaches 48px down, where the region
+   starts at 37.5.
+   `~`, not `+`: dots() emits the button and the popover it targets, so the menu sits between them. */
+.pophead > .dots ~ .popname, .pophead > .dots ~ .muted { padding-right: 78px; }
 /* The badge trails the location now, so its spacing has to flip with it. */
 .pophead .badge, .pophead .badges { margin: 6px 0 0; }
 .popname { font-size: 15px; font-weight: 500; line-height: 1.3; }
@@ -84,9 +95,6 @@
    were a double line. Keyed on `:first-child`, *not* `.pophead + .sensor`: map.js lifts the header
    out of #sideBody into #sideHead, so a sibling selector silently stopped matching. */
 #sideBody > .sensor:first-child { margin-top: 0; padding-top: 0; border-top: 0; }
-/* The nearest-webcam link leads every station card, so it needs room under it. The "you are here"
-   card has no link — it shows the picture instead, as a section like any other. */
-#sideBody > .link { margin-bottom: 8px; }
 .sensorhead { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
 .sensorhead b { font-size: 12px; font-weight: 500; }
 .sensorhead .muted { flex: 1; min-width: 0; text-align: right; overflow: hidden;

@@ -78,30 +78,57 @@ export const camImg = (c, alt) => `<div class="shotwrap" data-clip="${c.id.split
                   {className:'muted',textContent:'image unavailable'}))">
   <p class="clipcap"></p></div>`;
 
-/* The ⓘ on every sensor: where this reading came from, when, and the one action there is.
-   It was a ⋮ holding a single "ignore" item, with the provenance printed as a footer line under
-   every card. Two problems with that. The glyph promised actions and held one, and the footer was
-   three facts about *us* — our connection to the station, the stamp on the last packet, which feed
-   won — sitting in the reading's own column, on every sensor of a six-sensor mast. None of it
-   changes what the water is doing. It is what you check when you doubt the number, so it now lives
-   where you go to look, one tap away, and the card is the reading again.
+/* The favorite, as a menu row. `ids` is comma separated: ui.js's handler reads a full list as
+   "remove every one" and anything short of full as "add every one", which is what lets one press on
+   a mast act on all of its sensors. The glyph fills and turns `--fav` on the set state, the same two
+   marks the heart wore in the card's corner, so the row still reports the state it is about to
+   change. Never a `--s-*` colour: a favorite is not a status. */
+const favItem = (ids, set) => `<button class="mi" data-fav="${ids}"
+    ><i class="i i-favorite${set ? '' : '_outline'}"
+       style="color:${set ? 'var(--fav)' : 'var(--muted)'}"></i>
+    <span>${set ? 'Remove from favorites' : 'Add to favorites'}</span>
+  </button>`;
+
+/* The ⋮ on every sensor: where this reading came from, when, and everything you can do to it.
+   The glyph has been round the loop. It was a ⋮ holding a single "ignore" item, which promised
+   actions and held one, so it became an ⓘ — and the provenance moved into it from a footer line
+   that printed three facts about *us* on every sensor of a six-sensor mast. The menu now carries
+   the favorite, the nearest webcam or water level, the map link and the ignore, so it is four
+   actions behind an information glyph. It is a ⋮ again, and the argument that took it away is what
+   put it back: name the menu for what is in it. The first ⋮ was wrong for holding one action, not
+   for being a ⋮.
+   The provenance stays where it is. It is what you check when you doubt the number, so it lives one
+   tap from the number, and the card is the reading again.
    `popover` + `popovertarget` gives toggle, light dismiss and Esc for nothing; the panel lands in
    the top layer, so the station panel's own scrolling box can't clip it. Placement is ui.js's — CSS
    anchor positioning is still Chromium-only. Ids are safe because the panel holds one card at a
    time, so only one copy of a given sensor's menu is ever in the document. */
-export const dots = s => `<button class="icon dots" popovertarget="mnu-${s.id}"
-    title="Details" aria-label="Details and actions for ${s.name}"><i class="i i-info"></i></button>
+/* `extra` is the nearest webcam or water level, and only the card *header* passes one. A mast lists
+   its sensors with a menu on each, and that offer belongs to the place rather than to the rainfall
+   gauge whose row happens to hold it. */
+export const dots = (s, extra = '') => `<button class="icon dots" popovertarget="mnu-${s.id}"
+    title="Details" aria-label="Details and actions for ${s.name}"><i class="i i-more_vert"></i></button>
   <div id="mnu-${s.id}" class="menu surface" popover>
     ${sourceInfo(s)}
-    <button class="mi" data-fav="${s.id}"
-      ><i class="i i-favorite${isFav(s) ? '' : '_outline'}"
-         style="color:${isFav(s) ? 'var(--fav)' : 'var(--muted)'}"></i>
-      <span>${isFav(s) ? 'Remove from favorites' : 'Add to favorites'}</span>
-    </button>
+    ${favItem(s.id, isFav(s))}
+    ${extra}
     ${mapLink(s)}
     <button class="mi" data-ignore="${s.id}"><i class="i i-visibility_off"></i>
       <span>Ignore this sensor</span>
     </button>
+  </div>`;
+
+/* A mast's own menu, in the corner where a single-sensor card carries the sensor's ⋮.
+   It holds what belongs to the whole place and nothing else. No provenance, because six sensors have
+   six answers. No ignore, because that is a request about one sensor and every sensor's own row
+   already offers it. The favorite acts on all of them, which is the one thing this menu can say that
+   none of the rows below it can. */
+const siteDots = (lead, ids, all, extra) => `<button class="icon dots" popovertarget="mnu-site-${lead.id}"
+    title="Details" aria-label="Details and actions for ${lead.name}"><i class="i i-more_vert"></i></button>
+  <div id="mnu-site-${lead.id}" class="menu surface" popover>
+    ${favItem(ids, all)}
+    ${extra}
+    ${mapLink(lead)}
   </div>`;
 
 /* Where this station is, on a map that knows about roads. This app answers "what is the water
@@ -163,62 +190,41 @@ export function camNear(from, cam) {
   </div>`;
 }
 
-/* Everywhere else — every station card, every alert row — the camera is offered, not shown. One
-   line at the top of the card saying a picture exists and how far away it is, which is enough to
-   decide whether you want it. The alert panel would be N proxied fetches at JPS for pictures of
-   places you are scrolling past; a station card would be one you did not ask for.
-   A camera on the *same mast* is not a nearest-anything — it is this station's own view, so it says
-   so and drops the distance, which would read "0.0 km". `from` may be a bare latlng from a map
-   click, which has no `site` — hence the guard rather than a plain comparison. */
-/* The camera is named, and the name leads. A distance alone said a picture exists somewhere over
-   there, and the reader had to open it to find out whether "over there" is their road or the next
-   town. The name answers that before the fetch, and it is what the lightbox is about to be titled
-   anyway.
-   Three parts, the same shape as levelLink() below: the place, then what it is and how far away as a
-   caption under it. Strung on one line — "Nearest webcam · Dataran Kajang · 3.2 km" — the name is a
-   fragment in the middle of a sentence that never resolves, and it breaks in the wrong place when it
-   wraps. The place is what the button opens, so it goes where a reader looks first. */
-export const camLink = (from, cam) => !cam ? ''
-  // Same mast: an action, not an offer. There is no other place to name and no distance to state, so
-  // it stays the plain one-line button it has always been.
-  : from.site && from.site === cam.site
-    ? `<button class="link" data-cam="${cam.id}">
-         <i class="i i-photo_camera"></i> Show webcam
-       </button>`
-    : `<button class="link" data-cam="${cam.id}">
-         <i class="i i-photo_camera"></i>
-         <span class="lt">
-           <b>${cam.name}</b>
-           <small>Nearest webcam · ${distKm(from, cam).toFixed(1)} km away</small>
-         </span>
-       </button>`;
+/* Everywhere else — every station card, every mast card — the nearest thing is offered, not shown.
+   The alert panel would be N proxied fetches at JPS for pictures of places you are scrolling past.
+   A station card would be one picture you did not ask for.
+   It is a row in the card's own menu. It was a full-width button under the header, carrying a second
+   bold place name above the reading, and then a bare glyph in the header corner with the name in a
+   `title` — which a phone never opens. A menu row is the shape that states the name, the distance
+   and the reading in plain text and still costs the card no height.
+   `.mi`, the same row the menu's other items use. The glyph names the kind, so a reader who opens
+   the menu for the favorite reads what else is here without a legend. */
+const nearItem = (icon, attr, what, note, right = '') =>
+  `<button class="mi" ${attr}><i class="i i-${icon}"></i>
+     <span>${what}<br><small class="muted">${note}</small></span>${right}</button>`;
 
-/* The reverse, for a camera standing on its own. Every other card offers the nearest picture; a
+/* A camera on the *same mast* is not a nearest-anything. It is this station's own view, so it names
+   no place and drops the distance, which would read "0.0 km". `from` may be a bare latlng from a map
+   click, which has no `site` — hence the guard rather than a plain comparison. */
+export const camLink = (from, cam) => !cam ? ''
+  : from.site && from.site === cam.site
+    ? `<button class="mi" data-cam="${cam.id}"><i class="i i-photo_camera"></i>
+         <span>Show webcam</span></button>`
+    : nearItem('photo_camera', `data-cam="${cam.id}"`, cam.name,
+        `Nearest webcam · ${distKm(from, cam).toFixed(1)} km away`);
+
+/* The reverse, for a camera standing on its own. Every other card offers the nearest picture. A
    camera card offered nothing, and a picture of water is a question about a number — "is that high?"
    — which the frame cannot answer. So it carries the nearest water level, named, with its reading.
-   The reading is coloured by `color()`, the same function the pin and the card use, because the
-   number alone means nothing without the mark it is measured against: 1.74 m is either a quiet river
-   or a flood, and the colour is the only part of that which fits on one line. The button jumps to
-   that station, where the meter states it properly.
-   Only on a camera that is not on a mast with a river. Where they share a mast the card is already
-   showing both, and this would be a link to the section under it. */
-/* Three parts, not one line of four. "Nearest water level · TAMAN MAYANG · 14.6 m · 1.2 km" is a
-   place, a reading and a distance strung together with the same separator, so it reads as a sentence
-   that never resolves and it breaks in the wrong place when it wraps. The place leads, because that
-   is what the button opens; what it is and how far away it is drop to a caption under it; the
-   reading goes right, where every other number in this app sits. Same shape as `.popbody`, and the
-   same shape camLink() uses — this one has a fourth part to place, and that is the only difference
-   between them. */
-export const levelLink = (from, s) => s
-  ? `<button class="link" data-go="${s.id}">
-       <i class="i i-${KINDS.river.icon}"></i>
-       <span class="lt">
-         <b>${s.name}</b>
-         <small>Nearest water level · ${distKm(from, s).toFixed(1)} km away</small>
-       </span>
-       <b class="lv" style="color:${color(s)}">${s.level} m</b>
-     </button>`
-  : '';
+   The reading takes `color()`, the same function the pin and the card use, because the number alone
+   means nothing without the mark it is measured against: 1.74 m is either a quiet river or a flood.
+   The row jumps to that station, where the meter states it properly.
+   Only on a camera that is not on a mast with a river. Where they share a mast the card already
+   shows both, and this would point at the section under it. */
+export const levelLink = (from, s) => !s ? ''
+  : nearItem(KINDS.river.icon, `data-go="${s.id}"`, s.name,
+      `Nearest water level · ${distKm(from, s).toFixed(1)} km away`,
+      `<b class="mv" style="color:${color(s)}">${s.level} m</b>`);
 
 export function meter(s) {
   const max = s.danger || s.warning || s.alert;
@@ -300,7 +306,7 @@ const rainState = s => !hasInfo(s)
 
 /* Everything one sensor has to say, without its name or region — those belong to the place, and a
    site with five sensors on one mast would otherwise repeat them five times. */
-function sensorBody(s, withCam = true) {
+function sensorBody(s) {
   const body = [];
 
   if (s.kind === 'river' && s.rate != null) body.push(metric('Trend', rateHtml(s)));
@@ -348,18 +354,12 @@ function sensorBody(s, withCam = true) {
        ${sirenBand(s.history)}`;
   const gauge = s.kind !== 'gauge' ? '' : gaugeBlock(s);
 
-  // A camera shows its own view; everything else offers the closest one — but a site that already
-  // holds a camera has the picture right there, so the link would point at itself.
-  // Either way the view of the water leads, above the numbers: "can I see it?" is the first
-  // question a level on a river prompts, not the last.
+  // A camera shows its own view. The offer of the nearest one, and a camera card's offer of the
+  // nearest water level, are both in the card header now — see nearBtn() above.
   const still = s.kind !== 'camera' ? ''
     : s.image ? camImg(s, `Latest still from ${s.name}`) : '<div class="muted">No camera feed</div>';
-  const link = s.kind !== 'camera' && withCam ? camLink(s, nearestCam(s)) : '';
-  // Under the picture, not over it: on a camera card the frame is the reading and this is the aside.
-  // `withCam` is false for a member of a mast, which is exactly the case that must not draw it.
-  const level = s.kind === 'camera' && withCam ? levelLink(s, nearestLevel(s)) : '';
 
-  return `${link}${still}${level}${siren}${gauge}${wet}
+  return `${still}${siren}${gauge}${wet}
     ${s.kind === 'river' ? meter(s) : ''}
     ${body.length ? `<div class="popbody">${body.join('')}</div>` : ''}
     ${spark}${rain}`;
@@ -393,22 +393,6 @@ function sourceInfo(s) {
 
 const region = s => `<div class="muted">${
   [s.district, s.state].filter(Boolean).join(', ') || 'district n/a'} · ${s.basin || 'basin n/a'}</div>`;
-
-/* The favorite heart in a card header's top-right corner, beside the close button. One card kind
-   carries one sensor and the other carries a mast, and they differ only in how many ids a press
-   acts on. One builder for both, so the two cannot grow different shapes or different wording.
-   `ids` is comma separated. ui.js's handler reads a full list as "remove every one" and anything
-   short of full as "add every one", which is what makes a mast's heart fill only when all of its
-   sensors are favorites while one press still acts on all of them.
-   The `title` is allowed under this project's rule that a tooltip may only duplicate something
-   already on screen: the glyph and its colour already report the state, and this only names the
-   action they are offering. Nothing lives in the tooltip alone, so a phone loses nothing. */
-const favMark = (ids, set) => {
-  const says = set ? 'Remove from favorites' : 'Add to favorites';
-  return `<button class="favbtn${set ? ' on' : ''}" data-fav="${ids}"
-              aria-pressed="${set}" title="${says}" aria-label="${says}"
-        ><i class="i i-favorite${set ? '' : '_outline'}"></i></button>`;
-};
 
 /* The card's title is also the way back to its pin. The panel does not move when the map does, so a
    pan or a zoom leaves a reader holding a card with no idea which part of the screen it describes —
@@ -489,21 +473,22 @@ export function popup(s) {
   const tone = hasInfo(s) ? kind.color : 'var(--muted)';
   /* Place first, sensor second: you look up a popup by where it is, and the badge answers the
      follow-up question ("what is this reading?") rather than the opening one.
-     The heart sits in the same corner it holds on a mast card. A single-sensor card can also be
-     favorited from its ⓘ menu, which is two ways to the same switch — kept on purpose, because the
-     corner is where a reader learns to look across every card, and the menu item has to stay for
-     the sensors listed on a mast and on the "near this point" cards, which have no corner of their
-     own. Emitted before .popname because the CSS reserves the room with a sibling rule. */
+     One control in the corner, on the close button's line, and it is the ⋮. A favorite heart held
+     that slot, and then a webcam glyph beside the heart — two controls owing the title 108px of a
+     328px line, and standing a hair above the district under them. Both are rows in this menu now,
+     which is the same menu that has always carried the favorite for the sensors listed on a mast and
+     on the "near this point" card. The corner costs the title 68px for one control rather than 108
+     for two, and the rows state a station name, a distance and a reading in text that a glyph could
+     only have put in a `title`.
+     Emitted first, because the CSS reserves the room with a sibling rule. */
+  const near = s.kind === 'camera' ? levelLink(s, nearestLevel(s)) : camLink(s, nearestCam(s));
   return `<div class="pophead">
-      ${favMark(s.id, isFav(s))}
+      ${dots(s, near)}
       ${goName(s)}
       ${region(s)}
-      <div class="popact">
-        <span class="badge" style="--c:${tone}">
-          <i class="i i-${kind.icon}"></i>${kind.one || kind.label}
-        </span>
-        ${dots(s)}
-      </div>
+      <span class="badge" style="--c:${tone}">
+        <i class="i i-${kind.icon}"></i>${kind.one || kind.label}
+      </span>
     </div>
     ${metSection(s)}
     ${sensorBody(s)}`;
@@ -523,19 +508,18 @@ export function sitePopup(members) {
   if (members.length === 1) return popup(members[0]);
   const lead = members[0];
   const hasCam = members.some(m => m.kind === 'camera');
-  /* Solid only when every sensor here is a favorite, because this button acts on all of them and
-     has to state exactly what one press will undo. The pin on the map uses the opposite rule — any
-     one favorite draws a heart — because that badge is an indication and not a control. */
+  /* Set only when every sensor here is a favorite, because this row acts on all of them and has to
+     state exactly what one press will undo. The pin on the map uses the opposite rule — any one
+     favorite draws a heart — because that badge is an indication and not a control. */
   const favAll = members.every(isFav);
   const favIdList = members.map(m => m.id).join(',');
 
-  /* The heart holds the corner beside the close button, where a sensor-count chip used to sit. The
-     count went because the badge row directly below the name already lists one badge per sensor, so
-     the chip restated what was an inch under it — and this corner is the only place on the card with
-     room for a control that belongs to the whole mast rather than to one sensor on it.
-     Emitted before .popname because the CSS reserves room for it with an adjacent-sibling rule. */
+  /* The mast's menu holds the corner beside the close button, the same slot a single-sensor card
+     gives its sensor's ⓘ. A sensor-count chip held it first, then the favorite heart, then the heart
+     and a webcam glyph together — and by then the pair owed the title 108px of a 328px line. One
+     control costs it 68. Emitted first, because the CSS reserves the room with a sibling rule. */
   return `<div class="pophead">
-      ${favMark(favIdList, favAll)}
+      ${siteDots(lead, favIdList, favAll, hasCam ? '' : camLink(lead, nearestCam(lead)))}
       ${goName(lead)}
       ${region(lead)}
       <div class="badges">${members.map(m => {
@@ -545,7 +529,6 @@ export function sitePopup(members) {
       }).join('')}</div>
     </div>
     ${metSection(lead)}
-    ${hasCam ? '' : camLink(lead, nearestCam(lead))}
     ${camFirst(members).map(m => `<div class="sensor" data-sensor="${m.id}">
       <div class="sensorhead">
         <i class="glyph i i-${KINDS[m.kind].icon}" style="color:${hasInfo(m) ? KINDS[m.kind].color : 'var(--muted)'}"
@@ -554,7 +537,7 @@ export function sitePopup(members) {
         ${m.name !== lead.name ? `<span class="muted">${m.name}</span>` : ''}
         ${dots(m)}
       </div>
-      ${sensorBody(m, false)}
+      ${sensorBody(m)}
     </div>`).join('')}`;
 }
 
@@ -598,7 +581,7 @@ export function herePopup(e, loaded) {
       </div>
       <div class="place" data-go="${s.id}" title="Show ${s.name} on the map">${s.name}</div>
       ${region(s)}
-      ${sensorBody(s, false)}
+      ${sensorBody(s)}
     </div>`;
   }).join('');
 
