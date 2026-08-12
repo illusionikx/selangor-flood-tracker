@@ -488,10 +488,20 @@ In `css/chrome.css`, insert after the `.noticegrp .alerthead b` rule from Step 4
 .noticelinks li { margin: 4px 0; }
 ```
 
-- [ ] **Step 8: Bump the cache key**
+- [ ] **Step 8: Bump three cache keys**
 
-In `index.html`, find the `<link>` for `css/chrome.css` and raise its `?v=` by one. Herd serves
-everything `max-age=10800`, so an unbumped stylesheet is three hours of the old card.
+In `index.html`, raise the `?v=` by one on **three** stylesheet links. Herd serves everything
+`max-age=10800`, so an unbumped stylesheet is three hours of the old rules.
+
+| line | file | now | becomes | why |
+|---|---|---|---|---|
+| 33 | `css/icons.css` | `?v=82` | `?v=83` | Task 2 added `--i-public_off`, and this step is where markup first asks for it |
+| 34 | `css/base.css` | `?v=109` | `?v=110` | Step 3 added `--k-source` |
+| 35 | `css/chrome.css` | `?v=146` | `?v=147` | Step 4 and Step 7 added `.noticegrp` and `.noticelinks` |
+
+`css/icons.css` matters most and is the easiest to miss, because Task 2 changed that file and this
+task changed the markup that needs it. A reader holding the cached stylesheet gets the new `<i>` and
+no glyph to paint in it, which draws blank space rather than an error.
 
 - [ ] **Step 9: Check it**
 
