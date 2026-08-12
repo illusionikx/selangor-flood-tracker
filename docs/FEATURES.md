@@ -7135,3 +7135,102 @@ There is no map popup in this app. The sentence names `Details` now, the same co
 - The pane reads flatter. `This site is vibe coded` and `The rest I geoguessed` were the two lines
   people remembered, and neither survives a manual register.
 - Seven headings on a pane that had four. The three new ones cover text that was already there.
+
+## An outage the source announced
+
+On 2026-08-12 the national portal stopped serving its water-level tables. It answered every request
+with HTTP 200 and a 320-byte notice page instead. A status code alone does not catch this failure.
+
+`national.applied` fell from 71 stations to 47. The map still drew every station, each with its own
+last reading.
+
+Nothing on screen said the source was down. A Service Notice card and a ticker tile now say this
+instead.
+
+### What the notice says
+
+The page carries no text of its own. It carries one picture, a screenshot of Malay text, at
+`/maintenance-files/MaintenancePublicinfobanjir/notifikasi.png`. Translated, it reads:
+
+> We will be back shortly. The PublicinfoBanjir website has very high traffic right now. This can
+> affect your access. Our team works to restore access. In the meantime, find information through
+> the MyPublicInfoBanjir app, on the App Store and Google Play Store.
+
+Three facts in that message shaped the design.
+
+**The cause is high traffic, not a maintenance window.** A flood portal takes its heaviest traffic
+during a flood. This source fails hardest at the moment it matters most. That is why the notice
+outranks a weather warning below.
+
+**It carries no end time.** JPS gave none. This app must not invent one. It shows no countdown and
+no guess at a return time.
+
+**It names four channels to check instead.** These are the MyPublicInfoBanjir app, PublicInfoBanjir
+on Facebook, JPS_InfoBanjir on X, and the portal itself.
+
+A reader who doubts a flood map looks for a second opinion. The alert design standard calls this
+milling. The modal carries the links milling needs.
+
+### Why a notice counts toward nothing
+
+A notice adds nothing to the badge, the tab title, the tally glyphs, or the warning glyph. Those
+surfaces still read the station list alone. `warnCard()` set this rule for a MET warning first.
+
+A warning names a region. A station reading names a place. The two must never share one total.
+
+A notice follows the same rule for a stronger reason. It is not a reading at all. It is a statement
+about a source, not about the water.
+
+### Why an outage outranks a weather warning
+
+A MET warning sits under the `HAPPENING NOW` groups. A notice sits above all of them, including that
+group.
+
+The two make different claims. A warning adds one possible event to the list. A notice can mark the
+whole list wrong.
+
+A quiet panel can still be false. A silent source, not a calm river, is the reason.
+
+EEMUA states this exact point. A reader must be able to tell no alarms from a dead alarm system. A
+notice states that the system, not the weather, is the problem right now.
+
+### Against the alert design standard
+
+| rule | how it lands |
+|---|---|
+| ISA-18.2 — an alarm requires a response | The response is to check another channel. The modal carries them. |
+| ISA-18.2 — 10 in 10 minutes is a flood | It counts toward no total, so it cannot contribute to one. |
+| ISA-18.2 — priority must not be flat | It sits above the weather warnings, which sit above the stations. |
+| CAP — certainty | Observed. JPS states it. This app never infers it from a timeout. |
+| CAP — severity is not urgency | It claims neither. It reports a condition and names its scope. |
+| CAP — headline at most 160 characters | 62. |
+| CAP — alerts can be withdrawn | It leaves the payload the poll the tables parse again. |
+| Cry-wolf | It fires only on positive identification. A blip shows nothing. |
+| PADM — who says so | It names JPS, and links to JPS. |
+
+### Deliberately not built
+
+- **No duration.** "Down for 20 minutes" needs a first-seen time. `pageRow()` moves the timestamp on
+  every attempt. Tracking one sentence needs a schema change.
+- **No embed of the notice image, and no proxy for it.** The picture is 1280 by 720 pixels of Malay
+  text. No screen reader reads it. A phone draws it too small to read. A link serves the reader who
+  wants it.
+- **No rule for a silent hang.** A timeout is not a statement from the source. It stays in the
+  status popover.
+- **No toast.** A toast interrupts for news that needs action now. This notice does not need one.
+- **No all-clear.** A MET warning set that precedent. A source coming back online is not an event
+  worth an interruption.
+- **No second recogniser.** Only the national portal publishes a notice today. The KL host or MET
+  can start the same. Each one needs its own evidence before it gets a rule.
+- **No App Store link.** Apple publishes no working web search URL for its store. A guessed app id
+  points a worried reader at the wrong software. This app links Google Play search instead, because
+  its search URL works by construction. iOS readers get the app name with no link.
+
+### What breaks it
+
+JPS can change the notice title at any time. If it does, `noticeOf()` returns null for a real
+notice. The banner never appears. `sources.stale` still reports the feed as stale. The failure still
+shows, just not on the banner.
+
+The failure is silence, not a wrong claim. That is the correct direction for this feature to fail
+in.

@@ -26,7 +26,7 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `css/chrome.css` | page furniture: app bar, status dot, drawer, legend, splash |
 | `css/map.css` | Leaflet overrides, pins, cluster badges, popup template |
 | `js/app.js` | entry point — decides what happens on landing, nothing else |
-| `js/config.js` | constants (kinds, palettes, thresholds, tile styles, `WEATHER`). No imports. |
+| `js/config.js` | constants (kinds, palettes, thresholds, tile styles, `WEATHER`). Also `NOTICE`, the words for an upstream outage. No imports. |
 | `js/state.js` | `state` (data + hereAt) and the `PREFS` blob. Breaks module cycles. |
 | `js/util.js` | pure helpers + `hasInfo()` / `color()` / `isIgnored()` |
 | `js/stations.js` | queries over the station set (`nearestOf`, `nearestCam`, `byId`) |
@@ -408,6 +408,8 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   different by up to 45 minutes. Printing the poll time would tell a reader a forecast was fresh
   when it was three quarters of an hour old. `metPoints()` drops any marker whose stamp fails to
   parse, so a point that reaches the payload always carries one.
+  This app publishes a notice it can name as `notices[]`. The reader then sees it on screen. Every
+  other failure still stays in `sources.stale` alone.
 - **No `fastcgi_finish_request` under Herd** — the SAPI is `cgi-fcgi`, so there is no way to close
   the connection and keep working. Stale-while-revalidate is impossible in-process; the page cache
   is the workaround. A cron hitting `api.php` every 5 min would keep the cache warm for good.
