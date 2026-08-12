@@ -291,8 +291,11 @@ function favPanel() {
       <button class="solo" data-unfav="${s.id}"
               aria-label="Remove ${s.name} from favorites">remove</button>
     </li>`).join('')
-    || '<li class="none">Nothing starred yet. Use the star on a mast, or the Details button on any '
-     + 'sensor in a station’s card.</li>';
+    /* One control, named once. There is no star on a card any more — the favorite is a row in the
+       Details menu, in the card's own corner and on every sensor listed under it. A message naming
+       a control the reader cannot find is worse than no message. */
+    || '<li class="none">Nothing starred yet. Use the Details button on a station, or on any sensor '
+     + 'in its card.</li>';
   el('favClear').disabled = !rows.length;
 }
 
