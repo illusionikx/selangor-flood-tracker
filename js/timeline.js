@@ -59,6 +59,23 @@ const RANGES = [
    having stalled, not as an arrival. There is nothing on screen saying a pause is deliberate. */
 const FRAME_MS = 1000;
 
+/* One button, three states, cycling. A second a frame is the right *default* — see above — and it is
+   the wrong pace for a year range, which is 52 frames and therefore 52 seconds of sitting still. So
+   the pace above stays the resting one and this is the way out of it, rather than a faster FRAME_MS
+   that would take the reading pace away from the 24-hour range where it is correct.
+   Three stops, not a slider: a frame here already stands for 30 minutes to a week, so the useful
+   range of "faster" is small and a slider would offer a precision nothing here rewards. No slow
+   side either (Material publishes speed_0_5x and speed_0_75x) — the pause button is how you spend
+   longer on one frame, and it is already on the bar.
+   The glyph states the *current* rate, the way every player that carries this control does.
+   Deliberately not persisted, and not in PREFS: `reset()` puts it back to 1x, and `reset()` runs at
+   the top of every openTimeline(). A rate is a decision about the clip in front of you — inheriting
+   one set on a different camera an hour ago is a pace nobody asked this camera to run at. */
+const RATES = [1, 1.5, 2];
+// No `speed_1x` upstream, so 1x wears `1x_mobiledata` — same drawing, other name. See icons.css.
+const RATE_ICON = ['1x_mobiledata', 'speed_1_5x', 'speed_2x'];
+let rate = 0;
+
 /* Malaysian, like every other clock on this page — the frames are stamped in unix seconds, and a
    viewer in another timezone must not see an axis that disagrees with the readings beside it.
    The full date, because the year range holds frames 365 days old and `14 Nov, 17:00` says the same
@@ -91,6 +108,7 @@ const tl    = el('tl');
 const scrub = el('tlscrub');
 const ticks = box.querySelector('.tlticks');
 const play  = box.querySelector('.tlplay');
+const speed = box.querySelector('.tlspeed');
 const cmp   = box.querySelector('.tlcmp');
 const hint  = box.querySelector('.hintbox');
 const tapfx = box.querySelector('.tapfx');
@@ -275,8 +293,10 @@ function stop() {
    screen when play was pressed. Live was skipped originally because it is a full-size JPEG landing
    at the end of a run of 720p WebP; it does land visibly, but arriving at the present is what the
    clip is for.
-   Skipped only while comparing, where live is the *fixed* side — playing onto it would lay the
-   picture over itself, the same empty-divider state setCompare() steps around. */
+   Skipped only while comparing, where live is the *fixed* side — landing on it would lay the
+   picture over itself, the same empty-divider state setCompare() steps around. Nothing *plays* there
+   any more (setCompare() disables the play button), so that branch now serves `go()` alone — it is
+   what holds the step buttons and "now" off the live frame while the divider is up. */
 const lastPos = () => ab.hidden ? frames.length : frames.length - 1;
 
 /* Every deliberate move to a position goes through here: the step buttons, "now", and a click on a
@@ -326,6 +346,34 @@ function tapFlash() {
   flash(tapfx, 'on');
 }
 
+/* The one function that writes the speed button — glyph, accent, tooltip and accessible name, so
+   the four cannot drift apart. The accent earns its place: `#tl .icon` is 20px and these glyphs draw
+   numerals 320 units tall in a 960 grid, so "1.5x" stands about 6.7px high. The tint says the clip
+   is running fast without anybody reading it. `.on` is the same class compare uses, and the overlay
+   shape already restyles it in white, so this needs no CSS of its own.
+   Title and label diverge for the reason `stop()` gives: a screen reader must not read the state out
+   of a parenthesis it thinks is part of the control's name. */
+function paintSpeed() {
+  speed.firstElementChild.className = `i i-${RATE_ICON[rate]}`;
+  speed.classList.toggle('on', rate > 0);
+  speed.title = `Playback speed (${RATES[rate]}x)`;
+  speed.ariaLabel = `Playback speed ${RATES[rate]}x`;
+}
+
+/* Cycles, and always restarts the clip at the new pace. `stop()` then `toggle()` is one expression
+   for the two states this button can be pressed in: a running clip picks the new pace up on the
+   frame it is on, and a paused one starts. Starting is the point — you press this because you want
+   to get through the range, and handing back a still and a second press to find is not that.
+   `stop()` also clears `lead`, so a press inside the opening two seconds cancels the delayed start
+   rather than racing it. Every deliberate move in this file goes through `stop()` for that reason.
+   Never reachable while comparing: setCompare() disables the button. */
+speed.onclick = () => {
+  rate = (rate + 1) % RATES.length;
+  paintSpeed();
+  stop();
+  toggle();
+};
+
 /* Loops. A camera clip is 12–60 frames — under 20 seconds — and stopping dead at the end of a river
    rising means pressing play again to see it, which is how you end up watching the same 20 seconds
    three times anyway. */
@@ -347,13 +395,27 @@ function toggle() {
     if (frames.length < 2) return stop();
     scrub.value = (+scrub.value + 1) % (lastPos() + 1);
     paint();
-  }, FRAME_MS);
+    // Read at the moment the interval is created, not per tick — the speed button restarts the clip
+    // rather than retiming a running one, so there is never a rate to pick up mid-run.
+  }, FRAME_MS / RATES[rate]);
 }
 
 function setCompare(on) {
   ab.hidden = grip.hidden = !on || !frames.length;
   cmp.setAttribute('aria-pressed', String(!ab.hidden));
   cmp.classList.toggle('on', !ab.hidden);
+  /* Compare is a paused state, and these are the two buttons that would leave it. Pressing compare
+     already stopped the clip (`cmp.onclick`); this is what holds it stopped, instead of pausing the
+     reader and then handing them play. You raised the divider to hold one frame against the live
+     one — a clip carries that frame away a second later, which is the same reason a range press
+     refuses to start one while comparing.
+     The steps, "now" and the scrubber deliberately stay live: each moves the position and none
+     starts a clip (`go()` calls `stop()` first), so the archive can still be walked against the
+     live picture a frame at a time. That is the whole gesture.
+     Nothing else needs a guard. `stage.onclick` already tests `ab.hidden`, the range handler tests
+     it too, and space/`k` reach play through `.click()` — which a browser does not fire on a
+     disabled button. */
+  play.disabled = speed.disabled = !ab.hidden;
   // ui.js reads this back for its cursor; here it is the reason the picture stops being a play
   // button — while the divider is up a press on the picture is a drag, not a press.
   box.classList.toggle('cmp', !ab.hidden);
@@ -557,6 +619,10 @@ export function reset() {
   /* Forget the pill as well. ui.js writes the live one straight into `.player` as it opens the next
      camera, so a cached string that happened to match would skip a paint that has to happen. */
   warned = '';
+  // Every camera opens at 1x. reset() runs at the top of openTimeline(), so this is also what makes
+  // the rate a decision about the clip in front of you rather than one inherited from the last one.
+  rate = 0;
+  paintSpeed();
   setCompare(false);
   tl.hidden = true;
   stage.style.removeProperty('--ab');

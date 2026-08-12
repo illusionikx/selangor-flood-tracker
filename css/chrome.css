@@ -1448,6 +1448,12 @@ body.finding #find { display: none; }
    picture — six pixels a row is twelve either way. Still over the 24px minimum. */
 #tl .icon { width: 34px; height: 34px; font-size: 20px; }
 #tl .icon.on { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); }
+/* Play and speed go dark while the divider is up — see setCompare() in js/timeline.js. The glyph
+   still states what it holds, so a speed button disabled at 2x keeps saying 2x, faded: the reader
+   cannot change the rate from here, and the rate has not stopped applying.
+   `pointer-events: none` rather than a `:not(:disabled)` on every hover selector — the plain shape
+   and the PLAYER_OVERLAY block each paint their own hover, and this one declaration answers both. */
+#tl .icon:disabled { opacity: .4; pointer-events: none; }
 /* The seek bar, full width — it is the one control here that is dragged, and it used to give a
    button's width away to compare. `position: relative` because the alert strip and the two painted
    rails are all absolutely placed inside it, over the same 4px line the thumb runs along. */
@@ -1457,8 +1463,9 @@ body.finding #find { display: none; }
    nothing, with the range control hanging off one side. The ends work because the row is the width
    of the track: each cluster sits under the end of the thing it drives. */
 .tlctl { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; }
-/* The five buttons. The 10px gap is the whole statement that compare is not one of the four beside
-   it — they step and play, it changes what the picture is. Their own gap is 2px. */
+/* The six buttons, in three groups. The 10px gap is the whole statement that neither speed nor
+   compare is one of the four in the middle — those move through the archive, speed changes how fast
+   they are moved through, and compare changes what the picture is. The transport's own gap is 2px. */
 .tlleft { display: flex; align-items: center; gap: 10px; }
 .tltransport { display: flex; gap: 2px; }
 /* Too narrow for one line: stack, and centre both. Transport stays first, so the control you reach

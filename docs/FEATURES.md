@@ -7312,3 +7312,92 @@ the last row of a full-height menu sits under that bar.
   two failure modes to test. One rule is enough here.
 - **No anchor positioning.** `position-area` states this in one declaration and drops the handler.
   Firefox and Safari do not support it yet. The hand placement stays until they do.
+
+## The clip plays at 1x, 1.5x or 2x
+
+A camera clip runs one frame per second. That pace is correct, and the comment on `FRAME_MS` in
+`js/timeline.js` says why: consecutive frames stand 30 minutes to a week apart, so every frame is a
+separate scene a reader has to read. An earlier pass ran at 320 ms and pushed the archive past before
+any of it registered.
+
+The pace is wrong on a long range. A year window holds 52 frames, so the clip runs for 52 seconds.
+
+One button now cycles 1x, 1.5x and 2x. It sits between the transport group and compare, and the
+glyph states the current rate. The interval becomes `FRAME_MS / RATES[rate]`, which gives 1000 ms,
+667 ms and 500 ms. `FRAME_MS` does not move. The default pace stays right for the 24-hour range, and
+this button is the way out of it.
+
+**Three stops, not a slider.** A frame here already stands for 30 minutes to a week, so the useful
+span of "faster" is short. A slider offers a precision nothing on this bar rewards.
+
+**No slow side.** Material Symbols publishes `speed_0_5x` and `speed_0_75x`. The pause button is how
+a reader spends longer on one frame, and it is on the bar already.
+
+**A press always starts the clip.** The handler advances the index, repaints the button, then calls
+`stop()` and `toggle()`. That one pair covers both states this button answers. A running
+clip picks the new pace up on the frame it is on. A paused clip starts. Starting is the point: a
+reader presses this to get through the range, and a still plus a second press to find is not that.
+`stop()` also clears `lead`, so a press inside the opening two seconds cancels the delayed start
+rather than racing it.
+
+**The rate does not survive the dialog.** `reset()` sets it back to 1x, and `reset()` runs at the top
+of every `openTimeline()`. Nothing reaches `PREFS`. A rate is a decision about the clip in front of
+the reader. A camera opened an hour later did not ask to run at that pace.
+
+**The accent is what makes the rate readable.** `#tl .icon` sets `font-size: 20px`, and these glyphs
+draw numerals 320 units tall in a 960 grid — so `1.5x` stands about 6.7px high. The button takes the
+`on` class above 1x, which is the class compare already uses and the overlay bar already restyles in
+white. It states "this clip runs fast" with nothing to decipher.
+
+### Material Symbols publishes no `speed_1x`
+
+The set steps from `speed_0_75x` to `speed_1_2x`. `speed_1_5x` and `speed_2x` both answer. The
+refetch URL returns 404 on `speed_1x`.
+
+`1x_mobiledata` is that missing drawing under another name: the numerals `1x` at the same 320-unit
+cap height as the two glyphs beside it. The token keeps the upstream name, so the refetch URL at the
+top of `css/icons.css` still works on it, and the `title` on the button carries the purpose instead.
+`--i-last_page` drives the "Go to now" button the same way.
+
+## Compare disables play and speed
+
+Pressing compare already paused the clip. It now holds it paused: `setCompare()` sets `disabled` on
+the play button and the speed button whenever the divider is up.
+
+This finishes a rule rather than changing one. A reader who raises the divider has chosen one frame
+to hold against the live one, and a clip carries that frame away a second later. Pausing them and
+then handing them play was the app undoing its own reasoning one button along. A range press already
+refuses to start a clip while comparing, for the same reason.
+
+**Both steps, "go to now" and the seek bar stay enabled.** Each one moves the position and none
+starts a clip — `go()` calls `stop()` first. So a reader can still walk the archive against the live
+picture, a frame at a time. That is the whole gesture the divider exists for.
+
+**Nothing else needed a guard.** `stage.onclick` already tests `ab.hidden`, so the picture is not a
+play button while the divider is up. The range handler tests it too. Space and `k` reach play through
+`play.click()`, and a browser fires no click on a disabled button, so the keys go quiet on their own.
+No path into `toggle()` survives, so `toggle()` itself needs no test.
+
+**`lastPos()` keeps its compare branch and loses a reason.** Nothing plays while the divider is up
+any more, so that branch now serves `go()` alone. It is what holds the step buttons and "go to now"
+off the live frame.
+
+**The disabled glyph keeps stating what it holds.** A speed button disabled at 2x still reads 2x,
+faded. A disabled control means the reader cannot change the rate from here. It does not mean the
+rate stopped applying.
+
+`#tl .icon:disabled` takes `pointer-events: none` rather than a `:not(:disabled)` on every hover
+selector. The plain control bar and the `PLAYER_OVERLAY` block each paint their own hover, and one
+declaration answers both.
+
+### Deliberately not built
+
+- **No keyboard binding for speed.** Every key in `KEYS` maps to a button that lights up under
+  `.click()`. This button does not light up, because it sits outside `.tltransport` and the flash
+  listener is on that group. Its glyph changes on every press, which states the result better.
+- **No `aria-pressed` on the speed button.** That attribute states two states. This control has
+  three.
+- **No focus rescue when play goes dark.** Focus falls to the dialog. The keyboard bindings sit on
+  the dialog, so the arrows and `End` still answer.
+- **No speed control on the station panel clip.** `js/clip.js` carries no controls by design. The
+  lightbox is where a reader sits with a camera.

@@ -26,6 +26,12 @@
    attribute so the whole SVG survives a double-quoted url(), and bump `icons.css?v=`.  */
 
 :root {
+  /* The lightbox speed button's 1x state. Material Symbols publishes no `speed_1x` — the set steps
+     from `speed_0_75x` to `speed_1_2x` — and `1x_mobiledata` is that missing drawing under another
+     name: the numerals `1x` at the same 320-unit cap height as the two `speed_*` glyphs beside it.
+     The upstream name is kept so the refetch URL at the top of this file still works on it. The
+     button's own `title` says what it is for. `--i-last_page` drives "Go to now" the same way. */
+  --i-1x_mobiledata: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 -960 960 960'><path d='M240-280v-320h-80v-80h160v400h-80Zm174 0 126-212-114-188h94l66 110 68-110h92L634-492l126 212h-94l-80-134-80 134h-92Z'/></svg>");
   --i-apps: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 -960 960 960'><path d='M183.5-183.5Q160-207 160-240t23.5-56.5Q207-320 240-320t56.5 23.5Q320-273 320-240t-23.5 56.5Q273-160 240-160t-56.5-23.5Zm240 0Q400-207 400-240t23.5-56.5Q447-320 480-320t56.5 23.5Q560-273 560-240t-23.5 56.5Q513-160 480-160t-56.5-23.5Zm240 0Q640-207 640-240t23.5-56.5Q687-320 720-320t56.5 23.5Q800-273 800-240t-23.5 56.5Q753-160 720-160t-56.5-23.5Zm-480-240Q160-447 160-480t23.5-56.5Q207-560 240-560t56.5 23.5Q320-513 320-480t-23.5 56.5Q273-400 240-400t-56.5-23.5Zm240 0Q400-447 400-480t23.5-56.5Q447-560 480-560t56.5 23.5Q560-513 560-480t-23.5 56.5Q513-400 480-400t-56.5-23.5Zm240 0Q640-447 640-480t23.5-56.5Q687-560 720-560t56.5 23.5Q800-513 800-480t-23.5 56.5Q753-400 720-400t-56.5-23.5Zm-480-240Q160-687 160-720t23.5-56.5Q207-800 240-800t56.5 23.5Q320-753 320-720t-23.5 56.5Q273-640 240-640t-56.5-23.5Zm240 0Q400-687 400-720t23.5-56.5Q447-800 480-800t56.5 23.5Q560-753 560-720t-23.5 56.5Q513-640 480-640t-56.5-23.5Zm240 0Q640-687 640-720t23.5-56.5Q687-800 720-800t56.5 23.5Q800-753 800-720t-23.5 56.5Q753-640 720-640t-56.5-23.5Z'/></svg>");
   --i-arrow_downward: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 -960 960 960'><path d='M440-800v487L216-537l-56 57 320 320 320-320-56-57-224 224v-487h-80Z'/></svg>");
   --i-arrow_upward: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 -960 960 960'><path d='M440-160v-487L216-423l-56-57 320-320 320 320-56 57-224-224v487h-80Z'/></svg>");
@@ -74,6 +80,8 @@
   --i-search: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 -960 960 960'><path d='M784-120 532-372q-30 24-69 38t-83 14q-109 0-184.5-75.5T120-580q0-109 75.5-184.5T380-840q109 0 184.5 75.5T640-580q0 44-14 83t-38 69l252 252-56 56ZM380-400q75 0 127.5-52.5T560-580q0-75-52.5-127.5T380-760q-75 0-127.5 52.5T200-580q0 75 52.5 127.5T380-400Z'/></svg>");
   --i-skip_next: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 -960 960 960'><path d='M660-240v-480h80v480h-80Zm-440 0v-480l360 240-360 240Z'/></svg>");
   --i-skip_previous: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 -960 960 960'><path d='M220-240v-480h80v480h-80Zm520 0L380-480l360-240v480Z'/></svg>");
+  --i-speed_1_5x: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 -960 960 960'><path d='M240-280v-80h80v80h-80Zm-120 0v-320H40v-80h160v400h-80Zm500 0 120-200-120-200h80l80 133 80-133h80L820-480l120 200h-80l-80-133-80 133h-80Zm-260 0v-80h140v-80H360v-240h220v80H440v80h60q33 0 56.5 23.5T580-440v80q0 33-23.5 56.5T500-280H360Z'/></svg>");
+  --i-speed_2x: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 -960 960 960'><path d='M200-280v-160q0-33 23.5-56.5T280-520h80v-80H200v-80h160q33 0 56.5 23.5T440-600v80q0 33-23.5 56.5T360-440h-80v80h160v80H200Zm280 0 120-200-120-200h80l80 133 80-133h80L680-480l120 200h-80l-80-133-80 133h-80Z'/></svg>");
   --i-straighten: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 -960 960 960'><path d='M160-240q-33 0-56.5-23.5T80-320v-320q0-33 23.5-56.5T160-720h120v240h80v-240h80v240h80v-240h80v240h80v-240h120q33 0 56.5 23.5T880-640v320q0 33-23.5 56.5T800-240H160Z'/></svg>");
   --i-videocam_off: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 -960 960 960'><path d='M880-260 720-420v67L273-800h367q33 0 56.5 23.5T720-720v180l160-160v440ZM822-26 26-822l56-56L878-82l-56 56ZM160-800l560 560q0 33-23.5 56.5T640-160H160q-33 0-56.5-23.5T80-240v-480q0-33 23.5-56.5T160-800Z'/></svg>");
   --i-visibility_off: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 -960 960 960'><path d='M792-56 624-222q-35 11-70.5 16.5T480-200q-151 0-269-83.5T40-500q21-53 53-98.5t73-81.5L56-792l56-56 736 736-56 56ZM480-320q11 0 20.5-1t20.5-4L305-541q-3 11-4 20.5t-1 20.5q0 75 52.5 127.5T480-320Zm292 18L645-428q7-17 11-34.5t4-37.5q0-75-52.5-127.5T480-680q-20 0-37.5 4T408-664L306-766q41-17 84-25.5t90-8.5q151 0 269 83.5T920-500q-23 59-60.5 109.5T772-302ZM587-486 467-606q28-5 51.5 4.5T559-574q17 18 24.5 41.5T587-486Z'/></svg>");
@@ -100,6 +108,7 @@
           mask: var(--i) center / contain no-repeat;
 }
 
+.i-1x_mobiledata { --i: var(--i-1x_mobiledata); }
 .i-apps { --i: var(--i-apps); }
 .i-arrow_downward { --i: var(--i-arrow_downward); }
 .i-arrow_upward { --i: var(--i-arrow_upward); }
@@ -136,6 +145,8 @@
 .i-search { --i: var(--i-search); }
 .i-skip_next { --i: var(--i-skip_next); }
 .i-skip_previous { --i: var(--i-skip_previous); }
+.i-speed_1_5x { --i: var(--i-speed_1_5x); }
+.i-speed_2x { --i: var(--i-speed_2x); }
 .i-straighten { --i: var(--i-straighten); }
 .i-videocam_off { --i: var(--i-videocam_off); }
 .i-visibility_off { --i: var(--i-visibility_off); }

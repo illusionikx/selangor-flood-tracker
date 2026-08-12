@@ -30,9 +30,9 @@
 <link rel="stylesheet" href="vendor/leaflet.css">
 <link rel="stylesheet" href="vendor/markercluster.css">
 <link rel="stylesheet" href="vendor/fonts.css?v=49">
-<link rel="stylesheet" href="css/icons.css?v=83">
+<link rel="stylesheet" href="css/icons.css?v=84">
 <link rel="stylesheet" href="css/base.css?v=110">
-<link rel="stylesheet" href="css/chrome.css?v=149">
+<link rel="stylesheet" href="css/chrome.css?v=150">
 <link rel="stylesheet" href="css/map.css?v=145">
 
 <!-- Water tint for the dark basemap. CARTO's dark_all is greyscale — all 18 of its tones have zero
@@ -137,10 +137,12 @@
              Step is one *stored* frame, not a fixed span of time — the range decides what a frame is
              worth. -->
         <div class="tlctl">
-          <!-- Every button on one side. Compare is a press like the four beside it, so it belongs
-               with them rather than on the track's line, and the wrapper keeps the five together
-               when the row stacks on a narrow dialog. The gap between the two groups is what says
-               compare is not a transport control. -->
+          <!-- Every button on one side, in three groups, and the wrapper keeps the six together when
+               the row stacks on a narrow dialog. The four in the middle move through the archive.
+               Speed changes how fast they are moved through, and compare changes what the picture
+               is — so neither is a transport control, and a gap on each side of speed is what says
+               so. Speed leads to compare because both are settings on the clip; compare is last
+               because it is the one that takes the other two away (see js/timeline.js). -->
           <div class="tlleft">
             <div class="tltransport" role="group" aria-label="Playback">
               <button class="icon tlstep" data-d="-1" title="Previous frame (,)" aria-label="Previous frame"
@@ -151,6 +153,11 @@
               <button class="icon tlnow" title="Go to now (End)" aria-label="Go to now"
               ><i class="i i-last_page"></i></button>
             </div>
+            <!-- Three states on one button, cycling. The glyph, the title and the label are all
+                 written by paintSpeed() in js/timeline.js, so the markup carries the resting state
+                 only. No aria-pressed: that attribute states two states and this control has three. -->
+            <button class="icon tlspeed" title="Playback speed (1x)" aria-label="Playback speed 1x"
+            ><i class="i i-1x_mobiledata"></i></button>
             <button class="icon tlcmp" title="Compare against the live image"
                     aria-label="Compare against the live image" aria-pressed="false"
             ><i class="i i-compare"></i></button>
