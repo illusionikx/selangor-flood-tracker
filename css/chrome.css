@@ -469,6 +469,11 @@ table.data button[data-pop] { cursor: pointer; }
      taller than the screen cannot fit, so it must scroll instead. `dvh`, because a phone browser
      counts its own address bar in `vh` and would leave the last row under it. */
   max-height: calc(100dvh - 16px); overflow-y: auto;
+  /* The popover UA sheet says `height: fit-content`, and WebKit reads that on an out-of-flow box as
+     the space left under `top` rather than as the content height. iOS Safari therefore gave this box
+     a definite full-screen height, and `#appMenu`'s grid stretched its four rows down the page. Every
+     other UA declaration on `:popover-open` is already restated above; this is the one that was left. */
+  height: auto;
   padding: 4px; border: 1px solid var(--outline); border-radius: 10px; color: var(--on-surface);
 }
 .menu:popover-open { display: block; }

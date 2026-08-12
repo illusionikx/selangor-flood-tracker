@@ -539,6 +539,15 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   `.link { display: flex }` in `base.css` beats the browser's own `[hidden] { display: none }`, so
   the Developer section's "Refresh now" button — hidden on the GitHub Pages build, where the query it
   needs does nothing — needed `.rowbtns .link[hidden] { display: none }` to actually disappear.
+- **A popover inherits ten declarations from the UA sheet, and `height: fit-content` is the one that
+  gets forgotten.** `.menu` restates `position`, `inset`, `margin`, `padding`, `overflow`, `border`
+  and the colors, and left the height alone. WebKit reads `fit-content` on the block axis of an
+  out-of-flow box as the space available under `top`, not as the content height, so `#appMenu`
+  measured one viewport tall on iOS Safari — and a grid with a definite height stretches its rows to
+  fill, which drew the four tiles and the theme row spread down the whole screen. Chrome and Firefox
+  drew the same markup at 157px. `.menu` carries `height: auto` now, which changes nothing on the
+  engines that were already right. **Do not reach for `align-content: start`** — it closes the gaps
+  and keeps the full-height box, so an invisible panel goes on swallowing taps over the map.
 - **There is no map popup any more, and there must not be one again.** Station detail is `#side`, a
   fixed panel on the right edge of the viewport, filled by `openSide(key, html, mastAt)` in `map.js`.
   Everything a Leaflet popup needed — `autoPan` racing `setView`'s animation, `openStable()`

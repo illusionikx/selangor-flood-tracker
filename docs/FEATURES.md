@@ -7430,3 +7430,34 @@ Unscoped, the same declaration reaches the card and hides the box there for good
   question from this one. The feed exists and the fetch failed. `camImg()`'s `onerror` also replaces
   the `<img>` with a plain node that `js/clip.js` watches for. See the comment above `tick()` there.
   Move the two together or leave both.
+
+## The app menu grew to the height of an iPhone
+
+Safari on iOS drew `#appMenu` as a full-page panel. The four tiles sat in the top half, the theme row
+sat on the bottom edge, and wide empty bands separated them. Chrome and Firefox drew the same markup
+as a 260 by 157 box.
+
+The menu is a `popover`, so the browser's own stylesheet applies to it first. That rule sets
+`position`, `inset`, `width`, `height`, `margin`, `padding`, `overflow`, `border` and two colors.
+`.menu` in `css/chrome.css` restates all of them but one. **`height: fit-content` was the one left.**
+
+WebKit reads `fit-content` on the block axis of an out-of-flow box as the space that is available
+under `top`, not as the height of the content. The placement handler in `js/ui.js` sets `top: 8px`,
+so the box measured one viewport tall. `#appMenu` is a grid, and a grid with a definite height and
+the default `align-content` stretches its rows to fill. Four rows, one screen: that is the picture.
+
+The fix is `height: auto` on `.menu`. An out-of-flow box with `bottom: auto` and `height: auto` is
+the height of its content in every engine, so this changes no pixel on the engines that were already
+right. The sensor ⋮ menu shares the class and takes the same correction — it draws as a block, so
+the fault showed there as dead space under the last row rather than as a stretched grid, which is
+why nobody reported it.
+
+**Do not fix a stretch like this with `align-content: start`.** That closes the gaps and leaves the
+box its full height, so an invisible panel keeps swallowing every tap over the map behind it. Aim at
+the height.
+
+### Deliberately not built
+
+- **No sweep of the other popovers.** `.sparktip` and the table's `.tipbox` set their own height paths
+  and neither reads `fit-content` from the UA sheet. A future popover that restates part of that rule
+  needs the whole of it, and this entry is the record of which declaration is easy to miss.
