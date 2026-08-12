@@ -31,9 +31,9 @@
 <link rel="stylesheet" href="vendor/markercluster.css">
 <link rel="stylesheet" href="vendor/fonts.css?v=49">
 <link rel="stylesheet" href="css/icons.css?v=79">
-<link rel="stylesheet" href="css/base.css?v=106">
+<link rel="stylesheet" href="css/base.css?v=107">
 <link rel="stylesheet" href="css/chrome.css?v=142">
-<link rel="stylesheet" href="css/map.css?v=129">
+<link rel="stylesheet" href="css/map.css?v=130">
 
 <!-- Water tint for the dark basemap. CARTO's dark_all is greyscale — all 18 of its tones have zero
      chroma — so no saturate() or hue-rotate() can pull water out of it. What it does have is one
@@ -359,8 +359,21 @@
       feed does not cover, with their coordinates.</span>
   </div>
 
+  <div class="src">
+    <a href="https://www.met.gov.my/nowcasting/" target="_blank" rel="noopener">MET Malaysia</a>
+    <span class="muted">Weather, not water. Whether rain falls near a station now, and whether more
+      arrives within three hours. The day's temperature range and any official warning come from the
+      same department, through data.gov.my.</span>
+  </div>
+
   <p class="muted">Each station popup names the feed its reading came from. Where the feeds disagree,
      the newest reading wins, except that Public Infobanjir's figure is preferred outright.</p>
+
+  <p class="muted">Weather sits beside the water and never changes it. The rain outlook joins no
+     reading and overrides no station. It raises no alert of its own. MET's own warnings appear
+     above the alert list and in the moving text at the top of the page. They carry MET's words and
+     count toward no station total. The temperature is a forecast for the day, not a thermometer,
+     which is why the card says today.</p>
 
   <h3>Credits</h3>
   <p class="muted">Built by <a href="https://github.com/illusionikx" target="_blank" rel="noopener">illusionikx</a>.
@@ -371,7 +384,8 @@
      contributors. Icons and the app mark are <a href="https://fonts.google.com/icons" target="_blank"
      rel="noopener">Material Symbols</a> (Apache 2.0);
      mapping by <a href="https://leafletjs.com/" target="_blank" rel="noopener">Leaflet</a>.
-     Flood data remains the property of JPS Malaysia.</p>
+     Flood data remains the property of JPS Malaysia, and weather data of
+     <a href="https://www.met.gov.my/" target="_blank" rel="noopener">MET Malaysia</a>.</p>
 
   <!-- The toggle moved here out of the close-button row. Its old spot had a reason — a mode and its
        exit within reach of each other — and the tabs weakened it: this pane is now short enough that
