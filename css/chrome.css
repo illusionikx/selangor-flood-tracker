@@ -494,7 +494,7 @@ table.data button[data-pop] { cursor: pointer; }
 /* The label takes the slack, so a row that also carries a number on the right keeps the number
    whole and wraps the station name instead. Every other row has one child and looks the same
    either way. `min-width: 0` because a flex item refuses to shrink below its content without it. */
-.mi > span { flex: 1; min-width: 0; }
+.mi > span { min-width: 0; }
 /* The nearest water level's reading, on the right of its row in the card menu. `color()` paints it,
    the same function the pin and the card use — 1.74 m is a quiet river or a flood, and the mark it
    is measured against is not on this row. */
