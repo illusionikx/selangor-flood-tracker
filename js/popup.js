@@ -455,10 +455,13 @@ const wxDots = m => `<button class="icon dots" popovertarget="mnu-met"
 /* The MET section. Two cells, `Now` and `Later`, each one glyph beside the words that belong to it.
    This section appears once per card and never once per sensor. Rain over a place is one fact, and
    sourceInfo() already taught this app what a per-place fact costs when it repeats down a mast.
-   The header carries no point name and no distance. It did, and the owner asked for both to go
-   after seeing them on screen. The cost was accepted knowingly: the card states weather from a
-   point up to MET_KM away and shows nothing a reader can weigh that against. `at` and `km` stay
-   in the payload, so restoring the line is one span here and nothing else.
+   The point and the distance sit under the cells, not beside the heading. They were beside it
+   first, where the place name competed with the station name at the top of the card, and they were
+   dropped for that. The cost of dropping them is what brought them back: without the line, a card
+   states a local forecast from a point up to MET_KM away and gives a reader nothing to weigh it
+   against, and the point for ULU YAM is 11.7 km off over high ground. As a footnote under the
+   forecast the line answers the question the forecast raises. Keep `at` and `km` in the payload
+   whatever this line does — that is the only reason bringing it back cost one span.
    `Later` reads rung, the worst rain in the three-hour window, so the glyph and the sentence beside
    it describe one window. It read hr1 once, which drew a clear sky next to the words `Rain 12:00`.
    hr1 stays in the payload to answer a different question: will it rain in one hour.

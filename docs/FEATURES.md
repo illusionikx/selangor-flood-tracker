@@ -6926,14 +6926,25 @@ sentence under it. That put `Later: Clear` above the words `Rain 12:00, past 13:
 card, one cell arguing with its own sentence. The cell now reads the same rung the span reports, so
 the cell and the sentence describe one window and agree.
 
-### The dropped attribution
+### The attribution, dropped and then restored
 
-The header once printed the MET point and the distance to it: `Subang Jaya · 3.4 km`. It is gone,
-at the request of the person reading it, after they saw it on screen. The cost is real: the card now
-states a local forecast from a point up to 15 km away, with nothing on screen to weigh that claim
-against. The point for ULU YAM sits 11.7 km off, over high ground. `at` and `km` still ride in the
-payload, so the line can return in one line of markup. Record this as a trade made on purpose, not
-as a gap nobody noticed.
+The header printed the MET point and the distance to it, `Subang Jaya · 3.4 km`. It was dropped at
+the request of the person reading it, after they saw it on screen, and it is back.
+
+The cost of dropping it was stated at the time and is what brought it back. Without the line the
+card states a local forecast from a point up to 15 km away, with nothing on screen to weigh that
+claim against. The point for ULU YAM sits 11.7 km off, over high ground. A reader had no way to
+tell that card from one whose point stands in the next street.
+
+It reads `Via MET Malaysia · <place>, <n> km away` now, under the cells rather than beside the
+heading, which is what the first version got wrong. The place name competed with the station name
+at the top of the card. As a footnote under the forecast it answers the question the forecast
+raises instead of interrupting the one the card is already answering.
+
+Two things this records. `at` and `km` were kept in the payload when the line came out, which is
+the only reason bringing it back cost one span. And a decision reversed after seeing it on a real
+screen is not a decision made badly — both calls were made looking at the thing, which is the only
+way this particular question can be answered.
 
 ### A moon after dark, MYT
 
