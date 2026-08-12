@@ -1190,7 +1190,21 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   others**: the exclusivity guard read `e.target === el('heat') && …`, so it only fixed the pair when
   one of those two boxes was what changed. A pair that arrived already both-on survived every toggle
   of the two pin filters that share that handler, while `PREFS.heatLayer` saved `water` and the
-  drawer went on showing both. The test is on the pair now, whoever fired the event.
+  drawer went on showing both. The test moved to the pair, whoever fired the event.
+  **Both of those repairs failed, because a handler is not the only writer of a checkbox.** The bug
+  came back showing two answers at once: both ramps on the legend, both chips lit, and the section
+  summary still naming one. `syncHeat()` re-read the boxes on every poll, and the summary was written
+  from the change handler alone, so the two surfaces aged apart. Nothing in this app checked that
+  box. **A browser restores form state across a reload and fires no `change`**, so a repair that
+  lives in a change handler never runs on that path. **Repair an invariant where the state is read,
+  not where the reader changes it.** `syncHeat()` in `js/heat.js` now reads `PREFS.heatLayer` and
+  writes the two boxes, the legend, the layers and the summary from it, the way `syncRisingChip()`
+  and `syncFavChip()` in `js/render.js` already re-assert their own chips every poll. The handler
+  writes the pref from the box that fired and reads neither box back, so both-on is unrepresentable.
+  The four preference-owned checkboxes also carry `autocomplete="off"`, which stops the browser
+  writing them at all — the three text inputs already had it. **Any new control whose state a
+  preference owns needs both halves**: the attribute, and a reader that writes the control from the
+  preference rather than the reverse.
   **The theme control is the same rule at a second site.** It lives in `#appMenu` as `#themeRow`,
   three `<input type="radio" name="theme">` in a segmented pill, none of them carrying `checked`.
   **That pill is the lightbox range selector's shape, shared and not copied** — `.seg` and

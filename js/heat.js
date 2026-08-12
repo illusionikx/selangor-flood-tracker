@@ -3,6 +3,7 @@
 // and rain arrives over the same sort of area.
 
 import { HEAT_KM, HEAT_MAX_PX, HEAT_ALERT, HEAT_WARNING, RAIN_HEAT } from './config.js';
+import { PREFS } from './state.js';
 import { map } from './map.js';
 import { el } from './util.js';
 
@@ -90,14 +91,27 @@ export function heatOpacity() {
   for (const l of layers) if (l._canvas) l._canvas.style.opacity = pct / 100 * fade;
 }
 
-/* Puts the map and the legend on whichever of the two chips is ticked. ui.js keeps them mutually
-   exclusive, so exactly one scale is ever on screen — never a stack of two ramps to read against
-   each other. The opacity slider sits below both and serves either.
-   This runs at startup as well as on every render: index.html ships the water chip ticked and both
-   legend sections visible, and a render is a whole poll away — so a reader whose pref is rainfall
-   used to get the wrong legend, and the wrong layer, for as long as the first payload took. */
+/* Puts the map, the legend, the two chips and the section summary on `PREFS.heatLayer`. One string
+   with three values, so exactly one scale is ever on screen — never a stack of two ramps to read
+   against each other. The opacity slider sits below both and serves either.
+   This runs at startup as well as on every render, and a render is a whole poll away — so a reader
+   whose pref is rainfall used to get the wrong legend, and the wrong layer, for as long as the first
+   payload took.
+   **It reads the pref and writes the boxes, never the reverse.** A checkbox is state this app does
+   not own: a browser restores form state across a reload without firing `change`, so an invariant
+   repaired inside the change handler is repaired on none of the paths the browser takes. That is
+   how the pair reached both-on and stayed there — the legend drew both ramps, the two layers
+   composited into a colour neither scale defines, and the summary went on naming the one the reader
+   had picked, because it alone was written from the handler. Deriving the pair from one string
+   makes both-on unrepresentable whoever wrote the DOM. `syncRisingChip()` and `syncFavChip()` in
+   render.js re-assert their own chips on every poll for the same reason. */
 export function syncHeat() {
-  const wet = el('heat').checked, rainy = el('rainHeat').checked;
+  const wet = PREFS.heatLayer === 'water', rainy = PREFS.heatLayer === 'rain';
+  el('heat').checked = wet;
+  el('rainHeat').checked = rainy;
+  // Which of the two is on, on the section's summary — the one thing a collapsed heatmap section
+  // otherwise stops saying.
+  el('heatN').textContent = wet ? 'water level' : rainy ? 'rainfall' : 'off';
   wet   ? heat.addTo(map)     : heat.remove();
   rainy ? rainHeat.addTo(map) : rainHeat.remove();
   el('lgWater').style.display = wet ? '' : 'none';

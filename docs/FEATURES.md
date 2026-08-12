@@ -6065,12 +6065,32 @@ The pref is the only writer.
 `e.target === el('heat') && el('heat').checked` before switching the other off, so it only ever
 fixed the pair when one of these two boxes was the thing that changed. A pair that arrived already
 both-on survived every toggle of the two pin filters that share the handler, while `PREFS.heatLayer`
-saved `water` and the drawer went on showing both. The test is on the pair now, whoever fired the
-event. Water wins the tie, for the same reason it is the default.
+saved `water` and the drawer went on showing both. The test moved to the pair, whoever fired the
+event.
 
-**The rule this draws.** A control whose state is owned by a preference must not also state that
-state in the markup. And an invariant repaired on one path through a shared handler is repaired on
-none of the others.
+**Both repairs failed, because the handler is not the only writer of a checkbox.** The bug came back
+with a signature that named the fault. The legend drew both ramps, both chips were lit, and the
+section summary still read `RAINFALL`. Three surfaces, two answers. `syncHeat()` reads the boxes on
+every poll, and the summary was written from the change handler alone. So the summary held the last
+answer a reader gave, and the legend held the state the DOM had drifted to since. Nothing in this
+app writes that box. A browser does. It restores form state across a reload, and it fires no
+`change` when it does, so a repair that lives in the change handler never runs.
+
+**The fix inverts the direction.** `syncHeat()` in `js/heat.js` now reads `PREFS.heatLayer` and
+writes the two boxes, the legend, the layers and the summary from it. The handler writes the pref
+from the one box that fired, and reads neither box back. One string with three values cannot hold
+both-on, so no writer can put the pair into that state for longer than one poll. `syncRisingChip()`
+and `syncFavChip()` in `js/render.js` already re-assert their own chips this way on every poll. The
+heat pair was the only preference-owned control that did not.
+
+**And the four checkboxes carry `autocomplete="off"`.** That stops the browser writing them at all,
+which closes the window between a reload and the next poll. The three text inputs in this app
+already carried it.
+
+**The rules this draws.** A control whose state is owned by a preference must not also state that
+state in the markup. An invariant repaired on one path through a shared handler is repaired on none
+of the others. And an invariant repaired in a handler holds only against writers that call it —
+repair it where the state is read, not where the reader changes it.
 
 ## A river's sparkline always draws its marks now
 

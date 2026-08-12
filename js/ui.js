@@ -360,19 +360,13 @@ el('heatOpacity').oninput = () => {
    and a pref saved before this change is exactly that, which is what the `??` branch migrates.
    Water is the default because it is what this page is for; rain is what you switch to in order to
    ask where the water is coming from. */
-const heatPref = PREFS.heatLayer ?? (PREFS.rainHeat ? 'rain' : PREFS.heat === false ? '' : 'water');
+PREFS.heatLayer ??= PREFS.rainHeat ? 'rain' : PREFS.heat === false ? '' : 'water';
 delete PREFS.heat; delete PREFS.rainHeat;   // dropped from the blob on the next save()
-el('heat').checked = heatPref === 'water';
-el('rainHeat').checked = heatPref === 'rain';
 el('risingOnly').checked = !!PREFS.risingOnly;
 el('favOnly').checked = !!PREFS.favOnly;
-// Which of the two is on, on the section's summary — the one thing a collapsed heatmap section
-// otherwise stops saying.
-const heatName = () => el('heatN').textContent =
-  el('heat').checked ? 'water level' : el('rainHeat').checked ? 'rainfall' : 'off';
-heatName();
 // Before the first payload, not after it: render() is a whole poll away, and until it ran the map
-// carried the water layer and the legend carried both ramps whatever the pref said.
+// carried the water layer and the legend carried both ramps whatever the pref said. This is also
+// what puts the two chips and the section summary on the pref — see syncHeat() in heat.js.
 syncHeat();
 
 /* The rising filter hides most of the map, and unlike the district picker it is one checkbox with
@@ -395,22 +389,19 @@ el('heat').onchange = el('rainHeat').onchange = el('risingOnly').onchange =
      worse, leaflet.heat accumulates alpha across layers, so overlapping blobs blend into a colour
      that belongs to neither scale and reads as an intensity neither reading supports.
      Checkboxes rather than radios because "neither" has to stay reachable, and a radio group cannot
-     be cleared by clicking. Switching one on switches the other off; switching the live one off
-     leaves the map clean.
-     The test is on the *pair*, not on which box was clicked. Gated on `e.target` it only repaired
-     the state when one of these two boxes was the thing that changed — so a pair that arrived here
-     already both-on (the browser restoring form state across a reload, an older build's stray
-     `checked` attribute) survived every toggle of the two filters below it, and `PREFS.heatLayer`
-     then saved `water` while the drawer went on showing both. Repairing it whoever fired the event
-     means the invariant holds on every path through this handler rather than on two of them.
-     Water wins the tie for the same reason it is the default: it is what this page is for. */
-  if (el('heat').checked && el('rainHeat').checked)
-    (e.target === el('rainHeat') ? el('heat') : el('rainHeat')).checked = false;
+     be cleared by clicking. So the choice is one string, written here from the box the reader
+     actually moved, and syncHeat() puts both boxes back on it.
+     **Read the box that fired, never the pair.** Scoring the pref off both boxes let a pair that
+     was already both-on — the browser restoring form state across a reload — save `water` on any
+     toggle of the two filters below it, while the drawer went on showing both. Two repairs have now
+     been tried inside this handler and both failed, because the handler is not the only writer of a
+     checkbox and never was. */
+  if (e.target === el('heat') || e.target === el('rainHeat'))
+    PREFS.heatLayer = !e.target.checked ? '' : e.target === el('heat') ? 'water' : 'rain';
 
-  PREFS.heatLayer = el('heat').checked ? 'water' : el('rainHeat').checked ? 'rain' : '';
   PREFS.risingOnly = el('risingOnly').checked;
   PREFS.favOnly = el('favOnly').checked;
-  heatName();
+  syncHeat();
   risePill();
   save();
   // Both heatmaps are display options, not filters — only the two pin filters close the drawer.
