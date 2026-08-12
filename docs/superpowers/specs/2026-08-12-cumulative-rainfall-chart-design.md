@@ -97,7 +97,7 @@ published 60. MET gives 240 mm for the day, which covers both the "today" bar an
 Fit a curve through the two published anchors. Take no constant from outside the data:
 
     exponent = ln(240 / spVeryHeavy) / ln(24)
-    mark(D)  = spVeryHeavy * D ^ exponent
+    mark(D)  = spVeryHeavy * D ^ exponent        # D is the window in hours
 
 At `spVeryHeavy` 61 the exponent is 0.431 and the curve gives 97 mm at 3 hours and 385 mm at
 72 hours.
@@ -135,16 +135,16 @@ Two footnote lines sit under the chart. Emit a line only when its asterisk is on
 The two lines name two different operations. A derived value is arithmetic on stored
 measurements. An estimated threshold is a model.
 
-A station shows at most two lines. A Selangor station shows one of each. A KL station shows one
-of each.
+A station shows two lines at most. A station with no odometer baseline yet shows the threshold
+line alone, because it has no derived value to mark.
 
 ## The chart
 
 Five rows. Reuse the `.mk` stroke from `rainBars()`.
 
-The axis obeys the rule `rainBars()` already follows. Draw a mark only within one data span of
-the readings. Grow the axis only that far. So a dry day draws bars across the full width and no
-marks at all. A 385 mm mark never flattens 4 mm of drizzle.
+The axis obeys the rule `rainBars()` already follows, and reuses its exact test. Draw a mark only
+when it is 2 times the largest reading or less. Grow the axis only that far. So a dry day draws
+bars across the full width and no marks at all. A 385 mm mark never flattens 4 mm of drizzle.
 
 A window with no answer draws an em dash in muted ink. The row stays in place. Every station
 shows five rows.
