@@ -177,6 +177,11 @@ el('testMode').onchange = async () => {
   try {
     const m = await lazy(() => import('./test.js'), b.closest('label') || b);
     m.paintTestChrome();
+  } catch {
+    /* The module never arrived, so nothing can show a drill. Put the flag back rather than leave a
+       toggle claiming a state the screen does not show. */
+    state.test = false;
+    b.checked = false;
   } finally {
     b.disabled = false;
   }
@@ -184,10 +189,15 @@ el('testMode').onchange = async () => {
 };
 // The badge's own escape hatch: whoever is looking at a fake flood may not be whoever switched it
 // on, and hunting through a dialog to stop it is a poor way to find that out.
-el('testOff').onclick = () => {
+/* Delegated, because `#testOff` does not exist on landing. js/test.js inserts the badge that holds
+   it, and that module now loads only when a reader turns test mode on. Binding the button directly
+   at module scope threw on `null` and stopped js/ui.js, which js/app.js imports statically, so the
+   whole app failed to start. `#pills` is static markup and is always there. */
+el('pills').addEventListener('click', e => {
+  if (e.target.id !== 'testOff') return;
   el('testMode').checked = false;
   el('testMode').onchange();
-};
+});
 
 // --- all-stations table ------------------------------------------------------------------------
 
