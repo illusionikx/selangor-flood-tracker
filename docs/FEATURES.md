@@ -7941,17 +7941,31 @@ directly. It now runs the open through `withTimeline` and waits on the import al
 
 ```js
 withTimeline(m => m.openTimeline(src));
-await lazy(() => tlMod, el('lightbox'));
+el('tlfail').hidden = true;
+try { await lazy(() => tlMod, el('lightbox')); }
+catch { el('tlfail').hidden = false; }
 ```
 
 The first line registers the open on the shared promise, ahead of any close a reader triggers next.
-The second line hands `lazy()` the import alone.
+The `await` hands `lazy()` the import alone.
 `openTimeline()` then awaits `api.php?shots=` for up to 30 seconds.
 The skeleton must not stand for that whole wait on every open — only the import belongs behind it.
 An earlier version awaited the combined call, `lazy(() => withTimeline(m => m.openTimeline(src)))`,
 which held the skeleton across that fetch on every open instead of only the first.
-The handler is still `async`.
-Nothing in it runs after the second line — it is the handler's last statement.
+
+The `try` block shipped late, and its absence was a real defect.
+`lazy()` rethrows a failed import on purpose, because it does not know which surface a caller owns.
+The three other callers each answer that: the table and the wall draw a `loadfail` banner, and the
+test toggle puts its own flag back. The lightbox answered nothing.
+It awaited the raw import promise a second time, inside an `async` listener with no `try`.
+`withTimeline`'s own rejection handler does not cover that second `await`.
+So a failed import raised one unhandled rejection per lightbox open, and told the reader nothing.
+Measured in node on the two shapes: one unhandled rejection before, none after.
+`#tlfail` is the surface, and it is the same line `openTimeline()` prints when the archive is out of
+reach. The reader is in the same position either way. No scrubber, no compare, and a live picture
+that still works.
+The handler clears that line before every attempt.
+`reset()` clears it only on the path where the module loads, and that is the path which did not run.
 The second site, `lightbox.addEventListener('close', reset)`, passed `reset` itself as a callback.
 A dynamic import hands back a module object, not the bindings inside it.
 Once the static import is gone, there is no `reset` to pass.

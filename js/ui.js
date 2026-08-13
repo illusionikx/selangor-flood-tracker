@@ -1301,7 +1301,15 @@ document.addEventListener('click', async e => {
      module promise and nothing else: openTimeline() then awaits api.php?shots= for up to 30 s, and
      holding the skeleton across that would draw it on every open instead of only the first. */
   withTimeline(m => m.openTimeline(src));
-  await lazy(() => tlMod, el('lightbox'));
+  /* `lazy()` rethrows on purpose — it does not know which surface a caller owns. This one owns
+     `#tlfail`, the same line timeline.js prints when it cannot reach the archive, because the
+     reader is in the same position either way: no scrubber, no compare, and a live picture that
+     still works. Without this the await raised one unhandled rejection per open and said nothing.
+     Cleared before every attempt, because `reset()` clears it on the path where the module loads
+     and that path is exactly the one that did not run. */
+  el('tlfail').hidden = true;
+  try { await lazy(() => tlMod, el('lightbox')); }
+  catch { el('tlfail').hidden = false; }
 });
 /* A dead camera stops the spinner too — a spinner that never ends reads as "still trying".
    `naturalWidth`, not which event fired: a frame that failed leaves the image at 0×0, and `.stage`

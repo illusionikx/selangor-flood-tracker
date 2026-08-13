@@ -1193,6 +1193,19 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   from the first the day the palette moves. That already happened once, in the wall's own
   `camskel`, before this shared shape replaced it. Add a new deferred panel by adding a placement
   rule and a `.skel` child. Do not add a new shimmer.
+- **`lazy()` rethrows a failed import, so every caller owns a failure surface and a `try`.** The
+  function clears `aria-busy` in a `finally` and lets the error out, because it does not know which
+  box the caller owns. Three of the four callers answer that: `#dataBox` and `#camBox` take a
+  `loadfail` banner, and the test toggle puts `state.test` back. The lightbox answered nothing for a
+  while, and it is the one to copy the shape from. It awaited the raw import promise a second time,
+  inside an `async` listener with no `try`, so a failed import raised one unhandled rejection per
+  open and said nothing on screen. **`withTimeline`'s own rejection handler does not cover that
+  second `await`** — a handler on a promise settles that one continuation, never a separate one, and
+  the shape reads as guarded because the word `catch` is already on the line above. Measured in node
+  on the two shapes: one unhandled rejection before the `try`, none after. Its surface is `#tlfail`,
+  the line `openTimeline()` already prints when the archive is out of reach, cleared before every
+  attempt because `reset()` clears it only on the path that did not run. Anything new behind
+  `lazy()` needs both halves, and a surface a reader can see beats a `console.warn`.
 ## Conventions
 
 - **Anything that alerts is checked against the alert design standard** in
