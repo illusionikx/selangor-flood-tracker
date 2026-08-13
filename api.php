@@ -149,6 +149,15 @@ const CAM_ALERT_KM = 2;
    feed cannot publish between. JPS reports rainfall to one decimal, so 60.1 is that value. */
 const RAIN_DANGER = 60.1;
 const CACHE = __DIR__ . '/.cache.json';
+/* The camera still cache. Every ?cam= request used to reach JPS, so N readers on the camera wall
+   aimed N times 90 fetches at one agency. 300 seconds is the lifetime the Cache-Control
+   on this endpoint already claims, and it matches POLL_MS in js/config.js. A still cannot change
+   faster than the payload that names it.
+   CAM_URLS is a small map of camera id to image URL, written at the end of each rebuild. The
+   handler used to decode all 312 KB of .cache.json to read one string out of it. */
+const CAM_TTL  = 300;
+const CAM_DIR  = __DIR__ . '/.cam';
+const CAM_URLS = __DIR__ . '/.cams.json';
 const LOCK  = __DIR__ . '/.refresh.lock';   // held for the length of a rebuild; see below
 const HIST  = __DIR__ . '/.history.db';
 const READ  = 86400;         // seconds of history loaded per poll (trend + sparkline)
@@ -303,14 +312,40 @@ function camFix(string $kind, int $id, float $lat, float $lng): array {
     return $off > CAM_FIX_KM ? [$flat, $flng] : [$lat, $lng];
 }
 
+/**
+ * The upstream image URL for one camera.
+ *
+ * Reads the small map the rebuild writes. Falls back to the full payload when that map is absent,
+ * which is the state a fresh deployment starts in and the state a failed rename leaves behind. A
+ * missing map must degrade to a slower answer, never to a 404.
+ */
+function camUrl(int $id): ?string {
+    if ($id <= 0) return null;
+    $map = is_file(CAM_URLS) ? json_decode((string)@file_get_contents(CAM_URLS), true) : null;
+    if (is_array($map) && isset($map[$id])) return $map[$id];
+    $cams = is_file(CACHE) ? (json_decode((string)@file_get_contents(CACHE), true)['stations'] ?? []) : [];
+    foreach ($cams as $s) {
+        if ($s['kind'] === 'camera' && $s['id'] === 'camera-' . $id) return $s['image'] ?? null;
+    }
+    return null;
+}
+
 // ?cam=<id> streams a CCTV still. Upstream advertises these over plain http, which an https page
 // can't load, so we fetch server-side. Only ids we already hold a URL for — never an arbitrary URL.
 if (isset($_GET['cam'])) {
-    $cams = is_file(CACHE) ? (json_decode(file_get_contents(CACHE), true)['stations'] ?? []) : [];
-    $url = null;
-    foreach ($cams as $s) {
-        if ($s['kind'] === 'camera' && $s['id'] === 'camera-' . (int)$_GET['cam']) { $url = $s['image'] ?? null; break; }
+    $id  = (int)$_GET['cam'];
+    $hit = $id > 0 ? CAM_DIR . "/$id.jpg" : null;
+
+    /* A cached still answers without a lookup and without touching JPS. This is the whole point of
+       the endpoint: 90 tiles times every reader used to be 90 times every reader at the agency. */
+    if ($hit && is_file($hit) && time() - filemtime($hit) < CAM_TTL) {
+        header('Content-Type: image/jpeg');
+        header('Cache-Control: max-age=' . CAM_TTL);
+        readfile($hit);
+        exit;
     }
+
+    $url = camUrl($id);
     if (!$url || strcasecmp(parse_url($url, PHP_URL_HOST) ?? '', HOST) !== 0) {
         http_response_code(404);
         exit;
@@ -318,18 +353,33 @@ if (isset($_GET['cam'])) {
     /* curl, never file_get_contents. JPS publishes two A records for this host and one
        (58.27.97.62) blackholes SYNs. curl races both and lands on the live one in ~10ms. PHP's
        stream wrapper tries them serially with no connect timeout, so it ate Windows' full 21s TCP
-       timeout on every other still, and the http fallback below made a bad draw 42s. Every other
-       call here goes through fetchAll, which is why this was the only slow endpoint.
-       Prefer TLS. Fall back to what upstream advertised. */
+       timeout on every other still. Prefer TLS. Fall back to what upstream advertised. */
     $try = fn($u) => fetchAll([$u], 1, false)[$u] ?? '';
     $img = $try(preg_replace('#^http://#i', 'https://', $url)) ?: $try($url);
-    if ($img === '') { http_response_code(502); exit; }
+    if ($img === '') {
+        /* Serve a stale still rather than a broken picture. The archive is a year of pictures and
+           this cache is five minutes of them, so an upstream blip costs a slightly old frame
+           instead of the videocam_off panel on every tile at once. */
+        if ($hit && is_file($hit)) {
+            header('Content-Type: image/jpeg');
+            header('Cache-Control: max-age=60');
+            readfile($hit);
+            exit;
+        }
+        http_response_code(502);
+        exit;
+    }
+
+    /* Write a temporary file and rename it. Two readers can miss the cache at the same moment,
+       and this must never serve a half written file as a picture. */
+    if ($hit) {
+        @mkdir(CAM_DIR, 0777, true);
+        $tmp = $hit . '.' . getmypid();
+        if (file_put_contents($tmp, $img, LOCK_EX) !== false) rename($tmp, $hit);
+    }
     header('Content-Type: image/jpeg');
-    /* 300s = POLL_MS in js/config.js. The two must move together. A still cannot change faster than
-       the payload that names it, so a shorter life buys nothing and costs a real request at JPS.
-       js/clip.js re-sets this src every ~7s lap, so at 60s an open card sent a request a minute to
-       the agency — and cards are opened most during a flood. */
-    header('Cache-Control: max-age=300');
+    /* 300s = POLL_MS in js/config.js and CAM_TTL above. All three move together. */
+    header('Cache-Control: max-age=' . CAM_TTL);
     echo $img;
     exit;
 }
@@ -2042,6 +2092,18 @@ $db->beginTransaction();
 foreach ($samples as $k => [$ts, $v]) $ins->execute([$k, $ts, $v]);
 $db->exec('DELETE FROM level WHERE ts < ' . ($now - RETAIN));
 $db->commit();
+
+/* The id to URL map the ?cam= handler reads. This uses the same stations the payload carries, so
+   the two cannot disagree. Write a temporary file and rename it. A reader can arrive while this
+   runs, and rename is atomic on one filesystem. */
+$camMap = [];
+foreach ($stations as $s) {
+    if ($s['kind'] === 'camera' && !empty($s['image'])) {
+        $camMap[(int)explode('-', $s['id'])[1]] = $s['image'];
+    }
+}
+$camTmp = CAM_URLS . '.' . getmypid();
+if (file_put_contents($camTmp, json_encode($camMap), LOCK_EX) !== false) rename($camTmp, CAM_URLS);
 
 file_put_contents(CACHE, $payload, LOCK_EX);
 echo $payload;

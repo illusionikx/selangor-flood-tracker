@@ -8,5 +8,7 @@ lib/
 .place.stamp
 .place.lock
 .siren.stamp
+.cam/
+.cams.json
 shots/
 .superpowers/
