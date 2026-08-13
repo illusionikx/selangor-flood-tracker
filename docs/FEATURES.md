@@ -7607,3 +7607,120 @@ shapes makes a reader learn two shapes.
 
 The gate above guarantees the line has something to print. MET fills `at` and `km` in the same pass
 that fills `now`, and a card with no `now` draws no weather section at all.
+
+## Five costs a poll used to pay, all in `api.php`
+
+A reader reported a stuck camera wall. The investigation found five separate costs on every poll,
+not one fault. Each fix below is independent. Each one touches `api.php` alone.
+
+### The session lock serialized every request from one browser
+
+PHP starts a session on every request here. The file session handler holds an exclusive lock on
+the session file for the whole request. Every request that carries the same `PHPSESSID` therefore
+runs one at a time, no matter how many idle PHP-FPM workers wait.
+
+Six concurrent camera stills share one cookie. They measured 1.9, 3.0, 4.3, 5.4, 6.1 and 6.9
+seconds, a clean staircase. The same six requests with no shared cookie finish together in 3.4
+seconds. Nothing in this repository reads `$_SESSION`. The lock protects nothing and costs the
+whole camera wall its concurrency.
+
+The fix is one line: `session_write_close()`, right after the two `require_once` calls at the top
+of `api.php`. It runs before any real work starts and drops the lock at once. The fix stays inside
+the PHP file. It does not move into an ini setting, because this file must stay correct on a
+machine it does not own.
+
+### A siren detail call answered one field, all day, for every siren
+
+The siren list already carries `status`. The detail call adds exactly one more field,
+`statusLastUpdate`. Every rebuild fetched all 212 siren details anyway, at 61,056 requests a day,
+to keep one timestamp current on a sensor that reports once a day.
+
+`sirenWanted()` reads the list first. A siren currently sounding still gets a detail call every
+rebuild, so a real alarm loses no latency. A quiet siren refreshes on `SIREN_TTL`, one hour, so the
+daily count drops to 5,088.
+
+**`SIREN_TTL` must not grow to six hours.** The history pass stamps each sample from
+`statusLastUpdate`. The `(station, ts)` primary key drops a repeated stamp. Six hours between
+fetches folds six hours of samples into one row.
+
+A siren the sweep skips must keep the stamp it already had. It must not borrow the poll clock. The
+first version fell back to the poll time, through the ordinary rule in `readTs()` for a missing
+`updated` field. That miswrote 319 rows an hour across 131 sirens. "Not fetched this round" is not
+the same claim as "reported now."
+
+`stationUpdated()` now carries the last known `statusLastUpdate` forward for a siren the sweep
+skipped. It reads that value from the payload the previous rebuild wrote. A gauge or a camera never
+borrows one. Only a siren does.
+
+### The camera still endpoint reached JPS on every request and cached nothing
+
+`?cam=<id>` fetched the live still at JPS on every request, with no cache of its own. The camera
+wall draws about 90 tiles on one page. Every reader looking at that wall multiplied JPS traffic by
+90.
+
+The still now stays on disk for `CAM_TTL` (300 seconds). That matches the lifetime the
+`Cache-Control` header on this endpoint already claims, and the same number as `POLL_MS` in
+`js/config.js`. A still cannot change faster than the payload that names it.
+
+A cache hit answers with no lookup at all. A miss reads `.cams.json`, a small camera-id-to-URL map
+the rebuild writes, instead of decoding all of `.cache.json` for one string. Measured after
+clearing the cache file for one camera: a cold still takes 0.68 seconds. A warm one takes 0.05 to
+0.06 seconds.
+
+`camImageOk()` checks a fetched body with `getimagesizefromstring()` before anything writes it to
+disk. A maintenance window can answer HTTP 200 with an HTML notice instead of a picture, the same
+fault `pageHasData()` already guards against on the scraped pages. The old handler cached that body
+without checking it, served it for `CAM_TTL`, then offered it again as the stale fallback with no
+expiry. One bad response became a standing failure.
+
+`CAM_STALE` (3600 seconds) now bounds the fallback. An outage past one hour falls through to the
+failure panel the client already draws, instead of an old frame with nothing to mark it as old.
+
+### The archive had no route for "whatever is newest"
+
+`?shot=<id>&t=<unix>` names one exact frame. The camera wall wants a picture from the archive
+instead of a live JPS fetch, but it holds no frame list to read a timestamp from. Before this
+change it had no way to reach the archive at all, so it fetched a live still per tile instead.
+
+`?shot=<id>` with no timestamp now serves the newest stored frame. **The newest frame form must
+never take the `immutable` header.** An exact frame never changes once written, so a year is honest
+there. The bytes of the newest frame change every `SHOT_EVERY` (30 minutes). `shotCache()` gives it
+`max-age=900` instead, half of `SHOT_EVERY`, the same reasoning `?sheet=` already states for the
+strip.
+
+### The payload set no cache header of its own
+
+Herd serves every response `Cache-Control: public, max-age=10800`. The JSON payload set nothing to
+override that. A browser can answer all 36 polls of the next three hours from its own cache, on a
+page whose whole purpose is to stay current.
+
+`payloadValidators()` sets `Cache-Control: no-cache` and an `ETag`, a quoted `md5` of the body, and
+returns the ETag. `no-cache` does not forbid storage. It requires the browser to revalidate before
+it reuses a stored response. The ETag makes revalidating cheap: an unchanged payload now costs a
+304 and about 200 bytes, instead of the full payload, measured at 342,551 bytes on a live poll.
+
+`sendPayload()` calls `payloadValidators()`. It answers a matching `If-None-Match` with 304, and
+otherwise echoes the body and exits. It compares the incoming header after a `trim()`, quotes
+included. A comparison that always fails still returns 200 every time with no error. Check this
+against an actual 304. Do not assume it from the absence of a crash.
+
+**Three exits echo this payload, not two.** A fix that reaches only one of them has already cost
+this codebase once, the `forced` flag gotcha this file already records. `serveCache()` ends the
+request, so it calls `sendPayload()`. The `fastcgi_finish_request` branch and the end of a rebuild
+both keep running afterward, the branch to fall through to a foreground refresh, the rebuild to run
+`captureShots()`. Both call `payloadValidators()` directly and echo the body themselves.
+`payloadValidators()` is the one function all three call. No exit can drift its own headers from
+the others, the way `forced` once did.
+
+The service worker plays no part here. `sw.js` returns without calling `respondWith()` for
+`api.php`. These headers reach the HTTP cache inside the browser, and nothing else.
+
+### Deliberately not built
+
+- **No shared cache-busting scheme between the payload and the static assets.** The payload uses
+  `no-cache` plus an ETag because it changes every poll. The CSS and JS files use a `?v=` query
+  string because they change on a deploy, not on a timer. Two different problems, two different
+  answers.
+- **No new stampede guard for the ETag comparison.** `sendPayload()` runs after `cachedPayload()`
+  or a fresh rebuild, both of which already sit behind the refresh lock or the file cache. A
+  conditional request reaches no new code path to JPS.

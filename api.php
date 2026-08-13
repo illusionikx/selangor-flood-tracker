@@ -1374,11 +1374,52 @@ function cachedPayload(): array {
          + ['cacheAge' => max(0, time() - strtotime($j['fetched'] ?? 'now'))];
 }
 
+/**
+ * Set the two validators on a payload response, and return the ETag.
+ *
+ * Three exits echo a payload and only one of them may exit, so the headers live here and the
+ * exiting behaviour lives in sendPayload() below. One function sets these headers, so no exit can
+ * drift from the others. A default written into one exit alone reached none of the others once
+ * already, which is the `forced` flag gotcha in CLAUDE.md.
+ */
+function payloadValidators(string $body): string {
+    $etag = '"' . md5($body) . '"';
+    header('Cache-Control: no-cache');
+    header('ETag: ' . $etag);
+    return $etag;
+}
+
+/**
+ * Write the payload to the browser, with validators.
+ *
+ * Two headers, and both matter. The server this runs behind serves every response
+ * `Cache-Control: public, max-age=10800`, and this payload set none of its own, so a browser could
+ * answer all 36 polls of the next three hours from its own cache. `no-cache` does not stop a
+ * browser storing the response. It requires the browser to revalidate before reusing it, and the
+ * ETag is what makes revalidating cheap: an unchanged payload costs 304 and about 200 bytes rather
+ * than 33 KB.
+ *
+ * Every exit that echoes a payload calls this. There are three of them, and one is dead under Herd
+ * and live on the deploy target. A default written into one exit alone reached none of the others
+ * once already, which is the `forced` flag gotcha in CLAUDE.md.
+ *
+ * The service worker is unaffected. It returns without calling respondWith() for this URL, so
+ * these headers reach the cache in the browser and nothing else.
+ */
+function sendPayload(string $body): never {
+    $etag = payloadValidators($body);
+    if (trim($_SERVER['HTTP_IF_NONE_MATCH'] ?? '') === $etag) {
+        http_response_code(304);
+        exit;
+    }
+    echo $body;
+    exit;
+}
+
 function serveCache(array $extra = []): never {
     // $extra is left-biased, so an explicit refusal passed in here still overrides. The defaults
     // for an ordinary poll live in cachedPayload() now, since every exit reads through it.
-    echo json_encode($extra + cachedPayload(), JSON_UNESCAPED_SLASHES);
-    exit;
+    sendPayload(json_encode($extra + cachedPayload(), JSON_UNESCAPED_SLASHES));
 }
 
 /* Exactly one rebuild may be in flight at a time, process-wide.
@@ -1430,7 +1471,12 @@ if (is_file(CACHE)) {
     // A force is the exception. Nobody asked to see an ordinary poll's rebuild. Refresh now exists
     // so a reader can see what the rebuild produced, so it waits in the foreground.
     if (!$force && function_exists('fastcgi_finish_request')) {
-        echo json_encode(cachedPayload(), JSON_UNESCAPED_SLASHES);
+        /* Not sendPayload(): this branch keeps working after the response, so it must not exit here.
+           The validators still have to match the other two exits, or a reader on the deploy target
+           gets a payload with no ETag while everybody else gets one. */
+        $body = json_encode(cachedPayload(), JSON_UNESCAPED_SLASHES);
+        payloadValidators($body);
+        echo $body;
         fastcgi_finish_request();
         ignore_user_abort(true);
     }
@@ -2161,6 +2207,9 @@ if (file_put_contents($camTmp, json_encode($camMap), LOCK_EX) === false || !@ren
 }
 
 file_put_contents(CACHE, $payload, LOCK_EX);
+/* Not sendPayload(): captureShots() still has to run below, so this exit must not exit either. The
+   validators come from the same function as the other two exits. */
+payloadValidators($payload);
 echo $payload;
 
 /* Last, and still inside the refresh lock. The payload is already on the wire, so nothing the map

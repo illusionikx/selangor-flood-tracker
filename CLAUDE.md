@@ -424,6 +424,14 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   parse, so a point that reaches the payload always carries one.
   This app publishes a notice it can name as `notices[]`. The reader then sees it on screen. Every
   other failure still stays in `sources.stale` alone.
+- **`session.auto_start` serializes every request from one browser.** The file session handler
+  holds an exclusive lock on the session file for the whole request. Every request that carries
+  the same `PHPSESSID` therefore waits behind the one before it. Six concurrent camera stills
+  measured a staircase: 1.9, 3.0, 4.3, 5.4, 6.1 and 6.9 seconds. The same six requests with no
+  shared cookie finished together in 3.4 seconds. `api.php` calls `session_write_close()` on its
+  first statement, right after the two `require_once` lines, because nothing in this app reads
+  `$_SESSION`. The lock protects nothing. Do not move that release later in the file. Code added
+  above it runs inside the lock again.
 - **No `fastcgi_finish_request` under Herd** — the SAPI is `cgi-fcgi`, so there is no way to close
   the connection and keep working. Stale-while-revalidate is impossible in-process; the page cache
   is the workaround. A cron hitting `api.php` every 5 min would keep the cache warm for good.
