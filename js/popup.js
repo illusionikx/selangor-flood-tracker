@@ -450,38 +450,46 @@ const wxIcon = r => {
    Elapsed time is printed beside it always, where `sourceInfo()` prints it only on a stale station:
    a station card states a full date and this states a clock, and `14:50` alone cannot say whether
    MET has been quiet since yesterday.
-   The nearest point and its distance stay out of the header, where the owner asked for them to go,
-   and answer "who made this" here instead — a claim from 14 km away is a different claim from one
-   made next door, and the ⋮ is where this app already puts that kind of doubt. */
+   The nearest point and its distance are NOT here. They spent a revision in this menu, on the
+   reading that a claim from 14 km away is a different claim from one made next door, and the ⋮ is
+   where this app puts that kind of doubt. The doubt turned out to be the reading itself. `MET_KM`
+   now reaches 16.5 km, so the point behind a card can stand two districts away, and a fact a reader
+   must have to weigh the words above it does not belong behind a tap. It is `.wxfrom`, under the
+   cells. This menu keeps the one fact a reader goes looking for: when MET issued it. */
 const wxDots = m => `<button class="icon dots" popovertarget="mnu-met"
     title="Details" aria-label="Details about this weather"><i class="i i-more_vert"></i></button>
   <div id="mnu-met" class="menu surface" popover>
     <div class="mi info"><span>
       ${!m.stamp ? '' : `<small class="muted">Updated ${
         MYT_CLOCK.format(m.stamp * 1000)} · ${ago(m.stamp * 1000)}</small><br>`}
-      <small class="muted">Via ${MET_NAME}${m.at ? ` · ${m.at}, ${m.km} km away` : ''}</small>
+      <small class="muted">Via ${MET_NAME}</small>
     </span></div>
   </div>`;
 
 /* The MET section. Two cells, `Now` and `Later`, each one glyph beside the words that belong to it.
    This section appears once per card and never once per sensor. Rain over a place is one fact, and
    sourceInfo() already taught this app what a per-place fact costs when it repeats down a mast.
-   The point and the distance sit under the cells, not beside the heading. They were beside it
-   first, where the place name competed with the station name at the top of the card, and they were
-   dropped for that. The cost of dropping them is what brought them back: without the line, a card
-   states a local forecast from a point up to MET_KM away and gives a reader nothing to weigh it
-   against, and the point for ULU YAM is 11.7 km off over high ground. As a footnote under the
-   forecast the line answers the question the forecast raises. Keep `at` and `km` in the payload
-   whatever this line does — that is the only reason bringing it back cost one span.
+   The point and the distance sit under the cells, not beside the heading and not inside the ⋮. They
+   were beside the heading first, where the place name competed with the station name at the top of
+   the card. They then spent a revision inside the ⋮, which is a tap away and therefore unread. Both
+   moves cost the same thing: without a visible line, a card states a local forecast from a point up
+   to `MET_KM` away and gives a reader nothing to weigh it against. The point for ULU YAM is 11.7 km
+   off over high ground, and `MET_KM` reaches 16.5 km. As a footnote under the forecast the line
+   answers the question the forecast raises. The gate above guarantees `at` and `km` are there,
+   because MET fills them with `now`.
    `Later` reads rung, the worst rain in the three-hour window, so the glyph and the sentence beside
    it describe one window. It read hr1 once, which drew a clear sky next to the words `Rain 12:00`.
    hr1 stays in the payload to answer a different question: will it rain in one hour.
-   Either cell can be absent. 53 of 677 stations sit inside a forecast district but outside
-   MET_KM of any nowcast point, so they carry a temperature and no rain at all. The grid's first
-   column is `auto` for that reason — one cell left alone sizes to itself rather than stretching. */
+   The section is all or nothing. 53 of 677 stations sit inside a forecast district but outside
+   MET_KM of any nowcast point, so they carry a temperature and no rain at all. That drew a heading,
+   a glyph and two numbers under the word `Now`, which reads as a weather panel that failed to load
+   rather than as the two facts MET published. A half-drawn section costs a reader more than the
+   temperature is worth, so a station missing any part of the outlook shows no weather at all. The
+   grid's first column stays `auto`, because a cell must still size to itself and not stretch. */
 function metSection(s) {
   const m = s.met;
-  if (!m) return '';
+  // ponytail: one gate for the whole section. Widen only if a partial shape is worth drawing again.
+  if (!m || m.now == null || m.hr1 == null || m.tmax == null || m.tmin == null) return '';
 
   const w = r => WEATHER[r] || WEATHER[0];
 
@@ -529,6 +537,7 @@ function metSection(s) {
         ${wxDots(m)}
       </div>
       <div class="wx">${now}${out}</div>
+      <p class="wxfrom muted">From ${m.at}, ${m.km} km away</p>
     </div>`;
 }
 

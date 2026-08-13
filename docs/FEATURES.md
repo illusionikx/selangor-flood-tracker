@@ -7546,3 +7546,55 @@ while the picture is there, so the inline handler stays one expression.
 
 **The picture is removed, not hidden**, and that is load-bearing: `tick()` in `js/clip.js` reads
 `isConnected` on that element to know a clip's frames have started failing and stop the loop.
+
+## The weather section is all or nothing
+
+MET answers a station through two feeds. The nowcast gives the rain, and it joins by nearest point
+inside `MET_KM`. The forecast gives the two temperatures, and it joins by district name. A station
+can match one feed and miss the other. 53 of 676 stations sit inside a forecast district and outside
+`MET_KM` of every nowcast point, so they hold a temperature and no rain at all.
+
+The section used to draw whatever it held. On those 53 stations that made a heading, a ⋮, one cell
+and the word `Now` over two numbers. The `Later` cell was absent and the rain glyph beside the
+temperatures was absent with it. A reader saw a weather panel with most of its parts missing. That
+reads as a panel that failed to load, not as the one fact MET published.
+
+`metSection()` in `js/popup.js` now returns nothing unless MET answered both questions. The gate
+tests `now`, `hr1`, `tmax` and `tmin` together, at the top of the function. A card with no weather
+section is a shape this app already draws, because a station outside both feeds always drew that
+way. A card with a broken weather section was a new shape, and it was worth less than the
+temperature in it.
+
+The cost is that a hidden station loses a real temperature. That is the trade accepted. The
+temperature is a district figure, and the same district holds other stations that carry the full
+section.
+
+### The cutoff moved 1.5 km, and only that far
+
+Hiding the partial cards made the cutoff worth measuring. A sweep put each hidden station against
+every nowcast point MET published. The 53 sat between 15.0 km and 27.0 km from the nearest one.
+Eleven sat between 15.0 km and 15.5 km. The constant hid those eleven, and the weather did not.
+`MET_KM` went from 15.0 to 16.5, which recovered 17 stations and left 36 hidden.
+
+The 36 sit between 16.6 km and 27.0 km. A bigger number is the wrong tool for them. The far end
+is Sabak Bernam. MET built one point there for a cell about 28 km across. A radius that reaches the
+last station is the cell-scaled rule `api.php` already rejects. Point density records where MET
+chose to build a station. It says nothing about where the rain falls.
+
+16.5 km stays well inside the decorrelation distance for a 3-hour rainfall field, about 26.5 km.
+That distance is what sets this constant. The `Now` glyph is the weaker half of the claim,
+because an instant claim wants about 3 km. That gap was already open at 15.0 km and this does not
+widen it much.
+
+### The card names the point it read from
+
+`MET_KM` reaching 16.5 km puts the point behind a card up to two districts away. So the card states
+it. `.wxfrom` is one line under the two cells: `From Kuala Selangor, 15.1 km away`.
+
+The line was in the ⋮ menu before this, beside the issue time. A tap is the right price for a
+timestamp, which a reader goes looking for when they doubt a number. It is the wrong price for the
+distance, which a reader needs to weigh the words above it and will never think to ask for. The ⋮
+keeps the issue time alone.
+
+The gate above guarantees the line has something to print. MET fills `at` and `km` in the same pass
+that fills `now`, and a card with no `now` draws no weather section at all.

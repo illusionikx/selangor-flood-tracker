@@ -160,12 +160,19 @@ const BOX = [100.72, 3.95, 102.02, 2.50];
    this origin and to CARTO and to nothing else.
    MET_KM is the radius a nowcast point speaks across. It comes from the decorrelation distance
    for rainfall, which grows with the period measured: about 7.8 km at 10 minutes and about 26.5 km
-   at 3 hours. The card states a claim about a 3-hour window, so 15 km sits well inside it. A line
+   at 3 hours. The card states a claim about a 3-hour window, so 16.5 km sits well inside it. A line
    that ever claims rain is falling AT THIS MOMENT needs a much tighter radius, near 3 km. Do not
-   reuse this constant for one. */
+   reuse this constant for one.
+   It was 15.0, and the 1.5 km bought 17 stations. `metSection()` in `js/popup.js` hides the whole
+   weather section when MET answers a station with a temperature and no rain, and 53 stations were
+   hidden that way. Eleven of them sat at 15.0 to 15.5 km, which is the cutoff and not the physics.
+   The 36 still hidden sit at 16.6 to 27.0 km. Do not chase those with a bigger number. The far end
+   is Sabak Bernam, where MET built one point for a 28 km cell, and a radius that reaches it is the
+   cell-scaled rule this file already rejects. The card names the point and the distance now, so a
+   reader can weigh a claim made 16 km away. */
 const MET_URL     = 'https://www.met.gov.my/nowcasting/';
 const MET_DAY_URL = 'https://api.data.gov.my/weather/forecast/';
-const MET_KM      = 15.0;
+const MET_KM      = 16.5;
 const MET_STALE   = 7200;    // 2 h — an old projection is worse than none
 const MET_DAY_TTL = 21600;   // 6 h — the forecast changes once a day
 
