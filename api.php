@@ -2,9 +2,6 @@
 // Proxy + cache for infobanjirjps.selangor.gov.my (no CORS headers upstream, so we fetch server-side).
 // ponytail: sqlite for level history, flat file for the payload cache (one blob, nothing to query).
 
-require_once __DIR__ . '/sources.php';   // the two scraped upstreams (national portal + KL)
-require_once __DIR__ . '/shots.php';     // the camera archive: capture, retention, lookup
-
 /* This PHP runs with `session.auto_start=1`, and the file session handler takes an exclusive lock
    on the session file for the whole request. Every request that carries the PHPSESSID of one browser
    therefore runs one at a time. Six concurrent stills measured 1.9, 3.0, 4.3, 5.4, 6.1 and 6.9
@@ -23,7 +20,10 @@ if (session_status() === PHP_SESSION_ACTIVE) session_write_close();
    which is every poll this page makes.
    Both handlers refuse to write once the body has started. A payload already on the wire must not
    gain a JSON object glued to its end, and captureShots() runs after that point on every sixth
-   poll. A truncated payload the client can report is better than a corrupted one it cannot. */
+   poll. A truncated payload the client can report is better than a corrupted one it cannot.
+   These register above the two require_once lines on purpose. Composer's autoloader raises
+   E_USER_ERROR when a platform check fails, and that happens inside a require. Registering after
+   the requires leaves the one failure most likely to greet a fresh checkout uncovered. */
 $fatalJson = function (): void {
     if (headers_sent()) return;
     header('Content-Type: application/json');
@@ -33,8 +33,11 @@ $fatalJson = function (): void {
 set_exception_handler(function (Throwable $e) use ($fatalJson) { $fatalJson(); });
 register_shutdown_function(function () use ($fatalJson) {
     $e = error_get_last();
-    if ($e && in_array($e['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR], true)) $fatalJson();
+    if ($e && in_array($e['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR, E_USER_ERROR], true)) $fatalJson();
 });
+
+require_once __DIR__ . '/sources.php';   // the two scraped upstreams (national portal + KL)
+require_once __DIR__ . '/shots.php';     // the camera archive: capture, retention, lookup
 
 const API   = 'https://infobanjirjps.selangor.gov.my/JPSAPI/api/';
 const TTL   = 300;   // upstream updates hourly; 5 min is plenty
