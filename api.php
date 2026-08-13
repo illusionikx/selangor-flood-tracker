@@ -629,6 +629,23 @@ function sirenWanted(array $list, bool $sweep): array {
 }
 
 /**
+ * The reading stamp for one siren, gauge or camera.
+ *
+ * A siren this rebuild did not fetch keeps the timestamp it already had. Not fetching a siren is
+ * not evidence that it reported now. Without this, readTs() falls back to the poll time. That is
+ * the one thing a sample stamp must never be, and it defeats the (station, ts) key. See the
+ * reading-stamp gotcha in CLAUDE.md.
+ *
+ * Only a siren carries a stamp forward. A gauge and a camera must never borrow one.
+ *
+ * @param array $seen siren id to last known stamp, from the payload of the previous rebuild
+ */
+function stationUpdated(array $fg, array $sn, string $kind, int $id, array $seen): ?string {
+    return $fg['statusLastUpdate'] ?? $sn['statusLastUpdate']
+        ?? ($kind === 'siren' ? ($seen["siren-$id"] ?? null) : null);
+}
+
+/**
  * May a forced refresh run now?
  *
  * @param int      $now       unix seconds
@@ -819,14 +836,18 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
     $ok('a fresh stamp keeps it shut',       forceAllowed($now, $now - 60, SIREN_TTL)[0] === false);
     $ok('no stamp at all opens a sweep',     forceAllowed($now, null, SIREN_TTL)[0] === true);
 
-    echo "\nsiren timestamp carry forward:\n";
+    echo "\nstationUpdated():\n";
     $seen = ['siren-7' => '01/08/2026 09:00:00'];
-    $pick = fn(array $fg, array $sn, string $kind, $id) => $fg['statusLastUpdate'] ?? $sn['statusLastUpdate']
-         ?? ($kind === 'siren' ? ($seen["siren-$id"] ?? null) : null);
-    $ok('a fetched siren uses its own stamp',   $pick([], ['statusLastUpdate' => 'new'], 'siren', 7) === 'new');
-    $ok('an unfetched siren keeps the old one', $pick([], [], 'siren', 7) === '01/08/2026 09:00:00');
-    $ok('an unknown siren still gets null',     $pick([], [], 'siren', 99) === null);
-    $ok('a camera never borrows a siren stamp', $pick([], [], 'camera', 7) === null);
+    $ok('a fetched siren uses its own stamp',
+        stationUpdated([], ['statusLastUpdate' => 'new'], 'siren', 7, $seen) === 'new');
+    $ok('an unfetched siren keeps the old one',
+        stationUpdated([], [], 'siren', 7, $seen) === '01/08/2026 09:00:00');
+    $ok('an unknown siren still gets null',
+        stationUpdated([], [], 'siren', 99, $seen) === null);
+    $ok('a camera never borrows a siren stamp',
+        stationUpdated([], [], 'camera', 7, $seen) === null);
+    $ok('a gauge reads its own detail first',
+        stationUpdated(['statusLastUpdate' => 'fg'], [], 'gauge', 7, $seen) === 'fg');
 
     echo "\nserveFromCache():\n";
     $ok('a fresh cache is served',                 serveFromCache(10, true, false) === true);
@@ -1668,8 +1689,7 @@ foreach ([['siren', 'StationSirens'], ['gauge', 'StationFloodGauges'], ['camera'
         // Siren detail exists only for the timestamp — the list says a siren is "online" forever,
         // including ones that last reported over a year ago.
         $sn  = $kind === 'siren' ? ($details[API . 'StationSirens/' . $s['stationId']] ?? []) : [];
-        $updated = $fg['statusLastUpdate'] ?? $sn['statusLastUpdate']
-                ?? ($kind === 'siren' ? ($sirenSeen['siren-' . $s['stationId']] ?? null) : null);
+        $updated = stationUpdated($fg, $sn, $kind, (int)$s['stationId'], $sirenSeen);
 
         // A siren that hasn't checked in for two of its daily heartbeats is not idle, it is out of
         // contact — and "IDLE" on a dead siren is the most dangerous thing this map could print.
