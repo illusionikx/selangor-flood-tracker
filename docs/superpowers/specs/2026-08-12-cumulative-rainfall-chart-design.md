@@ -87,15 +87,24 @@ Two guards:
 `$hist` loads 24 hours through `READ`. The odometer needs 72 hours. Add one bulk read over the `#c`
 keys. That read returns about 2,200 rows against the 48,000 already in the table.
 
-### The 72 hour bar needs three days of uptime
+### The long windows follow the uptime of this box
 
-Measured on this box on 2026-08-12, a usable baseline exists for 77.4% of stations at 24 hours and
-**0% at 72 hours**. The archive holds no rows at all for 09/08, which is where the 72 hour
-baseline lands. Herd polls only while somebody has the page open.
+A window resolves only where the archive holds a sample near its far end. Measured twice, with a
+6 hour tolerance on the baseline:
 
-This is a data collection gap, not a design fault. The cron target in `docs/DEPLOY.md` closes it
-after three days of uptime. Ship all five bars now. The 72 hour bar draws its empty state until
-the archive fills. This document specifies that empty state below, and the chart needs it anyway.
+| measured | 24 hour | 72 hour |
+|---|---|---|
+| 2026-08-12 | 77.4% | 0% |
+| 2026-08-13 | 93.0% | 77.4% |
+
+The 72 hour figure moved from nothing to most stations in one day. On 08-12 the archive held no
+rows at all for 09/08, and that hole sat exactly where the 72 hour baseline lands. A day later the
+hole had aged out of the window.
+
+Read this as the shape of the failure, not as a number to trust. Herd polls only while somebody
+holds the page open, so every long window on this box tracks the uptime of a browser tab. The cron
+target in `docs/DEPLOY.md` removes the effect. Until then a bar can appear and vanish between
+polls, and the empty state below is a normal state rather than an edge case.
 
 ## No threshold marks
 
