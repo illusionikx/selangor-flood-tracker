@@ -625,6 +625,36 @@ table.data .dash { color: var(--outline); }
   border-top: 1px solid var(--outline); background: var(--surface);
 }
 
+/* --- loading skeletons ----------------------------------------------------------------------- */
+/* js/table.js and js/wall.js load only when their dialog opens. Both boxes show this shape until
+   the module arrives. */
+
+/* Placement only. The look is `.skel` in css/base.css, shared with the camera tile.
+   Both are drawn only while lazy() holds `aria-busy` on the dialog, and both are out of the flow
+   the moment it clears, so the real content lands where it always did. */
+.skelrows, .skeltiles { display: none; }
+#dataBox[aria-busy="true"] .skelrows { display: grid; gap: 8px; padding: 12px; }
+.skelrows .skel { height: 34px; }
+#camBox[aria-busy="true"] .skeltiles {
+  display: grid; gap: 6px; padding: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  grid-auto-rows: min-content;
+}
+/* The tile ratio, so the grid does not reflow when the real tiles replace these. `grid-auto-rows`
+   above is not optional: a grid row does not follow its item's aspect-ratio, and an auto row
+   measured a 110px tile at 27.86px on the live wall, which drew every tile over the two below it. */
+.skeltiles .skel { aspect-ratio: 16 / 9; }
+/* While the skeleton stands, the real content is not there yet. `.data` is the table itself, which
+   `#dataBox` holds directly. There is no wrapper element around it. */
+#dataBox[aria-busy="true"] .data, #camBox[aria-busy="true"] #camGrid { display: none; }
+
+/* A module that never arrives would otherwise leave a dialog shimmering forever. */
+.loadfail .skelrows, .loadfail .skeltiles { display: none; }
+.loadfail::after {
+  content: 'Could not load this view. Check your connection and try again.';
+  display: block; padding: 24px; text-align: center; color: var(--muted);
+}
+
 /* --- warning modal ------------------------------------------------------------------------------ */
 
 /* One warning, read in full. Small on purpose: a title, a paragraph and a validity line,

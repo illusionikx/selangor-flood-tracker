@@ -69,7 +69,7 @@
 <link rel="stylesheet" href="vendor/fonts.css?v=49">
 <link rel="stylesheet" href="css/icons.css?v=84">
 <link rel="stylesheet" href="css/base.css?v=114">
-<link rel="stylesheet" href="css/chrome.css?v=157">
+<link rel="stylesheet" href="css/chrome.css?v=158">
 <link rel="stylesheet" href="css/map.css?v=147">
 
 <!-- Water tint for the dark basemap. CARTO's dark_all is greyscale — all 18 of its tones have zero
@@ -840,6 +840,10 @@
            aria-label="Filter stations">
     <p id="dataCount" class="muted"></p>
   </div>
+  <div class="skelrows" aria-hidden="true">
+    <i class="skel"></i><i class="skel"></i><i class="skel"></i><i class="skel"></i>
+    <i class="skel"></i><i class="skel"></i><i class="skel"></i><i class="skel"></i>
+  </div>
   <table class="data"><thead id="dataHead"></thead><tbody id="dataBody"></tbody></table>
 </dialog>
 <!-- Every camera on one page. The same shell as #dataBox: a top that stays put, then the thing you
@@ -859,6 +863,11 @@
        aria attributes, never the element's presence. -->
   <div id="camBar" role="progressbar" aria-label="Loading camera pictures"
        aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-hidden="true"></div>
+  <div class="skeltiles" aria-hidden="true">
+    <i class="skel"></i><i class="skel"></i><i class="skel"></i><i class="skel"></i>
+    <i class="skel"></i><i class="skel"></i><i class="skel"></i><i class="skel"></i>
+    <i class="skel"></i><i class="skel"></i><i class="skel"></i><i class="skel"></i>
+  </div>
   <div id="camGrid"></div>
   <!-- The tally, under the thing it counts. A total belongs after the list, where a reader arrives
        at it having seen what it is totalling, rather than above one as a claim to check. -->

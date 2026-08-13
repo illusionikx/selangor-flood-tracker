@@ -9,14 +9,12 @@ import { heatOpacity, syncHeat } from './heat.js';
 import { byId } from './stations.js';
 import { camWarn } from './popup.js';
 import { render, districts } from './render.js';
-import { dataTable } from './table.js';
 import { alerts, toggleAlerts } from './alerts.js';
 import { ticker } from './ticker.js';
 import { openTimeline, reset } from './timeline.js';
 import { load, feedRows, sourceRows, lastPayload } from './net.js';
 import { askJson } from './ask.js';
 import { lazy } from './lazy.js';
-import * as wall from './wall.js';
 import './sparktip.js';   // side effect only: one delegated readout for every graph on the page
 
 // --- theme ---------------------------------------------------------------------------------------
@@ -202,23 +200,50 @@ el('pills').addEventListener('click', e => {
 // --- all-stations table ------------------------------------------------------------------------
 
 const dataBox = el('dataBox');
-el('data').onclick = () => { closeSide(); dataTable(); dataBox.showModal(); el('dataFind').focus(); };
+/* The dialog opens first and the module follows. A reader who pressed a button gets a response at
+   once, and the skeleton stands in the box until the rows arrive. */
+el('data').onclick = async () => {
+  closeSide();
+  // A retry after a failed open must not still carry the last failure's banner over the fresh rows.
+  dataBox.classList.remove('loadfail');
+  dataBox.showModal();
+  el('dataFind').focus();
+  try {
+    (await lazy(() => import('./table.js'), dataBox)).dataTable();
+  } catch {
+    el('dataFind').blur();
+    dataBox.classList.add('loadfail');
+  }
+};
 dataBox.onclick = e => { if (e.target === dataBox) dataBox.close(); };
-el('dataFind').oninput = dataTable;
+/* A wrapper, not the function itself. `dataTable` is no longer a static binding, so there is
+   nothing to assign here. The dialog cannot be open unless its opener already imported the module,
+   so this resolves from the module map with no request on every keystroke after the first. */
+el('dataFind').oninput = () => import('./table.js').then(m => m.dataTable());
 
 // --- all cameras ---------------------------------------------------------------------------
 
 const camBox = el('camBox');
-el('cams').onclick = () => {
+/* Same shape as the table opener above: the dialog opens first and js/wall.js follows. */
+el('cams').onclick = async () => {
   closeSide();
   el('camFind').value = '';
-  wall.open();
+  // Same reset as the table opener above: a retry must not carry the last failure's banner forward.
+  camBox.classList.remove('loadfail');
   camBox.showModal();
+  try {
+    (await lazy(() => import('./wall.js'), camBox)).open();
+  } catch {
+    camBox.classList.add('loadfail');
+  }
 };
 camBox.onclick = e => { if (e.target === camBox) camBox.close(); };
 /* Nothing ticks behind a closed dialog, and nothing holds 91 decoded frames after the reader has
-   gone. `onclose` catches Esc, the ×, and the backdrop click above, which is every way out. */
-camBox.onclose = () => wall.close();
+   gone. `onclose` catches Esc, the ×, and the backdrop click above, which is every way out.
+   The dialog can close before the module has arrived — a reader can open and shut it inside the
+   fetch — so this resolves from the module map like every other call site, rather than assume the
+   opener's own import already landed. wall.close() tears down an empty map safely on that path. */
+camBox.onclose = () => import('./wall.js').then(m => m.close());
 /* One delegated listener. 91 listeners for one behavior is the thing delegation exists to stop.
    Read the id before closing, though not because close() empties the grid before the next line
    runs: HTMLDialogElement.close() clears `open` synchronously but only queues a task to fire the
@@ -253,7 +278,9 @@ function camFilter() {
     t.hidden = !ok;
     if (ok) shown++;
   }
-  wall.count(shown);
+  /* Same reasoning as `dataFind`'s wrapper above: the grid can only hold tiles to filter because
+     js/wall.js already ran, so this resolves from the module map with no request. */
+  import('./wall.js').then(m => m.count(shown));
 }
 el('camFind').oninput = camFilter;
 

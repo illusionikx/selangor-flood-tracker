@@ -8,8 +8,6 @@ import { marks, siteMark, shown, syncCluster, focusOn, side, openSide,
          showMast, hideMast, pinGlyph } from './map.js';
 import { heat, rainHeat, syncHeat, thinHeat } from './heat.js';
 import { sitePopup } from './popup.js';
-import { dataTable } from './table.js';
-import * as wall from './wall.js';
 
 state.rerender = () => render();
 
@@ -198,9 +196,12 @@ export function render() {
   favPanel();
   // Every poll rebuilds the map; the table has to follow or it sits on readings the map has already
   // replaced. Only while it is open — no point rendering 435 rows into a closed dialog.
-  if (el('dataBox').open) dataTable();
+  /* `.then()`, not `await`. A dialog can only be open because its opener already imported the
+     module, so these resolve from the module map with no request. Making render() async would move
+     everything after it into a later task on every poll. */
+  if (el('dataBox').open) import('./table.js').then(m => m.dataTable());
   // The wall is painted, never rebuilt. See paint() in js/wall.js for what a rebuild costs.
-  if (el('camBox').open) wall.paint();
+  if (el('camBox').open) import('./wall.js').then(m => m.paint());
 }
 
 /* The district filter: every district the feeds returned, grouped under its state, each with the
