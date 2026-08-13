@@ -95,9 +95,12 @@ el('devForce').onclick = async () => {
   try {
     /* `no-store` stays here. This button exists to defeat the cache, and that is the one place
        where doing so is right. One try: a reader who pressed a button watches the result, and the
-       rate limit behind ?force=1 counts every arrival. */
+       rate limit behind ?force=1 counts every arrival. `ms: 45000` matches the budget js/net.js
+       gives the first load for the same rebuild, measured at 36.5 s cold. The default 20000 aborted
+       client-side before a slow rebuild finished on the server. It then printed a failure for a
+       refresh that had already succeeded. */
     const j = await askJson(FEED + (FEED.includes('?') ? '&' : '?') + 'force=1',
-                            { cache: 'no-store', tries: 1 });
+                            { cache: 'no-store', tries: 1, ms: 45000 });
     // The dialog can close while the fetch is in flight. onclose already cleared #devMsg for the
     // next session, and a result landing after that must not write into it.
     if (aboutBox.open) el('devMsg').textContent = j.forced

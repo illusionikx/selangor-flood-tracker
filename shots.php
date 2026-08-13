@@ -32,6 +32,11 @@
  */
 const SHOTS      = __DIR__ . '/shots';
 const SHOT_EVERY = 1800;    // 30 min between captures — see above
+/* How old the newest stored frame may be and still stand in for a live picture. SHOT_EVERY is the
+   gap between captures, not a ceiling on age: a camera whose capture keeps failing ages without
+   bound, and one measured 5.9 days. Past this the archive is no longer tracking that camera, so a
+   caller asking for "the newest frame" is better served by being told there is not one. */
+const SHOT_FRESH = 2 * SHOT_EVERY;
 const SHOT_W     = 1280;    // 720p — the native width of every camera measured
 /* Deliberately high. With the smaller-of-the-two rule below, a quality this close to the source
    means the re-encode almost never wins, so what gets stored is the original JPEG byte for byte,

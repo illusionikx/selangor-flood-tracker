@@ -189,12 +189,14 @@ let offline = 0;
  * The archive already holds a frame for every camera a capture has reached, and shots.php has it
  * on disk, so a wall of ninety tiles costs the agency nothing. Measured on the payload this landed
  * against: 89 tiles, every one of them with a stored frame. A live still costs 273 KB and about
- * 0.9 s each. The
- * archived frame costs 186 KB and about 0.06 s, and it is at most SHOT_EVERY old — which is what
- * the strip this tile plays is anyway, so the tile loses no freshness it was going to keep.
+ * 0.9 s each. The archived frame costs 186 KB and about 0.06 s.
  *
- * A camera with no stored frame answers 404, and onSettle() below falls that tile back to the live
- * still exactly once.
+ * The frame is at most SHOT_FRESH old, because api.php refuses to serve a staler one on this route
+ * and the tile then falls back to the live feed. SHOT_EVERY is only the gap between captures, and
+ * a camera whose capture keeps failing ages past it without bound.
+ *
+ * A camera with no stored frame, or none fresh enough, answers 404. onSettle() below falls that
+ * tile back to the live still, exactly once.
  *
  * STATIC has no PHP at all, so it keeps the direct URL camSrc() already builds for that build. */
 const tileSrc = (c, id) => STATIC ? camSrc(c) : `api.php?shot=${id}`;

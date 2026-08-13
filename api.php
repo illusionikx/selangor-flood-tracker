@@ -41,7 +41,12 @@ $fatalJson = function (): void {
     http_response_code(500);
     echo json_encode(['error' => 'server error']);
 };
-set_exception_handler(function (Throwable $e) use ($fatalJson) { $fatalJson(); });
+set_exception_handler(function (Throwable $e) use ($fatalJson) {
+    // PHP stops logging on its own once a handler is set, so an uncaught exception would otherwise
+    // be a silent 500 with no record of what threw.
+    error_log('api.php uncaught: ' . $e);
+    $fatalJson();
+});
 register_shutdown_function(function () use ($fatalJson) {
     $e = error_get_last();
     if ($e && in_array($e['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR, E_USER_ERROR], true)) $fatalJson();
@@ -687,6 +692,12 @@ if (isset($_GET['shot'])) {
     if ($id > 0 && !$exact) {
         $all = shotList($id);
         $t   = $all ? end($all) : 0;
+        /* Refuse a frame the archive has stopped refreshing. The caller asked for a picture that
+           stands in for now, and this route answering 404 is what sends the camera wall to the live
+           feed, and from there to the No picture panel if that is dead too. The `&t=` form is
+           unaffected: it names one exact frame and a reader asking for a specific past moment is
+           entitled to it however old it is. */
+        if ($t && time() - $t > SHOT_FRESH) $t = 0;
     }
     $f = $id > 0 && $t > 0 ? shotFile($id, $t) : null;
     if (!$f) { http_response_code(404); exit; }
@@ -947,6 +958,11 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
        readTs() guards on a JPS reading: a clock we do not own moved. */
     $ok('a stamp from the future is allowed',    forceAllowed($now, $now + 3600)[0] === true);
     $ok('the window is honored when passed',     forceAllowed($now, $now - 10, 5)[0] === true);
+
+    echo "\nSHOT_FRESH:\n";
+    $ok('the ceiling is two capture cycles', SHOT_FRESH === 2 * SHOT_EVERY);
+    $ok('a frame inside the ceiling stands',  ($now - ($now - SHOT_FRESH + 60)) <= SHOT_FRESH);
+    $ok('a frame past the ceiling does not',  ($now - ($now - SHOT_FRESH - 60)) > SHOT_FRESH);
 
     echo "\nsirenWanted():\n";
     $sirens = [

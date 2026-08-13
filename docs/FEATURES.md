@@ -7694,9 +7694,16 @@ change it had no way to reach the archive at all, so it fetched a live still per
 
 `?shot=<id>` with no timestamp now serves the newest stored frame. **The newest frame form must
 never take the `immutable` header.** An exact frame never changes once written, so a year is honest
-there. The bytes of the newest frame change every `SHOT_EVERY` (30 minutes). `shotCache()` gives it
-`max-age=900` instead, half of `SHOT_EVERY`, the same reasoning `?sheet=` already states for the
-strip.
+there. While capture keeps reaching a camera, the bytes of the newest frame change every
+`SHOT_EVERY` (30 minutes). `shotCache()` gives it `max-age=900` instead, half of `SHOT_EVERY`, the
+same reasoning `?sheet=` already states for the strip.
+
+**"Newest stored frame" is not the same claim as "recent frame."** A camera whose capture keeps
+failing still has a newest frame. It is just old — one measured 5.9 days behind. `SHOT_FRESH`
+(`shots.php`, twice `SHOT_EVERY`) is the ceiling. Past it, this route answers 404 instead of a
+picture with no age on it. That 404 sends a caller on to its own fallback. For the wall that is the
+live still, and past that, the `No picture` panel. This does not change the `&t=` form. It names one
+exact frame, and a reader asking for a specific past moment gets it however old that is.
 
 ### The payload set no cache header of its own
 
@@ -7777,7 +7784,11 @@ takes about 0.83 seconds and 275 KB. Ninety tiles on one page used to multiply t
 ninety, for every reader who opened the wall.
 
 A tile can still fall back to `api.php?cam=<id>` once. That path runs inside the error handler in
-`onSettle()`, for a camera JPS only just added, whose archive holds nothing yet.
+`onSettle()`. It now fires on two different 404s, not one. The first is a camera JPS only just
+added, whose archive holds nothing yet. The second is a camera whose capture has stopped reaching
+it. `?shot=` refuses a frame past `SHOT_FRESH`, so a stale archive now answers 404 too. Before that
+ceiling existed, a tile showed whatever frame was newest with no check on its age. One camera
+measured showed a picture 5.9 days old, with nothing on screen to say so.
 
 ### `null` and `[]` mean different things after a `?shots=` call
 
