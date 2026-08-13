@@ -31,7 +31,7 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `js/util.js` | pure helpers + `hasInfo()` / `color()` / `isIgnored()` |
 | `js/stations.js` | queries over the station set (`nearestOf`, `nearestCam`, `byId`) |
 | `js/map.js` | map instance, basemap/theme, cluster, the station panel (`openSide`), `focusOn` / `flashTo` |
-| `js/heat.js` | both heat layers (water level, rainfall), ground-fixed sizing, shared opacity |
+| `js/heat.js` | both heat layers (water level, rainfall), ground-fixed sizing per layer, shared opacity |
 | `js/popup.js` | popup + meter + gauge + sparkline templates |
 | `js/sparktip.js` | the hover/tap readout on every graph, and the label on any `data-tip`. One delegated listener, no imports |
 | `js/render.js` | rebuilds markers and heat points; drawer summary table |
@@ -805,13 +805,40 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   because they want no animation. Their counts live on the `<summary>`, so a collapsed section still
   reports what it is holding — do not move a count into the body.
 - **`border-collapse: collapse` drops padding on the table box** — `#netstats` uses `separate`.
-- **leaflet.heat sizes in screen pixels.** `heatScale()` converts `HEAT_KM` (5km) to pixels per
-  zoom so blobs stay ground-fixed. Do **not** also call `heat.redraw()` — the plugin repaints on
-  the following `moveend`, and doing both painted twice per zoom. Radius capped at 120px because
-  blur cost is quadratic; past that cap the layer *fades out* rather than quietly covering less
-  ground. `maxZoom` on the layer is **not** a display limit — it divides every weight by
-  `2^(maxZoom − zoom)`, so anything inside the usable zoom range dims blobs as you zoom out. Pinned
-  to 0.
+- **leaflet.heat sizes in screen pixels.** `heatScale()` converts a layer's ground distance to
+  pixels per zoom so blobs stay ground-fixed. Do **not** also call `heat.redraw()` — the plugin
+  repaints on the following `moveend`, and doing both painted twice per zoom. Radius capped at
+  `HEAT_MAX_PX` because blur cost is quadratic; past that cap the layer *fades out* rather than
+  quietly covering less ground, and the fade is per layer because the cap is. `maxZoom` on the layer
+  is **not** a display limit — it divides every weight by `2^(maxZoom − zoom)`, so anything inside
+  the usable zoom range dims blobs as you zoom out. Pinned to 0.
+- **A blob is painted `radius + blur` across, not `radius`, so the two must sum to the ground
+  distance and may never be set apart from each other.** simpleheat's `radius(t, i)` fills an arc of
+  radius `t`, blurs it by `i`, then stamps a sprite of half-width `t + i`. `heatScale()` handed
+  `radius` the whole of `HEAT_KM` and added `blur = radius * 0.8` on top, so every blob on both
+  layers reached 1.8× its stated size and covered 3.24× the area. One rain gauge reading 19 mm/h
+  washed 250 km² of Kuala Lumpur violet, over twenty gauges reporting 0.0 mm, the nearest of them
+  1.6 km away. **Three places asserted the 5 km and the code painted 9** — the constant's comment,
+  `heatScale()`'s own comment, and `thinHeat()`, which drops a weaker neighbour on the claim that
+  the stronger point's blob already covers it. That last one is the compounding fault: thinning at
+  5 km while painting at 9 let every pair between the two distances stack its alpha, which is the
+  bug `thinHeat()` exists to prevent, moved out one ring. The split is now `wide / (1 + BLUR)` and
+  `r * BLUR` off one `BLUR` constant, so the sum is right by construction. `HEAT_MAX_PX` also starts
+  bounding what it names: the sprite used to be 1.8× the cap.
+- **`HEAT_KM` is 5 km and `RAIN_KM` is 4 km, and rain must never borrow the water number again.**
+  5 km is a catchment claim, which is fair for a river level. Rain reached for it because it was
+  there. The payload can settle it: take the 211 rainfall stations that carry history, every pair
+  of them and every 15-minute bucket where one of the pair was wet, and ask how often the other was
+  wet too. It runs 24% out to 4 km, halves to 13% by 6 km, and is back to the 4–6% background rate
+  by 12 km. So a rain reading carries about 4 km of information. `MET_KM` in `api.php` states the
+  same rule from the other end — a claim about the next three hours reaches much further than a
+  claim about this moment, and `hourly` is the last rolling hour. **A layer's paint distance and its
+  `thinHeat()` distance are one number**, passed to both from `config.js`. Rain still covers ground
+  where no gauge reports rain, and that is weather rather than a defect: even inside 4 km, three
+  quarters of a wet gauge's neighbours are dry. Do not chase that figure to zero with a smaller
+  radius — below the distance a reading informs, the layer is 233 dots. Do not chase it with
+  interpolation either. This app draws readings, not a modelled field. See `docs/FEATURES.md`,
+  *The rainfall heatmap claimed rain over 250 km² from one gauge*.
 - **Leaflet paints its container `#ddd` in both themes.** That is what shows through wherever a tile
   has not arrived, and a zoom out has nothing to retain over the newly revealed area — so the
   missing tiles read as a grid of pale boxes on the dark basemap. `.leaflet-container` takes
@@ -989,17 +1016,27 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   defaults into `cachedPayload()`, the one function both exits call before they echo anything to a
   browser. A flag two exits can both return needs one default both of them share, not a copy pasted
   into each.
-- **`cacheAge` always reports 0, and the payload `ETag` is stable only because of that bug.**
-  `cachedPayload()` ends `['forced' => false, 'forceWhy' => null] + $j + ['cacheAge' => ...]`. The
-  array `+` operator in PHP is left-biased. `$j`, the stored payload, already carries a `cacheAge`
-  key. The write further down this file sets it to `0` every time. So the freshly computed value on
-  the right never survives the merge. Every cached read reports `cacheAge: 0`, even two polls apart.
-  `payloadValidators()` hashes the whole body into the `ETag`. A `cacheAge` frozen at `0` is one
-  reason that hash holds still between polls. **Do not repair `cacheAge` alone.** A real, rising
-  number changes the body every second. That changes the `ETag` every second. The `304` in
-  `sendPayload()` stops firing, and nothing errors. The feature looks like it still works. Fix
-  `cacheAge` and exclude the volatile diagnostics from the hash in `payloadValidators()` in the same
-  change. Otherwise the `304` stops firing, and nobody notices.
+- **`cacheAge` and the payload `ETag` are one repair, and neither half is safe to ship alone.**
+  `cachedPayload()` used to end `['forced' => false, 'forceWhy' => null] + $j + ['cacheAge' => ...]`.
+  The array `+` operator in PHP is left-biased. `$j`, the stored payload, already carries a
+  `cacheAge` key, and the rebuild write sets it to `0` every time. So the computed value on the
+  right never survived the merge, and every cached read reported `cacheAge: 0` however long the file
+  had sat. The status popover reads that field to say whether a poll came from JPS or from the file
+  cache, so it said JPS on every poll. `cacheAge` sits on the LEFT now.
+  **The `ETag` was stable only because of that bug.** `payloadValidators()` hashed the whole body,
+  and a field frozen at `0` is a field that cannot move a hash. Repair `cacheAge` by itself and a
+  rising number changes the body every second, which changes the `ETag` every second, and the `304`
+  in `sendPayload()` stops firing. Nothing errors. A validator that never matches is not a failure,
+  just a full 33 KB body on every poll for as long as a tab stays open. `payloadEtag()` is the other
+  half: it blanks `"cacheAge":N` to `"cacheAge":0` before hashing, so the tag names the build rather
+  than the moment somebody read it. **It blanks the field rather than cutting it**, so the hash
+  still depends on that field being present.
+  It sits apart from the header writing so `--selftest` can call the rule instead
+  of restating it. That is the same reason this file lifts out `shotFresh()` and `stationUpdated()`.
+  Five
+  assertions guard it, and `cacheAge does not move the ETag` is the one that keeps the `304` alive.
+  **Any diagnostic added to this payload that changes without the data changing needs the same
+  treatment**, or it silently costs every reader the full body on every poll.
 - **Moving an element to a new parent can change which flex rule governs it, even when the
   element's own rules stay the same.** `.testtog` was a flex item inside `.modalhead`. There,
   `flex: none` sized it to its own content, and it drew as a pill. Moved to sit as a block child of
@@ -1263,7 +1300,10 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   covers, which *is* "the highest reading within a blob radius" — the thing the colour claims to
   mean. **Any new heat layer must go through it**, and the water layer does too even though it has
   one point on a calm day: the flaw only appears when many stations alert at once, which is the one
-  moment the map has to be right.
+  moment the map has to be right. **It takes the distance as a parameter, and a caller must pass the
+  one its own layer paints at.** A thinning distance shorter than the paint leaves the stacking
+  alive in the ring between the two — see the `radius + blur` gotcha above, which is how that
+  happened.
 - **A heat layer's weight is its alpha.** leaflet.heat draws each point at its weight, so a scale
   that starts at 0 draws real readings as nothing. The water layer never hit this because its floor
   is the alert slot (0.38); the rain layer's first class therefore *starts at 0.25* (`RAIN_STOPS`)
@@ -1457,6 +1497,22 @@ echo json_encode(["met"=>$s["met"],"metday"=>$s["metday"],"metwarn"=>$s["metwarn
 php -r '$p=json_decode(file_get_contents(".cache.json"),true);
 preg_match("/MET_KM\s*=\s*([\d.]+)/",file_get_contents("api.php"),$m);$k=(float)$m[1];
 echo count(array_filter($p["stations"],fn($s)=>($s["met"]["km"]??0)>$k))," beyond MET_KM ($k km)\n";'
+
+# How much ground the rainfall heat layer claims, and how much of it holds a gauge reporting no
+# rain. This is the sweep that found the 1.8x paint bug: the wash covered 2,036 km2 and 82% of the
+# gauges under it were dry. RAIN_KM is read out of config.js, never copied here. Read the second
+# figure as a trend, not a pass mark — rain is patchy and it will never reach zero. A jump back
+# toward 80%, or an area far above 500 km2 on a dozen wet gauges, means a blob outgrew its number.
+php -r '$p=json_decode(file_get_contents(".cache.json"),true);
+preg_match("/RAIN_KM\s*=\s*([\d.]+)/",file_get_contents("js/config.js"),$m);$r=(float)$m[1];
+$km=fn($a,$b)=>hypot($a["lat"]-$b["lat"],($a["lng"]-$b["lng"])*cos(deg2rad($a["lat"])))*111;
+$all=array_values(array_filter($p["stations"],fn($s)=>$s["kind"]==="rainfall"&&$s["lat"]));
+$wet=array_values(array_filter($all,fn($s)=>($s["hourly"]??0)>0));
+usort($wet,fn($a,$b)=>$b["hourly"]<=>$a["hourly"]);
+$k=[];foreach($wet as $s){foreach($k as $x) if($km($x,$s)<$r) continue 2; $k[]=$s;}
+$cov=0;$dry=0;foreach($all as $s){foreach($k as $x) if($km($x,$s)<=$r){$cov++;if(($s["hourly"]??0)<=0)$dry++;break;}}
+printf("%d wet gauges -> %d blobs, %.0f km2, %d gauges covered, %d dry (%d%%)\n",
+count($wet),count($k),count($k)*M_PI*$r*$r,$cov,$dry,$cov?round(100*$dry/$cov):0);'
 
 # Which warnings survive the geography filter, and how many the feed offered.
 curl -sk https://flood-exp.test/api.php | php -r '$p=json_decode(stream_get_contents(STDIN),true);

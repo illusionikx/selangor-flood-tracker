@@ -7711,10 +7711,36 @@ Herd serves every response `Cache-Control: public, max-age=10800`. The JSON payl
 override that. A browser can answer all 36 polls of the next three hours from its own cache, on a
 page whose whole purpose is to stay current.
 
-`payloadValidators()` sets `Cache-Control: no-cache` and an `ETag`, a quoted `md5` of the body, and
-returns the ETag. `no-cache` does not forbid storage. It requires the browser to revalidate before
+`payloadValidators()` sets `Cache-Control: no-cache` and an `ETag`, and returns the ETag.
+`no-cache` does not forbid storage. It requires the browser to revalidate before
 it reuses a stored response. The ETag makes revalidating cheap: an unchanged payload now costs a
 304 and about 200 bytes, instead of the full payload, measured at 342,551 bytes on a live poll.
+
+`payloadEtag()` computes the tag, and it is not a plain hash of the body.
+It blanks `"cacheAge":N` to `"cacheAge":0` first.
+The tag then names the build rather than the moment somebody read it.
+
+That split shipped later than the rest, together with a repair to `cacheAge` itself.
+`cachedPayload()` merged its computed age to the right of the stored payload with the PHP `+`.
+That operator is left-biased, and the stored file already carries a `cacheAge` of `0`.
+So the computed value never survived, and every cached read reported `0` however long the file
+had sat. The status popover reads that field to name the source of a poll.
+It said `JPS` on every poll, including the ones a 5-minute file cache answered.
+
+Neither half was safe on its own, and the ETag is the reason.
+A frozen field cannot move a hash, so the tag held still only because the bug held it still.
+Repair `cacheAge` alone and a rising number changes the body every second.
+The tag then changes every second, and the 304 never fires again.
+
+Nothing errors. A validator that never matches is not a failure.
+It is a full 33 kB body on every poll, for as long as a reader keeps the tab open.
+
+`payloadEtag()` is a function apart from the header writing for one reason.
+`--selftest` can then call the rule rather than restate it.
+Five assertions cover it. `cacheAge does not move the ETag` is the one that keeps the 304 alive.
+Measured live: `cacheAge` moved from 147 s to 154 s, and the conditional poll still answered 304
+with 0 bytes.
+Any diagnostic added to this payload that moves without the data moving needs the same treatment.
 
 `sendPayload()` calls `payloadValidators()`. It answers a matching `If-None-Match` with 304, and
 otherwise echoes the body and exits. It compares the incoming header after a `trim()`, quotes
@@ -7997,3 +8023,92 @@ The control row is a 34px icon row, an 8px column gap, and a 25px range-pill row
 `#tlskel` carries a different padding of its own, 8px top and bottom.
 Its `.skel` needed 101 minus 16, or 85px, to match the same total.
 Replace this figure with a real browser measurement once someone takes one.
+
+## The rainfall heatmap claimed rain over 250 km² from one gauge
+
+A reader reported that the violet wash on the rainfall layer covered ground where no gauge
+reported rain. Measured on the payload it was reported from, this was correct. One gauge, JPS
+Ampang, read 19 mm/h. The blob it painted reached 9 km. Twenty other gauges stood inside that
+circle and every one of them read 0.0 mm. The nearest of the twenty was 1.6 km away.
+
+### Cause 1: a blob painted 1.8 times the distance the constant named
+
+`HEAT_KM` said 5 km. Three places treated 5 km as the size of a blob. The constant's own comment
+called it the ground size. `heatScale()` said it pins each blob to a fixed distance on the ground.
+`thinHeat()` dropped a weaker point within 5 km, on the claim that the stronger point's blob
+already covered it.
+
+The layer painted 9 km.
+
+simpleheat builds one sprite and stamps it at every point. `radius(t, i)` fills an arc of radius
+`t` and applies a shadow of blur `i` to it. It then sets `_r = t + i` and makes the sprite
+`2 * _r` across. So the painted circle reaches `radius + blur`, not `radius`. `heatScale()` gave
+`radius` the whole ground distance and then added `blur = radius * 0.8` on top of it. Every blob
+on both layers therefore reached 1.8 times its stated size, and the layer covered 3.24 times the
+area anyone had agreed to.
+
+`thinHeat()` under-reached by the same factor. It exists to stop overlapping blobs compositing
+their alpha, because both layers plot an intensity and two gauges reading 4 mm still means 4 mm.
+It dropped neighbours inside 5 km while the blobs reached 9 km, so any pair between those two
+distances still stacked. That is the same fault the function was written to fix, moved out one
+ring.
+
+`heatScale()` now splits the ground distance across the pair. `BLUR` is the blur as a fraction of
+the core, and the core is `distance / (1 + BLUR)`, so `radius + blur` is the distance by
+construction. Two numbers that must sum to a third are now derived from it rather than set beside
+each other. `HEAT_MAX_PX` also starts meaning what it says: the cap now bounds the sprite, where
+before the sprite was 1.8 times the cap.
+
+### Cause 2: rain borrowed the water layer's catchment radius
+
+The 5 km was chosen for water. Flooding is catchment scale, so one river gauge speaking for 5 km
+of catchment is a fair claim. The rain layer took `HEAT_KM` because it was there.
+
+Rain does not behave that way, and the payload can say so. Each rainfall station carries 12 hours
+of history at 15-minute buckets. Take every pair of the 211 gauges that hold history, and every
+time step where at least one of the pair was wet, and ask how often the other one was wet too.
+
+| separation | P(the other gauge is also wet) |
+|---|---|
+| 0–4 km | 24% |
+| 4–6 km | 13% |
+| 6–8 km | 9% |
+| 8–10 km | 8% |
+| 10–12 km | 6% |
+| 12 km and beyond | 4–6% |
+
+The last row is the background rate — how often any gauge is wet at all. So a wet gauge carries
+real information about 4 km of ground, half of it by 6 km, and none of it by 12 km. `RAIN_KM` is
+4 km on that measurement.
+
+The same reasoning already sits in `api.php` at `MET_KM`, which notes that a claim about the next
+three hours reaches much further than a claim about this moment. Rain here is the last rolling
+hour, and 4 km is what the gauges themselves report.
+
+`thinHeat()` now takes the distance as a parameter, and each layer is thinned at the distance it
+is painted at. Thinning rain at 4 km rather than 5 also keeps two readings that were being
+discarded.
+
+### What changed on screen
+
+Measured on the payload the report came from, 13 gauges reporting rain:
+
+| | blobs drawn | area painted | gauges under paint | of those, reporting no rain |
+|---|---|---|---|---|
+| before | 8 | 2,036 km² | 71 | 58 (82%) |
+| after | 10 | 503 km² | 31 | 18 (58%) |
+
+### What was not built
+
+**58% is not a defect left in place.** Rain over Klang Valley is genuinely that patchy. The
+measurement above says so directly. Even inside 4 km, three quarters of the neighbours of a wet
+gauge are dry. A radius small enough to drive that figure to zero is shorter than the distance a
+reading carries any information over. At that size the layer draws 233 dots.
+
+**No interpolation.** Two other designs were rejected. In the first, a dry gauge inside a blob
+shrinks it. In the second, the layer draws an inverse distance weighted field over all 233 gauges
+instead of one brush per point. Both replace a reading with a model, and this app draws readings.
+The heat layer states where the rain was observed, at the resolution the network observes it.
+
+**The water layer keeps 5 km.** Only its paint was wrong, not its number. A river level is a
+catchment claim and the catchment does not shrink because the brush was miscalculated.

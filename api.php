@@ -980,6 +980,20 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
        moved. A frame from ahead of now is not stale, so it stands. */
     $ok('a frame from the future stands',    shotFresh($now + 3600, $now) === $now + 3600);
 
+    echo "\npayloadEtag():\n";
+    /* Two reads of one build, one second apart. The bodies differ, and the ETag must not — this is
+       the assertion that keeps the 304 alive, and nothing on a live server would report its loss. */
+    $b1 = '{"fetched":"x","stations":[1,2],"cacheAge":0,"tookMs":40}';
+    $b2 = '{"fetched":"x","stations":[1,2],"cacheAge":287,"tookMs":40}';
+    $ok('cacheAge does not move the ETag',   payloadEtag($b1) === payloadEtag($b2));
+    $ok('a reading does move the ETag',
+        payloadEtag($b1) !== payloadEtag('{"fetched":"x","stations":[1,3],"cacheAge":0,"tookMs":40}'));
+    $ok('a rebuild moves the ETag',
+        payloadEtag($b1) !== payloadEtag('{"fetched":"y","stations":[1,2],"cacheAge":0,"tookMs":40}'));
+    // A body with no cacheAge at all hashes as itself, rather than failing the replace and the call.
+    $ok('a body without cacheAge still hashes', payloadEtag('{"a":1}') === '"' . md5('{"a":1}') . '"');
+    $ok('the ETag is quoted',                str_starts_with(payloadEtag($b1), '"'));
+
     echo "\nsirenWanted():\n";
     $sirens = [
         ['stationId' => 1, 'status' => 0],
@@ -1439,8 +1453,15 @@ function cachedPayload(): array {
     /* `forced` and `forceWhy` describe the request that built this file, not the one reading it.
        PHP's array + is left-biased, so the defaults sit on the LEFT to beat what the file holds.
        Every cached read passes through here, so no exit can replay a stale value. */
-    return ['forced' => false, 'forceWhy' => null] + $j
-         + ['cacheAge' => max(0, time() - strtotime($j['fetched'] ?? 'now'))];
+    /* `cacheAge` sits on the LEFT for the same reason, and it did not. The stored file already
+       carries a `cacheAge` of 0, written by the rebuild that made it, so a computed value on the
+       right lost to it on every read and this field reported 0 however long the payload had sat.
+       The status popover reads it to say whether a poll came from JPS or from the file cache, and
+       it therefore said JPS on every poll. See payloadEtag() for the half that had to move with
+       this one. */
+    return ['forced' => false, 'forceWhy' => null]
+         + ['cacheAge' => max(0, time() - strtotime($j['fetched'] ?? 'now'))]
+         + $j;
 }
 
 /**
@@ -1451,8 +1472,23 @@ function cachedPayload(): array {
  * drift from the others. A default written into one exit alone reached none of the others once
  * already, which is the `forced` flag gotcha in CLAUDE.md.
  */
+/* The ETag names the build, not the moment somebody read it.
+ *
+ * `cacheAge` counts up every second a payload sits in the file cache. Hash it and the validator
+ * moves on every poll, no two requests ever match, and the 304 stops firing — silently, because a
+ * validator that never matches is not an error, just a full 33 KB body every time. That is why the
+ * cacheAge repair above could not ship on its own: it was harmless only while the field was frozen
+ * at 0, and the ETag was stable only because of that.
+ *
+ * Blanked rather than cut, so the hash still depends on the field being there. A separate function
+ * from the header writing, so --selftest can call the rule rather than restate it.
+ */
+function payloadEtag(string $body): string {
+    return '"' . md5(preg_replace('/"cacheAge":\d+/', '"cacheAge":0', $body, 1)) . '"';
+}
+
 function payloadValidators(string $body): string {
-    $etag = '"' . md5($body) . '"';
+    $etag = payloadEtag($body);
     header('Cache-Control: no-cache');
     header('ETag: ' . $etag);
     return $etag;

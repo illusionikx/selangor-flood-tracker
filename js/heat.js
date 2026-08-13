@@ -2,7 +2,7 @@
 // Flooding is catchment-scale, so a hotspot should mean "this part of Selangor", not "this gauge",
 // and rain arrives over the same sort of area.
 
-import { HEAT_KM, HEAT_MAX_PX, HEAT_ALERT, HEAT_WARNING, RAIN_HEAT } from './config.js';
+import { HEAT_KM, RAIN_KM, HEAT_MAX_PX, HEAT_ALERT, HEAT_WARNING, RAIN_HEAT } from './config.js';
 import { PREFS } from './state.js';
 import { map } from './map.js';
 import { el } from './util.js';
@@ -10,6 +10,10 @@ import { el } from './util.js';
 // maxZoom is not a display limit — leaflet.heat divides every weight by 2^(maxZoom - zoom), so any
 // value inside our zoom range dims the blobs as you zoom out. 0 pins the factor at 1.
 const BASE = { radius: 70, blur: 55, maxZoom: 0 };
+
+// Blur as a fraction of the solid core. Only `heatScale()` may read it, and it must split the
+// ground distance by (1 + BLUR) — see the comment there for why the two cannot be set apart.
+const BLUR = 0.8;
 
 export const heat = L.heatLayer([], {
   ...BASE,
@@ -37,7 +41,10 @@ export const rainHeat = L.heatLayer([], {
   },
 });
 
-const layers = [heat, rainHeat];
+// Each layer with the ground distance one of its blobs is allowed to reach. They differ because the
+// two readings differ: a river level speaks for a catchment, an hour of rain speaks for a few
+// streets. See HEAT_KM and RAIN_KM in config.js for the measurement behind each number.
+const LAYERS = [[heat, HEAT_KM], [rainHeat, RAIN_KM]];
 
 /* leaflet.heat composites overlapping blobs, so N stations reporting the same thing paint something
    stronger than any of them reported. Density is the right model for "how many things are here";
@@ -53,33 +60,42 @@ const layers = [heat, rainHeat];
    Water is thinned too. It has one point on a calm day, so this changes nothing visible today — but
    the flaw is identical and only shows up once a lot of stations alert at once, which is the one
    moment the map has to be right.
+   `km` is the caller's blob size and must be the one the layer is drawn at, or the thinning reaches
+   a different distance from the paint and the stacking comes back in the ring between the two.
    ponytail: O(n·kept), 233 × 102 here — a fraction of a millisecond. Grid-index it if the network
    ever gets an order of magnitude denser. */
-export function thinHeat(points) {
+export function thinHeat(points, km = HEAT_KM) {
   const kept = [];
   for (const p of [...points].sort((a, b) => b[2] - a[2])) {
     const clash = kept.some(k =>
-      Math.hypot((k[1] - p[1]) * Math.cos(p[0] * Math.PI / 180), k[0] - p[0]) * 111 < HEAT_KM);
+      Math.hypot((k[1] - p[1]) * Math.cos(p[0] * Math.PI / 180), k[0] - p[0]) * 111 < km);
     if (!clash) kept.push(p);
   }
   return kept;
 }
 
-let fade = 1;   // extra dimming once the blob can no longer cover its ground distance
-
 // leaflet.heat sizes blobs in screen pixels, which makes them cover less ground the further you
 // zoom in. Recomputing the radius per zoom pins each blob to a fixed distance on the ground.
 function heatScale() {
-  if (!layers.some(l => map.hasLayer(l))) return;   // nothing to size while both layers are off
+  if (!LAYERS.some(([l]) => map.hasLayer(l))) return;   // nothing to size while both layers are off
   const c = map.getCenter();
-  const east = L.latLng(c.lat, c.lng + HEAT_KM / (111 * Math.cos(c.lat * Math.PI / 180)));
-  const px = Math.abs(map.latLngToLayerPoint(east).x - map.latLngToLayerPoint(c).x);
-  // Blur cost grows with the square of the radius, so the blob can't keep pace with HEAT_KM forever.
-  // Past the cap it would silently start covering less ground — a hotspot that means something
-  // different at each zoom. Fade it out over the next two zoom levels instead of lying about size.
-  const r = Math.max(10, Math.min(HEAT_MAX_PX, px));
-  fade = px <= HEAT_MAX_PX ? 1 : Math.max(0, 1 - Math.log2(px / HEAT_MAX_PX) / 2);
-  for (const l of layers) l.setOptions({ radius: r, blur: r * 0.8 });
+  for (const [l, km] of LAYERS) {
+    const east = L.latLng(c.lat, c.lng + km / (111 * Math.cos(c.lat * Math.PI / 180)));
+    const px = Math.abs(map.latLngToLayerPoint(east).x - map.latLngToLayerPoint(c).x);
+    // Blur cost grows with the square of the radius, so the blob can't keep pace with its ground
+    // distance forever. Past the cap it would silently start covering less ground — a hotspot that
+    // means something different at each zoom. Fade it out over the next two zoom levels instead of
+    // lying about size. The fade is per layer because the cap is, and the two sizes differ.
+    const wide = Math.max(10, Math.min(HEAT_MAX_PX, px));
+    l._fade = px <= HEAT_MAX_PX ? 1 : Math.max(0, 1 - Math.log2(px / HEAT_MAX_PX) / 2);
+    /* simpleheat paints a sprite `radius + blur` across, not `radius` — the arc is filled at
+       `radius` and the shadow that blurs it reaches `blur` further out. So the pair has to *sum*
+       to the ground distance. Handing `radius` the whole of it and adding 80% more as blur put
+       every blob 1.8× over its stated size: one gauge at 19 mm/h washed 250 km² of Kuala Lumpur
+       violet, over twenty gauges reporting nothing. Do not set these two apart from each other. */
+    const r = wide / (1 + BLUR);
+    l.setOptions({ radius: r, blur: r * BLUR });
+  }
   heatOpacity();
 }
 
@@ -88,7 +104,7 @@ function heatScale() {
 export function heatOpacity() {
   const pct = +el('heatOpacity').value;
   el('heatOpacityVal').textContent = pct + '%';
-  for (const l of layers) if (l._canvas) l._canvas.style.opacity = pct / 100 * fade;
+  for (const [l] of LAYERS) if (l._canvas) l._canvas.style.opacity = pct / 100 * (l._fade ?? 1);
 }
 
 /* Puts the map, the legend, the two chips and the section summary on `PREFS.heatLayer`. One string

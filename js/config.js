@@ -138,7 +138,16 @@ export const SPARK_H     = 12;     // hours on the graph's x axis
    nothing; raise it and they bunch up under the tick again, which is the bug it was picked to fix. */
 export const LEVEL_FLOOR = 6;
 
-export const HEAT_KM     = 5;      // ground size of one blob
+/* Ground size of one blob, as the distance the painted circle actually reaches — see `heatScale()`
+   in heat.js, which splits it into simpleheat's radius and blur rather than handing it to either.
+   Water is catchment scale, so one gauge speaks for 5 km of it.
+   Rain is not. Measured on 211 gauges over 12 hours of history: given one gauge is wet, the chance
+   its neighbour is wet too runs 24% out to 4 km, halves to 13% by 6 km, and is back to the 5%
+   background rate by 12 km. So a rain claim carries about 4 km and no more. The same reasoning set
+   MET_KM in api.php, which notes that a claim about this moment reaches far less far than a claim
+   about the next three hours. Rain here is the last rolling hour. */
+export const HEAT_KM     = 5;      // water level
+export const RAIN_KM     = 4;      // rainfall
 /* Heat weight is a position on the threshold scale, not a fraction of danger. The popup meter's
    piecewise slots (alert 38%, warning 68%, danger 100%) key straight into the gradient, so a blob's
    colour names the band a station crossed. The floor is the alert slot: below its first published

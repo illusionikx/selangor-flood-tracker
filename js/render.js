@@ -1,6 +1,6 @@
 // Rebuilds every marker and the heat layer from the current station set.
 
-import { KINDS, MAST, HEAT_FLOOR, RAIN_STOPS } from './config.js';
+import { KINDS, MAST, HEAT_FLOOR, HEAT_KM, RAIN_KM, RAIN_STOPS } from './config.js';
 import { state, PREFS, save } from './state.js';
 import { el, color, dkey, atDanger, statusColor, leads, hasInfo, isIgnored, ignoredIds,
          favIds, isFav, scalePos, levelStops, gaugeStops } from './util.js';
@@ -187,8 +187,9 @@ export function render() {
 
   syncCluster();
   // Thinned, not raw: overlapping blobs composite, and these are intensities rather than counts.
-  heat.setLatLngs(thinHeat(points));
-  rainHeat.setLatLngs(thinHeat(rainPoints));
+  // Each at the distance its own layer paints, or the thinning and the paint disagree.
+  heat.setLatLngs(thinHeat(points, HEAT_KM));
+  rainHeat.setLatLngs(thinHeat(rainPoints, RAIN_KM));
   syncHeat();   // layers + legend follow the chips; see heat.js
   counts();
   districts();
