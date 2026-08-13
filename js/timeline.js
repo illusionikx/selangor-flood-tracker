@@ -17,6 +17,7 @@
 import { el, isIgnored } from './util.js';
 import { byId } from './stations.js';
 import { camWarn } from './popup.js';
+import { askJson } from './ask.js';
 
 /* Named windows rather than a free zoom. The retention tiers mean the archive is *already* a set of
    resolutions — half-hourly for a day, then 3-hourly, then 12-hourly, then weekly — so a continuous
@@ -557,10 +558,22 @@ export async function openTimeline(src) {
   liveSrc = src;
   let rows = [];
   try {
-    rows = await (await fetch(`api.php?shots=${id}`)).json();
-  } catch { rows = []; }
+    rows = await askJson(`api.php?shots=${id}`, { tries: 2, ms: 15000 });
+  } catch {
+    /* null is not []. An empty array is a camera with no stored frames, which is a fact about the
+       archive. null is this client failing to ask, which is a fact about the connection. Drawing
+       the second as the first tells a reader the camera has no history when it may have a year of
+       it. That is the same rule the weather parser follows: an unknown marker is dropped, never
+       read as clear weather. */
+    rows = null;
+  }
   // Still the camera we opened? An impatient close-and-open-another beats a slow fetch otherwise.
-  if (cam !== id || !Array.isArray(rows)) return;
+  if (cam !== id) return;
+  /* `null` is this client failing to ask. `[]` is a camera with no stored frames. The first gets a
+     line, because a reader looking at an empty player otherwise cannot tell which happened. The
+     second draws nothing, which is what it has always drawn. */
+  el('tlfail').hidden = rows !== null;
+  if (!Array.isArray(rows)) return;
   /* Rows are [ts, tier, stationId]. A bare number is the shape this endpoint returned before the
      tiers landed, and a response cached for its 60 seconds can still be that old — so read both
      rather than blank the scrubber for a minute after every deploy. */
@@ -625,6 +638,8 @@ export function reset() {
   paintSpeed();
   setCompare(false);
   tl.hidden = true;
+  // A failure on one camera must not follow the reader to the next.
+  el('tlfail').hidden = true;
   stage.style.removeProperty('--ab');
   box.querySelector('.btime').textContent = '';
 }

@@ -1438,6 +1438,11 @@ body.finding #find { display: none; }
    with a stylus paired, an Android browser in desktop mode) fell through to a permanent black bar
    sitting on the photograph with no pointer able to dismiss it. A misread here now costs a footer,
    which is merely plainer. */
+/* Said only when this client failed to ask. An archive with no frames is a fact about the camera
+   and draws nothing, exactly as it did before. A failed request is a fact about the connection.
+   Stating that as "no frames" claims a camera has no history when it may hold a year of it. */
+#tlfail { margin: 0; padding: 10px 12px; text-align: center; color: var(--muted); font-size: 13px; }
+#tlfail[hidden] { display: none; }
 #tl {
   display: grid; gap: 2px; justify-items: center; width: 100%;
   padding: 10px 0 2px; line-height: 1.4;

@@ -32,7 +32,7 @@
 <link rel="stylesheet" href="vendor/fonts.css?v=49">
 <link rel="stylesheet" href="css/icons.css?v=84">
 <link rel="stylesheet" href="css/base.css?v=113">
-<link rel="stylesheet" href="css/chrome.css?v=155">
+<link rel="stylesheet" href="css/chrome.css?v=156">
 <link rel="stylesheet" href="css/map.css?v=147">
 
 <!-- Water tint for the dark basemap. CARTO's dark_all is greyscale — all 18 of its tones have zero
@@ -124,6 +124,9 @@
            frame was the same height whether or not anyone was using it, and the picture is the thing
            people came to look at. Hidden unless this camera has an archive — a scrubber over one frame
            is furniture, and that is also what the static build gets, where nothing was ever stored. -->
+      <!-- Said only when this client failed to ask for the archive. An empty archive draws nothing,
+           exactly as it always has. -->
+      <p id="tlfail" hidden>Could not load the archive.</p>
       <div id="tl" hidden>
         <!-- The seek bar runs the full width. Compare used to sit on its line and took a button's
              width off it — the one control here that is dragged, shortened for one that is pressed. -->
