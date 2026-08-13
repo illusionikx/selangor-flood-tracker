@@ -699,16 +699,58 @@ Add the import at the top of `js/timeline.js`:
 import { askJson } from './ask.js';
 ```
 
-- [ ] **Step 3: Make every reader of `rows` handle null**
+- [ ] **Step 3: Give the failure somewhere to be said**
 
-Read every line you recorded in Step 1. For each one that assumes `rows` is an array, decide what it
-must do when the value is `null`, and write it.
+`js/timeline.js` guards with `if (cam !== id || !Array.isArray(rows)) return;` directly below the
+fetch. So `null` already takes a different branch from `[]`, one line earlier. **But both outcomes
+look identical to a reader**, because neither sets `tl.hidden = false`, and the lightbox holds no
+surface that says anything. That is the defect: the two states are already distinct in the code and
+indistinguishable on screen.
 
-The rule is this. An empty archive draws whatever it draws today. A failed request must not claim the camera
-has no frames. Where the code has words to show, say `Could not load the archive.` — sentence case,
-no plumbing words. Where it has only a control, leave that control as it was. Do not reset it to an empty archive.
+`.hintbox` is `aria-hidden` and belongs to the gesture hint, so it is not that surface. Add one.
 
-Report each site you changed and what you chose for it.
+In `index.html`, directly above `<div id="tl" hidden>`, add:
+
+```html
+<p id="tlfail" hidden>Could not load the archive.</p>
+```
+
+In `css/chrome.css`, add:
+
+```css
+/* Said only when this client failed to ask. An archive with no frames is a fact about the camera
+   and draws nothing, exactly as it did before. A failed request is a fact about the connection.
+   Stating that as "no frames" claims a camera has no history when it may hold a year of it. */
+#tlfail { margin: 0; padding: 10px 12px; text-align: center; color: var(--muted); font-size: 13px; }
+#tlfail[hidden] { display: none; }
+```
+
+Bump the `?v=` on `css/chrome.css` in `index.html`.
+
+In `js/timeline.js`, replace the guard line:
+
+```js
+  if (cam !== id || !Array.isArray(rows)) return;
+```
+
+with:
+
+```js
+  if (cam !== id) return;
+  /* `null` is this client failing to ask. `[]` is a camera with no stored frames. The first gets a
+     line, because a reader looking at an empty player otherwise cannot tell which happened. The
+     second draws nothing, which is what it has always drawn. */
+  el('tlfail').hidden = rows !== null;
+  if (!Array.isArray(rows)) return;
+```
+
+Find where the lightbox resets between cameras, in `reset()` in the same file or wherever `tl.hidden`
+goes back to true, and hide `#tlfail` there too. A failure on one camera must not follow the reader
+to the next. Report the line you added and where you put it.
+
+Check whether `js/timeline.js` already imports `el`. Add the import if it does not.
+
+Report each site you changed.
 
 - [ ] **Step 4: Check the modules and the types**
 
