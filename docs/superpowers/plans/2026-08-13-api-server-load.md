@@ -522,11 +522,20 @@ mv .cams.json .cams.json.off
 curl -sk -o /dev/null -w 'no map, falls back to .cache.json: %{http_code}\n' "https://flood-exp.test/api.php?cam=1272"
 mv .cams.json.off .cams.json
 curl -sk -o /dev/null -w 'unknown id must be 404: %{http_code}\n' "https://flood-exp.test/api.php?cam=999999"
-curl -sk -o /dev/null -w 'array cast must not be 200: %{http_code}\n' "https://flood-exp.test/api.php?cam[]=1"
+curl -sk "https://flood-exp.test/api.php?cam[]=1" | head -c 4 | od -c | head -1
+curl -sk -o /dev/null -w 'path traversal must be 404: %{http_code}\n' "https://flood-exp.test/api.php?cam=../../etc/passwd"
 ```
 
-Expected: `200`, then `404`, then `404`. The second line is the rule that this endpoint never
-proxies a URL it was handed. A `200` on the third line means the integer cast was lost.
+Expected: `200`, then `404`. The second line is the rule that this endpoint never proxies a URL it
+was handed.
+
+The third line prints JPEG magic bytes, `377 330 377 340`, and no PHP warning. That is the whole
+test. `(int)` on a non-empty array is 1, so `?cam[]=1` asks for camera 1 and gets camera 1. The
+guarantee is that the cast stays silent, not that the request fails. A `(string)` cast would print
+`Warning: Array to string conversion` into the response body. See the array-cast gotcha in
+`CLAUDE.md`.
+
+The fourth line must be `404`. A `200` there means the integer cast was lost.
 
 - [ ] **Step 8: Commit**
 
