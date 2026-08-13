@@ -7737,20 +7737,30 @@ The service worker plays no part here. `sw.js` returns without calling `respondW
 
 ## Every client-side JSON fetch now goes through one wrapper
 
-Five places in the browser called `fetch()` directly: the payload poll, the force-refresh
-button, the place search, the camera wall tiles, and the lightbox archive fetch. Each one wrote
-its own timeout, its own retry, and its own error text. Plain `fetch()` gave none of the three.
+Four places in the browser ask this server for JSON: the payload poll, the force-refresh button,
+the place search, and the lightbox archive fetch. None of them set a timeout, checked the status,
+or retried, and `fetch()` supplies none of the three by itself. A hung worker therefore left the
+splash screen waiting with nothing to end it.
+
+`js/ask.js` gives all four one timeout, one status check and one retry. `AbortSignal.timeout()` is
+native, so no controller is wired up.
+
+A fifth `fetch()` stays bare on purpose. `js/map.js` loads `water.json` and swallows its own
+failure, because a map without the rivers is a plainer map rather than a broken one.
+
+The camera wall is not on that list. Its tiles are `<img>` elements, and a browser loading an image
+makes no `fetch()` call.
 
 ### `js/ask.js` adds three things
 
-`askJson(url, opts)` now carries every one of those five requests. It adds three things
+`askJson(url, opts)` now carries every one of those four requests. It adds three things
 `fetch()` does not do on its own.
 
 - A timeout, through `AbortSignal.timeout()`. Plain `fetch()` waits forever on a hung worker.
 - A throw on any status outside 200 to 299. Plain `fetch()` resolves on a 500. Calling
   `r.json()` on an HTML error page then throws a message written for a browser vendor.
-- One retry, on a network fault or a timeout. A single dropped packet used to cost a red status
-  dot for the rest of the five-minute poll window.
+- One retry, on a network fault, a timeout, or a 5xx status. A single dropped packet used to
+  cost a red status dot for the rest of the five-minute poll window.
 
 The payload poll passes no `cache` option. The server sends an `ETag`. An unchanged poll then
 costs a 304 and about 200 bytes. `cache: 'no-store'` skips that check and forces a full fetch
@@ -7760,7 +7770,7 @@ whole point of that button.
 ### The camera wall reads the archive, not a live still
 
 Each tile on the camera wall now loads `api.php?shot=<id>`, the newest stored frame. Before this
-change it loaded `api.php?cam=<id>`, a live fetch that reaches JPS on every request.
+change it loaded `api.php?cam=<id>`, a live request that reaches JPS every time the tile loads.
 
 Measured on one tile: the archive route answers in about 0.07 seconds and 186 KB. The live route
 takes about 0.83 seconds and 275 KB. Ninety tiles on one page used to multiply that live cost by
