@@ -697,7 +697,7 @@ if (isset($_GET['shot'])) {
            feed, and from there to the No picture panel if that is dead too. The `&t=` form is
            unaffected: it names one exact frame and a reader asking for a specific past moment is
            entitled to it however old it is. */
-        if ($t && time() - $t > SHOT_FRESH) $t = 0;
+        $t = shotFresh($t, time());
     }
     $f = $id > 0 && $t > 0 ? shotFile($id, $t) : null;
     if (!$f) { http_response_code(404); exit; }
@@ -783,6 +783,14 @@ function shotCache(bool $exact): string {
     return $exact
         ? 'public, max-age=31536000, immutable'
         : 'public, max-age=900';
+}
+
+/* The age ceiling on the newest-frame route, as a function so --selftest can reach the shipped rule.
+ * It returns the timestamp to serve, and 0 for "answer 404". Written inline first, which left the
+ * check restating the arithmetic instead of calling it: `SHOT_FRESH - 60 <= SHOT_FRESH` is true
+ * however this route behaves. A rule a test cannot call is a rule the test cannot guard. */
+function shotFresh(int $t, int $now): int {
+    return $t && $now - $t > SHOT_FRESH ? 0 : $t;
 }
 
 /**
@@ -959,10 +967,18 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
     $ok('a stamp from the future is allowed',    forceAllowed($now, $now + 3600)[0] === true);
     $ok('the window is honored when passed',     forceAllowed($now, $now - 10, 5)[0] === true);
 
-    echo "\nSHOT_FRESH:\n";
+    echo "\nshotFresh():\n";
     $ok('the ceiling is two capture cycles', SHOT_FRESH === 2 * SHOT_EVERY);
-    $ok('a frame inside the ceiling stands',  ($now - ($now - SHOT_FRESH + 60)) <= SHOT_FRESH);
-    $ok('a frame past the ceiling does not',  ($now - ($now - SHOT_FRESH - 60)) > SHOT_FRESH);
+    $ok('a frame inside the ceiling stands', shotFresh($now - SHOT_FRESH + 60, $now) === $now - SHOT_FRESH + 60);
+    $ok('a frame on the ceiling stands',     shotFresh($now - SHOT_FRESH, $now) === $now - SHOT_FRESH);
+    $ok('a frame past the ceiling is 404',   shotFresh($now - SHOT_FRESH - 60, $now) === 0);
+    $ok('a frame from this second stands',   shotFresh($now, $now) === $now);
+    /* An empty archive is 0 already, and 0 must stay 0 rather than become "no ceiling applied".
+       shotList() returning [] is what puts it there. */
+    $ok('an empty archive stays 404',        shotFresh(0, $now) === 0);
+    /* A stamp in the future is the same hazard forceAllowed() guards above: a clock we do not own
+       moved. A frame from ahead of now is not stale, so it stands. */
+    $ok('a frame from the future stands',    shotFresh($now + 3600, $now) === $now + 3600);
 
     echo "\nsirenWanted():\n";
     $sirens = [
