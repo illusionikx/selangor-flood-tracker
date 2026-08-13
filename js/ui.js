@@ -11,7 +11,6 @@ import { camWarn } from './popup.js';
 import { render, districts } from './render.js';
 import { alerts, toggleAlerts } from './alerts.js';
 import { ticker } from './ticker.js';
-import { openTimeline, reset } from './timeline.js';
 import { load, feedRows, sourceRows, lastPayload } from './net.js';
 import { askJson } from './ask.js';
 import { lazy } from './lazy.js';
@@ -27,6 +26,16 @@ import './sparktip.js';   // side effect only: one delegated readout for every g
 let tableMod, wallMod;
 const withTable = fn => (tableMod ??= import('./table.js')).then(fn, err => { tableMod = null; throw err; });
 const withWall  = fn => (wallMod  ??= import('./wall.js')).then(fn, err => { wallMod  = null; throw err; });
+
+/* The third of these, the same shape for the same two reasons. Registration order survives a
+   deferred import, and a failed import clears the entry so a later open can retry.
+   `.then(fn, onImportFailed)` rather than a trailing `.catch`: a rejection handler passed as the
+   second argument sees only the import failing, so a real bug inside the player still surfaces. */
+let tlMod;
+const withTimeline = fn => (tlMod ??= import('./timeline.js')).then(fn, err => {
+  tlMod = null;
+  console.warn('timeline.js did not load', err);
+});
 
 // --- theme ---------------------------------------------------------------------------------------
 
@@ -1216,7 +1225,7 @@ warnBox.onclick = e => { if (e.target === warnBox) warnBox.close(); };
 // Two ways in: the still inside a popup, and the table's "show image" button, which has no <img>
 // to click — it names the camera id and builds the same proxied URL.
 const lightbox = el('lightbox');
-document.addEventListener('click', e => {
+document.addEventListener('click', async e => {
   /* Resolve any click inside a `.shotwrap` to that wrapper's still. The warning glyph is a sibling
      of the img and takes its own pointer events, so a tap on it used to hit nothing at all — and on
      a phone it covered a corner of the picture it was warning about. It also needs a touch
@@ -1271,7 +1280,9 @@ document.addEventListener('click', e => {
   // and `.stage` is exactly the frame.
   if (c) lightbox.querySelector('.player').insertAdjacentHTML('beforeend', camWarn(c));
   lightbox.showModal();
-  openTimeline(src);   // no-op unless this is a proxied camera with an archive behind it
+  /* The picture opens first and the player follows. The frame is already on screen, so the reader
+     sees the camera at once and the controls arrive under it. */
+  await lazy(() => withTimeline(m => m.openTimeline(src)), el('lightbox'));
 });
 /* A dead camera stops the spinner too — a spinner that never ends reads as "still trying".
    `naturalWidth`, not which event fired: a frame that failed leaves the image at 0×0, and `.stage`
@@ -1288,7 +1299,9 @@ lbShot.onload = lbShot.onerror = () => {
 // exemption any more — that was the price of the old tap-anywhere overlay, which could not tell a
 // dismissal from a scrub, a play or a drag on the compare divider.
 lightbox.onclick = e => { if (e.target === lightbox) lightbox.close(); };
-lightbox.addEventListener('close', reset);
+/* A wrapper, because `reset` is no longer a binding. It shares `withTimeline` with the opener, so a
+   close registered while the module is still loading still runs after the open. */
+lightbox.addEventListener('close', () => withTimeline(m => m.reset()));
 
 // --- splash ------------------------------------------------------------------------------------------
 

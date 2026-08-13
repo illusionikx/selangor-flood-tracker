@@ -43,6 +43,7 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `js/clip.js` | the station panel's 3-hour camera clip — no controls, that is the lightbox's job |
 | `js/toast.js` | desktop-only "new alert since last poll" toast |
 | `js/test.js` | test mode: fakes a flood in the client's copy of the payload |
+| `js/lazy.js` | `lazy()` — loads a deferred module and drives `aria-busy` for its skeleton |
 | `js/net.js` | `load()` poll loop and the status dot on the logo |
 | `js/ui.js` | all DOM wiring: drawer, filters, chips, panels, lightbox, delegated jumps |
 | `js/wall.js` | the camera wall: every camera on one page, one timer for all of them |
@@ -1176,6 +1177,22 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   when a caller asks for it, so the payload poll must call it with no `cache` option at all. The
   force-refresh button sets `no-store` on purpose, because defeating the cache is the whole point
   of that one button.
+- **The `modulepreload` list has no build step, and it drifts silently.** `index.html` lists every
+  module the browser fetches on landing. A person edits that list by hand. Add a static import and
+  forget the line. The page still works, but the browser discovers that module one round trip
+  late. Remove a static import and leave the line, and the browser fetches a module landing no
+  longer needs. Neither mistake throws an error or shows on the page. The Verify block in this
+  file checks the list against `ls js/*.js`, and skips the five deferred modules by name. Run it
+  after every change to an import or to this list.
+- **A loading skeleton takes its state from `aria-busy` on the dialog. It takes its look from
+  `.skel` in `css/base.css`. Do not invent a second version of either.** `lazy()` sets
+  `aria-busy="true"` on the box passed to it, and clears it once the module resolves or fails.
+  Each surface gets its own placement class — `.skelrows`, `.skeltiles`, `#tlskel`. It draws only
+  while that attribute reads true. Each one wraps a plain `.skel` for the shimmer. `.skel` holds
+  the one animation and the one gradient. A second shimmer class, styled to match by eye, drifts
+  from the first the day the palette moves. That already happened once, in the wall's own
+  `camskel`, before this shared shape replaced it. Add a new deferred panel by adding a placement
+  rule and a `.skel` child. Do not add a new shimmer.
 ## Conventions
 
 - **Anything that alerts is checked against the alert design standard** in

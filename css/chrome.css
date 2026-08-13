@@ -1469,6 +1469,12 @@ body.finding #find { display: none; }
    Stating that as "no frames" claims a camera has no history when it may hold a year of it. */
 #tlfail { margin: 0; padding: 10px 12px; text-align: center; color: var(--muted); font-size: 13px; }
 #tlfail[hidden] { display: none; }
+/* Holds the control bar's box while js/timeline.js arrives. `#tl` sits in the flow on touch and
+   under 601px, so an absent bar shifts the picture when the real one lands. Only drawn while
+   lazy() holds `aria-busy` on the dialog. */
+#tlskel { display: none; }
+#lightbox[aria-busy="true"] #tlskel { display: block; padding: 8px 12px; }
+#tlskel .skel { display: block; height: 85px; }
 #tl {
   display: grid; gap: 2px; justify-items: center; width: 100%;
   padding: 10px 0 2px; line-height: 1.4;

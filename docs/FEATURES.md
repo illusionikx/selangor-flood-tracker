@@ -7805,3 +7805,143 @@ like an empty archive: no scrubber, no line of text, and no way to tell the two 
 archive." only when `rows` is `null`. An empty archive still draws nothing, exactly as before.
 `reset()` hides `#tlfail` between cameras. A failure on one camera must not follow the reader to
 the next.
+
+## Five panel-only modules now load on demand, not on landing
+
+Five modules used to load with every visit, whether or not the reader ever opened the surface each one drives.
+`js/table.js` and `js/wall.js` serve two dialogs.
+`js/clip.js` serves the station panel's camera preview.
+`js/test.js` serves a mode most visits never enter.
+`js/timeline.js` serves the lightbox scrubber.
+Together they measured 44.2 KB gzipped, out of about 160 KB of JS the page loaded before this work.
+Landing now loads about 116 KB.
+Each module still loads in full.
+It loads the first time a reader opens the surface it drives, not before.
+
+Sizes, gzipped over the wire, measured with curl against the running site:
+
+| module | size | surface |
+|---|---|---|
+| `js/table.js` | 9.4 KB | the all-stations table dialog |
+| `js/wall.js` | 9.7 KB | the camera wall dialog |
+| `js/clip.js` | 4.5 KB | the station panel's camera clip |
+| `js/test.js` | 5.5 KB | test mode |
+| `js/timeline.js` | 15.4 KB | the lightbox scrubber, the largest of the five |
+
+Every module import graph in this app is static except these five.
+The other eighteen modules still reach the page through ordinary `import` statements.
+`index.html` still preloads all eighteen with `<link rel="modulepreload">`.
+See the gotcha in `CLAUDE.md` about that list.
+The five stay out of both.
+A `modulepreload` link for one of them fetches that module on landing again.
+That is the exact cost this work removes.
+
+### `js/lazy.js` runs one job for every deferred module
+
+`lazy(load, box)` calls `load()`, and sets `aria-busy="true"` on `box` while the import is in flight.
+It clears the attribute once the import settles, in a `finally`, so a failed import cannot leave a box shimmering forever.
+It rethrows the error, because the caller owns the surface and knows what to draw in it.
+
+The 150 ms delay before `aria-busy` lands is the reason this function exists at all, not an afterthought.
+A warm same-origin import of a 9 KB to 15 KB module takes 10 ms to 40 ms.
+That holds once the browser has the file cached from a first load.
+A skeleton that appears and then vanishes inside 20 ms reads as a flicker, not as loading.
+Under 150 ms this function draws nothing.
+Past it, a reader has already started to notice a wait, and the shimmer is already there to answer it.
+
+### Each deferred module keeps one cached promise, not a bare `import()`
+
+`js/ui.js` holds `withTable`, `withWall` and, as of this task, `withTimeline`.
+`js/map.js` holds `withClip` the same way.
+Each wraps one specifier in a module-level variable:
+
+```js
+let tlMod;
+const withTimeline = fn => (tlMod ??= import('./timeline.js')).then(fn, err => {
+  tlMod = null;
+  console.warn('timeline.js did not load', err);
+});
+```
+
+Two things this buys back, both lost by a bare `import('./x.js').then(fn)` at each call site.
+
+First, registration order.
+A promise runs its callbacks in the order a caller attaches them.
+An open and a close registered on the same deferred module keep that order.
+They keep it even while the import is still in flight.
+A bare `import()` per call site raced two separate promises instead.
+A fast open-then-close on the table or the wall left the opener running last, behind an already-closed dialog.
+
+Second, a working retry.
+A dynamic import caches its rejection per specifier for the life of the page.
+A failed import handled with a plain `.catch()` stays failed forever, because the next call reuses the same rejected promise.
+Clearing the module-level variable on failure makes the next call issue a fresh `import()` instead.
+Every one of these four does this.
+
+`withTable` and `withWall` rethrow on failure.
+A table row or a wall tile has its own `loadfail` banner to draw, and needs to know the import failed.
+`withTimeline` does not rethrow.
+The lightbox has already opened on the picture by the time it asks for the module.
+A failed import there is not fatal to the surface — the reader still has a still image to look at.
+It logs a warning and lets the picture stand with no scrubber under it.
+It does not fail the click that opened the lightbox.
+
+### `render()` keeps its two deferred calls synchronous
+
+`js/render.js` runs on every poll, and two lines in it read a deferred module:
+
+```js
+if (el('dataBox').open) import('./table.js').then(m => m.dataTable());
+if (el('camBox').open) import('./wall.js').then(m => m.paint());
+```
+
+Both use `.then()`, not `await`, and `render()` itself stays a synchronous function.
+A dialog can only be open because its own opener already called `withTable` or `withWall` once.
+That means the module is already in the browser's module map.
+A poll that reaches these two lines finds it there already, with no network request behind it.
+Making `render()` `async` to `await` these two calls costs nothing on the network.
+It still moves every line after each one into a later microtask, on every poll.
+That cost falls on two calls that never actually wait for anything.
+
+### Task 6: the lightbox scrubber
+
+`js/timeline.js` was the last of the five and the largest, at 15.4 KB gzipped.
+It binds five listeners at module scope, on the stage, the transport buttons and the seek bar.
+That happens the first time anything imports it, not on landing.
+Those listeners target `#lightbox`, `#tl` and `#tlscrub`, all static markup, so the lookups still resolve once the module runs.
+`openTimeline()` is only reachable off the resolved module object.
+By the time a reader can call it, the listener setup has already finished.
+
+Two call sites in `js/ui.js` needed different fixes.
+The opener, a `document.addEventListener` delegated click handler, called `openTimeline(src)` directly and needed nothing more than the `withTimeline` wrapper, behind `lazy()`:
+
+```js
+await lazy(() => withTimeline(m => m.openTimeline(src)), el('lightbox'));
+```
+
+The handler is now `async`.
+Nothing in it runs after this line — it is the handler's last statement.
+The second site, `lightbox.addEventListener('close', reset)`, passed `reset` itself as a callback.
+A dynamic import hands back a module object, not the bindings inside it.
+Once the static import is gone, there is no `reset` to pass.
+It now passes a small wrapper instead:
+
+```js
+lightbox.addEventListener('close', () => withTimeline(m => m.reset()));
+```
+
+`#tl`, the control bar, sits in the page flow under the picture on touch devices and at widths under 601px.
+Only a hover-capable pointer at 601px or wider lifts it into an absolute overlay on top of the frame.
+In flow, an absent bar during the import shifts the picture up when the real bar lands under it.
+`#tlskel`, a plain box holding one `.skel` shimmer, now sits where `#tl` will render.
+It reserves that height while `lazy()` holds `aria-busy` on `#lightbox`.
+
+That height came from reading `#tl`'s own rules, not from a browser measurement.
+No browser was available while this task ran.
+At a 390px-wide dialog — narrow enough that `#tl`'s own `@container (max-width: 520px)` query stacks `.tlctl` into two rows — the bar totals 101px.
+That is 12px of its own padding, a 20px seek bar, and a 2px grid gap.
+Then comes a 67px stacked control row.
+The control row is a 34px icon row, an 8px column gap, and a 25px range-pill row.
+`#tlskel` carries a different padding of its own, 8px top and bottom.
+Its `.skel` needed 101 minus 16, or 85px, to match the same total.
+Replace this figure with a real browser measurement once someone takes one.
