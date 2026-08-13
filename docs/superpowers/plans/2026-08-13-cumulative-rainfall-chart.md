@@ -4,7 +4,7 @@
 
 **Goal:** Draw rain totals for five nested windows — 1 hour, 3 hours, today, 24 hours, 72 hours — as horizontal bars under the rain area graph on a station card and in the table popover.
 
-**Architecture:** `api.php` computes all five totals and publishes them as one `acc` blob per rainfall station. Three come straight off a JPS feed. Two come from differencing `cumulativeRainfall`, a year-to-date odometer stored as its own series in the existing `level` table. The client draws what it is handed and calculates nothing.
+**Architecture:** `api.php` computes all five totals and publishes them as one `acc` blob per rainfall station. Three come straight off a JPS feed. Two come from differencing `cumulativeRainfall`, a year-to-date odometer stored as its own series in the existing `level` table. The client draws these numbers and calculates nothing.
 
 **Tech Stack:** PHP 8 with pdo_sqlite, ES modules with no build step, plain CSS. No new dependency on either side.
 
@@ -18,7 +18,7 @@
 - **An asterisk marks any value this app worked out.** None on a value read from a feed.
 - **A window with no honest answer publishes `null`.** Never a zero, never a short sum.
 - **Prose rules:** active voice, one instruction per sentence, 20 words maximum, no semicolons, no contractions, American spelling. Check any file you write with `python "C:/Users/illus/.claude/ste-lint.py" < FILE`.
-- **`?v=` bump:** touching any file in `css/` requires bumping that file's `?v=` in `index.html`.
+- **`?v=` bump:** touching any file in `css/` requires a bump to the `?v=` for that file in `index.html`.
 - **Commit style:** the subject states the finding, not the change. See `git log`.
 
 ## File Structure
@@ -164,7 +164,7 @@ Inside the `--selftest` block in `api.php`, after the `stationUpdated():` group 
 php -l api.php && php api.php --selftest
 ```
 
-Expected: the two new groups print, every line reads `ok`, and the block's final total reports no failures.
+Expected: the two new groups print, every line reads `ok`, and the final total reports no failures.
 
 - [ ] **Step 5: Prove the assertions can fail**
 
@@ -336,7 +336,7 @@ foreach ($p["stations"] as $s) {
 
 Expected: every rainfall station carries `acc`, no `hour3` or `cumulative` leaked into the payload, `h1` and `day` hold numbers, `h24` and `h72` are `null` on this first run because the `#c` series starts empty.
 
-- [ ] **Step 6: Confirm the odometer is being stored**
+- [ ] **Step 6: Confirm the odometer reaches the table**
 
 ```bash
 php -r '
@@ -345,7 +345,7 @@ $r = $db->query("SELECT COUNT(*) n, COUNT(DISTINCT station) s FROM level WHERE s
 echo "odometer rows {$r["n"]} across {$r["s"]} stations\n";'
 ```
 
-Expected: about 193 rows across 193 stations after one poll. **`h24` and `h72` stay `null` for 24 and 72 hours** while the series fills. `cumulativeRainfall` has never been sampled and cannot be backfilled, so this wait is unavoidable.
+Expected: about 193 rows across 193 stations after one poll. **`h24` and `h72` stay `null` for 24 and 72 hours** while the series fills. Nothing has ever sampled `cumulativeRainfall`, and the `hourly` history cannot fill it in, so nobody can shorten this wait.
 
 - [ ] **Step 7: Commit**
 
@@ -634,7 +634,13 @@ EOF
 
 - [ ] **Step 1: Append to `docs/FEATURES.md`**
 
-Add a section covering: the five windows and why nested windows answer different questions; the three totals the feed already published and nobody read; the odometer and why a difference beats a sum; the asterisk rule; and the three rejected threshold sources with the 1.7-year against 216-year measurement. Point at the spec for the full record.
+Add a section covering five things. Point at the spec for the full record.
+
+1. The five windows, and why nested windows answer different questions.
+2. The three totals the feed already published and nobody read.
+3. The odometer, and why a difference beats a sum.
+4. The asterisk rule.
+5. The three rejected threshold sources, with the 1.7 year against 216 year measurement.
 
 - [ ] **Step 2: Update `CLAUDE.md`**
 
@@ -667,7 +673,7 @@ for f in js/*.js; do
 done
 ```
 
-Expected: both lints clean, both checks green, every source reporting a non-zero `parsed`, and no missing `modulepreload` line. No new module was added, so that last check should stay silent.
+Expected: both lints clean, both checks green, every source reporting a non-zero `parsed`, and no missing `modulepreload` line. This plan adds no module, so that last check stays silent.
 
 - [ ] **Step 5: Commit**
 
@@ -697,10 +703,10 @@ EOF
 
 ## Self-Review
 
-**Spec coverage.** Goal and both surfaces are Task 4. The five windows and their sources are Task 2. The odometer, its two guards and `ACC_READ` are Tasks 1 and 2. The KL 3 hour fallback with its all-or-nothing rule is Tasks 1 and 2. The asterisk rule and the single footnote line are Tasks 2 and 3. The empty state, the scale rule and `data-tip` are Task 3. Stale stations are Task 4. The checks list is Task 1, less the stale assertion, which is a DOM condition rather than arithmetic and is verified in Task 4 Step 5. Every item in "Not built" is satisfied by omission.
+**Spec coverage.** Goal and both surfaces are Task 4. The five windows and their sources are Task 2. The odometer, its two guards and `ACC_READ` are Tasks 1 and 2. The KL 3 hour fallback with its all-or-nothing rule is Tasks 1 and 2. The asterisk rule and the single footnote line are Tasks 2 and 3. The empty state, the scale rule and `data-tip` are Task 3. Stale stations are Task 4. The checks list is Task 1, less the stale assertion, which is a DOM condition rather than arithmetic. Task 4 Step 5 verifies that one. Every item in "Not built" stays unbuilt.
 
 **Placeholders.** None. Every code step carries the code and every check step carries its command and expected output.
 
 **Type consistency.** `accWindow()` returns `[mm, spanHours]` and Task 2 unpacks it as `$w[0]` and `$w[1]`. `accHours()` returns a float and Task 2 uses it directly. The payload row is `[mm, derived, spanHours]` in Task 2 and destructured in that order in Task 3. `ACC_ROWS` pairs are `[key, label]` in Task 3 and mapped in that order.
 
-**One known gap, stated rather than hidden.** `h24` and `h72` publish `null` for every station for the first 24 and 72 hours after Task 2 ships. `cumulativeRainfall` has never been sampled and no backfill is possible from the `hourly` history. Task 2 Step 6 says so and the empty state already covers it.
+**One known gap, stated rather than hidden.** `h24` and `h72` publish `null` for every station for the first 24 and 72 hours after Task 2 ships. Nothing has ever sampled `cumulativeRainfall`, and the `hourly` history cannot fill it in. Task 2 Step 6 says so, and the empty state already covers it.
