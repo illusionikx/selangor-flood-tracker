@@ -1431,6 +1431,13 @@ echo count(array_filter($p["stations"],fn($s)=>($s["met"]["km"]??0)>$k))," beyon
 # Which warnings survive the geography filter, and how many the feed offered.
 curl -sk https://flood-exp.test/api.php | php -r '$p=json_decode(stream_get_contents(STDIN),true);
 foreach($p["warnings"] as $w) echo substr($w["title"],0,70),"\n";'
+
+# Every module must carry a modulepreload link, except the five loaded on demand. There is no build
+# step to generate that list, so it goes stale silently when somebody adds a module.
+for f in js/*.js; do
+  case $(basename $f) in timeline.js|table.js|wall.js|test.js|clip.js) continue;; esac
+  grep -q "modulepreload\" href=\"$f\"" index.html || echo "MISSING modulepreload: $f"
+done
 ```
 
 There is otherwise no test suite. Changes are verified by linting, syntax-checking the modules,
