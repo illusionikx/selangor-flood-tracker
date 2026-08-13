@@ -26,6 +26,17 @@ if (session_status() === PHP_SESSION_ACTIVE) session_write_close();
    the requires leaves the one failure most likely to greet a fresh checkout uncovered. */
 $fatalJson = function (): void {
     if (headers_sent()) return;
+    /* Discard whatever is buffered first. This host serves with `display_errors=1` and
+       `html_errors=1`, so PHP writes an HTML "Fatal error" fragment into the buffer the moment a
+       non-exception fatal fires, which is before this runs. Left in place, the body is that
+       fragment with a JSON object glued to its end, and a client can parse neither.
+       Nothing buffered at this point is worth keeping. Either it is that fragment, or it is a
+       payload this request will never finish writing. `headers_sent()` above is what protects a
+       response that already went out: a payload is about 340 KB against a 4096 byte buffer, so it
+       has long since flushed and this returns before reaching here.
+       A catchable Error takes a different path. `set_exception_handler` intercepts it before PHP's
+       display path runs, so that case was already clean and stays clean. */
+    while (ob_get_level() > 0) ob_end_clean();
     header('Content-Type: application/json');
     http_response_code(500);
     echo json_encode(['error' => 'server error']);
