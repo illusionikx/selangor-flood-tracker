@@ -638,17 +638,24 @@ if (isset($_GET['shots'])) {
     exit;
 }
 
-/* ?shot=<id>&t=<unix> — one stored frame. Both parameters are cast to int before they touch the
-   filesystem, so the path cannot be steered outside SHOTS: the same rule as ?cam=, which never
-   proxies a URL it was handed. A stored frame never changes, so it is immutable for a year. */
 if (isset($_GET['shot'])) {
-    $id = (int)$_GET['shot'];
-    $t  = (int)($_GET['t'] ?? 0);
-    $f  = $id > 0 && $t > 0 ? shotFile($id, $t) : null;
+    $id    = (int)$_GET['shot'];
+    $exact = isset($_GET['t']);
+    $t     = (int)($_GET['t'] ?? 0);
+    /* No timestamp means the newest stored frame. shotList() returns them oldest first, so the
+       newest one is the last entry. The camera wall asks this way: it wants a picture from the
+       archive rather than a live fetch at JPS, and it has no frame list to pick from.
+       `$exact` is read from whether the caller supplied `t`, never from the resolved value. A
+       caller that sent `t=0` asked for an exact frame and gets a 404, not the newest one. */
+    if ($id > 0 && !$exact) {
+        $all = shotList($id);
+        $t   = $all ? end($all) : 0;
+    }
+    $f = $id > 0 && $t > 0 ? shotFile($id, $t) : null;
     if (!$f) { http_response_code(404); exit; }
     // A frame is stored in whichever format was smaller, so the type comes off the file we found.
     header('Content-Type: ' . (str_ends_with($f, '.webp') ? 'image/webp' : 'image/jpeg'));
-    header('Cache-Control: public, max-age=31536000, immutable');
+    header('Cache-Control: ' . shotCache($exact));
     readfile($f);
     exit;
 }
@@ -712,6 +719,22 @@ function sirenWanted(array $list, bool $sweep): array {
 function stationUpdated(array $fg, array $sn, string $kind, int $id, array $seen): ?string {
     return $fg['statusLastUpdate'] ?? $sn['statusLastUpdate']
         ?? ($kind === 'siren' ? ($seen["siren-$id"] ?? null) : null);
+}
+
+/**
+ * The Cache-Control for one frame response.
+ *
+ * `?shot=<id>&t=<unix>` names an exact frame. A stored frame never changes once written, so a year
+ * is honest.
+ *
+ * `?shot=<id>` with no timestamp names whichever frame is newest. Those bytes change every
+ * SHOT_EVERY, so `immutable` there is a promise this server cannot keep. 900 is half of
+ * SHOT_EVERY, which is the reasoning ?sheet= already states for the strip.
+ */
+function shotCache(bool $exact): string {
+    return $exact
+        ? 'public, max-age=31536000, immutable'
+        : 'public, max-age=900';
 }
 
 /**
@@ -1322,6 +1345,17 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
     $ok('a west coast warning matches',    count(metWarnings(json_encode([$wc]), $wnow)) === 1);
     $ok('pantai barat matches too',        count(metWarnings(json_encode([$wcBm]), $wnow)) === 1);
     $ok('a peninsula wide warning still drops', metWarnings(json_encode([$pen]), $wnow) === []);
+
+    echo "\nshotCache():\n";
+    /* The two forms of ?shot= mean different things and must not share a header. `&t=` names one
+       frame that never changes again, so a year is honest. The no timestamp form names whichever
+       frame is newest, and that changes every SHOT_EVERY. A browser holding the second for a year
+       keeps a stale picture with nothing to tell it so. */
+    $ok('an exact frame is immutable',     str_contains(shotCache(true), 'immutable'));
+    $ok('an exact frame lasts a year',     str_contains(shotCache(true), 'max-age=31536000'));
+    $ok('the newest frame is never immutable', !str_contains(shotCache(false), 'immutable'));
+    $ok('the newest frame lasts 900s',     str_contains(shotCache(false), 'max-age=900'));
+    $ok('900 is half of SHOT_EVERY',       900 === (int)(SHOT_EVERY / 2));
 
     echo $fail ? "\n$fail FAILED\n" : "\nall ok\n";
     exit($fail ? 1 : 0);
