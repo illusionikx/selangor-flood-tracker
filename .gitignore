@@ -7,5 +7,6 @@ lib/
 .force.stamp
 .place.stamp
 .place.lock
+.siren.stamp
 shots/
 .superpowers/

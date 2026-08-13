@@ -47,6 +47,14 @@ const RISE_ETA   = 3;     // hours to its own danger mark
 const RISE_DAY = 86400;
 // Sirens report a daily heartbeat (most stamp 08:00). Two missed days is out of contact, not idle.
 const SIREN_STALE = 48 * 3600;
+/* How often every siren refreshes `statusLastUpdate`. The list carries the status, so a quiet
+   siren needs its detail only to keep that timestamp current. Two things read it: the SIREN_STALE
+   check above, and the stamp on every siren sample in `.history.db`.
+   One hour, not six. The siren history pass stamps each sample from this field, and the
+   `(station, ts)` primary key drops a repeated stamp. A six hour value therefore folds six hours of
+   samples into one row. It also spends 12.5% of the 48 hour budget before the check above runs. */
+const SIREN_TTL   = 3600;
+const SIREN_STAMP = __DIR__ . '/.siren.stamp';
 /* Range from a siren to the river that siren watches. JPS sounds a siren at the Amaran mark, so the
    alarm is a claim about a level we already hold. A 1 with no high river behind it is a stuck relay.
    Measured: 194 of 212 sirens have a river inside 5 km, 133 inside 2 km, 9 have none inside 10 km.
@@ -597,6 +605,30 @@ if (isset($_GET['sheet'])) {
 }
 
 /**
+ * Which sirens need a detail call this rebuild.
+ *
+ * The list carries `status`, and this file already reads the status from there. A detail call adds
+ * one field, `statusLastUpdate`, so a quiet siren needs one only to keep that timestamp current.
+ * That costs 212 calls every five minutes, which is 61,056 requests a day for a daily heartbeat.
+ *
+ * A siren that claims to be sounding is fetched every rebuild, so an alarm loses no latency at all.
+ * The rest ride the SIREN_TTL sweep.
+ *
+ * @param array $list  the StationSirens list, as the feed publishes it
+ * @param bool  $sweep true when the SIREN_TTL window has elapsed
+ * @return array the stationId values to fetch
+ */
+function sirenWanted(array $list, bool $sweep): array {
+    $out = [];
+    foreach ($list as $s) {
+        // A missing status is quiet. The feed publishes the field on every row measured, and a row
+        // without one is not evidence of an alarm.
+        if ($sweep || (int)($s['status'] ?? 0) !== 0) $out[] = $s['stationId'];
+    }
+    return $out;
+}
+
+/**
  * May a forced refresh run now?
  *
  * @param int      $now       unix seconds
@@ -769,6 +801,23 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
        readTs() guards on a JPS reading: a clock we do not own moved. */
     $ok('a stamp from the future is allowed',    forceAllowed($now, $now + 3600)[0] === true);
     $ok('the window is honored when passed',     forceAllowed($now, $now - 10, 5)[0] === true);
+
+    echo "\nsirenWanted():\n";
+    $sirens = [
+        ['stationId' => 1, 'status' => 0],
+        ['stationId' => 2, 'status' => 1],
+        ['stationId' => 3],
+    ];
+    $ok('a sweep asks for every siren',      sirenWanted($sirens, true) === [1, 2, 3]);
+    $ok('no sweep asks only the loud one',   sirenWanted($sirens, false) === [2]);
+    $ok('a missing status counts as quiet',  !in_array(3, sirenWanted($sirens, false), true));
+    $ok('an all quiet list asks for none',   sirenWanted([['stationId' => 9, 'status' => 0]], false) === []);
+    $ok('an empty list asks for none',       sirenWanted([], true) === []);
+    /* The sweep window reuses forceAllowed(), the same way the place lookup reuses it at
+       PLACE_EVERY. A stamp older than SIREN_TTL opens the sweep. */
+    $ok('an hour old stamp opens a sweep',   forceAllowed($now, $now - SIREN_TTL, SIREN_TTL)[0] === true);
+    $ok('a fresh stamp keeps it shut',       forceAllowed($now, $now - 60, SIREN_TTL)[0] === false);
+    $ok('no stamp at all opens a sweep',     forceAllowed($now, null, SIREN_TTL)[0] === true);
 
     echo "\nserveFromCache():\n";
     $ok('a fresh cache is served',                 serveFromCache(10, true, false) === true);
@@ -1380,8 +1429,17 @@ $detailUrls = [];
 foreach ($rainfallList as $s) $detailUrls["rf-{$s['stationId']}"] = API . 'StationRainfalls/' . $s['stationId'];
 foreach ($riverList as $s)    $detailUrls["wl-{$s['stationId']}"] = API . 'StationRiverLevels/' . $s['stationId'];
 foreach ($get('CCTVS') as $s) $detailUrls["cam-{$s['stationId']}"] = API . 'CCTVS/' . $s['stationId'];
-// Sirens are fetched purely for `statusLastUpdate`; the list carries no timestamp of any kind.
-foreach ($get('StationSirens') as $s) $detailUrls["sn-{$s['stationId']}"] = API . 'StationSirens/' . $s['stationId'];
+/* Sirens are fetched for `statusLastUpdate` alone. The list carries the status itself, so only a
+   siren that claims to be sounding needs a detail every rebuild. The rest refresh on SIREN_TTL.
+   The stamp is written whether or not the sweep found anything, so a rebuild that reaches here
+   always moves the window. Compare the page cache rule in this file: never leave a row unable to
+   advance its own timestamp. */
+$sirenLast  = is_file(SIREN_STAMP) ? (int)file_get_contents(SIREN_STAMP) : null;
+$sirenSweep = forceAllowed(time(), $sirenLast, SIREN_TTL)[0];
+if ($sirenSweep) @file_put_contents(SIREN_STAMP, (string)time(), LOCK_EX);
+foreach (sirenWanted($get('StationSirens'), $sirenSweep) as $sid) {
+    $detailUrls["sn-$sid"] = API . 'StationSirens/' . $sid;
+}
 foreach ($get('StationFloodGauges') as $s) $detailUrls["fg-{$s['stationId']}"] = API . 'StationFloodGauges/' . $s['stationId'];
 $now = time();
 
