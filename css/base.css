@@ -547,6 +547,22 @@ dialog:focus, dialog:focus-visible { outline: none; }
   font-size: 10px; font-variant-numeric: tabular-nums; white-space: nowrap;
 }
 
+/* The rainfall accumulation chart: five nested windows as horizontal bars. A grid rather than a
+   flex row, so the labels line up down one column and the numbers down another whatever any of them
+   holds, and the bar takes what is left. Bars rather than an SVG, because five values need no plot
+   area, no axis and no path. */
+.acc { margin: 6px 0 2px; }
+.accrow {
+  display: grid; grid-template-columns: 58px 1fr auto;
+  align-items: center; gap: 8px; min-height: 20px;
+}
+.acck { color: var(--muted); font-size: 12px; }
+.accbar { height: 8px; border-radius: 4px; background: var(--hover); overflow: hidden; }
+/* Rainfall violet, the kind colour. Never a status hue: this bar says how much, not how bad. */
+.accbar i { display: block; height: 100%; border-radius: 4px; background: var(--k-rainfall); }
+.accv { font-size: 12px; font-variant-numeric: tabular-nums; }
+.accv sup { color: var(--muted); }
+
 /* The hover readout — see js/sparktip.js for why it is a popover and not a plain fixed box. Being
    one means undoing the browser's own defaults for a dialog it expects to centre on the screen. */
 /* It sits on the page's own surface, not inverted onto it: dark ink on paper in the light theme,

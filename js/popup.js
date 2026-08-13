@@ -2,7 +2,8 @@
 // status footer. The same meter/state blocks are reused by the alert panel.
 
 import { KINDS, SOURCES, SPARK_H, NO_INFO, ALERT_TITLE, RIVER_COLOR, RAIN_COLOR,
-         GAUGE_COLOR, RAIN_STOPS, NEAR_MAX_KM, camSrc, WEATHER, MET_NAME } from './config.js';
+         GAUGE_COLOR, RAIN_STOPS, NEAR_MAX_KM, camSrc, WEATHER, MET_NAME,
+         ACC_ROWS } from './config.js';
 import { num, ago, noSec, parseMY, distKm, hasInfo, isStale, statusColor, scalePos,
          levelStops, gaugeStops, gaugeColor, color, isFav } from './util.js';
 import { nearestOf, nearestCam, nearestLevel, camAlert } from './stations.js';
@@ -988,4 +989,44 @@ export function rainBars(points) {
     ${axisHtml(ticks)}
     <div class="muted">Peak ${hi} mm in an hour · last ${spanText(secs)}</div>
   </div>`;
+}
+
+/* Rain totalled over five nested windows, as horizontal bars.
+
+   This answers how much rain fell. It never answers how dangerous that is. `rainBars()` directly
+   above already draws the JPS intensity classes across its plot, and `rainState()` above that
+   prints the word — so this card answers the severity question twice before these bars start.
+   There is deliberately no threshold mark here. Three sources were tried for one and each failed a
+   different way, which the spec records in full:
+   docs/superpowers/specs/2026-08-12-cumulative-rainfall-chart-design.md
+   Anything proposing a fourth has to answer that section first.
+
+   A window with no honest answer keeps its row and draws an em dash, so the five are always in the
+   same place and nobody has to work out which one went missing. An asterisk marks a total this app
+   worked out rather than read off a feed. */
+export function rainAcc(acc) {
+  if (!acc) return '';
+  const rows = ACC_ROWS.map(([k, label]) => [label, acc[k]]);
+  if (!rows.some(([, r]) => r)) return '';
+  // The scale is the largest total, so the widest bar always fills the width. With no mark to hold,
+  // the axis needs no other rule.
+  const hi = Math.max(...rows.map(([, r]) => r ? r[0] : 0));
+  if (!hi) return '<div class="muted">No rain in the last 72 hours</div>';
+
+  const star = rows.some(([, r]) => r && r[1]);
+  const row = ([label, r]) => {
+    if (!r) return `<div class="accrow"><span class="acck">${label}</span>
+      <span class="accbar"></span><span class="accv muted">—</span></div>`;
+    const [mm, derived, span] = r;
+    /* The measured span rides in the readout rather than on the row. It answers "why does this say
+       24 hours when the archive has a hole in it", which is a question you go looking for, not
+       something to read at a glance. */
+    const tip = `${label} · ${mm} mm${span ? ` · measured over ${span} h` : ''}`;
+    return `<div class="accrow" data-tip="${tip}"><span class="acck">${label}</span>
+      <span class="accbar"><i style="width:${(mm / hi * 100).toFixed(1)}%"></i></span>
+      <span class="accv">${mm} mm${derived ? '<sup>*</sup>' : ''}</span></div>`;
+  };
+
+  return `<div class="acc">${rows.map(row).join('')}${
+    star ? '<div class="muted">* Value derived from archived readings.</div>' : ''}</div>`;
 }

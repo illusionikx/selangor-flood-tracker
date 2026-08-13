@@ -220,3 +220,15 @@ export const WEATHER = [
   { icon: 'rainy',       word: 'Rain',  line: 'Rain' },
   { icon: 'rainy_heavy', word: 'Heavy', line: 'Heavy rain' },
 ];
+
+/* The five windows of the rainfall accumulation chart, in the order they are drawn.
+   Each window contains the one above it, so the bars normally grow down the list. There is one
+   exception and it is real: near midnight "Today" is younger than "3 hours", because at 01:00 today
+   holds one hour of rain and the 3 hour window reaches back into yesterday. The dip stays. */
+export const ACC_ROWS = [
+  ['h1',  '1 hour'],
+  ['h3',  '3 hours'],
+  ['day', 'Today'],
+  ['h24', '24 hours'],
+  ['h72', '72 hours'],
+];
