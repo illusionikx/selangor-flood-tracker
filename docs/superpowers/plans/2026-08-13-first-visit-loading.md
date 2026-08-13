@@ -617,16 +617,41 @@ clip playing behind a closed card."
 - Consumes: `lazy()` from `js/lazy.js`.
 - Produces: nothing.
 
-Five call sites across three files. Two of them are inside `render()`, which runs on every poll.
+**Eight call sites across three files, not five.** Two are inside `render()`, which runs on every
+poll. One assigns the function as a reference rather than calling it, and that one needs different
+treatment from all the others.
 
-- [ ] **Step 1: Read all five sites**
+| site | shape |
+|---|---|
+| `js/ui.js` table opener | `dataTable()` inside a handler |
+| `js/ui.js` `el('dataFind').oninput = dataTable` | **a direct function reference, not a call** |
+| `js/ui.js` wall opener | `wall.open()` inside a handler |
+| `js/ui.js` `camBox.onclose = () => wall.close()` | inside a handler |
+| `js/ui.js` `wall.count(shown)` | inside the filter handler |
+| `js/render.js` | `dataTable()` guarded on `dataBox.open` |
+| `js/render.js` | `wall.paint()` guarded on `camBox.open` |
+| `js/locate.js` | `dataTable()` guarded on `dataBox.open` |
+
+**The reference assignment is the one to get right.** `el('dataFind').oninput = dataTable;` stores
+the function itself. A dynamic import gives you a module object, not a binding, so there is nothing
+to assign. It becomes a wrapper that loads on each keystroke and resolves from the module map after
+the first:
+
+```js
+/* A wrapper, not the function itself. `dataTable` is no longer a static binding, so there is
+   nothing to assign here. The dialog cannot be open unless its opener already imported the module,
+   so this resolves from the module map with no request on every keystroke after the first. */
+el('dataFind').oninput = () => import('./table.js').then(m => m.dataTable());
+```
+
+- [ ] **Step 1: Read all eight sites**
 
 ```bash
 cd d:/Herd/flood-exp
 grep -n "dataTable\|wall\." js/ui.js js/render.js js/locate.js
 ```
 
-Record every line.
+Record every line. The count must be eight. If you find more, report them before changing anything.
 
 - [ ] **Step 2: Add the skeleton markup**
 
