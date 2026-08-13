@@ -55,11 +55,25 @@ function setWater(on) {
        draws rivers and ponds the basemap omits, which is decoration over a map that already works,
        so it can arrive late. requestIdleCallback yields to anything the browser would rather do
        first, and the setTimeout is the fallback for Safari, which does not implement it. */
-    const later = window.requestIdleCallback || (fn => setTimeout(fn, 1200));
-    later(() => fetch('water.json')
-      .then(r => r.ok ? r.json() : Promise.reject(r.status))
-      .then(g => { waterGeo = g; if (isDark()) setWater(true); })
-      .catch(() => {}));   // No water is a plainer map, not a broken one. Every reading still draws.
+    /* Called as a method on `window`, never lifted off it. `requestIdleCallback` is a `Window`
+       operation, so invoking a detached reference gives it the wrong receiver and it throws. That
+       throw would land during module evaluation, because applyTheme() runs at the top level of
+       js/ui.js, which js/app.js imports statically. So a dark theme reader would lose the whole
+       app, not just the water. Safari has no requestIdleCallback, hence the timer. */
+    const later = fn => window.requestIdleCallback
+      ? window.requestIdleCallback(fn)
+      : setTimeout(fn, 1200);
+    try {
+      later(() => fetch('water.json')
+        .then(r => r.ok ? r.json() : Promise.reject(r.status))
+        .then(g => { waterGeo = g; if (isDark()) setWater(true); })
+        .catch(() => {}));
+    } catch {
+      /* Nothing about the water may take the app down. This runs inside module evaluation, so an
+         exception here stops js/ui.js and with it everything js/app.js does. A plainer map is the
+         documented outcome of a water failure, and that has to hold for a synchronous throw too,
+         not only for a rejected fetch. */
+    }
     return;
   }
 
