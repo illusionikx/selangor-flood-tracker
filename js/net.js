@@ -8,6 +8,7 @@ import { alerts } from './alerts.js';
 import { alertToast } from './toast.js';
 import { ticker } from './ticker.js';
 import { seedTest } from './test.js';
+import { askJson } from './ask.js';
 
 /* A dot on the mark. It answers one question — is what I am looking at current? — and every extra
    clause was answering a question nobody had asked yet ("upstream down — showing cache" is two facts
@@ -101,10 +102,12 @@ export async function load() {
       slower = setTimeout(() => say('Still waiting on JPS. The first load reads every station, '
         + 'water level, rain gauge and camera. This can take up to 20 seconds.'), 8000);
     }
-    const r = await fetch(FEED);
+    /* A longer budget on the first load than on a poll. A cold rebuild measured 36.5 s, and a
+       server kept warm by cron answers in 0.08 s. No `cache` option: the server sends an ETag, so
+       an unchanged poll is a 304 of about 200 bytes, and `no-store` would throw that away. */
+    const j = await askJson(FEED, { ms: first ? 45000 : 20000 });
     clearTimeout(slow); clearTimeout(slower);
     if (first) say('Reading water levels, rainfall, sirens and cameras…');
-    const j = await r.json();
     if (!j.stations) throw new Error(j.error || 'HTTP ' + r.status);
     state.data = j.stations;
     // Read before network()/alerts()/ticker() run below, in the same order every poll takes.

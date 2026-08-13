@@ -15,6 +15,7 @@ import { ticker } from './ticker.js';
 import { openTimeline, reset } from './timeline.js';
 import { load, feedRows, sourceRows, lastPayload } from './net.js';
 import { paintTestChrome } from './test.js';
+import { askJson } from './ask.js';
 import * as wall from './wall.js';
 import './sparktip.js';   // side effect only: one delegated readout for every graph on the page
 
@@ -92,8 +93,11 @@ el('devForce').onclick = async () => {
   b.disabled = true;
   el('devMsg').textContent = 'Refreshing…';
   try {
-    const r = await fetch(FEED + (FEED.includes('?') ? '&' : '?') + 'force=1', { cache: 'no-store' });
-    const j = await r.json();
+    /* `no-store` stays here. This button exists to defeat the cache, and that is the one place
+       where doing so is right. One try: a reader who pressed a button watches the result, and the
+       rate limit behind ?force=1 counts every arrival. */
+    const j = await askJson(FEED + (FEED.includes('?') ? '&' : '?') + 'force=1',
+                            { cache: 'no-store', tries: 1 });
     // The dialog can close while the fetch is in flight. onclose already cleared #devMsg for the
     // next session, and a result landing after that must not write into it.
     if (aboutBox.open) el('devMsg').textContent = j.forced
@@ -765,22 +769,23 @@ async function lookup(q) {
   pstate = 'Searching…';
   search();
   try {
-    const r = await fetch(`api.php?place=${encodeURIComponent(q)}`, { cache: 'no-store' });
-    const j = await r.json();
+    /* One try only. Nominatim allows one request a second, and this proxy is the only thing holding
+       that line. A retry would spend a second lookup on a reader who asked once. */
+    const j = await askJson(`api.php?place=${encodeURIComponent(q)}`,
+                            { cache: 'no-store', tries: 1, ms: 15000 });
     if (my !== gen) return;
     places = j.places || [];
-    pstate = places.length ? ''
-      : r.status === 429 ? 'Too many searches just now — try again in a moment'
-      // 400 is placeQuery() rejecting the query outright — too long, or invalid UTF-8 — and is a
-      // problem with what the reader typed, not with reaching JPS or Nominatim. Reporting it as
-      // "unavailable" blames this site's plumbing for the reader's own input.
-      : r.status === 400 ? 'That search is too long — try a shorter place name.'
-      : r.ok ? 'No place by that name in Selangor, Kuala Lumpur or Putrajaya'
-      : 'Place search is unavailable';
-  } catch {
+    pstate = places.length ? '' : 'No place by that name in Selangor, Kuala Lumpur or Putrajaya';
+  } catch (e) {
     if (my !== gen) return;
     places = [];
-    pstate = 'Place search is unavailable';
+    /* askJson() throws on any status outside 200 to 299, so the two messages that used to read
+       `r.status` read `e.status` here instead. Both name something the reader can act on. 400 is
+       placeQuery() rejecting the query outright, which is a problem with what the reader typed and
+       not with reaching Nominatim. Calling that "unavailable" blames this site for their input. */
+    pstate = e.status === 429 ? 'Too many searches just now — try again in a moment'
+      : e.status === 400 ? 'That search is too long — try a shorter place name.'
+      : 'Place search is unavailable';
   }
   /* search() unshifts one row per place onto the very front of `hits` — "Results lead the list" in
      the comment above that call — which moves every row already in the list back by places.length,
