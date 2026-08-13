@@ -158,6 +158,10 @@ const CACHE = __DIR__ . '/.cache.json';
 const CAM_TTL  = 300;
 const CAM_DIR  = __DIR__ . '/.cam';
 const CAM_URLS = __DIR__ . '/.cams.json';
+/* How long a stale still may stand in for a live one when the fetch fails. An upstream blip should
+   cost a slightly old picture rather than the No picture panel. An upstream that stays down must
+   not leave a frame of any age on screen with nothing saying so. */
+const CAM_STALE = 3600;
 const LOCK  = __DIR__ . '/.refresh.lock';   // held for the length of a rebuild; see below
 const HIST  = __DIR__ . '/.history.db';
 const READ  = 86400;         // seconds of history loaded per poll (trend + sparkline)
@@ -330,6 +334,21 @@ function camUrl(int $id): ?string {
     return null;
 }
 
+/**
+ * Is this body a picture?
+ *
+ * A status code cannot decide what a body is. JPS answers a maintenance window with a short HTML
+ * notice under HTTP 200, which is why pageHasData() guards the scraped pages in this file. Here the
+ * cost is higher: an unchecked body is written to disk, served for CAM_TTL, and then offered again
+ * as the stale fallback. One bad response becomes a standing failure.
+ *
+ * getimagesizefromstring() returns false for anything that is not an image, so it answers the
+ * question directly rather than guessing from a length or a header.
+ */
+function camImageOk(string $body): bool {
+    return $body !== '' && @getimagesizefromstring($body) !== false;
+}
+
 // ?cam=<id> streams a CCTV still. Upstream advertises these over plain http, which an https page
 // can't load, so we fetch server-side. Only ids we already hold a URL for — never an arbitrary URL.
 if (isset($_GET['cam'])) {
@@ -356,11 +375,11 @@ if (isset($_GET['cam'])) {
        timeout on every other still. Prefer TLS. Fall back to what upstream advertised. */
     $try = fn($u) => fetchAll([$u], 1, false)[$u] ?? '';
     $img = $try(preg_replace('#^http://#i', 'https://', $url)) ?: $try($url);
-    if ($img === '') {
-        /* Serve a stale still rather than a broken picture. The archive is a year of pictures and
-           this cache is five minutes of them, so an upstream blip costs a slightly old frame
-           instead of the videocam_off panel on every tile at once. */
-        if ($hit && is_file($hit)) {
+    if (!camImageOk($img)) {
+        /* Serve a recent stale still rather than a broken picture. Bounded by CAM_STALE: a blip
+           costs a slightly old frame, and an outage falls through to the failure panel the client
+           already draws for a dead camera. */
+        if ($hit && is_file($hit) && time() - filemtime($hit) < CAM_STALE) {
             header('Content-Type: image/jpeg');
             header('Cache-Control: max-age=60');
             readfile($hit);
@@ -375,7 +394,7 @@ if (isset($_GET['cam'])) {
     if ($hit) {
         @mkdir(CAM_DIR, 0777, true);
         $tmp = $hit . '.' . getmypid();
-        if (file_put_contents($tmp, $img, LOCK_EX) !== false) rename($tmp, $hit);
+        if (file_put_contents($tmp, $img, LOCK_EX) === false || !@rename($tmp, $hit)) @unlink($tmp);
     }
     header('Content-Type: image/jpeg');
     /* 300s = POLL_MS in js/config.js and CAM_TTL above. All three move together. */
@@ -2103,7 +2122,9 @@ foreach ($stations as $s) {
     }
 }
 $camTmp = CAM_URLS . '.' . getmypid();
-if (file_put_contents($camTmp, json_encode($camMap), LOCK_EX) !== false) rename($camTmp, CAM_URLS);
+if (file_put_contents($camTmp, json_encode($camMap), LOCK_EX) === false || !@rename($camTmp, CAM_URLS)) {
+    @unlink($camTmp);
+}
 
 file_put_contents(CACHE, $payload, LOCK_EX);
 echo $payload;
