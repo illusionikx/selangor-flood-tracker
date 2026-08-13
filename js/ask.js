@@ -26,17 +26,15 @@ export async function askJson(url, { ms = 20000, tries = 2, cache } = {}) {
     if (i) await new Promise(r => setTimeout(r, 400));
     try {
       const r = await fetch(url, { signal: AbortSignal.timeout(ms), ...(cache ? { cache } : {}) });
-      if (!r.ok) {
-        const err = Object.assign(new Error(`HTTP ${r.status}`), { status: r.status });
-        // A 404 or a 400 will not become a 200 on a second try, and the rate limiter behind
-        // ?place= counts every arrival. Give up at once on anything the server answered clearly.
-        if (r.status < 500) throw err;
-        last = err;
-        continue;
-      }
-      return await r.json();
+      if (r.ok) return await r.json();
+      last = Object.assign(new Error(`HTTP ${r.status}`), { status: r.status });
+      /* `break`, not `throw`. A throw here lands in this function's own catch one line below, which
+         sets `last` and lets the loop run again — so a 404 cost two requests and a 400 ms wait
+         before failing. A 4xx will not become a 2xx on a second try, and the rate limiter behind
+         ?place= counts every arrival. `throw last` below then raises the error this sets. */
+      if (r.status < 500) break;
     } catch (e) {
-      // AbortSignal.timeout() rejects with a TimeoutError. Retrying that is the point.
+      // A network fault or an AbortSignal.timeout() rejection. Retrying either is the point.
       last = e;
     }
   }
