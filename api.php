@@ -17,6 +17,25 @@ require_once __DIR__ . '/shots.php';     // the camera archive: capture, retenti
    correct on a machine it does not own. */
 if (session_status() === PHP_SESSION_ACTIVE) session_write_close();
 
+/* A fatal after the first header() sends an HTML error page under a JSON content type, so a client
+   that asked for JSON gets a parse error rather than something it can act on. The ?place= handler
+   already carries this guard for its own route. This covers every route, including the payload,
+   which is every poll this page makes.
+   Both handlers refuse to write once the body has started. A payload already on the wire must not
+   gain a JSON object glued to its end, and captureShots() runs after that point on every sixth
+   poll. A truncated payload the client can report is better than a corrupted one it cannot. */
+$fatalJson = function (): void {
+    if (headers_sent()) return;
+    header('Content-Type: application/json');
+    http_response_code(500);
+    echo json_encode(['error' => 'server error']);
+};
+set_exception_handler(function (Throwable $e) use ($fatalJson) { $fatalJson(); });
+register_shutdown_function(function () use ($fatalJson) {
+    $e = error_get_last();
+    if ($e && in_array($e['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR], true)) $fatalJson();
+});
+
 const API   = 'https://infobanjirjps.selangor.gov.my/JPSAPI/api/';
 const TTL   = 300;   // upstream updates hourly; 5 min is plenty
 const SCRAPE_TTL = 900;  // scraped HTML pages: slow to render, and updated no faster than this
