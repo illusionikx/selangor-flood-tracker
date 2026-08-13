@@ -198,10 +198,13 @@ export function render() {
   // replaced. Only while it is open — no point rendering 435 rows into a closed dialog.
   /* `.then()`, not `await`. A dialog can only be open because its opener already imported the
      module, so these resolve from the module map with no request. Making render() async would move
-     everything after it into a later task on every poll. */
-  if (el('dataBox').open) import('./table.js').then(m => m.dataTable());
+     everything after it into a later task on every poll.
+     A rejection handler on both: this runs on every poll, has no surface to report a failure on,
+     and a bare `import().then()` here would raise an unhandled rejection every poll for as long as
+     the reader leaves a failed dialog open. */
+  if (el('dataBox').open) import('./table.js').then(m => m.dataTable(), () => {});
   // The wall is painted, never rebuilt. See paint() in js/wall.js for what a rebuild costs.
-  if (el('camBox').open) import('./wall.js').then(m => m.paint());
+  if (el('camBox').open) import('./wall.js').then(m => m.paint(), () => {});
 }
 
 /* The district filter: every district the feeds returned, grouped under its state, each with the

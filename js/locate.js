@@ -84,8 +84,11 @@ function place(latlng, accuracy, setView) {
   // A fix can land while the table is open — it has a "my location" row that could not exist a
   // moment ago. Redraw so the row appears rather than waiting for the next thing to touch it.
   // A dialog can only be open because its opener already imported the module, so this resolves
-  // from the module map with no request — the same shape js/render.js uses on every poll.
-  if (el('dataBox').open) import('./table.js').then(m => m.dataTable());
+  // from the module map with no request — the same shape js/render.js uses on every poll, with the
+  // same rejection handler: this has no surface to report a failure on, and a fix can land many
+  // times while a failed dialog sits open, so a bare `.then()` here would raise one unhandled
+  // rejection per fix.
+  if (el('dataBox').open) import('./table.js').then(m => m.dataTable(), () => {});
 }
 
 map.on('locationfound', e => {

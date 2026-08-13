@@ -24,8 +24,18 @@ import './sparktip.js';   // side effect only: one delegated readout for every g
    specifier for the life of the page, so without this the retry the failure message offers could
    never succeed. */
 let tableMod, wallMod;
-const withTable = fn => (tableMod ??= import('./table.js')).then(fn, err => { tableMod = null; throw err; });
-const withWall  = fn => (wallMod  ??= import('./wall.js')).then(fn, err => { wallMod  = null; throw err; });
+/* `err.importFail` marks a rejection that came from the import itself, not from `fn`. The opener at
+   each dialog (below) still wants any rejection — that is how it knows to show `loadfail` — so
+   these keep rethrowing. A caller with nowhere to report a failure wants the opposite: ignore the
+   import failing (already logged by clearing the module map above), and let a real bug inside `fn`
+   surface. `ignoreImportFail` reads the tag to tell the two cases apart. */
+const withTable = fn => (tableMod ??= import('./table.js')).then(fn, err => {
+  tableMod = null; err.importFail = true; throw err;
+});
+const withWall  = fn => (wallMod  ??= import('./wall.js')).then(fn, err => {
+  wallMod  = null; err.importFail = true; throw err;
+});
+const ignoreImportFail = err => { if (!err.importFail) throw err; };
 
 /* The third of these, the same shape for the same two reasons. Registration order survives a
    deferred import, and a failed import clears the entry so a later open can retry.
@@ -238,8 +248,10 @@ el('data').onclick = async () => {
 dataBox.onclick = e => { if (e.target === dataBox) dataBox.close(); };
 /* A wrapper, not the function itself. `dataTable` is no longer a static binding, so there is
    nothing to assign here. The dialog cannot be open unless its opener already imported the module,
-   so this resolves from the module map with no request on every keystroke after the first. */
-el('dataFind').oninput = () => withTable(m => m.dataTable());
+   so this resolves from the module map with no request on every keystroke after the first.
+   `ignoreImportFail`, not a blanket `.catch(() => {})`: a keystroke has no surface to report a
+   failure on, but a real bug inside `dataTable()` still has to surface rather than vanish. */
+el('dataFind').oninput = () => withTable(m => m.dataTable()).catch(ignoreImportFail);
 
 // --- all cameras ---------------------------------------------------------------------------
 
@@ -263,9 +275,10 @@ camBox.onclick = e => { if (e.target === camBox) camBox.close(); };
    Routed through the same `withWall` promise the opener uses, so an open and a close registered
    before the module lands keep their order — a bare `import().then()` here raced the opener and
    could run close() before open(), leaving a stray timer and observer behind a shut dialog.
-   `.catch(() => {})` because this handler has no surface to report a failure on: the dialog is
-   already gone by the time this runs. */
-camBox.onclose = () => withWall(m => m.close()).catch(() => {});
+   `ignoreImportFail`, not a blanket `.catch(() => {})`: the dialog is already gone by the time this
+   runs, so an import failing has nowhere to report — but a real bug thrown inside `m.close()` is a
+   bug in the clip teardown, not a network hiccup, and must not vanish with it. */
+camBox.onclose = () => withWall(m => m.close()).catch(ignoreImportFail);
 /* One delegated listener. 91 listeners for one behavior is the thing delegation exists to stop.
    Read the id before closing, though not because close() empties the grid before the next line
    runs: HTMLDialogElement.close() clears `open` synchronously but only queues a task to fire the
@@ -301,9 +314,10 @@ function camFilter() {
     if (ok) shown++;
   }
   /* Same reasoning as `dataFind`'s wrapper above: the grid can only hold tiles to filter because
-     js/wall.js already ran, so this resolves from the module map with no request. `.catch(() => {})`
-     for the same reason as `camBox.onclose` above — a keystroke has no surface to report a failure on. */
-  withWall(m => m.count(shown)).catch(() => {});
+     js/wall.js already ran, so this resolves from the module map with no request. `ignoreImportFail`
+     for the same reason as `camBox.onclose` above — a keystroke has no surface to report a failure
+     on, but a real bug inside `m.count()` must still surface. */
+  withWall(m => m.count(shown)).catch(ignoreImportFail);
 }
 el('camFind').oninput = camFilter;
 
@@ -1281,8 +1295,13 @@ document.addEventListener('click', async e => {
   if (c) lightbox.querySelector('.player').insertAdjacentHTML('beforeend', camWarn(c));
   lightbox.showModal();
   /* The picture opens first and the player follows. The frame is already on screen, so the reader
-     sees the camera at once and the controls arrive under it. */
-  await lazy(() => withTimeline(m => m.openTimeline(src)), el('lightbox'));
+     sees the camera at once and the controls arrive under it.
+     Two steps on purpose. The first registers the open on the shared promise, which is what keeps
+     it ahead of a close registered while the module is still loading. The second gives `lazy()` the
+     module promise and nothing else: openTimeline() then awaits api.php?shots= for up to 30 s, and
+     holding the skeleton across that would draw it on every open instead of only the first. */
+  withTimeline(m => m.openTimeline(src));
+  await lazy(() => tlMod, el('lightbox'));
 });
 /* A dead camera stops the spinner too — a spinner that never ends reads as "still trying".
    `naturalWidth`, not which event fired: a frame that failed leaves the image at 0×0, and `.stage`

@@ -7813,20 +7813,23 @@ Five modules used to load with every visit, whether or not the reader ever opene
 `js/clip.js` serves the station panel's camera preview.
 `js/test.js` serves a mode most visits never enter.
 `js/timeline.js` serves the lightbox scrubber.
-Together they measured 44.2 KB gzipped, out of about 160 KB of JS the page loaded before this work.
-Landing now loads about 116 KB.
+Together they measured 45.3 kB gzipped, out of about 160 kB of JS the page loaded before this work.
+Landing now loads about 116 kB.
 Each module still loads in full.
 It loads the first time a reader opens the surface it drives, not before.
 
-Sizes, gzipped over the wire, measured with curl against the running site:
+Sizes, gzipped over the wire, measured with curl against the running site. One unit throughout —
+kB, meaning 1000 bytes, not the 1024-byte KiB a file manager shows. The total is the sum of the
+rows below it:
 
 | module | size | surface |
 |---|---|---|
-| `js/table.js` | 9.4 KB | the all-stations table dialog |
-| `js/wall.js` | 9.7 KB | the camera wall dialog |
-| `js/clip.js` | 4.5 KB | the station panel's camera clip |
-| `js/test.js` | 5.5 KB | test mode |
-| `js/timeline.js` | 15.4 KB | the lightbox scrubber, the largest of the five |
+| `js/table.js` | 9.5 kB | the all-stations table dialog |
+| `js/wall.js` | 9.7 kB | the camera wall dialog |
+| `js/clip.js` | 4.6 kB | the station panel's camera clip |
+| `js/test.js` | 5.7 kB | test mode |
+| `js/timeline.js` | 15.8 kB | the lightbox scrubber, the largest of the five |
+| **total** | **45.3 kB** | |
 
 Every module import graph in this app is static except these five.
 The other eighteen modules still reach the page through ordinary `import` statements.
@@ -7872,11 +7875,14 @@ They keep it even while the import is still in flight.
 A bare `import()` per call site raced two separate promises instead.
 A fast open-then-close on the table or the wall left the opener running last, behind an already-closed dialog.
 
-Second, a working retry.
-A dynamic import caches its rejection per specifier for the life of the page.
-A failed import handled with a plain `.catch()` stays failed forever, because the next call reuses the same rejected promise.
-Clearing the module-level variable on failure makes the next call issue a fresh `import()` instead.
-Every one of these four does this.
+Second, a variable this code can clear on failure.
+A browser can cache a failed dynamic import's rejection by specifier for the life of the page.
+A failed import handled with a plain `.catch()` reuses that same rejected promise on every later call.
+Clearing the module-level variable lets this code call `import()` again.
+The browser's own module map can still answer that call from its cached rejection, so the retry can still fail.
+A full page reload is the recovery that reliably works, because it starts a fresh module map.
+Every one of these four clears its variable on failure anyway.
+A specifier can fail once and still succeed on a later `import()`, when the network recovers between the two calls.
 
 `withTable` and `withWall` rethrow on failure.
 A table row or a wall tile has its own `loadfail` banner to draw, and needs to know the import failed.
@@ -7886,13 +7892,22 @@ A failed import there is not fatal to the surface — the reader still has a sti
 It logs a warning and lets the picture stand with no scrubber under it.
 It does not fail the click that opened the lightbox.
 
+Three more call sites read `withTable` or `withWall` with nowhere to report a failure: `dataFind`'s
+keystroke handler, `camBox`'s close handler, and the camera filter's tile count. Each already
+resolves the module from the cache with no network request, so the only rejection left to see is a
+real bug inside `dataTable()`, `close()` or `count()`. `withTable` and `withWall` tag the error with
+`importFail` when the import itself is what failed. `ignoreImportFail` in `js/ui.js` reads that tag
+and rethrows anything else, so a genuine bug still surfaces as an unhandled rejection in the console
+instead of vanishing into a blanket `.catch(() => {})`. A blanket catch was tried first and rejected:
+it also swallowed a real bug thrown inside the module it was guarding.
+
 ### `render()` keeps its two deferred calls synchronous
 
 `js/render.js` runs on every poll, and two lines in it read a deferred module:
 
 ```js
-if (el('dataBox').open) import('./table.js').then(m => m.dataTable());
-if (el('camBox').open) import('./wall.js').then(m => m.paint());
+if (el('dataBox').open) import('./table.js').then(m => m.dataTable(), () => {});
+if (el('camBox').open) import('./wall.js').then(m => m.paint(), () => {});
 ```
 
 Both use `.then()`, not `await`, and `render()` itself stays a synchronous function.
@@ -7903,24 +7918,40 @@ Making `render()` `async` to `await` these two calls costs nothing on the networ
 It still moves every line after each one into a later microtask, on every poll.
 That cost falls on two calls that never actually wait for anything.
 
+The second argument to `.then()` is a rejection handler that does nothing.
+`render()` runs on every poll, and it has no surface to report a failure on.
+A bare `import().then(fn)` here raised one unhandled rejection every poll, for as long as a reader
+left a failed dialog open behind its `loadfail` banner.
+`js/locate.js` reads the same table dialog on a location fix, and carries the same fix for the same
+reason.
+
 ### Task 6: the lightbox scrubber
 
-`js/timeline.js` was the last of the five and the largest, at 15.4 KB gzipped.
-It binds five listeners at module scope, on the stage, the transport buttons and the seek bar.
+`js/timeline.js` was the last of the five and the largest, at 15.8 kB gzipped.
+It binds 14 listeners at module scope, across ten elements, plus one `matchMedia` change listener.
 That happens the first time anything imports it, not on landing.
-Those listeners target `#lightbox`, `#tl` and `#tlscrub`, all static markup, so the lookups still resolve once the module runs.
+Every target is static markup already in `index.html` — the stage, the seek bar, the transport
+buttons, the range pills and the dialog itself — so each lookup still resolves once the module runs.
 `openTimeline()` is only reachable off the resolved module object.
 By the time a reader can call it, the listener setup has already finished.
 
 Two call sites in `js/ui.js` needed different fixes.
-The opener, a `document.addEventListener` delegated click handler, called `openTimeline(src)` directly and needed nothing more than the `withTimeline` wrapper, behind `lazy()`:
+The opener, a `document.addEventListener` delegated click handler, called `openTimeline(src)`
+directly. It now runs the open through `withTimeline` and waits on the import alone, in two steps:
 
 ```js
-await lazy(() => withTimeline(m => m.openTimeline(src)), el('lightbox'));
+withTimeline(m => m.openTimeline(src));
+await lazy(() => tlMod, el('lightbox'));
 ```
 
-The handler is now `async`.
-Nothing in it runs after this line — it is the handler's last statement.
+The first line registers the open on the shared promise, ahead of any close a reader triggers next.
+The second line hands `lazy()` the import alone.
+`openTimeline()` then awaits `api.php?shots=` for up to 30 seconds.
+The skeleton must not stand for that whole wait on every open — only the import belongs behind it.
+An earlier version awaited the combined call, `lazy(() => withTimeline(m => m.openTimeline(src)))`,
+which held the skeleton across that fetch on every open instead of only the first.
+The handler is still `async`.
+Nothing in it runs after the second line — it is the handler's last statement.
 The second site, `lightbox.addEventListener('close', reset)`, passed `reset` itself as a callback.
 A dynamic import hands back a module object, not the bindings inside it.
 Once the static import is gone, there is no `reset` to pass.
@@ -7935,6 +7966,13 @@ Only a hover-capable pointer at 601px or wider lifts it into an absolute overlay
 In flow, an absent bar during the import shifts the picture up when the real bar lands under it.
 `#tlskel`, a plain box holding one `.skel` shimmer, now sits where `#tl` will render.
 It reserves that height while `lazy()` holds `aria-busy` on `#lightbox`.
+Scoped to the in-flow case only: an earlier version drew it under `#lightbox[aria-busy="true"]`
+alone, with no width or pointer condition, so it also reserved the height on a hover-capable
+pointer at 601px or wider — where `#tl` is `position: absolute` and takes no flow height at all.
+That box appeared, then vanished when the real bar landed, shifting the picture twice on the
+majority platform, which is the shift this skeleton exists to prevent. The fix is one negated media
+query, `not all and (hover: hover) and (min-width: 601px)` — PLAYER_OVERLAY's own condition, inverted
+— around the `display: block` rule, so the reservation applies only where the footer shape holds.
 
 That height came from reading `#tl`'s own rules, not from a browser measurement.
 No browser was available while this task ran.

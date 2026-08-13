@@ -651,7 +651,10 @@ table.data .dash { color: var(--outline); }
 /* A module that never arrives would otherwise leave a dialog shimmering forever. */
 .loadfail .skelrows, .loadfail .skeltiles { display: none; }
 .loadfail::after {
-  content: 'Could not load this view. Check your connection and try again.';
+  /* Names the action that works. A dynamic import that failed once can still reject a same-page
+     retry from the browser's own module map — see the ledger for the mechanism — so the old wording
+     promised a fix an in-page retry cannot reliably give. A reload starts a new module map. */
+  content: 'Could not load this view. Check your connection, then reload the page.';
   display: block; padding: 24px; text-align: center; color: var(--muted);
 }
 
@@ -1469,11 +1472,17 @@ body.finding #find { display: none; }
    Stating that as "no frames" claims a camera has no history when it may hold a year of it. */
 #tlfail { margin: 0; padding: 10px 12px; text-align: center; color: var(--muted); font-size: 13px; }
 #tlfail[hidden] { display: none; }
-/* Holds the control bar's box while js/timeline.js arrives. `#tl` sits in the flow on touch and
-   under 601px, so an absent bar shifts the picture when the real one lands. Only drawn while
-   lazy() holds `aria-busy` on the dialog. */
+/* Holds the control bar's box while js/timeline.js arrives, but only where `#tl` sits in the flow:
+   on touch and under 601px. Inside PLAYER_OVERLAY below, `#tl` is `position: absolute` and takes no
+   flow height at all, so reserving a box there added height the real bar never took and then
+   removed it — a shift on the majority platform, which is the exact shift this skeleton exists to
+   prevent. `not all and (hover: hover) and (min-width: 601px)` is PLAYER_OVERLAY's own query,
+   negated: it matches whenever that query does not, which is exactly where the footer shape holds.
+   Only drawn while lazy() holds `aria-busy` on the dialog. */
 #tlskel { display: none; }
-#lightbox[aria-busy="true"] #tlskel { display: block; padding: 8px 12px; }
+@media not all and (hover: hover) and (min-width: 601px) {
+  #lightbox[aria-busy="true"] #tlskel { display: block; padding: 8px 12px; }
+}
 #tlskel .skel { display: block; height: 85px; }
 #tl {
   display: grid; gap: 2px; justify-items: center; width: 100%;

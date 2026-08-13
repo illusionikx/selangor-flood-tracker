@@ -163,11 +163,6 @@ sysDark.addEventListener('change', applyTheme);
 // chip — no kind icon or hue, because a cluster is usually mixed and a type colour would lie about
 // it — turning red if any child is at danger / sounding, dashed if it holds more than one kind.
 export const cluster = L.markerClusterGroup({
-  /* render() adds all 417 site markers in one addLayers() call, and that call blocks until it
-     finishes. This breaks the work into chunks and yields between them, so the page keeps
-     answering a tap while the markers arrive. The option only affects addLayers(), which is the
-     call js/map.js makes. */
-  chunkedLoading: true,
   // Tighten as you zoom rather than switching clustering off — several stations share exact
   // coordinates (a rainfall and a river gauge on the same mast), so they overlap at any zoom.
   // Those stay clustered to the end and fan out on click instead of hiding each other.
