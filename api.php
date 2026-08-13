@@ -204,6 +204,10 @@ const LOCK  = __DIR__ . '/.refresh.lock';   // held for the length of a rebuild;
 const HIST  = __DIR__ . '/.history.db';
 const READ  = 86400;         // seconds of history loaded per poll (trend + sparkline)
 const RETAIN = 30 * 86400;   // seconds kept on disk; older samples are pruned
+/* Seconds of odometer history loaded per poll. The longest window is 72 hours and a baseline has to
+   sit behind it, so this carries 8 hours of margin. A poll that arrives late still finds a sample
+   older than the far end of the window rather than reporting nothing. */
+const ACC_READ = 80 * 3600;
 
 /* A forced refresh skips the file cache, so it costs a full ~270-request fan-out at JPS. The button
    is public, so the guard sits here, not in the browser. One force a minute site-wide caps the
@@ -944,6 +948,58 @@ function placeParam(mixed $v): string {
     return is_string($v) ? $v : '';
 }
 
+/* Rain over a window, as the difference of two odometer readings.
+ *
+ * `cumulativeRainfall` only ever climbs, so the rain between two samples is one subtraction. That is
+ * the whole reason this reads an odometer instead of adding up `hourly` buckets. A sum loses the
+ * rain in every gap and reports a small number with nothing to say it is short — this box has held
+ * 9 of the last 24 clock hours, and a sum renders that as a dry day. A difference cannot lose rain.
+ * A missed poll widens the window instead, and the payload can measure that wider window, so this
+ * returns the span it actually covered and the card prints it.
+ *
+ * $odo must be ascending by timestamp, which is what the `ORDER BY ts` on the load gives.
+ *
+ * Returns [mm, spanHours], or null where the archive cannot answer:
+ *   - nothing stored for this station yet
+ *   - no sample at or before the far end of the window
+ *   - the odometer went backwards, which is the 1 January reset
+ *   - both ends landed on one sample, so there is no span to measure
+ */
+function accWindow(array $odo, int $now, int $win): ?array {
+    if (!$odo) return null;
+    $last = end($odo);
+    $cut  = $now - $win;
+    $base = null;
+    foreach ($odo as $p) {
+        if ($p[0] > $cut) break;
+        $base = $p;
+    }
+    if ($base === null || $base[0] === $last[0]) return null;
+    if ($last[1] < $base[1]) return null;                 // the odometer reset
+    return [round($last[1] - $base[1], 1), round(($last[0] - $base[0]) / 3600, 1)];
+}
+
+/* Rain over the last N whole clock hours, added from one reading per hour.
+ *
+ * The fallback for a feed that publishes no 3 hour total of its own. `hourlyRainfall` is a ROLLING
+ * hour, so one reading per clock hour is the most that can be added without counting the same rain
+ * twice. That is the same rule RAIN_BUCKET states for the graph.
+ *
+ * Null unless every hour in the window carries a reading. A short sum is indistinguishable from
+ * light rain, and this app must never report a dry hour it did not see.
+ */
+function accHours(array $points, int $now, int $hours): ?float {
+    $bucket = [];
+    foreach ($points as [$ts, $v]) $bucket[intdiv($ts, 3600)] = $v;  // ascending, so the newest wins
+    $top = intdiv($now, 3600);
+    $sum = 0.0;
+    for ($i = 0; $i < $hours; $i++) {
+        if (!isset($bucket[$top - $i])) return null;
+        $sum += $bucket[$top - $i];
+    }
+    return round($sum, 1);
+}
+
 /* `php api.php --selftest` — the guards above, checked offline. Here rather than in a second test
    file: the rules are arithmetic on a few integers, and a separate test would need a third file to
    hold them. CLI only, and it exits before the first header. */
@@ -1023,6 +1079,43 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
         stationUpdated([], [], 'camera', 7, $seen) === null);
     $ok('a gauge reads its own detail first',
         stationUpdated(['statusLastUpdate' => 'fg'], [], 'gauge', 7, $seen) === 'fg');
+
+    echo "\naccWindow():\n";
+    $odo = [[$now - 80 * 3600, 1000.0], [$now - 72 * 3600, 1010.0],
+            [$now - 24 * 3600, 1050.0], [$now, 1080.0]];
+    $ok('24h is the difference over 24h',   accWindow($odo, $now, 24 * 3600) === [30.0, 24.0]);
+    $ok('72h is the difference over 72h',   accWindow($odo, $now, 72 * 3600) === [70.0, 72.0]);
+    /* The point of the odometer. The baseline is 30 hours back rather than 24, and the answer says
+       so instead of claiming a 24 hour figure it does not have. */
+    $ok('a stale baseline reports its real span',
+        accWindow([[$now - 30 * 3600, 1000.0], [$now, 1012.0]], $now, 24 * 3600) === [12.0, 30.0]);
+    $ok('no baseline in range gives null',
+        accWindow([[$now - 2 * 3600, 1000.0], [$now, 1005.0]], $now, 24 * 3600) === null);
+    /* A year-to-date total resets on 1 January. Publishing the negative would draw a bar backwards
+       and poison a reader's idea of a wet week. */
+    $ok('a reset gives null, never a negative',
+        accWindow([[$now - 25 * 3600, 2400.0], [$now, 12.0]], $now, 24 * 3600) === null);
+    $ok('one sample cannot answer',
+        accWindow([[$now - 25 * 3600, 1000.0]], $now, 24 * 3600) === null);
+    $ok('an empty archive gives null',      accWindow([], $now, 24 * 3600) === null);
+    /* A genuinely dry day is 0 mm and must not be confused with an unanswerable window. The chart
+       draws a zero bar for one and an em dash for the other. */
+    $ok('a dry window is zero, not null',
+        accWindow([[$now - 25 * 3600, 1000.0], [$now, 1000.0]], $now, 24 * 3600) === [0.0, 25.0]);
+
+    echo "\naccHours():\n";
+    $h3 = [[$now - 2 * 3600, 4.0], [$now - 3600, 6.0], [$now, 2.0]];
+    $ok('three whole hours add up',         accHours($h3, $now, 3) === 12.0);
+    /* The reason KL's 3 hour bar can go blank. Two hours of rain plus one hour of silence is not a
+       3 hour total, and reporting it as one would call a gap dry. */
+    $ok('a missing hour gives null',
+        accHours([[$now - 2 * 3600, 4.0], [$now, 2.0]], $now, 3) === null);
+    $ok('an empty history gives null',      accHours([], $now, 3) === null);
+    $ok('the newest reading in an hour wins',
+        accHours([[$now - 2 * 3600, 4.0], [$now - 3600, 6.0], [$now - 3000, 9.0], [$now, 2.0]],
+                 $now, 3) === 15.0);
+    $ok('three dry hours are zero, not null',
+        accHours([[$now - 2 * 3600, 0.0], [$now - 3600, 0.0], [$now, 0.0]], $now, 3) === 0.0);
 
     echo "\nserveFromCache():\n";
     $ok('a fresh cache is served',                 serveFromCache(10, true, false) === true);
