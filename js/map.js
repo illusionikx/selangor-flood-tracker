@@ -5,7 +5,15 @@ import { KINDS, TILES, FLASH_MS } from './config.js';
 import { state, PREFS, save } from './state.js';
 import { el, distKm } from './util.js';
 import { byId } from './stations.js';
-import * as clip from './clip.js';
+
+/* One promise, shared by every call. Callbacks on one promise run in the order they were
+   registered, so a stop() registered after a start() still runs after it. That is what closes the
+   gap a deferred import opens: a reader can close a card before the module arrives, and without
+   this the stop would find nothing and the start would then play a clip on a closed card.
+   No skeleton here. The card already shows a still, which CLAUDE.md names as one of the two
+   allowed shapes for a picture path. */
+let clipMod;
+const withClip = fn => (clipMod ??= import('./clip.js')).then(fn).catch(() => {});
 
 // maxZoom on the map, not just the tile layer: markercluster is added below at module load, before
 // setBasemap() has run, and it throws "Map has no maxZoom specified" if no layer declares one yet.
@@ -277,11 +285,11 @@ export function openSide(key, html, mastAt) {
      to frame 0 while somebody was watching it. */
   const n = body.querySelector('[data-clip]')?.dataset.clip;
   const cam = n ? byId(`camera-${n}`) : null;
-  cam ? clip.start(body, cam) : clip.stop();
+  cam ? withClip(m => m.start(body, cam)) : withClip(m => m.stop());
 }
 
 export function closeSide() {
-  clip.stop();
+  withClip(m => m.stop());
   side.key = null;
   document.body.classList.remove('side');
   hideMast();
