@@ -698,8 +698,11 @@ the strip does."
 
 **Interfaces:**
 - Consumes: `cachedPayload(): array` — already in `api.php`. Every cached read passes through it.
-- Produces: `sendPayload(string $body): never` — writes the validators, answers a matching
-  `If-None-Match` with 304, otherwise echoes the body and exits.
+- Produces: `payloadValidators(string $body): string` — sets `Cache-Control` and `ETag`, and
+  returns the ETag it set. Every payload exit calls it.
+- Produces: `sendPayload(string $body): never` — calls `payloadValidators()`, answers a matching
+  `If-None-Match` with 304, otherwise echoes the body and exits. Only the exits that may exit call
+  this one.
 
 **There are three payload exits, not two.** `CLAUDE.md` records what a fix applied to one of them
 costs. All three must go through `sendPayload()`.
@@ -728,6 +731,21 @@ Find `function serveCache(array $extra = []): never {` in `api.php`. Add this di
 
 ```php
 /**
+ * Set the two validators on a payload response, and return the ETag.
+ *
+ * Three exits echo a payload and only one of them may exit, so the headers live here and the
+ * exiting behaviour lives in sendPayload() below. One function sets these headers, so no exit can
+ * drift from the others. A default written into one exit alone reached none of the others once
+ * already, which is the `forced` flag gotcha in CLAUDE.md.
+ */
+function payloadValidators(string $body): string {
+    $etag = '"' . md5($body) . '"';
+    header('Cache-Control: no-cache');
+    header('ETag: ' . $etag);
+    return $etag;
+}
+
+/**
  * Write the payload to the browser, with validators.
  *
  * Two headers, and both matter. The server this runs behind serves every response
@@ -745,9 +763,7 @@ Find `function serveCache(array $extra = []): never {` in `api.php`. Add this di
  * these headers reach the cache in the browser and nothing else.
  */
 function sendPayload(string $body): never {
-    $etag = '"' . md5($body) . '"';
-    header('Cache-Control: no-cache');
-    header('ETag: ' . $etag);
+    $etag = payloadValidators($body);
     if (trim($_SERVER['HTTP_IF_NONE_MATCH'] ?? '') === $etag) {
         http_response_code(304);
         exit;
@@ -787,8 +803,7 @@ Replace it with:
            The validators still have to match the other two exits, or a reader on the deploy target
            gets a payload with no ETag while everybody else gets one. */
         $body = json_encode(cachedPayload(), JSON_UNESCAPED_SLASHES);
-        header('Cache-Control: no-cache');
-        header('ETag: "' . md5($body) . '"');
+        payloadValidators($body);
         echo $body;
 ```
 
@@ -805,10 +820,9 @@ Replace only the second one, so the file write stays:
 
 ```php
 file_put_contents(CACHE, $payload, LOCK_EX);
-/* Not sendPayload(): captureShots() still has to run below, so this exit must not exit either. Same
-   validators, written the same way as the branch above. */
-header('Cache-Control: no-cache');
-header('ETag: "' . md5($payload) . '"');
+/* Not sendPayload(): captureShots() still has to run below, so this exit must not exit either. The
+   validators come from the same function as the other two exits. */
+payloadValidators($payload);
 echo $payload;
 ```
 
