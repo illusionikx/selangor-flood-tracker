@@ -50,10 +50,16 @@ function setWater(on) {
   if (!waterGeo) {
     if (asking) return;
     asking = true;
-    fetch('water.json')
+    /* Past the first paint. This file is 242 KB gzipped, against 271 KB for the whole of the rest
+       of the landing, so fetching it inline nearly doubles what a dark theme reader waits for. It
+       draws rivers and ponds the basemap omits, which is decoration over a map that already works,
+       so it can arrive late. requestIdleCallback yields to anything the browser would rather do
+       first, and the setTimeout is the fallback for Safari, which does not implement it. */
+    const later = window.requestIdleCallback || (fn => setTimeout(fn, 1200));
+    later(() => fetch('water.json')
       .then(r => r.ok ? r.json() : Promise.reject(r.status))
       .then(g => { waterGeo = g; if (isDark()) setWater(true); })
-      .catch(() => {});   // No water is a plainer map, not a broken one. Every reading still draws.
+      .catch(() => {}));   // No water is a plainer map, not a broken one. Every reading still draws.
     return;
   }
 
@@ -126,6 +132,11 @@ sysDark.addEventListener('change', applyTheme);
 // chip — no kind icon or hue, because a cluster is usually mixed and a type colour would lie about
 // it — turning red if any child is at danger / sounding, dashed if it holds more than one kind.
 export const cluster = L.markerClusterGroup({
+  /* render() adds all 417 site markers in one addLayers() call, and that call blocks until it
+     finishes. This breaks the work into chunks and yields between them, so the page keeps
+     answering a tap while the markers arrive. The option only affects addLayers(), which is the
+     call js/map.js makes. */
+  chunkedLoading: true,
   // Tighten as you zoom rather than switching clustering off — several stations share exact
   // coordinates (a rainfall and a river gauge on the same mast), so they overlap at any zoom.
   // Those stay clustered to the end and fan out on click instead of hiding each other.
