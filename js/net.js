@@ -108,7 +108,10 @@ export async function load() {
     const j = await askJson(FEED, { ms: first ? 45000 : 20000 });
     clearTimeout(slow); clearTimeout(slower);
     if (first) say('Reading water levels, rainfall, sirens and cameras…');
-    if (!j.stations) throw new Error(j.error || 'HTTP ' + r.status);
+    /* askJson() already threw on any status outside 200 to 299, so reaching this line means the
+       server answered 200 with a body that carries no stations. There is no status left worth
+       naming, and `r` no longer exists: the wrapper owns the response object now. */
+    if (!j.stations) throw new Error(j.error || 'payload carried no stations');
     state.data = j.stations;
     // Read before network()/alerts()/ticker() run below, in the same order every poll takes.
     state.warnings = j.warnings || [];
