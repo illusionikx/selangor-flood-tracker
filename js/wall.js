@@ -21,7 +21,7 @@
  * every second where one will do, and tiles that step together read as one thing rather than as
  * pictures out of phase. If a tile ever needs its own rate, this is the line to revisit.
  */
-import { CLIP_MS, SHEET_W, camSrc } from './config.js';
+import { CLIP_MS, SHEET_W, STATIC, camSrc } from './config.js';
 import { state } from './state.js';
 import { el, squash } from './util.js';
 import { camAlert } from './stations.js';
@@ -105,6 +105,16 @@ function paintBar() {
 function onSettle(e) {
   const t = e.target.closest('.camtile');
   if (!t) return;
+  /* Two of the 93 cameras hold no stored frame, so ?shot= answers 404 for them. Spend one live
+     fetch on those rather than drawing the No picture panel over a camera that works.
+     `data-live` records that the tile has spent that one retry, so a camera that is genuinely dead
+     draws the panel instead of alternating between two failing requests forever. The tile is not
+     marked `done` here, because it is still loading and `waiting` still counts it. */
+  if (e.type === 'error' && !STATIC && !t.dataset.live && t.dataset.lap) {
+    t.dataset.live = '1';
+    e.target.src = `api.php?cam=${t.dataset.lap}`;
+    return;
+  }
   if (!t.classList.contains('done')) {
     t.classList.add('done');
     /* Pairs with startBatch(): only a tile onSee actually started may decrement `waiting`. A tile
@@ -172,11 +182,24 @@ let offline = 0;
    same stations for the same reason — see the "not on the map" row in docs/FEATURES.md. `disabled`
    keeps a keyboard reader from landing on a control that does nothing, and `.unmapped` gives the
    second wave a hook to stop the tile looking pressable in the first place. */
+/* The first picture a tile shows.
+ *
+ * The archive holds a frame for 91 of the 93 cameras, and shots.php already has it, so a wall of
+ * ninety tiles costs the agency nothing. A live still costs 273 KB and about 0.9 s each. The
+ * archived frame costs 186 KB and about 0.06 s, and it is at most SHOT_EVERY old — which is what
+ * the strip this tile plays is anyway, so the tile loses no freshness it was going to keep.
+ *
+ * A camera with no stored frame answers 404, and onSettle() below falls that tile back to the live
+ * still exactly once.
+ *
+ * STATIC has no PHP at all, so it keeps the direct URL camSrc() already builds for that build. */
+const tileSrc = (c, id) => STATIC ? camSrc(c) : `api.php?shot=${id}`;
+
 const tileHtml = c => {
   const id = c.id.split('-')[1], mapped = !!(c.lat && c.lng);
   return `<button class="camtile${mapped ? '' : ' unmapped'}"${mapped ? ` data-cam="${id}"` : ''
     } data-lap="${id}" data-hay="${squash(`${c.name} ${c.district || ''} ${c.state || ''}`)}"${
-    mapped ? '' : ' disabled'}><img loading="lazy" alt="" src="${camSrc(c)}"><span class="camname"
+    mapped ? '' : ' disabled'}><img loading="lazy" alt="" src="${tileSrc(c, id)}"><span class="camname"
     >${c.name}</span><span class="camsay"><i class="i i-warning"></i><b></b></span><span
     class="camfail"><i class="i i-videocam_off"></i><b>No picture</b></span>${
     mapped ? '' : '<span class="camnote">Not on the map</span>'}</button>`;
