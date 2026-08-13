@@ -8,9 +8,9 @@
 import { KINDS, KIND_RANK, NO_INFO, camSrc } from './config.js';
 import { state } from './state.js';
 import { el, dkey, distKm, hasInfo, color, statusColor, scalePos, levelStops, leads, gaugeTone,
-         gaugeColor } from './util.js';
+         gaugeColor, isStale } from './util.js';
 import { nearestOf, nearestCam } from './stations.js';
-import { sparkline, rainBars, sirenBand, rateHtml, etaText, gaugeState } from './popup.js';
+import { sparkline, rainBars, sirenBand, rateHtml, etaText, gaugeState, rainAcc } from './popup.js';
 import { flashTo } from './map.js';
 
 
@@ -293,7 +293,9 @@ const trend = m => (m.kind === 'river' && m.rate != null
     // for the siren band, which is only sampled while the siren is in contact.
     : m.kind === 'gauge' ? (m.history?.length ? sparkline(m.history, 'gauge', m) : '')
     : m.kind === 'siren' ? (m.history?.length ? sirenBand(m.history) : '')
-    : m.kind === 'rainfall' ? rainBars(m.history) : '');
+    : m.kind === 'rainfall' ? rainBars(m.history) : '')
+  // The same totals as the station card, under the same graph, behind the same stale guard.
+  + (m.kind === 'rainfall' && !isStale(m) ? rainAcc(m.acc) : '');
 
 function summary(own, lead, scope) {
   const named = own.length === 1 && own[0].name !== lead.name;

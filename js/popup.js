@@ -343,6 +343,10 @@ function sensorBody(s) {
     body.push(metric('Today', num(s.daily, ' mm')));
   }
   const rain = s.kind === 'rainfall' ? rainBars(s.history) : '';
+  /* Totals under the graph. Not on a stale station: one gauge in the payload holds 27 mm in an hour
+     and its stamp reads last October, and `hasInfo()` calls it online because `hourly` is not null.
+     Drawing that as today's rain is the one thing this chart must never do. */
+  const acc = s.kind === 'rainfall' && !isStale(s) ? rainAcc(s.acc) : '';
   // The meter says where the level is against its own thresholds; this says how it got there. The
   // alert panel has carried it all along — the popup you reach by clicking the pin had the numbers
   // for the trend (m/h, hours to danger) but not the shape they came from.
@@ -386,7 +390,7 @@ function sensorBody(s) {
   return `${still}${siren}${gauge}${wet}
     ${s.kind === 'river' ? meter(s) : ''}
     ${body.length ? `<div class="popbody">${body.join('')}</div>` : ''}
-    ${spark}${rain}`;
+    ${spark}${rain}${acc}`;
 }
 
 /* The one place a timestamp is printed, and it now sits inside `dots()` rather than under the card.
@@ -1008,10 +1012,13 @@ export function rainAcc(acc) {
   if (!acc) return '';
   const rows = ACC_ROWS.map(([k, label]) => [label, acc[k]]);
   if (!rows.some(([, r]) => r)) return '';
-  // The scale is the largest total, so the widest bar always fills the width. With no mark to hold,
-  // the axis needs no other rule.
-  const hi = Math.max(...rows.map(([, r]) => r ? r[0] : 0));
-  if (!hi) return '<div class="muted">No rain in the last 72 hours</div>';
+  /* The scale is the largest total, so the widest bar always fills the width. With no mark to hold,
+     the axis needs no other rule. A dry station draws five empty tracks rather than one sentence,
+     which `rainBars()` above does say. That sentence would have to name a window, and the two long
+     ones are exactly the windows a young archive cannot answer — "No rain in the last 72 hours" on
+     a station whose 72 hour total is unknown is the claim this whole design refuses to make. Five
+     rows keep a measured zero and an unanswered window visibly apart, which is the point of them. */
+  const hi = Math.max(...rows.map(([, r]) => r ? r[0] : 0)) || 1;
 
   const star = rows.some(([, r]) => r && r[1]);
   const row = ([label, r]) => {
