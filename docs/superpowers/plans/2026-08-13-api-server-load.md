@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Release the PHP session lock, cut about 55,968 daily requests to JPS, and stop the browser caching the payload for three hours.
+**Goal:** Release the PHP session lock. Cut about 55,968 daily requests to JPS. Stop the browser from caching the payload for three hours.
 
 **Architecture:** All five tasks change `api.php` only. Each one is small and independent. Task 1 removes a lock. Task 2 skips a fan out. Tasks 3 and 4 add caches. Task 5 adds response headers.
 
@@ -23,7 +23,7 @@ This spec became three plans. Each one ships working software.
 - **No test framework.** `CLAUDE.md` states this repository has no test suite. Two checks run:
   `php api.php --selftest` and `php shots-test.php`. Add assertions to the first. Do not add a
   framework, a package or a third test file.
-- **Offline checks only in `--selftest`.** No assertion there may reach a network. That block runs
+- **Offline checks only in `--selftest`.** No assertion there reaches a network. That block runs
   before the first `header()` call and exits.
 - **Prose rules.** Write every comment in active voice. Keep sentences under 20 words. Use no
   semicolons and no contractions. Use American spelling.
@@ -42,7 +42,7 @@ No new PHP file. Each change is under 30 lines, and `api.php` already owns every
 
 ## Baseline
 
-Record these before Task 1. Each task compares against them.
+Run these before Task 1. Each task compares against them.
 
 ```bash
 cd d:/Herd/flood-exp
@@ -81,8 +81,7 @@ done; wait
 Expected: six times that climb by about one second each. The measured baseline reads
 `1.93 3.04 4.29 5.35 6.07 6.88`. Save the output. Step 4 compares against it.
 
-A staircase is the failure. Six times close together means the fault is already gone, and you should
-stop and report that instead of continuing.
+A staircase is the failure. Six times close together means the fault is already gone. Stop and report that instead of continuing.
 
 - [ ] **Step 2: Confirm nothing reads the session**
 
@@ -108,7 +107,7 @@ Insert this directly below them:
 
 ```php
 /* This PHP runs with `session.auto_start=1`, and the file session handler takes an exclusive lock
-   on the session file for the whole request. Every request that carries one browser's PHPSESSID
+   on the session file for the whole request. Every request that carries the PHPSESSID of one browser
    therefore runs one at a time. Six concurrent stills measured 1.9, 3.0, 4.3, 5.4, 6.1 and 6.9
    seconds, which is a clean staircase. The same six with no shared cookie finished in 3.4 seconds
    together. Four cheap requests finish in 347 ms, so the worker pool is not the reason.
@@ -229,7 +228,7 @@ php api.php --selftest
 ```
 
 Expected: PHP stops with `Call to undefined function sirenWanted()`. That is the failure this step
-wants. A pass here means the function already exists, and you should stop and read it.
+wants. A pass here means the function already exists. Stop and read it.
 
 - [ ] **Step 4: Write the function**
 
@@ -316,7 +315,7 @@ curl -sk "https://flood-exp.test/api.php?force=1" \
 
 Expected: the first number is about 614, because a missing stamp opens a sweep. The second is about
 402, because the stamp is now fresh. A second number still near 614 means the stamp did not write,
-so check that the web server may write to the repository directory.
+so check that the web server can write to the repository directory.
 
 - [ ] **Step 9: Confirm no siren lost its data**
 
@@ -347,7 +346,7 @@ alarm loses no latency. The quiet ones refresh hourly, which is 5,088 calls
 a day instead of 61,056.
 
 One hour and not six: the history pass stamps samples from this field, and
-the (station, ts) key would fold six hours into one row."
+the (station, ts) key folds six hours into one row."
 ```
 
 ---
@@ -375,8 +374,8 @@ Add below it:
 
 ```php
 /* The camera still cache. Every ?cam= request used to reach JPS, so N readers on the camera wall
-   aimed N times 90 fetches at one agency. 300 seconds is the lifetime this endpoint's own
-   Cache-Control already claims, and it matches POLL_MS in js/config.js. A still cannot change
+   aimed N times 90 fetches at one agency. 300 seconds is the lifetime the Cache-Control
+   on this endpoint already claims, and it matches POLL_MS in js/config.js. A still cannot change
    faster than the payload that names it.
    CAM_URLS is a small map of camera id to image URL, written at the end of each rebuild. The
    handler used to decode all 312 KB of .cache.json to read one string out of it. */
@@ -396,9 +395,9 @@ file_put_contents(CACHE, $payload, LOCK_EX);
 Insert directly above it:
 
 ```php
-/* The id to URL map the ?cam= handler reads. Written from the same stations the payload carries,
-   so the two cannot disagree. Written through a temporary file and renamed, because a reader may
-   arrive while this runs and rename is atomic on one filesystem. */
+/* The id to URL map the ?cam= handler reads. This uses the same stations the payload carries, so
+   the two cannot disagree. Write a temporary file and rename it. A reader can arrive while this
+   runs, and rename is atomic on one filesystem. */
 $camMap = [];
 foreach ($stations as $s) {
     if ($s['kind'] === 'camera' && !empty($s['image'])) {
@@ -476,8 +475,8 @@ if (isset($_GET['cam'])) {
         exit;
     }
 
-    /* Written through a temporary file and renamed. Two readers can miss the cache at the same
-       moment, and a half written file must never be served as a picture. */
+    /* Write a temporary file and rename it. Two readers can miss the cache at the same moment,
+       and this must never serve a half written file as a picture. */
     if ($hit) {
         @mkdir(CAM_DIR, 0777, true);
         $tmp = $hit . '.' . getmypid();
@@ -514,7 +513,7 @@ curl -sk -o /dev/null -w 'warm %{time_total}s %{size_download}B %{http_code}\n' 
 
 Expected: about 90 cameras mapped. The cold request takes about 0.8 seconds. The warm request takes
 under 0.05 seconds and returns the same byte count with status 200. A warm time still near 0.8
-seconds means the write failed, so check that the web server may create `.cam/`.
+seconds means the write failed, so check that the web server can create `.cam/`.
 
 - [ ] **Step 7: Confirm the fallback and the guard still hold**
 
@@ -558,7 +557,7 @@ An upstream blip serves the stale still rather than the No picture panel."
 - Consumes: `shotList(int $id): array` from `shots.php`. Returns every stored frame timestamp for a
   camera, oldest first. `shotFile(int $id, int $ts): ?string` returns the path or null.
 - Produces: `shotCache(bool $exact): string` — the `Cache-Control` value for a frame response.
-  Plan B's wall change consumes the route this task adds, not this function.
+  the wall change in Plan B consumes the route this task adds, not this function.
 
 Plan B points the camera wall at this route. The route has to exist first.
 
@@ -568,7 +567,7 @@ Add this at the end of the `--selftest` block, above the `echo $fail ? ...` line
 
 ```php
     echo "\nshotCache():\n";
-    /* The two forms of ?shot= mean different things and may not share a header. `&t=` names one
+    /* The two forms of ?shot= mean different things and must not share a header. `&t=` names one
        frame that never changes again, so a year is honest. The no timestamp form names whichever
        frame is newest, and that changes every SHOT_EVERY. A browser holding the second for a year
        keeps a stale picture with nothing to tell it so. */
@@ -686,7 +685,7 @@ live still from JPS per tile instead.
 
 The no timestamp form serves the newest stored frame. It does not inherit
 the immutable year: an exact frame never changes again, and the newest one
-changes every SHOT_EVERY. It takes the strip's header for the same reason
+changes every SHOT_EVERY. It takes the header of the strip for the same reason
 the strip does."
 ```
 
@@ -720,8 +719,8 @@ first and third here. Read the second and confirm by eye.
 curl -sk -o /dev/null -D - "https://flood-exp.test/api.php" | grep -i 'cache-control\|etag'
 ```
 
-Expected: `Cache-Control: public, max-age=10800` and no `ETag`. That header is Herd's blanket rule.
-The payload sets none of its own, so a browser may answer every poll from its cache for three hours.
+Expected: `Cache-Control: public, max-age=10800` and no `ETag`. That header is the blanket rule from Herd.
+The payload sets none of its own, so a browser answers every poll from its cache for three hours.
 
 - [ ] **Step 2: Write `sendPayload()`**
 
@@ -743,7 +742,7 @@ Find `function serveCache(array $extra = []): never {` in `api.php`. Add this di
  * once already, which is the `forced` flag gotcha in CLAUDE.md.
  *
  * The service worker is unaffected. It returns without calling respondWith() for this URL, so
- * these headers reach the browser's own cache and nothing else.
+ * these headers reach the cache in the browser and nothing else.
  */
 function sendPayload(string $body): never {
     $etag = '"' . md5($body) . '"';
@@ -784,7 +783,7 @@ Find this line inside the `fastcgi_finish_request` branch:
 Replace it with:
 
 ```php
-        /* Not sendPayload(): this branch keeps working after the response, so it may not exit here.
+        /* Not sendPayload(): this branch keeps working after the response, so it must not exit here.
            The validators still have to match the other two exits, or a reader on the deploy target
            gets a payload with no ETag while everybody else gets one. */
         $body = json_encode(cachedPayload(), JSON_UNESCAPED_SLASHES);
@@ -806,7 +805,7 @@ Replace only the second one, so the file write stays:
 
 ```php
 file_put_contents(CACHE, $payload, LOCK_EX);
-/* Not sendPayload(): captureShots() still has to run below, so this exit may not exit either. Same
+/* Not sendPayload(): captureShots() still has to run below, so this exit must not exit either. Same
    validators, written the same way as the branch above. */
 header('Cache-Control: no-cache');
 header('ETag: "' . md5($payload) . '"');
@@ -835,7 +834,7 @@ request means the `If-None-Match` comparison failed, so check the quoting in `se
 Open `https://flood-exp.test` in a browser and hard reload with Ctrl+Shift+R. The map draws its
 stations. The status dot on the logo is green or amber, never red.
 
-Then wait for one poll and confirm the dot's popover advances its `last checked` row. A dot stuck
+Then wait for one poll and confirm the popover on the dot advances its `last checked` row. A dot stuck
 on one time means the 304 is reaching code that expects a body.
 
 - [ ] **Step 8: Run both checks and commit**
@@ -844,9 +843,9 @@ on one time means the 304 is reaching code that expects a body.
 php api.php --selftest | tail -1
 php shots-test.php | tail -1
 git add api.php
-git commit -m "Every poll for three hours could come from the browser's own cache
+git commit -m "Every poll for three hours could come from the cache in the browser
 
-The payload set no cache header of its own, so nginx's blanket
+The payload set no cache header of its own, so the blanket
 max-age=10800 was the only one on it. The page polls every five minutes and
 the whole point is that it is current.
 
@@ -889,10 +888,9 @@ curl -sk -o /dev/null -D - "https://flood-exp.test/api.php" | grep -i 'cache-con
 
 ## Documentation
 
-`CLAUDE.md` requires a feature note as part of the change, not after it. Append to
-`docs/FEATURES.md` in the same commit series: what each of the five changes does, the measured
-numbers, and the two rules a later reader needs. Those two rules are that `SIREN_TTL` may not grow
-to six hours, and that the newest frame form may never take the `immutable` header.
+`CLAUDE.md` requires a feature note as part of the change, not after it. Append to `docs/FEATURES.md` in the same commit series. State what each of the five changes does.
+State the measured numbers. State two rules a later reader needs. `SIREN_TTL` must not grow to six
+hours. The newest frame form must never take the `immutable` header.
 
-Add to the gotcha list in `CLAUDE.md`: `session.auto_start` serializes every request from one
-browser, and `api.php` releases the session on its first statement.
+Add one gotcha to `CLAUDE.md`. `session.auto_start` serializes every request from one browser.
+`api.php` releases the session on its first statement.
