@@ -885,23 +885,53 @@ Bump the `?v=` on `css/chrome.css` in `index.html`.
 
 Delete the static import of `openTimeline` and `reset` from `js/ui.js`.
 
-Replace every call to `openTimeline(src)` with this:
+**Two call sites, and the second is a reference, not a call.** `js/ui.js:1274` calls
+`openTimeline(src)`. `js/ui.js:1291` is `lightbox.addEventListener('close', reset);`, which stores
+the function itself. A dynamic import gives a module object, not a binding, so there is nothing to
+pass there.
+
+**`js/timeline.js` has real import-time side effects.** It looks up `#lightbox`, `#tl` and
+`#tlscrub` at module scope and binds five listeners on the stage, the transport and the box. Those
+ids are all static markup, so the lookups still resolve. The listeners now bind when the module
+loads rather than on landing, and that is the first lightbox open. `openTimeline()` is reachable
+only off the resolved module, so evaluation always finishes first. Confirm both in your report.
+
+Delete the static import of `openTimeline` and `reset`, and add a third shared loader beside
+`withTable` and `withWall`:
 
 ```js
-/* The picture opens first and the player follows. The frame is already on screen, so the reader
-   sees the camera immediately and the controls arrive under it. */
-try {
-  (await lazy(() => import('./timeline.js'), el('lightbox'))).openTimeline(src);
-} catch {
-  el('lightbox').classList.add('loadfail');
-}
+/* The third of these, the same shape for the same two reasons. Registration order survives a
+   deferred import, and a failed import clears the entry so a later open can retry.
+   `.then(fn, onImportFailed)` rather than a trailing `.catch`: a rejection handler passed as the
+   second argument sees only the import failing, so a real bug inside the player still surfaces. */
+let tlMod;
+const withTimeline = fn => (tlMod ??= import('./timeline.js')).then(fn, err => {
+  tlMod = null;
+  console.warn('timeline.js did not load', err);
+});
 ```
 
-Make the enclosing handler `async` if it is not already, and report which handler you changed.
+At `js/ui.js:1274`, replace `openTimeline(src);` with:
 
-The lightbox calls `reset()` when it closes. Route it the same way `js/map.js` routes the clip in
-Task 4: one shared promise so a close registered after an open still runs after it. A `reset()` that
-runs before the module arrives must not throw.
+```js
+  /* The picture opens first and the player follows. The frame is already on screen, so the reader
+     sees the camera at once and the controls arrive under it. */
+  await lazy(() => withTimeline(m => m.openTimeline(src)), el('lightbox'));
+```
+
+Make the enclosing handler `async` if it is not already. Report which handler you changed and what
+else in it runs after this line.
+
+At `js/ui.js:1291`, replace the reference with a wrapper:
+
+```js
+/* A wrapper, because `reset` is no longer a binding. It shares `withTimeline` with the opener, so a
+   close registered while the module is still loading still runs after the open. */
+lightbox.addEventListener('close', () => withTimeline(m => m.reset()));
+```
+
+No extra `.catch` on either line. `withTimeline` already handles the only rejection it can raise,
+and a bug inside the player must stay visible.
 
 - [ ] **Step 4: Check the modules and the types**
 
