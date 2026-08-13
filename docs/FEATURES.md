@@ -7588,13 +7588,22 @@ widen it much.
 
 ### The card names the point it read from
 
-`MET_KM` reaching 16.5 km puts the point behind a card up to two districts away. So the card states
-it. `.wxfrom` is one line under the two cells: `From Kuala Selangor, 15.1 km away`.
+`MET_KM` reaching 16.5 km puts the point behind a card up to two districts away. So the card names
+it, in the section head: `Weather` on the left and `Slim River` on the right.
 
-The line was in the ⋮ menu before this, beside the issue time. A tap is the right price for a
-timestamp, which a reader goes looking for when they doubt a number. It is the wrong price for the
-distance, which a reader needs to weigh the words above it and will never think to ask for. The ⋮
-keeps the issue time alone.
+That slot is not new. `.sensorhead .muted` already right-aligns and truncates a label there, and a
+camera section already prints its own station name in it. One slot answers one question on every
+sensor of the card: what this reading is about, when the heading beside it does not say. The weather
+name costs one span and no new rule.
+
+The distance stays in the ⋮, and that is a rule about heads rather than about this number. A head
+that carries a distance makes every other head owe one. A camera then owes its metres from the
+station, and a river owes its own. The card holds one distance in one place, under the ⋮ with
+the issue time, where this app already puts what a reader checks when they doubt a number.
+
+The name sat under the cells for one revision, as a footnote reading `From Slim River, 6.1 km away`.
+The words were right and the place was wrong. A card that draws the same kind of label twice in two
+shapes makes a reader learn two shapes.
 
 The gate above guarantees the line has something to print. MET fills `at` and `km` in the same pass
 that fills `now`, and a card with no `now` draws no weather section at all.

@@ -453,30 +453,35 @@ const wxIcon = r => {
    The nearest point and its distance are NOT here. They spent a revision in this menu, on the
    reading that a claim from 14 km away is a different claim from one made next door, and the ⋮ is
    where this app puts that kind of doubt. The doubt turned out to be the reading itself. `MET_KM`
-   now reaches 16.5 km, so the point behind a card can stand two districts away, and a fact a reader
-   must have to weigh the words above it does not belong behind a tap. It is `.wxfrom`, under the
-   cells. This menu keeps the one fact a reader goes looking for: when MET issued it. */
+   The distance IS here, and the point is not. The point names the reading and belongs in the head,
+   beside the word Weather, where every other sensor on the card names its own. The distance is a
+   number, and a number in a head is a claim the other heads then have to answer: a camera would owe
+   its metres, a river its own. This card holds one distance in one place and this is the place.
+   Two facts, then, and both are about the plumbing: when MET issued this, and how far away. */
 const wxDots = m => `<button class="icon dots" popovertarget="mnu-met"
     title="Details" aria-label="Details about this weather"><i class="i i-more_vert"></i></button>
   <div id="mnu-met" class="menu surface" popover>
     <div class="mi info"><span>
       ${!m.stamp ? '' : `<small class="muted">Updated ${
         MYT_CLOCK.format(m.stamp * 1000)} · ${ago(m.stamp * 1000)}</small><br>`}
-      <small class="muted">Via ${MET_NAME}</small>
+      <small class="muted">Via ${MET_NAME}${m.km == null ? '' : ` · ${m.km} km away`}</small>
     </span></div>
   </div>`;
 
 /* The MET section. Two cells, `Now` and `Later`, each one glyph beside the words that belong to it.
    This section appears once per card and never once per sensor. Rain over a place is one fact, and
    sourceInfo() already taught this app what a per-place fact costs when it repeats down a mast.
-   The point and the distance sit under the cells, not beside the heading and not inside the ⋮. They
-   were beside the heading first, where the place name competed with the station name at the top of
-   the card. They then spent a revision inside the ⋮, which is a tap away and therefore unread. Both
-   moves cost the same thing: without a visible line, a card states a local forecast from a point up
-   to `MET_KM` away and gives a reader nothing to weigh it against. The point for ULU YAM is 11.7 km
-   off over high ground, and `MET_KM` reaches 16.5 km. As a footnote under the forecast the line
-   answers the question the forecast raises. The gate above guarantees `at` and `km` are there,
-   because MET fills them with `now`.
+   The point sits in the section head, in the `.muted` slot every other sensor head on this card
+   uses for the same job. A camera section prints its own station name there, and this prints where
+   the forecast was read. One slot, one meaning: what this reading is about, when the heading beside
+   it does not say. `.sensorhead .muted` already right-aligns it and truncates it, so this costs one
+   span and no rule. The distance stays in the ⋮ and the note on `wxDots()` says why.
+   Two other placements came first. Beside the heading at the top of the card, where the place name
+   competed with the station name. Then inside the ⋮ with the distance, which is a tap away and
+   therefore unread. Both cost the same thing: without a visible name, a card states a local
+   forecast from a point up to `MET_KM` away and gives a reader nothing to weigh it against. The
+   point for ULU YAM is 11.7 km off over high ground, and `MET_KM` reaches 16.5 km. The gate above
+   guarantees `at` is there, because MET fills it with `now`.
    `Later` reads rung, the worst rain in the three-hour window, so the glyph and the sentence beside
    it describe one window. It read hr1 once, which drew a clear sky next to the words `Rain 12:00`.
    hr1 stays in the payload to answer a different question: will it rain in one hour.
@@ -534,10 +539,10 @@ function metSection(s) {
       <div class="sensorhead">
         <i class="glyph i i-${wxIcon(m.rung ?? m.now ?? 0)}" style="color:var(--k-weather)"></i>
         <b>Weather</b>
+        <span class="muted">${m.at}</span>
         ${wxDots(m)}
       </div>
       <div class="wx">${now}${out}</div>
-      <p class="wxfrom muted">From ${m.at}, ${m.km} km away</p>
     </div>`;
 }
 

@@ -138,10 +138,6 @@
    held this glyph at 14px and the large one never drew large. */
 .wxbig { font-size: var(--g); color: var(--k-weather); flex: none; cursor: help; }
 .wxline { color: var(--on-surface); font-size: 11px; }
-/* The point the two cells above were read from. `p` carries a browser margin on both ends, so both
-   are stated: the top one is the seam under the grid and the bottom one would be a gap the `.sensor`
-   already owns. */
-.wxfrom { font-size: 11px; margin: 8px 0 0; }
 /* The weather section needs no seam of its own, and `.wxsec` is gone. It carried a bottom rule while
    the sensor under it was a loose body with no head. Every card wraps its sensor in a `.sensor` now,
    which draws its own top rule, so the two together were the double line that
