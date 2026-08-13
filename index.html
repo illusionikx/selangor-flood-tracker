@@ -27,11 +27,18 @@
      back plated in exactly the thing that was deliberately removed. This one is opaque white on
      purpose, with a smaller glyph because iOS rounds the corners itself. Built by icon-build.php. -->
 <link rel="apple-touch-icon" href="icon-180.png?v=3">
-<!-- The only third party this page contacts. Leaflet builds the first tile URL from js/map.js, and
-     that happens after the module graph has loaded, so the browser would otherwise start its DNS,
-     TCP and TLS work at the latest possible moment. The About pane's Credits already names CARTO
-     for these tiles. -->
-<link rel="preconnect" href="https://a.basemaps.cartocdn.com" crossorigin>
+<!-- The only third party this page contacts, and it answers on three origins. js/map.js builds
+     tile URLs from `{s}.basemaps.cartocdn.com`, and Leaflet expands `{s}` over its default
+     subdomains `abc`, so warming one of them covers about a third of the tiles.
+     No `crossorigin` here. Leaflet sets no `crossOrigin` on its tile layer, so the tiles load as
+     plain images with no CORS. A preconnect made in anonymous-CORS mode opens a connection the
+     browser will not reuse for them, which wastes the TCP and TLS work and keeps only the DNS
+     lookup. The attribute has to match how the resource is actually fetched.
+     Leaflet builds the first tile URL only after the whole module graph has loaded, so without
+     these the browser starts this work at the latest possible moment. -->
+<link rel="preconnect" href="https://a.basemaps.cartocdn.com">
+<link rel="preconnect" href="https://b.basemaps.cartocdn.com">
+<link rel="preconnect" href="https://c.basemaps.cartocdn.com">
 <!-- The import graph is seven levels deep and there is no build step to flatten it, so the browser
      discovers each level only after it parses the one above. That is seven round trips before
      js/net.js can ask for the payload. These links let it fetch all of them at once.
