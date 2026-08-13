@@ -118,6 +118,13 @@ via `curl_multi` (~270 requests, ~3s cold). **The lists alone are not enough** �
 return `lastReading: null` in the list but a real `floodLevel` in the detail.
 
 Field notes:
+- Rainfall detail carries more than `hourlyRainfall`. `threeHoursRainfall` is a 3-hour total and
+  `cumulativeRainfall` is a **year-to-date odometer** (645–1656 mm across 8 stations in August).
+  This app reads both now — see the accumulation gotcha below. `spLight` 5 / `spModerate` 11 /
+  `spHeavy` 31 / `spVeryHeavy` 61 are the intensity classes for that one station. Nothing reads
+  them. `RAIN_STOPS` hard-codes 10/30/60 for everyone. Moving to the published per-station numbers
+  changes pin colour, heat weight and `rainStatus()`, so it goes through the alert design standard
+  first. `rfSpike15`/`rfSpike60` are unread and nothing has looked at them.
 - River detail: `waterLevel1`, `wL1SPAlert/Warning/Danger`, `waterLevel1LastUpdate`.
 - Gauge detail: `floodLevel` = depth **over** a flood-prone spot; **negative means dry ground**.
   Thresholds `spWarning` 0.15m / `spDanger` 0.3m.
@@ -212,6 +219,14 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   climbing, so the UI can show what the cutoff is cutting off. The client reads `s.rising`; it never
   re-derives it, and nothing mirrors `RISE_ETA` client-side any more. `$assess()` takes a sample
   *index* precisely so the on-delay needs nothing persisted between requests.
+- **Rain totals over five nested windows** ride on every rainfall station as `acc`, keyed
+  `h1` / `h3` / `day` / `h24` / `h72`. Each is `[mm, derived, spanHours]` or `null` where nothing can
+  answer. `derived` is 1 where this app worked the number out, and the card prints an asterisk on
+  it. 1 hour, 3 hours and today come off the feed. 24 and 72 hours go through `accWindow()`, which
+  subtracts two `cumulativeRainfall` samples. Those live in the `level` table under a `#c` suffix,
+  so there is no schema change and `RETAIN` prunes them with the rest.
+  `ACC_READ` (80 h) is their own load window, because `READ` is 24 h and too short. KL publishes no 3-hour total, so those 37 stations use
+  `accHours()`, which refuses to answer unless every clock hour in the window has a reading.
 - Response also carries real diagnostics used by the status popover: `tookMs`, `details.ok/requested`,
   `offline`, `cacheAge`, `sourceUpdated`.
 - **`?place=<query>` — the go-to box's place search.** Proxies OpenStreetMap Nominatim server-side, so
@@ -380,6 +395,33 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   Two side effects to keep: the `(station, ts)` PK now dedupes a repeated reading to one row, and a
   station frozen on an old reading stores that old stamp, so `RETAIN` prunes it and `SPARK_WIN`
   excludes it instead of drawing a flat live-looking line.
+- **A rain total over 24 or 72 hours is a difference, never a sum.** `cumulativeRainfall` only
+  climbs, so `accWindow()` subtracts two samples. **Do not add up `hourly` buckets instead.** A sum
+  loses the rain in every gap and reports a small number with nothing to say it is short.
+  Measured on this box, the archive held 9 of the last 24 clock hours and a 15-hour hole.
+  A sum renders that as a dry day. The scrapers already fail silently by design, and a total with no alarm behind
+  it is worse than none. A difference cannot lose rain: a missed poll widens the window instead, and
+  the payload measures that wider window, so the card states `measured over 26.1 h` rather than
+  claiming 24. Four things return `null` rather than a number: an empty series, no sample at or
+  before the far end, a backwards odometer (the 1 January reset), and both ends on one sample.
+  `accHours()` is the KL fallback and obeys the same rule from the other side — all three clock
+  hours or nothing, because a short sum reads as light rain. **The `#c` series began 2026-08-13 and nothing
+  can fill it in**, because no earlier poll stored `cumulativeRainfall`. Both long windows published
+  `null` everywhere for the first day.
+- **The accumulation chart carries no threshold mark, and three sources failed to supply one.** It
+  says how much rain fell and never how bad that is — `rainBars()` above it already draws the JPS
+  intensity classes and `rainState()` above that prints the word. A curve fitted between
+  `spVeryHeavy` (61 mm/h) and the MET figure of 240 mm/day joins a **1.7-year event to a 216-year
+  one**, two
+  orders of magnitude apart in rarity, so it measures the gap between two definitions and nothing
+  about rain. JPS publishes MSMA 2nd Edition Equation 2.2, which covers 5 minutes to 72 hours
+  exactly, and it still loses: an IDF curve needs 20–30 years of record at one spot, JPS published
+  12 such gauges in this area, and **only 11 of 230 stations stand on one**. The rest borrow
+  climatology from another place at a median of 11 km. `spVeryHeavy` alone is per-station and honest
+  but marks the 1-hour bar only. A dry station therefore draws five empty tracks and **not** a
+  sentence: any sentence has to name a window, and "No rain in the last 72 hours" on a station whose
+  72-hour total is unknown is the exact claim this refuses to make. Five rows keep a measured zero
+  and an unanswered window apart. See `docs/superpowers/specs/2026-08-12-cumulative-rainfall-chart-design.md`.
 - **A tide is a rise, and three of these stations are tidal.** PINTU AIR IJOK is a water gate;
   BANDAR KLANG and TELUK PENYAMUN (JETI) are estuarine. They climb 0.5–0.7 m/h twice a day forever,
   so any rate-based forecast flags them daily. The guard is `level ≥ its own 24h high`, not a

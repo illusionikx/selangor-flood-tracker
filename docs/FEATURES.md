@@ -8112,3 +8112,91 @@ The heat layer states where the rain was observed, at the resolution the network
 
 **The water layer keeps 5 km.** Only its paint was wrong, not its number. A river level is a
 catchment claim and the catchment does not shrink because the brush was miscalculated.
+
+## Rain totals over five nested windows
+
+A rainfall sensor draws a second chart under its area graph. It shows the rain that fell in the
+last 1 hour, 3 hours, today from midnight, 24 hours and 72 hours. Each total is one horizontal bar.
+The station card and the table popover share one function, the way both already share `rainBars()`.
+
+Flash Flood Guidance publishes nested windows because each window answers a different question.
+A short window measures drainage overload. A long window measures how wet the ground already is.
+Sensitivity to earlier soil moisture falls as the window grows. So 1 hour and 72 hours are two
+facts rather than two views of one fact.
+
+Each window contains the one above it, so the bars normally grow down the list. One exception is
+real and it stays. Near midnight "Today" is younger than "3 hours". At 01:00 today holds one hour
+of rain and the 3 hour window reaches back into yesterday.
+
+### Three of the five totals were in the feed all along
+
+The Selangor rainfall detail endpoint publishes `threeHoursRainfall`, `cumulativeRainfall` and four
+`sp*` class thresholds beside the `hourlyRainfall` this app already read. This app fetched every one of them and threw
+it away on every poll since somebody wrote the proxy. So the 1 hour, 3 hour and today totals are
+fields rather than calculations.
+
+### 24 and 72 hours are a difference, never a sum
+
+Nobody publishes those two. `cumulativeRainfall` is a year to date odometer, so the rain between
+two samples is one subtraction. `accWindow()` in `api.php` does that subtraction.
+
+Do not add up `hourly` buckets instead. A sum loses the rain in every gap and reports a small
+number with nothing to say it is short. Measured on this box, the archive held 9 of the last 24
+clock hours and a 15 hour hole. A sum renders that as a dry day, and the scrapers already fail
+silently by design. A total with no alarm behind it has no place here.
+
+A difference fails a different way. A missed poll widens the window rather than losing the rain
+inside it, and the payload can measure that wider window. So the chart states 26.1 hours instead
+of claiming 24.
+
+The samples ride in the `level` table under a `#c` suffix. That needs no schema change, and
+`RETAIN` prunes them with everything else. No station id ends that way, so nothing can mistake an
+odometer row for a level.
+
+The series started on 2026-08-13 and nothing can fill it in, because no earlier poll ever stored
+`cumulativeRainfall`. So both long windows publish `null` until the archive reaches back that far.
+
+### An asterisk marks what this app worked out
+
+A total read from a feed carries nothing. A total this app computed carries an asterisk, and one
+footnote line appears under the chart to say what the asterisk means. The 24 and 72 hour totals
+always carry one. KL publishes no 3 hour total, so its 37 stations add clock hours for that row and
+carry one there too. That sum refuses to answer unless every clock hour has a reading, because a
+short sum reads as light rain.
+
+Measured across 230 rainfall stations and five windows: 56.8% of bars come from a feed, 36.8%
+carry an asterisk, and 6.4% hold no answer at all.
+
+### The chart carries no threshold mark, and three sources failed to supply one
+
+This chart answers how much rain fell. It never answers how dangerous that is. `rainBars()`
+directly above already draws the JPS intensity classes across its plot, and `rainState()` above
+that prints the word. The card answers the severity question twice before these bars start.
+
+This design tried three sources for a mark. Record all three, because each one looks reasonable
+until somebody measures it.
+
+**A curve fitted between the two published warning levels.** The first draft fitted a power curve
+through `spVeryHeavy` at 1 hour and the MET figure of 240 mm at 24 hours. MSMA prices those two
+numbers at a 1.7 year event and a 216 year event. They are 2 orders of magnitude apart in rarity,
+so a curve through them measures the distance between two unrelated definitions.
+
+**MSMA return periods.** JPS publishes MSMA 2nd Edition Equation 2.2, and its validity range of 5
+minutes to 72 hours covers every window here exactly. It is the right instrument and it still fails
+on coverage. An IDF curve needs 20 to 30 years of continuous high-resolution record at one spot.
+JPS found about 135 such sites nationwide and 12 in this coverage area. Only 11 of 230 stations
+stand on one. The other 219 borrow climatology from another place, at a median of 11.1 km and up to
+33.5 km, through convective rain beside a mountain range. The constants are sound. The borrowing is
+the compromise, and it lands on 95.2% of the chart.
+
+**A station and its own `spVeryHeavy`.** JPS publishes it per station, so this route borrows
+nothing. But it is a one hour intensity class. It can mark the 1 hour bar and nothing else, and one
+marked bar beside four bare ones reads as though only that window matters.
+
+A dry station draws five empty tracks rather than one sentence. The sentence has to name a window, and the
+two long ones are exactly the windows a young archive cannot answer. "No rain in
+the last 72 hours" on a station whose 72 hour total is unknown is the claim this design refuses to
+make. Five rows keep a measured zero and an unanswered window visibly apart.
+
+The full record, including the measurements behind each rejection, is in
+`docs/superpowers/specs/2026-08-12-cumulative-rainfall-chart-design.md`.
