@@ -988,6 +988,17 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   defaults into `cachedPayload()`, the one function both exits call before they echo anything to a
   browser. A flag two exits can both return needs one default both of them share, not a copy pasted
   into each.
+- **`cacheAge` always reports 0, and the payload `ETag` is stable only because of that bug.**
+  `cachedPayload()` ends `['forced' => false, 'forceWhy' => null] + $j + ['cacheAge' => ...]`. The
+  array `+` operator in PHP is left-biased. `$j`, the stored payload, already carries a `cacheAge`
+  key. The write further down this file sets it to `0` every time. So the freshly computed value on
+  the right never survives the merge. Every cached read reports `cacheAge: 0`, even two polls apart.
+  `payloadValidators()` hashes the whole body into the `ETag`. A `cacheAge` frozen at `0` is one
+  reason that hash holds still between polls. **Do not repair `cacheAge` alone.** A real, rising
+  number changes the body every second. That changes the `ETag` every second. The `304` in
+  `sendPayload()` stops firing, and nothing errors. The feature looks like it still works. Fix
+  `cacheAge` and exclude the volatile diagnostics from the hash in `payloadValidators()` in the same
+  change. Otherwise the `304` stops firing, and nobody notices.
 - **Moving an element to a new parent can change which flex rule governs it, even when the
   element's own rules stay the same.** `.testtog` was a flex item inside `.modalhead`. There,
   `flex: none` sized it to its own content, and it drew as a pill. Moved to sit as a block child of

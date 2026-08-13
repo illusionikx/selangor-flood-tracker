@@ -7636,8 +7636,14 @@ The siren list already carries `status`. The detail call adds exactly one more f
 to keep one timestamp current on a sensor that reports once a day.
 
 `sirenWanted()` reads the list first. A siren currently sounding still gets a detail call every
-rebuild, so a real alarm loses no latency. A quiet siren refreshes on `SIREN_TTL`, one hour, so the
-daily count drops to 5,088.
+rebuild, so a real alarm loses no latency. A quiet siren refreshes on `SIREN_TTL`, one hour.
+
+**5,088 is the floor, not the real count.** It assumes every siren stays quiet all day. This
+payload holds 7 sirens stuck at a non-zero status. `sirenWanted()` fetches each of those on every
+rebuild, not once an hour. The other 205 sirens still refresh on `SIREN_TTL`. The real daily count
+is 6,936: 205 sirens times 24 fetches, plus 7 sirens times 288 fetches (`TTL`, 300 seconds, is the
+rebuild cadence). A siren stuck at a non-zero status is now the most expensive siren on the map. It
+never earns the hourly refresh.
 
 **`SIREN_TTL` must not grow to six hours.** The history pass stamps each sample from
 `statusLastUpdate`. The `(station, ts)` primary key drops a repeated stamp. Six hours between
@@ -7658,9 +7664,13 @@ borrows one. Only a siren does.
 wall draws about 90 tiles on one page. Every reader looking at that wall multiplied JPS traffic by
 90.
 
-The still now stays on disk for `CAM_TTL` (300 seconds). That matches the lifetime the
-`Cache-Control` header on this endpoint already claims, and the same number as `POLL_MS` in
+The still now stays on disk for `CAM_TTL` (300 seconds), the same number as `POLL_MS` in
 `js/config.js`. A still cannot change faster than the payload that names it.
+
+The `Cache-Control` header on a hit reports the remaining life of the file, not the full `CAM_TTL`.
+A file 299 seconds old sends `max-age=1`, not `max-age=300`. The disk cache and the browser cache
+compose. A header that always claimed 300 let a reader hold a still for two cycles while both
+layers claimed one.
 
 A cache hit answers with no lookup at all. A miss reads `.cams.json`, a small camera-id-to-URL map
 the rebuild writes, instead of decoding all of `.cache.json` for one string. Measured after

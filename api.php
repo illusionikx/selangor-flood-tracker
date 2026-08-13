@@ -357,9 +357,13 @@ if (isset($_GET['cam'])) {
 
     /* A cached still answers without a lookup and without touching JPS. This is the whole point of
        the endpoint: 90 tiles times every reader used to be 90 times every reader at the agency. */
-    if ($hit && is_file($hit) && time() - filemtime($hit) < CAM_TTL) {
+    if ($hit && is_file($hit) && ($age = time() - filemtime($hit)) < CAM_TTL) {
         header('Content-Type: image/jpeg');
-        header('Cache-Control: max-age=' . CAM_TTL);
+        /* The remaining life of this file, not the whole of CAM_TTL. The disk cache and the browser
+           cache compose: a file served at 299 seconds old under `max-age=300` reaches a reader 599
+           seconds old, while both layers claim 300. This is the rule the ?sheet= header already
+           follows, where a cached strip may not outlive one capture cycle. */
+        header('Cache-Control: max-age=' . max(1, CAM_TTL - $age));
         readfile($hit);
         exit;
     }
