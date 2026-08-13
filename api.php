@@ -819,6 +819,15 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
     $ok('a fresh stamp keeps it shut',       forceAllowed($now, $now - 60, SIREN_TTL)[0] === false);
     $ok('no stamp at all opens a sweep',     forceAllowed($now, null, SIREN_TTL)[0] === true);
 
+    echo "\nsiren timestamp carry forward:\n";
+    $seen = ['siren-7' => '01/08/2026 09:00:00'];
+    $pick = fn(array $fg, array $sn, string $kind, $id) => $fg['statusLastUpdate'] ?? $sn['statusLastUpdate']
+         ?? ($kind === 'siren' ? ($seen["siren-$id"] ?? null) : null);
+    $ok('a fetched siren uses its own stamp',   $pick([], ['statusLastUpdate' => 'new'], 'siren', 7) === 'new');
+    $ok('an unfetched siren keeps the old one', $pick([], [], 'siren', 7) === '01/08/2026 09:00:00');
+    $ok('an unknown siren still gets null',     $pick([], [], 'siren', 99) === null);
+    $ok('a camera never borrows a siren stamp', $pick([], [], 'camera', 7) === null);
+
     echo "\nserveFromCache():\n";
     $ok('a fresh cache is served',                 serveFromCache(10, true, false) === true);
     $ok('a force rebuilds a fresh cache',          serveFromCache(10, true, true) === false);
@@ -1640,6 +1649,17 @@ foreach ($riverList as $s) {
     ];
 }
 
+/* The last `statusLastUpdate` this server saw for each siren, read from the payload it wrote on the
+   previous rebuild. A siren we did not fetch this time keeps the timestamp it already had.
+   Not fetching a siren is not evidence that it reported now. Without this, readTs() falls back to
+   the poll time, which is the one thing a sample stamp must never be. It also defeats the
+   (station, ts) key that holds a repeated reading to one row: measured at 6 rows per siren per
+   hour against a daily heartbeat. See the reading-stamp gotcha in CLAUDE.md. */
+$sirenSeen = [];
+foreach ((json_decode((string)@file_get_contents(CACHE), true)['stations'] ?? []) as $p) {
+    if (($p['kind'] ?? '') === 'siren' && !empty($p['updated'])) $sirenSeen[$p['id']] = $p['updated'];
+}
+
 foreach ([['siren', 'StationSirens'], ['gauge', 'StationFloodGauges'], ['camera', 'CCTVS']] as [$kind, $ep]) {
     foreach ($get($ep) as $s) {
         $cam = $kind === 'camera' ? ($details[API . 'CCTVS/' . $s['stationId']] ?? []) : [];
@@ -1648,7 +1668,8 @@ foreach ([['siren', 'StationSirens'], ['gauge', 'StationFloodGauges'], ['camera'
         // Siren detail exists only for the timestamp — the list says a siren is "online" forever,
         // including ones that last reported over a year ago.
         $sn  = $kind === 'siren' ? ($details[API . 'StationSirens/' . $s['stationId']] ?? []) : [];
-        $updated = $fg['statusLastUpdate'] ?? $sn['statusLastUpdate'] ?? null;
+        $updated = $fg['statusLastUpdate'] ?? $sn['statusLastUpdate']
+                ?? ($kind === 'siren' ? ($sirenSeen['siren-' . $s['stationId']] ?? null) : null);
 
         // A siren that hasn't checked in for two of its daily heartbeats is not idle, it is out of
         // contact — and "IDLE" on a dead siren is the most dangerous thing this map could print.
