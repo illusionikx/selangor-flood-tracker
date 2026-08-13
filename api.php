@@ -1378,7 +1378,7 @@ function cachedPayload(): array {
  * Set the two validators on a payload response, and return the ETag.
  *
  * Three exits echo a payload and only one of them may exit, so the headers live here and the
- * exiting behaviour lives in sendPayload() below. One function sets these headers, so no exit can
+ * exiting behavior lives in sendPayload() below. One function sets these headers, so no exit can
  * drift from the others. A default written into one exit alone reached none of the others once
  * already, which is the `forced` flag gotcha in CLAUDE.md.
  */
@@ -2208,8 +2208,12 @@ if (file_put_contents($camTmp, json_encode($camMap), LOCK_EX) === false || !@ren
 
 file_put_contents(CACHE, $payload, LOCK_EX);
 /* Not sendPayload(): captureShots() still has to run below, so this exit must not exit either. The
-   validators come from the same function as the other two exits. */
-payloadValidators($payload);
+   validators come from the same function as the other two exits.
+   The guard is for the deploy target. There the fastcgi branch above answers a reader from stale
+   cache, closes the connection, and falls through to here to rebuild. It has already set these
+   headers for that reader. Setting them again after the connection closes warns in the log and
+   reaches nobody. `headers_sent()` is true exactly in that case and false on every other path. */
+if (!headers_sent()) payloadValidators($payload);
 echo $payload;
 
 /* Last, and still inside the refresh lock. The payload is already on the wire, so nothing the map
