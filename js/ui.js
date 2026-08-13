@@ -14,8 +14,8 @@ import { alerts, toggleAlerts } from './alerts.js';
 import { ticker } from './ticker.js';
 import { openTimeline, reset } from './timeline.js';
 import { load, feedRows, sourceRows, lastPayload } from './net.js';
-import { paintTestChrome } from './test.js';
 import { askJson } from './ask.js';
+import { lazy } from './lazy.js';
 import * as wall from './wall.js';
 import './sparktip.js';   // side effect only: one delegated readout for every graph on the page
 
@@ -166,10 +166,20 @@ eggBox.onclick = () => {
 // that was edited in place, and the only honest undo is the real payload again.
 
 el('testMode').checked = state.test;      // always false on load — the flag is session-only
-paintTestChrome();
-el('testMode').onchange = () => {
+el('testMode').onchange = async () => {
   state.test = el('testMode').checked;
-  paintTestChrome();
+  /* Loaded here and nowhere else. test.js is 5.6 KB for a mode a reader enters deliberately, and
+     `state.test` is false on every landing, so nothing on the landing path needs this module.
+     The box is disabled while the module arrives, which is the honest state: the toggle has been
+     pressed and has not taken effect yet. */
+  const b = el('testMode');
+  b.disabled = true;
+  try {
+    const m = await lazy(() => import('./test.js'), b.closest('label') || b);
+    m.paintTestChrome();
+  } finally {
+    b.disabled = false;
+  }
   load();
 };
 // The badge's own escape hatch: whoever is looking at a fake flood may not be whoever switched it

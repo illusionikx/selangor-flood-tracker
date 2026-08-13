@@ -7,7 +7,6 @@ import { render } from './render.js';
 import { alerts } from './alerts.js';
 import { alertToast } from './toast.js';
 import { ticker } from './ticker.js';
-import { seedTest } from './test.js';
 import { askJson } from './ask.js';
 
 /* A dot on the mark. It answers one question — is what I am looking at current? — and every extra
@@ -146,7 +145,9 @@ export async function load() {
     if (j.siteM) state.siteM = j.siteM;   // the radius api.php actually grouped these by
     // Before anything reads it, and only in the client's copy — see test.js. Nothing downstream
     // needs to know it is looking at a drill, which is the point: the drill exercises the real code.
-    if (state.test) seedTest(state.data);
+    // Awaited, not fired and forgotten. render() below draws whatever state.data holds at that
+    // moment, so a drill that arrives one tick late would draw the real payload first.
+    if (state.test) (await import('./test.js')).seedTest(state.data);
     // render() blocks for as long as it takes to build 400-odd markers and popups, so the line
     // has to be given a frame to paint in — set and then rendered in the same task, it would
     // never appear at all.

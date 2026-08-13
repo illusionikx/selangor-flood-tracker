@@ -781,15 +781,11 @@ table.data .dash { color: var(--outline); }
 .camtile::before {
   content: ''; position: absolute; inset: 0; z-index: 2;
   background-color: var(--hover);
-  background-image: linear-gradient(100deg,
-    transparent 30%, color-mix(in srgb, var(--on-surface) 12%, transparent) 50%, transparent 70%);
+  background-image: var(--skel-img);
   background-size: 200% 100%;
-  animation: camskel 1.4s ease-in-out infinite;
+  animation: skel 1.4s ease-in-out infinite;
 }
 .camtile.done::before { content: none; animation: none; }
-@keyframes camskel { from { background-position: 100% 0; } to { background-position: -100% 0; } }
-/* A still skeleton, not a moving one, for anyone who asked for less motion — the shimmer is
-   decoration, and 90-odd tiles animating at once is 90-odd more reasons to honour the setting. */
 @media (prefers-reduced-motion: reduce) { .camtile::before { animation: none; } }
 
 /* Over the foot of the picture, on a gradient. In flow under it, the name would cost a row of

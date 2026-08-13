@@ -703,3 +703,23 @@ dialog:focus, dialog:focus-visible { outline: none; }
 @media (prefers-reduced-motion: reduce) {
   .shotwrap::after { animation-duration: 2.4s; }
 }
+
+/* One skeleton look for every surface that waits. The camera wall had it first and still uses it,
+   through the shared gradient and keyframes below. Two looks for one state is what this prevents.
+   The gradient is a custom property because a wall tile draws it on a pseudo-element and the other
+   surfaces draw it on real elements, and both must resolve the same value. */
+:root {
+  --skel-img: linear-gradient(100deg, transparent 30%,
+    color-mix(in srgb, var(--on-surface) 12%, transparent) 50%, transparent 70%);
+}
+@keyframes skel { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+.skel {
+  background-color: var(--hover);
+  background-image: var(--skel-img);
+  background-size: 200% 100%;
+  animation: skel 1.4s ease-in-out infinite;
+  border-radius: 6px;
+}
+/* A still skeleton for anyone who asked for less motion. The shimmer is decoration, and a grid of
+   them animating at once is that many more reasons to honor the setting. */
+@media (prefers-reduced-motion: reduce) { .skel { animation: none; } }
