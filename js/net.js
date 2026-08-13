@@ -47,8 +47,20 @@ export const sourceRows = j => [
 /** The payload the chip is currently describing, so the About dialog reports the same poll. */
 export const lastPayload = () => last;
 
+/* Two messages, not a taxonomy of faults. Whatever broke, the reader's next move is the same:
+   read the age on screen and decide whether to trust it. So the message says which of the two
+   things a reader can act on has happened, and the age rows below it carry the rest.
+   None of our own words for the plumbing: no status code, no exception text, no `proxy`. The raw
+   `e.message` used to land here, and it reads `Unexpected token '<'` or `Failed to fetch`
+   depending on the browser. */
+const netMessage = () => navigator.onLine ? 'Could not reach the server.' : 'No connection.';
+
 function network(j, err) {
-  last = err ? null : j;
+  /* Keep describing what is on screen. A failed poll leaves the last good payload drawn on the
+     map, so the age of those readings is exactly what a reader needs at that moment. Clearing this
+     dropped the age rows precisely when they mattered, and left the popover with a problem and no
+     way to judge it. */
+  if (!err) last = j;
   const stale = j && j.sourceUpdated && (Date.now() - new Date(j.sourceUpdated)) / 3.6e6 > 2;
   // Test mode outranks every real state: whatever the feed is doing, the map is not showing it.
   // Tokens, not hexes: the dot sits on the app bar, which is white on one theme and near-black on
@@ -62,7 +74,14 @@ function network(j, err) {
   /* The word leads the popover instead of sitting in the bar. The dot on the mark says *something
      changed* in a colour; which state it is now is a word, and a word needs a place to be read
      rather than a place to be glanced at. Nothing is lost: this row is the old chip's label. */
-  const rows = [['status', text], ...(err ? [['problem', err]] : feedRows(j))];
+  /* The problem line and the age rows are not alternatives. On a failure the reader wants both:
+     what went wrong, and how old the map under it is. `last` survives a failure now, so the age
+     rows still have a payload to describe. */
+  const rows = [
+    ['status', text],
+    ...(err ? [['problem', netMessage()]] : []),
+    ...(last ? feedRows(last) : []),
+  ];
 
   const dot = el('net');
   dot.style.setProperty('--c', color);         // dot and halo follow the state
