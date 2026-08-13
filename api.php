@@ -1957,6 +1957,15 @@ $hist = [];
 foreach ($db->query('SELECT station, ts, level FROM level WHERE ts >= ' . ($now - READ) . ' ORDER BY ts') as $r) {
     $hist[$r['station']][] = [(int)$r['ts'], (float)$r['level']];
 }
+/* The odometer series, on its own clock. `$hist` loads READ, which is 24 hours and right for a
+   trend, and short for a 72 hour total. So the cumulative keys take a second read at ACC_READ.
+   The `#c` suffix keeps them in the one table with no schema change, and RETAIN prunes them with
+   everything else. No station id ends in `#c`, so these rows can never be read as a level. */
+$odo = [];
+foreach ($db->query('SELECT station, ts, level FROM level WHERE station LIKE \'%#c\' AND ts >= '
+                    . ($now - ACC_READ) . ' ORDER BY ts') as $r) {
+    $odo[$r['station']][] = [(int)$r['ts'], (float)$r['level']];
+}
 $samples = [];
 
 $stations = [];
@@ -1980,6 +1989,11 @@ foreach ($rainfallList as $s) {
         'code'     => $s['station_Id'] ?? null,   // national JPS code — the key the other feeds share
         'source'   => 'selangor',
         'hourly'   => $d['hourlyRainfall']     ?? null,
+        // Both are already in the detail response and both were discarded on every poll until now.
+        // `hour3` saves adding up clock hours, and `cumulative` is a year-to-date odometer — see
+        // accWindow(). Neither reaches a browser: the acc block below reads them and then drops them.
+        'hour3'      => $d['threeHoursRainfall']  ?? null,
+        'cumulative' => $d['cumulativeRainfall']  ?? null,
         'daily'    => $d['dailyRainfall']      ?? null,
         'updated'  => $d['statusLastUpdate']   ?? null,
     ];
@@ -2139,10 +2153,38 @@ foreach ($stations as &$s) {
     if ($s['kind'] !== 'rainfall' || !isset($s['hourly'])) continue;
     $key = $s['id'];
     $ts  = readTs($s['updated'] ?? null, $now);
-    $s['history'] = sparkPoints(
-        array_merge($hist[$key] ?? [], [[$ts, (float)$s['hourly']]]), $now, RAIN_BUCKET,
-        false, fn($v) => rainStatus($v));
+    // This poll's own reading is not in the table yet, so it is appended to every series read here.
+    $pts = array_merge($hist[$key] ?? [], [[$ts, (float)$s['hourly']]]);
+    $s['history'] = sparkPoints($pts, $now, RAIN_BUCKET, false, fn($v) => rainStatus($v));
     $samples[$key] = [$ts, (float)$s['hourly']];
+
+    /* Five nested windows, computed here because the client works nothing out. Each entry is
+       [mm, derived, spanHours], and null where nothing can answer honestly. `derived` marks a total
+       this app worked out rather than read off a feed, and the card prints an asterisk on it.
+       The five keys are declared up front so the order is fixed whatever any of them resolves to. */
+    $acc = ['h1' => null, 'h3' => null, 'day' => null, 'h24' => null, 'h72' => null];
+    $acc['h1'] = [round((float)$s['hourly'], 1), 0, null];
+    if (($s['daily'] ?? null) !== null) $acc['day'] = [round((float)$s['daily'], 1), 0, null];
+
+    // Selangor publishes a 3 hour total. KL publishes none, so those 37 stations add clock hours,
+    // and go blank rather than report a sum with an hour missing out of it.
+    if (($s['hour3'] ?? null) !== null) {
+        $acc['h3'] = [round((float)$s['hour3'], 1), 0, null];
+    } elseif (($sum = accHours($pts, $now, 3)) !== null) {
+        $acc['h3'] = [$sum, 1, null];
+    }
+
+    // 24 and 72 hours need the odometer, which only Selangor publishes.
+    if (($s['cumulative'] ?? null) !== null) {
+        $series = array_merge($odo[$key . '#c'] ?? [], [[$ts, (float)$s['cumulative']]]);
+        foreach (['h24' => 86400, 'h72' => 259200] as $k => $win) {
+            if (($w = accWindow($series, $now, $win)) !== null) $acc[$k] = [$w[0], 1, $w[1]];
+        }
+        $samples[$key . '#c'] = [$ts, (float)$s['cumulative']];
+    }
+
+    $s['acc'] = $acc;
+    unset($s['hour3'], $s['cumulative']);   // read here, never sent to a browser
 }
 unset($s);
 
