@@ -11,9 +11,18 @@ import { byId } from './stations.js';
    gap a deferred import opens: a reader can close a card before the module arrives, and without
    this the stop would find nothing and the start would then play a clip on a closed card.
    No skeleton here. The card already shows a still, which CLAUDE.md names as one of the two
-   allowed shapes for a picture path. */
+   allowed shapes for a picture path.
+   `.then(fn, onImportFailed)` rather than a trailing `.catch`. A rejection handler passed as the
+   second argument sees only the import failing. An error thrown inside `fn` is a bug in the clip
+   itself and has to surface in the console rather than vanish.
+   Clearing `clipMod` on a failure matters too. The cache holds the promise, not the module, so a
+   single rejected import would otherwise be cached for the session and every later card open would
+   quietly do nothing. */
 let clipMod;
-const withClip = fn => (clipMod ??= import('./clip.js')).then(fn).catch(() => {});
+const withClip = fn => (clipMod ??= import('./clip.js')).then(fn, err => {
+  clipMod = null;
+  console.warn('clip.js did not load', err);
+});
 
 // maxZoom on the map, not just the tile layer: markercluster is added below at module load, before
 // setBasemap() has run, and it throws "Map has no maxZoom specified" if no layer declares one yet.
