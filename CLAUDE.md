@@ -1169,6 +1169,13 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   a claim MET makes about an area. A station count is a claim this app makes about a sensor. Merging
   the two makes the app assert something it cannot observe. Anything that later wants a warning to
   raise the count goes through the alert design standard first.
+- **The payload poll must never pass `cache: 'no-store'`.** The server sends an `ETag` with every
+  response. An unchanged poll then costs one 304 and about 200 bytes instead of the full body.
+  `no-store` skips that check and forces a full fetch every time, on a poll that runs every few
+  minutes for as long as the tab stays open. `js/ask.js`'s `askJson()` passes `cache` through only
+  when a caller asks for it, so the payload poll must call it with no `cache` option at all. The
+  force-refresh button sets `no-store` on purpose, because defeating the cache is the whole point
+  of that one button.
 ## Conventions
 
 - **Anything that alerts is checked against the alert design standard** in

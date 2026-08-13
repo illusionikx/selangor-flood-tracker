@@ -7734,3 +7734,53 @@ The service worker plays no part here. `sw.js` returns without calling `respondW
 - **No new stampede guard for the ETag comparison.** `sendPayload()` runs after `cachedPayload()`
   or a fresh rebuild, both of which already sit behind the refresh lock or the file cache. A
   conditional request reaches no new code path to JPS.
+
+## Every client-side JSON fetch now goes through one wrapper
+
+Five places in the browser called `fetch()` directly: the payload poll, the force-refresh
+button, the place search, the camera wall tiles, and the lightbox archive fetch. Each one wrote
+its own timeout, its own retry, and its own error text. Plain `fetch()` gave none of the three.
+
+### `js/ask.js` adds three things
+
+`askJson(url, opts)` now carries every one of those five requests. It adds three things
+`fetch()` does not do on its own.
+
+- A timeout, through `AbortSignal.timeout()`. Plain `fetch()` waits forever on a hung worker.
+- A throw on any status outside 200 to 299. Plain `fetch()` resolves on a 500. Calling
+  `r.json()` on an HTML error page then throws a message written for a browser vendor.
+- One retry, on a network fault or a timeout. A single dropped packet used to cost a red status
+  dot for the rest of the five-minute poll window.
+
+The payload poll passes no `cache` option. The server sends an `ETag`. An unchanged poll then
+costs a 304 and about 200 bytes. `cache: 'no-store'` skips that check and forces a full fetch
+every time. The force-refresh button sets `no-store` on purpose. Defeating the cache is the
+whole point of that button.
+
+### The camera wall reads the archive, not a live still
+
+Each tile on the camera wall now loads `api.php?shot=<id>`, the newest stored frame. Before this
+change it loaded `api.php?cam=<id>`, a live fetch that reaches JPS on every request.
+
+Measured on one tile: the archive route answers in about 0.07 seconds and 186 KB. The live route
+takes about 0.83 seconds and 275 KB. Ninety tiles on one page used to multiply that live cost by
+ninety, for every reader who opened the wall.
+
+A tile can still fall back to `api.php?cam=<id>` once. That path runs inside the error handler in
+`onSettle()`, for a camera JPS only just added, whose archive holds nothing yet.
+
+### `null` and `[]` mean different things after a `?shots=` call
+
+The lightbox scrubber asks `?shots=<id>` for the frame list stored for one camera. `[]` means the
+camera holds no stored frames. That is a fact about the archive.
+
+A failed request now resolves to `null` instead. A timeout, a dropped connection, and a bad
+status all count as failed. `null` is a fact about this client, not about the camera.
+
+Before this change, both cases produced `[]`. A failed request then drew the scrubber exactly
+like an empty archive: no scrubber, no line of text, and no way to tell the two apart.
+
+`#tlfail` now carries the difference on screen. `openTimeline()` shows "Could not load the
+archive." only when `rows` is `null`. An empty archive still draws nothing, exactly as before.
+`reset()` hides `#tlfail` between cameras. A failure on one camera must not follow the reader to
+the next.
