@@ -87,7 +87,7 @@ function paintBar() {
    way back up, it has already stopped propagating from the `<img>` itself. Bound once, below, rather
    than inside open(): `#camGrid` is static markup in index.html and is never recreated, only its
    children are, so one pair of listeners outlives every open()/close() cycle and needs no rebinding.
-   `arm()` succeeding rewrites `img.src` once, from the live still to the strip, so a second `load`
+   `arm()` succeeding rewrites `img.src` once, from the archived frame to the strip, so a second `load`
    can still arrive on this same `<img>` after the first — the first branch below is what stops this
    counting a tile twice. Nothing else touches the visible `<img>` again after that: `tick()` only
    ever writes the `--i` custom property css/chrome.css reads, and arm()'s own probe is a detached
@@ -105,8 +105,10 @@ function paintBar() {
 function onSettle(e) {
   const t = e.target.closest('.camtile');
   if (!t) return;
-  /* Two of the 93 cameras hold no stored frame, so ?shot= answers 404 for them. Spend one live
-     fetch on those rather than drawing the No picture panel over a camera that works.
+  /* A camera no capture has reached yet holds no stored frame, so ?shot= answers 404 for it. Spend
+     one live fetch there rather than drawing the No picture panel over a camera that works. Every
+     tiled camera has a frame today, so this path is unreachable on the current payload. It exists
+     for the next camera the feed adds, which has none until the following capture.
      `data-live` records that the tile has spent that one retry, so a camera that is genuinely dead
      draws the panel instead of alternating between two failing requests forever. The tile is not
      marked `done` here, because it is still loading and `waiting` still counts it. */
@@ -184,8 +186,10 @@ let offline = 0;
    second wave a hook to stop the tile looking pressable in the first place. */
 /* The first picture a tile shows.
  *
- * The archive holds a frame for 91 of the 93 cameras, and shots.php already has it, so a wall of
- * ninety tiles costs the agency nothing. A live still costs 273 KB and about 0.9 s each. The
+ * The archive already holds a frame for every camera a capture has reached, and shots.php has it
+ * on disk, so a wall of ninety tiles costs the agency nothing. Measured on the payload this landed
+ * against: 89 tiles, every one of them with a stored frame. A live still costs 273 KB and about
+ * 0.9 s each. The
  * archived frame costs 186 KB and about 0.06 s, and it is at most SHOT_EVERY old — which is what
  * the strip this tile plays is anyway, so the tile loses no freshness it was going to keep.
  *
@@ -207,7 +211,7 @@ const tileHtml = c => {
 
 /* A tile is armed the first time it comes into view, and never again. Arming is one request: the
    strip itself, read through a detached Image() rather than the tile's own — a missing or too-thin
-   strip must never touch the tile's own `<img>`, which is already showing the live still
+   strip must never touch the tile's own `<img>`, which is already showing the archived frame
    tileHtml() gave it, and a probe that comes back empty has to leave that exactly as it is.
    `ready` is set before the request starts. Two intersections can arrive before it settles, and
    the flag is the only thing stopping the second one probing again.
@@ -220,7 +224,7 @@ const tileHtml = c => {
    plain network failure the way the old code's `catch` did: an `<img>` error event fires the same
    way for a 404 and for a dropped connection, and telling the two apart would need the very
    frame-list fetch this change removes. A tile that misses one probe on a genuine hiccup keeps its
-   live still until the reader scrolls away and back. */
+   archived frame until the reader scrolls away and back. */
 function arm(t, L) {
   L.ready = true;
   const probe = new Image();
