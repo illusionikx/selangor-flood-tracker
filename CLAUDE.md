@@ -1395,9 +1395,12 @@ curl -sk "https://flood-exp.test/api.php?place=Bandar+Utama" \
 curl -sk https://flood-exp.test/api.php | php -r '$s=json_decode(stream_get_contents(STDIN),true)["sources"];
 echo json_encode(["met"=>$s["met"],"metday"=>$s["metday"],"metwarn"=>$s["metwarn"]]),"\n";'
 
-# No station may hold a MET point beyond MET_KM.
+# No station may hold a MET point beyond MET_KM. The radius is read out of api.php rather than
+# copied here: this check sat at a hardcoded 15 after MET_KM moved to 16.5, and reported the 16
+# stations that change was made to recover as failures.
 php -r '$p=json_decode(file_get_contents(".cache.json"),true);
-echo count(array_filter($p["stations"],fn($s)=>($s["met"]["km"]??0)>15))," beyond MET_KM\n";'
+preg_match("/MET_KM\s*=\s*([\d.]+)/",file_get_contents("api.php"),$m);$k=(float)$m[1];
+echo count(array_filter($p["stations"],fn($s)=>($s["met"]["km"]??0)>$k))," beyond MET_KM ($k km)\n";'
 
 # Which warnings survive the geography filter, and how many the feed offered.
 curl -sk https://flood-exp.test/api.php | php -r '$p=json_decode(stream_get_contents(STDIN),true);
