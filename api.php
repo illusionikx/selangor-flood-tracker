@@ -5,6 +5,18 @@
 require_once __DIR__ . '/sources.php';   // the two scraped upstreams (national portal + KL)
 require_once __DIR__ . '/shots.php';     // the camera archive: capture, retention, lookup
 
+/* This PHP runs with `session.auto_start=1`, and the file session handler takes an exclusive lock
+   on the session file for the whole request. Every request that carries the PHPSESSID of one browser
+   therefore runs one at a time. Six concurrent stills measured 1.9, 3.0, 4.3, 5.4, 6.1 and 6.9
+   seconds, which is a clean staircase. The same six with no shared cookie finished in 3.4 seconds
+   together. Four cheap requests finish in 347 ms, so the worker pool is not the reason.
+   Ninety camera tiles queue that way, and the five minute poll queues behind them.
+   Nothing in this repository reads `$_SESSION`, so the lock protects nothing and costs the whole
+   camera wall. Release it before any work starts.
+   Do not replace this with an ini change. The ini belongs to the machine, and this file has to be
+   correct on a machine it does not own. */
+if (session_status() === PHP_SESSION_ACTIVE) session_write_close();
+
 const API   = 'https://infobanjirjps.selangor.gov.my/JPSAPI/api/';
 const TTL   = 300;   // upstream updates hourly; 5 min is plenty
 const SCRAPE_TTL = 900;  // scraped HTML pages: slow to render, and updated no faster than this
