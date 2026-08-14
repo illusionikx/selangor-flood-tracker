@@ -511,13 +511,21 @@ dialog:focus, dialog:focus-visible { outline: none; }
    stretched and knows nothing about either.
    `translateX(-50%)` on the glyph and not on the box, because the box is the rule and the rule
    belongs on the column. Only the mark above it needs centring. */
+/* Amber, and it is the one place a status token paints something that is not a status. Two things
+   make it safe here. It marks a single point on a single graph and never a station, a pin, a row or
+   a badge — nothing that a reader scans for a verdict. And amber is the one hue this plot does not
+   already use: `RAIN_COLOR` draws the intensity classes across it in violet, then `--k-rain-heavy`,
+   then `--s-danger`, so the mark cannot be misread as a class line it sits beside.
+   Grey was the first version and it lost the mark in the plate's own furniture — the rules, the
+   class lines and the history glyph are all `--muted` or near it. Do not widen this to a second
+   annotation without the same two arguments. */
 .spark .peak {
   position: absolute; top: 0; height: 42px; width: 0;
-  border-left: 1px dashed var(--muted); opacity: .7; pointer-events: none;
+  border-left: 1px dashed var(--s-alert); pointer-events: none;
 }
 .spark .peak .i {
   position: absolute; top: 0; left: 0; transform: translateX(-50%);
-  width: 13px; height: 13px; color: var(--muted); pointer-events: auto; cursor: default;
+  width: 13px; height: 13px; color: var(--s-alert); pointer-events: auto; cursor: default;
 }
 /* Against the right edge the glyph hangs its right half off the plate, and the newest sample is the
    right edge — so rain peaking right now is the ordinary case. Anchor the mark inside instead, and

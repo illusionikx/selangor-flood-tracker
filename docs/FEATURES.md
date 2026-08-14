@@ -8861,6 +8861,7 @@ It marks one point on one graph. It never paints a station, a pin, a table row o
 a reader scans for a verdict, and nothing that feeds a count.
 
 Amber is the one hue this plot does not already use. `RAIN_COLOR` draws the intensity classes across
-it in `--k-rainfall`, then `--k-rain-heavy`, then `--s-danger`. Measured on the rendered card, the
-three class lines are violet, mauve and red. So the mark cannot be misread as a class line beside
-it, which is the confusion that would matter here.
+it in `--k-rainfall`, then `--k-rain-heavy`, then `--s-danger`.
+
+Measured on the rendered card, the three class lines are violet, mauve and red. No class line
+shares that hue, so the mark cannot read as one of them. That is the confusion this had to avoid.
