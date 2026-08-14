@@ -1688,7 +1688,17 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   [`docs/FEATURES.md`](docs/FEATURES.md#alert-design-standard) — CAP's separate severity / urgency /
   certainty axes, ISA-18.2's "an alarm requires a response" and its 10-in-10-minutes flood
   threshold, and the cry-wolf finding that false alarms cost more trust than they buy attention.
-  Four gaps are open there; raise them when alert work comes up rather than adding a fifth surface.
+  Four gaps are open there. Raise them when alert work comes up rather than adding a fifth surface.
+- **Three official notice feeds wait for a design, and this line is the reminder.** JPS
+  publishes a flood alert, a weather alert and a media statement at
+  `publicinfobanjir.water.gov.my/ramalan/{amaran-banjir,met-alert,pernyataan-media}/`. A reader asked
+  for all three on 2026-08-14. Each one needs the alert design standard on its own. The media
+  statement is a document list rather than an alarm, so it probably fails that standard. **All three
+  pages held no rows on that date**, which is the reason for the wait. A parser that never meets one
+  real row cannot tell a quiet feed from a moved layout. That is the one way a scraper here must not
+  fail. Design them when a row appears, or sooner with a deliberate zero-row alarm.
+  Do not fold any of them into an existing alert count without the standard first. Background is in
+  `docs/superpowers/specs/2026-08-14-portal-rainfall-river-source-design.md`, under Not in this spec.
 - **Material Design 3 is the reference for every UI decision.** Where M3 names a component, take its
   behaviour from the spec instead of inventing one — a reader already knows the platform convention,
   and a hand-made control costs them that knowledge. The modal drawer is the worked example: both
