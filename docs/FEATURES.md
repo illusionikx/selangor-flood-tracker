@@ -8414,3 +8414,46 @@ draws as a faulty signal, with no pin colour and no blob under it.
 a number, and the asterisk covers totals derived from our own archive rather than totals we quietly
 corrected. A value we invent is worse than one we can show belongs to upstream, which is the rule
 `CAM_FIX` already states about coordinates.
+
+### The rainfall section names its three parts
+
+A rainfall card carries a state block, a 12 hour graph and five window totals. Nothing stood between
+them, so a reader had to work out from the shapes that the three measure three different spans of
+time. Each part now carries one line naming what it answers: `Right now`, `Last 11 h`, `Totals`.
+
+The middle heading states the span the graph actually covers, not the `SPARK_H` cap. A station
+watched for two hours says two hours.
+
+Sentence case, and not the ALL-CAPS of `MODERATE RAIN` under it. That register belongs to a reading.
+A heading is furniture.
+
+Each template emits its own heading, so the table popover gets the same structure and the two
+surfaces cannot drift. The three early returns in `rainBars()` take no heading, because each already
+names its own window in its own sentence.
+
+### The chart marks its own peak
+
+The graph ended with `Peak 60 mm in an hour · last 12 h`. Both halves have moved. The span is the
+heading above the graph, and the peak is a mark on the plot.
+
+**That caption was also wrong.** It printed `hi`, the axis maximum, which is the taller of the data
+peak and the highest intensity class drawn across the plot. A station peaking at 37.5 mm with the
+60 mm class on screen captioned itself `Peak 60 mm in an hour`, a figure no gauge had reported. The
+mark reads `hi0`, the peak of the readings.
+
+The mark is a dashed rule down the column, with a `keyboard_double_arrow_up` glyph at the top and
+the figure and the clock time in `data-tip`. A `title` never opens on a phone, and `show()` in
+`js/sparktip.js` tests `[data-tip]` before `.spark[data-pts]` — so the label wins while the pointer
+is on the glyph, and the per-sample readout takes every other column.
+
+**The mark is HTML over the plot and not a shape inside the SVG.** That viewBox carries
+`preserveAspectRatio="none"`, and the browser stretches it to the plate. Anything drawn inside it
+stretches too. A glyph comes out squashed and a one-unit rule comes out wide.
+
+`.spark` already carries `position: relative` for the axis labels, so a percentage from the same
+`x()` the polyline uses lands on the same column.
+
+**The rule keeps the true column and the glyph moves aside at the edges.** Rain peaking right now is
+the ordinary case, because the newest sample is the last column, and a centred glyph there hangs
+half its width outside the plate. Two classes anchor the mark inward at each end. Only the glyph
+moves.

@@ -494,7 +494,36 @@ dialog:focus, dialog:focus-visible { outline: none; }
 /* The SVG stretches (preserveAspectRatio="none") so the line can use a 0-100 coordinate space at any
    width — which is exactly why the hour labels are HTML underneath rather than <text> inside: text
    in a stretched viewBox comes out distorted. */
+/* One line naming each part of a sensor's body. Rainfall is the only kind with three of them —
+   a state block, a 12 hour graph and five window totals — and they measure three different spans of
+   time with nothing but their shapes to say so.
+   Quieter than `.sensorhead b` at 12px/500, because that names the sensor and this names a part of
+   it. `.sensorhead` already carries `margin-bottom: 6px`, so the first one sits tight under it. */
+.subhead { font-size: 11px; font-weight: 500; color: var(--muted); margin: 10px 0 3px; }
+.sensorhead + .subhead { margin-top: 0; }
+
 .spark { position: relative; margin: 6px 0 4px; }
+/* The peak, marked on the plot. A rule down the column it happened in, with the glyph sitting on
+   top of the plate rather than inside it — a label at the peak's own height would land on the area
+   fill at exactly the moment the reading is highest, which is the one sample it must not hide.
+   Height 42px, matching `.spark svg`, so the rule stops at the plate and never crosses the axis
+   labels under it. Set in pixels for the same reason the plate's height is: the viewBox is
+   stretched and knows nothing about either.
+   `translateX(-50%)` on the glyph and not on the box, because the box is the rule and the rule
+   belongs on the column. Only the mark above it needs centring. */
+.spark .peak {
+  position: absolute; top: 0; height: 42px; width: 0;
+  border-left: 1px dashed var(--muted); opacity: .7; pointer-events: none;
+}
+.spark .peak .i {
+  position: absolute; top: 0; left: 0; transform: translateX(-50%);
+  width: 13px; height: 13px; color: var(--muted); pointer-events: auto; cursor: default;
+}
+/* Against the right edge the glyph hangs its right half off the plate, and the newest sample is the
+   right edge — so rain peaking right now is the ordinary case. Anchor the mark inside instead, and
+   the same on the left. Only the glyph moves. The rule stays on the column it belongs to. */
+.spark .peak.er .i { transform: translateX(-100%); }
+.spark .peak.el .i { transform: none; }
 /* A plate under the plot. Without it a graph holding one sample is a stray line on the card, with
    nothing to say it is a graph at all — which is what a station looks like for the first hour we
    watch it. The plate is the frame the line is drawn in, so an almost-empty one reads as a graph

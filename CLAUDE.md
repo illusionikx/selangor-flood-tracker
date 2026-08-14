@@ -1174,6 +1174,23 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   evidence rather than as a one-off, and treat `.muted` as a colour-plus-size pair. In a compact
   context, either state the size on the element or reach for the token instead of the class.
 
+- **A graph's viewBox is stretched, so a mark on the plot goes in HTML over it, not in the SVG.**
+  Every `.spark` carries `viewBox="0 0 100 28"` with `preserveAspectRatio="none"`, which is what lets
+  one template serve any width — and it stretches everything drawn inside it. A line survives on
+  `vector-effect: non-scaling-stroke`, and nothing else does: a glyph comes out squashed and a
+  one-unit rule comes out wide. The rainfall peak mark is the worked example. `.spark` is already
+  `position: relative` for the axis labels, so a percentage off the same `x()` the polyline uses
+  lands on the same column, and `.peak` is a plain `<b>` with a `border-left` and an `<i>` on top.
+  Its words go in `data-tip`, because `show()` in `js/sparktip.js` tests `[data-tip]` before
+  `.spark[data-pts]` — the label wins while the pointer is on the glyph and the per-sample readout
+  keeps every other column. **A mark near an edge moves the glyph, never the rule**: the newest
+  sample is the last column, so rain peaking right now is the ordinary case rather than an edge case,
+  and a centred glyph there hangs half its width off the plate.
+  **The caption it replaced read the wrong maximum**, and that is the part worth remembering.
+  `rainBars()` holds `hi0`, the peak of the readings, and `hi`, the axis maximum — which is the
+  taller of `hi0` and the highest intensity class drawn across the plot. The caption printed `hi`, so
+  a station peaking at 37.5 mm with the 60 mm class on screen said `Peak 60 mm in an hour`, a figure
+  no gauge had reported. Anything stating a graph's peak reads the data, never the scale.
 - **A label sharing a box with a percentage-height bar has to be reserved with `padding`, and a
   raised `sup` beside it grows the box that reserves it.** Two rules, both on `.acccol` in
   `css/base.css`, and the rain accumulation chart needs each. Its five totals print inside the plate

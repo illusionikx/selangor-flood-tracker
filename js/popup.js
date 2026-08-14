@@ -330,10 +330,17 @@ const RAIN_STATE = ['NOT RAINING', 'LIGHT RAIN', 'MODERATE RAIN', 'HEAVY RAIN', 
    The sentence names the verdict and one fact behind it, and no more. `Faulty signal` is the
    siren's word for the same finding. A rain gauge collects rain into a total, so "collected no
    rain" is the reader's own model of the instrument and needs none of our vocabulary. */
+/* Three parts under one `Rainfall` heading, so each says which question it answers. The section
+   carried a status block, a 12 hour graph and five window totals with nothing between them, and a
+   reader had to work out from the shapes that the three measured different spans of time.
+   Sentence case and not the ALL-CAPS of `MODERATE RAIN` below. That register belongs to a reading,
+   and a heading is furniture. */
+const SUB = t => `<div class="subhead">${t}</div>`;
 const rainState = s => {
-  if (!hasInfo(s)) return '<div class="state">NO READING</div>';
+  if (!hasInfo(s)) return SUB('Right now') + '<div class="state">NO READING</div>';
   const stuck = s.backed === false;
-  return `<div class="state ${stuck ? 'off' : s.status >= 3 ? 'on' : s.status >= 1 ? 'mid' : 'off'}"
+  return SUB('Right now')
+    + `<div class="state ${stuck ? 'off' : s.status >= 3 ? 'on' : s.status >= 1 ? 'mid' : 'off'}"
       >${RAIN_STATE[s.status] || 'NOT RAINING'}</div>
     ${stuck ? '<div class="muted">Faulty signal. This gauge collected no rain this hour.</div>' : ''}`;
 };
@@ -983,7 +990,35 @@ export function rainBars(points) {
   }
   const [id, defs] = areaFill(KINDS.rainfall.color);
 
-  return `<div class="spark"${readout(inWin, x, v => `${v} mm/h`, 'rainfall')}>
+  /* The peak, marked where it happened rather than stated in a line under the graph.
+     **It reads `hi0` and not `hi`.** The caption it replaces printed `hi`, which is the axis
+     maximum — the taller of the peak and the highest class drawn across the plot. So a station
+     peaking at 37.5 mm with the 60 mm class on screen captioned itself `Peak 60 mm in an hour`, a
+     figure no gauge had reported. The `· last 11 h` half of that caption is the heading above the
+     graph now, so nothing of it is lost.
+     Placed in HTML rather than in the SVG, because the viewBox is stretched with
+     `preserveAspectRatio="none"` and anything drawn inside it is stretched with it — a glyph would
+     come out squashed and a 1-unit rule would come out wide. `.spark` is already `position:
+     relative` for the axis, so a percentage from the same `x()` the polyline uses lands on the same
+     column.
+     The words go in `data-tip` and not in a `title`, which never opens on a phone. `show()` in
+     js/sparktip.js tests `[data-tip]` before `.spark[data-pts]`, so this label wins over the
+     per-sample readout while the pointer is on it, and the readout takes every other column. */
+  const pk = inWin.reduce((a, b) => (b[1] > a[1] ? b : a));
+  /* The rule keeps the true column and the glyph moves off centre at the edges, rather than the
+     other way round. Rain peaking right now is the ordinary case, not an edge case — the newest
+     sample is the last column — and a centred glyph there hangs half its width outside the plate. */
+  const px = +x(pk[0]);
+  const peak = `<b class="peak${px > 94 ? ' er' : px < 6 ? ' el' : ''}" style="left:${px}%"
+      data-tip="Peak ${pk[1]} mm in an hour · ${MYT_CLOCK.format(pk[0] * 1000)}"
+    ><i class="i i-keyboard_double_arrow_up"></i></b>`;
+
+  /* The heading carries the span the old caption ended with. It states the ground the graph covers,
+     which is what the reader needs before reading a shape off it — and it is a measurement, not the
+     `SPARK_H` cap, so a station watched for two hours says two hours. The three early returns above
+     name their own window in their own sentence and take no heading. */
+  return SUB(`Last ${spanText(secs)}`) + `<div class="spark"${
+      readout(inWin, x, v => `${v} mm/h`, 'rainfall')}>
     <svg viewBox="0 0 100 28" preserveAspectRatio="none" aria-hidden="true">
       ${defs}
       ${rules(ticks)}
@@ -999,8 +1034,8 @@ export function rainBars(points) {
             style="stroke:${KINDS.rainfall.color}" stroke-width="1.5" stroke-linejoin="round"/>`;
       }).join('')}
     </svg>
+    ${peak}
     ${axisHtml(ticks)}
-    <div class="muted">Peak ${hi} mm in an hour · last ${spanText(secs)}</div>
   </div>`;
 }
 
@@ -1055,7 +1090,8 @@ export function rainAcc(acc) {
       (mm / hi * 100).toFixed(1)}%"></i></div>`;
   };
 
-  return `<div class="acc">
+  // `Totals` and not `Rain totals`: the section is already headed `Rainfall` two lines up.
+  return SUB('Totals') + `<div class="acc">
     <div class="accplot">${rows.map(col).join('')}</div>
     ${/* No `.muted` on an unanswered label. `.accx` already paints every one of them `--muted`, so
           the class added no colour — and it carries `font-size: 12px`, which beat the 10px the row
