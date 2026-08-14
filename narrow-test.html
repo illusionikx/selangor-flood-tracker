@@ -1,0 +1,68 @@
+<!-- The narrow-window block is the one surface here that takes the whole app away from a reader, so
+     every way it can be wrong is expensive. Three of them put nothing wrong on screen. A dialog
+     opened over it wins the top layer and the block covers nothing. A `cancel` that goes through
+     hands back a broken map on one Escape. A threshold that drifts from NARROW_PX in js/config.js
+     blocks a width that works. See `#narrowBox` in css/chrome.css and the tail of js/ui.js.
+
+     chrome --headless=new --dump-dom narrow-test.html -->
+<title>Narrow-window block</title>
+<style>body { font: 13px/1.6 monospace; margin: 16px } .f { color: #b00 }</style>
+<pre id="out">running…</pre>
+<script>
+const L = [], fail = [];
+const ok = (c, n) => { L.push((c ? 'ok   ' : 'FAIL ') + n); if (!c) fail.push(n); };
+const frame = async w => {
+  const f = document.createElement('iframe');
+  f.style.cssText = `width:${w}px;height:760px;border:0;position:absolute;left:-9999px`;
+  f.src = 'index.html';
+  document.body.append(f);
+  await new Promise(r => f.addEventListener('load', r, { once: true }));
+  await new Promise(r => setTimeout(r, 900));        // modules run, the map settles, the bar reflows
+  return f;
+};
+
+(async () => {
+  // NARROW_PX is read out of the source rather than copied here. A check that carries its own copy
+  // of a constant reports on the number it remembers and not on the one the app uses.
+  const px = +(await (await fetch('js/config.js')).text()).match(/NARROW_PX\s*=\s*(\d+)/)[1];
+  L.push(`NARROW_PX = ${px}\n`);
+
+  for (const w of [px + 60, px + 20, px, px - 1, px - 20, 240]) {
+    const want = w < px, f = await frame(w), d = f.contentDocument, b = d.getElementById('narrowBox');
+    ok(b.open === want, `${w}px: the block is ${want ? 'up' : 'down'}`);
+    if (want) {
+      const r = b.getBoundingClientRect();      // covers the viewport, scrollbar included
+      ok(r.width >= w - 1 && r.height >= 759, `${w}px: covers the viewport, ${Math.round(r.width)}x${Math.round(r.height)}`);
+      const hit = d.elementFromPoint(w / 2, 380);
+      ok(b.contains(hit), `${w}px: nothing behind it takes a tap`);
+      /* Assert `defaultPrevented` and not `b.open`. A synthetic event runs no default action, so a
+         dispatched `cancel` leaves the dialog open whether or not anything listened — `b.open` here
+         passes on an app that refuses nothing. `defaultPrevented` is what the browser reads. */
+      const cancel = new f.contentWindow.Event('cancel', { cancelable: true });
+      b.dispatchEvent(cancel);
+      ok(cancel.defaultPrevented, `${w}px: refuses cancel, which is Escape and the phone back gesture`);
+      ok(!b.querySelector('button, [role=button], .icon'), `${w}px: carries no way to dismiss it`);
+    }
+    f.remove();
+  }
+
+  /* The block has to be MODAL, and that is the whole reason it is a <dialog>. A modal dialog is in
+     the top layer, which is not part of any stacking context, so it covers an About box or the
+     camera wall that was already open — something no z-index can do. A plain `show()` paints over
+     the page and leaves it live underneath, which looks identical on screen.
+
+     Focus is what tells the two apart, because `showModal()` makes the rest of the document inert.
+     This is the property and not the scenario. Two attempts at the scenario are worth not
+     repeating. Calling `showModal()` from this file asserted this file's own call, and passed
+     against an app put back to `show()`. Narrowing a live iframe to reach the app's own call needs
+     a layout, and headless virtual time gives neither a reliable `setTimeout` nor an animation
+     frame to wait on. */
+  const g = await frame(px - 20), gd = g.contentDocument, behind = gd.getElementById('menu');
+  behind.focus();
+  ok(gd.activeElement !== behind, 'modal: the page behind the block is inert, so it is in the top layer');
+  g.remove();
+
+  out.innerHTML = L.join('\n') + '\n\n' +
+    (fail.length ? `<b class="f">FAIL</b>\n` + fail.join('\n') : '<b>PASS</b>');
+})();
+</script>

@@ -71,7 +71,7 @@
 <link rel="stylesheet" href="vendor/fonts.css?v=49">
 <link rel="stylesheet" href="css/icons.css?v=86">
 <link rel="stylesheet" href="css/base.css?v=123">
-<link rel="stylesheet" href="css/chrome.css?v=166">
+<link rel="stylesheet" href="css/chrome.css?v=168">
 <link rel="stylesheet" href="css/map.css?v=147">
 
 <!-- Water tint for the dark basemap. CARTO's dark_all is greyscale — all 18 of its tones have zero
@@ -221,6 +221,20 @@
       </div>
     </div>
   </div>
+</dialog>
+<!-- Too narrow to draw a map. A <dialog> rather than a sheet with a large z-index: a dialog opened
+     with showModal() is in the top layer, so it covers an open About box, the all-stations table or
+     the camera wall, which no z-index can do — see the popover gotcha in CLAUDE.md. showModal() also
+     makes the rest of the page inert, so nothing behind this takes a tap or a Tab.
+     It carries no close control on purpose. The only thing that fixes a narrow window is width, so a
+     dismiss button would hand the reader a broken map and call it a choice. js/ui.js refuses the
+     `cancel` event for the same reason, and closes the box itself the moment the width arrives. -->
+<dialog id="narrowBox">
+  <div class="mark"><i class="i i-flood"></i></div>
+  <h2>This screen is too narrow</h2>
+  <p>The map does not fit a window this narrow.</p>
+  <p>Turn your phone to landscape. On a computer, make the window wider.</p>
+  <p class="muted">The map returns when there is room.</p>
 </dialog>
 <div id="splash">
   <div class="mark"><i class="i i-flood"></i></div>

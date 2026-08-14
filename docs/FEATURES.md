@@ -9662,3 +9662,72 @@ alone. Every selector in the ladder goes through `.word >` for that reason.
 `title-test.html` loads the app in an iframe at fifteen widths. It asserts one spelling at a time,
 never wider than its rail, and never a longer spelling on a narrower rail. It prints PASS or the
 failures. Checked against a wrong threshold, it reports all three faults.
+
+## The map refuses a window under 300px
+
+Under 300 CSS pixels the app draws a full-screen block instead of a map. It states the problem, it
+states the two ways out, and it closes itself the moment the width arrives.
+
+```
+This screen is too narrow
+The map does not fit a window this narrow.
+Turn your phone to landscape. On a computer, make the window wider.
+The map returns when there is room.
+```
+
+### The number is a floor somebody chose, not the point where the layout breaks
+
+Measured before the block existed. The app bar holds together down to 245px. Below that the
+document overflows its own width and draws a horizontal scrollbar.
+
+| width | document | overflows |
+|---|---|---|
+| 300px | 300 | no |
+| 280px | 280 | no |
+| 260px | 260 | no |
+| 240px | 244 | yes |
+
+So 300 blocks 55 pixels of width that work today. Weigh two things before you move it.
+
+A Galaxy Fold cover screen is 280 CSS pixels wide, and it lands inside the block. This is a flood
+map, so a reader locked out is a reader with no water levels.
+
+Against that, a map in a 240px keyhole during a flood is worse than a sentence that says to turn
+the phone. `NARROW_PX` in `js/config.js` is the one place to change it.
+
+### It is a dialog, and that is the whole design
+
+`showModal()` puts the box in the top layer, which is not part of any stacking context. So it covers
+an open About box, the all-stations table and the camera wall. No `z-index` can do that — the same
+rule the graph readout already obeys.
+
+`showModal()` also makes the rest of the page inert. Nothing behind the block takes a tap or a Tab.
+No `inert` attribute has to travel over the page to arrange it.
+
+### Nothing dismisses it except width
+
+The box carries no close control. A dismiss button hands the reader a broken map and calls it a
+choice. Only width repairs a narrow window.
+
+`js/ui.js` refuses the `cancel` event, which is what Escape and the phone back gesture raise. The
+media query is live, so the box opens and closes itself. No resize listener runs.
+
+`:root:has(#narrowBox[open])` hides the overflow. The page behind the block is inert, and the
+browser still lays it out. So under 245px it drew a scrollbar along the bottom of the block, for a
+map nobody can reach.
+
+### Three ways this fails with nothing wrong on screen
+
+A dialog opened over it wins the top layer, and the block covers nothing. A `cancel` that goes
+through hands back a broken map on one Escape. A threshold in `js/ui.js` that drifts from
+`NARROW_PX` blocks a width that works.
+
+`narrow-test.html` reads `NARROW_PX` out of the source and asserts all three. Checked against each
+fault in turn, it reports each one.
+
+The check also records two attempts at the top-layer assertion that do not work. A `showModal()`
+call from the check asserts a call this file made. A resize of a live iframe needs a layout, and
+headless virtual time supplies no reliable clock to wait on.
+
+The check asserts the property instead. Focus proves the block is modal, and a modal dialog is in
+the top layer by definition.

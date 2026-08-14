@@ -221,6 +221,14 @@ export const SHEET_W = 480;
 export const FLASH_MS    = 2400;   // how long the jump-to ripple runs
 export const POLL_MS     = 300000; // matches the proxy's cache TTL
 
+/* Under this width the app refuses to draw a map and asks for room instead. Measured: the app bar
+   itself holds together down to 245px and overflows the document below that, so this number is a
+   floor somebody chose and not the point where the layout breaks. Two consequences to weigh before
+   moving it. A Galaxy Fold cover screen is 280 CSS pixels wide and lands inside this block, and this
+   is a flood map, so a reader locked out is a reader with no water levels. Against that, a map in a
+   240px keyhole during a flood is worse than a sentence telling somebody to turn the phone. */
+export const NARROW_PX = 300;
+
 // GitHub Pages has no PHP. The Actions bake flips STATIC to true and drops api.php's output next to
 // index.html as api.json; nothing sniffs the hostname, and the two builds differ by this one line.
 // Camera stills need no proxy in that build: upstream serves the same file over TLS, so an https

@@ -19,12 +19,13 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `api.php` | server-side proxy + cache + source merge + poll history + camera image proxy + rate-limited `?force=1` + place lookup (`?place=`, proxies Nominatim) |
 | `sources.php` | scrapers for the two HTML-only upstreams (national portal, JPS WP) and the three MET feeds (nowcast, forecast, warning) |
 | `shots.php` | camera archive: capture, retention tiers, lookup, and the on-request strip (`buildSheet()`) the wall and the clip play. Required by `api.php` |
-| `shots-test.php` | `php shots-test.php` — one of four runnable checks. Guards retention. Exercises `pruneShots()` |
+| `shots-test.php` | `php shots-test.php` — one of five runnable checks. Guards retention. Exercises `pruneShots()` |
 | `log.php` | where a browser error lands. `js/oops.js` is the only caller. Appends one JSON line to `.client-errors.log` |
 | `watch.php` | reads a payload on stdin and complains when it is wrong. The poll cron pipes into it. Reports a change of state, never a state |
 | `.user.ini` | per-directory PHP settings. Holds one line, `session.auto_start=0`, and the reason it is there |
 | `index.html` | markup only — no inline CSS or JS |
-| `title-test.html` | `chrome --headless --dump-dom` — one of four runnable checks. Guards the app bar wordmark ladder, in rendered pixels |
+| `title-test.html` | `chrome --headless --dump-dom` — one of five runnable checks. Guards the app bar wordmark ladder, in rendered pixels |
+| `narrow-test.html` | `chrome --headless --dump-dom` — one of five runnable checks. Guards the narrow-window block: its threshold, its coverage, its refusal to be dismissed, and that it is modal |
 | `css/icons.css` | every icon, as an SVG mask. Generated — see docs/FEATURES.md for the fetch |
 | `css/base.css` | tokens, reset, controls, blocks shared by popup + alert panel |
 | `css/chrome.css` | page furniture: app bar, status dot, drawer, legend, splash |
@@ -37,7 +38,7 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `js/stations.js` | queries over the station set (`nearestOf`, `nearestCam`, `byId`) |
 | `js/map.js` | map instance, basemap/theme, cluster, the station panel (`openSide`), `focusOn` / `flashTo` |
 | `js/heat.js` | both heat layers (water level, rainfall), ground-fixed sizing per layer, shared opacity, and the field pass where a gauge reporting no rain denies the ground a wet one claims |
-| `heat-test.html` | `chrome --headless --dump-dom` — one of four runnable checks. Guards the rain layer's paint distance, its dry-gauge erase and its handover between neighbours, in canvas pixels |
+| `heat-test.html` | `chrome --headless --dump-dom` — one of five runnable checks. Guards the rain layer's paint distance, its dry-gauge erase and its handover between neighbours, in canvas pixels |
 | `js/popup.js` | popup + meter + gauge + sparkline templates |
 | `js/sparktip.js` | the hover/tap readout on every graph, and the label on any `data-tip`. One delegated listener, no imports |
 | `js/render.js` | rebuilds markers and heat points; drawer summary table |
@@ -1525,6 +1526,24 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   `align-items: start` on the grid, `position: absolute` on the tile's `<img>`, and a wider tile
   ratio. Each left the row exactly where it was.
 
+- **Under `NARROW_PX` (300) the app blocks the whole page, and that block is a `<dialog>` for one
+  reason.** `showModal()` puts it in the **top layer**, which is not part of any stacking context, so
+  it covers an open About box, the all-stations table and the camera wall. No `z-index` can do that —
+  the same rule `js/sparktip.js` already obeys from the other side. It also makes the rest of the
+  page inert for free, so no `inert` attribute has to travel over the page. A plain `show()` paints
+  over the map and leaves the page live underneath, and the two look identical on screen.
+  **Nothing dismisses it except width.** There is no close control, because a dismiss button hands a
+  reader a broken map and calls it a choice. `js/ui.js` refuses the `cancel` event, which is what
+  Escape and the phone back gesture raise. The media query is live, so the box opens and closes
+  itself and no resize listener runs. `:root:has(#narrowBox[open])` hides the overflow, because the
+  page behind is inert and still laid out, and under 245px it drew a scrollbar along the bottom of
+  the block for a map nobody can reach.
+  **300 is a floor somebody chose and not the width where the layout breaks.** Measured: the app bar
+  holds together to 245px and the document overflows below that, so the block takes 55 pixels of
+  width that work today. A Galaxy Fold cover screen is 280 CSS pixels wide and lands inside it, and
+  a reader locked out of a flood map is a reader with no water levels. Weigh that against a map in a
+  240px keyhole before moving the number, and move it in `js/config.js` only.
+  `narrow-test.html` reads `NARROW_PX` out of the source and guards all three silent faults.
 - **The app bar wordmark has four spellings and the title rail picks one, so a specificity slip
   draws none of them.** `Klang Valley Flood Watch` → `KV Flood Watch` → `KVFW` → the drop alone, at
   282px, 190px and 94px of `header h1`. That is a **container query and not a media query**, because
@@ -2087,7 +2106,7 @@ foreach($r as $s){$la=(float)$s["latitude"];$ln=(float)$s["longitude"];if(!$la)c
 $b=null;$bd=1e9;foreach($non as $n){$d=$km($la,$ln,$n["lat"],$n["lng"]);if($d<$bd){$bd=$d;$b=$n;}}
 printf("%-5d %-28s %6.0f m  %-30s %s\n",$s["stationId"],$s["stationName"],$bd*1000,$b["name"],$b["district"]);}'
 
-php shots-test.php            # one of four runnable checks. Guards camera retention. Must stay green.
+php shots-test.php            # one of five runnable checks. Guards camera retention. Must stay green.
 php api.php --selftest       # another. Guards the force-refresh rate limit, cache choice, and the
                               # place-lookup validator/rate limit. Must stay green.
 curl -sk "https://flood-exp.test/api.php?shots=1"                          # frame timestamps
@@ -2171,6 +2190,14 @@ echo count(array_filter($p["stations"],fn($s)=>($s["met"]["km"]??0)>$k))," beyon
 "/c/Program Files/Google/Chrome/Application/chrome.exe" --headless=new --disable-gpu \
   --ignore-certificate-errors --virtual-time-budget=15000 --dump-dom \
   https://flood-exp.test/heat-test.html | perl -0777 -ne 'print $1 if /<pre id="out">([^<]*)</s'
+
+# The narrow-window block. Under NARROW_PX the app draws a full-screen dialog instead of a map.
+# Three ways it fails with nothing wrong on screen: a dialog opened over it wins the top layer and
+# the block covers nothing, a `cancel` that goes through hands back a broken map on one Escape, and
+# a threshold in js/ui.js that drifts from NARROW_PX blocks a width that works. Reads PASS.
+"/c/Program Files/Google/Chrome/Application/chrome.exe" --headless=new --disable-gpu \
+  --ignore-certificate-errors --virtual-time-budget=35000 --window-size=1200,900 --dump-dom \
+  https://flood-exp.test/narrow-test.html | perl -0777 -ne 'print $1 if /<pre id="out">(.*?)<\/pre>/s'
 
 # The app bar wordmark ladder, in rendered pixels. Loads the app in an iframe at fifteen widths and
 # asserts one spelling at a time, never wider than its rail, and never a longer spelling on a
@@ -2279,8 +2306,8 @@ done
 There is otherwise no test suite. Changes are verified by linting, syntax-checking the modules,
 querying `.cache.json` for the data shape being relied on, and looking at the page.
 
-`shots-test.php`, `php api.php --selftest`, `heat-test.html` and `title-test.html` are the four
-runnable checks here, and each guards a different risk.
+`shots-test.php`, `php api.php --selftest`, `heat-test.html`, `title-test.html` and
+`narrow-test.html` are the five runnable checks here, and each guards a different risk.
 
 `shots-test.php` is deliberately narrow: retention is the only rule in this repo that can *quietly
 destroy* data. Everything else either works or visibly does not, but a prune that buckets a frame
@@ -2326,3 +2353,21 @@ a real rung of the ladder. The second one shipped for one run.
 
 The check loads the app in an iframe at fifteen widths and reads the rungs back. The rail is a
 rendered width, and no query over the source can state it.
+
+`narrow-test.html` guards the narrow-window block, which is the one surface here that takes the
+whole app away from a reader.
+
+Three faults put nothing wrong on screen. A dialog opened over the block wins the top layer and the
+block covers nothing. A `cancel` that goes through hands back a broken map on one Escape. A
+threshold in `js/ui.js` that drifts from `NARROW_PX` blocks a width that works.
+
+It reads `NARROW_PX` out of `js/config.js` rather than carrying a copy. A check that holds its own
+copy of a constant reports on the number it remembers and not on the number the app uses.
+
+**Assert the property, not the scenario, and two attempts here show why.** A `showModal()` call from
+the check asserts a call the check made. It passes against an app put back to a plain `show()`.
+Narrowing a live iframe reaches the call the app makes. That needs a layout, and headless virtual
+time supplies no reliable clock to wait on.
+
+Focus is the property. A modal dialog makes the page behind it inert, and a modal dialog is in the
+top layer by definition.

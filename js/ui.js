@@ -1,6 +1,6 @@
 // DOM wiring: drawer, theme, filters, layer chips, panels, lightbox and the delegated jumps.
 
-import { KINDS, MAST, camSrc, FEED, STATIC, NEAR_MAX_KM, NOTICE } from './config.js';
+import { KINDS, MAST, camSrc, FEED, STATIC, NEAR_MAX_KM, NOTICE, NARROW_PX } from './config.js';
 import { state, PREFS, PREFS_KEY, save } from './state.js';
 import { el, distKm, dkey, ignoredIds, leads, favIds, isFav, squash, termsOf, matches, esc
        } from './util.js';
@@ -1342,3 +1342,22 @@ el('splashRetry').onclick = () => {
 addEventListener('online', () => {
   if (!el('splash').classList.contains('gone')) el('splashRetry').onclick();
 });
+
+// --- too narrow to draw a map -------------------------------------------------------------------
+
+/* Under NARROW_PX the reader gets a sentence instead of a keyhole. `showModal()` rather than a sheet
+   with a large z-index, because a modal dialog is in the top layer and therefore covers an open
+   About box, the all-stations table and the camera wall — see the popover gotcha in CLAUDE.md. It
+   also makes the rest of the page inert, so nothing behind it takes a tap or a Tab.
+
+   Nothing dismisses it except width. `cancel` fires on Escape and on the phone back gesture, and
+   refusing it is what makes the block a block. The media query is live, so the box opens and closes
+   itself and no resize listener has to run. */
+const narrow = matchMedia(`(max-width: ${NARROW_PX - 1}px)`);
+const narrowBox = el('narrowBox');
+const syncNarrow = () => narrow.matches
+  ? !narrowBox.open && narrowBox.showModal()
+  : narrowBox.open && narrowBox.close();
+narrowBox.addEventListener('cancel', e => e.preventDefault());
+narrow.addEventListener('change', syncNarrow);
+syncNarrow();
