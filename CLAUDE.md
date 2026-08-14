@@ -37,7 +37,6 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `js/map.js` | map instance, basemap/theme, cluster, the station panel (`openSide`), `focusOn` / `flashTo` |
 | `js/heat.js` | both heat layers (water level, rainfall), ground-fixed sizing per layer, shared opacity, and the field pass where a gauge reporting no rain denies the ground a wet one claims |
 | `heat-test.html` | `chrome --headless --dump-dom` — one of three runnable checks. Guards the rain layer's paint distance, its dry-gauge erase and its handover between neighbours, in canvas pixels |
-| `geo-test.html` | temporary. A boundary probe for a location fix that never arrives. Open it on the machine that fails. Delete it, and its line in `pages.yml`, once the fault has a name |
 | `js/popup.js` | popup + meter + gauge + sparkline templates |
 | `js/sparktip.js` | the hover/tap readout on every graph, and the label on any `data-tip`. One delegated listener, no imports |
 | `js/render.js` | rebuilds markers and heat points; drawer summary table |
@@ -577,9 +576,12 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   `navigator.permissions` gives for the site half. A `granted` beside a failed fix names the device
   and never the browser. A `denied` names the site. No answer from that API names both. On Windows
   the tip also names the path, because a reader told to open the settings for a device still has to
-  find them. **A repair a reader runs in a terminal is not a fix**, and the first draft of this entry
-  ended in three PowerShell lines. `geo-test.html` is the probe that found the fault, and it puts its
-  own clock on each request rather than trust the one it passes in.
+  find them. **A repair a reader runs in a terminal is not a fix.** The first draft of this entry
+  ended in three PowerShell lines.
+  **A one-page probe found the fault and is gone now. The method is the part to keep.** Put a wall
+  clock on each request rather than trust the timeout you pass in. Ask at both accuracy settings. A
+  browser that ignores its own timeout and one whose provider never answers look identical from
+  inside this app. Only the clock tells them apart.
   **The words ride `data-tip` and the state rides the glyph.** `#locate.fail` swaps `my_location` for
   `location_disabled` and keeps the ink, and `js/sparktip.js` names anything carrying that attribute
   on hover and on tap alike. The surface took three tries. A panel card came first and it was too
