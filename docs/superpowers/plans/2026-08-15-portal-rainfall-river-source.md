@@ -601,38 +601,88 @@ function portalKey(string $name): string {
 function portalMatch(array $rows, array $stations, string $kind): array {
     $mine = array_values(array_filter($stations, fn($s) => $s['kind'] === $kind));
 
-    $byCode = $byName = [];
+    /* Three indexes, because evidence identifies a station only where it is unique on BOTH sides.
+       A code two rows carry names neither of them. A code two of OUR stations carry is worse: it
+       hands one station another station's rain. Both happen in the live feed. */
+    $byCode = $byName = $mineByCode = [];
     foreach ($rows as $i => $r) {
-        if (($r['code'] ?? null) !== null && $r['code'] !== '') $byCode[$r['code']][] = $i;
+        if (($r['code'] ?? '') !== '') $byCode[$r['code']][] = $i;
         $byName[portalKey($r['name'] ?? '')][] = $i;
     }
+    foreach ($mine as $s) {
+        if (($s['code'] ?? '') !== '') $mineByCode[$s['code']][] = $s['id'];
+    }
 
-    $hit = $used = $clash = [];
+    $cand = $clash = [];
     foreach ($mine as $s) {
         $key  = portalKey($s['name'] ?? '');
-        $code = ($s['code'] ?? null) !== null && $s['code'] !== '' ? ($byCode[$s['code']][0] ?? null) : null;
-        $name = null;
-        if ($key !== '' && count($byName[$key] ?? []) === 1) {
-            $name = $byName[$key][0];
-        } else {
-            // The suffix rule. Exactly one row's name may end with ours, or nothing joins.
+        $code = $s['code'] ?? '';
+
+        // Rung 3. JAMBATAN S.K.C shares code 3813001 with Tanjung Malim, and taking the first row
+        // gave it Tanjung Malim's rain. BATU 9 and BATU 20 share 3118104 on our own side.
+        $codeRow = null;
+        if ($code !== '') {
+            $there = $byCode[$code] ?? [];
+            $here  = $mineByCode[$code] ?? [];
+            if (count($there) === 1 && count($here) === 1) $codeRow = $there[0];
+            elseif ($there) $clash[] = ['code', $s['id'], $code];
+        }
+
+        /* Rung 2 is an equal name, and rung 1 is a suffix that exactly one row ends with. An
+           ambiguous equal name REFUSES here. It never falls through to the suffix rule, because a
+           name two rows carry proves ambiguity more strongly than a suffix proves identity. */
+        $nameRow = null;
+        $nameRung = 0;
+        $named = $byName[$key] ?? [];
+        if ($key !== '' && count($named) === 1) {
+            $nameRow = $named[0];
+            $nameRung = 2;
+        } elseif (count($named) > 1) {
+            $clash[] = ['name', $s['id'], $key];
+        } elseif ($key !== '') {
             $ends = [];
             foreach ($rows as $i => $r) {
                 $rk = portalKey($r['name'] ?? '');
-                if ($key !== '' && $rk !== $key && str_ends_with($rk, $key)) $ends[] = $i;
+                if ($rk !== $key && str_ends_with($rk, $key)) $ends[] = $i;
             }
-            if (count($ends) === 1) $name = $ends[0];
+            if (count($ends) === 1) { $nameRow = $ends[0]; $nameRung = 1; }
         }
 
-        $win = $code ?? $name;
-        if ($win === null) continue;
-        if ($code !== null && $name !== null && $code !== $name) $clash[] = [$s['id'], $code, $name];
-        $hit[$s['id']]  = $win;
-        $used[$win]     = true;
+        // The code wins, and this names the row it beat rather than dropping it in silence.
+        if ($codeRow !== null && $nameRow !== null && $codeRow !== $nameRow) {
+            $clash[] = [$s['id'], $codeRow, $nameRow];
+        }
+        $row = $codeRow ?? $nameRow;
+        if ($row !== null) $cand[$s['id']] = [$row, $codeRow !== null ? 3 : $nameRung];
+    }
+
+    /* A portal row is one physical gauge, so it belongs to one station. Five rows were awarded to
+       two stations each before this pass. The stronger rung wins, and two equal claims identify
+       neither of them. */
+    $perRow = [];
+    foreach ($cand as $sid => [$row, $rung]) $perRow[$row][] = [$sid, $rung];
+
+    $hit = $used = [];
+    foreach ($perRow as $row => $claims) {
+        usort($claims, fn($a, $b) => $b[1] <=> $a[1]);
+        if (count($claims) > 1) {
+            $clash[] = ['row', $row, array_column($claims, 0)];
+            if ($claims[0][1] === $claims[1][1]) continue;
+        }
+        $hit[$claims[0][0]] = $row;
+        $used[$row] = true;
     }
     return ['hit' => $hit, 'used' => $used, 'clash' => $clash];
 }
 ```
+
+**This block was rewritten after the live data broke the first version.** The original read
+`$byCode[$code][0]`, tried a suffix when an equal name was ambiguous, and let two stations claim one
+row. Measured on the live payload, that awarded five rows twice over: BATU 9 took BATU 20's rain and
+JENDERAM HILIR took JENDERAM HULU's, which are different places one upstream of the other. The
+corrected rule matches 179 stations of 230 across 179 distinct rows with nothing claimed twice,
+against 183 matched with 5 wrong. **It costs four joins and removes five wrong readings.** A station
+that stays on its old feed is the outcome the spec asks for.
 
 - [ ] **Step 4: Run the test to verify it passes**
 
