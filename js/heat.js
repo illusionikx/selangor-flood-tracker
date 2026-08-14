@@ -7,16 +7,260 @@ import { PREFS } from './state.js';
 import { map } from './map.js';
 import { el } from './util.js';
 
-// maxZoom is not a display limit — leaflet.heat divides every weight by 2^(maxZoom - zoom), so any
-// value inside our zoom range dims the blobs as you zoom out. 0 pins the factor at 1.
+/* `radius` and `blur` size simpleheat's sprite, which `SoftHeat._redraw()` does not use — it paints
+   the blobs itself. They stay because `_updateOptions()` runs on add and builds `_grad` out of
+   `gradient` in the same call, and `_grad` is where the colours come from.
+   maxZoom is not a display limit — leaflet.heat divides every weight by 2^(maxZoom - zoom), so any
+   value inside our zoom range dims the blobs as you zoom out. 0 pins the factor at 1. */
 const BASE = { radius: 70, blur: 55, maxZoom: 0 };
 
-// Blur as a fraction of the solid core. Only `heatScale()` may read it, and it must split the
-// ground distance by (1 + BLUR) — see the comment there for why the two cannot be set apart.
-const BLUR = 0.8;
+/* **A heat blob's colour must not be derived from its alpha, and this is the whole reason the layer
+   paints itself.** simpleheat's `_colorize()` looks the gradient up by alpha, so alpha is a blob's
+   extent and its colour at once, and any brush that fades walks down the legend.
+   Measured on one gauge reading 27 mm/h, which is JPS's *heavy* class: heavy at the gauge,
+   moderate 4 km out, light 6 km out. Three classes, one measurement, and a legend beside them
+   saying those colours mean millimetres.
+   Cutting it to 0.04 fixed the colour and broke the look, and softening the edge back with a
+   `destination-out` pass fixed the look and broke the neighbours — see `SoftHeat._redraw()`, which
+   paints the blobs itself and needs no sprite at all. The constant is gone with the sprite. This
+   note stays because the trap does not: **anything that fades a heat blob before its colour is
+   chosen fades it down the legend.** */
 
-export const heat = L.heatLayer([], {
+/* Both layers are this class. It paints each blob directly, in one colour taken from the layer's
+   own gradient, with only its alpha fading out. Then a gauge reporting no rain takes back what it
+   denies. Water passes no dry gauges, so that pass costs it nothing — a river reading low says
+   nothing about the river beside it, and rain is the only reading here that argues with a neighbour.
+
+   **Softening a blob by erasing it is the trap, and it was built and thrown away.** A
+   `destination-out` pass is a claim about the canvas, not about one blob, so a blob's own soft edge
+   ate whatever its neighbours had painted underneath. Measured on two gauges one blob apart, which
+   is the closest `thinHeat()` ever leaves them: each one's centre was erased to alpha 5 of 177 by
+   the *other* one's feather, and the ground between them stacked to 200 in a class neither gauge
+   had reported. Painting is additive over a neighbour and erasing is not, so the fade has to be
+   painted.
+
+   The dry-gauge eraser stays a `destination-out` pass on purpose, and is the one thing here that
+   *should* reach every blob under it: a dry reading denies the ground, not one neighbour's
+   contribution to it. It also runs last, so the colour beneath is already settled. `destination-out`
+   multiplies canvas alpha by one minus the brush, so overlapping erasers compound — two dry gauges
+   over the same ground remove more of it than one does, which is two readings saying the same
+   thing.
+
+   The eraser's own alternative was to make every blob small enough that it could not reach a dry
+   gauge, and that was built first and thrown away too. It cost the same ground everywhere — over
+   Sabak Bernam, where the nearest other gauge is 12 km off and nothing disputes anything, as over
+   Ampang where a dry gauge stands 1.6 km away. Sizing on the evidence keeps the reach where there
+   is no evidence against it. */
+
+/* Two kernels, because a cell asks two questions and one curve cannot answer both. Both hold full
+   strength across the inner fraction named here, then smoothstep to nothing at the radius.
+
+   `BLEND` sizes the say each reading gets in the mean. It falls off early on purpose. A gauge most
+   of a radius away must not argue as loudly as the one underfoot.
+
+   `FEATHER` sizes the coverage, which is only the soft outer edge of the wash. The halo is spent on
+   alpha alone and the colour never moves, so a pale edge reads as "the edge of this reading" rather
+   than as "lighter rain". **A rim facing empty ground and a join between two blobs are different
+   edges, and the combine below is what tells them apart.** That is what lets this sit as low as it
+   does. Coverage alone at 0.20 would hollow out every join.
+   It is shorter than `BLEND`, and that is allowed: far ground takes its colour from a mix of
+   readings and is nearly transparent while it does so. The two answer different questions.
+   **This value is sized against gauge spacing measured in blob radii, so `RAIN_KM` moves it.** At
+   9 km the network's 90th-percentile join sat at 1.48 radii and this stood at 0.50. At 6 km the
+   same join is 1.66 radii, because thinning at a shorter distance keeps gauges that are relatively
+   further apart. Re-run the spacing sweep in CLAUDE.md after any change to either.
+
+   **One curve served both for a while, and it drew a border on every equidistant line.** The blend
+   weight is down to 0.30 at 0.8 of a radius, which is right for a weight and wrong for coverage.
+   `thinHeat()` only guarantees a radius between two gauges, so real spacings run past 1.5 of one.
+   Measured on two gauges that agreed on the same rain: alpha 179 at each of them and 61 between
+   them at 1.6 radii, 20 at 1.8. On an unequal pair the midpoint came out at 54 against ends of 242
+   and 89 — darker than either gauge, which is a line drawn between two cells. */
+const BLEND = 0.45, FEATHER = 0.2;
+
+/* Smoothstep from 1 at the core edge `k` to 0 at the radius. Hoisted out of `_field()` on purpose:
+   the inner loop runs about half a million times per paint, and a closure per point there is half a
+   million allocations for two multiplies of work. */
+function ramp(t, k) { const u = (t - k) / (1 - k); return 1 - u * u * (3 - 2 * u); }
+
+/* Lay a radial gradient down over its own disc and nowhere else. **Never `fillRect` one of these.**
+   A canvas radial gradient does not stop at its last stop, it *clamps* to it, so every pixel beyond
+   `r` keeps whatever the outermost colour was. The feather's outermost colour is full erase. Filled
+   as a square, the four corners outside the circle — 21% of the box — therefore erased everything
+   under them, including the paint belonging to the next blob along. On the map that drew as hard
+   rectangles cut out of the wash, axis-aligned and about 2r on a side, which reads as a tiling or a
+   canvas-tile fault and is neither. The eraser below never showed it, because its outermost colour
+   happens to be transparent and clamping to "no erase" is invisible. That is luck, not design, so
+   both passes go through here. */
+function stamp(ctx, x, y, r, gradient) {
+  ctx.fillStyle = gradient;
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+const SoftHeat = L.HeatLayer.extend({
+  setDry(latlngs) { this._dry = latlngs; return this.redraw(); },
+
+  /* Paint the readings as a field rather than as a pile of shapes. **Two gauges over one patch of
+     ground still mean what they read, not the sum of what they read**, and no canvas composite
+     operation can say that: every Porter-Duff `over` adds alpha, so a second blob made the same
+     rain look heavier. Drawing the blobs as shapes is what produced 227 alpha where two 179 blobs
+     met, in the class above what either gauge reported.
+     So each cell asks the readings instead of being stamped by them:
+       `v`   the blended reading — every gauge in reach, weighted by how near it is, **normalised**.
+             A weighted mean, so two gauges reading the same thing give that thing back.
+       `cov` whether any reading reaches this ground at all, as a union and never a max. It carries
+             the soft edge, and it is why an isolated blob still fades out while an overlap does
+             not brighten.
+     Colour is `_grad[v]`, the ramp simpleheat builds from `options.gradient`, so the legend stays
+     the one definition of what a colour means. Opacity is `v * cov`.
+     `CELL` is the trade. The field is computed on a coarse grid and scaled up with the browser's
+     own bilinear filter, which is what makes the transition between two gauges smooth for free.
+     At 4 px that is about 59,000 cells against a viewport, a few milliseconds per `moveend`, and
+     the smoothing hides the grid. Raise it and the edges go blocky. Lower it and the cost climbs
+     with the square. */
+  _field(ctx, pts, r) {
+    const CELL = 4, grad = this._heat._grad;
+    const w = this._canvas.width, h = this._canvas.height;
+    const cw = Math.ceil(w / CELL), ch = Math.ceil(h / CELL);
+    const off = this._grid || (this._grid = document.createElement('canvas'));
+    if (off.width !== cw || off.height !== ch) { off.width = cw; off.height = ch; }
+    const octx = off.getContext('2d', { willReadFrequently: true });
+    const img = octx.createImageData(cw, ch), d = img.data, r2 = r * r;
+
+    /* Bucket the readings into a grid one radius across, so a cell tests its own bucket and the
+       eight around it rather than every reading on the map. Anything within `r` of a cell has to
+       be in one of those nine, so nothing is missed.
+       **This is not a premature optimisation, it is the difference between usable and frozen.**
+       Without it the cost is cells × readings, and `thinHeat()` packs readings one radius apart —
+       so zooming out shrinks the radius and multiplies the readings at the same time. Measured on
+       a full viewport at that spacing: 52 ms with 30 readings, 785 ms with 638, and 3.0 s with
+       2,655, against a flat 35 ms indexed at every one of those. A flood is exactly when a lot of
+       stations report at once and exactly when the map must not seize. */
+    const nbx = Math.ceil(w / r) + 3, nby = Math.ceil(h / r) + 3, bins = new Array(nbx * nby);
+    for (let i = 0; i < pts.length; i++) {
+      const bx = Math.floor(pts[i][0] / r) + 1, by = Math.floor(pts[i][1] / r) + 1;
+      if (bx < 0 || by < 0 || bx >= nbx || by >= nby) continue;
+      const k = by * nbx + bx;
+      (bins[k] || (bins[k] = [])).push(pts[i]);
+    }
+
+    for (let gy = 0; gy < ch; gy++) {
+      const py = gy * CELL + CELL / 2, cby = Math.floor(py / r) + 1;
+      for (let gx = 0; gx < cw; gx++) {
+        const px = gx * CELL + CELL / 2, cbx = Math.floor(px / r) + 1;
+        let sum = 0, wsum = 0, csum = 0;
+        for (let by = cby - 1; by <= cby + 1; by++) {
+          if (by < 0 || by >= nby) continue;
+          for (let bx = cbx - 1; bx <= cbx + 1; bx++) {
+            const b = bx < 0 || bx >= nbx ? null : bins[by * nbx + bx];
+            if (!b) continue;
+            for (let i = 0; i < b.length; i++) {
+              const dx = px - b[i][0], dy = py - b[i][1], dd = dx * dx + dy * dy;
+              if (dd >= r2) continue;
+              const t = Math.sqrt(dd) / r;
+              const f = t > BLEND ? ramp(t, BLEND) : 1;
+              if (f <= 0) continue;
+              sum += f; wsum += f * b[i][2];
+              // Coverage is summed here and shaped below. Never take the largest — see `cov`.
+              csum += t > FEATHER ? ramp(t, FEATHER) : 1;
+            }
+          }
+        }
+        if (!sum) continue;
+        /* Shape the summed coverage. **A rim facing empty ground and a join between two blobs must
+           not fade alike**, and summing is what separates them: one gauge at half strength stays
+           half covered, while two blobs meeting at half strength each read as fully covered.
+           `max` cannot see the difference at all and drew a Voronoi border. A union
+           (`1-(1-c1)(1-c2)…`) sees it and saturates too slowly to act on it — with `FEATHER` this
+           low it hollows out every join.
+           The clamp is squared rather than bare, because `min(1, sum)` breaks its first derivative
+           where it bites. That is a crease along an iso-contour, which is the Voronoi fault again
+           on a different line. `1-(1-s)²` has slope 0 at s=1 and meets the flat part smoothly.
+           Squared is also the highest power that still fades the rim gently, since a higher one
+           holds full opacity further out and hardens the edge it exists to soften. Measured against
+           the whole gauge network at `RAIN_KM` 6: a join at the median spacing holds 100% of a
+           gauge centre, and the softest tenth of joins sit at 42%. That tenth is the price of a
+           6 km blob with a 2.35 km rim fade — the two blobs really are 10 km apart, so each one
+           stops 3 km short of the ground between them. */
+        const s = csum < 1 ? csum : 1, cov = 1 - (1 - s) * (1 - s);
+        const v = wsum / sum, o = (gy * cw + gx) * 4, g = Math.round(v * 255) * 4;
+        d[o] = grad[g]; d[o + 1] = grad[g + 1]; d[o + 2] = grad[g + 2];
+        d[o + 3] = Math.round(v * cov * 255);
+      }
+    }
+    octx.putImageData(img, 0, 0);
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(off, 0, 0, w, h);
+  },
+
+  _redraw() {
+    if (!this._map || !this._canvas || !this._heat?._grad) return;
+    const r = blobPx(this.options.groundKm), pad = this._pad(), size = this._map.getSize();
+    // Same padded canvas and same one-radius bleed margin the stock layer uses — see PATCH 3 in
+    // vendor/leaflet-heat.js. A raw container point is not a canvas point here.
+    const bounds = new L.Bounds(L.point([-r, -r])._subtract(pad), size.add(pad).add([r, r]));
+    const ctx = this._canvas.getContext('2d');
+    ctx.clearRect(0, 0, this._canvas.width, this._canvas.height);
+    ctx.save();
+    ctx.globalAlpha = 1;
+
+    // The painted gauges in the same space the erasers are measured in. Projected once here rather
+    // than per dry gauge: 218 dry against 10 wet is 2,180 comparisons on every pan.
+    const wet = [], near = [];
+    for (const ll of this._latlngs) {
+      const p = this._map.latLngToContainerPoint(L.latLng(ll[0], ll[1]));
+      wet.push(p);
+      if (bounds.contains(p))
+        near.push([p.x + pad.x, p.y + pad.y, Math.max(0, Math.min(1, +ll[2] || 0))]);
+    }
+    if (near.length) this._field(ctx, near, r);
+
+    /* Pass two: take back what a gauge reporting no rain denies. This one *is* allowed to reach
+       every blob under it — a dry reading denies the ground, not one neighbour's contribution to
+       it — and it runs last so the colour beneath is already settled. Water passes no dry gauges
+       and stops here, because a river reading low says nothing about the river beside it. */
+    ctx.globalCompositeOperation = 'destination-out';
+    for (const ll of this._dry ?? []) {
+      const p = this._map.latLngToContainerPoint(ll);
+      if (!bounds.contains(p)) continue;
+      const x = p.x + pad.x, y = p.y + pad.y;
+      /* An eraser stops at the midpoint to the nearest gauge that *is* reporting rain, and reaches
+         its full RAIN_KM only where there is no such gauge to stop it. That midpoint is what makes
+         the two readings equal: on the line between a wet gauge and a dry one, paint survives
+         exactly where the pixel is nearer to the wet one. Neither reading is discarded and neither
+         outranks the other.
+         Without it a dry gauge reaches across a wet one and takes its reading off the map. Measured
+         before the rule: a wet gauge 2 km from a dry one lost half its alpha, and a dry gauge on the
+         same pole erased its neighbour outright. The archive holds one of those pairs. */
+      const er = Math.min(r, wet.reduce((m, q) => Math.min(m, p.distanceTo(q)), Infinity) / 2);
+      if (er < 1) continue;
+      // Full denial where the gauge stands, fading to none at the edge. The taper is the point: a
+      // hard circle would bite holes in the wash, and a hole reads as a rendering fault rather
+      // than as weather.
+      const g = ctx.createRadialGradient(x, y, 0, x, y, er);
+      g.addColorStop(0, 'rgba(0,0,0,1)');
+      // A short core at full strength before the taper starts. A ramp that peaks at the exact
+      // centre honours the reading at a mathematical point, and no pixel is one — the gauge itself
+      // kept 5 of 206 alpha, purely because the sample sat half a pixel off the peak.
+      g.addColorStop(0.15, 'rgba(0,0,0,1)');
+      g.addColorStop(1, 'rgba(0,0,0,0)');
+      stamp(ctx, x, y, er, g);
+    }
+    ctx.restore();
+    this._frame = null;   // this override never calls the stock _redraw, which used to clear it
+  },
+});
+
+/* `groundKm` is how far one of this layer's blobs may reach, and it is an option on the layer so
+   that the paint, the feather, the eraser and `thinHeat()` cannot end up measured against four
+   different rulers. The two layers differ because the two readings differ: a river level speaks for
+   a catchment, an hour of rain speaks for a few streets. See HEAT_KM and RAIN_KM in config.js. */
+export const heat = new SoftHeat([], {
   ...BASE,
+  groundKm: HEAT_KM,
   /* Stops are the thresholds, not arbitrary fractions: render.js weights each point by where it
      sits on its own alert / warning / danger scale, so yellow means "past alert", orange "past
      warning" and red "at danger" — the same reading the pin and the meter give, in the same
@@ -34,17 +278,15 @@ export const heat = L.heatLayer([], {
    a `var()`. One set for both themes: a blob is composited *over* the basemap at low alpha rather
    than read against it. The flat run below the first class *is* seen here, unlike the water layer:
    anything above 0 mm is drawn, so drizzle paints the lightest violet rather than nothing. */
-export const rainHeat = L.heatLayer([], {
+export const rainHeat = new SoftHeat([], {
   ...BASE,
+  groundKm: RAIN_KM,
   gradient: {
     0: RAIN_HEAT[1], 0.25: RAIN_HEAT[1], 0.5: RAIN_HEAT[2], 0.75: RAIN_HEAT[3], 1: RAIN_HEAT[4],
   },
 });
 
-// Each layer with the ground distance one of its blobs is allowed to reach. They differ because the
-// two readings differ: a river level speaks for a catchment, an hour of rain speaks for a few
-// streets. See HEAT_KM and RAIN_KM in config.js for the measurement behind each number.
-const LAYERS = [[heat, HEAT_KM], [rainHeat, RAIN_KM]];
+const LAYERS = [heat, rainHeat];
 
 /* leaflet.heat composites overlapping blobs, so N stations reporting the same thing paint something
    stronger than any of them reported. Density is the right model for "how many things are here";
@@ -74,27 +316,36 @@ export function thinHeat(points, km = HEAT_KM) {
   return kept;
 }
 
-// leaflet.heat sizes blobs in screen pixels, which makes them cover less ground the further you
-// zoom in. Recomputing the radius per zoom pins each blob to a fixed distance on the ground.
-function heatScale() {
-  if (!LAYERS.some(([l]) => map.hasLayer(l))) return;   // nothing to size while both layers are off
+// A canvas sizes in screen pixels, which would make a blob cover less ground the further you zoom
+// in. Recomputing per zoom pins each blob to a fixed distance on the ground.
+function kmPx(km) {
   const c = map.getCenter();
-  for (const [l, km] of LAYERS) {
-    const east = L.latLng(c.lat, c.lng + km / (111 * Math.cos(c.lat * Math.PI / 180)));
-    const px = Math.abs(map.latLngToLayerPoint(east).x - map.latLngToLayerPoint(c).x);
-    // Blur cost grows with the square of the radius, so the blob can't keep pace with its ground
-    // distance forever. Past the cap it would silently start covering less ground — a hotspot that
-    // means something different at each zoom. Fade it out over the next two zoom levels instead of
-    // lying about size. The fade is per layer because the cap is, and the two sizes differ.
-    const wide = Math.max(10, Math.min(HEAT_MAX_PX, px));
+  const east = L.latLng(c.lat, c.lng + km / (111 * Math.cos(c.lat * Math.PI / 180)));
+  return Math.abs(map.latLngToLayerPoint(east).x - map.latLngToLayerPoint(c).x);
+}
+
+/* The radius one blob is drawn at. `_redraw()` and `heatScale()` both go through it, so the paint
+   and the fade that warns the cap is biting cannot end up measured against different rulers. */
+function blobPx(km) { return Math.max(10, Math.min(HEAT_MAX_PX, kmPx(km))); }
+
+function heatScale() {
+  for (const l of LAYERS) {
+    /* Only a layer that is on the map. `setOptions()` ends in `redraw()`, which reads
+       `this._map._animating` — and Leaflet nulls `_map` when it removes a layer, so sizing a layer
+       that is off throws. It survived because the layer that is off has usually never been added,
+       and a layer with no canvas returns from `redraw()` one test earlier. Switching the heat chip
+       from rainfall to water is what reaches it: that leaves rainHeat added-then-removed, holding a
+       canvas and no map. `syncHeat()` adds and removes before it calls this, so a layer just
+       switched on is on the map by now and still gets sized. */
+    if (!map.hasLayer(l)) continue;
+    const px = kmPx(l.options.groundKm);
+    /* Fill cost grows with the square of the radius, so a blob cannot keep pace with its ground
+       distance forever. `blobPx()` caps it. Past the cap the blob would silently start covering
+       less ground — a hotspot that means something different at each zoom — so fade it out over the
+       next two zoom levels instead of lying about its size. Per layer, because the cap is, and the
+       two ground distances differ. */
     l._fade = px <= HEAT_MAX_PX ? 1 : Math.max(0, 1 - Math.log2(px / HEAT_MAX_PX) / 2);
-    /* simpleheat paints a sprite `radius + blur` across, not `radius` — the arc is filled at
-       `radius` and the shadow that blurs it reaches `blur` further out. So the pair has to *sum*
-       to the ground distance. Handing `radius` the whole of it and adding 80% more as blur put
-       every blob 1.8× over its stated size: one gauge at 19 mm/h washed 250 km² of Kuala Lumpur
-       violet, over twenty gauges reporting nothing. Do not set these two apart from each other. */
-    const r = wide / (1 + BLUR);
-    l.setOptions({ radius: r, blur: r * BLUR });
+    l.redraw();   // the radius is read inside _redraw(), so there is no option to set
   }
   heatOpacity();
 }
@@ -104,7 +355,7 @@ function heatScale() {
 export function heatOpacity() {
   const pct = +el('heatOpacity').value;
   el('heatOpacityVal').textContent = pct + '%';
-  for (const [l] of LAYERS) if (l._canvas) l._canvas.style.opacity = pct / 100 * (l._fade ?? 1);
+  for (const l of LAYERS) if (l._canvas) l._canvas.style.opacity = pct / 100 * (l._fade ?? 1);
 }
 
 /* Puts the map, the legend, the two chips and the section summary on `PREFS.heatLayer`. One string

@@ -141,13 +141,26 @@ export const LEVEL_FLOOR = 6;
 /* Ground size of one blob, as the distance the painted circle actually reaches — see `heatScale()`
    in heat.js, which splits it into simpleheat's radius and blur rather than handing it to either.
    Water is catchment scale, so one gauge speaks for 5 km of it.
-   Rain is not. Measured on 211 gauges over 12 hours of history: given one gauge is wet, the chance
-   its neighbour is wet too runs 24% out to 4 km, halves to 13% by 6 km, and is back to the 5%
-   background rate by 12 km. So a rain claim carries about 4 km and no more. The same reasoning set
-   MET_KM in api.php, which notes that a claim about this moment reaches far less far than a claim
-   about the next three hours. Rain here is the last rolling hour. */
+
+   Rain spreads further because nothing stops it, not because one gauge knows more. A rain reading
+   reaches `RAIN_KM` and stops where another station disagrees. **One number covers both readings.**
+   A gauge reporting rain paints this far and a gauge reporting none erases this far, and where the
+   two meet the boundary is halfway between them — see `SoftHeat` in heat.js. Two numbers stood here
+   first, 9 km of paint against 4 km of erase, and there is no defending that: it is the same
+   instrument, the same minute and the same question, so the answer "none" cannot carry less ground
+   than the answer "12 mm". Symmetry cost 4% of the painted area on the payload it was measured on.
+
+   Measured on 211 gauges over 12 hours of history: given one gauge is wet, the chance its neighbour
+   is wet too runs 24% out to 4 km, halves to 13% by 6 km, and is back to the 5% background rate by
+   12 km. So no rain claim survives 12 km. **This stood at 9 km first, which is the outer edge of a
+   claim that survives rather than the middle of one**, and the same study puts the halving distance
+   at 6. A convective cell over the Klang Valley is 1 to 2 km across, so the shorter number is the
+   one the evidence already carried. `MET_KM` in api.php reasons the same way about a MET point.
+   Moving this moves the erase, the thinning and the blob together, and it changes gauge spacing
+   measured in blob radii — which is what `FEATHER` in heat.js is sized against. Re-run the spacing
+   sweep in CLAUDE.md before and after. */
 export const HEAT_KM     = 5;      // water level
-export const RAIN_KM     = 4;      // rainfall
+export const RAIN_KM     = 6;      // rainfall, either way it reads
 /* Heat weight is a position on the threshold scale, not a fraction of danger. The popup meter's
    piecewise slots (alert 38%, warning 68%, danger 100%) key straight into the gradient, so a blob's
    colour names the band a station crossed. The floor is the alert slot: below its first published
@@ -156,7 +169,11 @@ export const RAIN_KM     = 4;      // rainfall
 export const HEAT_ALERT   = 0.38;
 export const HEAT_WARNING = 0.68;
 export const HEAT_FLOOR   = HEAT_ALERT;
-export const HEAT_MAX_PX = 220;    // blur cost is quadratic; past this the layer fades instead
+/* Widest sprite one blob may be drawn at. Blur cost is quadratic, so past this the layer fades
+   rather than quietly covering less ground. It reads 400 and not 220 because it now caps the whole
+   painted circle, where it used to cap only the solid core and simpleheat added 80% more blur
+   outside it — 220 there was 396 on the canvas. 400 is the same sprite and the same cost. */
+export const HEAT_MAX_PX = 400;
 
 /* Rainfall heat, on JPS's own intensity classes (`rainStatus()` in sources.php: >0 light, >10
    moderate, >30 heavy, >60 very heavy, mm in the last hour). The slots are evenly spaced because

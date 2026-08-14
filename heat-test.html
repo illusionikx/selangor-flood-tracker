@@ -1,0 +1,228 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Rain heat layer check</title>
+<!-- Third runnable check in this repo, beside shots-test.php and `php api.php --selftest`.
+     It guards the two rules the rainfall heat layer is built on, and both of them live in canvas
+     pixels, where nothing else here can reach them. Reading the code proves neither.
+
+       1. A blob paints RAIN_KM of ground. simpleheat stamps a sprite of `radius + blur`, so the
+          pair has to sum to that distance rather than either one carrying it.
+       2. A gauge reporting no rain erases the paint over itself, and only near itself.
+
+     Run it headless. It prints its own verdict into the output box below, so there is nothing to
+     look at. CLAUDE.md's Verify block carries the command. Do not write that element's own tag
+     into this comment — the reader there cuts the output out of the dumped DOM by matching it,
+     and a second copy in a comment is the one it finds first.
+
+     It found one fault already. simpleheat sets `globalAlpha` per point in its draw loop and never
+     puts it back, so the eraser inherited the last blob's weight and removed 90% instead of all of
+     it. On screen that is a faint violet stain over a gauge reporting zero, which nobody would read
+     as an inherited canvas setting. -->
+<style>#map{width:800px;height:600px}</style>
+<div id="map"></div>
+<button id="sideClose"></button>
+<input id="heatOpacity" type="range" min="0" max="100" value="100">
+<span id="heatOpacityVal"></span>
+<pre id="out">running</pre>
+<script>
+  const out = document.getElementById('out'), log = [];
+  window.say = (...a) => { log.push(a.join(' ')); out.textContent = log.join('\n'); };
+  window.onerror = (m, f, l) => say('ERROR', m, 'at', f + ':' + l);
+  window.onunhandledrejection = e => say('REJECT', e.reason && (e.reason.stack || e.reason.message));
+</script>
+<script src="vendor/leaflet.js"></script>
+<script src="vendor/markercluster.js"></script>
+<script src="vendor/leaflet-heat.js"></script>
+<script type="module">
+const { say } = window;
+const fails = [];
+const ok = (name, pass, detail) => { say((pass ? 'ok   ' : 'FAIL ') + name + '   ' + detail);
+                                     if (!pass) fails.push(name); };
+try {
+  const { map } = await import('./js/map.js');
+  const { rainHeat } = await import('./js/heat.js');
+  const { RAIN_KM } = await import('./js/config.js');
+
+  // One gauge reporting rain, and one reporting none, a quarter of the reach to the east. Close
+  // enough that an eraser of the full RAIN_KM would reach across the wet gauge and thin it.
+  const WET = [3.16, 101.75], GAP = RAIN_KM / 4;
+  const east = d => [WET[0], WET[1] + d / (111 * Math.cos(WET[0] * Math.PI / 180))];
+  const DRY = east(GAP), MIRROR = east(-GAP), MID = east(GAP / 2);
+  // Half a blob out, inside the part that holds full strength. And 92% out, deep in the soft halo.
+  // Both on the side no dry gauge touches. **The halo is the outer quarter of the radius, not the
+  // outer half** — coverage holds full strength to FEATHER (0.75), so a probe at 80% lands on the
+  // flat part and reports a hard edge that is not there. And a point the eraser has taken about
+  // half of, to read the colour off a boundary rather than off a body.
+  const HALF = east(-RAIN_KM / 2), OUTER = east(-RAIN_KM * 0.92), FADE = east(GAP * 0.75);
+
+  // An animated setView is asynchronous and this page is not. Every read below is synchronous.
+  map.setView(WET, 12, { animate: false });
+  rainHeat.addTo(map);
+  rainHeat.setDry([DRY]);
+  rainHeat.setLatLngs([[...WET, 0.9]]);
+  map.fire('zoomend');          // heatScale sizes the sprite from the ground distance
+  rainHeat._redraw();           // draw now rather than on the next animation frame
+
+  const px = km => {
+    const c = map.getCenter();
+    const e = L.latLng(c.lat, c.lng + km / (111 * Math.cos(c.lat * Math.PI / 180)));
+    return Math.abs(map.latLngToLayerPoint(e).x - map.latLngToLayerPoint(c).x);
+  };
+  // The canvas is padded — see PATCH 3 in vendor/leaflet-heat.js. A container point is not a
+  // canvas point, and reading one as the other silently samples the wrong pixel.
+  const pixAt = ll => {
+    const pad = rainHeat._pad(), p = map.latLngToContainerPoint(L.latLng(ll));
+    const d = rainHeat._canvas.getContext('2d')
+      .getImageData(Math.round(p.x + pad.x), Math.round(p.y + pad.y), 1, 1).data;
+    return { a: d[3], hex: [d[0], d[1], d[2]].map(v => v.toString(16).padStart(2, '0')).join('') };
+  };
+  const alphaAt = ll => pixAt(ll).a;
+  // Canvas stores colour premultiplied by alpha, so reading a half-transparent pixel back costs a
+  // rounding step. Measured, that is a couple of counts per channel — nowhere near the distance
+  // between two named rain classes, which is what these assertions are about.
+  const sameHue = (a, b) => [0, 2, 4].every(i =>
+    Math.abs(parseInt(a.slice(i, i + 2), 16) - parseInt(b.slice(i, i + 2), 16)) <= 8);
+
+  // Scan outward for the last pixel with any paint on it. That measures what the layer actually
+  // drew, rather than an internal — the sprite `_r` this used to read is no longer what gets
+  // painted, and an assertion on a field nothing renders from passes while the map is wrong.
+  const reach = () => {
+    let last = 0;
+    for (let d = 0; d <= RAIN_KM * 1.5; d += 0.1) if (alphaAt(east(-d)) > 0) last = d;
+    return last;
+  };
+  const want = px(RAIN_KM);
+  const wet = alphaAt(WET), dry = alphaAt(DRY), mirror = alphaAt(MIRROR), mid = alphaAt(MID);
+  const fade = pixAt(FADE);
+
+  // The same paint with nothing arguing against it, to measure the erase against.
+  rainHeat.setDry([]);
+  rainHeat._redraw();
+  const rawWet = pixAt(WET), rawDry = alphaAt(DRY), rawMid = alphaAt(MID);
+  const rawHalf = pixAt(HALF), rawOuter = pixAt(OUTER);
+
+  say('zoom ' + map.getZoom() + ', ' + RAIN_KM + ' km = ' + Math.round(want) + ' px');
+  say('dry gauge ' + GAP.toFixed(2) + ' km east of the wet one');
+  say('');
+  const drew = reach();
+  ok('a blob paints RAIN_KM of ground   ', Math.abs(drew - RAIN_KM) <= 0.25,
+     'paint reaches ' + drew.toFixed(1) + ' km, wanted ' + RAIN_KM + ' km');
+  ok('a wet gauge paints                ', wet > 0, 'alpha ' + wet);
+  ok('a dry gauge is left almost clear  ', dry <= rawDry * 0.02,
+     'alpha ' + dry + ', was ' + rawDry + ' before the erase');
+  // The one the first build got wrong. Alpha is this layer's colour scale, so an eraser that
+  // reaches a wet gauge does not shrink its blob, it restates the rainfall as a lighter class.
+  ok('the erase never reaches a wet one ', wet >= rawWet.a - 1,
+     'alpha ' + wet + ' on the gauge, ' + rawWet.a + ' with no dry gauge present');
+  ok('ground away from it is untouched  ', mirror > 0.6 * rawWet.a,
+     'alpha ' + mirror + ' the same distance the other way');
+  /* A blob says what its gauge said, once, and the halo is spent on opacity alone. simpleheat looks
+     the gradient up by alpha, so any fade applied *before* `_colorize()` walks down the colour
+     scale — at the old BLUR one gauge reading 27 mm/h drew heavy, moderate and light in rings.
+     The feather runs after it, so the edge goes pale without changing what it claims. */
+  ok('one hue from the middle to the edge', sameHue(rawHalf.hex, rawWet.hex)
+       && sameHue(rawOuter.hex, rawWet.hex),
+     '#' + rawWet.hex + ' on the gauge, #' + rawHalf.hex + ' at half, #' + rawOuter.hex + ' at 92%');
+  ok('and the edge really is soft       ', rawOuter.a < rawHalf.a * 0.6 && rawOuter.a > 0,
+     'alpha ' + rawWet.a + ' -> ' + rawHalf.a + ' -> ' + rawOuter.a);
+  /* The erase pass runs after simpleheat's `_colorize()`, so it takes alpha away from a pixel whose
+     colour is already decided. That ordering is the whole reason a denied edge fades out instead of
+     restating the rain as a lighter class. Move the erase inside the draw loop and this fails. */
+  ok('erasing fades, it does not recolour', sameHue(fade.hex, rawWet.hex)
+       && fade.a > rawWet.a * 0.1 && fade.a < rawWet.a * 0.8,
+     '#' + fade.hex + ' at alpha ' + fade.a + ', against #' + rawWet.hex + ' at ' + rawWet.a);
+  // Neither reading outranks the other. Halfway between the two gauges the erase is still fading,
+  // so some paint stands and some is gone. All of it, or none, would mean one of them won.
+  ok('halfway between, neither one wins ', mid > 0 && mid < rawMid,
+     'alpha ' + mid + ' at the midpoint, ' + rawMid + ' with no dry gauge present');
+
+  /* A second gauge on the diagonal, 1.2 blobs away. That is far enough for thinHeat() to keep both,
+     and it lands outside the first blob's circle but inside the square that circle is inscribed in.
+     A radial gradient clamps past its last stop rather than stopping, so a feather filled as a
+     square erased that corner outright and took this gauge's paint with it — hard rectangles cut
+     out of the wash, about 2r on a side. Both passes fill a disc now. */
+  const diag = RAIN_KM * 1.2 / Math.SQRT2;
+  const FAR = [WET[0] + diag / 111, WET[1] + diag / (111 * Math.cos(WET[0] * Math.PI / 180))];
+  rainHeat.setLatLngs([[...WET, 0.9], [...FAR, 0.9]]);
+  rainHeat._redraw();
+  const far = pixAt(FAR);
+  ok('a neighbour blob is not squared off', far.a >= rawWet.a * 0.9 && sameHue(far.hex, rawWet.hex),
+     'alpha ' + far.a + ' at a gauge ' + (RAIN_KM * 1.2).toFixed(1)
+     + ' km away on the diagonal, against ' + rawWet.a + ' alone');
+
+  /* Two gauges one blob apart, the closest thinHeat() ever leaves them. Two readings of the same
+     rain still mean that rain, so the ground between them must not come out heavier than either.
+     Every canvas `over` adds alpha, which is why the layer computes a field instead of stamping
+     shapes — when it stamped them, two 179 blobs met at 227 in the class above what either read. */
+  const TWO = east(RAIN_KM);
+  rainHeat.setLatLngs([[...WET, 0.7], [...TWO, 0.7]]);
+  rainHeat._redraw();
+  const oneA = pixAt(WET), oneB = pixAt(TWO), between = pixAt(east(RAIN_KM / 2));
+  /* Never brighter is the rule, and the union coverage below holds it: it cannot pass 1, and a
+     gauge centre is already at 1. A count or two dimmer is rounding. */
+  ok('two equal readings do not stack   ', between.a <= oneA.a + 2 && between.a >= oneA.a * 0.9
+       && sameHue(between.hex, oneA.hex),
+     'alpha ' + oneA.a + ' at A, ' + between.a + ' between, ' + oneB.a + ' at B');
+
+  // And two different readings hand over rather than cutting. Each channel at the midpoint has to
+  // sit between the two ends, which is what "smooth transition" means in a number.
+  rainHeat.setLatLngs([[...WET, 0.95], [...TWO, 0.35]]);
+  rainHeat._redraw();
+  const hi = pixAt(WET), lo = pixAt(TWO), mix = pixAt(east(RAIN_KM / 2));
+  const ch = (s, i) => parseInt(s.slice(i, i + 2), 16);
+  const tween = [0, 2, 4].every(i => {
+    const a = ch(hi.hex, i), b = ch(lo.hex, i), m = ch(mix.hex, i);
+    return m >= Math.min(a, b) - 8 && m <= Math.max(a, b) + 8;
+  });
+  ok('and different ones blend across   ', tween && mix.a < hi.a && mix.a > lo.a,
+     '#' + hi.hex + ' -> #' + mix.hex + ' -> #' + lo.hex
+     + ', alpha ' + hi.a + ' -> ' + mix.a + ' -> ' + lo.a);
+
+  /* The same two questions at the spacing the network really has. `thinHeat()` guarantees one radius
+     between two gauges and no more, and on the live payload every overlapping pair sat between 1.01
+     and 1.58 of one. So 1.6 r is the far end of the real range rather than a corner case.
+     Coverage was once the `max` of the per-gauge weights, and `max` follows whichever gauge is
+     nearer — so its slope flips sign on the equidistant line, which is a Voronoi edge. It also read
+     two overlapping readings as one. Measured before the union: two gauges agreeing on 0.70 held
+     alpha 179 each and 61 between them, and an unequal pair fell to 54 between ends of 242 and 89.
+     A midpoint darker than both of its ends is a border drawn between two cells. */
+  /* Two probes, at the two spacings the gauge network really has.
+     **The spacings come from the station geometry and not from taste, and they move with
+     `RAIN_KM`.** Thinning every rain gauge at 6 km leaves 82 nearest-neighbour pairs with a median
+     of 1.21 r and a 90th percentile of 1.66 r. Read it from the stations, which do not move, and
+     never from the wet gauges of the moment — the wet set changes with the weather, and two
+     snapshots an hour apart put the widest pair at 1.58 r and 1.90 r. Thinning at a *shorter*
+     distance also spaces gauges relatively further apart: the same 90th percentile was 1.48 r when
+     `RAIN_KM` was 9. Re-run the sweep in CLAUDE.md after touching either constant.
+     A join at the median must be solid. At the 90th percentile the two blobs are 10 km apart and
+     each stops 3 km short of the ground between them, so a real dip there is honest — that probe
+     only has to stay clear of what a `max` would draw, which is 23%. */
+  const join = (gap, want, name) => {
+    const B = east(RAIN_KM * gap), mid = east(RAIN_KM * gap / 2);
+    map.setView(mid, 12, { animate: false });   // both gauges well inside the canvas at this gap
+    rainHeat.setLatLngs([[...WET, 0.7], [...B, 0.7]]);
+    rainHeat._redraw();
+    const a = pixAt(WET), b = pixAt(B), m = pixAt(mid);
+    ok(name, m.a >= a.a * want && sameHue(m.hex, a.hex),
+       'alpha ' + a.a + ' at A, ' + m.a + ' between, ' + b.a + ' at B, ' + gap + ' r apart, wanted '
+       + Math.round(a.a * want));
+    return B;
+  };
+  join(1.21, 0.97, 'a join is solid at median spacing ');
+  const WIDE = join(1.66, 0.33, 'and stands up at the 90th pct     ');
+
+  /* The handover between two different readings, at the median spacing. **Not at the wider one**:
+     there the blobs have genuinely parted, so the midpoint is fainter than the weaker gauge and
+     "between the two ends" stops being the contract. */
+  rainHeat.setLatLngs([[...WET, 0.95], [...east(RAIN_KM * 1.21), 0.35]]);
+  rainHeat._redraw();
+  const wh = pixAt(WET), wl = pixAt(east(RAIN_KM * 1.21)), wm = pixAt(east(RAIN_KM * 0.605));
+  ok('a handover never dips under both  ', wm.a < wh.a && wm.a > wl.a,
+     'alpha ' + wh.a + ' -> ' + wm.a + ' -> ' + wl.a + ', 1.21 r apart');
+
+  say('');
+  say(fails.length ? 'FAILED: ' + fails.join(', ') : 'PASS');
+} catch (e) {
+  say('THREW', e && (e.stack || e.message));
+}
+</script>

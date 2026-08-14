@@ -62,6 +62,7 @@ export function render() {
   hideMast();
   const points = [];
   const rainPoints = [];
+  const dryPoints = [];   // rain gauges reporting zero — they erase, see heat.js
   const perKind = Object.fromEntries(Object.keys(marks).map(k => [k, 0]));
 
   // Filter first, group second. A site is drawn from the sensors still showing on it, so switching
@@ -105,15 +106,20 @@ export function render() {
     // warm from end to end is a map nobody reads.
     if (near >= HEAT_FLOOR) points.push([s.lat, s.lng, near]);
 
-    // Rainfall drives its own layer, on its own scale — see heat.js for why the two aren't summed.
-    // The floor here is simply "is it raining": a class the reader is told about starts above 0 mm,
-    // and a dry gauge painting the palest violet would make the whole state look wet.
-    /* `backed === false` is a gauge whose own running total denies the reading, so it cannot paint.
-       See `rainBacked()` in api.php and `raining()` in util.js. Measured 2026-08-14, one gauge had
-       held 4.5 mm for twelve hours against an odometer that never moved, and it had been painting a
-       violet blob for every one of them. */
-    if (s.kind === 'rainfall' && hasInfo(s) && s.backed !== false && s.hourly > 0)
-      rainPoints.push([s.lat, s.lng, scalePos(s.hourly, RAIN_STOPS) / 100]);
+    /* Rainfall drives its own layer, on its own scale — see heat.js for why the two aren't summed.
+       A wet gauge paints. A gauge reporting no rain does not paint the palest violet, which would
+       make the whole state look wet — it erases, and heat.js says how.
+       `hasInfo()` gates the dry side as hard as the wet side, and for a stronger reason: a station
+       that is offline or has sent no number is not saying it is dry. Only a live zero denies rain.
+       Both sides also sit under the same filters above, so a district switched off takes its wet
+       gauges and its dry ones out together and cannot leave one half of the argument standing.
+       `backed === false` leaves out both sides for the same reason, one step further back: the
+       station's own total denies the reading, so it cannot paint — and it must not erase either,
+       because a reading nobody can stand behind is no evidence that the ground under it is dry.
+       See `rainBacked()` in api.php and `raining()` in util.js. */
+    if (s.kind === 'rainfall' && hasInfo(s) && s.backed !== false)
+      s.hourly > 0 ? rainPoints.push([s.lat, s.lng, scalePos(s.hourly, RAIN_STOPS) / 100])
+                   : dryPoints.push([s.lat, s.lng]);
 
     if (!pinned && !shown(s.kind)) continue;
     const key = s.site || s.id;
@@ -193,6 +199,10 @@ export function render() {
   // Thinned, not raw: overlapping blobs composite, and these are intensities rather than counts.
   // Each at the distance its own layer paints, or the thinning and the paint disagree.
   heat.setLatLngs(thinHeat(points, HEAT_KM));
+  // Both setters ask for a redraw and leaflet.heat coalesces the pair into one frame, so the order
+  // is for a reader rather than for the canvas: the evidence against goes in beside the evidence
+  // for, and neither call is the one that draws.
+  rainHeat.setDry(dryPoints);
   rainHeat.setLatLngs(thinHeat(rainPoints, RAIN_KM));
   syncHeat();   // layers + legend follow the chips; see heat.js
   counts();

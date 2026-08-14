@@ -19,7 +19,7 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `api.php` | server-side proxy + cache + source merge + poll history + camera image proxy + rate-limited `?force=1` + place lookup (`?place=`, proxies Nominatim) |
 | `sources.php` | scrapers for the two HTML-only upstreams (national portal, JPS WP) and the three MET feeds (nowcast, forecast, warning) |
 | `shots.php` | camera archive: capture, retention tiers, lookup, and the on-request strip (`buildSheet()`) the wall and the clip play. Required by `api.php` |
-| `shots-test.php` | `php shots-test.php` — one of two runnable checks. Guards retention. Exercises `pruneShots()` |
+| `shots-test.php` | `php shots-test.php` — one of three runnable checks. Guards retention. Exercises `pruneShots()` |
 | `index.html` | markup only — no inline CSS or JS |
 | `css/icons.css` | every icon, as an SVG mask. Generated — see docs/FEATURES.md for the fetch |
 | `css/base.css` | tokens, reset, controls, blocks shared by popup + alert panel |
@@ -31,7 +31,8 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `js/util.js` | pure helpers + `hasInfo()` / `color()` / `isIgnored()` |
 | `js/stations.js` | queries over the station set (`nearestOf`, `nearestCam`, `byId`) |
 | `js/map.js` | map instance, basemap/theme, cluster, the station panel (`openSide`), `focusOn` / `flashTo` |
-| `js/heat.js` | both heat layers (water level, rainfall), ground-fixed sizing per layer, shared opacity |
+| `js/heat.js` | both heat layers (water level, rainfall), ground-fixed sizing per layer, shared opacity, and the pass that erases rain over a gauge reporting none |
+| `heat-test.html` | `chrome --headless --dump-dom` — one of three runnable checks. Guards the rain layer's paint distance, its dry-gauge erase and its handover between neighbours, in canvas pixels |
 | `js/popup.js` | popup + meter + gauge + sparkline templates |
 | `js/sparktip.js` | the hover/tap readout on every graph, and the label on any `data-tip`. One delegated listener, no imports |
 | `js/render.js` | rebuilds markers and heat points; drawer summary table |
@@ -899,23 +900,160 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   `heatScale()`'s own comment, and `thinHeat()`, which drops a weaker neighbour on the claim that
   the stronger point's blob already covers it. That last one is the compounding fault: thinning at
   5 km while painting at 9 let every pair between the two distances stack its alpha, which is the
-  bug `thinHeat()` exists to prevent, moved out one ring. The split is now `wide / (1 + BLUR)` and
-  `r * BLUR` off one `BLUR` constant, so the sum is right by construction. `HEAT_MAX_PX` also starts
-  bounding what it names: the sprite used to be 1.8× the cap.
-- **`HEAT_KM` is 5 km and `RAIN_KM` is 4 km, and rain must never borrow the water number again.**
-  5 km is a catchment claim, which is fair for a river level. Rain reached for it because it was
-  there. The payload can settle it: take the 211 rainfall stations that carry history, every pair
-  of them and every 15-minute bucket where one of the pair was wet, and ask how often the other was
-  wet too. It runs 24% out to 4 km, halves to 13% by 6 km, and is back to the 4–6% background rate
-  by 12 km. So a rain reading carries about 4 km of information. `MET_KM` in `api.php` states the
-  same rule from the other end — a claim about the next three hours reaches much further than a
-  claim about this moment, and `hourly` is the last rolling hour. **A layer's paint distance and its
-  `thinHeat()` distance are one number**, passed to both from `config.js`. Rain still covers ground
-  where no gauge reports rain, and that is weather rather than a defect: even inside 4 km, three
-  quarters of a wet gauge's neighbours are dry. Do not chase that figure to zero with a smaller
-  radius — below the distance a reading informs, the layer is 233 dots. Do not chase it with
-  interpolation either. This app draws readings, not a modelled field. See `docs/FEATURES.md`,
-  *The rainfall heatmap claimed rain over 250 km² from one gauge*.
+  bug `thinHeat()` exists to prevent, moved out one ring. **`SoftHeat._redraw()` paints the blobs
+  itself now and never draws that sprite**, so the trap is gone rather than tuned — one `blobPx()`
+  is the radius, `thinHeat()` takes the same ground distance, and `HEAT_MAX_PX` bounds what it
+  names. The `radius` and `blur` options stay in `BASE` only because `_updateOptions()` builds
+  `_grad` from `gradient` in the same call, and `_grad` is where the colours come from.
+- **A rain gauge reporting zero is a reading, and the rain heat layer draws it.** The network says
+  two things — 12 gauges reporting rain and 218 reporting none, on the payload this was built from
+  — and the layer used to draw only the first, so the wash covered ground that 218 stations had
+  already measured and found dry. `SoftHeat` in `js/heat.js` runs the second pass for this reason: it
+  paints the wet gauges, then runs a second pass in `destination-out` stamping a soft brush at every
+  dry one. **`RAIN_KM` (6 km) is one number and covers both readings.** A gauge reporting rain
+  paints that far and a gauge reporting none erases that far. Two numbers stood here first, 9 km of
+  paint against 4 km of erase, and there is no defending that — it is the same instrument, the same
+  minute and the same question, so the answer "none" cannot carry less ground than the answer
+  "12 mm". Symmetry cost 4% of the painted area, 2,005 km² against 1,906. **Do not split them
+  again.**
+  **The number itself was 9 km until 2026-08-14, and the evidence for 6 was already in the file.**
+  The co-wetness study in `config.js` puts the halving distance at 6 km and the background rate at
+  12, so 9 was the outer edge of a claim that survives rather than the middle of one. A convective
+  cell here is 1 to 2 km across. **Moving it moves four things at once** — the paint, the erase,
+  `thinHeat()`'s spacing and the blob — and it changes gauge spacing *measured in blob radii*, which
+  is what `FEATHER` is sized against. Thinning at a shorter distance keeps gauges that are
+  relatively further apart: the 90th-percentile join went from 1.48 radii at 9 km to 1.66 at 6.
+  **The first fix used 4 km as the blob size instead, and it is the wrong shape of answer** — a
+  smaller brush charges the same ground everywhere, including Sabak Bernam where the nearest other
+  gauge is 12 km off and nothing disputes anything. It cost three quarters of the map's area to fix
+  a problem that only existed where a dry gauge stood. Measured: 2,747 km² before, 503 km² under
+  the small brush, 1,906 km² now, with 58 dry gauges under paint before and 1 after. **Three
+  details are load-bearing and all three were found by running `heat-test.html`, not by reading the
+  code.**
+  **simpleheat leaves `globalAlpha` set** — its draw loop assigns each point's weight and never puts
+  it back, so an eraser inherits the last blob's weight and removes that fraction rather than all of
+  it. A 0.9 blob left 22 of 229 alpha on a dry gauge. The pass runs inside `save()`/`restore()`.
+  **An eraser stops at the midpoint to the nearest wet gauge.** Alpha is this layer's colour scale,
+  so an eraser reaching a wet gauge does not shrink its blob — it restates the rainfall as a lighter
+  class. A wet gauge 2 km from a dry one lost half its alpha and dropped a class it had measured,
+  and a dry gauge on the same pole erased its neighbour off the map outright. Halfway between two
+  stations that disagree is where the boundary goes.
+  **The brush holds full strength over its first 15%**, because a ramp peaking at the exact centre
+  honours the reading at a mathematical point and no pixel is one — the gauge kept 5 of 206 alpha on
+  a half-pixel sampling offset. Do not replace any of this with interpolation: a dry gauge may deny
+  ground, never supply a value. See `docs/FEATURES.md`, *The rainfall heatmap claimed rain over
+  250 km² from one gauge*.
+- **A heat blob's alpha is its colour as well as its size, so the brush's own falloff walks down the
+  legend.** simpleheat's `_colorize()` looks the gradient up by alpha, and the stock brush fades
+  across most of a blob — so one rain gauge reading 27 mm/h, JPS's *heavy* class, painted heavy at
+  the gauge, moderate 4 km out and light 6 km out. Three classes from one number, with a legend beside them naming those colours in
+  millimetres. In IDW or kriging a value falls off because the estimate falls off. Here it fell off
+  because that is how a brush is drawn.
+  **So `SoftHeat._redraw()` in `js/heat.js` paints the blobs itself and never calls `_colorize()`.**
+  It reads the class colour out of `_grad` — the 256-entry ramp simpleheat builds from
+  `options.gradient`, so the legend stays the one definition — and draws each blob in that **one**
+  colour with only its alpha ramping, and the alpha holds full strength across an inner core before
+  it smoothsteps out. Measured on one gauge at 27 mm/h: one hue from the centre to 8 km with alpha
+  falling 182 to 20. A river at its danger mark paints `#ff4e4d` across its whole 5 km, 255 to 0.
+  **Two shorter fixes were built and thrown away, and both are worth not repeating.** Cutting the
+  sprite's blur to 0.04 got one class per blob and drew hard discs. Softening those back with a
+  `destination-out` pass got the look and broke the neighbours: a `destination-out` brush is a claim
+  about the canvas, not about one blob, so each blob's own feather ate whatever its neighbours had
+  painted under it. Measured on two gauges one blob apart, which is the closest `thinHeat()` ever
+  leaves them, **each centre was erased to alpha 5 of 177 by the other one's feather**, and the
+  ground between them stacked to 200 in a class neither gauge reported. Painting is additive over a
+  neighbour and erasing is not, so a fade has to be painted. After the rewrite the same two gauges
+  hold 179 at both centres, one hue end to end, and the largest step between 1 km samples is 53
+  inside the smooth falloff against 172 before.
+  **And the layer computes a field rather than stamping shapes, because two readings are not twice
+  one reading.** Every Porter-Duff `over` adds alpha, so two gauges reading the same rain over the
+  same ground came out heavier than either reported — 227 where two 179 blobs met. No composite
+  operation blends colour while taking the *larger* alpha, so `SoftHeat._field()` asks the readings
+  per cell instead: `v` is the blended reading, every gauge in reach weighted by nearness and
+  **normalised**, so two gauges reading the same thing give that thing back. `cov` asks whether any
+  reading reaches this ground at all, which carries the soft edge and is why an isolated blob fades
+  while an overlap does not brighten. Colour is `_grad[v]`, opacity is `v * cov`. Measured on
+  two gauges one blob apart: both at 0.70 gives alpha 179 flat end to end, largest step over a
+  kilometre one count. One at 0.95 and one at 0.35 walks `#f35772` to `#7b7bff` with alpha 242 to
+  89. The smoothness between neighbours is the browser's bilinear filter on a 4 px grid — raise
+  `CELL` and the edges go blocky, lower it and the cost climbs with the square.
+  **`cov` is a union, and it must never go back to a max — that is a Voronoi border.** A cell asks
+  two questions and one curve cannot answer both, so `BLEND` (0.45) sizes each reading's say in the
+  mean and `FEATHER` (0.75) sizes the coverage. One curve served both at first, joined by `max`, and
+  that failed twice over. `max` follows whichever gauge is nearer, so its slope flips sign on the
+  equidistant locus — the Voronoi edge. A sign flip is a crease, and the eye reads a crease as a
+  line. The blend weight is also down to 0.30 at 0.8 of a radius. That is right for a weight and far
+  too steep for coverage. `thinHeat()` guarantees one radius between two gauges and no more.
+  Measured on two gauges reading the same 0.70, against 179 at each of them: 107 between them at 1.4
+  radii, 61 at 1.6, 20 at 1.8. An unequal pair states it more plainly. 0.95 and 0.35 painted 242 and
+  89 with **54 between them**, and a midpoint darker than both ends is a border, not a transition.
+  The replacement is a **clamped sum**, and it cannot pass 1, so an overlap still never paints
+  brighter than a gauge centre. After it, 179 flat at 1.13 and 1.48 radii, and the unequal pair
+  walks 242 → 149 → 89.
+- **A rim facing empty ground and a join between two blobs are different edges, and only the combine
+  can tell them apart.** `FEATHER` is one radial curve, so lowering it to soften the rim hollows out
+  every join by the same amount — measured, 0.75 to 0.50 under a union took the share of solid joins
+  from 84% to 45%. The combine sees something the curve cannot: how many readings arrive. A rim has
+  one and a join has two. So `cov` sums the per-gauge coverage rather than unioning it. One gauge at
+  half strength stays half covered, and two blobs meeting at half strength each add up to covered.
+  **The clamp is `1-(1-s)²` and not `min(1, s)`.** A bare clamp breaks its first derivative where it
+  bites, which is a crease along an iso-contour — the Voronoi fault on a different line. Squared has
+  slope 0 at s=1. It is also the highest power that still fades the rim gently, because a higher one
+  holds full opacity further out and hardens the edge it exists to soften. That bought `FEATHER` at
+  0.50 while `RAIN_KM` was 9: the rim fade went from 1.38 km to 2.20 km with a 34% gentler slope.
+  **It sits at 0.20 now, and the value only means anything beside `RAIN_KM`.** A 6 km blob at 0.50
+  fades over 1.47 km, which is less gentle in metres than the 9 km blob it replaced. At 0.20 it
+  fades over 2.35 km at a slope of 0.413 per km, gentler than the 9 km layer on both counts. The
+  cost is stated in the next line and is real.
+  **A 6 km blob with a 2.35 km rim does not merge into one sheet. That is arithmetic, not a fault.**
+  A join at the median spacing holds 178 of 179. At the 90th percentile the two gauges are 10 km
+  apart. Each blob stops 3 km short of the ground between them, and the midpoint reads 74.
+  The softest tenth of joins sit near that. Measured at 1.21 / 1.48 / 1.66 / 1.95 radii: 178, 133,
+  74, 2. **Raise `FEATHER` to trade rim softness back for a solid wash, and re-measure both.** The
+  two cannot both be maximised, because one curve reaches the rim and the ground between gauges
+  alike.
+  **Read gauge spacing off the station geometry, never off the gauges reporting rain.** The wet set
+  changes with the weather. Two snapshots an hour apart put the widest overlapping pair at 1.58 and
+  at 1.90 radii, and one sweep scored the same candidate at 71% and then 11% with no code change
+  between. Thin *every* rain gauge instead. **Two populations answer two questions and their
+  percentiles differ**, so name which one a number came from. Nearest neighbour, which is where a
+  seam shows first and where `heat-test.html` takes its probe distances: at `RAIN_KM` 6, 82 pairs,
+  median 1.21 r, p90 1.66 r, widest 1.95 r. Every overlapping pair, which is what join solidity is
+  scored over since any two blobs that meet can show a seam: 143 pairs, median 1.54 r, p90 1.89 r.
+  The Verify block prints both. A constant tuned against one snapshot is tuned against one
+  afternoon's rain.
+  **The bucket index in `_field()` is load-bearing, not tidiness.** Without it the cost is cells
+  times readings, and `thinHeat()` packs readings one radius apart, so zooming out shrinks the
+  radius and multiplies the readings together. Measured on a full viewport at that spacing: 52 ms at
+  30 readings, 785 ms at 638, 3.0 s at 2,655 — against a flat 33 to 38 ms bucketed at every one of
+  them. A flood is when a lot of stations report at once and when the map must not seize.
+- **The dry-gauge eraser stays `destination-out`, and it is the one pass that should reach every
+  blob under it.** A dry reading denies the ground, not one neighbour's contribution to it. It runs
+  last, after every colour beneath is settled, so a denied edge fades at the colour it already had.
+  Measured across an erased boundary, `#e86093` at alpha 230 on the gauge and `#e96293` at alpha 83
+  in the fade, two counts of premultiplied-alpha rounding apart. `heat-test.html` asserts the hue at
+  three radii and across an erased boundary for this reason.
+- **A canvas radial gradient clamps past its last stop, so never `fillRect` one — `stamp()` fills
+  the disc.** Beyond `r` the gradient does not stop, it keeps painting whatever the outermost colour
+  was. The feather's outermost colour is full erase. Filled as a square, the four corners outside the
+  circle — 21% of the box — erased everything under them, **including the paint belonging to the next
+  blob along**, which `thinHeat()` places exactly one blob away and therefore right in that corner.
+  It drew as hard rectangles cut out of the wash, axis-aligned and about 2r on a side, which reads
+  as a tiling fault or a canvas-tile seam and is neither. The dry-gauge eraser used `fillRect` for
+  weeks and never showed it, because *its* outermost colour is transparent and clamping to "no
+  erase" is invisible. That is luck, not design, so both passes go through `stamp()` now.
+  `heat-test.html` puts a second gauge 1.2 blobs away on the diagonal — outside the first blob's
+  circle, inside its square — and that assertion reads alpha 0 against 230 with the square fill back.
+- **`heatScale()` may only size a layer the map is holding.** `setOptions()` ends in `redraw()`,
+  which reads `this._map._animating`, and Leaflet nulls `_map` when it removes a layer — so sizing a
+  layer that is off throws a `TypeError`. It hid for a long time because the layer that is off has
+  usually never been added, and a layer with no canvas returns from `redraw()` one test earlier.
+  **Switching the heat chip from rainfall to water is what reaches it**, since that leaves `rainHeat`
+  added-then-removed, holding a canvas and no map. `syncHeat()` adds and removes before it calls
+  `heatScale()`, so a layer just switched on is on the map by then and still gets sized.
+- **The water layer has no eraser and must not get one.** A river reading low says nothing about the
+  river beside it. Rain gauges are the only sensors here where one station's zero is evidence about
+  the ground next to it, which is the whole reason that pass exists on one layer only.
 - **Leaflet paints its container `#ddd` in both themes.** That is what shows through wherever a tile
   has not arrived, and a zoom out has nothing to retain over the newly revealed area — so the
   missing tiles read as a grid of pale boxes on the dark basemap. `.leaflet-container` takes
@@ -1581,8 +1719,8 @@ foreach($r as $s){$la=(float)$s["latitude"];$ln=(float)$s["longitude"];if(!$la)c
 $b=null;$bd=1e9;foreach($non as $n){$d=$km($la,$ln,$n["lat"],$n["lng"]);if($d<$bd){$bd=$d;$b=$n;}}
 printf("%-5d %-28s %6.0f m  %-30s %s\n",$s["stationId"],$s["stationName"],$bd*1000,$b["name"],$b["district"]);}'
 
-php shots-test.php            # one of two runnable checks. Guards camera retention. Must stay green.
-php api.php --selftest       # the other. Guards the force-refresh rate limit, cache choice, and the
+php shots-test.php            # one of three runnable checks. Guards camera retention. Must stay green.
+php api.php --selftest       # another. Guards the force-refresh rate limit, cache choice, and the
                               # place-lookup validator/rate limit. Must stay green.
 curl -sk "https://flood-exp.test/api.php?shots=1"                          # frame timestamps
 
@@ -1598,17 +1736,6 @@ echo count($r)," rainfall: ",json_encode($c),"\n";
 foreach($r as $s) if(($s["backed"]??null)===false)
   printf("  %-9s %-26s hourly=%-5s status=%s daily=%s\n",$s["id"],substr($s["name"],0,26),
          $s["hourly"],$s["status"],json_encode($s["daily"]??null));'
-
-# Which archived frames still carry an alert span, and which sensor raised each one. The siren rule
-# lives in a closure inside the request handler and cannot be reached by --selftest, so this sweep is
-# its check: a siren id appearing here must have had a river at its Amaran mark at that time. Both
-# stuck relays (siren-50, siren-1081) coloured 14 frames before the rule and none after it.
-for d in shots/*/; do id=$(basename "$d"); curl -sk "https://flood-exp.test/api.php?shots=$id"; done \
-  | php -r 'while($l=fgets(STDIN)) foreach(json_decode($l,true)?:[] as $f) if($f[1]!==null) echo "$f[2] $f[1]\n";' \
-  | sort | uniq -c
-curl -sk -o /dev/null -w '%{http_code} %{content_type}\n' \
-     "https://flood-exp.test/api.php?shot=1&t=$(curl -sk 'https://flood-exp.test/api.php?shots=1' \
-     | php -r 'echo json_decode(stream_get_contents(STDIN))[0];')"          # 200 image/webp
 
 # Which archived frames still carry an alert span, and which sensor raised each one. The siren rule
 # lives in a closure inside the request handler and cannot be reached by --selftest, so this sweep is
@@ -1642,21 +1769,67 @@ php -r '$p=json_decode(file_get_contents(".cache.json"),true);
 preg_match("/MET_KM\s*=\s*([\d.]+)/",file_get_contents("api.php"),$m);$k=(float)$m[1];
 echo count(array_filter($p["stations"],fn($s)=>($s["met"]["km"]??0)>$k))," beyond MET_KM ($k km)\n";'
 
-# How much ground the rainfall heat layer claims, and how much of it holds a gauge reporting no
-# rain. This is the sweep that found the 1.8x paint bug: the wash covered 2,036 km2 and 82% of the
-# gauges under it were dry. RAIN_KM is read out of config.js, never copied here. Read the second
-# figure as a trend, not a pass mark — rain is patchy and it will never reach zero. A jump back
-# toward 80%, or an area far above 500 km2 on a dozen wet gauges, means a blob outgrew its number.
-php -r '$p=json_decode(file_get_contents(".cache.json"),true);
-preg_match("/RAIN_KM\s*=\s*([\d.]+)/",file_get_contents("js/config.js"),$m);$r=(float)$m[1];
-$km=fn($a,$b)=>hypot($a["lat"]-$b["lat"],($a["lng"]-$b["lng"])*cos(deg2rad($a["lat"])))*111;
+# The rain heat layer, in canvas pixels. Guards the paint distance, the dry-gauge erase and the
+# handover between two neighbours — the rules that live in a canvas, where linting and node --check
+# cannot reach them. It prints its own verdict. Must read PASS.
+"/c/Program Files/Google/Chrome/Application/chrome.exe" --headless=new --disable-gpu \
+  --ignore-certificate-errors --virtual-time-budget=15000 --dump-dom \
+  https://flood-exp.test/heat-test.html | perl -0777 -ne 'print $1 if /<pre id="out">([^<]*)</s'
+
+# How far apart the rain gauges stand, in blob radii. FEATHER (0.20) and the two join assertions in
+# heat-test.html are sized from this, so re-run it before moving either — and after any change to
+# RAIN_KM, which rescales every number here.
+# **It thins EVERY rain gauge, not the wet ones.** The wet set changes with the weather, and two
+# snapshots an hour apart moved the widest pair from 1.58 to 1.90 radii. The station geometry does
+# not move. thinHeat() guarantees 1.00 and no more, so read the spread rather than the floor.
+# Both populations, because they answer different questions and their percentiles differ. A seam
+# shows first between a gauge and its NEAREST neighbour, so heat-test.html takes its probe distances
+# from that row. Join solidity is scored over EVERY overlapping pair instead, since any two blobs
+# that meet can show one. Measured 2026-08-14 at RAIN_KM 6: 231 -> 84 kept, nearest 1.21/1.66/1.95,
+# all 1.54/1.89/1.98. At RAIN_KM 9 the same sweep read 49 kept and nearest 1.13/1.48/1.96 — a SHORTER
+# radius keeps gauges that are relatively FURTHER apart, which is the opposite of the intuition.
+php -r '$p=json_decode(file_get_contents(".cache.json"),true);$c=file_get_contents("js/config.js");
+preg_match("/RAIN_KM\s*=\s*([\d.]+)/",$c,$m);$R=(float)$m[1];
+$km=fn($a,$b,$c2,$d)=>hypot($a-$c2,($b-$d)*cos(deg2rad($a)))*111;
+$all=array_values(array_filter($p["stations"],fn($s)=>$s["kind"]==="rainfall"&&$s["lat"]));
+$k=[];foreach($all as $s){foreach($k as $x) if($km($x["lat"],$x["lng"],$s["lat"],$s["lng"])<$R) continue 2; $k[]=$s;}
+$nn=[];foreach($k as $i=>$a){$n=1e9;foreach($k as $j=>$b) if($i!=$j) $n=min($n,$km($a["lat"],$a["lng"],$b["lat"],$b["lng"]));
+if($n/$R<2)$nn[]=$n/$R;}
+$ap=[];foreach($k as $i=>$a){foreach($k as $j=>$b){ if($j<=$i)continue;
+$t=$km($a["lat"],$a["lng"],$b["lat"],$b["lng"])/$R; if($t<2)$ap[]=$t;}}
+sort($nn);sort($ap);$q=fn($x,$f)=>$x[(int)(count($x)*$f)];
+printf("%d stations -> %d kept\n",count($all),count($k));
+printf("nearest neighbour : %d pairs, median %.2f, p90 %.2f, max %.2f\n",count($nn),$q($nn,.5),$q($nn,.9),end($nn));
+printf("all overlapping   : %d pairs, median %.2f, p90 %.2f, max %.2f\n",count($ap),$q($ap,.5),$q($ap,.9),end($ap));'
+
+# How much ground the rain layer claims, and how many gauges reporting no rain are left under it.
+# This is the sweep that found the 1.8x paint bug: the wash covered 2,747 km2 with 58 dry gauges
+# under it. RAIN_KM is read out of config.js, never copied here — it sizes the paint and the erase
+# alike. Expect most of the reach kept — 96% at RAIN_KM 6, against 79% at 9, because a shorter blob
+# reaches fewer dry gauges — and at most a handful of dry gauges left, and those
+# share a pole with a wet gauge, so their eraser has no room. A dry count in the dozens means the
+# erase pass stopped running.
+php -r '$p=json_decode(file_get_contents(".cache.json"),true);$c=file_get_contents("js/config.js");
+preg_match("/RAIN_KM\s*=\s*([\d.]+)/",$c,$m);$RW=(float)$m[1];$RD=$RW;
+$km=fn($a,$b,$c2,$d)=>hypot($a-$c2,($b-$d)*cos(deg2rad($a)))*111;
 $all=array_values(array_filter($p["stations"],fn($s)=>$s["kind"]==="rainfall"&&$s["lat"]));
 $wet=array_values(array_filter($all,fn($s)=>($s["hourly"]??0)>0));
+$dry=array_values(array_filter($all,fn($s)=>($s["hourly"]??null)!==null&&$s["hourly"]<=0));
 usort($wet,fn($a,$b)=>$b["hourly"]<=>$a["hourly"]);
-$k=[];foreach($wet as $s){foreach($k as $x) if($km($x,$s)<$r) continue 2; $k[]=$s;}
-$cov=0;$dry=0;foreach($all as $s){foreach($k as $x) if($km($x,$s)<=$r){$cov++;if(($s["hourly"]??0)<=0)$dry++;break;}}
-printf("%d wet gauges -> %d blobs, %.0f km2, %d gauges covered, %d dry (%d%%)\n",
-count($wet),count($k),count($k)*M_PI*$r*$r,$cov,$dry,$cov?round(100*$dry/$cov):0);'
+$k=[];foreach($wet as $s){foreach($k as $x) if($km($x["lat"],$x["lng"],$s["lat"],$s["lng"])<$RW) continue 2; $k[]=$s;}
+$er=[];foreach($dry as $d){$n=1e9;foreach($k as $s)$n=min($n,$km($d["lat"],$d["lng"],$s["lat"],$s["lng"]));
+$er[]=[$d["lat"],$d["lng"],min($RD,$n/2)];}
+$keep=function($y,$x)use($er,$km){$v=1.0;foreach($er as [$dl,$dg,$r]){if($r<=0)continue;$e=$km($y,$x,$dl,$dg);
+if($e<$r)$v*=max(0,min(1,($e/$r-0.15)/0.85));}return $v;};
+$st=0.4;$dg2=$st/111;$la=array_column($k,"lat");$ln=array_column($k,"lng");$full=0;$lit=0;
+for($y=min($la)-0.12;$y<=max($la)+0.12;$y+=$dg2){$dx=$dg2/cos(deg2rad($y));
+for($x=min($ln)-0.12;$x<=max($ln)+0.12;$x+=$dx){$in=false;
+foreach($k as $s)if($km($y,$x,$s["lat"],$s["lng"])<=$RW){$in=true;break;} if(!$in)continue;
+$full+=$st*$st; if($keep($y,$x)>=0.25)$lit+=$st*$st;}}
+$on=0;foreach($er as [$dl,$dg,$r]){$u=false;foreach($k as $s)if($km($dl,$dg,$s["lat"],$s["lng"])<=$RW)$u=true;
+if($u&&$keep($dl,$dg)>=0.25)$on++;}
+printf("%d wet -> %d blobs, reach %.0f km2, violet %.0f km2 (%d%% kept), %d of %d dry gauges under violet\n",
+count($wet),count($k),$full,$lit,round(100*$lit/max(1,$full)),$on,count($dry));'
 
 # Which warnings survive the geography filter, and how many the feed offered.
 curl -sk https://flood-exp.test/api.php | php -r '$p=json_decode(stream_get_contents(STDIN),true);
@@ -1673,8 +1846,8 @@ done
 There is otherwise no test suite. Changes are verified by linting, syntax-checking the modules,
 querying `.cache.json` for the data shape being relied on, and looking at the page.
 
-`shots-test.php` and `php api.php --selftest` are the two runnable checks here, and each guards a
-different risk.
+`shots-test.php`, `php api.php --selftest` and `heat-test.html` are the three runnable checks here,
+and each guards a different risk.
 
 `shots-test.php` is deliberately narrow: retention is the only rule in this repo that can *quietly
 destroy* data. Everything else either works or visibly does not, but a prune that buckets a frame
@@ -1691,3 +1864,23 @@ case with no PHP notice), `placeParam()`'s array-cast guard (see the gotcha abov
 `forceAllowed()` reused at `PLACE_EVERY`'s window for the per-second Nominatim limit — fifteen
 assertions in all, half the check's total, and all offline for the same reason: no test here should
 cost a real request to either upstream.
+
+`heat-test.html` guards the one part of this app that lives in canvas pixels. The rain heat layer
+paints a distance and then erases what a gauge reporting no rain denies. Neither rule is visible to
+`php -l`, to `node --check`, or to any query over `.cache.json`. Both are wrong only on screen.
+It needs a browser, so it runs headless and prints its own verdict rather than a picture. It earned
+its place immediately. Six faults survived the code review that wrote the layer, and the check and
+its probes found all six: simpleheat's leaked `globalAlpha`, an eraser reaching across a wet gauge
+and restating its rainfall as a lighter class, a brush that peaked where no pixel sits, a paint
+falloff that drew four rain classes out of one reading, `heatScale()` sizing a layer the map had
+already dropped, and a gradient filled as a square erasing its neighbour's blob. Two of the six had
+shipped for months and no amount of reading found either. Anything else added to a canvas here needs the same treatment. A canvas
+is where reading the code stops working.
+
+**A seventh fault got past it, and how it did is the lesson.** `cov` took the max of the blend
+weights and drew a Voronoi border on every equidistant line. The check held two assertions over
+overlapping gauges and both passed. Both probe two gauges exactly one radius apart, which is the one
+spacing where a max behaves. A reader found it on screen instead. **`thinHeat()` guarantees one
+radius and nothing more, so one radius is the best case and never the typical one.** The assertions
+added after it probe at 1.48 and 1.60 radii, which the spacing sweep takes off the station geometry.
+Pick a probe distance from measured data. Otherwise the check reports on a case the map never draws.

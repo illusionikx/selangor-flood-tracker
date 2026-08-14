@@ -8053,13 +8053,13 @@ It dropped neighbours inside 5 km while the blobs reached 9 km, so any pair betw
 distances still stacked. That is the same fault the function was written to fix, moved out one
 ring.
 
-`heatScale()` now splits the ground distance across the pair. `BLUR` is the blur as a fraction of
-the core, and the core is `distance / (1 + BLUR)`, so `radius + blur` is the distance by
-construction. Two numbers that must sum to a third are now derived from it rather than set beside
-each other. `HEAT_MAX_PX` also starts meaning what it says: the cap now bounds the sprite, where
-before the sprite was 1.8 times the cap.
+The first repair split the ground distance across the pair, so that `radius + blur` summed to it by
+construction. That trap is gone rather than tuned now: `SoftHeat._redraw()` paints the blobs itself
+and never draws simpleheat's sprite, so `blobPx()` is the radius, `thinHeat()` takes the same ground
+distance, and `HEAT_MAX_PX` bounds what it names. See *And the feather ate its neighbours* below for
+why the layer ended up painting its own blobs.
 
-### Cause 2: rain borrowed the water layer's catchment radius
+### Cause 2: the layer read only half of what the network reported
 
 The 5 km was chosen for water. Flooding is catchment scale, so one river gauge speaking for 5 km
 of catchment is a fair claim. The rain layer took `HEAT_KM` because it was there.
@@ -8077,41 +8077,432 @@ time step where at least one of the pair was wet, and ask how often the other on
 | 10–12 km | 6% |
 | 12 km and beyond | 4–6% |
 
-The last row is the background rate — how often any gauge is wet at all. So a wet gauge carries
-real information about 4 km of ground, half of it by 6 km, and none of it by 12 km. `RAIN_KM` is
-4 km on that measurement.
+The last row is the background rate — how often any gauge is wet at all. So one station's claim is
+strong out to 4 km, half gone by 6 km, and worth nothing by 12 km. No rain claim survives 12 km,
+and `RAIN_KM` at 9 km is the outer edge of one that does. The same reasoning already sits in
+`api.php` at `MET_KM`, which notes that a claim about the next three hours reaches much further
+than a claim about this moment.
 
-The same reasoning already sits in `api.php` at `MET_KM`, which notes that a claim about the next
-three hours reaches much further than a claim about this moment. Rain here is the last rolling
-hour, and 4 km is what the gauges themselves report.
+**The first fix used that 4 km as the blob size, and it was wrong.** It made every blob small
+enough to stop short of any dry gauge. That charges the same ground everywhere. Over Ampang,
+where a dry gauge stands 1.6 km away, cutting the blob back is what the evidence says. Over Sabak
+Bernam, where the nearest other gauge is 12 km off, nothing disputes anything and the cut buys
+nothing. The map lost three quarters of its area and most of that loss was not evidence-driven.
 
-`thinHeat()` now takes the distance as a parameter, and each layer is thinned at the distance it
-is painted at. Thinning rain at 4 km rather than 5 also keeps two readings that were being
-discarded.
+**The network reports two things and the layer was reading one.** 12 gauges said rain. 218 said
+none. Only the 12 reached the canvas, so the wash spread over ground that 218 stations had already
+measured and found dry. The fix is not a smaller brush. It is to draw the other 218.
+
+### What it does now
+
+A wet gauge paints `RAIN_KM`, which is 9 km — the same reach the layer had before any of this.
+A gauge reporting no rain then erases that paint over itself, at the same 9 km.
+
+**One number covers both readings, and that is the rule.** The first build gave the paint 9 km and
+the erase 4 km. There is no defending it. It is the same instrument, the same minute and the same
+question, so the answer "none" cannot carry less ground than the answer "12 mm" — and a reader
+looking at a small erased patch inside a large violet one is reading exactly that unfairness off
+the screen. Symmetry cost 4% of the painted area, 2,005 km² against 1,906, because the midpoint
+rule below already governs every dry gauge with paint on it. Only 19 of 213 were reaching the
+4 km cap at all.
+
+`SoftHeat` in `js/heat.js` is the subclass both layers use. It paints the wet
+gauges the way the water layer does, then runs a second pass in `destination-out`, stamping a soft
+brush at every dry gauge. `destination-out` multiplies canvas alpha by one minus the brush, so
+overlapping erasers compound. Two dry gauges over the same ground remove more of it than one does,
+which is right — that is two readings saying the same thing.
+
+Three details are load-bearing, and each one was found by running the check rather than by reading
+the code.
+
+**simpleheat leaves `globalAlpha` set.** Its draw loop assigns the weight of each point and never
+puts it back, so the eraser inherited the last blob's weight. A 0.9 blob left 22 of 229 alpha
+standing on a gauge reporting zero. The pass runs inside `save()` and `restore()` now.
+
+**An eraser stops at the midpoint to the nearest wet gauge.** This is what makes two equal radii
+work. On the line between a wet gauge and a dry one, paint survives exactly where the pixel is
+nearer to the wet one, so neither reading outranks the other and neither is discarded. Without it,
+alpha is this layer's colour scale, so an eraser that reaches a wet gauge does not shrink its blob
+— it restates the rainfall as a lighter class. A wet gauge 2 km from a dry one lost half its alpha
+and dropped a class it had measured. A dry gauge on the same pole erased its neighbour off the map.
+
+**The eraser holds full strength over its first 15%.** A ramp that peaks at the exact centre honours
+the reading at a mathematical point, and no pixel is one. The gauge itself kept 5 of 206 alpha
+because the sample sat half a pixel off the peak.
+
+### A third fault: the paint brush drew four rain classes from one reading
+
+This one predates both of the above and is worse than either. simpleheat looks its gradient up by
+alpha, so alpha is the blob's extent **and** its colour at the same time. The brush fades from the
+gauge's weight at the centre to nothing at the edge. That fade walks straight down the colour
+scale, and the legend beside it names those colours in millimetres.
+
+Measured on the canvas, one gauge reading 27 mm/h, which is JPS's *heavy* class:
+
+| distance | alpha | colour | what the legend says it means |
+|---|---|---|---|
+| 0 km | 178 | `#bc7dff` | heavy — the actual reading |
+| 3 km | 142 | `#9a7aff` | between moderate and heavy |
+| 4 km | 112 | `#867bff` | moderate |
+| 6 km | 44 | `#6e7aff` | light |
+
+Three classes from one number, and no measurement behind two of them. In IDW or kriging a value
+falls off because the estimate falls off. Here it fell off because that is how a brush is drawn.
+
+**The first fix cut `BLUR` to 0.12 and it was ugly.** `BLUR` is the blur as a fraction of the solid
+core, and dropping it from 0.8 turned every blob into a hard disc. The colour stopped lying and the
+map stopped looking like a map. It also still drifted: 0.12 leaves a Gaussian tail that pulls the
+weight from 0.9 to about 0.87 at four fifths of the radius, and between the 0.75 and 1.0 gradient
+stops that is a visible move toward the next class up.
+
+**The softness was never the problem. Softness bought with alpha *before* the colour is chosen was.**
+`_colorize()` runs inside simpleheat's `draw()`, reads each pixel's alpha, writes the matching colour
+back, and leaves the alpha alone. Anything that takes alpha away *after* that point makes a pixel
+more transparent without touching what colour it already is. The dry-gauge eraser had been doing
+exactly this all along, which is why an erased edge never changed hue.
+
+**The second fix drew the blob twice over**, and it is the one the section below tears down. `BLUR`
+went to 0.04, near enough to a hard disc that `_colorize()` saw one weight and painted one class
+across the whole thing. `FEATHER` (0.45) then faded the outer 55% back out with a smoothstep in
+`destination-out`, after the colour was settled. On one blob it was right, and this is what it did
+to a gauge reading 27 mm/h:
+
+| distance | before | now |
+|---|---|---|
+| 0 km | `#bc7dff` heavy, alpha 178 | `#bf7dff` heavy, alpha 182 |
+| 3 km | `#9a7aff` **between classes** | `#be7dff` heavy, alpha 177 |
+| 4 km | `#867bff` **moderate** | `#bf7dff` heavy, alpha 175 |
+| 6 km | `#6e7aff` **light** | `#be7dff` heavy, alpha 118 |
+| 8 km | fading | `#bf80ff` heavy, alpha 20 |
+
+One colour, one claim, and an edge that fades. The water layer shared both constants and came out
+the same way: a river at its danger mark painted `#ff4e4d` across the whole 5 km with the alpha
+falling 255 to 0, where it used to grade through warning orange and alert amber on the way out.
+
+That is a Thiessen cell with a soft edge, which is what a point reading spread over an area has
+always been. It survives. What did not survive is the way the edge was made.
+
+**The insight does survive, and it is the rule to keep.** `_colorize()` decides every pixel's colour
+from its alpha and writes it back, so anything that changes alpha *afterwards* changes opacity and
+nothing else. The dry-gauge eraser had been relying on that from the start, which is why an erased
+edge never changed hue. Measured across an erased boundary: `#e86093` at alpha 230 on the gauge,
+`#e96293` at alpha 83 in the fade — the same hue, two counts of premultiplied-alpha rounding apart.
+That is still how the eraser works. It is only the blob's own edge that stopped being made this way,
+for the reason below.
+
+### And the feather ate its neighbours
+
+Softening the edge by erasing it was wrong twice over, and the second one only showed on a screenshot
+of two blobs close together.
+
+A `destination-out` brush is a claim about the canvas, not about one blob. So each blob's own feather
+removed whatever its neighbours had painted underneath it. `thinHeat()` leaves two kept gauges exactly
+one blob apart, which puts each one's centre on the far rim of the other's feather — where that
+feather is at full strength.
+
+Measured along the line between two gauges one blob apart, both reading the same weight:
+
+| position | alpha | colour |
+|---|---|---|
+| 1 km before gauge A | 177 | `#bc7dff` |
+| **gauge A** | **5** | — |
+| midway | 200 | `#e95e8c` |
+| **gauge B** | **179** | `#bc7dff` |
+
+Both centres erased to nothing by the other one's halo, and the ground between them stacked into a
+class neither gauge had reported. The cliff at each centre is a 172-count step between samples 1 km
+apart.
+
+**Painting is additive over a neighbour and erasing is not, so the fade has to be painted.**
+`SoftHeat._redraw()` now draws each blob itself: one colour out of `_grad`, the ramp simpleheat
+builds from `options.gradient`, with only the alpha falling away. `_colorize()` is not called at all,
+so nothing derives a colour from an alpha and there is nothing left to walk down the legend. Blobs
+are drawn weakest first, so the worst reading in an overlap is the one on top — the rule `leads()`
+and `atDanger()` already use everywhere else in this app.
+
+The same two gauges after the rewrite: 179 at both centres, `#bc7dff` from end to end, and the
+largest step between 1 km samples is 53, inside the smooth falloff.
+
+### Painting shapes was still wrong, because two readings are not twice one reading
+
+Drawing each blob as its own shape fixed the erasing, and left one thing that no composite operation
+can fix. Every Porter-Duff `over` **adds** alpha. So two gauges reading the same rain over the same
+ground came out heavier than either of them had reported: 227 where two 179 blobs met.
+
+The hue did not move, so it never claimed a class nobody measured. It still said "more" where the
+readings said "the same". There is no composite operation that blends colour and takes the *larger*
+alpha rather than the sum, so the layer stopped stamping shapes and started asking the readings.
+
+`SoftHeat._field()` computes the surface on a grid and lets the browser scale it up:
+
+| per cell | what it is |
+|---|---|
+| `v` | the blended reading — every gauge in reach, weighted by nearness, **normalised**. A weighted mean, so two gauges reading the same thing give that thing back. |
+| `cov` | whether any reading reaches this ground at all. A clamped sum, never a max. It carries the soft edge, and it is why an isolated blob still fades while an overlap does not brighten. |
+
+Colour is `_grad[v]` and opacity is `v * cov`. Measured on two gauges one blob apart:
+
+| both reading 0.70 | one 0.95, one 0.35 |
+|---|---|
+| alpha 179 flat from end to end, largest step over a kilometre: **1 count** | `#f35772` → `#b17cff` → `#7b7bff`, alpha 242 → 166 → 89 |
+
+`cov` was a max in the first build of this field, and the section after next is what that cost.
+
+The transition between two neighbours is the browser's own bilinear filter on a 4 px grid, which is
+what makes it smooth for nothing. Raise the cell size and the edges go blocky. Lower it and the cost
+climbs with the square.
+
+**The bucket index is not a premature optimisation.** Without it the cost is cells times readings,
+and `thinHeat()` packs readings one radius apart — so zooming out shrinks the radius and multiplies
+the readings at the same time. Measured on a full viewport at that spacing:
+
+| readings in view | flat scan | bucketed |
+|---|---|---|
+| 30 | 52 ms | 35 ms |
+| 180 | 228 ms | 35 ms |
+| 638 | 785 ms | 33 ms |
+| 2,655 | 3.0 s | 38 ms |
+
+A flood is exactly when a lot of stations report at once, and exactly when the map must not seize.
+
+### The field drew a Voronoi border on every equidistant line
+
+The overlap stopped brightening and the wash still came out as a set of circular lobes. Each lobe
+faded at its own rim, and the fade lines between neighbours read as borders. A reader named it a
+Voronoi diagram, which is what it was.
+
+**One curve answered two questions, and `max` joined the answers.** A cell asks how much each
+reading counts here, and it asks whether any reading reaches here at all. `cov` took the largest of
+the per-gauge blend weights, so both faults sat in one expression.
+
+`max` follows whichever gauge is nearer. Its slope therefore flips sign the moment another gauge
+takes over, which happens on the equidistant locus. That locus is the Voronoi edge, and a slope that
+flips sign is a crease. The eye reads a crease as a line.
+
+The blend weight is also the wrong curve for coverage. It holds full strength across the inner 45%
+and is down to 0.30 at 0.8 of a radius. That is correct for a weight and far too steep for coverage.
+`thinHeat()` guarantees one radius between two kept gauges and nothing more, so real spacings run
+well past that. Measured along the line between two gauges reading the same 0.70:
+
+| gauges apart | midpoint alpha, against 179 at each gauge |
+|---|---|
+| 1.0 r | 177 |
+| 1.4 r | 107 |
+| 1.6 r | **61** |
+| 1.8 r | **20** |
+
+Two gauges that agree left a trench between them. The unequal pair states the same fault more
+plainly. At 1.6 r the readings 0.95 and 0.35 painted alpha 242 and 89. The ground between them came
+out at **54**. A midpoint darker than both of its ends is not a transition. It is a border.
+
+**So the two questions get two kernels, and coverage gets a union.**
+
+| constant | question | value |
+|---|---|---|
+| `BLEND` | how much say does this reading get in the mean | 0.45 |
+| `FEATHER` | how far does the wash stay solid before its outer edge fades | 0.50 |
+
+`cov` asks whether any reading reaches this ground. It cannot pass 1, so an overlap still never
+paints brighter than a gauge centre, which is the rule this whole field render exists to keep. The
+first build of it was `1 - (1-c1)(1-c2)…`, and the section below is why that changed.
+
+The same measurement after the change:
+
+| gauges apart | with the max | with the union |
+|---|---|---|
+| 1.4 r | 179 → 107 → 179 | 179 → **179** → 179 |
+| 1.6 r | 179 → 61 → 179 | 179 → **177** → 179 |
+| 1.8 r | 179 → 20 → 179 | 179 → **102** → 179 |
+| 0.95 and 0.35, 1.6 r apart | 242 → 54 → 89 | 242 → **159** → 89 |
+
+The handover now walks down from one reading to the other instead of diving between them.
+
+**The old suite did not see any of this.** Its two overlap assertions probe two gauges exactly one
+radius apart. That is the single spacing where `max` behaves, so both passed with the bug present.
+`heat-test.html` gained probes at the wider spacings for this reason.
+
+### A rim facing nothing and a join between two blobs are different edges
+
+The union held the joins together and left the outer rim as abrupt as before. The ask that followed
+named the distinction exactly: feather the edges that reach the limit of a blob and touch no other
+blob, so the wash goes to empty ground more gently. Leave the joins alone.
+
+`FEATHER` alone cannot do that. It is one radial curve, so lowering it softens the rim and hollows
+out every join by the same amount. Measured on the whole gauge network, dropping it from 0.75 to
+0.50 under the union took the share of joins that stay solid from 84% to 45%.
+
+**The combine is what can tell the two edges apart, because it sees how many readings arrive.** A
+rim has one. A join has two. A union asks whether any reading reaches the ground and saturates too
+slowly to act on the count. A **sum** acts on it directly: one gauge at half strength stays half
+covered, while two blobs meeting at half strength each add up to fully covered.
+
+The sum needs a clamp, and the clamp is squared rather than bare. `min(1, s)` breaks its first
+derivative where it bites, which is a crease along an iso-contour — the same fault as the Voronoi
+edge, drawn on a different line. `1 - (1-s)²` has slope 0 at `s = 1` and meets the flat part
+smoothly. Squaring is also the highest power that still lets the rim fade gently, since a higher one
+holds full opacity further out and hardens the edge it was meant to soften.
+
+That buys a much lower `FEATHER`. Held to joins staying solid at the median and 90th-percentile
+spacing:
+
+| coverage | `FEATHER` | joins solid | rim fade band | steepest slope |
+|---|---|---|---|---|
+| union | 0.75 | 84% | 1.38 km | 0.667 / km |
+| union | 0.50 | 45% | 2.75 km | — |
+| **sum, squared clamp** | **0.50** | **91–100%** | **2.20 km** | **0.440 / km** |
+
+A 59% longer rim fade and a 34% gentler slope, with the joins no worse. One gauge alone, alpha by
+radius:
+
+```
+before  230 230 230 230 230 230 230 230 230 230 230 230 230 230 230 227 196 135  67  15   0
+after   230 230 230 230 230 230 230 230 230 230 229 229 227 217 197 166 125  79  37   8   0
+0%                                                                                     100%
+```
+
+Ten steps across the outer half, against five across the outer quarter. And the joins, both gauges
+reading 0.70:
+
+| gauges apart | midpoint alpha, against 179 |
+|---|---|
+| 1.13 r, the median | 178 |
+| 1.48 r, the 90th percentile | 179 |
+| 1.60 r | 162 |
+| 1.96 r, the widest that overlaps | 4 |
+
+The last row is not a fault. At 1.96 r each gauge reaches 0.98 r short of the midpoint, so those two
+blobs do not meet. Two separate blobs are the honest picture of two readings that far apart.
+
+**Read the spacing off the station geometry, never off the wet gauges of the moment.** This tuning
+first used the gauges reporting rain, and that set changes with the weather. Two snapshots an hour
+apart put the widest overlapping pair at 1.58 r and at 1.90 r, and the same sweep scored one
+candidate at 71% and then at 11% with no code change in between. The fixed answer comes from thinning
+every rain gauge the network has, and it holds two populations that must not be quoted as one:
+
+| population | pairs | median | 90th pct | widest |
+|---|---|---|---|---|
+| a gauge and its nearest neighbour | 47 | 1.13 r | 1.48 r | 1.96 r |
+| every overlapping pair | 89 | 1.38 r | 1.88 r | 1.98 r |
+
+A seam shows first between a gauge and its nearest neighbour, so `heat-test.html` takes its probe
+distances from the first row. Join solidity is scored over the second, because any two blobs that
+meet can show a seam. A constant tuned against one snapshot is tuned against one afternoon's rain.
+
+### The blob went to 6 km, and every number above moved with it
+
+Two asks arrived together: a gentler rim still, and a 6 km blob rather than 9. They pull against
+each other, and the second one moves the ground the first is measured on.
+
+**`RAIN_KM` at 6 km was already the better-supported number.** The co-wetness study behind the
+constant puts the halving distance at 6 km and the background rate at 12. So 9 km was the outer edge
+of a claim that survives, rather than the middle of one. A convective cell over the Klang Valley is
+1 to 2 km across.
+
+**A shorter radius spaces the gauges relatively further apart, which is the opposite of the
+intuition.** `thinHeat()` drops a gauge whose blob another one already covers, so thinning at 6 km
+keeps 84 gauges where 9 km kept 49 — and those 84 sit further apart *measured in blob radii*. The
+90th-percentile join moves from 1.48 r to 1.66 r. Everything `FEATHER` was sized against therefore
+moved, and `FEATHER` is a fraction of a radius rather than a distance.
+
+| | `RAIN_KM` 9 | `RAIN_KM` 6 |
+|---|---|---|
+| gauges kept | 49 | 84 |
+| median join | 1.13 r | 1.21 r |
+| 90th-percentile join | 1.48 r | 1.66 r |
+| `FEATHER` at 0.50 fades over | 2.20 km | 1.47 km |
+
+The last row is the trap. `FEATHER` held at 0.50 through the change makes the rim **less** gentle in
+metres, and the ask was for more. It sits at **0.20** now. That gives a 2.35 km fade at a slope of
+0.413 per km, gentler than the 9 km layer on both counts.
+
+```
+9 km, 0.50   230 230 230 230 230 230 230 230 230 230 229 229 227 217 197 166 125  79  37   8   0
+6 km, 0.20   230 230 230 230 229 229 229 227 224 217 205 190 170 146 119  91  62  40  19   4   0
+0%                                                                                         100%
+```
+
+Sixteen steps against ten, over a blob two thirds the size.
+
+**A 6 km blob with a 2.35 km rim does not merge into one sheet, and that is arithmetic.** Both
+gauges reading 0.70, midpoint alpha against 179 at each of them:
+
+| gauges apart | midpoint |
+|---|---|
+| 1.21 r, the median | 178 |
+| 1.48 r | 133 |
+| 1.66 r, the 90th percentile | 74 |
+| 1.95 r, the widest | 2 |
+
+At the 90th percentile the two gauges stand 10 km apart. Each blob stops 3 km short of the ground
+between them. The softest tenth of real joins sit near 42%. That is the price of the two asks
+together, and the dip is smooth rather than a crease — the fault this layer was rebuilt to remove
+was a slope that flipped sign, not a slope. Raising `FEATHER` trades rim softness back for a solid
+wash. The two cannot both be maximised, because one curve reaches the rim and the ground between
+two gauges alike.
+
+`heat-test.html` moved its probes to 1.21 r and 1.66 r, and the handover assertion moved to 1.21 r
+as well. **At 1.66 r the midpoint is now fainter than the weaker of the two gauges**, so "the
+handover never dips under both ends" stops being a contract out there. The blobs have parted, and
+saying so is the honest picture of two readings 10 km apart.
+
+### The feather shipped square, for one line
+
+The first build of the feather filled a square. A canvas radial gradient does not stop at its last
+stop, it clamps to it, so every pixel beyond `r` keeps the outermost colour. The feather's outermost
+colour is full erase. The four corners outside the circle are 21% of that box, and they erased
+everything under them — including the paint belonging to the next blob along, which `thinHeat()`
+places exactly one blob away and therefore right in that corner.
+
+On screen it drew as hard rectangles cut out of the wash, axis-aligned, about 2r on a side. That
+reads as a tiling fault or a canvas seam. It is neither.
+
+The dry-gauge eraser had used the same `fillRect` for weeks without ever showing it, because its
+outermost colour is transparent and clamping to "no erase" is invisible. That is luck rather than
+design, so both passes now go through one `stamp()` that fills the disc.
+
+The check grew a case for it: a second gauge 1.2 blobs away on the diagonal, which is outside the
+first blob's circle and inside its square. With the disc fill that gauge reads alpha 230. With the
+square fill back it reads 0 — erased off the map entirely by a neighbour's corner.
+
+### One more fault, found by the probe
+
+`heatScale()` sized every layer in `LAYERS`, on the map or not. `setOptions()` ends in `redraw()`,
+which reads `this._map._animating`, and Leaflet nulls `_map` when it removes a layer. So sizing a
+layer that is off throws a `TypeError`.
+
+It hid because the layer that is off has usually never been added, and a layer with no canvas
+returns from `redraw()` one test earlier. Switching the heat chip from rainfall to water is what
+reaches it. That leaves `rainHeat` added-then-removed, holding a canvas and no map. `heatScale()`
+now skips any layer the map does not hold. `syncHeat()` adds and removes before it calls
+`heatScale()`, so a layer just switched on is already on the map and still gets sized.
 
 ### What changed on screen
 
-Measured on the payload the report came from, 13 gauges reporting rain:
+Measured on the payload, 12 gauges reporting rain and 218 reporting none:
 
-| | blobs drawn | area painted | gauges under paint | of those, reporting no rain |
+| | paint | erase | area still violet | dry gauges under violet |
 |---|---|---|---|---|
-| before | 8 | 2,036 km² | 71 | 58 (82%) |
-| after | 10 | 503 km² | 31 | 18 (58%) |
+| before | 9 km | none | 2,747 km² | 58 of 218 |
+| first fix, rejected | 4 km | none | 503 km² | 18 |
+| second, asymmetric | 9 km | 4 km | 2,005 km² | 1 |
+| now | 9 km | 9 km | 1,906 km² | 1 |
+
+79% of the reach survives the erase. The one dry gauge left under paint shares a pole with a wet
+one, so its eraser has no room and the wet reading wins. That is the midpoint rule working, not a
+gap in it.
 
 ### What was not built
 
-**58% is not a defect left in place.** Rain over Klang Valley is genuinely that patchy. The
-measurement above says so directly. Even inside 4 km, three quarters of the neighbours of a wet
-gauge are dry. A radius small enough to drive that figure to zero is shorter than the distance a
-reading carries any information over. At that size the layer draws 233 dots.
+**No interpolation.** An inverse distance weighted field over all 230 gauges gives a smooth
+surface and fills every pixel. It replaces a reading with a model, and this app draws readings. The
+erase pass uses a dry gauge only to deny ground, never to invent a value.
 
-**No interpolation.** Two other designs were rejected. In the first, a dry gauge inside a blob
-shrinks it. In the second, the layer draws an inverse distance weighted field over all 233 gauges
-instead of one brush per point. Both replace a reading with a model, and this app draws readings.
-The heat layer states where the rain was observed, at the resolution the network observes it.
+**Nothing was added to the alert path.** This is a colour on a map. `isHot()`, the alert count, the
+icon badge and the ticker are untouched.
 
-**The water layer keeps 5 km.** Only its paint was wrong, not its number. A river level is a
-catchment claim and the catchment does not shrink because the brush was miscalculated.
+**The water layer keeps 5 km and has no eraser.** Only its paint distance was wrong, not its
+number. And a river reading low is not evidence that the river next to it is low. Rain gauges are
+the only sensors here where one station's zero says something about the ground beside it.
 
 ## Rain totals over five nested windows
 
@@ -8457,3 +8848,19 @@ stretches too. A glyph comes out squashed and a one-unit rule comes out wide.
 the ordinary case, because the newest sample is the last column, and a centred glyph there hangs
 half its width outside the plate. Two classes anchor the mark inward at each end. Only the glyph
 moves.
+
+### The peak mark is amber, and it is the one status colour on a thing that is not a status
+
+The mark started grey and the plate swallowed it. The time rules, the class lines and the history
+glyph are all `--muted` or near it, so a fourth grey thing read as more furniture.
+
+`--s-alert` breaks the colour rule as written. Two things carry the exception, and a second
+annotation needs both of them again.
+
+It marks one point on one graph. It never paints a station, a pin, a table row or a badge — nothing
+a reader scans for a verdict, and nothing that feeds a count.
+
+Amber is the one hue this plot does not already use. `RAIN_COLOR` draws the intensity classes across
+it in `--k-rainfall`, then `--k-rain-heavy`, then `--s-danger`. Measured on the rendered card, the
+three class lines are violet, mauve and red. So the mark cannot be misread as a class line beside
+it, which is the confusion that would matter here.
