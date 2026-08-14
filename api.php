@@ -1097,7 +1097,11 @@ function portalKey(string $name): string {
  * Returns:
  *   hit    stationId => row index, the winner for each station
  *   used   row index => true, every row that found a home
- *   clash  [stationId, winning row, losing row], one entry per collision
+ *   clash  array of four shapes, each recording why a station or row went unclaimed:
+ *          ['code', stationId, code] — the code exists on two rows or two of our stations
+ *          ['name', stationId, key] — an equal name appears on two portal rows (ambiguous)
+ *          [stationId, codeRow, nameRow] — the code match beat a name match, logging the loser
+ *          ['row', row, [stationIds]] — two stations claimed one row with equal-strength rungs
  */
 function portalMatch(array $rows, array $stations, string $kind): array {
     $mine = array_values(array_filter($stations, fn($s) => $s['kind'] === $kind));
@@ -1135,7 +1139,7 @@ function portalMatch(array $rows, array $stations, string $kind): array {
         $nameRow = null;
         $nameRung = 0;
         $named = $byName[$key] ?? [];
-        if (count($named) === 1) {
+        if ($key !== '' && count($named) === 1) {
             $nameRow = $named[0];
             $nameRung = 2;
         } elseif (count($named) > 1) {
