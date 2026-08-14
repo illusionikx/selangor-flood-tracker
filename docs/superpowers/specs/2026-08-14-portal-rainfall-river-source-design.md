@@ -154,8 +154,11 @@ The map grows from 338 to 471 river and rainfall stations. Of the 133 new statio
 equal name and 50 on a unique suffix. 22 of the 37 new rivers are the Kuala Lumpur ones, so that gap
 closes completely.
 
-**262 stations change where their number comes from.** That is the real size of this change, larger
-than the 133 new pins. Each of those stations shows a reading today and shows
+**Rivers already take the portal reading. 75 of 107 carry `source: national` today.** So the river
+half of this work adds 37 stations and changes no existing number at all.
+
+**178 rainfall stations change where their number comes from.** That is the real size of this
+change, larger than the 133 new pins. Each of those stations shows a reading today and shows
 the portal figure after this change. A disagreement between the two feeds then becomes visible on a
 station somebody watches.
 
@@ -166,8 +169,47 @@ On the surfaces:
 - the 12 hour graph draws disjoint buckets. Today it samples a rolling hour and buckets at
   `RAIN_BUCKET` to avoid counting the same rain twice
 - this work deletes `accHours()`, and the Kuala Lumpur 3 hour sum retires
+- the JPS Selangor rainfall detail fetch **stays**. See below
 - `rainBacked()` keeps working for the 86 stations on the old feeds. It means nothing on a portal
   station, because the hour and the check come from one source
+
+### Keep the JPS Selangor rainfall detail
+
+The portal supplies the readings. It does not supply everything the detail endpoint carries, so that
+fetch stays.
+
+`spLight`, `spModerate`, `spHeavy` and `spVeryHeavy` are the reason. On one station they read 5, 11,
+31 and 61. They differ per station, and they are the only per-station rain thresholds that exist
+anywhere in these feeds. The portal publishes 10, 30, 60 and 90 for every station it answers for.
+Drop this fetch and the app loses the one input that makes a per-station `rainStatus()` possible.
+
+The detail also feeds `rainBacked()` for the 86 stations that keep the old source.
+
+## Upstream load
+
+This app already contacts `publicinfobanjir.water.gov.my` 3 times per `SCRAPE_TTL`. After this work
+it contacts the same host 6 times per `SCRAPE_TTL`, which is 24 requests each hour. The 15 minute
+page cache in the `page` table bounds that. No new code bypasses it.
+
+The backfill is the risk, not the steady state. It is about 425 per-station requests and about 35
+gazetteer queries. Sent together that is a burst at one government host, which is the shape of the
+camera stampede, and this app has a rule against it.
+
+Four mitigations, and each one already has a precedent in this repo.
+
+1. **Drip the backfill.** Take at most `PORTAL_FILL` stations per refresh. At 5 per refresh and 4
+   refreshes each hour, 425 stations finish in about 21 hours. No burst reaches the host. A `filled`
+   table names the stations this app already fetched, so the work never repeats.
+2. **Rate limit site-wide.** Reuse `forceAllowed()` with its own window, the same guard `?force=1`
+   and `?place=` use. A stamp file caps the rate however many readers arrive at once.
+3. **Stay inside the refresh lock.** `flock` on `.refresh.lock` already stops two rebuilds running
+   together. Anything added to the refresh path stays inside it, so N readers never become N fetches.
+4. **Keep identifying this app.** `CURLOPT_USERAGENT` already sends
+   `flood-exp/1.0 (+https://github.com/illusionikx/selangor-flood-tracker)`. Every new call uses the
+   same handle, so an administrator can always see who is asking and why.
+
+The backfill never runs on a reader's poll. It runs at the end of a refresh, at most once per
+window, exactly as `captureShots()` does for the camera archive.
 
 ## Not in this spec
 
