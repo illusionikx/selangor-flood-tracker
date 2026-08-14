@@ -8026,6 +8026,13 @@ Replace this figure with a real browser measurement once someone takes one.
 
 ## The rainfall heatmap claimed rain over 250 km² from one gauge
 
+**Every "gauge" in this section is a rainfall station**, measuring `hourly` in mm/h. That is the only
+kind the rain layer reads, on both sides of the argument. A **flood gauge** is a different kind
+altogether — `depth` in metres over a flood-prone spot — and it feeds the *water level* layer beside
+the rivers. No rule in this section paints, denies or thins one. The two are worth keeping apart by
+name, because JPS records a flood gauge reading negative as **dry ground**, and this section says
+"dry gauge" about three hundred times meaning something else.
+
 A reader reported that the violet wash on the rainfall layer covered ground where no gauge
 reported rain. Measured on the payload it was reported from, this was correct. One gauge, JPS
 Ampang, read 19 mm/h. The blob it painted reached 9 km. Twenty other gauges stood inside that

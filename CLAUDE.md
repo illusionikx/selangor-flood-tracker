@@ -942,6 +942,15 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   is the radius, `thinHeat()` takes the same ground distance, and `HEAT_MAX_PX` bounds what it
   names. The `radius` and `blur` options stay in `BASE` only because `_updateOptions()` builds
   `_grad` from `gradient` in the same call, and `_grad` is where the colours come from.
+- **"Gauge" in the rain heat entries below means a rainfall station, and this is the one place two
+  kinds share a word.** A rainfall station measures `hourly` in mm/h and is the only kind the rain
+  layer reads, on both sides of the argument — `render.js` gates every one of them on
+  `kind === 'rainfall'`. A **flood gauge** is the kind spelled `gauge`, labelled `Flood gauge`,
+  measuring `depth` in metres over a flood-prone spot. It feeds the **water level** layer beside the
+  rivers and no rain rule touches it. The collision is not theoretical: the JPS field notes above
+  record that a flood gauge reading negative means **dry ground**, so "a dry gauge" reads as a
+  rainfall station saying 0 mm/h in one entry and as a flood gauge on dry land in another. Name the
+  kind in any sentence that reads both ways.
 - **A rain gauge reporting zero is a reading, and the rain heat layer draws it.** The network says
   two things — 12 gauges reporting rain and 218 reporting none, on the payload this was built from
   — and the layer used to draw only the first, so the wash covered ground that 218 stations had

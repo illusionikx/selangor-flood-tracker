@@ -1,6 +1,13 @@
 // The two heatmaps — water level, and rainfall — on one set of sizing and opacity controls.
-// Flooding is catchment-scale, so a hotspot should mean "this part of Selangor", not "this gauge",
+// Flooding is catchment-scale, so a hotspot should mean "this part of Selangor", not "this station",
 // and rain arrives over the same sort of area.
+//
+// **Read "gauge" in this file as a rainfall station.** It measures `hourly`, in mm/h, and it is the
+// only kind either layer's rain half ever reads. A **flood gauge** is a different kind — `gauge` in
+// the payload, `Flood gauge` on screen, `depth` in metres over a flood-prone spot. It feeds the
+// *water level* layer beside the rivers, and nothing here paints, denies or thins it. The two names
+// collide badly in one place: `api.php` records that a flood gauge reading negative means **dry
+// ground**, so "a dry gauge" says one thing here and another thing there. Say which one.
 
 import { HEAT_KM, RAIN_KM, HEAT_MAX_PX, HEAT_ALERT, HEAT_WARNING, RAIN_HEAT } from './config.js';
 import { PREFS } from './state.js';
