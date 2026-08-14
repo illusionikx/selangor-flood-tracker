@@ -31,7 +31,7 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `js/util.js` | pure helpers + `hasInfo()` / `color()` / `isIgnored()` |
 | `js/stations.js` | queries over the station set (`nearestOf`, `nearestCam`, `byId`) |
 | `js/map.js` | map instance, basemap/theme, cluster, the station panel (`openSide`), `focusOn` / `flashTo` |
-| `js/heat.js` | both heat layers (water level, rainfall), ground-fixed sizing per layer, shared opacity, and the pass that erases rain over a gauge reporting none |
+| `js/heat.js` | both heat layers (water level, rainfall), ground-fixed sizing per layer, shared opacity, and the field pass where a gauge reporting no rain denies the ground a wet one claims |
 | `heat-test.html` | `chrome --headless --dump-dom` — one of three runnable checks. Guards the rain layer's paint distance, its dry-gauge erase and its handover between neighbours, in canvas pixels |
 | `js/popup.js` | popup + meter + gauge + sparkline templates |
 | `js/sparktip.js` | the hover/tap readout on every graph, and the label on any `data-tip`. One delegated listener, no imports |
@@ -403,19 +403,41 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   A sum renders that as a dry day. The scrapers already fail silently by design, and a total with no alarm behind
   it is worse than none. A difference cannot lose rain: a missed poll widens the window instead, and
   the payload measures that wider window, so the card states `measured over 26.1 h` rather than
-  claiming 24. Four things return `null` rather than a number: an empty series, no sample at or
-  before the far end, a backwards odometer (the 1 January reset), and both ends on one sample.
+  claiming 24. Three things return `null` rather than a number: an empty series, a backwards odometer
+  (the 1 January reset), and both ends on one sample.
   `accHours()` is the KL fallback and obeys the same rule from the other side — all three clock
-  hours or nothing, because a short sum reads as light rain. **The `#c` series began 2026-08-13 18:30
-  and nothing can fill it in**, because no earlier poll stored `cumulativeRainfall`. So the 24-hour
-  window answered nothing until 2026-08-14 18:30, and the 72-hour window until 2026-08-16 18:30.
-  Measured 2026-08-14 15:23, with the archive 20.9 h deep, 1 station of 231 answered `h24`. That one
-  reads a 27 h span. Its first stored sample carried a stamp 6.5 h older than the poll that stored
-  it. A `null` on either long window is the correct answer while the archive is short.
-  **The 38 KL stations answer neither window, and they never will.** SPHTN publishes no
+  hours or nothing, because a short sum reads as light rain.
+  **The 38 KL stations answer neither long window, and they never will.** SPHTN publishes no
   `cumulativeRainfall`, so there is no odometer to subtract. Do not close that gap with `accHours()`
   at 24 hours. That is the sum this rule forbids. Two `—` columns on a KL gauge are the right
-  answer.
+  answer, and the readout on the dash says which of the two states it is.
+- **A window may also be measured over LESS ground than it names, and then it says so.** `accWindow()`
+  takes `$partial`. With no sample at or before the far end it measures from the oldest sample there
+  is and returns `short`. `derived` is a ladder of three rungs rather than a flag — 0 off the feed,
+  1 worked out over the whole window, 2 worked out over a shorter one — and the card prints one
+  asterisk per rung. This is still a difference, so it still cannot lose rain. **The `#c` series began
+  2026-08-13 18:30 and nothing can fill it in**, because no earlier poll stored `cumulativeRainfall`.
+  Before this, both long windows drew a dash for two days. Measured 2026-08-14 15:45 with the archive
+  20.5 h deep: 179 stations of 231 answer `h24` over 20.5 h, 1 answers it whole, and 51 answer
+  nothing. **`$partial` is false by default, and `rainBacked()` depends on that.** A window narrower
+  than the hour it asks about would call live rain faulty. A wider window can only add rain, which is
+  the safe way to be wrong.
+  **Two windows that come back with the same span measured the same ground, and the call site drops
+  the longer one.** Both windows end on the newest sample, so an equal span is an equal baseline.
+  PUNCAK ATHENEUM is the worked case: its records reach back 27 h, so the 24-hour window WIDENED to
+  27 h and the 72-hour window fell SHORT to that same sample, and both published 6.5 mm. Two columns
+  then draw one number at one height, and a reader takes the pair as a measurement of the 45 hours
+  between them. Nobody measured those hours. **A floor in hours cannot catch this and was tried
+  first** — a floor compares one span to a constant, and the fault is two spans landing on each
+  other, which a widened window can do at any depth. **Do not compare mm instead**: two different
+  spans holding one total means no rain fell in the extra ground, and that is measured.
+  **A short window can undershoot a window nested inside it, and this app does not suppress that.**
+  Measured on the same poll: 4 stations of 180 report less over 24 h than over today, three of them
+  by 0.5 to 1.0 mm and TAMAN MAYANG by 12.5. The odometer and the feed's own daily total disagree,
+  and nothing here can say which is wrong. Suppressing the odometer figure would trust the feed over
+  it, which inverts the trust `rainBacked()` already built on the same two fields. For scale, 17
+  stations on that poll report less today than in the last 3 hours, with both sides straight off the
+  feed. The chart has always drawn windows that disagree.
 - **The accumulation chart carries no threshold mark, and three sources failed to supply one.** It
   says how much rain fell and never how bad that is — `rainBars()` above it already draws the JPS
   intensity classes and `rainState()` above that prints the word. A curve fitted between
@@ -948,14 +970,29 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   **simpleheat leaves `globalAlpha` set** — its draw loop assigns each point's weight and never puts
   it back, so an eraser inherits the last blob's weight and removes that fraction rather than all of
   it. A 0.9 blob left 22 of 229 alpha on a dry gauge. The pass runs inside `save()`/`restore()`.
-  **An eraser stops at the midpoint to the nearest wet gauge.** Alpha is this layer's colour scale,
-  so an eraser reaching a wet gauge does not shrink its blob — it restates the rainfall as a lighter
-  class. A wet gauge 2 km from a dry one lost half its alpha and dropped a class it had measured,
-  and a dry gauge on the same pole erased its neighbour off the map outright. Halfway between two
-  stations that disagree is where the boundary goes.
-  **The brush holds full strength over its first 15%**, because a ramp peaking at the exact centre
-  honours the reading at a mathematical point and no pixel is one — the gauge kept 5 of 206 alpha on
-  a half-pixel sampling offset. Do not replace any of this with interpolation: a dry gauge may deny
+  **A gauge reporting no rain reaches exactly as far as a gauge reporting rain, and the boundary
+  between two that disagree is halfway between them.** Both rules are old. The `destination-out`
+  stamp that carried them held the second alone, and it bought that by breaking the first.
+  Its radius was one scalar, `min(r, nearest_wet / 2)`, applied to a circle — so a dry gauge with a
+  wet neighbour to the east shrank in **every** direction, including west where nothing disputed it.
+  Measured on the live network: 143 of 191 dry gauges capped, a median of 0.54 of the radius, and
+  35% of the ground they were entitled to deny actually denied.
+  `_field()` decides it per pixel now and the stamp is gone. `keep = 1 - dcov * gate`, where `dcov`
+  is the dry coverage shaped exactly like `cov`, and `gate` is inverse-square distance to each side —
+  Shepard's weighting, chosen for the one property that matters. **A gauge's own point is a
+  singularity**, so the gate is 0 at a wet gauge and its reading survives whole, 1 at a dry gauge,
+  0.5 exactly halfway between the two, and 1 with no wet gauge in reach. The protection and the
+  reach come from the same expression instead of fighting each other. Measured after: 77% of the wet
+  reach kept against 96% under the cap, and still only 2 of 193 dry gauges left under paint — both
+  of those share a pole with a wet gauge.
+  **The cap existed for a real reason, so keep the reason when touching this.** A dry gauge on the
+  same pole once erased its neighbour off the map outright. A wet gauge 2 km from a dry one lost
+  half its alpha. `heat-test.html` asserts the wet gauge keeps 229 of 230 with a dry gauge 1.5 km
+  away.
+  **The brush holds full strength over its first 15%** — now `FEATHER`'s flat core, and once a
+  gradient stop — because a ramp peaking at the exact centre honours the reading at a mathematical
+  point and no pixel is one. The gauge kept 5 of 206 alpha on a half-pixel sampling offset. Do not
+  replace any of this with interpolation: a dry gauge may deny
   ground, never supply a value. See `docs/FEATURES.md`, *The rainfall heatmap claimed rain over
   250 km² from one gauge*.
 - **A heat blob's alpha is its colour as well as its size, so the brush's own falloff walks down the
@@ -1042,23 +1079,27 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   radius and multiplies the readings together. Measured on a full viewport at that spacing: 52 ms at
   30 readings, 785 ms at 638, 3.0 s at 2,655 — against a flat 33 to 38 ms bucketed at every one of
   them. A flood is when a lot of stations report at once and when the map must not seize.
-- **The dry-gauge eraser stays `destination-out`, and it is the one pass that should reach every
-  blob under it.** A dry reading denies the ground, not one neighbour's contribution to it. It runs
-  last, after every colour beneath is settled, so a denied edge fades at the colour it already had.
-  Measured across an erased boundary, `#e86093` at alpha 230 on the gauge and `#e96293` at alpha 83
-  in the fade, two counts of premultiplied-alpha rounding apart. `heat-test.html` asserts the hue at
-  three radii and across an erased boundary for this reason.
-- **A canvas radial gradient clamps past its last stop, so never `fillRect` one — `stamp()` fills
-  the disc.** Beyond `r` the gradient does not stop, it keeps painting whatever the outermost colour
-  was. The feather's outermost colour is full erase. Filled as a square, the four corners outside the
+- **The denial touches alpha and never colour, and that survived the move out of `destination-out`.**
+  A dry reading denies the ground, not one neighbour's contribution to it. The old pass ran last, so
+  a denied edge faded at the colour already settled beneath it. `_field()` gets the same result by
+  construction rather than by ordering: hue is `_grad[v]`, `keep` multiplies only the alpha, and `v`
+  never sees a dry gauge at all. **Do not let a dry gauge into `v`.** It would restate the rainfall
+  as a lighter class, which is the thing this layer exists not to do — and with `BLEND`'s flat core a
+  dry gauge 2 km away would carry equal weight and halve the reading. A dry gauge may deny ground and
+  never supply a value. `heat-test.html` asserts the hue at three radii and across a denied boundary.
+- **A canvas radial gradient clamps past its last stop, so never `fillRect` one.** Beyond `r` the
+  gradient does not stop, it keeps painting whatever the outermost colour was. The old eraser's
+  outermost colour was full erase. Filled as a square, the four corners outside the
   circle — 21% of the box — erased everything under them, **including the paint belonging to the next
   blob along**, which `thinHeat()` places exactly one blob away and therefore right in that corner.
   It drew as hard rectangles cut out of the wash, axis-aligned and about 2r on a side, which reads
-  as a tiling fault or a canvas-tile seam and is neither. The dry-gauge eraser used `fillRect` for
-  weeks and never showed it, because *its* outermost colour is transparent and clamping to "no
-  erase" is invisible. That is luck, not design, so both passes go through `stamp()` now.
-  `heat-test.html` puts a second gauge 1.2 blobs away on the diagonal — outside the first blob's
-  circle, inside its square — and that assertion reads alpha 0 against 230 with the square fill back.
+  as a tiling fault or a canvas-tile seam and is neither. It went unseen for weeks first, because
+  the *erase* clamps to transparent and clamping to "no erase" is invisible. That is luck, not
+  design. **This layer stamps nothing any more** — `_field()` computes every pixel, so there is no
+  sprite and no disc left to get wrong, and the `stamp()` helper that guarded the trap went with the
+  pass. Anything that brings a gradient back needs it back too.
+  `heat-test.html` still puts a second gauge 1.2 blobs away on the diagonal, outside the first blob's
+  circle and inside its square.
 - **`heatScale()` may only size a layer the map is holding.** `setOptions()` ends in `redraw()`,
   which reads `this._map._animating`, and Leaflet nulls `_map` when it removes a layer — so sizing a
   layer that is off throws a `TypeError`. It hid for a long time because the layer that is off has
@@ -1819,32 +1860,34 @@ printf("all overlapping   : %d pairs, median %.2f, p90 %.2f, max %.2f\n",count($
 
 # How much ground the rain layer claims, and how many gauges reporting no rain are left under it.
 # This is the sweep that found the 1.8x paint bug: the wash covered 2,747 km2 with 58 dry gauges
-# under it. RAIN_KM is read out of config.js, never copied here — it sizes the paint and the erase
-# alike. Expect most of the reach kept — 96% at RAIN_KM 6, against 79% at 9, because a shorter blob
-# reaches fewer dry gauges — and at most a handful of dry gauges left, and those
-# share a pole with a wet gauge, so their eraser has no room. A dry count in the dozens means the
-# erase pass stopped running.
-php -r '$p=json_decode(file_get_contents(".cache.json"),true);$c=file_get_contents("js/config.js");
-preg_match("/RAIN_KM\s*=\s*([\d.]+)/",$c,$m);$RW=(float)$m[1];$RD=$RW;
+# under it. It is a PHP replica of `_field()`, so RAIN_KM and FEATHER are read out of the source and
+# never copied here. Expect about 77% of the reach kept, and at most a handful of dry gauges left
+# under paint — those share a pole with a wet gauge, where the gate protects the wet reading.
+# A dry count in the dozens means the denial stopped running. A kept figure near 96% means the
+# per-pixel gate has been replaced by a per-gauge radius again, which under-denies by two thirds.
+php -r '$p=json_decode(file_get_contents(".cache.json"),true);
+preg_match("/RAIN_KM\s*=\s*([\d.]+)/",file_get_contents("js/config.js"),$m);$R=(float)$m[1];
+preg_match("/FEATHER\s*=\s*([\d.]+)/",file_get_contents("js/heat.js"),$m2);$F=(float)$m2[1];
 $km=fn($a,$b,$c2,$d)=>hypot($a-$c2,($b-$d)*cos(deg2rad($a)))*111;
+$ramp=fn($t,$k)=>1-(($t-$k)/(1-$k))**2*(3-2*($t-$k)/(1-$k));
+$ker=fn($t)=>$t>=1?0:($t>$F?$ramp($t,$F):1);
 $all=array_values(array_filter($p["stations"],fn($s)=>$s["kind"]==="rainfall"&&$s["lat"]));
 $wet=array_values(array_filter($all,fn($s)=>($s["hourly"]??0)>0));
 $dry=array_values(array_filter($all,fn($s)=>($s["hourly"]??null)!==null&&$s["hourly"]<=0));
 usort($wet,fn($a,$b)=>$b["hourly"]<=>$a["hourly"]);
-$k=[];foreach($wet as $s){foreach($k as $x) if($km($x["lat"],$x["lng"],$s["lat"],$s["lng"])<$RW) continue 2; $k[]=$s;}
-$er=[];foreach($dry as $d){$n=1e9;foreach($k as $s)$n=min($n,$km($d["lat"],$d["lng"],$s["lat"],$s["lng"]));
-$er[]=[$d["lat"],$d["lng"],min($RD,$n/2)];}
-$keep=function($y,$x)use($er,$km){$v=1.0;foreach($er as [$dl,$dg,$r]){if($r<=0)continue;$e=$km($y,$x,$dl,$dg);
-if($e<$r)$v*=max(0,min(1,($e/$r-0.15)/0.85));}return $v;};
-$st=0.4;$dg2=$st/111;$la=array_column($k,"lat");$ln=array_column($k,"lng");$full=0;$lit=0;
-for($y=min($la)-0.12;$y<=max($la)+0.12;$y+=$dg2){$dx=$dg2/cos(deg2rad($y));
-for($x=min($ln)-0.12;$x<=max($ln)+0.12;$x+=$dx){$in=false;
-foreach($k as $s)if($km($y,$x,$s["lat"],$s["lng"])<=$RW){$in=true;break;} if(!$in)continue;
-$full+=$st*$st; if($keep($y,$x)>=0.25)$lit+=$st*$st;}}
-$on=0;foreach($er as [$dl,$dg,$r]){$u=false;foreach($k as $s)if($km($dl,$dg,$s["lat"],$s["lng"])<=$RW)$u=true;
-if($u&&$keep($dl,$dg)>=0.25)$on++;}
-printf("%d wet -> %d blobs, reach %.0f km2, violet %.0f km2 (%d%% kept), %d of %d dry gauges under violet\n",
-count($wet),count($k),$full,$lit,round(100*$lit/max(1,$full)),$on,count($dry));'
+$k=[];foreach($wet as $s){foreach($k as $x) if($km($x["lat"],$x["lng"],$s["lat"],$s["lng"])<$R) continue 2; $k[]=$s;}
+$cell=function($y,$x)use($k,$dry,$km,$R,$ker){$cs=0;$wn=0;$dsum=0;$dn=0;
+ foreach($k as $s){$d=$km($y,$x,$s["lat"],$s["lng"]);if($d>=$R)continue;$c=$ker($d/$R);$cs+=$c;$wn+=$c/($d*$d+0.01);}
+ foreach($dry as $s){$d=$km($y,$x,$s["lat"],$s["lng"]);if($d>=$R)continue;$c=$ker($d/$R);$dsum+=$c;$dn+=$c/($d*$d+0.01);}
+ $cov=1-(1-min(1,$cs))**2; $dcov=1-(1-min(1,$dsum))**2;
+ return [$cov, $dn?1-$dcov*($dn/($wn+$dn)):1];};
+$st=0.4;$dg=$st/111;$la=array_column($k,"lat");$ln=array_column($k,"lng");$full=0;$lit=0;
+for($y=min($la)-0.1;$y<=max($la)+0.1;$y+=$dg){$dx=$dg/cos(deg2rad($y));
+for($x=min($ln)-0.1;$x<=max($ln)+0.1;$x+=$dx){[$cov,$keep]=$cell($y,$x);
+ if($cov<0.25)continue; $full+=$st*$st; if($cov*$keep>=0.25)$lit+=$st*$st;}}
+$on=0;foreach($dry as $d){[$cov,$keep]=$cell($d["lat"],$d["lng"]); if($cov*$keep>=0.25)$on++;}
+printf("%d wet -> %d blobs, %d dry. reach %.0f km2, violet %.0f km2 (%d%% kept), %d of %d dry under\n",
+count($wet),count($k),count($dry),$full,$lit,round(100*$lit/max(1,$full)),$on,count($dry));'
 
 # Which warnings survive the geography filter, and how many the feed offered.
 curl -sk https://flood-exp.test/api.php | php -r '$p=json_decode(stream_get_contents(STDIN),true);

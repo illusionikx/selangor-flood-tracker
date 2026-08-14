@@ -8445,6 +8445,81 @@ as well. **At 1.66 r the midpoint is now fainter than the weaker of the two gaug
 handover never dips under both ends" stops being a contract out there. The blobs have parted, and
 saying so is the honest picture of two readings 10 km apart.
 
+### A gauge reporting no rain had a radius, and it was not the same one
+
+`RAIN_KM` is one number and covers both answers. That was already true and already documented. The
+asymmetry was somewhere else, in the shape the denial was drawn with.
+
+The denial was a `destination-out` stamp, one per dry gauge, and its radius was a single scalar:
+
+```
+er = min(r, nearest_wet / 2)
+```
+
+The cap protects a real thing. Without it a dry gauge reaches across a wet one and takes its reading
+off the map. A wet gauge 2 km from a dry one lost half its alpha. A dry gauge on the same pole
+erased its neighbour outright. Halfway between two stations that disagree is where the boundary
+belongs.
+
+**But a scalar radius on a circle applies in every direction.** A dry gauge with a wet neighbour
+2 km to the east shrank to 1 km westward too, where no wet gauge disputed anything. Measured on the
+live network:
+
+| | |
+|---|---|
+| dry gauges capped below the full radius | 143 of 191, **75%** |
+| median cap | 0.54 of the radius |
+| ground denied, against the ground they were entitled to deny | **35%** |
+
+Two thirds of every dry reading was thrown away, most of it in directions nothing contested.
+
+**The denial moved into `_field()` and is decided per pixel.** Dry gauges are read through the same
+kernel at the same radius as wet ones, and the cell asks who owns the ground:
+
+```
+keep = 1 - dcov * gate        gate = D / (W + D)
+```
+
+`dcov` is the dry coverage, shaped exactly like `cov`, because it is the same question asked of the
+other answer. `W` and `D` sum inverse-square distance to each side. That is Shepard's weighting, and
+it is here for one property: **a gauge's own point is a singularity.**
+
+| where | gate | result |
+|---|---|---|
+| at a wet gauge | 0 | its reading survives whole |
+| at a dry gauge | 1 | the ground is denied whole |
+| exactly halfway between the two | 0.5 | the boundary rule, unchanged |
+| no wet gauge in reach | 1 | the dry gauge denies its full radius |
+
+The protection and the reach now come out of one expression instead of fighting each other. The last
+row is the ask. The first row is what the cap was for, and it is stronger than the cap was: the
+guarantee is exact at the point rather than approximate at a radius.
+
+Measured after, with a dry gauge 1.5 km from a wet one: the wet gauge keeps **229 of 230**. Across
+the network the wash keeps **77% of its reach** against 96% under the cap, and **2 of 193** dry
+gauges are still under paint. Both of those two share a pole with a wet gauge, which is exactly
+where the gate is supposed to protect the wet reading.
+
+**The hue is untouched by construction now, rather than by ordering.** The old pass ran last so that
+a denied edge faded at the colour already settled beneath it. In the field, colour is `_grad[v]`,
+`keep` multiplies only the alpha, and **`v` never sees a dry gauge at all**. One let in there
+restates the rainfall as a lighter class. With `BLEND`'s flat core a dry gauge 2 km away carries
+equal weight and halves the reading. A dry gauge denies ground and never supplies a value.
+
+The cost is a second loop over the dry gauges, bucketed through the same index:
+
+| load | before | after |
+|---|---|---|
+| 29 wet, 191 dry — the live network | 21.0 ms | 36.5 ms |
+| 100 wet, 500 dry | — | 77.8 ms |
+| 300 wet, 1500 dry | — | 215.9 ms |
+
+The last two rows cannot happen. The network holds 231 rain gauges in total and they only ever move
+between the two sets, so a flood raises the wet count and lowers the dry one.
+
+`stamp()` went with the pass, and the trap it guarded is recorded in the section below. This layer
+stamps nothing at all now.
+
 ### The feather shipped square, for one line
 
 The first build of the feather filled a square. A canvas radial gradient does not stop at its last

@@ -53,7 +53,12 @@ try {
   // outer half** — coverage holds full strength to FEATHER (0.75), so a probe at 80% lands on the
   // flat part and reports a hard edge that is not there. And a point the eraser has taken about
   // half of, to read the colour off a boundary rather than off a body.
-  const HALF = east(-RAIN_KM / 2), OUTER = east(-RAIN_KM * 0.92), FADE = east(GAP * 0.75);
+  /* And a point the denial has taken about half of, to read the colour off a boundary rather than
+     off a body. **It sits nearer the wet gauge than the dry one**, at 0.45 of the gap. The denial
+     reaches its full radius now rather than stopping at the midpoint, so three quarters of the way
+     across leaves only alpha 22 — partially erased on a technicality, and no use for reading a hue
+     off. */
+  const HALF = east(-RAIN_KM / 2), OUTER = east(-RAIN_KM * 0.92), FADE = east(GAP * 0.45);
 
   // An animated setView is asynchronous and this page is not. Every read below is synchronous.
   map.setView(WET, 12, { animate: false });
@@ -219,6 +224,32 @@ try {
   const wh = pixAt(WET), wl = pixAt(east(RAIN_KM * 1.21)), wm = pixAt(east(RAIN_KM * 0.605));
   ok('a handover never dips under both  ', wm.a < wh.a && wm.a > wl.a,
      'alpha ' + wh.a + ' -> ' + wm.a + ' -> ' + wl.a + ', 1.21 r apart');
+
+  /* **A gauge reporting no rain reaches as far as a gauge reporting rain.** Both are one reading and
+     both cover `RAIN_KM`, so the denial has to carry the same ground the paint does.
+     The old erase was a `destination-out` stamp with one scalar radius, `min(r, nearest_wet / 2)`.
+     That is a circle, so a dry gauge with a wet neighbour to the east shrank in *every* direction,
+     including west where nothing disputed it. Measured on the live network: 143 of 191 dry gauges
+     were capped, at a median of 0.54 of the radius, and together they denied 35% of the ground they
+     were entitled to deny.
+     Two wet gauges 1.2 r apart with a dry gauge on the midpoint is the case that separates the two
+     rules. The dry gauge sits 0.6 r from each, so the old cap gave it an eraser of 0.3 r — which
+     stops dead at the point probed here, 0.3 r along the line toward the first gauge. The old rule
+     leaves that point untouched. The new one denies about half of it, because there the two
+     readings are equidistant and neither outranks the other. */
+  const W2 = east(RAIN_KM * 1.2), REACH = east(RAIN_KM * 0.3);
+  map.setView(east(RAIN_KM * 0.6), 12, { animate: false });
+  rainHeat.setDry([]);
+  rainHeat.setLatLngs([[...WET, 0.7], [...W2, 0.7]]);
+  rainHeat._redraw();
+  const openGround = pixAt(REACH).a;
+  rainHeat.setDry([east(RAIN_KM * 0.6)]);
+  rainHeat._redraw();
+  const denied = pixAt(REACH).a;
+  ok('a dry gauge reaches as far as a wet', denied > openGround * 0.25 && denied < openGround * 0.75,
+     'alpha ' + openGround + ' with no dry gauge, ' + denied + ' with one 0.3 r away, wanted '
+     + Math.round(openGround * 0.25) + ' to ' + Math.round(openGround * 0.75)
+     + ' (the old scalar cap left it untouched)');
 
   say('');
   say(fails.length ? 'FAILED: ' + fails.join(', ') : 'PASS');

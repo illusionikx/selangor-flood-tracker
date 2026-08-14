@@ -83,21 +83,14 @@ const BLEND = 0.45, FEATHER = 0.2;
    million allocations for two multiplies of work. */
 function ramp(t, k) { const u = (t - k) / (1 - k); return 1 - u * u * (3 - 2 * u); }
 
-/* Lay a radial gradient down over its own disc and nowhere else. **Never `fillRect` one of these.**
+/* **This layer stamps no gradients any more, and it must not start again without reading this.**
    A canvas radial gradient does not stop at its last stop, it *clamps* to it, so every pixel beyond
-   `r` keeps whatever the outermost colour was. The feather's outermost colour is full erase. Filled
-   as a square, the four corners outside the circle — 21% of the box — therefore erased everything
-   under them, including the paint belonging to the next blob along. On the map that drew as hard
-   rectangles cut out of the wash, axis-aligned and about 2r on a side, which reads as a tiling or a
-   canvas-tile fault and is neither. The eraser below never showed it, because its outermost colour
-   happens to be transparent and clamping to "no erase" is invisible. That is luck, not design, so
-   both passes go through here. */
-function stamp(ctx, x, y, r, gradient) {
-  ctx.fillStyle = gradient;
-  ctx.beginPath();
-  ctx.arc(x, y, r, 0, Math.PI * 2);
-  ctx.fill();
-}
+   `r` keeps whatever the outermost colour was. Filled as a square rather than as a disc, the four
+   corners outside the circle — 21% of the box — therefore carried full strength, and the eraser
+   that once used one cut hard rectangles out of the wash, axis-aligned and about 2r on a side. That
+   reads as a tiling or a canvas-tile fault and is neither. `_field()` computes every pixel now, so
+   there is no sprite and no disc to get wrong. A `stamp()` helper guarded the trap while the pass
+   existed and went with it. */
 
 const SoftHeat = L.HeatLayer.extend({
   setDry(latlngs) { this._dry = latlngs; return this.redraw(); },
@@ -120,7 +113,7 @@ const SoftHeat = L.HeatLayer.extend({
      At 4 px that is about 59,000 cells against a viewport, a few milliseconds per `moveend`, and
      the smoothing hides the grid. Raise it and the edges go blocky. Lower it and the cost climbs
      with the square. */
-  _field(ctx, pts, r) {
+  _field(ctx, pts, dry, r) {
     const CELL = 4, grad = this._heat._grad;
     const w = this._canvas.width, h = this._canvas.height;
     const cw = Math.ceil(w / CELL), ch = Math.ceil(h / CELL);
@@ -138,33 +131,48 @@ const SoftHeat = L.HeatLayer.extend({
        a full viewport at that spacing: 52 ms with 30 readings, 785 ms with 638, and 3.0 s with
        2,655, against a flat 35 ms indexed at every one of those. A flood is exactly when a lot of
        stations report at once and exactly when the map must not seize. */
-    const nbx = Math.ceil(w / r) + 3, nby = Math.ceil(h / r) + 3, bins = new Array(nbx * nby);
-    for (let i = 0; i < pts.length; i++) {
-      const bx = Math.floor(pts[i][0] / r) + 1, by = Math.floor(pts[i][1] / r) + 1;
-      if (bx < 0 || by < 0 || bx >= nbx || by >= nby) continue;
-      const k = by * nbx + bx;
-      (bins[k] || (bins[k] = [])).push(pts[i]);
-    }
+    const nbx = Math.ceil(w / r) + 3, nby = Math.ceil(h / r) + 3;
+    const index = list => {
+      const bins = new Array(nbx * nby);
+      for (let i = 0; i < list.length; i++) {
+        const bx = Math.floor(list[i][0] / r) + 1, by = Math.floor(list[i][1] / r) + 1;
+        if (bx < 0 || by < 0 || bx >= nbx || by >= nby) continue;
+        const k = by * nbx + bx;
+        (bins[k] || (bins[k] = [])).push(list[i]);
+      }
+      return bins;
+    };
+    const bins = index(pts), dbins = index(dry);
 
     for (let gy = 0; gy < ch; gy++) {
       const py = gy * CELL + CELL / 2, cby = Math.floor(py / r) + 1;
       for (let gx = 0; gx < cw; gx++) {
         const px = gx * CELL + CELL / 2, cbx = Math.floor(px / r) + 1;
-        let sum = 0, wsum = 0, csum = 0;
+        let sum = 0, wsum = 0, csum = 0, wnear = 0, dsum = 0, dnear = 0;
         for (let by = cby - 1; by <= cby + 1; by++) {
           if (by < 0 || by >= nby) continue;
           for (let bx = cbx - 1; bx <= cbx + 1; bx++) {
-            const b = bx < 0 || bx >= nbx ? null : bins[by * nbx + bx];
-            if (!b) continue;
-            for (let i = 0; i < b.length; i++) {
+            if (bx < 0 || bx >= nbx) continue;
+            const k = by * nbx + bx, b = bins[k], q = dbins[k];
+            if (b) for (let i = 0; i < b.length; i++) {
               const dx = px - b[i][0], dy = py - b[i][1], dd = dx * dx + dy * dy;
               if (dd >= r2) continue;
               const t = Math.sqrt(dd) / r;
               const f = t > BLEND ? ramp(t, BLEND) : 1;
-              if (f <= 0) continue;
-              sum += f; wsum += f * b[i][2];
+              if (f > 0) { sum += f; wsum += f * b[i][2]; }
               // Coverage is summed here and shaped below. Never take the largest — see `cov`.
-              csum += t > FEATHER ? ramp(t, FEATHER) : 1;
+              const c = t > FEATHER ? ramp(t, FEATHER) : 1;
+              csum += c; wnear += c / (dd + 1);
+            }
+            /* The gauges reporting no rain, read at the same radius and through the same kernel as
+               the ones reporting rain. **A station saying "none" is one reading, and it covers the
+               same ground as a station saying "12 mm".** */
+            if (q) for (let i = 0; i < q.length; i++) {
+              const dx = px - q[i][0], dy = py - q[i][1], dd = dx * dx + dy * dy;
+              if (dd >= r2) continue;
+              const t = Math.sqrt(dd) / r;
+              const c = t > FEATHER ? ramp(t, FEATHER) : 1;
+              dsum += c; dnear += c / (dd + 1);
             }
           }
         }
@@ -185,9 +193,30 @@ const SoftHeat = L.HeatLayer.extend({
            6 km blob with a 2.35 km rim fade — the two blobs really are 10 km apart, so each one
            stops 3 km short of the ground between them. */
         const s = csum < 1 ? csum : 1, cov = 1 - (1 - s) * (1 - s);
+        /* What the gauges reporting no rain take back, shaped exactly like `cov` because it is the
+           same question asked of the other answer. `gate` is who owns this ground, by inverse
+           square distance to each side — Shepard's weighting, and the reason it is used here is the
+           one property that matters: a gauge's own point is a singularity, so **at a wet gauge the
+           gate is 0 and its reading survives whole, and at a dry gauge it is 1 and the ground is
+           denied whole.** Exactly halfway between a wet gauge and a dry one it is 0.5, which is the
+           boundary rule this layer has always stated. With no wet gauge in reach it is 1, so a dry
+           gauge denies its full radius.
+           **That last case is why this moved out of a `destination-out` stamp.** The stamp took one
+           scalar radius, `min(r, nearest_wet / 2)`, so a dry gauge with a wet neighbour to the east
+           shrank to half that gap *in every direction* — including west, where nothing disputed it.
+           Measured on the live network: 143 of 191 dry gauges were capped, at a median of 0.54 of
+           the radius, and together they denied 35% of the ground they were entitled to deny. The
+           cap existed to stop an eraser reaching across a wet gauge and taking its reading off the
+           map, which is real — a dry gauge on the same pole erased its neighbour outright. The gate
+           answers that per pixel instead of per gauge, so the protection stays and the reach comes
+           back. */
+        const ds = dsum < 1 ? dsum : 1, dcov = 1 - (1 - ds) * (1 - ds);
+        const keep = dnear ? 1 - dcov * (dnear / (wnear + dnear)) : 1;
         const v = wsum / sum, o = (gy * cw + gx) * 4, g = Math.round(v * 255) * 4;
         d[o] = grad[g]; d[o + 1] = grad[g + 1]; d[o + 2] = grad[g + 2];
-        d[o + 3] = Math.round(v * cov * 255);
+        // Colour is `_grad[v]` and the denial only touches alpha, so an erased edge fades at the
+        // colour it already had. That was true of the old `destination-out` pass and stays true.
+        d[o + 3] = Math.round(v * cov * keep * 255);
       }
     }
     octx.putImageData(img, 0, 0);
@@ -207,48 +236,22 @@ const SoftHeat = L.HeatLayer.extend({
     ctx.save();
     ctx.globalAlpha = 1;
 
-    // The painted gauges in the same space the erasers are measured in. Projected once here rather
-    // than per dry gauge: 218 dry against 10 wet is 2,180 comparisons on every pan.
-    const wet = [], near = [];
+    /* Both answers, projected into the one space the field is computed in. A gauge reporting no
+       rain is carried the same way as one reporting rain, out to the same `bounds` and read at the
+       same radius — see `_field()`, which decides who owns each pixel. Water passes no dry gauges,
+       so `dry` is empty there and the layer is unchanged: a river reading low says nothing about
+       the river beside it. */
+    const near = [], dry = [];
     for (const ll of this._latlngs) {
       const p = this._map.latLngToContainerPoint(L.latLng(ll[0], ll[1]));
-      wet.push(p);
       if (bounds.contains(p))
         near.push([p.x + pad.x, p.y + pad.y, Math.max(0, Math.min(1, +ll[2] || 0))]);
     }
-    if (near.length) this._field(ctx, near, r);
-
-    /* Pass two: take back what a gauge reporting no rain denies. This one *is* allowed to reach
-       every blob under it — a dry reading denies the ground, not one neighbour's contribution to
-       it — and it runs last so the colour beneath is already settled. Water passes no dry gauges
-       and stops here, because a river reading low says nothing about the river beside it. */
-    ctx.globalCompositeOperation = 'destination-out';
     for (const ll of this._dry ?? []) {
-      const p = this._map.latLngToContainerPoint(ll);
-      if (!bounds.contains(p)) continue;
-      const x = p.x + pad.x, y = p.y + pad.y;
-      /* An eraser stops at the midpoint to the nearest gauge that *is* reporting rain, and reaches
-         its full RAIN_KM only where there is no such gauge to stop it. That midpoint is what makes
-         the two readings equal: on the line between a wet gauge and a dry one, paint survives
-         exactly where the pixel is nearer to the wet one. Neither reading is discarded and neither
-         outranks the other.
-         Without it a dry gauge reaches across a wet one and takes its reading off the map. Measured
-         before the rule: a wet gauge 2 km from a dry one lost half its alpha, and a dry gauge on the
-         same pole erased its neighbour outright. The archive holds one of those pairs. */
-      const er = Math.min(r, wet.reduce((m, q) => Math.min(m, p.distanceTo(q)), Infinity) / 2);
-      if (er < 1) continue;
-      // Full denial where the gauge stands, fading to none at the edge. The taper is the point: a
-      // hard circle would bite holes in the wash, and a hole reads as a rendering fault rather
-      // than as weather.
-      const g = ctx.createRadialGradient(x, y, 0, x, y, er);
-      g.addColorStop(0, 'rgba(0,0,0,1)');
-      // A short core at full strength before the taper starts. A ramp that peaks at the exact
-      // centre honours the reading at a mathematical point, and no pixel is one — the gauge itself
-      // kept 5 of 206 alpha, purely because the sample sat half a pixel off the peak.
-      g.addColorStop(0.15, 'rgba(0,0,0,1)');
-      g.addColorStop(1, 'rgba(0,0,0,0)');
-      stamp(ctx, x, y, er, g);
+      const p = this._map.latLngToContainerPoint(L.latLng(ll[0], ll[1]));
+      if (bounds.contains(p)) dry.push([p.x + pad.x, p.y + pad.y]);
     }
+    if (near.length) this._field(ctx, near, dry, r);
     ctx.restore();
     this._frame = null;   // this override never calls the stock _redraw, which used to clear it
   },
