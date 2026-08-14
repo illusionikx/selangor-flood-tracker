@@ -194,9 +194,9 @@ function portalRainUrls(array $states = ['SEL', 'WLH', 'PTJ']): array {
  * holds a td child. The existing wrap cannot help: it supplies a missing table, and this page is
  * missing its rows instead.
  *
- * So the body is split on the closing tag and each chunk is wrapped as a row of its own. That is a
- * repair, and a repair needs a check that the shape it produced is the shape expected — which is
- * what the 13-cell guard is. Measured on the live Selangor page: 239 chunks, all 13 cells.
+ * So `portalRows()` splits the body on the closing tag and wraps each chunk as a row of its own.
+ * That is a repair, and the 13-cell guard checks that the shape it produced is the shape expected.
+ * Measured on the live Selangor page: 239 chunks, all 13 cells.
  *
  * 13 and not 14. The header block names 14 columns at colspan 1 and every data row holds 13 cells,
  * so a parser that trusts the headers reads every value one column to the left in silence. */
@@ -217,10 +217,10 @@ function portalRows(string $html): array {
  * 0 no. · 1 code · 2 name · 3 district · 4 updated · 5-10 six daily totals OLDEST first
  * 11 rainfall from midnight (today) · 12 total 1 hour (now)
  *
- * Only cells 0 and 1 carry `data-th`, so the rest are read by position under the width guard, the
- * same rule the SPHTN parser obeys. The mapping is measured, not read off the headers: against JPS
- * on the 150 stations that join, cell 12 matches the hourly reading on 96% and cell 11 matches the
- * daily on 95%. Read in header order those fall to 49% and 23%.
+ * Only cells 0 and 1 carry `data-th`, so this function reads the rest by position under the width
+ * guard, the same rule the SPHTN parser obeys. Testing measured the mapping, not read off the
+ * headers: against JPS on the 150 stations that join, cell 12 matches the hourly reading on 96% and
+ * cell 11 matches the daily on 95%. Read in header order those fall to 49% and 23%.
  *
  * `days` keeps all six because the last of them is yesterday's whole total, which is what bridges a
  * midnight in the running total. See portalOdo() in api.php.
