@@ -47,10 +47,23 @@ search form until the caller also sends the two hidden inputs the page carries:
 
     ?state=SEL&district=ALL&station=ALL&loginStatus=0&language=1
 
-With them it returns 241 rows for Selangor, 68 for Kuala Lumpur and 2 for Putrajaya. Columns are
-`No | Station ID | Station | District | Last Updated | Rainfall from Midnight | Total 1 Hour (Now)`
-and then six daily totals, one per previous day. Only the first two cells carry `data-th`. Read the
-rest by position, and guard on row width, the same rule the SPHTN parser obeys.
+With them it returns 241 rows for Selangor, 68 for Kuala Lumpur and 2 for Putrajaya. Only the first
+two cells carry `data-th`. Read the rest by position, and guard on row width at 13 cells, the same
+rule the SPHTN parser obeys.
+
+**The cells do not follow the header block, and a parser that trusts the headers is wrong in
+silence.** The header row names 14 columns, each at colspan 1, while every data row holds 13 cells.
+Pinned against one station's own series, the true order is:
+
+    0  No            5..10  six daily totals, OLDEST first
+    1  Station ID    11     Rainfall from Midnight, today
+    2  Station       12     Total 1 Hour (Now)
+    3  District
+    4  Last Updated
+
+Kg. Melayu Ampang held `8.5` in cell 10 and `28.5` in cell 11 while its own series summed 8.5 mm for
+13 August and 28.5 mm for 14 August. Read the headers instead and today's total lands in a column
+labelled with last Tuesday's date.
 
 ### Rainfall from Midnight is a per-day odometer
 
@@ -59,11 +72,25 @@ no new arithmetic. The six daily columns bridge each midnight the window crosses
 
 ### The 5 minute series
 
-`getrainfalllast7days.php?station=<graphid>` returns 1,815 records over 167.8 hours. `clean` is a
-disjoint 5 minute bucket. Two identities confirm it:
+`getrainfalllast7days.php?station=<graphid>` returns 1,815 records over 167.8 hours. The sibling
+`searchresultrainfalldthourlylead.php?station=&from=&to=&datafreq=60` returns the same shape for a
+date range. **Set `to` to tomorrow.** A `to` of today stops at midnight and returns one record.
 
-- twelve consecutive `clean` values equal `chourly`, maximum error 0.00 over 1,803 checks
-- `clean` summed from midnight equals `cdaily`
+**`raw` is the disjoint 5 minute bucket. `clean` is not.** `clean` equals `chourly` on every record,
+maximum error 0.00, so both name one rolling 60 minute total. `c15min` is the rolling 15 minutes.
+Measured on a wet station over 860 records:
+
+| test | median | p90 | max |
+|---|---|---|---|
+| twelve `raw` values against `chourly` | 0.00 | 0.00 | **0.00** |
+| `raw` from midnight against `cdaily` | 0.00 | 0.00 | 8.50 |
+
+The 8.50 is the first day of the window, which starts after its midnight. Per calendar day `raw`
+sums to 8.5 for 13 August and 28.5 for 14 August, which the table's own cells repeat.
+
+**Test this identity on a station with rain in the window.** An earlier pass ran it on a station holding 15
+non-zero buckets out of 1,815 and `clean` passed, because twelve zeros sum to a zero. A dry station
+cannot tell a rolling window from a disjoint one.
 
 Disjoint buckets add up. That is the whole reason this source solves what SPHTN cannot.
 
