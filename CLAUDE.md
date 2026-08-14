@@ -410,7 +410,11 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   **The 38 KL stations answer neither long window, and they never will.** SPHTN publishes no
   `cumulativeRainfall`, so there is no odometer to subtract. Do not close that gap with `accHours()`
   at 24 hours. That is the sum this rule forbids. Two `—` columns on a KL gauge are the right
-  answer, and the readout on the dash says which of the two states it is.
+  answer, and the readout on the dash says so: `Not measured. This gauge reports no running total.`
+  **That is the only empty long window a reader ever meets.** Measured 2026-08-14: of the 184 gauges
+  that draw this chart, 37 carry that dash and none carries any other kind. There is no second,
+  temporary reason and this file described one for a while. A gauge waiting for the archive to reach
+  back stopped existing when a short window started answering — two odometer samples are enough.
 - **A window can also cover LESS ground than it names, and then it says so.** `accWindow()`
   takes `$partial`. With no sample at or before the far end it measures from the oldest sample there
   is and returns `short`. `derived` is a ladder of three rungs rather than a flag — 0 off the feed,
@@ -431,9 +435,12 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   `Measured from 13 Aug, 19:11` and the readout repeated it. A reader cut both. The shortfall changes
   how to read the number, and the hour this one server first stored an odometer reading does not.
   `accFrom` still rides on every station with a running total, because the card tests whether the key
-  is THERE — that is what separates a permanent dash from a waiting one. Nothing prints its value, so
-  do not delete the field on the strength of that. `MYT_WHEN` in `popup.js` existed only to format it
-  and is gone.
+  is THERE, which is how the card names the KL gauges. Nothing prints its value, so do not delete the
+  field on the strength of that. `MYT_WHEN` in `popup.js` existed only to format it and is gone.
+  **The `!from` guard covers one poll in the life of a server, and that is not a state.** A fresh
+  `.history.db` leaves a station holding one odometer sample and no difference. That station does
+  publish a running total, so the clause is false on it. The guard stops this app saying a false thing
+  for eight minutes. Do not give it a message of its own, and do not delete it either.
   **Two filters tried to suppress the pair and both are gone. Do not build a third.** The first
   was a floor in hours: a partial had to cover more ground than the fixed window under it. The live
   payload broke it at once, because a floor compares one span to a constant and the fault is two spans

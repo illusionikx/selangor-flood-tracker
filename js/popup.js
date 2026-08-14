@@ -1106,9 +1106,14 @@ export function rainAcc(acc, from) {
 
   /* An empty column carried no readout at all, so a reader hovering the em dash learned nothing —
      and on one of the 38 KL gauges that dash never fills in, because SPHTN publishes no running
-     total for either window to subtract. Two states look identical on the chart and are not:
-     one is waiting and the other is permanent. The readout is where that belongs, the same way the
-     measured span belongs there rather than on the plot. */
+     total for either window to subtract. That is what the clause names, and it is the only empty
+     long window a reader ever meets: measured on the live payload, 37 of the 184 gauges that draw
+     this chart carry the permanent dash and none carries a bare one.
+     **There is no "waiting" state and the `!from` guard is not one.** A short window answers off two
+     odometer samples, so a gauge stops being unanswerable on its second stored reading. The guard
+     exists for the single poll after a fresh `.history.db`, when a station holds one sample and no
+     difference: it publishes a running total, so the clause is false on it. Keep the guard, and do
+     not build a message behind it. */
   const blank = (k, label) => `${label} · Not measured.${
     ODO[k] && !from ? ' This gauge reports no running total.' : ''}`;
 

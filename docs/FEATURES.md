@@ -9076,29 +9076,29 @@ ATHENEUM draws `24 h*` beside `72 h**` at 6.5 mm each. The first covered more gr
 The second covered less. That is two different facts about one subtraction, and the marks are what
 separate them.
 
-### An empty column said nothing, and two of its states differ
+### An empty column said nothing, and one reason for it is permanent
 
 An answered column has carried a readout since the chart shipped: `24 h · 31 mm · measured over
 24.2 h`. An empty one carried none, so a reader who hovers the dash learns nothing at all.
 
-Two states draw that same dash and they are not one state. A Selangor gauge waits for the archive
-to reach back far enough. A Kuala Lumpur gauge waits for nothing. SPHTN publishes no
-`cumulativeRainfall`, so 38 of 231 rain gauges have no running total to subtract and never will.
-Both look identical on the plot.
-
-The readout now separates them. A bare `Not measured.` stands against `Not measured. This gauge
-reports no running total.`
+The two long windows subtract two odometer readings. SPHTN publishes no `cumulativeRainfall`, so 38
+of 231 rain gauges have nothing to subtract and their two columns are empty forever. The readout now
+says so: `Not measured. This gauge reports no running total.` The other three windows come straight
+off a feed, and a bare `Not measured.` is the whole of what there is to say about them.
 
 The station carries one new field, `accFrom`, holding the oldest odometer sample it has. Only its
 presence matters. A gauge with no running total holds no such sample, and that is the whole test.
 
-The waiting half of this is close to unreachable now, and that is worth knowing before somebody
-deletes it. Two distinct odometer samples are enough to answer both windows over a short span, so a
-Selangor gauge stops waiting on its second stored reading. What is left is the permanent case and a
-frozen station, and a frozen station draws no chart at all.
+There is no second, temporary reason. An earlier version of this text described one — a gauge waiting
+for the archive to reach back far enough — and that stopped being true the moment a short window
+started answering. Two odometer samples are enough, so a gauge stops being unanswerable on its second
+stored reading. Measured on the live payload: of the 184 gauges that draw this chart, 37 carry the
+permanent dash and **none** carries any other kind.
 
-Only the two long windows get a reason. The other three come straight off a feed, and the feed
-published none of them.
+The `!from` guard survives for one poll in the life of a server. A fresh `.history.db` leaves a
+station holding one sample and no difference. That station does publish a running total, so the
+clause is false on it. The guard is there to stop this app saying a false thing for eight minutes. It
+is not a state, and it gets no message of its own.
 
 ### A short window can undershoot a window inside it
 
@@ -9118,3 +9118,37 @@ The chart has also always drawn windows that disagree. On the same poll, 17 stat
 rain today than in the last 3 hours. Both sides of that come straight off the feed. It is a larger
 contradiction than the short window adds, it predates this work, and nothing here can name the
 wrong side of it.
+
+### The camera wall now fits the screen it is on
+
+The "All cameras" dialog carried two pixel caps. It was 1060px wide at most and 900px tall at most.
+On a wide monitor it sat in the middle at a size that ignored the screen.
+
+It now takes the viewport, less a 12px inset on every edge. That inset keeps the border and the
+12px radius reading as a deliberate edge. The phone breakpoint still takes the last 24px.
+
+The grid stated a column count for each screen width. Five columns, four below 840px, three below
+680px, and two below 600px.
+
+A person worked each threshold back from the dialog width, the grid padding and the gaps between
+columns. A change to any of those three made the whole table wrong, and nothing reported it.
+
+`repeat(auto-fill, minmax(min(150px, 100%), 1fr))` states the rule once. The 150px tile floor stays,
+because that is the point a camera still stops reading as a picture.
+
+The browser counts the columns from the box the grid is in. All three media queries are gone.
+
+The floor is a `min()`. A viewport narrower than one 150px column then gets a column that fits.
+Without it, that column overflows the dialog.
+
+The skeleton grid takes the same track sizing and the same padding as the real one. Both grids count
+columns the same way now, so the tiles land on the columns the skeleton drew.
+
+Measured in a headless browser at eight widths. A 2560px monitor draws 15 columns at 159px. A
+1920px monitor draws 11 columns at 159px.
+
+A 1280px monitor draws 7 columns at 162px. Every tile stays above the floor.
+
+Two widths change what a reader sees. A 599px window drew 2 columns before and draws 3 at 177px
+now. A 320px phone drew 2 columns at 145px and draws 1 at 296px. Both old counts were already under
+the 150px floor, so the second case trades a long scroll for a picture a reader can use.
