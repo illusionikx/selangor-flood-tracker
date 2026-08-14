@@ -8033,6 +8033,13 @@ the rivers. No rule in this section paints, denies or thins one. The two are wor
 name, because JPS records a flood gauge reading negative as **dry ground**, and this section says
 "dry gauge" about three hundred times meaning something else.
 
+**And they must stay apart in the logic, not only in the wording.** A flood gauge measures what the
+drainage failed to carry away, which is not what fell. Where the drainage is good, rain falls as
+hard as anywhere and the gauge stays clear. Where runoff arrives from upstream, the gauge goes under
+with no rain overhead. So a clear flood gauge is no evidence that the wash above it is overclaiming,
+and it must never join the readings that deny ground. A submerged one is no evidence of rain either,
+and must never paint. Only a rainfall station reports rain.
+
 A reader reported that the violet wash on the rainfall layer covered ground where no gauge
 reported rain. Measured on the payload it was reported from, this was correct. One gauge, JPS
 Ampang, read 19 mm/h. The blob it painted reached 9 km. Twenty other gauges stood inside that

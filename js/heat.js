@@ -8,6 +8,12 @@
 // *water level* layer beside the rivers, and nothing here paints, denies or thins it. The two names
 // collide badly in one place: `api.php` records that a flood gauge reading negative means **dry
 // ground**, so "a dry gauge" says one thing here and another thing there. Say which one.
+//
+// **A flood gauge is never evidence about rain, in either direction, and this is the rule to keep.**
+// It measures what the drainage failed to carry away. Where the drainage is good, rain falls as hard
+// as anywhere and the gauge stays clear. Where runoff arrives from upstream, the gauge goes under
+// with no rain overhead at all. So a clear flood gauge cannot deny the wash above it, and a
+// submerged one cannot paint. Only a rainfall station reports rain.
 
 import { HEAT_KM, RAIN_KM, HEAT_MAX_PX, HEAT_ALERT, HEAT_WARNING, RAIN_HEAT } from './config.js';
 import { PREFS } from './state.js';

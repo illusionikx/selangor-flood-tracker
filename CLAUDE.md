@@ -951,6 +951,16 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   record that a flood gauge reading negative means **dry ground**, so "a dry gauge" reads as a
   rainfall station saying 0 mm/h in one entry and as a flood gauge on dry land in another. Name the
   kind in any sentence that reads both ways.
+  **A flood gauge is never evidence about rain, in either direction.** It measures what the drainage
+  failed to carry away, which is not what fell. Where the drainage is good, rain falls as hard as
+  anywhere and the gauge stays clear. Where runoff arrives from upstream, the gauge goes under with
+  no rain overhead. **So a clear flood gauge must never join `dryPoints` and deny the wash, and a
+  submerged one must never paint.** Only a rainfall station reports rain. Checked on the current
+  tree: no rain conclusion reads `depth`, and `rainBacked()` tests the station's own
+  `cumulativeRainfall` odometer rather than any gauge. Keep it that way — the tempting mistake is to
+  read a dry flood gauge as proof that the rain layer is overclaiming, and good drainage is the
+  whole reason it is not. This is the same rule the siren already obeys from the other side, where
+  flood gauges are not backing evidence either.
 - **A rain gauge reporting zero is a reading, and the rain heat layer draws it.** The network says
   two things — 12 gauges reporting rain and 218 reporting none, on the payload this was built from
   — and the layer used to draw only the first, so the wash covered ground that 218 stations had
