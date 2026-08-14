@@ -866,10 +866,14 @@ function pageRow(bool $asked, string $got, string $had): array {
  */
 function pageHasData(string $key, string $body): bool {
     if ($body === '') return false;
-    return match ($key) {
-        'met-day', 'met-warn' => json_decode($body) !== null,
-        'met-now'             => str_contains($body, 'map.setView'),
-        default               => str_contains($body, '<tr'),   // the national and KL tables
+    return match (true) {
+        $key === 'met-day', $key === 'met-warn' => json_decode($body) !== null,
+        $key === 'met-now'                      => str_contains($body, 'map.setView'),
+        /* The portal rainfall page carries no <tr> on a data row — see portalRows(). Its header
+           holds four, and the empty form page holds the same four, so the shared test passes on a
+           page with nothing in it. `data-th='No'` appears once per data row and nowhere else. */
+        str_starts_with($key, 'prf-')           => str_contains($body, "data-th='No'"),
+        default                                 => str_contains($body, '<tr'),
     };
 }
 
@@ -1312,6 +1316,12 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
     // A quiet nowcast publishes the map and no markers. That is weather, not an outage.
     $ok('a nowcast with no markers is data', pageHasData('met-now', 'map.setView([3,101],8)') === true);
     $ok('a nowcast notice is not data',  pageHasData('met-now', '<html>Notis Gangguan</html>') === false);
+
+    echo "\npageHasData() on the portal pages:\n";
+    $ok('a portal page with a row passes',   pageHasData('prf-SEL', "<td data-th='No'>1</td>") === true);
+    $ok('a portal form page fails',          pageHasData('prf-SEL', "<table><tr><th>No.</th></tr></table>") === false);
+    $ok('an empty body fails',               pageHasData('prf-SEL', '') === false);
+    $ok('the other tables keep the tr test',  pageHasData('nat-SEL', "<tr class='item'>") === true);
 
     echo "\nnoticeOf():\n";
     $ok('the notice page returns its id',  noticeOf('<html><title> Notis Gangguan </title><body></body></html>') === 'publicinfobanjir');
@@ -2005,7 +2015,7 @@ $db->exec('CREATE TABLE IF NOT EXISTS page (url TEXT PRIMARY KEY, ts INTEGER, bo
 // updates faster than a quarter hour. Refetching them every 5 minutes would triple the cost of a
 // poll for data that cannot have changed. A page that fails to fetch falls back to the last copy we
 // stored — a slow upstream should cost freshness, never a whole region's worth of pins.
-$extraUrls = nationalUrls() + klUrls() + metUrls($now);
+$extraUrls = nationalUrls() + klUrls() + metUrls($now) + portalRainUrls();
 $stored = [];
 foreach ($db->query('SELECT url, ts, body FROM page') as $r) $stored[$r['url']] = $r;
 // The daily forecast and the warning feed each keep their own clock. Everything else keeps SCRAPE_TTL.
@@ -2086,6 +2096,10 @@ foreach ($noticeHits as $id => $regions) {
     $notices[] = ['id' => $id, 'regions' => array_values(array_unique($regions))];
 }
 $page = fn(string $k) => $pages[$k] ?? '';
+
+/* The national portal's rainfall table, parsed here so every later pass can read it. Nothing
+   consumes a reading from it yet. */
+$prf = portalRain(array_intersect_key($pages, portalRainUrls()));
 
 // The forecast URL carries the current date, so no later request reads a row a day old again. Two
 // days of slack cover a clock that slips backward, so the delete never removes a row this code wants.
@@ -2600,6 +2614,7 @@ $payload = json_encode([
         'met'      => ['parsed' => $metParsed, 'fresh' => count($metPts), 'matched' => $metMatched],
         'metday'   => ['parsed' => count($metDay), 'matched' => $metDayMatched],
         'metwarn'  => ['parsed' => count($metWarn)],
+        'portalrf' => ['parsed' => count($prf)],
         // Empty on a healthy poll. A key here names a table the map is drawing from a stored copy.
         'stale'    => $pagesStale,
     ],
