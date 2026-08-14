@@ -1903,18 +1903,21 @@ EOF
 **Interfaces:**
 - Consumes: `graphId` from Task 4 and Task 8, `portalOdo()` from Task 5
 - Produces:
-  - `seriesUrl(int $graphId): string`
-  - `seriesParse(string $json): array` — a list of `[unix seconds, raw mm]`, ascending
+  - `seriesUrl(string $graphId): string`
+  - `seriesParse(string $json): array` — a list of `[unix seconds, mm]`, ascending
   - A `histdone` row set in the `page` table, one per station already seeded
 
-**`raw` is the disjoint 5 minute bucket. `clean` is not.** `clean` equals `chourly` on every record,
-maximum error 0.00, so both name one rolling 60 minute total. Measured on a wet station over 860
-records, twelve `raw` values reproduce `chourly` with a maximum error of 0.00, and `raw` summed from
-midnight reproduces `cdaily`.
+**`clean_rainfall` is the disjoint 5 minute bucket, not `raw`.** The field names guessed before the
+endpoint was read — `tarikh`, `raw`, `clean`, `chourly` — do not exist on the live feed. The real
+fields are `date_time` (no seconds), `clean_rainfall`, `cum_hourly` and `cum_daily`. `cum_hourly` is a
+rolling 60 minute total and `cum_daily` is the running day total, so there is no single rolling field
+to confuse with the disjoint bucket — there are two, and neither is the one to sum. Measured against
+the live endpoint on three stations across up to 8 days, `clean_rainfall` summed across one calendar
+day reproduced `cum_daily`'s own end-of-day figure exactly, every time.
 
 **Test this identity on a station with rain in the window.** An earlier pass ran it on a station
-holding 15 non-zero buckets out of 1,815 and `clean` passed, because twelve zeros sum to a zero. A dry
-station cannot tell a rolling window from a disjoint one.
+holding 15 non-zero buckets out of 1,815 and the rolling field passed, because twelve zeros sum to a
+zero. A dry station cannot tell a rolling window from a disjoint one.
 
 **Disjoint buckets add up.** That is the whole reason this source solves what SPHTN cannot, and it is
 what lets a backfill build a running total for the days before this app first saw the station.
@@ -1923,15 +1926,15 @@ what lets a backfill build a running total for the days before this app first sa
 
 ```php
     echo "\nseriesParse():\n";
-    $sJson = '[{"tarikh":"2026-08-14 10:00:00","raw":"2.5","clean":"7.5","chourly":"7.5"},'
-           . '{"tarikh":"2026-08-14 10:05:00","raw":"0.0","clean":"7.5","chourly":"7.5"},'
-           . '{"tarikh":"2026-08-14 10:10:00","raw":"1.0","clean":"8.5","chourly":"8.5"}]';
+    $sJson = '[{"date_time":"14/08/2026 10:00","clean_rainfall":"2.5","cum_hourly":"7.5","cum_daily":"7.5"},'
+           . '{"date_time":"14/08/2026 10:05","clean_rainfall":"0.0","cum_hourly":"7.5","cum_daily":"7.5"},'
+           . '{"date_time":"14/08/2026 10:10","clean_rainfall":"1.0","cum_hourly":"8.5","cum_daily":"8.5"}]';
     $sr = seriesParse($sJson);
     $ok('every record is read',        count($sr) === 3);
     $ok('the stamp becomes unix',      $sr[0][0] === strtotime('2026-08-14 10:00:00 +0800'));
-    /* raw, never clean. clean equals chourly on every record, so both name one ROLLING 60 minute
-       total. Summing a rolling window counts the same rain twelve times. */
-    $ok('the value is raw',            $sr[0][1] === 2.5);
+    /* clean_rainfall, never cum_hourly or cum_daily. Both of those are rolling or running totals,
+       and summing either counts the same rain many times over. */
+    $ok('the value is clean_rainfall', $sr[0][1] === 2.5);
     $ok('a zero bucket is kept',       $sr[1][1] === 0.0);
     $ok('the series is ascending',     $sr[0][0] < $sr[1][0] && $sr[1][0] < $sr[2][0]);
     $ok('bad json yields nothing',     seriesParse('not json') === []);
@@ -1961,31 +1964,38 @@ Add to `sources.php`, after `gazParse()`. Correct the key names from Step 1 if t
 ```php
 const SERIES = 'https://publicinfobanjir.water.gov.my/wp-content/themes/enlighten/query/getrainfalllast7days.php';
 
-function seriesUrl(int $graphId): string {
+function seriesUrl(string $graphId): string {
     return SERIES . '?' . http_build_query(['station' => $graphId]);
 }
 
 /* 7 days of 5 minute buckets, as [unix seconds, mm].
  *
- * `raw` AND NOTHING ELSE. `clean` equals `chourly` on every record with a maximum error of 0.00, so
- * both name one ROLLING 60 minute total, and summing a rolling window counts the same rain twelve
- * times over. `c15min` is the rolling 15 minutes. Measured on a wet station over 860 records,
- * twelve `raw` values reproduce `chourly` exactly, and `raw` summed from midnight reproduces
- * `cdaily`.
+ * `clean_rainfall` AND NOTHING ELSE. It is the disjoint 5-minute bucket. `cum_hourly` is a rolling
+ * 60 minute total and `cum_daily` is the running day total, and summing either counts the same rain
+ * many times over. Measured on a wet station across up to 8 days, `clean_rainfall` summed across
+ * one calendar day reproduced `cum_daily`'s own end-of-day figure exactly, every time.
  *
  * SCORE ANY CHECK OF THIS ON A STATION WITH RAIN IN THE WINDOW. An earlier pass ran it on a station
- * holding 15 non-zero buckets out of 1,815 and `clean` passed, because twelve zeros sum to a zero.
+ * holding 15 non-zero buckets out of 1,815 and a rolling field passed, because twelve zeros sum to
+ * a zero.
+ *
+ * `date_time` parses on DateTime::createFromFormat(), never strtotime(). strtotime() reads a bare
+ * slash-separated date as American m/d/y, so a day past 12 fails outright and a day at or under 12
+ * only looks right by accident.
  *
  * Stamps are Malaysian wall clock with no offset, the same as every other reading here.
  */
 function seriesParse(string $json): array {
     $rows = json_decode($json, true);
     if (!is_array($rows)) return [];
+    $tz = new DateTimeZone('Asia/Kuala_Lumpur');
     $out = [];
     foreach ($rows as $r) {
-        $ts = strtotime(($r['tarikh'] ?? '') . ' +0800');
-        if (!$ts) continue;
-        $out[] = [$ts, (float)($r['raw'] ?? 0)];
+        $d = DateTime::createFromFormat('d/m/Y H:i', trim((string)($r['date_time'] ?? '')), $tz);
+        if (!$d) continue;
+        $v = numOrNull((string)($r['clean_rainfall'] ?? ''));
+        if ($v === null || $v < 0) continue;
+        $out[] = [$d->getTimestamp(), $v];
     }
     usort($out, fn($a, $b) => $a[0] <=> $b[0]);
     return $out;
@@ -2123,15 +2133,15 @@ file. A full per-station fetch on every refresh costs 28 MB, which is about 2.7
 GB each day at one government host, and that is the camera stampede in slow
 motion. At five per refresh the 425 stations complete in about 21 hours.
 
-The seed reads raw and nothing else. clean equals chourly on every record with
-a maximum error of 0.00, so both name one rolling 60 minute total, and summing
-a rolling window counts the same rain twelve times. Twelve raw values reproduce
-chourly exactly on a wet station over 860 records, and raw summed from midnight
-reproduces the table's own midnight cell.
+The seed reads clean_rainfall and nothing else. cum_hourly is a rolling 60
+minute total and cum_daily is a running day total, and summing either counts
+the same rain many times over. clean_rainfall summed across one calendar day
+reproduces cum_daily's own end-of-day figure exactly, on every station and day
+measured.
 
 Score any check of that on a station with rain in the window. An earlier pass
-ran it on a station holding 15 non-zero buckets out of 1,815 and clean passed,
-because twelve zeros sum to a zero.
+ran it on a station holding 15 non-zero buckets out of 1,815 and a rolling
+field passed, because twelve zeros sum to a zero.
 
 Summing here is allowed because these buckets do not overlap. It is the one
 place in this app that adds rainfall readings together, and every other window
@@ -2250,7 +2260,8 @@ curl -sk https://flood-exp.test/api.php \
      repair is to split on the closing tag. Include the measured numbers.
   2. `pageHasData()`'s `<tr` test passes on that page's header and on the empty form page alike, so
      those keys test `data-th='No'` instead.
-  3. `raw` is the disjoint bucket and `clean` is not, and a dry station cannot tell the two apart.
+  3. `clean_rainfall` is the disjoint bucket and `cum_hourly`/`cum_daily` are not, and a dry station
+     cannot tell them apart.
 - **The Verify block** gains the four sweeps from Steps 1 to 4.
 - The accumulation gotcha was already rewritten in Task 6. Check it reads correctly beside the new
   entries.

@@ -9778,3 +9778,41 @@ headless virtual time supplies no reliable clock to wait on.
 
 The check asserts the property instead. Focus proves the block is modal, and a modal dialog is in
 the top layer by definition.
+
+## The national portal becomes the preferred rainfall and river source
+
+The map grows from 338 river and rainfall stations to about 471, drawn from
+`publicinfobanjir.water.gov.my`'s own rainfall table and its own station search. The portal is now
+the preferred reading for both kinds, ahead of the Selangor API and SPHTN. Every rainfall window —
+1 hour, 3 hours, today, 24 hours, 72 hours — answers exactly now, rather than through a summed
+approximation.
+
+Three measured faults drove this.
+
+**Kuala Lumpur publishes no running rainfall total.** SPHTN carries no `cumulativeRainfall`, so
+`accWindow()` had nothing to subtract for 38 gauges. Their 24 hour and 72 hour columns showed an em
+dash on every one of them, always.
+
+**The fallback for those 38 gauges was wrong.** `accHours()` summed one rolling-hour reading per
+clock hour. The readings sit a median 46 minutes apart, so most hour boundaries counted about
+14 minutes of rain twice. Scored against the 3 hour total Selangor publishes for itself, 14 of 176
+stations were out by more than 5 mm, worst 60 mm. `accHours()` is gone.
+
+**Kuala Lumpur's river coverage was 26 of 48.** SPHTN's own water-level table publishes no
+coordinate for 22 of its 48 rivers, so nothing here can place them. The portal's own station search
+does carry a coordinate, and 22 of the 37 new rivers this change adds are exactly those Kuala
+Lumpur rivers.
+
+**The trade accepted.** About 178 rainfall stations change where their number comes from. Each one
+showed a reading before this change and shows the portal's own figure after it. A disagreement
+between the two feeds is now visible on a station somebody already watches, where before only one
+feed's number ever reached the screen.
+
+**Deliberately not built.** Per-station rainfall thresholds from the portal: six stations across
+three states all return 10, 30, 60 and 90, and those are constants — `RAIN_STOPS` already hardcodes
+three of them. Near-name matching for a station this app cannot place on an equal name: 17
+candidates, and no evidence behind any of them. A coordinate this app invents is worse than one it
+can show belongs to upstream, the rule `CAM_FIX` already states. `cyearly` as an odometer: measured
+flat at 766.5 across a window where 12 mm fell. The three official JPS notice feeds a reader asked
+for on 2026-08-14: each needs the alert design standard on its own, and all three held no rows when
+measured, so no parser here can yet tell a quiet feed from a moved layout.

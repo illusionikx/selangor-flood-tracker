@@ -27,9 +27,16 @@ if (!is_array($p) || !isset($p['stations'])) {
     $bad[] = 'no payload';   // the site is down, or it answered something that is not the payload
 } else {
     /* `metwarn` is deliberately absent from this list. Zero warnings is the ordinary state of a
-       calm day, not a broken scrape. It read 0 on the poll this file was written against. */
-    foreach (['kl', 'national', 'met', 'metday'] as $k)
+       calm day, not a broken scrape. It read 0 on the poll this file was written against.
+       `gaz.pending` and `hist.pending` are absent too, on purpose. Both reach 0 when their drip
+       finishes, which is the healthy end state, and an alarm that fires on success is the cry-wolf
+       failure the alert design standard in docs/FEATURES.md rejects. */
+    foreach (['kl', 'national', 'met', 'metday', 'portalrf'] as $k)
         if ((int)($p['sources'][$k]['parsed'] ?? 0) === 0) $bad[] = "$k parsed 0 rows";
+
+    /* `portalrf.parsed` above catches a moved table or a broken hidden-input pair. This catches the
+       other half: the table still parses, but every row failed to join a station we already hold. */
+    if ((int)($p['sources']['portalrf']['applied'] ?? 0) === 0) $bad[] = 'portalrf applied 0 rows';
 
     /* A stored copy parses as well as a fresh one, so the parse counters cannot see this. */
     if (!empty($p['sources']['stale'])) $bad[] = 'stale pages: ' . implode(' ', $p['sources']['stale']);

@@ -113,21 +113,23 @@ A row without the link keeps a null id and takes no history backfill.
 `searchresultrainfalldthourlylead.php?station=&from=&to=&datafreq=60` returns the same shape for a
 date range. **Set `to` to tomorrow.** A `to` of today stops at midnight and returns one record.
 
-**`raw` is the disjoint 5 minute bucket. `clean` is not.** `clean` equals `chourly` on every record,
-maximum error 0.00, so both name one rolling 60 minute total. `c15min` is the rolling 15 minutes.
-Measured on a wet station over 860 records:
+**`clean_rainfall` is the disjoint 5 minute bucket.** The field names guessed before the endpoint was
+read — `tarikh`, `raw`, `clean`, `chourly` — do not exist on the live feed. The real fields are
+`date_time` (no seconds), `clean_rainfall`, `cum_hourly` and `cum_daily`. `cum_hourly` is a rolling
+60 minute total and `cum_daily` is the running day total, so there is no single rolling field to
+confuse with the disjoint bucket — there are two, and neither is the one to sum.
 
-| test | median | p90 | max |
-|---|---|---|---|
-| twelve `raw` values against `chourly` | 0.00 | 0.00 | **0.00** |
-| `raw` from midnight against `cdaily` | 0.00 | 0.00 | 8.50 |
-
-The 8.50 is the first day of the window, which starts after its midnight. Per calendar day `raw`
-sums to 8.5 for 13 August and 28.5 for 14 August, which the table's own cells repeat.
+Measured against the live endpoint, three stations across up to 8 days: on Sg. Selangor di Teluk
+Penyamun Jeti (F2), a burst from 09:25 to 09:50 pushed `cum_hourly` and `cum_daily` to the same
+111.5 together, because nothing had yet fallen out of the rolling hour. A gap to 10:50 then reset
+`cum_hourly` to that one bucket alone (0.5) while `cum_daily` kept the running 112.0. Over the full
+8 days on the 3 stations, `clean_rainfall` summed across one calendar day reproduced `cum_daily`'s
+own end-of-day figure exactly, every time.
 
 **Test this identity on a station with rain in the window.**
-An earlier pass ran it on a station holding 15 non-zero buckets out of 1,815 and `clean` passed,
-because twelve zeros sum to a zero. A dry station cannot tell a rolling window from a disjoint one.
+An earlier pass ran it on a station holding 15 non-zero buckets out of 1,815 and the rolling field
+passed, because twelve zeros sum to a zero. A dry station cannot tell a rolling window from a
+disjoint one.
 
 Disjoint buckets add up. That is the whole reason this source solves what SPHTN cannot.
 
@@ -291,10 +293,10 @@ Each check below fails loudly if the thing it guards breaks.
    "updated" means a join broke. A rise in "kept on the old feed" means the portal dropped rows.
    **Allow a station or two of drift.** Two fetches an hour apart returned 311 Selangor rainfall
    rows and then 310. Assert a range, never an equality.
-2. **The bucket identity.** Assert that twelve `raw` values equal `chourly` and that `raw` from
-   midnight equals `cdaily`. This is what licenses adding them. **The field is `raw`.** This rule
-   named `clean` until the correction above reached it, and a check on `clean` asserts that one
-   rolling hour equals itself.
+2. **The bucket identity.** Assert that `clean_rainfall` summed from midnight equals `cum_daily`.
+   This is what licenses adding them. **The field is `clean_rainfall`.** This rule named `raw`, then
+   `clean`, before the field names were checked against the live endpoint — neither exists there, and
+   a check on the wrong field asserts nothing about the real data.
 3. **Window agreement.** Compare the portal 3 hour window against the 3 hour total Selangor
    publishes for itself, on every station carrying both. The current sum is out by more than 5 mm on
    14 of 176. The portal figure must beat that by a wide margin or the migration is wrong.

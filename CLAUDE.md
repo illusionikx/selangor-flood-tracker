@@ -17,7 +17,7 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | file | role |
 |---|---|
 | `api.php` | server-side proxy + cache + source merge + poll history + camera image proxy + rate-limited `?force=1` + place lookup (`?place=`, proxies Nominatim) |
-| `sources.php` | scrapers for the two HTML-only upstreams (national portal, JPS WP) and the three MET feeds (nowcast, forecast, warning) |
+| `sources.php` | scrapers for the two HTML-only upstreams (national portal, JPS WP) and the three MET feeds (nowcast, forecast, warning). Also the national portal's rainfall table, gazetteer and 7-day history endpoints |
 | `shots.php` | camera archive: capture, retention tiers, lookup, and the on-request strip (`buildSheet()`) the wall and the clip play. Required by `api.php` |
 | `shots-test.php` | `php shots-test.php` — one of five runnable checks. Guards retention. Exercises `pruneShots()` |
 | `log.php` | where a browser error lands. `js/oops.js` is the only caller. Appends one JSON line to `.client-errors.log` |
@@ -87,16 +87,22 @@ Dependencies must stay acyclic; anything two modules both need lives in `state.j
 ## Data sources
 
 Three JPS feeds, joined on the national station code (`station_Id` in the Selangor API, `Station ID`
-in both HTML tables). Priority for a *reading* is national → whichever feed placed the pin.
-Coordinates only ever come from Selangor or WP; the national portal publishes none.
+in both HTML tables). The national portal is now the **preferred rainfall source** as well as the
+authoritative river reading: priority for a *reading* is national/portal → whichever feed placed the
+pin. Coordinates for a station another feed already placed still come only from Selangor or WP; the
+portal publishes none there. The portal can place a station no other feed carries, but only through
+its own station search — a small gazetteer this app drips in slowly, never a per-poll coordinate. See
+the `## api.php` section below.
 Only these three carry water. The other three hosts in the table below are not flood-data sources.
 Nominatim answers `?place=` and joins nothing at all. The two MET hosts join a station by nearest
-point and by district name, and they never touch a reading. See the `## api.php` section below.
+point and by district name, and they never touch a reading.
 
 | source | gives | shape |
 |---|---|---|
 | `infobanjirjps.selangor.gov.my/JPSAPI/api/` | Selangor: everything, incl. the only cameras, sirens and gauges | JSON |
 | `publicinfobanjir.water.gov.my` | national water levels + thresholds; **authoritative reading** | HTML table |
+| `publicinfobanjir.water.gov.my` (rainfall table) | national rainfall + a per-day running total; **preferred rainfall source** | HTML fragment |
+| `publicinfobanjir.water.gov.my` (station search + 7-day history) | the portal's own gazetteer, and the backfill for a rainfall archive | JSON |
 | `infobanjirjpskl.water.gov.my` (SPHTN) | KL + Putrajaya water level and rainfall | HTML table |
 | `met.gov.my/nowcasting` | rain now and every 30 min to +3 h, 294 points | HTML with baked-in JS |
 | `api.data.gov.my/weather/forecast` | daily lowest and highest temperature, by district | JSON |
@@ -158,9 +164,21 @@ one call per state (`SEL`, `WLH` = KL, `PTJ` = Putrajaya). 301s to a canonical p
 `CURLOPT_FOLLOWLOCATION` is required. Rows are `<tr class='item'>` and every cell carries a
 **`data-th` attribute** — read columns by that (`$td->attr('data-th')`), never by position.
 
-Rainfall exists on the portal but its table is loaded through
-`wp-content/themes/shapely/agency/searchresultrainfall.php`, which returns headers and no rows for
-every parameter combination tried. Not wired up; rainfall comes from the other two feeds.
+The portal also publishes rainfall, at `wp-content/themes/shapely/agency/searchresultrainfall.php` —
+`portalRainUrls()` / `portalRows()` / `portalRain()` in `sources.php`. It once answered only headers
+and no rows for every parameter tried. The missing piece was two hidden form inputs, `loginStatus`
+and `language`, that the site's own page always submits alongside the query. With those added it is
+now the **preferred rainfall source**: an authoritative reading and a per-day running total that
+neither Selangor nor SPHTN publishes. See the gotcha list for the row-parsing fault this table hides.
+
+The portal publishes a coordinate too, but only through a separate endpoint, its own station search
+at `wp-content/themes/enlighten/query/searchstation_control.php` — `gazUrl()` / `gazParse()` in
+`sources.php`. That endpoint answers a substring search over station names. It is not a per-poll
+feed, so `api.php` drips it slowly into a small gazetteer table and reads it only to place a station
+no other feed carries. A sibling endpoint, `getrainfalllast7days.php` — `seriesUrl()` /
+`seriesParse()` — answers one station's own 5-minute rainfall history for the last 7 days, and seeds
+a running total for a station this app has never polled before. See the `## api.php` section below
+for both drips.
 
 ### 3. JPS Wilayah Persekutuan / SPHTN — `sources.php`
 
@@ -195,8 +213,21 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   triple the cost of a refresh for data that can't have changed. A page that fails to fetch falls
   back to the stored copy. Warm poll ~3.5s, and one poll per quarter hour pays the ~15s.
 - Merge order: Selangor API → KL (skipping any station within ~200 m of one we already have, since
-  the two feeds share no station codes) → national override by code → trend pass over the winner.
-- Every station carries `source` (`selangor` / `kl` / `national`) and, where known, `code`.
+  the two feeds share no station codes) → national override by code (rivers) → portal override by
+  match (rainfall) → new rows the national portal alone knows, placed from its own gazetteer → trend
+  pass over the winner.
+- Every station carries `source` (`selangor` / `kl` / `national` / `portal`) and, where known, `code`.
+- **Two drips run at the end of a refresh, inside the same lock, the shape `captureShots()` already
+  uses:** at most `GAZ_FILL` (5) prefixes and `HIST_FILL` (5) stations per refresh, at most once per
+  `GAZ_EVERY` / `HIST_EVERY` (600 s each), site-wide, behind `.gaz.stamp` and `.hist.stamp`. The
+  gazetteer drip queries the portal's own station search. It writes a `station(name, lat, lng,
+  district, state)` row in `.history.db`, which `gazPlace()` reads to place a rainfall or river row
+  the portal alone knows about. The history drip fetches one station's 7-day series and writes it
+  into `level` under a `<id>#c` key, through `seedRebase()` — see the gotcha list for why the seed
+  must join the running total this app already keeps rather than restart it. Both drips reuse the
+  `page` table's reserved-prefix pattern (`gazdone:`, `histdone:`), the same one `notice:` and
+  `place:` already use, so each row marks a prefix or a station asked whether or not it answered —
+  the rule `pageRow()` already states for a scraped page.
 - **`camFix()` corrects or supplies twenty-five camera coordinates, across two faults in JPS's feed:**
   fourteen swapped between cameras, and eleven published with no coordinate at all. It is the only
   place this app overrides a value the feed states. See the gotcha below for the rule that admits an
@@ -362,6 +393,62 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   and a descendant search counts the inner table's cells too, blowing the 14-cell guard.
 - **Iterating a `Crawler` yields raw `DOMNode`s**, which have no `attr()`. Use `->each(fn(Crawler
   $n) => $n->attr(…))` to stay in Crawler-land, or you get a fatal on the first attribute read.
+- **`crawl()` reads nothing from the national portal's rainfall table.** No data row carries an
+  opening `<tr>`. The `<tbody>` holds one empty row, then about 31 stray closing tags, then every row
+  as a bare run of `<td>` cells ending in `</tr>`. Measured on the live page,
+  `crawl($html)->filter('tr')` finds 4 elements, and none holds a `td` child, against 239 real rows.
+  The existing wrap in `crawl()` cannot repair this. It supplies a missing table, and this page
+  lacks the rows instead. `portalRows()` splits the body on `</tr>` and wraps each chunk as a row
+  of its own, then keeps only chunks of exactly 13 cells. The width guard checks that the repair
+  produced the shape expected.
+- **`pageHasData()`'s `<tr` test cannot answer for the portal rainfall page.** Its header block holds
+  four instances of `<tr`, and the empty form page — what the endpoint returns without its two hidden
+  inputs — holds the same four. A shared test cannot tell the two apart. Those keys test
+  `data-th='No'` instead, which appears once per data row and nowhere else.
+- **`clean_rainfall` is the disjoint 5-minute bucket in the 7-day history series, not `raw`.** The
+  field names guessed before the endpoint was read — `tarikh`, `raw`, `clean`, `chourly` — do not
+  exist on the live feed. The real fields are `date_time` (no seconds), `clean_rainfall`,
+  `cum_hourly` and `cum_daily`. `cum_hourly` is a rolling 60-minute total and `cum_daily` is the
+  running day total, so there is no single rolling field to confuse with the disjoint one. There are
+  two, and neither is the one to sum. Measured against the live endpoint on three stations across up
+  to 8 days, `clean_rainfall` summed across one calendar day reproduced `cum_daily`'s own end-of-day
+  figure exactly, every time. **Score this identity on a station with rain in the window.** An
+  earlier pass scored it on a station holding 15 non-zero buckets out of 1,815, and the rolling field
+  passed, because twelve zeros sum to a zero.
+- **A `graphId` is a string, and casting it to `int` silently breaks the history backfill.** Some ids
+  carry a trailing underscore the site's own link puts there, `stationid=3015084_`. Measured against
+  the live SEL/WLH/PTJ pages: 58 of 176 ids on the Selangor page alone carry one, 72 of 308 across all
+  three state pages. The digit run alone is a *different* id to the endpoint the id names. It answers
+  with an empty series, while the id with its underscore answers with the station's own 7-day
+  history. This app stamps a station `histdone:` whether or not its fetch answered, so an `(int)`
+  cast here silently empties the backfill for 23% of stations, for good.
+- **A running total must never restart when this app cannot advance it.** Before this work a
+  Selangor station stored a year-to-date odometer under `#c`. A portal station starts a total near
+  zero. Without a guard, restarting on deploy writes a small number after a large one. `accWindow()`
+  reads the total going backwards and answers null, so 140 stations sit dark for 72 hours. It held
+  here only because `INSERT OR IGNORE` collided on `(station, ts)`, which is luck, not a guard.
+  `portalOdo()` holds the total instead of restarting it whenever it has no `prevDaily` to measure the
+  rise against — the exact case a fresh deploy meets — and that costs one poll of rain, once.
+- **A name alone cannot place a station.** The portal's own gazetteer holds two entries for one
+  station, 81 km apart: `Sg. Bernam di Tanjung Malim`, 1.1 km from the real town, and `Sg. Bernam di
+  Tanjung Malim (F2)`, beside Putrajaya. `gazCorroborated()` requires the point to sit within
+  `GAZ_DISTRICT_KM` (50 km) of the median of stations in the district the portal itself assigns. This
+  is the rule `CAM_FIX` already states for a camera, above, so nothing here restates it in full.
+  Evidence for 50 km: zero of about 470 stations this app already holds sit past it, the check
+  refuses the same two rows at 40, 50 and 60 km alike, and the worst legitimate outlier measured,
+  34.6 km, leaves a wide gap under the closest rejected placement, at 67.5 km.
+- **The corroboration check has a floor, and the floor is a hole.** A `state|district` bucket
+  holding fewer than 3 known stations passes `gazCorroborated()` unchecked. Refusing there has no
+  evidence behind it, and that invents a check rather than makes one. 8 buckets are that small: 7
+  Kuala Lumpur districts, and Putrajaya, whose only two stations are new placements from this same
+  source — so its own baseline started at zero.
+- **A skipped rainfall bucket understates the seeded history, and nothing marks it.**
+  `seriesParse()` drops a bucket that fails `numOrNull()` or reads negative, which keeps the running
+  sum non-decreasing. `seedRebase()`'s rebasing offset is one constant added across the whole
+  backfilled series, so it cancels out of a window whose two ends sit on the same side of a skipped
+  bucket. It does not cancel out of a window whose ends straddle one, and several skips compound in
+  the same, understating, direction. That is the opposite of this repo's safe way to be wrong, and no
+  `derived` marker communicates it.
 - **Never `file_get_contents()` a JPS URL — always curl.** `infobanjirjps.selangor.gov.my` resolves
   to *two* A records and one of them (`58.27.97.62`) blackholes SYNs. curl races both (happy
   eyeballs) and connects in ~10 ms; PHP's stream wrapper tries addresses serially with no connect
@@ -1989,6 +2076,43 @@ php -l api.php && php -l sources.php                  # lint proxy + scrapers
 
 # Are all three sources actually contributing? parsed:0 means a scraped table moved.
 curl -sk https://flood-exp.test/api.php | php -r 'echo json_encode(json_decode(stream_get_contents(STDIN),true)["sources"]),"\n";'
+
+# The portal migration's accounting. A fall in `applied` means a join broke. A rise in the stations
+# left on an old feed means the portal dropped rows. ASSERT A RANGE, NEVER AN EQUALITY — two fetches
+# an hour apart returned 311 rainfall rows and then 310, and the Selangor page returned 239 on
+# 15 August. A station or two of drift is upstream churn, not a fault.
+curl -sk https://flood-exp.test/api.php | php -r '$p=json_decode(stream_get_contents(STDIN),true);
+$s=$p["sources"]; echo json_encode(["portalrf"=>$s["portalrf"],"national"=>$s["national"],
+  "gaz"=>$s["gaz"],"hist"=>$s["hist"]]),"\n";
+$k=[]; foreach($p["stations"] as $x) $k[$x["kind"]."/".$x["source"]]++;
+ksort($k); echo json_encode($k),"\n";'
+
+# Does the portal's 3 hour window agree with the 3 hour total Selangor publishes for itself? This is
+# the sweep that condemned accHours(): the old sum was out by more than 5 mm on 14 of 176 stations,
+# worst 60 mm. The portal figure must beat that by a wide margin.
+# SCORE IT ON STATIONS WITH RAIN IN THE WINDOW. A dry station agrees with everything, and that is how
+# a rolling field passed for a disjoint one while this was designed.
+curl -sk https://flood-exp.test/api.php | php -r '$p=json_decode(stream_get_contents(STDIN),true);
+$d=[]; foreach($p["stations"] as $s){ if($s["kind"]!=="rainfall")continue;
+ $a=$s["acc"]["h3"] ?? null; if(!$a || $a[0]<=0) continue;   // wet only
+ if(($a[1]??0)===0) continue;                                 // the feed answered, nothing to score
+ $d[]=$a[0]; }
+sort($d); $n=count($d);
+printf("%d wet derived 3h windows, median %.1f mm, p90 %.1f mm\n", $n,
+  $n?$d[(int)($n*.5)]:0, $n?$d[(int)($n*.9)]:0);'
+
+# This migration must not lose any station's reading. The count of rainfall and river stations with
+# a null reading must not rise.
+curl -sk https://flood-exp.test/api.php | php -r '$p=json_decode(stream_get_contents(STDIN),true);
+$n=0; $t=0; foreach($p["stations"] as $s){ if(!in_array($s["kind"],["rainfall","river"]))continue; $t++;
+ $v = $s["kind"]==="rainfall" ? ($s["hourly"]??null) : ($s["level"]??null); if($v===null)$n++; }
+echo "$n of $t river and rainfall stations hold no reading\n";'
+
+# The portal pages must reach sources.stale when they fail, and the map must fall back rather than
+# blank. Expire them, break the URL, force a refresh, and read the key back.
+php -r '$d=new PDO("sqlite:.history.db"); $d->exec("UPDATE page SET ts=0");'
+curl -sk 'https://flood-exp.test/api.php?force=1' \
+  | php -r 'echo json_encode(json_decode(stream_get_contents(STDIN),true)["sources"]["stale"]),"\n";'
 
 php api.php | head -c 400                             # cold fetch (~3s), writes .cache.json
 curl -sk https://flood-exp.test/api.php | php -r '...' # served payload
