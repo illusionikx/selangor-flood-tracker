@@ -75,6 +75,10 @@ jobs:
           # missing (js/ui.js). Copied conditionally so an absent directory can never fail a bake and
           # leave the map frozen on the last deployment over a decoration.
           [ -d img ] && cp -r img site/ || true
+          # ponytail: temporary. The geolocation fault only appears on a machine nobody here has, so
+          # the probe has to reach a deployed origin. No other test file ships. Delete this line and
+          # the file when the fault has a name. Conditional, so a delete can never fail a bake.
+          [ -f geo-test.html ] && cp geo-test.html site/ || true
           # The one line that separates the two builds — see js/config.js.
           sed -i 's/^export const STATIC = false;/export const STATIC = true;/' site/js/config.js
           grep -q 'STATIC = true' site/js/config.js
