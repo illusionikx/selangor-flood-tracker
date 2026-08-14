@@ -198,7 +198,7 @@ camera stampede, and this app has a rule against it.
 Four mitigations, and each one already has a precedent in this repo.
 
 1. **Drip the backfill.** Take at most `PORTAL_FILL` stations per refresh. At 5 per refresh and 4
-   refreshes each hour, 425 stations finish in about 21 hours. No burst reaches the host. A `filled`
+   refreshes each hour, 425 stations complete in about 21 hours. No burst reaches the host. A `filled`
    table names the stations this app already fetched, so the work never repeats.
 2. **Rate limit site-wide.** Reuse `forceAllowed()` with its own window, the same guard `?force=1`
    and `?place=` use. A stamp file caps the rate however many readers arrive at once.
