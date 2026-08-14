@@ -1547,9 +1547,11 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
 - **The app bar wordmark has four spellings and the title rail picks one, so a specificity slip
   draws none of them.** `Klang Valley Flood Watch` → `KV Flood Watch` → `KVFW` → the drop alone, at
   282px, 190px and 94px of `header h1`. That is a **container query and not a media query**, because
-  the rail is what is left after the ticker and the controls, and two things move it that a viewport
-  width cannot see: the ticker is `min(58vw, 656px)`, so it stops growing at 1131px, and below 600px
-  it takes a row of its own and the rail jumps from 0px at 601px to 272px at 600px. The phone rule
+  the rail is what is left after the ticker and the controls, and both of those move on their own.
+  Below 600px the ticker takes a row of its own, so the rail WIDENS as the viewport narrows, from
+  77px at 601px to 272px at 600px — no viewport threshold can follow that. The ticker then proved
+  the rest: it changed from `min(58vw, 656px)` to a flat `40vw`, which moved the rail at every width
+  above 600px, and not one threshold here needed an edit. The phone rule
   that hid the title whole is gone, since the container now measures what that rule assumed.
   `container-type: inline-size` is safe on that flex item because `flex: 1 1 0` with `min-width: 0`
   already takes the width from the flex algorithm and never from the content.

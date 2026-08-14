@@ -1787,10 +1787,18 @@ Decisions:
   *popped*, because with one tile on the belt the item leaving the left edge is the whole strip
   leaving — nothing follows it until the loop restarts. Padding to at least three tiles guarantees a
   neighbour behind whatever is going out.
-- **Fixed width, not content width.** `flex: 0 1 min(58vw, 656px)`. Sized to content the strip grew
+- **Fixed width, not content width.** `flex: 0 1 40vw`. Sized to content the strip grew
   and shrank with the number of alerts, so the header re-laid itself out on every poll and the bar
   was a different shape in a flood than on a calm day. It is a window onto the news; a window does
   not change size with the news.
+
+  **One share of the viewport, and no cap.** It read `min(58vw, 656px)`, which stopped growing at
+  1131px. Above that it held one width across every screen, so the strip took 43% of a 1536px window,
+  34% of a 1920px one and 19% of an ultrawide. A window onto the news does not change size with the
+  news, and that is not a reason to hold one size across every screen.
+
+  A reader judged this on a 1536px window, where the strip held 42.7%. 40% is that share rounded
+  down. It costs 42px there, and it buys a round number and a wider title rail at every width.
 - **Speed scales with the count.** One lap has to show everything, so a fixed pace means waiting a
   minute to find out whether your river is on the list when 40 stations are up. `pace()` ramps
   `PX_PER_SEC` from 45 upward once the count passes `FAST_FROM` (5), capped at 2×: past that the
@@ -1807,8 +1815,8 @@ Decisions:
   lands on the middle of the bar. Three things hold it up, and each one was a wrong turn first:
 
   - **The strip stays in the flow.** `position: absolute; left: 50%` centres it too, and it holds its
-    width whatever else is on the bar — so at about 1024px it draws over the title, because 58vw of
-    ticker leaves 21vw a side and the wordmark needs more than that. A flex item gives way instead.
+    width whatever else is on the bar — so at about 1024px it draws over the title, because a ticker
+    that wide leaves too little a side for the wordmark. A flex item gives way instead.
   - **Neither rail carries `margin-left: auto`.** An auto margin absorbs free space *before*
     flex-grow does, so one on `.hactions` leaves the rails nothing to grow into and the centring
     never happens. `justify-content: flex-end` holds the controls against the right edge instead,
@@ -1822,8 +1830,8 @@ Decisions:
   It fails safely at every width. `min-width` is `auto` on both rails, so neither rail drops under
   its own content — a rail short of room takes what it needs and the strip goes off centre
   rather than running under the title. And a rail with a zero basis has zero shrink weight, so the
-  strip (`flex: 0 1 min(58vw, 656px)`) is the only thing a narrow window takes from. It clips before
-  anything else moves. The wordmark ellipsises after that, which it already did.
+  strip (`flex: 0 1 40vw`) is the only thing a narrow window takes from. It clips before
+  anything else moves. The wordmark then steps down a rung, which it does on the rail's own width.
 - **Hover pauses it** and the items are buttons that jump to the station. A moving target you cannot
   catch is a link that isn't one. Clicks are delegated once, because the strip is rebuilt every poll
   and holds several copies of every station.
@@ -9636,9 +9644,13 @@ Four rungs now, and the rail picks one:
 
 ### Why a container query and not a media query
 
-The rail is not the viewport. Two things move it that a viewport width cannot see. The ticker is
-`min(58vw, 656px)`, so it stops growing at 1131px and the rail starts growing faster. Below 600px
-the ticker takes a row of its own and the rail widens again, from 0px at 601px to 272px at 600px.
+The rail is not the viewport. It is what is left after the ticker and the controls, and both of
+those move on their own. Below 600px the ticker takes a row of its own, so the rail widens as the
+viewport narrows, from 77px at 601px to 272px at 600px. No viewport threshold can follow that.
+
+The ticker settled this a day later. It changed from `min(58vw, 656px)` to a flat `40vw`, which
+moved the rail at every width above 600px. Not one threshold here needed an edit, and
+`title-test.html` went from green to green. A media query needs all three numbers again.
 
 `header h1` is the container. `container-type: inline-size` is safe on it, because `flex: 1 1 0`
 with `min-width: 0` already takes the width from the flex algorithm and never from the content.
