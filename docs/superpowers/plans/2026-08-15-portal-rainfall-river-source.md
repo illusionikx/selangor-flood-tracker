@@ -1025,7 +1025,8 @@ Add to `api.php`, after `rainBacked()` and beside `portalMatch()` from Task 3.
  * Returns the next total, or null where the caller has nothing to store.
  */
 function portalOdo(?float $prevOdo, ?float $prevDaily, ?float $daily, ?float $yesterday): ?float {
-    if ($daily === null) return null;
+    // A negative total is refused the same way a null one is. See the note under this block.
+    if ($daily === null || $daily < 0) return null;
     if ($prevOdo === null || $prevDaily === null) return $daily;
     if ($daily >= $prevDaily) return round($prevOdo + ($daily - $prevDaily), 1);
     // A fall is a reset. Owe nothing rather than subtract where yesterday's column is missing or
@@ -1033,6 +1034,33 @@ function portalOdo(?float $prevOdo, ?float $prevDaily, ?float $daily, ?float $ye
     $owed = max(0.0, ($yesterday ?? $prevDaily) - $prevDaily);
     return round($prevOdo + $owed + $daily, 1);
 }
+```
+
+**A negative daily total is refused, and the reason is that the fault would hide.** The reset branch
+adds `$daily` unclamped, so `portalOdo(100.0, 7.5, -0.1, null)` returns 99.9 against a prior total of
+100.0. `numOrNull()` nulls at or below −9990, which catches the −9999 sentinel and passes every
+smaller negative. Measured on the live feed: 0 of 308 rows carry a negative daily, hourly or
+day-column, so nothing triggers this today.
+
+**It is guarded anyway, because it does not repair itself.** `accWindow()` would null the one window
+that straddles the bad sample, and that reads exactly like the ordinary one-day gap this design
+already accepts and draws as a dash. Meanwhile the running total keeps climbing from the corrupted
+baseline on every later poll, so the station under-reports every future window permanently and in
+silence. A fault disguised as an accepted degradation is worse than one that shows.
+
+**Refuse rather than clamp to zero.** Zero takes the reset branch and adds `$owed`, which invents a
+midnight that did not happen. Refusing stores no sample, so the series keeps its last good value and
+the next good reading continues from there — the shape `numOrNull()` already uses for a sentinel.
+`$yesterday` needs no guard because `max(0.0, ...)` already clamps it, and `$prevDaily` can never be
+negative once this refuses to store one.
+
+Four more assertions cover it and the untested half of the restart branch:
+
+```php
+    $ok('a negative daily is refused',       portalOdo(100.0, 7.5, -0.1, null) === null);
+    $ok('a large negative is refused too',   portalOdo(100.0, 7.5, -9999.0, 9.0) === null);
+    $ok('a missing previous total restarts', portalOdo(null, 7.5, 3.0, null) === 3.0);
+    $ok('a missing previous daily restarts', portalOdo(100.0, null, 3.0, null) === 3.0);
 ```
 
 - [ ] **Step 4: Run the test to verify it passes**
