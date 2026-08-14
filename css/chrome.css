@@ -74,15 +74,19 @@ header .hactions {
 
      One share of the viewport and no cap. It read `min(58vw, 656px)`, which stopped growing at
      1131px and then held one width across every screen above that — so the strip took 43% of a
-     1536px window, 34% of a 1920px one and 19% of an ultrawide. 1536 is the width this was judged
-     on, where the strip held 42.7%, and 40% is that share rounded down. It costs 42px there and
-     buys a round number and a wider title rail at every width.
+     1536px window, 34% of a 1920px one and 19% of an ultrawide.
 
-     The number is not free. Both rails are what is left after this strip, so widening it narrows the
-     title rail, and the title rail is what picks the wordmark spelling — see `header h1` above and
-     re-run title-test.html after moving this. Below 600px the strip takes a row of its own and none
-     of this applies. */
-  flex: 0 1 40vw; min-width: 0;
+     Half the viewport, picked by a reader on a 1536px window. That is wider than the 42.7% the
+     capped rule gave that window, so this is a deliberate share and not the old number carried over.
+     40% was measured beside it and lost.
+
+     The number is not free, and a move here is measured on both candidates. Both rails are what is
+     left after this strip, so widening it narrows the title rail, and the title rail is what picks
+     the wordmark spelling. At 50% the full title survives to 1400px and a 700px window
+     draws the drop alone. At 40% the full title reaches 1200px and 700px draws `KVFW`. See
+     `header h1` above, and re-run title-test.html after moving this. Below 600px the strip takes a
+     row of its own and none of this applies. */
+  flex: 0 1 50vw; min-width: 0;
   /* The header's own padding is 8px on the left and 16px on the right, because the logo sits closer
      to the edge than the buttons do. Equal rails therefore centre the strip in that box, which is
      4px left of the viewport's middle. This 8px splits between the two rails and moves the strip

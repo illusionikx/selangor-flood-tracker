@@ -1550,8 +1550,9 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   the rail is what is left after the ticker and the controls, and both of those move on their own.
   Below 600px the ticker takes a row of its own, so the rail WIDENS as the viewport narrows, from
   77px at 601px to 272px at 600px — no viewport threshold can follow that. The ticker then proved
-  the rest: it changed from `min(58vw, 656px)` to a flat `40vw`, which moved the rail at every width
-  above 600px, and not one threshold here needed an edit. The phone rule
+  the rest: it changed from `min(58vw, 656px)` to a flat `50vw`, with a `40vw` candidate in and out
+  beside it. Each move changed the rail at every width above 600px, and not one threshold here
+  needed an edit. The phone rule
   that hid the title whole is gone, since the container now measures what that rule assumed.
   `container-type: inline-size` is safe on that flex item because `flex: 1 1 0` with `min-width: 0`
   already takes the width from the flex algorithm and never from the content.
