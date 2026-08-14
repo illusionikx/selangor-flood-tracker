@@ -2619,6 +2619,14 @@ foreach ($stations as &$s) {
 }
 unset($s);
 
+/* `pdays` rides on a station between the override pass and the block above, and no browser may
+   ever see it. The block above drops it for every station it processes, and it skips a station
+   holding no hourly reading, so this pass closes that gap. Widening the gate above instead would
+   run the history body on a null reading, and `(float) null` would store a fabricated 0.0 mm
+   sample on a gauge that reported nothing. */
+foreach ($stations as &$s) unset($s['pdays']);
+unset($s);
+
 // --- Gauge history -----------------------------------------------------------------------------
 // Depth over a flood-prone spot is a level like any other, so it takes the same table, window and
 // bucket as a river. A line between two readings is honest: the water really was in between. No
@@ -2847,7 +2855,9 @@ $payload = json_encode([
         'metday'   => ['parsed' => count($metDay), 'matched' => $metDayMatched],
         'metwarn'  => ['parsed' => count($metWarn)],
         // `parsed` is the alarm for a layout change. `applied` is how many stations took a portal
-        // reading. `clash` names every station two rows claimed — the code row won each one.
+        // reading. `clash` counts every ambiguity portalMatch() logs: a code two rows or two
+        // stations share, a name two rows share, a code match overriding a weaker name match on
+        // one station, and two stations claiming one row.
         'portalrf' => ['parsed' => count($prf), 'applied' => $prfUsed,
                        'clash'  => count($prfHit['clash'])],
         // Empty on a healthy poll. A key here names a table the map is drawing from a stored copy.
