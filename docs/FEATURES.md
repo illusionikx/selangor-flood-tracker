@@ -1816,9 +1816,15 @@ Decisions:
   It is a divider and not an item. It sits after the map that inserts the advisory, so
   `i % ADVISE_EVERY` cannot land on it.
 
-  It is a `<span>` with no `data-go` and no `data-banner`, so nothing opens. It keeps the muted
-  colour throughout and takes no hover, because it is the one tile on the strip that reports
-  nothing. `MIN_TILES` counts it, the same as every other tile on the belt.
+  It is a `<span>` with no `data-go` and no `data-banner`, so nothing opens, and it restates both
+  halves of `.tk-i:hover b` so a pointer neither tints nor underlines it.
+
+  It draws the same lockup as the app bar and the splash. Plain text, then a `<b>` at weight 500 in
+  the accent, with the drop in the accent beside it. The name is one `<span>` and not two flex
+  items, because `.tk-i` is a flex row with a 6px gap, and a bare text node beside a `<b>` takes
+  that gap instead of an ordinary word space.
+
+  `MIN_TILES` counts it, the same as every other tile on the belt.
 - **Speed scales with the count.** One lap has to show everything, so a fixed pace means waiting a
   minute to find out whether your river is on the list when 40 stations are up. `pace()` ramps
   `PX_PER_SEC` from 45 upward once the count passes `FAST_FROM` (5), capped at 2×: past that the

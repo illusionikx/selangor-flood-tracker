@@ -154,9 +154,12 @@ export function ticker() {
 
      It sits after the map rather than inside `items`, so the advisory's `i % ADVISE_EVERY` cannot
      land on it, and it is a `<span>` with no `data-go` and no `data-banner`, so nothing opens.
-     Muted, because it is the one tile on the strip that reports nothing. */
+
+     Same lockup as the app bar and the splash: plain text, then a `<b>` the accent colour picks up.
+     The name is one `<span>` and not two flex items, because `.tk-i` is a flex row with a 6px gap
+     and a bare text node beside a `<b>` would take that gap instead of an ordinary word space. */
   const brand = `<span class="tk-i tk-brand"><i class="i i-flood"></i>
-      <b>Klang Valley Flood Watch</b><span class="tk-dot">•</span></span>`;
+      <span>Klang Valley <b>Flood Watch</b></span><span class="tk-dot">•</span></span>`;
 
   const set = items.map((tile, i) => i % ADVISE_EVERY === 0 ? advise + tile : tile).join('') + brand;
   run.style.removeProperty('--dur');
