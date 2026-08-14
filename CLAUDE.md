@@ -444,11 +444,15 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   source — so its own baseline started at zero.
 - **A skipped rainfall bucket understates the seeded history, and nothing marks it.**
   `seriesParse()` drops a bucket that fails `numOrNull()` or reads negative, which keeps the running
-  sum non-decreasing. `seedRebase()`'s rebasing offset is one constant added across the whole
-  backfilled series, so it cancels out of a window whose two ends sit on the same side of a skipped
-  bucket. It does not cancel out of a window whose ends straddle one, and several skips compound in
-  the same, understating, direction. That is the opposite of this repo's safe way to be wrong, and no
-  `derived` marker communicates it.
+  sum non-decreasing. The drop happens before `seedRebase()`'s accumulator ever sees the bucket. So
+  `$run` sits short by that bucket's rain from that point forward. The shortfall lives in the running
+  sum, not in the offset. The offset is one constant, computed once per station and added to every
+  point. It cancels out of any window, skip or no skip — the identical rule `sources.php`'s own
+  comment on `seedRebase()` already states. A window with both ends on the same side of a skipped
+  bucket still nets the shortfall out, because both ends carry the same short `$run`. A window
+  straddling the skip does not, because only the later end has absorbed the loss, and several skips
+  compound in the same, understating, direction. That is the opposite of this repo's safe way to be
+  wrong, and no `derived` marker communicates it.
 - **Never `file_get_contents()` a JPS URL — always curl.** `infobanjirjps.selangor.gov.my` resolves
   to *two* A records and one of them (`58.27.97.62`) blackholes SYNs. curl races both (happy
   eyeballs) and connects in ~10 ms; PHP's stream wrapper tries addresses serially with no connect
@@ -2087,9 +2091,12 @@ $s=$p["sources"]; echo json_encode(["portalrf"=>$s["portalrf"],"national"=>$s["n
 $k=[]; foreach($p["stations"] as $x) $k[$x["kind"]."/".$x["source"]]++;
 ksort($k); echo json_encode($k),"\n";'
 
-# Does the portal's 3 hour window agree with the 3 hour total Selangor publishes for itself? This is
-# the sweep that condemned accHours(): the old sum was out by more than 5 mm on 14 of 176 stations,
-# worst 60 mm. The portal figure must beat that by a wide margin.
+# The spread of derived 3 hour rainfall windows, on stations with rain. This is a sanity check on
+# the derivation, not a comparison against a referee.
+# `api.php` reads `hour3`, the 3 hour total Selangor publishes for itself. It unsets that field
+# before the payload ships, so no sweep can see it.
+# A different check condemned the old summed approach, scored against that hidden figure before it
+# shipped. `accHours()` was out by more than 5 mm on 14 of 176 stations, worst 60 mm.
 # SCORE IT ON STATIONS WITH RAIN IN THE WINDOW. A dry station agrees with everything, and that is how
 # a rolling field passed for a disjoint one while this was designed.
 curl -sk https://flood-exp.test/api.php | php -r '$p=json_decode(stream_get_contents(STDIN),true);
@@ -2108,8 +2115,11 @@ $n=0; $t=0; foreach($p["stations"] as $s){ if(!in_array($s["kind"],["rainfall","
  $v = $s["kind"]==="rainfall" ? ($s["hourly"]??null) : ($s["level"]??null); if($v===null)$n++; }
 echo "$n of $t river and rainfall stations hold no reading\n";'
 
-# The portal pages must reach sources.stale when they fail, and the map must fall back rather than
-# blank. Expire them, break the URL, force a refresh, and read the key back.
+# Expires every cached page and forces a rebuild.
+# This demonstrates recovery, not failure. All three `prf-` keys reach `sources.stale` only when a
+# fetch fails. An empty result here shows the pages refetched cleanly on the forced refresh.
+# To test the failure path by hand: change one character in `PRF`. Expire the pages and force a
+# refresh. Confirm all three `prf-` keys land in `sources.stale`. Then restore `PRF`.
 php -r '$d=new PDO("sqlite:.history.db"); $d->exec("UPDATE page SET ts=0");'
 curl -sk 'https://flood-exp.test/api.php?force=1' \
   | php -r 'echo json_encode(json_decode(stream_get_contents(STDIN),true)["sources"]["stale"]),"\n";'
