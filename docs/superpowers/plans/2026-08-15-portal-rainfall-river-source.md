@@ -1027,7 +1027,15 @@ Add to `api.php`, after `rainBacked()` and beside `portalMatch()` from Task 3.
 function portalOdo(?float $prevOdo, ?float $prevDaily, ?float $daily, ?float $yesterday): ?float {
     // A negative total is refused the same way a null one is. See the note under this block.
     if ($daily === null || $daily < 0) return null;
-    if ($prevOdo === null || $prevDaily === null) return $daily;
+    if ($prevOdo === null) return $daily;     // a station with no total starts at today's figure
+    /* A running total with no previous daily reading beside it. This app cannot work out the
+       increment, so it holds the total rather than restarting it. Restarting writes a small number
+       after a large one, accWindow() reads that as a total going backwards, and every long window
+       on that station answers null until the old values age out. The case is the deploy itself:
+       before this change a Selangor station stored a year-to-date odometer here, and the first poll
+       after it has no daily reading to measure against. Holding costs one poll of rain, once. The
+       same poll stores the daily figure, so the next one measures normally. */
+    if ($prevDaily === null) return $prevOdo;
     if ($daily >= $prevDaily) return round($prevOdo + ($daily - $prevDaily), 1);
     // A fall is a reset. Owe nothing rather than subtract where yesterday's column is missing or
     // sits below what this app already counted from it.
@@ -1060,7 +1068,7 @@ Four more assertions cover it and the untested half of the restart branch:
     $ok('a negative daily is refused',       portalOdo(100.0, 7.5, -0.1, null) === null);
     $ok('a large negative is refused too',   portalOdo(100.0, 7.5, -9999.0, 9.0) === null);
     $ok('a missing previous total restarts', portalOdo(null, 7.5, 3.0, null) === 3.0);
-    $ok('a missing previous daily restarts', portalOdo(100.0, null, 3.0, null) === 3.0);
+    $ok('a total with no daily is held',     portalOdo(100.0, null, 3.0, null) === 100.0);
 ```
 
 - [ ] **Step 4: Run the test to verify it passes**
