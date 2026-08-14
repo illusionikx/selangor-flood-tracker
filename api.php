@@ -1144,6 +1144,50 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
     $ok('a gauge reads its own detail first',
         stationUpdated(['statusLastUpdate' => 'fg'], [], 'gauge', 7, $seen) === 'fg');
 
+    echo "\nportalRain():\n";
+    /* The live page's own shape: an empty row, stray closing tags, then bare cell runs. A fixture
+       that supplies the missing <tr> would test a page this upstream does not serve. */
+    $prfFixture = "<table><tbody><tr></tr></tr></tr>"
+        . "<td data-th='No'>1</td><td data-th='Station ID'>0232331RF</td>"
+        . "<td>S.M.K Bandar Kinrara (F2)</td><td>Petaling</td><td>15/08/2026 00:00:00</td>"
+        . "<td>0.0</td><td>0.0</td><td>2.5</td><td>0.0</td><td>0.0</td><td>7.5</td>"
+        . "<td><a href='/index.php/rf-graph/?stationid=27398'>7.5</a></td>"
+        . "<td class='info'>0.0</a></td></tr>"
+        // A row with no code, no graph link and a -9999 hour. All three happen upstream.
+        . "<td data-th='No'>2</td><td data-th='Station ID'></td>"
+        . "<td>Jave Setia (F2)</td><td>Petaling</td><td>15/08/2026 00:00:00</td>"
+        . "<td>0.0</td><td>0.0</td><td>0.0</td><td>0.0</td><td>0.0</td><td>5.0</td>"
+        . "<td>5.0</td><td class='info'>-9,999.00</td></tr>"
+        // Twelve cells. A row this shape is a layout change, and it must be dropped.
+        . "<td>x</td><td>x</td><td>x</td><td>x</td><td>x</td><td>x</td>"
+        . "<td>x</td><td>x</td><td>x</td><td>x</td><td>x</td><td>x</td></tr>"
+        . "</tbody></table>";
+
+    $prf = portalRain(['prf-SEL' => $prfFixture]);
+    $ok('two rows survive the width guard',  count($prf) === 2);
+    $ok('the code comes off data-th',        $prf[0]['code'] === '0232331RF');
+    $ok('the name is cell 2',                $prf[0]['name'] === 'S.M.K Bandar Kinrara (F2)');
+    $ok('the district is cell 3',            $prf[0]['district'] === 'Petaling');
+    $ok('the stamp is normalised',           $prf[0]['updated'] === '15/08/2026 00:00:00');
+    /* The mapping the header block gets wrong. Cell 11 is today and cell 12 is the hour. Read in
+       header order they land one column left, which puts today's total under last Tuesday's date. */
+    $ok('cell 11 is the day, not a daily column', $prf[0]['daily'] === 7.5);
+    $ok('cell 12 is the hour',               $prf[0]['hourly'] === 0.0);
+    $ok('the six daily columns are kept',    $prf[0]['days'] === [0.0, 0.0, 2.5, 0.0, 0.0, 7.5]);
+    $ok('yesterday is the last of the six',  end($prf[0]['days']) === 7.5);
+    $ok('the graph id comes off the link',   $prf[0]['graphId'] === 27398);
+    $ok('a missing code is null',            $prf[1]['code'] === null);
+    $ok('a missing graph link is null',      $prf[1]['graphId'] === null);
+    $ok('-9999 is no reading',               $prf[1]['hourly'] === null);
+    $ok('an empty page yields nothing',      portalRain(['prf-SEL' => '']) === []);
+    /* The form the endpoint serves without its two hidden inputs. It holds a table and no row, so
+       pageHasData() lets it through and the parser has to answer for it. */
+    $ok('a form page yields nothing',        portalRain(['prf-SEL' => '<table><tbody></tbody></table>']) === []);
+
+    echo "\nportalRainUrls():\n";
+    $ok('three states, three keys',          array_keys(portalRainUrls()) === ['prf-SEL', 'prf-WLH', 'prf-PTJ']);
+    $ok('the hidden inputs ride in the url', str_contains(portalRainUrls()['prf-SEL'], 'loginStatus=0&language=1'));
+
     echo "\naccWindow():\n";
     $odo = [[$now - 80 * 3600, 1000.0], [$now - 72 * 3600, 1010.0],
             [$now - 24 * 3600, 1050.0], [$now, 1080.0]];

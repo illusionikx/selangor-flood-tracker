@@ -173,6 +173,83 @@ function klLatLng(Crawler $nameCell): array {
     return [null, null];
 }
 
+/* The national portal's rainfall table. Three requests, one per state, and the two hidden inputs
+   the search form carries. Without `loginStatus` and `language` the endpoint returns the form
+   itself, which is why CLAUDE.md recorded this endpoint as returning no rows. */
+const PRF = 'https://publicinfobanjir.water.gov.my/wp-content/themes/shapely/agency/searchresultrainfall.php';
+
+function portalRainUrls(array $states = ['SEL', 'WLH', 'PTJ']): array {
+    $u = [];
+    foreach ($states as $s) {
+        $u['prf-' . $s] = PRF . '?state=' . $s . '&district=ALL&station=ALL&loginStatus=0&language=1';
+    }
+    return $u;
+}
+
+/* Rows of exactly 13 cells, as [cell text, the cells themselves].
+ *
+ * NO DATA ROW ON THIS PAGE CARRIES AN OPENING <tr>. The tbody holds one empty row, then about 31
+ * stray closing tags, then every row as a bare run of <td> cells ending in </tr>. Both parsers drop
+ * a cell that sits outside a row, so crawl()->filter('tr') finds 4 elements here and none of them
+ * holds a td child. The existing wrap cannot help: it supplies a missing table, and this page is
+ * missing its rows instead.
+ *
+ * So the body is split on the closing tag and each chunk is wrapped as a row of its own. That is a
+ * repair, and a repair needs a check that the shape it produced is the shape expected — which is
+ * what the 13-cell guard is. Measured on the live Selangor page: 239 chunks, all 13 cells.
+ *
+ * 13 and not 14. The header block names 14 columns at colspan 1 and every data row holds 13 cells,
+ * so a parser that trusts the headers reads every value one column to the left in silence. */
+function portalRows(string $html): array {
+    global $text;
+    $out = [];
+    foreach (explode('</tr>', $html) as $chunk) {
+        if (!str_contains($chunk, '<td')) continue;
+        $tds = crawl('<tr>' . $chunk . '</tr>')->filter('tr')->children('td');
+        if (count($tds) !== 13) continue;
+        $out[] = [$tds->each($text), $tds];
+    }
+    return $out;
+}
+
+/* Portal rainfall stations, one entry per row.
+ *
+ * 0 no. · 1 code · 2 name · 3 district · 4 updated · 5-10 six daily totals OLDEST first
+ * 11 rainfall from midnight (today) · 12 total 1 hour (now)
+ *
+ * Only cells 0 and 1 carry `data-th`, so the rest are read by position under the width guard, the
+ * same rule the SPHTN parser obeys. The mapping is measured, not read off the headers: against JPS
+ * on the 150 stations that join, cell 12 matches the hourly reading on 96% and cell 11 matches the
+ * daily on 95%. Read in header order those fall to 49% and 23%.
+ *
+ * `days` keeps all six because the last of them is yesterday's whole total, which is what bridges a
+ * midnight in the running total. See portalOdo() in api.php.
+ *
+ * `graphId` rides in cell 11's link and is the key the 7 day series takes. A row without the link
+ * keeps a null id and simply takes no history backfill. */
+function portalRain(array $pages): array {
+    $out = [];
+    foreach ($pages as $html) {
+        if (!$html) continue;
+        foreach (portalRows($html) as [$c, $tds]) {
+            $days = [];
+            for ($i = 5; $i <= 10; $i++) $days[] = numOrNull($c[$i]);
+            $href = $tds->eq(11)->filter('a')->count() ? ($tds->eq(11)->filter('a')->attr('href') ?? '') : '';
+            $out[] = [
+                'code'     => ($c[1] ?? '') === '' ? null : $c[1],
+                'name'     => $c[2],
+                'district' => $c[3],
+                'updated'  => myTime($c[4] ?? ''),
+                'days'     => $days,
+                'daily'    => numOrNull($c[11]),
+                'hourly'   => numOrNull($c[12]),
+                'graphId'  => preg_match('/stationid=(\d+)/', $href, $m) ? (int)$m[1] : null,
+            ];
+        }
+    }
+    return $out;
+}
+
 /** Water-level status from thresholds: the scraped feeds publish values, not a status code. */
 function wlStatus(?float $lvl, ?float $alert, ?float $warning, ?float $danger): int {
     if ($lvl === null) return -1;

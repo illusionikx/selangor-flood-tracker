@@ -10,6 +10,7 @@ lib/
 .siren.stamp
 .cam/
 .cams.json*
+.prf.json
 shots/
 .superpowers/
 .php-error.log
