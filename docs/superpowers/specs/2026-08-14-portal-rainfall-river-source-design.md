@@ -291,8 +291,10 @@ Each check below fails loudly if the thing it guards breaks.
    "updated" means a join broke. A rise in "kept on the old feed" means the portal dropped rows.
    **Allow a station or two of drift.** Two fetches an hour apart returned 311 Selangor rainfall
    rows and then 310. Assert a range, never an equality.
-2. **The bucket identity.** Assert that twelve `clean` values equal `chourly` and that `clean` from
-   midnight equals `cdaily`. This is what licenses adding them.
+2. **The bucket identity.** Assert that twelve `raw` values equal `chourly` and that `raw` from
+   midnight equals `cdaily`. This is what licenses adding them. **The field is `raw`.** This rule
+   named `clean` until the correction above reached it, and a check on `clean` asserts that one
+   rolling hour equals itself.
 3. **Window agreement.** Compare the portal 3 hour window against the 3 hour total Selangor
    publishes for itself, on every station carrying both. The current sum is out by more than 5 mm on
    14 of 176. The portal figure must beat that by a wide margin or the migration is wrong.
