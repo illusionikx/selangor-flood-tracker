@@ -40,6 +40,10 @@ them comes off a document.
 | `…/themes/enlighten/query/searchstation_control.php` | about 35, once | coordinates for 2,513 stations |
 | `…/themes/enlighten/query/getrainfalllast7days.php` | 1 per station, once | 7 days of 5 minute buckets |
 
+An independent source confirms the column mapping below. On the 150 stations that join, the
+`Total 1 Hour` cell equals the JPS hourly reading on 96% of them. The `Rainfall from Midnight` cell
+equals the JPS daily on 95%. Read in header order instead, those two figures fall to 49% and 23%.
+
 ### The rainfall table
 
 `CLAUDE.md` records that this endpoint returns headers and no rows. That is wrong. It returns the
@@ -67,8 +71,17 @@ labelled with last Tuesday's date.
 
 ### Rainfall from Midnight is a per-day odometer
 
-`cdaily` only climbs and resets at midnight. So `accWindow()` computes an exact window from it with
-no new arithmetic. The six daily columns bridge each midnight the window crosses.
+`cdaily` climbs through a day and resets to zero at the start of the next. So `accWindow()` computes
+an exact window from it with no new arithmetic. The six daily columns bridge each midnight the
+window crosses.
+
+**The reset lands at 00:05, not 00:00.** The 00:00 record still carries the previous day's total.
+Group a day from 00:05, or the last reading of each day lands in the wrong one.
+
+**A mid-day reset happens, and the existing guard is the right answer.** Measured over 12 stations
+and 20,717 records across 5 days: 19 drops at the midnight boundary, which is the reset, and 3
+drops in mid-day, which is about one per station per 20 days. `accWindow()` already returns null on
+a backwards odometer. A null window on the rare glitch beats a wrong number, so add nothing.
 
 ### The 5 minute series
 
@@ -252,11 +265,15 @@ Each check below fails loudly if the thing it guards breaks.
 
 1. **Station accounting.** A sweep that prints the six numbers in the table above. A fall in
    "updated" means a join broke. A rise in "kept on the old feed" means the portal dropped rows.
+   **Allow a station or two of drift.** Two fetches an hour apart returned 311 Selangor rainfall
+   rows and then 310. Assert a range, never an equality.
 2. **The bucket identity.** Assert that twelve `clean` values equal `chourly` and that `clean` from
    midnight equals `cdaily`. This is what licenses adding them.
 3. **Window agreement.** Compare the portal 3 hour window against the 3 hour total Selangor
    publishes for itself, on every station carrying both. The current sum is out by more than 5 mm on
    14 of 176. The portal figure must beat that by a wide margin or the migration is wrong.
+   **Score every check of this kind on stations with rain in the window.** A dry station agrees with
+   everything, and that is how a rolling field passed for a disjoint one during this design.
 4. **`sources.stale`.** The two new page keys must appear there when the portal fails, and the map
    must fall back rather than blank.
 5. **No station loses a reading.** Count stations with a null reading before and after. The number
