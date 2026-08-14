@@ -9029,8 +9029,14 @@ short. A difference over a shorter span says exactly how short it is.
 `derived` became a ladder of three rungs rather than a flag. 0 means the number came off a feed.
 1 means this app worked it out over the whole window. 2 means it worked it out over less.
 
-The card prints one asterisk per rung. `24 h**` carries a footnote with the hour the measurement
-starts from. The readout on the column repeats it.
+The card prints one asterisk per rung, and `24 h**` carries a footnote saying the records cover less
+than the full period. The readout on the column gives the span it did cover.
+
+Neither one names a clock time. An early version printed the hour the records start at, in the
+footnote and again in the readout. A reader cut it. The shortfall is the fact that changes how to read
+the number, and the hour this particular server first stored an odometer reading is a fact about the
+server. `accFrom` still rides on the station, because the chart reads whether it is there. Nothing
+prints its value.
 
 `$partial` is false by default, and `rainBacked()` depends on that default. It asks whether an hour
 of claimed rain reached the odometer. A window narrower than that hour calls live rain faulty. A
@@ -9080,11 +9086,16 @@ to reach back far enough. A Kuala Lumpur gauge waits for nothing. SPHTN publishe
 `cumulativeRainfall`, so 38 of 231 rain gauges have no running total to subtract and never will.
 Both look identical on the plot.
 
-The readout now separates them. `Not measured. Records start 13 Aug, 19:11.` stands against
-`Not measured. This gauge reports no running total.`
+The readout now separates them. A bare `Not measured.` stands against `Not measured. This gauge
+reports no running total.`
 
-The station carries one new field, `accFrom`. It holds the oldest odometer sample the station has.
-Its presence answers which state a station is in, and its value dates any short window on that card.
+The station carries one new field, `accFrom`, holding the oldest odometer sample it has. Only its
+presence matters. A gauge with no running total holds no such sample, and that is the whole test.
+
+The waiting half of this is close to unreachable now, and that is worth knowing before somebody
+deletes it. Two distinct odometer samples are enough to answer both windows over a short span, so a
+Selangor gauge stops waiting on its second stored reading. What is left is the permanent case and a
+frozen station, and a frozen station draws no chart at all.
 
 Only the two long windows get a reason. The other three come straight off a feed, and the feed
 published none of them.

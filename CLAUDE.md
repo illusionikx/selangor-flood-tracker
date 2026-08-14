@@ -427,6 +427,13 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   short. On the 2026-08-14 16:20 poll, 180 stations of 231 answer both windows over one span, which is
   every Selangor gauge that can answer at all. The earliest record is the earliest record, and a dash
   tells a reader nothing. The mark and the span in the readout carry the shortfall on each column.
+  **Neither surface names a clock time, and an early version named it twice.** The footnote printed
+  `Measured from 13 Aug, 19:11` and the readout repeated it. A reader cut both. The shortfall changes
+  how to read the number, and the hour this one server first stored an odometer reading does not.
+  `accFrom` still rides on every station with a running total, because the card tests whether the key
+  is THERE — that is what separates a permanent dash from a waiting one. Nothing prints its value, so
+  do not delete the field on the strength of that. `MYT_WHEN` in `popup.js` existed only to format it
+  and is gone.
   **Two filters tried to suppress the pair and both are gone. Do not build a third.** The first
   was a floor in hours: a partial had to cover more ground than the fixed window under it. The live
   payload broke it at once, because a floor compares one span to a constant and the fault is two spans

@@ -708,16 +708,6 @@ const MYT_CLOCK = new Intl.DateTimeFormat('en-GB', {
   timeZone: 'Asia/Kuala_Lumpur', hour: '2-digit', minute: '2-digit', hour12: false,
 });
 
-/* The same clock with a date on it, for a time that may not be today. Both graphs span 12 hours at
-   most, so MYT_CLOCK alone is unambiguous on either of them. The accumulation chart's baseline is
-   not: a short 72 hour window starts up to three days back, and `18:30` on its own names one hour
-   out of three candidates. Used nowhere else — a timestamp inside a 12 hour window keeps the
-   shorter form, because a date on it is noise. */
-const MYT_WHEN = new Intl.DateTimeFormat('en-GB', {
-  timeZone: 'Asia/Kuala_Lumpur', day: 'numeric', month: 'short',
-  hour: '2-digit', minute: '2-digit', hour12: false,
-});
-
 // Tick spacings, coarsening until about five fit across the axis. All divide an hour evenly, so a
 // tick always lands on a round clock time rather than an arbitrary offset from the first reading.
 const TICK_STEPS = [900, 1800, 3600, 7200, 10800];   // 15m · 30m · 1h · 2h · 3h
@@ -1080,9 +1070,11 @@ export function rainBars(points) {
    A window with no honest answer keeps its column and prints an em dash over an empty one, so the
    five are always in the same place and nobody has to work out which went missing. An asterisk
    marks a total this app worked out rather than read off a feed, and a second one marks a window it
-   worked out over less ground than the label names. `from` is the oldest odometer sample this
-   station holds, which is the baseline of any such window — and its absence is what separates a
-   gauge that publishes no running total from one this archive has not caught up with. */
+   worked out over less ground than the label names. Neither mark carries a clock time, and that is
+   deliberate: the shortfall is the fact a reader needs, and the hour the records happen to start is
+   plumbing. `from` is `accFrom`, the oldest odometer sample this station holds, and only its PRESENCE
+   is read — a gauge that publishes no running total has none, which is the one distinction the chart
+   cannot draw for itself. Do not print its value. */
 export function rainAcc(acc, from) {
   if (!acc) return '';
   const rows = ACC_ROWS.map(([k, label]) => [k, label, acc[k]]);
@@ -1096,7 +1088,6 @@ export function rainAcc(acc, from) {
   const hi    = Math.max(...rows.map(([, , r]) => r ? r[0] : 0)) || 1;
   const star  = rows.some(([, , r]) => r && r[1]);
   const short = rows.some(([, , r]) => r && r[1] > 1);
-  const at    = from ? MYT_WHEN.format(from * 1000) : '';
 
   /* Two grids of the same five columns, and they line up because they share a column count, a gap
      and a padding. Neither measures the other.
@@ -1119,17 +1110,17 @@ export function rainAcc(acc, from) {
      one is waiting and the other is permanent. The readout is where that belongs, the same way the
      measured span belongs there rather than on the plot. */
   const blank = (k, label) => `${label} · Not measured.${
-    !ODO[k] ? '' : at ? ` Records start ${at}.` : ' This gauge reports no running total.'}`;
+    ODO[k] && !from ? ' This gauge reports no running total.' : ''}`;
 
   const col = ([k, label, r]) => {
     if (!r) return `<div class="acccol" data-tip="${blank(k, label)}"><b class="muted">—</b></div>`;
-    const [mm, prov, span] = r;
+    const [, , span] = r, mm = r[0];
     /* The measured span rides in the readout rather than on the chart. It answers "why does this
        say 24 hours when the archive has a hole in it", which is a question you go looking for
-       rather than something to read at a glance. A short window adds the hour it starts from, so
-       the reader can see which end moved — the far one, never the near one. */
-    const tip = `${label} · ${mm} mm${span ? ` · measured over ${span} h` : ''}${
-      prov > 1 && at ? ` from ${at}` : ''}`;
+       rather than something to read at a glance. The span is the whole of what a short window has
+       to add — it already says the measurement fell short, and by how much. The clock time it
+       started at answers nothing a reader asked. */
+    const tip = `${label} · ${mm} mm${span ? ` · measured over ${span} h` : ''}`;
     return `<div class="acccol" data-tip="${tip}"><b>${mm}<small> mm</small></b><i style="height:${
       (mm / hi * 100).toFixed(1)}%"></i></div>`;
   };
@@ -1144,11 +1135,12 @@ export function rainAcc(acc, from) {
     <div class="accx">${rows.map(([, label, r]) =>
       `<span>${label}${r && r[1] ? `<sup>${'*'.repeat(r[1])}</sup>` : ''}</span>`).join('')}</div>
     ${star ? '<div class="muted">* Value derived from archived readings.</div>' : ''}
-    ${/* The shortfall leads, because that is the claim the mark makes — the date is the fact behind
-          it. Both long windows carry this mark together on a young archive: they anchor to the same
-          earliest record, so they draw one number twice, and the remark is what says why. */''}
-    ${short ? `<div class="muted">** Records cover less than the full period.${
-      at ? ` Measured from ${at}.` : ''}</div>` : ''}
+    ${/* One sentence, and no clock time. The shortfall is the claim the mark makes, and the hour the
+          records start at is a fact about this server rather than about rain. Both long windows carry
+          this mark together on a young archive: they anchor to the same earliest record, so they draw
+          one number twice, and the remark is what says why. The per-column readout carries the span,
+          which is where a reader who wants the size of the shortfall goes. */''}
+    ${short ? '<div class="muted">** Records cover less than the full period.</div>' : ''}
   </div>`;
 }
 

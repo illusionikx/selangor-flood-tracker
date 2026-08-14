@@ -102,11 +102,12 @@ function soak(s, mm) {
   s.status = rainCode(mm);
   s.history = rainRamp(mm);
   s.acc = stormAcc(s, mm);
-  /* The hour a short window starts from, which the chart names in its footnote and in the readout
-     on the column. `reachOf()` decides how far back this station's records go, so the same number
-     shapes the window and dates it — a footnote reading `Measured from 06:30` over a column marked
-     `measured over 40 h` is the drift this whole function exists to stop. 80 h is past every
-     window, so a station with a full archive states no short window and needs no date. */
+  /* The oldest odometer sample this station would hold. `reachOf()` decides how far back its records
+     go, so the same number shapes the two long windows and supplies this field. The card prints no
+     clock time from it and reads only whether the key is there — but a fake that left it out would
+     put every gauge in the KL state and draw `This gauge reports no running total` over two columns
+     that are answering fine. 80 h is past every window, so a station with a full archive states no
+     short window at all. */
   s.accFrom = Math.floor(Date.now() / 1000) - (reachOf(s) || 80) * 3600;
   /* Faked rain is rain the odometer saw. Without this the fake inherits whatever `rainBacked()`
      said about the real reading, so the four gauges measured stuck on 2026-08-14 would draw a storm

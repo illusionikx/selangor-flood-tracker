@@ -962,7 +962,7 @@ function placeParam(mixed $v): string {
  * $partial opts a caller into a SHORT window. With no sample at or before the far end, the
  * measurement runs from the oldest sample there is, and the third return element says so. That is
  * still a difference and it still cannot lose rain. It covers less ground than the window names, so
- * the card prints a second asterisk on it and the readout gives the hour it starts from. A window
+ * the card prints a second asterisk on it and the readout gives the span it really covered. A window
  * this app measured over 20.9 h and labelled beats an em dash for the two days the archive takes to
  * fill.
  *
@@ -2277,7 +2277,7 @@ foreach ($stations as &$s) {
        [mm, derived, spanHours], and null where nothing can answer honestly. `derived` is a ladder
        of three rungs rather than a flag, and the card prints one asterisk per rung: 0 read straight
        off a feed, 1 this app worked it out over the whole window, 2 this app worked it out over a
-       shorter window and the readout names the hour it starts from.
+       shorter window and the readout names the span it really covered.
        The five keys are declared up front so the order is fixed whatever any of them resolves to. */
     $acc = ['h1' => null, 'h3' => null, 'day' => null, 'h24' => null, 'h72' => null];
     $acc['h1'] = [round((float)$s['hourly'], 1), 0, null];
@@ -2306,9 +2306,11 @@ foreach ($stations as &$s) {
            archive answers both with one number over one span, each marked short. See accWindow()
            above for the version that dropped the longer one and why it is gone. */
         $s['backed'] = rainBacked($s['hourly'] ?? null, $series, $now);
-        /* The oldest odometer sample this station has. It is the baseline of any short answer, so
-           the card names it, and its absence is what tells the card that a gauge publishes no
-           running total at all rather than one this archive has not caught up with. */
+        /* The oldest odometer sample this station has, which is the baseline of any short answer.
+           The card reads only whether this key is HERE: a gauge that publishes no running total has
+           none, and that is the one thing separating a permanent dash from a waiting one. The card
+           deliberately prints no clock time, so the value itself is for whoever opens the raw
+           payload. Do not delete it on the strength of that — the presence test needs the key. */
         $s['accFrom'] = $series[0][0];
         $samples[$key . '#c'] = [$ts, (float)$s['cumulative']];
     }
