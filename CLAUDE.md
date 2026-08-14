@@ -787,6 +787,36 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   as live.
 - **41 sirens last reported months ago** (one in July 2025). They render `OUT OF CONTACT`, never
   `IDLE` — a silent siren and a dead siren look identical, and only one is safe.
+- **The siren band frames on the clock, and it is the only graph here that does.** Every other graph
+  spans the readings it holds, because a reading exists only where somebody took it. A state exists at
+  every instant. `sirenBand()` therefore spans the last `SPARK_H` hours ending **now** and lets the
+  samples colour parts of it, through the `frame` parameter on `timeAxis()` that no other caller
+  passes. Measured on the live payload: 212 sirens, of which 86 hold no history at all and 103 hold
+  exactly one sample, and the median newest sample is 9.3 hours old — a siren heartbeats daily and
+  `.history.db` keys on the reading's own stamp, so an unchanged siren stores one row. Framed on its
+  data the way a river graph is, the median siren drew a window of **zero width**.
+  **A reading holds until the next one, and that reverses the rule that stood here.** The band used
+  to cut each bar 15 minutes after its sample and leave the rest blank, on the argument that an
+  unbroken quiet band across a hole says the siren was silent in the same shape as one measured
+  silent. That argument assumed a hole meant lost contact. It does not: this app polls an online
+  siren every few minutes and only stores a row when the siren's own stamp moves, so a hole is the
+  value not changing. The cost of the old assumption was 103 sirens drawn as one sliver.
+  **A hairline rail in `--s-none` covers what the samples do not**, and that is the token this app
+  already uses for no reading — a rail and not a bar, because it is the absence of a state rather
+  than a third one. **The out-of-contact case needs no flag and must never grow one.** `SPARK_WIN`
+  is 12 hours and `SIREN_STALE` is 48, so a siren's last sample leaves the window a day and a half
+  before this app calls the station out of contact. All 65 out-of-contact sirens hold zero history, so
+  the whole band is rail by geometry. A `hasInfo()` test here states one fact in two places, and
+  the copy then drifts from the block above it.
+  **The band draws for an out-of-contact siren too** — it sits outside the state ternary in
+  `sensorBody()`. It used to sit inside, which left the one kind whose whole question is "for how
+  long" as the one kind with no timeline.
+  **An empty band ships no `data-pts`.** `show()` in `js/sparktip.js` takes the last sample at or
+  before the pointer and destructures it, so an empty array is a `TypeError` on every pointermove
+  across the plate. A graph with nothing to say ships no attribute.
+  There is **no caption**. It read `Silent for 9 h`, `Last sounded 14:22` or `Sounding since 13:50`,
+  and the band states all three. A rail with no bar on it is silence. A red bar shows when
+  it started. A red bar that reaches the right edge means the siren sounds now.
 - **A siren reading 1 is a claim, not a fact, and the river behind it is the check.** JPS sounds a
   siren for one minute at the Amaran mark, repeating every 3 hours while the water stays there, and
   every 5 at Bahaya. So the alarm is a claim about a river level the payload already holds.
@@ -1818,54 +1848,67 @@ for f in "$T"/*.mjs; do node --check "$f" || echo "FAIL $f"; done
 for f in js/*.js css/*.css; do
   curl -sk -o /dev/null -w "%{content_type} $f\n" "https://flood-exp.test/$f"; done | grep -v 'javascript\|css'
 
-# `stamp()` and `spanText()` in js/popup.js, the two string rules with a branch in them. There is no
-# JS test harness here and this does not add one: the functions are lifted out of the SHIPPED source
-# by regex, so a copy cannot drift from what runs. `stamp()` decides a clock against a date on a
-# same-day test, and `spanText()` floors. Both fail silently — a wrong slice index prints an empty
-# string, and a wrong rounding claims minutes the record never held.
+# The three rules in js/popup.js that fail silently and no linter can reach. `stamp()` chooses a
+# clock against a date on a same-day test, so a wrong slice index prints an empty string.
+# `spanText()` floors, so a wrong rounding claims minutes the record never held. `sirenBand()`
+# frames on the clock and carries a reading forward, and an empty band that still ships `data-pts`
+# throws in js/sparktip.js on every pointermove.
+# There is no JS test harness here and this does not add one. The MODULE is evaluated as it ships,
+# with only its imports stubbed, so no copy can drift from what runs. An earlier version lifted each
+# function out by its own regex, which was a second mechanism for the same job.
 node --input-type=module -e "
 import fs from 'fs';
-const src = fs.readFileSync('js/popup.js','utf8'), util = fs.readFileSync('js/util.js','utf8');
-const grab=(s,re)=>{const m=s.match(re); if(!m) throw new Error('not found: '+re); return m[0];};
-const { stamp, spanText } = new Function([
-  grab(util,/export const noSec = .*;/).replace('export ',''),
-  grab(src,/const MYT_DATE = new Intl\.DateTimeFormat[\s\S]*?\);/),
-  grab(src,/const MYT_CLOCK = new Intl\.DateTimeFormat[\s\S]*?\);/),
-  grab(src,/const stamp = t => \{[\s\S]*?\n\};/),
-  grab(src,/const spanText = secs => secs < 3600[\s\S]*?;/),
-].join('\n') + '; return { stamp, spanText };')();
+const src = fs.readFileSync('js/popup.js','utf8')
+  .replace(/^import[\s\S]*?from '\.\/stations\.js';/m,'').replace(/\bexport /g,'');
+const noSec = fs.readFileSync('js/util.js','utf8').match(/export const noSec = .*;/)[0].replace('export ','');
+const stubs = \`
+const SPARK_H=12, NO_INFO='var(--s-none)', NEAR_MAX_KM=30, MET_NAME='MET';
+const RIVER_COLOR=[],RAIN_COLOR=[],GAUGE_COLOR=[],RAIN_STOPS=[],ACC_ROWS=[],WEATHER=[{}];
+const KINDS={},SOURCES={},ALERT_TITLE={},camSrc=()=>'',distKm=()=>0;
+const hasInfo=()=>true,isStale=()=>false,statusColor=n=>'RED'+n,scalePos=()=>0;
+const levelStops=()=>null,gaugeStops=()=>null,gaugeColor=()=>'',color=()=>'',isFav=()=>false;
+const nearestOf=()=>null,nearestCam=()=>null,nearestLevel=()=>null,camAlert=()=>null;\`;
+const { stamp, spanText, sirenBand } = new Function(stubs + noSec + src +
+  '; return { stamp, spanText, sirenBand };')();
+
 let bad=0; const is=(g,w,n)=>{const ok=g===w; if(!ok)bad++;
   console.log((ok?'ok  ':'FAIL')+'  '+n+'  -> '+JSON.stringify(g)+(ok?'':'  want '+JSON.stringify(w)));};
 const today = new Intl.DateTimeFormat('en-GB',
   {timeZone:'Asia/Kuala_Lumpur',day:'2-digit',month:'2-digit',year:'numeric'}).format(new Date());
-is(stamp(today+' 15:45:00'),'15:45','today -> clock, seconds trimmed');
-is(stamp('19/09/2025 12:15:00'),'19/09/2025','another day -> date only');
-is(stamp(today),today,'date with no clock -> the date');
-is(stamp(Date.parse('2025-09-19T12:15:00+08:00')),'19/09/2025','unix ms, another day -> date');
-is(/^\d\d:\d\d\$/.test(stamp(Date.now())),true,'unix ms, today -> clock');
-is(spanText(3600*9.6),'9 h','floors, never rounds up');
-is(spanText(3600),'1 h','exactly one hour');
-is(spanText(1800),'30 min','under an hour keeps minutes');
-console.log(bad?'FAILURES: '+bad:'all pass'); process.exit(bad?1:0);"
+is(stamp(today+' 15:45:00'),'15:45','stamp: today -> clock, seconds trimmed');
+is(stamp('19/09/2025 12:15:00'),'19/09/2025','stamp: another day -> date only');
+is(stamp(today),today,'stamp: a date with no clock -> the date');
+is(stamp(Date.parse('2025-09-19T12:15:00+08:00')),'19/09/2025','stamp: unix ms, another day -> date');
+is(/^\d\d:\d\d\$/.test(stamp(Date.now())),true,'stamp: unix ms, today -> clock');
+is(spanText(3600*9.6),'9 h','spanText: floors, never rounds up');
+is(spanText(3600),'1 h','spanText: exactly one hour');
+is(spanText(1800),'30 min','spanText: under an hour keeps minutes');
 
-# And that every stamp the live payload can produce is one shape or the other, never a fragment.
-# Expect roughly 5 of 6 on the clock. A count of 0 on either side means the same-day test broke.
-node --input-type=module -e "
-import fs from 'fs';
-const src=fs.readFileSync('js/popup.js','utf8'), util=fs.readFileSync('js/util.js','utf8');
-const grab=(s,re)=>s.match(re)[0];
-const { stamp } = new Function([
-  grab(util,/export const noSec = .*;/).replace('export ',''),
-  grab(src,/const MYT_DATE = new Intl\.DateTimeFormat[\s\S]*?\);/),
-  grab(src,/const MYT_CLOCK = new Intl\.DateTimeFormat[\s\S]*?\);/),
-  grab(src,/const stamp = t => \{[\s\S]*?\n\};/),
-].join('\n') + '; return { stamp };')();
-let clock=0,date=0,bad=[];
+const now=Math.floor(Date.now()/1000), H=3600;
+const rects=h=>[...h.matchAll(/<rect[\s\S]*?\/>/g)].map(m=>m[0]);
+const A=sirenBand(null), B=sirenBand([[now-9.3*H,0]]);
+const C=sirenBand([[now-11*H,0],[now-6*H,1],[now-5*H,0]]);
+is(rects(A).length,1,'band: no history -> the empty rail alone');
+is(/data-pts/.test(A),false,'band: no history -> no data-pts, or sparktip throws on pointermove');
+is(rects(A)[0].includes('var(--s-none)'),true,'band: the rail is the no-reading token');
+is(rects(B).length,2,'band: one sample -> rail + one bar');
+const b=rects(B)[1], bx=+b.match(/x=\"([\d.]+)\"/)[1], bw=+b.match(/width=\"([\d.]+)\"/)[1];
+is(Math.round(bx),23,'band: the bar starts at its own time');
+is(Math.round(bx+bw),100,'band: and carries forward to now');
+is(b.includes('var(--outline)'),true,'band: an idle sample is the outline colour, never green');
+const cr=rects(C);
+is(cr.filter(r=>r.includes('RED3')).length,1,'band: exactly one bar takes the danger red');
+is(cr[2].includes('RED3'),true,'band: and it is the sounding sample');
+is(/Silent for|Last sounded|Sounding since/.test(A+B+C),false,'band: no caption on any shape');
+
+let clock=0,date=0,odd=[];
 for (const s of JSON.parse(fs.readFileSync('.cache.json','utf8')).stations) {
   const t=s.updated||s.shot; if(!t) continue; const o=stamp(t);
-  if(/^\d\d:\d\d\$/.test(o)) clock++; else if(/^\d\d\/\d\d\/\d{4}\$/.test(o)) date++; else bad.push([s.id,t,o]); }
-console.log('clock:',clock,' date:',date,' unexpected:',bad.length);
-bad.slice(0,5).forEach(b=>console.log('  ',b.join('  ')));"
+  if(/^\d\d:\d\d\$/.test(o)) clock++; else if(/^\d\d\/\d\d\/\d{4}\$/.test(o)) date++; else odd.push([s.id,t,o]); }
+console.log('payload stamps -> clock:',clock,' date:',date,' unexpected:',odd.length);
+odd.slice(0,5).forEach(o=>console.log('   ',o.join('  ')));
+if(odd.length) bad++;
+console.log(bad?'FAILURES: '+bad:'all pass'); process.exit(bad?1:0);"
 ```
 
 ```bash

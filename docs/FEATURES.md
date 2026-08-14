@@ -9318,3 +9318,68 @@ Nothing else about the section changed. It keeps its own ⋮, which states two f
 outlook at that time, and the borrowed station stands that far from the point. Neither number is the
 distance from the reader to the point, and the card claims no such thing. The number a reader can
 act on sits in the section head, which names the place behind the forecast.
+## The siren band frames on the clock
+
+The siren log answered "has this gone off today" for 23 sirens of 212. The other 189 drew a sliver.
+
+Measured on the live payload. 212 sirens. 86 hold no history at all, 103 hold exactly one sample,
+and 23 hold two to twelve. The median newest sample is 9.3 hours old.
+
+A siren heartbeats daily, and `.history.db` keys on the reading's own stamp. So an unchanged siren
+stores one row however often this app polls it. Every other graph here spans the readings it holds,
+because a reading exists only where somebody took it. Framed that way, a one-sample siren has a
+window of zero width, and 103 of them drew a single 0.8% sliver against an empty plate.
+
+A state is not a reading. A state exists at every instant. So the band spans the last `SPARK_H`
+hours ending now, and the samples colour parts of it. `timeAxis()` takes a `frame` parameter for
+this, and the siren band is its only caller.
+
+### A reading holds until the next one
+
+The band used to cut each bar 15 minutes after its sample and leave the rest blank. The argument for
+that: an unbroken quiet band across a hole says the siren was silent, in the same shape as a siren
+measured silent.
+
+That argument assumed a hole meant lost contact. It does not. This app polls an online siren every
+few minutes and stores a row only when the siren's own stamp moves, so a hole is the value staying
+put. The reading now carries forward to the next sample, or to now.
+
+The honest residue of the old argument is that polls run on a request, so a quiet stretch can also
+mean nobody opened the page. The station stays online either way, and the block above the band says so.
+
+### Three states, and the third one is an absence
+
+| what | how it draws |
+|---|---|
+| Triggered | a 10px bar in the danger red |
+| Idle | a 10px bar in `--outline`, never green |
+| Out of contact | a 2px rail in `--s-none` |
+
+A rail and not a bar, because the third one is the absence of a state rather than a state. `--s-none`
+is the token this app already reserves for offline and no reading.
+
+**The out-of-contact case needs no flag, and it must never grow one.** `SPARK_WIN` is 12 hours and
+`SIREN_STALE` is 48. A siren's last sample leaves the window a day and a half early. Only then does this app call
+the station out of contact. Measured: all 65 out-of-contact sirens hold zero history, so the whole band
+is rail by geometry. A `hasInfo()` test here states one fact in two places. The copy then drifts from the block
+above it.
+
+The band also moved outside the state test in `sensorBody()`. An out-of-contact siren used to get
+the block alone, which left the one kind whose whole question is "and for how long" as the one kind
+with no timeline.
+
+### Two things the rewrite had to keep
+
+An empty band ships no `data-pts`. `show()` in `js/sparktip.js` takes the last sample at or before
+the pointer and destructures it, so an empty array raises a `TypeError` on every pointermove across
+the plate. A graph with nothing to say ships no attribute, which is the contract that module already
+states for a kind with no status.
+
+The table drops its own guard. `dataTable()` wrapped the call in `m.history?.length`, which is the
+right rule for a flood gauge and the wrong one here now that a siren with no samples has something
+to draw.
+
+### The caption is gone
+
+It read `Silent for 9 h`, `Last sounded 14:22` or `Sounding since 13:50`. The band states all three.
+A rail with no bar on it is silence. A red bar shows when it started. A red bar that reaches the right edge means the siren sounds now. The hover readout names the hour on any sample.

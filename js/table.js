@@ -289,10 +289,11 @@ const trend = m => (m.kind === 'river' && m.rate != null
     : '')
   + (m.kind === 'river' ? sparkline(m.history, 'river', m)
     // Only where there is one: an offline gauge is not sampled, and "graph builds as we poll" on a
-    // sensor nobody is hearing from would promise a line that is never going to arrive. Same rule
-    // for the siren band, which is only sampled while the siren is in contact.
+    // sensor nobody is hearing from would promise a line that is never going to arrive.
     : m.kind === 'gauge' ? (m.history?.length ? sparkline(m.history, 'gauge', m) : '')
-    : m.kind === 'siren' ? (m.history?.length ? sirenBand(m.history) : '')
+    // The siren band takes no such guard any more. It frames on the clock rather than on its
+    // samples, so a siren with none draws twelve hours of empty rail, which is the answer.
+    : m.kind === 'siren' ? sirenBand(m.history)
     : m.kind === 'rainfall' ? rainBars(m.history) : '')
   // The same totals as the station card, under the same graph, behind the same stale guard.
   + (m.kind === 'rainfall' && !isStale(m) ? rainAcc(m.acc) : '');

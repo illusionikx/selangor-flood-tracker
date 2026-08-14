@@ -401,12 +401,16 @@ function sensorBody(s) {
      already acted on this judgement — the station is out of the alert list, off the badge and off
      the ticker — so softening the words on the one screen that explains it would hide a decision
      rather than qualify it. Say it plainly and let it be checked. */
+  /* The band is outside the state test, so an out-of-contact siren draws one too. It used to get the
+     block alone, which left the one kind whose whole question is "and for how long" as the one kind
+     with no timeline. It has no samples in the window — that is what being out of contact means
+     here — so what it draws is the empty rail across the full twelve hours. See `sirenBand()`. */
   const stuck = s.kind === 'siren' && s.backed === false;
-  const siren = s.kind !== 'siren' ? '' : !hasInfo(s)
-    ? '<div class="state">OUT OF CONTACT</div>'
-    : `<div class="state ${s.status > 0 && !stuck ? 'on' : 'off'}">${s.status > 0 ? 'TRIGGERED' : 'IDLE'}</div>
-       ${stuck ? '<div class="muted">Faulty signal. No river nearby is high.</div>' : ''}
-       ${sirenBand(s.history)}`;
+  const siren = s.kind !== 'siren' ? '' : `${hasInfo(s)
+    ? `<div class="state ${s.status > 0 && !stuck ? 'on' : 'off'}">${s.status > 0 ? 'TRIGGERED' : 'IDLE'}</div>
+       ${stuck ? '<div class="muted">Faulty signal. No river nearby is high.</div>' : ''}`
+    : '<div class="state">OUT OF CONTACT</div>'}
+    ${sirenBand(s.history)}`;
   const gauge = s.kind !== 'gauge' ? '' : gaugeBlock(s);
 
   // A camera shows its own view. The offer of the nearest one, and a camera card's offer of the
@@ -762,13 +766,18 @@ const MYT_CLOCK = new Intl.DateTimeFormat('en-GB', {
 // tick always lands on a round clock time rather than an arbitrary offset from the first reading.
 const TICK_STEPS = [900, 1800, 3600, 7200, 10800];   // 15m · 30m · 1h · 2h · 3h
 
-/* Shared by both graphs: the window (data extent, capped at SPARK_H), and ticks on round clock
+/* Shared by all three graphs: the window (data extent, capped at SPARK_H), and ticks on round clock
    times inside it. MYT is a whole-hour offset, so rounding up to a multiple of the step in epoch
-   seconds lands on :00, :15 or :30 as intended. */
-function timeAxis(points) {
-  const last = points.at(-1)[0];
-  const t0 = Math.max(points[0][0], last - SPARK_H * 3600);
-  const inWin = points.filter(([t]) => t >= t0);
+   seconds lands on :00, :15 or :30 as intended.
+   `frame` overrides the window with an explicit `[t0, t1]`, and the siren band is the one caller
+   that passes one — see `sirenBand()` for why a state timeline frames on the clock where a reading
+   plot frames on its data. With a frame the points may be empty, so nothing here may index them.
+   The `t <= last` half of the filter is a no-op for the other two callers, where `last` is already
+   the newest sample. */
+function timeAxis(points, frame) {
+  const last = frame ? frame[1] : points.at(-1)[0];
+  const t0 = frame ? frame[0] : Math.max(points[0][0], last - SPARK_H * 3600);
+  const inWin = points.filter(([t]) => t >= t0 && t <= last);
   const t1 = last, secs = t1 - t0;
   const x = t => ((t - t0) / (secs || 1) * 100).toFixed(2);
 
@@ -954,24 +963,51 @@ export function sparkline(points, kind = 'river', st = null) {
 
 /* A siren's last 12 hours, as a band rather than a graph. Its samples are status codes, not a
    quantity, so there is no shape to plot: a polyline between them would draw ramps up and down that
-   never happened, and an axis of "0–2" is not a number anyone reads. What the pin is opened to ask is "has this thing
-   gone off today", and a strip that is either quiet or red answers it at a glance.
+   never happened, and an axis of "0-2" is not a number anyone reads. What the pin is opened to ask
+   is "has this thing gone off today", and a strip that is either quiet or red answers it at a
+   glance. Quiet is drawn in the outline colour, not green — the state block above already carries
+   the green, and a 12-hour reassurance is more than a log of samples is entitled to give.
 
-   Each sample owns the span up to the next one. A gap longer than an hour and a half is left blank
-   for the same reason the rain chart breaks its area there: an unbroken quiet band across a hole in
-   the record says the siren was silent, in exactly the same shape as a siren that was measured
-   silent. Quiet is drawn in the outline colour, not green — the state block above already carries
-   the green, and a 12-hour reassurance is more than a log of samples is entitled to give. */
+   **The frame is the clock, not the samples.** Every other graph here spans the readings it holds,
+   because a reading exists only where it was taken. A state exists at every instant, so this one
+   spans the last SPARK_H hours ending now and lets the samples colour parts of it. Anchored to the
+   newest sample the way a river graph is, 103 of 212 sirens drew a window of zero width: a siren
+   heartbeats daily and `.history.db` keys on the reading's own stamp, so an unchanged siren stores
+   one row and the median siren holds exactly one sample in twelve hours.
+
+   **A reading holds until the next one.** This app polls an online siren every few minutes and only
+   stores a row when the siren's own stamp moves, so a hole in the record is the value not changing.
+   The old rule cut each bar 15 minutes after its sample and left the rest blank, on the argument
+   that an unbroken quiet band across a hole says the siren was silent in the same shape as one that
+   was measured silent. That argument assumed a hole meant lost contact. It does not, and the cost
+   of assuming it did was 103 sirens drawn as one sliver on an empty plate.
+
+   **What the samples do not cover is drawn, not left blank**, as a hairline rail in `--s-none` —
+   the token this app already uses for no reading. A rail and not a bar, because it is the absence
+   of a state rather than a third one. Two spans get it: the time before the first sample, and the
+   whole width on a siren that is out of contact. That second case needs no test of its own and must
+   not grow one. `SPARK_WIN` is 12 hours and `SIREN_STALE` is 48, so a siren's last sample leaves
+   this window a day and a half before the station is called out of contact — measured on the live
+   payload, all 65 out-of-contact sirens hold no history at all. The geometry says it, so no flag
+   has to stay in step with `hasInfo()`.
+
+   No caption under it. It read `Silent for 9 h`, `Last sounded 14:22` or `Sounding since 13:50`,
+   and the band now states all three: a rail with no bar on it, a red bar and where it starts, a red
+   bar still running at the right edge. The hover readout names the hour on any sample.
+
+   An empty band ships **no `data-pts`**. `show()` in js/sparktip.js takes the last sample at or
+   before the pointer and destructures it, so an empty array throws a TypeError on every pointermove
+   across the plate. A graph with nothing to say ships no attribute, which is the same contract that
+   module already states for a kind with no status. */
 export function sirenBand(points) {
-  if (!points || !points.length) return '<div class="muted">Log builds as readings arrive</div>';
+  const now = Math.floor(Date.now() / 1000);
+  const { inWin, x, ticks } = timeAxis(points || [], [now - SPARK_H * 3600, now]);
 
-  const { t1, secs, inWin, x, ticks } = timeAxis(points);
-  if (!inWin.length) return `<div class="muted">No readings in the last ${SPARK_H} hours</div>`;
+  const rail = '<rect x="0" y="13" width="100" height="2" rx="1" style="fill:var(--s-none)"/>';
 
   const on = statusColor(3);
   const bars = inWin.map(([t, v], i) => {
-    const nxt = inWin[i + 1]?.[0];
-    const end = nxt && nxt - t <= 5400 ? nxt : Math.min(t + 900, t1);
+    const end = inWin[i + 1]?.[0] ?? now;
     // A lone sample at the right edge has no width of its own; give it enough to be visible — and
     // pull it back inside the plot, because the newest sample sits *on* x=100 and `.spark svg` is
     // `overflow: visible`, so the minimum width would hang off the plate as a stray sliver.
@@ -981,26 +1017,17 @@ export function sirenBand(points) {
       style="fill:${v > 0 ? on : 'var(--outline)'}"/>`;
   }).join('');
 
-  /* A time, not a tally. "Sounded in 11 of 11 readings" counted our polls, which is our business and
-     not the reader's — the same siren behind a slower poll would say "3 of 3" and mean the same
-     thing, and neither number says when it went off. The question a siren log is opened with is when
-     it last sounded, so that is what the line says. */
-  let i = inWin.length - 1;
-  const live = inWin[i][1] > 0;
-  if (live) while (i > 0 && inWin[i - 1][1] > 0) i--;   // back to the start of the run still running
-  else while (i >= 0 && !inWin[i][1]) i--;              // back to the last sample that was on
   // `.band` keeps the shorter box. A siren log is a state over time, not a shape — there is nothing
   // in it that a quarter more height would draw better, and the difference in height is what says
   // this is not a reading. See base.css.
   // Capitalised, because the readout prints this word where every other graph prints a number, and
   // a lower-case word beside `1.74 m` reads as a fragment of a sentence rather than a reading.
-  return `<div class="spark band"${readout(inWin, x, v => v > 0 ? 'Sounding' : 'Quiet', 'siren')}>
+  return `<div class="spark band"${
+      inWin.length ? readout(inWin, x, v => v > 0 ? 'Sounding' : 'Quiet', 'siren') : ''}>
     <svg viewBox="0 0 100 28" preserveAspectRatio="none" aria-hidden="true">
-      ${rules(ticks)}${bars}
+      ${rules(ticks)}${rail}${bars}
     </svg>
     ${axisHtml(ticks)}
-    <div class="muted">${i < 0 ? `Silent for ${spanText(secs)}`
-      : `${live ? 'Sounding since' : 'Last sounded'} ${MYT_CLOCK.format(inWin[i][0] * 1000)}`}</div>
   </div>`;
 }
 
