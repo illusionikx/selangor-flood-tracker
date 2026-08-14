@@ -234,6 +234,15 @@ const PLACE_STAMP = __DIR__ . '/.place.stamp';
 const PLACE_LOCK  = __DIR__ . '/.place.lock';
 const PLACE_TTL   = 30 * 86400;   // place names do not move
 const NOMINATIM   = 'https://nominatim.openstreetmap.org/search';
+
+/* The coordinate gazetteer. About 35 queries would cover the roughly 163 portal rainfall names this
+   app cannot place, which is a burst at one government host — the shape of the camera stampede.
+   So it drips: at most GAZ_FILL prefixes per refresh, at most once every GAZ_EVERY, site-wide. */
+const GAZ_FILL  = 5;                              // prefixes per refresh
+const GAZ_EVERY = 600;                            // seconds between drips, site-wide
+const GAZ_STAMP = __DIR__ . '/.gaz.stamp';
+const GAZ_KEY   = 'gazdone:';                     // one page row per prefix already queried
+
 /* The coverage box: Selangor, Kuala Lumpur and Putrajaya. The 683 stations span latitude 2.6088 to
    3.8470 and longitude 100.8229 to 101.9215, plus 0.1 degrees of margin so an edge place resolves.
    Nominatim reads `viewbox` as west,north,east,south. Published as `box`, a diagnostic beside
@@ -1210,6 +1219,31 @@ function portalMatch(array $rows, array $stations, string $kind): array {
     return ['hit' => $hit, 'used' => $used, 'clash' => $clash];
 }
 
+/* Which prefixes to ask the station search for next.
+ *
+ * The set comes from the data rather than from a list: the first three characters of every portal
+ * name this app could not match, lower cased, distinct. About 35 queries cover the roughly 163
+ * unmatched names, and their union is the whole gazetteer this app needs.
+ *
+ * DO NOT REPLACE THIS WITH A FIXED LIST. A list is a thing somebody maintains, and it is wrong the
+ * day the portal publishes a station whose name starts with something else.
+ *
+ * Capped per call because about 35 requests sent together is a burst at one government host, which
+ * is the shape of the camera stampede this app has a rule against.
+ */
+function gazWanted(array $names, array $done, int $cap): array {
+    $want = [];
+    foreach ($names as $n) {
+        $k = strtolower(preg_replace('/\s+/', '', $n));
+        if (strlen($k) < 3) continue;
+        $p = substr($k, 0, 3);
+        if (isset($done[$p]) || isset($want[$p])) continue;
+        $want[$p] = true;
+        if (count($want) >= $cap) break;
+    }
+    return array_keys($want);
+}
+
 /* `php api.php --selftest` — the guards above, checked offline. Here rather than in a second test
    file: the rules are arithmetic on a few integers, and a separate test would need a third file to
    hold them. CLI only, and it exits before the first header. */
@@ -1551,6 +1585,31 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
         ['id' => 'rf-832', 'kind' => 'rainfall', 'code' => null, 'name' => 'Jenderam Hulu'],
     ], 'rainfall');
     $ok('two equal claims identify neither',    $t['hit'] === []);
+
+    echo "\ngazParse():\n";
+    $gazJson = '[{"loc":[3.1,101.6],"title":"Sg. Klang di Kuala Lumpur, Kuala Lumpur, Wilayah Persekutuan Kuala Lumpur"},'
+             . '{"loc":[2.38,103.87],"title":"Sg. Paya Dato, Mersing, Johor"},'
+             . '{"loc":[3.0,101.5],"title":"Desa Pinggiran Putra (F2), Sepang, Selangor"},'
+             . '{"loc":[0,0],"title":"Broken, Nowhere, Selangor"}]';
+    $g = gazParse($gazJson);
+    $ok('every row is read',            count($g) === 3);
+    $ok('the name is the first part',   $g[0]['name'] === 'Sg. Klang di Kuala Lumpur');
+    $ok('the state is the last part',   $g[0]['state'] === 'Wilayah Persekutuan Kuala Lumpur');
+    $ok('the district is the middle',   $g[0]['district'] === 'Kuala Lumpur');
+    $ok('a Johor station is kept here', $g[1]['state'] === 'Johor');
+    $ok('a zero coordinate is dropped', count(array_filter($g, fn($r) => $r['name'] === 'Broken')) === 0);
+    $ok('bad json yields nothing',      gazParse('not json') === []);
+    $ok('an empty body yields nothing', gazParse('') === []);
+
+    echo "\ngazWanted():\n";
+    $names = ['Bandar Kinrara', 'Bandar Utama', 'Kg Melayu Ampang', 'Sri Muda', 'sri kembangan'];
+    $ok('three characters, lower case, distinct',
+        gazWanted($names, [], 99) === ['ban', 'kgm', 'sri']);
+    $ok('a short name is skipped',      gazWanted(['ab'], [], 99) === []);
+    $ok('the cap is honoured',          count(gazWanted($names, [], 2)) === 2);
+    $ok('a done prefix is not asked again', gazWanted($names, ['ban' => 1], 99) === ['kgm', 'sri']);
+    $ok('a finished set asks for none',
+        gazWanted($names, ['ban' => 1, 'kgm' => 1, 'sri' => 1], 99) === []);
 
     echo "\nserveFromCache():\n";
     $ok('a fresh cache is served',                 serveFromCache(10, true, false) === true);
@@ -2272,6 +2331,10 @@ $db->exec('CREATE TABLE IF NOT EXISTS level (
     PRIMARY KEY (station, ts)
 ) WITHOUT ROWID');  // the key also makes a retried poll idempotent — INSERT OR IGNORE and move on
 $db->exec('CREATE TABLE IF NOT EXISTS page (url TEXT PRIMARY KEY, ts INTEGER, body TEXT) WITHOUT ROWID');
+// The coordinate gazetteer. Filled a few rows at a time by the drip at the end of this file, from
+// the portal's own station search — the only place the portal publishes a coordinate.
+$db->exec('CREATE TABLE IF NOT EXISTS station (name TEXT PRIMARY KEY, lat REAL, lng REAL,
+                                               district TEXT, state TEXT) WITHOUT ROWID');
 
 // The scraped pages ride along in the same concurrent batch, but on their own clock: the KL rainfall
 // table takes ~10s to render upstream, against ~0.3s for a JSON call, and none of these sources
@@ -2599,6 +2662,18 @@ unset($s);
 // It publishes no coordinate, so this pass only ever corrects a station another feed already placed.
 // The rows it alone knows about are placed in a later pass, from the portal's own station search.
 $prfHit = portalMatch($prf, $stations, 'rainfall');
+
+/* What the gazetteer holds and what it still owes, counted before the payload goes out. The drip
+   itself runs at the end of this file, after the echo, so it cannot report on itself. */
+$gazDone = [];
+foreach ($stored as $su => $sr) {
+    if (str_starts_with($su, GAZ_KEY)) $gazDone[substr($su, strlen(GAZ_KEY))] = 1;
+}
+// Only the rows that found no home. A matched row needs no coordinate: it already has one.
+$gazNames = [];
+foreach ($prf as $i => $r) if (!isset($prfHit['used'][$i])) $gazNames[] = $r['name'];
+$gazAsk = gazWanted($gazNames, $gazDone, GAZ_FILL);
+
 $prfUsed = 0;
 /* Station id => graph id, for the history backfill at the end of this file. It cannot read
    $s['graphId'] there: the accumulation block below unsets that key before the payload goes out,
@@ -2942,6 +3017,10 @@ $payload = json_encode([
         // one station, and two stations claiming one row.
         'portalrf' => ['parsed' => count($prf), 'applied' => $prfUsed,
                        'clash'  => count($prfHit['clash'])],
+        // `pending` is what the NEXT drip will ask for, capped at GAZ_FILL. It reaching 0 is the
+        // backfill finishing, which is success — see watch.php in Task 10.
+        'gaz' => ['stations' => (int)$db->query('SELECT COUNT(*) FROM station')->fetchColumn(),
+                  'asked'    => count($gazDone), 'pending' => count($gazAsk)],
         // Empty on a healthy poll. A key here names a table the map is drawing from a stored copy.
         'stale'    => $pagesStale,
     ],
@@ -2991,3 +3070,33 @@ echo $payload;
 ignore_user_abort(true);
 flush();
 captureShots($stations);
+
+/* The gazetteer drip. At the END of a refresh, never on a reader's poll, and never as a burst —
+   exactly the rule captureShots() obeys for the camera archive.
+   forceAllowed() at its own window is the site-wide guard, the same one ?force=1 and ?place= use.
+   A stamp file caps the rate however many readers arrive at once, and the refresh lock already
+   stops two rebuilds running together. */
+[$gazOk] = forceAllowed($now, is_file(GAZ_STAMP) ? filemtime(GAZ_STAMP) : null, GAZ_EVERY);
+if ($gazOk) {
+    $ask = $gazAsk;
+    if ($ask) {
+        touch(GAZ_STAMP);
+        $urls = [];
+        foreach ($ask as $p) $urls[$p] = gazUrl($p);
+        $got = fetchAll($urls, 3, false);
+        $put = $db->prepare('INSERT OR REPLACE INTO station (name, lat, lng, district, state)
+                             VALUES (?, ?, ?, ?, ?)');
+        $db->beginTransaction();
+        foreach ($ask as $p) {
+            foreach (gazParse($got[$urls[$p]] ?? '') as $g) {
+                // Three states, because that is the map. The endpoint answers for the country.
+                if (!preg_match('/selangor|kuala lumpur|putrajaya/i', $g['state'])) continue;
+                $put->execute([$g['name'], $g['lat'], $g['lng'], $g['district'], $g['state']]);
+            }
+            // Stamped whether or not it answered, the same rule pageRow() states: a prefix that
+            // never answers must not be asked again on every refresh forever.
+            $keep->execute([GAZ_KEY . $p, $now, '1']);
+        }
+        $db->commit();
+    }
+}

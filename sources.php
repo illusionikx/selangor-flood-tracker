@@ -250,6 +250,41 @@ function portalRain(array $pages): array {
     return $out;
 }
 
+/* The portal's own station search, which is the only place it publishes a coordinate.
+   Three characters or more, and it is a SUBSTRING search rather than a prefix one — `q=sg.`
+   returned 1,208 rows on 15 August, including names carrying `sg.` in the middle. It answers for
+   the whole country, so a caller filters to the states it draws. */
+const GAZ = 'https://publicinfobanjir.water.gov.my/wp-content/themes/enlighten/query/searchstation_control.php';
+
+function gazUrl(string $q): string {
+    return GAZ . '?' . http_build_query(['q' => $q]);
+}
+
+/* `{"loc":[lat,lng],"title":"Name, District, State"}` into something with named parts.
+   The title is comma separated and the NAME ITSELF CAN HOLD A COMMA, so the split takes the last
+   two parts as district and state and rejoins everything before them as the name.
+   A zero coordinate is dropped. JPS publishes those on cameras too, and CAM_FIX exists because a
+   coordinate this app invents is worse than none. */
+function gazParse(string $json): array {
+    $rows = json_decode($json, true);
+    if (!is_array($rows)) return [];
+    $out = [];
+    foreach ($rows as $r) {
+        $lat = (float)($r['loc'][0] ?? 0);
+        $lng = (float)($r['loc'][1] ?? 0);
+        if (!$lat || !$lng) continue;
+        $parts = array_map('trim', explode(',', (string)($r['title'] ?? '')));
+        if (count($parts) < 3) continue;
+        $state    = array_pop($parts);
+        $district = array_pop($parts);
+        $out[] = [
+            'name' => implode(', ', $parts), 'district' => $district, 'state' => $state,
+            'lat'  => $lat, 'lng' => $lng,
+        ];
+    }
+    return $out;
+}
+
 /** Water-level status from thresholds: the scraped feeds publish values, not a status code. */
 function wlStatus(?float $lvl, ?float $alert, ?float $warning, ?float $danger): int {
     if ($lvl === null) return -1;
