@@ -204,7 +204,7 @@ Four mitigations, and each one already has a precedent in this repo.
    and `?place=` use. A stamp file caps the rate however many readers arrive at once.
 3. **Stay inside the refresh lock.** `flock` on `.refresh.lock` already stops two rebuilds running
    together. Anything added to the refresh path stays inside it, so N readers never become N fetches.
-4. **Keep identifying this app.** `CURLOPT_USERAGENT` already sends
+4. **Name this app in every request.** `CURLOPT_USERAGENT` already sends
    `flood-exp/1.0 (+https://github.com/illusionikx/selangor-flood-tracker)`. Every new call uses the
    same handle, so an administrator can always see who is asking and why.
 
