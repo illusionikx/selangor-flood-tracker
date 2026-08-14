@@ -37,6 +37,7 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `js/map.js` | map instance, basemap/theme, cluster, the station panel (`openSide`), `focusOn` / `flashTo` |
 | `js/heat.js` | both heat layers (water level, rainfall), ground-fixed sizing per layer, shared opacity, and the field pass where a gauge reporting no rain denies the ground a wet one claims |
 | `heat-test.html` | `chrome --headless --dump-dom` — one of three runnable checks. Guards the rain layer's paint distance, its dry-gauge erase and its handover between neighbours, in canvas pixels |
+| `geo-test.html` | temporary. A boundary probe for a location fix that never arrives. Open it on the machine that fails. Delete it, and its line in `pages.yml`, once the fault has a name |
 | `js/popup.js` | popup + meter + gauge + sparkline templates |
 | `js/sparktip.js` | the hover/tap readout on every graph, and the label on any `data-tip`. One delegated listener, no imports |
 | `js/render.js` | rebuilds markers and heat points; drawer summary table |
@@ -557,6 +558,20 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   `ini_set()` rather than an ini file because `__DIR__` resolves on both deploy targets. A committed
   absolute path is correct on one target at most. **Any new PHP entry point needs that line**, or its
   errors go back to the shared log and nobody finds them.
+- **A geolocation permission can read `granted` and still yield nothing, because the operating
+  system refuses the browser underneath it.** Measured on one Windows desktop reaching this app over
+  https: the permission query returned `granted`, and `getCurrentPosition` timed out at both accuracy
+  settings, 10 s and 30 s. Windows held `lfsvc` disabled and the machine consent key at `Deny`. Edge
+  inherited that `Deny` and had no source left, network fallback included.
+  Leaflet adds no timer of its own, so `map.locate()` reports what the browser reports and no sooner.
+  The browser did fire `locationerror` on time. Nobody saw it.
+  `js/locate.js` wrote the reason into `btn.title` alone, and `#locate.busy` carries
+  `pointer-events: none` for those ten seconds. So a reader pressed, waited, saw nothing, and pressed
+  again. That reads as a button that spins for ever.
+  **Do not tell a reader to check the site settings in the browser.** Those can be correct while the
+  device refuses. Name the device beside the site, which `hereFail()` in `js/popup.js` does.
+  `geo-test.html` is the probe that found it, and it puts its own clock on each request rather than
+  trust the one it passes in.
 - **`js/oops.js` must stay the first import in `app.js`.** A static import runs before the body of
   the file that imports it. A handler written inside `app.js` therefore starts after every other
   module has evaluated, and a throw during that evaluation reaches nobody. This is a real case rather

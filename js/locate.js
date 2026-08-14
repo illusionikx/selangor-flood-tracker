@@ -4,7 +4,7 @@
 import { state, PREFS, save } from './state.js';
 import { el } from './util.js';
 import { map, focusOn, openSide, ping, pinGlyph } from './map.js';
-import { herePopup } from './popup.js';
+import { herePopup, hereFail } from './popup.js';
 import { alerts } from './alerts.js';
 
 const btn = el('locate');
@@ -99,8 +99,10 @@ map.on('locationfound', e => {
 
 map.on('locationerror', e => {
   btn.className = 'icon';
-  // Real reason, not a guess: "User denied Geolocation", "Timeout expired", …
-  btn.title = /denied/i.test(e.message)
-    ? 'Location blocked — allow it in your browser’s site settings, then click again'
-    : `Couldn’t get your location: ${e.message}. Click to retry`;
+  btn.title = 'Show my location';
+  /* Only where the reader asked, the same gate the arrival ripple takes. The landing auto-locate is
+     a question nobody asked, and a card that opens by itself replaces what the reader opened.
+     Leaflet forwards the code and prefixes the message with its own words, so the card reads
+     `e.code` and never the sentence. */
+  if (wantPopup) openSide('@here', hereFail(e.code));
 });

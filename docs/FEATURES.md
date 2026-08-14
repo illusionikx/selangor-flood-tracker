@@ -844,7 +844,21 @@ space; a list that was already there when you arrived is not.
 **Location** — auto-located on landing (view untouched) purely to enable proximity sorting;
 clicking the button recentres, ripples over where you are and opens a "You are here" card holding
 the nearest water level, rainfall, siren and gauge — each as a full sensor section, plus the nearest
-webcam's picture (see below). Errors report the real reason.
+webcam's picture (see below).
+
+**A failed location says what to change, and where.** The button can carry a `title` and nothing
+else, and a `title` opens on no phone. So a refusal or a silence opens the same panel a fix opens,
+with two steps in it. `hereFail()` in `js/popup.js` holds the words.
+
+The words name the device beside the site. A site permission can read `granted` while the operating
+system refuses the browser under it.
+
+Measured on one Windows desktop: Edge held the grant, the machine held its location service
+disabled, and both accuracy settings timed out. The old text named the site settings in the browser
+alone. Those were already correct, so it sent the reader in a circle.
+
+The card opens only where the reader pressed the button. The landing auto-locate stays silent,
+because nobody asked it a question.
 
 **The marker is the glyph alone — no chip.** Every station pin is a filled disc, because that is
 what says "a sensor is here"; wearing the same chip put the reader into the dataset as a 672nd

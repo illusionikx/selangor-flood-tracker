@@ -758,6 +758,24 @@ export function herePopup(e, loaded) {
     }${camNear(at, nearestCam(at))}${rows}`;
 }
 
+/* The other end of the same card: the reader pressed the button and no position came back.
+   The panel carries it because a button can hold a `title` and nothing else, and a `title` opens on
+   no phone and waits a second on a mouse. The card is the surface every other answer here uses.
+   The advice names the device beside the site, and that is the finding rather than the wording.
+   A site permission can read `granted` while the operating system refuses the browser under it.
+   Measured on one Windows desktop: the site held permission, the machine held its location service
+   disabled, and both accuracy settings timed out after their full window. The old text named the
+   site settings in the browser alone, which were already correct, so it sent the reader in a circle.
+   Code 1 is a refusal and the other two are silence. Both take the same two steps, so the split is
+   one sentence wide. */
+export function hereFail(code) {
+  const act = code === 1
+    ? 'Allow location for this site, and for this device.'
+    : 'Turn location on for this device, not only for this site.';
+  return `<b>${code === 1 ? 'Location is off' : 'Your location did not arrive'}</b>
+    <br><span class="muted">${act} Then press the button again.</span>`;
+}
+
 /* Hours are Malaysian, not the viewer's, so the axis agrees with every other timestamp on the page —
    JPS stamps its readings in MYT with no offset, and we print those verbatim. Reading the map from
    another timezone must not put "14:00" on the axis beside a reading stamped 06:00. */
