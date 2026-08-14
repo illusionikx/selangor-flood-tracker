@@ -964,10 +964,14 @@ function placeParam(mixed $v): string {
  * still a difference and it still cannot lose rain. It covers less ground than the window names, so
  * the card prints a second asterisk on it and the readout gives the hour it starts from. A window
  * this app measured over 20.9 h and labelled beats an em dash for the two days the archive takes to
- * fill. The caller owns one duty in exchange: two windows that come back with the same span
- * measured the same ground, and drawing both puts one number at one height twice. A reader takes
- * that pair as a measurement of the gap between them, and nobody measured that gap. See the call
- * site, which drops the longer of the two.
+ * fill.
+ *
+ * TWO WINDOWS CAN COME BACK WITH THE SAME SPAN, AND BOTH ARE PUBLISHED. The earliest record is the
+ * earliest record, so an archive 23 h deep answers 24 h and 72 h with the same 23 h difference, each
+ * marked short. Both columns then draw one number at one height. An earlier version dropped the
+ * longer of the pair, on the reasoning that two equal bars read as a measurement of the 49 hours
+ * between them. That is gone on purpose. A dash tells a reader nothing at all, and the mark plus the
+ * span in the readout carry the shortfall on both columns. Do not put the drop back.
  *
  * $partial is false by default, which forbids the short answer outright. rainBacked() needs that:
  * it asks whether an hour of claimed rain reached the odometer, and a window narrower than the hour
@@ -1173,20 +1177,22 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
     $ok('a short window still needs two samples',
         accWindow([[$now - 20 * 3600, 1000.0]], $now, 24 * 3600, true) === null);
 
-    /* The collision the call site has to drop. An archive reaching back 27 h answers 24 h by
-       WIDENING to 27 and answers 72 h by falling SHORT to the same 27, so both windows subtract the
-       same pair of samples and publish one number. Measured on PUNCAK ATHENEUM. */
+    /* Both long windows anchor to the earliest record, and BOTH publish it. An archive 23 h deep
+       answers 24 h and 72 h with one 23 h difference, each marked short. An earlier version dropped
+       the longer of the pair. These two assertions are what stops it coming back. */
+    $reach23 = [[$now - 23 * 3600, 1000.0], [$now, 1006.5]];
+    $ok('23h of records answers the 24h window',
+        accWindow($reach23, $now, 24 * 3600, true) === [6.5, 23.0, true]);
+    $ok('and answers the 72h window with the same span',
+        accWindow($reach23, $now, 72 * 3600, true) === [6.5, 23.0, true]);
+    /* A WIDENED window is not a short one, so the pair can carry different marks over one number.
+       PUNCAK ATHENEUM holds 27 h: its 24 h window covers more ground than it names and keeps one
+       asterisk, and its 72 h window covers less and takes two. */
     $reach27 = [[$now - 27 * 3600, 1000.0], [$now, 1006.5]];
-    $w24 = accWindow($reach27, $now, 24 * 3600, true);
-    $w72 = accWindow($reach27, $now, 72 * 3600, true);
-    $ok('a widened 24h and a short 72h can land on one span',
-        $w24 === [6.5, 27.0, false] && $w72 === [6.5, 27.0, true]);
-    $ok('the collision is visible as an equal span', $w24[1] === $w72[1]);
-    /* And the pair that must NOT be dropped: different spans holding the same total. The extra
-       45 hours were measured and held no rain, so two equal bars are a true statement there. */
-    $deep = [[$now - 72 * 3600, 1000.0], [$now - 24 * 3600, 1000.0], [$now, 1006.5]];
-    $ok('two spans with one total are not a collision',
-        accWindow($deep, $now, 24 * 3600, true)[1] !== accWindow($deep, $now, 72 * 3600, true)[1]);
+    $ok('a 27h archive covers the 24h window whole',
+        accWindow($reach27, $now, 24 * 3600, true) === [6.5, 27.0, false]);
+    $ok('and falls short on the 72h window',
+        accWindow($reach27, $now, 72 * 3600, true) === [6.5, 27.0, true]);
 
     echo "\naccHours():\n";
     $h3 = [[$now - 2 * 3600, 4.0], [$now - 3600, 6.0], [$now, 2.0]];
@@ -2296,17 +2302,9 @@ foreach ($stations as &$s) {
             if (($w = accWindow($series, $now, $win, true)) !== null)
                 $acc[$k] = [$w[0], $w[2] ? 2 : 1, $w[1]];
         }
-        /* Equal spans mean equal baselines, because both windows end on the same newest sample. So
-           the two columns measured the same ground and would draw one number at one height twice —
-           which a reader takes as a measurement of the 48 hours between them. Drop the longer one:
-           the 24 hour window is the claim the archive actually covers.
-           Measured on PUNCAK ATHENEUM, whose records reach back 27 h: the 24 hour window widened to
-           27 h and the 72 hour window fell back to the same sample, and both published 6.5 mm.
-           This is deliberately NOT a floor in hours. A floor compares a span to a constant, and the
-           fault is two spans landing on each other — a widened window can collide with a short one
-           at any depth, so only the comparison catches it. Do not test mm instead: two different
-           spans holding the same total means no rain fell in the extra ground, which is measured. */
-        if ($acc['h72'] && $acc['h24'] && $acc['h72'][2] === $acc['h24'][2]) $acc['h72'] = null;
+        /* Nothing filters the pair. Both windows anchor to the oldest sample there is, so a young
+           archive answers both with one number over one span, each marked short. See accWindow()
+           above for the version that dropped the longer one and why it is gone. */
         $s['backed'] = rainBacked($s['hourly'] ?? null, $series, $now);
         /* The oldest odometer sample this station has. It is the baseline of any short answer, so
            the card names it, and its absence is what tells the card that a gauge publishes no

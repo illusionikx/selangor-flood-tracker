@@ -1144,8 +1144,11 @@ export function rainAcc(acc, from) {
     <div class="accx">${rows.map(([, label, r]) =>
       `<span>${label}${r && r[1] ? `<sup>${'*'.repeat(r[1])}</sup>` : ''}</span>`).join('')}</div>
     ${star ? '<div class="muted">* Value derived from archived readings.</div>' : ''}
-    ${short ? `<div class="muted">** ${at ? `Measured from ${at}. ` : ''
-      }Records do not reach further back.</div>` : ''}
+    ${/* The shortfall leads, because that is the claim the mark makes — the date is the fact behind
+          it. Both long windows carry this mark together on a young archive: they anchor to the same
+          earliest record, so they draw one number twice, and the remark is what says why. */''}
+    ${short ? `<div class="muted">** Records cover less than the full period.${
+      at ? ` Measured from ${at}.` : ''}</div>` : ''}
   </div>`;
 }
 

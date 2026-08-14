@@ -146,32 +146,43 @@ function stormAcc(s, mm) {
   const day = +(mm * DAY_X).toFixed(1);
   const h24 = +(day * (1.05 + 0.40 * t)).toFixed(1);
   const h72 = +(h24 * (1.15 + 0.80 * t)).toFixed(1);
+  /* Rain over `h` hours of records, interpolated between the two windows that hour falls between.
+     Interpolated rather than scaled, because a window covering 40 of its 72 hours measured the rain
+     in those 40 — so it sits between the neighbouring totals rather than at a fraction of one. */
+  const over = h => h <= 24 ? +(h3 + (h24 - h3) * ((h - 3) / 21)).toFixed(1)
+                            : +(h24 + (h72 - h24) * ((h - 24) / 48)).toFixed(1);
   return {
     h1:  [+mm.toFixed(1), 0, null],
     h3:  [h3, s.source === 'kl' ? 1 : 0, null],
     day: [day, 0, null],
-    /* A server polling every five minutes lands a baseline within a few minutes of the far end, so
-       these stay close to the window they name. The stretched wording needs no knob of its own: it
-       is on screen whenever the archive has a hole, which is most days on a box like this one. */
-    h24: [h24, 1, +(24.1 + t * 0.6).toFixed(1)],
-    /* A short 72 hour window on about half of them. A real box takes two days to reach back that
-       far, so the second asterisk and its footnote would otherwise only be visible in the two days
-       after somebody loses `.history.db`. Same rule as the derived flag above: a state real data
-       reaches rarely still needs a knob, or it ships unseen.
-       The value is interpolated rather than scaled, because a window covering 40 of its 72 hours
-       measured the rain in those 40 — so it sits between the 24 hour total and the full 72. */
-    h72: reach ? [+(h24 + (h72 - h24) * ((reach - 24) / 48)).toFixed(1), 2, reach]
+    /* Three states across the station set, because all three are real and two of them were invisible
+       in test mode. `reachOf()` picks which one a station is in.
+       An archive past every window: both totals whole, spans a few minutes wide of the name, because
+       a server polling every five minutes lands a baseline close to the far end.
+       An archive between the two windows: 24 h whole, 72 h short.
+       An archive inside both: BOTH short, both anchored on the same earliest record, so both draw one
+       number over one span. That is the state a young archive is in, and it is what the remark under
+       the chart exists to explain — see the pair of assertions in api.php that keep it. */
+    h24: reach && reach < 24 ? [over(reach), 2, reach]
+                             : [h24, 1, +(24.1 + t * 0.6).toFixed(1)],
+    h72: reach ? [over(reach), 2, reach]
                : [h72, 1, +(72.1 + t * 0.8).toFixed(1)],
   };
 }
 
-/* How far back a faked archive reaches, in hours, or 0 where it reaches past every window. One
-   number per station, because both long windows subtract from the same oldest sample — a station
-   whose records start 40 h back has a short 72 hour window and a whole 24 hour one, and `accFrom`
-   has to agree with both. Never under 26, which keeps the fake self-consistent two ways: a baseline
-   older than 24 h is what lets the 24 hour window above claim a whole window, and the two spans stay
-   apart, so the fake cannot draw the collision api.php drops rather than sends. */
-const reachOf = s => { const t = seed(s.id || ''); return t < 0.45 ? +(26 + t * 40).toFixed(1) : 0; };
+/* How far back a faked archive reaches, in hours, or 0 where it reaches past every window. ONE
+   number per station, because both long windows subtract from the same oldest sample and `accFrom`
+   has to agree with both of them. A station whose records start 40 h back has a whole 24 hour window
+   and a short 72 hour one. A station whose records start 18 h back has two short windows holding one
+   number, which is what a real box draws for its first two days.
+   Never between 22 and 26: a reach either side of 24 puts the fake in one of the two states cleanly,
+   and a value at the boundary makes the 24 hour window's own span ambiguous for no gain. */
+const reachOf = s => {
+  const t = seed(s.id || '');
+  return t < 0.25 ? +(12 + t * 40).toFixed(1)              // inside both windows
+       : t < 0.55 ? +(26 + (t - 0.25) * 60).toFixed(1)     // between them
+       : 0;                                                // past both
+};
 
 // One sensor, pushed to the worst its own kind can report. Used by the first pass on rivers and by
 // the site pass on everything else at a place that is already under water.

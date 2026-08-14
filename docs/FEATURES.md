@@ -9037,27 +9037,38 @@ of claimed rain reached the odometer. A window narrower than that hour calls liv
 wider window can only add rain, which is the safe way to be wrong. A narrower one is the unsafe
 way, so the short answer stays opt-in.
 
-### One archive answered two windows with one number
+### Two windows answered with one number, and both of them keep it
 
-The first version of the short window used a floor in hours. A partial had to cover more ground
-than the fixed window under it. That is 3 hours under the day, and 24 hours under the three days.
-Two columns holding one number at one height read as a claim about the gap between them. Nobody
-measured that gap.
+Both long windows anchor to the oldest sample there is. So an archive 21 hours deep answers 24 hours
+and 72 hours with the same 21-hour difference, each marked short, and the two columns draw one number
+at one height. On the 2026-08-14 16:20 poll that is 180 stations of 231 — every Selangor gauge that
+can answer at all.
 
-The floor was the wrong shape of answer, and the live payload said so at once. PUNCAK ATHENEUM
-holds 27 hours of records. Its 24-hour window **widened** to 27 hours. The oldest sample is the
-last one at or before the far end. Its 72-hour window then fell **short** to that same sample.
-Both subtracted one pair of readings and both published 6.5 mm.
+This work built two filters to suppress that pair. Both are gone. The reasoning behind them is worth
+keeping, because it is the argument against what ships.
 
-The floor passed that pair. A floor compares one span to a constant, and the fault is two spans
-landing on each other. A widened window can collide with a short one at any depth.
+The first was a floor in hours. A partial had to cover more ground than the fixed window under it:
+3 hours under the day, and 24 hours under the three days. The live payload broke it in one query.
+PUNCAK ATHENEUM holds 27 hours of records. Its 24-hour window **widened** to 27 hours, because the
+base is the last sample at or before the far end. Its 72-hour window fell **short** to that same
+sample. Both published 6.5 mm, and the floor passed the pair. A floor compares one span to a
+constant, and the fault is two spans landing on each other. A widened window can meet a short one at
+any depth, so no constant catches it.
 
-The call site compares the two spans instead. Both windows end on the newest sample, so an equal
-span is an equal baseline. It drops the longer window, because the 24-hour claim is the one the
-archive covers.
+The second compared the two spans and dropped the longer one. That is the one a reader reversed, and
+the reversal is right. Suppression trades a true short measurement for no measurement at all. The
+reader asked for the earliest record on both columns with a remark saying the records fall short, and
+the remark is already there under the chart. A dash says nothing, and a reader who sees one asks why
+— which is how this whole feature started.
 
-Do not compare the totals instead. Two different spans that hold one total mean no rain fell in the
-extra ground, and this app measured that extra ground.
+Do not build a third filter. Four assertions in `--selftest` hold the behaviour: 23 hours of records
+answers both windows over 23 hours, and a 27-hour archive covers the 24-hour window whole while
+falling short on the 72-hour one.
+
+A widened window is not a short one, so the pair can carry different marks over one number. PUNCAK
+ATHENEUM draws `24 h*` beside `72 h**` at 6.5 mm each. The first covered more ground than it names.
+The second covered less. That is two different facts about one subtraction, and the marks are what
+separate them.
 
 ### An empty column said nothing, and two of its states differ
 

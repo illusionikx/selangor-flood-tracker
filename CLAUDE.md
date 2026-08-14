@@ -422,15 +422,22 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   nothing. **`$partial` is false by default, and `rainBacked()` depends on that.** A window narrower
   than the hour it asks about calls live rain faulty. A wider window can only add rain, which is
   the safe way to be wrong.
-  **Two windows that come back with the same span measured the same ground, and the call site drops
-  the longer one.** Both windows end on the newest sample, so an equal span is an equal baseline.
-  PUNCAK ATHENEUM is the worked case: its records reach back 27 h, so the 24-hour window WIDENED to
-  27 h and the 72-hour window fell SHORT to that same sample, and both published 6.5 mm. Two columns
-  then draw one number at one height, and a reader reads the pair as a claim about the 45 hours
-  between them. Nobody measured those hours. **A floor in hours cannot catch this.** The first
-  version used one — a floor compares one span to a constant, and the fault is two spans landing on each
-  other, which a widened window can do at any depth. **Do not compare mm instead**: two different
-  spans that hold one total mean no rain fell in the extra ground, and this app measured it.
+  **Both long windows anchor to the earliest record, and both publish it even when that is one number
+  twice.** An archive 21 h deep answers 24 h and 72 h with the same 21 h difference, each marked
+  short. On the 2026-08-14 16:20 poll, 180 stations of 231 answer both windows over one span, which is
+  every Selangor gauge that can answer at all. The earliest record is the earliest record, and a dash
+  tells a reader nothing. The mark and the span in the readout carry the shortfall on each column.
+  **Two filters tried to suppress the pair and both are gone. Do not build a third.** The first
+  was a floor in hours: a partial had to cover more ground than the fixed window under it. The live
+  payload broke it at once, because a floor compares one span to a constant and the fault is two spans
+  landing on each other. PUNCAK ATHENEUM holds 27 h, so its 24-hour window WIDENED to 27 and its
+  72-hour window fell SHORT to that same sample. A widened window can meet a short one at any depth.
+  The second compared the two spans and dropped the longer. That is the one this reverses on a
+  reader's instruction, and the instruction is right: suppression trades a true short measurement for
+  no measurement, and the remark already states what the columns share.
+  **A widened window is not a short one, so the pair can carry different marks over one number.**
+  PUNCAK ATHENEUM draws `24 h*` and `72 h**` at 6.5 mm each. The first covered more ground than it
+  names and the second covered less. Four assertions in `--selftest` hold both halves.
   **A short window can undershoot a window nested inside it, and this app does not suppress that.**
   On the same poll, 4 stations of 180 report less over 24 h than over today, three of them
   by 0.5 to 1.0 mm and TAMAN MAYANG by 12.5. The odometer and the feed's own daily total disagree,
