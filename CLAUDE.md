@@ -45,7 +45,7 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `js/alerts.js` | "On alert": the app bar's warning glyph, the list it opens in `#side`, the icon badge, the red favicon, and the MET warning cards above that list |
 | `js/table.js` | the all-stations table dialog, grouped district → mast → sensor |
 | `js/locate.js` | geolocation, the "You are here" marker, and the amber button a failed fix leaves behind |
-| `js/ticker.js` | header alert marquee — measured, seamless, speed scales with the alert count, and draws the MET warning tiles into the strip |
+| `js/ticker.js` | header alert marquee — measured, seamless, speed scales with the alert count, draws the MET warning tiles into the strip, and closes every set with the app's own name as a divider |
 | `js/timeline.js` | camera archive replay + A/B compare, inside the lightbox and nowhere else |
 | `js/clip.js` | the station panel's 3-hour camera clip — no controls, that is the lightbox's job |
 | `js/toast.js` | desktop-only "new alert since last poll" toast |

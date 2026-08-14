@@ -133,6 +133,14 @@ header .hactions {
 /* A MET warning tile. It shares the shape of .tk-i. Its colour comes through --c, set inline in
    js/ticker.js to --k-weather, not a kind colour. */
 #ticker .tk-warn .i { color: var(--c); }
+/* The app's name, closing every set. It is a divider and not news, so it is the quietest thing on
+   the strip: muted throughout, no hover, no target. `.tk-i:hover b` would otherwise tint and
+   underline it like a station you can go to. The drop keeps the accent, because that mark is the
+   accent everywhere else in the bar. */
+#ticker .tk-brand { cursor: default; color: var(--muted); }
+#ticker .tk-brand .i { color: var(--accent); }
+#ticker .tk-brand b { font-weight: 400; }
+#ticker .tk-brand:hover b { color: var(--muted); text-decoration: none; }
 #ticker .tk-dot { color: var(--outline); margin: 0 16px; }
 /* All-clear: centred, grey, still. It is the one card that is not a link and not news, so it reads
    as a label rather than an item that happens to be showing — and stillness is the message. */

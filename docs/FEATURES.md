@@ -1806,6 +1806,19 @@ Decisions:
   Measured on both candidates. At 50% the full title survives to 1400px, and a 700px window draws
   the drop alone. At 40% the full title reaches 1200px, and 700px draws `KVFW`. The reader took the
   wider strip.
+- **The name of the app closes every set.** With one alert the strip carried that alert and nothing
+  else, so a lap was the same tile four times over. That reads as a stuck ticker rather than as one
+  river in trouble.
+
+  A second tile gives the eye a seam. One alert now scrolls `LABOHAN DAGANG · Klang Valley Flood
+  Watch · LABOHAN DAGANG · …`, and a long list gets one marker per lap.
+
+  It is a divider and not an item. It sits after the map that inserts the advisory, so
+  `i % ADVISE_EVERY` cannot land on it.
+
+  It is a `<span>` with no `data-go` and no `data-banner`, so nothing opens. It keeps the muted
+  colour throughout and takes no hover, because it is the one tile on the strip that reports
+  nothing. `MIN_TILES` counts it, the same as every other tile on the belt.
 - **Speed scales with the count.** One lap has to show everything, so a fixed pace means waiting a
   minute to find out whether your river is on the list when 40 stations are up. `pace()` ramps
   `PX_PER_SEC` from 45 upward once the count passes `FAST_FROM` (5), capped at 2×: past that the

@@ -148,15 +148,26 @@ export function ticker() {
      phone number past once and then bury it under a minute of station names — which is the wrong
      way round, because the longer the list the more likely the reader is someone who needs the
      number rather than the telemetry. */
-  const set = items.map((tile, i) => i % ADVISE_EVERY === 0 ? advise + tile : tile).join('');
+  /* The app's own name closes every set, and it is a divider rather than an item. With one alert the
+     strip had nothing but that alert on it, wrapping into itself several times a lap — which reads
+     as a stuck ticker rather than as one river in trouble. A second tile gives the eye the seam.
+
+     It sits after the map rather than inside `items`, so the advisory's `i % ADVISE_EVERY` cannot
+     land on it, and it is a `<span>` with no `data-go` and no `data-banner`, so nothing opens.
+     Muted, because it is the one tile on the strip that reports nothing. */
+  const brand = `<span class="tk-i tk-brand"><i class="i i-flood"></i>
+      <b>Klang Valley Flood Watch</b><span class="tk-dot">•</span></span>`;
+
+  const set = items.map((tile, i) => i % ADVISE_EVERY === 0 ? advise + tile : tile).join('') + brand;
   run.style.removeProperty('--dur');
   run.innerHTML = set;
   const one = run.scrollWidth;
   // items.length, not hot.length: a banner with no hot station still fills the strip and needs
   // a real pace. hot.length alone divides by zero on a banner-only poll.
+  // The `+ 1` is the brand tile. MIN_TILES counts what is on the belt, and the brand is on it.
   const reps = Math.max(
     one > 0 ? Math.ceil(box.clientWidth / one) : 2,
-    Math.ceil(MIN_TILES / items.length),
+    Math.ceil(MIN_TILES / (items.length + 1)),
   );
 
   run.innerHTML = set.repeat(reps * 2);
