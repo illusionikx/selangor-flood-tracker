@@ -244,6 +244,15 @@ const GAZ_STAMP = __DIR__ . '/.gaz.stamp';
 const GAZ_KEY   = 'gazdone:';                     // one page row per prefix already queried
 const GAZ_DISTRICT_KM = 50;   // a placement must corroborate the district the portal itself assigns
 
+/* The rainfall history backfill. A full per-station 7-day fetch costs about 28 MB, so asking for
+   every station on one refresh is about 2.7 GB in one request at one government host — the camera
+   stampede in slow motion. It drips instead, the same shape GAZ_ above uses: at most HIST_FILL
+   stations per refresh, at most once every HIST_EVERY, site-wide. */
+const HIST_FILL  = 5;                             // stations per refresh
+const HIST_EVERY = 600;                           // seconds between drips, site-wide
+const HIST_STAMP = __DIR__ . '/.hist.stamp';
+const HIST_KEY   = 'histdone:';                   // one page row per station already seeded
+
 /* The coverage box: Selangor, Kuala Lumpur and Putrajaya. The 683 stations span latitude 2.6088 to
    3.8470 and longitude 100.8229 to 101.9215, plus 0.1 degrees of margin so an edge place resolves.
    Nominatim reads `viewbox` as west,north,east,south. Published as `box`, a diagnostic beside
@@ -1395,13 +1404,21 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
         . "<td>Jave Setia (F2)</td><td>Petaling</td><td>15/08/2026 00:00:00</td>"
         . "<td>0.0</td><td>0.0</td><td>0.0</td><td>0.0</td><td>0.0</td><td>5.0</td>"
         . "<td>5.0</td><td class='info'>-9,999.00</td></tr>"
+        // A live shape measured 2026-08-15: the graph link the site prints for Taman Sri Muda
+        // carries a trailing underscore the getrainfalllast7days.php endpoint requires — the
+        // digits alone are a DIFFERENT id there, and answer with no history at all.
+        . "<td data-th='No'>3</td><td data-th='Station ID'>3015084</td>"
+        . "<td>Taman Sri Muda</td><td>Klang</td><td>15/08/2026 03:30:00</td>"
+        . "<td>0.0</td><td>0.0</td><td>1.0</td><td>0.0</td><td>8.0</td><td>0.5</td>"
+        . "<td><a href='/index.php/rf-graph/?stationid=3015084_'>0.0</a></td>"
+        . "<td class='info'>0.0</a></td></tr>"
         // Twelve cells. A row this shape is a layout change, and it must be dropped.
         . "<td>x</td><td>x</td><td>x</td><td>x</td><td>x</td><td>x</td>"
         . "<td>x</td><td>x</td><td>x</td><td>x</td><td>x</td><td>x</td></tr>"
         . "</tbody></table>";
 
     $prf = portalRain(['prf-SEL' => $prfFixture]);
-    $ok('two rows survive the width guard',  count($prf) === 2);
+    $ok('three rows survive the width guard', count($prf) === 3);
     $ok('the code comes off data-th',        $prf[0]['code'] === '0232331RF');
     $ok('the name is cell 2',                $prf[0]['name'] === 'S.M.K Bandar Kinrara (F2)');
     $ok('the district is cell 3',            $prf[0]['district'] === 'Petaling');
@@ -1412,10 +1429,12 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
     $ok('cell 12 is the hour',               $prf[0]['hourly'] === 0.0);
     $ok('the six daily columns are kept',    $prf[0]['days'] === [0.0, 0.0, 2.5, 0.0, 0.0, 7.5]);
     $ok('yesterday is the last of the six',  end($prf[0]['days']) === 7.5);
-    $ok('the graph id comes off the link',   $prf[0]['graphId'] === 27398);
+    // A string, never an int — see the trailing-underscore case right below.
+    $ok('the graph id comes off the link',   $prf[0]['graphId'] === '27398');
     $ok('a missing code is null',            $prf[1]['code'] === null);
     $ok('a missing graph link is null',      $prf[1]['graphId'] === null);
     $ok('-9999 is no reading',               $prf[1]['hourly'] === null);
+    $ok('a trailing underscore in the id survives', $prf[2]['graphId'] === '3015084_');
     $ok('an empty page yields nothing',      portalRain(['prf-SEL' => '']) === []);
     /* The form the endpoint serves without its two hidden inputs. It holds a table and no row, so
        pageHasData() lets it through and the parser has to answer for it. */
@@ -1703,6 +1722,37 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
     $ok('a done prefix is not asked again', gazWanted($names, ['ban' => 1], 99) === ['kgm', 'sri']);
     $ok('a finished set asks for none',
         gazWanted($names, ['ban' => 1, 'kgm' => 1, 'sri' => 1], 99) === []);
+
+    echo "\nseriesParse():\n";
+    /* Field names measured against the live endpoint on 2026-08-15 (three stations, up to 8 days
+       each), not guessed: `date_time`, no seconds, not `tarikh`. `clean_rainfall`, not `raw`.
+       There is no single rolling-total field — `cum_hourly` and `cum_daily` stand in for it, and
+       neither is the one to sum. See seriesParse()'s own comment in sources.php for the
+       measurement that tells them apart. */
+    $sJson = '[{"station_name":"X","date_time":"14/08/2026 10:00","clean_rainfall":2.5,"cum_hourly":2.5,"cum_daily":2.5,"tot_daily":0},'
+           . '{"station_name":"X","date_time":"14/08/2026 10:05","clean_rainfall":0,"cum_hourly":2.5,"cum_daily":2.5,"tot_daily":0},'
+           . '{"station_name":"X","date_time":"14/08/2026 10:10","clean_rainfall":1,"cum_hourly":3.5,"cum_daily":3.5,"tot_daily":0}]';
+    $sr = seriesParse($sJson);
+    $ok('every record is read',        count($sr) === 3);
+    $ok('the stamp becomes unix',      $sr[0][0] === strtotime('2026-08-14 10:00:00 +0800'));
+    /* clean_rainfall, never cum_hourly. Measured on Sg. Selangor di Teluk Penyamun Jeti (F2): a
+       burst from 09:25 to 09:50 pushed cum_hourly and cum_daily to the same 111.5 together, then a
+       gap to 10:50 reset cum_hourly to that bucket alone (0.5) while cum_daily kept the running
+       112.0. cum_hourly is a rolling window, and summing a rolling window counts the same rain
+       many times over. clean_rainfall summed across one calendar day reproduced cum_daily's own
+       end-of-day figure on all 8 days measured, on 3 stations, to the last decimal. */
+    $ok('the value is clean_rainfall', $sr[0][1] === 2.5);
+    $ok('a zero bucket is kept',       $sr[1][1] === 0.0);
+    $ok('the series is ascending',     $sr[0][0] < $sr[1][0] && $sr[1][0] < $sr[2][0]);
+    $ok('bad json yields nothing',     seriesParse('not json') === []);
+    $ok('an empty body yields nothing', seriesParse('') === []);
+    /* strtotime() reads a slash-separated date as American m/d/y, so a day past 12 fails outright
+       and a day at or under 12 only looks right by accident — "08/08/2026" cannot be told from
+       August the 8th. seriesParse() has to use DateTime::createFromFormat() instead, the same rule
+       myTime() already states for the other two scraped feeds. */
+    $ok('a day past 12 still parses',
+        seriesParse('[{"date_time":"20/08/2026 09:15","clean_rainfall":1}]')[0][0]
+        === strtotime('2026-08-20 09:15:00 +0800'));
 
     echo "\nserveFromCache():\n";
     $ok('a fresh cache is served',                 serveFromCache(10, true, false) === true);
@@ -2890,6 +2940,21 @@ $gazNames = [];
 foreach ($prf as $i => $r) if (!isset($prfHit['used'][$i])) $gazNames[] = $r['name'];
 $gazAsk = gazWanted($gazNames, $gazDone, GAZ_FILL);
 
+/* What the archive already seeded and which stations are next, counted before the payload goes out.
+   `$graphIds` is the map the two placement passes filled — the station's own `graphId` key is
+   unset before this point, which is why that map exists. The drip itself runs at the end of this
+   file, after the echo, so it cannot report on itself — the same split GAZ_ above uses. */
+$histDone = [];
+foreach ($stored as $su => $sr) {
+    if (str_starts_with($su, HIST_KEY)) $histDone[substr($su, strlen(HIST_KEY))] = 1;
+}
+$histTodo = [];
+foreach ($graphIds as $id => $g) {
+    if (isset($histDone[$id])) continue;
+    $histTodo[$id] = $g;
+    if (count($histTodo) >= HIST_FILL) break;
+}
+
 // --- Rainfall history --------------------------------------------------------------------------
 // Rain now is the river's rise in an hour, so this is the earlier signal of the two — worth keeping
 // even though nothing computes a trend from it. Same table, same window; only the bucket differs.
@@ -3221,6 +3286,8 @@ $payload = json_encode([
         // backfill finishing, which is success — see watch.php in Task 10.
         'gaz' => ['stations' => (int)$db->query('SELECT COUNT(*) FROM station')->fetchColumn(),
                   'asked'    => count($gazDone), 'pending' => count($gazAsk)],
+        // `pending` reaching 0 is the seed finishing, which is success — see watch.php in Task 10.
+        'hist' => ['seeded' => count($histDone), 'pending' => count($histTodo)],
         // Empty on a healthy poll. A key here names a table the map is drawing from a stored copy.
         'stale'    => $pagesStale,
     ],
@@ -3296,6 +3363,73 @@ if ($gazOk) {
             // Stamped whether or not it answered, the same rule pageRow() states: a prefix that
             // never answers must not be asked again on every refresh forever.
             $keep->execute([GAZ_KEY . $p, $now, '1']);
+        }
+        $db->commit();
+    }
+}
+
+/* The history seed. One request per station, ONE TIME EVER, dripped exactly like the gazetteer
+   above. A full per-station fetch on every refresh costs 28 MB, which is about 2.7 GB each day at
+   one government host. That is the camera stampede in slow motion, and it is the thing this app
+   has a rule against. At 5 stations per refresh the 425 stations complete in about 21 hours.
+   The seed is what makes a 24 hour and a 72 hour window answer on the FIRST poll rather than after
+   two days of ordinary polling. */
+[$histOk] = forceAllowed($now, is_file(HIST_STAMP) ? filemtime(HIST_STAMP) : null, HIST_EVERY);
+if ($histOk) {
+    $todo = $histTodo;
+    if ($todo) {
+        touch(HIST_STAMP);
+        $urls = [];
+        foreach ($todo as $id => $g) $urls[$id] = seriesUrl($g);
+        $got = fetchAll($urls, 3, false);
+        $ins2   = $db->prepare('INSERT OR IGNORE INTO level (station, ts, level) VALUES (?, ?, ?)');
+        // The earliest sample this app has already stored for a station's running total, if any —
+        // read fresh per station rather than off $odo, which only holds ACC_READ (80h) of it. A
+        // station polled for days before its turn in the drip comes up would lose the join if this
+        // read the windowed copy instead of the table itself.
+        $first2 = $db->prepare('SELECT ts, level FROM level WHERE station = ? ORDER BY ts LIMIT 1');
+        $db->beginTransaction();
+        foreach ($todo as $id => $g) {
+            $pts = seriesParse($got[$urls[$id]] ?? '');
+            $key = $id . '#c';
+
+            /* The seed has to JOIN the running total this app already keeps, not restart it. By
+               the time a station's turn in the drip comes up, live polling may already have
+               written #c samples for it — a LARGER number at a NEWER timestamp than a seed
+               starting from zero would produce. accWindow() reads a total that only climbs, so a
+               seed ending below the first live sample is a station whose 24 and 72 hour windows
+               go null the moment the two series meet.
+
+               Read the earliest live sample. With none, there is nothing to join to, and the seed
+               is the whole series, starting from zero — portalOdo()'s own starting rule. With one,
+               keep only the seed buckets OLDER than it (the ground the live series already owns is
+               not seeded again) and let R be the raw running total at the last of those. Offsetting
+               every kept value by firstLive's own value minus R makes the LAST seeded value equal
+               firstLive's value exactly, so the join has no step in it and no direction to go
+               backwards in. Early seeded values may land negative under that offset, which is
+               harmless: accWindow() only ever subtracts two samples, so a constant offset cancels
+               out of every window it touches. */
+            $first2->execute([$key]);
+            $firstLive = $first2->fetch(PDO::FETCH_NUM);
+            $firstTs   = $firstLive !== false ? (int)$firstLive[0] : null;
+
+            // Disjoint buckets add up, so a running total is a running sum. This is the ONE place
+            // in this app that adds rainfall readings together, and it is allowed because these
+            // buckets do not overlap. Everything else takes a difference — see accWindow().
+            $run = 0.0;
+            $toInsert = [];
+            foreach ($pts as [$ts2, $mm]) {
+                $run = round($run + $mm, 1);
+                if ($firstTs !== null && $ts2 >= $firstTs) break;   // the live series owns this ground
+                $toInsert[] = [$ts2, $run];
+            }
+            $r      = $toInsert ? end($toInsert)[1] : 0.0;
+            $offset = $firstLive !== false ? ((float)$firstLive[1] - $r) : 0.0;
+            foreach ($toInsert as [$ts2, $raw]) {
+                $ins2->execute([$key, $ts2, round($raw + $offset, 1)]);
+            }
+            // Stamped whether or not it answered, the same rule pageRow() states.
+            $keep->execute([HIST_KEY . $id, $now, '1']);
         }
         $db->commit();
     }

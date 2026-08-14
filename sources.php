@@ -226,7 +226,17 @@ function portalRows(string $html): array {
  * midnight in the running total. See portalOdo() in api.php.
  *
  * `graphId` rides in cell 11's link and is the key the 7 day series takes. A row without the link
- * keeps a null id and simply takes no history backfill. */
+ * keeps a null id and simply takes no history backfill.
+ *
+ * `graphId` IS A STRING, NEVER CAST TO INT. MEASURED against the live SEL/WLH/PTJ pages on
+ * 2026-08-15: 308 rows carry a `stationid=` link, and 72 of them — Taman Sri Muda among them —
+ * carry a trailing underscore the site's own link puts there, `stationid=3015084_`. The digit run
+ * alone, `3015084`, is a DIFFERENT id to the endpoint the id is for: it answers with an empty
+ * array, while the id with its underscore answers with the station's own 7 day history. An earlier
+ * version of this function cast to `(int)`, which silently drops that underscore and silently
+ * empties the backfill for every one of those 72 rows — a quarter of everything this join places.
+ * The regex now captures the underscore where the page prints one and nothing where it does not,
+ * and seriesUrl() takes the result verbatim. */
 function portalRain(array $pages): array {
     $out = [];
     foreach ($pages as $html) {
@@ -243,7 +253,7 @@ function portalRain(array $pages): array {
                 'days'     => $days,
                 'daily'    => numOrNull($c[11]),
                 'hourly'   => numOrNull($c[12]),
-                'graphId'  => preg_match('/stationid=(\d+)/', $href, $m) ? (int)$m[1] : null,
+                'graphId'  => preg_match('/stationid=(\d+_?)/', $href, $m) ? $m[1] : null,
             ];
         }
     }
@@ -282,6 +292,66 @@ function gazParse(string $json): array {
             'lat'  => $lat, 'lng' => $lng,
         ];
     }
+    return $out;
+}
+
+/* The station's own 7 day rainfall history — a public JSON feed under the portal's `enlighten`
+ * theme, not a scrape. Distinct from GAZ above: that answers a substring search over station
+ * NAMES, this answers by `graphId`, the id the rainfall table's own link carries — see
+ * portalRain(). A backfill uses it to build a running rainfall total for the days before this app
+ * first polled a station, so a 24 and 72 hour window can answer on the first poll rather than
+ * after two days of ordinary polling.
+ *
+ * MEASURED against the live endpoint on 2026-08-15, three stations, up to 8 days each. The field
+ * names in the task this function was briefed from do not exist on the real endpoint — `tarikh`,
+ * `raw`, `clean` and `chourly` were guesses, and every one is wrong. The real feed carries
+ * `date_time` (no seconds), `clean_rainfall`, `cum_hourly` and `cum_daily`. There is no single
+ * rolling-total field to confuse with the disjoint bucket, which is the risk the brief warned
+ * about — there are two, and neither is the one to sum. See seriesParse() below for which one is.
+ */
+const SERIES = 'https://publicinfobanjir.water.gov.my/wp-content/themes/enlighten/query/getrainfalllast7days.php';
+
+// A STRING, not an int — see the measurement on portalRain()'s own `graphId` line. Some ids carry
+// a trailing underscore the endpoint requires, and (int) silently drops it.
+function seriesUrl(string $graphId): string {
+    return SERIES . '?' . http_build_query(['station' => $graphId]);
+}
+
+/* 7 days of 5 minute buckets, as [unix seconds, mm], ascending.
+ *
+ * `clean_rainfall` AND NOTHING ELSE. It is the disjoint 5-minute bucket, so disjoint buckets add
+ * up — the whole reason this backfill can build a running total for days this app never polled.
+ * `cum_hourly` is a rolling window and summing a rolling window counts the same rain many times
+ * over.
+ *
+ * MEASURED on Sg. Selangor di Teluk Penyamun Jeti (F2): a burst from 09:25 to 09:50 pushed
+ * `cum_hourly` and `cum_daily` to the same 111.5 together — while nothing had yet fallen out of
+ * the rolling hour, a rolling total and a running total read identically. A gap to 10:50 then
+ * reset `cum_hourly` to that one bucket alone (0.5) while `cum_daily` kept the running 112.0. Over
+ * 8 days on 3 stations, `clean_rainfall` summed across one calendar day reproduced `cum_daily`'s
+ * own end-of-day figure exactly, every time.
+ *
+ * SCORE ANY CHECK OF THIS ON A STATION WITH RAIN IN THE WINDOW. A dry station agrees with either
+ * reading — twelve zeros sum to a zero, so it cannot tell a rolling window from a disjoint one.
+ *
+ * `date_time` parses on DateTime::createFromFormat(), never strtotime(). strtotime() reads a bare
+ * slash-separated date as American m/d/y, so a day past 12 fails outright and a day at or under 12
+ * only looks right by accident — the same trap myTime() above already guards against on the other
+ * two scraped feeds.
+ *
+ * Stamps are Malaysian wall clock with no offset, the same as every other reading here.
+ */
+function seriesParse(string $json): array {
+    $rows = json_decode($json, true);
+    if (!is_array($rows)) return [];
+    $tz = new DateTimeZone('Asia/Kuala_Lumpur');
+    $out = [];
+    foreach ($rows as $r) {
+        $d = DateTime::createFromFormat('d/m/Y H:i', trim((string)($r['date_time'] ?? '')), $tz);
+        if (!$d) continue;
+        $out[] = [$d->getTimestamp(), (float)($r['clean_rainfall'] ?? 0)];
+    }
+    usort($out, fn($a, $b) => $a[0] <=> $b[0]);
     return $out;
 }
 
