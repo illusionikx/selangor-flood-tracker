@@ -1092,10 +1092,17 @@ function rainBacked(?float $hourly, array $odo, int $now): ?bool {
  * and a fall is a reset whenever it happens. A mid-day glitch, measured at about one per station
  * per 20 days, takes the same path and still climbs.
  *
+ * A NEGATIVE DAILY TOTAL IS REFUSED, the same way a null one is. Rain from midnight cannot run
+ * backwards, so a negative is a fault rather than a reading. numOrNull() catches the -9999 sentinel
+ * and lets a smaller negative through, and adding one here would drive the running total DOWN.
+ * accWindow() would then null the one window that straddles it, which reads as an ordinary gap,
+ * while every later poll kept climbing from the corrupted baseline. Refusing stores no sample, so
+ * the series keeps its last good value and the next good reading continues from there.
+ *
  * Returns the next total, or null where the caller has nothing to store.
  */
 function portalOdo(?float $prevOdo, ?float $prevDaily, ?float $daily, ?float $yesterday): ?float {
-    if ($daily === null) return null;
+    if ($daily === null || $daily < 0) return null;
     if ($prevOdo === null || $prevDaily === null) return $daily;
     if ($daily >= $prevDaily) return round($prevOdo + ($daily - $prevDaily), 1);
     // A fall is a reset. Owe nothing rather than subtract where yesterday's column is missing or
@@ -1357,6 +1364,15 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
        midnight, and the bridge treats it as one. accWindow() sees a total that still climbs. */
     $ok('a mid-day glitch still climbs',     portalOdo(100.0, 30.0, 0.0, 30.0) === 100.0);
     $ok('a null daily cannot be counted',    portalOdo(100.0, 7.5, null, 9.0) === null);
+    /* A negative total is a fault, not a reading, and adding one would drive the running total
+       DOWN. accWindow() would null one window and every later poll would keep climbing from the
+       corrupted baseline, so the under-reporting would never repair itself. */
+    $ok('a negative daily is refused',       portalOdo(100.0, 7.5, -0.1, null) === null);
+    $ok('a large negative is refused too',   portalOdo(100.0, 7.5, -9999.0, 9.0) === null);
+    /* The pair is stored together, so one half arriving without the other means a fresh station.
+       Starting at today's total is right for it. */
+    $ok('a missing previous total restarts', portalOdo(null, 7.5, 3.0, null) === 3.0);
+    $ok('a missing previous daily restarts', portalOdo(100.0, null, 3.0, null) === 3.0);
 
     echo "\naccWindow():\n";
     $odo = [[$now - 80 * 3600, 1000.0], [$now - 72 * 3600, 1010.0],
