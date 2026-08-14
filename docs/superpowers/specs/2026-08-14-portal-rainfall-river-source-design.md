@@ -55,6 +55,16 @@ With them it returns 241 rows for Selangor, 68 for Kuala Lumpur and 2 for Putraj
 two cells carry `data-th`. Read the rest by position, and guard on row width at 13 cells, the same
 rule the SPHTN parser obeys.
 
+**No data row carries an opening `<tr>`, and `crawl()` reads nothing from this table.** The `<tbody>`
+holds one empty `<tr></tr>`, then about 31 stray closing tags, then every row as a bare run of `<td>`
+cells ending in `</tr>`. Measured on the live page: `crawl($html)->filter('tr')` finds 4 elements and
+none of them holds a `td` child. The existing wrap does not repair this. The wrap supplies a table
+this page already has, and the page omits its rows instead.
+Split the body on `</tr>` instead. Take each chunk that holds a `<td>`, wrap that chunk in `<tr>`,
+and parse it alone. Measured on the same page: 239 chunks, every one of them exactly 13 cells.
+**This is why the count guard stays.** The split is a repair, and a repair needs a check that the
+shape it produced is the shape expected.
+
 **The cells do not follow the header block, and a parser that trusts the headers is wrong in
 silence.** The header row names 14 columns, each at colspan 1, while every data row holds 13 cells.
 Pinned against one station's own series, the true order is:
@@ -71,12 +81,22 @@ labelled with last Tuesday's date.
 
 ### Rainfall from Midnight is a per-day odometer
 
-`cdaily` climbs through a day and resets to zero at the start of the next. So `accWindow()` computes
-an exact window from it with no new arithmetic. The six daily columns bridge each midnight the
-window crosses.
+`cdaily` climbs through a day and resets to zero at the start of the next. `accWindow()` needs a
+number that only climbs, so this app keeps a running one and never stores `cdaily` raw.
+
+Each poll adds the rise since the last sample. A reset adds the whole of the new day plus whatever
+the old day still owed, which is yesterday's column minus the last reading this app took from it.
+Nothing else reads a daily column. This is what holds the total continuous across a midnight.
+
+**Bridge one midnight, never several.** This cannot close a gap longer than a day. Restart the total
+instead. `accWindow()` already returns null on a total that goes
+backwards, so a dash appears for a day and then the archive recovers on its own. Adding five more
+columns of bridging buys a case that only a day of downtime reaches.
 
 **The reset lands at 00:05, not 00:00.** The 00:00 record still carries the previous day's total.
-Group a day from 00:05, or the last reading of each day lands in the wrong one.
+Group a day from 00:05, or the last reading of each day lands in the wrong one. Confirmed again on
+the live table at 00:06 on 15 August: S.M.K Bandar Kinrara stamps `15/08/2026 00:00:00`, and its
+midnight cell reads 7.5, which is the whole of its 14 August column.
 
 **A mid-day reset happens, and the existing guard is the right answer.** Measured over 12 stations
 and 20,717 records across 5 days: 19 drops at the midnight boundary, which is the reset, and 3
@@ -84,6 +104,10 @@ drops in mid-day, which is about one per station per 20 days. `accWindow()` alre
 a backwards odometer. A null window on the rare glitch beats a wrong number, so add nothing.
 
 ### The 5 minute series
+
+**The graph id rides in the row, so no second lookup places it.** Cell 11 wraps its value in
+`<a href='/index.php/rf-graph/?stationid=27398'>`. Read the id from that link while reading the row.
+A row without the link keeps a null id and takes no history backfill.
 
 `getrainfalllast7days.php?station=<graphid>` returns 1,815 records over 167.8 hours. The sibling
 `searchresultrainfalldthourlylead.php?station=&from=&to=&datafreq=60` returns the same shape for a
@@ -101,9 +125,9 @@ Measured on a wet station over 860 records:
 The 8.50 is the first day of the window, which starts after its midnight. Per calendar day `raw`
 sums to 8.5 for 13 August and 28.5 for 14 August, which the table's own cells repeat.
 
-**Test this identity on a station with rain in the window.** An earlier pass ran it on a station holding 15
-non-zero buckets out of 1,815 and `clean` passed, because twelve zeros sum to a zero. A dry station
-cannot tell a rolling window from a disjoint one.
+**Test this identity on a station with rain in the window.**
+An earlier pass ran it on a station holding 15 non-zero buckets out of 1,815 and `clean` passed,
+because twelve zeros sum to a zero. A dry station cannot tell a rolling window from a disjoint one.
 
 Disjoint buckets add up. That is the whole reason this source solves what SPHTN cannot.
 
