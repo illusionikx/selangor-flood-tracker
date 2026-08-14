@@ -1233,16 +1233,18 @@ export function rainAcc(acc, from) {
      window is answered the same way on every station — so it belongs to `24 h` rather than to
      `140.2 mm`. On the value it also sat between the number and the next column's number, which is
      the one place on this chart where a mark can be read against the wrong bar. */
-  /* Only the two long windows subtract two odometer readings, so they are the only two with a reason
-     worth naming when they cannot answer. The other three come straight off a feed, and "the feed
-     published none" is all there is to say about them. */
-  const ODO = { h24: 1, h72: 1 };
+  /* All three odometer windows can answer now, not only the two long ones. A station's running
+     total — a portal station's own, built from its midnight column, or a Selangor station's
+     year-to-date odometer where the portal does not carry it — answers `h3` the same way it answers
+     `h24` and `h72`, wherever the feed publishes no 3 hour figure of its own. `h1` and `day` still
+     come straight off a feed, and "the feed published none" is all there is to say about them. */
+  const ODO = { h3: 1, h24: 1, h72: 1 };
 
-  /* An empty column carried no readout at all, so a reader hovering the em dash learned nothing —
-     and on one of the 38 KL gauges that dash never fills in, because SPHTN publishes no running
-     total for either window to subtract. That is what the clause names, and it is the only empty
-     long window a reader ever meets: measured on the live payload, 37 of the 184 gauges that draw
-     this chart carry the permanent dash and none carries a bare one.
+  /* An empty column carried no readout at all, so a reader hovering the em dash learned nothing.
+     The permanent dash now marks the stations the portal does not carry — those hold no running
+     total of any kind, so none of the three windows above can subtract one. That is what the clause
+     names, and it is the only window that stays permanently blank: measured on the live payload, 3
+     of the 204 gauges that draw this chart carry it and none carries a bare one.
      **There is no "waiting" state and the `!from` guard is not one.** A short window answers off two
      odometer samples, so a gauge stops being unanswerable on its second stored reading. The guard
      exists for the single poll after a fresh `.history.db`, when a station holds one sample and no
