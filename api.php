@@ -1068,6 +1068,42 @@ function rainBacked(?float $hourly, array $odo, int $now): ?bool {
     return $w === null ? null : $w[0] > 0;
 }
 
+/* The next value of a running rainfall total, built from the portal's own midnight column.
+ *
+ * `accWindow()` subtracts two samples, so it needs a number that only climbs. The portal publishes
+ * `Rainfall from Midnight`, which resets every day. This app therefore keeps its own running number
+ * and never stores the daily figure raw. Everything downstream — accWindow(), rainBacked(),
+ * ACC_READ, RETAIN, the acc block — then works with no change at all.
+ *
+ * Within a day the total gains the rise since the last sample.
+ *
+ * ACROSS A MIDNIGHT the total gains two things: whatever the old day still owed, and the whole of
+ * the new day so far. What the old day owed is yesterday's column minus the last reading this app
+ * took from it. Nothing else reads a daily column. THE COLUMN IS OLDEST FIRST, so yesterday is the
+ * LAST of the six — see portalRain().
+ *
+ * ONE MIDNIGHT, NEVER SEVERAL. A caller that missed a whole day cannot bridge it this way. It
+ * restarts the total instead, accWindow() returns null on a total that goes backwards, and a dash
+ * shows for a day while the archive recovers. Bridging five more columns buys a case only a day of
+ * downtime reaches.
+ *
+ * THE RESET LANDS AT 00:05, NOT 00:00. The 00:00 record still carries the previous day's total.
+ * This function never reads a clock, so that boundary costs it nothing — it compares two readings
+ * and a fall is a reset whenever it happens. A mid-day glitch, measured at about one per station
+ * per 20 days, takes the same path and still climbs.
+ *
+ * Returns the next total, or null where the caller has nothing to store.
+ */
+function portalOdo(?float $prevOdo, ?float $prevDaily, ?float $daily, ?float $yesterday): ?float {
+    if ($daily === null) return null;
+    if ($prevOdo === null || $prevDaily === null) return $daily;
+    if ($daily >= $prevDaily) return round($prevOdo + ($daily - $prevDaily), 1);
+    // A fall is a reset. Owe nothing rather than subtract where yesterday's column is missing or
+    // sits below what this app already counted from it.
+    $owed = max(0.0, ($yesterday ?? $prevDaily) - $prevDaily);
+    return round($prevOdo + $owed + $daily, 1);
+}
+
 /* A station name reduced for comparison. Comparison only — never stored, never rendered.
    The two feeds spell one place several ways: `Kg. Melayu Ampang`, `KG MELAYU AMPANG`,
    `Kg.Melayu  Ampang`. Case, punctuation and spacing carry no information here, so they go. */
@@ -1303,6 +1339,24 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
     echo "\nportalRainUrls():\n";
     $ok('three states, three keys',          array_keys(portalRainUrls()) === ['prf-SEL', 'prf-WLH', 'prf-PTJ']);
     $ok('the hidden inputs ride in the url', str_contains(portalRainUrls()['prf-SEL'], 'loginStatus=0&language=1'));
+
+    echo "\nportalOdo():\n";
+    $ok('a first sample starts at today',   portalOdo(null, null, 7.5, null) === 7.5);
+    $ok('a rise within a day adds the rise', portalOdo(100.0, 7.5, 12.0, null) === 104.5);
+    $ok('no rise adds nothing',              portalOdo(100.0, 7.5, 7.5, null) === 100.0);
+    /* The midnight bridge. The last reading taken yesterday was 7.5, yesterday's column closed at
+       9.0, and today has 2.0 so far. The total owes 1.5 from yesterday plus today's 2.0. */
+    $ok('a reset bridges through yesterday', portalOdo(100.0, 7.5, 2.0, 9.0) === 103.5);
+    /* Yesterday's column is missing, so the bridge falls back to what was already counted. The
+       rain between the last reading and midnight is lost, and a lost millimetre beats a wrong one. */
+    $ok('no column bridges to the last read', portalOdo(100.0, 7.5, 2.0, null) === 102.0);
+    /* Yesterday's column BELOW the last reading taken from it. Upstream corrected a number
+       downwards. Owe nothing rather than subtract. */
+    $ok('a shrinking column owes nothing',   portalOdo(100.0, 7.5, 2.0, 6.0) === 102.0);
+    /* A mid-day reset, which happens about once per station per 20 days. It reads exactly like a
+       midnight, and the bridge treats it as one. accWindow() sees a total that still climbs. */
+    $ok('a mid-day glitch still climbs',     portalOdo(100.0, 30.0, 0.0, 30.0) === 100.0);
+    $ok('a null daily cannot be counted',    portalOdo(100.0, 7.5, null, 9.0) === null);
 
     echo "\naccWindow():\n";
     $odo = [[$now - 80 * 3600, 1000.0], [$now - 72 * 3600, 1010.0],
