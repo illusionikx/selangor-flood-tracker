@@ -111,10 +111,12 @@ header .hactions {
 #locate.busy::before { animation: pulse 1s infinite; }
 #locate::before { --i: var(--i-my_location); width: 22px; height: 22px; }
 #locate.on::before { --i: var(--i-near_me); color: var(--accent); }
-/* The one place in this app's chrome where a status hue does not mean a station is in trouble. Every
-   other `--s-alert` here rides an alert row, a ticker tile or a camera frame. A reader asked for it
-   on this button, and the words behind it arrive through `data-tip` rather than a `title`. */
-#locate.fail::before { color: var(--s-alert); }
+/* A failed fix changes the glyph and keeps the ink. Amber came first and a reader cut it. On a flood
+   map every other status hue means a station is in trouble. So an amber glyph in the app bar reads
+   as an alert on the water. `location_disabled` is the crosshair of the resting state with a line
+   through it, so the two read as one control in two states. The words behind it arrive through
+   `data-tip` rather than a `title`. */
+#locate.fail::before { --i: var(--i-location_disabled); }
 
 /* --- sources dialog -------------------------------------------------------------------------- */
 

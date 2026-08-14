@@ -262,11 +262,10 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   taupe, camera cyan, mast indigo. Tokens `--k-*`.
 - **Status only**: green → amber → orange → red (`--s-normal` / `--s-alert` / `--s-warning` /
   `--s-danger`, exposed as `STATUS_COLOR`), plus grey `--s-none` for offline / no reading.
-  **`#locate.fail` is the one documented exception, and a reader asked for it.** It paints
-  `--s-alert` for a location this app could not get, which is a fault in a control rather than a
-  station in trouble. Every other status hue in the chrome rides an alert row, a ticker tile, a
-  toast or a camera frame, and still means a station. Do not add a second exception without the
-  same conversation — an amber glyph on a flood map reads as an alert at a glance.
+  **There is no exception. A reader cut the one this app tried.** `#locate.fail` painted `--s-alert`
+  for a location this app could not get, which is a fault in a control rather than a station in
+  trouble. On a flood map an amber glyph in the app bar reads as an alert on the water.
+  **A broken control changes its glyph, never its hue.** See `--i-location_disabled`.
 - **The values live in `css/base.css` and nowhere else**, two sets, one per theme — except on a map
   pin. `.pin` shares the dark theme's set on both themes, through the selector
   `:root[data-theme="dark"], .pin` on the map-palette block, because the pin glyph carries a real
@@ -581,12 +580,14 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   find them. **A repair a reader runs in a terminal is not a fix**, and the first draft of this entry
   ended in three PowerShell lines. `geo-test.html` is the probe that found the fault, and it puts its
   own clock on each request rather than trust the one it passes in.
-  **The words ride `data-tip` and the state rides the glyph.** `#locate.fail` paints `--s-alert`, and
-  `js/sparktip.js` names anything carrying that attribute on hover and on tap alike. A panel card
-  came first and it was too much furniture for a button that did not answer. It also had to stay off
-  the landing auto-locate, and a glyph does not. `setBtn()` writes all three button states through
-  one function, so no attribute outlives the state that set it — a tip left over from a failure names
-  a fault on a button that has since found you.
+  **The words ride `data-tip` and the state rides the glyph.** `#locate.fail` swaps `my_location` for
+  `location_disabled` and keeps the ink, and `js/sparktip.js` names anything carrying that attribute
+  on hover and on tap alike. The surface took three tries. A panel card came first and it was too
+  much furniture for a button that did not answer. Amber came second and read as an alert on the
+  water. The glyph is the third, and it is the crosshair of the resting state with a line through it,
+  so the two read as one control in two states. `setBtn()` writes all three button states through one
+  function, so no attribute outlives the state that set it — a tip left over from a failure names a
+  fault on a button that has since found you.
 - **`js/oops.js` must stay the first import in `app.js`.** A static import runs before the body of
   the file that imports it. A handler written inside `app.js` therefore starts after every other
   module has evaluated, and a throw during that evaluation reaches nobody. This is a real case rather

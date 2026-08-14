@@ -846,16 +846,24 @@ clicking the button recentres, ripples over where you are and opens a "You are h
 the nearest water level, rainfall, siren and gauge — each as a full sensor section, plus the nearest
 webcam's picture (see below).
 
-**A failed location turns the button amber and says why on hover.** `#locate.fail` paints the glyph
-`--s-alert`, and the words ride `data-tip`, which `js/sparktip.js` names on hover and on tap alike.
-A `title` does neither on a phone. `failTip()` in `js/locate.js` holds the words.
+**A failed location crosses out the button glyph and says why on hover.** `#locate.fail` swaps
+`my_location` for `location_disabled` and keeps the ink. The words ride `data-tip`, which
+`js/sparktip.js` names on hover and on tap alike. A `title` does neither on a phone. `failTip()` in
+`js/locate.js` holds the words.
 
-That amber is the one status hue in this chrome that does not mean a station is in trouble. Every
-other one rides an alert row, a ticker tile or a camera frame. A reader asked for it here.
+The surface took three tries, and the two it discarded are worth keeping written down. A panel card
+came first, and it was too much furniture for a button that did not answer. Amber came second, on a
+request from a reader, and the same reader cut it within the day.
 
-A panel card came first, and it was too much furniture for a button that did not answer. The card
-also had to stay off the landing auto-locate, because a card nobody asked for lands on whatever the
-reader opened. A glyph has no such problem, so the amber shows on that path too.
+Amber was wrong for a reason the whole app shares. Every other status hue in this chrome rides an
+alert row, a ticker tile, a toast or a camera frame. Each one means a station is in trouble. On a
+flood map an amber glyph in the app bar therefore reads as an alert on the water. **A broken control
+changes its glyph, never its hue.**
+
+`location_disabled` is the crosshair of the resting state with a line through it, so the two read as
+one control in two states. The card also had to stay off the landing auto-locate, because a card
+nobody asked for lands on whatever the reader opened. A glyph has no such problem, so the crossed
+crosshair shows on that path too.
 
 The tip names one place, and the Permissions API is what picks it. A site permission can read
 `granted` while the operating system refuses the browser under it.
