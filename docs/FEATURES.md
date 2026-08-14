@@ -9263,3 +9263,58 @@ a grep.
 on the live payload, `met.rung` is 1 on 566 stations, 2 on 54, and absent on 59. It is never 0,
 because `metSpan()` in `api.php` returns null when no step in the window is wet. The invariant is
 upstream and the guard belongs here, so this entry states the risk rather than coding around it.
+
+## The "You are here" card now carries the weather
+
+The card that answers "what is near me" listed four sensors and a camera picture. It said nothing
+about the sky. Every station card above it has carried the MET outlook since the weather section
+landed. A reader who taps their own position asks the question a reader who taps a pin asks. So the
+card draws the same section now, in the same slot.
+
+### It borrows a station, because the outlook hangs on one
+
+`api.php` attaches the MET nowcast to a station by nearest point. It attaches the daily temperature
+by district name. The payload publishes no list of MET points.
+
+So the browser holds nothing to measure a bare coordinate against. A point that is not a station has
+to borrow one.
+
+`nearestWx()` in `js/stations.js` picks the nearest station that carries a whole outlook. The card
+caps it at `NEAR_MAX_KM` (10 km), the number the four sensor rows above it already state. Past that
+cap the card shows no weather at all.
+
+The section names the MET point behind the reading. That point arrives through a borrowed station.
+A station further away than any sensor the card lists makes a claim about somewhere else.
+
+Measured on the payload of 2026-08-14, from four points. Kuala Lumpur city centre borrows a station
+1.0 km away. Shah Alam borrows one at 3.2 km, Putrajaya at 2.5 km and Sabak Bernam at 0.5 km. No
+point comes near the cap.
+
+The stacked error needs a name. `MET_KM` lets a station hold a point up to 16.5 km away, and this
+card adds up to 10 km more. A reader at the cap can therefore read an outlook from 26 km off. That
+figure is the decorrelation distance for a 3-hour rainfall field. `MET_KM` takes its own value from
+the same figure, so the worst case here sits at the edge of the claim rather than outside it. It
+also needs both halves at their worst together, and the measurements above say they are not.
+
+### The all-or-nothing gate moved, and that is what makes the pick correct
+
+`metSection()` refuses to draw a half outlook. A heading, a glyph and two numbers under the word
+`Now` read as a panel that failed to load. That test is `hasWx()` in `js/util.js` now, and
+`nearestWx()` asks the same one.
+
+The two must share it. 643 of 679 stations carry a whole outlook and 36 carry a part of one. A pick
+on `s.met` alone lands on one of those 36 about one time in nineteen. The section then draws nothing
+while a station a kilometre further holds the whole answer. The reader gets no weather and no
+reason.
+
+### Where it sits
+
+Straight after `.pophead`, above the camera picture and the four sensor rows. A station card puts it
+there, and the reason holds here too. Rain over a place is one fact about the whole card. It is not
+a reading that belongs to one of the sensors under it. `openSide()` lifts `.pophead` into
+`#sideHead`, so the section must follow it rather than precede it.
+
+Nothing else about the section changed. It keeps its own ⋮, which states two facts. MET issued the
+outlook at that time, and the borrowed station stands that far from the point. Neither number is the
+distance from the reader to the point, and the card claims no such thing. The number a reader can
+act on sits in the section head, which names the place behind the forecast.

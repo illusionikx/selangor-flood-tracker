@@ -4,9 +4,9 @@
 import { KINDS, SOURCES, SPARK_H, NO_INFO, ALERT_TITLE, RIVER_COLOR, RAIN_COLOR,
          GAUGE_COLOR, RAIN_STOPS, NEAR_MAX_KM, camSrc, WEATHER, MET_NAME,
          ACC_ROWS } from './config.js';
-import { noSec, distKm, hasInfo, isStale, statusColor, scalePos,
+import { noSec, distKm, hasInfo, hasWx, isStale, statusColor, scalePos,
          levelStops, gaugeStops, gaugeColor, color, isFav } from './util.js';
-import { nearestOf, nearestCam, nearestLevel, camAlert } from './stations.js';
+import { nearestOf, nearestCam, nearestLevel, nearestWx, camAlert } from './stations.js';
 
 /* The warning that rides a camera picture, in the lightbox and nowhere else. Empty string when
    nothing near the lens is on alert, so it costs nothing to interpolate unconditionally.
@@ -550,9 +550,10 @@ const wxDots = m => `<button class="icon dots" popovertarget="mnu-met"
    temperature is worth, so a station missing any part of the outlook shows no weather at all. The
    grid's first column stays `auto`, because a cell must still size to itself and not stretch. */
 function metSection(s) {
-  const m = s.met;
-  // ponytail: one gate for the whole section. Widen only if a partial shape is worth drawing again.
-  if (!m || m.now == null || m.hr1 == null || m.tmax == null || m.tmin == null) return '';
+  const m = s?.met;
+  // ponytail: one gate for the whole section, shared with nearestWx(). Widen only if a partial shape
+  // is worth drawing again.
+  if (!hasWx(m)) return '';
 
   const w = r => WEATHER[r] || WEATHER[0];
 
@@ -732,12 +733,22 @@ export function herePopup(e, loaded) {
     </div>`;
   }).join('');
 
+  /* The same weather section a station card draws, in the same slot — above the sensors, because
+     rain over a place is one fact about the whole card rather than a reading belonging to one of the
+     four sensors under it. The outlook hangs on a station, so this borrows the nearest one carrying a
+     whole one, under `NEAR_MAX_KM`, the cap the rows above already state. Past it the card says
+     nothing about the weather: the section names the MET point it was read at, and a point borrowed
+     through a station further away than any sensor this card will list is a claim about somewhere
+     else. */
+  const wx = nearestWx(at);
+
   return `<div class="pophead">
       <span class="badge" style="--c:var(--me)"><i class="i i-home_pin"></i>You are here</span>
       ${/* Not `Accurate to about N m`. The figure is already a radius the browser is unsure of,
             so `about` hedges a number that is itself the hedge. */''}
       <div class="muted">Accurate to ${Math.round(e.accuracy)} m</div>
-    </div>${camNear(at, nearestCam(at))}${rows}`;
+    </div>${metSection(wx && distKm(at, wx) <= NEAR_MAX_KM ? wx : null)
+    }${camNear(at, nearestCam(at))}${rows}`;
 }
 
 /* Hours are Malaysian, not the viewer's, so the axis agrees with every other timestamp on the page —

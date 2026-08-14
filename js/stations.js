@@ -1,7 +1,7 @@
 // Queries over the current station set.
 
 import { state } from './state.js';
-import { distKm, hasInfo, isHot, atDanger, isStale, isIgnored, tier, TIER_RANK } from './util.js';
+import { distKm, hasInfo, hasWx, isHot, atDanger, isStale, isIgnored, tier, TIER_RANK } from './util.js';
 import { CAM_MAX_KM, CAM_ALERT_KM } from './config.js';
 
 // Nearest station of one kind that is actually reporting something.
@@ -24,6 +24,13 @@ export const nearestLevel = from => {
   const s = nearestOf('river', from);
   return s && distKm(from, s) <= CAM_MAX_KM ? s : null;
 };
+
+/* Whose weather covers this point. `api.php` hangs the MET outlook on a station, so a point that is
+   not a station has to borrow one — and the nearest station carrying a whole outlook is the closest
+   this app can get to "the forecast here". No cap, the same way nearestOf() has none: the one caller
+   applies NEAR_MAX_KM, so the cap stays beside the rows that state the same number. */
+export const nearestWx = from => state.data.reduce((best, s) =>
+  hasWx(s.met) && (!best || distKm(from, s) < distKm(from, best)) ? s : best, null);
 
 export const byId = id => state.data.find(s => s.id === id);
 

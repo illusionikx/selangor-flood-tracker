@@ -124,6 +124,12 @@ export const gaugeTone = s => s.depth == null || s.depth <= 0 ? 0
 // alert amber, because upstream never published a mark down there. See GAUGE_COLOR in config.js.
 export const gaugeColor = s => GAUGE_COLOR[gaugeTone(s)];
 
+/* The weather section is all or nothing — see metSection() in popup.js for why a half-drawn outlook
+   costs a reader more than the temperature is worth. The rule sits here because two callers ask it:
+   the section itself, and nearestWx(), which must not pick a station the section will then refuse to
+   draw while a neighbour a kilometre further carries the whole outlook. */
+export const hasWx = m => !!m && m.now != null && m.hr1 != null && m.tmax != null && m.tmin != null;
+
 // A station with nothing to report gets grey everywhere — colour means "there is a reading here".
 export const hasInfo = s => s.online && ({
   river:    s.level != null,
