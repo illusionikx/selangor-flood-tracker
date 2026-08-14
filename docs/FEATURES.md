@@ -846,26 +846,33 @@ clicking the button recentres, ripples over where you are and opens a "You are h
 the nearest water level, rainfall, siren and gauge — each as a full sensor section, plus the nearest
 webcam's picture (see below).
 
-**A failed location says what to change, and where.** The button can carry a `title` and nothing
-else, and a `title` opens on no phone. So a refusal or a silence opens the same panel a fix opens,
-with two steps in it. `hereFail()` in `js/popup.js` holds the words.
+**A failed location turns the button amber and says why on hover.** `#locate.fail` paints the glyph
+`--s-alert`, and the words ride `data-tip`, which `js/sparktip.js` names on hover and on tap alike.
+A `title` does neither on a phone. `failTip()` in `js/locate.js` holds the words.
 
-The card names one place, and the Permissions API is what picks it. A site permission can read
+That amber is the one status hue in this chrome that does not mean a station is in trouble. Every
+other one rides an alert row, a ticker tile or a camera frame. A reader asked for it here.
+
+A panel card came first, and it was too much furniture for a button that did not answer. The card
+also had to stay off the landing auto-locate, because a card nobody asked for lands on whatever the
+reader opened. A glyph has no such problem, so the amber shows on that path too.
+
+The tip names one place, and the Permissions API is what picks it. A site permission can read
 `granted` while the operating system refuses the browser under it.
 
-So `granted` beside a failed fix is proof that the device is at fault. The card then says so, and
+So `granted` beside a failed fix is proof that the device is at fault. The tip then says so, and
 never names the browser at all.
 
 A `denied` permission names the site and the browser instead. A browser that answers nothing gets
-both halves. On Windows the card also names the path, because a reader told to open the settings
-for a device still has to find them.
+both halves. On Windows the tip also names the path, because a reader told to open the settings for
+a device still has to find them.
 
 Measured on one Windows desktop: Edge held the grant, the machine held its location service
-disabled, and both accuracy settings timed out. The first text named the settings in the browser
-alone. Those were already correct, so it sent the reader in a circle.
+disabled, and both accuracy settings timed out. The first words named the settings in the browser
+alone. Those were already correct, so they sent the reader in a circle.
 
-The card opens only where the reader pressed the button. The landing auto-locate stays silent,
-because nobody asked it a question.
+`setBtn()` writes all three states, so no attribute outlives the state that set it. A tip left over
+from a failure names a fault on a button that has since found you.
 
 **The marker is the glyph alone — no chip.** Every station pin is a filled disc, because that is
 what says "a sensor is here"; wearing the same chip put the reader into the dataset as a 672nd

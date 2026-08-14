@@ -111,6 +111,10 @@ header .hactions {
 #locate.busy::before { animation: pulse 1s infinite; }
 #locate::before { --i: var(--i-my_location); width: 22px; height: 22px; }
 #locate.on::before { --i: var(--i-near_me); color: var(--accent); }
+/* The one place in this app's chrome where a status hue does not mean a station is in trouble. Every
+   other `--s-alert` here rides an alert row, a ticker tile or a camera frame. A reader asked for it
+   on this button, and the words behind it arrive through `data-tip` rather than a `title`. */
+#locate.fail::before { color: var(--s-alert); }
 
 /* --- sources dialog -------------------------------------------------------------------------- */
 

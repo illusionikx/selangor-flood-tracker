@@ -43,7 +43,7 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `js/render.js` | rebuilds markers and heat points; drawer summary table |
 | `js/alerts.js` | "On alert": the app bar's warning glyph, the list it opens in `#side`, the icon badge, the red favicon, and the MET warning cards above that list |
 | `js/table.js` | the all-stations table dialog, grouped district → mast → sensor |
-| `js/locate.js` | geolocation and the "You are here" marker |
+| `js/locate.js` | geolocation, the "You are here" marker, and the amber button a failed fix leaves behind |
 | `js/ticker.js` | header alert marquee — measured, seamless, speed scales with the alert count, and draws the MET warning tiles into the strip |
 | `js/timeline.js` | camera archive replay + A/B compare, inside the lightbox and nowhere else |
 | `js/clip.js` | the station panel's 3-hour camera clip — no controls, that is the lightbox's job |
@@ -262,6 +262,11 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   taupe, camera cyan, mast indigo. Tokens `--k-*`.
 - **Status only**: green → amber → orange → red (`--s-normal` / `--s-alert` / `--s-warning` /
   `--s-danger`, exposed as `STATUS_COLOR`), plus grey `--s-none` for offline / no reading.
+  **`#locate.fail` is the one documented exception, and a reader asked for it.** It paints
+  `--s-alert` for a location this app could not get, which is a fault in a control rather than a
+  station in trouble. Every other status hue in the chrome rides an alert row, a ticker tile, a
+  toast or a camera frame, and still means a station. Do not add a second exception without the
+  same conversation — an amber glyph on a flood map reads as an alert at a glance.
 - **The values live in `css/base.css` and nowhere else**, two sets, one per theme — except on a map
   pin. `.pin` shares the dark theme's set on both themes, through the selector
   `:root[data-theme="dark"], .pin` on the map-palette block, because the pin glyph carries a real
@@ -569,13 +574,19 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   `pointer-events: none` for those ten seconds. So a reader pressed, waited, saw nothing, and pressed
   again. That reads as a button that spins for ever.
   **Do not tell a reader to check the site settings in the browser.** Those can be correct while the
-  device refuses. `hereFail()` in `js/popup.js` splits three ways instead, and `locate.js` asks
-  `navigator.permissions` for the site half. A `granted` beside a failed fix names the device and
-  never the browser. A `denied` names the site. No answer from that API names both. On Windows the
-  card also names the path, because a reader told to open the settings for a device still has to
+  device refuses. `failTip()` in `js/locate.js` splits three ways instead, on the answer
+  `navigator.permissions` gives for the site half. A `granted` beside a failed fix names the device
+  and never the browser. A `denied` names the site. No answer from that API names both. On Windows
+  the tip also names the path, because a reader told to open the settings for a device still has to
   find them. **A repair a reader runs in a terminal is not a fix**, and the first draft of this entry
   ended in three PowerShell lines. `geo-test.html` is the probe that found the fault, and it puts its
   own clock on each request rather than trust the one it passes in.
+  **The words ride `data-tip` and the state rides the glyph.** `#locate.fail` paints `--s-alert`, and
+  `js/sparktip.js` names anything carrying that attribute on hover and on tap alike. A panel card
+  came first and it was too much furniture for a button that did not answer. It also had to stay off
+  the landing auto-locate, and a glyph does not. `setBtn()` writes all three button states through
+  one function, so no attribute outlives the state that set it — a tip left over from a failure names
+  a fault on a button that has since found you.
 - **`js/oops.js` must stay the first import in `app.js`.** A static import runs before the body of
   the file that imports it. A handler written inside `app.js` therefore starts after every other
   module has evaluated, and a throw during that evaluation reaches nobody. This is a real case rather

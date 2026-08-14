@@ -4,12 +4,46 @@
 import { state, PREFS, save } from './state.js';
 import { el } from './util.js';
 import { map, focusOn, openSide, ping, pinGlyph } from './map.js';
-import { herePopup, hereFail } from './popup.js';
+import { herePopup } from './popup.js';
 import { alerts } from './alerts.js';
 
 const btn = el('locate');
 let layer, marker, at, acc;
 let wantPopup = false;   // only pop up when the user asked; never on the landing auto-locate
+
+/* One writer for the button's three states, so no attribute survives a transition it does not
+   belong to. A tip left over from a failure would name a fault on a button that has since found
+   you.
+   The words ride on `data-tip` rather than on a `title`, because a `title` opens on no phone. That
+   is the rule `js/sparktip.js` exists for, and it names anything holding the attribute, on hover
+   and on tap alike, so this needs no listener of its own.
+   The label is the accessible name. A colour and a hover are two things a screen reader cannot
+   reach, so a failure has to arrive as text as well. */
+const setBtn = (cls, label, tip) => {
+  btn.className = cls ? `icon ${cls}` : 'icon';
+  btn.setAttribute('aria-label', tip || label);
+  if (tip) { btn.dataset.tip = tip; btn.removeAttribute('title'); }
+  else { delete btn.dataset.tip; btn.title = label; }
+};
+
+/* Two settings in two places refuse a location, and naming the wrong one sends the reader in a
+   circle. That circle happened here. One Windows desktop held the grant for this site and held its
+   own location service disabled at the same time. Both accuracy settings timed out, and the first
+   words this app tried named the browser alone.
+   The Permissions API answers the site half, so `granted` beside a failed fix is proof that the
+   device is the half at fault. A browser that answers nothing gets both halves.
+   Windows is the one platform that failed this way here, so it is the one platform whose path this
+   names. A reader told to open the settings for a device still has to find them. */
+const WIN = /Windows/.test(navigator.userAgent);
+
+export const failTip = (code, perm) =>
+  perm === 'granted'
+    ? `Location is off for this device. ${WIN
+        ? 'Open Settings, then Privacy and security, then Location.'
+        : 'Turn it on in the device settings.'}`
+    : perm === 'denied' || code === 1
+      ? 'Location is off for this site. Allow it in your browser.'
+      : 'No location came back. Check that location is on for this site, and for this device.';
 
 // The one non-station card the panel shows. Built fresh on every open so it reflects the latest
 // poll; the `@` key keeps render()'s refresh pass off it, since it belongs to no site.
@@ -27,8 +61,7 @@ export function findMe(setView) {
   const f = PREFS.fix;
   if (f && Date.now() - f[3] < FIX_TTL) return place(L.latLng(f[0], f[1]), f[2], setView);
 
-  btn.className = 'icon busy';
-  btn.title = 'Finding your location…';
+  setBtn('busy', 'Finding your location…');
   map.locate({ setView, maxZoom: 13, enableHighAccuracy: true, timeout: 10000, maximumAge: FIX_TTL });
 }
 
@@ -52,8 +85,7 @@ btn.onclick = () => {
 function place(latlng, accuracy, setView) {
   at = state.hereAt = latlng;
   acc = accuracy;
-  btn.className = 'icon on';
-  btn.title = `Recenter on my location (±${Math.round(accuracy)} m)`;
+  setBtn('on', `Recenter on my location (±${Math.round(accuracy)} m)`);
   if (layer) layer.remove();
 
   marker = L.marker(latlng, { icon: L.divIcon({
@@ -106,12 +138,12 @@ const sitePerm = async () => {
   catch { return null; }
 };
 
+/* The glyph carries the state and the tip carries the reason, so nothing opens by itself. A panel
+   card came first and it was too much furniture for a button that did not answer. It also had to
+   stay off the landing auto-locate, because a card nobody asked for lands on whatever they were
+   reading — the button has no such problem, so the amber shows on that path too.
+   Leaflet forwards the code and prefixes the message with its own words, so this reads `e.code`
+   and never the sentence. */
 map.on('locationerror', async e => {
-  btn.className = 'icon';
-  btn.title = 'Show my location';
-  /* Only where the reader asked, the same gate the arrival ripple takes. The landing auto-locate is
-     a question nobody asked, and a card that opens by itself replaces what the reader opened.
-     Leaflet forwards the code and prefixes the message with its own words, so the card reads
-     `e.code` and never the sentence. */
-  if (wantPopup) openSide('@here', hereFail(e.code, await sitePerm()));
+  setBtn('fail', 'Location unavailable', failTip(e.code, await sitePerm()));
 });
