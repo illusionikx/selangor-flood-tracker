@@ -4,7 +4,7 @@
 import { KINDS, SOURCES, SPARK_H, NO_INFO, ALERT_TITLE, RIVER_COLOR, RAIN_COLOR,
          GAUGE_COLOR, RAIN_STOPS, NEAR_MAX_KM, camSrc, WEATHER, MET_NAME,
          ACC_ROWS } from './config.js';
-import { ago, noSec, parseMY, distKm, hasInfo, isStale, statusColor, scalePos,
+import { noSec, distKm, hasInfo, isStale, statusColor, scalePos,
          levelStops, gaugeStops, gaugeColor, color, isFav } from './util.js';
 import { nearestOf, nearestCam, nearestLevel, camAlert } from './stations.js';
 
@@ -175,7 +175,7 @@ export const rateHtml = s => s.rate == null ? '' : !s.rate
 export const etaText = h => h <= 0 ? 'already at it'
   : h < 1 ? `in ~${Math.round(h * 60)} min`
   : h <= 6 ? `in ~${h.toFixed(1)} h`
-  : 'over 6 h away';
+  : 'over 6 h';
 
 /* The "you are here" card, and only that card, shows the nearest camera's picture rather than a link
    to it. There the camera is one of the five things you asked for — "what is around me" is the whole
@@ -195,7 +195,7 @@ export function camNear(from, cam) {
     <div class="sensorhead">
       <i class="glyph i i-${k.icon}" style="color:${k.color}"></i>
       <b>Nearest camera</b>
-      <span class="muted">${distKm(from, cam).toFixed(1)} km away</span>
+      <span class="muted">${distKm(from, cam).toFixed(1)} km</span>
     </div>
     <div class="place" data-cam="${cam.id}" title="Show ${cam.name} on the map">${cam.name}</div>
     ${camImg(cam, `Latest still from ${cam.name}`)}
@@ -234,7 +234,7 @@ export const camLink = (from, cam) => !cam
     ? `<button class="mi" data-cam="${cam.id}"><i class="i i-photo_camera"></i>
          <span>Show webcam</span></button>`
     : nearItem('photo_camera', `data-cam="${cam.id}"`, 'Nearest webcam',
-        `${cam.name} · ${distKm(from, cam).toFixed(1)} km away`);
+        `${cam.name} · ${distKm(from, cam).toFixed(1)} km`);
 
 /* The reverse, for a camera standing on its own. Every other card offers the nearest picture. A
    camera card offered nothing, and a picture of water is a question about a number — "is that high?"
@@ -247,7 +247,7 @@ export const camLink = (from, cam) => !cam
 export const levelLink = (from, s) => !s
   ? nearItem(KINDS.river.icon, 'disabled', 'Nearest water level', 'No water level nearby')
   : nearItem(KINDS.river.icon, `data-go="${s.id}"`, 'Nearest water level',
-      `${s.name} · ${distKm(from, s).toFixed(1)} km away`,
+      `${s.name} · ${distKm(from, s).toFixed(1)} km`,
       `<b class="mv" style="color:${color(s)}">${s.level} m</b>`);
 
 export function meter(s) {
@@ -265,7 +265,10 @@ export function meter(s) {
   return `<div class="meter">
     <div class="mtop">
       <b style="color:${col}">${s.level} m</b>
-      <span class="muted">${(s.level / max * 100).toFixed(0)}% of danger (${max} m)</span>
+      ${/* No `(3.50 m)` after the percentage. `max` is the danger mark, and `.mscale` below draws
+            that same number as `3.50 danger` about 20px lower — one number twice, and the lower one
+            is the one standing on the scale it belongs to. */''}
+      <span class="muted">${(s.level / max * 100).toFixed(0)}% of danger</span>
     </div>
     <div class="track">
       <span class="fill" style="width:${scalePos(s.level, stops).toFixed(1)}%;background:${col}"></span>
@@ -313,8 +316,13 @@ function gaugeBlock(s) {
         <div class="mscale muted">
           <span style="left:68%">warning ${s.warning}</span><span style="left:100%">danger ${s.danger}</span>
         </div>`
-        : `<div class="muted">${s.depth < 0 ? `water is ${Math.abs(s.depth)} m below the gauge marker`
-                                            : 'water is level with the gauge marker'}</div>`}
+        /* The block above already says DRY GROUND, and the section is headed Flood gauge, so
+           "water is" and "the gauge marker" restated two things the reader had just read. The depth
+           and what it is measured from are all that is left to say. A plain comment and not the
+           `${...''}` form the templates above use — this sits between the two arms of a ternary,
+           which is expression context and not a template. */
+        : `<div class="muted">${s.depth < 0 ? `${Math.abs(s.depth)} m below the marker`
+                                            : 'Level with the marker'}</div>`}
     </div>`;
 }
 
@@ -328,8 +336,11 @@ const RAIN_STATE = ['NOT RAINING', 'LIGHT RAIN', 'MODERATE RAIN', 'HEAVY RAIN', 
    JPS publishes and this card is where you come to read what it publishes — but the map has already
    stopped painting it, so the card owes an explanation rather than a matching red.
    The sentence names the verdict and one fact behind it, and no more. `Faulty signal` is the
-   siren's word for the same finding. A rain gauge collects rain into a total, so "collected no
-   rain" is the reader's own model of the instrument and needs none of our vocabulary. */
+   siren's word for the same finding, and the second sentence is the same length as the siren's —
+   five words that name what was checked. "No rain reached this gauge" is the reader's own model of
+   the instrument and needs none of our vocabulary. It said "This gauge collected no rain this
+   hour", which spends two words restating the subject and one naming a window the block above it
+   has already named. */
 /* Three parts under one `Rainfall` heading, so each says which question it answers. The section
    carried a status block, a 12 hour graph and five window totals with nothing between them, and a
    reader had to work out from the shapes that the three measured different spans of time.
@@ -342,7 +353,7 @@ const rainState = s => {
   return SUB('Right now')
     + `<div class="state ${stuck ? 'off' : s.status >= 3 ? 'on' : s.status >= 1 ? 'mid' : 'off'}"
       >${RAIN_STATE[s.status] || 'NOT RAINING'}</div>
-    ${stuck ? '<div class="muted">Faulty signal. This gauge collected no rain this hour.</div>' : ''}`;
+    ${stuck ? '<div class="muted">Faulty signal. No rain reached this gauge.</div>' : ''}`;
 };
 
 /* Everything one sensor has to say, without its name or region — those belong to the place, and a
@@ -409,18 +420,39 @@ function sensorBody(s) {
     ${spark}${rain}${acc}`;
 }
 
+/* One clock, at the precision the fact needs.
+   A reading taken today is answered by its time. The date is today on every live station, so
+   `Updated 14/08/2026 15:45` spent ten characters saying so. A reading from any other day is
+   answered by its date: `Last reported 19/09/2025 12:15 · 7892.0h ago` put a minute hand and an
+   elapsed figure on a sensor eleven months dead, and neither says anything the date does not. Four
+   stations in the payload are past 6,500 hours.
+   `ago()` has no unit above hours, which is what printed `7892.0h`. It is not fixed, because this
+   was its only caller that could overflow — a camera frame and the poll clock are the two that
+   remain, and both stay inside the range it was written for.
+   ponytail: a string compare, not a parse. JPS stamps `DD/MM/YYYY HH:MM:SS` in MYT and `en-GB`
+   formats a date the same way, so the same-day test costs one `startsWith` on either shape. */
+const MYT_DATE = new Intl.DateTimeFormat('en-GB',
+  { timeZone: 'Asia/Kuala_Lumpur', day: '2-digit', month: '2-digit', year: 'numeric' });
+
+const stamp = t => {
+  // A unix instant (MET's issue time) is rendered into the feed's own shape first, so one rule reads
+  // both. `|| s` covers a stamp that carries a date and no clock.
+  const s = typeof t === 'number' ? `${MYT_DATE.format(t)} ${MYT_CLOCK.format(t)}` : noSec(t);
+  return s.startsWith(MYT_DATE.format(new Date())) ? s.slice(11) || s : s.slice(0, 10);
+};
+
 /* The one place a timestamp is printed, and it now sits inside `dots()` rather than under the card.
    Three facts, all about the plumbing: whether we are hearing from the station, the stamp on the
-   last thing it sent, and which of the three feeds won the reading. Elapsed time is appended only
-   where it is the point — on a live station the date is the answer and "· 4m ago" is padding.
+   last thing it sent, and which of the three feeds won the reading. The stamp is printed at the
+   precision its age needs — see `stamp()` above. Elapsed time is gone: it was appended on a stale
+   station, where the date already answers the question, and it is the half of the line that reached
+   `7892.0h ago`.
    Not a button. It is the panel's first item because it is what the ignore action underneath it is
    read against: you silence a sensor after you decide you cannot trust it. */
 function sourceInfo(s) {
   const t = s.updated || s.shot;
-  const at = parseMY(t);
-  const late = at && (!s.online || isStale(s));
   const when = t
-    ? `${s.online ? 'Updated ' : 'Last reported '}${noSec(t)}${late ? ` · ${ago(at)}` : ''}`
+    ? `${s.online ? 'Updated ' : 'Last reported '}${stamp(t)}`
     : s.online ? '' : 'Never reported';
   /* The connection state is a badge, not a glyph and a word. It is the one thing in this panel that
      is a *state* rather than a fact, and the badge is what this app already uses to say so — the
@@ -435,8 +467,14 @@ function sourceInfo(s) {
     </div><hr>`;
 }
 
-const region = s => `<div class="muted">${
-  [s.district, s.state].filter(Boolean).join(', ') || 'district n/a'} · ${s.basin || 'basin n/a'}</div>`;
+/* Where the station is, and only what is known. `basin n/a` drew on 287 of 679 stations and
+   `district n/a` on none — the first states a gap in the feed rather than a fact about the place,
+   and the second is a branch nothing can reach. An absent part is dropped and its separator goes
+   with it. */
+const region = s => {
+  const bits = [[s.district, s.state].filter(Boolean).join(', '), s.basin].filter(Boolean);
+  return bits.length ? `<div class="muted">${bits.join(' · ')}</div>` : '';
+};
 
 /* The card's title is also the way back to its pin. The panel does not move when the map does, so a
    pan or a zoom leaves a reader holding a card with no idea which part of the screen it describes —
@@ -468,9 +506,9 @@ const wxIcon = r => {
    of those, and an action that acts on nothing is worse than an absent one.
    Two facts, the same two `sourceInfo()` gives a sensor: when the reading was made, and who made it.
    `stamp` is MET's own issue time and never our poll time, so the clock is the one MET published.
-   Elapsed time is printed beside it always, where `sourceInfo()` prints it only on a stale station:
-   a station card states a full date and this states a clock, and `14:50` alone cannot say whether
-   MET has been quiet since yesterday.
+   It goes through `stamp()`, the same rule a station's reading takes, which is what `· 25m ago`
+   used to be for: `14:50` alone could not say whether MET had been quiet since yesterday, and a
+   stamp that prints the date the moment it is not today can.
    The nearest point and its distance are NOT here. They spent a revision in this menu, on the
    reading that a claim from 14 km away is a different claim from one made next door, and the ⋮ is
    where this app puts that kind of doubt. The doubt turned out to be the reading itself. `MET_KM`
@@ -483,9 +521,8 @@ const wxDots = m => `<button class="icon dots" popovertarget="mnu-met"
     title="Details" aria-label="Details about this weather"><i class="i i-more_vert"></i></button>
   <div id="mnu-met" class="menu surface" popover>
     <div class="mi info"><span>
-      ${!m.stamp ? '' : `<small class="muted">Updated ${
-        MYT_CLOCK.format(m.stamp * 1000)} · ${ago(m.stamp * 1000)}</small><br>`}
-      <small class="muted">Via ${MET_NAME}${m.km == null ? '' : ` · ${m.km} km away`}</small>
+      ${!m.stamp ? '' : `<small class="muted">Updated ${stamp(m.stamp * 1000)}</small><br>`}
+      <small class="muted">Via ${MET_NAME}${m.km == null ? '' : ` · ${m.km} km`}</small>
     </span></div>
   </div>`;
 
@@ -697,7 +734,9 @@ export function herePopup(e, loaded) {
 
   return `<div class="pophead">
       <span class="badge" style="--c:var(--me)"><i class="i i-home_pin"></i>You are here</span>
-      <div class="muted">Accurate to about ${Math.round(e.accuracy)} m</div>
+      ${/* Not `Accurate to about N m`. The figure is already a radius the browser is unsure of,
+            so `about` hedges a number that is itself the hedge. */''}
+      <div class="muted">Accurate to ${Math.round(e.accuracy)} m</div>
     </div>${camNear(at, nearestCam(at))}${rows}`;
 }
 
@@ -816,8 +855,14 @@ const areaFill = c => {
   </linearGradient></defs>`];
 };
 
+/* Whole hours. The decimal under ten hours claimed six-minute precision on a span nobody measures
+   that finely, and three surfaces print it — a rainfall heading, a level graph's caption and a
+   siren's quiet run. Rounded DOWN, not to nearest: every reader of this number reads it as ground
+   covered, so a span stated short understates what was watched and a span stated long claims
+   minutes that were never in the record. Minutes keep their rounding — under an hour the whole
+   number is the fact. */
 const spanText = secs => secs < 3600
-  ? `${Math.round(secs / 60)} min` : `${(secs / 3600).toFixed(secs < 36000 ? 1 : 0)} h`;
+  ? `${Math.round(secs / 60)} min` : `${Math.floor(secs / 3600)} h`;
 
 /* Level over the last SPARK_H hours, plotted against the clock rather than against sample index.
    Sample index lied whenever polling was uneven — and it always is, because the cache only refreshes
@@ -943,8 +988,8 @@ export function sirenBand(points) {
       ${rules(ticks)}${bars}
     </svg>
     ${axisHtml(ticks)}
-    <div class="muted">${i < 0 ? `silent for the last ${spanText(secs)}`
-      : `${live ? 'sounding since' : 'last sounded'} ${MYT_CLOCK.format(inWin[i][0] * 1000)}`}</div>
+    <div class="muted">${i < 0 ? `Silent for ${spanText(secs)}`
+      : `${live ? 'Sounding since' : 'Last sounded'} ${MYT_CLOCK.format(inWin[i][0] * 1000)}`}</div>
   </div>`;
 }
 
@@ -1019,11 +1064,13 @@ export function rainBars(points) {
   /* The rule keeps the true column and the glyph moves off centre at the edges, rather than the
      other way round. Rain peaking right now is the ordinary case, not an edge case — the newest
      sample is the last column — and a centred glyph there hangs half its width outside the plate. */
-  // No mark on a dry station. `Peak 0 mm in an hour` names a peak that did not happen, and an amber
+  // `mm/h` and not `mm in an hour`: the per-sample readout on every other column of this same graph
+  // prints `mm/h`, so three words spelled out what one unit says beside it.
+  // No mark on a dry station. `Peak 0 mm/h` names a peak that did not happen, and an amber
   // mark on a graph with nothing to point at is the cry-wolf failure in miniature.
   const px = +x(pk[0]);
   const peak = !hi0 ? '' : `<b class="peak${px > 94 ? ' er' : px < 6 ? ' el' : ''}" style="left:${px}%"
-      data-tip="Peak ${pk[1]} mm in an hour · ${MYT_CLOCK.format(pk[0] * 1000)}"
+      data-tip="Peak ${pk[1]} mm/h · ${MYT_CLOCK.format(pk[0] * 1000)}"
     ><i class="i i-keyboard_double_arrow_up"></i></b>`;
 
   /* The heading carries the span the old caption ended with. It states the ground the graph covers,
@@ -1114,8 +1161,12 @@ export function rainAcc(acc, from) {
      exists for the single poll after a fresh `.history.db`, when a station holds one sample and no
      difference: it publishes a running total, so the clause is false on it. Keep the guard, and do
      not build a message behind it. */
-  const blank = (k, label) => `${label} · Not measured.${
-    ODO[k] && !from ? ' This gauge reports no running total.' : ''}`;
+  /* One sentence, not two. `Not measured. This gauge reports no running total.` states the outcome
+     and then the cause, and the cause already implies the outcome — so the permanent case is named
+     rather than qualified, and the waiting case keeps the short line on its own. */
+  const blank = (k, label) => ODO[k] && !from
+    ? `${label} · This gauge keeps no running total.`
+    : `${label} · Not measured.`;
 
   const col = ([k, label, r]) => {
     if (!r) return `<div class="acccol" data-tip="${blank(k, label)}"><b class="muted">—</b></div>`;
@@ -1139,13 +1190,13 @@ export function rainAcc(acc, from) {
           The em dash over the column is what says the window has no answer. */''}
     <div class="accx">${rows.map(([, label, r]) =>
       `<span>${label}${r && r[1] ? `<sup>${'*'.repeat(r[1])}</sup>` : ''}</span>`).join('')}</div>
-    ${star ? '<div class="muted">* Value derived from archived readings.</div>' : ''}
+    ${star ? '<div class="muted">* Derived from archived readings.</div>' : ''}
     ${/* One sentence, and no clock time. The shortfall is the claim the mark makes, and the hour the
           records start at is a fact about this server rather than about rain. Both long windows carry
           this mark together on a young archive: they anchor to the same earliest record, so they draw
           one number twice, and the remark is what says why. The per-column readout carries the span,
           which is where a reader who wants the size of the shortfall goes. */''}
-    ${short ? '<div class="muted">** Records cover less than the full period.</div>' : ''}
+    ${short ? '<div class="muted">** Measured over a shorter period.</div>' : ''}
   </div>`;
 }
 

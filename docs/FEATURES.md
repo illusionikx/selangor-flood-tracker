@@ -501,8 +501,9 @@ announced at all.
 sentence in the state block (`last signal 411.0h ago`) and the footer naming the same moment again
 two lines below (`OFFLINE · last reported 06/07/2026 10:19:05 · via JPS Selangor`). `footLine()` now
 carries all of it — state, date, elapsed, source — and the state blocks for siren, rainfall and
-gauge print no time at all. Elapsed time is appended only when the station is offline or stale; on a
-live one the date is the answer and `· 4m ago` is padding. Seconds are dropped for display by
+gauge print no time at all. Elapsed time is gone from both callers, and the stamp is now printed at
+the precision its age needs — see *The station panel said more than it knew* below. Seconds are
+dropped for display by
 `noSec()`, because the feeds stamp to the second but publish on a 15-minute slot, and the `:05` was
 enough to wrap the footer onto two lines on a phone. It trims the printed string only — nothing
 parses the result, so `parseMY()` still sees the verbatim stamp.
@@ -6879,10 +6880,12 @@ here. A favorite is a place. A map link is a coordinate. `PREFS.ignored` silence
 weather is none of those, and an action that acts on nothing is worse than an absent one.
 
 It states the two facts `sourceInfo()` states for a sensor. When the reading was made, and who made
-it. `met.stamp` is MET's own issue time, so the clock is the one MET published. Elapsed time sits
-beside it always, where `sourceInfo()` prints it only on a stale station. A station card states a
-full date and this states a clock, and `12:40` alone cannot say whether MET has been quiet since
-yesterday. The nearest point and its distance answer "who made this" on the second line. They stay
+it. `met.stamp` is MET's own issue time, so the clock is the one MET published. It goes through
+`stamp()`, the same rule a station's reading takes: the clock alone while the issue is from today,
+the date alone once it is not. That replaced a `· 25m ago` beside it. The elapsed figure was there
+because `12:40` alone cannot say whether MET has been quiet since yesterday — which is the question
+a stamp that switches to a date answers directly, and in fewer characters. The nearest point and its
+distance answer "who made this" on the second line. They stay
 out of the header, where the owner asked for them to go. A claim from 14 km away is a different
 claim from one made next door, and the ⋮ is where this app already puts that kind of doubt.
 
@@ -8979,8 +8982,11 @@ it. Every point came out `NaN` and the polyline rendered nothing.
 Any positive number puts a zero on the floor. So 1 is the smallest one that reads as arbitrary rather
 than as a threshold somebody chose.
 
-A dry station gets no peak mark. `Peak 0 mm in an hour` names a peak that did not happen, and an
+A dry station gets no peak mark. `Peak 0 mm/h` names a peak that did not happen, and an
 amber mark over nothing is the cry-wolf failure in miniature.
+
+The mark reads `mm/h` and not `mm in an hour`. The per-sample readout on every other column of this
+same graph already prints `mm/h`, so three words spelled out what one unit says beside them.
 
 Two sentences remain. Both cover the case with nothing at all to plot: no history yet, and no
 reading inside the window. A graph cannot state either of those for itself.
@@ -9158,3 +9164,102 @@ to 192px. Every desktop width holds the tile between 254px and 288px.
 The wall trades density for legibility. A 1920px monitor showed 11 tiles a row at 159px before this
 work and shows 7 at 254px now.
 
+## The station panel said more than it knew
+
+The card printed facts at a precision beyond what it knew. A sensor eleven months dead still drew
+a minute hand and an elapsed figure: `Last reported 19/09/2025 12:15 · 7892.0h ago`. Four stations
+in the payload are past 6,500 hours. At the other end, `Updated 14/08/2026 15:45` spent ten
+characters saying the date was today, which it is on every live station.
+
+One sweep read every rendered string on the panel against one question: does this state more
+precision than the fact needs. The sweep cut or trimmed eighteen strings. Nothing moved, no section
+collapsed, and no template changed shape.
+
+### One clock, at the precision the age needs
+
+`stamp()` in `js/popup.js` prints the clock alone on a reading taken today and the date alone on one
+from any other day. Two callers: `sourceInfo()` for a sensor, `wxDots()` for the weather section.
+Elapsed time is gone from both.
+
+Measured over the whole payload: 557 of 679 stations get a clock, 122 get a date, none produce
+anything else.
+
+The same-day test is a `startsWith` and not a parse. JPS stamps `DD/MM/YYYY HH:MM:SS` in MYT and
+`en-GB` formats a date the same way. So one expression reads both that string and MET's unix
+instant. The numeric case takes the feed's own shape first.
+
+**`ago()` was deliberately not fixed.** It has no unit above hours, which is what printed `7892.0h`.
+Adding one was the obvious repair and it is dead code. This was its only caller with a value large enough to overflow.
+The two that remain are `clip.js`, which ages a camera frame no older than three hours, and
+`net.js`, which prints how long ago the last poll ran. Both stay inside the range `ago()` covers, and
+seconds are the right precision for the second one.
+
+This reverses a rule that stood in `CLAUDE.md`. It said elapsed time belonged on a stale station
+"because on a live one the date is the answer". The live case is the one where the date says least.
+
+### Seventeen more, on the same question
+
+Cut, because the fact was already on screen or was never about the place:
+
+| where | printed | why |
+|---|---|---|
+| `meter()` | `85% of danger (3.50 m)` | `.mscale` draws `3.50 danger` 20px below |
+| `region()` | `basin n/a` | 287 of 679 stations. A gap in the feed, not a fact about the place |
+| `region()` | `district n/a` | 0 stations. A branch nothing reaches |
+| peak mark | `Peak 12.5 mm in an hour` | the readout beside it already prints `mm/h` |
+
+Trimmed, because the words or the digits outran the fact:
+
+| where | printed | now |
+|---|---|---|
+| four sites | `2.4 km away` | `2.4 km` |
+| `spanText()` | `Last 9.4 h` | `Last 9 h` |
+| `gaugeBlock()` | `water is 3.55 m below the gauge marker` | `3.55 m below the marker` |
+| `gaugeBlock()` | `water is level with the gauge marker` | `Level with the marker` |
+| `rainState()` | `Faulty signal. This gauge collected no rain this hour.` | `Faulty signal. No rain reached this gauge.` |
+| `rainAcc()` | `* Value derived from archived readings.` | `* Derived from archived readings.` |
+| `rainAcc()` | `** Records cover less than the full period.` | `** Measured over a shorter period.` |
+| `blank()` | `24 h · Not measured. This gauge reports no running total.` | `24 h · This gauge keeps no running total.` |
+| `etaText()` | `over 6 h away` | `over 6 h` |
+| `sirenBand()` | `silent for the last 9 h` | `Silent for 9 h` |
+| `herePopup()` | `Accurate to about 250 m` | `Accurate to 250 m` |
+
+`spanText()` rounds **down**, not to nearest. Three surfaces print it: a rainfall heading, a level
+graph's caption, a siren's quiet run. Every reader of that number reads it as ground covered, so a
+span stated short understates the watch, and a span stated long claims minutes the record never
+held. Minutes keep their rounding, because under an hour the whole number is the fact.
+
+`blank()` states one sentence rather than two. `Not measured.` followed by the cause said the same
+thing twice, and the permanent case — a KL gauge that publishes no running total and never will — is
+better named than qualified.
+
+### What the sweep did not cut
+
+`Faulty signal. No river nearby is high.` is the model for the rest, so it stands.
+`No rain in the next 3 hours` keeps its window, because the heading above it reads `Later` and names
+none. The three empty-graph lines stay: a graph that has not filled yet, a window with no readings
+in it, and a log with nothing logged are three states, and none is inferable from the others.
+`0.22 m of water` keeps `of water`, because the bare unit is ambiguous against a river level on a
+mast card. Every control keeps its verb.
+
+This sweep leaves `in ~1.4 h` alone, against the writing standard's ban on hedging. The tilde is the coarseness
+marker, not a hedge — a straight-line projection off an hour of samples has no business claiming six
+minutes, and `in 1.4 h` claims exactly that.
+
+### The sentence-case sweep had missed five
+
+`CLAUDE.md` claimed the UI had been swept for sentence case. Five strings still opened lowercase, all
+in `popup.js`: two in `gaugeBlock()` and three in `sirenBand()`. Shortening them fixed every one as a
+side effect.
+
+That is the useful part. A line nobody has reworded is a line nobody has re-read, so the strings that
+survive a style sweep are the ones no later change happened to touch. Do not trust a past sweep over
+a grep.
+
+### One latent bug, named and not fixed
+
+`WEATHER[0].line` is the empty string, and `metSection()` builds its rain sentence whenever
+`m.rung != null`. A rung of 0 renders ` until 16:00` — a leading space and no subject. Measured
+on the live payload, `met.rung` is 1 on 566 stations, 2 on 54, and absent on 59. It is never 0,
+because `metSpan()` in `api.php` returns null when no step in the window is wet. The invariant is
+upstream and the guard belongs here, so this entry states the risk rather than coding around it.

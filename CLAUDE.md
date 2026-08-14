@@ -915,9 +915,21 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   thing it sent, which of the three feeds won. None of them changes what the water is doing, and as a
   footer line they repeated per sensor down a six-sensor mast. They are what you check when you doubt
   the number, so they sit where you go to look. The stale state blocks (siren, rainfall, gauge) print
-  no time at all. Elapsed time is appended only when the station is offline or stale, because on a
-  live one the date is the answer and `· 4m ago` is padding. Seconds are trimmed for display by
-  `noSec()`; the underlying string stays verbatim, so `parseMY()` is unaffected. **The glyph names
+  no time at all. **The stamp is printed at the precision its age needs, and `stamp()` in `popup.js`
+  is the one rule.** A reading taken today is answered by its clock. A reading from any other day is
+  answered by its date. This reverses what stood here, which said elapsed time was appended only on
+  a stale station "because on a live one the date is the answer" — the live case is the one where
+  the date says least, since it is today on every live station, and `Updated 14/08/2026 15:45` spent
+  ten characters saying so. The stale case was worse: `Last reported 19/09/2025 12:15 · 7892.0h ago`
+  put a minute hand and an elapsed figure on a sensor eleven months dead. Four stations in the
+  payload are past 6,500 hours. **Elapsed time is gone from both callers**, and `ago()` was
+  deliberately **not** given a unit above hours to fix `7892.0h` — this was its only caller that
+  could overflow, and the two that remain (`clip.js`'s frame age, `net.js`'s poll clock) stay inside
+  the range it was written for. A day unit there would be unreachable code. The same-day test is a
+  `startsWith` and not a parse: JPS stamps `DD/MM/YYYY HH:MM:SS` in MYT and `en-GB` formats a date
+  the same way, so one expression reads both that string and MET's unix instant. Seconds are trimmed
+  for display by `noSec()`; the underlying string stays verbatim, so `parseMY()` is unaffected — it
+  has no caller in `popup.js` any more, and `js/clip.js` is the module that still uses it. **The glyph names
   what is in the menu, and it has changed twice on that one rule.** It was a ⋮ over a single "ignore"
   item, which promised actions and held one, so it became an ⓘ when the provenance moved in. It is a
   `more_vert` ⋮ now that the menu also carries the favorite, the nearest webcam or water level, the
@@ -1619,16 +1631,31 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   this file wins and the disagreement is written down.
 - Responsive is a standing requirement (breakpoint 600px), including touch equivalents for every
   hover-only affordance.
-- **A message on screen is written for the reader, not for the system.** Three rules, and the whole
-  UI was swept for them once. **Sentence case** — a capital at the front of every rendered string,
-  including the small `.muted` helper lines, which were all lowercase fragments. **No hedging** —
+- **A message on screen is written for the reader, not for the system.** Four rules, and the station
+  panel was swept for them twice. **Sentence case** — a capital at the front of every rendered
+  string, including the small `.muted` helper lines, which were all lowercase fragments. The first
+  sweep missed five, all in `popup.js`: `water is … below the gauge marker` and `water is level with
+  the gauge marker` in `gaugeBlock()`, and `silent for the last …` / `last sounded …` / `sounding
+  since …` in `sirenBand()`. The second sweep caught every one of them as a side effect of
+  *shortening* them, which is the usual way — a line nobody has reworded is a line nobody has
+  re-read. Do not trust a past sweep over a grep. **No hedging** —
   the writing standard bans "probably", and a hedge is dishonest anyway where the app has already
   acted on the judgement it is hedging about. **None of our vocabulary**: `proxy`, `cold start`,
   `as we poll`, `stuck relay`, `warning mark`, `the alert list` and `5 km` are how *we* describe the
   plumbing, and a reader wants the verdict and one fact behind it. The siren line is the model —
   `Faulty signal. No river nearby is high.` replaced a 28-word sentence that never answered whether
-  there was a flood. The ALL-CAPS blocks (`TRIGGERED`, `HEAVY RAIN`, `HAPPENING NOW`) are a
-  deliberate visual language and are **not** messages — leave them.
+  there was a flood. **The precision the fact needs, and no more.** A live station's stamp needs its
+  clock and not today's date. A sensor eleven months dead needs its date and neither a minute hand
+  nor `· 7892.0h ago`. A graph window measured over 9.6 hours is `9 h`, because a decimal claims
+  six-minute precision on a span nobody measures that finely — and it rounds **down**, since a span
+  is read as ground covered and a long one claims minutes that were never in the record. A number
+  already drawn on the scale 20px below is not repeated in the line above it. A distance needs no
+  `away` after it, an accuracy radius no `about` before it, and `mm/h` says what `mm in an hour`
+  spells. Sweeping the station panel on this one rule cut or trimmed 18 strings, and deleted
+  `basin n/a` from 287 of 679 cards — a line stating a gap in the feed rather than a fact about the
+  place, beside `district n/a`, which no station could ever reach. The ALL-CAPS blocks (`TRIGGERED`,
+  `HEAVY RAIN`, `HAPPENING NOW`) are a deliberate visual language and are **not** messages — leave
+  them.
 - All user settings live in one `prefs` blob in `localStorage` (`PREFS` + `save()`).
 - **`PREFS.ignored` is the only alarm-suppression control**, and it is applied *further* than the
   district filter: `isIgnored()` gates pins, heat, the alert panel, the ticker **and** the toast. The
@@ -1790,6 +1817,55 @@ for f in "$T"/*.mjs; do node --check "$f" || echo "FAIL $f"; done
 # with index.html and a 200, so a typo'd path passes a status check and fails in the browser.
 for f in js/*.js css/*.css; do
   curl -sk -o /dev/null -w "%{content_type} $f\n" "https://flood-exp.test/$f"; done | grep -v 'javascript\|css'
+
+# `stamp()` and `spanText()` in js/popup.js, the two string rules with a branch in them. There is no
+# JS test harness here and this does not add one: the functions are lifted out of the SHIPPED source
+# by regex, so a copy cannot drift from what runs. `stamp()` decides a clock against a date on a
+# same-day test, and `spanText()` floors. Both fail silently — a wrong slice index prints an empty
+# string, and a wrong rounding claims minutes the record never held.
+node --input-type=module -e "
+import fs from 'fs';
+const src = fs.readFileSync('js/popup.js','utf8'), util = fs.readFileSync('js/util.js','utf8');
+const grab=(s,re)=>{const m=s.match(re); if(!m) throw new Error('not found: '+re); return m[0];};
+const { stamp, spanText } = new Function([
+  grab(util,/export const noSec = .*;/).replace('export ',''),
+  grab(src,/const MYT_DATE = new Intl\.DateTimeFormat[\s\S]*?\);/),
+  grab(src,/const MYT_CLOCK = new Intl\.DateTimeFormat[\s\S]*?\);/),
+  grab(src,/const stamp = t => \{[\s\S]*?\n\};/),
+  grab(src,/const spanText = secs => secs < 3600[\s\S]*?;/),
+].join('\n') + '; return { stamp, spanText };')();
+let bad=0; const is=(g,w,n)=>{const ok=g===w; if(!ok)bad++;
+  console.log((ok?'ok  ':'FAIL')+'  '+n+'  -> '+JSON.stringify(g)+(ok?'':'  want '+JSON.stringify(w)));};
+const today = new Intl.DateTimeFormat('en-GB',
+  {timeZone:'Asia/Kuala_Lumpur',day:'2-digit',month:'2-digit',year:'numeric'}).format(new Date());
+is(stamp(today+' 15:45:00'),'15:45','today -> clock, seconds trimmed');
+is(stamp('19/09/2025 12:15:00'),'19/09/2025','another day -> date only');
+is(stamp(today),today,'date with no clock -> the date');
+is(stamp(Date.parse('2025-09-19T12:15:00+08:00')),'19/09/2025','unix ms, another day -> date');
+is(/^\d\d:\d\d\$/.test(stamp(Date.now())),true,'unix ms, today -> clock');
+is(spanText(3600*9.6),'9 h','floors, never rounds up');
+is(spanText(3600),'1 h','exactly one hour');
+is(spanText(1800),'30 min','under an hour keeps minutes');
+console.log(bad?'FAILURES: '+bad:'all pass'); process.exit(bad?1:0);"
+
+# And that every stamp the live payload can produce is one shape or the other, never a fragment.
+# Expect roughly 5 of 6 on the clock. A count of 0 on either side means the same-day test broke.
+node --input-type=module -e "
+import fs from 'fs';
+const src=fs.readFileSync('js/popup.js','utf8'), util=fs.readFileSync('js/util.js','utf8');
+const grab=(s,re)=>s.match(re)[0];
+const { stamp } = new Function([
+  grab(util,/export const noSec = .*;/).replace('export ',''),
+  grab(src,/const MYT_DATE = new Intl\.DateTimeFormat[\s\S]*?\);/),
+  grab(src,/const MYT_CLOCK = new Intl\.DateTimeFormat[\s\S]*?\);/),
+  grab(src,/const stamp = t => \{[\s\S]*?\n\};/),
+].join('\n') + '; return { stamp };')();
+let clock=0,date=0,bad=[];
+for (const s of JSON.parse(fs.readFileSync('.cache.json','utf8')).stations) {
+  const t=s.updated||s.shot; if(!t) continue; const o=stamp(t);
+  if(/^\d\d:\d\d\$/.test(o)) clock++; else if(/^\d\d\/\d\d\/\d{4}\$/.test(o)) date++; else bad.push([s.id,t,o]); }
+console.log('clock:',clock,' date:',date,' unexpected:',bad.length);
+bad.slice(0,5).forEach(b=>console.log('  ',b.join('  ')));"
 ```
 
 ```bash
