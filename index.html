@@ -700,7 +700,10 @@
     <span class="pins">
       <span class="pin" style="--c:var(--s-alert)"><i class="i i-water_drop"></i></span>
       <span class="pin" style="--c:var(--s-warning)"><i class="i i-water_drop"></i></span>
-      <span class="pin danger"><i class="i i-water_drop"></i></span>
+      <!-- `--c` is not optional on a sample. `.pin` reads `color: var(--c, var(--accent))`, so a pin
+           with no `--c` draws in the accent blue — which is what this one did, under a line of text
+           promising the reader it fills red. See the legend rule in the Verify block in CLAUDE.md. -->
+      <span class="pin danger" style="--c:var(--s-danger)"><i class="i i-water_drop"></i></span>
     </span>
     <span>A river past its <b>alert</b>, <b>warning</b> and <b>danger</b> marks. At danger it fills
        red, keeps a pulsing halo, and draws over everything else.</span>

@@ -1850,6 +1850,14 @@ count($wet),count($k),$full,$lit,round(100*$lit/max(1,$full)),$on,count($dry));'
 curl -sk https://flood-exp.test/api.php | php -r '$p=json_decode(stream_get_contents(STDIN),true);
 foreach($p["warnings"] as $w) echo substr($w["title"],0,70),"\n";'
 
+# Every pin sample in the Help legend must state its own `--c`. A `.pin` reads
+# `color: var(--c, var(--accent))`, so a sample with no `--c` draws in the accent blue instead of the
+# colour the sentence beside it names. The "at danger" sample shipped that way: an accent-blue drop
+# inside the pulsing red halo, under a line promising the reader it fills red. The map was right the
+# whole time, which is why this reads as a map fault and is not one.
+grep -n 'class="pin[ "]' index.html | grep -v -- '--c:' \
+  && echo "FAIL: a legend pin sample has no --c" || echo "OK: every legend pin states its colour"
+
 # Every module must carry a modulepreload link, except the five loaded on demand. There is no build
 # step to generate that list, so it goes stale silently when somebody adds a module.
 for f in js/*.js; do

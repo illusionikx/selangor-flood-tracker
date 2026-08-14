@@ -8895,3 +8895,27 @@ amber mark over nothing is the cry-wolf failure in miniature.
 
 Two sentences remain. Both cover the case with nothing at all to plot: no history yet, and no
 reading inside the window. A graph cannot state either of those for itself.
+
+### The Help legend showed a blue pin at danger
+
+A reader saw a station at danger. It drew a pulsing red ring around an icon that was not red.
+The map was right. The Help legend was wrong. The legend is where they looked.
+
+`.pin` reads `color: var(--c, var(--accent))`. Every sample in that legend states its own `--c`.
+The "at danger" sample did not, so it fell back to the accent blue. A browser measures that pin
+at `#1a73e8`. The sentence under it promised the reader it fills red.
+
+`render.js` sets the class and the colour in one expression, `critical ? statusColor(3) : ...`.
+So a real pin cannot show the halo and miss the red. That is what makes this fault read as a map
+fault. A reader can still tell the two states apart on screen. Only the picture that teaches them
+was wrong.
+
+The check is one line in the Verify block. Every `.pin` sample in `index.html` states a `--c`.
+A legend is a claim about what the map draws. A claim needs a check that fails when it stops
+being true. The same rule caught the "It loads nothing from a third party" sentence in the About
+pane.
+
+This work measured three other explanations first and dropped all three. `atDanger()` refuses an
+offline station. The map-palette block can omit `--s-danger`. And `.pin.rise` does draw red around
+a pin that keeps its own status colour. That last one is deliberate and stays. A forecast is not
+a reading.
