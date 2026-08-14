@@ -8261,10 +8261,8 @@ five thin marks stood in a wide plate. The 6 px grid gap is now the only thing b
 The bar has no rounded top. A 3 px radius on a 58 px column reads as a soft edge on a wide block
 rather than as a bar with a cap.
 
-The fill is a gradient from `--k-rainfall` down to the same color at 20 percent. **The fade stops at
-20 percent and not at `transparent`.** A gradient takes the size of its own element, so a short bar draws
-entirely inside the faded end. A bar two pixels tall then disappears, and the smallest total on the
-chart reads as no total at all.
+The fill is a gradient in `--k-rainfall`. The section below states the stops, which changed once the
+bars took an outline.
 
 The color stays `--k-rainfall`, the kind token. This chart states how much rain fell and never how
 bad that is, so a status hue claims something the chart refuses to say.
@@ -8300,3 +8298,49 @@ Measured across four states, with the plate at 58 px and the tallest bar at 42 p
 starts at 16 px and every value ends at 15 px. Nothing overlaps, and every value sits inside the
 plate. The four are a live station, a full set of nested windows, a station with two unanswered
 windows, and a station reporting no rain in any window.
+
+### The bars took the shape of the line graph, and the grid runs the other way
+
+A card can carry three graphs at once: a level line, a rain area and these columns. The first two
+draw a see-through fill under an opaque stroke. The columns filled solid, so one card stated a value
+two ways.
+
+`areaFill()` in `js/popup.js` runs 0.6 alpha at the foot of an area and 0.1 at its head, and a solid
+stroke rides the upper boundary. `.acccol i` states the same gradient and takes a 1 px border in
+`--k-rainfall`. The border stops at the base, the way an area graph strokes its upper boundary and
+leaves the axis bare.
+
+`box-sizing: border-box` keeps that border inside the height the bar states. Without it a 1 px line
+adds itself to every total, and the tallest column runs into its own value.
+
+**A measured zero now draws its own baseline**, because a border box cannot go under the height of
+its own border. That is worth keeping rather than working around.
+
+Five columns exist to hold a measured zero and an unanswered window apart. Before this, both of them
+drew nothing at all. The station with two unanswered windows now shows three columns with a violet
+base and two with none.
+
+**The grid is horizontal where `rules()` draws a vertical one, and both are right.** A grid marks
+the axis that carries the scale. On a line graph that axis is time, and it runs across. On these
+columns it is the total, and it runs up.
+
+The grid takes the same `--outline` and the same 1 px as `.spark line`, so the two read as one
+family.
+
+The grid sits at the bottom of the plate, in a box 42 px tall. It covers the bars and stops under
+the value strip. Four lines land at 0, 10.5, 21 and 31.5. The box ends before a fifth line starts,
+so the plot needs no rule along its top edge.
+
+### A utility class carrying a font size beats the size its context passes down
+
+The `24 h` and `72 h` labels drew larger than their three neighbours. `.accx` sets `font-size: 10px`
+and every label inherits it. An unanswered label also carried `class="muted"`, and `.muted` declares
+`font-size: 12px`. **A declaration on the element always beats a value the parent passes down**, so
+the two labels a reader is most likely to question drew biggest.
+
+The class is gone from those labels. It added no colour, because `.accx` already paints all five
+`--muted`. The em dash over the column is what says the window has no answer.
+
+`#ignoredList .nm .muted` in `css/base.css` patches the same trap at another site. Read that rule as
+evidence rather than as a one-off. Any compact context that sets its own font size needs to state it
+on the element, or avoid `.muted` there.

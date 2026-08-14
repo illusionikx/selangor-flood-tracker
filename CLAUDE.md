@@ -1143,6 +1143,17 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   `align-items: start` on the grid, `position: absolute` on the tile's `<img>`, and a wider tile
   ratio. Each left the row exactly where it was.
 
+- **`.muted` carries a `font-size`, so it beats whatever size its context passes down.**
+  `.muted { color: var(--muted); font-size: 12px }` in `css/base.css`. A declaration on the element
+  always wins against an inherited value, however specific the parent's selector is. `.accx` sets
+  `font-size: 10px` on the rain chart's label row and every label inherits it — but an unanswered
+  window's label also carried `class="muted"`, so `24 h` and `72 h` drew at 12px beside three
+  neighbours at 10. The two labels a reader is most likely to question drew biggest. The class was
+  doing no work there either, since `.accx` already paints all five `--muted`. **This is not the
+  first site**: `#ignoredList .nm .muted` patches the same trap by restating 11px. Read that rule as
+  evidence rather than as a one-off, and treat `.muted` as a colour-plus-size pair. In a compact
+  context, either state the size on the element or reach for the token instead of the class.
+
 - **A label sharing a box with a percentage-height bar has to be reserved with `padding`, and a
   raised `sup` beside it grows the box that reserves it.** Two rules, both on `.acccol` in
   `css/base.css`, and the rain accumulation chart needs each. Its five totals print inside the plate

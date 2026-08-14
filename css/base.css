@@ -566,10 +566,19 @@ dialog:focus, dialog:focus-visible { outline: none; }
 }
 /* The same plate the spark graphs draw on. See the note there for why it is 4% of the text colour
    and not `--hover`. 58px is the 42px of bar this chart has always had, plus the 16px strip the
-   values now sit in. */
+   values now sit in.
+   The grid is horizontal where `rules()` in js/popup.js draws a vertical one, and both are correct
+   for the same reason: a grid marks the axis that carries the scale. On a line graph that axis is
+   time and it runs across, and on these columns it is the total and it runs up. Same `--outline`
+   and same 1px as `.spark line`, so the two read as one family.
+   It is anchored to the bottom and sized to 42px, so it covers the bars and stops under the value
+   strip. Four lines land at 0, 10.5, 21 and 31.5. The fifth would start on the top edge of its own
+   box, so the box ends before it draws and the plot needs no rule of its own up there. */
 .accplot {
-  height: 58px; align-items: end;
-  background: color-mix(in srgb, var(--on-surface) 4%, transparent); border-radius: 6px;
+  height: 58px; align-items: end; border-radius: 6px;
+  background: repeating-linear-gradient(to top, var(--outline) 0 1px, transparent 1px 10.5px)
+                bottom / 100% 42px no-repeat,
+              color-mix(in srgb, var(--on-surface) 4%, transparent);
 }
 /* `padding-top` is what reserves the value strip, and it has to be padding rather than a margin or
    a shorter plate. A bar states its total as a percentage height, and a percentage resolves against
@@ -593,14 +602,21 @@ dialog:focus, dialog:focus-visible { outline: none; }
 .acccol sup { font-size: 8px; vertical-align: baseline; position: relative; top: -4px;
               line-height: 0; }
 /* Rainfall violet, the kind colour. Never a status hue: a column says how much, not how bad.
-   Full column width, square top, and a fade toward the base. The fade stops at 20% and not at
-   `transparent`. A gradient takes the size of its own element, so a short bar draws entirely inside
-   the faded end. A bar two pixels tall then disappears, which is the smallest total on the chart
-   reading as no total at all. */
+   A see-through fill under an opaque outline, which is the shape `sparkline()` and `rainBars()`
+   already draw: `areaFill()` in js/popup.js runs 0.6 alpha at the foot of the area to 0.1 at its
+   head, and a solid stroke rides the boundary. The numbers here are that gradient, and the border
+   is that stroke. So the three graphs on one card state a value the same way.
+   The outline stops at the base, the way the area graphs stroke their upper boundary and leave the
+   axis bare. `box-sizing` keeps the border inside the height the bar states, or a 1px line would
+   add itself to every total.
+   A measured zero draws its own baseline, because a border box cannot go under its own border. That
+   is worth keeping: five windows exist to hold a measured zero and an unanswered window apart, and
+   before this both of them drew nothing at all. */
 .acccol i {
-  display: block; width: 100%;
-  background: linear-gradient(var(--k-rainfall),
-                              color-mix(in srgb, var(--k-rainfall) 20%, transparent));
+  display: block; width: 100%; box-sizing: border-box;
+  border: 1px solid var(--k-rainfall); border-bottom: 0;
+  background: linear-gradient(color-mix(in srgb, var(--k-rainfall) 10%, transparent),
+                              color-mix(in srgb, var(--k-rainfall) 60%, transparent));
 }
 
 /* The hover readout — see js/sparktip.js for why it is a popover and not a plain fixed box. Being

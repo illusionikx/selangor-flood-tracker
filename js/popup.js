@@ -1044,8 +1044,11 @@ export function rainAcc(acc) {
 
   return `<div class="acc">
     <div class="accplot">${rows.map(col).join('')}</div>
-    <div class="accx">${rows.map(([label, r]) =>
-      `<span${r ? '' : ' class="muted"'}>${label}</span>`).join('')}</div>
+    ${/* No `.muted` on an unanswered label. `.accx` already paints every one of them `--muted`, so
+          the class added no colour — and it carries `font-size: 12px`, which beat the 10px the row
+          passes down by inheritance and drew `24 h` and `72 h` larger than their three neighbours.
+          The em dash over the column is what says the window has no answer. */''}
+    <div class="accx">${rows.map(([label]) => `<span>${label}</span>`).join('')}</div>
     ${star ? '<div class="muted">* Value derived from archived readings.</div>' : ''}
   </div>`;
 }
