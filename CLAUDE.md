@@ -799,12 +799,13 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   nothing in test mode reaches a server. Without it the hover readout printed a faked flood in plain
   ink, which hid the very crossing the fake exists to show.
   **A fake that moves one field of a sensor has to move every field the card draws beside it.**
-  `soak()` is the single door for a rain gauge â€” the hour, the day, the status, the graph and the
-  `acc` chart all leave through it, because the card prints `Last hour 75 mm` directly above a
-  1 h column and the two disagreeing reads as a bug in the chart. Two callers had already drifted.
+  `soak()` is the single door for a rain gauge — the hour, the day, the status, the graph and the
+  `acc` chart all leave through it, because `rainState()` prints `HEAVY RAIN` and `rainBars()` draws
+  the hour directly above a 1 h column that states it as a number, and the two disagreeing reads as a
+  bug in the chart rather than as a fake. Two callers had already drifted.
   `drown()` hard-coded a 158 mm day where the storm cell applies a multiplier that gives 157.5.
   **`stormAcc()` shapes the five windows rather than scaling them.** A violent cell is short, so its
-  3-hour multiplier falls as the hour gets heavier â€” 75 mm held for three hours is a once-in-decades
+  3-hour multiplier falls as the hour gets heavier — 75 mm held for three hours is a once-in-decades
   total, while 4 mm/h of drizzle really does run all afternoon. The two long windows carry a
   per-station `seed()`, because antecedent rain is the one thing that does *not* follow from the
   hour on the gauge, and scaling it off that hour gave every faked gauge one silhouette. That seed
@@ -1141,6 +1142,21 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   mistake, and both are this. Three other explanations were tried first and all three were wrong:
   `align-items: start` on the grid, `position: absolute` on the tile's `<img>`, and a wider tile
   ratio. Each left the row exactly where it was.
+
+- **A label sharing a box with a percentage-height bar has to be reserved with `padding`, and a
+  raised `sup` beside it grows the box that reserves it.** Two rules, both on `.acccol` in
+  `css/base.css`, and the rain accumulation chart needs each. Its five totals print inside the plate
+  rather than on a row above it, and a bar states its total as a percentage height — which resolves
+  against the **content box** of its container. So `padding-top: 16px` shortens the scale of all five
+  bars at once, and the tallest fills the 42px under its own number. A margin, or a shorter plate,
+  leaves the percentage measuring the full box and the tallest bar covers the value it belongs to.
+  The second rule is the provenance asterisk. A bare `sup` lifts itself with `vertical-align: super`,
+  and a raised inline box **grows the line box that holds it** — the value measured 17.3px against
+  the 16px strip, so the tallest bar started 1.3px inside its own number. `line-height: 0` with
+  `position: relative; top: -4px` lifts the mark and contributes nothing to the measurement. **That
+  is the normal case and not an edge case**: the 24h and 72h totals are both derived, so both carry
+  the mark, and the five windows nest, so the longest is the tallest column. Anything new that prints
+  a value inside a plot needs both halves.
 
 - **The dark basemap is greyscale, and its *filled* water is the brighter tone, not the darker one.**
   All 18 colors in CARTO `dark_all` have a chroma of zero, so `saturate()` and `hue-rotate()` have

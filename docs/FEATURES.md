@@ -8205,9 +8205,10 @@ The full record, including the measurements behind each rejection, is in
 
 A drill has to move this chart too. `soak()` in `js/test.js` is the one door a faked rain gauge
 leaves through, so the hour, the day, the status, the graph and the five totals cannot drift apart.
-The card prints `Last hour 75 mm` directly above a 1 hour column, and the two disagreeing reads as a
-bug in the chart rather than as a fake. The two callers had already drifted before this. `drown()`
-hard-coded a 158 mm day where the storm cell applies a multiplier that gives 157.5.
+`rainState()` prints `HEAVY RAIN` and `rainBars()` draws the hour, both directly above a 1 hour
+column that states the same hour as a number. The three disagreeing reads as a bug in the chart
+rather than as a fake. The two callers had already drifted before this. `drown()` hard-coded a
+158 mm day where the storm cell applies a multiplier that gives 157.5.
 
 `stormAcc()` shapes the five windows. A violent cell is short, so the 3 hour multiplier falls as the
 hour gets heavier. At 75 mm in an hour the 3 hour total is 1.37 times it, because 225 mm in three
@@ -8230,3 +8231,72 @@ another reader. That is the reason the threshold marks could take no invented nu
 Test mode fakes the `derived` flags and the measured spans as well. Both reach real data only once
 the odometer fills, so without a knob here the asterisk and its footnote ship unseen. A KL gauge carries
 the asterisk on its 3 hour column, because a summed one really would.
+
+### The chart replaced the two rows above it
+
+The rainfall card carried a `Last hour` row and a `Today` row. Both are gone. The chart states the
+same two numbers, as its `1 h` and `Today` columns, and it states three more windows beside them.
+
+One fact must not get two looks on one card. The rows and the columns read the same fields, so they
+agreed or exposed a fault, and nothing else.
+
+They had already exposed one. The test mode section above describes it, and `soak()` became a single
+door for exactly that reason. Removing the rows leaves one place to read the hour, and one place to
+fix it.
+
+Nothing is lost where a station reports nothing. A gauge with no reading printed `Last hour —`
+before, and the chart prints an em dash over an empty column now. Measured on the live payload, one
+of 231 rainfall stations carries no `acc` at all, and that station publishes a null hour and a null
+day, so both rows were already em dashes on it.
+
+`num()` left `js/popup.js` with those rows. It was the only caller in that file.
+
+### The columns are the full width of their cell
+
+Three changes, all in `.acccol i`.
+
+The bar fills its grid cell. A `max-width` of 22 px held it to about a third of the 58 px cell, so
+five thin marks stood in a wide plate. The 6 px grid gap is now the only thing between two columns.
+
+The bar has no rounded top. A 3 px radius on a 58 px column reads as a soft edge on a wide block
+rather than as a bar with a cap.
+
+The fill is a gradient from `--k-rainfall` down to the same color at 20 percent. **The fade stops at
+20 percent and not at `transparent`.** A gradient takes the size of its own element, so a short bar draws
+entirely inside the faded end. A bar two pixels tall then disappears, and the smallest total on the
+chart reads as no total at all.
+
+The color stays `--k-rainfall`, the kind token. This chart states how much rain fell and never how
+bad that is, so a status hue claims something the chart refuses to say.
+
+### The value moved inside the plate
+
+The five totals sat on a row above the chart. They sit inside their own column now, in a strip at
+the top of the plate.
+
+A row above the plate asks the reader to carry a number sideways to the bar it belongs to. One
+number over one bar is easy. Five over five is the moment that goes wrong, and the two long columns
+often print an em dash, so the row and the plate did not even hold the same count of marks.
+
+**`.acccol` reserves the strip with `padding-top`, and padding is the only thing that works here.**
+A bar states its total as a percentage height. A percentage height resolves against the content box
+of its container. So 16 px of padding shortens the scale of all five bars at once, and the tallest
+column fills the 42 px below its own number.
+
+A margin or a shorter plate leaves the percentage measuring the full box, and the tallest bar then
+covers its own value. The plate is 58 px: the 42 px of bar this chart has always had, plus the 16 px
+strip.
+
+**`position` lifts the asterisk, and `vertical-align: super` does not.** A raised inline box grows
+the line box that holds it. Measured, the value box went from 15 px to 17.3 px against a 16 px
+strip, and the tallest bar started 1.3 px inside its own number.
+
+That case is the normal one and not an edge case. The 24 hour and 72 hour totals are both derived,
+so both carry the mark, and the five windows nest, so the longest of them is the tallest column.
+`line-height: 0` takes the mark out of the measurement and `top` puts it back where it looks right.
+The value box measures a flat 15 px with the mark or without it.
+
+Measured across four states, with the plate at 58 px and the tallest bar at 42 px: the tallest bar
+starts at 16 px and every value ends at 15 px. Nothing overlaps, and every value sits inside the
+plate. The four are a live station, a full set of nested windows, a station with two unanswered
+windows, and a station reporting no rain in any window.

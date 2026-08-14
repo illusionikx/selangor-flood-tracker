@@ -4,7 +4,7 @@
 import { KINDS, SOURCES, SPARK_H, NO_INFO, ALERT_TITLE, RIVER_COLOR, RAIN_COLOR,
          GAUGE_COLOR, RAIN_STOPS, NEAR_MAX_KM, camSrc, WEATHER, MET_NAME,
          ACC_ROWS } from './config.js';
-import { num, ago, noSec, parseMY, distKm, hasInfo, isStale, statusColor, scalePos,
+import { ago, noSec, parseMY, distKm, hasInfo, isStale, statusColor, scalePos,
          levelStops, gaugeStops, gaugeColor, color, isFav } from './util.js';
 import { nearestOf, nearestCam, nearestLevel, camAlert } from './stations.js';
 
@@ -338,10 +338,9 @@ function sensorBody(s) {
   // not, so "not rising" can be read as "still hours away" rather than taken on trust.
   if (s.kind === 'river' && s.eta != null) body.push(metric('Reaches danger',
     etaText(s.eta), s.rising ? 'up' : ''));
-  if (s.kind === 'rainfall') {
-    body.push(metric('Last hour', `<b>${num(s.hourly, ' mm')}</b>`));
-    body.push(metric('Today', num(s.daily, ' mm')));
-  }
+  /* No `Last hour` or `Today` row. The chart below carries both, as the `1 h` and `Today` columns,
+     and it states three more windows beside them. Two surfaces for one number is how the card and
+     the chart came to disagree once already — see the test-mode note in docs/FEATURES.md. */
   const rain = s.kind === 'rainfall' ? rainBars(s.history) : '';
   /* Totals under the graph. Not on a stale station: one gauge in the payload holds 27 mm in an hour
      and its stamp reads last October, and `hasInfo()` calls it online because `hourly` is not null.
@@ -1025,24 +1024,25 @@ export function rainAcc(acc) {
   const hi = Math.max(...rows.map(([, r]) => r ? r[0] : 0)) || 1;
   const star = rows.some(([, r]) => r && r[1]);
 
-  // Three grids of the same five columns. The numbers, the columns and the labels line up because
-  // they share a column count, a gap and a padding, and none of them measures the others.
-  const num = ([, r]) => r
-    ? `<span>${r[0]}<small> mm</small>${r[1] ? '<sup>*</sup>' : ''}</span>`
-    : '<span class="muted">—</span>';
+  /* Two grids of the same five columns, and they line up because they share a column count, a gap
+     and a padding. Neither measures the other.
+     The value rides inside its own column rather than on a row above the plate. A row above needed
+     the reader to carry a number sideways to the bar it belonged to, and five numbers over five
+     bars is the moment that goes wrong. `.acccol` reserves the strip it sits in, so a full-height
+     bar cannot reach it — see the padding note in css/base.css. */
   const col = ([label, r]) => {
-    if (!r) return '<div class="acccol"></div>';
-    const [mm, , span] = r;
+    if (!r) return '<div class="acccol"><b class="muted">—</b></div>';
+    const [mm, derived, span] = r;
     /* The measured span rides in the readout rather than on the chart. It answers "why does this
        say 24 hours when the archive has a hole in it", which is a question you go looking for
        rather than something to read at a glance. */
     const tip = `${label} · ${mm} mm${span ? ` · measured over ${span} h` : ''}`;
-    return `<div class="acccol" data-tip="${tip}"><i style="height:${
+    return `<div class="acccol" data-tip="${tip}"><b>${mm}<small> mm</small>${
+      derived ? '<sup>*</sup>' : ''}</b><i style="height:${
       (mm / hi * 100).toFixed(1)}%"></i></div>`;
   };
 
   return `<div class="acc">
-    <div class="accnums">${rows.map(num).join('')}</div>
     <div class="accplot">${rows.map(col).join('')}</div>
     <div class="accx">${rows.map(([label, r]) =>
       `<span${r ? '' : ' class="muted"'}>${label}</span>`).join('')}</div>

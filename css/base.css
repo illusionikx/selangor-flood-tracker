@@ -557,27 +557,50 @@ dialog:focus, dialog:focus-visible { outline: none; }
    The plate, the 42px height and the 10px label row are taken from `.spark` above, so a card
    carrying a line graph, a rain area and this reads as one family rather than three. */
 .acc { margin: 6px 0 4px; }
-.accnums, .accplot, .accx {
+.accplot, .accx {
   display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; padding: 0 6px;
 }
-.accnums, .accx {
+.accx {
   font-size: 10px; font-variant-numeric: tabular-nums; text-align: center; white-space: nowrap;
+  margin-top: 2px; color: var(--muted);
 }
-.accnums { margin-bottom: 2px; }
-.accnums small, .accnums sup { color: var(--muted); }
-.accx { margin-top: 2px; color: var(--muted); }
 /* The same plate the spark graphs draw on. See the note there for why it is 4% of the text colour
-   and not `--hover`. */
+   and not `--hover`. 58px is the 42px of bar this chart has always had, plus the 16px strip the
+   values now sit in. */
 .accplot {
-  height: 42px; align-items: end;
+  height: 58px; align-items: end;
   background: color-mix(in srgb, var(--on-surface) 4%, transparent); border-radius: 6px;
 }
-.acccol { display: flex; align-items: flex-end; justify-content: center; height: 100%; }
+/* `padding-top` is what reserves the value strip, and it has to be padding rather than a margin or
+   a shorter plate. A bar states its total as a percentage height, and a percentage resolves against
+   the content box — so the padding takes the strip out of every bar's scale at once, and the
+   tallest column fills the space below its own number instead of running under it. */
+.acccol {
+  position: relative; box-sizing: border-box; height: 100%; padding-top: 16px;
+  display: flex; align-items: flex-end;
+}
+.acccol > b {
+  position: absolute; top: 0; left: 0; right: 0; text-align: center;
+  font-size: 10px; font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.acccol small, .acccol sup { color: var(--muted); font-weight: 400; }
+/* `position` lifts the asterisk, and `vertical-align: super` does not, which is what a bare `sup`
+   uses. A raised inline box grows the line box it sits in, so the value measured 17.3px
+   against a 16px strip and the tallest bar started 1.3px inside its own number. That case is the
+   normal one rather than an edge: 24 h and 72 h are both derived, and nested windows make the
+   longest of them the tallest column. `line-height: 0` takes the mark out of the measurement, and
+   `top` puts it back where it looks right. */
+.acccol sup { font-size: 8px; vertical-align: baseline; position: relative; top: -4px;
+              line-height: 0; }
 /* Rainfall violet, the kind colour. Never a status hue: a column says how much, not how bad.
-   Capped in width so two columns on a wide card stay columns rather than becoming panels. */
+   Full column width, square top, and a fade toward the base. The fade stops at 20% and not at
+   `transparent`. A gradient takes the size of its own element, so a short bar draws entirely inside
+   the faded end. A bar two pixels tall then disappears, which is the smallest total on the chart
+   reading as no total at all. */
 .acccol i {
-  display: block; width: 100%; max-width: 22px; border-radius: 3px 3px 0 0;
-  background: var(--k-rainfall);
+  display: block; width: 100%;
+  background: linear-gradient(var(--k-rainfall),
+                              color-mix(in srgb, var(--k-rainfall) 20%, transparent));
 }
 
 /* The hover readout — see js/sparktip.js for why it is a popover and not a plain fixed box. Being
