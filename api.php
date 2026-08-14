@@ -2526,6 +2526,40 @@ foreach ($stations as &$s) {
 }
 unset($s);
 
+// --- National portal, rainfall ------------------------------------------------------------------
+// The portal is the preferred rainfall source. It publishes a per-day running total the Selangor
+// API does not and Kuala Lumpur has never had, which is what makes a 24 hour window exact rather
+// than a sum of rolling hours. See portalOdo() and the accumulation block below.
+//
+// It publishes no coordinate, so this pass only ever corrects a station another feed already placed.
+// The rows it alone knows about are placed in a later pass, from the portal's own station search.
+$prfHit = portalMatch($prf, $stations, 'rainfall');
+$prfUsed = 0;
+/* Station id => graph id, for the history backfill at the end of this file. It cannot read
+   $s['graphId'] there: the accumulation block below unsets that key before the payload goes out,
+   and the backfill runs after the payload. Keep the map instead. */
+$graphIds = [];
+foreach ($stations as &$s) {
+    $i = $prfHit['hit'][$s['id']] ?? null;
+    if ($i === null) continue;
+    $r = $prf[$i];
+    if ($r['hourly'] === null && $r['daily'] === null) continue;   // a row with nothing to give
+    $prfUsed++;
+    $s['hourly']  = $r['hourly'] ?? $s['hourly'];
+    $s['daily']   = $r['daily']  ?? $s['daily'];
+    $s['updated'] = $r['updated'] ?? $s['updated'];
+    $s['online']  = $s['hourly'] !== null;
+    // One definition of a status, and it is this file's. Mixing the portal's reading with another
+    // feed's status code lets the two disagree on one card.
+    $s['status']  = rainStatus($s['hourly']);
+    $s['source']  = 'portal';
+    // The six daily columns and the graph id ride here for the passes below. Neither reaches a
+    // browser: the accumulation block reads `pdays` and then drops it.
+    $s['pdays']   = $r['days'];
+    if ($r['graphId'] !== null) $graphIds[$s['id']] = $r['graphId'];
+}
+unset($s);
+
 // --- Rainfall history --------------------------------------------------------------------------
 // Rain now is the river's rise in an hour, so this is the earlier signal of the two — worth keeping
 // even though nothing computes a trend from it. Same table, same window; only the bucket differs.
@@ -2581,7 +2615,7 @@ foreach ($stations as &$s) {
     }
 
     $s['acc'] = $acc;
-    unset($s['hour3'], $s['cumulative']);   // read here, never sent to a browser
+    unset($s['hour3'], $s['cumulative'], $s['pdays']);   // read here, never sent to a browser
 }
 unset($s);
 
@@ -2812,7 +2846,10 @@ $payload = json_encode([
         'met'      => ['parsed' => $metParsed, 'fresh' => count($metPts), 'matched' => $metMatched],
         'metday'   => ['parsed' => count($metDay), 'matched' => $metDayMatched],
         'metwarn'  => ['parsed' => count($metWarn)],
-        'portalrf' => ['parsed' => count($prf)],
+        // `parsed` is the alarm for a layout change. `applied` is how many stations took a portal
+        // reading. `clash` names every station two rows claimed — the code row won each one.
+        'portalrf' => ['parsed' => count($prf), 'applied' => $prfUsed,
+                       'clash'  => count($prfHit['clash'])],
         // Empty on a healthy poll. A key here names a table the map is drawing from a stored copy.
         'stale'    => $pagesStale,
     ],
