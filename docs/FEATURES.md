@@ -1813,6 +1813,13 @@ Decisions:
 - **Fades, not hard edges.** 56px `mask` ramps on both sides, so items dissolve rather than being
   guillotined by the box. A marquee is always mid-item at both edges, so a short ramp there reads as
   a clipped word rather than one still coming into view.
+
+  **Below 600px the ramp is 18px, and for a while only the right edge had one.**
+
+  The strip lost its left fade the day it got a row of its own. The marquee translates `-50%` at
+  every width. So a phone guillotined a word on the left the way a desktop does with no mask.
+
+  The ramp stays at 18px rather than 56px there. Two 56px ramps take 31% of a 360px strip.
 - **Centred on the viewport**, by two rails of equal width. This replaced a right-aligned strip that
   sat against the status chip. That version made the header read as a title on the left and one wide
   cluster on the right, and the news was the least prominent thing in the bar.

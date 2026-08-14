@@ -1892,8 +1892,14 @@ body.finding #find { display: none; }
        from doing (15px over the words, 8px under). */
     height: 36px; margin: 5px -8px 0 -4px; padding: 0 8px;
     border-top: 1px solid var(--outline);
-    -webkit-mask: linear-gradient(90deg, #000 calc(100% - 18px), transparent);
-    mask: linear-gradient(90deg, #000 calc(100% - 18px), transparent);
+    /* Both edges, the same rule the wide layout states. This fell to the right edge alone from the
+       day the strip got a row of its own. The marquee translates -50% at every width, so a phone
+       guillotines a word on the left the way a desktop does with no mask.
+       The ramp stays at the 18px the right edge already used, rather than the wide layout's 56px.
+       Two 56px ramps take 31% of a 360px strip, and 18 is the number somebody chose for this
+       width. */
+    -webkit-mask: linear-gradient(90deg, transparent, #000 18px, #000 calc(100% - 18px), transparent);
+    mask: linear-gradient(90deg, transparent, #000 18px, #000 calc(100% - 18px), transparent);
   }
   /* The title used to go here whole, on the argument that five buttons and the status chip all have
      to fit. The container query on `header h1` measures that directly, so a phone with room draws
