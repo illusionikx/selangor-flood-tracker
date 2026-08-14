@@ -206,7 +206,7 @@ Four mitigations, and each one already has a precedent in this repo.
    together. Anything added to the refresh path stays inside it, so N readers never become N fetches.
 4. **Name this app in every request.** `CURLOPT_USERAGENT` already sends
    `flood-exp/1.0 (+https://github.com/illusionikx/selangor-flood-tracker)`. Every new call uses the
-   same handle, so an administrator can always see who is asking and why.
+   same handle, so an administrator can always see who asks and why.
 
 The backfill never runs on a reader's poll. It runs at the end of a refresh, at most once per
 window, exactly as `captureShots()` does for the camera archive.
