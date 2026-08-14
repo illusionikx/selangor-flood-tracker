@@ -411,31 +411,31 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   `cumulativeRainfall`, so there is no odometer to subtract. Do not close that gap with `accHours()`
   at 24 hours. That is the sum this rule forbids. Two `—` columns on a KL gauge are the right
   answer, and the readout on the dash says which of the two states it is.
-- **A window may also be measured over LESS ground than it names, and then it says so.** `accWindow()`
+- **A window can also cover LESS ground than it names, and then it says so.** `accWindow()`
   takes `$partial`. With no sample at or before the far end it measures from the oldest sample there
   is and returns `short`. `derived` is a ladder of three rungs rather than a flag — 0 off the feed,
   1 worked out over the whole window, 2 worked out over a shorter one — and the card prints one
   asterisk per rung. This is still a difference, so it still cannot lose rain. **The `#c` series began
   2026-08-13 18:30 and nothing can fill it in**, because no earlier poll stored `cumulativeRainfall`.
-  Before this, both long windows drew a dash for two days. Measured 2026-08-14 15:45 with the archive
-  20.5 h deep: 179 stations of 231 answer `h24` over 20.5 h, 1 answers it whole, and 51 answer
+  Before this, both long windows drew a dash for two days. On the 2026-08-14 15:45 poll, with the
+  archive 20.5 h deep: 179 stations of 231 answer `h24` over 20.5 h, 1 answers it whole, and 51 answer
   nothing. **`$partial` is false by default, and `rainBacked()` depends on that.** A window narrower
-  than the hour it asks about would call live rain faulty. A wider window can only add rain, which is
+  than the hour it asks about calls live rain faulty. A wider window can only add rain, which is
   the safe way to be wrong.
   **Two windows that come back with the same span measured the same ground, and the call site drops
   the longer one.** Both windows end on the newest sample, so an equal span is an equal baseline.
   PUNCAK ATHENEUM is the worked case: its records reach back 27 h, so the 24-hour window WIDENED to
   27 h and the 72-hour window fell SHORT to that same sample, and both published 6.5 mm. Two columns
-  then draw one number at one height, and a reader takes the pair as a measurement of the 45 hours
-  between them. Nobody measured those hours. **A floor in hours cannot catch this and was tried
-  first** — a floor compares one span to a constant, and the fault is two spans landing on each
+  then draw one number at one height, and a reader reads the pair as a claim about the 45 hours
+  between them. Nobody measured those hours. **A floor in hours cannot catch this.** The first
+  version used one — a floor compares one span to a constant, and the fault is two spans landing on each
   other, which a widened window can do at any depth. **Do not compare mm instead**: two different
-  spans holding one total means no rain fell in the extra ground, and that is measured.
+  spans that hold one total mean no rain fell in the extra ground, and this app measured it.
   **A short window can undershoot a window nested inside it, and this app does not suppress that.**
-  Measured on the same poll: 4 stations of 180 report less over 24 h than over today, three of them
+  On the same poll, 4 stations of 180 report less over 24 h than over today, three of them
   by 0.5 to 1.0 mm and TAMAN MAYANG by 12.5. The odometer and the feed's own daily total disagree,
-  and nothing here can say which is wrong. Suppressing the odometer figure would trust the feed over
-  it, which inverts the trust `rainBacked()` already built on the same two fields. For scale, 17
+  and nothing here can say which is wrong. Do not suppress the odometer figure. That trusts the feed
+  over it, and those two fields already carry the opposite trust. For scale, 17
   stations on that poll report less today than in the last 3 hours, with both sides straight off the
   feed. The chart has always drawn windows that disagree.
 - **The accumulation chart carries no threshold mark, and three sources failed to supply one.** It

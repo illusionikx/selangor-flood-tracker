@@ -102,6 +102,12 @@ function soak(s, mm) {
   s.status = rainCode(mm);
   s.history = rainRamp(mm);
   s.acc = stormAcc(s, mm);
+  /* The hour a short window starts from, which the chart names in its footnote and in the readout
+     on the column. `reachOf()` decides how far back this station's records go, so the same number
+     shapes the window and dates it — a footnote reading `Measured from 06:30` over a column marked
+     `measured over 40 h` is the drift this whole function exists to stop. 80 h is past every
+     window, so a station with a full archive states no short window and needs no date. */
+  s.accFrom = Math.floor(Date.now() / 1000) - (reachOf(s) || 80) * 3600;
   /* Faked rain is rain the odometer saw. Without this the fake inherits whatever `rainBacked()`
      said about the real reading, so the four gauges measured stuck on 2026-08-14 would draw a storm
      cell that the card calls a faulty signal, with no pin colour and no heat blob under it. A fake
@@ -135,6 +141,7 @@ function stormAcc(s, mm) {
      same silhouette, so the chart could not be looked at against the two cases it exists to tell
      apart: a flash burst, and a week of monsoon with a shower on top. */
   const t = seed(s.id || '');
+  const reach = reachOf(s);
   const h3  = +(mm * (1.3 + 1.4 * Math.exp(-mm / 25))).toFixed(1);
   const day = +(mm * DAY_X).toFixed(1);
   const h24 = +(day * (1.05 + 0.40 * t)).toFixed(1);
@@ -147,9 +154,24 @@ function stormAcc(s, mm) {
        these stay close to the window they name. The stretched wording needs no knob of its own: it
        is on screen whenever the archive has a hole, which is most days on a box like this one. */
     h24: [h24, 1, +(24.1 + t * 0.6).toFixed(1)],
-    h72: [h72, 1, +(72.1 + t * 0.8).toFixed(1)],
+    /* A short 72 hour window on about half of them. A real box takes two days to reach back that
+       far, so the second asterisk and its footnote would otherwise only be visible in the two days
+       after somebody loses `.history.db`. Same rule as the derived flag above: a state real data
+       reaches rarely still needs a knob, or it ships unseen.
+       The value is interpolated rather than scaled, because a window covering 40 of its 72 hours
+       measured the rain in those 40 — so it sits between the 24 hour total and the full 72. */
+    h72: reach ? [+(h24 + (h72 - h24) * ((reach - 24) / 48)).toFixed(1), 2, reach]
+               : [h72, 1, +(72.1 + t * 0.8).toFixed(1)],
   };
 }
+
+/* How far back a faked archive reaches, in hours, or 0 where it reaches past every window. One
+   number per station, because both long windows subtract from the same oldest sample — a station
+   whose records start 40 h back has a short 72 hour window and a whole 24 hour one, and `accFrom`
+   has to agree with both. Never under 26, which keeps the fake self-consistent two ways: a baseline
+   older than 24 h is what lets the 24 hour window above claim a whole window, and the two spans stay
+   apart, so the fake cannot draw the collision api.php drops rather than sends. */
+const reachOf = s => { const t = seed(s.id || ''); return t < 0.45 ? +(26 + t * 40).toFixed(1) : 0; };
 
 // One sensor, pushed to the worst its own kind can report. Used by the first pass on rivers and by
 // the site pass on everything else at a place that is already under water.

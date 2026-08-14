@@ -959,24 +959,45 @@ function placeParam(mixed $v): string {
  *
  * $odo must be ascending by timestamp, which is what the `ORDER BY ts` on the load gives.
  *
- * Returns [mm, spanHours], or null where the archive cannot answer:
+ * $partial opts a caller into a SHORT window. With no sample at or before the far end, the
+ * measurement runs from the oldest sample there is, and the third return element says so. That is
+ * still a difference and it still cannot lose rain. It covers less ground than the window names, so
+ * the card prints a second asterisk on it and the readout gives the hour it starts from. A window
+ * this app measured over 20.9 h and labelled beats an em dash for the two days the archive takes to
+ * fill. The caller owns one duty in exchange: two windows that come back with the same span
+ * measured the same ground, and drawing both puts one number at one height twice. A reader takes
+ * that pair as a measurement of the gap between them, and nobody measured that gap. See the call
+ * site, which drops the longer of the two.
+ *
+ * $partial is false by default, which forbids the short answer outright. rainBacked() needs that:
+ * it asks whether an hour of claimed rain reached the odometer, and a window narrower than the hour
+ * would call live rain faulty. A wider window can only add rain, which is the safe way to be wrong.
+ * A narrower one is the unsafe way.
+ *
+ * Returns [mm, spanHours, short], or null where the archive cannot answer:
  *   - nothing stored for this station yet
- *   - no sample at or before the far end of the window
+ *   - no sample at or before the far end, and the caller allowed no short answer
  *   - the odometer went backwards, which is the 1 January reset
  *   - both ends landed on one sample, so there is no span to measure
  */
-function accWindow(array $odo, int $now, int $win): ?array {
+function accWindow(array $odo, int $now, int $win, bool $partial = false): ?array {
     if (!$odo) return null;
-    $last = end($odo);
-    $cut  = $now - $win;
-    $base = null;
+    $last  = end($odo);
+    $cut   = $now - $win;
+    $base  = null;
+    $short = false;
     foreach ($odo as $p) {
         if ($p[0] > $cut) break;
         $base = $p;
     }
-    if ($base === null || $base[0] === $last[0]) return null;
+    if ($base === null) {
+        if (!$partial) return null;
+        $base  = $odo[0];
+        $short = true;
+    }
+    if ($base[0] === $last[0]) return null;
     if ($last[1] < $base[1]) return null;                 // the odometer reset
-    return [round($last[1] - $base[1], 1), round(($last[0] - $base[0]) / 3600, 1)];
+    return [round($last[1] - $base[1], 1), round(($last[0] - $base[0]) / 3600, 1), $short];
 }
 
 /* Rain over the last N whole clock hours, added from one reading per hour.
@@ -1113,12 +1134,13 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
     echo "\naccWindow():\n";
     $odo = [[$now - 80 * 3600, 1000.0], [$now - 72 * 3600, 1010.0],
             [$now - 24 * 3600, 1050.0], [$now, 1080.0]];
-    $ok('24h is the difference over 24h',   accWindow($odo, $now, 24 * 3600) === [30.0, 24.0]);
-    $ok('72h is the difference over 72h',   accWindow($odo, $now, 72 * 3600) === [70.0, 72.0]);
+    $ok('24h is the difference over 24h',   accWindow($odo, $now, 24 * 3600) === [30.0, 24.0, false]);
+    $ok('72h is the difference over 72h',   accWindow($odo, $now, 72 * 3600) === [70.0, 72.0, false]);
     /* The point of the odometer. The baseline is 30 hours back rather than 24, and the answer says
-       so instead of claiming a 24 hour figure it does not have. */
+       so instead of claiming a 24 hour figure it does not have. A WIDER window is not a short one:
+       the far end is covered, so this keeps one asterisk. */
     $ok('a stale baseline reports its real span',
-        accWindow([[$now - 30 * 3600, 1000.0], [$now, 1012.0]], $now, 24 * 3600) === [12.0, 30.0]);
+        accWindow([[$now - 30 * 3600, 1000.0], [$now, 1012.0]], $now, 24 * 3600) === [12.0, 30.0, false]);
     $ok('no baseline in range gives null',
         accWindow([[$now - 2 * 3600, 1000.0], [$now, 1005.0]], $now, 24 * 3600) === null);
     /* A year-to-date total resets on 1 January. Publishing the negative would draw a bar backwards
@@ -1131,7 +1153,40 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
     /* A genuinely dry day is 0 mm and must not be confused with an unanswerable window. The chart
        draws a zero bar for one and an em dash for the other. */
     $ok('a dry window is zero, not null',
-        accWindow([[$now - 25 * 3600, 1000.0], [$now, 1000.0]], $now, 24 * 3600) === [0.0, 25.0]);
+        accWindow([[$now - 25 * 3600, 1000.0], [$now, 1000.0]], $now, 24 * 3600) === [0.0, 25.0, false]);
+
+    /* The short answer. A young archive reaches 20.9 h and the 24 h window is asked for. Measuring
+       what there is beats an em dash for the two days it takes to fill, as long as the answer says
+       how far it really reached. */
+    $young = [[$now - 20.9 * 3600, 1000.0], [$now, 1006.5]];
+    $ok('a short window is refused by default',
+        accWindow($young, $now, 24 * 3600) === null);
+    $ok('a short window answers when the caller allows it',
+        accWindow($young, $now, 24 * 3600, true) === [6.5, 20.9, true]);
+    /* rainBacked() passes no flag, so it can never be handed a window narrower than the hour it asks
+       about. A 20 minute window showing no rise is no evidence that an hour of rain is faulty. */
+    $ok('rainBacked cannot draw a short window',
+        accWindow([[$now - 1200, 1000.0], [$now, 1000.0]], $now, 3600) === null);
+    // The short path obeys the reset guard and the one-sample guard the full path already obeys.
+    $ok('a short window still refuses a reset',
+        accWindow([[$now - 20 * 3600, 2400.0], [$now, 12.0]], $now, 24 * 3600, true) === null);
+    $ok('a short window still needs two samples',
+        accWindow([[$now - 20 * 3600, 1000.0]], $now, 24 * 3600, true) === null);
+
+    /* The collision the call site has to drop. An archive reaching back 27 h answers 24 h by
+       WIDENING to 27 and answers 72 h by falling SHORT to the same 27, so both windows subtract the
+       same pair of samples and publish one number. Measured on PUNCAK ATHENEUM. */
+    $reach27 = [[$now - 27 * 3600, 1000.0], [$now, 1006.5]];
+    $w24 = accWindow($reach27, $now, 24 * 3600, true);
+    $w72 = accWindow($reach27, $now, 72 * 3600, true);
+    $ok('a widened 24h and a short 72h can land on one span',
+        $w24 === [6.5, 27.0, false] && $w72 === [6.5, 27.0, true]);
+    $ok('the collision is visible as an equal span', $w24[1] === $w72[1]);
+    /* And the pair that must NOT be dropped: different spans holding the same total. The extra
+       45 hours were measured and held no rain, so two equal bars are a true statement there. */
+    $deep = [[$now - 72 * 3600, 1000.0], [$now - 24 * 3600, 1000.0], [$now, 1006.5]];
+    $ok('two spans with one total are not a collision',
+        accWindow($deep, $now, 24 * 3600, true)[1] !== accWindow($deep, $now, 72 * 3600, true)[1]);
 
     echo "\naccHours():\n";
     $h3 = [[$now - 2 * 3600, 4.0], [$now - 3600, 6.0], [$now, 2.0]];
@@ -2213,8 +2268,10 @@ foreach ($stations as &$s) {
     $samples[$key] = [$ts, (float)$s['hourly']];
 
     /* Five nested windows, computed here because the client works nothing out. Each entry is
-       [mm, derived, spanHours], and null where nothing can answer honestly. `derived` marks a total
-       this app worked out rather than read off a feed, and the card prints an asterisk on it.
+       [mm, derived, spanHours], and null where nothing can answer honestly. `derived` is a ladder
+       of three rungs rather than a flag, and the card prints one asterisk per rung: 0 read straight
+       off a feed, 1 this app worked it out over the whole window, 2 this app worked it out over a
+       shorter window and the readout names the hour it starts from.
        The five keys are declared up front so the order is fixed whatever any of them resolves to. */
     $acc = ['h1' => null, 'h3' => null, 'day' => null, 'h24' => null, 'h72' => null];
     $acc['h1'] = [round((float)$s['hourly'], 1), 0, null];
@@ -2228,13 +2285,33 @@ foreach ($stations as &$s) {
         $acc['h3'] = [$sum, 1, null];
     }
 
-    // 24 and 72 hours need the odometer, which only Selangor publishes.
+    /* 24 and 72 hours need the odometer, which only Selangor publishes. The 38 KL gauges answer
+       neither window and never will, so their two columns carry an em dash and the readout on it
+       says why. Do not close that gap by adding up `hourly` buckets — see accWindow() above.
+
+       Both windows may answer over a shorter span than they name, and then both say so. */
     if (($s['cumulative'] ?? null) !== null) {
         $series = array_merge($odo[$key . '#c'] ?? [], [[$ts, (float)$s['cumulative']]]);
         foreach (['h24' => 86400, 'h72' => 259200] as $k => $win) {
-            if (($w = accWindow($series, $now, $win)) !== null) $acc[$k] = [$w[0], 1, $w[1]];
+            if (($w = accWindow($series, $now, $win, true)) !== null)
+                $acc[$k] = [$w[0], $w[2] ? 2 : 1, $w[1]];
         }
+        /* Equal spans mean equal baselines, because both windows end on the same newest sample. So
+           the two columns measured the same ground and would draw one number at one height twice —
+           which a reader takes as a measurement of the 48 hours between them. Drop the longer one:
+           the 24 hour window is the claim the archive actually covers.
+           Measured on PUNCAK ATHENEUM, whose records reach back 27 h: the 24 hour window widened to
+           27 h and the 72 hour window fell back to the same sample, and both published 6.5 mm.
+           This is deliberately NOT a floor in hours. A floor compares a span to a constant, and the
+           fault is two spans landing on each other — a widened window can collide with a short one
+           at any depth, so only the comparison catches it. Do not test mm instead: two different
+           spans holding the same total means no rain fell in the extra ground, which is measured. */
+        if ($acc['h72'] && $acc['h24'] && $acc['h72'][2] === $acc['h24'][2]) $acc['h72'] = null;
         $s['backed'] = rainBacked($s['hourly'] ?? null, $series, $now);
+        /* The oldest odometer sample this station has. It is the baseline of any short answer, so
+           the card names it, and its absence is what tells the card that a gauge publishes no
+           running total at all rather than one this archive has not caught up with. */
+        $s['accFrom'] = $series[0][0];
         $samples[$key . '#c'] = [$ts, (float)$s['cumulative']];
     }
 

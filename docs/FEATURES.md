@@ -8994,3 +8994,91 @@ This work measured three other explanations first and dropped all three. `atDang
 offline station. The map-palette block can omit `--s-danger`. And `.pin.rise` does draw red around
 a pin that keeps its own status colour. That last one is deliberate and stays. A forecast is not
 a reading.
+
+### The two long rain totals drew a dash for two days
+
+The `#c` odometer series starts the moment somebody deploys the code that stores it. Before that
+there is nothing, and no later poll can supply it. So a fresh box draws an em dash under `24 h` and
+`72 h` for two days while the archive fills. On this box the series began 2026-08-13 18:30. The
+next afternoon it held 20.5 hours, and 1 station of 231 answered the 24-hour window.
+
+A reader asked why. That is the right question to ask of a dash. The chart had no answer for it
+anywhere on screen.
+
+`accWindow()` now takes `$partial`. With no sample at or before the far end, it measures from the
+oldest sample there is. It reports the span it really covered.
+
+This is the same subtraction it always did, so it still cannot lose rain. The standing rule forbids
+a **sum**. A sum drops the rain in every gap and states a small number with nothing to say it is
+short. A difference over a shorter span says exactly how short it is.
+
+`derived` became a ladder of three rungs rather than a flag. 0 means the number came off a feed.
+1 means this app worked it out over the whole window. 2 means it worked it out over less.
+
+The card prints one asterisk per rung. `24 h**` carries a footnote with the hour the measurement
+starts from. The readout on the column repeats it.
+
+`$partial` is false by default, and `rainBacked()` depends on that default. It asks whether an hour
+of claimed rain reached the odometer. A window narrower than that hour calls live rain faulty. A
+wider window can only add rain, which is the safe way to be wrong. A narrower one is the unsafe
+way, so the short answer stays opt-in.
+
+### One archive answered two windows with one number
+
+The first version of the short window used a floor in hours. A partial had to cover more ground
+than the fixed window under it. That is 3 hours under the day, and 24 hours under the three days.
+Two columns holding one number at one height read as a claim about the gap between them. Nobody
+measured that gap.
+
+The floor was the wrong shape of answer, and the live payload said so at once. PUNCAK ATHENEUM
+holds 27 hours of records. Its 24-hour window **widened** to 27 hours. The oldest sample is the
+last one at or before the far end. Its 72-hour window then fell **short** to that same sample.
+Both subtracted one pair of readings and both published 6.5 mm.
+
+The floor passed that pair. A floor compares one span to a constant, and the fault is two spans
+landing on each other. A widened window can collide with a short one at any depth.
+
+The call site compares the two spans instead. Both windows end on the newest sample, so an equal
+span is an equal baseline. It drops the longer window, because the 24-hour claim is the one the
+archive covers.
+
+Do not compare the totals instead. Two different spans that hold one total mean no rain fell in the
+extra ground, and this app measured that extra ground.
+
+### An empty column said nothing, and two of its states differ
+
+An answered column has carried a readout since the chart shipped: `24 h · 31 mm · measured over
+24.2 h`. An empty one carried none, so a reader who hovers the dash learns nothing at all.
+
+Two states draw that same dash and they are not one state. A Selangor gauge waits for the archive
+to reach back far enough. A Kuala Lumpur gauge waits for nothing. SPHTN publishes no
+`cumulativeRainfall`, so 38 of 231 rain gauges have no running total to subtract and never will.
+Both look identical on the plot.
+
+The readout now separates them. `Not measured. Records start 13 Aug, 19:11.` stands against
+`Not measured. This gauge reports no running total.`
+
+The station carries one new field, `accFrom`. It holds the oldest odometer sample the station has.
+Its presence answers which state a station is in, and its value dates any short window on that card.
+
+Only the two long windows get a reason. The other three come straight off a feed, and the feed
+published none of them.
+
+### A short window can undershoot a window inside it
+
+A 24-hour window measured over 20.5 hours still contains today, so it must not report less rain
+than today does. On the 2026-08-14 15:45 poll, 4 stations of 180 do. Three are out by 0.5 to
+1.0 mm. TAMAN MAYANG is out by 12.5. Its odometer says 25 mm over 20.5 hours and the feed's own
+daily total says 37.5.
+
+This app suppresses neither number, for two reasons.
+
+Do not suppress the odometer figure. That trusts the feed's daily total over the odometer, and
+those two fields already carry the opposite trust. `rainBacked()` reads the odometer to catch an
+`hourly` figure that claims rain the same gauge never collected. The odometer is the reference here,
+not the suspect.
+
+The chart has also always drawn windows that disagree. On the same poll, 17 stations report less
+rain today than in the last 3 hours. Both sides of that come straight off the feed. It is a larger
+contradiction than the short window adds, it predates this work, and nothing here can name the
+wrong side of it.

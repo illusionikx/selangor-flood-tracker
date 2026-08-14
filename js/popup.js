@@ -362,7 +362,7 @@ function sensorBody(s) {
   /* Totals under the graph. Not on a stale station: one gauge in the payload holds 27 mm in an hour
      and its stamp reads last October, and `hasInfo()` calls it online because `hourly` is not null.
      Drawing that as today's rain is the one thing this chart must never do. */
-  const acc = s.kind === 'rainfall' && !isStale(s) ? rainAcc(s.acc) : '';
+  const acc = s.kind === 'rainfall' && !isStale(s) ? rainAcc(s.acc, s.accFrom) : '';
   // The meter says where the level is against its own thresholds; this says how it got there. The
   // alert panel has carried it all along — the popup you reach by clicking the pin had the numbers
   // for the trend (m/h, hours to danger) but not the shape they came from.
@@ -706,6 +706,16 @@ export function herePopup(e, loaded) {
    another timezone must not put "14:00" on the axis beside a reading stamped 06:00. */
 const MYT_CLOCK = new Intl.DateTimeFormat('en-GB', {
   timeZone: 'Asia/Kuala_Lumpur', hour: '2-digit', minute: '2-digit', hour12: false,
+});
+
+/* The same clock with a date on it, for a time that may not be today. Both graphs span 12 hours at
+   most, so MYT_CLOCK alone is unambiguous on either of them. The accumulation chart's baseline is
+   not: a short 72 hour window starts up to three days back, and `18:30` on its own names one hour
+   out of three candidates. Used nowhere else — a timestamp inside a 12 hour window keeps the
+   shorter form, because a date on it is noise. */
+const MYT_WHEN = new Intl.DateTimeFormat('en-GB', {
+  timeZone: 'Asia/Kuala_Lumpur', day: 'numeric', month: 'short',
+  hour: '2-digit', minute: '2-digit', hour12: false,
 });
 
 // Tick spacings, coarsening until about five fit across the axis. All divide an hour evenly, so a
@@ -1069,19 +1079,24 @@ export function rainBars(points) {
 
    A window with no honest answer keeps its column and prints an em dash over an empty one, so the
    five are always in the same place and nobody has to work out which went missing. An asterisk
-   marks a total this app worked out rather than read off a feed. */
-export function rainAcc(acc) {
+   marks a total this app worked out rather than read off a feed, and a second one marks a window it
+   worked out over less ground than the label names. `from` is the oldest odometer sample this
+   station holds, which is the baseline of any such window — and its absence is what separates a
+   gauge that publishes no running total from one this archive has not caught up with. */
+export function rainAcc(acc, from) {
   if (!acc) return '';
-  const rows = ACC_ROWS.map(([k, label]) => [label, acc[k]]);
-  if (!rows.some(([, r]) => r)) return '';
+  const rows = ACC_ROWS.map(([k, label]) => [k, label, acc[k]]);
+  if (!rows.some(([, , r]) => r)) return '';
   /* The tallest total takes the full height, so the shape is the comparison between the five and
      nothing else. A dry station draws five flat columns rather than one sentence, which
      `rainBars()` above does say. That sentence has to name a window, and the two long ones are
      exactly the windows a young archive cannot answer — "No rain in the last 72 hours" on a station
      whose 72 hour total is unknown is the claim this whole design refuses to make. Five columns
      keep a measured zero and an unanswered window visibly apart, which is the point of them. */
-  const hi = Math.max(...rows.map(([, r]) => r ? r[0] : 0)) || 1;
-  const star = rows.some(([, r]) => r && r[1]);
+  const hi    = Math.max(...rows.map(([, , r]) => r ? r[0] : 0)) || 1;
+  const star  = rows.some(([, , r]) => r && r[1]);
+  const short = rows.some(([, , r]) => r && r[1] > 1);
+  const at    = from ? MYT_WHEN.format(from * 1000) : '';
 
   /* Two grids of the same five columns, and they line up because they share a column count, a gap
      and a padding. Neither measures the other.
@@ -1093,13 +1108,28 @@ export function rainAcc(acc) {
      window is answered the same way on every station — so it belongs to `24 h` rather than to
      `140.2 mm`. On the value it also sat between the number and the next column's number, which is
      the one place on this chart where a mark can be read against the wrong bar. */
-  const col = ([label, r]) => {
-    if (!r) return '<div class="acccol"><b class="muted">—</b></div>';
-    const [mm, , span] = r;
+  /* Only the two long windows subtract two odometer readings, so they are the only two with a reason
+     worth naming when they cannot answer. The other three come straight off a feed, and "the feed
+     published none" is all there is to say about them. */
+  const ODO = { h24: 1, h72: 1 };
+
+  /* An empty column carried no readout at all, so a reader hovering the em dash learned nothing —
+     and on one of the 38 KL gauges that dash never fills in, because SPHTN publishes no running
+     total for either window to subtract. Two states look identical on the chart and are not:
+     one is waiting and the other is permanent. The readout is where that belongs, the same way the
+     measured span belongs there rather than on the plot. */
+  const blank = (k, label) => `${label} · Not measured.${
+    !ODO[k] ? '' : at ? ` Records start ${at}.` : ' This gauge reports no running total.'}`;
+
+  const col = ([k, label, r]) => {
+    if (!r) return `<div class="acccol" data-tip="${blank(k, label)}"><b class="muted">—</b></div>`;
+    const [mm, prov, span] = r;
     /* The measured span rides in the readout rather than on the chart. It answers "why does this
        say 24 hours when the archive has a hole in it", which is a question you go looking for
-       rather than something to read at a glance. */
-    const tip = `${label} · ${mm} mm${span ? ` · measured over ${span} h` : ''}`;
+       rather than something to read at a glance. A short window adds the hour it starts from, so
+       the reader can see which end moved — the far one, never the near one. */
+    const tip = `${label} · ${mm} mm${span ? ` · measured over ${span} h` : ''}${
+      prov > 1 && at ? ` from ${at}` : ''}`;
     return `<div class="acccol" data-tip="${tip}"><b>${mm}<small> mm</small></b><i style="height:${
       (mm / hi * 100).toFixed(1)}%"></i></div>`;
   };
@@ -1111,9 +1141,11 @@ export function rainAcc(acc) {
           the class added no colour — and it carries `font-size: 12px`, which beat the 10px the row
           passes down by inheritance and drew `24 h` and `72 h` larger than their three neighbours.
           The em dash over the column is what says the window has no answer. */''}
-    <div class="accx">${rows.map(([label, r]) =>
-      `<span>${label}${r && r[1] ? '<sup>*</sup>' : ''}</span>`).join('')}</div>
+    <div class="accx">${rows.map(([, label, r]) =>
+      `<span>${label}${r && r[1] ? `<sup>${'*'.repeat(r[1])}</sup>` : ''}</span>`).join('')}</div>
     ${star ? '<div class="muted">* Value derived from archived readings.</div>' : ''}
+    ${short ? `<div class="muted">** ${at ? `Measured from ${at}. ` : ''
+      }Records do not reach further back.</div>` : ''}
   </div>`;
 }
 
