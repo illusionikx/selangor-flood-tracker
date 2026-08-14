@@ -645,7 +645,7 @@ table.data .dash { color: var(--outline); }
    the whole of what keeps the count identical. */
 #camBox[aria-busy="true"] .skeltiles {
   display: grid; gap: 6px; padding: 12px 20px 20px;
-  grid-template-columns: repeat(auto-fill, minmax(min(180px, 45%), 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(240px, 45%), 1fr));
   grid-auto-rows: min-content;
 }
 /* The tile ratio, so the grid does not reflow when the real tiles replace these. `grid-auto-rows`
@@ -722,19 +722,19 @@ table.data .dash { color: var(--outline); }
 }
 @media (prefers-reduced-motion: reduce) { #camBar, #camBar::after { transition: none; } }
 
-/* As many columns as fit, each at least 180px. `auto-fill` is the whole of the responsive rule, so
+/* As many columns as fit, each at least 240px. `auto-fill` is the whole of the responsive rule, so
    the count follows the box the grid is actually in rather than a table of viewport widths. Three
    media queries stated that table before (840px, 680px and the phone block), each one a column count
    worked back from the dialog's own width, its padding and its gaps — arithmetic that had to be
    redone by hand every time any of the three moved. `minmax` reads the same numbers off the layout
    itself.
-   The floor is `min(180px, 45%)`, and the percentage is the phone half of one expression. A
+   The floor is `min(240px, 45%)`, and the percentage is the phone half of one expression. A
    percentage track resolves against the grid's own content box, so 45% is the widest floor that
    still leaves room for two columns at any width — which is what holds a phone at two tiles where
-   180px alone would drop a 375px screen to one. Above about 410px of content the 180px is the
-   smaller of the two and takes over, so the percentage never touches a desktop. Measured: 2 columns
-   from 320px to 430px of phone, then 3 at a 682px viewport up to 13 on a 2560px monitor, with the
-   tile between 180px and 196px on every desktop width.
+   240px alone would drop every phone to one. Above about 533px of content the 240px is the smaller
+   of the two and takes over, so the percentage never touches a desktop. Measured: 2 columns from
+   320px to 430px of phone, then 3 at a 900px viewport up to 9 on a 2560px monitor, with the tile
+   between 254px and 288px on every desktop width.
    `gap: 6px`, the same number on both axes, is the whole of what a uniform, minimal gutter asks
    for. */
 /* `grid-auto-rows: min-content` is what makes the row the height of the tile in it. A tile takes
@@ -749,7 +749,7 @@ table.data .dash { color: var(--outline); }
 #camGrid {
   flex: 1; overflow: auto; padding: 12px 20px 20px;
   display: grid; grid-auto-rows: min-content; gap: 6px;
-  grid-template-columns: repeat(auto-fill, minmax(min(180px, 45%), 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(240px, 45%), 1fr));
 }
 
 /* A <button>, so keyboard reach, Enter, Space and the focus ring all come free.

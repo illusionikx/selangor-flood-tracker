@@ -9119,7 +9119,7 @@ rain today than in the last 3 hours. Both sides of that come straight off the fe
 contradiction than the short window adds, it predates this work, and nothing here can name the
 wrong side of it.
 
-### The camera wall now fits the screen it is on
+## The camera wall now fits the screen it is on
 
 The "All cameras" dialog carried two pixel caps. It was 1060px wide at most and 900px tall at most.
 On a wide monitor it sat in the middle at a size that ignored the screen.
@@ -9133,26 +9133,28 @@ The grid stated a column count for each screen width. Five columns, four below 8
 A person worked each threshold back from the dialog width, the grid padding and the gaps between
 columns. A change to any of those three made the whole table wrong, and nothing reported it.
 
-`repeat(auto-fill, minmax(min(180px, 45%), 1fr))` states the rule once. The browser counts the
+`repeat(auto-fill, minmax(min(240px, 45%), 1fr))` states the rule once. The browser counts the
 columns from the box the grid is in. All three media queries are gone.
 
-The floor went from the old 150px to 180px, because the old five columns drew a 155px tile and a
-camera still at that size reads as a swatch.
+The floor went from the old 150px to 240px. The old five columns drew a 155px tile, and a camera
+still at that size reads as a swatch rather than as a picture.
 
 The percentage is the phone half of the same expression. A percentage track resolves against the
 grid content box. 45% is the widest floor that still leaves room for two columns at any width.
 
-That is what holds a phone at two tiles. A bare 180px floor drops a 375px screen to one column,
-which is a long scroll through ninety cameras. Above about 410px of content the 180px is the
-smaller of the two, so the percentage never touches a desktop.
+That is what holds a phone at two tiles. A bare 240px floor drops every phone to one column, which
+is a long scroll through ninety cameras. Above about 533px of content the 240px is the smaller of
+the two, so the percentage never touches a desktop.
 
 The skeleton grid takes the same track sizing and the same padding as the real one. Both grids count
 columns the same way now, so the tiles land on the columns the skeleton drew.
 
-Measured in a headless browser. A 2560px monitor draws 13 columns at 184px. A 1920px monitor draws
-9 columns at 196px. A 1280px monitor draws 6 columns at 190px.
+Measured in a headless browser. A 2560px monitor draws 9 columns at 267px. A 1920px monitor draws
+7 columns at 254px. A 1280px monitor draws 4 columns at 288px.
 
-A 682px viewport draws 3 columns at 193px. Phones from 320px to 430px draw 2 columns, from 137px
-to 192px. Every desktop width holds the tile between 180px and 196px.
+A 900px viewport draws 3 columns at 260px. Phones from 320px to 430px draw 2 columns, from 137px
+to 192px. Every desktop width holds the tile between 254px and 288px.
 
-One width changes what a reader sees. A 599px window drew 2 columns before and draws 3 now.
+The wall trades density for legibility. A 1920px monitor showed 11 tiles a row at 159px before this
+work and shows 7 at 254px now.
+
