@@ -761,19 +761,31 @@ export function herePopup(e, loaded) {
 /* The other end of the same card: the reader pressed the button and no position came back.
    The panel carries it because a button can hold a `title` and nothing else, and a `title` opens on
    no phone and waits a second on a mouse. The card is the surface every other answer here uses.
-   The advice names the device beside the site, and that is the finding rather than the wording.
-   A site permission can read `granted` while the operating system refuses the browser under it.
-   Measured on one Windows desktop: the site held permission, the machine held its location service
-   disabled, and both accuracy settings timed out after their full window. The old text named the
-   site settings in the browser alone, which were already correct, so it sent the reader in a circle.
-   Code 1 is a refusal and the other two are silence. Both take the same two steps, so the split is
-   one sentence wide. */
-export function hereFail(code) {
-  const act = code === 1
-    ? 'Allow location for this site, and for this device.'
-    : 'Turn location on for this device, not only for this site.';
-  return `<b>${code === 1 ? 'Location is off' : 'Your location did not arrive'}</b>
-    <br><span class="muted">${act} Then press the button again.</span>`;
+
+   Two settings in two places refuse a location, and naming the wrong one sends the reader in a
+   circle. That circle happened here. One Windows desktop held the grant for this site and held its
+   own location service disabled at the same time. Both accuracy settings timed out. The first text
+   named the settings in the browser alone, which were already correct.
+
+   The Permissions API answers the site half, so `granted` beside a failed fix is proof that the
+   device is the half at fault. Then the card names one place rather than two. A browser that
+   answers nothing gets both halves, which is where this card started.
+
+   The card names the Windows path, because Windows is the one platform that failed this way. A
+   reader told to open the settings for a device still has to find them. */
+const WIN_PATH = /Windows/.test(navigator.userAgent)
+  ? ' Open Settings, then Privacy and security, then Location.' : '';
+
+const failCard = (head, act) =>
+  `<b>${head}</b><br><span class="muted">${act} Then press the button again.</span>`;
+
+export function hereFail(code, perm) {
+  if (perm === 'granted') return failCard('This device is not sharing its location',
+    `Turn location on in the settings for this device.${WIN_PATH}`);
+  if (perm === 'denied' || code === 1) return failCard('Location is off for this site',
+    'Allow location for this site in your browser.');
+  return failCard('Your location did not arrive',
+    'Turn location on for this device, not only for this site.');
 }
 
 /* Hours are Malaysian, not the viewer's, so the axis agrees with every other timestamp on the page —

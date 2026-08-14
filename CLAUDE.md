@@ -569,9 +569,13 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   `pointer-events: none` for those ten seconds. So a reader pressed, waited, saw nothing, and pressed
   again. That reads as a button that spins for ever.
   **Do not tell a reader to check the site settings in the browser.** Those can be correct while the
-  device refuses. Name the device beside the site, which `hereFail()` in `js/popup.js` does.
-  `geo-test.html` is the probe that found it, and it puts its own clock on each request rather than
-  trust the one it passes in.
+  device refuses. `hereFail()` in `js/popup.js` splits three ways instead, and `locate.js` asks
+  `navigator.permissions` for the site half. A `granted` beside a failed fix names the device and
+  never the browser. A `denied` names the site. No answer from that API names both. On Windows the
+  card also names the path, because a reader told to open the settings for a device still has to
+  find them. **A repair a reader runs in a terminal is not a fix**, and the first draft of this entry
+  ended in three PowerShell lines. `geo-test.html` is the probe that found the fault, and it puts its
+  own clock on each request rather than trust the one it passes in.
 - **`js/oops.js` must stay the first import in `app.js`.** A static import runs before the body of
   the file that imports it. A handler written inside `app.js` therefore starts after every other
   module has evaluated, and a throw during that evaluation reaches nobody. This is a real case rather

@@ -850,11 +850,18 @@ webcam's picture (see below).
 else, and a `title` opens on no phone. So a refusal or a silence opens the same panel a fix opens,
 with two steps in it. `hereFail()` in `js/popup.js` holds the words.
 
-The words name the device beside the site. A site permission can read `granted` while the operating
-system refuses the browser under it.
+The card names one place, and the Permissions API is what picks it. A site permission can read
+`granted` while the operating system refuses the browser under it.
+
+So `granted` beside a failed fix is proof that the device is at fault. The card then says so, and
+never names the browser at all.
+
+A `denied` permission names the site and the browser instead. A browser that answers nothing gets
+both halves. On Windows the card also names the path, because a reader told to open the settings
+for a device still has to find them.
 
 Measured on one Windows desktop: Edge held the grant, the machine held its location service
-disabled, and both accuracy settings timed out. The old text named the site settings in the browser
+disabled, and both accuracy settings timed out. The first text named the settings in the browser
 alone. Those were already correct, so it sent the reader in a circle.
 
 The card opens only where the reader pressed the button. The landing auto-locate stays silent,

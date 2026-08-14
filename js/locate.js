@@ -97,12 +97,21 @@ map.on('locationfound', e => {
   place(e.latlng, e.accuracy, false);   // locate() already moved the view if it was asked to
 });
 
-map.on('locationerror', e => {
+/* Whether this site holds the grant. The card needs it to tell a site that refuses from a device
+   that refuses, and those take a reader to two different screens. The catch covers a browser with
+   no Permissions API, and one that rejects a name it does not know. Both leave the answer null,
+   and the card then names both halves. */
+const sitePerm = async () => {
+  try { return (await navigator.permissions.query({ name: 'geolocation' })).state; }
+  catch { return null; }
+};
+
+map.on('locationerror', async e => {
   btn.className = 'icon';
   btn.title = 'Show my location';
   /* Only where the reader asked, the same gate the arrival ripple takes. The landing auto-locate is
      a question nobody asked, and a card that opens by itself replaces what the reader opened.
      Leaflet forwards the code and prefixes the message with its own words, so the card reads
      `e.code` and never the sentence. */
-  if (wantPopup) openSide('@here', hereFail(e.code));
+  if (wantPopup) openSide('@here', hereFail(e.code, await sitePerm()));
 });
