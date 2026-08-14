@@ -187,15 +187,16 @@ git clone https://github.com/illusionikx/selangor-flood-tracker.git /srv/flood
 cd /srv/flood
 composer install --no-dev            # writes lib/, NOT vendor/ — vendor/ is hand-managed browser assets
 
-# api.php writes four things; www-data must own all of them. -R because the auto-update cron below
+# PHP writes six things; www-data must own all of them. -R because the auto-update cron below
 # runs git as www-data, and git refuses a repo it does not own.
 mkdir -p shots
 chown -R www-data:www-data /srv/flood
 ```
 
-That last line matters: `.cache.json`, `.history.db`, `.refresh.lock` and `shots/` are all created by
-PHP at runtime, in the app directory. If `www-data` cannot write there the site serves an error object
-and never caches anything.
+That last line matters: `.cache.json`, `.history.db`, `.refresh.lock`, `shots/`, `.php-error.log` and
+`.client-errors.log` are all created by PHP at runtime, in the app directory. If `www-data` cannot
+write there the site serves an error object and never caches anything. The two logs fail more quietly
+than the rest. PHP cannot report that it failed to open the file it reports failures into.
 
 **On an unprivileged LXC — the usual Proxmox setup — that `chown` is not the whole story if `shots/`
 is a bind mount.** The container's `www-data` is uid 33 inside, but the kernel maps it to **100033 on
@@ -235,13 +236,25 @@ server {
         fastcgi_read_timeout 120;
     }
 
-    # api.php is the ONLY php that may be requested. shots.php and sources.php are libraries —
-    # they emit nothing today, but "harmless when called directly" is not a property to rely on.
+    # The browser's error reporter (js/oops.js beacons here). It appends one line and returns 204,
+    # so it needs none of api.php's timeout. An exact `location =` match beats the regex 404 below
+    # whatever the order, which is the same reason /api.php works. Drop this block and client error
+    # reporting fails silently: the beacon posts into a 404 and nothing is ever written.
+    location = /log.php {
+        include snippets/fastcgi-php.conf;
+        fastcgi_pass unix:/run/php/php-fpm.sock;
+        fastcgi_read_timeout 10;
+    }
+
+    # api.php and log.php are the ONLY php that may be requested. shots.php and sources.php are
+    # libraries — they emit nothing today, but "harmless when called directly" is not a property
+    # to rely on.
     location ~ \.php$ { return 404; }
 
     # State, not content. None of this is ever served directly.
     location ~ ^/(shots|lib)/ { return 404; }
-    location ~ /\.          { return 404; }   # .cache.json, .history.db, .refresh.lock, .git
+    location ~ /\.          { return 404; }   # .cache.json, .history.db, .refresh.lock, .git,
+                                              # .user.ini, .php-error.log, .client-errors.log
     location ~ ^/(composer\.(json|lock)|shots-test\.php)$ { return 404; }
 
     # Stylesheets carry ?v=; the modules do not, so they must not be cached hard.
@@ -257,6 +270,15 @@ server {
 `fastcgi_read_timeout` is not optional. The default 60 s is survivable but a cold start that also
 triggers a capture round has taken 40 s here, and a 504 mid-rebuild leaves the visitor with nothing.
 
+**The dotfile rule already covers the two logs, and that is load-bearing.** `.php-error.log` and
+`.client-errors.log` each start with a dot, so `location ~ /\.` answers 404 for both. A stack trace
+names the path of every file in it. A browser report names the page and the browser of a reader. Do
+not rename either log to a name without the leading dot.
+
+`log.php` writes to disk and anybody can reach it. The 5 MB ceiling inside that file is the backstop,
+and it is deliberate rather than tidy. Add `limit_req` on that location if this site ever draws real
+traffic. `.php-error.log` has no ceiling of its own, so add it to `logrotate` or truncate it by hand.
+
 ### The cron is not optional — it is what runs the site
 
 **This whole app is request-driven. `api.php` only does work when something calls it**, so with no
@@ -268,9 +290,12 @@ cache it keeps warm.
 
 ```bash
 tee /etc/cron.d/flood >/dev/null <<'EOF'
-*/5 * * * * www-data curl -fsS -o /dev/null http://127.0.0.1/api.php
+*/5 * * * * www-data curl -fsS http://127.0.0.1/api.php | php /srv/flood/watch.php
 EOF
 ```
+
+The payload used to go to `/dev/null`. It now goes through `watch.php`, which is the whole of the
+monitoring on this box — see **Watching it** below. The request is the same request either way.
 
 Five minutes matches `TTL`, so it does three jobs at once:
 
@@ -306,8 +331,12 @@ account that uses the site:
 ```powershell
 $n = 'flood-exp-warm'
 Unregister-ScheduledTask -TaskName $n -Confirm:$false -ErrorAction SilentlyContinue
-$a = New-ScheduledTaskAction -Execute 'curl.exe' `
-     -Argument '-fsS --ssl-no-revoke --max-time 240 -o NUL https://flood-exp.test/api.php'
+# cmd.exe, because Task Scheduler runs one program and this needs a pipe. The payload goes to
+# watch.php rather than to NUL — see "Watching it" above. Replace `php` with the full path from
+# `(Get-Command php).Source` if the task runs with a PATH that lacks it.
+$a = New-ScheduledTaskAction -Execute 'cmd.exe' -Argument (
+     '/c curl.exe -fsS --ssl-no-revoke --max-time 240 https://flood-exp.test/api.php' +
+     ' | php D:\Herd\flood-exp\watch.php')
 $t = New-ScheduledTaskTrigger -Once -At (Get-Date).Date `
      -RepetitionInterval (New-TimeSpan -Minutes 5)
 $s = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
@@ -405,6 +434,43 @@ re-fetch. `.history.db` at least regenerates over an hour; `shots/` is simply go
 **Do not `rm -rf shots/` to re-test capture** — `rm shots/.last` expires the 30-minute stamp instead.
 Same for the payload cache: `touch -d '2020-01-01' .cache.json`, never delete `.history.db`.
 
+### Watching it
+
+The cron above already fetches `api.php` every five minutes, and it threw the answer away. That
+answer carries the alarm. Pipe it through `watch.php` instead. The check then costs no extra request,
+no service, no container, no account and no third party.
+
+**What it checks.** `kl`, `national`, `met` and `metday` must each parse more than zero rows.
+`sources.stale` must be empty. `upstreamOk` must be true. The station count must clear 300, which
+catches a collapse rather than a wobble. Empty input is a fault too, so a dead site reports itself
+through the same path.
+
+**What it ignores on purpose.** `metwarn.parsed` reads 0 on any calm day, because no warning is in
+force. It read 0 on the poll behind this note. An alarm there fires most days and teaches a reader
+to ignore the log.
+
+**It reports a change of state, never a state.** A fault repeated every five minutes for a week is
+2,016 identical lines. An alarm nobody acts on is the cry-wolf failure the alert design standard
+rejects. It reports the recovery too, or a cleared fault looks open forever. `.watch.state` holds the
+last verdict, and `watch.php` compares against it.
+
+Output goes to `.php-error.log`. That keeps one file to read when something looks wrong.
+`.client-errors.log` holds the browser side, one JSON line per report. Both are absent on a healthy
+day.
+
+**What it cannot catch.** `watch.php` runs on the machine it watches. A machine that is off runs no
+cron and says nothing. That failure is the loud one, and you meet it the moment you open the site.
+The silent failures are the class this catches, and they are the ones that hide behind a green
+status dot.
+
+**To get a message on a phone**, add one line beside the `error_log()` call in `watch.php`. A push
+service such as ntfy needs no account and reaches a machine behind a home router. That contacts a
+third party from PHP alone. The browser still talks to this origin and to the basemap host, so the
+claim in the About pane holds.
+
+An external uptime service is the only thing that answers "is the whole box alive". It also needs the
+site to be reachable from the internet. Add one when this runs somewhere public, and not before.
+
 ### Updating
 
 ```bash
@@ -453,6 +519,10 @@ bump it and the server is updated while the browser is not.
   internet. Behind a Cloudflare Tunnel that is Cloudflare's problem; on a bare forwarded port,
   consider `limit_req` on `/api.php`.
 - **No metrics.** The status chip's `tookMs`, `details.ok/requested` and `sources` counters are the
-  only instrumentation, and they are only visible to someone looking at the page.
+  only instrumentation, and they are only visible to someone looking at the page. *Errors* are
+  covered now — see **Watching it** above for the two monitors and the two log files.
+- **No push alerting.** `watch.php` writes a line to `.php-error.log` and tells nobody. Nothing on
+  this box sends a message anywhere. Add one call beside its `error_log()` if you want one — see
+  **Watching it** above.
 - **Serving `shots/` directly from nginx** would be cheaper than `readfile()` through PHP, but it
   would be a second door into the archive with its own validation story. One door.

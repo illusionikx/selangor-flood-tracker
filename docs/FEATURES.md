@@ -9318,6 +9318,104 @@ Nothing else about the section changed. It keeps its own ⋮, which states two f
 outlook at that time, and the borrowed station stands that far from the point. Neither number is the
 distance from the reader to the point, and the card claims no such thing. The number a reader can
 act on sits in the section head, which names the place behind the forecast.
+
+## A browser error reached nobody
+
+Three faults made this site hard to trace. Each one failed in a different way.
+
+`api.php` already caught what it can. `set_exception_handler` logs an uncaught throw. A shutdown
+function turns a fatal into JSON a client can parse. That code was right. Its destination was not.
+
+PHP ran with no `error_log` set. Each of those lines went to standard error. A FastCGI server folds
+standard error into its own log. That log held about 28,000 lines on the machine here. An uncaught
+exception from this app was one line among them.
+
+Most of those lines were one warning, repeated. `session.auto_start` was on, and the session
+directory refused a write. So PHP logged two warnings for every request. Each font, stylesheet and
+module paid that cost. Nothing in this app reads `$_SESSION`.
+
+The browser reported nothing at all. Twenty modules run in the browser, and five more load on demand.
+A throw in any of them left the map half drawn and told nobody.
+
+### What now happens
+
+`.user.ini` sets `session.auto_start=0` for this directory. The noise stops at the source. The file
+is per-directory, so it changes nothing for another site on the same server. `api.php` keeps its
+`session_write_close()` call. A server that ignores `.user.ini` still needs it.
+
+`api.php` and `log.php` each call `ini_set('error_log', __DIR__ . '/.php-error.log')`. This app now
+writes to a file of its own. `__DIR__` finds the correct path on both deploy targets. A committed
+absolute path cannot do that.
+
+`js/oops.js` reports a browser error to `log.php`. It listens for three things. An `error` event
+carries a throw. The same event in the capture phase carries a file that failed to load. An
+`unhandledrejection` event carries a promise nobody caught. `log.php` appends one JSON line per
+report to `.client-errors.log`.
+
+### Why the module loads first
+
+`app.js` imports `oops.js` before any other module. A static import runs before the body of the file
+that imports it. A handler inside `app.js` therefore starts too late to see a throw from another
+module. That case is real. `state.js` reads the saved preferences with `JSON.parse`. Corrupt storage
+there throws before the map draws.
+
+`oops.js` imports nothing, so it runs first and listens for the rest.
+
+The capture phase on the `error` listener earns its place the same way. A failed load does not
+bubble. A listener without capture sees a throw alone. Herd answers a missing file with `index.html`
+and HTTP 200. A wrong path in the module list therefore reaches a reader as a parse error. This is
+how that arrives from a real visitor.
+
+### What this deliberately does not use
+
+An error tracking service sells two things above a log file. It groups repeated errors. It maps a
+minified stack trace back to the source. The second is worth nothing here. This app has no build
+step, so a stack trace already names the file and the line a reader runs.
+
+The first is worth something, one day. The trigger is a log file too large to read. GlitchTip is the
+answer then. It speaks the Sentry protocol and runs in four containers.
+
+A hosted tracker is a separate question, and the answer is no for now. The About pane states what
+this app sends to a third party. A hosted tracker puts a new third party in the browser. That makes
+the sentence false. A tracker on our own machine keeps it true. Read the entry about the CDN grep
+before any change to that sentence.
+
+`sendBeacon` carries the report. It cannot throw, cannot slow the page, and survives a closing tab.
+The ordinary fetch in `ask.js` does none of those. GitHub Pages serves no PHP, so `log.php` is absent
+there and the browser drops the report. That is the correct result on a static host. It needs no test
+for the host in use.
+
+### The guards on a public write endpoint
+
+`log.php` writes to disk and anybody can reach it. It takes four guards. It accepts POST alone. It
+reads 4096 bytes at most. It refuses a body that is not a JSON object. It stops writing at 5 MB.
+
+The client caps itself at 20 reports per session. One throw inside a loop must not become a thousand
+requests. That cap protects an honest reader. The size ceiling answers a dishonest one.
+
+`log.php` records no IP address. The report already names the page, the browser and the stack. Who
+saw the fault is not part of the repair.
+
+### The one thing an error tracker does not catch
+
+The scrapers fail silently by design. A layout change upstream yields zero rows and no error. The map
+then draws stale water levels under a green status dot. `sources.stale` and the `parsed` counters are
+the alarm. This app has published them for months. Nothing rang them.
+
+That failure is an HTTP 200 with valid JSON and no rows. No error tracker looks at it. `watch.php`
+does, and it needs no service, no container and no account. The poll cron already fetches the payload
+every five minutes and threw the answer away. That answer carries the alarm, so the cron pipes into
+`watch.php` now and the check costs one extra process.
+
+`watch.php` reports a change of state rather than a state. A fault every five minutes for a week is
+2,016 identical lines, and the alert design standard above rejects exactly that. It skips
+`metwarn.parsed`, which reads 0 on any calm day. See `docs/DEPLOY.md` under *Watching it*.
+
+An external uptime service answers one question this cannot. A machine that is off runs no cron. That
+failure is the loud one, and a reader meets it on the first page load. Add a monitor when this runs
+somewhere public, and not before.
+
+
 ## The siren band frames on the clock
 
 The siren log answered "has this gone off today" for 23 sirens of 212. The other 189 drew a sliver.
@@ -9383,6 +9481,7 @@ to draw.
 
 It read `Silent for 9 h`, `Last sounded 14:22` or `Sounding since 13:50`. The band states all three.
 A rail with no bar on it is silence. A red bar shows when it started. A red bar that reaches the right edge means the siren sounds now. The hover readout names the hour on any sample.
+
 ## A graph always draws
 
 The state of the station took the timeline away from three of the four sensor kinds. The flood

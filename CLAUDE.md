@@ -20,12 +20,16 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `sources.php` | scrapers for the two HTML-only upstreams (national portal, JPS WP) and the three MET feeds (nowcast, forecast, warning) |
 | `shots.php` | camera archive: capture, retention tiers, lookup, and the on-request strip (`buildSheet()`) the wall and the clip play. Required by `api.php` |
 | `shots-test.php` | `php shots-test.php` — one of three runnable checks. Guards retention. Exercises `pruneShots()` |
+| `log.php` | where a browser error lands. `js/oops.js` is the only caller. Appends one JSON line to `.client-errors.log` |
+| `watch.php` | reads a payload on stdin and complains when it is wrong. The poll cron pipes into it. Reports a change of state, never a state |
+| `.user.ini` | per-directory PHP settings. Holds one line, `session.auto_start=0`, and the reason it is there |
 | `index.html` | markup only — no inline CSS or JS |
 | `css/icons.css` | every icon, as an SVG mask. Generated — see docs/FEATURES.md for the fetch |
 | `css/base.css` | tokens, reset, controls, blocks shared by popup + alert panel |
 | `css/chrome.css` | page furniture: app bar, status dot, drawer, legend, splash |
 | `css/map.css` | Leaflet overrides, pins, cluster badges, popup template |
 | `js/app.js` | entry point — decides what happens on landing, nothing else |
+| `js/oops.js` | reports a browser throw, a rejected promise or a failed asset to `log.php`. No imports, and `app.js` imports it first |
 | `js/config.js` | constants (kinds, palettes, thresholds, tile styles, `WEATHER`). Also `NOTICE`, the words for an upstream outage. No imports. |
 | `js/state.js` | `state` (data + hereAt) and the `PREFS` blob. Breaks module cycles. |
 | `js/util.js` | pure helpers + `hasInfo()` / `color()` / `isIgnored()` |
@@ -63,6 +67,9 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `.github/workflows/pages.yml` | bakes the static GitHub Pages build — runs the PHP on cron, publishes `api.json` |
 | `docs/DEPLOY.md` | both targets: Pages (what it can't do) and a Debian box / Proxmox LXC (spec, nginx, cron, container traps) |
 | `.cache.json` | last payload (gitignored) |
+| `.php-error.log` | this app's own PHP errors, and nothing else (gitignored) |
+| `.client-errors.log` | one JSON line per browser error, written by `log.php` (gitignored) |
+| `.watch.state` | the last verdict `watch.php` reached, so it reports a change and not a state (gitignored) |
 | `.history.db` | sqlite: water-level samples per station, 30-day retention (gitignored) |
 | `shots/` | the camera archive — one dir per camera, `<unixts>.webp` per frame (gitignored) |
 
@@ -526,14 +533,42 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   parse, so a point that reaches the payload always carries one.
   This app publishes a notice it can name as `notices[]`. The reader then sees it on screen. Every
   other failure still stays in `sources.stale` alone.
-- **`session.auto_start` serializes every request from one browser.** The file session handler
-  holds an exclusive lock on the session file for the whole request. Every request that carries
-  the same `PHPSESSID` therefore waits behind the one before it. Six concurrent camera stills
-  measured a staircase: 1.9, 3.0, 4.3, 5.4, 6.1 and 6.9 seconds. The same six requests with no
-  shared cookie finished together in 3.4 seconds. `api.php` calls `session_write_close()` on its
-  first statement, right after the two `require_once` lines, because nothing in this app reads
-  `$_SESSION`. The lock protects nothing. Do not move that release later in the file. Code added
-  above it runs inside the lock again.
+- **`session.auto_start` serializes every request from one browser, and it also buries every other
+  fault.** The file session handler holds an exclusive lock on the session file for the whole
+  request. Every request that carries the same `PHPSESSID` therefore waits behind the one before it.
+  Six concurrent camera stills measured a staircase: 1.9, 3.0, 4.3, 5.4, 6.1 and 6.9 seconds. The
+  same six requests with no shared cookie finished together in 3.4 seconds.
+  The second cost hid the first for months. Where the session directory refuses a write, PHP logs
+  two warnings for every request. Each font, stylesheet and module pays that. The log on this
+  machine reached about 28,000 lines, and almost all of them said the same thing.
+  `.user.ini` sets `session.auto_start=0` for this directory now, so there is usually no session at
+  all. Measured after the change: three requests grew the shared log by zero bytes.
+  `api.php` still calls `session_write_close()` as its first statement, above the two `require_once`
+  lines, because nothing in this app reads `$_SESSION` and a server that ignores `.user.ini` still
+  needs the release. Do not move it later in the file. Code added above it runs inside the lock
+  again. `session_write_close()` is silent when no session is active, so the call costs nothing once
+  `.user.ini` applies. Note that PHP caches `.user.ini` for `user_ini.cache_ttl` seconds, 300 by
+  default.
+- **`error_log()` writes to standard error, and a FastCGI server folds that into its own log.**
+  `api.php` has called `error_log()` correctly the whole time. PHP ran with no `error_log` set, so
+  every one of those lines landed in the log of the web server, beside every unrelated line it
+  writes. An uncaught exception from this app was one line among about 28,000.
+  `api.php` and `log.php` each call `ini_set('error_log', __DIR__ . '/.php-error.log')` now. This is
+  `ini_set()` rather than an ini file because `__DIR__` resolves on both deploy targets. A committed
+  absolute path is correct on one target at most. **Any new PHP entry point needs that line**, or its
+  errors go back to the shared log and nobody finds them.
+- **`js/oops.js` must stay the first import in `app.js`.** A static import runs before the body of
+  the file that imports it. A handler written inside `app.js` therefore starts after every other
+  module has evaluated, and a throw during that evaluation reaches nobody. This is a real case rather
+  than a theoretical one. `state.js` reads the saved preferences with `JSON.parse`, so corrupt
+  storage throws there before the map draws anything. `oops.js` imports nothing, so it evaluates
+  first. Moving it down the import list, or folding it into `app.js`, gives up the one case it exists
+  for and breaks nothing visible.
+  The third argument on its `error` listener is the capture phase, and it is what catches a file that
+  failed to load. That event does not bubble, so a listener without capture sees a throw alone.
+  **A headless check with `--dump-dom` captures nothing, and the fault there is the harness.** Chrome
+  exits at the dump and discards the queued beacon, so the log stays empty and the code looks broken.
+  Keep the browser alive for a few seconds instead, then stop it.
 - **No `fastcgi_finish_request` under Herd** — the SAPI is `cgi-fcgi`, so there is no way to close
   the connection and keep working. Stale-while-revalidate is impossible in-process; the page cache
   is the workaround. A cron hitting `api.php` every 5 min would keep the cache warm for good.
@@ -2016,6 +2051,34 @@ curl -sk -o /dev/null -w '%{http_code} %{content_type}\n' \
 # non-empty `places` array on a real place name.
 curl -sk "https://flood-exp.test/api.php?place=Bandar+Utama" \
      | php -r 'echo json_encode(json_decode(stream_get_contents(STDIN),true)),"\n";'
+
+# The two logs this app writes. Both are gitignored, and both are absent on a healthy day.
+tail -20 .php-error.log        # PHP: an uncaught throw or a fatal, from api.php or log.php
+tail -20 .client-errors.log    # the browser: one JSON line per report, from js/oops.js
+
+# log.php is a public endpoint that writes to disk, so only a POST carrying a JSON object may write
+# a line. Expect `wrote 1` from the four requests below. Any other number means a guard has gone.
+B=$( [ -f .client-errors.log ] && wc -l < .client-errors.log || echo 0 )
+curl -sk -o /dev/null                                     "https://flood-exp.test/log.php"  # GET
+curl -sk -o /dev/null -X POST --data 'not json'           "https://flood-exp.test/log.php"
+curl -sk -o /dev/null -X POST --data '"a bare string"'    "https://flood-exp.test/log.php"
+curl -sk -o /dev/null -X POST --data '{"kind":"error","msg":"verify"}' "https://flood-exp.test/log.php"
+echo "wrote $(( $(wc -l < .client-errors.log) - B ))"
+
+# watch.php is the whole of the monitoring on a self-hosted box. The poll cron pipes the payload into
+# it. Healthy is silent, and it reports a CHANGE of state so a fault logs once rather than every five
+# minutes. Expect exit 0, 1, 1, 0 and exactly two new lines in the log.
+rm -f .watch.state
+curl -sk https://flood-exp.test/api.php | php watch.php; echo "healthy    -> $?"
+printf '' | php watch.php;                               echo "no payload -> $?"
+printf '' | php watch.php;                               echo "again      -> $?  (must not log twice)"
+curl -sk https://flood-exp.test/api.php | php watch.php; echo "recovered  -> $?"
+tail -2 .php-error.log
+
+# metwarn.parsed reads 0 on any calm day, so watch.php must NOT treat it as a fault. Expect 0.
+curl -sk https://flood-exp.test/api.php \
+  | php -r '$p=json_decode(stream_get_contents(STDIN),true);$p["sources"]["metwarn"]["parsed"]=0;echo json_encode($p);' \
+  | php watch.php; echo "metwarn 0  -> $?  (must be 0)"
 ```
 
 ```bash

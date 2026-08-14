@@ -2,17 +2,26 @@
 // Proxy + cache for infobanjirjps.selangor.gov.my (no CORS headers upstream, so we fetch server-side).
 // ponytail: sqlite for level history, flat file for the payload cache (one blob, nothing to query).
 
-/* This PHP runs with `session.auto_start=1`, and the file session handler takes an exclusive lock
-   on the session file for the whole request. Every request that carries the PHPSESSID of one browser
-   therefore runs one at a time. Six concurrent stills measured 1.9, 3.0, 4.3, 5.4, 6.1 and 6.9
+/* Where a session auto-starts, the file session handler takes an exclusive lock on the session file
+   for the whole request. Every request that carries the PHPSESSID of one browser therefore runs one
+   at a time. Six concurrent stills measured 1.9, 3.0, 4.3, 5.4, 6.1 and 6.9
    seconds, which is a clean staircase. The same six with no shared cookie finished in 3.4 seconds
    together. Four cheap requests finish in 347 ms, so the worker pool is not the reason.
    Ninety camera tiles queue that way, and the five minute poll queues behind them.
    Nothing in this repository reads `$_SESSION`, so the lock protects nothing and costs the whole
    camera wall. Release it before any work starts.
-   Do not replace this with an ini change. The ini belongs to the machine, and this file has to be
-   correct on a machine it does not own. */
+   `.user.ini` now sets `session.auto_start=0` for this directory, so on most requests there is no
+   session to close and this line does nothing. Keep the line. A server that ignores `.user.ini`
+   still needs it, and this file has to be correct on a machine it does not own. */
 if (session_status() === PHP_SESSION_ACTIVE) session_write_close();
+
+/* Send this app's errors to a file of its own. Without this, `error_log()` below writes to stderr,
+   which a FastCGI server folds into its own error log next to every unrelated line it writes. The
+   log on the machine this was added on held about 28,000 lines, and an uncaught exception from here
+   was one of them.
+   This is `ini_set()` rather than an ini file because `__DIR__` finds the right path on both deploy
+   targets. A committed absolute path is correct on one of them at most. */
+ini_set('error_log', __DIR__ . '/.php-error.log');
 
 /* A fatal after the first header() sends an HTML error page under a JSON content type, so a client
    that asked for JSON gets a parse error rather than something it can act on. The ?place= handler

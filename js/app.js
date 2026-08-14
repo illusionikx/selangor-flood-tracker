@@ -2,6 +2,7 @@
 // Load order matters in one place: ./ui.js builds the layer chips that render() reads back, so it
 // must be imported before the first load().
 
+import './oops.js';   // first, and it must stay first — see the file for why
 import { POLL_MS } from './config.js';
 import { state } from './state.js';
 import './ui.js';

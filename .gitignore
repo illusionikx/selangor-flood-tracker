@@ -12,3 +12,6 @@ lib/
 .cams.json*
 shots/
 .superpowers/
+.php-error.log
+.client-errors.log
+.watch.state
