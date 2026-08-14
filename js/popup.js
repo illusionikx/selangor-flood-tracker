@@ -995,45 +995,58 @@ export function rainBars(points) {
   </div>`;
 }
 
-/* Rain totalled over five nested windows, as horizontal bars.
+/* Rain totalled over five nested windows, as five columns on one plate.
+
+   A column chart rather than a row of meters, because the five are a series and the eye reads a
+   series across, not down. It takes the plate, the height and the label row from `.spark` above it,
+   so a card carrying a line graph, a rain area and this reads as one family rather than three.
 
    This answers how much rain fell. It never answers how dangerous that is. `rainBars()` directly
    above already draws the JPS intensity classes across its plot, and `rainState()` above that
-   prints the word — so this card answers the severity question twice before these bars start.
+   prints the word — so this card answers the severity question twice before these columns start.
    There is deliberately no threshold mark here. Three sources were tried for one and each failed a
    different way, which the spec records in full:
    docs/superpowers/specs/2026-08-12-cumulative-rainfall-chart-design.md
    Anything proposing a fourth has to answer that section first.
 
-   A window with no honest answer keeps its row and draws an em dash, so the five are always in the
-   same place and nobody has to work out which one went missing. An asterisk marks a total this app
-   worked out rather than read off a feed. */
+   A window with no honest answer keeps its column and prints an em dash over an empty one, so the
+   five are always in the same place and nobody has to work out which went missing. An asterisk
+   marks a total this app worked out rather than read off a feed. */
 export function rainAcc(acc) {
   if (!acc) return '';
   const rows = ACC_ROWS.map(([k, label]) => [label, acc[k]]);
   if (!rows.some(([, r]) => r)) return '';
-  /* The scale is the largest total, so the widest bar always fills the width. With no mark to hold,
-     the axis needs no other rule. A dry station draws five empty tracks rather than one sentence,
-     which `rainBars()` above does say. That sentence would have to name a window, and the two long
-     ones are exactly the windows a young archive cannot answer — "No rain in the last 72 hours" on
-     a station whose 72 hour total is unknown is the claim this whole design refuses to make. Five
-     rows keep a measured zero and an unanswered window visibly apart, which is the point of them. */
+  /* The tallest total takes the full height, so the shape is the comparison between the five and
+     nothing else. A dry station draws five flat columns rather than one sentence, which
+     `rainBars()` above does say. That sentence has to name a window, and the two long ones are
+     exactly the windows a young archive cannot answer — "No rain in the last 72 hours" on a station
+     whose 72 hour total is unknown is the claim this whole design refuses to make. Five columns
+     keep a measured zero and an unanswered window visibly apart, which is the point of them. */
   const hi = Math.max(...rows.map(([, r]) => r ? r[0] : 0)) || 1;
-
   const star = rows.some(([, r]) => r && r[1]);
-  const row = ([label, r]) => {
-    if (!r) return `<div class="accrow"><span class="acck">${label}</span>
-      <span class="accbar"></span><span class="accv muted">—</span></div>`;
-    const [mm, derived, span] = r;
-    /* The measured span rides in the readout rather than on the row. It answers "why does this say
-       24 hours when the archive has a hole in it", which is a question you go looking for, not
-       something to read at a glance. */
+
+  // Three grids of the same five columns. The numbers, the columns and the labels line up because
+  // they share a column count, a gap and a padding, and none of them measures the others.
+  const num = ([, r]) => r
+    ? `<span>${r[0]}<small> mm</small>${r[1] ? '<sup>*</sup>' : ''}</span>`
+    : '<span class="muted">—</span>';
+  const col = ([label, r]) => {
+    if (!r) return '<div class="acccol"></div>';
+    const [mm, , span] = r;
+    /* The measured span rides in the readout rather than on the chart. It answers "why does this
+       say 24 hours when the archive has a hole in it", which is a question you go looking for
+       rather than something to read at a glance. */
     const tip = `${label} · ${mm} mm${span ? ` · measured over ${span} h` : ''}`;
-    return `<div class="accrow" data-tip="${tip}"><span class="acck">${label}</span>
-      <span class="accbar"><i style="width:${(mm / hi * 100).toFixed(1)}%"></i></span>
-      <span class="accv">${mm} mm${derived ? '<sup>*</sup>' : ''}</span></div>`;
+    return `<div class="acccol" data-tip="${tip}"><i style="height:${
+      (mm / hi * 100).toFixed(1)}%"></i></div>`;
   };
 
-  return `<div class="acc">${rows.map(row).join('')}${
-    star ? '<div class="muted">* Value derived from archived readings.</div>' : ''}</div>`;
+  return `<div class="acc">
+    <div class="accnums">${rows.map(num).join('')}</div>
+    <div class="accplot">${rows.map(col).join('')}</div>
+    <div class="accx">${rows.map(([label, r]) =>
+      `<span${r ? '' : ' class="muted"'}>${label}</span>`).join('')}</div>
+    ${star ? '<div class="muted">* Value derived from archived readings.</div>' : ''}
+  </div>`;
 }
+

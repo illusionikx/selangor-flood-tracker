@@ -221,14 +221,16 @@ export const WEATHER = [
   { icon: 'rainy_heavy', word: 'Heavy', line: 'Heavy rain' },
 ];
 
-/* The five windows of the rainfall accumulation chart, in the order they are drawn.
-   Each window contains the one above it, so the bars normally grow down the list. There is one
-   exception and it is real: near midnight "Today" is younger than "3 hours", because at 01:00 today
-   holds one hour of rain and the 3 hour window reaches back into yesterday. The dip stays. */
+/* The five windows of the rainfall accumulation chart, left to right.
+   Each window contains the one to its left, so the columns normally climb across. There is one
+   exception and it is real: near midnight "Today" is younger than "3 h", because at 01:00 today
+   holds one hour of rain and the 3 hour window reaches back into yesterday. The dip stays.
+   Labels are short because five of them share the width of one graph. They also open the hover
+   readout, where `24 h · 180 mm` is the whole sentence and a longer word buys nothing. */
 export const ACC_ROWS = [
-  ['h1',  '1 hour'],
-  ['h3',  '3 hours'],
+  ['h1',  '1 h'],
+  ['h3',  '3 h'],
   ['day', 'Today'],
-  ['h24', '24 hours'],
-  ['h72', '72 hours'],
+  ['h24', '24 h'],
+  ['h72', '72 h'],
 ];

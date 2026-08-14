@@ -418,10 +418,10 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   exactly, and it still loses: an IDF curve needs 20–30 years of record at one spot, JPS published
   12 such gauges in this area, and **only 11 of 230 stations stand on one**. The rest borrow
   climatology from another place at a median of 11 km. `spVeryHeavy` alone is per-station and honest
-  but marks the 1-hour bar only. A dry station therefore draws five empty tracks and **not** a
+  but marks the 1-hour bar only. A dry station therefore draws five flat columns and **not** a
   sentence: any sentence has to name a window, and "No rain in the last 72 hours" on a station whose
-  72-hour total is unknown is the exact claim this refuses to make. Five rows keep a measured zero
-  and an unanswered window apart. See `docs/superpowers/specs/2026-08-12-cumulative-rainfall-chart-design.md`.
+  72-hour total is unknown is the exact claim this refuses to make. Five columns keep a measured
+  zero and an unanswered window apart. See `docs/superpowers/specs/2026-08-12-cumulative-rainfall-chart-design.md`.
 - **A tide is a rise, and three of these stations are tidal.** PINTU AIR IJOK is a water gate;
   BANDAR KLANG and TELUK PENYAMUN (JETI) are estuarine. They climb 0.5–0.7 m/h twice a day forever,
   so any rate-based forecast flags them daily. The guard is `level ≥ its own 24h high`, not a

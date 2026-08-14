@@ -8116,7 +8116,7 @@ catchment claim and the catchment does not shrink because the brush was miscalcu
 ## Rain totals over five nested windows
 
 A rainfall sensor draws a second chart under its area graph. It shows the rain that fell in the
-last 1 hour, 3 hours, today from midnight, 24 hours and 72 hours. Each total is one horizontal bar.
+last 1 hour, 3 hours, today from midnight, 24 hours and 72 hours. Each total is one column.
 The station card and the table popover share one function, the way both already share `rainBars()`.
 
 Flash Flood Guidance publishes nested windows because each window answers a different question.
@@ -8124,9 +8124,9 @@ A short window measures drainage overload. A long window measures how wet the gr
 Sensitivity to earlier soil moisture falls as the window grows. So 1 hour and 72 hours are two
 facts rather than two views of one fact.
 
-Each window contains the one above it, so the bars normally grow down the list. One exception is
-real and it stays. Near midnight "Today" is younger than "3 hours". At 01:00 today holds one hour
-of rain and the 3 hour window reaches back into yesterday.
+Each window contains the one to its left, so the columns normally climb across. One exception is
+real and it stays. Near midnight "Today" is younger than "3 h". At 01:00 today holds one hour of
+rain and the 3 hour window reaches back into yesterday.
 
 ### Three of the five totals were in the feed all along
 
@@ -8193,10 +8193,10 @@ the compromise, and it lands on 95.2% of the chart.
 nothing. But it is a one hour intensity class. It can mark the 1 hour bar and nothing else, and one
 marked bar beside four bare ones reads as though only that window matters.
 
-A dry station draws five empty tracks rather than one sentence. The sentence has to name a window, and the
+A dry station draws five flat columns rather than one sentence. The sentence has to name a window, and the
 two long ones are exactly the windows a young archive cannot answer. "No rain in
 the last 72 hours" on a station whose 72 hour total is unknown is the claim this design refuses to
-make. Five rows keep a measured zero and an unanswered window visibly apart.
+make. Five columns keep a measured zero and an unanswered window visibly apart.
 
 The full record, including the measurements behind each rejection, is in
 `docs/superpowers/specs/2026-08-12-cumulative-rainfall-chart-design.md`.

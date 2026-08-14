@@ -5,7 +5,7 @@ Date: 2026-08-12
 ## Goal
 
 Show rain totals for five nested windows on a rainfall sensor. The windows are 1 hour, 3 hours,
-today from midnight, 24 hours and 72 hours. Draw each total as a horizontal bar.
+today from midnight, 24 hours and 72 hours. Draw each total as a column.
 
 **This chart answers how much rain fell. It never answers how dangerous that is.** Severity stays
 with `rainBars()`, the area graph directly above it. That graph already draws the JPS intensity
@@ -22,11 +22,11 @@ A short window measures drainage overload. A long window measures how wet the gr
 Sensitivity to earlier soil moisture falls as the window grows. So 1 hour and 72 hours are two
 facts. They are not two views of one fact.
 
-## Each bar contains the one above it, and the order can still invert
+## Each column contains the one to its left, and the order can still invert
 
-Each window contains the one before it. So the bars never fall as the reader goes down the
-list, except at one point. Near midnight the "today" bar is younger than the "3 hours" bar.
-At 01:00 today holds one hour of rain and the 3 hour window reaches back into yesterday.
+Each window contains the one before it. So the columns never fall as the eye moves right, except
+at one point. Near midnight the "Today" column is younger than the "3 h" column. At 01:00 today
+holds one hour of rain and the 3 hour window reaches back into yesterday.
 
 The dip is true. Keep it. Keep the order the reader asked for.
 
@@ -103,8 +103,8 @@ hole had aged out of the window.
 
 Read this as the shape of the failure, not as a number to trust. Herd polls only while somebody
 holds the page open, so every long window on this box tracks the uptime of a browser tab. The cron
-target in `docs/DEPLOY.md` removes the effect. Until then a bar can appear and vanish between
-polls, and the empty state below is a normal state rather than an edge case.
+target in `docs/DEPLOY.md` removes the effect. Until then a column can appear and vanish
+between polls, and the empty state below is a normal state rather than an edge case.
 
 ## No threshold marks
 
@@ -128,8 +128,8 @@ a mountain range. The constants are sound. The compromise is the borrowing, and 
 95.2% of the chart.
 
 **A station and its own `spVeryHeavy`.** JPS publishes it per station, so this route borrows nothing.
-But it is a one hour intensity class. It can mark the 1 hour bar and nothing else. One marked bar beside four bare
-ones reads as though only that window matters.
+But it is a one hour intensity class. It can mark the 1 hour column and nothing else. One marked column beside
+four bare ones reads as though only that window matters.
 
 So the chart states measured totals and stops there. `rainBars()` above it already carries the
 JPS intensity classes, and `rainState()` above that already prints `HEAVY RAIN`. This card
@@ -156,13 +156,16 @@ A station with every window answered from a feed shows no footnote at all.
 
 ## The chart
 
-Five rows. The scale runs from zero to the largest of the five totals, so the widest bar always
-fills the width. With no marks to hold, the axis needs no other rule.
+Five columns on one plate. The scale runs from zero to the largest of the five totals, so the
+tallest column always fills the height. With no marks to hold, the axis needs no other rule.
 
-A window with no answer draws an em dash in muted ink. The row stays in place. Every station
-shows five rows.
+The plate, the 42 px height and the 10 px label row come from `.spark` above. A card carrying a
+line graph, a rain area and this then reads as one family rather than three.
 
-Each row carries a `data-tip`. `js/sparktip.js` already labels any `data-tip` and works on
+A window with no answer prints an em dash over an empty column. The column stays in place. Every
+station shows five columns.
+
+Each column carries a `data-tip`. `js/sparktip.js` already labels any `data-tip` and works on
 touch. A `title` does not open on a phone, so a `title` is not an option here.
 
 Example tip text:
