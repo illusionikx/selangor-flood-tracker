@@ -15,11 +15,36 @@ header {
    fails safely. `min-width` is `auto` on both rails, so neither can be squeezed under its own
    content — a rail short of room takes what it needs and the strip goes off centre instead of
    running under the title. The wordmark ellipsises before that, which it already did. */
+/* `container-type: inline-size` makes the rail itself the thing the wordmark is measured against.
+   A viewport query cannot do this job: the rail is what is left after the ticker and the controls,
+   and both of those change width on their own. Safe on a flex item, because `flex: 1 1 0` plus
+   `min-width: 0` already takes the width from the flex algorithm and never from the content. */
 header h1 {
   display: flex; align-items: center; gap: 8px; flex: 1 1 0;
   font-size: 22px; font-weight: 400; letter-spacing: 0; min-width: 0;
+  container-type: inline-size;
 }
 header h1 .word { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* The wordmark shortens before it clips: Klang Valley Flood Watch -> KV Flood Watch -> KVFW -> the
+   drop alone. Measured at 22px Roboto, the three spellings are 247, 156 and 59px wide, and the drop
+   with its gap adds 32. So each step is the width it needs plus about 2px of slack. The ellipsis is
+   still there under all of it, for a rail between two steps. Remeasure the three if the font, the
+   size or the words change. */
+/* Every selector here goes through `.word >`, and that is specificity rather than tidiness: the
+   hide rule is one class and three elements, so `header h1 .w-sm` loses to it and nothing draws at
+   all. Two classes beat one class and any number of elements. */
+header h1 .word > span { display: none; }
+header h1 .word > .w-sm { display: inline; }
+@container (min-width: 190px) {
+  header h1 .word > .w-sm { display: none; } header h1 .word > .w-md { display: inline; }
+}
+@container (min-width: 282px) {
+  header h1 .word > .w-md { display: none; } header h1 .word > .w-lg { display: inline; }
+}
+/* Under the shortest spelling there is nothing left to shorten, so the drop carries the identity on
+   its own. The tab title says the rest. */
+@container (max-width: 93px) { header h1 .word { display: none; } }
 header h1 b { font-weight: 500; color: var(--accent); }
 header h1 .brand { font-size: 24px; color: var(--accent); flex: none; }
 /* Just the glyph's own box, so the status dot has a corner to hang off. `cursor: help` and the hover
@@ -1835,9 +1860,9 @@ body.finding #find { display: none; }
     -webkit-mask: linear-gradient(90deg, #000 calc(100% - 18px), transparent);
     mask: linear-gradient(90deg, #000 calc(100% - 18px), transparent);
   }
-  /* The title is the first thing worth losing: five buttons and the status chip all have to fit,
-     and the drop icon carries the identity on its own once the tab title says the rest. */
-  header h1 .word { display: none; }
+  /* The title used to go here whole, on the argument that five buttons and the status chip all have
+     to fit. The container query on `header h1` measures that directly, so a phone with room draws
+     `KVFW` and one without draws the drop alone. Nothing to state at this width any more. */
   /* The popover clears the two-row header rather than the one-row one; --hdr already carries the
      difference, so this only has to stop sitting under the ticker's rule. */
   #netstats { left: 8px; }

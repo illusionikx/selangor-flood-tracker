@@ -1,0 +1,45 @@
+<!-- The app bar wordmark shortens rather than ellipsises, and the rungs are container queries against
+     measured font widths. Two ways that fails silently. A threshold that is too low draws a spelling
+     wider than its rail, which clips. A selector that loses on specificity draws nothing, which
+     looks exactly like the bottom rung. This loads the app at fifteen widths and reads the rungs
+     back. See `header h1` in css/chrome.css.
+
+     chrome --headless=new --dump-dom title-test.html -->
+<title>Wordmark ladder</title>
+<style>body { font: 13px/1.5 monospace; margin: 16px } .f { color: #b00 }</style>
+<pre id="out">running…</pre>
+<script>
+const W = [1600, 1400, 1280, 1200, 1100, 1000, 900, 800, 700, 601, 600, 480, 414, 360, 320];
+const RUNG = { 'w-lg': 3, 'w-md': 2, 'w-sm': 1 };          // taller number, longer spelling
+const rows = [], fail = [];
+let last = 4;                                              // nothing above the longest spelling
+
+(async () => {
+  for (const w of W) {
+    const f = document.createElement('iframe');
+    f.style.cssText = `width:${w}px;height:800px;border:0;position:absolute;left:-9999px`;
+    f.src = 'index.html';
+    document.body.append(f);
+    await new Promise(r => f.addEventListener('load', r, { once: true }));
+    await new Promise(r => setTimeout(r, 700));            // the map settles, the bar reflows
+
+    const d = f.contentDocument, win = f.contentWindow, shown = s => win.getComputedStyle(s).display !== 'none';
+    const rail = d.querySelector('header h1').clientWidth;
+    const word = d.querySelector('header h1 .word');
+    const on = [...word.children].filter(shown);
+    const rung = shown(word) && on.length === 1 ? RUNG[on[0].className] : 0;
+    const txt = rung ? on[0].textContent : '(logo)';
+    const need = rung ? on[0].getBoundingClientRect().width + 32 : 0;   // the drop and its gap
+    rows.push(`${String(w).padStart(4)}px  rail ${String(rail).padStart(4)}px  ${txt}`);
+
+    if (shown(word) && on.length !== 1) fail.push(`${w}px: ${on.length} spellings drawn at once`);
+    if (rung && need > rail + 1) fail.push(`${w}px: "${txt}" wants ${need.toFixed(0)}px of a ${rail}px rail`);
+    // Only the phone layout may widen the rail as the viewport narrows, so it restarts the ladder.
+    if (w !== 600 && rung > last) fail.push(`${w}px: a narrower rail drew a LONGER spelling`);
+    last = rung;
+    f.remove();
+  }
+  out.innerHTML = rows.join('\n') + '\n\n' +
+    (fail.length ? `<b class="f">FAIL</b>\n` + fail.join('\n') : '<b>PASS</b>');
+})();
+</script>

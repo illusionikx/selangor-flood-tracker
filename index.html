@@ -71,7 +71,7 @@
 <link rel="stylesheet" href="vendor/fonts.css?v=49">
 <link rel="stylesheet" href="css/icons.css?v=86">
 <link rel="stylesheet" href="css/base.css?v=123">
-<link rel="stylesheet" href="css/chrome.css?v=165">
+<link rel="stylesheet" href="css/chrome.css?v=166">
 <link rel="stylesheet" href="css/map.css?v=147">
 
 <!-- Water tint for the dark basemap. CARTO's dark_all is greyscale — all 18 of its tones have zero
@@ -241,8 +241,15 @@
   <!-- The feed's state rides the mark as a dot on its corner, the way a presence dot rides an avatar:
        it is a property of the thing it sits on, and it costs no bar width. Hovering the mark (or
        tapping the dot) still brings up the full diagnostics — see #netstats below. -->
+  <!-- The wordmark shortens rather than ellipsises. Three spellings, one shown at a time, chosen by
+       the width of the title rail itself — see `header h1` in css/chrome.css. Only one is ever in
+       the render tree, so a screen reader reads one heading. -->
   <h1><span class="mark"><i class="glyph brand i i-flood"></i><span id="net" tabindex="0"
-        role="img"></span></span><span class="word">Klang Valley <b>Flood Watch</b></span></h1>
+        role="img"></span></span><span class="word"
+      ><span class="w-lg">Klang Valley <b>Flood Watch</b></span
+      ><span class="w-md">KV <b>Flood Watch</b></span
+      ><span class="w-sm">KV<b>FW</b></span
+  ></span></h1>
   <!-- Outside the <h1>: a <table> is flow content and cannot legally live inside a heading, so the
        popover is a sibling positioned under the mark rather than a child of the dot. -->
   <table id="netstats" class="surface"></table>

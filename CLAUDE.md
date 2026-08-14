@@ -19,11 +19,12 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `api.php` | server-side proxy + cache + source merge + poll history + camera image proxy + rate-limited `?force=1` + place lookup (`?place=`, proxies Nominatim) |
 | `sources.php` | scrapers for the two HTML-only upstreams (national portal, JPS WP) and the three MET feeds (nowcast, forecast, warning) |
 | `shots.php` | camera archive: capture, retention tiers, lookup, and the on-request strip (`buildSheet()`) the wall and the clip play. Required by `api.php` |
-| `shots-test.php` | `php shots-test.php` — one of three runnable checks. Guards retention. Exercises `pruneShots()` |
+| `shots-test.php` | `php shots-test.php` — one of four runnable checks. Guards retention. Exercises `pruneShots()` |
 | `log.php` | where a browser error lands. `js/oops.js` is the only caller. Appends one JSON line to `.client-errors.log` |
 | `watch.php` | reads a payload on stdin and complains when it is wrong. The poll cron pipes into it. Reports a change of state, never a state |
 | `.user.ini` | per-directory PHP settings. Holds one line, `session.auto_start=0`, and the reason it is there |
 | `index.html` | markup only — no inline CSS or JS |
+| `title-test.html` | `chrome --headless --dump-dom` — one of four runnable checks. Guards the app bar wordmark ladder, in rendered pixels |
 | `css/icons.css` | every icon, as an SVG mask. Generated — see docs/FEATURES.md for the fetch |
 | `css/base.css` | tokens, reset, controls, blocks shared by popup + alert panel |
 | `css/chrome.css` | page furniture: app bar, status dot, drawer, legend, splash |
@@ -36,7 +37,7 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `js/stations.js` | queries over the station set (`nearestOf`, `nearestCam`, `byId`) |
 | `js/map.js` | map instance, basemap/theme, cluster, the station panel (`openSide`), `focusOn` / `flashTo` |
 | `js/heat.js` | both heat layers (water level, rainfall), ground-fixed sizing per layer, shared opacity, and the field pass where a gauge reporting no rain denies the ground a wet one claims |
-| `heat-test.html` | `chrome --headless --dump-dom` — one of three runnable checks. Guards the rain layer's paint distance, its dry-gauge erase and its handover between neighbours, in canvas pixels |
+| `heat-test.html` | `chrome --headless --dump-dom` — one of four runnable checks. Guards the rain layer's paint distance, its dry-gauge erase and its handover between neighbours, in canvas pixels |
 | `js/popup.js` | popup + meter + gauge + sparkline templates |
 | `js/sparktip.js` | the hover/tap readout on every graph, and the label on any `data-tip`. One delegated listener, no imports |
 | `js/render.js` | rebuilds markers and heat points; drawer summary table |
@@ -1524,6 +1525,23 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   `align-items: start` on the grid, `position: absolute` on the tile's `<img>`, and a wider tile
   ratio. Each left the row exactly where it was.
 
+- **The app bar wordmark has four spellings and the title rail picks one, so a specificity slip
+  draws none of them.** `Klang Valley Flood Watch` → `KV Flood Watch` → `KVFW` → the drop alone, at
+  282px, 190px and 94px of `header h1`. That is a **container query and not a media query**, because
+  the rail is what is left after the ticker and the controls, and two things move it that a viewport
+  width cannot see: the ticker is `min(58vw, 656px)`, so it stops growing at 1131px, and below 600px
+  it takes a row of its own and the rail jumps from 0px at 601px to 272px at 600px. The phone rule
+  that hid the title whole is gone, since the container now measures what that rule assumed.
+  `container-type: inline-size` is safe on that flex item because `flex: 1 1 0` with `min-width: 0`
+  already takes the width from the flex algorithm and never from the content.
+  **Every selector in the ladder goes through `.word >`, and that is specificity rather than
+  tidiness.** `header h1 .word > span { display: none }` is one class and three elements, and
+  `header h1 .w-sm` is one class and two, so the hide rule won and every width drew the drop alone —
+  which looks exactly like the bottom rung and errors nowhere. Two classes beat one class and any
+  number of elements. The thresholds are measured font widths (247, 156 and 59px at 22px Roboto,
+  plus 32 for the drop and its gap), so **remeasure them if the font, the size or the words change**
+  — a threshold set too low draws a spelling wider than its rail and the ellipsis hides the overflow.
+  `title-test.html` is the check for both faults.
 - **`.muted` carries a `font-size`, so it beats whatever size its context passes down.**
   `.muted { color: var(--muted); font-size: 12px }` in `css/base.css`. A declaration on the element
   always wins against an inherited value, however specific the parent's selector is. `.accx` sets
@@ -2069,7 +2087,7 @@ foreach($r as $s){$la=(float)$s["latitude"];$ln=(float)$s["longitude"];if(!$la)c
 $b=null;$bd=1e9;foreach($non as $n){$d=$km($la,$ln,$n["lat"],$n["lng"]);if($d<$bd){$bd=$d;$b=$n;}}
 printf("%-5d %-28s %6.0f m  %-30s %s\n",$s["stationId"],$s["stationName"],$bd*1000,$b["name"],$b["district"]);}'
 
-php shots-test.php            # one of three runnable checks. Guards camera retention. Must stay green.
+php shots-test.php            # one of four runnable checks. Guards camera retention. Must stay green.
 php api.php --selftest       # another. Guards the force-refresh rate limit, cache choice, and the
                               # place-lookup validator/rate limit. Must stay green.
 curl -sk "https://flood-exp.test/api.php?shots=1"                          # frame timestamps
@@ -2153,6 +2171,14 @@ echo count(array_filter($p["stations"],fn($s)=>($s["met"]["km"]??0)>$k))," beyon
 "/c/Program Files/Google/Chrome/Application/chrome.exe" --headless=new --disable-gpu \
   --ignore-certificate-errors --virtual-time-budget=15000 --dump-dom \
   https://flood-exp.test/heat-test.html | perl -0777 -ne 'print $1 if /<pre id="out">([^<]*)</s'
+
+# The app bar wordmark ladder, in rendered pixels. Loads the app in an iframe at fifteen widths and
+# asserts one spelling at a time, never wider than its rail, and never a longer spelling on a
+# narrower rail. Both faults here are invisible: an overflowing spelling hides under the ellipsis,
+# and a selector that loses on specificity draws the drop alone, which is a real rung. Reads PASS.
+"/c/Program Files/Google/Chrome/Application/chrome.exe" --headless=new --disable-gpu \
+  --ignore-certificate-errors --virtual-time-budget=40000 --window-size=1800,1000 --dump-dom \
+  https://flood-exp.test/title-test.html | perl -0777 -ne 'print $1 if /<pre id="out">(.*?)<\/pre>/s'
 
 # How far apart the stations stand, in blob radii. **Both heat layers, because FEATHER (0.20) is one
 # module constant and governs both.** It is not a rain setting. Re-run this before moving it, before
@@ -2253,8 +2279,8 @@ done
 There is otherwise no test suite. Changes are verified by linting, syntax-checking the modules,
 querying `.cache.json` for the data shape being relied on, and looking at the page.
 
-`shots-test.php`, `php api.php --selftest` and `heat-test.html` are the three runnable checks here,
-and each guards a different risk.
+`shots-test.php`, `php api.php --selftest`, `heat-test.html` and `title-test.html` are the four
+runnable checks here, and each guards a different risk.
 
 `shots-test.php` is deliberately narrow: retention is the only rule in this repo that can *quietly
 destroy* data. Everything else either works or visibly does not, but a prune that buckets a frame
@@ -2291,3 +2317,12 @@ spacing where a max behaves. A reader found it on screen instead. **`thinHeat()`
 radius and nothing more, so one radius is the best case and never the typical one.** The assertions
 added after it probe at 1.48 and 1.60 radii, which the spacing sweep takes off the station geometry.
 Pick a probe distance from measured data. Otherwise the check reports on a case the map never draws.
+
+`title-test.html` guards the app bar wordmark ladder, which is the same class of problem one layer
+up. The rungs are container queries against measured font widths, and both ways they fail put
+nothing wrong on screen. A threshold set too low draws a spelling wider than its rail, and the
+ellipsis hides the overflow. A selector that loses on specificity draws no spelling at all, which is
+a real rung of the ladder. The second one shipped for one run.
+
+The check loads the app in an iframe at fifteen widths and reads the rungs back. The rail is a
+rendered width, and no query over the source can state it.

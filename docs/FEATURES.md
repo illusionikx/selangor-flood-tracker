@@ -9616,3 +9616,49 @@ forecast about a river, and a river can reach its mark and go on climbing. The t
 
 The counts still count sensors, and each row is a place. A monitoring station with two rivers over
 their marks is two in the head and one row. That is a different question and it is not changed here.
+
+## The wordmark shortens instead of clipping
+
+`KLANG VALLEY FLOOD WATCH` ran out of room and the app bar cut it with an ellipsis. It read
+`Klang Valley Flood W…`, which names no place and no app.
+
+The bar centres a ticker between two rails of equal width, so the title rail is what is left after
+the ticker and the controls. On a 1000px screen that rail is 136px and the title wants 279px.
+
+Four rungs now, and the rail picks one:
+
+| rail | drawn |
+|---|---|
+| 282px and over | Klang Valley Flood Watch |
+| 190 to 281px | KV Flood Watch |
+| 94 to 189px | KVFW |
+| under 94px | the drop alone |
+
+### Why a container query and not a media query
+
+The rail is not the viewport. Two things move it that a viewport width cannot see. The ticker is
+`min(58vw, 656px)`, so it stops growing at 1131px and the rail starts growing faster. Below 600px
+the ticker takes a row of its own and the rail widens again, from 0px at 601px to 272px at 600px.
+
+`header h1` is the container. `container-type: inline-size` is safe on it, because `flex: 1 1 0`
+with `min-width: 0` already takes the width from the flex algorithm and never from the content.
+
+The phone rule that hid the title whole is gone. The container measures what that rule assumed.
+
+### The numbers
+
+Measured at 22px Roboto: the three spellings are 247, 156 and 59px wide. The drop and its gap add
+32. Each threshold is the sum plus about 2px of slack. `title-test.html` holds them.
+
+### Two ways this fails with nothing on screen to say so
+
+A threshold set too low draws a spelling wider than its rail, and the ellipsis hides it.
+
+A selector that loses on specificity draws nothing at all, which looks exactly like the bottom rung.
+This one shipped for one run. `header h1 .word > span { display: none }` is one class and three
+elements. `header h1 .w-sm` is one class and two elements. So it lost, and every width drew the drop
+alone. Every selector in the ladder goes through `.word >` for that reason.
+
+`title-test.html` loads the app in an iframe at fifteen widths. It asserts one spelling at a time,
+never wider than its rail, and never a longer spelling on a narrower rail. It prints PASS or the
+failures. Checked against a wrong threshold, it reports all three faults.
