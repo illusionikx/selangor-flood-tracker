@@ -963,9 +963,15 @@ export function rainBars(points) {
   const { secs, inWin, x, ticks } = timeAxis(points);
   if (!inWin.length) return `<div class="muted">No readings in the last ${SPARK_H} hours</div>`;
 
+  /* A dry station draws its measured zeros. It used to print `No rain in the last 11 h` instead, and
+     a sentence cannot say the two things this graph says. **A measured zero and a gap in the record
+     are different facts**, and the plot already tells them apart: a run of zeros is a line along the
+     floor, and a station we could not reach is a break in that line, because the segment loop below
+     cuts wherever two readings sit more than an hour and a half apart. The sentence collapsed both
+     into one claim about the whole window, and it was the same claim either way.
+     It is also the rule the five totals beside it already obey — see the accumulation chart, where
+     five flat columns keep a measured zero and an unanswered window visibly apart. */
   const hi0 = Math.max(...inWin.map(([, v]) => v));
-  // All zeroes is a real answer, and a row of flat bars states it worse than a sentence does.
-  if (!hi0) return `<div class="muted">No rain in the last ${spanText(secs)}</div>`;
 
   /* JPS's intensity classes, drawn across the plot — moderate at 10 mm/h, heavy at 30, the top class
      at 60. `RAIN_STOPS` holds the same boundaries for the heat gradient, so the graph and the map
@@ -975,7 +981,12 @@ export function rainBars(points) {
      axis is zero-based here, so the span is the peak itself — 4 mm/h of drizzle does not get its
      graph flattened to draw a line at 60. */
   const marks = RAIN_STOPS.map(([v], i) => [v, i + 1]).slice(1).filter(([v]) => v <= hi0 * 2);
-  const hi = Math.max(hi0, ...marks.map(m => m[0]));
+  /* `|| 1` is what lets a dry station draw at all. With every reading at zero there is no peak and
+     no class in range, so both the peak and the mark list are zero, and `y()` below divides by this.
+     Left at zero it returns `NaN` for every point and the polyline never renders. The number itself
+     does not matter — any positive axis puts a zero on the floor — so it is the smallest one that
+     reads as arbitrary rather than as a threshold somebody chose. */
+  const hi = Math.max(hi0, ...marks.map(m => m[0])) || 1;
 
   /* An area, not bars — but cut into segments wherever an hour is missing, so a gap in the record
      still draws as a gap. That was the whole reason bars were used here: an unbroken line across a
@@ -1008,15 +1019,18 @@ export function rainBars(points) {
   /* The rule keeps the true column and the glyph moves off centre at the edges, rather than the
      other way round. Rain peaking right now is the ordinary case, not an edge case — the newest
      sample is the last column — and a centred glyph there hangs half its width outside the plate. */
+  // No mark on a dry station. `Peak 0 mm in an hour` names a peak that did not happen, and an amber
+  // mark on a graph with nothing to point at is the cry-wolf failure in miniature.
   const px = +x(pk[0]);
-  const peak = `<b class="peak${px > 94 ? ' er' : px < 6 ? ' el' : ''}" style="left:${px}%"
+  const peak = !hi0 ? '' : `<b class="peak${px > 94 ? ' er' : px < 6 ? ' el' : ''}" style="left:${px}%"
       data-tip="Peak ${pk[1]} mm in an hour · ${MYT_CLOCK.format(pk[0] * 1000)}"
     ><i class="i i-keyboard_double_arrow_up"></i></b>`;
 
   /* The heading carries the span the old caption ended with. It states the ground the graph covers,
      which is what the reader needs before reading a shape off it — and it is a measurement, not the
-     `SPARK_H` cap, so a station watched for two hours says two hours. The three early returns above
-     name their own window in their own sentence and take no heading. */
+     `SPARK_H` cap, so a station watched for two hours says two hours. The two early returns above
+     name their own window in their own sentence and take no heading. Both are the case where there
+     is nothing at all to plot, which is the one thing a graph cannot state for itself. */
   return SUB(`Last ${spanText(secs)}`) + `<div class="spark"${
       readout(inWin, x, v => `${v} mm/h`, 'rainfall')}>
     <svg viewBox="0 0 100 28" preserveAspectRatio="none" aria-hidden="true">

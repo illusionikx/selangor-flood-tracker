@@ -423,6 +423,14 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   sentence: any sentence has to name a window, and "No rain in the last 72 hours" on a station whose
   72-hour total is unknown is the exact claim this refuses to make. Five columns keep a measured
   zero and an unanswered window apart. See `docs/superpowers/specs/2026-08-12-cumulative-rainfall-chart-design.md`.
+  **`rainBars()` above it now obeys the same rule and for the same reason.** It printed `No rain in
+  the last 11 h` on an all-zero history and draws the zeros instead. A sentence about a window can
+  only make one claim about the whole of it, and this graph holds two facts that have to stay apart:
+  a run of measured zeros is a line along the floor, and a station we could not reach is a break in
+  that line. Its `hi` therefore ends `|| 1` — with no peak and no class in range the axis is zero,
+  and `y()` divides by it, so every point came out `NaN` and nothing rendered. Any positive number
+  puts a zero on the floor. The two remaining sentences are the case where there is nothing at all to
+  plot, which is the one thing a graph cannot state for itself.
 - **A tide is a rise, and three of these stations are tidal.** PINTU AIR IJOK is a water gate;
   BANDAR KLANG and TELUK PENYAMUN (JETI) are estuarine. They climb 0.5–0.7 m/h twice a day forever,
   so any rate-based forecast flags them daily. The guard is `level ≥ its own 24h high`, not a

@@ -8865,3 +8865,33 @@ it in `--k-rainfall`, then `--k-rain-heavy`, then `--s-danger`.
 
 Measured on the rendered card, the three class lines are violet, mauve and red. No class line
 shares that hue, so the mark cannot read as one of them. That is the confusion this had to avoid.
+
+### A dry rain graph draws its zeros
+
+`rainBars()` printed `No rain in the last 11 h` whenever every reading in the window was zero. It
+draws the readings now.
+
+A sentence about a window makes one claim about the whole of it. This graph holds two facts that
+have to stay apart. **A run of measured zeros is a line along the floor. A break in that line is a
+station nobody reached.** The segment loop already cuts wherever two readings sit more than an hour and a
+half apart, so the plot told the two apart all along and the sentence collapsed them.
+
+The five totals beside it already worked this way. A dry station draws five flat columns rather
+than a sentence, for the same reason and in the same words.
+
+Three histories from the live payload check it. An all-zero station draws one segment flat at the
+floor, with no class lines and no peak mark. The same station with four hours cut out of it draws two
+segments. A raining station draws what it drew before.
+
+**`hi` ends `|| 1`, and that is what lets a dry station draw at all.** With every reading at zero
+there is no peak and no intensity class in range, so the axis maximum is zero — and `y()` divides by
+it. Every point came out `NaN` and the polyline rendered nothing.
+
+Any positive number puts a zero on the floor. So 1 is the smallest one that reads as arbitrary rather
+than as a threshold somebody chose.
+
+A dry station gets no peak mark. `Peak 0 mm in an hour` names a peak that did not happen, and an
+amber mark over nothing is the cry-wolf failure in miniature.
+
+Two sentences remain. Both cover the case with nothing at all to plot: no history yet, and no
+reading inside the window. A graph cannot state either of those for itself.
