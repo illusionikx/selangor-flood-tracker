@@ -1017,27 +1017,6 @@ function accWindow(array $odo, int $now, int $win, bool $partial = false): ?arra
     return [round($last[1] - $base[1], 1), round(($last[0] - $base[0]) / 3600, 1), $short];
 }
 
-/* Rain over the last N whole clock hours, added from one reading per hour.
- *
- * The fallback for a feed that publishes no 3 hour total of its own. `hourlyRainfall` is a ROLLING
- * hour, so one reading per clock hour is the most that can be added without counting the same rain
- * twice. That is the same rule RAIN_BUCKET states for the graph.
- *
- * Null unless every hour in the window carries a reading. A short sum is indistinguishable from
- * light rain, and this app must never report a dry hour it did not see.
- */
-function accHours(array $points, int $now, int $hours): ?float {
-    $bucket = [];
-    foreach ($points as [$ts, $v]) $bucket[intdiv($ts, 3600)] = $v;  // ascending, so the newest wins
-    $top = intdiv($now, 3600);
-    $sum = 0.0;
-    for ($i = 0; $i < $hours; $i++) {
-        if (!isset($bucket[$top - $i])) return null;
-        $sum += $bucket[$top - $i];
-    }
-    return round($sum, 1);
-}
-
 /**
  * Is a rain gauge's hourly total backed by the odometer on the same station?
  *
@@ -1374,6 +1353,25 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
     $ok('a missing previous total restarts', portalOdo(null, 7.5, 3.0, null) === 3.0);
     $ok('a missing previous daily restarts', portalOdo(100.0, null, 3.0, null) === 3.0);
 
+    /* The cycle this task builds: a series of daily readings becomes a running total, and
+       accWindow() reads an exact window off it. Two days of polls across one midnight. */
+    $day = [[$now - 30 * 3600, 2.0, null], [$now - 26 * 3600, 6.0, null],
+            [$now - 20 * 3600, 1.0, 9.0],  [$now - 2 * 3600, 4.5, 9.0]];
+    $odoSeries = [];
+    $run = $wasDaily = null;
+    foreach ($day as [$ts, $d, $yest]) {
+        $run = portalOdo($run, $wasDaily, $d, $yest);
+        $wasDaily = $d;
+        $odoSeries[] = [$ts, $run];
+    }
+    /* 2.0 at the first sample, +4.0 to 6.0, then a reset owing 3.0 and adding 1.0, then +3.5.
+       Total 13.5 mm, and the 24 hour window covers the last three of those samples. */
+    $ok('the running total only climbs',
+        $odoSeries[3][1] >= $odoSeries[2][1] && $odoSeries[2][1] >= $odoSeries[1][1]);
+    $ok('a midnight loses no rain',          $odoSeries[3][1] === 13.5);
+    $ok('the 24h window reads it exactly',
+        accWindow($odoSeries, $now, 24 * 3600, true) === [7.5, 24.0, false]);
+
     echo "\naccWindow():\n";
     $odo = [[$now - 80 * 3600, 1000.0], [$now - 72 * 3600, 1010.0],
             [$now - 24 * 3600, 1050.0], [$now, 1080.0]];
@@ -1432,20 +1430,6 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
         accWindow($reach27, $now, 24 * 3600, true) === [6.5, 27.0, false]);
     $ok('and falls short on the 72h window',
         accWindow($reach27, $now, 72 * 3600, true) === [6.5, 27.0, true]);
-
-    echo "\naccHours():\n";
-    $h3 = [[$now - 2 * 3600, 4.0], [$now - 3600, 6.0], [$now, 2.0]];
-    $ok('three whole hours add up',         accHours($h3, $now, 3) === 12.0);
-    /* The reason KL's 3 hour bar can go blank. Two hours of rain plus one hour of silence is not a
-       3 hour total, and reporting it as one would call a gap dry. */
-    $ok('a missing hour gives null',
-        accHours([[$now - 2 * 3600, 4.0], [$now, 2.0]], $now, 3) === null);
-    $ok('an empty history gives null',      accHours([], $now, 3) === null);
-    $ok('the newest reading in an hour wins',
-        accHours([[$now - 2 * 3600, 4.0], [$now - 3600, 6.0], [$now - 3000, 9.0], [$now, 2.0]],
-                 $now, 3) === 15.0);
-    $ok('three dry hours are zero, not null',
-        accHours([[$now - 2 * 3600, 0.0], [$now - 3600, 0.0], [$now, 0.0]], $now, 3) === 0.0);
 
     echo "\nrainBacked():\n";
     // The odometer climbed 4.5 mm across the hour the gauge is claiming. The reading stands.
@@ -2412,7 +2396,7 @@ foreach ($db->query('SELECT station, ts, level FROM level WHERE ts >= ' . ($now 
    The `#c` suffix keeps them in the one table with no schema change, and RETAIN prunes them with
    everything else. No station id ends in `#c`, so these rows can never be read as a level. */
 $odo = [];
-foreach ($db->query('SELECT station, ts, level FROM level WHERE station LIKE \'%#c\' AND ts >= '
+foreach ($db->query('SELECT station, ts, level FROM level WHERE (station LIKE \'%#c\' OR station LIKE \'%#d\') AND ts >= '
                     . ($now - ACC_READ) . ' ORDER BY ts') as $r) {
     $odo[$r['station']][] = [(int)$r['ts'], (float)$r['level']];
 }
@@ -2652,36 +2636,53 @@ foreach ($stations as &$s) {
     $acc['h1'] = [round((float)$s['hourly'], 1), 0, null];
     if (($s['daily'] ?? null) !== null) $acc['day'] = [round((float)$s['daily'], 1), 0, null];
 
-    // Selangor publishes a 3 hour total. KL publishes none, so those 37 stations add clock hours,
-    // and go blank rather than report a sum with an hour missing out of it.
+    /* The 3 hour window. Selangor publishes its own total, and it is read straight off the feed.
+       Everything else measures it from the running total, which is exact.
+       accHours() is gone. It added one rolling hour per clock hour, which only tiles where the
+       readings sit exactly an hour apart. They sit a median 46 minutes apart, so every boundary
+       counted about 14 minutes of rain twice — zero error on a dry station and up to 60 mm during
+       heavy rain, which is the worst shape an error can take here. */
     if (($s['hour3'] ?? null) !== null) {
         $acc['h3'] = [round((float)$s['hour3'], 1), 0, null];
-    } elseif (($sum = accHours($pts, $now, 3)) !== null) {
-        $acc['h3'] = [$sum, 1, null];
     }
 
-    /* 24 and 72 hours need the odometer, which only Selangor publishes. The 38 KL gauges answer
-       neither window and never will, so their two columns carry an em dash and the readout on it
-       says why. Do not close that gap by adding up `hourly` buckets — see accWindow() above.
+    /* The running total. A portal station builds one from the midnight column — see portalOdo().
+       A Selangor station that took no portal reading keeps using the year-to-date odometer the
+       detail endpoint publishes. Both are numbers that only climb, so accWindow() reads either. */
+    $run = null;
+    if (($s['source'] ?? '') === 'portal' && ($s['daily'] ?? null) !== null) {
+        // end() takes its argument by reference, so both series go into a variable first. Passing
+        // an expression there is a PHP notice and a value this code would then read as null.
+        $cSeries = $odo[$key . '#c'] ?? [];
+        $dSeries = $odo[$key . '#d'] ?? [];
+        $prev    = $cSeries ? end($cSeries) : null;
+        $prevD   = $dSeries ? end($dSeries) : null;
+        $run     = portalOdo(
+            $prev[1]  ?? null,
+            $prevD[1] ?? null,
+            (float)$s['daily'],
+            // Oldest first, so yesterday is the last of the six.
+            ($s['pdays'] ?? []) ? end($s['pdays']) : null,
+        );
+        // The daily reading itself, so the next poll knows what it already counted. Its own suffix,
+        // for the same reason `#c` has one: no station id ends in `#d`.
+        if ($run !== null) $samples[$key . '#d'] = [$ts, (float)$s['daily']];
+    } elseif (($s['cumulative'] ?? null) !== null) {
+        $run = (float)$s['cumulative'];
+    }
 
-       Both windows may answer over a shorter span than they name, and then both say so. */
-    if (($s['cumulative'] ?? null) !== null) {
-        $series = array_merge($odo[$key . '#c'] ?? [], [[$ts, (float)$s['cumulative']]]);
-        foreach (['h24' => 86400, 'h72' => 259200] as $k => $win) {
+    if ($run !== null) {
+        $series = array_merge($odo[$key . '#c'] ?? [], [[$ts, $run]]);
+        foreach (['h3' => 10800, 'h24' => 86400, 'h72' => 259200] as $k => $win) {
+            if ($acc[$k] !== null) continue;          // the feed already answered this window
             if (($w = accWindow($series, $now, $win, true)) !== null)
                 $acc[$k] = [$w[0], $w[2] ? 2 : 1, $w[1]];
         }
-        /* Nothing filters the pair. Both windows anchor to the oldest sample there is, so a young
-           archive answers both with one number over one span, each marked short. See accWindow()
-           above for the version that dropped the longer one and why it is gone. */
-        $s['backed'] = rainBacked($s['hourly'] ?? null, $series, $now);
-        /* The oldest odometer sample this station has, which is the baseline of any short answer.
-           The card reads only whether this key is HERE: a gauge that publishes no running total has
-           none, and that is the one thing separating a permanent dash from a waiting one. The card
-           deliberately prints no clock time, so the value itself is for whoever opens the raw
-           payload. Do not delete it on the strength of that — the presence test needs the key. */
+        /* Nothing filters the pair. Both long windows anchor to the oldest sample there is, so a
+           young archive answers both with one number over one span, each marked short. */
+        $s['backed']  = rainBacked($s['hourly'] ?? null, $series, $now);
         $s['accFrom'] = $series[0][0];
-        $samples[$key . '#c'] = [$ts, (float)$s['cumulative']];
+        $samples[$key . '#c'] = [$ts, $run];
     }
 
     $s['acc'] = $acc;

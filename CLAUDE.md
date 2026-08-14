@@ -230,11 +230,13 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
 - **Rain totals over five nested windows** ride on every rainfall station as `acc`, keyed
   `h1` / `h3` / `day` / `h24` / `h72`. Each is `[mm, derived, spanHours]` or `null` where nothing can
   answer. `derived` is 1 where this app worked the number out, and the card prints an asterisk on
-  it. 1 hour, 3 hours and today come off the feed. 24 and 72 hours go through `accWindow()`, which
-  subtracts two `cumulativeRainfall` samples. Those live in the `level` table under a `#c` suffix,
-  so there is no schema change and `RETAIN` prunes them with the rest.
-  `ACC_READ` (80 h) is their own load window, because `READ` is 24 h and too short. KL publishes no 3-hour total, so those 37 stations use
-  `accHours()`, which refuses to answer unless every clock hour in the window has a reading.
+  it. 1 hour and today come off the feed, and so does 3 hours where Selangor publishes its own
+  total. Every other window goes through `accWindow()`, which subtracts two samples off a running
+  total: `portalOdo()`'s total for a station the national portal carries, or the year-to-date
+  `cumulativeRainfall` odometer for a Selangor station the portal does not. Those totals live in the
+  `level` table under `#c` and `#d` suffixes, so there is no schema change and `RETAIN` prunes them
+  with the rest.
+  `ACC_READ` (80 h) is their own load window, because `READ` is 24 h and too short.
 - Response also carries real diagnostics used by the status popover: `tookMs`, `details.ok/requested`,
   `offline`, `cacheAge`, `sourceUpdated`.
 - **`?place=<query>` — the go-to box's place search.** Proxies OpenStreetMap Nominatim server-side, so
@@ -416,16 +418,23 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   the payload measures that wider window, so the card states `measured over 26.1 h` rather than
   claiming 24. Three things return `null` rather than a number: an empty series, a backwards odometer
   (the 1 January reset), and both ends on one sample.
-  `accHours()` is the KL fallback and obeys the same rule from the other side — all three clock
-  hours or nothing, because a short sum reads as light rain.
-  **The 38 KL stations answer neither long window, and they never will.** SPHTN publishes no
-  `cumulativeRainfall`, so there is no odometer to subtract. Do not close that gap with `accHours()`
-  at 24 hours. That is the sum this rule forbids. Two `—` columns on a KL gauge are the right
-  answer, and the readout on the dash says so: `Not measured. This gauge reports no running total.`
-  **That is the only empty long window a reader ever meets.** Measured 2026-08-14: of the 184 gauges
-  that draw this chart, 37 carry that dash and none carries any other kind. There is no second,
-  temporary reason and this file described one for a while. A gauge waiting for the archive to reach
-  back stopped existing when a short window started answering — two odometer samples are enough.
+  **The national portal supplies a per-day running total, and `accHours()` is gone.** A station the
+  portal carries builds the total from its midnight column — see `portalOdo()` — and answers both
+  long windows the same way a Selangor station with its own year-to-date odometer always did.
+  `accHours()` added one rolling hour per clock hour. `hourlyRainfall` is a rolling 60 minute total,
+  and the readings sit a median 46 minutes apart, so every hour boundary counted about 14 minutes of
+  rain twice. Scored against the 3 hour total Selangor publishes for itself, 14 of 176 stations were
+  out by more than 5 mm, the worst by 60 mm. The error was zero on a dry station and large during
+  heavy rain, the worst shape an error can take here.
+  **The permanent dash now marks the stations the portal does not carry**, not a fixed block of 38
+  KL gauges. Two `—` columns on such a station are still the right answer, and the readout on the
+  dash still says why: `Not measured. This gauge keeps no running total.` Measured 2026-08-15: of
+  204 gauges that draw this chart, 3 carry that dash, all Kuala Lumpur stations the portal search
+  never matched. **That is still the only empty long window a reader ever meets.**
+  **The `#d` series holds the previous daily reading.** It carries its own suffix for the same
+  reason `#c` has one: no station id ends in `#d`. `portalOdo()` needs both the last running total
+  and the last daily reading to bridge a midnight, so the next poll stores `#d` to know what it
+  already counted.
 - **A window can also cover LESS ground than it names, and then it says so.** `accWindow()`
   takes `$partial`. With no sample at or before the far end it measures from the oldest sample there
   is and returns `short`. `derived` is a ladder of three rungs rather than a flag — 0 off the feed,
