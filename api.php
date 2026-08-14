@@ -1068,6 +1068,72 @@ function rainBacked(?float $hourly, array $odo, int $now): ?bool {
     return $w === null ? null : $w[0] > 0;
 }
 
+/* A station name reduced for comparison. Comparison only — never stored, never rendered.
+   The two feeds spell one place several ways: `Kg. Melayu Ampang`, `KG MELAYU AMPANG`,
+   `Kg.Melayu  Ampang`. Case, punctuation and spacing carry no information here, so they go. */
+function portalKey(string $name): string {
+    return strtolower(preg_replace('/[^a-z0-9]/i', '', $name));
+}
+
+/* Which portal row belongs to which station this app already holds.
+ *
+ * Three rules, strongest first, and nothing weaker is accepted:
+ *
+ *   1. the national station code, which 145 of 231 rainfall stations carry on both sides
+ *   2. an equal name under portalKey()
+ *   3. a UNIQUE suffix — the rainfall table drops the river prefix the portal's own gazetteer
+ *      carries, so `Desa Pinggiran Putra (F2)` is the tail of `Sg.Langat di Desa Pinggiran Putra
+ *      (F2)`. Exactly one candidate may end with it. A suffix that fits two identifies neither.
+ *
+ * A NEAR NAME IS NOT EVIDENCE. 17 rainfall stations have a close name and no equal one, and they
+ * keep the source they have. This is the rule CAM_FIX states from the other side: a value this app
+ * invents is worse than one it can show belongs to upstream.
+ *
+ * TWO ROWS CAN CLAIM ONE STATION. Measured, 262 rows match 252 distinct stations, because 10 rows
+ * collide — one wins on the code and another on the name. The code wins, and the loser goes in
+ * `clash` rather than disappearing. A silent pick here is a reading swapped for another station's
+ * reading, on a station somebody watches, with nothing to say it happened.
+ *
+ * Returns:
+ *   hit    stationId => row index, the winner for each station
+ *   used   row index => true, every row that found a home
+ *   clash  [stationId, winning row, losing row], one entry per collision
+ */
+function portalMatch(array $rows, array $stations, string $kind): array {
+    $mine = array_values(array_filter($stations, fn($s) => $s['kind'] === $kind));
+
+    $byCode = $byName = [];
+    foreach ($rows as $i => $r) {
+        if (($r['code'] ?? null) !== null && $r['code'] !== '') $byCode[$r['code']][] = $i;
+        $byName[portalKey($r['name'] ?? '')][] = $i;
+    }
+
+    $hit = $used = $clash = [];
+    foreach ($mine as $s) {
+        $key  = portalKey($s['name'] ?? '');
+        $code = ($s['code'] ?? null) !== null && $s['code'] !== '' ? ($byCode[$s['code']][0] ?? null) : null;
+        $name = null;
+        if ($key !== '' && count($byName[$key] ?? []) === 1) {
+            $name = $byName[$key][0];
+        } else {
+            // The suffix rule. Exactly one row's name may end with ours, or nothing joins.
+            $ends = [];
+            foreach ($rows as $i => $r) {
+                $rk = portalKey($r['name'] ?? '');
+                if ($key !== '' && $rk !== $key && str_ends_with($rk, $key)) $ends[] = $i;
+            }
+            if (count($ends) === 1) $name = $ends[0];
+        }
+
+        $win = $code ?? $name;
+        if ($win === null) continue;
+        if ($code !== null && $name !== null && $code !== $name) $clash[] = [$s['id'], $code, $name];
+        $hit[$s['id']]  = $win;
+        $used[$win]     = true;
+    }
+    return ['hit' => $hit, 'used' => $used, 'clash' => $clash];
+}
+
 /* `php api.php --selftest` — the guards above, checked offline. Here rather than in a second test
    file: the rules are arithmetic on a few integers, and a separate test would need a third file to
    hold them. CLI only, and it exits before the first header. */
@@ -1288,6 +1354,57 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
        carries the total. A longer window would call this live rain faulty. */
     $burst = [[$now - 2 * 3600, 680.5], [$now - 2400, 685.0], [$now - 600, 685.0], [$now, 685.0]];
     $ok('a burst that has stopped is still backed', rainBacked(4.5, $burst, $now) === true);
+
+    echo "\nportalKey():\n";
+    $ok('case and punctuation go',    portalKey('S.M.K Bandar Kinrara (F2)') === 'smkbandarkinraraf2');
+    $ok('spacing goes',               portalKey('  Kg.  Melayu   Ampang ') === 'kgmelayuampang');
+    $ok('two spellings meet',         portalKey('Sg. Klang') === portalKey('SG KLANG'));
+
+    echo "\nportalMatch():\n";
+    $stations = [
+        ['id' => 'rf-1', 'kind' => 'rainfall', 'code' => '0232331RF', 'name' => 'Bandar Kinrara'],
+        ['id' => 'rf-2', 'kind' => 'rainfall', 'code' => null,        'name' => 'Kg Melayu Ampang'],
+        ['id' => 'rf-3', 'kind' => 'rainfall', 'code' => null,        'name' => 'Desa Pinggiran Putra (F2)'],
+        ['id' => 'rf-4', 'kind' => 'rainfall', 'code' => null,        'name' => 'Taman Sri Muda'],
+        ['id' => 'wl-9', 'kind' => 'river',    'code' => '0232331RF', 'name' => 'Bandar Kinrara'],
+    ];
+    $rows = [
+        0 => ['code' => '0232331RF', 'name' => 'Anything At All'],
+        1 => ['code' => null,        'name' => 'KG. MELAYU AMPANG'],
+        2 => ['code' => null,        'name' => 'Sg.Langat di Desa Pinggiran Putra (F2)'],
+        3 => ['code' => null,        'name' => 'Taman Sri Mudah'],
+    ];
+    $m = portalMatch($rows, $stations, 'rainfall');
+    $ok('a code beats a name',            $m['hit']['rf-1'] === 0);
+    $ok('an equal name joins',            $m['hit']['rf-2'] === 1);
+    $ok('a unique suffix joins',          $m['hit']['rf-3'] === 2);
+    $ok('a near name never joins',        !isset($m['hit']['rf-4']));
+    $ok('a river is not matched here',    !isset($m['hit']['wl-9']));
+    $ok('used names every joined row',    $m['used'] === [0 => true, 1 => true, 2 => true]);
+    $ok('nothing clashes here',           $m['clash'] === []);
+
+    /* The collision the accounting found: 262 rows match 252 stations, so 10 rows claim a station
+       another row already took. The code match wins and the loser is logged. */
+    $clashRows = [
+        0 => ['code' => '0232331RF', 'name' => 'Somewhere Else'],
+        1 => ['code' => null,        'name' => 'Bandar Kinrara'],
+    ];
+    $c = portalMatch($clashRows, $stations, 'rainfall');
+    $ok('the code row wins a collision',  $c['hit']['rf-1'] === 0);
+    $ok('the name row is not used',       !isset($c['used'][1]));
+    $ok('the collision is logged',        $c['clash'] === [['rf-1', 0, 1]]);
+
+    /* Two gazetteer-style names both ending in one suffix. Neither may join: a suffix that fits two
+       candidates identifies nothing, and picking either invents a fact. */
+    $twoWay = [
+        ['id' => 'rf-5', 'kind' => 'rainfall', 'code' => null, 'name' => 'Kuala Lumpur'],
+    ];
+    $ambiguous = [
+        0 => ['code' => null, 'name' => 'Sg. Klang di Kuala Lumpur'],
+        1 => ['code' => null, 'name' => 'Sg. Gombak di Kuala Lumpur'],
+    ];
+    $a = portalMatch($ambiguous, $twoWay, 'rainfall');
+    $ok('an ambiguous suffix joins nothing', $a['hit'] === []);
 
     echo "\nserveFromCache():\n";
     $ok('a fresh cache is served',                 serveFromCache(10, true, false) === true);
