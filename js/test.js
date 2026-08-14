@@ -102,6 +102,12 @@ function soak(s, mm) {
   s.status = rainCode(mm);
   s.history = rainRamp(mm);
   s.acc = stormAcc(s, mm);
+  /* Faked rain is rain the odometer saw. Without this the fake inherits whatever `rainBacked()`
+     said about the real reading, so the four gauges measured stuck on 2026-08-14 would draw a storm
+     cell that the card calls a faulty signal, with no pin colour and no heat blob under it. A fake
+     that moves one field has to move every field read beside it, which is why this function exists
+     at all — see `raining()` in util.js for what reads this one. */
+  s.backed = true;
 }
 
 /* The five nested totals that hour would have left behind, so the accumulation chart agrees with

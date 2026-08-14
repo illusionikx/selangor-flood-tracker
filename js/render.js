@@ -108,7 +108,11 @@ export function render() {
     // Rainfall drives its own layer, on its own scale — see heat.js for why the two aren't summed.
     // The floor here is simply "is it raining": a class the reader is told about starts above 0 mm,
     // and a dry gauge painting the palest violet would make the whole state look wet.
-    if (s.kind === 'rainfall' && hasInfo(s) && s.hourly > 0)
+    /* `backed === false` is a gauge whose own running total denies the reading, so it cannot paint.
+       See `rainBacked()` in api.php and `raining()` in util.js. Measured 2026-08-14, one gauge had
+       held 4.5 mm for twelve hours against an odometer that never moved, and it had been painting a
+       violet blob for every one of them. */
+    if (s.kind === 'rainfall' && hasInfo(s) && s.backed !== false && s.hourly > 0)
       rainPoints.push([s.lat, s.lng, scalePos(s.hourly, RAIN_STOPS) / 100]);
 
     if (!pinned && !shown(s.kind)) continue;

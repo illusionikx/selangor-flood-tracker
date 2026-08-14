@@ -745,6 +745,26 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   siren's frames. It must never fall back to the live `backed` flag: a picture from last week is
   judged by last week's water, the same rule `camWarn()` obeys. Flood gauges are **not** backing
   evidence — measured, they hold no samples across any alarm window on record.
+- **A rain gauge's hourly reading is a claim too, and its own odometer is the check.**
+  `hourlyRainfall` is a *rolling* one-hour total and `cumulativeRainfall` only climbs, so rain the
+  first claims has to appear in the second across that hour. `rainBacked()` in `api.php` asks it and
+  publishes `backed`: true where the odometer rose, false where it did not move while the gauge
+  still claimed rain, **null where nothing can be asked** — a young archive, or a station with no
+  odometer, which is every KL gauge. `raining()` in `util.js` reads `backed !== false`, exactly as
+  `sounding()` does, and a gauge nobody can check keeps its reading. Measured 2026-08-14: 5 of the
+  48 gauges that could be asked were claiming rain their own total denied, and T.K.P.M SG. KELAMBU
+  had held 4.5 mm for **twelve hours** against an odometer that never moved and a daily total of 0.
+  **The window is the hour the reading names, and a longer one is wrong.** A real burst leaves the
+  odometer flat straight afterwards while the rolling hour still carries the total, so any window
+  wider than the claim calls live rain faulty. `accWindow()` does the reading, so a sparse archive
+  widens the window instead of failing, and a wider window can only add rain — it can only move the
+  answer toward true, which is the safe way to be wrong. Three surfaces read the flag: the pin
+  colour through `color()`, `atDanger()` at the top class, and the rain heat layer, where an
+  unbacked gauge **neither paints nor erases** — a reading nobody can stand behind is no evidence
+  that the ground under it is dry either. The card keeps printing what JPS publishes and adds
+  `Faulty signal.`, the same shape the siren block above uses. **`soak()` in `test.js` sets
+  `backed: true`**, or a faked storm on one of those gauges draws as a faulty signal with no pin and
+  no blob. Do not widen this to a duration cutoff, and do not let it silence a gauge it cannot ask.
 - **Nothing outranks a popover except another popover.** The table draws its graphs inside `.tipbox`,
   which is a `popover` and therefore in the **top layer** — above every `z-index` on the page, because
   the top layer is not part of the stacking context at all. So `js/sparktip.js`'s readout is itself a
@@ -1548,6 +1568,30 @@ php shots-test.php            # one of two runnable checks. Guards camera retent
 php api.php --selftest       # the other. Guards the force-refresh rate limit, cache choice, and the
                               # place-lookup validator/rate limit. Must stay green.
 curl -sk "https://flood-exp.test/api.php?shots=1"                          # frame timestamps
+
+# Which rain gauges are claiming rain their own odometer denies. The siren sweep below is the same
+# question on the other sensor. Read the three counts together: `null` is the archive being unable
+# to answer, not a pass, and it covers every KL gauge because only Selangor publishes an odometer.
+# A `false` count climbing past a handful means either JPS broke a batch of gauges or the odometer
+# stopped arriving — check `sources.stale` before believing the first one.
+curl -sk https://flood-exp.test/api.php | php -r '$p=json_decode(stream_get_contents(STDIN),true);
+$r=array_filter($p["stations"],fn($s)=>$s["kind"]==="rainfall");$c=["true"=>0,"false"=>0,"null"=>0];
+foreach($r as $s){$b=$s["backed"]??null;$c[$b===true?"true":($b===false?"false":"null")]++;}
+echo count($r)," rainfall: ",json_encode($c),"\n";
+foreach($r as $s) if(($s["backed"]??null)===false)
+  printf("  %-9s %-26s hourly=%-5s status=%s daily=%s\n",$s["id"],substr($s["name"],0,26),
+         $s["hourly"],$s["status"],json_encode($s["daily"]??null));'
+
+# Which archived frames still carry an alert span, and which sensor raised each one. The siren rule
+# lives in a closure inside the request handler and cannot be reached by --selftest, so this sweep is
+# its check: a siren id appearing here must have had a river at its Amaran mark at that time. Both
+# stuck relays (siren-50, siren-1081) coloured 14 frames before the rule and none after it.
+for d in shots/*/; do id=$(basename "$d"); curl -sk "https://flood-exp.test/api.php?shots=$id"; done \
+  | php -r 'while($l=fgets(STDIN)) foreach(json_decode($l,true)?:[] as $f) if($f[1]!==null) echo "$f[2] $f[1]\n";' \
+  | sort | uniq -c
+curl -sk -o /dev/null -w '%{http_code} %{content_type}\n' \
+     "https://flood-exp.test/api.php?shot=1&t=$(curl -sk 'https://flood-exp.test/api.php?shots=1' \
+     | php -r 'echo json_decode(stream_get_contents(STDIN))[0];')"          # 200 image/webp
 
 # Which archived frames still carry an alert span, and which sensor raised each one. The siren rule
 # lives in a closure inside the request handler and cannot be reached by --selftest, so this sweep is

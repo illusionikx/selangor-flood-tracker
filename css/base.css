@@ -592,15 +592,14 @@ dialog:focus, dialog:focus-visible { outline: none; }
   position: absolute; top: 0; left: 0; right: 0; text-align: center;
   font-size: 10px; font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap;
 }
-.acccol small, .acccol sup { color: var(--muted); font-weight: 400; }
+.acccol small { color: var(--muted); font-weight: 400; }
 /* `position` lifts the asterisk, and `vertical-align: super` does not, which is what a bare `sup`
-   uses. A raised inline box grows the line box it sits in, so the value measured 17.3px
-   against a 16px strip and the tallest bar started 1.3px inside its own number. That case is the
-   normal one rather than an edge: 24 h and 72 h are both derived, and nested windows make the
-   longest of them the tallest column. `line-height: 0` takes the mark out of the measurement, and
-   `top` puts it back where it looks right. */
-.acccol sup { font-size: 8px; vertical-align: baseline; position: relative; top: -4px;
-              line-height: 0; }
+   uses. A raised inline box grows the line box it sits in. The mark rode the value first, and there
+   it measured 17.3px against a 16px strip, so the tallest bar started 1.3px inside its own number.
+   It marks the axis label now and the strip is clear, but the rule stays and covers both places:
+   the label row has no fixed height, so a growing line box there shifts the row instead. */
+.acc sup { color: var(--muted); font-weight: 400; font-size: 8px; vertical-align: baseline;
+           position: relative; top: -4px; line-height: 0; }
 /* Rainfall violet, the kind colour. Never a status hue: a column says how much, not how bad.
    A see-through fill under an opaque outline, which is the shape `sparkline()` and `rainBars()`
    already draw: `areaFill()` in js/popup.js runs 0.6 alpha at the foot of the area to 0.1 at its

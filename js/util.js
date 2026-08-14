@@ -136,7 +136,9 @@ export const hasInfo = s => s.online && ({
 export function color(s) {
   if (!hasInfo(s)) return NO_INFO;
   if (s.kind === 'river')    return RIVER_COLOR[s.status] || KINDS.river.color;
-  if (s.kind === 'rainfall') return RAIN_COLOR[s.status]  || KINDS.rainfall.color;
+  // A gauge whose own total denies its reading is painted as a gauge reporting nothing, the way a
+  // siren that is not sounding drops back to its kind colour on the line below.
+  if (s.kind === 'rainfall') return RAIN_COLOR[raining(s) ? s.status : 0] || KINDS.rainfall.color;
   if (s.kind === 'siren')    return s.status > 0 ? statusColor(3) : KINDS.siren.color;   // red only when sounding
   // Taupe only while the ground is dry. Any depth at all is a status, and wears a status colour.
   if (s.kind === 'gauge')    return gaugeTone(s) ? gaugeColor(s) : KINDS.gauge.color;
@@ -164,6 +166,17 @@ export function color(s) {
    refuses to list is the map contradicting the panel, and one of them is wrong on screen. */
 export const sounding = s => s.kind === 'siren' && s.status > 0 && s.backed !== false;
 
+/* Is this gauge actually catching rain? The same question as `sounding()` and the same answer, on a
+   different sensor. `hourlyRainfall` is a rolling one hour total and `cumulativeRainfall` only
+   climbs, so rain the first claims has to show in the second — and `rainBacked()` in api.php asks
+   exactly that, over the one hour the reading names. The client reads the flag and never re-derives
+   it, the same rule `rising` and a siren's `backed` obey.
+   `!== false` again: `null` is "the archive cannot reach back an hour", which covers every KL gauge,
+   since only Selangor publishes an odometer. A gauge nobody can check keeps its reading.
+   Measured 2026-08-14, 4 of the 25 live gauges with enough archive to ask were claiming rain their
+   own total denied. One had held 4.5 mm for twelve hours against an odometer that never moved. */
+export const raining = s => s.kind === 'rainfall' && s.hourly > 0 && s.backed !== false;
+
 // Is this station the reason someone opens the map at all: a river at danger, or a siren sounding.
 export const isCritical = s => (s.kind === 'river' && s.status >= 3) || sounding(s);
 
@@ -179,7 +192,9 @@ export const atDanger = s => hasInfo(s) && ({
   river:    s.status >= 3,
   siren:    sounding(s),
   gauge:    gaugeTone(s) === 3,
-  rainfall: s.status >= 4,
+  // `raining()` and not `status` alone, for the reason the siren line above it carries: the top
+  // class paints a pin red and puts a warning on a camera, and a stuck field must not do either.
+  rainfall: raining(s) && s.status >= 4,
 }[s.kind] ?? false);
 
 /* What the "On alert" panel lists — critical, plus rivers forecast to reach danger within RISE_ETA.

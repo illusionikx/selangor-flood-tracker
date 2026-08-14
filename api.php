@@ -1000,6 +1000,36 @@ function accHours(array $points, int $now, int $hours): ?float {
     return round($sum, 1);
 }
 
+/**
+ * Is a rain gauge's hourly total backed by the odometer on the same station?
+ *
+ * `hourlyRainfall` is a rolling one hour total and `cumulativeRainfall` only climbs, so rain the
+ * first claims has to appear in the second across that same hour. True when the odometer rose,
+ * false when it did not move while the gauge still claims rain, null when nothing can be asked —
+ * the archive cannot reach back an hour, or the station publishes no odometer at all, which is
+ * every KL gauge.
+ *
+ * Do not collapse the three. False is evidence against the reading and null is no evidence, and a
+ * gauge nobody can check keeps the benefit of the doubt. That is `sirenBacked()`'s rule, and this
+ * is the same shape of question: a reading is a claim, and another field of the same payload is the
+ * check on it.
+ *
+ * **The window is the hour the reading itself names, and that is the whole safety of this.** A real
+ * burst leaves the odometer flat immediately afterwards while the rolling hour still carries the
+ * total, so a flat odometer over any longer window proves nothing and would call live rain faulty.
+ * Over the hour the reading claims, flat is decisive. Measured 2026-08-14: T.K.P.M SG. KELAMBU held
+ * 4.5 mm for twelve hours with an odometer that never moved and a daily total of 0.
+ *
+ * `accWindow()` does the reading, so a sparse archive widens the window rather than failing. That
+ * widening can only add rain, so it can only move the answer toward true, which is the safe way for
+ * it to be wrong.
+ */
+function rainBacked(?float $hourly, array $odo, int $now): ?bool {
+    if ($hourly === null || $hourly <= 0) return null;   // no claim, so nothing to check
+    $w = accWindow($odo, $now, 3600);
+    return $w === null ? null : $w[0] > 0;
+}
+
 /* `php api.php --selftest` — the guards above, checked offline. Here rather than in a second test
    file: the rules are arithmetic on a few integers, and a separate test would need a third file to
    hold them. CLI only, and it exits before the first header. */
@@ -1116,6 +1146,30 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
                  $now, 3) === 15.0);
     $ok('three dry hours are zero, not null',
         accHours([[$now - 2 * 3600, 0.0], [$now - 3600, 0.0], [$now, 0.0]], $now, 3) === 0.0);
+
+    echo "\nrainBacked():\n";
+    // The odometer climbed 4.5 mm across the hour the gauge is claiming. The reading stands.
+    $rose = [[$now - 2 * 3600, 680.5], [$now - 1800, 685.0], [$now, 685.0]];
+    $ok('a reading the odometer confirms is backed', rainBacked(4.5, $rose, $now) === true);
+    /* The measured fault. The gauge claims 4.5 mm in the last hour and its own total has not moved
+       across that hour, so the claim has no rain behind it. */
+    $flat = [[$now - 12 * 3600, 685.0], [$now - 3600, 685.0], [$now, 685.0]];
+    $ok('a reading the odometer denies is not backed', rainBacked(4.5, $flat, $now) === false);
+    /* Benefit of the doubt, the same rule sirenBacked() obeys. A gauge nobody can check is not a
+       gauge caught lying, and these three cases are every KL station plus a young archive. */
+    $ok('no odometer at all cannot be asked',   rainBacked(4.5, [], $now) === null);
+    $ok('an archive too young cannot be asked',
+        rainBacked(4.5, [[$now - 600, 685.0], [$now, 685.0]], $now) === null);
+    $ok('an odometer reset cannot be asked',
+        rainBacked(4.5, [[$now - 2 * 3600, 2400.0], [$now, 4.5]], $now) === null);
+    // A gauge claiming nothing is not making a claim, so there is nothing to back or to deny.
+    $ok('a dry gauge is never marked faulty',   rainBacked(0.0, $flat, $now) === null);
+    $ok('a gauge with no reading is not asked', rainBacked(null, $flat, $now) === null);
+    /* The reason the window is the hour the reading names and not a longer one. Rain fell 40
+       minutes ago and stopped, so the odometer is flat right now while the rolling hour still
+       carries the total. A longer window would call this live rain faulty. */
+    $burst = [[$now - 2 * 3600, 680.5], [$now - 2400, 685.0], [$now - 600, 685.0], [$now, 685.0]];
+    $ok('a burst that has stopped is still backed', rainBacked(4.5, $burst, $now) === true);
 
     echo "\nserveFromCache():\n";
     $ok('a fresh cache is served',                 serveFromCache(10, true, false) === true);
@@ -2180,6 +2234,7 @@ foreach ($stations as &$s) {
         foreach (['h24' => 86400, 'h72' => 259200] as $k => $win) {
             if (($w = accWindow($series, $now, $win)) !== null) $acc[$k] = [$w[0], 1, $w[1]];
         }
+        $s['backed'] = rainBacked($s['hourly'] ?? null, $series, $now);
         $samples[$key . '#c'] = [$ts, (float)$s['cumulative']];
     }
 

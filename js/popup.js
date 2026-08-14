@@ -323,10 +323,20 @@ function gaugeBlock(s) {
    the server's own rainStatus() cutoffs (>0 / >10 / >30 / >60 mm an hour), so the block, the pin
    colour and the status code can never disagree. */
 const RAIN_STATE = ['NOT RAINING', 'LIGHT RAIN', 'MODERATE RAIN', 'HEAVY RAIN', 'VERY HEAVY RAIN'];
-const rainState = s => !hasInfo(s)
-  ? '<div class="state">NO READING</div>'
-  : `<div class="state ${s.status >= 3 ? 'on' : s.status >= 1 ? 'mid' : 'off'}"
-      >${RAIN_STATE[s.status] || 'NOT RAINING'}</div>`;
+/* A gauge whose own total denies its reading keeps the word the station reports and loses the
+   colour, which is exactly how the siren block below states a doubted alarm. The reading is what
+   JPS publishes and this card is where you come to read what it publishes — but the map has already
+   stopped painting it, so the card owes an explanation rather than a matching red.
+   The sentence names the verdict and one fact behind it, and no more. `Faulty signal` is the
+   siren's word for the same finding. A rain gauge collects rain into a total, so "collected no
+   rain" is the reader's own model of the instrument and needs none of our vocabulary. */
+const rainState = s => {
+  if (!hasInfo(s)) return '<div class="state">NO READING</div>';
+  const stuck = s.backed === false;
+  return `<div class="state ${stuck ? 'off' : s.status >= 3 ? 'on' : s.status >= 1 ? 'mid' : 'off'}"
+      >${RAIN_STATE[s.status] || 'NOT RAINING'}</div>
+    ${stuck ? '<div class="muted">Faulty signal. This gauge collected no rain this hour.</div>' : ''}`;
+};
 
 /* Everything one sensor has to say, without its name or region — those belong to the place, and a
    site with five sensors on one mast would otherwise repeat them five times. */
@@ -1030,15 +1040,18 @@ export function rainAcc(acc) {
      the reader to carry a number sideways to the bar it belonged to, and five numbers over five
      bars is the moment that goes wrong. `.acccol` reserves the strip it sits in, so a full-height
      bar cannot reach it — see the padding note in css/base.css. */
+  /* The asterisk marks the axis label, not the value. It says how a window was answered, and a
+     window is answered the same way on every station — so it belongs to `24 h` rather than to
+     `140.2 mm`. On the value it also sat between the number and the next column's number, which is
+     the one place on this chart where a mark can be read against the wrong bar. */
   const col = ([label, r]) => {
     if (!r) return '<div class="acccol"><b class="muted">—</b></div>';
-    const [mm, derived, span] = r;
+    const [mm, , span] = r;
     /* The measured span rides in the readout rather than on the chart. It answers "why does this
        say 24 hours when the archive has a hole in it", which is a question you go looking for
        rather than something to read at a glance. */
     const tip = `${label} · ${mm} mm${span ? ` · measured over ${span} h` : ''}`;
-    return `<div class="acccol" data-tip="${tip}"><b>${mm}<small> mm</small>${
-      derived ? '<sup>*</sup>' : ''}</b><i style="height:${
+    return `<div class="acccol" data-tip="${tip}"><b>${mm}<small> mm</small></b><i style="height:${
       (mm / hi * 100).toFixed(1)}%"></i></div>`;
   };
 
@@ -1048,7 +1061,8 @@ export function rainAcc(acc) {
           the class added no colour — and it carries `font-size: 12px`, which beat the 10px the row
           passes down by inheritance and drew `24 h` and `72 h` larger than their three neighbours.
           The em dash over the column is what says the window has no answer. */''}
-    <div class="accx">${rows.map(([label]) => `<span>${label}</span>`).join('')}</div>
+    <div class="accx">${rows.map(([label, r]) =>
+      `<span>${label}${r && r[1] ? '<sup>*</sup>' : ''}</span>`).join('')}</div>
     ${star ? '<div class="muted">* Value derived from archived readings.</div>' : ''}
   </div>`;
 }

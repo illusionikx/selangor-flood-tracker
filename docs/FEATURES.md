@@ -8344,3 +8344,73 @@ The class is gone from those labels. It added no colour, because `.accx` already
 `#ignoredList .nm .muted` in `css/base.css` patches the same trap at another site. Read that rule as
 evidence rather than as a one-off. Any compact context that sets its own font size needs to state it
 on the element, or avoid `.muted` there.
+
+### A rain gauge reporting rain its own total denies
+
+The five nested windows put three sources on one plate, and that made a fault visible that nothing
+here had asked about before. The windows nest, so the totals must not fall as the eye moves right.
+On 2026-08-14 seven of 147 live gauges broke that order.
+
+The raw JPS detail endpoint settled where the fault sits. Station 878 publishes `hourlyRainfall`
+29.5 and `threeHoursRainfall` 20.5 in one response. Nothing here touches either number.
+
+Two different causes hide behind one symptom, and only one of them is safe to act on.
+
+**The three hour total trails.** Station 878 was in live rain. Its odometer and its hourly field
+moved together step for step, plus 6.5, plus 9, plus 9. The three hour field sat at 20.5, which is
+what the hourly field read ten minutes earlier.
+
+Nothing here can repair a lag. Clamping the column to the one beside it prints a number JPS never
+published.
+
+**A gauge sticks.** T.K.P.M SG. KELAMBU read 4.5 mm for twelve straight hours while its odometer
+never moved and its daily total read 0. A rolling one hour total cannot hold one value for twelve
+hours.
+
+### The odometer is the check, the way a river is the check on a siren
+
+`rainBacked()` in `api.php` asks the second question and publishes `backed`. True where the odometer
+rose across the hour the reading names. False where it did not move while the gauge still claimed
+rain. Null where the archive cannot answer.
+
+The three do not collapse into two. False is evidence against the reading and null is no evidence,
+so a gauge nobody can check keeps what it reports. `sirenBacked()` already obeys that rule, and this
+asks the same shape of question on another sensor. `raining()` in `js/util.js` reads
+`backed !== false`, exactly as `sounding()` does.
+
+Null covers every KL gauge, because only Selangor publishes an odometer. It also covers a young
+archive. Measured on the payload this shipped against: 43 true, 5 false, 183 null.
+
+**The window is the hour the reading names, and a longer one is wrong.** Rain that fell forty
+minutes ago and stopped leaves the odometer flat right now, while the rolling hour still carries the
+total. Any window wider than the claim calls that live rain faulty. A selftest assertion holds the
+case.
+
+`accWindow()` does the reading, so a sparse archive widens the window rather than failing. A wider
+window can only add rain, so it can only move the answer toward true. That is the safe direction to
+be wrong in.
+
+### What the flag reaches
+
+Three surfaces read it, and the card states it.
+
+`color()` paints an unbacked gauge as a gauge reporting nothing. `atDanger()` needs the reading
+backed before the top class can turn a pin red or put a warning on a camera. The rain heat layer
+leaves the station out of **both** passes: an unbacked gauge cannot paint, and it must not erase
+either, because a reading nobody can stand behind is no evidence that the ground under it is dry.
+
+The card keeps printing the word JPS publishes and loses the colour, which is how the siren block
+states a doubted alarm. Under it goes one line: `Faulty signal. This gauge collected no rain this
+hour.` The verdict, then one fact. A rain gauge collects rain into a total, so the sentence needs
+none of our vocabulary.
+
+Measured on the shipping payload, four pins change colour and no pin changes to or from red. Nothing
+stood at the top class that day, so a selftest guards the red path rather than an observation.
+
+`soak()` in `js/test.js` sets `backed: true`. Without it a faked storm on one of those five gauges
+draws as a faulty signal, with no pin colour and no blob under it.
+
+**The three hour lag stays unrepaired, on purpose.** Clamping a window to the one beside it invents
+a number, and the asterisk covers totals derived from our own archive rather than totals we quietly
+corrected. A value we invent is worse than one we can show belongs to upstream, which is the rule
+`CAM_FIX` already states about coordinates.
