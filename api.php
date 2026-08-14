@@ -1219,6 +1219,32 @@ function portalMatch(array $rows, array $stations, string $kind): array {
     return ['hit' => $hit, 'used' => $used, 'clash' => $clash];
 }
 
+/* Where a portal station stands, from the gazetteer this app filled in Task 7.
+ *
+ * Two rules and nothing weaker:
+ *   1. an equal name under portalKey()
+ *   2. a UNIQUE suffix — exactly one gazetteer name may end with this one
+ *
+ * Measured over the 133 stations this places, 83 join on an equal name and 50 on a unique suffix.
+ * 30 more rows join on neither and stay off the map. THEY ARE COUNTED, NEVER GUESSED AT. A
+ * coordinate this app invents is worse than one it can show belongs to upstream, which is the rule
+ * CAM_FIX states after ten rounds of arguing about single pins.
+ */
+function gazPlace(string $name, array $gaz): ?array {
+    $k = portalKey($name);
+    if ($k === '') return null;
+    $equal = $ends = [];
+    foreach ($gaz as $g) {
+        $gk = portalKey($g['name']);
+        if ($gk === $k) $equal[] = $g;
+        elseif (str_ends_with($gk, $k)) $ends[] = $g;
+    }
+    $win = count($equal) === 1 ? $equal[0] : (count($ends) === 1 ? $ends[0] : null);
+    if ($win === null) return null;
+    return ['lat' => $win['lat'], 'lng' => $win['lng'],
+            'district' => $win['district'], 'state' => $win['state']];
+}
+
 /* Which prefixes to ask the station search for next.
  *
  * The set comes from the data rather than from a list: the first three characters of every portal
@@ -1585,6 +1611,30 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
         ['id' => 'rf-832', 'kind' => 'rainfall', 'code' => null, 'name' => 'Jenderam Hulu'],
     ], 'rainfall');
     $ok('two equal claims identify neither',    $t['hit'] === []);
+
+    echo "\ngazPlace():\n";
+    $gaz = [
+        ['name' => 'Sg.Langat di Desa Pinggiran Putra (F2)', 'lat' => 3.0, 'lng' => 101.5,
+         'district' => 'Sepang', 'state' => 'Selangor'],
+        ['name' => 'Bandar Kinrara',      'lat' => 3.05, 'lng' => 101.63,
+         'district' => 'Petaling', 'state' => 'Selangor'],
+        ['name' => 'Sg. Klang di Ampang', 'lat' => 3.15, 'lng' => 101.75,
+         'district' => 'Kuala Lumpur', 'state' => 'Wilayah Persekutuan Kuala Lumpur'],
+        ['name' => 'Sg. Gombak di Ampang','lat' => 3.20, 'lng' => 101.72,
+         'district' => 'Gombak', 'state' => 'Selangor'],
+    ];
+    $ok('an equal name places',
+        gazPlace('Bandar Kinrara', $gaz)['lat'] === 3.05);
+    $ok('the district comes with it',
+        gazPlace('Bandar Kinrara', $gaz)['district'] === 'Petaling');
+    $ok('a unique suffix places',
+        gazPlace('Desa Pinggiran Putra (F2)', $gaz)['lat'] === 3.0);
+    /* Two gazetteer names end with `Ampang`. A suffix that fits two identifies neither, and picking
+       one puts a pin on a river it does not belong to. */
+    $ok('an ambiguous suffix places nothing', gazPlace('Ampang', $gaz) === null);
+    $ok('an unknown name places nothing',     gazPlace('Nowhere At All', $gaz) === null);
+    $ok('an empty gazetteer places nothing',  gazPlace('Bandar Kinrara', []) === null);
+    $ok('an empty name places nothing',       gazPlace('', $gaz) === null);
 
     echo "\ngazParse():\n";
     $gazJson = '[{"loc":[3.1,101.6],"title":"Sg. Klang di Kuala Lumpur, Kuala Lumpur, Wilayah Persekutuan Kuala Lumpur"},'
@@ -2474,6 +2524,12 @@ foreach ($db->query('SELECT station, ts, level FROM level WHERE (station LIKE \'
                     . ($now - ACC_READ) . ' ORDER BY ts') as $r) {
     $odo[$r['station']][] = [(int)$r['ts'], (float)$r['level']];
 }
+
+// The gazetteer this app has filled so far, for gazPlace() below. Loaded once, whole — the drip
+// leaves it partly filled for weeks, and every placement pass this refresh reads the same rows.
+$gaz = [];
+foreach ($db->query('SELECT name, lat, lng, district, state FROM station') as $r) $gaz[] = $r;
+
 $samples = [];
 
 $stations = [];
@@ -2595,6 +2651,14 @@ function klState(?string $district): string {
     return stripos($district ?? '', 'putrajaya') !== false ? 'Putrajaya' : 'Kuala Lumpur';
 }
 
+/* The gazetteer spells the federal territory in full. This app draws three states and names them
+   the way every other station in the payload already does. */
+function portalState(string $s): string {
+    if (stripos($s, 'putrajaya') !== false) return 'Putrajaya';
+    if (stripos($s, 'kuala lumpur') !== false) return 'Kuala Lumpur';
+    return 'Selangor';
+}
+
 // --- KL (SPHTN) ------------------------------------------------------------------------------
 // Adds Kuala Lumpur, which the Selangor API does not cover. Its catchment reaches into Selangor, so
 // some of its stations are ones we already hold: same mast, different id space (the two feeds share
@@ -2654,6 +2718,33 @@ foreach ($stations as &$s) {
 }
 unset($s);
 
+/* The rivers the portal alone knows about. $nat is keyed by station code and $natUsed names every
+   code that corrected a station this app already held, so the difference is the new set.
+   22 of these are the Kuala Lumpur rivers the SPHTN table never placed, which is the gap this
+   whole source exists to close. */
+$natNew = $natSkip = 0;
+foreach ($nat as $code => $n) {
+    if (isset($natUsed[$code]) || $n['level'] === null) continue;
+    $at = gazPlace($n['name'], $gaz);
+    if ($at === null) { $natSkip++; continue; }
+    $natNew++;
+    $stations[] = [
+        'kind'    => 'river',
+        'id'      => 'pwl-' . $code,
+        'name'    => $n['name'],
+        'district'=> $at['district'],
+        'basin'   => null,
+        'lat'     => $at['lat'], 'lng' => $at['lng'],
+        'status'  => wlStatus($n['level'], $n['alert'], $n['warning'], $n['danger']),
+        'online'  => true,
+        'level'   => $n['level'], 'alert' => $n['alert'],
+        'warning' => $n['warning'], 'danger' => $n['danger'],
+        'code'    => $code, 'source' => 'national',
+        'state'   => portalState($at['state']),
+        'updated' => $n['updated'],
+    ];
+}
+
 // --- National portal, rainfall ------------------------------------------------------------------
 // The portal is the preferred rainfall source. It publishes a per-day running total the Selangor
 // API does not and Kuala Lumpur has never had, which is what makes a 24 hour window exact rather
@@ -2662,17 +2753,6 @@ unset($s);
 // It publishes no coordinate, so this pass only ever corrects a station another feed already placed.
 // The rows it alone knows about are placed in a later pass, from the portal's own station search.
 $prfHit = portalMatch($prf, $stations, 'rainfall');
-
-/* What the gazetteer holds and what it still owes, counted before the payload goes out. The drip
-   itself runs at the end of this file, after the echo, so it cannot report on itself. */
-$gazDone = [];
-foreach ($stored as $su => $sr) {
-    if (str_starts_with($su, GAZ_KEY)) $gazDone[substr($su, strlen(GAZ_KEY))] = 1;
-}
-// Only the rows that found no home. A matched row needs no coordinate: it already has one.
-$gazNames = [];
-foreach ($prf as $i => $r) if (!isset($prfHit['used'][$i])) $gazNames[] = $r['name'];
-$gazAsk = gazWanted($gazNames, $gazDone, GAZ_FILL);
 
 $prfUsed = 0;
 /* Station id => graph id, for the history backfill at the end of this file. It cannot read
@@ -2699,6 +2779,48 @@ foreach ($stations as &$s) {
     if ($r['graphId'] !== null) $graphIds[$s['id']] = $r['graphId'];
 }
 unset($s);
+
+/* Rows the portal alone knows about. Placed from the gazetteer, or counted and dropped.
+   `state` decides which half of the map a station belongs to, and district names collide across
+   states — Kuala Lumpur and Selangor both have a Gombak — so anything keyed by district must key by
+   state and district together. See dkey() in js/util.js. */
+$prfNew = $prfSkip = 0;
+foreach ($prf as $i => $r) {
+    if (isset($prfHit['used'][$i])) continue;
+    $at = gazPlace($r['name'], $gaz);
+    if ($at === null) { $prfSkip++; continue; }
+    $prfNew++;
+    $id = 'prf-' . ($r['code'] ?? md5($r['name']));
+    $stations[] = [
+        'kind'     => 'rainfall',
+        'id'       => $id,
+        'name'     => $r['name'],
+        'district' => $at['district'],
+        'basin'    => null,
+        'lat'      => $at['lat'], 'lng' => $at['lng'],
+        'status'   => rainStatus($r['hourly']),
+        'online'   => $r['hourly'] !== null,
+        'hourly'   => $r['hourly'], 'daily' => $r['daily'],
+        'code'     => $r['code'], 'source' => 'portal',
+        'state'    => portalState($at['state']),
+        'updated'  => $r['updated'],
+        'pdays'    => $r['days'],
+    ];
+    // Same map the override pass fills, and for the same reason: the backfill runs after the
+    // payload, and `pdays` is unset before then.
+    if ($r['graphId'] !== null) $graphIds[$id] = $r['graphId'];
+}
+
+/* What the gazetteer holds and what it still owes, counted before the payload goes out. The drip
+   itself runs at the end of this file, after the echo, so it cannot report on itself. */
+$gazDone = [];
+foreach ($stored as $su => $sr) {
+    if (str_starts_with($su, GAZ_KEY)) $gazDone[substr($su, strlen(GAZ_KEY))] = 1;
+}
+// Only the rows that found no home. A matched row needs no coordinate: it already has one.
+$gazNames = [];
+foreach ($prf as $i => $r) if (!isset($prfHit['used'][$i])) $gazNames[] = $r['name'];
+$gazAsk = gazWanted($gazNames, $gazDone, GAZ_FILL);
 
 // --- Rainfall history --------------------------------------------------------------------------
 // Rain now is the river's rise in an hour, so this is the earlier signal of the two — worth keeping
@@ -3006,17 +3128,23 @@ $payload = json_encode([
     // means a table layout moved, not that the rivers went quiet.
     'sources'  => [
         'kl'       => ['parsed' => count($kl), 'added' => $klAdded, 'merged' => $klDupes],
+        // `placed` is how many rivers the portal alone knew about, pinned from the gazetteer.
+        // `unmapped` is what is left once a code either corrected a station or placed a new one —
+        // no coordinate for it anywhere in the gazetteer yet.
         'national' => ['parsed' => count($nat), 'applied' => count($natUsed),
-                       'unmapped' => count($nat) - count($natUsed)],
+                       'placed' => $natNew, 'unplaced' => $natSkip,
+                       'unmapped' => count($nat) - count($natUsed) - $natNew],
         'met'      => ['parsed' => $metParsed, 'fresh' => count($metPts), 'matched' => $metMatched],
         'metday'   => ['parsed' => count($metDay), 'matched' => $metDayMatched],
         'metwarn'  => ['parsed' => count($metWarn)],
         // `parsed` is the alarm for a layout change. `applied` is how many stations took a portal
         // reading. `clash` counts every ambiguity portalMatch() logs: a code two rows or two
         // stations share, a name two rows share, a code match overriding a weaker name match on
-        // one station, and two stations claiming one row.
+        // one station, and two stations claiming one row. `placed` and `unplaced` are the rows the
+        // portal alone knew about — gazPlace() pinned one, or the row is counted and dropped.
         'portalrf' => ['parsed' => count($prf), 'applied' => $prfUsed,
-                       'clash'  => count($prfHit['clash'])],
+                       'clash'  => count($prfHit['clash']),
+                       'placed' => $prfNew, 'unplaced' => $prfSkip],
         // `pending` is what the NEXT drip will ask for, capped at GAZ_FILL. It reaching 0 is the
         // backfill finishing, which is success — see watch.php in Task 10.
         'gaz' => ['stations' => (int)$db->query('SELECT COUNT(*) FROM station')->fetchColumn(),
