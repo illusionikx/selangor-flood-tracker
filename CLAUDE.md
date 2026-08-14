@@ -784,7 +784,10 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   into `.history.db`* and carry no `history`. A flat line at a number from months ago reads as
   "steady", which is the one thing a graph of a dead sensor must not say. Anything offline or
   >24h old renders grey with an explicit `OFFLINE` block, the date in the footer. Never show these
-  as live.
+  as live. **A graph is still drawn for them**, and that does not breach the rule above: an offline
+  gauge holds no samples at all, so what draws is its two marks against an empty plot rather than a
+  flat line through a number from April. The gate that used to suppress it took the timeline from 15
+  of 36 gauges. See the always-draw rule under Conventions.
 - **41 sirens last reported months ago** (one in July 2025). They render `OUT OF CONTACT`, never
   `IDLE` — a silent siren and a dead siren look identical, and only one is safe.
 - **The siren band frames on the clock, and it is the only graph here that does.** Every other graph
@@ -1796,7 +1799,32 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   accepted cost is that a calm river draws as a near-flat line at the foot of the graph — a true
   picture, with the trend figure beside it stating the movement in m/h. **A flood gauge keeps the
   proximity rule**: its marks are 0.15 m and 0.3 m of depth over a spot, never far from the readings,
-  and its axis crosses zero where a river's does not.
+  and its axis crosses zero where a river's does not. With no readings to be near, that filter has
+  nothing to measure and every mark is drawn.
+  **The caption under the graph states the readings, never the axis.** It read `lo` and `hi`, which
+  are the axis — and this very rule grows the axis to hold every mark, so T.T.D.I JAYA captioned
+  itself `3.42–8.30 m` over readings of 3.42 to 5.32 and named its danger mark as water that had
+  arrived. **102 of 104 river graphs stated a range no reading reached.** It reads `lo0` and `hi0`
+  now. This is the same rule the rain peak already carried, broken at a second site by the change
+  that let the axis grow — see the peak-mark gotcha. Anything stating a graph's range reads the data.
+  Two readings or it is not a range, so a graph holding one or none carries no caption.
+- **A graph always draws, and no state of the station suppresses it.** `sparkline()`, `rainBars()`
+  and `sirenBand()` each frame on the readings they hold, and a window needs two readings to have a
+  width — so with fewer than two the clock supplies one, through the `frame` parameter on
+  `timeAxis()`. With two or more nothing changed. A graph holding nothing is not an empty box: it
+  draws the plate, the axis and the station's own marks, which is the scale with nothing on it.
+  **The flood gauge is why.** All 36 of its stations were broken. 15 drew nothing behind a
+  `history?.length` gate in `sensorBody()` and another in `table.js`. 18 hold a single sample. Even
+  the 3 holding more have a data span of 0.0 h. JPS stamps a batch of them to one time.
+  Three rivers and eighteen rainfall stations sat in the same state, and the siren was the whole 212.
+  **A lone reading draws as a dash and never a dot.** The viewBox stretches everything inside it, so a `<circle>`
+  comes out an ellipse — the same reason the rain peak mark sits in HTML over the plot. A `<rect>`
+  stretches too, and it is a dash either way.
+  **The two sentences are gone**: `Graph builds as readings arrive` and `No readings in the last 12
+  hours`. The second was already unreachable, because the server windows `SPARK_WIN` against now and
+  no delivered sample is older than it. **`rainAcc()` keeps its `!isStale(s)` gate and is not covered
+  by this rule** — it draws five current totals rather than a history, and one gauge in the payload
+  holds 27 mm in an hour stamped last October.
 - **Rainfall is an interval quantity, not a level.** It gets `rainBars()`, never `sparkline()` — a
   line between two rain readings claims a value in between that never existed. And `hourlyRainfall`
   is a *rolling* hour, so it buckets by `RAIN_BUCKET` (1 h): finer buckets show the same rain twice.
@@ -1848,66 +1876,81 @@ for f in "$T"/*.mjs; do node --check "$f" || echo "FAIL $f"; done
 for f in js/*.js css/*.css; do
   curl -sk -o /dev/null -w "%{content_type} $f\n" "https://flood-exp.test/$f"; done | grep -v 'javascript\|css'
 
-# The three rules in js/popup.js that fail silently and no linter can reach. `stamp()` chooses a
-# clock against a date on a same-day test, so a wrong slice index prints an empty string.
-# `spanText()` floors, so a wrong rounding claims minutes the record never held. `sirenBand()`
-# frames on the clock and carries a reading forward, and an empty band that still ships `data-pts`
-# throws in js/sparktip.js on every pointermove.
+# The rules in js/popup.js that fail silently and no linter reaches. `stamp()` chooses a clock
+# against a date, so a wrong slice index prints an empty string. `spanText()` floors, so a wrong
+# rounding claims minutes the record never held. `sirenBand()`, `sparkline()` and `rainBars()` all
+# draw whatever they hold, so a degenerate window is a graph that renders nothing and errors
+# nowhere. The last block runs every station in the payload through its own graph.
 # There is no JS test harness here and this does not add one. The MODULE is evaluated as it ships,
-# with only its imports stubbed, so no copy can drift from what runs. An earlier version lifted each
-# function out by its own regex, which was a second mechanism for the same job.
+# with only its imports stubbed, so no copy can drift from what runs.
+# **Give the palette stubs real values.** `RAIN_COLOR` as a bare `[]` puts `undefined` in the
+# readout for 96 rainfall stations, which reads as a fault in the code and is a fault in the check.
 node --input-type=module -e "
 import fs from 'fs';
 const src = fs.readFileSync('js/popup.js','utf8')
   .replace(/^import[\s\S]*?from '\.\/stations\.js';/m,'').replace(/\bexport /g,'');
 const noSec = fs.readFileSync('js/util.js','utf8').match(/export const noSec = .*;/)[0].replace('export ','');
 const stubs = \`
-const SPARK_H=12, NO_INFO='var(--s-none)', NEAR_MAX_KM=30, MET_NAME='MET';
-const RIVER_COLOR=[],RAIN_COLOR=[],GAUGE_COLOR=[],RAIN_STOPS=[],ACC_ROWS=[],WEATHER=[{}];
-const KINDS={},SOURCES={},ALERT_TITLE={},camSrc=()=>'',distKm=()=>0;
-const hasInfo=()=>true,isStale=()=>false,statusColor=n=>'RED'+n,scalePos=()=>0;
+const SPARK_H=12, NO_INFO='', NEAR_MAX_KM=30, MET_NAME='', ACC_ROWS=[], WEATHER=[{}];
+const RIVER_COLOR={1:'r1',2:'r2',3:'r3'},RAIN_COLOR={1:'c1',2:'c2',3:'c3',4:'c4'};
+const GAUGE_COLOR={1:'g1',2:'g2',3:'g3'},RAIN_STOPS=[[0],[10],[30],[60]];
+const KINDS={river:{color:'B'},gauge:{color:'T'},rainfall:{color:'V'},siren:{color:'P'}};
+const SOURCES={},ALERT_TITLE={},camSrc=()=>'',distKm=()=>0;
+const hasInfo=()=>true,isStale=()=>false,statusColor=n=>'S'+n,scalePos=()=>0;
 const levelStops=()=>null,gaugeStops=()=>null,gaugeColor=()=>'',color=()=>'',isFav=()=>false;
 const nearestOf=()=>null,nearestCam=()=>null,nearestLevel=()=>null,camAlert=()=>null;\`;
-const { stamp, spanText, sirenBand } = new Function(stubs + noSec + src +
-  '; return { stamp, spanText, sirenBand };')();
-
+const M = new Function(stubs+noSec+src+
+  '; return { stamp, spanText, sirenBand, sparkline, rainBars };')();
+const now=Math.floor(Date.now()/1000), H=3600;
 let bad=0; const is=(g,w,n)=>{const ok=g===w; if(!ok)bad++;
   console.log((ok?'ok  ':'FAIL')+'  '+n+'  -> '+JSON.stringify(g)+(ok?'':'  want '+JSON.stringify(w)));};
-const today = new Intl.DateTimeFormat('en-GB',
+const today=new Intl.DateTimeFormat('en-GB',
   {timeZone:'Asia/Kuala_Lumpur',day:'2-digit',month:'2-digit',year:'numeric'}).format(new Date());
-is(stamp(today+' 15:45:00'),'15:45','stamp: today -> clock, seconds trimmed');
-is(stamp('19/09/2025 12:15:00'),'19/09/2025','stamp: another day -> date only');
-is(stamp(today),today,'stamp: a date with no clock -> the date');
-is(stamp(Date.parse('2025-09-19T12:15:00+08:00')),'19/09/2025','stamp: unix ms, another day -> date');
-is(/^\d\d:\d\d\$/.test(stamp(Date.now())),true,'stamp: unix ms, today -> clock');
-is(spanText(3600*9.6),'9 h','spanText: floors, never rounds up');
-is(spanText(3600),'1 h','spanText: exactly one hour');
-is(spanText(1800),'30 min','spanText: under an hour keeps minutes');
 
-const now=Math.floor(Date.now()/1000), H=3600;
+is(M.stamp(today+' 15:45:00'),'15:45','stamp: today -> clock, seconds trimmed');
+is(M.stamp('19/09/2025 12:15:00'),'19/09/2025','stamp: another day -> date only');
+is(M.stamp(today),today,'stamp: a date with no clock -> the date');
+is(M.stamp(Date.parse('2025-09-19T12:15:00+08:00')),'19/09/2025','stamp: unix ms, another day -> date');
+is(/^\d\d:\d\d\$/.test(M.stamp(Date.now())),true,'stamp: unix ms, today -> clock');
+is(M.spanText(3600*9.6),'9 h','spanText: floors, never rounds up');
+is(M.spanText(1800),'30 min','spanText: under an hour keeps minutes');
+
 const rects=h=>[...h.matchAll(/<rect[\s\S]*?\/>/g)].map(m=>m[0]);
-const A=sirenBand(null), B=sirenBand([[now-9.3*H,0]]);
-const C=sirenBand([[now-11*H,0],[now-6*H,1],[now-5*H,0]]);
+const A=M.sirenBand(null), B=M.sirenBand([[now-9.3*H,0]]);
+const C=M.sirenBand([[now-11*H,0],[now-6*H,1],[now-5*H,0]]);
 is(rects(A).length,1,'band: no history -> the empty rail alone');
 is(/data-pts/.test(A),false,'band: no history -> no data-pts, or sparktip throws on pointermove');
-is(rects(A)[0].includes('var(--s-none)'),true,'band: the rail is the no-reading token');
-is(rects(B).length,2,'band: one sample -> rail + one bar');
-const b=rects(B)[1], bx=+b.match(/x=\"([\d.]+)\"/)[1], bw=+b.match(/width=\"([\d.]+)\"/)[1];
-is(Math.round(bx),23,'band: the bar starts at its own time');
-is(Math.round(bx+bw),100,'band: and carries forward to now');
-is(b.includes('var(--outline)'),true,'band: an idle sample is the outline colour, never green');
-const cr=rects(C);
-is(cr.filter(r=>r.includes('RED3')).length,1,'band: exactly one bar takes the danger red');
-is(cr[2].includes('RED3'),true,'band: and it is the sounding sample');
-is(/Silent for|Last sounded|Sounding since/.test(A+B+C),false,'band: no caption on any shape');
+const b=rects(B)[1];
+is(Math.round(+b.match(/x=\"([\d.]+)\"/)[1] + +b.match(/width=\"([\d.]+)\"/)[1]),100,
+   'band: one sample carries forward to now');
+is(rects(C).filter(r=>r.includes('S3')).length,1,'band: exactly one bar takes the danger red');
 
-let clock=0,date=0,odd=[];
+const G={warning:0.15,danger:0.3}, R={alert:6.0,warning:7.0,danger:8.30};
+const g0=M.sparkline(null,'gauge',G), g1=M.sparkline([[now-4*H,0.12]],'gauge',G);
+is((g0.match(/class=\"mk\"/g)||[]).length,2,'spark: a gauge with no readings still draws both marks');
+is(/polyline|data-pts/.test(g0),false,'spark: no readings -> no line and no readout');
+is(rects(g1).length,1,'spark: one reading -> a dash, not a line');
+const r2=M.sparkline([[now-9*H,3.42],[now-5*H,4.80],[now-1*H,5.32]],'river',R);
+is(/3.42–5.32 m/.test(r2),true,'spark: the caption states the READINGS');
+is(/8.30/.test(r2.match(/class=\"muted\">[^<]*/)[0]),false,'spark: and never the axis, which holds the marks');
+is((r2.match(/class=\"mk\"/g)||[]).length,3,'spark: a river still draws all three marks');
+is(/<svg/.test(M.sparkline(null,'river',null)),true,'spark: no readings and no marks -> still a graph');
+is(/data-pts|class=\"peak/.test(M.rainBars(null)),false,'bars: no readings -> no readout and no peak');
+is(/Last 12 h/.test(M.rainBars(null)),true,'bars: no readings -> heading names the window it drew');
+
+let drew=0, threw=0, faults=0, capBad=0;
 for (const s of JSON.parse(fs.readFileSync('.cache.json','utf8')).stations) {
-  const t=s.updated||s.shot; if(!t) continue; const o=stamp(t);
-  if(/^\d\d:\d\d\$/.test(o)) clock++; else if(/^\d\d\/\d\d\/\d{4}\$/.test(o)) date++; else odd.push([s.id,t,o]); }
-console.log('payload stamps -> clock:',clock,' date:',date,' unexpected:',odd.length);
-odd.slice(0,5).forEach(o=>console.log('   ',o.join('  ')));
-if(odd.length) bad++;
+  const k=s.kind; if(!['river','gauge','rainfall','siren'].includes(k)) continue;
+  let h=''; try { h = k==='rainfall'?M.rainBars(s.history):k==='siren'?M.sirenBand(s.history)
+      :M.sparkline(s.history,k,s); } catch(e){ threw++; console.log('  THREW',s.id,e.message); continue; }
+  if(/<svg/.test(h)) drew++; else console.log('  NO GRAPH',s.id,k);
+  if(/NaN|Infinity|undefined/.test(h)){ faults++; if(faults<3) console.log('  BAD MARKUP',s.id,k); }
+  const c=h.match(/([\d.-]+)–([\d.-]+) m over/);
+  if(c && s.history?.length>1){ const v=s.history.map(r=>r[1]);
+    if(Math.abs(+c[1]-Math.min(...v))>0.005||Math.abs(+c[2]-Math.max(...v))>0.005){ capBad++;
+      console.log('  CAPTION STATES THE AXIS',s.id,c[0]); } } }
+console.log('every station drew a graph:',drew,' threw:',threw,' bad markup:',faults,' bad captions:',capBad);
+bad += threw + faults + capBad;
 console.log(bad?'FAILURES: '+bad:'all pass'); process.exit(bad?1:0);"
 ```
 

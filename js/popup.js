@@ -377,10 +377,13 @@ function sensorBody(s) {
   // The meter says where the level is against its own thresholds; this says how it got there. The
   // alert panel has carried it all along — the popup you reach by clicking the pin had the numbers
   // for the trend (m/h, hours to danger) but not the shape they came from.
-  // Gauges get one too, in their own taupe: "0.12 m of water" is a fact, "filling for three hours"
-  // is the answer. Only where there is history — offline gauges are not sampled at all.
+  /* Gauges get one too, in their own taupe: "0.12 m of water" is a fact, "filling for three hours"
+     is the answer. **No `history?.length` gate.** It stood here because an offline gauge is never
+     sampled, and it made the flood gauge the one kind whose timeline a station's state could take
+     away — 15 of 36 drew nothing at all. A gauge with no readings now draws its own two marks
+     against an empty plot, which is what the card was opened to ask about. See `sparkline()`. */
   const spark = s.kind === 'river' ? sparkline(s.history, 'river', s)
-    : s.kind === 'gauge' && s.history?.length ? sparkline(s.history, 'gauge', s) : '';
+    : s.kind === 'gauge' ? sparkline(s.history, 'gauge', s) : '';
   const wet = s.kind === 'rainfall' ? rainState(s) : '';
   // A siren has exactly one thing to say, so it gets a centred state block instead of a metric row.
   // "No signal" is only half the story — a siren that fell off the network last March must not read
@@ -897,16 +900,27 @@ const spanText = secs => secs < 3600
 const MARK_RUNG = { alert: 1, warning: 2, danger: 3 };
 
 export function sparkline(points, kind = 'river', st = null) {
-  // "As we poll" told the reader about our timer. What they need is that the graph fills itself in.
-  if (!points || points.length < 2) return '<div class="muted">Graph builds as readings arrive</div>';
-
-  // The axis spans the readings we actually hold, up to a 12-hour cap — so two hours of history
-  // draws as two labelled hours rather than a sliver at the edge of a mostly empty 12-hour frame.
-  const { secs, inWin, x, ticks } = timeAxis(points);
-  if (inWin.length < 2) return `<div class="muted">No readings in the last ${SPARK_H} hours</div>`;
+  points = points || [];
+  /* The graph always draws, and no state of the station suppresses it. A window needs two readings
+     to have a width, so with fewer than two the clock supplies one — the same frame the siren band
+     takes, through the same `frame` parameter on `timeAxis()`. With two or more nothing changes: the
+     axis still spans the readings held, capped at SPARK_H, so two hours of history draws as two
+     labelled hours rather than a sliver at the edge of an empty 12-hour frame.
+     The flood gauge is what needed this. All 36 of its stations were broken. 15 drew nothing behind
+     a `history?.length` gate in `sensorBody()`, 18 hold a single sample, and even the 3 holding more
+     have a data span of 0.0 h, because JPS stamps a batch of them to one time. Three rivers and
+     eighteen rainfall stations sat in the same state.
+     A graph with no readings is not an empty box. It draws the plate, the axis and the station's own
+     marks, which is the scale with nothing on it — 0.15 m and 0.3 m on a flood gauge, the alert,
+     warning and danger marks on a river. That is the question the card is opened with, and it is a
+     true picture of a sensor this app holds no readings for. */
+  const now = Math.floor(Date.now() / 1000);
+  const { secs, inWin, x, ticks } = timeAxis(points,
+    points.length < 2 ? [now - SPARK_H * 3600, now] : undefined);
 
   const vals = inWin.map(([, v]) => v);
-  const lo0 = Math.min(...vals), hi0 = Math.max(...vals);
+  const has = vals.length > 0;
+  const lo0 = has ? Math.min(...vals) : 0, hi0 = has ? Math.max(...vals) : 0;
 
   /* The station's own marks, drawn across the graph.
      **A river draws every mark it publishes, always.** The question a reader brings to a river graph
@@ -922,7 +936,8 @@ export function sparkline(points, kind = 'river', st = null) {
      rivers with no mark at all on a quiet day.
      A flood gauge keeps the proximity rule. Its two marks sit at 0.15 m and 0.3 m of *depth over a
      spot*, so they are never far from the readings in the first place, and its axis crosses zero
-     where a river's does not — there is no distant mark to reach for and nothing to gain.
+     where a river's does not — there is no distant mark to reach for and nothing to gain. With no
+     readings to be near, that filter has nothing to measure and every mark is drawn.
      No labels on them. Text in a stretched viewBox distorts, and the meter directly above names all
      three marks with their values, in these exact colours. */
   const named = kind === 'gauge' ? ['warning', 'danger'] : ['alert', 'warning', 'danger'];
@@ -930,10 +945,17 @@ export function sparkline(points, kind = 'river', st = null) {
   const first = st?.alert ?? st?.warning ?? top;
   const reach = (hi0 - lo0) || (top > first ? top - first : 1);
   const marks = !st ? [] : named.map(n => [n, st[n]])
-    .filter(([, v]) => v != null && (kind !== 'gauge' || (v <= hi0 + reach && v >= lo0 - reach)));
+    .filter(([, v]) => v != null
+      && (kind !== 'gauge' || !has || (v <= hi0 + reach && v >= lo0 - reach)));
 
-  const lo = Math.min(lo0, ...marks.map(m => m[1]));
-  const hi = Math.max(hi0, ...marks.map(m => m[1]));
+  /* With no readings the marks are the only scale the station publishes, so the axis comes from
+     them — padded, or a mark lands along the edge of the plot instead of inside it. A station with
+     neither readings nor marks gets a bare 0 to 1, which draws an empty plate and divides by 1. */
+  const mv = marks.map(m => m[1]);
+  const pad = mv.length > 1 ? (Math.max(...mv) - Math.min(...mv)) * 0.25
+    : Math.abs(mv[0] ?? 0) * 0.1 || 1;
+  const lo = has ? Math.min(lo0, ...mv) : (mv.length ? Math.min(...mv) - pad : 0);
+  const hi = has ? Math.max(hi0, ...mv) : (mv.length ? Math.max(...mv) + pad : 1);
   const span = hi - lo || 1;
   const y = v => (26 - (v - lo) / span * 24).toFixed(2);
   const marked = marks.map(([n, v]) =>
@@ -947,17 +969,35 @@ export function sparkline(points, kind = 'river', st = null) {
   const col = KINDS[kind].color;
   const [id, defs] = areaFill(col);
 
-  return `<div class="spark"${readout(inWin, x, v => `${v} m`, kind)}>
+  /* One reading is a dash at its own level, not a line and not a point. A line needs two readings,
+     and a `<circle>` comes out an ellipse: the viewBox is stretched, which is the same reason the
+     rain peak mark sits in HTML over the plot rather than inside it. A `<rect>` is stretched too,
+     and it is a dash either way. */
+  const body = inWin.length > 1
+    ? `<polygon points="${x(inWin[0][0])},28 ${pts} ${x(inWin.at(-1)[0])},28" fill="url(#${id})"/>
+       ${marked}
+       <polyline points="${pts}" fill="none" vector-effect="non-scaling-stroke"
+         style="stroke:${col}" stroke-width="2" stroke-linejoin="round"/>`
+    : `${marked}${!has ? '' : `<rect x="${Math.min(+x(inWin[0][0]), 98.4).toFixed(2)}"
+         y="${(+y(inWin[0][1]) - 1).toFixed(2)}" width="1.6" height="2" rx="1"
+         style="fill:${col}"/>`}`;
+
+  /* **The caption states the readings, never the axis.** It read `lo` and `hi`, which are the axis
+     — and the axis grows to hold every mark a river publishes, so T.T.D.I JAYA captioned itself
+     `3.42–8.30 m` over readings of 3.42 to 5.32, naming its danger mark as water that arrived.
+     102 of 104 river graphs stated a range no reading had reached. This is the same rule `rainBars()`
+     below already carries for its peak mark, broken at a second site by the later change that let
+     the axis grow. Anything stating a graph's range reads the data.
+     Two readings or it is not a range, so one reading and none carry no caption at all. */
+  return `<div class="spark"${has ? readout(inWin, x, v => `${v} m`, kind) : ''}>
     <svg viewBox="0 0 100 28" preserveAspectRatio="none" aria-hidden="true">
       ${defs}
       ${rules(ticks)}
-      <polygon points="${x(inWin[0][0])},28 ${pts} ${x(inWin.at(-1)[0])},28" fill="url(#${id})"/>
-      ${marked}
-      <polyline points="${pts}" fill="none" vector-effect="non-scaling-stroke"
-        style="stroke:${col}" stroke-width="2" stroke-linejoin="round"/>
+      ${body}
     </svg>
     ${axisHtml(ticks)}
-    <div class="muted">${lo.toFixed(2)}–${hi.toFixed(2)} m over ${spanText(secs)}</div>
+    ${inWin.length > 1
+      ? `<div class="muted">${lo0.toFixed(2)}–${hi0.toFixed(2)} m over ${spanText(secs)}</div>` : ''}
   </div>`;
 }
 
@@ -1041,10 +1081,14 @@ export function sirenBand(points) {
    One bar per clock hour, because `hourly` is a rolling one-hour total — the server buckets to
    RAIN_BUCKET for the same reason, so two samples 15 minutes apart can't show the same rain twice. */
 export function rainBars(points) {
-  if (!points || !points.length) return '<div class="muted">Graph builds as readings arrive</div>';
-
-  const { secs, inWin, x, ticks } = timeAxis(points);
-  if (!inWin.length) return `<div class="muted">No readings in the last ${SPARK_H} hours</div>`;
+  points = points || [];
+  /* Always drawn, on the same rule `sparkline()` above states in full: a window needs two readings
+     to have a width, and with fewer than two the clock supplies one. 18 of 231 rainfall stations
+     hold no history, 16 of them because they are offline, and each printed a sentence where a
+     timeline belongs. An empty plot still carries its axis and its intensity classes. */
+  const now = Math.floor(Date.now() / 1000);
+  const { secs, inWin, x, ticks } = timeAxis(points,
+    points.length < 2 ? [now - SPARK_H * 3600, now] : undefined);
 
   /* A dry station draws its measured zeros. It used to print `No rain in the last 11 h` instead, and
      a sentence cannot say the two things this graph says. **A measured zero and a gap in the record
@@ -1054,7 +1098,9 @@ export function rainBars(points) {
      into one claim about the whole window, and it was the same claim either way.
      It is also the rule the five totals beside it already obey — see the accumulation chart, where
      five flat columns keep a measured zero and an unanswered window visibly apart. */
-  const hi0 = Math.max(...inWin.map(([, v]) => v));
+  // `Math.max()` of nothing is -Infinity, which would carry into the axis and the mark filter, so
+  // a station with no readings floors at zero and draws the classes against an empty plot.
+  const hi0 = inWin.length ? Math.max(...inWin.map(([, v]) => v)) : 0;
 
   /* JPS's intensity classes, drawn across the plot — moderate at 10 mm/h, heavy at 30, the top class
      at 60. `RAIN_STOPS` holds the same boundaries for the heat gradient, so the graph and the map
@@ -1098,7 +1144,8 @@ export function rainBars(points) {
      The words go in `data-tip` and not in a `title`, which never opens on a phone. `show()` in
      js/sparktip.js tests `[data-tip]` before `.spark[data-pts]`, so this label wins over the
      per-sample readout while the pointer is on it, and the readout takes every other column. */
-  const pk = inWin.reduce((a, b) => (b[1] > a[1] ? b : a));
+  // `reduce` with no initial value throws on an empty array, and an empty plot is now a real case.
+  const pk = inWin.length ? inWin.reduce((a, b) => (b[1] > a[1] ? b : a)) : null;
   /* The rule keeps the true column and the glyph moves off centre at the edges, rather than the
      other way round. Rain peaking right now is the ordinary case, not an edge case — the newest
      sample is the last column — and a centred glyph there hangs half its width outside the plate. */
@@ -1106,18 +1153,19 @@ export function rainBars(points) {
   // prints `mm/h`, so three words spelled out what one unit says beside it.
   // No mark on a dry station. `Peak 0 mm/h` names a peak that did not happen, and an amber
   // mark on a graph with nothing to point at is the cry-wolf failure in miniature.
-  const px = +x(pk[0]);
-  const peak = !hi0 ? '' : `<b class="peak${px > 94 ? ' er' : px < 6 ? ' el' : ''}" style="left:${px}%"
+  const px = pk ? +x(pk[0]) : 0;
+  const peak = !hi0 || !pk ? '' : `<b class="peak${px > 94 ? ' er' : px < 6 ? ' el' : ''}" style="left:${px}%"
       data-tip="Peak ${pk[1]} mm/h · ${MYT_CLOCK.format(pk[0] * 1000)}"
     ><i class="i i-keyboard_double_arrow_up"></i></b>`;
 
   /* The heading carries the span the old caption ended with. It states the ground the graph covers,
      which is what the reader needs before reading a shape off it — and it is a measurement, not the
-     `SPARK_H` cap, so a station watched for two hours says two hours. The two early returns above
-     name their own window in their own sentence and take no heading. Both are the case where there
-     is nothing at all to plot, which is the one thing a graph cannot state for itself. */
+     `SPARK_H` cap, so a station watched for two hours says two hours. A station with no readings
+     says `Last 12 h`, which is the window the clock frame gave it and the ground the empty plot
+     covers. The two early returns that used to stand here are gone — a sentence about a window and
+     an empty plot make the same claim, and only one of them keeps the axis and the classes. */
   return SUB(`Last ${spanText(secs)}`) + `<div class="spark"${
-      readout(inWin, x, v => `${v} mm/h`, 'rainfall')}>
+      inWin.length ? readout(inWin, x, v => `${v} mm/h`, 'rainfall') : ''}>
     <svg viewBox="0 0 100 28" preserveAspectRatio="none" aria-hidden="true">
       ${defs}
       ${rules(ticks)}

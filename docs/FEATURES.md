@@ -9383,3 +9383,75 @@ to draw.
 
 It read `Silent for 9 h`, `Last sounded 14:22` or `Sounding since 13:50`. The band states all three.
 A rail with no bar on it is silence. A red bar shows when it started. A red bar that reaches the right edge means the siren sounds now. The hover readout names the hour on any sample.
+## A graph always draws
+
+The state of the station took the timeline away from three of the four sensor kinds. The flood
+gauge lost it almost always.
+
+| kind | stations | drew a timeline | why the rest did not |
+|---|---|---|---|
+| river | 107 | 104 | 3 hold under two samples |
+| rainfall | 231 | 213 | 18 hold none, and 16 of those are offline |
+| gauge | 36 | 3 | a gate on `history?.length`, and single-sample history |
+| siren | 212 | 212 | fixed one commit earlier |
+
+Even the 3 gauges that drew had a data span of 0.0 h. JPS stamps a batch of them to one time. So no gauge in the payload
+produces a data-framed window.
+
+### The clock supplies the window the readings cannot
+
+A window needs two readings to have a width. With fewer than two, `sparkline()` and `rainBars()` now
+frame on the last 12 hours ending now. They take the `frame` parameter on `timeAxis()` that the siren
+band already uses.
+
+With two readings or more, nothing changed. The axis still spans the readings held, capped at
+`SPARK_H`. Two hours of history still draws as two labelled hours.
+
+A graph holding nothing is not an empty box. It draws the plate, the axis and the station's own
+marks. For a flood gauge that is the 0.15 m and 0.3 m lines. For a river it is alert, warning and
+danger. That is the scale with nothing on it. It answers the question a reader brings to the card.
+
+A lone reading draws as a dash. The viewBox stretches everything inside it, so a `<circle>` comes out
+an ellipse. That is the same reason the rain peak mark sits in HTML over the plot.
+
+### Two gates removed, one kept
+
+`sensorBody()` and `dataTable()` each wrapped the gauge sparkline in `history?.length`. That gate is
+why 15 gauges drew nothing at all. Both are gone.
+
+`rainAcc()` keeps its `!isStale(s)` gate. It draws five current totals rather than a history, so it
+is not a timeline. One gauge in the payload holds 27 mm in an hour stamped last October, and printing
+that under a column headed `Today` is the one thing that chart must never do.
+
+### The caption stated the axis
+
+This fault turned up during the rewrite, and it is the larger one.
+
+The caption under a level graph read `lo` and `hi`. Those are the axis. An earlier change grew the
+axis to hold every mark a river publishes, so the caption started naming marks as water.
+
+```
+T.T.D.I JAYA, SHAH ALAM    caption said 3.42-8.30 m    the river ranged 3.42-5.32 m
+```
+
+**102 of 104 river graphs stated a range no reading had reached.** The caption reads `lo0` and `hi0`
+now, which are the readings.
+
+`rainBars()` already carried this rule for its peak mark, after the same fault. The peak printed the
+axis maximum and named 60 mm on a station that peaked at 37.5. Anything stating a graph's range reads
+the data, never the scale.
+
+Two readings or it is not a range. A graph holding one reading or none carries no caption.
+
+### What the rewrite had to guard
+
+`Math.max()` of nothing is `-Infinity`, and it fed both the axis and the mark filter. `reduce()` with
+no initial value throws on an empty array, and an empty plot is a real case now. An empty graph ships
+no `data-pts`, for the reason the siren band already states.
+
+Measured after the change. All 586 sensors draw a graph. Nothing throws. No `NaN` and no `Infinity`
+reaches the markup. All 107 river captions match their own readings.
+
+The two sentences are gone. `Graph builds as readings arrive` and `No readings in the last 12 hours`.
+The second was already unreachable, because the server windows `SPARK_WIN` against now and no
+delivered sample is older than that.

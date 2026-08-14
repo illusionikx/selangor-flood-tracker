@@ -288,9 +288,10 @@ const trend = m => (m.kind === 'river' && m.rate != null
         m.eta != null ? ` · danger ${etaText(m.eta)}` : ''}</div>`
     : '')
   + (m.kind === 'river' ? sparkline(m.history, 'river', m)
-    // Only where there is one: an offline gauge is not sampled, and "graph builds as we poll" on a
-    // sensor nobody is hearing from would promise a line that is never going to arrive.
-    : m.kind === 'gauge' ? (m.history?.length ? sparkline(m.history, 'gauge', m) : '')
+    // No guard on the gauge either. `sparkline()` frames on the clock when the readings cannot
+    // supply a window, so a gauge nobody is hearing from draws its own marks against an empty plot
+    // rather than vanishing from the panel.
+    : m.kind === 'gauge' ? sparkline(m.history, 'gauge', m)
     // The siren band takes no such guard any more. It frames on the clock rather than on its
     // samples, so a siren with none draws twelve hours of empty rail, which is the answer.
     : m.kind === 'siren' ? sirenBand(m.history)
