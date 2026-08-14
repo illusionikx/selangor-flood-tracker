@@ -2229,6 +2229,19 @@ foreach($p["warnings"] as $w) echo substr($w["title"],0,70),"\n";'
 grep -n 'class="pin[ "]' index.html | grep -v -- '--c:' \
   && echo "FAIL: a legend pin sample has no --c" || echo "OK: every legend pin states its colour"
 
+# The tally chips in the alert panel head must partition the list under them, so the forecast chip
+# reads a tier and not a flag. A river at its danger mark can also be rising, and `tier()` files it
+# under `now` alone — so a chip counting `s.rising` claims a second alert the cards never draw.
+# `alerts.js` evaluates the DOM at module scope, so node cannot load it. This grep is the check.
+grep -q 'live.filter(s => s.rising && tier(s) === .soon.)' js/alerts.js \
+  && echo "OK: the forecast chip counts a tier" || echo "FAIL: the forecast chip double-counts"
+
+# Which stations hold two alert flags at once. Nothing is wrong when this lists a row. It names the
+# case the check above guards, so a reader can see the chips against the cards on a live payload.
+php -r '$p=json_decode(file_get_contents(".cache.json"),true);
+foreach($p["stations"] as $s) if($s["kind"]==="river"&&($s["status"]??0)>=3&&!empty($s["rising"]))
+  printf("%-8s %-26s at danger AND rising\n",$s["id"],$s["name"]);'
+
 # Every module must carry a modulepreload link, except the five loaded on demand. There is no build
 # step to generate that list, so it goes stale silently when somebody adds a module.
 for f in js/*.js; do

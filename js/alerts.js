@@ -204,7 +204,10 @@ export function alerts() {
   // and counted separately. A number that silently includes a reading from April is a lie with a
   // digit in front of it.
   const live   = hot.filter(s => tier(s) !== 'stale');
-  const rising = live.filter(s => s.rising).length;
+  // Each chip counts a tier, because that is what the cards below draw. A river at its danger mark
+  // and still climbing carries both flags, and counted twice it made the head promise two alerts
+  // over one row. `tier()` already elected `now` for it, so the forecast chip reads `soon` alone.
+  const rising = live.filter(s => s.rising && tier(s) === 'soon').length;
   const danger = live.filter(s => s.kind === 'river' && s.status >= 3).length;
   const sirens = live.filter(s => s.kind === 'siren').length;
   const stale  = hot.length - live.length;

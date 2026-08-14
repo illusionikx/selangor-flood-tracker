@@ -9590,3 +9590,29 @@ reaches the markup. All 107 river captions match their own readings.
 The two sentences are gone. `Graph builds as readings arrive` and `No readings in the last 12 hours`.
 The second was already unreachable, because the server windows `SPARK_WIN` against now and no
 delivered sample is older than that.
+
+## The alert head counted one station twice
+
+The panel head read `1 at danger` and `1 rising`, over a list that held one row.
+
+`tier()` puts each station in one tier. `isCritical` wins, so a river at its danger mark and still
+climbing is `now`, and the cards draw it once under `HAPPENING NOW`. The chips above those cards did
+not follow that rule.
+
+Three of the four already did. `live` subtracts `stale` out of itself. The danger chip and the
+sounding chip cannot both match one station, because one reads a river and the other reads a siren.
+The forecast chip read `s.rising` alone.
+
+```
+wl-201  JAMBATAN S.K.C  status=3  rising=1  ->  tier() says now, chips said now and soon
+```
+
+The chip counts a tier now. A river that is at danger and rising is one alert in the head and one row
+in the list.
+
+**A chip in that head must count a tier, not a flag.** The flags overlap on purpose. `rising` is a
+forecast about a river, and a river can reach its mark and go on climbing. The tier is the answer to
+"what does a reader do about this", and the cards are already grouped by it.
+
+The counts still count sensors, and each row is a place. A monitoring station with two rivers over
+their marks is two in the head and one row. That is a different question and it is not changed here.
