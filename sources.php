@@ -340,6 +340,15 @@ function seriesUrl(string $graphId): string {
  * two scraped feeds.
  *
  * Stamps are Malaysian wall clock with no offset, the same as every other reading here.
+ *
+ * A NEGATIVE BUCKET IS SKIPPED, THE SAME RULE numOrNull() ALREADY STATES FOR THIS HOST'S TWO
+ * SIBLING FEEDS. Rain over five minutes cannot be negative, so a negative reading is a fault, not
+ * a measurement — and this host uses -9999 as its no-reading sentinel on those siblings, so a
+ * sentinel here is a live possibility, not a hypothetical one. seedRebase() below builds a running
+ * sum out of this series and pins only its LAST value to the live total it joins; one bad bucket
+ * anywhere earlier would dip the sum and stay a real backwards step between two adjacent samples,
+ * which no constant offset afterward can undo. Skipping the bucket removes it from the sum
+ * entirely, so the running total stays non-decreasing by construction rather than by luck.
  */
 function seriesParse(string $json): array {
     $rows = json_decode($json, true);
@@ -349,9 +358,55 @@ function seriesParse(string $json): array {
     foreach ($rows as $r) {
         $d = DateTime::createFromFormat('d/m/Y H:i', trim((string)($r['date_time'] ?? '')), $tz);
         if (!$d) continue;
-        $out[] = [$d->getTimestamp(), (float)($r['clean_rainfall'] ?? 0)];
+        $v = numOrNull((string)($r['clean_rainfall'] ?? ''));
+        if ($v === null || $v < 0) continue;
+        $out[] = [$d->getTimestamp(), $v];
     }
     usort($out, fn($a, $b) => $a[0] <=> $b[0]);
+    return $out;
+}
+
+/**
+ * The pure half of the history seed's rebasing join — no I/O, no database, so it can be tested
+ * offline rather than only by hand against the live drip. `$pts` is a parsed 7-day series
+ * (ascending, as seriesParse() returns). `$firstLive` is the earliest `[ts, value]` this app has
+ * already stored for the station's own running total, or null where there is none yet. Returns the
+ * `[ts, value]` rows to insert; the caller does the fetching and the writing.
+ *
+ * The seed has to JOIN the running total this app already keeps, not restart it. By the time a
+ * station's turn in the drip comes up, live polling may already have written samples for it — a
+ * LARGER number at a NEWER timestamp than a seed starting from zero would produce. accWindow()
+ * reads a total that only climbs, so a seed ending below the first live sample is a station whose
+ * 24 and 72 hour windows go null the moment the two series meet.
+ *
+ * With no live sample, there is nothing to join to, and the seed is the whole series, starting
+ * from zero — the same starting rule portalOdo() uses for a station with no total yet. With one,
+ * this keeps only the buckets OLDER than it (the ground the live series already owns is not seeded
+ * again) and lets `R` be the raw running total at the last of those. Offsetting every kept value by
+ * `firstLive`'s own value minus `R` makes the LAST returned value equal `firstLive`'s value
+ * exactly, so the join has no step in it and no direction to go backwards in. Early values may land
+ * negative under that offset, which is harmless: accWindow() only ever subtracts two samples, so a
+ * constant offset cancels out of every window it touches.
+ *
+ * A non-decreasing `$pts` in is what makes this return a non-decreasing result — a constant offset
+ * cannot repair a dip already inside the sum, only shift the whole line up or down. seriesParse()
+ * above is what keeps a bad bucket out of `$pts` in the first place.
+ */
+function seedRebase(array $pts, ?array $firstLive): array {
+    $firstTs = $firstLive !== null ? (int)$firstLive[0] : null;
+
+    $run = 0.0;
+    $toInsert = [];
+    foreach ($pts as [$ts2, $mm]) {
+        $run = round($run + $mm, 1);
+        if ($firstTs !== null && $ts2 >= $firstTs) break;   // the live series owns this ground
+        $toInsert[] = [$ts2, $run];
+    }
+    $r      = $toInsert ? end($toInsert)[1] : 0.0;
+    $offset = $firstLive !== null ? ((float)$firstLive[1] - $r) : 0.0;
+
+    $out = [];
+    foreach ($toInsert as [$ts2, $raw]) $out[] = [$ts2, round($raw + $offset, 1)];
     return $out;
 }
 

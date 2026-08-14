@@ -9,6 +9,7 @@ lib/
 .place.lock
 .siren.stamp
 .gaz.stamp
+.hist.stamp
 .cam/
 .cams.json*
 .prf.json

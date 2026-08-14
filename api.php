@@ -1753,6 +1753,69 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
     $ok('a day past 12 still parses',
         seriesParse('[{"date_time":"20/08/2026 09:15","clean_rainfall":1}]')[0][0]
         === strtotime('2026-08-20 09:15:00 +0800'));
+    /* This host's two sibling HTML feeds use -9999 as their no-reading sentinel (numOrNull()
+       exists for exactly that), so a sentinel here is a real possibility rather than a
+       hypothetical one. Rain over five minutes cannot be negative, so any negative bucket is a
+       fault and is dropped rather than summed — see seedRebase() for why a dropped bucket, and
+       not a clamped one, is what keeps the running total non-decreasing. */
+    $ok('a sentinel bucket is dropped', seriesParse(
+        '[{"date_time":"14/08/2026 10:00","clean_rainfall":-9999},'
+      . '{"date_time":"14/08/2026 10:05","clean_rainfall":1}]'
+    ) === [[strtotime('2026-08-14 10:05:00 +0800'), 1.0]]);
+    $ok('an ordinary negative bucket is dropped too', seriesParse(
+        '[{"date_time":"14/08/2026 10:00","clean_rainfall":-0.5},'
+      . '{"date_time":"14/08/2026 10:05","clean_rainfall":1}]'
+    ) === [[strtotime('2026-08-14 10:05:00 +0800'), 1.0]]);
+
+    echo "\nseedRebase():\n";
+    // No element may be lower than the one before it — the task's central claim, asserted
+    // directly rather than left to a paragraph.
+    $nondec = function (array $r): bool {
+        for ($i = 1; $i < count($r); $i++) if ($r[$i][1] < $r[$i - 1][1] - 0.0001) return false;
+        return true;
+    };
+
+    // No live sample at all: nothing to join to, so the seed runs from zero — portalOdo()'s own
+    // starting rule for a station with no total yet.
+    $rbA = seedRebase([[100, 2.0], [200, 3.0], [300, 1.0]], null);
+    $ok('no live sample runs from zero', $rbA === [[100, 2.0], [200, 5.0], [300, 6.0]]);
+
+    // Every bucket at or after the live sample: the live series already owns all of that ground,
+    // so nothing is kept.
+    $rbB = seedRebase([[500, 2.0], [600, 3.0]], [100, 50.0]);
+    $ok('every bucket newer than firstLive keeps nothing', $rbB === []);
+
+    /* R (35.0, the raw sum of the kept buckets) sits ABOVE firstLive's value (20.0), so the
+       offset is negative and the early values land below zero. That is harmless — accWindow()
+       only ever subtracts two samples, so a constant offset cancels — and the sequence still
+       climbs throughout and still ends exactly on firstLive's own value. */
+    $rbC = seedRebase([[100, 10.0], [200, 20.0], [300, 5.0]], [400, 20.0]);
+    $ok('R above firstLive gives a negative offset',
+        $rbC === [[100, -5.0], [200, 15.0], [300, 20.0]]);
+    $ok('it still climbs under a negative offset', $nondec($rbC));
+    $ok('it still ends exactly on firstLive', end($rbC)[1] === 20.0);
+
+    /* A negative bucket reaching seedRebase() would dip the running sum, and a constant offset
+       cannot repair a dip already inside it — only seriesParse() dropping the bucket first can.
+       This is the end-to-end case: the same malformed feed that would have produced a real
+       backwards step before that fix now produces none. */
+    $rbD = seedRebase(seriesParse(
+        '[{"date_time":"14/08/2026 10:00","clean_rainfall":10},'
+      . '{"date_time":"14/08/2026 10:05","clean_rainfall":-9999},'
+      . '{"date_time":"14/08/2026 10:10","clean_rainfall":8}]'
+    ), null);
+    $ok('a sentinel bucket never produces a backwards step', $nondec($rbD));
+    $ok('the dropped bucket contributed nothing to the sum',
+        $rbD === [[strtotime('2026-08-14 10:00:00 +0800'), 10.0],
+                  [strtotime('2026-08-14 10:10:00 +0800'), 18.0]]);
+
+    // The ordinary case: R (4.5) sits below firstLive's value (42.0), the offset is positive, and
+    // the last kept value still lands exactly on firstLive's own value.
+    $rbE = seedRebase([[100, 1.0], [200, 2.0], [300, 1.5], [500, 3.0]], [400, 42.0]);
+    $ok('the ordinary case ends exactly on firstLive', end($rbE)[1] === 42.0);
+    $ok('the ordinary case matches by hand',
+        $rbE === [[100, 38.5], [200, 40.5], [300, 42.0]]);
+    $ok('the ordinary case climbs throughout', $nondec($rbE));
 
     echo "\nserveFromCache():\n";
     $ok('a fresh cache is served',                 serveFromCache(10, true, false) === true);
@@ -3386,47 +3449,26 @@ if ($histOk) {
         // The earliest sample this app has already stored for a station's running total, if any —
         // read fresh per station rather than off $odo, which only holds ACC_READ (80h) of it. A
         // station polled for days before its turn in the drip comes up would lose the join if this
-        // read the windowed copy instead of the table itself.
+        // read the windowed copy instead of the table itself. It would also miss a station getting
+        // its first-ever #c sample on this very request: $odo was loaded before this poll wrote
+        // its own live samples, so a fresh table read is the only copy that can see one just written.
         $first2 = $db->prepare('SELECT ts, level FROM level WHERE station = ? ORDER BY ts LIMIT 1');
         $db->beginTransaction();
         foreach ($todo as $id => $g) {
             $pts = seriesParse($got[$urls[$id]] ?? '');
             $key = $id . '#c';
 
-            /* The seed has to JOIN the running total this app already keeps, not restart it. By
-               the time a station's turn in the drip comes up, live polling may already have
-               written #c samples for it — a LARGER number at a NEWER timestamp than a seed
-               starting from zero would produce. accWindow() reads a total that only climbs, so a
-               seed ending below the first live sample is a station whose 24 and 72 hour windows
-               go null the moment the two series meet.
-
-               Read the earliest live sample. With none, there is nothing to join to, and the seed
-               is the whole series, starting from zero — portalOdo()'s own starting rule. With one,
-               keep only the seed buckets OLDER than it (the ground the live series already owns is
-               not seeded again) and let R be the raw running total at the last of those. Offsetting
-               every kept value by firstLive's own value minus R makes the LAST seeded value equal
-               firstLive's value exactly, so the join has no step in it and no direction to go
-               backwards in. Early seeded values may land negative under that offset, which is
-               harmless: accWindow() only ever subtracts two samples, so a constant offset cancels
-               out of every window it touches. */
-            $first2->execute([$key]);
-            $firstLive = $first2->fetch(PDO::FETCH_NUM);
-            $firstTs   = $firstLive !== false ? (int)$firstLive[0] : null;
-
             // Disjoint buckets add up, so a running total is a running sum. This is the ONE place
             // in this app that adds rainfall readings together, and it is allowed because these
-            // buckets do not overlap. Everything else takes a difference — see accWindow().
-            $run = 0.0;
-            $toInsert = [];
-            foreach ($pts as [$ts2, $mm]) {
-                $run = round($run + $mm, 1);
-                if ($firstTs !== null && $ts2 >= $firstTs) break;   // the live series owns this ground
-                $toInsert[] = [$ts2, $run];
-            }
-            $r      = $toInsert ? end($toInsert)[1] : 0.0;
-            $offset = $firstLive !== false ? ((float)$firstLive[1] - $r) : 0.0;
-            foreach ($toInsert as [$ts2, $raw]) {
-                $ins2->execute([$key, $ts2, round($raw + $offset, 1)]);
+            // buckets do not overlap. Everything else takes a difference — see accWindow(). The
+            // arithmetic that turns $pts and the earliest live sample into rows to insert is pure,
+            // so it lives in seedRebase() beside seriesParse(), where --selftest can reach it
+            // offline rather than only by watching a live drip.
+            $first2->execute([$key]);
+            $row       = $first2->fetch(PDO::FETCH_NUM);
+            $firstLive = $row !== false ? [(int)$row[0], (float)$row[1]] : null;
+            foreach (seedRebase($pts, $firstLive) as [$ts2, $v]) {
+                $ins2->execute([$key, $ts2, $v]);
             }
             // Stamped whether or not it answered, the same rule pageRow() states.
             $keep->execute([HIST_KEY . $id, $now, '1']);
