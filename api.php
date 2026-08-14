@@ -242,6 +242,7 @@ const GAZ_FILL  = 5;                              // prefixes per refresh
 const GAZ_EVERY = 600;                            // seconds between drips, site-wide
 const GAZ_STAMP = __DIR__ . '/.gaz.stamp';
 const GAZ_KEY   = 'gazdone:';                     // one page row per prefix already queried
+const GAZ_DISTRICT_KM = 50;   // a placement must corroborate the district the portal itself assigns
 
 /* The coverage box: Selangor, Kuala Lumpur and Putrajaya. The 683 stations span latitude 2.6088 to
    3.8470 and longitude 100.8229 to 101.9215, plus 0.1 degrees of margin so an edge place resolves.
@@ -1245,6 +1246,36 @@ function gazPlace(string $name, array $gaz): ?array {
             'district' => $win['district'], 'state' => $win['state']];
 }
 
+/* Does a placement corroborate the district the portal itself assigns? CAM_FIX states the same rule
+ * for cameras, in CLAUDE.md: the station name must geocode to the point, and that point must sit
+ * near the median of the other stations in the district JPS itself assigns. A name alone is not
+ * enough. gazPlace() proved the gap on its own: the gazetteer holds two entries for one station 81
+ * km apart, `Sg. Bernam di Tanjung Malim` near the real town and `Sg. Bernam di Tanjung Malim (F2)`
+ * near Putrajaya, and both of gazPlace()'s rules fired clean on the second one, because the portal
+ * row asked for was named `Tanjung Malim (F2)`. Upstream contradicts itself, and this app has no
+ * business picking a side without a second, independent check.
+ *
+ * GAZ_DISTRICT_KM (50) is measured, not guessed. Zero of about 470 stations this app already holds
+ * sit more than 50 km from their own district's median. The same two rows above are refused at 40,
+ * 50 and 60 km alike, so the number is not sitting on a cliff edge, and the worst legitimate
+ * outlier measured, at 34.6 km, leaves a wide gap under the closest rejected placement, at 67.5 km.
+ *
+ * A district with fewer than 3 known stations has nothing to corroborate against, so it passes —
+ * refusing on no evidence would be inventing a check rather than making one.
+ */
+function gazCorroborated(float $lat, float $lng, array $near): bool {
+    if (count($near) < 3) return true;
+    $mid = function (array $a) {
+        sort($a);
+        $n = count($a);
+        return $n % 2 ? $a[($n - 1) / 2] : ($a[$n / 2 - 1] + $a[$n / 2]) / 2;
+    };
+    $cLat = $mid(array_column($near, 0));
+    $cLng = $mid(array_column($near, 1));
+    $km = hypot($lat - $cLat, ($lng - $cLng) * cos(deg2rad($cLat))) * 111;
+    return $km <= GAZ_DISTRICT_KM;
+}
+
 /* Which prefixes to ask the station search for next.
  *
  * The set comes from the data rather than from a list: the first three characters of every portal
@@ -1635,6 +1666,18 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
     $ok('an unknown name places nothing',     gazPlace('Nowhere At All', $gaz) === null);
     $ok('an empty gazetteer places nothing',  gazPlace('Bandar Kinrara', []) === null);
     $ok('an empty name places nothing',       gazPlace('', $gaz) === null);
+
+    echo "\ngazCorroborated():\n";
+    // A fabricated district: three known points with median (3.00, 101.50).
+    $near = [[3.00, 101.50], [3.01, 101.51], [2.99, 101.49]];
+    $ok('a placement 60 km from the district refuses',
+        gazCorroborated(3.541, 101.50, $near) === false);
+    $ok('the same placement 10 km away passes',
+        gazCorroborated(3.0901, 101.50, $near) === true);
+    $ok('under 3 known stations passes, nothing to check against',
+        gazCorroborated(9.0, 99.0, [[3.0, 101.5], [3.01, 101.51]]) === true);
+    $ok('no known stations passes',
+        gazCorroborated(9.0, 99.0, []) === true);
 
     echo "\ngazParse():\n";
     $gazJson = '[{"loc":[3.1,101.6],"title":"Sg. Klang di Kuala Lumpur, Kuala Lumpur, Wilayah Persekutuan Kuala Lumpur"},'
@@ -2718,15 +2761,36 @@ foreach ($stations as &$s) {
 }
 unset($s);
 
+/* Every already-held station's point, grouped by state and district — the same two fields the
+   district outlier sweep in CLAUDE.md groups on, and what gazCorroborated() below checks a new
+   placement against. Built here, once, from the stations this app held BEFORE either new-station
+   pass below runs: a placement this task adds must corroborate against ground this app already
+   knew, never against another guess this same task just made.
+   State and district are not normalised to their final form yet — that runs far below, near
+   $sourceTs — so this repeats the same two rules here: an unset state is Selangor, and district
+   case folds to Title Case, or "HULU SELANGOR" and "Hulu Selangor" would count as two districts and
+   split the very evidence this check needs. */
+$distKey = fn(?string $state, string $district) => ($state ?: 'Selangor') . '|'
+    . mb_convert_case(trim($district), MB_CASE_TITLE, 'UTF-8');
+$distPts = [];
+foreach ($stations as $s) {
+    if (!$s['lat'] || !$s['lng'] || !$s['district']) continue;
+    $distPts[$distKey($s['state'] ?? null, $s['district'])][] = [$s['lat'], $s['lng']];
+}
+
 /* The rivers the portal alone knows about. $nat is keyed by station code and $natUsed names every
    code that corrected a station this app already held, so the difference is the new set.
    22 of these are the Kuala Lumpur rivers the SPHTN table never placed, which is the gap this
    whole source exists to close. */
-$natNew = $natSkip = 0;
+$natNew = $natSkip = $natDistrict = 0;
 foreach ($nat as $code => $n) {
     if (isset($natUsed[$code]) || $n['level'] === null) continue;
     $at = gazPlace($n['name'], $gaz);
     if ($at === null) { $natSkip++; continue; }
+    // gazPlace() matched a name; this corroborates the point against the district the portal
+    // itself assigns it, the same way CAM_FIX corroborates a camera against its own district.
+    $near = $distPts[$distKey(portalState($at['state']), $at['district'])] ?? [];
+    if (!gazCorroborated($at['lat'], $at['lng'], $near)) { $natDistrict++; continue; }
     $natNew++;
     $stations[] = [
         'kind'    => 'river',
@@ -2784,11 +2848,15 @@ unset($s);
    `state` decides which half of the map a station belongs to, and district names collide across
    states — Kuala Lumpur and Selangor both have a Gombak — so anything keyed by district must key by
    state and district together. See dkey() in js/util.js. */
-$prfNew = $prfSkip = 0;
+$prfNew = $prfSkip = $prfDistrict = 0;
 foreach ($prf as $i => $r) {
     if (isset($prfHit['used'][$i])) continue;
     $at = gazPlace($r['name'], $gaz);
     if ($at === null) { $prfSkip++; continue; }
+    // gazPlace() matched a name; this corroborates the point against the district the portal
+    // itself assigns it, the same way CAM_FIX corroborates a camera against its own district.
+    $near = $distPts[$distKey(portalState($at['state']), $at['district'])] ?? [];
+    if (!gazCorroborated($at['lat'], $at['lng'], $near)) { $prfDistrict++; continue; }
     $prfNew++;
     $id = 'prf-' . ($r['code'] ?? md5($r['name']));
     $stations[] = [
@@ -3129,11 +3197,13 @@ $payload = json_encode([
     'sources'  => [
         'kl'       => ['parsed' => count($kl), 'added' => $klAdded, 'merged' => $klDupes],
         // `placed` is how many rivers the portal alone knew about, pinned from the gazetteer.
-        // `unmapped` is what is left once a code either corrected a station or placed a new one —
-        // no coordinate for it anywhere in the gazetteer yet.
+        // `district` is a different failure from `unplaced`: gazPlace() found a name match, but
+        // gazCorroborated() would not stand behind the point — see gazCorroborated()'s own comment.
+        // `unmapped` is what is left once a code corrected a station, placed a new one, or was
+        // refused by the district check — no coordinate for it anywhere in the gazetteer yet.
         'national' => ['parsed' => count($nat), 'applied' => count($natUsed),
-                       'placed' => $natNew, 'unplaced' => $natSkip,
-                       'unmapped' => count($nat) - count($natUsed) - $natNew],
+                       'placed' => $natNew, 'unplaced' => $natSkip, 'district' => $natDistrict,
+                       'unmapped' => count($nat) - count($natUsed) - $natNew - $natDistrict],
         'met'      => ['parsed' => $metParsed, 'fresh' => count($metPts), 'matched' => $metMatched],
         'metday'   => ['parsed' => count($metDay), 'matched' => $metDayMatched],
         'metwarn'  => ['parsed' => count($metWarn)],
@@ -3142,9 +3212,11 @@ $payload = json_encode([
         // stations share, a name two rows share, a code match overriding a weaker name match on
         // one station, and two stations claiming one row. `placed` and `unplaced` are the rows the
         // portal alone knew about — gazPlace() pinned one, or the row is counted and dropped.
+        // `district` is a third, different count: gazPlace() pinned a point, but gazCorroborated()
+        // refused it — a coordinate found and not trusted, not a coordinate that was never found.
         'portalrf' => ['parsed' => count($prf), 'applied' => $prfUsed,
                        'clash'  => count($prfHit['clash']),
-                       'placed' => $prfNew, 'unplaced' => $prfSkip],
+                       'placed' => $prfNew, 'unplaced' => $prfSkip, 'district' => $prfDistrict],
         // `pending` is what the NEXT drip will ask for, capped at GAZ_FILL. It reaching 0 is the
         // backfill finishing, which is success — see watch.php in Task 10.
         'gaz' => ['stations' => (int)$db->query('SELECT COUNT(*) FROM station')->fetchColumn(),
