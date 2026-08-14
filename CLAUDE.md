@@ -406,9 +406,16 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   claiming 24. Four things return `null` rather than a number: an empty series, no sample at or
   before the far end, a backwards odometer (the 1 January reset), and both ends on one sample.
   `accHours()` is the KL fallback and obeys the same rule from the other side — all three clock
-  hours or nothing, because a short sum reads as light rain. **The `#c` series began 2026-08-13 and nothing
-  can fill it in**, because no earlier poll stored `cumulativeRainfall`. Both long windows published
-  `null` everywhere for the first day.
+  hours or nothing, because a short sum reads as light rain. **The `#c` series began 2026-08-13 18:30
+  and nothing can fill it in**, because no earlier poll stored `cumulativeRainfall`. So the 24-hour
+  window answered nothing until 2026-08-14 18:30, and the 72-hour window until 2026-08-16 18:30.
+  Measured 2026-08-14 15:23, with the archive 20.9 h deep, 1 station of 231 answered `h24`. That one
+  reads a 27 h span. Its first stored sample carried a stamp 6.5 h older than the poll that stored
+  it. A `null` on either long window is the correct answer while the archive is short.
+  **The 38 KL stations answer neither window, and they never will.** SPHTN publishes no
+  `cumulativeRainfall`, so there is no odometer to subtract. Do not close that gap with `accHours()`
+  at 24 hours. That is the sum this rule forbids. Two `—` columns on a KL gauge are the right
+  answer.
 - **The accumulation chart carries no threshold mark, and three sources failed to supply one.** It
   says how much rain fell and never how bad that is — `rainBars()` above it already draws the JPS
   intensity classes and `rainState()` above that prints the word. A curve fitted between
