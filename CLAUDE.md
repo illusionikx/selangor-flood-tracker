@@ -1133,9 +1133,14 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   **Switching the heat chip from rainfall to water is what reaches it**, since that leaves `rainHeat`
   added-then-removed, holding a canvas and no map. `syncHeat()` adds and removes before it calls
   `heatScale()`, so a layer just switched on is on the map by then and still gets sized.
-- **The water layer has no eraser and must not get one.** A river reading low says nothing about the
-  river beside it. Rain gauges are the only sensors here where one station's zero is evidence about
-  the ground next to it, which is the whole reason that pass exists on one layer only.
+- **The water layer has no denial and must not get one, and everything else it shares.** Both layers
+  are `SoftHeat`, so the field render, `BLEND`, `FEATHER`, the clamped-sum coverage and the bucket
+  index are one implementation and reach both. Only `setDry()` is called on one of them, from
+  `render.js`. **A river reading low says nothing about the river beside it.** A rain gauge is the
+  only sensor here whose zero is evidence about the ground next to it, which is why that argument
+  exists on one layer alone. A flood gauge is not that sensor either — see the drainage rule in the
+  rain heat entry above. Anything added to `SoftHeat` lands on both layers, so check it against both
+  before assuming it is a rain change.
 - **Leaflet paints its container `#ddd` in both themes.** That is what shows through wherever a tile
   has not arrived, and a zoom out has nothing to retain over the newly revealed area — so the
   missing tiles read as a grid of pale boxes on the dark basemap. `.leaflet-container` takes
@@ -1858,31 +1863,37 @@ echo count(array_filter($p["stations"],fn($s)=>($s["met"]["km"]??0)>$k))," beyon
   --ignore-certificate-errors --virtual-time-budget=15000 --dump-dom \
   https://flood-exp.test/heat-test.html | perl -0777 -ne 'print $1 if /<pre id="out">([^<]*)</s'
 
-# How far apart the rain gauges stand, in blob radii. FEATHER (0.20) and the two join assertions in
-# heat-test.html are sized from this, so re-run it before moving either — and after any change to
-# RAIN_KM, which rescales every number here.
-# **It thins EVERY rain gauge, not the wet ones.** The wet set changes with the weather, and two
-# snapshots an hour apart moved the widest pair from 1.58 to 1.90 radii. The station geometry does
-# not move. thinHeat() guarantees 1.00 and no more, so read the spread rather than the floor.
-# Both populations, because they answer different questions and their percentiles differ. A seam
-# shows first between a gauge and its NEAREST neighbour, so heat-test.html takes its probe distances
-# from that row. Join solidity is scored over EVERY overlapping pair instead, since any two blobs
-# that meet can show one. Measured 2026-08-14 at RAIN_KM 6: 231 -> 84 kept, nearest 1.21/1.66/1.95,
-# all 1.54/1.89/1.98. At RAIN_KM 9 the same sweep read 49 kept and nearest 1.13/1.48/1.96 — a SHORTER
-# radius keeps gauges that are relatively FURTHER apart, which is the opposite of the intuition.
+# How far apart the stations stand, in blob radii. **Both heat layers, because FEATHER (0.20) is one
+# module constant and governs both.** It is not a rain setting. Re-run this before moving it, before
+# moving RAIN_KM or HEAT_KM, and before moving the join assertions in heat-test.html.
+# The two rows should stay close to each other. Measured 2026-08-14 they are near identical —
+# rainfall at 6 km reads 1.21/1.66/1.95 and water at 5 km reads 1.18/1.68/1.99 — so one FEATHER
+# fits both. That is not luck: each radius was picked for its own network's density, so the ratio
+# lands in the same place. If a future change pulls the two rows apart, FEATHER has to become a
+# per-layer option beside `groundKm` rather than stay a shared constant.
+# **It thins EVERY station, not the ones currently reporting.** The reporting set changes with the
+# weather, and two snapshots an hour apart moved the widest rain pair from 1.58 to 1.90 radii. The
+# station geometry does not move. thinHeat() guarantees 1.00 and no more, so read the spread rather
+# than the floor. Both populations, because they answer different questions and their percentiles
+# differ. A seam shows first between a station and its NEAREST neighbour, so heat-test.html takes its
+# probe distances from that row. Join solidity is scored over EVERY overlapping pair instead, since
+# any two blobs that meet can show one. At RAIN_KM 9 the rain row read 49 kept and nearest
+# 1.13/1.48/1.96 — a SHORTER radius keeps stations relatively FURTHER apart, the opposite of the
+# intuition.
 php -r '$p=json_decode(file_get_contents(".cache.json"),true);$c=file_get_contents("js/config.js");
-preg_match("/RAIN_KM\s*=\s*([\d.]+)/",$c,$m);$R=(float)$m[1];
+preg_match("/RAIN_KM\s*=\s*([\d.]+)/",$c,$m);preg_match("/HEAT_KM\s*=\s*([\d.]+)/",$c,$m2);
 $km=fn($a,$b,$c2,$d)=>hypot($a-$c2,($b-$d)*cos(deg2rad($a)))*111;
-$all=array_values(array_filter($p["stations"],fn($s)=>$s["kind"]==="rainfall"&&$s["lat"]));
+foreach(["rainfall"=>[["rainfall"],(float)$m[1]],"water"=>[["river","gauge"],(float)$m2[1]]] as $nm=>[$kinds,$R]){
+$all=array_values(array_filter($p["stations"],fn($s)=>in_array($s["kind"],$kinds)&&$s["lat"]));
 $k=[];foreach($all as $s){foreach($k as $x) if($km($x["lat"],$x["lng"],$s["lat"],$s["lng"])<$R) continue 2; $k[]=$s;}
 $nn=[];foreach($k as $i=>$a){$n=1e9;foreach($k as $j=>$b) if($i!=$j) $n=min($n,$km($a["lat"],$a["lng"],$b["lat"],$b["lng"]));
 if($n/$R<2)$nn[]=$n/$R;}
 $ap=[];foreach($k as $i=>$a){foreach($k as $j=>$b){ if($j<=$i)continue;
 $t=$km($a["lat"],$a["lng"],$b["lat"],$b["lng"])/$R; if($t<2)$ap[]=$t;}}
 sort($nn);sort($ap);$q=fn($x,$f)=>$x[(int)(count($x)*$f)];
-printf("%d stations -> %d kept\n",count($all),count($k));
-printf("nearest neighbour : %d pairs, median %.2f, p90 %.2f, max %.2f\n",count($nn),$q($nn,.5),$q($nn,.9),end($nn));
-printf("all overlapping   : %d pairs, median %.2f, p90 %.2f, max %.2f\n",count($ap),$q($ap,.5),$q($ap,.9),end($ap));'
+printf("%-9s @%.0fkm: %d stations -> %d kept\n",$nm,$R,count($all),count($k));
+printf("  nearest neighbour : %d pairs, median %.2f, p90 %.2f, max %.2f\n",count($nn),$q($nn,.5),$q($nn,.9),end($nn));
+printf("  all overlapping   : %d pairs, median %.2f, p90 %.2f, max %.2f\n",count($ap),$q($ap,.5),$q($ap,.9),end($ap));}'
 
 # How much ground the rain layer claims, and how many gauges reporting no rain are left under it.
 # This is the sweep that found the 1.8x paint bug: the wash covered 2,747 km2 with 58 dry gauges

@@ -78,10 +78,17 @@ const BASE = { radius: 70, blur: 55, maxZoom: 0 };
    does. Coverage alone at 0.20 would hollow out every join.
    It is shorter than `BLEND`, and that is allowed: far ground takes its colour from a mix of
    readings and is nearly transparent while it does so. The two answer different questions.
-   **This value is sized against gauge spacing measured in blob radii, so `RAIN_KM` moves it.** At
-   9 km the network's 90th-percentile join sat at 1.48 radii and this stood at 0.50. At 6 km the
-   same join is 1.66 radii, because thinning at a shorter distance keeps gauges that are relatively
-   further apart. Re-run the spacing sweep in CLAUDE.md after any change to either.
+   **This value is sized against station spacing measured in blob radii, so a radius moves it.** At
+   9 km the rain network's 90th-percentile join sat at 1.48 radii and this stood at 0.50. At 6 km the
+   same join is 1.66 radii, because thinning at a shorter distance keeps stations relatively further
+   apart.
+   **`BLEND` and `FEATHER` are shared by both layers and neither is a rain setting.** That works
+   because the two networks land at nearly the same spacing once measured in radii. Rainfall at 6 km
+   reads 1.21 / 1.66 / 1.95 for median, 90th percentile and widest. Water at 5 km reads
+   1.18 / 1.68 / 1.99. Each radius was picked for its own network's density, so the ratio comes out
+   in the same place. **If a change ever pulls those two rows apart, `FEATHER` becomes a per-layer
+   option beside `groundKm` rather than staying a module constant.** The spacing sweep in CLAUDE.md
+   prints both rows. Re-run it after any change to `RAIN_KM` or `HEAT_KM`.
 
    **One curve served both for a while, and it drew a border on every equidistant line.** The blend
    weight is down to 0.30 at 0.8 of a radius, which is right for a weight and wrong for coverage.
