@@ -8200,3 +8200,33 @@ make. Five columns keep a measured zero and an unanswered window visibly apart.
 
 The full record, including the measurements behind each rejection, is in
 `docs/superpowers/specs/2026-08-12-cumulative-rainfall-chart-design.md`.
+
+### Test mode fakes the chart, and shapes it rather than scaling it
+
+A drill has to move this chart too. `soak()` in `js/test.js` is the one door a faked rain gauge
+leaves through, so the hour, the day, the status, the graph and the five totals cannot drift apart.
+The card prints `Last hour 75 mm` directly above a 1 hour column, and the two disagreeing reads as a
+bug in the chart rather than as a fake. The two callers had already drifted before this. `drown()`
+hard-coded a 158 mm day where the storm cell applies a multiplier that gives 157.5.
+
+`stormAcc()` shapes the five windows. A violent cell is short, so the 3 hour multiplier falls as the
+hour gets heavier. At 75 mm in an hour the 3 hour total is 1.37 times it, because 225 mm in three
+hours is a once-in-decades event. At 4 mm/h it is 2.5 times, because drizzle really does run all
+afternoon.
+
+The 24 and 72 hour windows take a per-station seed instead. Antecedent rain is the one thing that
+does not follow from the hour on the gauge. A station can read 4 mm now after a soaking week.
+Another can read 75 mm in the first hour of a dry month. Scaling those two off the hour gave all 198 faked gauges one
+silhouette. Nobody could then look at the chart against the two cases it exists to tell apart.
+Measured after the change: 183 distinct silhouettes across 198 gauges, and no run of two the same.
+
+That seed is FNV-1a and not the `h * 31 + c` one-liner. Station ids run `rf-153`, `rf-154`,
+`rf-156`, so the simple hash put adjacent ids on adjacent values and twenty gauges in a row drew the
+same chart. A run of identical charts reads as a pattern rather than as weather.
+
+This app invents that shape, and it may. Nothing in test mode reaches a server, a history file or
+another reader. That is the reason the threshold marks could take no invented number and this can.
+
+Test mode fakes the `derived` flags and the measured spans as well. Both reach real data only once
+the odometer fills, so without a knob here the asterisk and its footnote ship unseen. A KL gauge carries
+the asterisk on its 3 hour column, because a summed one really would.

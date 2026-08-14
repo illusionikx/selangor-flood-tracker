@@ -35,6 +35,8 @@ const OFFLINE_EVERY = 11; // and every Nth station of any kind is knocked off th
    a wet state, and the point is to see the gradient. */
 const STORM = [3.14, 101.69];                                 // central KL
 const STORM_BANDS = [[10, 75], [20, 42], [35, 18], [55, 4]];  // ≤ km → mm/h
+const DROWN_MM = 45;   // what a gauge reports at a place already under water — see drown()
+const DAY_X = 3.5;     // today's total, as a multiple of the hour under the cell
 
 // Every Nth site holding both a camera and a river is pushed over the mark whatever the first pass
 // decided — see the site pass at the foot of seedTest() for why the camera path needs its own knob.
@@ -74,6 +76,75 @@ const rainRamp = mm => Array.from({ length: 12 }, (_, i) => {
   return [Math.floor(Date.now() / 1000) - (11 - i) * 3600, v, rainCode(v)];
 });
 
+/* A number between 0 and 1 that belongs to one station and never moves. Deterministic for the same
+   reason every knob above is: `seedTest()` runs on every poll, so anything drawn from `Math.random`
+   would reshuffle each chart every five minutes and read as a bug rather than as weather.
+
+   FNV-1a rather than the `h * 31 + c` one-liner, because that one does not avalanche: station ids
+   run `rf-153`, `rf-154`, `rf-156`, so adjacent ids landed on adjacent values and twenty gauges in
+   a row drew the same silhouette. A run of identical charts reads as a pattern, not as weather. */
+const seed = id => {
+  let h = 2166136261;
+  for (let i = 0; i < id.length; i++) h = Math.imul(h ^ id.charCodeAt(i), 16777619);
+  return ((h >>> 0) % 1000) / 1000;
+};
+
+/* One rain gauge reporting `mm` in the last hour, with everything that has to agree with it.
+   Both callers come through here, so the hour, the day, the status, the graph and the accumulation
+   chart cannot drift apart. They already had: `drown()` hard-coded a 158 mm day where the storm
+   cell's own multiplier gives 157.5. */
+function soak(s, mm) {
+  s.hourly = mm;
+  s.daily = +(mm * DAY_X).toFixed(1);
+  /* The same cutoffs rainStatus() applies server-side. Set rather than derived because the client
+     never recomputes a status — the pin colour, the popup's band and the heat weight all read this
+     one field, so a fake that only moved `hourly` would contradict itself. */
+  s.status = rainCode(mm);
+  s.history = rainRamp(mm);
+  s.acc = stormAcc(s, mm);
+}
+
+/* The five nested totals that hour would have left behind, so the accumulation chart agrees with
+   the reading printed above it. Without this the card said `Last hour 75 mm` over a 1 h column
+   holding whatever the real gauge reported, which is the contradiction `soak()` above exists to
+   prevent.
+
+   Shaped, not scaled. A violent cell is short: 75 mm in an hour held for three would be 225 mm, a
+   once-in-decades total, while 4 mm/h of drizzle really does run all afternoon. So the 3 hour
+   multiplier falls as the hour gets heavier. The two long windows are the day plus the night before
+   it, and then two more days of monsoon behind that.
+
+   This shape is chosen to look like weather. It is not a claim about weather, and it is allowed to
+   be invented here for the one reason the threshold marks were not: nothing in test mode reaches a
+   server, a history file or another reader.
+
+   `derived` and the measured span are faked too. Both appear on real data only once the odometer
+   has filled, so without a knob here the asterisk and its footnote ship unseen — the same rule the
+   flood gauge's shallow rung follows below. KL publishes no 3 hour total, so a KL gauge carries the
+   asterisk on that column that a summed one really would. */
+function stormAcc(s, mm) {
+  /* How wet the days before this one were, which is the one thing that does NOT follow from the
+     hour on the gauge. A station can read 4 mm now after a soaking week, or 75 mm in the first
+     hour of a dry month. Scaling the long windows off the hour alone gave every faked gauge the
+     same silhouette, so the chart could not be looked at against the two cases it exists to tell
+     apart: a flash burst, and a week of monsoon with a shower on top. */
+  const t = seed(s.id || '');
+  const h3  = +(mm * (1.3 + 1.4 * Math.exp(-mm / 25))).toFixed(1);
+  const day = +(mm * DAY_X).toFixed(1);
+  const h24 = +(day * (1.05 + 0.40 * t)).toFixed(1);
+  const h72 = +(h24 * (1.15 + 0.80 * t)).toFixed(1);
+  return {
+    h1:  [+mm.toFixed(1), 0, null],
+    h3:  [h3, s.source === 'kl' ? 1 : 0, null],
+    day: [day, 0, null],
+    /* A server polling every five minutes lands a baseline within a few minutes of the far end, so
+       these stay close to the window they name. The stretched wording needs no knob of its own: it
+       is on screen whenever the archive has a hole, which is most days on a box like this one. */
+    h24: [h24, 1, +(24.1 + t * 0.6).toFixed(1)],
+    h72: [h72, 1, +(72.1 + t * 0.8).toFixed(1)],
+  };
+}
+
 // One sensor, pushed to the worst its own kind can report. Used by the first pass on rivers and by
 // the site pass on everything else at a place that is already under water.
 function drown(s) {
@@ -91,9 +162,8 @@ function drown(s) {
     // Heavy, not very heavy: the top class belongs to the middle of the storm cell, and a mast that
     // happens to sit under a flooding river is not automatically the worst of the weather. A gauge
     // already inside the cell keeps what the cell gave it — this may only ever raise a reading.
-    if ((s.hourly ?? 0) >= 45) return true;
-    s.hourly = 45; s.daily = 158; s.status = 3;
-    s.history = rainRamp(45);
+    if ((s.hourly ?? 0) >= DROWN_MM) return true;
+    soak(s, DROWN_MM);
   } else if (s.kind === 'gauge') {
     const mark = s.danger ?? 0.3;
     s.depth = +(mark * 1.2).toFixed(2);
@@ -157,13 +227,7 @@ export function seedTest(data) {
                             s.lat - STORM[0]) * 111;
       const mm = STORM_BANDS.find(([r]) => km <= r)?.[1];
       if (!mm) continue;   // outside the cell — this one stays dry
-      s.hourly = mm;
-      s.daily = +(mm * 3.5).toFixed(1);
-      // The same cutoffs rainStatus() applies server-side. Set rather than derived because the
-      // client never recomputes a status — the pin colour, the popup's band and the heat weight all
-      // read this one field, so a fake that only moved `hourly` would contradict itself.
-      s.status = rainCode(mm);
-      s.history = rainRamp(mm);
+      soak(s, mm);
     } else if (s.kind === 'gauge' && s.online && s.depth != null && ++gauges % GAUGE_EVERY === 0) {
       drown(s);
     } else if (s.kind === 'gauge' && s.online && s.depth != null && gauges % WET_EVERY === 0) {

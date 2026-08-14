@@ -798,6 +798,20 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   scored client-side, and it is allowed because
   nothing in test mode reaches a server. Without it the hover readout printed a faked flood in plain
   ink, which hid the very crossing the fake exists to show.
+  **A fake that moves one field of a sensor has to move every field the card draws beside it.**
+  `soak()` is the single door for a rain gauge â€” the hour, the day, the status, the graph and the
+  `acc` chart all leave through it, because the card prints `Last hour 75 mm` directly above a
+  1 h column and the two disagreeing reads as a bug in the chart. Two callers had already drifted.
+  `drown()` hard-coded a 158 mm day where the storm cell applies a multiplier that gives 157.5.
+  **`stormAcc()` shapes the five windows rather than scaling them.** A violent cell is short, so its
+  3-hour multiplier falls as the hour gets heavier â€” 75 mm held for three hours is a once-in-decades
+  total, while 4 mm/h of drizzle really does run all afternoon. The two long windows carry a
+  per-station `seed()`, because antecedent rain is the one thing that does *not* follow from the
+  hour on the gauge, and scaling it off that hour gave every faked gauge one silhouette. That seed
+  is **FNV-1a and not `h * 31 + c`**: ids run `rf-153`, `rf-154`, `rf-156`, so the simple hash put
+  adjacent ids on adjacent values and twenty gauges in a row drew the same chart. Test mode fakes the
+  `derived` flags and the measured spans too. Both reach real data only once the odometer fills, so
+  without a knob the asterisk and its footnote ship unseen.
 - **The alert panel is a directory, not a stack of readings.** `groupCard()` in `alerts.js` draws one
   card per kind per tier — five at most, usually two — and **every row in it is a place**, grouped on
   `site` so a mast with two gauges over their marks is one row. One card per station carried a meter,
