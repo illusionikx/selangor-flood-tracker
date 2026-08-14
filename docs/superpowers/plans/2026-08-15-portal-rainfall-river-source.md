@@ -853,9 +853,31 @@ at `api.php:2276` already ends with an `unset()` of exactly this shape. Extend t
 **A rainfall station that took no portal reading never gets that key**, so the `unset()` is safe on
 every station. `unset()` on a missing key is silent in PHP.
 
-**That `unset()` runs inside `if ($s['kind'] !== 'rainfall' ...) continue;`**, so a station the loop
-skips keeps whatever it has. Every station carrying `pdays` is a rainfall station with an `hourly`
-value, so every one of them reaches the line. Confirm it in Step 5 rather than reasoning about it.
+**That line alone does not hold the guarantee, and an earlier version of this plan claimed it did.**
+It runs inside `if ($s['kind'] !== 'rainfall' || !isset($s['hourly'])) continue;`. The override gate
+above is an OR, so a portal row carrying a daily total and no hourly reading still sets `pdays`, and
+`$s['hourly'] = $r['hourly'] ?? $s['hourly']` can fall back to a null the station already held. That
+station skips the whole block, and six raw scraped values ride into `json_encode()`. The live payload
+already holds one rainfall station with a persistently null hourly reading, so half of that
+precondition stands today.
+
+So add a second pass, immediately after the rainfall history loop's closing `unset($s);`:
+
+```php
+/* `pdays` rides on a station between the override pass and the block above, and no browser may
+   ever see it. The block above drops it for every station it processes, and it skips a station
+   holding no hourly reading, so this pass closes that gap. Widening the gate above instead would
+   run the history body on a null reading, and `(float) null` would store a fabricated 0.0 mm
+   sample on a gauge that reported nothing. */
+foreach ($stations as &$s) unset($s['pdays']);
+unset($s);
+```
+
+**Do not close this by widening the history loop's gate instead.** That body reads
+`(float) $s['hourly']`, and `(float) null` is `0.0`, so the station would store a fabricated dry hour
+it never reported. A latent leak traded for an invented reading is the wrong direction on a flood
+map. The separate pass makes the guarantee unconditional rather than dependent on two gates agreeing
+about one condition.
 
 - [ ] **Step 5: Verify the live poll**
 
