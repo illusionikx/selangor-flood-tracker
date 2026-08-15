@@ -9,18 +9,25 @@ header {
   display: flex; align-items: center; gap: 12px; padding: 0 16px 0 8px;
   background: var(--surface); border-bottom: 1px solid var(--outline);
 }
-/* `flex: 1 1 0` here and the same on `.hactions` is what centres the ticker on the viewport rather
-   than between the two clusters: a zero basis with equal grow gives the two rails the same width
-   whatever their contents measure, so the strip between them lands on the middle of the bar. It also
-   fails safely. `min-width` is `auto` on both rails, so neither can be squeezed under its own
-   content — a rail short of room takes what it needs and the strip goes off centre instead of
-   running under the title. The wordmark ellipsises before that, which it already did. */
-/* `container-type: inline-size` makes the rail itself the thing the wordmark is measured against.
-   A viewport query cannot do this job: the rail is what is left after the ticker and the controls,
-   and both of those change width on their own. Safe on a flex item, because `flex: 1 1 0` plus
-   `min-width: 0` already takes the width from the flex algorithm and never from the content. */
+/* The bar is a title, a strip and a cluster of controls, and the strip takes what the other two
+   leave. It used to take a share of the viewport instead, first `min(58vw, 656px)` and then a flat
+   `50vw`, with both rails on `flex: 1 1 0` so the strip landed on the middle of the bar. That
+   centring is what a wide screen exposes: at 2560px the rails were 640px each holding about 280px
+   of title and about 260px of controls, so the bar carried two voids of roughly 370px and the news
+   was the narrowest thing on it.
+
+   `max-width` on this rail rather than a basis on the strip, and the reason is the container query
+   below. `container-type: inline-size` collapses an element whose width comes from its own content,
+   so this rail may never be content-sized — `flex: 0 1 auto` here draws no wordmark at all. It
+   keeps a zero basis and grows, and the cap stops it growing past the longest spelling.
+
+   The cap is 300px against a longest spelling of 282px. Raise it with that spelling and never
+   below it, or the top rung of the ladder can no longer be reached.
+
+   `min-width: 0` still lets the rail be squeezed under its own content, which is what steps the
+   wordmark down a rung. */
 header h1 {
-  display: flex; align-items: center; gap: 8px; flex: 1 1 0;
+  display: flex; align-items: center; gap: 8px; flex: 1 1 0; max-width: 300px;
   font-size: 22px; font-weight: 400; letter-spacing: 0; min-width: 0;
   container-type: inline-size;
 }
@@ -50,13 +57,13 @@ header h1 .brand { font-size: 24px; color: var(--accent); flex: none; }
 /* Just the glyph's own box, so the status dot has a corner to hang off. `cursor: help` and the hover
    target are on the mark rather than the whole h1: the wordmark is a title, not a control. */
 header h1 .mark { position: relative; display: flex; flex: none; cursor: help; }
-/* Everything that is not the menu or the mark, kept together. The right rail — see the h1 rule above
-   for why both rails carry the same `flex`. It carries no `margin-left: auto`: an auto margin
-   absorbs free space *before* flex-grow does, so one here would leave the two rails nothing to grow
-   into and the centring would never happen. `justify-content: flex-end` is what holds the controls
-   against the right edge instead, now that the rail is wider than they are. */
+/* Everything that is not the menu or the mark, kept together. `flex: 0 0 auto` — the controls are
+   worth exactly what they measure, and the strip beside them takes the rest. This was `flex: 1 1 0`
+   while the bar centred the strip on the viewport, which gave the controls a rail far wider than
+   they needed and put a void beside them. `justify-content: flex-end` no longer has slack to act on
+   and stays as the guard for a rail that somehow gets one. */
 header .hactions {
-  display: flex; align-items: center; justify-content: flex-end; gap: 4px; flex: 1 1 0;
+  display: flex; align-items: center; justify-content: flex-end; gap: 4px; flex: 0 0 auto;
 }
 
 /* --- alert ticker ----------------------------------------------------------------------------- */
@@ -72,27 +79,28 @@ header .hactions {
      so the header re-laid itself out every poll and the bar was a different shape in a flood than on
      a calm day. It is a window onto the news, and a window does not change size with the news.
 
-     One share of the viewport and no cap. It read `min(58vw, 656px)`, which stopped growing at
-     1131px and then held one width across every screen above that — so the strip took 43% of a
-     1536px window, 34% of a 1920px one and 19% of an ultrawide.
+     What the title and the controls leave, and no share of the viewport. Three rules stood here
+     before this one. `min(58vw, 656px)` stopped growing at 1131px and then held one width across
+     every screen above it. A flat `40vw` and then a flat `50vw` each held one share at every width.
+     All three sized the strip against the window rather than against the space in the bar, so a
+     wide screen paid for them in voids. At 2560px a 50% strip left about 370px of nothing on each
+     side of it.
 
-     Half the viewport, picked by a reader on a 1536px window. That is wider than the 42.7% the
-     capped rule gave that window, so this is a deliberate share and not the old number carried over.
-     40% was measured beside it and lost.
+     `flex: 1 1 0` takes the free space instead. The basis stays zero, which is the rule the lines
+     above have always carried. A strip sized to its own content re-lays the header out on every
+     poll as the alert count moves, and the bar is then a different shape in a flood than on a calm
+     day. A zero basis with grow is not content sizing. `flex: 0 1 auto` is.
 
-     The number is not free, and a move here is measured on both candidates. Both rails are what is
-     left after this strip, so widening it narrows the title rail, and the title rail is what picks
-     the wordmark spelling. At 50% the full title survives to 1400px and a 700px window
-     draws the drop alone. At 40% the full title reaches 1200px and 700px draws `KVFW`. See
-     `header h1` above, and re-run title-test.html after moving this. Below 600px the strip takes a
-     row of its own and none of this applies. */
-  flex: 0 1 50vw; min-width: 0;
-  /* The header's own padding is 8px on the left and 16px on the right, because the logo sits closer
-     to the edge than the buttons do. Equal rails therefore centre the strip in that box, which is
-     4px left of the viewport's middle. This 8px splits between the two rails and moves the strip
-     back the 4px. Move it whenever the header's padding changes. */
-  margin-left: 8px; height: 30px; overflow: hidden;
-  flex-shrink: 1;
+     Both rails still bound it. The title rail grows to at most 300px and the controls measure what
+     they hold, so the strip is the window minus those two and minus the header's own padding.
+     Below 600px it takes a row of its own and none of this applies. */
+  flex: 1 1 0; min-width: 0;
+  /* No `margin-left` any more. It was 8px, and it existed only to correct the centring: the header
+     pads 8px left and 16px right, so equal rails put the middle of the strip 4px left of the middle
+     of the window, and 8px of margin split between the rails moved it back. Nothing is centred on
+     the window now, so there is nothing left to correct. The header's own `gap: 12px` already holds
+     the strip off the title and off the controls. */
+  height: 30px; overflow: hidden;
   display: flex; align-items: center;
   /* Both edges fade, so an item entering or leaving dissolves instead of appearing at a hard cut.
      Long ramps (56px) because a marquee is *always* half-way through an item at both edges — a

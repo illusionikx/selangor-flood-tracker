@@ -1787,25 +1787,23 @@ Decisions:
   *popped*, because with one tile on the belt the item leaving the left edge is the whole strip
   leaving — nothing follows it until the loop restarts. Padding to at least three tiles guarantees a
   neighbour behind whatever is going out.
-- **Fixed width, not content width.** `flex: 0 1 50vw`. Sized to content the strip grew
+- **Fixed basis, not content width.** `flex: 1 1 0`. Sized to content the strip grew
   and shrank with the number of alerts, so the header re-laid itself out on every poll and the bar
   was a different shape in a flood than on a calm day. It is a window onto the news; a window does
-  not change size with the news.
+  not change size with the news. A zero basis with grow is not content sizing. `flex: 0 1 auto` is.
 
-  **One share of the viewport, and no cap.** It read `min(58vw, 656px)`, which stopped growing at
-  1131px. Above that it held one width across every screen, so the strip took 43% of a 1536px window,
-  34% of a 1920px one and 19% of an ultrawide. A window onto the news does not change size with the
-  news, and that is not a reason to hold one size across every screen.
+  **The strip takes what the title and the controls leave, and no share of the viewport.** Three
+  rules stood here before this one. `min(58vw, 656px)` stopped at 1131px and then held one
+  width across every screen above it. A flat `40vw` and then a flat `50vw` each held one share at
+  every width.
 
-  A reader picked half the viewport, on a 1536px window. That is wider than the 42.7% the capped
-  rule gave that window, so it is a deliberate share and not the old number carried over.
+  All three sized the strip against the window rather than against the space in the bar. A wide
+  screen paid for them in voids. At 2560px a 50% strip left about 370px of nothing on each side of
+  it. Each rail took 640px to hold a 280px title and a 176px cluster of controls.
 
-  **The number is not free.** Both rails are what is left after the strip, so a wider strip narrows
-  the title rail, and the title rail is what picks the wordmark spelling.
-
-  Measured on both candidates. At 50% the full title survives to 1400px, and a 700px window draws
-  the drop alone. At 40% the full title reaches 1200px, and 700px draws `KVFW`. The reader took the
-  wider strip.
+  Measured after the change, at every width from 3440px down to 601px: the controls measure a
+  constant 176px, the title rail stops at 300px, the gap either side of the strip holds a constant
+  24px, and the strip is everything else. At 1536px it is 960px against the 768px a 50% rule gave.
 - **The name of the app closes every set.** With one alert the strip carried that alert and nothing
   else, so a lap was the same tile four times over. That reads as a stuck ticker rather than as one
   river in trouble.
@@ -1839,32 +1837,36 @@ Decisions:
   every width. So a phone guillotined a word on the left the way a desktop does with no mask.
 
   The ramp stays at 18px rather than 56px there. Two 56px ramps take 31% of a 360px strip.
-- **Centred on the viewport**, by two rails of equal width. This replaced a right-aligned strip that
-  sat against the status chip. That version made the header read as a title on the left and one wide
-  cluster on the right, and the news was the least prominent thing in the bar.
+- **Bounded by the two rails, and centred on nothing.** The bar was centred on the viewport for a
+  long time, by two rails of equal width. That itself replaced a right-aligned strip sitting against
+  the status chip, which made the header read as a title on the left and one wide cluster on the
+  right, with the news the least prominent thing in the bar.
 
-  The mechanism is `flex: 1 1 0` on `header h1` *and* on `header .hactions`. A zero basis with equal
-  grow gives the two rails the same width whatever their contents measure, so the strip between them
-  lands on the middle of the bar. Three things hold it up, and each one was a wrong turn first:
+  Centring is what a wide screen exposes. It gives each rail half the leftover whatever it holds, so
+  the more screen there is the more of it goes to two rails that need none of it.
 
-  - **The strip stays in the flow.** `position: absolute; left: 50%` centres it too, and it holds its
-    width whatever else is on the bar — so at about 1024px it draws over the title, because a ticker
-    that wide leaves too little a side for the wordmark. A flex item gives way instead.
-  - **Neither rail carries `margin-left: auto`.** An auto margin absorbs free space *before*
-    flex-grow does, so one on `.hactions` leaves the rails nothing to grow into and the centring
-    never happens. `justify-content: flex-end` holds the controls against the right edge instead,
-    now that the rail is wider than they are. That is true on a phone as well, where the two rails
-    share line one and the strip has a row of its own.
-  - **The strip carries `margin-left: 8px`.** The header pads 8px on the left and 16px on the right,
-    because the logo sits closer to the edge than the buttons do. Equal rails centre the strip in
-    that box, which is 4px left of the viewport's middle. The 8px splits between the two rails and
-    moves the strip back the 4px. Move it whenever the header's padding changes.
+  The shape now is a cap on the title rail and a content width on the controls:
 
-  It fails safely at every width. `min-width` is `auto` on both rails, so neither rail drops under
-  its own content — a rail short of room takes what it needs and the strip goes off centre
-  rather than running under the title. And a rail with a zero basis has zero shrink weight, so the
-  strip (`flex: 0 1 50vw`) is the only thing a narrow window takes from. It clips before
-  anything else moves. The wordmark then steps down a rung, which it does on the rail's own width.
+  - **`header h1` keeps `flex: 1 1 0` and gains `max-width: 300px`.** The cap stops the rail growing
+    past the longest spelling, which measures 282px.
+  - **`header .hactions` is `flex: 0 0 auto`.** The controls are worth what they measure.
+    `justify-content: flex-end` has no slack left to act on and stays as a guard.
+  - **`#ticker` is `flex: 1 1 0`.** It is the only item that grows, so it takes the free space.
+
+  **The cap goes on the rail and never a basis on the strip, and the container query is the reason.**
+  `container-type: inline-size` collapses an element whose width comes from its own content, so this
+  rail never takes its width from its content. `header h1 { flex: 0 1 auto }` draws no wordmark at
+  all. A zero basis with grow keeps the width in the flex algorithm, which is what containment needs.
+
+  **`margin-left: 8px` is gone from the strip.** It existed only to correct the centring: the header
+  pads 8px left and 16px right, so equal rails put the middle of the strip 4px left of the middle of
+  the window, and 8px of margin split between the rails moved it back. Nothing is centred on the
+  window now. The header's own `gap: 12px` holds the strip off the title and off the controls.
+
+  It still fails safely. Both rails carry `min-width: 0`, so the title gives way first and steps the
+  wordmark down a rung. Below 601px the two rails share line one and the strip has a row of its own,
+  where none of this applies. With the go-to box open the controls grow to 422px and the strip gives
+  up the difference. Measured at 1536, 900, 700 and 601px, the header never overflows.
 - **Hover pauses it** and the items are buttons that jump to the station. A moving target you cannot
   catch is a link that isn't one. Clicks are delegated once, because the strip is rebuilt every poll
   and holds several copies of every station.
@@ -9675,8 +9677,9 @@ their marks is two in the head and one row. That is a different question and it 
 `KLANG VALLEY FLOOD WATCH` ran out of room and the app bar cut it with an ellipsis. It read
 `Klang Valley Flood W…`, which names no place and no app.
 
-The bar centres a ticker between two rails of equal width, so the title rail is what is left after
-the ticker and the controls. On a 1000px screen that rail is 136px and the title wants 279px.
+The title rail is what is left after the ticker and the controls. The bar centred the ticker between
+two rails of equal width when this shipped, and a 1000px screen gave the rail 136px against a title
+that wants 279px.
 
 Four rungs now, and the rail picks one:
 
@@ -9693,11 +9696,16 @@ The rail is not the viewport. It is what is left after the ticker and the contro
 those move on their own. Below 600px the ticker takes a row of its own, so the rail widens as the
 viewport narrows, from 77px at 601px to 272px at 600px. No viewport threshold can follow that.
 
-The ticker settled this a day later. It changed from `min(58vw, 656px)` to a flat `50vw`, and a
-`40vw` candidate went in and out beside it. Each move changed the rail at every width above 600px.
+The ticker settled this over the next day. It went from `min(58vw, 656px)` to a flat `50vw`, with a
+`40vw` candidate in and out beside it, and then to `flex: 1 1 0` under a 300px cap on this rail.
+Each move changed the rail at every width above 600px.
 
 Not one threshold here needed an edit, and `title-test.html` stayed green through all of it. A media
 query needs all three numbers again on each move.
+
+The last move also fixed the ladder by accident. The rail now stops at 300px instead of taking half
+the leftover. The full spelling reaches 900px where a 50% strip only reached 1400px, and a
+700px window draws `KVFW` where it drew the drop alone.
 
 `header h1` is the container. `container-type: inline-size` is safe on it, because `flex: 1 1 0`
 with `min-width: 0` already takes the width from the flex algorithm and never from the content.

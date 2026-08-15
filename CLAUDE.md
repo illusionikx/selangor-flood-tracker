@@ -1641,12 +1641,14 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   the rail is what is left after the ticker and the controls, and both of those move on their own.
   Below 600px the ticker takes a row of its own, so the rail WIDENS as the viewport narrows, from
   77px at 601px to 272px at 600px — no viewport threshold can follow that. The ticker then proved
-  the rest: it changed from `min(58vw, 656px)` to a flat `50vw`, with a `40vw` candidate in and out
-  beside it. Each move changed the rail at every width above 600px, and not one threshold here
-  needed an edit. The phone rule
+  the rest: it went from `min(58vw, 656px)` to a flat `50vw`, with a `40vw` candidate in and out
+  beside it, and then to `flex: 1 1 0` under a 300px cap on this rail. Each move changed the rail at
+  every width above 600px, and not one threshold here needed an edit. The phone rule
   that hid the title whole is gone, since the container now measures what that rule assumed.
   `container-type: inline-size` is safe on that flex item because `flex: 1 1 0` with `min-width: 0`
-  already takes the width from the flex algorithm and never from the content.
+  already takes the width from the flex algorithm and never from the content. **That is also why the
+  cap sits on this rail and never as a basis on the strip** — containment collapses an element whose
+  width comes from its own content, so `header h1 { flex: 0 1 auto }` draws no wordmark at all.
   **Every selector in the ladder goes through `.word >`, and that is specificity rather than
   tidiness.** `header h1 .word > span { display: none }` is one class and three elements, and
   `header h1 .w-sm` is one class and two, so the hide rule won and every width drew the drop alone —

@@ -18,3 +18,4 @@ shots/
 .php-error.log
 .client-errors.log
 .watch.state
+.claude/settings.local.json
