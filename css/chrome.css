@@ -1546,7 +1546,12 @@ body.finding #find { display: none; }
 @media not all and (hover: hover) and (min-width: 601px) {
   #lightbox[aria-busy="true"] #tlskel { display: block; padding: 8px 12px; }
 }
-#tlskel .skel { display: block; height: 85px; }
+/* 64, not 85. The first figure came from reading #tl's own rules and was never measured, and it
+   over-reserved by 21px — the picture jumped when the real bar landed, which is the shift this box
+   exists to prevent. Measured in headless Chrome with a real frame in the stage, at the widths where
+   #tl sits in the flow: the bar is 80px at 360, 390 and 480, and 68px at 600. 64 plus this box's own
+   16px of padding matches the 80. The in-flow case is the phone, so it is the one to match. */
+#tlskel .skel { display: block; height: 64px; }
 #tl {
   display: grid; gap: 2px; justify-items: center; width: 100%;
   padding: 10px 0 2px; line-height: 1.4;

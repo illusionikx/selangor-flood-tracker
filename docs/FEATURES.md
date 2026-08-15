@@ -8094,15 +8094,27 @@ majority platform, which is the shift this skeleton exists to prevent. The fix i
 query, `not all and (hover: hover) and (min-width: 601px)` — PLAYER_OVERLAY's own condition, inverted
 — around the `display: block` rule, so the reservation applies only where the footer shape holds.
 
-That height came from reading `#tl`'s own rules, not from a browser measurement.
-No browser was available while this task ran.
-At a 390px-wide dialog — narrow enough that `#tl`'s own `@container (max-width: 520px)` query stacks `.tlctl` into two rows — the bar totals 101px.
-That is 12px of its own padding, a 20px seek bar, and a 2px grid gap.
-Then comes a 67px stacked control row.
-The control row is a 34px icon row, an 8px column gap, and a 25px range-pill row.
-`#tlskel` carries a different padding of its own, 8px top and bottom.
-Its `.skel` needed 101 minus 16, or 85px, to match the same total.
-Replace this figure with a real browser measurement once someone takes one.
+**The first pass read that height off the CSS rather than measuring it, and missed by 21px.**
+No browser was available then. It added the rules of `#tl` and reached 101px.
+It then gave `.skel` 101 minus the 16px of padding on this box, or 85px.
+A later measurement in headless Chrome put the real bar at 80px.
+So the skeleton reserved 21px more than the bar it stands in for, and the picture jumped by that
+much when the module landed. That is the shift this box exists to prevent, drawn smaller and in the
+other direction.
+
+Measure this with a real frame in the stage.
+`.stage` and `.player` are both shrink-to-fit around the picture.
+An empty stage gives `.player` a width it never has in use, so `#tl`'s own container query resolves
+against the wrong number and the bar reports a height nobody sees.
+
+Measured at the widths where `#tl` sits in the flow, with a frame loaded:
+the bar is 80px at 360, 390 and 480, and 68px at 600. The 900px case is `position: absolute`, and
+the reservation correctly reads 0 there, which is the negated media query above doing its job.
+`.skel` is 64px now, so 64 plus 16 matches the 80.
+
+One reservation cannot match a bar that changes height.
+The in-flow case is the phone, so the phone is the width to match.
+The shift is 0px at 360, 390, 480 and 900, and 12px at exactly 600.
 
 ## The rainfall heatmap claimed rain over 250 km² from one gauge
 
