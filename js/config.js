@@ -42,6 +42,7 @@ export const SOURCES = {
   selangor: { name: 'JPS Selangor Infobanjir' },
   national: { name: 'JPS Malaysia · Public Infobanjir' },
   kl:       { name: 'JPS Wilayah Persekutuan (SPHTN)' },
+  portal:   { name: 'JPS Malaysia · Public Infobanjir' },
 };
 
 /* The department behind the weather section, named once. It is not in SOURCES, because that table

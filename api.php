@@ -1117,6 +1117,29 @@ function portalOdo(?float $prevOdo, ?float $prevDaily, ?float $daily, ?float $ye
     return round($prevOdo + $owed + $daily, 1);
 }
 
+/* Whether a plain `cumulative` reading may overwrite a running total that was last extended through
+ * portalOdo() — the return trip portalOdo()'s own $prevDaily === null guard does not cover.
+ *
+ * That guard holds the entry INTO the portal path: a running total with no #d beside it is held
+ * rather than restarted. Nothing held the EXIT. The moment a station's portal row goes missing, or
+ * arrives with both hourly and daily null, the accumulation block below falls back to
+ * $s['cumulative'] — the year-to-date odometer JPS publishes, a different scale from portalOdo()'s
+ * own running total — and writes it straight over the #c series with no check at all. Latent today,
+ * 0 backwards steps measured, and it does not self-repair: accWindow() nulls the one window that
+ * straddles a backward step, which reads as an ordinary gap, while a forward one draws a rain total
+ * nobody measured. Both are a number from the wrong scale.
+ *
+ * $prevD's own timestamp matches $prevC's only when they were stamped in the same breath — the
+ * accumulation block below writes both under one $ts, and only inside the portal branch. A #d entry
+ * older than the last #c write, or no #d at all, means the ground under this station already
+ * changed: nothing from the portal scale to protect, so the raw cumulative wins outright.
+ *
+ * Holding costs one poll, once, the same trade Task 6 accepted on the way in.
+ */
+function rainScaleHeld(?array $prevC, ?array $prevD): bool {
+    return $prevC !== null && $prevD !== null && $prevD[0] === $prevC[0];
+}
+
 /* A station name reduced for comparison. Comparison only — never stored, never rendered.
    The two feeds spell one place several ways: `Kg. Melayu Ampang`, `KG MELAYU AMPANG`,
    `Kg.Melayu  Ampang`. Case, punctuation and spacing carry no information here, so they go. */
@@ -1283,6 +1306,33 @@ function gazCorroborated(float $lat, float $lng, array $near): bool {
     $cLng = $mid(array_column($near, 1));
     $km = hypot($lat - $cLat, ($lng - $cLng) * cos(deg2rad($cLat))) * 111;
     return $km <= GAZ_DISTRICT_KM;
+}
+
+/* Is this point the same instrument as one already held? The KL merge below refuses a same-kind
+ * candidate within about 200 m of a station it already holds — same mast, different id space — and
+ * that guard was missing from both portal placement passes.
+ *
+ * Measured on the live payload: 153 new stations, 79 within 50 m of a station already held and 87
+ * within 200 m, 64 of the 79 publishing an IDENTICAL reading, which is the proof they are one
+ * instrument rather than two close together. The portal publishes an old and a new record for one
+ * site — its own gazetteer pairs `Pekan Banting` with `Pekan Banting (F2)` at the same coordinate —
+ * and portalKey() cannot join them, because the `(F2)` suffix only satisfies gazPlace()'s OTHER
+ * direction (a gazetteer name ending with the portal row's name), not the reverse.
+ *
+ * A duplicated station matters here specifically because js/alerts.js counts stations, not sites: a
+ * duplicated gauge at its top class adds one to the app-bar number, the icon badge, the document
+ * title and the toast, and isIgnored() keys on station id, so silencing one twin leaves the other
+ * alerting. One check, shared by every pass that can add a second copy of a place this app already
+ * holds.
+ */
+function posDupe(array $stations, string $kind, float $lat, float $lng): bool {
+    foreach ($stations as $have) {
+        if ($have['kind'] === $kind && abs($have['lat'] - $lat) < 0.002
+                                     && abs($have['lng'] - $lng) < 0.002) {
+            return true;
+        }
+    }
+    return false;
 }
 
 /* Which prefixes to ask the station search for next.
@@ -1493,6 +1543,19 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
     $ok('the 24h window reads it exactly',
         accWindow($odoSeries, $now, 24 * 3600, true) === [7.5, 24.0, false]);
 
+    echo "\nrainScaleHeld():\n";
+    $ok('no previous #c at all: nothing to hold',
+        rainScaleHeld(null, null) === false);
+    $ok('a #c with no #d beside it: never was portal-scale, nothing to hold',
+        rainScaleHeld([$now - 300, 900.0], null) === false);
+    // #d exists but from an earlier poll — the portal path has not run since, so the ground under
+    // this station already moved and there is nothing left to protect.
+    $ok('a stale #d does not hold',
+        rainScaleHeld([$now, 12.0], [$now - 300, 3.0]) === false);
+    // Stamped in the same breath, which only happens inside the portal branch.
+    $ok('a #c and #d stamped together holds',
+        rainScaleHeld([$now, 12.0], [$now, 3.0]) === true);
+
     echo "\naccWindow():\n";
     $odo = [[$now - 80 * 3600, 1000.0], [$now - 72 * 3600, 1010.0],
             [$now - 24 * 3600, 1050.0], [$now, 1080.0]];
@@ -1698,18 +1761,40 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
     $ok('no known stations passes',
         gazCorroborated(9.0, 99.0, []) === true);
 
+    echo "\nposDupe():\n";
+    $have = [['kind' => 'river', 'lat' => 3.000, 'lng' => 101.500]];
+    $ok('the same point, same kind, is a duplicate',
+        posDupe($have, 'river', 3.000, 101.500) === true);
+    $ok('0.001 degrees away is still a duplicate (about 110 m here)',
+        posDupe($have, 'river', 3.001, 101.500) === true);
+    $ok('0.003 degrees away is not (about 330 m)',
+        posDupe($have, 'river', 3.003, 101.500) === false);
+    $ok('the same point, a different kind, is not a duplicate',
+        posDupe($have, 'rainfall', 3.000, 101.500) === false);
+    $ok('an empty station list has nothing to duplicate',
+        posDupe([], 'river', 3.000, 101.500) === false);
+
     echo "\ngazParse():\n";
+    // The Johor row carries Sg. Paya Dato's real coordinate, genuinely outside BOX rather than a
+    // stand-in — before the BOX check this function did not filter by state at all, which is what
+    // that row used to demonstrate. It still demonstrates gazParse() reading state text as-is. It
+    // is now also outside the box, which is the row this fixture uses to prove that check works on
+    // a real place and not only on the -9999 sentinel.
     $gazJson = '[{"loc":[3.1,101.6],"title":"Sg. Klang di Kuala Lumpur, Kuala Lumpur, Wilayah Persekutuan Kuala Lumpur"},'
              . '{"loc":[2.38,103.87],"title":"Sg. Paya Dato, Mersing, Johor"},'
              . '{"loc":[3.0,101.5],"title":"Desa Pinggiran Putra (F2), Sepang, Selangor"},'
-             . '{"loc":[0,0],"title":"Broken, Nowhere, Selangor"}]';
+             . '{"loc":[0,0],"title":"Broken, Nowhere, Selangor"},'
+             . '{"loc":[-9999,-9999],"title":"Sentinel, Nowhere, Selangor"}]';
     $g = gazParse($gazJson);
-    $ok('every row is read',            count($g) === 3);
+    $ok('every row inside the coverage box is read', count($g) === 2);
     $ok('the name is the first part',   $g[0]['name'] === 'Sg. Klang di Kuala Lumpur');
     $ok('the state is the last part',   $g[0]['state'] === 'Wilayah Persekutuan Kuala Lumpur');
     $ok('the district is the middle',   $g[0]['district'] === 'Kuala Lumpur');
-    $ok('a Johor station is kept here', $g[1]['state'] === 'Johor');
     $ok('a zero coordinate is dropped', count(array_filter($g, fn($r) => $r['name'] === 'Broken')) === 0);
+    $ok('a real place outside the coverage box is dropped',
+        count(array_filter($g, fn($r) => $r['state'] === 'Johor')) === 0);
+    $ok('the -9999 sentinel is truthy but still outside the box, and dropped',
+        count(array_filter($g, fn($r) => $r['name'] === 'Sentinel')) === 0);
     $ok('bad json yields nothing',      gazParse('not json') === []);
     $ok('an empty body yields nothing', gazParse('') === []);
 
@@ -2824,13 +2909,7 @@ function portalState(string $s): string {
 $kl = klStations($pages);
 $klAdded = $klDupes = 0;
 foreach ($kl as $s) {
-    foreach ($stations as $have) {
-        if ($have['kind'] === $s['kind'] && abs($have['lat'] - $s['lat']) < 0.002
-                                         && abs($have['lng'] - $s['lng']) < 0.002) {
-            $klDupes++;
-            continue 2;   // ~200 m apart and the same kind: one mast, and we already have it
-        }
-    }
+    if (posDupe($stations, $s['kind'], $s['lat'], $s['lng'])) { $klDupes++; continue; }
     $klAdded++;
     $stations[] = $s['kind'] === 'river' ? [
         'kind' => 'river', 'id' => 'kl-wl-' . $s['code'], 'name' => $s['name'],
@@ -2895,7 +2974,7 @@ foreach ($stations as $s) {
    code that corrected a station this app already held, so the difference is the new set.
    22 of these are the Kuala Lumpur rivers the SPHTN table never placed, which is the gap this
    whole source exists to close. */
-$natNew = $natSkip = $natDistrict = 0;
+$natNew = $natSkip = $natDistrict = $natDupe = 0;
 foreach ($nat as $code => $n) {
     if (isset($natUsed[$code]) || $n['level'] === null) continue;
     $at = gazPlace($n['name'], $gaz);
@@ -2904,6 +2983,8 @@ foreach ($nat as $code => $n) {
     // itself assigns it, the same way CAM_FIX corroborates a camera against its own district.
     $near = $distPts[$distKey(portalState($at['state']), $at['district'])] ?? [];
     if (!gazCorroborated($at['lat'], $at['lng'], $near)) { $natDistrict++; continue; }
+    // Same guard the KL merge above uses — see posDupe()'s own comment for the measurement.
+    if (posDupe($stations, 'river', $at['lat'], $at['lng'])) { $natDupe++; continue; }
     $natNew++;
     $stations[] = [
         'kind'    => 'river',
@@ -2961,7 +3042,7 @@ unset($s);
    `state` decides which half of the map a station belongs to, and district names collide across
    states — Kuala Lumpur and Selangor both have a Gombak — so anything keyed by district must key by
    state and district together. See dkey() in js/util.js. */
-$prfNew = $prfSkip = $prfDistrict = 0;
+$prfNew = $prfSkip = $prfDistrict = $prfDupe = 0;
 foreach ($prf as $i => $r) {
     if (isset($prfHit['used'][$i])) continue;
     $at = gazPlace($r['name'], $gaz);
@@ -2970,6 +3051,11 @@ foreach ($prf as $i => $r) {
     // itself assigns it, the same way CAM_FIX corroborates a camera against its own district.
     $near = $distPts[$distKey(portalState($at['state']), $at['district'])] ?? [];
     if (!gazCorroborated($at['lat'], $at['lng'], $near)) { $prfDistrict++; continue; }
+    // Same guard the KL merge above uses — see posDupe()'s own comment for the measurement. The
+    // portal's own gazetteer publishes an old and a new record for one site, e.g. `Batu Caves` and
+    // `Batu Caves (F2)` a metre apart, and portalKey() cannot join them: the `(F2)` suffix only
+    // satisfies gazPlace()'s OTHER direction, never this one.
+    if (posDupe($stations, 'rainfall', $at['lat'], $at['lng'])) { $prfDupe++; continue; }
     $prfNew++;
     $id = 'prf-' . ($r['code'] ?? md5($r['name']));
     $stations[] = [
@@ -3016,6 +3102,26 @@ foreach ($graphIds as $id => $g) {
     if (isset($histDone[$id])) continue;
     $histTodo[$id] = $g;
     if (count($histTodo) >= HIST_FILL) break;
+}
+
+/* Being stamped is not the same claim as having answered. seriesParse('') returns [] on a failed
+   request, seedRebase() then returns [] too, zero rows are written, and the stamp below is written
+   regardless — the same rule pageRow() states for a page that never answers, and the right one:
+   a request that dies must not be asked again on every refresh forever. But it means `seeded`
+   climbing to count($histDone) and `pending` reaching 0 look exactly like a finished backfill even
+   where a table moved and every request came back empty — the graphId integer-cast fault Task 9
+   found, with the detection removed. That one silently left 23% of stations seeded with nothing.
+   Queried rather than trusted: does the archive hold a #c row for this station AT ALL, not windowed
+   to ACC_READ (80h) the way $odo above is — a station seeded days ago and never polled live since
+   reads empty there, and looks like a fresh failure on a seed that was fine. */
+$histEmpty = 0;
+if ($histDone) {
+    $keys = array_map(fn($id) => $id . '#c', array_keys($histDone));
+    $ph   = implode(',', array_fill(0, count($keys), '?'));
+    $chk  = $db->prepare("SELECT DISTINCT station FROM level WHERE station IN ($ph)");
+    $chk->execute($keys);
+    $withRows = array_flip($chk->fetchAll(PDO::FETCH_COLUMN));
+    foreach (array_keys($histDone) as $id) if (!isset($withRows[$id . '#c'])) $histEmpty++;
 }
 
 // --- Rainfall history --------------------------------------------------------------------------
@@ -3072,7 +3178,14 @@ foreach ($stations as &$s) {
         // for the same reason `#c` has one: no station id ends in `#d`.
         if ($run !== null) $samples[$key . '#d'] = [$ts, (float)$s['daily']];
     } elseif (($s['cumulative'] ?? null) !== null) {
-        $run = (float)$s['cumulative'];
+        // The return trip from the portal scale — see rainScaleHeld()'s own comment. $cSeries and
+        // $dSeries are read fresh here rather than reused from the branch above, because a station
+        // takes exactly one of the two branches per poll.
+        $cSeries = $odo[$key . '#c'] ?? [];
+        $dSeries = $odo[$key . '#d'] ?? [];
+        $prevC   = $cSeries ? end($cSeries) : null;
+        $prevD   = $dSeries ? end($dSeries) : null;
+        $run     = rainScaleHeld($prevC, $prevD) ? $prevC[1] : (float)$s['cumulative'];
     }
 
     if ($run !== null) {
@@ -3327,11 +3440,16 @@ $payload = json_encode([
         // `placed` is how many rivers the portal alone knew about, pinned from the gazetteer.
         // `district` is a different failure from `unplaced`: gazPlace() found a name match, but
         // gazCorroborated() would not stand behind the point — see gazCorroborated()'s own comment.
+        // `dupe` is a fourth, and the newest: gazPlace() and gazCorroborated() both agreed, but
+        // posDupe() found the point already belongs to a station this app holds — see its own
+        // comment for the measurement that added this counter.
         // `unmapped` is what is left once a code corrected a station, placed a new one, or was
-        // refused by the district check — no coordinate for it anywhere in the gazetteer yet.
+        // refused by the district or duplicate check — no coordinate for it anywhere in the
+        // gazetteer yet.
         'national' => ['parsed' => count($nat), 'applied' => count($natUsed),
                        'placed' => $natNew, 'unplaced' => $natSkip, 'district' => $natDistrict,
-                       'unmapped' => count($nat) - count($natUsed) - $natNew - $natDistrict],
+                       'dupe' => $natDupe,
+                       'unmapped' => count($nat) - count($natUsed) - $natNew - $natDistrict - $natDupe],
         'met'      => ['parsed' => $metParsed, 'fresh' => count($metPts), 'matched' => $metMatched],
         'metday'   => ['parsed' => count($metDay), 'matched' => $metDayMatched],
         'metwarn'  => ['parsed' => count($metWarn)],
@@ -3342,15 +3460,23 @@ $payload = json_encode([
         // portal alone knew about — gazPlace() pinned one, or the row is counted and dropped.
         // `district` is a third, different count: gazPlace() pinned a point, but gazCorroborated()
         // refused it — a coordinate found and not trusted, not a coordinate that was never found.
+        // `dupe` is a fourth: gazPlace() and gazCorroborated() both agreed, but posDupe() found the
+        // point already belongs to a station this app holds, most often the portal's own OLD and
+        // NEW record for one site — see posDupe()'s own comment.
         'portalrf' => ['parsed' => count($prf), 'applied' => $prfUsed,
                        'clash'  => count($prfHit['clash']),
-                       'placed' => $prfNew, 'unplaced' => $prfSkip, 'district' => $prfDistrict],
+                       'placed' => $prfNew, 'unplaced' => $prfSkip, 'district' => $prfDistrict,
+                       'dupe'   => $prfDupe],
         // `pending` is what the NEXT drip will ask for, capped at GAZ_FILL. It reaching 0 is the
         // backfill finishing, which is success — see watch.php in Task 10.
         'gaz' => ['stations' => (int)$db->query('SELECT COUNT(*) FROM station')->fetchColumn(),
                   'asked'    => count($gazDone), 'pending' => count($gazAsk)],
         // `pending` reaching 0 is the seed finishing, which is success — see watch.php in Task 10.
-        'hist' => ['seeded' => count($histDone), 'pending' => count($histTodo)],
+        // `empty` is a station already stamped seeded that holds no #c row at all — seriesParse('')
+        // returns [] on a failed request, seedRebase() then returns [] too, and the stamp is written
+        // regardless. Without this, `seeded` climbing and `pending` reaching 0 look exactly like a
+        // finished backfill even when every request failed. See $histEmpty's own comment above.
+        'hist' => ['seeded' => count($histDone), 'pending' => count($histTodo), 'empty' => $histEmpty],
         // Empty on a healthy poll. A key here names a table the map is drawing from a stored copy.
         'stale'    => $pagesStale,
     ],

@@ -9828,3 +9828,80 @@ can show belongs to upstream, the rule `CAM_FIX` already states. `cyearly` as an
 flat at 766.5 across a window where 12 mm fell. The three official JPS notice feeds a reader asked
 for on 2026-08-14: each needs the alert design standard on its own, and all three held no rows when
 measured, so no parser here can yet tell a quiet feed from a moved layout.
+
+## The portal placement passes drew duplicate stations
+
+A whole-branch review found a gap in both new-station placement passes. The KL merge already
+refuses a same-kind candidate near a station this app already holds. Neither portal pass did.
+
+The portal publishes an old and a new record for some sites. The gazetteer holds both `Pekan
+Banting` and `Pekan Banting (F2)` at one coordinate. `portalKey()` cannot join the two records,
+because the `(F2)` suffix only satisfies `gazPlace()`'s other-direction rule.
+
+Measured before the fix: 153 new stations, 79 within 50 meters of a station already held, and 87
+within 200 meters. 64 of the 79 published an identical reading. An identical reading proves one
+instrument counted twice.
+
+The fix adds `posDupe()`, one function shared by the KL merge and both portal placement passes. It
+refuses a same-kind candidate within about 200 meters of a station already held, the same distance
+the KL merge already used. Each pass counts its own refusals as `dupe`, beside `placed`, `unplaced`
+and `district`.
+
+**Why this mattered.** `js/alerts.js` counts stations, not sites. A duplicated gauge at its top
+class adds one to the app-bar number, the icon badge, the document title and the toast. That
+widens an alert surface with no design review behind it.
+
+`isIgnored()` also keys on station id, so silencing one twin leaves the other alerting. That breaks
+the rule that `PREFS.ignored` is the only alarm-suppression control.
+
+Measured after the fix, on a forced refresh: 62 new stations, 0 within 50 meters of a station
+already held, 0 within 200 meters. `pwl-2914401`, the duplicate national record for RS Batu 8, no
+longer appears in the payload. The fix leaves `wl-831`, the original Selangor reading, untouched.
+
+## A failed history seed looked the same as a finished one
+
+`seriesParse('')` returns an empty array on a failed request. `seedRebase()` then returns an empty
+array too. Zero rows get inserted, and the drip still writes the `histdone:` stamp. The stamp is
+right on its own: the drip must not repeat a dead request on every refresh.
+
+But it left no way to tell a failing endpoint from a finished backfill. `hist.seeded` counts
+stamps, not rows, so a failing endpoint can drive `seeded` toward the full station count and
+`pending` toward zero, the same shape success takes. This is the `graphId` integer-cast fault an
+earlier task found, with the detection removed — that one silently left 23% of stations seeded with
+nothing.
+
+The fix adds `hist.empty`, a count of stations that carry a `histdone:` stamp but hold no `#c` row
+in `.history.db` at all. The query checks the whole table, not the 80-hour window `$odo` loads,
+because a station seeded days ago, with no live poll since, looks empty in that window even when
+the seed succeeded.
+
+## `gazParse()` accepted a coordinate outside the coverage area
+
+`gazParse()` dropped only a falsy coordinate, `0, 0`. The live gazetteer holds two rows at the
+sentinel `-9999.0000, -9999.0000` (`SUNGAI SENTUL AOP6-3` and `AOP7-7`). `-9999` is truthy in PHP,
+so `gazParse()` kept both rows. Nothing else bounds a placement: `gazCorroborated()` only checks a
+district that already holds three stations, so a sparse district waves a sentinel straight through.
+
+The fix rejects a gazetteer row whose point falls outside `BOX`, the coverage area constant already
+defined in `api.php`. The constant orders `BOX` as `[west, north, east, south]`.
+
+`gazParse()` lives in `sources.php`. It reads the constant from `api.php` directly, rather than
+keep a second copy — a second copy drifts from the original over time. The Johor row in the
+`--selftest` fixture now proves the same check on a real, far-off coordinate, not only on the
+sentinel.
+
+## A source flip-flop can put a backwards step into a rainfall running total
+
+A station uses `portalOdo()`'s running total while its source is `portal`. The moment its portal
+row goes missing, or arrives with both `hourly` and `daily` null, the accumulation block fell back
+to `(float)$s['cumulative']` — the year-to-date odometer JPS publishes, a different scale from
+`portalOdo()`'s own running total.
+
+An earlier task held the one-way transition into the portal path. Nothing held the way back out.
+The new function `rainScaleHeld()` checks whether the last `#c` write carries a `#d` write at the
+same timestamp, which only happens inside the portal branch. When it does, the accumulation block
+holds the last `#c` value for one poll, instead of writing the raw cumulative figure.
+
+This fault is latent today: zero backwards steps measured. But one backwards step nulls every
+accumulation window on that station for up to 72 hours, since `accWindow()` treats a falling
+odometer as a reset.

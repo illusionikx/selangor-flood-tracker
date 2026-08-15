@@ -45,6 +45,8 @@ export const sourceRows = j => [
   ['kl scraped', `${j.sources?.kl?.parsed ?? '?'} parsed, ${j.sources?.kl?.added ?? '?'} added`],
   ['national scraped',
     `${j.sources?.national?.parsed ?? '?'} parsed, ${j.sources?.national?.applied ?? '?'} applied`],
+  ['portal rainfall',
+    `${j.sources?.portalrf?.parsed ?? '?'} parsed, ${j.sources?.portalrf?.applied ?? '?'} applied`],
   ['offline stations', j.offline ?? '?'],
 ];
 

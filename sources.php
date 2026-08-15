@@ -283,6 +283,13 @@ function gazParse(string $json): array {
         $lat = (float)($r['loc'][0] ?? 0);
         $lng = (float)($r['loc'][1] ?? 0);
         if (!$lat || !$lng) continue;
+        // A sentinel is not always zero, so the falsy check above does not catch every bad point.
+        // The live station table holds two rows at -9999.0000, -9999.0000 (SUNGAI SENTUL AOP6-3 and
+        // AOP7-7), and -9999 is truthy in PHP. Nothing else bounds a placement: gazCorroborated()
+        // in api.php only fires where a district already holds 3 stations, so a sparse district
+        // waves a sentinel straight through. BOX is [west, north, east, south] — api.php's own
+        // coverage box, read here rather than kept as a second copy — a second copy drifts.
+        if ($lng < BOX[0] || $lat > BOX[1] || $lng > BOX[2] || $lat < BOX[3]) continue;
         $parts = array_map('trim', explode(',', (string)($r['title'] ?? '')));
         if (count($parts) < 3) continue;
         $state    = array_pop($parts);
