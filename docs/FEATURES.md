@@ -1863,12 +1863,12 @@ Decisions:
   the window, and 8px of margin split between the rails moved it back. Nothing is centred on the
   window now. The header's own `gap: 12px` holds the strip off the title.
 
-  **`margin-right: 8px` rides on top of that gap, so the strip stops 20px short of the controls and
+  **`margin-right: 16px` rides on top of that gap, so the strip stops 28px short of the controls and
   12px short of the title.** The two sides are not symmetric on purpose. The title is text that ends
   where it ends, and the controls are a row of 40px targets. A strip that stops as close to a button
   as it does to a word reads as though it belongs to that button.
 
-  Margin and not padding. The fade is a `mask` over the whole box. Padding puts the last 8px of the
+  Margin and not padding. The fade is a `mask` over the whole box. Padding puts the last 16px of the
   right ramp inside the padding and shortens the visible fade. Margin moves the box and leaves the
   ramp measuring what it says.
 
