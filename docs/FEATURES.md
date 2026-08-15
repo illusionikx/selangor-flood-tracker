@@ -1861,7 +1861,16 @@ Decisions:
   **`margin-left: 8px` is gone from the strip.** It existed only to correct the centring: the header
   pads 8px left and 16px right, so equal rails put the middle of the strip 4px left of the middle of
   the window, and 8px of margin split between the rails moved it back. Nothing is centred on the
-  window now. The header's own `gap: 12px` holds the strip off the title and off the controls.
+  window now. The header's own `gap: 12px` holds the strip off the title.
+
+  **`margin-right: 8px` rides on top of that gap, so the strip stops 20px short of the controls and
+  12px short of the title.** The two sides are not symmetric on purpose. The title is text that ends
+  where it ends, and the controls are a row of 40px targets. A strip that stops as close to a button
+  as it does to a word reads as though it belongs to that button.
+
+  Margin and not padding. The fade is a `mask` over the whole box. Padding puts the last 8px of the
+  right ramp inside the padding and shortens the visible fade. Margin moves the box and leaves the
+  ramp measuring what it says.
 
   It still fails safely. Both rails carry `min-width: 0`, so the title gives way first and steps the
   wordmark down a rung. Below 601px the two rails share line one and the strip has a row of its own,

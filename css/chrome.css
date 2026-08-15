@@ -98,9 +98,18 @@ header .hactions {
   /* No `margin-left` any more. It was 8px, and it existed only to correct the centring: the header
      pads 8px left and 16px right, so equal rails put the middle of the strip 4px left of the middle
      of the window, and 8px of margin split between the rails moved it back. Nothing is centred on
-     the window now, so there is nothing left to correct. The header's own `gap: 12px` already holds
-     the strip off the title and off the controls. */
-  height: 30px; overflow: hidden;
+     the window now, so there is nothing left to correct. The header's own `gap: 12px` holds the
+     strip off the title.
+
+     `margin-right` is 8px on top of that gap, so the strip stops 20px short of the controls and
+     12px short of the title. The two sides are not symmetric on purpose. The title is text that
+     ends where it ends, and the controls are a row of 40px targets — a strip that stops as close to
+     a button as it does to a word reads as though it belongs to that button.
+
+     Margin and not padding. The fade is a `mask` over the whole box. Padding puts the last 8px of the
+     right ramp inside the padding and shortens the visible fade. Margin moves the box and leaves
+     the ramp measuring what it says. */
+  margin-right: 8px; height: 30px; overflow: hidden;
   display: flex; align-items: center;
   /* Both edges fade, so an item entering or leaving dissolves instead of appearing at a hard cut.
      Long ramps (56px) because a marquee is *always* half-way through an item at both edges — a
