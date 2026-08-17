@@ -968,11 +968,18 @@ function floodAlerts(string $json, int $now): array {
            alone. A point list this app cannot read is no reason to drop a flood forecast. */
         if (!hereNames($state . ' ' . implode(' ', $pois), false)) continue;
 
+        /* `fresh` is how long this keeps interrupting, so it measures from when JPS issued the
+           message and never from the forecast start. An NT_7D Early alert names a window seven days
+           out. Measured from that start, `$now - $from` goes negative and the test is trivially
+           true, so one tile would hold the ticker for a week. That is the standing banner the alert
+           design standard rejects. */
+        $said = strtotime((string)($r['MessageDT'] ?? '')) ?: $from;
+
         $out[] = ['title' => 'Flood alert · ' . FLOOD_KEEP[$code],
                   'text'  => $pois ? implode(', ', $pois) . ($state !== '' ? " ($state)" : '') : $state,
                   'from'  => date('Y-m-d\TH:i:s', $from),
                   'to'    => date('Y-m-d\TH:i:s', $to),
-                  'fresh' => ($now - $from) < WARN_FRESH,
+                  'fresh' => ($now - $said) < WARN_FRESH,
                   'kind'  => 'flood', 'src' => 'jps'];
     }
     return $out;

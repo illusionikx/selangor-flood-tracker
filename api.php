@@ -2502,6 +2502,24 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
     $ok('a siren notification survives',
         count(floodAlerts($fa(['NotificationTypeCode' => 'NT_DF']), time())) === 1);
 
+    /* `fresh` has to measure from the issue stamp, not the forecast start. An NT_7D Early alert
+       names a window seven days out, so `$now - $from` on that row is negative and any comparison
+       against it is trivially true. Measuring from `MessageDT` instead keeps the row on screen (the
+       panel reads validity, not freshness) while `fresh` answers a different question: how long ago
+       did JPS speak. */
+    $early7d = fn(string $said) => $fa([
+        'NotificationTypeCode' => 'NT_7D',
+        'MessageDT'      => $said,
+        'EstimatedDT'    => date('d-m-Y H:i:s', time() + 7 * 86400),
+        'EstimatedEndDT' => date('d-m-Y H:i:s', time() + 8 * 86400),
+    ]);
+    $earlyNow = floodAlerts($early7d(date('d-m-Y H:i:s', time())), time());
+    $ok('a 7-day-ahead early alert still appears', count($earlyNow) === 1);
+    $ok('and is fresh when JPS just issued it',    ($earlyNow[0]['fresh'] ?? null) === true);
+    $earlyOld = floodAlerts($early7d(date('d-m-Y H:i:s', time() - 7 * 3600)), time());
+    $ok('the same alert still appears 7h later',   count($earlyOld) === 1);
+    $ok('but is no longer fresh',                  ($earlyOld[0]['fresh'] ?? null) === false);
+
     /* The three withdrawals drop. Every surface renders a notice only inside its validity window,
        so an alert that ended leaves the panel without help. A withdrawal row restates that, and it
        appears alone whenever the alert it withdraws expired between two polls. */
