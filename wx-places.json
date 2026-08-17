@@ -1,0 +1,202 @@
+{
+    "ampang": {
+        "district": "hulu langat",
+        "state": "Selangor"
+    },
+    "bangi": {
+        "district": "hulu langat",
+        "state": "Selangor"
+    },
+    "bangsar": {
+        "district": "kuala lumpur",
+        "state": "Kuala Lumpur"
+    },
+    "banting": {
+        "district": "kuala langat",
+        "state": "Selangor"
+    },
+    "batu-caves": {
+        "district": "gombak",
+        "state": "Selangor"
+    },
+    "bentong": {
+        "district": "bentong",
+        "state": "Pahang"
+    },
+    "bukit-bintang": {
+        "district": "kuala lumpur",
+        "state": "Kuala Lumpur"
+    },
+    "bukit-fraser": {
+        "district": "raub",
+        "state": "Pahang"
+    },
+    "bukit-tinggi": {
+        "district": "bentong",
+        "state": "Pahang"
+    },
+    "cheras": {
+        "district": "kuala lumpur",
+        "state": "Kuala Lumpur"
+    },
+    "cyberjaya": {
+        "district": "sepang",
+        "state": "Selangor"
+    },
+    "damansara": {
+        "district": "petaling",
+        "state": "Selangor"
+    },
+    "genting-highlands": {
+        "district": "bentong",
+        "state": "Pahang"
+    },
+    "jalan-duta": {
+        "district": "kuala lumpur",
+        "state": "Kuala Lumpur"
+    },
+    "kajang": {
+        "district": "hulu langat",
+        "state": "Selangor"
+    },
+    "kepong": {
+        "district": "gombak",
+        "state": "Selangor"
+    },
+    "kfc-taman-sri-muda-shah-alam": {
+        "district": "klang",
+        "state": "Selangor"
+    },
+    "kuala-kubu-bharu": {
+        "district": "hulu selangor",
+        "state": "Selangor"
+    },
+    "kuala-lumpur": {
+        "district": "kuala lumpur",
+        "state": "Kuala Lumpur"
+    },
+    "kuala-lumpur-convention-center": {
+        "district": "kuala lumpur",
+        "state": "Kuala Lumpur"
+    },
+    "kuala-selangor": {
+        "district": "kuala selangor",
+        "state": "Selangor"
+    },
+    "menara-lembaga-pertubuhan-peladang": {
+        "district": "kuala lumpur",
+        "state": "Kuala Lumpur"
+    },
+    "met-malaysia": {
+        "district": "petaling",
+        "state": "Selangor"
+    },
+    "met-selangor": {
+        "district": "petaling",
+        "state": "Selangor"
+    },
+    "met-sepang": {
+        "district": "sepang",
+        "state": "Selangor"
+    },
+    "nilai": {
+        "district": "seremban",
+        "state": "Negeri Sembilan"
+    },
+    "nres-putrajaya": {
+        "district": "putrajaya",
+        "state": "Putrajaya"
+    },
+    "parlimen-kl": {
+        "district": "kuala lumpur",
+        "state": "Kuala Lumpur"
+    },
+    "paya-indah-wetlands": {
+        "district": "kuala langat",
+        "state": "Selangor"
+    },
+    "pdsa-enstek": {
+        "district": "seremban",
+        "state": "Negeri Sembilan"
+    },
+    "petaling-jaya": {
+        "district": "petaling",
+        "state": "Selangor"
+    },
+    "port-dickson": {
+        "district": "port dickson",
+        "state": "Negeri Sembilan"
+    },
+    "port-klang": {
+        "district": "klang",
+        "state": "Selangor"
+    },
+    "putrajaya": {
+        "district": "putrajaya",
+        "state": "Putrajaya"
+    },
+    "putrajaya-international-convention-center": {
+        "district": "putrajaya",
+        "state": "Putrajaya"
+    },
+    "raub": {
+        "district": "raub",
+        "state": "Pahang"
+    },
+    "rawang": {
+        "district": "gombak",
+        "state": "Selangor"
+    },
+    "sabak-bernam": {
+        "district": "sabak bernam",
+        "state": "Selangor"
+    },
+    "selayang": {
+        "district": "gombak",
+        "state": "Selangor"
+    },
+    "semenyih": {
+        "district": "hulu langat",
+        "state": "Selangor"
+    },
+    "sentul": {
+        "district": "kuala lumpur",
+        "state": "Kuala Lumpur"
+    },
+    "sepang": {
+        "district": "sepang",
+        "state": "Selangor"
+    },
+    "serdang": {
+        "district": "petaling",
+        "state": "Selangor"
+    },
+    "seremban": {
+        "district": "seremban",
+        "state": "Negeri Sembilan"
+    },
+    "seri-kembangan": {
+        "district": "petaling",
+        "state": "Selangor"
+    },
+    "setapak": {
+        "district": "kuala lumpur",
+        "state": "Kuala Lumpur"
+    },
+    "shah-alam": {
+        "district": "petaling",
+        "state": "Selangor"
+    },
+    "slim-river": {
+        "district": "muallim",
+        "state": "Perak"
+    },
+    "subang-jaya": {
+        "district": "petaling",
+        "state": "Selangor"
+    },
+    "sungai-besi": {
+        "district": "kuala lumpur",
+        "state": "Kuala Lumpur"
+    }
+}

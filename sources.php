@@ -1075,3 +1075,28 @@ function beatDead(string $body): bool {
     $rows = jsonLoose($body);
     return $rows === null || $rows === [];
 }
+
+/* --- MET nowcast, as a map layer ------------------------------------------------------------- */
+
+/**
+ * A stable key for one MET nowcast point.
+ *
+ * The name is the only identity MET publishes. A coordinate is a float and it moves when MET nudges
+ * a marker, so it cannot key a database row. A rename orphans the history for that point instead,
+ * and RETAIN prunes the orphan 30 days later.
+ */
+function wxSlug(string $name): string {
+    $s = strtolower(trim(preg_replace('/\s+/', ' ', $name)));
+    return trim(preg_replace('/[^a-z0-9]+/', '-', $s), '-');
+}
+
+/**
+ * The points inside the coverage box.
+ *
+ * `$box` is [west, north, east, south], the order api.php states for BOX.
+ */
+function wxInBox(array $pts, array $box): array {
+    [$w, $n, $e, $s] = $box;
+    return array_values(array_filter($pts, fn($p) =>
+        $p['lng'] >= $w && $p['lng'] <= $e && $p['lat'] <= $n && $p['lat'] >= $s));
+}
