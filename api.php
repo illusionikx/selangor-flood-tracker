@@ -2441,6 +2441,63 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
     $ok('an unreadable body yields nothing', jpsMetWarnings('<html>Notis</html>', time()) === []);
     $ok('an empty feed yields nothing',      jpsMetWarnings('[]', time()) === []);
 
+    echo "\nfloodAlerts():\n";
+    /* --- floodAlerts(): the JPS flood forecast --- */
+    $fa = fn(array $o = []) => json_encode([$o + [
+        'NotificationTypeCode' => 'NT_2D',
+        'State'                => 'SELANGOR',
+        'POINew'               => 'Sungai Klang di Jambatan Sulaiman!Sungai Gombak',
+        'POIType'              => 'FP',
+        'MessageDT'            => date('d-m-Y H:i:s', time() - 1800),
+        'EstimatedDT'          => date('d-m-Y H:i:s', time() - 1800),
+        'EstimatedEndDT'       => date('d-m-Y H:i:s', time() + 7200),
+        'hide'                 => '0',
+    ]]);
+
+    $f = floodAlerts($fa(), time());
+    $ok('a live flood alert survives',   count($f) === 1);
+    $ok('it is stamped flood and jps',
+        ($f[0]['kind'] ?? '') === 'flood' && ($f[0]['src'] ?? '') === 'jps');
+    $ok('the title names the alert type', ($f[0]['title'] ?? '') === 'Flood alert · Final');
+    // POINew is a `!`-delimited list. A reader needs the places, not the delimiter.
+    $ok('the text lists the points',
+        ($f[0]['text'] ?? '') === 'Sungai Klang di Jambatan Sulaiman, Sungai Gombak (SELANGOR)');
+    $ok('the stamp is normalized to ISO',
+        (bool)preg_match('/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d$/', $f[0]['from'] ?? ''));
+
+    $ok('an early alert survives',   count(floodAlerts($fa(['NotificationTypeCode' => 'NT_7D']), time())) === 1);
+    $ok('an update survives',        count(floodAlerts($fa(['NotificationTypeCode' => 'NT_UP']), time())) === 1);
+    $ok('a siren notification survives',
+        count(floodAlerts($fa(['NotificationTypeCode' => 'NT_DF']), time())) === 1);
+
+    /* The three withdrawals drop. Every surface renders a notice only inside its validity window,
+       so an alert that ended leaves the panel without help. A withdrawal row restates that, and it
+       appears alone whenever the alert it withdraws expired between two polls. */
+    $ok('a termination drops',  floodAlerts($fa(['NotificationTypeCode' => 'NT_TM']), time()) === []);
+    $ok('a recall drops',       floodAlerts($fa(['NotificationTypeCode' => 'NT_RC']), time()) === []);
+    $ok('a no-flood drops',     floodAlerts($fa(['NotificationTypeCode' => 'NT_NF']), time()) === []);
+    $ok('an unknown code drops', floodAlerts($fa(['NotificationTypeCode' => 'NT_XX']), time()) === []);
+
+    // JPS operators hide a message through their own update_showhidefloodalert.php endpoint. That
+    // flag is a decision the source made, and this app does not overrule a source.
+    $ok('a hidden row drops',   floodAlerts($fa(['hide' => '1']), time()) === []);
+
+    $ok('a row outside its window drops',
+        floodAlerts($fa(['EstimatedDT'    => date('d-m-Y H:i:s', time() - 7200),
+                         'EstimatedEndDT' => date('d-m-Y H:i:s', time() - 3600)]), time()) === []);
+    // Nothing can retire a row with no end, and every surface here renders inside a window.
+    $ok('a row with no end drops',  floodAlerts($fa(['EstimatedEndDT' => '']), time()) === []);
+    $ok('a row for another state drops',
+        floodAlerts($fa(['State' => 'SARAWAK', 'POINew' => 'Sungai Rajang']), time()) === []);
+    // The state alone can carry a row. A point list this app cannot read is not a reason to drop it.
+    $ok('the state alone can carry a row',
+        count(floodAlerts($fa(['POINew' => '']), time())) === 1);
+    $ok('and the text is then the state',
+        (floodAlerts($fa(['POINew' => '']), time())[0]['text'] ?? '') === 'SELANGOR');
+
+    $ok('an unreadable body yields nothing', floodAlerts('<html>Notis</html>', time()) === []);
+    $ok('an empty feed yields nothing',      floodAlerts('[]', time()) === []);
+
     echo "\nshotCache():\n";
     /* The two forms of ?shot= mean different things and must not share a header. `&t=` names one
        frame that never changes again, so a year is honest. The no timestamp form names whichever

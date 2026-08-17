@@ -883,3 +883,74 @@ function jpsMetWarnings(string $json, int $now): array {
     }
     return $out;
 }
+
+/* --- the JPS flood alert --------------------------------------------------------------------- */
+
+/* The notification types `getdisse.php` publishes, and the word each one gets on screen.
+ *
+ * The three withdrawals are absent on purpose. `NT_TM` Termination, `NT_RC` Recall and `NT_NF` No
+ * Flood all cancel an earlier alert.
+ *
+ * Every surface here renders a notice only inside its validity window. An alert that ended leaves
+ * the panel without help. A withdrawal row restates that. It also appears alone whenever the alert
+ * it withdraws expired between two polls. */
+const FLOOD_KEEP = [
+    'NT_7D'  => 'Early',
+    'NT_2D'  => 'Final',
+    'NT_UP'  => 'Update',
+    'NT_DF'  => 'Siren',
+    'NT_MET' => 'Meteorological',
+];
+
+/* The JPS flood forecast, from `publicinfobanjir.water.gov.my/ramalan/amaran-banjir/`.
+ *
+ * This is the only true flood alarm among the three notice feeds. It carries a validity window, an
+ * update type and a withdrawal path. That is what the alert design standard asks an alert to have.
+ *
+ * THIS PARSER HAS NEVER SEEN A ROW. `getdisse.php` answered `[]` on every fetch during the design.
+ * The field names come from the consumer JavaScript on the JPS page.
+ *
+ * That is evidence and not a guess, and nobody has tested it against real data. The first non-empty
+ * response is the moment to check it by hand. Do not widen it to handle a shape nobody has seen.
+ *
+ * The row carries map geometry too. Nothing plots it, so nothing here parses it. */
+function floodAlerts(string $json, int $now): array {
+    $rows = json_decode($json, true);
+    if (!is_array($rows)) return [];
+
+    $out = [];
+    foreach ($rows as $r) {
+        if (!is_array($r)) continue;
+
+        $code = (string)($r['NotificationTypeCode'] ?? '');
+        if (!isset(FLOOD_KEEP[$code])) continue;
+
+        /* JPS operators hide a message through their own `update_showhidefloodalert.php` endpoint.
+           That flag is a decision the source made, and this app does not overrule a source. */
+        if ((string)($r['hide'] ?? '0') === '1') continue;
+
+        /* This needs both ends. Nothing can retire a row with no end, and every surface here
+           renders inside a window. `EstimatedDT` is the forecast start and `MessageDT` is when JPS
+           issued the message, so the first is the better start and the second is the fallback. */
+        $from = strtotime((string)($r['EstimatedDT'] ?? '')) ?: strtotime((string)($r['MessageDT'] ?? ''));
+        $to   = strtotime((string)($r['EstimatedEndDT'] ?? ''));
+        if (!$from || !$to || $now > $to) continue;
+
+        /* `POINew` is a `!`-delimited list of the points this alert names. A reader needs the
+           places, not the delimiter. */
+        $pois = array_values(array_filter(array_map('trim', explode('!', (string)($r['POINew'] ?? '')))));
+        $state = trim((string)($r['State'] ?? ''));
+
+        /* A flood alert is about land, so the straits test does not apply. The state carries a row
+           alone. A point list this app cannot read is no reason to drop a flood forecast. */
+        if (!hereNames($state . ' ' . implode(' ', $pois), false)) continue;
+
+        $out[] = ['title' => 'Flood alert · ' . FLOOD_KEEP[$code],
+                  'text'  => $pois ? implode(', ', $pois) . ($state !== '' ? " ($state)" : '') : $state,
+                  'from'  => date('Y-m-d\TH:i:s', $from),
+                  'to'    => date('Y-m-d\TH:i:s', $to),
+                  'fresh' => ($now - $from) < WARN_FRESH,
+                  'kind'  => 'flood', 'src' => 'jps'];
+    }
+    return $out;
+}
