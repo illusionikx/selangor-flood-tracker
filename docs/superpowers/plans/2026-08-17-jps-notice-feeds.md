@@ -871,14 +871,22 @@ function mergeNotices(array ...$sets): array {
     $out  = [];
     $seen = [];
     foreach ($all as $r) {
-        $k = strtolower(trim((string)$r['title'] . '|' . (string)$r['text']));
+        $k = strtolower(trim((string)$r['title'])) . "\x00" . strtolower(trim((string)$r['text']));
         if (isset($seen[$k])) continue;
         $seen[$k] = true;
         $out[] = $r;
     }
     return $out;
 }
+```
 
+The shipped code joins `title` and `text` on `"\x00"`, not on the plain `'|'` this snippet showed
+when it was written. A `'|'` join collides: a row with title `A` and text `B|C` builds the same key
+as a row with title `A|B` and text `C`, so two different rows would read as one duplicate. A null
+byte cannot appear in either field, so the key stays unambiguous. Copy the shipped form, not this
+one.
+
+```php
 /* The newest issue stamp in a RAW notice body, or 0 where the body holds no row.
  *
  * This reads the feed and not the filtered output. `met-warn` yielded 0 rows through the geography

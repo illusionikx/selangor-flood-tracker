@@ -441,18 +441,25 @@ answer carries the alarm. Pipe it through `watch.php` instead. The check then co
 no service, no container, no account and no third party.
 
 **What it checks.** `kl`, `national`, `met` and `metday` must each parse more than zero rows.
-`sources.stale` must be empty. `upstreamOk` must be true. The station count must clear 300, which
-catches a collapse rather than a wobble. Empty input is a fault too, so a dead site reports itself
-through the same path.
+`sources.stale` must be empty. `sources.old` must be empty too — `stale` names a page that did not
+answer at all, and `old` names one that answered with nothing recent, which a parse counter cannot
+see on its own: a week-old bulletin parses the same as a fresh one. `upstreamOk` must be true. The
+station count must clear 300, which catches a collapse rather than a wobble. Empty input is a fault
+too, so a dead site reports itself through the same path.
 
 **What it ignores on purpose.** `metwarn.parsed` reads 0 on any calm day, because no warning is in
 force. It read 0 on the poll behind this note. An alarm there fires most days and teaches a reader
 to ignore the log.
 
-**It reports a change of state, never a state.** A fault repeated every five minutes for a week is
-2,016 identical lines. An alarm nobody acts on is the cry-wolf failure the alert design standard
-rejects. It reports the recovery too, or a cleared fault looks open forever. `.watch.state` holds the
-last verdict, and `watch.php` compares against it.
+**It reports a change of state, never a state — with one qualification.** A fault repeated every
+five minutes for a week is 2,016 identical lines. An alarm nobody acts on is the cry-wolf failure the
+alert design standard rejects. It reports the recovery too, or a cleared fault looks open forever.
+`.watch.state` holds the last verdict, and `watch.php` compares against it.
+"Healthy is silent" assumes a fault clears. `sources.old` breaks that assumption if the upstream it
+names stays dead: the state never changes, so `watch.php` keeps exiting 1 on every poll and the cron
+keeps mailing, for as long as that source stays stale. That is by design — the log line still fires
+once, not every five minutes — but a `MAILTO` cron reader should expect repeat mail from a source
+that has stopped moving and not stopped answering.
 
 Output goes to `.php-error.log`. That keeps one file to read when something looks wrong.
 `.client-errors.log` holds the browser side, one JSON line per report. Both are absent on a healthy
