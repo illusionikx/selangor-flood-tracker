@@ -9981,9 +9981,12 @@ can go quiet on its own, the way `api.data.gov.my` just did. The merge survives 
 never depends on one source alone.
 
 **`jpsmet.parsed` reading 3 beside `warnings` holding 1 row is not a contradiction.** Each `parsed`
-counter states what its own source yielded, before the merge removes anything. `jpsmet.parsed` names
-three JPS rows. `warnings` names what is left once the geography filter and the cross-source
-duplicate test both run. A reader who checks only one of the two numbers will misread the other.
+counter states what its own source yielded, before the merge removes anything. `jpsmet.parsed`
+already names three rows that passed the geography filter — that filter runs inside
+`jpsMetWarnings()` itself, so it has done its work before `count($warnJps)` is ever taken.
+`warnings` names what is left once `mergeNotices()`'s cross-source duplicate test runs on top of
+that. The 3 to 1 reduction here is the duplicate test alone. A reader who checks only one of the
+two numbers will misread the other.
 
 `mergeNotices()`'s duplicate key cannot join the same bulletin worded two ways. JPS writes "SECOND
 CATEGORY WARNING ON STRONG WINDS AND ROUGH SEAS" in capitals. `data.gov.my` writes "Warning on Strong
