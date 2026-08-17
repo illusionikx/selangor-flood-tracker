@@ -3753,7 +3753,10 @@ $payload = json_encode([
                        'unmapped' => count($nat) - count($natUsed) - $natNew - $natDistrict - $natDupe],
         'met'      => ['parsed' => $metParsed, 'fresh' => count($metPts), 'matched' => $metMatched],
         'metday'   => ['parsed' => count($metDay), 'matched' => $metDayMatched],
-        'metwarn'  => ['parsed' => count($metWarn)],
+        // The MET source alone, never the merged total. This counter is the per-source alarm and
+        // 0 means data.gov.my moved something. Counting the merge masks that forever, because the
+        // JPS mirror keeps the number above 0 on its own.
+        'metwarn'  => ['parsed' => count($warnMet)],
         // `parsed` is the alarm for a layout change. `applied` is how many stations took a portal
         // reading. `clash` counts every ambiguity portalMatch() logs: a code two rows or two
         // stations share, a name two rows share, a code match overriding a weaker name match on
