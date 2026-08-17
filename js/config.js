@@ -39,10 +39,11 @@ export const ALERT_TITLE = {
    The words live here beside ALERT_TITLE and HOTLINES, because that is where this app keeps its
    strings, and because three surfaces read them: the panel card, the ticker tile and the modal. */
 export const NOTICE_KIND = {
-  weather: { icon: 'rainy_heavy', c: 'var(--k-weather)', head: 'Forecast Warning' },
   // A flood forecast from JPS. It counts toward nothing, exactly as a weather warning does — see
-  // the alert design standard in docs/FEATURES.md.
-  flood:   { icon: 'flood',       c: 'var(--k-river)',   head: 'Flood Alert' },
+  // the alert design standard in docs/FEATURES.md. It draws first: a flood forecast is a stronger
+  // claim than a weather forecast, and `alerts.js` draws these cards in this object's own order.
+  flood:   { icon: 'flood',       c: 'var(--k-notice)',  head: 'Flood Alert' },
+  weather: { icon: 'rainy_heavy', c: 'var(--k-weather)', head: 'Forecast Warning' },
 };
 
 // Who published the reading on a station. `api.php` stamps every station with one of these keys, so
