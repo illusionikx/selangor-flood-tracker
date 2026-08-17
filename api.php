@@ -2540,6 +2540,12 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
         === ['late', 'early']);
     $ok('an empty merge is an empty array', mergeNotices([], [], []) === []);
 
+    // The separator must not appear in upstream text. With a bare `|` these two rows produced
+    // one key, and a real warning went missing as a duplicate.
+    $ok('a pipe in the title does not collide',
+        count(mergeNotices([$mk('A|B', 'C', '2026-08-17T08:00:00')],
+                           [$mk('A', 'B|C', '2026-08-17T09:00:00')])) === 2);
+
     /* --- noticeNewest() / noticeOld(): a page that answered with nothing recent --- */
     $DGM = json_encode([['valid_from' => '2026-08-10T09:00:00'],
                         ['valid_from' => '2026-08-09T09:00:00']]);

@@ -982,7 +982,7 @@ function mergeNotices(array ...$sets): array {
     $out  = [];
     $seen = [];
     foreach ($all as $r) {
-        $k = strtolower(trim((string)$r['title'] . '|' . (string)$r['text']));
+        $k = strtolower(trim((string)$r['title'])) . "\x00" . strtolower(trim((string)$r['text']));
         if (isset($seen[$k])) continue;
         $seen[$k] = true;
         $out[] = $r;
@@ -994,7 +994,11 @@ function mergeNotices(array ...$sets): array {
  *
  * This reads the feed and not the filtered output. `met-warn` yielded 0 rows through the geography
  * filter on 2026-08-17 and still held 7 rows upstream, every one issued on 2026-08-10. The
- * staleness lives in the feed, so the test has to read the feed. */
+ * staleness lives in the feed, so the test has to read the feed.
+ *
+ * The `jps-` branch assumes a body shaped like the met_*.json mirror, which carries `Valid_from`.
+ * `getdisse.php` carries `EstimatedDT` instead and answers 0 here. Task 6 keeps `jps-flood` out of
+ * the age loop for that reason. A caller that adds it needs a field for it first. */
 function noticeNewest(string $key, string $body): int {
     $jps  = str_starts_with($key, 'jps-');
     $rows = $jps ? jsonLoose($body) : json_decode($body, true);
