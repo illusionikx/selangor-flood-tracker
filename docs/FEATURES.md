@@ -9962,11 +9962,11 @@ mirror keeps that number above 0 on its own, so a merged count hides exactly the
 describes. `metwarn.parsed` counts `api.data.gov.my` alone now, so the existing rule in `CLAUDE.md` —
 zero there, and only there, means `data.gov.my` moved something — still holds.
 
-The JPS mirror of the same MET bulletins answered on the same day, with rows issued at 08:21 and
-08:31. Two of them named the waters of Selangor, each valid from 08:00 to 12:00. That gave 3 rows
-through `sources.jpsmet.parsed`. After the geography filter and the merge, `warnings` held 1 row: the
-live Selangor warning `metWarnings()` had never seen, because its own source had stopped moving three
-days before.
+The JPS mirror of the same MET bulletins answered the morning of 2026-08-17, with rows issued at
+08:21 and 08:31. Two of them named the waters of Selangor, each valid from 08:00 to 12:00. A poll
+that afternoon read `sources.jpsmet.parsed: 3`, once the feed had churned to a third row. After the
+geography filter and the merge, `warnings` held 1 row: the live Selangor warning `metWarnings()` had
+never seen, because its own source had stopped moving three days before.
 
 ### One array, two sources, and a duplicate no exact key can catch
 
@@ -9992,8 +9992,10 @@ match those two strings, so a reader can meet one bulletin twice while both sour
 the accepted trade. A fuzzy key invents its own match, and a wrong join hides a real warning behind an
 assumed duplicate. That failure is worse than showing one warning twice.
 
-The exact key still earns its place inside one source alone. `met_gelora.json` answered with three
-byte-identical rows on 2026-08-17. `mergeNotices()` collapsed them to one.
+The exact key still earns its place inside one source alone. Measured on the morning of 2026-08-17,
+`met_gelora.json` held two rows naming the waters of Selangor. Measured the same afternoon, it held
+three byte-identical rows, and `mergeNotices()` collapsed them to one. The feed churns within a day,
+so a row count taken once is a row count taken once.
 
 ### Paragraph-level geography
 
@@ -10081,12 +10083,13 @@ The field names come from the consumer JavaScript JPS publishes on its own page.
 not a guess, but nobody has tested the parser against real data yet. The first non-empty response is
 the moment to check it by hand.
 
-This work also surfaced a false positive it did not cause and does not fix. The ticker carried a
-sentence naming "Northern part of Phuket, Northern Straits Of Melaka, Southern Straits Of Melaka,
-Northern Reef South, Southeastern Reef North and Labuan". None of that sits inside the area this map
-covers. `WARN_SEA_FAR` at `sources.php:709` cuts only `northern straits of melaka` before the keep
-test runs. MET also writes `Southern Straits Of Melaka`, which still matches `WARN_SEA_KEEP`'s
-`straits of melaka`. `CLAUDE.md` already documents this exact fault for the northern phrase. This is
-the same fault at the southern site. It never showed before, because `data.gov.my` was dead and no
-row ever reached the filter. See the gotcha list in `CLAUDE.md` for the fix this leaves open, and why
-it stays out of this change.
+This work also surfaced a false positive it did not cause and does not fix. Before this work,
+`data.gov.my` was the only warning source this app had, and it had published nothing for seven days.
+No row reached the geography filter at all, so the fault stayed invisible. The JPS mirror delivers
+rows now, and on 2026-08-17 the ticker carried a sentence naming "Northern part of Phuket, Northern
+Straits Of Melaka, Southern Straits Of Melaka, Northern Reef South, Southeastern Reef North and
+Labuan". None of that sits inside the area this map covers. `WARN_SEA_FAR` at `sources.php:709` cuts
+only `northern straits of melaka` before the keep test runs. MET also writes `Southern Straits Of
+Melaka`, which still matches `WARN_SEA_KEEP`'s `straits of melaka`. `CLAUDE.md` already documents this
+exact fault for the northern phrase. This is the same fault at the southern site. See the gotcha list
+in `CLAUDE.md` for the fix this leaves open, and why it stays out of this change.

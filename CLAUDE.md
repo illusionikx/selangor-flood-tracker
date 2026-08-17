@@ -1802,16 +1802,18 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   is open on purpose: adding `semenanjung` and `peninsular` also lets in warnings about every other
   state. Name the gap so the next reader sees a decision, not a bug. The filter reads English and
   Malay text alike, because MET writes some rows in one language only.
-  **A live payload surfaced the same fault at the southern site.** On 2026-08-17 the ticker carried
-  "Northern part of Phuket, Northern Straits Of Melaka, Southern Straits Of Melaka, Northern Reef
-  South, Southeastern Reef North and Labuan", and none of that names anywhere this map covers.
-  `WARN_SEA_FAR` cuts only `northern straits of melaka`. MET also writes `Southern Straits Of Melaka`,
-  which still matches `WARN_SEA_KEEP`'s `straits of melaka` once the northern phrase is gone. The fix
-  is the same shape: add `southern straits of melaka`, `southern straits of malacca` and `selatan
-  selat melaka` to `WARN_SEA_FAR`. This entry leaves that fix undone on purpose. `api.data.gov.my` was
-  dead for the seven days this work measured, so no row reached the filter and the fault never showed.
-  Adding a stretch to the drop list is a claim about Malaysian maritime zones, a judgement outside what
-  this work set out to change. Read this as an open decision, not a bug nobody noticed.
+  **A live payload surfaced the same fault at the southern site.** Before this work, `data.gov.my`
+  was the only warning source this app had, and it had published nothing for seven days. No row
+  reached the geography filter at all, so the fault stayed invisible. The JPS mirror delivers rows
+  now, and on 2026-08-17 the ticker carried "Northern part of Phuket, Northern Straits Of Melaka,
+  Southern Straits Of Melaka, Northern Reef South, Southeastern Reef North and Labuan", and none of
+  that names anywhere this map covers. `WARN_SEA_FAR` cuts only `northern straits of melaka`. MET
+  also writes `Southern Straits Of Melaka`, which still matches `WARN_SEA_KEEP`'s `straits of melaka`
+  once the northern phrase is gone. The fix is the same shape: add `southern straits of melaka`,
+  `southern straits of malacca` and `selatan selat melaka` to `WARN_SEA_FAR`. This entry leaves that
+  fix undone on purpose. Adding a stretch to the drop list is a claim about Malaysian maritime zones,
+  a judgement outside what this work set out to change. Read this as an open decision, not a bug
+  nobody noticed.
 - **The two warning surfaces disagree about time on purpose, and `fresh` is the seam.** The panel
   lists a warning for its whole validity. The ticker carries it only while `fresh` — the first
   `WARN_FRESH` (6 h) of that validity, measured from the warning's own start and **not** from when
@@ -2370,6 +2372,14 @@ tail -2 .php-error.log
 curl -sk https://flood-exp.test/api.php \
   | php -r '$p=json_decode(stream_get_contents(STDIN),true);$p["sources"]["metwarn"]["parsed"]=0;echo json_encode($p);' \
   | php watch.php; echo "metwarn 0  -> $?  (must be 0)"
+
+# watch.php now reads sources.old as well as sources.stale. They name different faults: `stale` is a
+# page that did not answer, `old` is a page that answered with nothing recent. On the payload this
+# work measured, `old` holds met-warn and `stale` is empty, so watch.php reports a fault and exits 1.
+rm -f .watch.state
+curl -sk https://flood-exp.test/api.php | php watch.php; echo "first  -> $?"
+curl -sk https://flood-exp.test/api.php | php watch.php; echo "again  -> $?  (must not log twice)"
+tail -2 .php-error.log
 ```
 
 ```bash
