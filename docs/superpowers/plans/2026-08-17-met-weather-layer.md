@@ -686,7 +686,7 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 
 **Interfaces:**
 - Consumes: `api.php?wx=1` from Task 3, the tokens from Task 4.
-- Produces: `js/wx.js` exporting `syncWx(): void`, `tick(): Promise<void>` and `card(p): string`. `config.js` exporting `WX_THIN_PX: number` and `FEED_WX: string`, and `WEATHER[n].pin`. `popup.js` exporting `wxIcon(rung, { clock, pin }): string`.
+- Produces: `js/wx.js` exporting `syncWx(): void` and `tick(): Promise<void>`. `card(p)` stays module-private, because `tick()` is its only caller. `config.js` exporting `WX_THIN_PX: number` and `FEED_WX: string`, and `WEATHER[n].pin`. `popup.js` exporting `wxIcon(rung, { clock, pin }): string`.
 
 - [ ] **Step 1: Add the config**
 
@@ -745,7 +745,7 @@ export const wxIcon = (r, { clock, pin } = {}) => {
 };
 ```
 
-Check `popup.js` for `export function stamp(`. Where the line reads `function stamp(`, add the `export`. `js/wx.js` imports that function.
+`stamp` is declared `const stamp = t => {` at about `js/popup.js:444` and it is NOT exported today. Change that line to `export const stamp = t => {`. `js/wx.js` imports it. Verified 2026-08-17.
 
 - [ ] **Step 3: Add the drawer section**
 
@@ -905,7 +905,7 @@ const stepCard = (rung, clock, now) => {
     </div>`;
 };
 
-export function card(p) {
+function card(p) {
   const temp = p.tmax == null ? '' : `<div class="wxrow wxtoday">
       <span class="wxtemp" data-tip="Max ${p.tmax}° · Min ${p.tmin}°">
         <span>${p.tmax}°</span><span>${p.tmin}°</span></span>
