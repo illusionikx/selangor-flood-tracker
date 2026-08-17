@@ -339,8 +339,12 @@ export function flashTo(t) {
      the go-to box, table, alert rows, ticker and menu rows. PREFS.heatLayer was never
      written while the mode was on. So syncHeat() inside the rerender below brings back
      whatever heatmap the reader had. Nothing here has to remember it. */
-  if (PREFS.wx) { PREFS.wx = false; save(); }
-  if (state.pinned !== t.id) { state.pinned = t.id; state.rerender(); }
+  /* Leaving weather mode always needs a rebuild, whatever `state.pinned` holds. The mode
+     emptied `siteMark`. A second jump to the station already pinned would find no marker
+     and open no card. Nothing clears `state.pinned` when the mode turns on. */
+  const wasWx = PREFS.wx;
+  if (wasWx) { PREFS.wx = false; save(); }
+  if (wasWx || state.pinned !== t.id) { state.pinned = t.id; state.rerender(); }
 
   /* One way in: the marker's own click handler centres the map and fills the panel, so a jump from
      a list and a click on the pin cannot drift apart. Nothing has to wait for the map to settle or
