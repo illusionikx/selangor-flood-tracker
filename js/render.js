@@ -12,7 +12,7 @@ import { sitePopup } from './popup.js';
 state.rerender = () => render();
 
 /* True once weather mode has run at least once this session. render() reads it below to decide
-   whether wx.js still needs a tick(), even after PREFS.wx has gone false. It never resets, so a
+   whether wx.js still needs a tick(), even after PREFS.wx has gone false. It never resets. So a
    reader who leaves weather mode still gets the one extra tick that tears the layer down. */
 let wxSeen = false;
 

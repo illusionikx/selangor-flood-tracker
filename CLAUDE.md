@@ -299,8 +299,8 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   keyed `wx:box`. This handler parses nothing and reaches no upstream. So it cannot be slow, and it
   cannot fail in a new way. A try/catch wraps the connect to `.history.db`, the same shape `?place=`
   uses. A missing or unreadable row degrades to `{"points":[]}` rather than a broken response. The
-  body carries an `ETag`. MET reissues about every 30 minutes against a poll every 8.5, so most
-  polls cost one 304 instead of the full body.
+  body carries an `ETag`. MET reissues about every 30 minutes, against a poll every 8.5. So most
+  polls cost one 304 rather than the full body.
 
 ## Colour language — do not violate
 
