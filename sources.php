@@ -609,6 +609,43 @@ function metUrls(int $now): array {
     ];
 }
 
+/* --- lenient JSON ---------------------------------------------------------------------------- */
+
+/* JPS writes raw newline characters inside JSON string values, so `json_decode()` returns null on
+   `met_gelora.json`. The failure is silent, because a null decode and an empty feed look the same
+   to a caller that tests `is_array()`. So this returns null for one and an empty array for the
+   other, and the liveness rule in api.php reads that difference.
+ *
+ * The scan tracks whether the cursor sits inside a string literal and honours the backslash escape.
+ * It escapes any control character it finds inside a string. It changes nothing outside one.
+ *
+ * Measured 2026-08-17 against all five JPS MET files. Four decode the same either way.
+ * `met_gelora.json` goes from a parse failure to 2 rows. */
+function jsonLoose(string $s): ?array {
+    $out = '';
+    $in  = false;
+    $esc = false;
+    $n   = strlen($s);
+    for ($i = 0; $i < $n; $i++) {
+        $c = $s[$i];
+        if ($esc)                { $out .= $c; $esc = false; continue; }
+        if ($c === '\\' && $in)  { $out .= $c; $esc = true;  continue; }
+        if ($c === '"')          { $in = !$in; $out .= $c;   continue; }
+        if ($in && ord($c) < 0x20) {
+            $out .= match ($c) {
+                "\n"    => '\\n',
+                "\r"    => '\\r',
+                "\t"    => '\\t',
+                default => sprintf('\\u%04x', ord($c)),
+            };
+            continue;
+        }
+        $out .= $c;
+    }
+    $j = json_decode($out, true);
+    return is_array($j) ? $j : null;
+}
+
 /* --- MET Malaysia warnings ------------------------------------------------------------------ */
 
 /* Rows this map never shows. A seismic warning and an empty advisory say nothing about the weather

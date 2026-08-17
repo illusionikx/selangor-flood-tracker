@@ -1936,6 +1936,23 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
     $ok('an empty body fails',               pageHasData('prf-SEL', '') === false);
     $ok('the other tables keep the tr test',  pageHasData('nat-SEL', "<tr class='item'>") === true);
 
+    echo "\njsonLoose():\n";
+    /* --- jsonLoose(): JPS writes raw control characters inside JSON strings --- */
+    $ok('valid JSON decodes',            jsonLoose('[{"a":1}]') === [['a' => 1]]);
+    $ok('an empty list is an empty list', jsonLoose('[]') === []);
+    $ok('a raw newline inside a string',  jsonLoose("[{\"a\":\"x\ny\"}]") === [['a' => "x\ny"]]);
+    $ok('a raw tab inside a string',      jsonLoose("[{\"a\":\"x\ty\"}]") === [['a' => "x\ty"]]);
+    $ok('a newline outside a string',     jsonLoose("[\n {\"a\":1}\n]") === [['a' => 1]]);
+    $ok('an escaped quote survives',      jsonLoose('[{"a":"x\"y"}]') === [['a' => 'x"y']]);
+    // A string ending in an escaped backslash. Without the escape tracking the parser reads the
+    // closing quote as an opening one and every following newline goes unescaped.
+    $ok('a trailing escaped backslash',   jsonLoose('[{"a":"x\\\\"},{"b":2}]') === [['a' => 'x\\'], ['b' => 2]]);
+    $ok('an HTML notice is not an array', jsonLoose('<html>Notis Gangguan</html>') === null);
+    $ok('an empty body is not an array',  jsonLoose('') === null);
+    // The failure this exists for. A null decode and an empty feed look identical to a caller that
+    // tests is_array(), which is why the return separates them.
+    $ok('a bare scalar is not an array',  jsonLoose('"just a string"') === null);
+
     echo "\nnoticeOf():\n";
     $ok('the notice page returns its id',  noticeOf('<html><title> Notis Gangguan </title><body></body></html>') === 'publicinfobanjir');
     $ok('a real table is not a notice',    noticeOf("<table><tr class='item'><td>1</td></tr></table>") === null);
