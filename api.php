@@ -1956,6 +1956,55 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
     // the byte untouched, so a recoverable row decoded as null.
     $ok('a control byte after a backslash', jsonLoose("[{\"a\":\"x\\\\\ny\"}]") !== null);
 
+    echo "\nhereNames() / hereParts():\n";
+    /* --- hereNames() / hereParts(): a bulletin names six regions and one of them is ours --- */
+    $ok('a land row naming Selangor',    hereNames('Heavy rain over Selangor', false) === true);
+    $ok('a land row naming nowhere here', hereNames('Heavy rain over Sarawak', false) === false);
+    $ok('a marine row naming the straits',
+        hereNames('rough seas over the Straits of Melaka', true) === true);
+    // The far stretch is CUT before the keep test reads it, so a row naming only the northern
+    // straits has nothing left to match. See CLAUDE.md.
+    $ok('a marine row naming the far straits',
+        hereNames('rough seas over the Northern Straits of Melaka', true) === false);
+    $ok('a marine row naming both stretches',
+        hereNames('Northern Straits of Melaka and Central Straits of Melaka', true) === true);
+    // The straits are open to a marine row only. A land row must name a place.
+    $ok('a land row may not use the straits',
+        hereNames('rough seas over the Straits of Melaka', false) === false);
+
+    $BULLETIN = "Thunderstorms are expected over Sarawak until noon.\n"
+              . "Heavy rain is expected over Selangor until 12:00 PM.\n"
+              . "Strong winds are expected over Sabah until noon.";
+    $ok('a bulletin keeps only the part naming here',
+        hereParts($BULLETIN, false) === 'Heavy rain is expected over Selangor until 12:00 PM.');
+    $ok('a bulletin naming nowhere here narrows to nothing',
+        hereParts("Thunderstorms over Sarawak.\nStrong winds over Sabah.", false) === '');
+    $ok('a single sentence naming here survives whole',
+        hereParts('Heavy rain over Kuala Lumpur.', false) === 'Heavy rain over Kuala Lumpur.');
+    $ok('two parts naming here both survive',
+        hereParts("Rain over Selangor.\nWind over Putrajaya.", false)
+        === 'Rain over Selangor. Wind over Putrajaya.');
+    // A sentence split must not fire on a decimal or an abbreviation mid-sentence.
+    $ok('a sentence splits on the period and the newline alone',
+        hereParts('Waves reach 4.5 metres over Selangor.', false)
+        === 'Waves reach 4.5 metres over Selangor.');
+
+    /* metWarnings() must keep every row it kept before. A row qualifying on its Malay half alone
+       narrows to nothing in English, and the whole English text stands. */
+    $MY = json_encode([[
+        'heading_en' => 'Warning on Thunderstorms',
+        'text_en'    => 'Thunderstorms are expected until noon.',
+        'text_bm'    => 'Ribut petir dijangka di negeri Selangor sehingga tengah hari.',
+        'valid_from' => date('Y-m-d\TH:i:s', time() - 60),
+        'valid_to'   => date('Y-m-d\TH:i:s', time() + 3600),
+    ]]);
+    $r = metWarnings($MY, time());
+    $ok('a row qualifying on Malay text is kept',  count($r) === 1);
+    $ok('and it shows its whole English text',
+        ($r[0]['text'] ?? '') === 'Thunderstorms are expected until noon.');
+    $ok('metWarnings stamps kind and src',
+        ($r[0]['kind'] ?? '') === 'weather' && ($r[0]['src'] ?? '') === 'met');
+
     echo "\nnoticeOf():\n";
     $ok('the notice page returns its id',  noticeOf('<html><title> Notis Gangguan </title><body></body></html>') === 'publicinfobanjir');
     $ok('a real table is not a notice',    noticeOf("<table><tr class='item'><td>1</td></tr></table>") === null);

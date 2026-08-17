@@ -700,6 +700,45 @@ const WARN_SEA_FAR = ['northern straits of melaka', 'northern straits of malacca
 const WARN_HERE = ['selangor', 'kuala lumpur', 'putrajaya', 'lembah klang', 'klang valley',
                    'wilayah persekutuan', 'west coast', 'pantai barat'];
 
+/* Does this text name somewhere this map covers?
+ *
+ * A marine text has a second way in: our stretch of the Straits of Melaka, with the far stretch cut
+ * out before the keep test reads it. Cutting rather than testing is what keeps a text naming two
+ * stretches — strip the northern mention from "Northern Straits of Melaka and Central Straits of
+ * Melaka" and the central one still answers. See CLAUDE.md for the row this rule was written for.
+ *
+ * The straits are open to a marine text alone. A land text must name a state or a district. */
+function hereNames(string $text, bool $sea): bool {
+    $where = strtolower($text);
+    foreach (WARN_HERE as $k) if (str_contains($where, $k)) return true;
+    if (!$sea) return false;
+    foreach (WARN_SEA_FAR as $f) $where = str_replace($f, '', $where);
+    foreach (WARN_SEA_KEEP as $k) if (str_contains($where, $k)) return true;
+    return false;
+}
+
+/* Keep only the parts of a bulletin that name somewhere this map covers.
+ *
+ * MET writes one warning across several regions in one row. `met_gelora.json` carried 1,795
+ * characters across 16 lines on 2026-08-17, naming Sarawak, Sabah, Selangor, Perlis, Kedah and
+ * Perak together. A row-level place test keeps that row on one word, and the panel then prints a
+ * wall of text that is mostly about Borneo. On the measured row this returns a single
+ * 203-character sentence.
+ *
+ * The split runs on a newline or on a period followed by a space. A period inside a number carries
+ * no space after it, so "4.5 meters" stays whole.
+ *
+ * An empty return means the text names nowhere here. The caller decides what that means: the gate
+ * is a separate test on the combined English and Malay text, and this narrows the English alone. */
+function hereParts(string $text, bool $sea): string {
+    $keep = [];
+    foreach (preg_split('/\n+|(?<=\.)\s+/', $text) as $part) {
+        $p = trim($part);
+        if ($p !== '' && hereNames($p, $sea)) $keep[] = $p;
+    }
+    return implode(' ', $keep);
+}
+
 /**
  * Every MET warning live at $now, newest first.
  *
@@ -749,17 +788,15 @@ function metWarnings(string $json, int $now): array {
         foreach (WARN_SEA as $s) if (str_contains($hay, $s)) { $sea = true; break; }
         if (!$sea) foreach (WARN_WATER as $s) if (str_contains($where, $s)) { $sea = true; break; }
 
-        /* A row survives by naming somewhere this map covers. A marine row has a second way in:
-           our stretch of the straits, with the far stretch cut out first. Both ways are open to a
-           marine row on purpose — "the waters of Selangor" names the coast without naming the
-           straits, and it is as much our weather as the straits are. */
-        $near = false;
-        foreach (WARN_HERE as $k) if (str_contains($where, $k)) { $near = true; break; }
-        if (!$near && $sea) {
-            foreach (WARN_SEA_FAR as $f) $where = str_replace($f, '', $where);
-            foreach (WARN_SEA_KEEP as $k) if (str_contains($where, $k)) { $near = true; break; }
-        }
-        if (!$near) continue;
+        /* The gate reads the combined English and Malay text, because MET writes some rows in one
+           language only. That is unchanged, so this keeps every row it kept before. */
+        if (!hereNames($where, $sea)) continue;
+
+        /* The displayed text narrows to the parts naming somewhere this map covers. It falls back
+           to the whole English text, because a row can qualify on its Malay half alone and then
+           have nothing to narrow. */
+        $narrow = hereParts($text, $sea);
+        if ($narrow !== '') $text = $narrow;
 
         $key = $title . '|' . $text;
         if (isset($seen[$key])) continue;
@@ -777,7 +814,10 @@ function metWarnings(string $json, int $now): array {
            for. An interruption has to end. The directory does not. */
         $out[] = ['title' => $title, 'text' => $text,
                   'from' => (string)$r['valid_from'], 'to' => (string)$r['valid_to'],
-                  'fresh' => ($now - $from) < WARN_FRESH];
+                  'fresh' => ($now - $from) < WARN_FRESH,
+                  // One array carries every notice, and these two separate them. `weather` renders
+                  // as this row always has. See mergeNotices().
+                  'kind' => 'weather', 'src' => 'met'];
     }
     usort($out, fn($a, $b) => strcmp($b['from'], $a['from']));
     return $out;
