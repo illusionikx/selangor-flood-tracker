@@ -35,6 +35,16 @@ export const ALERT_TITLE = {
   'rainfall|now': ['Very heavy rain', 'Very heavy rain'],
 };
 
+/* The shell each kind of regional notice draws in. `kind` arrives on every row in `warnings[]`.
+   The words live here beside ALERT_TITLE and HOTLINES, because that is where this app keeps its
+   strings, and because three surfaces read them: the panel card, the ticker tile and the modal. */
+export const NOTICE_KIND = {
+  weather: { icon: 'rainy_heavy', c: 'var(--k-weather)', head: 'Forecast Warning' },
+  // A flood forecast from JPS. It counts toward nothing, exactly as a weather warning does — see
+  // the alert design standard in docs/FEATURES.md.
+  flood:   { icon: 'flood',       c: 'var(--k-river)',   head: 'Flood Alert' },
+};
+
 // Who published the reading on a station. `api.php` stamps every station with one of these keys, so
 // a popup can always say where its number came from — three feeds disagreeing by a few centimetres
 // is normal, and unattributed numbers would make that look like a bug in the map.

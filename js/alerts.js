@@ -2,7 +2,7 @@
 // well is indistinguishable from one that broke, so quiet is stated rather than implied — and the
 // list itself in the station panel, which is the same popout a pin opens.
 
-import { KINDS, STATUS_COLOR, NO_INFO, ALERT_TITLE, NOTICE } from './config.js';
+import { KINDS, STATUS_COLOR, NO_INFO, ALERT_TITLE, NOTICE, NOTICE_KIND } from './config.js';
 import { state, PREFS } from './state.js';
 import { el, distKm, dkey, isHot, tier, TIER_RANK, isIgnored, noSec, isFav, esc } from './util.js';
 import { side, openSide, closeSide } from './map.js';
@@ -167,35 +167,50 @@ const favicon = red => {
 
    The row clips its text with CSS, not by cutting the string. The full sentence stays in the DOM
    for a screen reader. It stays too for anyone who copies it. The modal holds all of it. */
+/* The outage shell. The two notice shells live in NOTICE_KIND in config.js, because the ticker and
+   the modal read them too and this module is not importable from either. */
 const BANNER = {
-  warn:   { cls: 'warngrp',   icon: 'rainy_heavy', c: 'var(--k-weather)', head: 'Forecast Warning' },
-  notice: { cls: 'noticegrp', icon: 'public_off',  c: 'var(--k-source)',  head: 'Service Notice' },
+  notice: { icon: 'public_off', c: 'var(--k-source)', head: 'Service Notice' },
 };
 
-/* One card for both kinds. `kind` picks the shell. The row text comes from the payload item for a
-   warning, and from NOTICE in config.js for an outage, because an outage publishes an id rather
-   than prose. */
+/* One card for both kinds. An outage publishes an id rather than prose, so its words come from
+   NOTICE in config.js. A warning carries its own.
+ *
+ * A warning card is split by `kind`, so a JPS flood forecast and a MET thunderstorm never share a
+ * heading. They are different claims, and one heading over both makes the app state something
+ * neither source said. */
 function bannerCard(list, kind) {
   if (!list || !list.length) return '';
-  const b = BANNER[kind];
-  const rows = list.map((w, i) => {
-    const t = kind === 'notice' ? NOTICE[w.id] : w;
-    if (!t) return '';                    // an id this build has no words for says nothing
-    return `<button class="warnrow" data-banner="${kind}:${i}">
-        <b>${esc(t.title)}</b>
-        <span class="warntext">${esc(kind === 'notice' ? t.line : t.text)}</span>
-      </button>`;
+  if (kind === 'notice') {
+    const rows = list.map((w, i) => {
+      const t = NOTICE[w.id];
+      if (!t) return '';                  // an id this build has no words for says nothing
+      return `<button class="warnrow" data-banner="notice:${i}">
+          <b>${esc(t.title)}</b><span class="warntext">${esc(t.line)}</span>
+        </button>`;
+    }).join('');
+    return rows ? shell(BANNER.notice, 'noticegrp', rows) : '';
+  }
+
+  /* `data-banner` indexes state.warnings, so the index is taken BEFORE the split. Renumbering
+     after it opens the wrong warning — the same rule the ticker already obeys. */
+  return Object.entries(NOTICE_KIND).map(([k, b]) => {
+    const rows = list.map((w, i) => [w, i]).filter(([w]) => (w.kind || 'weather') === k)
+      .map(([w, i]) => `<button class="warnrow" data-banner="warn:${i}">
+          <b>${esc(w.title)}</b><span class="warntext">${esc(w.text)}</span>
+        </button>`).join('');
+    return rows ? shell(b, 'warngrp', rows) : '';
   }).join('');
-  // Every row unknown means an empty card shell, which draws a heading over nothing.
-  if (!rows) return '';
-  return `<div class="alertgrp ${b.cls}">
+}
+
+// The shared card shell. Split out because bannerCard() now builds up to three of them.
+const shell = (b, cls, rows) => `<div class="alertgrp ${cls}">
       <div class="alerthead">
         <i class="i i-${b.icon}" style="--c:${b.c}"></i>
         <b>${b.head}</b>
       </div>
       ${rows}
     </div>`;
-}
 
 export function alerts() {
   const hidden = new Set(PREFS.hidden || []);

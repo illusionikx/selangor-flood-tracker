@@ -1,6 +1,7 @@
 // DOM wiring: drawer, theme, filters, layer chips, panels, lightbox and the delegated jumps.
 
-import { KINDS, MAST, camSrc, FEED, STATIC, NEAR_MAX_KM, NOTICE, NARROW_PX } from './config.js';
+import { KINDS, MAST, camSrc, FEED, STATIC, NEAR_MAX_KM, NOTICE, NOTICE_KIND, NARROW_PX
+       } from './config.js';
 import { state, PREFS, PREFS_KEY, save } from './state.js';
 import { el, distKm, dkey, ignoredIds, leads, favIds, isFav, squash, termsOf, matches, esc
        } from './util.js';
@@ -1223,9 +1224,10 @@ document.addEventListener('click', e => {
     el('warnBody').innerHTML = `<h3>${esc(t.title)}</h3><p>${esc(t.text)}</p>${where}
       <p>Source: <a href="${esc(url)}" target="_blank" rel="noopener">${esc(label)}</a></p>`;
   } else {
-    icon.className = 'i i-rainy_heavy';
-    icon.style.color = 'var(--k-weather)';
-    el('warnBoxTitle').textContent = 'Forecast Warning';
+    const b = NOTICE_KIND[it.kind] || NOTICE_KIND.weather;
+    icon.className = `i i-${b.icon}`;
+    icon.style.color = b.c;
+    el('warnBoxTitle').textContent = b.head;
     el('warnBody').innerHTML = `<h3>${esc(it.title)}</h3><p>${esc(it.text)}</p>
       <p class="muted">Valid ${esc(warnWhen(it.from))} to ${esc(warnWhen(it.to))}</p>`;
   }

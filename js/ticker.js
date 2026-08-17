@@ -12,7 +12,7 @@
  * edge and leave at the left, and a name is read in the same direction it is written.
  */
 
-import { KINDS, HOTLINES, NOTICE } from './config.js';
+import { KINDS, HOTLINES, NOTICE, NOTICE_KIND } from './config.js';
 import { state } from './state.js';
 import { el, isHot, dkey, tier, isIgnored, esc } from './util.js';
 import { flashTo } from './map.js';
@@ -82,7 +82,12 @@ export function ticker() {
   const warns = state.warnings
     .map((w, i) => [w, i])
     .filter(([w]) => w.fresh)
-    .map(([w, i]) => tile('warn', 'rainy_heavy', 'var(--k-weather)', w.title, w.text, i));
+    // `data-warn` indexes state.warnings, so the index comes from the map above and never from the
+    // filtered position. The glyph and the colour come from the row's own kind.
+    .map(([w, i]) => {
+      const b = NOTICE_KIND[w.kind] || NOTICE_KIND.weather;
+      return tile('warn', b.icon, b.c, w.title, w.text, i);
+    });
 
   const banners = notes.concat(warns);
 
