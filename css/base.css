@@ -165,9 +165,11 @@
      theme. On the map the heart also carries a --surface halo, so it is never read against the
      basemap alone. */
   --fav: #ff85d0;
-  /* The weather layer uses natural sky colors. This is the one documented exception to the status
-     rule above. The exception holds on one condition: weather mode draws no station pin. Nothing
-     status-colored shares the map. An amber glyph cannot read as a station in trouble.
+  /* The weather layer uses natural sky colors, in warm hues that do not join the status set.
+     The status rule above reserves --s-alert and its neighbors for status, and states there is
+     no exception. This does not breach it. --wx-clear is its own token, muted away from
+     --s-alert so it cannot read as one. Weather mode also draws no station pin, so nothing
+     status-colored shares the map.
      The status set holds full saturation. The weather set holds much less. The two sets also
      separate by vividness.
      The design phase measured gold #f2b705 and rejected it. It sits within a shade of --s-alert on

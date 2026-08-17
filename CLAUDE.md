@@ -1950,12 +1950,13 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   beside `rainy` it reads as hatching rather than as more of one thing. The map reads its ladder
   from `WEATHER[].pin`. The card reads its own ladder from `WEATHER[].icon`. The card keeps the
   streaks, because they read at `wxbig` size. The card also has no color ladder to carry intensity.
-  **The weather pins are the one documented exception to the color rule.** The exception holds on
-  one condition. Weather mode draws no station pin. So nothing status-colored shares the map, and
-  an amber glyph cannot read as a station in trouble. The status set reads as saturated, and this
-  set reads as muted. So the two also separate by vividness. This app measured and rejected gold
-  `#f2b705`. It sits within one shade of `--s-alert` on the light theme. It also matches `#ffc000`
-  on the dark theme.
+  **The weather pins sit in warm hues without joining the status set.** The status rule above
+  reserves `--s-alert` and its neighbors for status, and states there is no exception. This does
+  not breach it. `--wx-clear` is its own token, muted away from `--s-alert` so it cannot read as
+  one. Weather mode also draws no station pin, so nothing status-colored shares the map. The
+  status set reads as saturated, and this set reads as muted, so the two also separate by
+  vividness. This app measured and rejected gold `#f2b705` for sitting too close. It lands within
+  one shade of `--s-alert` on the light theme, and matches `#ffc000` on the dark theme.
   **Heavy differs from rain by saturation and never by lightness.** `.pin` uses one palette on both
   themes, because a pin has to win over the basemap. So a darker heavy pin disappears into the dark
   tile.

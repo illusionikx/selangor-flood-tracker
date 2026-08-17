@@ -3117,9 +3117,9 @@ Each carries its state on its summary. That is the rule every section here obeys
 what the map paints — `weather`, `water level`, `rainfall` or `off`. `#kindN` counts the kinds
 switched off, the same `N hidden` the district filter shows.
 
-*Later:* **`#heatsect` became `#layersect`.** A weather mode joined the two heatmaps as a third
-answer to one question. The entry further down this file covers the merge and the reasoning behind
-it.
+*Later:* **`#heatsect` became `#layersect`.** A weather mode joined the two heatmaps under the
+same control, because weather forces both heatmaps off. So exactly one of the three ever paints.
+The entry further down this file covers the mode itself.
 
 **`#shown` stays outside both sections.** It carries the `· N ignored` count, which is one of the
 two always-visible indications that an alarm has been silenced — a collapsed section would hide it,
@@ -10165,7 +10165,7 @@ same pass now builds the weather rows. It writes them as one row in the `page` t
 key `wx:box`. `api.php?wx=1` reads that row and echoes it. The handler parses nothing. It cannot
 reach MET, and it cannot be slow.
 
-The main payload runs about 33 KB. Riding the main payload will add about 9 KB to every poll.
+The main payload runs about 33 KB. Riding the main payload will add about 10 KB to every poll.
 Most readers never open weather mode, so a permanent tax on every poll will buy them nothing.
 `?cam=`, `?shots=`, `?sheet=` and `?place=` already answer this way: on their own endpoint,
 fetched only when a reader asks. `js/wx.js` is a deferred module for the same reason. A reader
@@ -10174,7 +10174,7 @@ who never opens weather mode fetches none of its data and loads none of its code
 `?wx=1` carries an `ETag`. Every row in its body carries the issue stamp MET gives. Nothing in
 the body moves without the data moving. MET reissues about every 30 minutes. A reader polls about
 every 8.5 minutes. So roughly three polls in four cost one 304 and about 200 bytes, not the full
-9 KB. `cacheAge` broke this same contract on the main payload once, by holding a field that moved
+10 KB. `cacheAge` broke this same contract on the main payload once, by holding a field that moved
 every second. See that gotcha in `CLAUDE.md` before adding a field to this body.
 
 ### The archive: MET publishes no past
@@ -10229,16 +10229,23 @@ to read `data-tip`.
 The current card carries a `NOW` chip and an outline. A reader lands on that card without reading
 every one first.
 
-### Color is the one exception, and it holds on one condition
+### Weather gets a third color axis, not an exception to the other two
 
-Every other surface in this app reserves color for status, from green through red. Weather
-paints real sky colors instead — `--wx-clear`, `--wx-rain` and `--wx-heavy` in `css/base.css`.
+Most surfaces in this app carry two color axes. Station kind uses its own hue — `--k-river`,
+`--k-rainfall` and the rest — for a calm reading. Status escalates to a separate palette only
+past a threshold: green through red, `--s-normal` through `--s-danger`. On a quiet day, most
+pins read by kind, not by status.
 
-The exception holds only because weather mode draws no station pin. Nothing status-colored
-shares the map, so an amber glyph cannot read as a station in trouble. The weather palette reads
-as muted, where the status palette reads as saturated. The two separate by vividness, as well as
-by hue. This app rejected gold `#f2b705` for this reason. It sits within one shade of
-`--s-alert` on the light theme.
+Weather adds a third palette, and joins neither axis. `--wx-clear`, `--wx-rain` and `--wx-heavy`
+in `css/base.css` are their own tokens. Each sits muted away from the status palette, so none of
+them can read as one. `css/base.css` states this explicitly. The status rule reserves
+`--s-alert` and its neighbors for status, and this palette does not breach that.
+
+Weather mode also draws no station pin, so nothing status-colored or kind-colored shares the map
+with a weather glyph. The weather palette reads as muted, where the status palette reads as
+saturated. The two separate by vividness, as well as by hue. This app measured and rejected gold
+`#f2b705` for sitting too close. It lands within one shade of `--s-alert` on the light theme,
+and matches `#ffc000` on the dark theme.
 
 `rainy_heavy` carries no cloud of its own. Beside `rainy` at a 31px pin it read as hatching,
 rather than as more of one thing. So the pin ladder collapses both wet rungs to `rainy`. The card
