@@ -266,8 +266,9 @@ The panel is a tenant of `#side`, under the key `@wx-<slug>`. That is the patter
 `@here` already follow. Its head is a `.pophead`, and `openSide()` lifts that head out.
 
 **The panel reuses the weather card on the station panel.** That card draws two cells. The `Later`
-cell holds a glyph on the left and a line of words beside it, with a label under the pair. This
-panel repeats that cell once per half hour, and the label states the clock.
+cell holds a glyph on the left. A line of words sits beside it. A label sits under the pair.
+
+This panel repeats that cell once per half hour. The label states the clock.
 
 ```
 Petaling Jaya                          ...  x
@@ -297,21 +298,20 @@ Every one of those classes exists in `css/map.css` today, on the `Later` cell. O
 is new, and the container is one column.
 
 **The cards stack down the panel. They never run sideways.** A sideways strip hides the later
-hours behind a swipe, and a hidden hour on a flood map helps nobody. A vertical stack also gives
-each card the full width, so the word sits beside its glyph the way the `Later` cell already draws
-it.
+hours behind a swipe, and a hidden hour on a flood map helps nobody. A vertical stack also gives each card the full width. The word then sits beside its
+glyph, the way the `Later` cell draws it.
 
 **Each card names its weather in words.** That reverses the rule the weather card states for its
 own two cells, where the glyph carries the state alone.
 
 Two cells can afford that, because a reader scans two glyphs at once. Nine cannot. A stack of nine
-glyphs with no words makes a reader decode every one of them, and `data-tip` opens one at a time.
+glyphs with no words makes a reader decode every one of them. `data-tip` opens one at a time.
 
 **The panel states no span and no sentence.** It never prints "Rain until 16:30". Every half hour
 MET publishes gets its own card.
 
-The current card takes a `NOW` chip and an outline. The chip labels it and the outline finds it,
-so a reader scanning nine cards lands on the right one without reading.
+The current card takes a `NOW` chip and an outline. The chip labels it and the outline finds it.
+A reader scanning nine cards then lands on the right one without reading.
 
 The clock stays on the card. A card that traded the time for the word states one fact and loses
 another. `NOW` in capitals joins `TRIGGERED` and `HAPPENING NOW` as badge language. It is not a

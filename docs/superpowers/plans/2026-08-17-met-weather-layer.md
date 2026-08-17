@@ -80,13 +80,13 @@ Expected: `No syntax errors detected`
  * MET gives a nowcast point a name and a coordinate. It gives no district. metDaily() keys its rows
  * by district name, so the two feeds cannot join without one.
  *
- * No station may supply that district. A temperature taken through the district of a station reads
- * as that station reporting a temperature, and no station in this payload holds a weather reading.
- * Nominatim answers instead, and it belongs to nobody in this app.
+ * A station must not supply that district. A temperature taken that way reads as the station
+ * reporting it. No station in this payload holds a weather reading. Nominatim answers instead, and
+ * it belongs to nobody in this app.
  *
  * Run this by hand and commit the result. Nominatim allows one request each second, so fifty
  * lookups cannot ride a refresh. Towns do not move. A new MET point shows no temperature until
- * somebody runs this again, which is a missing row and never a wrong one.
+ * somebody runs this again. That is a missing row, never a wrong one.
  */
 
 require_once __DIR__ . '/sources.php';
@@ -231,7 +231,7 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 ### Task 2: Build the weather rows and store them
 
 **Files:**
-- Modify: `api.php` (constants near line 260, functions near the MET block, assertions in the `--selftest` block, the write near the payload assembly)
+- Modify: `api.php` — the constants, the three functions, the `--selftest` assertions, and the refresh write
 
 **Interfaces:**
 - Consumes: `wxSlug()`, `wxInBox()` from Task 1.
@@ -1085,7 +1085,7 @@ for f in js/*.js css/*.css; do
   curl -sk -o /dev/null -w "%{content_type} $f\n" "https://flood-exp.test/$f"; done | grep -v 'javascript\|css'
 ```
 
-Expected: no output. Herd answers a missing file with `index.html` and a 200, so the type is the test and the status is not.
+Expected: no output. Herd answers a missing file with `index.html` and a 200. So the type is the test, and the status is not.
 
 - [ ] **Step 11: Look at it**
 
