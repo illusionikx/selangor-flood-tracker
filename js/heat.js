@@ -417,6 +417,10 @@ export function syncHeat() {
   el('lgRain').style.display  = rainy && show ? '' : 'none';
   // The legend box holds three sections now, so one function decides whether the box itself shows.
   el('lgWx').style.display = show ? 'none' : '';
+  /* The opacity slider drives whichever canvas is on the map, through the LAYERS loop in
+     heatOpacity() below. Weather mode and the "off" choice both leave neither canvas on the map.
+     A slider left on screen there acts on nothing. That is worse than no slider at all. */
+  el('heatOpacityRow').style.display = (wet || rainy) && show ? '' : 'none';
   el('legend').style.display = !show || wet || rainy ? '' : 'none';
   heatScale();   // sizes whichever is on, and re-applies opacity
   heatOpacity();

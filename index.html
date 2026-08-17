@@ -70,7 +70,7 @@
 <link rel="stylesheet" href="vendor/markercluster.css">
 <link rel="stylesheet" href="vendor/fonts.css?v=51">
 <link rel="stylesheet" href="css/icons.css?v=88">
-<link rel="stylesheet" href="css/base.css?v=126">
+<link rel="stylesheet" href="css/base.css?v=127">
 <link rel="stylesheet" href="css/chrome.css?v=181">
 <link rel="stylesheet" href="css/map.css?v=149">
 
@@ -1088,7 +1088,10 @@
       <span><i class="i i-rainy" style="color:var(--wx-heavy)"></i>Heavy</span>
     </div>
   </div>
-  <label class="slider muted">Opacity
+  <!-- Hidden by syncHeat() in js/heat.js whenever neither heat canvas is on the map. The slider
+       drives both of them through the LAYERS loop in heatOpacity(). A control left on screen with
+       nothing under it acts on nothing. -->
+  <label id="heatOpacityRow" class="slider muted">Opacity
     <input type="range" id="heatOpacity" min="15" max="100" step="5" value="100">
     <span id="heatOpacityVal">100%</span>
   </label>

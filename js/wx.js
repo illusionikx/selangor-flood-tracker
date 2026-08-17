@@ -8,7 +8,12 @@ import { PREFS } from './state.js';
 import { map, pinGlyph, openSide, side, focusOn } from './map.js';
 import { wxIcon, stamp } from './popup.js';
 import { askJson } from './ask.js';
-import { el } from './util.js';
+import { el, ago } from './util.js';
+
+/* Mirrors MET_STALE in api.php. That constant stops a refresh from writing a row of stale
+   points. It cannot stop an already-written row from aging once every point in it turns
+   stale. tick() below reads this to warn a reader when that has happened. */
+const STALE_S = 7200;
 
 const layer = L.layerGroup();
 let pts = [];    // the last answer from ?wx=1
@@ -104,11 +109,19 @@ function card(p) {
   ].join('');
 
   /* `.pophead` first, always. openSide() lifts it out into #sideHead, and that seam is what keeps
-     the place name off the scrolling body. */
+     the place name off the scrolling body.
+
+     `dots(p)` comes first inside it too. css/map.css reserves the ⋮'s corner with a rule that only
+     matches a title after it, `.dots ~ .popname`. popup.js's own goName() states the same rule and
+     obeys it the same way.
+
+     Both lines below are block `<div>`s, matching goName() and region() in popup.js. A padding-
+     right on an inline box only clears its own last line. On a wrapped title, the ⋮ still overlaps
+     every line above the last one. */
   return `<div class="pophead">
-      <b class="popname">${p.n}</b>
-      <span class="popsub muted">${MET_NAME}</span>
       ${dots(p)}
+      <div class="popname">${p.n}</div>
+      <div class="muted">${MET_NAME}</div>
     </div>
     <div class="sensor">
       <div class="sensorhead">
@@ -147,8 +160,16 @@ export async function tick() {
      row yet, and the static bake may have skipped the file.
      The chip says so, not the section. `.loadfail` prints a dialog-sized message, and this section
      also holds two heatmaps that work. `.hint` is the small slot the two filter chips below
-     already use for the same job. */
-  el('wxHint').textContent = pts.length === 0 ? 'no data yet' : '';
+     already use for the same job.
+
+     A non-empty answer can still be old. See STALE_S above for why a stored row can age with
+     nobody rewriting it. So the chip states the age instead of staying blank when that has
+     happened. Stating old weather with confidence is worse than stating nothing. An offline gauge
+     draws grey instead of a flat line, for the same reason. */
+  const now = Date.now() / 1000;
+  const newest = pts.reduce((m, p) => Math.max(m, p.stamp), 0);
+  el('wxHint').textContent = pts.length === 0 ? 'no data yet'
+    : now - newest > STALE_S ? `MET last issued ${ago(newest * 1000)}` : '';
   paint();
   if (side.key?.startsWith('@wx-')) {
     const p = pts.find(x => '@wx-' + x.id === side.key);
