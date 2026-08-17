@@ -7,7 +7,7 @@ Date: 2026-08-17
 Draw a map of MET Malaysia nowcast points. Hide every flood station while that map is on.
 
 A tap on a weather point opens a panel. The panel states the temperature range for the day.
-It then draws every half hour MET publishes, one tile per step.
+It then draws every half hour MET publishes, one card per step.
 
 This layer adds no alert surface. It moves no count, no badge and no ticker tile. It is weather,
 and weather makes no claim about a sensor.
@@ -265,55 +265,67 @@ before writing the values down.
 The panel is a tenant of `#side`, under the key `@wx-<slug>`. That is the pattern `@alerts` and
 `@here` already follow. Its head is a `.pophead`, and `openSide()` lifts that head out.
 
-**The panel reuses the weather card on the station panel.** That card already draws a tile per
-cell. Each tile holds one glyph over one label. This panel repeats the same tile once per half
-hour, and the label states the clock.
+**The panel reuses the weather card on the station panel.** That card draws two cells. The `Later`
+cell holds a glyph on the left and a line of words beside it, with a label under the pair. This
+panel repeats that cell once per half hour, and the label states the clock.
 
 ```
 Petaling Jaya                          ...  x
 MET Malaysia
-[ Weather ]
 ---------------------------------------------
   32 / 24    Today
 ---------------------------------------------
-  +-----+ +-----+ +-----+ +-----+ +-----+
-  | sun | | sun | | rai | | rai | | hvy |
-  |14:00| |14:30| |15:00| |15:30| |16:00|
-  +-----+ +-----+ +=====+ +-----+ +-----+
-                    NOW
-  +-----+ +-----+ +-----+ +-----+
-  | rai | | sun | | sun | | sun |
-  |16:30| |17:00| |17:30| |18:00|
-  +-----+ +-----+ +-----+ +-----+
+  +---------------------------------------+
+  | sun   Clear                           |
+  | 14:00                                 |
+  +---------------------------------------+
+  | rai   Rain                            |
+  | 14:30                                 |
+  +---------------------------------------+
+  | rai   Rain                      NOW   |   <- outlined
+  | 15:00                                 |
+  +---------------------------------------+
+  | hvy   Heavy rain                      |
+  | 15:30                                 |
+  +---------------------------------------+
+        ... one card per half hour, to +3 h
 ```
 
-The tile is `.wxcol`. The glyph is `.wxbig`. The label is `.wxsub`. All three classes exist in
-`css/map.css` today. Only the container is new.
+The card is `.wxcol`. The glyph is `.wxbig`. The words are `.wxline`. The clock is `.wxsub`.
 
-**The tiles wrap. They never scroll sideways.** Nine tiles at about 54 px need 486 px. The panel
-holds 328 px on a phone. A sideways scroller hides forecast behind a swipe, and a hidden hour on a
-flood map helps nobody. `repeat(auto-fill, minmax(54px, 1fr))` wraps them onto two rows.
+Every one of those classes exists in `css/map.css` today, on the `Later` cell. Only the container
+is new, and the container is one column.
 
-The glyph states the weather, so no tile writes that word under it. The word rides on `data-tip`
-and on `aria-label`. `js/sparktip.js` opens `data-tip` on hover and on a tap. That is the rule the
-weather card already states for the same glyph.
+**The cards stack down the panel. They never run sideways.** A sideways strip hides the later
+hours behind a swipe, and a hidden hour on a flood map helps nobody. A vertical stack also gives
+each card the full width, so the word sits beside its glyph the way the `Later` cell already draws
+it.
+
+**Each card names its weather in words.** That reverses the rule the weather card states for its
+own two cells, where the glyph carries the state alone.
+
+Two cells can afford that, because a reader scans two glyphs at once. Nine cannot. A stack of nine
+glyphs with no words makes a reader decode every one of them, and `data-tip` opens one at a time.
 
 **The panel states no span and no sentence.** It never prints "Rain until 16:30". Every half hour
-MET publishes gets its own tile.
+MET publishes gets its own card.
 
-The current tile takes a `.now` modifier and a `NOW` chip. It keeps its clock, because a tile that
-traded the time for the word states one fact and loses another. `NOW` in capitals joins `TRIGGERED`
-and `HAPPENING NOW` as badge language. It is not a message.
+The current card takes a `NOW` chip and an outline. The chip labels it and the outline finds it,
+so a reader scanning nine cards lands on the right one without reading.
 
-The temperature sits above the tiles, in a `.wxrow`, and reuses `.wxtemp`. It is absent where no
-district matched. The tiles then start the panel.
+The clock stays on the card. A card that traded the time for the word states one fact and loses
+another. `NOW` in capitals joins `TRIGGERED` and `HAPPENING NOW` as badge language. It is not a
+message.
 
-The tiles before the badge come from the archive in this app. The tiles after it come from the MET
+The temperature sits above the cards, in a `.wxrow`, and reuses `.wxtemp`. It is absent where no
+district matched. The cards then start the panel.
+
+The cards before the chip come from the archive in this app. The cards after it come from the MET
 forecast.
 
 **That fact rides in the three-dot menu, and nowhere else.** It is provenance, and this app
 already prints provenance there. The menu holds three lines. It states the issue time, the
-source, and which half of the list this app observed.
+source, and which half of the stack this app observed.
 
 ## Exits
 
@@ -358,7 +370,7 @@ the same way the trend history does.
 | `js/ui.js` | the chip handler and its `lazy()` failure surface |
 | `index.html` | drawer section, legend key |
 | `css/base.css` | three `--wx-*` tokens, in both themes and in the `.pin` block |
-| `css/map.css` | `.wxsteps` grid, `.wxcol.now` and the `NOW` chip |
+| `css/map.css` | `.wxsteps` column, `.wxcol.now` and the `NOW` chip |
 | `wx-build.php` | new. Runs by hand. Writes `wx-places.json` |
 | `wx-places.json` | new. Committed. 50 rows of slug, district and state |
 | `.github/workflows/pages.yml` | bake `wx.json`, copy it, never fail on it |
