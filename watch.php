@@ -27,9 +27,14 @@ if (!is_array($p) || !isset($p['stations'])) {
     $bad[] = 'no payload';   // the site is down, or it answered something that is not the payload
 } else {
     /* `metwarn` is deliberately absent from this list. Zero warnings is the ordinary state of a
-       calm day, not a broken scrape. It read 0 on the poll this file was written against.
+       calm day, not a broken scrape. It read 0 on the poll behind this file.
+
+       `jpsmet` and `floodalert` are absent for the same reason, and `floodalert` more strongly.
+       getdisse.php answered `[]` on every fetch during its design. `sources.old` below is what
+       names a notice feed that has stopped moving.
+
        `gaz.pending` and `hist.pending` are absent too, on purpose. Both reach 0 when their drip
-       finishes, which is the healthy end state, and an alarm that fires on success is the cry-wolf
+       finishes, which is the healthy end state. An alarm that fires on success is the cry-wolf
        failure the alert design standard in docs/FEATURES.md rejects. */
     foreach (['kl', 'national', 'met', 'metday', 'portalrf'] as $k)
         if ((int)($p['sources'][$k]['parsed'] ?? 0) === 0) $bad[] = "$k parsed 0 rows";
@@ -40,6 +45,11 @@ if (!is_array($p) || !isset($p['stations'])) {
 
     /* A stored copy parses as well as a fresh one, so the parse counters cannot see this. */
     if (!empty($p['sources']['stale'])) $bad[] = 'stale pages: ' . implode(' ', $p['sources']['stale']);
+
+    /* A stale answer is not a missing one, so `stale` above cannot see this. Every row of
+       api.data.gov.my/weather/warning was seven days old on 2026-08-17 and every counter stayed
+       quiet, because the fetch had succeeded. */
+    if (!empty($p['sources']['old'])) $bad[] = 'old sources: ' . implode(' ', $p['sources']['old']);
 
     if (($p['upstreamOk'] ?? true) === false) $bad[] = 'serving stale cache';
     if (count($p['stations']) < FLOOR)        $bad[] = count($p['stations']) . ' stations';

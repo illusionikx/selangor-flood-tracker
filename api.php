@@ -295,6 +295,15 @@ const MET_WARN_TTL = 900;    // 15 min
  * MET issues a bulletin at least daily, so 48 hours is a wide margin over the real cadence. */
 const NOTICE_OLD = 172800;   // 48 h
 
+/* The three notice feeds at publicinfobanjir.water.gov.my/ramalan/. Each page renders its table
+   with JavaScript, so the data sits behind these requests rather than in the HTML. */
+const JPS_NOTICE = 'https://publicinfobanjir.water.gov.my/wp-content/themes/enlighten/';
+
+/* The flood alert takes the shorter clock because it is the only true flood alarm here. Its
+   response was 2 bytes on every fetch during the design, and a late flood alert costs more than the
+   request does. The four MET mirror files keep MET_WARN_TTL, the window MET warnings already use. */
+const JPS_FLOOD_TTL = 300;
+
 date_default_timezone_set('Asia/Kuala_Lumpur'); // upstream timestamps are local MYT, unlabelled
 
 const HOST = 'infobanjirjps.selangor.gov.my';
@@ -903,6 +912,11 @@ function pageHasData(string $key, string $body): bool {
            holds four, and the empty form page holds the same four, so the shared test passes on a
            page with nothing in it. `data-th='No'` appears once per data row and nowhere else. */
         str_starts_with($key, 'prf-')           => str_contains($body, "data-th='No'"),
+        /* The JPS notice feeds. `jsonLoose()` and not `json_decode()`, because JPS writes raw
+           newline characters inside JSON string values. Without it a good page reads as an outage.
+           An empty list IS data. met_rain22.json is legitimately `[]` on a dry day, and
+           getdisse.php answered `[]` on every fetch during the design. */
+        str_starts_with($key, 'jps-')           => jsonLoose($body) !== null,
         default                                 => str_contains($body, '<tr'),
     };
 }
@@ -1947,6 +1961,13 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
     $ok('an empty body fails',               pageHasData('prf-SEL', '') === false);
     $ok('the other tables keep the tr test',  pageHasData('nat-SEL', "<tr class='item'>") === true);
 
+    echo "\npageHasData() on the JPS notice feeds:\n";
+    $ok('a JPS empty list is data',      pageHasData('jps-rain', '[]') === true);
+    $ok('a JPS row set is data',         pageHasData('jps-sea', '[{"Heading_EN":"x"}]') === true);
+    // The one that plain json_decode() gets wrong.
+    $ok('a raw newline is still data',   pageHasData('jps-sea', "[{\"a\":\"x\ny\"}]") === true);
+    $ok('a JPS notice is not data',      pageHasData('jps-flood', '<html>Notis Gangguan</html>') === false);
+
     echo "\njsonLoose():\n";
     /* --- jsonLoose(): JPS writes raw control characters inside JSON strings --- */
     $ok('valid JSON decodes',            jsonLoose('[{"a":1}]') === [['a' => 1]]);
@@ -2892,14 +2913,15 @@ $db->exec('CREATE TABLE IF NOT EXISTS station (name TEXT PRIMARY KEY, lat REAL, 
 // updates faster than a quarter hour. Refetching them every 5 minutes would triple the cost of a
 // poll for data that cannot have changed. A page that fails to fetch falls back to the last copy we
 // stored — a slow upstream should cost freshness, never a whole region's worth of pins.
-$extraUrls = nationalUrls() + klUrls() + metUrls($now) + portalRainUrls();
+$extraUrls = nationalUrls() + klUrls() + metUrls($now) + portalRainUrls() + jpsUrls();
 $stored = [];
 foreach ($db->query('SELECT url, ts, body FROM page') as $r) $stored[$r['url']] = $r;
 // The daily forecast and the warning feed each keep their own clock. Everything else keeps SCRAPE_TTL.
 $ttlFor = fn(string $k) => match ($k) {
-    'met-day'  => MET_DAY_TTL,
-    'met-warn' => MET_WARN_TTL,
-    default    => SCRAPE_TTL,
+    'met-day'   => MET_DAY_TTL,
+    'met-warn'  => MET_WARN_TTL,
+    'jps-flood' => JPS_FLOOD_TTL,
+    default     => SCRAPE_TTL,
 };
 $want = [];
 foreach ($extraUrls as $k => $u) {
@@ -2998,7 +3020,26 @@ $metPts = metPoints($page('met-now'));
 $metParsed = count($metPts);
 $metPts = array_values(array_filter($metPts, fn($p) => $p['stamp'] >= $now - MET_STALE));
 $metDay = metDaily($page('met-day'));
-$metWarn = metWarnings($page('met-warn'), $now);
+/* Three producers, one array. See mergeNotices() for the sort and the duplicate rule.
+   `warnings` counts toward nothing, and that separation is what let this surface pass the alert
+   design standard — see the rule beside the payload key below. */
+$warnMet   = metWarnings($page('met-warn'), $now);
+$warnJps   = array_merge(jpsMetWarnings($page('jps-rain'),  $now),
+                         jpsMetWarnings($page('jps-storm'), $now),
+                         jpsMetWarnings($page('jps-sea'),   $now));
+$warnFlood = floodAlerts($page('jps-flood'), $now);
+$metWarn   = mergeNotices($warnMet, $warnJps, $warnFlood);
+
+/* A source that answered with nothing recent. This is NOT sources.stale, which names a page that
+   did not answer at all. api.data.gov.my/weather/warning sat seven days on 2026-08-17 with every
+   counter quiet, because the fetch had succeeded. */
+$pagesOld = [];
+foreach (['met-warn', 'jps-rain', 'jps-storm', 'jps-sea', 'jps-beat'] as $k) {
+    if (noticeOld($k, $page($k), $now, NOTICE_OLD)) $pagesOld[] = $k;
+}
+/* The heartbeat speaks for the whole mirror. jps-rain goes legitimately empty most days, so it
+   holds no evidence itself. */
+if (beatDead($page('jps-beat')) && !in_array('jps-beat', $pagesOld, true)) $pagesOld[] = 'jps-beat';
 
 // One-off carry-over from the flat file, so trends survive the switch instead of going null for an
 // hour. Deletes itself; drop this block once no deployment has a .history.json left.
@@ -3737,6 +3778,14 @@ $payload = json_encode([
         // regardless. Without this, `seeded` climbing and `pending` reaching 0 look exactly like a
         // finished backfill even when every request failed. See $histEmpty's own comment above.
         'hist' => ['seeded' => count($histDone), 'pending' => count($histTodo), 'empty' => $histEmpty],
+        // The JPS mirror of the MET bulletins, and the JPS flood forecast. Read `parsed` as
+        // `met.parsed` reads. 0 means the scrape found nothing, which on these feeds is a real and
+        // common state. `old` below is what names a feed that has stopped moving.
+        'jpsmet'    => ['parsed' => count($warnJps)],
+        'floodalert' => ['parsed' => count($warnFlood)],
+        // Empty on a healthy poll. A key here names a source that answered with nothing recent,
+        // which a parse counter cannot see: a week-old bulletin parses as well as a fresh one.
+        'old'       => $pagesOld,
         // Empty on a healthy poll. A key here names a table the map is drawing from a stored copy.
         'stale'    => $pagesStale,
     ],

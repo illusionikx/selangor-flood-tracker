@@ -609,6 +609,24 @@ function metUrls(int $now): array {
     ];
 }
 
+/* The five requests behind the two notice pages this app reads.
+ *
+ * This app fetches `jps-beat` and never surfaces it. `met_cyclone.json` carries a row at all times.
+ * `jps-rain` goes legitimately empty on most days, so that row is the only liveness evidence it
+ * has. `WARN_DROP` already holds `no advisory`, so the permanent row can never reach a screen.
+ *
+ * `data/met_earthquake.json` is absent on purpose. `WARN_DROP` holds `earthquake` and `tsunami`, so
+ * every row of that file drops. Fetching it spends a request to discard the answer. */
+function jpsUrls(): array {
+    return [
+        'jps-flood' => JPS_NOTICE . 'query/getdisse.php',
+        'jps-rain'  => JPS_NOTICE . 'data/met_rain22.json',
+        'jps-storm' => JPS_NOTICE . 'data/met_thunderain2.json',
+        'jps-sea'   => JPS_NOTICE . 'data/met_gelora.json',
+        'jps-beat'  => JPS_NOTICE . 'data/met_cyclone.json',
+    ];
+}
+
 /* --- lenient JSON ---------------------------------------------------------------------------- */
 
 /* JPS writes raw newline characters inside JSON string values, so `json_decode()` returns null on
