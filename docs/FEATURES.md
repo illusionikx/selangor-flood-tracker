@@ -9956,6 +9956,12 @@ correct: the geography filter was right to refuse warnings about Phuket that wer
 Nothing in the payload said the source itself had gone quiet. The map looked calm because the feed
 was calm, not because the weather was.
 
+**`metwarn.parsed` almost lost the meaning that reading depends on.** An early draft of the merge
+counted the merged `warnings` array under that key instead of `metWarnings()`'s own output. The JPS
+mirror keeps that number above 0 on its own, so a merged count hides exactly the outage this section
+describes. `metwarn.parsed` counts `api.data.gov.my` alone now, so the existing rule in `CLAUDE.md` —
+zero there, and only there, means `data.gov.my` moved something — still holds.
+
 The JPS mirror of the same MET bulletins answered on the same day, with rows issued at 08:21 and
 08:31. Two of them named the waters of Selangor, each valid from 08:00 to 12:00. That gave 3 rows
 through `sources.jpsmet.parsed`. After the geography filter and the merge, `warnings` held 1 row: the
