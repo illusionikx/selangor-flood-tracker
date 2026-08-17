@@ -181,8 +181,28 @@ then one filter over data the file already holds.
 the layer and the legend. **It never reads the control back.** That is the rule `syncHeat()` exists
 to state, and a browser restores a checkbox without firing `change`.
 
-The control sits in the drawer, in its own section under Heatmap. Its summary carries the state, so
-a collapsed section still says whether weather is on.
+### One Layers section, not two
+
+The control sits in the drawer, in the **Layers** section, beside the two heatmaps.
+
+**The three share one section because they are one choice.** Weather mode forces both heatmaps
+off, so exactly one of the three ever paints. Two sections said otherwise. A reader had to open both sections to learn what the map draws.
+
+The section takes the `layers` glyph, which suits it. `Sensor kinds` gives that glyph up and takes
+`apps`, a grid, which suits a row of one chip per kind.
+
+**One summary, written by one function.** `syncHeat()` owns it, because that function already reads
+both preferences. Two writers on one line age apart, which is the fault `syncHeat()` itself exists
+to prevent. `syncWx()` writes no summary.
+
+The summary names the layer on screen: `weather`, `water level`, `rainfall` or `off`.
+
+**The two view filters keep their rule below.** Rising-only and favorites-only hide pins rather
+than paint a layer, so they stay under the divider they already sit under.
+
+**Merging the sections merges no state.** `PREFS.wx` stays a boolean and `PREFS.heatLayer` stays a
+string. A single control has to remember the heatmap it replaced. Two preferences remember
+it by never having disturbed it.
 
 `PREFS.heatLayer` is never written. `syncHeat()` takes `PREFS.wx` as one more input and drops both
 canvases while the mode is on. Turn the mode off and the heat choice returns, because it

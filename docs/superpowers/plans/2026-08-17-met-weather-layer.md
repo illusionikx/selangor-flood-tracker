@@ -398,7 +398,7 @@ print_r(array_slice($j["points"],0,1));'
 
 Expected: `points: 50`. `with a temperature: 0` is correct today, because the MET forecast feed answers an empty array. The printed row must carry `id`, `n`, `lat`, `lng`, `stamp`, `rungs`, `clocks` and `past`.
 
-- [ ] **Step 8: Check the archive is filling**
+- [ ] **Step 8: Check the archive fills**
 
 Run:
 
@@ -745,7 +745,7 @@ export const wxIcon = (r, { clock, pin } = {}) => {
 };
 ```
 
-`stamp` is declared `const stamp = t => {` at about `js/popup.js:444` and it is NOT exported today. Change that line to `export const stamp = t => {`. `js/wx.js` imports it. Verified 2026-08-17.
+`js/popup.js:444` holds `const stamp = t => {`. That line carries no `export` today. Change that line to `export const stamp = t => {`. `js/wx.js` imports it. Verified 2026-08-17.
 
 - [ ] **Step 3: Add the drawer section**
 
@@ -1338,6 +1338,179 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 ```
 
 ---
+
+---
+
+### Task 8: One Layers section
+
+**Files:**
+- Modify: `index.html` — the two `<details>` become one, and `#kinds` swaps its glyph
+- Modify: `css/base.css` — the `hr` selector follows the renamed section
+- Modify: `js/heat.js` — `syncHeat()` writes the one summary
+- Modify: `js/wx.js` — `syncWx()` writes no summary, and the failure surface moves
+- Modify: `js/ui.js` — the failure surface moves
+
+**Interfaces:**
+- Consumes: `PREFS.wx` and `PREFS.heatLayer` from Task 5.
+- Produces: `#layersect`, `#layerN`, `#wxHint`. `#heatsect`, `#wxsect`, `#heatN` and `#wxN` are gone.
+
+**Why:** weather mode forces both heatmaps off, so exactly one of the three ever paints. Two
+sections said otherwise. A reader had to open both to learn what the map draws.
+
+- [ ] **Step 1: Replace both `<details>` in `index.html` with one**
+
+Delete the whole `<details id="heatsect">` block and the whole `<details id="wxsect">` block. Put
+this in their place:
+
+```html
+    <!-- One section, because the three layers in it answer one question: what does the map paint.
+         Weather mode forces both heatmaps off, so exactly one of the three ever paints.
+         No `checked` attribute on any box. `PREFS.heatLayer` and `PREFS.wx` are the source of
+         truth, and syncHeat() and syncWx() write the boxes from them. A hard-coded state here is a
+         second source that can only disagree. It disagrees during the window before the deferred
+         module runs. `autocomplete="off"` stops the other writer. A browser restores a checkbox
+         across a reload without firing `change`. Every checkbox a preference owns carries it. -->
+    <details id="layersect" class="sect" open>
+      <summary><i class="i i-layers"></i>Layers<b id="layerN"></b></summary>
+      <label class="chip"><input type="checkbox" id="heat" autocomplete="off">
+        <i class="glyph i i-water_drop"></i>Water-level heatmap</label>
+      <label class="chip"><input type="checkbox" id="rainHeat" autocomplete="off">
+        <i class="glyph i i-rainy"></i>Rainfall heatmap</label>
+      <!-- Weather is a mode rather than a wash, because it hides every station. It rides here
+           because it is the third answer to the one question this section asks. -->
+      <label class="chip"><input type="checkbox" id="wxLayer" autocomplete="off">
+        <i class="glyph i i-sunny"></i>MET nowcast map <span id="wxHint" class="hint"></span></label>
+      <!-- Under a rule because these two are not a fourth layer. The three above are one
+           mutually-exclusive choice about what the map paints. These filter the pins. -->
+      <hr>
+      <label class="chip"><input type="checkbox" id="risingOnly" autocomplete="off">
+        <i class="glyph i i-warning"></i>Rising stations only <span id="risingHint" class="hint"></span></label>
+      <!-- A view filter, like the district picker and unlike the ignored list. It hides pins and
+           changes no alert. Two things say it is on: this panel, and the `· favorites only` note
+           in #shown below. That is the pair the ignored list uses. It needs no standing pill the
+           way the rising filter does. That one is a lone checkbox with no list under it saying
+           what it took away, and this one has exactly that list. -->
+      <label class="chip"><input type="checkbox" id="favOnly" autocomplete="off">
+        <i class="glyph i i-favorite"></i>Favorites only <span id="favHint" class="hint"></span></label>
+    </details>
+```
+
+- [ ] **Step 2: Give `#kinds` a glyph of its own**
+
+`i-layers` now belongs to the Layers section. In `index.html`, change the `#kinds` summary line
+from `<i class="i i-layers"></i>Sensor kinds` to:
+
+```html
+      <summary><i class="i i-apps"></i>Sensor kinds<b id="kindN"></b></summary>
+```
+
+`apps` is a grid, which suits a row of one chip per kind. Confirm `--i-apps` exists in
+`css/icons.css` before relying on it.
+
+- [ ] **Step 3: Follow the rename in `css/base.css`**
+
+One selector names the old section. Change `#heatsect hr` to `#layersect hr`. The declarations
+stay as they are.
+
+- [ ] **Step 4: Write the one summary from `syncHeat()`**
+
+In `js/heat.js`, replace the `el('heatN').textContent = ...` assignment with:
+
+```js
+  /* One summary for the whole section, written here because this function already reads both
+     preferences. Two writers on one line age apart, which is the fault this function exists to
+     prevent. syncWx() writes no summary.
+     It names the layer on screen rather than the preference behind it. A reader who opens the
+     drawer during weather mode wants to know what the map draws. */
+  el('layerN').textContent = !show ? 'weather'
+    : wet ? 'water level' : rainy ? 'rainfall' : 'off';
+```
+
+Bump `?v=` on every stylesheet link in `index.html`, because `css/base.css` changed.
+
+- [ ] **Step 5: Take the summary and the failure surface out of `js/wx.js`**
+
+In `syncWx()`, delete the `el('wxN').textContent = ...` line. Nothing replaces it.
+
+In `tick()`, replace the `el('wxsect').classList.toggle('loadfail', ...)` line with:
+
+```js
+  /* The chip says so, not the section. `.loadfail` prints a dialog-sized message, and this section
+     also holds two heatmaps that work. `.hint` is the small slot the two filter chips below
+     already use for the same job. */
+  el('wxHint').textContent = pts.length === 0 ? 'no data yet' : '';
+```
+
+- [ ] **Step 6: Move the failure surface in `js/ui.js`**
+
+In the `#wxLayer` handler, replace the three `el('wxsect')` references. The `remove` becomes a
+cleared hint. The `lazy()` box becomes the label around the chip. The `add` becomes a written
+hint.
+
+```js
+el('wxLayer').onchange = async e => {
+  PREFS.wx = e.target.checked;
+  save();
+  el('wxHint').textContent = '';
+  try {
+    const m = await lazy(() => import('./wx.js'), e.target.closest('label'));
+    await m.tick();
+  } catch {
+    PREFS.wx = false;
+    save();
+    e.target.checked = false;
+    el('wxHint').textContent = 'could not load';
+  }
+  syncHeat();
+  render();
+};
+```
+
+Keep the comment block above that handler. Its last sentence names `#wxsect` as the surface this
+caller owns. Update it. The surface is `#wxHint` now.
+
+- [ ] **Step 7: Confirm nothing still names the old ids**
+
+Run:
+
+```bash
+grep -rn "heatsect\|wxsect\|heatN\|wxN" js/*.js css/*.css index.html \
+  && echo "FAIL: an old id survives" || echo "OK: no old id remains"
+grep -c 'id="layerN"\|id="wxHint"\|id="layersect"' index.html
+```
+
+Expected: `OK: no old id remains`, then `3`.
+
+- [ ] **Step 8: Syntax-check and serve-check**
+
+```bash
+T=$(mktemp -d); for f in js/*.js; do cp "$f" "$T/$(basename ${f%.js}).mjs"; done
+for f in "$T"/*.mjs; do node --check "$f" || echo "FAIL $f"; done
+for f in js/*.js css/*.css; do
+  curl -sk -o /dev/null -w "%{content_type} $f\n" "https://flood-exp.test/$f"; done | grep -v 'javascript\|css'
+```
+
+Expected: no output from either.
+
+- [ ] **Step 9: Look at it**
+
+Load `https://flood-exp.test/` with a hard reload and open the drawer. Confirm each of these:
+- One section reads `Layers`, holding three layer chips, a rule, then the two filter chips.
+- `Sensor kinds` draws the grid glyph and no longer shares one with `Layers`.
+- With nothing on, the summary reads `off`. With water-level heat on it reads `water level`.
+- Ticking `MET nowcast map` makes the summary read `weather`, and the water-level box stays ticked.
+- Unticking it puts the summary back to `water level`, and the heatmap returns.
+
+- [ ] **Step 10: Commit**
+
+Commit `index.html`, `css/base.css`, `js/heat.js`, `js/wx.js` and `js/ui.js` together. Use the
+subject `Merge the heatmap and weather sections into one Layers section`.
+
+State three things in the body. Exactly one of the three layers ever paints, so two sections misled
+a reader. `syncHeat()` writes the one summary, because it already reads both preferences. Merging
+the sections merged no state, so leaving weather mode still restores the heatmap.
+
+End with the `Co-Authored-By` trailer this repo uses.
 
 ## Self-review
 
