@@ -2530,6 +2530,18 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
     $ok('an unreadable body yields nothing', floodAlerts('<html>Notis</html>', time()) === []);
     $ok('an empty feed yields nothing',      floodAlerts('[]', time()) === []);
 
+    /* Mirrors pageHasData()'s own `jps-` case: JPS writes a raw newline byte inside a JSON string
+       value, which `json_decode()` refuses and `jsonLoose()` repairs. Before this used jsonLoose(),
+       pageHasData() accepted and stored this exact body, and this function silently read it as zero
+       rows — a real flood alert would vanish with every diagnostic reading healthy. */
+    $rawNlBody = '[{"NotificationTypeCode":"NT_2D","State":"SELANGOR",'
+               . '"POINew":"Sungai Klang di Jambatan Sulaiman!Sungai' . "\n" . 'Gombak",'
+               . '"MessageDT":"' . date('d-m-Y H:i:s', time() - 1800) . '",'
+               . '"EstimatedDT":"' . date('d-m-Y H:i:s', time() - 1800) . '",'
+               . '"EstimatedEndDT":"' . date('d-m-Y H:i:s', time() + 7200) . '",'
+               . '"hide":"0"}]';
+    $ok('a raw newline in POINew still parses', count(floodAlerts($rawNlBody, time())) === 1);
+
     /* --- mergeNotices(): one array, fresher first, duplicates dropped --- */
     $mk = fn(string $t, string $x, string $from, string $src = 'met') =>
         ['title' => $t, 'text' => $x, 'from' => $from, 'to' => $from,

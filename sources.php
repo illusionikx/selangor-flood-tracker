@@ -933,7 +933,12 @@ const FLOOD_KEEP = [
  *
  * The row carries map geometry too. Nothing plots it, so nothing here parses it. */
 function floodAlerts(string $json, int $now): array {
-    $rows = json_decode($json, true);
+    /* `jsonLoose()`, not `json_decode()`. JPS writes raw newline characters inside JSON string
+       values — see jsonLoose()'s own comment, and pageHasData()'s `jps-` arm, which already accepts
+       this body on that ground. A `json_decode()` here disagreed with the acceptance gate: a body
+       with a raw newline in POINew passed pageHasData() and got stored, then read as zero rows by
+       this function. Nothing named the loss, because the fetch had in fact succeeded. */
+    $rows = jsonLoose($json);
     if (!is_array($rows)) return [];
 
     $out = [];
