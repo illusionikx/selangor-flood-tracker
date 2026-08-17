@@ -166,7 +166,9 @@ const favicon = red => {
    in trouble when none is.
 
    The row clips its text with CSS, not by cutting the string. The full sentence stays in the DOM
-   for a screen reader. It stays too for anyone who copies it. The modal holds all of it. */
+   for a screen reader. It stays too for anyone who copies it. The modal holds the same text as the
+   row, not the source's original bulletin — `hereParts()` in sources.php already narrowed it to
+   the part naming somewhere this map covers, before either surface ever sees it. */
 /* The outage shell. The two notice shells live in NOTICE_KIND in config.js, because the ticker and
    the modal read them too and this module is not importable from either. */
 const BANNER = {
