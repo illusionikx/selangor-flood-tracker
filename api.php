@@ -301,7 +301,18 @@ const JPS_NOTICE = 'https://publicinfobanjir.water.gov.my/wp-content/themes/enli
 
 /* The flood alert takes the shorter clock because it is the only true flood alarm here. Its
    response was 2 bytes on every fetch during the design, and a late flood alert costs more than the
-   request does. The four MET mirror files keep MET_WARN_TTL, the window MET warnings already use. */
+   request does. The four MET mirror files keep MET_WARN_TTL, the window MET warnings already use.
+
+   300 equals TTL, the payload's own file cache, and that is a trade rather than a coincidence. The
+   other scraped pages sit behind SCRAPE_TTL (15 min), which absorbs a hang three times before the
+   payload asks again. jps-flood re-enters the fetch set on effectively every rebuild instead,
+   because its own cache window expires no slower than the payload's does. `pageRow()` still stamps
+   the page whether or not it answers, so a hang costs the timeout once per JPS_FLOOD_TTL rather
+   than once per request — the same guard that turned the `infobanjirjpskl.water.gov.my`
+   `Rainfall/LatestData/All` page's four-day hang into a fixed 25 s per cache miss instead of a
+   25 s tax on every poll. jps-flood accepts that same shape of cost, on a shorter clock, on
+   purpose: a live flood forecast arriving 15 minutes late is worse than a hang costing 25 s once
+   every 5 rather than once every 15. */
 const JPS_FLOOD_TTL = 300;
 
 date_default_timezone_set('Asia/Kuala_Lumpur'); // upstream timestamps are local MYT, unlabelled
