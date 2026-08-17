@@ -823,3 +823,63 @@ function metWarnings(string $json, int $now): array {
     usort($out, fn($a, $b) => strcmp($b['from'], $a['from']));
     return $out;
 }
+
+/* --- the JPS mirror of the MET bulletins ----------------------------------------------------- */
+
+/* `publicinfobanjir.water.gov.my/ramalan/met-alert/` reads five static JSON files. They mirror the
+ * same MET bulletins `api.data.gov.my/weather/warning` carries, and they mirror them fresher.
+ *
+ * Measured 2026-08-17. Every data.gov.my row carried an issue stamp of 2026-08-10. This mirror
+ * answered with rows issued that morning. Two of them named the waters of Selangor.
+ *
+ * The row shape belongs to JPS. Every rule below is the rule `metWarnings()` already applies,
+ * reading a differently named field.
+ *
+ * This app does not fetch `met_earthquake.json`. `WARN_DROP` holds `earthquake` and `tsunami`, so
+ * every row of that file drops. Fetching it spends a request to discard the answer. */
+function jpsMetWarnings(string $json, int $now): array {
+    $rows = jsonLoose($json);
+    if ($rows === null) return [];
+
+    $out = [];
+    foreach ($rows as $r) {
+        if (!is_array($r)) continue;
+
+        /* `Heading_EN` is the heading for this row. `Title_EN` names the bulletin kind, and it
+           repeats across rows of different severities. So `Title_EN` is the fallback and never the
+           first choice. `metWarnings()` already states this rule about `warning_issue.title_en`. */
+        $title = trim((string)($r['Heading_EN'] ?? ''));
+        if ($title === '') $title = trim((string)($r['Title_EN'] ?? ''));
+        $text  = trim((string)($r['Msg_EN'] ?? ''));
+        $bm    = trim((string)($r['Msg_MY'] ?? ''));
+        if ($title === '' && $text === '') continue;
+
+        /* JPS stamps `17-08-2026 08:00:00`. `strtotime()` reads that correctly, because PHP assumes
+           the European d-m-y order when the separator is a dash. Measured 2026-08-17. */
+        $from = strtotime((string)($r['Valid_from'] ?? ''));
+        $to   = strtotime((string)($r['Valid_to'] ?? ''));
+        if (!$from || !$to || $now < $from || $now > $to) continue;
+
+        $hay = strtolower($title);
+        foreach (WARN_DROP as $bad) if (str_contains($hay, $bad)) continue 2;
+
+        /* Is this row about water? The heading is not enough on its own. MET files a storm over the
+           sea as "Warning on Thunderstorms", the same words it uses over land. */
+        $where = strtolower($text . ' ' . $bm);
+        $sea = false;
+        foreach (WARN_SEA as $s) if (str_contains($hay, $s)) { $sea = true; break; }
+        if (!$sea) foreach (WARN_WATER as $s) if (str_contains($where, $s)) { $sea = true; break; }
+
+        if (!hereNames($where, $sea)) continue;
+        $narrow = hereParts($text, $sea);
+        if ($narrow !== '') $text = $narrow;
+
+        /* The ISO shape, because `warnWhen()` in js/ui.js tests for it and prints the raw string
+           otherwise. The merge sort is a strcmp over this field for the same reason. */
+        $out[] = ['title' => $title, 'text' => $text,
+                  'from' => date('Y-m-d\TH:i:s', $from), 'to' => date('Y-m-d\TH:i:s', $to),
+                  'fresh' => ($now - $from) < WARN_FRESH,
+                  'kind' => 'weather', 'src' => 'jps'];
+    }
+    return $out;
+}

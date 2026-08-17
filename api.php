@@ -2382,6 +2382,65 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
     $ok('pantai barat matches too',        count(metWarnings(json_encode([$wcBm]), $wnow)) === 1);
     $ok('a peninsula wide warning still drops', metWarnings(json_encode([$pen]), $wnow) === []);
 
+    /* --- jpsMetWarnings(): the JPS mirror of the MET bulletins --- */
+    $jm = fn(array $r) => json_encode([$r]);
+    $liveFrom = date('d-m-Y H:i:s', time() - 3600);
+    $liveTo   = date('d-m-Y H:i:s', time() + 3600);
+    $row = fn(array $o = []) => $jm($o + [
+        'Heading_EN' => 'THUNDERSTORMS WARNING',
+        'Msg_EN'     => 'Heavy rain is expected over Selangor until noon.',
+        'Msg_MY'     => 'Hujan lebat dijangka di Selangor.',
+        'Valid_from' => $liveFrom,
+        'Valid_to'   => $liveTo,
+    ]);
+
+    $w = jpsMetWarnings($row(), time());
+    $ok('a live JPS row survives',       count($w) === 1);
+    $ok('it carries the JPS heading',    ($w[0]['title'] ?? '') === 'THUNDERSTORMS WARNING');
+    $ok('it is stamped weather and jps',
+        ($w[0]['kind'] ?? '') === 'weather' && ($w[0]['src'] ?? '') === 'jps');
+    // warnWhen() in js/ui.js tests the ISO shape and prints the raw string otherwise.
+    // A JPS stamp printed verbatim puts two date formats in one modal. The merge sort is a strcmp
+    // over this field, so a stamp outside that shape also misorders every same-day row.
+    $ok('the stamp is normalized to ISO',
+        (bool)preg_match('/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d$/', $w[0]['from'] ?? ''));
+    $ok('and so is the end stamp',
+        (bool)preg_match('/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d$/', $w[0]['to'] ?? ''));
+    $ok('a fresh row is marked fresh',   ($w[0]['fresh'] ?? null) === true);
+
+    $ok('a row outside its window drops',
+        jpsMetWarnings($row(['Valid_from' => date('d-m-Y H:i:s', time() - 7200),
+                             'Valid_to'   => date('d-m-Y H:i:s', time() - 3600)]), time()) === []);
+    $ok('a row naming nowhere here drops',
+        jpsMetWarnings($row(['Msg_EN' => 'Heavy rain over Sarawak.', 'Msg_MY' => 'Hujan di Sarawak.']),
+                       time()) === []);
+    // WARN_DROP already holds these. A seismic row and an empty advisory say nothing about weather
+    // here, and met_cyclone.json publishes "No Advisory" as its permanent heartbeat row.
+    $ok('a seismic row drops',
+        jpsMetWarnings($row(['Heading_EN' => 'Moderate Earthquake in Flores Region']), time()) === []);
+    $ok('an empty advisory drops',
+        jpsMetWarnings($row(['Heading_EN' => 'No Advisory']), time()) === []);
+
+    /* The row this whole task exists for. met_gelora.json publishes one national bulletin naming
+       six regions, and only one of them is ours. */
+    $GEL = $jm(['Heading_EN' => 'SECOND CATEGORY WARNING ON STRONG WINDS AND ROUGH SEAS',
+                'Msg_EN'     => "SECTION A: FOR MALAYSIAN WATERS\n"
+                              . "1) THUNDERSTORMS WARNING\n"
+                              . "Thunderstorms are expected over the waters of Western Sarawak, "
+                              . "Western Sabah, Selangor and Perak until 12:00 PM.\n"
+                              . "2) This condition may cause rough seas off Sarawak.",
+                'Msg_MY'     => '',
+                'Valid_from' => $liveFrom, 'Valid_to' => $liveTo]);
+    $g = jpsMetWarnings($GEL, time());
+    $ok('the gelora bulletin survives',  count($g) === 1);
+    $ok('and it keeps only the part naming here',
+        str_contains($g[0]['text'] ?? '', 'Selangor')
+        && !str_contains($g[0]['text'] ?? '', 'SECTION A')
+        && !str_contains($g[0]['text'] ?? '', 'rough seas off Sarawak'));
+
+    $ok('an unreadable body yields nothing', jpsMetWarnings('<html>Notis</html>', time()) === []);
+    $ok('an empty feed yields nothing',      jpsMetWarnings('[]', time()) === []);
+
     echo "\nshotCache():\n";
     /* The two forms of ?shot= mean different things and must not share a header. `&t=` names one
        frame that never changes again, so a year is honest. The no timestamp form names whichever
