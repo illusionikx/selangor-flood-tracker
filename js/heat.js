@@ -404,7 +404,12 @@ export function syncHeat() {
      leaving weather mode restores it with no state to remember. The summary names what is stored
      rather than what is drawn. That is because the pref is what the two boxes above report. */
   const show = !PREFS.wx;
-  el('heatN').textContent = !show ? 'hidden by weather'
+  /* One summary for the whole section, written here because this function already reads both
+     preferences. Two writers on one line age apart, which is the fault this function exists to
+     prevent. syncWx() writes no summary.
+     It names the layer on screen rather than the preference behind it. A reader who opens the
+     drawer during weather mode wants to know what the map draws. */
+  el('layerN').textContent = !show ? 'weather'
     : wet ? 'water level' : rainy ? 'rainfall' : 'off';
   wet && show   ? heat.addTo(map)     : heat.remove();
   rainy && show ? rainHeat.addTo(map) : rainHeat.remove();

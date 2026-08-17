@@ -120,14 +120,14 @@ function card(p) {
     </div>`;
 }
 
-/* Reads the preference and writes the control, the summary and the layer. It never reads the
-   control back. A browser restores a checkbox across a reload without firing `change`. So an
-   invariant repaired inside a change handler is repaired on none of the paths the browser takes.
-   This is the rule syncHeat() exists to state. */
+/* Reads the preference and writes the control and the layer. syncHeat() writes the summary now,
+   because it already reads both heat preferences. It never reads the control back. A browser
+   restores a checkbox across a reload without firing `change`. So an invariant repaired inside a
+   change handler is repaired on none of the paths the browser takes. This is the rule syncHeat()
+   exists to state. */
 export function syncWx() {
   const on = !!PREFS.wx;
   el('wxLayer').checked = on;
-  el('wxN').textContent = on ? 'on · stations hidden' : 'off';
   on ? layer.addTo(map) : layer.remove();
 }
 
@@ -144,9 +144,11 @@ export async function tick() {
   } catch { /* keep pts */ }
   if (mine !== gen) return;
   /* Nothing to draw and nothing to blame the reader for. A server that has never refreshed has no
-     row yet, and the static bake may have skipped the file. Say so on the section rather than
-     leaving an empty map under a control that reads "on". */
-  el('wxsect').classList.toggle('loadfail', pts.length === 0);
+     row yet, and the static bake may have skipped the file.
+     The chip says so, not the section. `.loadfail` prints a dialog-sized message, and this section
+     also holds two heatmaps that work. `.hint` is the small slot the two filter chips below
+     already use for the same job. */
+  el('wxHint').textContent = pts.length === 0 ? 'no data yet' : '';
   paint();
   if (side.key?.startsWith('@wx-')) {
     const p = pts.find(x => '@wx-' + x.id === side.key);

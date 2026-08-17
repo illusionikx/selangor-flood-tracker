@@ -447,7 +447,7 @@ dialog:focus, dialog:focus-visible { outline: none; }
 /* The one divider in the drawer, between the heatmap pair and the rising filter sharing their
    section. A rule rather than a second `.sect`: they belong to the same fold, and a heading for one
    chip is a heading with nothing to hold. */
-#heatsect hr { margin: 12px 0 8px; border: 0; border-top: 1px solid var(--outline); }
+#layersect hr { margin: 12px 0 8px; border: 0; border-top: 1px solid var(--outline); }
 
 .rowbtns { display: flex; gap: 8px; margin-top: 8px; }
 .rowbtns .link { justify-content: center; }

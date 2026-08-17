@@ -68,11 +68,11 @@
 <link rel="modulepreload" href="js/ui.js">
 <link rel="stylesheet" href="vendor/leaflet.css">
 <link rel="stylesheet" href="vendor/markercluster.css">
-<link rel="stylesheet" href="vendor/fonts.css?v=50">
-<link rel="stylesheet" href="css/icons.css?v=87">
-<link rel="stylesheet" href="css/base.css?v=125">
-<link rel="stylesheet" href="css/chrome.css?v=180">
-<link rel="stylesheet" href="css/map.css?v=148">
+<link rel="stylesheet" href="vendor/fonts.css?v=51">
+<link rel="stylesheet" href="css/icons.css?v=88">
+<link rel="stylesheet" href="css/base.css?v=126">
+<link rel="stylesheet" href="css/chrome.css?v=181">
+<link rel="stylesheet" href="css/map.css?v=149">
 
 <!-- Water tint for the dark basemap. CARTO's dark_all is greyscale — all 18 of its tones have zero
      chroma — so no saturate() or hue-rotate() can pull water out of it. What it does have is one
@@ -981,48 +981,38 @@
     </details>
   </div>
   <div>
-    <!-- The two heatmaps are one choice, so they get one section. Its summary carries which of them
-         is on, for the same reason the district count sits on its own: a collapsed section still has
-         to say what it is holding. -->
-    <details id="heatsect" class="sect" open>
-      <summary><i class="i i-water_drop"></i>Heatmap<b id="heatN"></b></summary>
-      <!-- No `checked` attribute on either box. `PREFS.heatLayer` is the one source of truth and
-           syncHeat() in js/heat.js writes both from it, so a hard-coded state here is a second
-           source that can only ever disagree — and it disagrees during the window before the
-           deferred module runs, which is the one state the pair is not allowed to be in: both on at
-           once. `autocomplete="off"` stops the second writer: a browser restores a checkbox across
-           a reload without firing `change`, so a restored box put the pair back into that state
-           behind the app's back. Every checkbox that a preference owns carries it. -->
+    <!-- One section, because the three layers in it answer one question: what does the map paint.
+         Weather mode forces both heatmaps off, so exactly one of the three ever paints.
+         No `checked` attribute on any box. `PREFS.heatLayer` and `PREFS.wx` are the source of
+         truth, and syncHeat() and syncWx() write the boxes from them. A hard-coded state here is a
+         second source that can only disagree. It disagrees during the window before the deferred
+         module runs. `autocomplete="off"` stops the other writer. A browser restores a checkbox
+         across a reload without firing `change`. Every checkbox a preference owns carries it. -->
+    <details id="layersect" class="sect" open>
+      <summary><i class="i i-layers"></i>Layers<b id="layerN"></b></summary>
       <label class="chip"><input type="checkbox" id="heat" autocomplete="off">
         <i class="glyph i i-water_drop"></i>Water-level heatmap</label>
       <label class="chip"><input type="checkbox" id="rainHeat" autocomplete="off">
         <i class="glyph i i-rainy"></i>Rainfall heatmap</label>
-      <!-- Under a rule because it is not a third heatmap: the two above are one mutually-exclusive
-           choice, this is a filter on the pins. It rides in the same section because it is the other
-           control that changes what the map is showing rather than which stations exist. -->
+      <!-- Weather is a mode rather than a wash, because it hides every station. It rides here
+           because it is the third answer to the one question this section asks. -->
+      <label class="chip"><input type="checkbox" id="wxLayer" autocomplete="off">
+        <i class="glyph i i-sunny"></i>MET nowcast map <span id="wxHint" class="hint"></span></label>
+      <!-- Under a rule because these two are not a fourth layer. The three above are one
+           mutually-exclusive choice about what the map paints. These filter the pins. -->
       <hr>
       <label class="chip"><input type="checkbox" id="risingOnly" autocomplete="off">
         <i class="glyph i i-warning"></i>Rising stations only <span id="risingHint" class="hint"></span></label>
-      <!-- A view filter, like the district picker and unlike the ignored list: it hides pins and
-           changes no alert. The two indications that it is on are the drawer panel above and the
-           `· favorites only` note in #shown below, which is the same pair the ignored list uses. It
-           needs no standing pill the way the rising filter does, because that one is a lone checkbox
-           with no list under it saying what it took away, and this one has exactly that list. -->
+      <!-- A view filter, like the district picker and unlike the ignored list. It hides pins and
+           changes no alert. Two things say it is on: this panel, and the `· favorites only` note
+           in #shown below. That is the pair the ignored list uses. It needs no standing pill the
+           way the rising filter does. That one is a lone checkbox with no list under it saying
+           what it took away. This one has exactly that list. -->
       <label class="chip"><input type="checkbox" id="favOnly" autocomplete="off">
         <i class="glyph i i-favorite"></i>Favorites only <span id="favHint" class="hint"></span></label>
     </details>
-    <!-- Weather is a mode and not a third heatmap. It takes the map over and hides every station,
-         where the two heatmaps add a wash under them. Its own section for that reason. The
-         summary carries the state, so a collapsed section still says the stations are hidden.
-         No `checked` attribute, and `autocomplete="off"` — PREFS.wx is the one source of truth.
-         syncWx() in js/wx.js writes the box from it, never the reverse. -->
-    <details id="wxsect" class="sect">
-      <summary><i class="i i-sunny"></i>Weather<b id="wxN"></b></summary>
-      <label class="chip"><input type="checkbox" id="wxLayer" autocomplete="off">
-        <i class="glyph i i-sunny"></i>MET nowcast map</label>
-    </details>
     <details id="kinds" class="sect" open>
-      <summary><i class="i i-layers"></i>Sensor kinds<b id="kindN"></b></summary>
+      <summary><i class="i i-apps"></i>Sensor kinds<b id="kindN"></b></summary>
       <div id="layers"></div>
     </details>
     <!-- Outside both sections on purpose: the `· N ignored` count is one of the two always-visible

@@ -504,19 +504,19 @@ el('heat').onchange = el('rainHeat').onchange = el('risingOnly').onchange =
    be the source of truth. This is the rule syncHeat() and syncWx() both state.
    A failed import puts the pref back and marks the section. It is the same shape the test toggle
    and the two dialogs already use. lazy() rethrows on purpose, because it does not know which
-   surface a caller owns, and this one owns #wxsect. */
+   surface a caller owns, and this one owns #wxHint. */
 el('wxLayer').onchange = async e => {
   PREFS.wx = e.target.checked;
   save();
-  el('wxsect').classList.remove('loadfail');
+  el('wxHint').textContent = '';
   try {
-    const m = await lazy(() => import('./wx.js'), el('wxsect'));
+    const m = await lazy(() => import('./wx.js'), e.target.closest('label'));
     await m.tick();
   } catch {
     PREFS.wx = false;
     save();
     e.target.checked = false;
-    el('wxsect').classList.add('loadfail');
+    el('wxHint').textContent = 'could not load';
   }
   syncHeat();
   render();
