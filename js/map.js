@@ -334,6 +334,12 @@ export function flashTo(t) {
   // it, or rising-only did. All three are answered the same way now that render() groups by site:
   // pin it, rebuild, and drop the pin once the user navigates off. Pinning outranks every filter,
   // so the marker is guaranteed to exist afterwards.
+  /* A jump to a station is a request for the station map, so weather mode ends here.
+     One place, because every jump in this app reaches this function. The jumps are from
+     the go-to box, table, alert rows, ticker and menu rows. PREFS.heatLayer was never
+     written while the mode was on. So syncHeat() inside the rerender below brings back
+     whatever heatmap the reader had. Nothing here has to remember it. */
+  if (PREFS.wx) { PREFS.wx = false; save(); }
   if (state.pinned !== t.id) { state.pinned = t.id; state.rerender(); }
 
   /* One way in: the marker's own click handler centres the map and fills the panel, so a jump from
