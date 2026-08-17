@@ -258,12 +258,17 @@ where the glyph works and no color ladder exists. The pin uses `rainy` for both 
 
 ### Color
 
-This layer paints natural sky colors. That is an exception to the color rule in `CLAUDE.md`, and
-the exception rests on one condition.
+This layer paints natural sky colors. **That is not an exception to the status rule, and an early
+draft of this spec wrongly called it one.**
 
-**Weather mode draws no station pin.** Nothing status-colored shares the map, so an amber glyph
-cannot read as a station in trouble. The stated reason for that rule does not reach this surface. The
-drawer control must still take no status hue, and the header keeps its own alert colors.
+The rule in `CLAUDE.md` reserves the status TOKENS for status. That rule already cut one
+attempt. `#locate.fail` took `--s-alert` for a failed location fix. Weather takes no status token. `--wx-clear` is its own token.
+
+The real risk is perceptual, not token misuse. Two things manage it. The value sits muted away from
+`--s-alert`, which is `#e68e16` on light and `#ffc000` on dark. And weather mode draws no station
+pin, so nothing status-colored shares the map.
+
+The drawer control still takes no status hue, and the header keeps its own alert colors.
 
 One more rule holds the two sets apart. **The status set uses saturated colors. Weather uses muted ones.** A reader
 separates them by vividness as well as by hue.
