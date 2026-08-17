@@ -2531,6 +2531,28 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
     $ok('the same alert still appears 7h later',   count($earlyOld) === 1);
     $ok('but is no longer fresh',                  ($earlyOld[0]['fresh'] ?? null) === false);
 
+    /* No fallback to `$from` when `MessageDT` cannot be read. `$from` on an NT_7D row is the
+       forecast start, days in the future, so falling back there reopens the exact bug just fixed:
+       `$now - $from` goes negative and `fresh` is trivially true. The row must still list — a point
+       list this app cannot read is not a reason to drop a forecast either — it must simply never
+       interrupt. Built by hand rather than through `$early7d()`, because that closure always writes
+       a `MessageDT` key and this needs the key itself absent, not merely empty. */
+    $early7dRow = fn(array $extra = []) => json_encode([[
+        'NotificationTypeCode' => 'NT_7D',
+        'State'                => 'SELANGOR',
+        'POINew'               => 'Sungai Klang di Jambatan Sulaiman!Sungai Gombak',
+        'EstimatedDT'          => date('d-m-Y H:i:s', time() + 7 * 86400),
+        'EstimatedEndDT'       => date('d-m-Y H:i:s', time() + 8 * 86400),
+        'hide'                 => '0',
+    ] + $extra]);
+    $earlyNoMsg = floodAlerts($early7dRow(), time());
+    $ok('a 7-day-ahead alert with no MessageDT still appears', count($earlyNoMsg) === 1);
+    $ok('and is not fresh with no issue time to measure from',
+        ($earlyNoMsg[0]['fresh'] ?? null) === false);
+    $earlyEmptyMsg = floodAlerts($early7dRow(['MessageDT' => '']), time());
+    $ok('a 7-day-ahead alert with an empty MessageDT still appears', count($earlyEmptyMsg) === 1);
+    $ok('and is not fresh either', ($earlyEmptyMsg[0]['fresh'] ?? null) === false);
+
     /* The three withdrawals drop. Every surface renders a notice only inside its validity window,
        so an alert that ended leaves the panel without help. A withdrawal row restates that, and it
        appears alone whenever the alert it withdraws expired between two polls. */

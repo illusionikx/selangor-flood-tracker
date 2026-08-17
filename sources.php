@@ -977,14 +977,19 @@ function floodAlerts(string $json, int $now): array {
            message and never from the forecast start. An NT_7D Early alert names a window seven days
            out. Measured from that start, `$now - $from` goes negative and the test is trivially
            true, so one tile would hold the ticker for a week. That is the standing banner the alert
-           design standard rejects. */
-        $said = strtotime((string)($r['MessageDT'] ?? '')) ?: $from;
+           design standard rejects.
+           No fallback to `$from`. On an NT_7D row `$from` is the forecast start, which is in the
+           future, so falling back there makes `fresh` trivially true and the tile holds the ticker
+           for a week — the exact failure this seam exists to prevent, reopened through the
+           fallback. With no parseable issue time the row still lists in the panel and simply never
+           interrupts. A missed interruption beats a banner that does not end. */
+        $said = strtotime((string)($r['MessageDT'] ?? ''));
 
         $out[] = ['title' => 'Flood alert · ' . FLOOD_KEEP[$code],
                   'text'  => $pois ? implode(', ', $pois) . ($state !== '' ? " ($state)" : '') : $state,
                   'from'  => date('Y-m-d\TH:i:s', $from),
                   'to'    => date('Y-m-d\TH:i:s', $to),
-                  'fresh' => ($now - $said) < WARN_FRESH,
+                  'fresh' => $said && ($now - $said) < WARN_FRESH,
                   'kind'  => 'flood', 'src' => 'jps'];
     }
     return $out;
