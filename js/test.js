@@ -47,16 +47,33 @@ const CAM_EVERY = 3;
    when somebody is looking at the panel on purpose. The id must be a key of NOTICE in config.js. */
 const TEST_NOTICE = { id: 'publicinfobanjir', regions: ['Kuala Lumpur', 'Putrajaya'] };
 
+/* Every warning row states Malaysian wall clock with no offset — the same convention floodAlerts(),
+   jpsMetWarnings() and metWarnings() all state in sources.php, and the one warnWhen() in js/ui.js
+   reads: it only rearranges the digits, no timezone arithmetic. `toISOString()` states UTC instead,
+   eight hours off MYT, so the drill's modal would show its own window wrong. js/popup.js already
+   pins two clocks to Asia/Kuala_Lumpur (MYT_DATE, MYT_CLOCK) but neither states the full shape a
+   warning row needs — MYT_DATE is DD/MM/YYYY and MYT_CLOCK carries no seconds — so this is a third
+   formatter built the same way, not a fourth field pulled out of either existing one. */
+const MYT_ISO = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Asia/Kuala_Lumpur', hour12: false,
+  year: 'numeric', month: '2-digit', day: '2-digit',
+  hour: '2-digit', minute: '2-digit', second: '2-digit',
+});
+const mytIso = ts => {
+  const p = Object.fromEntries(MYT_ISO.formatToParts(ts).map(x => [x.type, x.value]));
+  return `${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}:${p.second}`;
+};
+
 /* Test mode fakes a JPS flood alert too, for the same reason. `getdisse.php` has never returned a
    row, so the Flood Alert heading, its glyph, its rule colour, its ticker tile and its modal head
    cannot be seen on any real payload today — without a knob here they ship unseen. The shape copies
-   what floodAlerts() in sources.php emits: the same seven keys, an ISO stamp on `from`/`to`, and a
+   what floodAlerts() in sources.php emits: the same seven keys, an MYT stamp on `from`/`to`, and a
    window that already holds now. */
 const TEST_FLOOD = {
   title: 'Flood alert · Final',
   text:  'Sungai Klang di Jambatan Sulaiman, Sungai Gombak (SELANGOR)',
-  from:  new Date(Date.now() - 30 * 60000).toISOString().slice(0, 19),
-  to:    new Date(Date.now() + 3 * 3600000).toISOString().slice(0, 19),
+  from:  mytIso(Date.now() - 30 * 60000),
+  to:    mytIso(Date.now() + 3 * 3600000),
   fresh: true,
   kind:  'flood',
   src:   'jps',

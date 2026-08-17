@@ -10055,6 +10055,33 @@ own validity window. An alert that has ended leaves the panel on its own, once `
 window test. A withdrawal row only restates that fact. It also arrives alone whenever the alert it
 withdraws has already expired by the next poll.
 
+### `--k-notice` is its own token, not `--k-river`
+
+A JPS flood forecast is a claim about an area, not a station reading. `--k-weather` and
+`--k-source` already exist for exactly that reason. `NOTICE_KIND.flood.c` must not borrow the
+colour of a station. Before this pass it pointed at `--k-river`, the colour a river gauge reading
+uses.
+
+The hue of `--k-notice` sits closer to `--k-river` than any other pair in the palette. Saturation
+and lightness carry the separation, not hue angle. `--k-river` reads `#3a88ff` on light and
+`#66b2ff` on dark. `--k-notice` reads `#2f6690` on light and `#6fa8d8` on dark. This choice is a
+judgment call. It does not come from the contrast passes the rest of the palette went through.
+Write it down here so a reader does not have to reconstruct it.
+
+### The flood card draws first
+
+A JPS flood forecast is a stronger claim than a MET weather forecast. Its card must draw above the
+weather card in the alert panel. `js/alerts.js` builds the cards by iterating
+`Object.entries(NOTICE_KIND)`. The insertion order of that object is the mechanism, so `flood` sits
+before `weather` in `NOTICE_KIND`. Reordering the object reorders the panel.
+
+### `TEST_FLOOD`
+
+`getdisse.php` has never returned a row. So no real payload today shows the Flood Alert heading,
+its glyph, its rule colour, its ticker tile or its modal head. `js/test.js` fakes one through
+`TEST_FLOOD`. `CAM_EVERY` already carries the same argument for the camera warning path: anything
+that alerts needs a knob in test mode, or it ships unseen.
+
 ### The media statement becomes a link, not a parser
 
 `publicinfobanjir.water.gov.my/ramalan/pernyataan-media/` is a list of PDF documents, not an alarm.
