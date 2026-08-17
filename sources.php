@@ -705,7 +705,7 @@ const WARN_HERE = ['selangor', 'kuala lumpur', 'putrajaya', 'lembah klang', 'kla
  * A marine text has a second way in: our stretch of the Straits of Melaka, with the far stretch cut
  * out before the keep test reads it. Cutting rather than testing is what keeps a text naming two
  * stretches — strip the northern mention from "Northern Straits of Melaka and Central Straits of
- * Melaka" and the central one still answers. See CLAUDE.md for the row this rule was written for.
+ * Melaka" and the central one still answers. CLAUDE.md names the row that needed this rule.
  *
  * The straits are open to a marine text alone. A land text must name a state or a district. */
 function hereNames(string $text, bool $sea): bool {
@@ -720,15 +720,16 @@ function hereNames(string $text, bool $sea): bool {
 /* Keep only the parts of a bulletin that name somewhere this map covers.
  *
  * MET writes one warning across several regions in one row. `met_gelora.json` carried 1,795
- * characters across 16 lines on 2026-08-17, naming Sarawak, Sabah, Selangor, Perlis, Kedah and
- * Perak together. A row-level place test keeps that row on one word, and the panel then prints a
- * wall of text that is mostly about Borneo. On the measured row this returns a single
- * 203-character sentence.
+ * characters across 16 lines on 2026-08-17. It names Sarawak, Sabah, Selangor, Perlis, Kedah and
+ * Perak together.
+ *
+ * A row-level place test keeps that row on one word. The panel then prints a wall of text that is
+ * mostly about Borneo. On the measured row this returns a single 203-character sentence.
  *
  * The split runs on a newline or on a period followed by a space. A period inside a number carries
  * no space after it, so "4.5 meters" stays whole.
  *
- * An empty return means the text names nowhere here. The caller decides what that means: the gate
+ * An empty return means the text names nowhere here. The caller decides what that means. The gate
  * is a separate test on the combined English and Malay text, and this narrows the English alone. */
 function hereParts(string $text, bool $sea): string {
     $keep = [];
@@ -788,8 +789,8 @@ function metWarnings(string $json, int $now): array {
         foreach (WARN_SEA as $s) if (str_contains($hay, $s)) { $sea = true; break; }
         if (!$sea) foreach (WARN_WATER as $s) if (str_contains($where, $s)) { $sea = true; break; }
 
-        /* The gate reads the combined English and Malay text, because MET writes some rows in one
-           language only. That is unchanged, so this keeps every row it kept before. */
+        /* The gate reads the combined English and Malay text. MET writes some rows in one
+           language only. This gate does not change, so it keeps every row it kept before. */
         if (!hereNames($where, $sea)) continue;
 
         /* The displayed text narrows to the parts naming somewhere this map covers. It falls back
