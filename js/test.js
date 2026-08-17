@@ -47,6 +47,21 @@ const CAM_EVERY = 3;
    when somebody is looking at the panel on purpose. The id must be a key of NOTICE in config.js. */
 const TEST_NOTICE = { id: 'publicinfobanjir', regions: ['Kuala Lumpur', 'Putrajaya'] };
 
+/* Test mode fakes a JPS flood alert too, for the same reason. `getdisse.php` has never returned a
+   row, so the Flood Alert heading, its glyph, its rule colour, its ticker tile and its modal head
+   cannot be seen on any real payload today — without a knob here they ship unseen. The shape copies
+   what floodAlerts() in sources.php emits: the same seven keys, an ISO stamp on `from`/`to`, and a
+   window that already holds now. */
+const TEST_FLOOD = {
+  title: 'Flood alert · Final',
+  text:  'Sungai Klang di Jambatan Sulaiman, Sungai Gombak (SELANGOR)',
+  from:  new Date(Date.now() - 30 * 60000).toISOString().slice(0, 19),
+  to:    new Date(Date.now() + 3 * 3600000).toISOString().slice(0, 19),
+  fresh: true,
+  kind:  'flood',
+  src:   'jps',
+};
+
 /* Every fake sample carries the status it was at, the third element real samples get from
    `sparkPoints()` in api.php. Without it the graph's hover readout printed a faked flood in plain
    ink, because the readout colours a sample by its own code and a two-element sample has none —
@@ -225,6 +240,10 @@ export function seedTest(data) {
      not appended to, so a real outage during a drill is replaced rather than doubled. The next poll
      with the switch off restores whatever the payload actually said. */
   state.notices = [TEST_NOTICE];
+
+  /* `state.warnings` is pushed onto, not overwritten: a real MET or JPS warning can be live at the
+     same time as the drill, and this fake must not hide it. */
+  state.warnings = [...state.warnings, TEST_FLOOD];
 
   /* Knock stations off the network first, not last. Every branch below requires `s.online`, so an
      offlined station simply falls through and stays offline — which means the two fakes can never
