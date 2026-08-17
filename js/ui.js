@@ -502,9 +502,9 @@ el('heat').onchange = el('rainHeat').onchange = el('risingOnly').onchange =
 
 /* The weather mode toggle. The pref is written first and the module reads it, so the box can never
    be the source of truth. This is the rule syncHeat() and syncWx() both state.
-   A failed import puts the pref back and marks the section. It is the same shape the test toggle
-   and the two dialogs already use. lazy() rethrows on purpose, because it does not know which
-   surface a caller owns, and this one owns #wxHint. */
+   A failed import puts the pref back and writes the hint on the chip. It is the same shape the
+   test toggle and the two dialogs already use. lazy() rethrows on purpose, because it does not
+   know which surface a caller owns, and this one owns #wxHint. */
 el('wxLayer').onchange = async e => {
   PREFS.wx = e.target.checked;
   save();

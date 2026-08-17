@@ -121,7 +121,7 @@ function card(p) {
 }
 
 /* Reads the preference and writes the control and the layer. syncHeat() writes the summary now,
-   because it already reads both heat preferences. It never reads the control back. A browser
+   because it already reads both preferences. It never reads the control back. A browser
    restores a checkbox across a reload without firing `change`. So an invariant repaired inside a
    change handler is repaired on none of the paths the browser takes. This is the rule syncHeat()
    exists to state. */
