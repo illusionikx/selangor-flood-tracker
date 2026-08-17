@@ -831,8 +831,13 @@ function metWarnings(string $json, int $now): array {
            thing the alert design standard warns about. The split follows what the two surfaces are
            for: the panel is a directory you open, the ticker is an interruption you did not ask
            for. An interruption has to end. The directory does not. */
+        /* The ISO shape, not the raw field. `jpsMetWarnings()` and `floodAlerts()` both normalize to
+           this same shape, because `warnWhen()` in js/ui.js tests for it and the merge sort in
+           mergeNotices() is a strcmp over this field. Both held today only because
+           api.data.gov.my happens to already emit a `T` between the date and the time — state the
+           shape by construction instead of relying on that. */
         $out[] = ['title' => $title, 'text' => $text,
-                  'from' => (string)$r['valid_from'], 'to' => (string)$r['valid_to'],
+                  'from' => date('Y-m-d\TH:i:s', $from), 'to' => date('Y-m-d\TH:i:s', $to),
                   'fresh' => ($now - $from) < WARN_FRESH,
                   // One array carries every notice, and these two separate them. `weather` renders
                   // as this row always has. See mergeNotices().
