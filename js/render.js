@@ -11,6 +11,11 @@ import { sitePopup } from './popup.js';
 
 state.rerender = () => render();
 
+/* True once weather mode has run at least once this session. render() reads it below to decide
+   whether wx.js still needs a tick(), even after PREFS.wx has gone false. It never resets, so a
+   reader who leaves weather mode still gets the one extra tick that tears the layer down. */
+let wxSeen = false;
+
 /* A filter that can legitimately match nothing must never silently empty the map — an empty map
    reads as "the app is broken", or worse during a flood, as "nothing is happening". So the chip
    turns itself off and says why: either nothing is climbing, or `rate` is null everywhere because
@@ -207,9 +212,39 @@ export function render() {
   // for, and neither call is the one that draws.
   rainHeat.setDry(dryPoints);
   rainHeat.setLatLngs(thinHeat(rainPoints, RAIN_KM));
-  /* Deferred, and rejection-handled, exactly like the table and the wall below. This runs on every
-     poll and has no surface to report an import failure on. */
-  if (PREFS.wx) import('./wx.js').then(m => m.tick(), () => {});
+  /* Weather mode must tear itself down when a reader leaves it, not just paint while inside it.
+     flashTo() sets PREFS.wx to false and calls state.rerender() on every jump to a station. The old
+     check here was `if (PREFS.wx)` alone, and that was already false by the time this line ran. So
+     tick() never fired, and the layer and the checked #wxLayer box were both left on screen.
+
+     wxSeen fixes that. It stays true once weather mode has run once this session. So render()
+     still calls tick() on the render right after PREFS.wx flips false. tick() already handles that
+     case. syncWx() removes the layer and unchecks the box whenever PREFS.wx reads false.
+
+     `.then(m => m.tick()).catch(...)`, not a second argument to `.then()`. A second argument only
+     catches the import failing. tick() is async, so its own rejection is a separate promise. A
+     second `.then()` argument never sees that rejection. This is the same gap the withTimeline
+     gotcha in CLAUDE.md records, at a new call site.
+
+     A failed import must not leave a blank map under a checked box. render() already skips every
+     station pin while PREFS.wx is true, so a wx.js that never loads draws nothing at all. The catch
+     rolls back the same way js/ui.js's own toggle handler does. It turns the pref off and saves it.
+     It writes the reason into #wxHint. Then it renders once more, so the station pins return.
+
+     The rollback checks that PREFS.wx is still true before it runs. wxSeen never resets, so every
+     later render calls import('./wx.js') again. A rejected dynamic import stays rejected in the
+     module cache. So it keeps rejecting on every later render too.
+
+     Without the guard, each later render flips PREFS.wx off again and calls render() again. That
+     repeats forever. The guard lets the rollback run once and then stop. */
+  if (PREFS.wx) wxSeen = true;
+  if (wxSeen) import('./wx.js').then(m => m.tick()).catch(() => {
+    if (!PREFS.wx) return;
+    PREFS.wx = false;
+    save();
+    el('wxHint').textContent = 'could not load';
+    render();
+  });
   syncHeat();   // layers + legend follow the chips; see heat.js
   counts();
   districts();
