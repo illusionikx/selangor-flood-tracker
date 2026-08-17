@@ -399,14 +399,20 @@ export function syncHeat() {
   const wet = PREFS.heatLayer === 'water', rainy = PREFS.heatLayer === 'rain';
   el('heat').checked = wet;
   el('rainHeat').checked = rainy;
-  // Which of the two is on, on the section's summary — the one thing a collapsed heatmap section
-  // otherwise stops saying.
-  el('heatN').textContent = wet ? 'water level' : rainy ? 'rainfall' : 'off';
-  wet   ? heat.addTo(map)     : heat.remove();
-  rainy ? rainHeat.addTo(map) : rainHeat.remove();
-  el('lgWater').style.display = wet ? '' : 'none';
-  el('lgRain').style.display = rainy ? '' : 'none';
-  el('legend').style.display = wet || rainy ? '' : 'none';
+  /* Weather mode takes the map, so both canvases come off — but PREFS.heatLayer is NOT written.
+     That is the whole of "turn the previous heatmap back on": the reader's choice never left. So
+     leaving weather mode restores it with no state to remember. The summary names what is stored
+     rather than what is drawn. That is because the pref is what the two boxes above report. */
+  const show = !PREFS.wx;
+  el('heatN').textContent = !show ? 'hidden by weather'
+    : wet ? 'water level' : rainy ? 'rainfall' : 'off';
+  wet && show   ? heat.addTo(map)     : heat.remove();
+  rainy && show ? rainHeat.addTo(map) : rainHeat.remove();
+  el('lgWater').style.display = wet && show ? '' : 'none';
+  el('lgRain').style.display  = rainy && show ? '' : 'none';
+  // The legend box holds three sections now, so one function decides whether the box itself shows.
+  el('lgWx').style.display = show ? 'none' : '';
+  el('legend').style.display = !show || wet || rainy ? '' : 'none';
   heatScale();   // sizes whichever is on, and re-applies opacity
   heatOpacity();
 }

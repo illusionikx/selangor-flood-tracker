@@ -127,7 +127,10 @@ export function render() {
   }
   state.perKind = perKind;
 
-  for (const [key, members] of sites) {
+  /* Weather mode takes the map: no station pin and no heat. The counts above still run, because
+     they describe the station set and the drawer still reports it. See #shown, which says in
+     words that the stations are hidden. */
+  if (!PREFS.wx) for (const [key, members] of sites) {
     members.sort(leads);
     const lead = members[0];
     const rising = members.some(m => m.rising);
@@ -204,6 +207,9 @@ export function render() {
   // for, and neither call is the one that draws.
   rainHeat.setDry(dryPoints);
   rainHeat.setLatLngs(thinHeat(rainPoints, RAIN_KM));
+  /* Deferred, and rejection-handled, exactly like the table and the wall below. This runs on every
+     poll and has no surface to report an import failure on. */
+  if (PREFS.wx) import('./wx.js').then(m => m.tick(), () => {});
   syncHeat();   // layers + legend follow the chips; see heat.js
   counts();
   districts();
@@ -339,8 +345,12 @@ function counts() {
   // answer it should give.
   const ign = ignoredIds();
   const nIgn = state.data.filter(s => ign.has(s.id)).length;
-  el('shown').textContent = `${total} of ${state.data.length} stations on the map` +
-    (pins && pins < total ? ` · ${pins} pins` : '') +
-    (el('favOnly').checked ? ' · favorites only' : '') +
-    (nIgn ? ` · ${nIgn} ignored` : '');
+  /* Weather mode hides every station, so the station tally would read "0 of 729" and explain
+     nothing. This line is the one the eye lands on to ask why the map is empty, so it answers. */
+  el('shown').textContent = PREFS.wx
+    ? 'Weather map · flood stations hidden'
+    : `${total} of ${state.data.length} stations on the map` +
+      (pins && pins < total ? ` · ${pins} pins` : '') +
+      (el('favOnly').checked ? ' · favorites only' : '') +
+      (nIgn ? ` · ${nIgn} ignored` : '');
 }

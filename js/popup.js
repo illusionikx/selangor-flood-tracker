@@ -441,7 +441,7 @@ function sensorBody(s) {
 const MYT_DATE = new Intl.DateTimeFormat('en-GB',
   { timeZone: 'Asia/Kuala_Lumpur', day: '2-digit', month: '2-digit', year: 'numeric' });
 
-const stamp = t => {
+export const stamp = t => {
   // A unix instant (MET's issue time) is rendered into the feed's own shape first, so one rule reads
   // both. `|| s` covers a stamp that carries a date and no clock.
   const s = typeof t === 'number' ? `${MYT_DATE.format(t)} ${MYT_CLOCK.format(t)}` : noSec(t);
@@ -499,12 +499,21 @@ const goName = s =>
 const MYT_H = new Intl.DateTimeFormat('en-GB', {
   timeZone: 'Asia/Kuala_Lumpur', hour: '2-digit', hour12: false,
 });
-const night = () => { const h = +MYT_H.format(new Date()); return h >= 19 || h < 7; };
+/* `clock` is "HH:MM" in Malaysian time, or absent for the hour in Malaysia now. A stack of cards
+   reaches three hours out and can cross 19:00. So each card reads its own clock rather than one
+   hour for all of them. Night runs 19:00 to 06:59. Near the equator the sun moves by under half an
+   hour across the year. So a fixed pair of hours needs no almanac. */
+const night = clock => {
+  const h = clock ? +clock.slice(0, 2) : +MYT_H.format(new Date());
+  return h >= 19 || h < 7;
+};
 
-/* One glyph name for a rung. Only a clear sky has a night form. */
-const wxIcon = r => {
+/* One glyph name for a rung. Only a clear sky has a night form.
+   `pin` picks the map's ladder — see WEATHER in config.js for why the two differ at rung 2. */
+export const wxIcon = (r, { clock, pin } = {}) => {
   const w = WEATHER[r] || WEATHER[0];
-  return (night() && w.night) || w.icon;
+  if (night(clock) && w.night) return w.night;
+  return (pin && w.pin) || w.icon;
 };
 
 /* The weather section's ⋮, and it holds provenance alone. Every other ⋮ on a card carries actions

@@ -500,6 +500,28 @@ el('heat').onchange = el('rainHeat').onchange = el('risingOnly').onchange =
   applyFilter(e.target === el('risingOnly') || e.target === el('favOnly'));
 };
 
+/* The weather mode toggle. The pref is written first and the module reads it, so the box can never
+   be the source of truth. This is the rule syncHeat() and syncWx() both state.
+   A failed import puts the pref back and marks the section. It is the same shape the test toggle
+   and the two dialogs already use. lazy() rethrows on purpose, because it does not know which
+   surface a caller owns, and this one owns #wxsect. */
+el('wxLayer').onchange = async e => {
+  PREFS.wx = e.target.checked;
+  save();
+  el('wxsect').classList.remove('loadfail');
+  try {
+    const m = await lazy(() => import('./wx.js'), el('wxsect'));
+    await m.tick();
+  } catch {
+    PREFS.wx = false;
+    save();
+    e.target.checked = false;
+    el('wxsect').classList.add('loadfail');
+  }
+  syncHeat();
+  render();
+};
+
 // --- district filter ------------------------------------------------------------------------------
 // render.js draws the list; this only interprets clicks on it. `hidden` holds the districts switched
 // off, so a district the feeds add later shows up by default rather than silently missing.

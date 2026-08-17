@@ -247,16 +247,31 @@ export const NARROW_PX = 300;
 // page can hotlink it. api.php still fetches them server-side because it also validates the host.
 export const STATIC = false;
 export const FEED   = STATIC ? 'api.json' : 'api.php';
+// The weather layer rides its own endpoint, so a reader who never opens it pays nothing. The
+// static bake writes the same body to wx.json — see .github/workflows/pages.yml.
+export const FEED_WX = STATIC ? 'wx.json' : 'api.php?wx=1';
 export const camSrc = s =>
   STATIC ? s.image.replace(/^http:/i, 'https:') : `api.php?cam=${s.id.split('-')[1]}`;
 
 /* The three rungs MET publishes. `word` fills the narrow "now" column, so it has to be one word at
-   about 64px. `line` opens the worst-rung sentence, which is why the two differ. */
+   about 64px. `line` opens the worst-rung sentence, which is why the two differ.
+   `pin` is the map's own ladder and it exists because `rainy_heavy` carries no cloud. Beside
+   `rainy` at a 31px pin it reads as hatching rather than as more of one thing. So the map states
+   heavy by color instead. The card keeps the streaks: at `wxbig` size they read. The card has
+   no color ladder to carry intensity with. */
 export const WEATHER = [
-  { icon: 'sunny', night: 'clear_night', word: 'Clear', line: '' },
-  { icon: 'rainy',       word: 'Rain',  line: 'Rain' },
-  { icon: 'rainy_heavy', word: 'Heavy', line: 'Heavy rain' },
+  { icon: 'sunny', night: 'clear_night', pin: 'sunny', word: 'Clear', line: '' },
+  { icon: 'rainy',       pin: 'rainy', word: 'Rain',  line: 'Rain' },
+  { icon: 'rainy_heavy', pin: 'rainy', word: 'Heavy', line: 'Heavy rain' },
 ];
+
+/* How close two weather pins may draw before the map keeps only the first. A pin draws 31.2px
+   wide, so 40 leaves about 9px of air. Measured at latitude 3.1, this thins hard at zoom 11 and
+   below, which is the Klang valley overview. It changes almost nothing above zoom 12.
+   `Serdang` and `Seri Kembangan` stand 80 m apart and measure 16px apart even at zoom 15. So one
+   of them always wins and the other never draws. That is right. Two points 80 m apart report one
+   weather. */
+export const WX_THIN_PX = 40;
 
 /* The five windows of the rainfall accumulation chart, left to right.
    Each window contains the one to its left, so the columns normally climb across. There is one

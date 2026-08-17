@@ -450,3 +450,26 @@
   from { background: color-mix(in srgb, var(--accent) 26%, transparent); }
   to   { background: transparent; }
 }
+
+/* One card per half hour MET publishes. It is built like the weather card's own `Later` cell.
+   A glyph sits on the left, the word beside it, and the clock under the pair.
+   The cards STACK and never run sideways. A sideways strip hides the later hours behind a swipe,
+   and a hidden hour on a flood map helps nobody. A full-width card also lets the word sit beside
+   its glyph, which is what the `Later` cell already draws. */
+.wxsteps { display: grid; gap: 6px; }
+/* `.wxsub` is `width: var(--g)`, which is 28px and narrower than "14:30". The card's own two titles
+   are narrower than the glyph box. These are wider, so the width comes off here. Left, not
+   centred: the clock lines up under the glyph above it. */
+.wxsteps .wxsub { width: auto; text-align: left; }
+/* The step happening now. The chip labels it and the outline finds it. So a reader scanning nine
+   cards lands on the right one before reading any of them.
+   `.wxline` already carries `flex: 1` inside `.wxrow`, so the chip lands hard right with no rule
+   of its own. */
+.wxcol.now { outline: 2px solid var(--accent); outline-offset: -2px; }
+.wxnow { flex: none; font-size: 9px; letter-spacing: .06em; color: var(--accent);
+  border: 1px solid var(--accent); border-radius: 4px; padding: 1px 5px; }
+/* The temperature, above the cards. `.wxtemp` already stacks high over low. */
+.wxtoday { margin-bottom: 8px; }
+/* The legend key. One row per rung, glyph then word. */
+.wxkey { display: flex; gap: 12px; font-size: 11px; }
+.wxkey span { display: inline-flex; align-items: center; gap: 4px; }

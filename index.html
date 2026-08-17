@@ -68,11 +68,11 @@
 <link rel="modulepreload" href="js/ui.js">
 <link rel="stylesheet" href="vendor/leaflet.css">
 <link rel="stylesheet" href="vendor/markercluster.css">
-<link rel="stylesheet" href="vendor/fonts.css?v=49">
-<link rel="stylesheet" href="css/icons.css?v=86">
-<link rel="stylesheet" href="css/base.css?v=124">
-<link rel="stylesheet" href="css/chrome.css?v=179">
-<link rel="stylesheet" href="css/map.css?v=147">
+<link rel="stylesheet" href="vendor/fonts.css?v=50">
+<link rel="stylesheet" href="css/icons.css?v=87">
+<link rel="stylesheet" href="css/base.css?v=125">
+<link rel="stylesheet" href="css/chrome.css?v=180">
+<link rel="stylesheet" href="css/map.css?v=148">
 
 <!-- Water tint for the dark basemap. CARTO's dark_all is greyscale — all 18 of its tones have zero
      chroma — so no saturate() or hue-rotate() can pull water out of it. What it does have is one
@@ -1011,6 +1011,16 @@
       <label class="chip"><input type="checkbox" id="favOnly" autocomplete="off">
         <i class="glyph i i-favorite"></i>Favorites only <span id="favHint" class="hint"></span></label>
     </details>
+    <!-- Weather is a mode and not a third heatmap. It takes the map over and hides every station,
+         where the two heatmaps add a wash under them. Its own section for that reason. The
+         summary carries the state, so a collapsed section still says the stations are hidden.
+         No `checked` attribute, and `autocomplete="off"` — PREFS.wx is the one source of truth.
+         syncWx() in js/wx.js writes the box from it, never the reverse. -->
+    <details id="wxsect" class="sect">
+      <summary><i class="i i-sunny"></i>Weather<b id="wxN"></b></summary>
+      <label class="chip"><input type="checkbox" id="wxLayer" autocomplete="off">
+        <i class="glyph i i-sunny"></i>MET nowcast map</label>
+    </details>
     <details id="kinds" class="sect" open>
       <summary><i class="i i-layers"></i>Sensor kinds<b id="kindN"></b></summary>
       <div id="layers"></div>
@@ -1077,6 +1087,16 @@
     </div>
     <div class="ramp rain"></div>
     <div class="ticks muted"><span>light</span><span>moderate</span><span>heavy</span><span>violent</span></div>
+  </div>
+  <!-- The weather key. Three colors and two glyphs, because the map states rain and heavy rain with
+       one cloud in two colors. See WEATHER in js/config.js. -->
+  <div id="lgWx" class="lgsec">
+    <div class="title">Weather</div>
+    <div class="wxkey muted">
+      <span><i class="i i-sunny" style="color:var(--wx-clear)"></i>Clear</span>
+      <span><i class="i i-rainy" style="color:var(--wx-rain)"></i>Rain</span>
+      <span><i class="i i-rainy" style="color:var(--wx-heavy)"></i>Heavy</span>
+    </div>
   </div>
   <label class="slider muted">Opacity
     <input type="range" id="heatOpacity" min="15" max="100" step="5" value="100">
