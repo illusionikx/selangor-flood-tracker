@@ -284,6 +284,17 @@ const MET_DAY_TTL = 21600;   // 6 h — the forecast changes once a day
 const MET_WARN_URL = 'https://api.data.gov.my/weather/warning';
 const MET_WARN_TTL = 900;    // 15 min
 
+/* How long a notice source can sit without a new row before this app calls it old.
+ *
+ * `api.data.gov.my/weather/warning` sat seven days on 2026-08-17. All 7 rows carried an issue stamp
+ * of 2026-08-10, and most expired on 2026-08-13.
+ *
+ * Every counter stayed quiet. The fetch had succeeded, and the geography filter correctly refused
+ * week-old warnings about Phuket.
+ *
+ * MET issues a bulletin at least daily, so 48 hours is a wide margin over the real cadence. */
+const NOTICE_OLD = 172800;   // 48 h
+
 date_default_timezone_set('Asia/Kuala_Lumpur'); // upstream timestamps are local MYT, unlabelled
 
 const HOST = 'infobanjirjps.selangor.gov.my';
@@ -2497,6 +2508,64 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
 
     $ok('an unreadable body yields nothing', floodAlerts('<html>Notis</html>', time()) === []);
     $ok('an empty feed yields nothing',      floodAlerts('[]', time()) === []);
+
+    /* --- mergeNotices(): one array, fresher first, duplicates dropped --- */
+    $mk = fn(string $t, string $x, string $from, string $src = 'met') =>
+        ['title' => $t, 'text' => $x, 'from' => $from, 'to' => $from,
+         'fresh' => true, 'kind' => 'weather', 'src' => $src];
+
+    $m = mergeNotices([$mk('B', 'older', '2026-08-10T09:00:00')],
+                      [$mk('A', 'newer', '2026-08-17T08:00:00')]);
+    $ok('the merge sorts newest first', array_column($m, 'title') === ['A', 'B']);
+
+    /* met_gelora.json held two identical rows on 2026-08-17, so the duplicate test earns its place
+       inside one source as well as across two. */
+    $ok('an exact duplicate drops',
+        count(mergeNotices([$mk('A', 'x', '2026-08-17T08:00:00'),
+                            $mk('A', 'x', '2026-08-17T08:00:00')])) === 1);
+
+    /* JPS writes a heading in capitals and data.gov.my does not, so the key lowercases. */
+    $ok('a duplicate in another case drops',
+        count(mergeNotices([$mk('STORM WARNING', 'x', '2026-08-17T09:00:00', 'jps')],
+                           [$mk('Storm Warning', 'x', '2026-08-10T09:00:00')])) === 1);
+    $ok('and the fresher copy is the one kept',
+        mergeNotices([$mk('STORM WARNING', 'x', '2026-08-17T09:00:00', 'jps')],
+                     [$mk('Storm Warning', 'x', '2026-08-10T09:00:00')])[0]['src'] === 'jps');
+
+    // Both sources emit ISO, so a strcmp orders two rows on one day correctly. A JPS stamp left
+    // verbatim reads `17-08-2026 08:00:00`, and `T` sorts above a space at that position.
+    $ok('two rows on one day sort by time',
+        array_column(mergeNotices([$mk('early', 'a', '2026-08-17T08:00:00')],
+                                  [$mk('late',  'b', '2026-08-17T09:00:00')]), 'title')
+        === ['late', 'early']);
+    $ok('an empty merge is an empty array', mergeNotices([], [], []) === []);
+
+    /* --- noticeNewest() / noticeOld(): a page that answered with nothing recent --- */
+    $DGM = json_encode([['valid_from' => '2026-08-10T09:00:00'],
+                        ['valid_from' => '2026-08-09T09:00:00']]);
+    $ok('the newest data.gov.my stamp wins',
+        noticeNewest('met-warn', $DGM) === strtotime('2026-08-10T09:00:00'));
+    $ok('a JPS body reads its own field',
+        noticeNewest('jps-sea', json_encode([['Valid_from' => '17-08-2026 08:00:00']]))
+        === strtotime('2026-08-17 08:00:00'));
+    $ok('a body with no row has no stamp',   noticeNewest('met-warn', '[]') === 0);
+    $ok('an unreadable body has no stamp',   noticeNewest('met-warn', '<html>') === 0);
+
+    $T = strtotime('2026-08-17 10:00:00');
+    $ok('a week-old feed is old',   noticeOld('met-warn', $DGM, $T, NOTICE_OLD) === true);
+    $ok('a feed from this hour is not old',
+        noticeOld('jps-sea', json_encode([['Valid_from' => '17-08-2026 08:00:00']]), $T, NOTICE_OLD) === false);
+    /* Zero rows is NOT old. A calm day is the ordinary state of a warning feed, and an alarm on
+       quiet is the cry-wolf failure the alert design standard rejects. The jps-beat heartbeat
+       covers the empty case instead. */
+    $ok('an empty feed is not old',          noticeOld('jps-rain', '[]', $T, NOTICE_OLD) === false);
+    $ok('an unreadable feed is not old here', noticeOld('jps-rain', '<html>', $T, NOTICE_OLD) === false);
+
+    /* --- beatDead(): the one feed that always carries a row --- */
+    $ok('a heartbeat row is alive',
+        beatDead(json_encode([['Heading_EN' => 'No Advisory']])) === false);
+    $ok('an empty heartbeat is dead',      beatDead('[]') === true);
+    $ok('an unreadable heartbeat is dead', beatDead('<html>Notis</html>') === true);
 
     echo "\nshotCache():\n";
     /* The two forms of ?shot= mean different things and must not share a header. `&t=` names one

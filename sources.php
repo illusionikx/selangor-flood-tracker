@@ -954,3 +954,80 @@ function floodAlerts(string $json, int $now): array {
     }
     return $out;
 }
+
+/* --- one array, and the two ways a notice feed announces its own death ------------------------ */
+
+/* Every producer emits one row shape. So the merge is a concatenation, a sort and the duplicate
+ * test `metWarnings()` already ran inside one source.
+ *
+ * The sort puts the fresher copy of a repeated bulletin first, so the duplicate test drops the
+ * older one. That is the whole of "prefer the fresher row". It is an order, not a comparison.
+ *
+ * The key lowercases the title. JPS writes a heading in capitals and `data.gov.my` does not.
+ * `met_gelora.json` held two identical rows on 2026-08-17, so the test earns its place inside one
+ * source as well as across two.
+ *
+ * KNOWN LIMIT. The two MET sources word one bulletin differently. JPS writes "SECOND CATEGORY
+ * WARNING ON STRONG WINDS AND ROUGH SEAS" where data.gov.my writes "Warning on Strong Wind and
+ * Rough Seas (Second Category)".
+ *
+ * An exact key cannot join those, so a reader can meet one bulletin twice while both sources run.
+ * That is visible rather than silent, which is the trade taken here. A fuzzy key invents a match,
+ * and a wrong join hides a real warning. */
+function mergeNotices(array ...$sets): array {
+    $all = array_merge(...$sets);
+    /* A strcmp is enough because every producer emits ISO. See jpsMetWarnings() for why. */
+    usort($all, fn($a, $b) => strcmp((string)$b['from'], (string)$a['from']));
+
+    $out  = [];
+    $seen = [];
+    foreach ($all as $r) {
+        $k = strtolower(trim((string)$r['title'] . '|' . (string)$r['text']));
+        if (isset($seen[$k])) continue;
+        $seen[$k] = true;
+        $out[] = $r;
+    }
+    return $out;
+}
+
+/* The newest issue stamp in a RAW notice body, or 0 where the body holds no row.
+ *
+ * This reads the feed and not the filtered output. `met-warn` yielded 0 rows through the geography
+ * filter on 2026-08-17 and still held 7 rows upstream, every one issued on 2026-08-10. The
+ * staleness lives in the feed, so the test has to read the feed. */
+function noticeNewest(string $key, string $body): int {
+    $jps  = str_starts_with($key, 'jps-');
+    $rows = $jps ? jsonLoose($body) : json_decode($body, true);
+    if (!is_array($rows)) return 0;
+
+    $field = $jps ? 'Valid_from' : 'valid_from';
+    $t = 0;
+    foreach ($rows as $r) {
+        if (!is_array($r)) continue;
+        $t = max($t, strtotime((string)($r[$field] ?? '')) ?: 0);
+    }
+    return $t;
+}
+
+/* Did this source answer with nothing recent?
+ *
+ * Zero rows is NOT old. A calm day is the ordinary state of a warning feed, and an alarm on quiet
+ * is the cry-wolf failure the alert design standard rejects.
+ *
+ * The heartbeat below covers a feed that goes legitimately empty. This is a different fault from
+ * `sources.stale`, which names a page that did not answer at all. */
+function noticeOld(string $key, string $body, int $now, int $max): bool {
+    $t = noticeNewest($key, $body);
+    return $t > 0 && $t < $now - $max;
+}
+
+/* `met_cyclone.json` carries a row at all times. It read `No Advisory` on 2026-08-17.
+ * `WARN_DROP` already holds `no advisory`, so the heartbeat can never reach a surface. It needs no
+ * new rule to keep it off one.
+ *
+ * An empty or unreadable file marks the whole JPS MET mirror as old. `jps-rain` goes legitimately
+ * empty on most days, so this is the only liveness evidence it has. */
+function beatDead(string $body): bool {
+    $rows = jsonLoose($body);
+    return $rows === null || $rows === [];
+}
