@@ -4,7 +4,7 @@
 // its data. That is why the points ride ?wx=1 and not the payload every poll already carries.
 
 import { FEED_WX, WX_THIN_PX, WEATHER, MET_NAME } from './config.js';
-import { PREFS, save } from './state.js';
+import { PREFS } from './state.js';
 import { map, pinGlyph, openSide, side, focusOn } from './map.js';
 import { wxIcon, stamp } from './popup.js';
 import { askJson } from './ask.js';
@@ -14,8 +14,8 @@ const layer = L.layerGroup();
 let pts = [];    // the last answer from ?wx=1
 let gen = 0;     // a stale fetch must never paint over a newer one — the rule clip.js states
 
-/* Every clock this app prints is Malaysian, because JPS and MET both stamp that way and a mixed
-   panel is a panel nobody can read. */
+/* Every clock this app prints is Malaysian. JPS and MET both stamp that way. A mixed panel is a
+   panel nobody can read. */
 const MYT_HM = new Intl.DateTimeFormat('en-GB', {
   timeZone: 'Asia/Kuala_Lumpur', hour: '2-digit', minute: '2-digit', hour12: false,
 });
@@ -44,7 +44,7 @@ function paint() {
     const r = p.rungs[0];
     L.marker([p.lat, p.lng], {
       icon: L.divIcon({
-        // Matches `.pin`'s box in map.css, the same way render.js does — Leaflet positions the
+        // Matches `.pin`'s box in map.css, the same way render.js does. Leaflet positions the
         // marker off this and not off the CSS.
         className: '', iconSize: [39, 39], iconAnchor: [19.5, 19.5],
         html: `<span class="pin" style="--c:var(--wx-${tone(r)})">${
