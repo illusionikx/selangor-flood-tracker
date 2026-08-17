@@ -17,7 +17,7 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | file | role |
 |---|---|
 | `api.php` | server-side proxy + cache + source merge + poll history + camera image proxy + rate-limited `?force=1` + place lookup (`?place=`, proxies Nominatim) |
-| `sources.php` | scrapers for the two HTML-only upstreams (national portal, JPS WP) and the three MET feeds (nowcast, forecast, warning). Also the national portal's rainfall table, gazetteer and 7-day history endpoints |
+| `sources.php` | scrapers for the two HTML-only upstreams (national portal, JPS WP) and the three MET feeds (nowcast, forecast, warning). Also the national portal's rainfall table, gazetteer and 7-day history endpoints. Also the two JPS notice parsers: the MET mirror, the flood alert |
 | `shots.php` | camera archive: capture, retention tiers, lookup, and the on-request strip (`buildSheet()`) the wall and the clip play. Required by `api.php` |
 | `shots-test.php` | `php shots-test.php` — one of five runnable checks. Guards retention. Exercises `pruneShots()` |
 | `log.php` | where a browser error lands. `js/oops.js` is the only caller. Appends one JSON line to `.client-errors.log` |
@@ -107,9 +107,12 @@ point and by district name, and they never touch a reading.
 | `met.gov.my/nowcasting` | rain now and every 30 min to +3 h, 294 points | HTML with baked-in JS |
 | `api.data.gov.my/weather/forecast` | daily lowest and highest temperature, by district | JSON |
 | `api.data.gov.my/weather/warning` | warnings from MET, with a validity window | JSON |
+| `publicinfobanjir.water.gov.my` (JPS mirror of MET warnings — `jps-rain`, `jps-storm`, `jps-sea`, `jps-beat`) | continuous rain, thunderstorm, rough seas and a heartbeat, fresher than `api.data.gov.my` | JSON |
+| `publicinfobanjir.water.gov.my` (flood forecast — `jps-flood`) | the JPS flood alert, with a validity window and a withdrawal code | JSON |
 
 MET Malaysia adds three more feeds, all weather rather than water. They join no water reading and
-override no station.
+override no station. The two JPS notice feeds sit on the same host as the national portal. Neither is
+a reading, and neither joins a station either.
 
 The nowcast and the forecast each attach to a station. The nowcast attaches by nearest point. The
 forecast attaches by district name.
@@ -1799,6 +1802,16 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   is open on purpose: adding `semenanjung` and `peninsular` also lets in warnings about every other
   state. Name the gap so the next reader sees a decision, not a bug. The filter reads English and
   Malay text alike, because MET writes some rows in one language only.
+  **A live payload surfaced the same fault at the southern site.** On 2026-08-17 the ticker carried
+  "Northern part of Phuket, Northern Straits Of Melaka, Southern Straits Of Melaka, Northern Reef
+  South, Southeastern Reef North and Labuan", and none of that names anywhere this map covers.
+  `WARN_SEA_FAR` cuts only `northern straits of melaka`. MET also writes `Southern Straits Of Melaka`,
+  which still matches `WARN_SEA_KEEP`'s `straits of melaka` once the northern phrase is gone. The fix
+  is the same shape: add `southern straits of melaka`, `southern straits of malacca` and `selatan
+  selat melaka` to `WARN_SEA_FAR`. This entry leaves that fix undone on purpose. `api.data.gov.my` was
+  dead for the seven days this work measured, so no row reached the filter and the fault never showed.
+  Adding a stretch to the drop list is a claim about Malaysian maritime zones, a judgement outside what
+  this work set out to change. Read this as an open decision, not a bug nobody noticed.
 - **The two warning surfaces disagree about time on purpose, and `fresh` is the seam.** The panel
   lists a warning for its whole validity. The ticker carries it only while `fresh` — the first
   `WARN_FRESH` (6 h) of that validity, measured from the warning's own start and **not** from when
@@ -1857,6 +1870,55 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   the line `openTimeline()` already prints when the archive is out of reach, cleared before every
   attempt because `reset()` clears it only on the path that did not run. Anything new behind
   `lazy()` needs both halves, and a surface a reader can see beats a `console.warn`.
+- **The JPS MET mirror answers JSON that is not valid JSON.** `met_gelora.json` and its siblings hold
+  raw newline characters inside string values, so `json_decode()` returns null on a page that holds
+  real rows. A null decode looks exactly like an empty feed to a caller that only tests `is_array()`,
+  so a good page reads as an outage. `jsonLoose()` in `sources.php` walks the text, tracks whether the
+  cursor sits inside a string, and escapes any control character it finds there. `pageHasData()` must
+  test a `jps-` key with `jsonLoose()`, never with `json_decode()` alone, or a good page reads as an
+  outage. **A second fault hid inside the first fix.** Inside a string, a backslash sets an escape
+  flag. The old rule then copied the next character through raw. A raw control byte straight after a
+  backslash skipped the sanitizer that way, and the function returned null on readable data. The
+  escaped character now runs through the same control-character test the rest of the string uses.
+  Measured 2026-08-17 against all five JPS MET files: four decode the same either way, and
+  `met_gelora.json` goes from a parse failure to 2 rows.
+- **A stale feed and a calm feed look the same, and `parsed: 0` cannot tell them apart.**
+  `api.data.gov.my/weather/warning` sat seven days dead on 2026-08-17. Every counter stayed quiet,
+  because the fetch had succeeded and the geography filter correctly refused week-old warnings about
+  Phuket. `sources.stale` names a page that did not answer at all. `sources.old` is the new signal: it
+  names a page that answered with nothing recent, scored off the stamp on the newest row. An age test
+  cannot live in `pageHasData()`. That function decides what kind of document arrived, and a failure
+  there discards the stored copy and delays the retry, the wrong outcome for a week-old bulletin,
+  which is a real bulletin and not a broken fetch.
+- **Zero rows is not old.** An alarm on a quiet warning feed is the cry-wolf failure the alert design
+  standard rejects, so `noticeOld()` never reads an empty JSON array as a sign the feed has decayed.
+  `jps-beat` (`met_cyclone.json`) covers the case a genuinely empty feed cannot cover for itself: it
+  carries a row at all times, so an empty or unreadable heartbeat marks the whole JPS MET mirror old
+  on its own. `jps-rain` is legitimately empty on most days, so the heartbeat is the only liveness
+  evidence it has.
+- **A warning stamp needs the ISO shape, or the merge and the modal both misread it.** `warnWhen()` in
+  `js/ui.js` matches `^\d{4}-\d\d-\d\dT\d\d:\d\d` and prints the raw string when a stamp does not
+  match it. JPS stamps `17-08-2026 08:00:00`. Left verbatim, that puts two date formats inside one
+  modal. The merge sort is a `strcmp` over the same field, so a JPS stamp left in the shape JPS uses
+  also misorders the merge. `jpsMetWarnings()` converts the stamp with `date('Y-m-d\TH:i:s', $from)`,
+  the same shape `metWarnings()` already emits.
+- **A national bulletin names several regions, and only one of them is ours.** A row-level place
+  test keeps the whole bulletin once it names one place this map covers. `met_gelora.json` carried a
+  1,795-character bulletin across 16 lines on 2026-08-17, naming Sarawak, Sabah, Selangor, Perlis,
+  Kedah and Perak together, and the panel printed a wall of text mostly about Borneo. `hereParts()`
+  splits the text on sentence and line boundaries, keeps only the parts naming somewhere this map
+  covers, and rejoins them. On that row it returns a single 203-character sentence. The gate itself
+  stays on the combined English and Malay text, so every row that used to survive still survives.
+  Only the display narrows.
+- **`floodAlerts()` has never seen a row.** `getdisse.php` answered `[]` on every fetch made during
+  design. The field names come from the consumer JavaScript JPS publishes on its own page, which is
+  evidence and not a guess, but nobody has tested the parser against real data yet. The first
+  non-empty response is the moment to check it by hand. **It also skips a check its sibling parser
+  keeps, on purpose.** `jpsMetWarnings()` drops a row where `$now < $from`, because a MET bulletin
+  describes weather already underway. `floodAlerts()` does not: an `NT_7D` Early alert forecasts a
+  flood up to seven days ahead, and dropping it before its own window opens hides a seven-day warning
+  until the day it starts. Do not add the missing-looking check back without checking which parser it
+  belongs on.
 ## Conventions
 
 - **Anything that alerts is checked against the alert design standard** in
@@ -1864,16 +1926,17 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   certainty axes, ISA-18.2's "an alarm requires a response" and its 10-in-10-minutes flood
   threshold, and the cry-wolf finding that false alarms cost more trust than they buy attention.
   Four gaps are open there. Raise them when alert work comes up rather than adding a fifth surface.
-- **Three official notice feeds wait for a design, and this line is the reminder.** JPS
-  publishes a flood alert, a weather alert and a media statement at
-  `publicinfobanjir.water.gov.my/ramalan/{amaran-banjir,met-alert,pernyataan-media}/`. A reader asked
-  for all three on 2026-08-14. Each one needs the alert design standard on its own. The media
-  statement is a document list rather than an alarm, so it probably fails that standard. **All three
-  pages held no rows on that date**, which is the reason for the wait. A parser that never meets one
-  real row cannot tell a quiet feed from a moved layout. That is the one way a scraper here must not
-  fail. Design them when a row appears, or sooner with a deliberate zero-row alarm.
-  Do not fold any of them into an existing alert count without the standard first. Background is in
-  `docs/superpowers/specs/2026-08-14-portal-rainfall-river-source-design.md`, under Not in this spec.
+- **Two of the three JPS notice feeds now reach the map, and the third became a link.** The flood
+  forecast and the weather-alert mirror at
+  `publicinfobanjir.water.gov.my/ramalan/{amaran-banjir,met-alert}/` are rows in the warning surface,
+  through `floodAlerts()` and `jpsMetWarnings()` in `sources.php`. The media statement at
+  `.../ramalan/pernyataan-media/` became one outbound link in the About dialog, because a document
+  list is not an alarm. See "The JPS notice feeds join the warning surface" in `docs/FEATURES.md` for
+  what shipped and why, and the alert design standard section there for how both cleared it.
+  **`floodAlerts()` has never seen a row.** `getdisse.php` answered `[]` on every fetch made during
+  design, so the parser ships checked against evidence, not against a real response. A parser that has
+  never met one real row cannot tell a quiet feed from a moved layout. The first non-empty response
+  from that endpoint is the moment to check it by hand.
 - **Material Design 3 is the reference for every UI decision.** Where M3 names a component, take its
   behaviour from the spec instead of inventing one — a reader already knows the platform convention,
   and a hand-made control costs them that knowledge. The modal drawer is the worked example: both
@@ -2409,9 +2472,39 @@ $on=0;foreach($dry as $d){[$cov,$keep]=$cell($d["lat"],$d["lng"]); if($cov*$keep
 printf("%d wet -> %d blobs, %d dry. reach %.0f km2, violet %.0f km2 (%d%% kept), %d of %d dry under\n",
 count($wet),count($k),count($dry),$full,$lit,round(100*$lit/max(1,$full)),$on,count($dry));'
 
-# Which warnings survive the geography filter, and how many the feed offered.
+# Which notices survive the filter, and where each one came from. `kind` names a flood alert or a
+# weather warning. `src` names which of the two MET sources answered, or `jps` for the flood alert.
 curl -sk https://flood-exp.test/api.php | php -r '$p=json_decode(stream_get_contents(STDIN),true);
-foreach($p["warnings"] as $w) echo substr($w["title"],0,70),"\n";'
+foreach($p["warnings"] as $w) printf("%-8s %-5s %s\n  %s\n", $w["kind"], $w["src"]??"?",
+  substr($w["title"],0,60), substr(preg_replace("/\s+/"," ",$w["text"]),0,150));'
+
+# Every JPS MET file must decode. A raw newline inside a string breaks json_decode() and must not
+# break jsonLoose(). met_gelora is the file that failed a plain decode on 2026-08-17.
+php -r 'require "sources.php";
+foreach (["met_rain22","met_thunderain2","met_cyclone","met_gelora"] as $f) {
+  $u = "https://publicinfobanjir.water.gov.my/wp-content/themes/enlighten/data/$f.json";
+  $c = curl_init($u); curl_setopt_array($c,[CURLOPT_RETURNTRANSFER=>1,CURLOPT_SSL_VERIFYPEER=>0,CURLOPT_TIMEOUT=>20]);
+  $b = curl_exec($c); curl_close($c);
+  $j = jsonLoose($b);
+  printf("%-18s %s\n", $f, $j === null ? "NULL decode" : count($j)." rows"); }'
+
+# The two liveness signals must stay apart. `stale` names a page that did not answer at all. `old`
+# names a page that answered with nothing recent. On 2026-08-17, `old` held `met-warn` and `stale`
+# was empty.
+curl -sk https://flood-exp.test/api.php | php -r '$s=json_decode(stream_get_contents(STDIN),true)["sources"];
+echo "stale: ",json_encode($s["stale"]),"\n  old: ",json_encode($s["old"]??null),"\n";'
+
+# No notice text may name only places this map does not cover. A row naming Sarawak alone means the
+# paragraph filter kept the wrong part of a national bulletin.
+curl -sk https://flood-exp.test/api.php | php -r '$p=json_decode(stream_get_contents(STDIN),true);
+$here=["selangor","kuala lumpur","putrajaya","klang","melaka","malacca","west coast","pantai barat"];
+$bad=0; foreach($p["warnings"] as $w){ $t=strtolower($w["text"]); $ok=false;
+ foreach($here as $k) if(str_contains($t,$k)){$ok=true;break;}
+ if(!$ok){$bad++; echo "  NAMES NOWHERE HERE: ",substr($w["title"],0,60),"\n";} }
+echo $bad?"FAIL: $bad rows\n":"OK: every row names somewhere this map covers\n";'
+
+# The media statement link must reach the JPS page.
+curl -sk -o /dev/null -w '%{http_code}\n' "https://publicinfobanjir.water.gov.my/ramalan/pernyataan-media/?lang=en"
 
 # Every pin sample in the Help legend must state its own `--c`. A `.pin` reads
 # `color: var(--c, var(--accent))`, so a sample with no `--c` draws in the accent blue instead of the

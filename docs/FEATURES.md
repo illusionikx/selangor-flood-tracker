@@ -2305,6 +2305,23 @@ rescued.
 **Also not done: a per-siren river mapping.** JPS does not publish which gauge drives which siren,
 and a hand-kept list is a list to maintain forever, wrong the day a station moves.
 
+### The flood alert and the JPS MET mirror
+
+This work checked `floodAlerts()` and `jpsMetWarnings()` against this standard, the same way it
+already checked `metWarnings()` when the first warning surface shipped. Both clear it on the same
+ground the MET warning already cleared. Neither carries a coordinate, so both read a place from text
+alone. Both name a validity window that already retires the alert, in place of an unmarked flag. Both
+count toward nothing: not the alert number, the icon badge, the app-bar glyph, the toast, or the
+window title. A notice is a claim JPS makes about an area. A count on this page is a claim this app
+makes about a sensor, and the two must never share one total.
+
+**One gap this work leaves open.** `NT_DF` is an official siren notification from JPS, evidence that a
+siren sounded. `sirenBacked()` does not read it. It still asks only whether a river nearby stands at
+its Amaran mark, the rule "A siren's alarm is checked against the water" above already states. Reading
+`NT_DF` gives a second, stronger source for the same question. This work does not build it, because it
+changes `sirenBacked()`, which drives `sounding()`, `isCritical()` and two reds on the map. See "Not
+built" in "The JPS notice feeds join the warning surface" below.
+
 ## Gauge state block, and the siren band
 
 Two gaps in the popup, both about a station carrying a status nobody printed.
@@ -9922,3 +9939,148 @@ holds the last `#c` value for one poll, instead of writing the raw cumulative fi
 This fault is latent today: zero backwards steps measured. But one backwards step nulls every
 accumulation window on that station for up to 72 hours, since `accWindow()` treats a falling
 odometer as a reset.
+
+## The JPS notice feeds join the warning surface
+
+Three more pages at `publicinfobanjir.water.gov.my/ramalan/` now reach the map: the JPS flood
+forecast, the JPS mirror of the MET bulletins, and a link to the JPS media statement page. A reader
+asked for all three on 2026-08-14. The repository deferred them that day, because every page held no
+rows. Measured again on 2026-08-17, two of the three held real data.
+
+### The MET warning source sat seven days dead, and every counter stayed quiet
+
+`api.data.gov.my/weather/warning` held 7 rows on 2026-08-17. Every row carried an issue stamp of
+2026-08-10. Most had expired by 2026-08-13. `sources.metwarn.parsed` read 0, and that number was
+correct: the geography filter was right to refuse warnings about Phuket that were a week old.
+
+Nothing in the payload said the source itself had gone quiet. The map looked calm because the feed
+was calm, not because the weather was.
+
+The JPS mirror of the same MET bulletins answered on the same day, with rows issued at 08:21 and
+08:31. Two of them named the waters of Selangor, each valid from 08:00 to 12:00. That gave 3 rows
+through `sources.jpsmet.parsed`. After the geography filter and the merge, `warnings` held 1 row: the
+live Selangor warning `metWarnings()` had never seen, because its own source had stopped moving three
+days before.
+
+### One array, two sources, and a duplicate no exact key can catch
+
+`api.php` now merges three producers into one `warnings` array: `metWarnings()` for
+`api.data.gov.my`, `jpsMetWarnings()` for the JPS mirror, and `floodAlerts()` for the JPS flood
+forecast. Every row from every producer carries the same seven fields: `title`, `text`, `from`, `to`,
+`fresh`, `kind` and `src`.
+
+The merge does not pick one source over the other. It keeps both running, sorts every row newest
+first, and drops a row whose lowercased `title` and `text` match a row it already kept. Either source
+can go quiet on its own, the way `api.data.gov.my` just did. The merge survives that, because it
+never depends on one source alone.
+
+**`jpsmet.parsed` reading 3 beside `warnings` holding 1 row is not a contradiction.** Each `parsed`
+counter states what its own source yielded, before the merge removes anything. `jpsmet.parsed` names
+three JPS rows. `warnings` names what is left once the geography filter and the cross-source
+duplicate test both run. A reader who checks only one of the two numbers will misread the other.
+
+`mergeNotices()`'s duplicate key cannot join the same bulletin worded two ways. JPS writes "SECOND
+CATEGORY WARNING ON STRONG WINDS AND ROUGH SEAS" in capitals. `data.gov.my` writes "Warning on Strong
+Wind and Rough Seas (Second Category)" in sentence case for the same event. An exact key cannot
+match those two strings, so a reader can meet one bulletin twice while both sources carry it. That is
+the accepted trade. A fuzzy key invents its own match, and a wrong join hides a real warning behind an
+assumed duplicate. That failure is worse than showing one warning twice.
+
+The exact key still earns its place inside one source alone. `met_gelora.json` answered with three
+byte-identical rows on 2026-08-17. `mergeNotices()` collapsed them to one.
+
+### Paragraph-level geography
+
+`met_gelora.json` can carry a bulletin for the whole country in one row. Measured on 2026-08-17: one
+row held 1,795 characters across 16 lines, naming Sarawak, Sabah, Selangor, Perlis, Kedah and Perak
+together. The row-level place test in `metWarnings()` already kept a row like this on the single word
+`selangor`. The panel then printed a wall of text that was mostly about Borneo.
+
+`hereParts()` in `sources.php` splits the text on sentence and line boundaries. It keeps only the
+parts naming somewhere this map covers, then rejoins them. On the measured row that reduced 1,795
+characters to one 203-character sentence. The gate itself did not change: `hereNames()` still tests
+the combined English and Malay text, so every row that used to survive still survives. Only what the
+panel prints narrows.
+
+### `sources.old` beside `sources.stale`
+
+`sources.stale` already named a page that did not answer at all. It cannot name the fault this work
+found, because `api.data.gov.my/weather/warning` answered every time. `sources.old` is the new
+signal. It names a page whose newest row is older than a maximum age set for that source.
+
+That test cannot live inside `pageHasData()`. That function decides what kind of document arrived. A
+failure there discards the stored copy and pushes the next retry back by a full `SCRAPE_TTL`. A
+week-old MET bulletin is a real bulletin, not a broken fetch, so `noticeOld()` runs as a separate
+check, after `pageHasData()` already accepts the page.
+
+Five page keys carry the two JPS notice feeds:
+
+| key | role | TTL |
+|---|---|---|
+| `jps-flood` | the flood forecast, `getdisse.php` | 300 s |
+| `jps-rain` | continuous rain | 900 s |
+| `jps-storm` | thunderstorm | 900 s |
+| `jps-sea` | strong wind and rough seas | 900 s |
+| `jps-beat` | heartbeat only, `met_cyclone.json` | 900 s |
+
+`jps-flood` takes the shorter TTL, because it is the only true flood alarm among the three feeds this
+work adds. `jps-beat` never reaches a screen: `met_cyclone.json` carries a row at all times, and it
+read `No Advisory` on 2026-08-17. `WARN_DROP` already discards that phrase. The file exists so
+`beatDead()` has something to test. An empty or unreadable heartbeat marks the whole JPS MET mirror
+old, which is the only liveness evidence `jps-rain` has on the days it legitimately holds nothing.
+
+Measured on 2026-08-17: `sources.old` read `["met-warn"]` and `sources.stale` read `[]`. A cold
+rebuild of the payload, with every page cache expired, took 13.7 seconds. A warm poll took 0.08
+seconds.
+
+### Three withdrawal codes, and why the validity window already retires an alert
+
+`getdisse.php` publishes eight notification codes. `floodAlerts()` keeps five: `NT_7D` (Early),
+`NT_2D` (Final), `NT_UP` (Update), `NT_DF` (Siren) and `NT_MET` (Meteorological). It drops `NT_TM`
+(Termination), `NT_RC` (Recall) and `NT_NF` (No Flood).
+
+The three dropped codes are withdrawals. Every surface here already renders a notice only inside its
+own validity window. An alert that has ended leaves the panel on its own, once `$now > $to` fails the
+window test. A withdrawal row only restates that fact. It also arrives alone whenever the alert it
+withdraws has already expired by the next poll.
+
+### The media statement becomes a link, not a parser
+
+`publicinfobanjir.water.gov.my/ramalan/pernyataan-media/` is a list of PDF documents, not an alarm.
+It fails the alert design standard on that alone: it carries no severity, no urgency, and nothing to
+withdraw.
+
+The alert design standard cites the milling literature: a reader confirms a warning across channels
+before acting on it. An outbound link is what that reader needs. It is the whole of what a document
+list can honestly give. The About dialog now carries one link to the page, beside the `HOTLINES`
+directory. There is no parser and no payload field for it.
+
+### Not built
+
+- **Siren backing from `NT_DF`.** JPS publishes an official siren notification, stronger evidence than
+  the current rule in `sirenBacked()`, which looks for a river at its Amaran mark within 5 km. This
+  work leaves it out, because it changes `sirenBacked()`, which drives `sounding()`, `isCritical()`
+  and two reds on the map. That change goes through the alert design standard on its own.
+- **POI geometry.** `getdisse.php` carries map geometry for each alert. Nothing plots it, so nothing
+  here parses it.
+- **A flood-alert count.** The same rule that keeps a MET warning out of every count keeps this out. A
+  notice is a claim JPS makes about an area. A count is a claim this app makes about a sensor.
+- **A reader-facing staleness notice.** `sources.old` reaches `watch.php` and no screen. The merge
+  already protects a reader: a reader keeps seeing rows from whichever source is still alive.
+
+### Open risk
+
+`floodAlerts()` has never seen a row. `getdisse.php` answered `[]` on every fetch made during design.
+The field names come from the consumer JavaScript JPS publishes on its own page. That is evidence,
+not a guess, but nobody has tested the parser against real data yet. The first non-empty response is
+the moment to check it by hand.
+
+This work also surfaced a false positive it did not cause and does not fix. The ticker carried a
+sentence naming "Northern part of Phuket, Northern Straits Of Melaka, Southern Straits Of Melaka,
+Northern Reef South, Southeastern Reef North and Labuan". None of that sits inside the area this map
+covers. `WARN_SEA_FAR` at `sources.php:709` cuts only `northern straits of melaka` before the keep
+test runs. MET also writes `Southern Straits Of Melaka`, which still matches `WARN_SEA_KEEP`'s
+`straits of melaka`. `CLAUDE.md` already documents this exact fault for the northern phrase. This is
+the same fault at the southern site. It never showed before, because `data.gov.my` was dead and no
+row ever reached the filter. See the gotcha list in `CLAUDE.md` for the fix this leaves open, and why
+it stays out of this change.
