@@ -259,6 +259,15 @@ const HIST_KEY   = 'histdone:';                   // one page row per station al
    `siteM` and `ttl` below. No client script reads it today. */
 const BOX = [100.72, 3.95, 102.02, 2.50];
 
+/* The weather layer. `wx:box` reuses the reserved-prefix pattern `place:` and `gazdone:` already
+   follow, so the layer needs no store of its own.
+   WX_PAST anchors on MET's own issue time and never on `now`. A window measured from `now` would
+   drop a sample as the clock moved. That changes the body between two issues and breaks the ETag
+   on ?wx=1. `cacheAge` caused the same fault on the payload. */
+const WX_KEY    = 'wx:box';
+const WX_PAST   = 3600;
+const WX_PLACES = __DIR__ . '/wx-places.json';
+
 /* MET Malaysia. Two products, two hosts, both reached from PHP only — the browser still talks to
    this origin and to CARTO and to nothing else.
    MET_KM is the radius a nowcast point speaks across. It comes from the decorrelation distance
@@ -1394,6 +1403,51 @@ function gazWanted(array $names, array $done, int $cap): array {
         if (count($want) >= $cap) break;
     }
     return array_keys($want);
+}
+
+/** The baked district table. An absent or broken file costs the temperature and nothing else. */
+function wxPlaces(): array {
+    $j = is_file(WX_PLACES) ? json_decode((string)file_get_contents(WX_PLACES), true) : null;
+    return is_array($j) ? $j : [];
+}
+
+/**
+ * The archived rungs for each point, in the hour before `$anchor`.
+ *
+ * One query for every point, because 50 separate reads on one table is 50 round trips for nothing.
+ * The caller filters each point against its own stamp afterwards.
+ */
+function wxPast(PDO $db, array $ids, int $anchor): array {
+    if (!$ids) return [];
+    $in = implode(',', array_fill(0, count($ids), '?'));
+    $q  = $db->prepare("SELECT station, ts, level FROM level
+                        WHERE station IN ($in) AND ts >= ? AND ts < ? ORDER BY ts");
+    $q->execute([...array_map(fn($i) => 'wx-' . $i, $ids), $anchor - WX_PAST, $anchor]);
+    $out = [];
+    foreach ($q as $r) $out[substr((string)$r['station'], 3)][] = [(int)$r['ts'], (int)$r['level']];
+    return $out;
+}
+
+/**
+ * One row per weather point, ready to publish.
+ *
+ * The temperature joins on the baked district and on nothing else. A point with no baked row, or a
+ * district MET does not publish, carries no temperature. The panel then draws no temperature block.
+ */
+function wxRows(array $pts, array $box, array $places, array $metDay, array $past): array {
+    $out = [];
+    foreach (wxInBox($pts, $box) as $p) {
+        $id  = wxSlug($p['name']);
+        $mine = array_values(array_filter($past[$id] ?? [], fn($s) => $s[0] < $p['stamp']));
+        $row = ['id'    => $id,          'n'      => $p['name'],
+                'lat'   => $p['lat'],    'lng'    => $p['lng'],
+                'stamp' => $p['stamp'],  'rungs'  => $p['rungs'],
+                'clocks'=> $p['clocks'], 'past'   => $mine];
+        $d = strtolower((string)($places[$id]['district'] ?? ''));
+        if ($d !== '' && isset($metDay[$d])) $row += $metDay[$d];
+        $out[] = $row;
+    }
+    return $out;
 }
 
 /* `php api.php --selftest` — the guards above, checked offline. Here rather than in a second test
@@ -2668,6 +2722,42 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
     $ok('the newest frame lasts 900s',     str_contains(shotCache(false), 'max-age=900'));
     $ok('900 is half of SHOT_EVERY',       900 === (int)(SHOT_EVERY / 2));
 
+    echo "\nwxSlug():\n";
+    $ok('a plain name slugs',             wxSlug('Petaling Jaya') === 'petaling-jaya');
+    $ok('case and runs collapse',         wxSlug('  KUALA   Kubu  Bharu ') === 'kuala-kubu-bharu');
+    $ok('punctuation becomes one dash',   wxSlug('MET MALAYSIA (HQ)') === 'met-malaysia-hq');
+    $ok('no leading or trailing dash',    wxSlug('- Sepang -') === 'sepang');
+
+    echo "\nwxInBox():\n";
+    $mkp = fn($n, $la, $ln) => ['name' => $n, 'lat' => $la, 'lng' => $ln, 'stamp' => $now,
+                                'rungs' => [0, 0, 0, 0, 0, 0, 0],
+                                'clocks' => [null, '01', '02', '03', '04', '05', '06']];
+    $pts = [$mkp('Petaling Jaya', 3.100, 101.645), $mkp('Kota Bharu', 6.133, 102.238),
+            $mkp('Teluk Intan', 4.021, 101.020),   $mkp('Muar', 2.046, 102.568)];
+    $names = array_column(wxInBox($pts, BOX), 'name');
+    $ok('a point inside is kept',         $names === ['Petaling Jaya']);
+    $ok('a point north of the box goes',  !in_array('Teluk Intan', $names, true));
+    $ok('a point east of the box goes',   !in_array('Kota Bharu', $names, true));
+    $ok('a point south of the box goes',  !in_array('Muar', $names, true));
+
+    echo "\nwxRows():\n";
+    $one  = $mkp('Petaling Jaya', 3.100, 101.645);
+    $day  = ['petaling' => ['tmin' => 24, 'tmax' => 32]];
+    $rows = wxRows([$one], BOX, ['petaling-jaya' => ['district' => 'petaling']], $day, []);
+    $ok('one point in the box makes one row', count($rows) === 1);
+    $ok('the slug rides on the row',          $rows[0]['id'] === 'petaling-jaya');
+    $ok('a baked district joins a temperature', ($rows[0]['tmax'] ?? null) === 32);
+    $bare = wxRows([$one], BOX, [], $day, []);
+    $ok('no baked row means no temperature',  !isset($bare[0]['tmax']));
+    $miss = wxRows([$one], BOX, ['petaling-jaya' => ['district' => 'nowhere']], $day, []);
+    $ok('a district MET lacks means no temperature', !isset($miss[0]['tmax']));
+    /* wxRows() anchors the archive on the issue. A sample stamped at or after it belongs to the
+       forecast half. It never belongs to the past half. */
+    $arch = ['petaling-jaya' => [[$now - 1800, 1], [$now - 60, 2], [$now, 0], [$now + 60, 1]]];
+    $back = wxRows([$one], BOX, [], [], $arch);
+    $ok('the past holds only samples before the issue', count($back[0]['past']) === 2);
+    $ok('the past keeps its order',       $back[0]['past'][0][0] === $now - 1800);
+
     echo $fail ? "\n$fail FAILED\n" : "\nall ok\n";
     exit($fail ? 1 : 0);
 }
@@ -3083,6 +3173,25 @@ $metPts = metPoints($page('met-now'));
 $metParsed = count($metPts);
 $metPts = array_values(array_filter($metPts, fn($p) => $p['stamp'] >= $now - MET_STALE));
 $metDay = metDaily($page('met-day'));
+
+/* The weather layer, built in the pass that already parsed the nowcast. Two writes, both cheap.
+   The archive first, because MET publishes no past and this app has to record one. `ts` is MET's
+   own issue stamp and never the poll time. That is the rule readTs() states for every other
+   writer to this table. The (station, ts) primary key dedupes a re-read of one issue to one row.
+   The row second. ?wx=1 then echoes it and parses nothing. */
+$wxPts = wxInBox($metPts, BOX);
+if ($wxPts) {
+    $put = $db->prepare('INSERT OR IGNORE INTO level (station, ts, level) VALUES (?, ?, ?)');
+    $db->beginTransaction();
+    foreach ($wxPts as $p) $put->execute(['wx-' . wxSlug($p['name']), $p['stamp'], $p['rungs'][0]]);
+    $db->commit();
+
+    $ids    = array_map(fn($p) => wxSlug($p['name']), $wxPts);
+    $anchor = max(array_column($wxPts, 'stamp'));
+    $rows   = wxRows($metPts, BOX, wxPlaces(), $metDay, wxPast($db, $ids, $anchor));
+    $keep->execute([WX_KEY, $now, json_encode(['points' => $rows])]);
+}
+
 /* Three producers, one array. See mergeNotices() for the sort and the duplicate rule.
    `warnings` counts toward nothing, and that separation is what let this surface pass the alert
    design standard — see the rule beside the payload key below. */
