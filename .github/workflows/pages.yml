@@ -52,6 +52,16 @@ jobs:
       - name: Poll the three sources
         run: php api.php > api.json
 
+      # The weather layer. `php api.php` above already wrote the `wx:box` row, so this only lifts
+      # it out. `|| true` because nothing optional may fail the bake: a failed weather file must
+      # leave the map updating, and js/wx.js marks its own section when the file is absent.
+      - name: Bake the weather layer
+        run: |
+          php -r '$d = new PDO("sqlite:.history.db");
+                  $b = $d->query("SELECT body FROM page WHERE url = \"wx:box\"")->fetchColumn();
+                  file_put_contents("wx.json",
+                    is_string($b) && $b !== "" ? $b : "{\"points\":[]}");' || true
+
       # api.php answers with an error object rather than a non-zero exit when upstream dies. Fail
       # here instead of publishing it: a failed bake leaves the last good deployment on the site.
       - name: Check the payload
@@ -75,6 +85,9 @@ jobs:
           # missing (js/ui.js). Copied conditionally so an absent directory can never fail a bake and
           # leave the map frozen on the last deployment over a decoration.
           [ -d img ] && cp -r img site/ || true
+          # The weather layer. Conditional for the reason img/ is: a missing file must never stop
+          # the map updating, and js/wx.js marks its own section when the file is absent.
+          [ -f wx.json ] && cp wx.json site/ || true
           # The one line that separates the two builds — see js/config.js.
           sed -i 's/^export const STATIC = false;/export const STATIC = true;/' site/js/config.js
           grep -q 'STATIC = true' site/js/config.js

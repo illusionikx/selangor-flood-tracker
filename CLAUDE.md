@@ -54,12 +54,15 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `js/net.js` | `load()` poll loop and the status dot on the logo |
 | `js/ui.js` | all DOM wiring: drawer, filters, chips, panels, lightbox, delegated jumps |
 | `js/wall.js` | the camera wall: every camera on one page, one timer for all of them |
+| `js/wx.js` | the MET weather layer: the map mode, the pins, and the half-hour panel. Deferred |
 | `manifest.json` | PWA manifest. `.json`, not `.webmanifest` — see the gotcha below |
 | `sw.js` | service worker: network-first shell cache, and the reason Chrome offers "Install app" |
 | `icon.svg` | the app mark: bare glyph, no fill. Source for the PNGs *and* the `--i-flood` mask |
 | `icon-build.php` | `php icon-build.php` — rebakes the two icons and prints the mask rule to paste |
 | `water-build.php` | `php water-build.php` — rebakes `water.json` from OpenStreetMap. Run by hand, never in a request |
 | `water.json` | the water the dark basemap will not draw: 2,775 rivers + 3,860 ponds, baked and committed |
+| `wx-build.php` | `php wx-build.php` — bakes `wx-places.json` from Nominatim. Run by hand, never in a request |
+| `wx-places.json` | the district behind each weather point, baked and committed |
 | `icon-192.png`, `icon-512.png` | manifest icons (`any`) and the favicon — the glyph on transparency |
 | `icon-180.png` | `apple-touch-icon`. Opaque, because iOS flattens alpha onto a colour of its own |
 | `img/` | optional. Only `egg.webp` (the About easter egg). Absent is a supported state — see below |
@@ -1924,6 +1927,49 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   flood up to seven days ahead, and dropping it before its own window opens hides a seven-day warning
   until the day it starts. Do not add the missing-looking check back without checking which parser it
   belongs on.
+- **MET publishes no past, and the weather panel needs one.** A nowcast marker holds the current
+  word and six forward steps at 30 minutes each. It never answers what happened an hour ago. So a
+  refresh writes one `level` row per point, keyed `wx-<slug>`. **This app stamps it with the issue
+  time MET gives, never the poll time.** That is the rule `readTs()` states for every writer to that
+  table.
+  The `(station, ts)` primary key dedupes a re-read of one issue to one row. `RETAIN` prunes it
+  with everything else. There is no schema change.
+  **`WX_PAST` anchors on the issue stamp, not on `now`.** A window measured from `now` drops a
+  sample as the clock moves. That changes the `?wx=1` body between two MET issues. A changing body
+  kills the 304 — the same fault `cacheAge` caused on the payload. Never put a field in that body
+  that moves without the data moving.
+- **A station must never supply the district for a weather point.** `metDaily()` keys its rows by
+  district and a nowcast point carries none, so the join needs one from somewhere. The nearest
+  station is the tempting answer and it is wrong twice. It reads as that station reporting a
+  temperature, and no station in this payload holds a weather reading. It is also measurably wrong
+  at the edge. The nearest station to `Bentong` sits 20.9 km away, in Hulu Selangor. So a Pahang
+  town prints a Selangor temperature instead. `wx-build.php` bakes the district from Nominatim,
+  through `district` then `city` then `state`. Kuala Lumpur is a federal territory with no daerah,
+  so `city` answers there. Putrajaya answers on `state`.
+- **`rainy_heavy` carries no cloud, so the map states heavy rain by color.** Rendered at 31px
+  beside `rainy` it reads as hatching rather than as more of one thing. The map reads its ladder
+  from `WEATHER[].pin`. The card reads its own ladder from `WEATHER[].icon`. The card keeps the
+  streaks, because they read at `wxbig` size. The card also has no color ladder to carry intensity.
+  **The weather pins are the one documented exception to the color rule.** The exception holds on
+  one condition. Weather mode draws no station pin. So nothing status-colored shares the map, and
+  an amber glyph cannot read as a station in trouble. The status set reads as saturated, and this
+  set reads as muted. So the two also separate by vividness. This app measured and rejected gold
+  `#f2b705`. It sits within one shade of `--s-alert` on the light theme. It also matches `#ffc000`
+  on the dark theme.
+  **Heavy differs from rain by saturation and never by lightness.** `.pin` uses one palette on both
+  themes, because a pin has to win over the basemap. So a darker heavy pin disappears into the dark
+  tile.
+- **Weather mode never writes `PREFS.heatLayer`.** `syncHeat()` reads `PREFS.wx` as one more input
+  and drops both canvases while the mode is on. So leaving the mode restores whatever heatmap the
+  reader had, with nothing remembered and nothing to get wrong. Do not add a "previous layer" field.
+  **`PREFS.wx` persists across a reload**, which means a reader can land on a map with no flood
+  stations on it. `#shown` states `Weather map · flood stations hidden`. The Layers section summary
+  reads `weather`. Those two lines are the whole of what says why, so do not delete either one.
+- **Two MET points stand 80 m apart and never separate.** `Serdang` and `Seri Kembangan` measure
+  16 screen pixels apart at zoom 15. So `WX_THIN_PX` keeps one of them at every zoom a reader uses.
+  That is right. Two points 80 m apart report one weather. But somebody who knows both names will
+  only ever find one. The layer thins rather than clusters, for the same family of reason. A
+  cluster badge reading 6 cannot say WHICH weather.
 ## Conventions
 
 - **Anything that alerts is checked against the alert design standard** in
@@ -2399,6 +2445,38 @@ php -r '$p=json_decode(file_get_contents(".cache.json"),true);
 preg_match("/MET_KM\s*=\s*([\d.]+)/",file_get_contents("api.php"),$m);$k=(float)$m[1];
 echo count(array_filter($p["stations"],fn($s)=>($s["met"]["km"]??0)>$k))," beyond MET_KM ($k km)\n";'
 
+# The weather layer. `points` must hold about 50 rows. A fall means BOX, metPoints() or the MET
+# page moved. `temp` reads 0 while api.data.gov.my/weather/forecast answers an empty array. That
+# happened on 2026-08-17 — read it beside `metday.parsed` before calling it a fault.
+curl -sk "https://flood-exp.test/api.php?wx=1" | php -r '$j=json_decode(stream_get_contents(STDIN),true);
+$p=$j["points"] ?? []; printf("points: %d, temp: %d, past: %d\n", count($p),
+  count(array_filter($p, fn($x)=>isset($x["tmax"]))),
+  count(array_filter($p, fn($x)=>($x["past"] ?? []) !== [])));'
+
+# The ETag must not move between two MET issues. A 200 here means the body carries a field that
+# changes without the data changing. Every poll then ships the full body, for as long as a tab
+# stays open. That is the fault `cacheAge` caused on the payload.
+E=$(curl -sk -D - -o /dev/null "https://flood-exp.test/api.php?wx=1" | tr -d '\r' | awk '/^ETag:/{print $2}')
+curl -sk -o /dev/null -w 'must be 304: %{http_code}\n' -H "If-None-Match: $E" \
+     "https://flood-exp.test/api.php?wx=1"
+
+# A weather row must never borrow a district from a station. Every district must come from
+# wx-places.json, which wx-build.php bakes from Nominatim.
+php -r '$j=json_decode(file_get_contents("wx-places.json"),true);
+$d=new PDO("sqlite:.history.db");
+$w=json_decode($d->query("SELECT body FROM page WHERE url=\"wx:box\"")->fetchColumn(),true);
+$bad=0; foreach($w["points"] ?? [] as $p){ if(!isset($p["tmax"])) continue;
+ if(!isset($j[$p["id"]])){ $bad++; echo "  NOT BAKED: ",$p["id"],"\n"; } }
+echo $bad ? "FAIL: $bad rows\n" : "OK: every temperature came from the baked table\n";'
+
+# The weather archive. One row per point per MET issue, stamped with the issue time MET gives. A
+# row stamped with the poll minute means something bypassed the stamp rule.
+php -r '$d=new PDO("sqlite:.history.db");
+printf("rows: %d, points: %d, newest: %s\n",
+  $d->query("SELECT COUNT(*) FROM level WHERE station LIKE \"wx-%\"")->fetchColumn(),
+  $d->query("SELECT COUNT(DISTINCT station) FROM level WHERE station LIKE \"wx-%\"")->fetchColumn(),
+  date("Y-m-d H:i", (int)$d->query("SELECT MAX(ts) FROM level WHERE station LIKE \"wx-%\"")->fetchColumn()));'
+
 # The rain heat layer, in canvas pixels. Guards the paint distance, the dry-gauge erase and the
 # handover between two neighbours — the rules that live in a canvas, where linting and node --check
 # cannot reach them. It prints its own verdict. Must read PASS.
@@ -2540,10 +2618,10 @@ php -r '$p=json_decode(file_get_contents(".cache.json"),true);
 foreach($p["stations"] as $s) if($s["kind"]==="river"&&($s["status"]??0)>=3&&!empty($s["rising"]))
   printf("%-8s %-26s at danger AND rising\n",$s["id"],$s["name"]);'
 
-# Every module must carry a modulepreload link, except the five loaded on demand. There is no build
+# Every module must carry a modulepreload link, except the six loaded on demand. There is no build
 # step to generate that list, so it goes stale silently when somebody adds a module.
 for f in js/*.js; do
-  case $(basename $f) in timeline.js|table.js|wall.js|test.js|clip.js) continue;; esac
+  case $(basename $f) in timeline.js|table.js|wall.js|test.js|clip.js|wx.js) continue;; esac
   grep -q "modulepreload\" href=\"$f\"" index.html || echo "MISSING modulepreload: $f"
 done
 ```

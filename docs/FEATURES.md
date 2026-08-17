@@ -3108,14 +3108,18 @@ over it, so it matches exactly). Two consequences worth keeping: the overlap liv
 button on top of a number hides the number; and the row takes the same tint on `:focus-within`, or
 the button would land on an untinted row when it is reached by keyboard.
 
-**The heatmap pair and the sensor kinds are `<details>` sections** (`#heatsect`, `#kinds`), the same
-`.sect` as Districts and Ignored sensors — so the drawer is four labelled things rather than two
-lists followed by five loose chips, and the two layer groups can be folded away by anyone who set
-them once. They persist through the same `PREFS.sect` map keyed by id that the other two use.
+**The layer choices and the sensor kinds are `<details>` sections**, `#layersect` and `#kinds`. Both
+use the same `.sect` class as Districts and Ignored sensors. The drawer is four labelled things now,
+rather than two lists followed by five loose chips. Both sections fold away, for anyone who set them
+once. They persist through the same `PREFS.sect` map, keyed by id, that the other two already use.
 
-Each carries its state on its summary, which is the rule every section here obeys: `#heatN` names
-the live layer (`water level` / `rainfall` / `off`) because the two chips are one mutually-exclusive
-choice, and `#kindN` counts the kinds switched off, the same `N hidden` the district filter shows.
+Each carries its state on its summary. That is the rule every section here obeys. `#layerN` names
+what the map paints — `weather`, `water level`, `rainfall` or `off`. `#kindN` counts the kinds
+switched off, the same `N hidden` the district filter shows.
+
+*Later:* **`#heatsect` became `#layersect`.** A weather mode joined the two heatmaps as a third
+answer to one question. The entry further down this file covers the merge and the reasoning behind
+it.
 
 **`#shown` stays outside both sections.** It carries the `· N ignored` count, which is one of the
 two always-visible indications that an alarm has been silenced — a collapsed section would hide it,
@@ -10129,3 +10133,139 @@ sentence and line boundaries, so one sentence naming six places survives whole o
 in reach. That is a granularity floor rather than a fault. Narrowing it further needs per-place surgery
 on MET's own wording, which is a larger change than a paragraph filter. See the gotcha list in
 `CLAUDE.md`.
+
+## Weather becomes a map mode, not only a card
+
+A weather mode replaces the flood stations on the map with the nowcast points MET Malaysia
+publishes. A tap on a point opens a panel. It states the high and low for the day. Then it draws
+one card for every half hour MET publishes, out to three hours ahead. The mode hides every
+station pin, so nothing status-colored shares the map with the weather glyphs. It adds no alert
+surface. It moves no count, no badge and no ticker tile. Weather is not a claim about a sensor.
+See `docs/superpowers/specs/2026-08-17-met-weather-layer-design.md` for the full design.
+
+### Fifty points, not 294
+
+MET publishes 294 nowcast markers for the whole country. `BOX`, the same box `?place=` already
+bounds its results to, keeps 50 of them.
+
+Ten of the fifty sit outside Selangor, Kuala Lumpur and Putrajaya, in Pahang, Negeri Sembilan or
+Perak. Five of those ten sit on the Titiwangsa ridge, which feeds the Klang valley. Rain over
+Genting Highlands reaches Kuala Lumpur as a flash flood. A state border cuts the most useful
+weather this layer can show.
+
+Every one of the fifty points sits within 21 km of a station this app already carries. Forty sit
+within 2 km. `Serdang` and `Seri Kembangan` stand 80 m apart. They measure 16 screen pixels apart
+at zoom 15, so `WX_THIN_PX` keeps only one of them. Two points 80 m apart report one weather. See
+the gotcha list in `CLAUDE.md`.
+
+### Why the points ride `?wx=1`, not the poll payload
+
+A refresh already parses the MET nowcast page, to join each station to its nearest point. The
+same pass now builds the weather rows. It writes them as one row in the `page` table, under the
+key `wx:box`. `api.php?wx=1` reads that row and echoes it. The handler parses nothing. It cannot
+reach MET, and it cannot be slow.
+
+The main payload runs about 33 KB. Riding the main payload will add about 9 KB to every poll.
+Most readers never open weather mode, so a permanent tax on every poll will buy them nothing.
+`?cam=`, `?shots=`, `?sheet=` and `?place=` already answer this way: on their own endpoint,
+fetched only when a reader asks. `js/wx.js` is a deferred module for the same reason. A reader
+who never opens weather mode fetches none of its data and loads none of its code.
+
+`?wx=1` carries an `ETag`. Every row in its body carries the issue stamp MET gives. Nothing in
+the body moves without the data moving. MET reissues about every 30 minutes. A reader polls about
+every 8.5 minutes. So roughly three polls in four cost one 304 and about 200 bytes, not the full
+9 KB. `cacheAge` broke this same contract on the main payload once, by holding a field that moved
+every second. See that gotcha in `CLAUDE.md` before adding a field to this body.
+
+### The archive: MET publishes no past
+
+A nowcast marker holds one current word and six forward steps, thirty minutes apart. It never
+states what happened an hour ago. So this app keeps its own record. Each refresh that parsed a
+nowcast writes one `level` row per point, keyed `wx-<slug>`.
+
+The stamp is the issue time MET gives, never the poll time. That is the rule `readTs()` already
+states for every writer to that table. The `(station, ts)` primary key dedupes a re-read of one
+issue to one row. `RETAIN` prunes it with everything else. There is no schema change.
+
+`WX_PAST` reads that archive back one hour, anchored on the issue stamp rather than on `now`. A
+window measured from `now` drops a sample as the clock moves. That changes the `?wx=1` body
+between two MET issues, and breaks its own ETag.
+
+A fresh server holds no past. The panel then starts at the current card. It prints no message
+about that. One poll in the life of a server is not a state worth naming.
+
+### The district comes from Nominatim, not a station
+
+`metDaily()`, the daily forecast, keys its rows by district name. A nowcast point carries a name
+and a coordinate, never a district. The join needs one from somewhere.
+
+The nearest station is the tempting answer, and it is wrong twice. It reads as that station
+reporting a temperature, and no station in this payload holds a weather reading. It is also
+measurably wrong: the nearest station to `Bentong` sits 20.9 km away, in Hulu Selangor. A Pahang
+town then prints a Selangor temperature instead.
+
+`wx-build.php` asks the Nominatim reverse endpoint for each point instead, through `district`,
+then `city`, then `state`. Kuala Lumpur is a federal territory with no daerah, so `city` answers
+there. Putrajaya answers on `state`. The script runs by hand and commits `wx-places.json`, the
+pattern `water-build.php` already sets. Nominatim allows one request a second, so fifty lookups
+cannot ride a refresh. Towns do not move, so a missing row is a stale bake, never a wrong join.
+
+### The panel reuses the `Later` cell from the weather card
+
+The station panel already draws a weather card, with two cells for the current hour and the
+next. The `Later` cell holds a glyph, a line of words beside it, and a clock underneath.
+
+This weather layer draws its own panel. It repeats that cell once per half hour, from the
+archive, through the current step, to the MET forecast. Most of the classes it draws with —
+`.wxcol`, `.wxbig`, `.wxline`, `.wxsub` — already existed on that cell. `.wxsteps` stacks the
+cards, and `.wxnow` marks the current one.
+
+The cards stack down the panel, rather than run sideways. A sideways strip hides a later hour
+behind a swipe. A hidden hour on a flood map helps nobody. Each card also names its weather in
+words, which reverses the rule the two-cell weather card keeps for itself. Two cells let a reader
+take both in at a glance. Nine cannot. A stack of nine bare glyphs sends a reader tapping each one
+to read `data-tip`.
+
+The current card carries a `NOW` chip and an outline. A reader lands on that card without reading
+every one first.
+
+### Color is the one exception, and it holds on one condition
+
+Every other surface in this app reserves color for status, from green through red. Weather
+paints real sky colors instead — `--wx-clear`, `--wx-rain` and `--wx-heavy` in `css/base.css`.
+
+The exception holds only because weather mode draws no station pin. Nothing status-colored
+shares the map, so an amber glyph cannot read as a station in trouble. The weather palette reads
+as muted, where the status palette reads as saturated. The two separate by vividness, as well as
+by hue. This app rejected gold `#f2b705` for this reason. It sits within one shade of
+`--s-alert` on the light theme.
+
+`rainy_heavy` carries no cloud of its own. Beside `rainy` at a 31px pin it read as hatching,
+rather than as more of one thing. So the pin ladder collapses both wet rungs to `rainy`. The card
+keeps the distinct heavy glyph, at its own larger size.
+
+### What ships unverified
+
+- **The temperature join has never met a real response.** `api.data.gov.my/weather/forecast`
+  answered an empty array on every date tested on 2026-08-17. Check the first non-empty response
+  by hand. `floodAlerts()` carries the same caveat.
+- **Nothing alarms when that feed dies.** `sources.old` names `met-warn` alone. `metday.parsed`
+  reads 0 with no signal behind it, so nobody can say how long the feed has been quiet.
+- **Nobody has measured how often MET reissues.** The 30-minute figure comes from one code
+  comment and one observed stamp. Measure it over a few real hours before trusting the number.
+- **The archive key is the name of a point, not a coordinate.** A rename orphans the history for
+  that point, and `RETAIN` prunes it 30 days later. A name is steadier than a float coordinate,
+  but no measurement backs that choice.
+- **Nobody has chosen the rain and heavy colors yet.** Gold failed the test above. Nobody has
+  tuned the surviving pair against a real basemap tile yet.
+
+### Not built
+
+- **A previous-heatmap memory.** Nothing writes `PREFS.heatLayer` while weather mode is on. So
+  leaving the mode restores whatever heatmap a reader had, with nothing to remember and nothing
+  to get wrong.
+- **A visible failure for a missing weather file.** The Pages bake copies `wx.json` the way it
+  copies `img/`: conditionally. So an absent file can never fail the map bake. `js/wx.js` marks
+  the chip with a `no data yet` hint instead.
+- **A district clip by state.** `wx-build.php` already bakes a state for each point. Nothing
+  reads it today. A future filter by state is one line, over data already on disk.
