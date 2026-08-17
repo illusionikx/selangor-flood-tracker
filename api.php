@@ -1952,6 +1952,9 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
     // The failure this exists for. A null decode and an empty feed look identical to a caller that
     // tests is_array(), which is why the return separates them.
     $ok('a bare scalar is not an array',  jsonLoose('"just a string"') === null);
+    // A backslash immediately before a raw control byte. The escape branch used to append
+    // the byte untouched, so a recoverable row decoded as null.
+    $ok('a control byte after a backslash', jsonLoose("[{\"a\":\"x\\\\\ny\"}]") !== null);
 
     echo "\nnoticeOf():\n";
     $ok('the notice page returns its id',  noticeOf('<html><title> Notis Gangguan </title><body></body></html>') === 'publicinfobanjir');

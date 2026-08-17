@@ -616,7 +616,7 @@ function metUrls(int $now): array {
    to a caller that tests `is_array()`. So this returns null for one and an empty array for the
    other, and the liveness rule in api.php reads that difference.
  *
- * The scan tracks whether the cursor sits inside a string literal and honours the backslash escape.
+ * The scan tracks whether the cursor sits inside a string literal and honors the backslash escape.
  * It escapes any control character it finds inside a string. It changes nothing outside one.
  *
  * Measured 2026-08-17 against all five JPS MET files. Four decode the same either way.
@@ -628,7 +628,16 @@ function jsonLoose(string $s): ?array {
     $n   = strlen($s);
     for ($i = 0; $i < $n; $i++) {
         $c = $s[$i];
-        if ($esc)                { $out .= $c; $esc = false; continue; }
+        if ($esc) {
+            $out .= ord($c) < 0x20 ? match ($c) {
+                "\n"    => '\\n',
+                "\r"    => '\\r',
+                "\t"    => '\\t',
+                default => sprintf('\\u%04x', ord($c)),
+            } : $c;
+            $esc = false;
+            continue;
+        }
         if ($c === '\\' && $in)  { $out .= $c; $esc = true;  continue; }
         if ($c === '"')          { $in = !$in; $out .= $c;   continue; }
         if ($in && ord($c) < 0x20) {
