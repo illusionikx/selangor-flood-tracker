@@ -165,6 +165,17 @@
      theme. On the map the heart also carries a --surface halo, so it is never read against the
      basemap alone. */
   --fav: #ff85d0;
+  /* The weather layer uses natural sky colors. This is the one documented exception to the status
+     rule above. The exception holds on one condition: weather mode draws no station pin. Nothing
+     status-colored shares the map. An amber glyph cannot read as a station in trouble.
+     The status set holds full saturation. The weather set holds much less. The two sets also
+     separate by vividness.
+     The design phase measured gold #f2b705 and rejected it. It sits within a shade of --s-alert on
+     the light theme. It matches #ffc000 on the dark theme.
+     One set serves both themes, like every other token in this block. A pin has to win over
+     the basemap. Heavy differs from rain by SATURATION, never by lightness: a darker heavy pin
+     disappears into the dark tile. */
+  --wx-clear: #d8a93f; --wx-rain: #93a9bb; --wx-heavy: #2f7fc9;
 }
 
 * { box-sizing: border-box; }
