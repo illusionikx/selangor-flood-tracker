@@ -10113,13 +10113,19 @@ The field names come from the consumer JavaScript JPS publishes on its own page.
 not a guess, but nobody has tested the parser against real data yet. The first non-empty response is
 the moment to check it by hand.
 
-This work also surfaced a false positive it did not cause and does not fix. Before this work,
+This work also put a live row through the sea test for the first time. Before this work,
 `data.gov.my` was the only warning source this app had, and it had published nothing for seven days.
-No row reached the geography filter at all, so the fault stayed invisible. The JPS mirror delivers
-rows now, and on 2026-08-17 the ticker carried a sentence naming "Northern part of Phuket, Northern
-Straits Of Melaka, Southern Straits Of Melaka, Northern Reef South, Southeastern Reef North and
-Labuan". None of that sits inside the area this map covers. `WARN_SEA_FAR` at `sources.php:709` cuts
-only `northern straits of melaka` before the keep test runs. MET also writes `Southern Straits Of
-Melaka`, which still matches `WARN_SEA_KEEP`'s `straits of melaka`. `CLAUDE.md` already documents this
-exact fault for the northern phrase. This is the same fault at the southern site. See the gotcha list
-in `CLAUDE.md` for the fix this leaves open, and why it stays out of this change.
+No row reached the geography filter at all. The JPS mirror delivers rows now, and on 2026-08-17 the
+ticker carried a sentence naming "Northern part of Phuket, Northern Straits Of Melaka, Southern
+Straits Of Melaka, Northern Reef South, Southeastern Reef North and Labuan". `WARN_SEA_FAR` at
+`sources.php:709` cuts `northern straits of melaka` before the keep test runs.
+
+MET's `Southern Straits Of Melaka` then matches `WARN_SEA_KEEP`. That is the right answer. The
+southern stretch reaches this map during the northeast monsoon. The repository owner confirmed it on
+2026-08-17. The row belongs here, so no code changed.
+
+The sentence also names Phuket, two reefs and Labuan, and `hereParts()` cannot cut those. It splits on
+sentence and line boundaries, so one sentence naming six places survives whole once any one of them is
+in reach. That is a granularity floor rather than a fault. Narrowing it further needs per-place surgery
+on MET's own wording, which is a larger change than a paragraph filter. See the gotcha list in
+`CLAUDE.md`.

@@ -1802,18 +1802,21 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   is open on purpose: adding `semenanjung` and `peninsular` also lets in warnings about every other
   state. Name the gap so the next reader sees a decision, not a bug. The filter reads English and
   Malay text alike, because MET writes some rows in one language only.
-  **A live payload surfaced the same fault at the southern site.** Before this work, `data.gov.my`
-  was the only warning source this app had, and it had published nothing for seven days. No row
-  reached the geography filter at all, so the fault stayed invisible. The JPS mirror delivers rows
-  now, and on 2026-08-17 the ticker carried "Northern part of Phuket, Northern Straits Of Melaka,
-  Southern Straits Of Melaka, Northern Reef South, Southeastern Reef North and Labuan", and none of
-  that names anywhere this map covers. `WARN_SEA_FAR` cuts only `northern straits of melaka`. MET
-  also writes `Southern Straits Of Melaka`, which still matches `WARN_SEA_KEEP`'s `straits of melaka`
-  once the northern phrase is gone. The fix is the same shape: add `southern straits of melaka`,
-  `southern straits of malacca` and `selatan selat melaka` to `WARN_SEA_FAR`. This entry leaves that
-  fix undone on purpose. Adding a stretch to the drop list is a claim about Malaysian maritime zones,
-  a judgement outside what this work set out to change. Read this as an open decision, not a bug
-  nobody noticed.
+  **A live payload tested the southern stretch, and the rule answered correctly.** Before this work,
+  `data.gov.my` was the only warning source this app had, and it had published nothing for seven days.
+  No row reached the geography filter at all, so nothing exercised this rule. The JPS mirror delivers
+  rows now, and on 2026-08-17 the ticker carried "Northern part of Phuket, Northern Straits Of
+  Melaka, Southern Straits Of Melaka, Northern Reef South, Southeastern Reef North and Labuan".
+  `WARN_SEA_FAR` cuts `northern straits of melaka`, and MET's `Southern Straits Of Melaka` then
+  matches `WARN_SEA_KEEP`. **That is the right answer. The southern stretch reaches this map, and the
+  northeast monsoon is when.** The repository owner confirmed it on 2026-08-17. So do not add
+  `southern straits of melaka` to the drop list. An earlier draft of this entry recommended exactly
+  that, on the assumption that the row named nowhere here.
+  **What else the sentence names is a granularity floor, not a fault.** `hereParts()` splits on
+  sentence and line boundaries. So one sentence naming six places survives whole once any one of them
+  is in reach, and this row puts Phuket, two reefs and Labuan on the ticker beside our own water.
+  Cutting inside a sentence needs per-place surgery on MET's wording, and that is a larger change than
+  the paragraph filter this app has.
 - **The two warning surfaces disagree about time on purpose, and `fresh` is the seam.** The panel
   lists a warning for its whole validity. The ticker carries it only while `fresh` — the first
   `WARN_FRESH` (6 h) of that validity, measured from the warning's own start and **not** from when
