@@ -388,9 +388,9 @@ Add to the `--selftest` block in `api.php`, after the Task 2 assertions:
     $ok('it carries the JPS heading',    ($w[0]['title'] ?? '') === 'THUNDERSTORMS WARNING');
     $ok('it is stamped weather and jps',
         ($w[0]['kind'] ?? '') === 'weather' && ($w[0]['src'] ?? '') === 'jps');
-    // warnWhen() in js/ui.js matches ^\d{4}-\d\d-\d\dT\d\d:\d\d and falls back to the raw string.
+    // warnWhen() in js/ui.js tests the ISO shape and prints the raw string otherwise.
     // A JPS stamp printed verbatim puts two date formats in one modal. The merge sort is a strcmp
-    // over this field, so a non-ISO stamp also misorders every same-day row.
+    // over this field, so a stamp outside that shape also misorders every same-day row.
     $ok('the stamp is normalized to ISO',
         (bool)preg_match('/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d$/', $w[0]['from'] ?? ''));
     $ok('and so is the end stamp',
@@ -443,16 +443,17 @@ Add to `sources.php`, directly below the closing brace of `metWarnings()`:
 ```php
 /* --- the JPS mirror of the MET bulletins ----------------------------------------------------- */
 
-/* `publicinfobanjir.water.gov.my/ramalan/met-alert/` reads five static JSON files, and they mirror
- * the same MET bulletins `api.data.gov.my/weather/warning` carries. It mirrors them fresher.
- * Measured 2026-08-17: every data.gov.my row carried an issue stamp of 2026-08-10, and this mirror
+/* `publicinfobanjir.water.gov.my/ramalan/met-alert/` reads five static JSON files. They mirror the
+ * same MET bulletins `api.data.gov.my/weather/warning` carries, and they mirror them fresher.
+ *
+ * Measured 2026-08-17. Every data.gov.my row carried an issue stamp of 2026-08-10. This mirror
  * answered with rows issued that morning. Two of them named the waters of Selangor.
  *
- * The row shape is JPS's own. Every rule below is the rule `metWarnings()` already applies, reading
- * a differently named field.
+ * The row shape belongs to JPS. Every rule below is the rule `metWarnings()` already applies,
+ * reading a differently named field.
  *
- * `met_earthquake.json` is not fetched. `WARN_DROP` holds `earthquake` and `tsunami`, so every row
- * of that file drops, and fetching it spends a request to discard the answer. */
+ * This app does not fetch `met_earthquake.json`. `WARN_DROP` holds `earthquake` and `tsunami`, so
+ * every row of that file drops. Fetching it spends a request to discard the answer. */
 function jpsMetWarnings(string $json, int $now): array {
     $rows = jsonLoose($json);
     if ($rows === null) return [];
@@ -461,9 +462,9 @@ function jpsMetWarnings(string $json, int $now): array {
     foreach ($rows as $r) {
         if (!is_array($r)) continue;
 
-        /* `Heading_EN` is this row's own heading. `Title_EN` is the bulletin kind and it repeats
-           across rows of different severities, so it is the fallback and never the first choice.
-           This is the rule `metWarnings()` already states about `warning_issue.title_en`. */
+        /* `Heading_EN` is the heading for this row. `Title_EN` names the bulletin kind, and it
+           repeats across rows of different severities. So `Title_EN` is the fallback and never the
+           first choice. `metWarnings()` already states this rule about `warning_issue.title_en`. */
         $title = trim((string)($r['Heading_EN'] ?? ''));
         if ($title === '') $title = trim((string)($r['Title_EN'] ?? ''));
         $text  = trim((string)($r['Msg_EN'] ?? ''));
@@ -490,7 +491,7 @@ function jpsMetWarnings(string $json, int $now): array {
         $narrow = hereParts($text, $sea);
         if ($narrow !== '') $text = $narrow;
 
-        /* ISO, because `warnWhen()` in js/ui.js matches that shape and prints the raw string
+        /* The ISO shape, because `warnWhen()` in js/ui.js tests for it and prints the raw string
            otherwise. The merge sort is a strcmp over this field for the same reason. */
         $out[] = ['title' => $title, 'text' => $text,
                   'from' => date('Y-m-d\TH:i:s', $from), 'to' => date('Y-m-d\TH:i:s', $to),
@@ -603,7 +604,7 @@ Add to the `--selftest` block in `api.php`, after the Task 3 assertions:
     $ok('a row outside its window drops',
         floodAlerts($fa(['EstimatedDT'    => date('d-m-Y H:i:s', time() - 7200),
                          'EstimatedEndDT' => date('d-m-Y H:i:s', time() - 3600)]), time()) === []);
-    // A row with no end cannot be retired, and every surface here renders inside a window.
+    // Nothing can retire a row with no end, and every surface here renders inside a window.
     $ok('a row with no end drops',  floodAlerts($fa(['EstimatedEndDT' => '']), time()) === []);
     $ok('a row for another state drops',
         floodAlerts($fa(['State' => 'SARAWAK', 'POINew' => 'Sungai Rajang']), time()) === []);
@@ -632,9 +633,11 @@ Add to `sources.php`, directly below the closing brace of `jpsMetWarnings()`:
 /* The notification types `getdisse.php` publishes, and the word each one gets on screen.
  *
  * The three withdrawals are absent on purpose. `NT_TM` Termination, `NT_RC` Recall and `NT_NF` No
- * Flood all cancel an earlier alert. Every surface here renders a notice only inside its validity
- * window, so an alert that ended leaves the panel without help. A withdrawal row restates that. It
- * also appears alone whenever the alert it withdraws expired between two polls. */
+ * Flood all cancel an earlier alert.
+ *
+ * Every surface here renders a notice only inside its validity window. An alert that ended leaves
+ * the panel without help. A withdrawal row restates that. It also appears alone whenever the alert
+ * it withdraws expired between two polls. */
 const FLOOD_KEEP = [
     'NT_7D'  => 'Early',
     'NT_2D'  => 'Final',
@@ -646,12 +649,13 @@ const FLOOD_KEEP = [
 /* The JPS flood forecast, from `publicinfobanjir.water.gov.my/ramalan/amaran-banjir/`.
  *
  * This is the only true flood alarm among the three notice feeds. It carries a validity window, an
- * update type and a withdrawal path, which is what the alert design standard asks an alert to have.
+ * update type and a withdrawal path. That is what the alert design standard asks an alert to have.
  *
  * THIS PARSER HAS NEVER SEEN A ROW. `getdisse.php` answered `[]` on every fetch during the design.
- * The field names come from the consumer JavaScript on the JPS page. That is evidence and not a
- * guess, and it is still untested against real data. The first non-empty response is the moment to
- * check it by hand. Do not widen it to handle a shape nobody has seen.
+ * The field names come from the consumer JavaScript on the JPS page.
+ *
+ * That is evidence and not a guess, and nobody has tested it against real data. The first non-empty
+ * response is the moment to check it by hand. Do not widen it to handle a shape nobody has seen.
  *
  * The row carries map geometry too. Nothing plots it, so nothing here parses it. */
 function floodAlerts(string $json, int $now): array {
@@ -669,7 +673,7 @@ function floodAlerts(string $json, int $now): array {
            That flag is a decision the source made, and this app does not overrule a source. */
         if ((string)($r['hide'] ?? '0') === '1') continue;
 
-        /* Both ends are required. A row with no end cannot be retired, and every surface here
+        /* This needs both ends. Nothing can retire a row with no end, and every surface here
            renders inside a window. `EstimatedDT` is the forecast start and `MessageDT` is when JPS
            issued the message, so the first is the better start and the second is the fallback. */
         $from = strtotime((string)($r['EstimatedDT'] ?? '')) ?: strtotime((string)($r['MessageDT'] ?? ''));
@@ -681,8 +685,8 @@ function floodAlerts(string $json, int $now): array {
         $pois = array_values(array_filter(array_map('trim', explode('!', (string)($r['POINew'] ?? '')))));
         $state = trim((string)($r['State'] ?? ''));
 
-        /* A flood alert is about land, so the straits are closed to it. The state carries a row on
-           its own: a point list this app cannot read is not a reason to drop a flood forecast. */
+        /* A flood alert is about land, so the straits test does not apply. The state carries a row
+           alone. A point list this app cannot read is no reason to drop a flood forecast. */
         if (!hereNames($state . ' ' . implode(' ', $pois), false)) continue;
 
         $out[] = ['title' => 'Flood alert · ' . FLOOD_KEEP[$code],
@@ -754,11 +758,13 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 In `api.php`, directly below `const MET_WARN_TTL = 900;` at line 285:
 
 ```php
-/* How long a notice source may go without a new row before this app calls it old.
+/* How long a notice source can sit without a new row before this app calls it old.
  *
  * `api.data.gov.my/weather/warning` sat seven days on 2026-08-17. All 7 rows carried an issue stamp
- * of 2026-08-10 and most expired on 2026-08-13. Every counter stayed quiet, because the fetch had
- * succeeded and the geography filter correctly refused week-old warnings about Phuket.
+ * of 2026-08-10, and most expired on 2026-08-13.
+ *
+ * Every counter stayed quiet. The fetch had succeeded, and the geography filter correctly refused
+ * week-old warnings about Phuket.
  *
  * MET issues a bulletin at least daily, so 48 hours is a wide margin over the real cadence. */
 const NOTICE_OLD = 172800;   // 48 h
@@ -816,8 +822,8 @@ Add to the `--selftest` block in `api.php`, after the Task 4 assertions:
     $ok('a feed from this hour is not old',
         noticeOld('jps-sea', json_encode([['Valid_from' => '17-08-2026 08:00:00']]), $T, NOTICE_OLD) === false);
     /* Zero rows is NOT old. A calm day is the ordinary state of a warning feed, and an alarm on
-       quiet is the cry-wolf failure the alert design standard rejects. The empty case is covered by
-       the jps-beat heartbeat instead. */
+       quiet is the cry-wolf failure the alert design standard rejects. The jps-beat heartbeat
+       covers the empty case instead. */
     $ok('an empty feed is not old',          noticeOld('jps-rain', '[]', $T, NOTICE_OLD) === false);
     $ok('an unreadable feed is not old here', noticeOld('jps-rain', '<html>', $T, NOTICE_OLD) === false);
 
@@ -840,21 +846,23 @@ Add to `sources.php`, directly below the closing brace of `floodAlerts()`:
 ```php
 /* --- one array, and the two ways a notice feed announces its own death ------------------------ */
 
-/* Every producer emits one row shape, so the merge is a concatenation, a sort and the duplicate
+/* Every producer emits one row shape. So the merge is a concatenation, a sort and the duplicate
  * test `metWarnings()` already ran inside one source.
  *
  * The sort puts the fresher copy of a repeated bulletin first, so the duplicate test drops the
- * older one. That is the whole of "prefer the fresher row" — an order, not a field comparison.
+ * older one. That is the whole of "prefer the fresher row". It is an order, not a comparison.
  *
- * The key lowercases the title, because JPS writes a heading in capitals and `data.gov.my` does
- * not. `met_gelora.json` held two identical rows on 2026-08-17, so the test earns its place inside
- * one source as well as across two.
+ * The key lowercases the title. JPS writes a heading in capitals and `data.gov.my` does not.
+ * `met_gelora.json` held two identical rows on 2026-08-17, so the test earns its place inside one
+ * source as well as across two.
  *
  * KNOWN LIMIT. The two MET sources word one bulletin differently. JPS writes "SECOND CATEGORY
  * WARNING ON STRONG WINDS AND ROUGH SEAS" where data.gov.my writes "Warning on Strong Wind and
- * Rough Seas (Second Category)". An exact key cannot join those, so a reader can meet one bulletin
- * twice while both sources run. That is visible rather than silent, which is the trade taken here.
- * A fuzzy key invents a match, and a wrong join hides a real warning. */
+ * Rough Seas (Second Category)".
+ *
+ * An exact key cannot join those, so a reader can meet one bulletin twice while both sources run.
+ * That is visible rather than silent, which is the trade taken here. A fuzzy key invents a match,
+ * and a wrong join hides a real warning. */
 function mergeNotices(array ...$sets): array {
     $all = array_merge(...$sets);
     /* A strcmp is enough because every producer emits ISO. See jpsMetWarnings() for why. */
@@ -893,21 +901,21 @@ function noticeNewest(string $key, string $body): int {
 /* Did this source answer with nothing recent?
  *
  * Zero rows is NOT old. A calm day is the ordinary state of a warning feed, and an alarm on quiet
- * is the cry-wolf failure the alert design standard rejects. A feed that can be legitimately empty
- * is covered by the heartbeat below instead.
+ * is the cry-wolf failure the alert design standard rejects.
  *
- * This is a different fault from `sources.stale`, which names a page that did not answer at all. */
+ * The heartbeat below covers a feed that goes legitimately empty. This is a different fault from
+ * `sources.stale`, which names a page that did not answer at all. */
 function noticeOld(string $key, string $body, int $now, int $max): bool {
     $t = noticeNewest($key, $body);
     return $t > 0 && $t < $now - $max;
 }
 
-/* `met_cyclone.json` carries a row at all times. It read `No Advisory` on 2026-08-17, and
- * `WARN_DROP` already holds `no advisory`, so the heartbeat can never reach a surface and needs no
+/* `met_cyclone.json` carries a row at all times. It read `No Advisory` on 2026-08-17.
+ * `WARN_DROP` already holds `no advisory`, so the heartbeat can never reach a surface. It needs no
  * new rule to keep it off one.
  *
- * An empty or unreadable file marks the whole JPS MET mirror as old. That is the only liveness
- * evidence available for `jps-rain`, which is legitimately empty on most days. */
+ * An empty or unreadable file marks the whole JPS MET mirror as old. `jps-rain` goes legitimately
+ * empty on most days, so this is the only liveness evidence it has. */
 function beatDead(string $body): bool {
     $rows = jsonLoose($body);
     return $rows === null || $rows === [];
@@ -972,12 +980,12 @@ In `sources.php`, directly below `metUrls()` at line 610:
 ```php
 /* The five requests behind the two notice pages this app reads.
  *
- * `jps-beat` is fetched and never surfaced. `met_cyclone.json` carries a row at all times, so it is
- * the only liveness evidence available for `jps-rain`, which is legitimately empty on most days.
- * `WARN_DROP` already holds `no advisory`, so its permanent row can never reach a screen.
+ * This app fetches `jps-beat` and never surfaces it. `met_cyclone.json` carries a row at all times.
+ * `jps-rain` goes legitimately empty on most days, so that row is the only liveness evidence it
+ * has. `WARN_DROP` already holds `no advisory`, so the permanent row can never reach a screen.
  *
  * `data/met_earthquake.json` is absent on purpose. `WARN_DROP` holds `earthquake` and `tsunami`, so
- * every row of that file drops, and fetching it spends a request to discard the answer. */
+ * every row of that file drops. Fetching it spends a request to discard the answer. */
 function jpsUrls(): array {
     return [
         'jps-flood' => JPS_NOTICE . 'query/getdisse.php',
@@ -995,8 +1003,8 @@ In `api.php`, add one arm to the `match (true)` inside `pageHasData()`, above th
 
 ```php
         /* The JPS notice feeds. `jsonLoose()` and not `json_decode()`, because JPS writes raw
-           newline characters inside JSON string values and a good page would otherwise read as an
-           outage. An empty list IS data: met_rain22.json is legitimately `[]` on a dry day, and
+           newline characters inside JSON string values. Without it a good page reads as an outage.
+           An empty list IS data. met_rain22.json is legitimately `[]` on a dry day, and
            getdisse.php answered `[]` on every fetch during the design. */
         str_starts_with($key, 'jps-')           => jsonLoose($body) !== null,
 ```
@@ -1054,8 +1062,8 @@ $pagesOld = [];
 foreach (['met-warn', 'jps-rain', 'jps-storm', 'jps-sea', 'jps-beat'] as $k) {
     if (noticeOld($k, $page($k), $now, NOTICE_OLD)) $pagesOld[] = $k;
 }
-/* The heartbeat speaks for the whole mirror, because jps-rain is legitimately empty most days and
-   has no evidence of its own. */
+/* The heartbeat speaks for the whole mirror. jps-rain goes legitimately empty most days, so it
+   holds no evidence itself. */
 if (beatDead($page('jps-beat')) && !in_array('jps-beat', $pagesOld, true)) $pagesOld[] = 'jps-beat';
 ```
 
@@ -1064,9 +1072,9 @@ if (beatDead($page('jps-beat')) && !in_array('jps-beat', $pagesOld, true)) $page
 In `api.php`, inside the `sources` array, directly above the `'stale' => $pagesStale,` line:
 
 ```php
-        // The JPS mirror of the MET bulletins, and the JPS flood forecast. Read `parsed` the same
-        // way `met.parsed` is read: 0 means the scrape found nothing, which on these feeds is a
-        // real and common state. `old` below is what names a feed that has stopped moving.
+        // The JPS mirror of the MET bulletins, and the JPS flood forecast. Read `parsed` as
+        // `met.parsed` reads. 0 means the scrape found nothing, which on these feeds is a real and
+        // common state. `old` below is what names a feed that has stopped moving.
         'jpsmet'    => ['parsed' => count($warnJps)],
         'floodalert' => ['parsed' => count($warnFlood)],
         // Empty on a healthy poll. A key here names a source that answered with nothing recent,
@@ -1089,12 +1097,14 @@ Also extend the comment above the `foreach` at line 30, which names the keys del
 
 ```php
     /* `metwarn` is deliberately absent from this list. Zero warnings is the ordinary state of a
-       calm day, not a broken scrape. It read 0 on the poll this file was written against.
-       `jpsmet` and `floodalert` are absent for the same reason, and `floodalert` more strongly:
+       calm day, not a broken scrape. It read 0 on the poll behind this file.
+
+       `jpsmet` and `floodalert` are absent for the same reason, and `floodalert` more strongly.
        getdisse.php answered `[]` on every fetch during its design. `sources.old` below is what
        names a notice feed that has stopped moving.
+
        `gaz.pending` and `hist.pending` are absent too, on purpose. Both reach 0 when their drip
-       finishes, which is the healthy end state, and an alarm that fires on success is the cry-wolf
+       finishes, which is the healthy end state. An alarm that fires on success is the cry-wolf
        failure the alert design standard in docs/FEATURES.md rejects. */
 ```
 
