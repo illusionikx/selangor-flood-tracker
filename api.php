@@ -3058,7 +3058,12 @@ $warnJps   = array_merge(jpsMetWarnings($page('jps-rain'),  $now),
                          jpsMetWarnings($page('jps-storm'), $now),
                          jpsMetWarnings($page('jps-sea'),   $now));
 $warnFlood = floodAlerts($page('jps-flood'), $now);
-$metWarn   = mergeNotices($warnMet, $warnJps, $warnFlood);
+/* $warnAll, not $metWarn: this is the merged union of all three producers, and the old name
+   differed from $warnMet only in word order. That near-miss already caused a real bug in this
+   branch — sources.metwarn.parsed counted the merged rows instead of the MET-only rows, which
+   would have permanently masked the seven-day outage this counter exists to expose. $warnMet,
+   $warnJps and $warnFlood now read as one family with $warnAll as their union. */
+$warnAll   = mergeNotices($warnMet, $warnJps, $warnFlood);
 
 /* A source that answered with nothing recent. This is NOT sources.stale, which names a page that
    did not answer at all. api.data.gov.my/weather/warning sat seven days on 2026-08-17 with every
@@ -3824,7 +3829,7 @@ $payload = json_encode([
     ],
     // A regional notice, not a station reading. isHot() and every count in alerts() read the
     // station list alone, and this key feeds neither — see js/alerts.js for the rule.
-    'warnings' => $metWarn,
+    'warnings' => $warnAll,
     // Empty on a healthy poll, so a reader of this key needs no special case. See noticeOf().
     'notices'  => $notices,
     'offline'  => count(array_filter($stations, fn($s) => !$s['online'])),
