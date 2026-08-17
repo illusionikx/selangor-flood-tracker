@@ -5,13 +5,13 @@
  * MET gives a nowcast point a name and a coordinate. It gives no district. metDaily() keys its rows
  * by district name, so the two feeds cannot join without one.
  *
- * No station may supply that district. A temperature taken through the district of a station reads
- * as that station reporting a temperature, and no station in this payload holds a weather reading.
- * Nominatim answers instead, and it belongs to nobody in this app.
+ * A station must not supply that district. A temperature taken that way reads as the station
+ * reporting it. No station in this payload holds a weather reading. Nominatim answers instead, and
+ * it belongs to nobody in this app.
  *
  * Run this by hand and commit the result. Nominatim allows one request each second, so fifty
  * lookups cannot ride a refresh. Towns do not move. A new MET point shows no temperature until
- * somebody runs this again, which is a missing row and never a wrong one.
+ * somebody runs this again. That is a missing row, never a wrong one.
  */
 
 require_once __DIR__ . '/sources.php';
