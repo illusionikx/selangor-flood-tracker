@@ -53,8 +53,8 @@ jobs:
         run: php api.php > api.json
 
       # The weather layer. `php api.php` above already wrote the `wx:box` row, so this only lifts
-      # it out. `|| true` because nothing optional may fail the bake: a failed weather file must
-      # leave the map updating, and js/wx.js marks its own section when the file is absent.
+      # it out. `|| true` because nothing optional can fail the bake. A failed weather file must
+      # leave the map updating. js/wx.js reports the gap on #wxHint, the hint span on the chip.
       - name: Bake the weather layer
         run: |
           php -r '$d = new PDO("sqlite:.history.db");
@@ -86,7 +86,7 @@ jobs:
           # leave the map frozen on the last deployment over a decoration.
           [ -d img ] && cp -r img site/ || true
           # The weather layer. Conditional for the reason img/ is: a missing file must never stop
-          # the map updating, and js/wx.js marks its own section when the file is absent.
+          # the map updating. js/wx.js reports the gap on #wxHint, the hint span on the chip.
           [ -f wx.json ] && cp wx.json site/ || true
           # The one line that separates the two builds — see js/config.js.
           sed -i 's/^export const STATIC = false;/export const STATIC = true;/' site/js/config.js

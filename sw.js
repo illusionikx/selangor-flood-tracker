@@ -21,10 +21,11 @@ self.addEventListener('activate', e => e.waitUntil(self.clients.claim()));
 
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
-  // Cross-origin (map tiles), non-GET, and the data itself: not ours. No respondWith at all, so the
-  // request behaves exactly as it would with no worker installed, error handling included.
+  // Cross-origin (map tiles), non-GET, and the readings themselves: not ours. No respondWith at
+  // all, so the request behaves exactly as it does with no worker installed, error handling
+  // included. wx.json carries the weather layer, the same kind of reading api.json carries.
   if (e.request.method !== 'GET' || url.origin !== location.origin) return;
-  if (/\/api\.(php|json)$/.test(url.pathname)) return;
+  if (/\/(api\.(php|json)|wx\.json)$/.test(url.pathname)) return;
 
   e.respondWith(
     fetch(e.request)

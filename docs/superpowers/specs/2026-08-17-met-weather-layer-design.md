@@ -435,3 +435,12 @@ Measure the stamp over a few hours before trusting the number.
 it 30 days later. A name is steadier than a float coordinate. No measurement stands behind that.
 
 **5. The rain and heavy colors are not chosen.** See the color section above.
+
+**6. `wxPast()` anchors on the newest stamp across every point, not on each point's own.**
+`api.php:3223` takes `max()` of all fifty stamps. Today every point shares one stamp. The anchor
+and each point's own stamp are the same number.
+
+A future point can lag behind the newest by more than `WX_PAST` (1 hour). Its own window then
+starts from the wrong anchor. It gets an empty `past` array instead of a shorter one.
+
+Check this once MET publishes points on staggered issue times.

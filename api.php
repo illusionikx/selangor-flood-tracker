@@ -642,8 +642,9 @@ if (isset($_GET['place'])) {
    and cannot reach MET. So it cannot be slow, and it cannot fail in a new way.
    The connect is caught for the reason ?place= states. Content-Type is already sent. So an
    uncaught PDOException would put a PHP fatal-error page inside a response a client parses as JSON.
-   An empty answer is a real state on a server that has never refreshed. js/wx.js hides the drawer
-   section on it rather than drawing an empty map. */
+
+   An empty answer is a real state on a server that has never refreshed. js/wx.js writes that into
+   #wxHint, the hint span on the chip, rather than drawing an empty map. */
 if (isset($_GET['wx'])) {
     header('Content-Type: application/json');
     $body = '{"points":[]}';
@@ -3210,6 +3211,10 @@ $metDay = metDaily($page('met-day'));
    The archive first, because MET publishes no past and this app has to record one. `ts` is MET's
    own issue stamp and never the poll time. That is the rule readTs() states for every other
    writer to this table. The (station, ts) primary key dedupes a re-read of one issue to one row.
+
+   No station id starts with `wx-`, so nothing here can mistake these rows for a station's own
+   level.
+
    The row second. ?wx=1 then echoes it and parses nothing. */
 $wxPts = wxInBox($metPts, BOX);
 if ($wxPts) {

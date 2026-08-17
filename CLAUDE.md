@@ -16,7 +16,7 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 
 | file | role |
 |---|---|
-| `api.php` | server-side proxy + cache + source merge + poll history + camera image proxy + rate-limited `?force=1` + place lookup (`?place=`, proxies Nominatim) |
+| `api.php` | server-side proxy + cache + source merge + poll history + camera image proxy + rate-limited `?force=1` + place lookup (`?place=`, proxies Nominatim) + weather layer lookup (`?wx=1`) |
 | `sources.php` | scrapers for the two HTML-only upstreams (national portal, JPS WP) and the three MET feeds (nowcast, forecast, warning). Also the national portal's rainfall table, gazetteer and 7-day history endpoints. Also the two JPS notice parsers: the MET mirror, the flood alert |
 | `shots.php` | camera archive: capture, retention tiers, lookup, and the on-request strip (`buildSheet()`) the wall and the clip play. Required by `api.php` |
 | `shots-test.php` | `php shots-test.php` — one of five runnable checks. Guards retention. Exercises `pruneShots()` |
@@ -295,6 +295,12 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   already sent `Content-Type: application/json` by the time it runs, so an uncaught `PDOException`
   would put a PHP fatal-error page inside a response a client expects to parse as JSON — a connect
   failure degrades to "no cache" rather than a broken response.
+- **`?wx=1` — the weather layer.** Serves the row a refresh already wrote in the `page` table,
+  keyed `wx:box`. This handler parses nothing and reaches no upstream. So it cannot be slow, and it
+  cannot fail in a new way. A try/catch wraps the connect to `.history.db`, the same shape `?place=`
+  uses. A missing or unreadable row degrades to `{"points":[]}` rather than a broken response. The
+  body carries an `ETag`. MET reissues about every 30 minutes against a poll every 8.5, so most
+  polls cost one 304 instead of the full body.
 
 ## Colour language — do not violate
 
