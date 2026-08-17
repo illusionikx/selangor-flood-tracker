@@ -638,6 +638,38 @@ if (isset($_GET['place'])) {
     exit;
 }
 
+/* The weather layer, straight off the row a refresh already wrote. This handler parses nothing
+   and cannot reach MET. So it cannot be slow, and it cannot fail in a new way.
+   The connect is caught for the reason ?place= states. Content-Type is already sent. So an
+   uncaught PDOException would put a PHP fatal-error page inside a response a client parses as JSON.
+   An empty answer is a real state on a server that has never refreshed. js/wx.js hides the drawer
+   section on it rather than drawing an empty map. */
+if (isset($_GET['wx'])) {
+    header('Content-Type: application/json');
+    $body = '{"points":[]}';
+    try {
+        $db  = new PDO('sqlite:' . HIST, null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+        $sel = $db->prepare('SELECT body FROM page WHERE url = ?');
+        $sel->execute([WX_KEY]);
+        $hit = $sel->fetchColumn();
+        if (is_string($hit) && $hit !== '') $body = $hit;
+    } catch (\Throwable $e) {
+        // No cache is a worse answer than a cached one and a better answer than a broken one.
+    }
+    /* The body holds MET's data and nothing else, so the hash moves only when MET reissues. That is
+       about every 30 minutes against a poll every 8.5, so about three polls in four cost one 304.
+       Never add a field here that changes without the data changing. */
+    $etag = '"' . md5($body) . '"';
+    header('ETag: ' . $etag);
+    header('Cache-Control: max-age=60');
+    if (trim((string)($_SERVER['HTTP_IF_NONE_MATCH'] ?? '')) === $etag) {
+        http_response_code(304);
+        exit;
+    }
+    echo $body;
+    exit;
+}
+
 /* ?shots=<id> — which frames exist, and what the river beside the camera was doing at each one.
    The client asks when a lightbox opens and when a camera card opens.
    Shape is [[ts, tier, stationId], …]. `tier` is "now", "soon" or null.
