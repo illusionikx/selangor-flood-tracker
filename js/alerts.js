@@ -193,9 +193,13 @@ function bannerCard(list, kind) {
   }
 
   /* `data-banner` indexes state.warnings, so the index is taken BEFORE the split. Renumbering
-     after it opens the wrong warning — the same rule the ticker already obeys. */
+     after it opens the wrong warning — the same rule the ticker already obeys.
+     A row whose kind this build has no shell for falls back to weather, the same fallback the
+     ticker and the modal already use — one rule stated three ways must not drift, and a dropped
+     warning is worse than a mislabeled one. */
   return Object.entries(NOTICE_KIND).map(([k, b]) => {
-    const rows = list.map((w, i) => [w, i]).filter(([w]) => (w.kind || 'weather') === k)
+    const rows = list.map((w, i) => [w, i])
+      .filter(([w]) => (NOTICE_KIND[w.kind] ? w.kind : 'weather') === k)
       .map(([w, i]) => `<button class="warnrow" data-banner="warn:${i}">
           <b>${esc(w.title)}</b><span class="warntext">${esc(w.text)}</span>
         </button>`).join('');
@@ -204,7 +208,10 @@ function bannerCard(list, kind) {
 }
 
 // The shared card shell. Split out because bannerCard() now builds up to three of them.
-const shell = (b, cls, rows) => `<div class="alertgrp ${cls}">
+// `--c` on the outer div, not only the inner <i>: .warngrp's left rule reads it too, now that
+// the class serves two kinds instead of one. The inner <i>'s own --c is redundant and harmless —
+// removing it would touch the notice path for no gain.
+const shell = (b, cls, rows) => `<div class="alertgrp ${cls}" style="--c:${b.c}">
       <div class="alerthead">
         <i class="i i-${b.icon}" style="--c:${b.c}"></i>
         <b>${b.head}</b>

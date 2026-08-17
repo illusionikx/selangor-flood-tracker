@@ -82,7 +82,7 @@ export function ticker() {
   const warns = state.warnings
     .map((w, i) => [w, i])
     .filter(([w]) => w.fresh)
-    // `data-warn` indexes state.warnings, so the index comes from the map above and never from the
+    // `data-banner` indexes state.warnings, so the index comes from the map above and never from the
     // filtered position. The glyph and the colour come from the row's own kind.
     .map(([w, i]) => {
       const b = NOTICE_KIND[w.kind] || NOTICE_KIND.weather;

@@ -1320,12 +1320,14 @@ body.finding #find { display: none; }
 
 /* --- MET warnings (panel section) --------------------------------------------------------------- */
 
-/* A regional notice, not a station reading — see the comment on warnCard() in js/alerts.js.
-   Same box shape as an .alert card, so the two read as one list. The left rule takes
-   --k-weather instead of a status colour: nothing here stands at a published threshold. */
+/* A regional notice, not a station reading — see the comment on bannerCard() in js/alerts.js.
+   Same box shape as an .alert card, so the two read as one list. The left rule takes --c, which
+   shell() sets on the outer div, instead of a status colour: nothing here stands at a published
+   threshold. This class now serves two kinds — weather and flood — so the colour has to come from
+   the row's own kind rather than be fixed to one of them. */
 .warngrp {
   padding: 14px 0 14px 10px; border-top: 1px solid var(--outline);
-  border-left: 3px solid var(--k-weather);
+  border-left: 3px solid var(--c);
 }
 #sideBody > .warngrp:first-child { border-top: 0; padding-top: 4px; }
 .warngrp .alerthead { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
