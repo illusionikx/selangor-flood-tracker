@@ -70,9 +70,9 @@
 <link rel="stylesheet" href="vendor/markercluster.css">
 <link rel="stylesheet" href="vendor/fonts.css?v=51">
 <link rel="stylesheet" href="css/icons.css?v=90">
-<link rel="stylesheet" href="css/base.css?v=130">
-<link rel="stylesheet" href="css/chrome.css?v=184">
-<link rel="stylesheet" href="css/map.css?v=150">
+<link rel="stylesheet" href="css/base.css?v=131">
+<link rel="stylesheet" href="css/chrome.css?v=185">
+<link rel="stylesheet" href="css/map.css?v=151">
 
 <!-- Water tint for the dark basemap. CARTO's dark_all is greyscale — all 18 of its tones have zero
      chroma — so no saturate() or hue-rotate() can pull water out of it. What it does have is one
@@ -999,7 +999,10 @@
      the alert list behind the app bar's warning glyph carries the same information without a time
      limit. -->
 <div id="toast" class="surface" role="status" aria-live="polite"></div>
-<!-- Top-left of the map. Two groups, because the five controls under it answer two questions.
+<!-- Bottom of the map, in the zoom control's own cluster: beside it on a desktop, above it on a
+     phone where the legend takes the width. It is map furniture, so it sits with the map furniture
+     and wears the zoom control's own look. Two groups, because the six controls under it answer two
+     questions.
      Heatmap is what the map WASHES, and the two in it are one mutually-exclusive choice.
      Icons is what the map DRAWS, and the three in it are independent.
      They sit here rather than in the drawer for the reason the go-to box does: this is a control you
@@ -1013,8 +1016,8 @@
      source that can only disagree. `autocomplete="off"` stops the other writer. A browser restores
      a checkbox across a reload without firing `change`. Every checkbox a preference owns carries
      it. -->
-<button id="paint" class="fab" popovertarget="paintmenu" aria-label="Map layers">
-  <i class="i i-layers"></i><b>Layers</b></button>
+<button id="paint" class="mapbtn" popovertarget="paintmenu"
+        title="Map layers" aria-label="Map layers"><i class="i i-layers"></i></button>
 <div id="paintmenu" class="menu surface" popover>
   <!-- The two heat canvases. Weather takes the map from both of them and leaves the preference
        alone, which is the whole of "turn the previous heatmap back on". So these two chips stay

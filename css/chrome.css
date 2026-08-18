@@ -1056,18 +1056,28 @@ header:has(#net.open) #netstats { opacity: 1; visibility: visible; }
 /* Map furniture slides with the drawer instead of hiding under it. */
 /* `translate` too: a swipe writes the drag there rather than to `transform`, which is holding the
    open/shut position — see swipeOff() in ui.js. This is what carries a half-swiped panel home. */
-#bar, #legend, #paint { transition: transform var(--slide), translate var(--slide), visibility var(--slide); }
-body:not(.ready) #bar, body:not(.ready) #legend, body:not(.ready) #paint { transition: none; }
+#bar, #legend { transition: transform var(--slide), translate var(--slide), visibility var(--slide); }
+body:not(.ready) #bar, body:not(.ready) #legend { transition: none; }
 body.drawer #bar { transform: none; visibility: visible; }
-body.drawer #legend, body.drawer #paint { transform: translateX(var(--drawer)); }
+body.drawer #legend { transform: translateX(var(--drawer)); }
 
 /* --- the paint chooser ------------------------------------------------------------------------ */
 
-/* Top-left, the one corner of the map that carries nothing. #legend is bottom-left, #credit and the
-   zoom buttons bottom-right, #toast top-right and #pills top-centre.
+/* In the zoom control's cluster, not alone in a corner of the map. It is map furniture, so it sits
+   with the map furniture and wears its look — see `.mapbtn` in base.css.
+   **The offsets are measured off the zoom control and move with it.** `.leaflet-bottom.leaflet-right`
+   carries `margin-bottom: 26px` and Leaflet's own corner adds a 10px gutter, so the zoom box sits
+   36px up and 10px in. Its buttons are 30px, so the box is 30 wide and 60 tall.
+   Desktop puts this button to the LEFT of that box: 10 + 30 + 8 = 48px in, on the same 36px
+   baseline. paint-check.html asserts the adjacency in rendered pixels, so a change to either margin
+   fails a check rather than drifting apart on screen.
    401, not 400: it stands over the legend and the alert panel, one rung under #gotoBox's results
-   list at 402 and well under the app bar at 600. The look is `.fab` in base.css. */
-#paint { position: absolute; z-index: 401; top: calc(var(--hdr) + 12px); left: 12px; }
+   list at 402 and well under the app bar at 600. */
+#paint { position: absolute; z-index: 401; right: 48px; bottom: 36px; }
+
+/* It steps aside for the station panel exactly as the zoom buttons and the credit do — see the
+   `body.side` block further down, which this joins. Nothing here rides the drawer any more: that
+   panel is on the left and this button is not. */
 
 /* Weather takes the map from both heat canvases and deliberately leaves `PREFS.heatLayer` alone —
    that is the whole of "turn the previous heatmap back on". So syncHeat() leaves the two chips above
@@ -1203,8 +1213,9 @@ body:not(.ready) #scrim { transition: none; }
 /* The right-hand strip belongs to the panel while it is open, so what already lives there steps
    aside rather than hiding under it — the attribution in particular has to stay readable, and the
    zoom buttons have to stay usable. Same idea as the drawer pushing the legend and alert panel. */
-#toast, #credit, .leaflet-bottom.leaflet-right { transition: transform var(--slide); }
-body.side #toast, body.side #credit, body.side .leaflet-bottom.leaflet-right {
+#toast, #credit, #paint, .leaflet-bottom.leaflet-right { transition: transform var(--slide); }
+body.side #toast, body.side #credit, body.side #paint,
+body.side .leaflet-bottom.leaflet-right {
   transform: translateX(calc(-1 * var(--side)));
 }
 
@@ -1978,13 +1989,15 @@ body.finding #find { display: none; }
   /* The popover clears the two-row header rather than the one-row one; --hdr already carries the
      difference, so this only has to stop sitting under the ticker's rule. */
   #netstats { left: 8px; }
-  /* No size override. `.fab` is 64px wide and taller than it is at every width, which clears the
-     44px touch target on its own.
-     #pills is NOT moved for this button, and it was, for one revision. The strip is centred on the
-     viewport and #risebadge measures 180px at 360px wide, so it runs 90 to 270 against a button
-     that ends at 76. It clears on its own. The rule that pushed the strip down 48px was written
-     against an estimate of the pill's width and never against the pill. paint-check.html measures
-     the pair now, so a wider pill fails a check rather than landing on the button. */
+  /* ABOVE the zoom box here rather than beside it. `#legend` takes `left: 12px; right: 68px` at this
+     width, so the strip left of the zoom buttons is the legend's and there is nowhere to stand.
+     44px to match the zoom buttons, which take that size here for the same reason.
+     Measured off the same two rules the desktop offset uses. `.leaflet-bottom.leaflet-right` carries
+     `margin-bottom: 30px` here and Leaflet's gutter adds 10, so the zoom box sits 40px up. Two 44px
+     buttons make it 88 tall. 40 + 88 + 8 = 136. paint-check.html asserts the adjacency, so a change
+     to either number fails a check rather than drifting apart on screen. */
+  #paint { right: 10px; bottom: 136px; width: 44px; height: 44px; }
+  #paint .i { font-size: 22px; }
   /* The legend earns its space: the heatmap is the one layer whose colours mean nothing without it,
      and it is the layer a phone shows most of. Compacted rather than dropped — full width beside the
      zoom buttons, and the sentence explaining the doubling goes, since the tip already says it. */
@@ -2006,7 +2019,8 @@ body.finding #find { display: none; }
   /* Nothing steps aside here — the panel covers most of the map, so there is nowhere to step to. The
      zoom buttons go *behind* it instead, which map.css now does for every Leaflet corner at every
      width; this only has to cancel the desktop shift. */
-  body.side #toast, body.side #credit, body.side .leaflet-bottom.leaflet-right { transform: none; }
+  body.side #toast, body.side #credit, body.side #paint,
+  body.side .leaflet-bottom.leaflet-right { transform: none; }
   /* The search takes the ticker's row rather than adding one: --hdr is a fixed two-line height, and
      a third line would push the map down every time someone looked up a station. */
   body.finding #ticker { display: none; }

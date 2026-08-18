@@ -36,8 +36,18 @@
    splash (900). One rule for all four corners, so any control added lands in the same stack. */
 .leaflet-top, .leaflet-bottom { z-index: 400; }
 .leaflet-bottom.leaflet-right { margin-bottom: 26px; }
-.leaflet-control-zoom { border: 0 !important; box-shadow: var(--shadow); border-radius: 8px; overflow: hidden; }
-.leaflet-control-zoom a {
+/* **Leaflet adds `.leaflet-touch` to its container, and its two-class rules beat every one-class
+   rule here.** `.leaflet-touch .leaflet-bar` sets `box-shadow: none` and `.leaflet-touch
+   .leaflet-bar a` sets 30px. So the elevation below and the 44px phone size further down both lost,
+   on every touch-capable browser — which is every phone, and a laptop with a touchscreen. Measured
+   in headless Chrome at 360px: the zoom buttons were 30px against the 44 this file asks for, and
+   the control carried no shadow at all. It went unseen because both faults look like a choice.
+   `!important` on the shadow, matching the `border` beside it, and the size is stated for both
+   touch states rather than left to Leaflet. The layers button stands against this control and wears
+   the same look — see `.mapbtn` in base.css — so the two have to agree. */
+.leaflet-control-zoom { border: 0 !important; box-shadow: var(--shadow) !important; border-radius: 8px; overflow: hidden; }
+.leaflet-control-zoom a, .leaflet-touch .leaflet-control-zoom a {
+  width: 30px; height: 30px; line-height: 30px;
   background: var(--surface) !important; color: var(--on-surface) !important;
   border-color: var(--outline) !important;
 }
@@ -393,7 +403,11 @@
 @media (max-width: 600px) {
   /* 30 + Leaflet's own 10px control margin = 40px, the legend's bottom. Both clear the credit. */
   .leaflet-bottom.leaflet-right { margin-bottom: 30px; }
-  .leaflet-control-zoom a { width: 44px; height: 44px; line-height: 44px; font-size: 22px; }
+  /* Both selectors, so this holds whether or not Leaflet decided the browser is touch-capable. The
+     bare one alone lost to `.leaflet-touch .leaflet-bar a` and left 30px targets on every phone. */
+  .leaflet-control-zoom a, .leaflet-touch .leaflet-control-zoom a {
+    width: 44px; height: 44px; line-height: 44px; font-size: 22px;
+  }
 
   /* Compress the card on phones: less spacing on every block. The camera still used to be capped at
      210px and centred here, to stop it eating the screen. On a phone the panel *is* the screen, so

@@ -4,7 +4,7 @@
 :root {
   color-scheme: light;
   --surface: #fff; --on-surface: #1f1f1f; --muted: #5f6368; --outline: #dadce0;
-  --hover: #f1f3f4; --accent: #1a73e8; --on-accent: #fff;
+  --hover: #f1f3f4; --accent: #1a73e8;
   --shadow: 0 1px 2px rgba(60,64,67,.3), 0 2px 6px 2px rgba(60,64,67,.15);
   --drawer: 288px; --slide: .25s cubic-bezier(.4, 0, .2, 1);
   /* The station panel's width, in a token because three other pieces of map furniture step aside by
@@ -120,7 +120,7 @@
 :root[data-theme="dark"] {
   color-scheme: dark;
   --surface: #202124; --on-surface: #e8eaed; --muted: #9aa0a6; --outline: #3c4043;
-  --hover: #303134; --accent: #8ab4f8; --on-accent: #202124;
+  --hover: #303134; --accent: #8ab4f8;
   --shadow: 0 1px 2px rgba(0,0,0,.6), 0 2px 6px 2px rgba(0,0,0,.3);
   /* The river lines js/map.js draws over the dark basemap, read from here by name so no hex lands
      in a JS file. **Exactly the colour the tint paints the sea and the lakes**, so a river reads as
@@ -464,31 +464,26 @@ dialog:focus, dialog:focus-visible { outline: none; }
 }
 .icon:hover, body.drawer #menu { background: var(--hover); }
 
-/* --- FAB ---------------------------------------------------------------------------------------
-   M3's floating action button: filled, elevated, and it stands OFF the surface it floats over. The
-   glyph is `layers` at every state and never the layer currently painting. It carried the water drop
-   and the rain cloud first, and those are the two glyphs the river and rainfall PINS draw. So the
-   control read as a station, on a map covered in stations, in the corner where the eye looks for a
-   control. **A control has to look like a control.** The label under the glyph says which control.
-   `--accent` rather than `--surface`, because a surface-coloured plate on a dark basemap is the
-   same tone as the ground behind it. That was the second half of the same fault.
-   It takes no status hue and it is not allowed one. The status ladder is reserved, and an amber or
-   red control on a flood map reads as an alert on the water. `--accent` is the colour this app
-   already paints a control that is doing something, on `#locate.on` and on a checked chip.
-   `--on-accent` is a real token in both themes rather than a literal white. The dark theme's accent
-   is a pale blue, so white on it fails contrast the moment somebody switches theme. */
-.fab {
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
-  width: 64px; padding: 10px 6px; cursor: pointer;
-  background: var(--accent); color: var(--on-accent);
-  border: 0; border-radius: 16px; box-shadow: var(--shadow);
+/* --- a map control ------------------------------------------------------------------------------
+   The layers button, and the shape for anything else that joins the map's own furniture. It is the
+   zoom control's look, restated rather than shared: `.leaflet-control-zoom` carries `!important` on
+   three declarations to beat Leaflet's own sheet, and there is no Leaflet sheet to beat here.
+   Keep the two in step. The button sits against the zoom box and a mismatch of 1px or one shade
+   reads as a mistake at that distance.
+   **It has no text and it takes no accent.** An earlier version was an M3 FAB, filled `--accent`
+   with `Layers` under the glyph, alone in the top-left corner. It stood out too much, which is the
+   opposite fault to the one before it, and the cause was the same both times: a control on its own
+   in the middle of a map has to shout to be read as a control. In the furniture cluster it does
+   not. The glyph is the layers glyph and the panel it opens states everything in words. */
+.mapbtn {
+  display: grid; place-items: center;
+  width: 30px; height: 30px; padding: 0; cursor: pointer;
+  background: var(--surface); color: var(--on-surface);
+  border: 0; border-radius: 8px; box-shadow: var(--shadow);
 }
-.fab .i { font-size: 24px; }
-.fab b { font: 500 10px/1.2 Roboto, sans-serif; letter-spacing: .02em; }
-/* M3's state layer: the on-colour at 8% over the container, rather than a brightness filter. A
-   filter on this box would also be discarded on the glyph inside it — see the mask gotcha. */
-.fab:hover { background: color-mix(in srgb, var(--on-accent) 8%, var(--accent)); }
-.fab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.mapbtn .i { font-size: 18px; }
+.mapbtn:hover { background: var(--hover); }
+.mapbtn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* --- a labelled group inside a menu ------------------------------------------------------------
    The same words as a drawer section heading, so the two panels speak one language: 11px, 500,

@@ -10333,8 +10333,8 @@ that reports a change in feed order.
 
 ## The paint chooser moved onto the map
 
-**The layer controls left the drawer.** They sit behind a FAB on the map's own top-left corner,
-`#paint`, with a popover under it. Five controls in two labelled groups.
+**The layer controls left the drawer.** They sit behind `#paint`, a button in the map's own
+zoom-control cluster, with a popover on it. Six controls in two labelled groups.
 
 | group | holds | shape |
 |---|---|---|
@@ -10345,10 +10345,21 @@ that reports a change in feed order.
 map*. Behind the hamburger it meant opening a panel to use it, then closing that panel to see the
 result. Filters shape the view and this paints it. The key was already on the map, bottom-left.
 
-**Top-left is the one free corner.** `#legend` is bottom-left, `#credit` and the zoom buttons are
-bottom-right, `#toast` is top-right and `#pills` is top-centre. `z-index: 401` puts it over the
-legend and the alert panel, one rung under `#gotoBox`'s results list and under the app bar.
-It rides the drawer shift the way `#legend` does.
+**It sits with the zoom control, not alone in a corner.** Beside it on a desktop, above it on a
+phone where `#legend` takes the width. It is map furniture, so it stands in the furniture cluster
+and wears that cluster's look.
+
+The offsets come off Leaflet's own margins. `.leaflet-bottom.leaflet-right` carries
+`margin-bottom: 26px` and Leaflet adds a 10px gutter, so the zoom box sits 36px up and 10px in with
+30px buttons. Desktop puts this button 48px in on the same baseline. A phone puts it 136px up on the
+same right edge, over an 88px box.
+
+`paint-check.html` asserts the adjacency in rendered pixels at both widths, so a change to either
+margin fails a check rather than drifting apart on screen.
+
+`z-index: 401` puts it over the legend and the alert panel, one rung under `#gotoBox`'s results list
+and under the app bar. It steps aside for the station panel exactly as the zoom buttons and the
+credit do. It does not ride the drawer, which is on the other side.
 
 **No JavaScript at all.** The panel is a `popover`, so the open state, the light dismiss, the Escape
 key and the top layer are the platform's.
@@ -10357,33 +10368,48 @@ The `toggle` handler in `js/ui.js` places any `.menu` under its own `[popovertar
 in that handler names one menu. The five checkboxes keep their ids, so `syncHeat()`, `syncWx()`,
 `syncRisingChip()` and `syncFavChip()` still write them, and remain the only writer of them.
 
-### The button is a control, and the first one was not
+### The button took three tries, and both failures had one cause
 
-**It shipped with the active layer's glyph on it, and that was wrong twice over.**
-
-The glyph followed the layer: the water drop, the rain cloud, the sun. Two of those three are the
-glyphs the river and rainfall PINS draw.
+**First it drew the active layer's glyph.** The water drop, the rain cloud, the sun. Two of those
+three are the glyphs the river and rainfall PINS draw.
 
 So the control drew a rain cloud, on a map covered in rain clouds, in the corner where a reader
-looks for a control.
-
-The plate made it worse. `--surface` on the dark theme is the tone of the basemap under it. A reader
+looks for a control. `--surface` on the dark theme is the tone of the basemap under it. A reader
 named the result: indistinguishable from a map icon.
 
-**A control has to look like a control.** So the glyph is `layers` at every state, the label under
-it reads `Layers`, and `.fab` fills the plate with `--accent`.
+**Then it became an M3 FAB**, filled `--accent`, with `Layers` under the glyph, still alone in the
+top-left corner. The same reader: it stands out too much.
 
-**It takes no status hue, and nothing gives it one.** This app reserves that ladder. An amber
-or red control on a flood map reads as an alert on the water. `--accent` is what this app already
-paints a control at work, on `#locate.on` and on a checked chip.
+**Both failures came from the same thing.** A control on its own in the middle of a map has to
+shout to read as a control. Neither the whisper nor the shout is the answer to that.
 
-`--on-accent` is a real token in both themes rather than a literal white. The dark theme's accent is
-a pale blue, so white on it fails contrast the moment somebody switches theme.
+**So it moved into the zoom control's cluster and stopped doing either.** `.mapbtn` is the zoom
+control's own look: `--surface`, `--on-surface`, an 8px radius and `var(--shadow)`. No text and no
+accent. Standing against the zoom box, it reads as one more map control, which is what it is.
 
-**The state went with the glyph, and nothing was lost.** `#legend` names the wash and draws its
-ramp, bottom-left. `#risebadge` states the filter, top-centre. `#shown` counts what the drawer hides.
-Every one of those was already on screen. `#layerN`, the drawer summary that named the layer, is
-gone with its line in `syncHeat()`.
+**The state left with the glyph, and nothing was lost.** `#legend` names the wash and draws its
+ramp, bottom-left. `#risebadge` states the filter, top-centre. `#shown` counts what the drawer
+hides. Every one of those was already on screen. `#layerN`, the drawer summary that named the layer, is gone with
+its line in `syncHeat()`.
+
+### The zoom control had lost its own shadow and its touch targets
+
+Moving in beside it surfaced this. Leaflet puts `.leaflet-touch` on its container, and its
+two-class rules beat every one-class rule in `css/map.css`.
+
+`.leaflet-touch .leaflet-bar` sets `box-shadow: none`. `.leaflet-touch .leaflet-bar a` sets 30px.
+So this app's `box-shadow: var(--shadow)` and its 44px phone rule both lost, on every touch-capable
+browser. That is every phone, and any laptop with a touchscreen.
+
+Measured in headless Chrome at 360px: 30px buttons against the 44 the file asks for, and no shadow
+at all.
+
+**It went unseen because both faults look like a choice.** A flat zoom control reads as a style, and
+a 30px button reads as Leaflet's default rather than as this app's rule losing a cascade.
+
+The shadow takes `!important`, matching the `border` declaration beside it. The rule names both
+touch states rather than leaving the size to Leaflet. The layers button wears the same look, so the two
+have to agree, and `paint-check.html` now compares them declaration by declaration.
 
 ### Stations owns Favorites and On alert
 
@@ -10432,17 +10458,25 @@ checked chips claim a wash that is not on the map. The group dims and captions i
 leaving weather mode restores. It is a `:has()` rule rather than a line in `syncHeat()`, because two
 writers on one fact age apart.
 
-### A menu opens away from the nearest edge
+### A menu opens away from the nearest edge, on both axes
 
-The placement handler right-aligned every menu to its button. Every caller was the ⋮ on a station
-card, and `#side` is on the right edge, so that rule was invisible.
+The placement handler right-aligned every menu to its button and always opened downward. Every
+caller was the ⋮ on a station card. Those sit near the top of a panel on the right edge, so neither
+rule ever showed.
 
-`#paint` is 64px wide on the map's left edge. A 236px menu right-aligned to it grew leftward across
-the drawer, and read as the drawer's menu rather than the button's. A button in the left half of the
-viewport now aligns the LEFT edges.
+`#paint` exercised both. On the left edge it grew a menu leftward across the drawer, and read as the
+drawer's menu. At the bottom edge the clamp drags a downward menu back over the button it came
+from.
+
+So a button in the left half aligns the LEFT edges, and a button in the bottom half opens UPWARD.
+
+**Both are position tests, never space tests, and that is the whole of it.** The handler used to
+flip above the button when the space BELOW ran short. A phone has short space below almost
+everywhere, so that flip put the ⋮ menu above the top edge of the screen. A button in the bottom
+half always has more than half a viewport above it, so a position test cannot repeat that.
 
 Measured: `#appMenu` holds its place at 1400px and at 360px. So does the ⋮, because `#side` anchors
-to the right edge at both widths.
+to the right edge at both widths and its buttons sit near the top of it.
 
 ### What was left behind
 
@@ -10468,13 +10502,12 @@ trade-off and chose the narrow filter. Read this as a decision on record, not an
 
 ### Measured
 
-**Nothing moves `#pills` for this button, and one revision did.** The strip centres on the viewport.
-`#risebadge` measures 180px at 360px wide, so it runs 90 to 270 against a button ending at 76. It
-clears by 14px.
+**Nothing moves `#pills` for this button, and one revision did.** The strip centres on the viewport
+and the button was in the top-left corner then. That rule pushed the whole strip down 48px, aimed at
+an estimate of the pill's width and never at the pill. Measured, it cleared already.
 
-The rule that pushed the whole strip down 48px aimed at an estimate of the pill's width, never at
-the pill. `paint-check.html` measures the pair and prints the clearance, so a wider pill fails a
-check rather than landing on the button.
+The button is at the bottom now, so the two cannot meet at all. `paint-check.html` keeps the
+assertion rather than dropping it, because this button has moved twice.
 
 ### Not built
 
@@ -10485,5 +10518,9 @@ One press, both platforms.
 *No copy left in the drawer.* Two controls on one preference is the fault `syncHeat()`'s own comment
 describes at length.
 
-*No thumbnail on the FAB.* Google Maps previews the basemap there. This app has one basemap, and it
-follows the theme. So the picture carries no information.
+*No thumbnail on the button.* Google Maps previews the basemap there. This app has one basemap, and
+it follows the theme. So the picture carries no information.
+
+*No Leaflet control wrapper.* `L.Control` stacks a control above the zoom box for free, which is the
+phone layout. It cannot put one beside the box, which is the desktop layout. Two placements from one
+CSS rule beat a control class that answers half the question.

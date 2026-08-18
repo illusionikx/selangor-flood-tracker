@@ -1414,6 +1414,18 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
   missing tiles read as a grid of pale boxes on the dark basemap. `.leaflet-container` takes
   `var(--surface)` in `map.css`. Anything that changes the basemap has to keep a gap looking like
   the page rather than like a table.
+- **Leaflet puts `.leaflet-touch` on its container, and its two-class rules beat every one-class
+  rule in `css/map.css`.** `.leaflet-touch .leaflet-bar` sets `box-shadow: none` and `.leaflet-touch
+  .leaflet-bar a` sets 30px. So this app's `box-shadow: var(--shadow)` on `.leaflet-control-zoom`,
+  and its 44px phone rule for the buttons, both lost on every touch-capable browser. That is every
+  phone, and any laptop with a touchscreen. Measured in headless Chrome at 360px: 30px buttons
+  against the 44 the file asks for, and no shadow at all. **Both faults look like a choice**, which
+  is why they went unseen. A flat zoom control reads as a style, and a 30px button reads as
+  Leaflet's own default rather than as this app's rule losing a cascade. The shadow takes
+  `!important`, matching the `border` declaration beside it. The size names both touch states rather
+  than leaving it to Leaflet. **Anything else added to `map.css` that styles a Leaflet control needs
+  the same check**: read the computed value back off the live element, never trust that the rule
+  applied. `.leaflet-touch` is not in the markup, so grepping the repo for it finds nothing.
 - **`maxZoom` belongs on the map, not only the tile layer.** `cluster` is created and added at
   `map.js` load time, before `setBasemap()` adds any tile layer. If nothing has declared a
   `maxZoom` by then, markercluster throws *"Map has no maxZoom specified"*.
@@ -2094,16 +2106,22 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   collapse and the weather dim are `:has()` rules in `chrome.css`, so no JS can get either wrong.
   `render()` gates the pins on `!PREFS.wx && PREFS.stations !== false`, and `#shown` names whichever
   of the two emptied the map.
-  **The FAB's glyph is `layers` at every state and must never name the active layer.** It carried
-  the water drop and the rain cloud first, which are the glyphs the river and rainfall PINS draw, on
-  a `--surface` plate the same tone as the dark basemap. A reader called it indistinguishable from a
-  map icon, and they were right.
+  **Its glyph is `layers` at every state and must never name the active layer.** It carried the
+  water drop and the rain cloud first, which are the glyphs the river and rainfall PINS draw. A
+  reader called it indistinguishable from a map icon, and they were right.
 
   The state is already on screen three times over. `#legend` names the wash and draws its ramp,
   `#risebadge` states the filter, and `#shown` counts what the drawer hides. A control states which
-  control it is. **`.fab` takes `--accent` and `--on-accent` and no status hue.** This app reserves
-  that ladder, and an amber control on a flood map reads as an alert on the water. See
-  `docs/FEATURES.md`, *The paint chooser moved onto the map*.
+  control it is.
+
+  **It sits in the zoom control's cluster and wears that cluster's look — no text, no accent.** See
+  `.mapbtn` in `base.css`, which restates `.leaflet-control-zoom`'s fill, ink, radius and shadow.
+  **Keep the two in step.** They stand against each other, and a mismatch of one shade or one pixel
+  reads as a mistake at that distance. `paint-check.html` compares them declaration by declaration.
+  A second try made it an accent FAB with a label, still alone in that corner. A reader said it
+  stood out too much. **Both failures came from putting a control on its own in the middle of a map.
+  One had to whisper and the other had to shout. Neither is the answer.** See `docs/FEATURES.md`,
+  *The paint chooser moved onto the map*.
 - **`#risebadge` reads `ON ALERT` and the chip that raises it filters on `s.rising`.** That is
   narrower than `isHot()`, which is what the app bar counts, the badge shows and the panel lists. So
   the map chip hides stations the app bar counts, and the pill's own sentence carries the real
@@ -2805,10 +2823,17 @@ controls-shaped things. What it asserts is rendered pixels, and none of it reach
 `node --check` or any query over `.cache.json`.
 
 **The button must not read as a map pin, and the first one did.** Its glyph followed the active
-layer, so it drew `water_drop` or `rainy` beside real pins carrying those exact shapes, on a
-`--surface` plate the tone of the dark basemap. So the check asserts the layers glyph, that the
-glyph HOLDS across all four layer states, a real text label, and a fill that is neither the surface
-behind it nor transparent.
+layer, so it drew `water_drop` or `rainy` beside real pins carrying those exact shapes. So the check
+asserts the layers glyph and that the glyph HOLDS across all four layer states.
+
+**It also must not shout, and the second one did.** It is map furniture now, so the check compares
+its fill, ink, radius and shadow against the zoom control's, and its box against a zoom button's.
+That comparison found a fault in the zoom control rather than in the button — see the
+`.leaflet-touch` gotcha above.
+
+**Placement is asserted against the zoom box, never against a constant.** Beside it on a desktop,
+above it on a phone, hard up against it either way. The offsets in `chrome.css` are derived from
+Leaflet's own margins, so a change to either drifts the two apart on screen and nowhere else.
 
 **A resolved token is not a painted pixel.** An early version asserted `--i` alone and passed on a
 button drawing an empty plate, because `#paint::before` had never joined the mask list in
@@ -2817,6 +2842,10 @@ button drawing an empty plate, because `#paint::before` had never joined the mas
 **Geometry is measured with the panel OPEN.** A closed popover is `display: none`, so every rect
 inside it reads zero. An indent assertion then compares 0 against 0 and reports a working indent as
 broken. That happened here.
+
+**It paints after every assertion, not once at the end.** A check that reports only on completion
+reports nothing at all when it hangs, and this one hung. The page sat on `running...` with no way to
+tell how far it got. The whole body is in a `try` for the same reason.
 
 **It measures the corner rather than trusts an estimate of it.** A first revision pushed `#pills`
 down 48px to clear the button, on a guess at `#risebadge`'s width. Measured, that pill is 180px and

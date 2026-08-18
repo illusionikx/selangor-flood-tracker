@@ -2,15 +2,18 @@
 <meta charset="utf-8">
 <title>paint chooser check</title>
 <!--
-  The paint chooser is a FAB on the map holding five controls in two groups. What it guards is
-  rendered pixels, which `php -l`, `node --check` and any query over .cache.json all miss.
+  The paint chooser is a map control holding six boxes in two groups. What it guards is rendered
+  pixels, which `php -l`, `node --check` and any query over .cache.json all miss.
 
-  The button must not read as a map pin. It did: it drew the water drop and the rain cloud, which
-  are the glyphs the river and rainfall pins draw, on a `--surface` plate the same tone as the dark
-  basemap under it. So it asserts the layers glyph, a real label, and a fill that is neither the
-  surface behind it nor any status hue.
+  **It took three tries to sit right, and both failures were about the same thing.** First it drew
+  the active layer's glyph — the water drop, the rain cloud — on a `--surface` plate, alone in the
+  top-left corner among pins carrying those exact shapes. A reader called it indistinguishable from
+  a map icon. Then it became an accent-filled FAB with a label, still alone in that corner, and it
+  stood out too much. A control on its own in the middle of a map has to shout to read as a control.
 
-  The rest is placement. Nothing else floats in that corner, at either width.
+  It sits in the zoom control's cluster now and wears the zoom control's look, so it needs to do
+  neither. The check asserts the layers glyph, the shared look, and the adjacency in rendered pixels
+  at both widths — beside the zoom box on a desktop, above it on a phone.
 
   Run:
   "/c/Program Files/Google/Chrome/Application/chrome.exe" --headless=new --disable-gpu \
@@ -23,13 +26,17 @@
 <script type="module">
 const out = document.getElementById('out'), lines = [];
 let bad = 0;
+/* Painted after every assertion, not once at the end. A check that reports only on completion
+   reports nothing at all when it hangs, and this one hung. */
 const is = (got, want, name) => {
   const ok = got === want; if (!ok) bad++;
   lines.push((ok ? 'ok  ' : 'FAIL') + '  ' + name + '  -> ' + JSON.stringify(got)
     + (ok ? '' : '  want ' + JSON.stringify(want)));
+  out.textContent = lines.join('\n');
 };
 const wait = ms => new Promise(r => setTimeout(r, ms));
 
+try {
 const f = document.getElementById('f');
 await new Promise(r => f.addEventListener('load', r, { once: true }));
 await wait(4000);
@@ -61,11 +68,18 @@ btn.click();
 await wait(200);
 is(menu.matches(':popover-open'), true, 'the button opens the panel');
 const mb = menu.getBoundingClientRect(), bb = btn.getBoundingClientRect();
-is(mb.top >= bb.bottom && mb.top - bb.bottom < 16, true, 'the panel is placed just under the button');
+/* The button sits 36px off the bottom edge, so a menu opened downward is clamped up over the button
+   it came from. A button in the bottom half opens UPWARD. It is a position test and never a space
+   test — see the handler's own comment for the fault that distinction avoids. */
+is(bb.top > w.innerHeight / 2, true, 'the button is in the bottom half of the viewport');
+is(mb.bottom <= bb.top && bb.top - mb.bottom < 16, true, 'so the panel opens upward from it');
+is(mb.bottom < bb.top, true, 'and never over the button it came from');
 is(mb.left >= 8, true, 'and clamped onto the screen rather than off its left edge');
-/* A FAB on the left edge opens its menu rightward. Right-aligned, a 236px menu grew leftward from a
-   64px button across the drawer, and read as the drawer's menu. */
-is(Math.abs(mb.left - bb.left) < 2, true, 'a left-edge button opens its menu to the right');
+/* Away from the nearest edge. This button sits in the bottom-RIGHT cluster now, so the menu aligns
+   the right edges. It spent one revision on the left, where the same rule aligned the left edges —
+   the handler decides from the button's own position, so neither placement is written down twice. */
+is(bb.left > w.innerWidth / 2, true, 'the button is in the right half of the viewport');
+is(Math.abs(mb.right - bb.right) < 2, true, 'so its menu aligns the right edges');
 is(mb.width > 0 && mb.height > 0, true, 'it has a size, so the three chips laid out');
 // A press inside must not dismiss it: three mutually-exclusive choices means trying another one.
 el('favOnly').closest('label').click();
@@ -96,14 +110,17 @@ is(d.querySelector('#kinds hr'), null, 'and the rule that split them went with t
 // --- placement, in rendered pixels -------------------------------------------------------------
 
 const r = btn.getBoundingClientRect();
-const hdr = parseFloat(w.getComputedStyle(d.documentElement).getPropertyValue('--hdr'));
-is(Math.round(r.top - hdr), 12, 'the top edge clears the app bar by the gutter');
-is(r.width >= 44 && r.height >= 44, true, 'the button clears the 44px touch target');
-// The desktop drawer opens by default, and the button rides its shift the way #legend does.
-const drawerOpen = d.body.classList.contains('drawer');
-const shift = drawerOpen ? parseFloat(w.getComputedStyle(d.documentElement).getPropertyValue('--drawer')) : 0;
-is(Math.round(r.left - shift), 12, 'the left edge is the map gutter, plus the drawer shift if open');
-// Nothing else floats in this corner. An overlap here is a control a reader cannot press.
+const zoom = d.querySelector('.leaflet-control-zoom').getBoundingClientRect();
+const zbtn = d.querySelector('.leaflet-control-zoom a').getBoundingClientRect();
+/* Beside the zoom box, on its baseline, at the same size. The offsets in chrome.css are derived
+   from Leaflet's own margins, so a change to either drifts the two apart on screen and nowhere
+   else. These assert the result rather than the arithmetic. */
+is(Math.round(r.bottom), Math.round(zoom.bottom), 'desktop: shares the zoom control baseline');
+is(r.right < zoom.left, true, 'desktop: sits to the LEFT of the zoom box');
+is(Math.round(zoom.left - r.right) <= 12, true, 'desktop: and up against it, not adrift');
+is(Math.round(r.width), Math.round(zbtn.width), 'desktop: the same width as a zoom button');
+is(Math.round(r.height), Math.round(zbtn.height), 'desktop: and the same height');
+// Nothing else floats here. An overlap is a control a reader cannot press.
 for (const id of ['legend', 'pills', 'toast', 'credit', 'bar']) {
   const o = el(id); if (!o) continue;
   const b = o.getBoundingClientRect();
@@ -111,6 +128,8 @@ for (const id of ['legend', 'pills', 'toast', 'credit', 'bar']) {
   is(r.left < b.right && b.left < r.right && r.top < b.bottom && b.top < r.bottom, false,
      `does not overlap #${id}`);
 }
+is(r.left < zoom.left && r.top < zoom.bottom && r.bottom > zoom.top
+   && r.right > zoom.left, false, 'and it does not overlap the zoom control itself');
 
 // --- the button is a control, not a pin ------------------------------------------------------
 /* The fault this replaced: the glyph followed the active layer, so it drew `water_drop` or `rainy`
@@ -121,17 +140,19 @@ is(!!ico, true, 'the button carries a glyph element');
 is(ico.classList.contains('i-layers'), true, 'and it is the layers glyph');
 is(/water_drop|rainy|sunny/.test(ico.className), false, 'never a station-pin glyph');
 is(w.getComputedStyle(ico).maskImage !== 'none', true, 'the glyph is masked, so it paints');
-const label = btn.querySelector('b');
-is(!!label && label.textContent.trim().length > 0, true, 'it carries a text label');
-is(label.textContent.trim(), 'Layers', 'and the label names the control');
 
-const fab = w.getComputedStyle(btn);
-const surface = w.getComputedStyle(d.getElementById('legend')).backgroundColor;
-is(fab.backgroundColor !== 'rgba(0, 0, 0, 0)' && fab.backgroundColor !== 'transparent', true,
+const me = w.getComputedStyle(btn);
+const zc = w.getComputedStyle(d.querySelector('.leaflet-control-zoom'));
+const za = w.getComputedStyle(d.querySelector('.leaflet-control-zoom a'));
+is(btn.textContent.trim(), '', 'it carries no text — the glyph and the panel do the talking');
+is(me.backgroundColor !== 'rgba(0, 0, 0, 0)' && me.backgroundColor !== 'transparent', true,
    'the plate is opaque');
-is(fab.backgroundColor !== surface, true, 'and it is not the surface tone the basemap sits under');
-is(parseFloat(fab.borderTopLeftRadius) >= 12, true, 'FAB corner radius');
-is(fab.boxShadow !== 'none', true, 'and it is elevated off the map');
+/* It stands against the zoom box, so a mismatch of one shade or one pixel reads as a mistake. Two
+   rules in two files paint them, because Leaflet's sheet needs beating and this does not. */
+is(me.backgroundColor, za.backgroundColor, 'it wears the zoom control fill');
+is(me.color, za.color, 'and its ink');
+is(me.borderTopLeftRadius, zc.borderTopLeftRadius, 'and its corner radius');
+is(me.boxShadow, zc.boxShadow, 'and its elevation');
 
 /* The glyph holds whatever paints. That is the whole point of the change. */
 const seen = new Set();
@@ -238,16 +259,30 @@ await wait(300);
 
 is(pd.body.classList.contains('drawer'), false, 'phone: lands with the drawer shut');
 const pr = pbtn.getBoundingClientRect();
-is(pr.width >= 44 && pr.height >= 44, true, 'phone: the button clears the touch target unchanged');
-is(Math.round(pr.left), 12, 'phone: still the map gutter — the drawer is shut at this width');
+const pz = pd.querySelector('.leaflet-control-zoom').getBoundingClientRect();
+const pza = pd.querySelector('.leaflet-control-zoom a').getBoundingClientRect();
+is(pr.width >= 44 && pr.height >= 44, true, 'phone: the button clears the 44px touch target');
+is(Math.round(pr.width), Math.round(pza.width), 'phone: the same size as a zoom button');
+/* ABOVE the zoom box here, not beside it. #legend takes `left: 12px; right: 68px` at this width, so
+   the strip left of the zoom buttons belongs to the legend and there is nowhere to stand. */
+is(pr.bottom <= pz.top, true, 'phone: sits ABOVE the zoom box');
+is(Math.round(pz.top - pr.bottom) <= 12, true, 'phone: and up against it, not adrift');
+is(Math.round(pr.right), Math.round(pz.right), 'phone: sharing its right edge');
+const plg = pd.getElementById('legend').getBoundingClientRect();
+is(pr.left < plg.right && plg.left < pr.right && pr.top < plg.bottom && plg.top < pr.bottom, false,
+   'phone: and clear of the legend, which takes the width beside the zoom buttons');
 
 const pb = pd.getElementById('pills').getBoundingClientRect();
 is(pb.width > 0, true, 'phone: the rising pill is on screen, so there is something to clear');
+/* It used to share the top-left corner with this button and needed measuring against it. The button
+   is at the bottom now, so the two cannot meet. Kept as an assertion rather than deleted: the
+   button has moved twice already. */
 is(pr.left < pb.right && pb.left < pr.right && pr.top < pb.bottom && pb.top < pr.bottom, false,
    'phone: the rising pill clears the button');
-// Named rather than left implicit: 34px is the whole margin, and a pill 68px wider takes it.
-lines.push(`      (clearance: ${Math.round(pb.left - pr.right)}px, pill ${Math.round(pb.width)}px)`);
 
 lines.push(bad ? `FAIL: ${bad}` : 'PASS');
+/* Without this the page stays on "running..." and says nothing about why. A check that can
+   fail silently is not a check. */
+} catch (e) { bad++; lines.push('THREW: ' + ((e && e.stack) || e)); lines.push('FAIL: ' + bad); }
 out.textContent = lines.join('\n');
 </script>

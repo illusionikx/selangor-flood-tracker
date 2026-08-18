@@ -714,14 +714,18 @@ document.addEventListener('toggle', e => {
   const wantLeft = r.left < innerWidth / 2 ? r.left : r.right - box.offsetWidth;
   box.style.left = `${Math.max(8,
     Math.min(wantLeft, innerWidth - box.offsetWidth - 8))}px`;
-  /* Always below the button, then slid up only as far as the viewport needs. It used to flip above
-     the button when the space below ran short, and a phone has short space below almost everywhere.
-     The ⋮ on a station card sits near the top of `#side`, so the flip put the menu above the top
-     edge of the screen, where a reader could not reach it. The slide keeps the whole box on screen
-     and can overlap the button, which is the lesser fault — an overlapped button is still a menu
-     you can read. The clamp is the same shape as the one on the left axis above. */
+  /* Away from the nearest edge again, on the other axis. A button in the top half opens downward
+     and one in the bottom half opens upward, then the clamp keeps the whole box on screen.
+     **This is a position test, never a space test, and that distinction is the whole entry.** It
+     used to flip above the button when the space BELOW ran short, and a phone has short space below
+     almost everywhere. The ⋮ on a station card sits near the top of `#side`, so that flip put the
+     menu above the top edge of the screen, where a reader could not reach it. A button in the
+     bottom half always has more than half a viewport above it, so this rule cannot repeat that.
+     `#paint` is what needs it: the button sits 36px off the bottom edge beside the zoom control, and
+     a menu opened downward from there is clamped up over the button it came from. */
+  const wantTop = r.top > innerHeight / 2 ? r.top - box.offsetHeight - 4 : r.bottom + 4;
   box.style.top = `${Math.max(8,
-    Math.min(r.bottom + 4, innerHeight - box.offsetHeight - 8))}px`;
+    Math.min(wantTop, innerHeight - box.offsetHeight - 8))}px`;
 }, true);
 
 // --- alert list ------------------------------------------------------------------------------
