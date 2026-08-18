@@ -104,7 +104,7 @@
 /* Pseudo-element icons: the component sets --i and the size, this supplies the rest. Listed here
    rather than repeated in three stylesheets, so there is one place that answers "how do icons
    work". */
-#locate::before, #paint::before, #gotoBox::after, .spark::before, .sparktip.warn::before {
+#locate::before, #gotoBox::after, .spark::before, .sparktip.warn::before {
   content: ''; display: block; background: currentColor;
   -webkit-mask: var(--i) center / contain no-repeat;
           mask: var(--i) center / contain no-repeat;

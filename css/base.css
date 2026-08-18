@@ -4,7 +4,7 @@
 :root {
   color-scheme: light;
   --surface: #fff; --on-surface: #1f1f1f; --muted: #5f6368; --outline: #dadce0;
-  --hover: #f1f3f4; --accent: #1a73e8;
+  --hover: #f1f3f4; --accent: #1a73e8; --on-accent: #fff;
   --shadow: 0 1px 2px rgba(60,64,67,.3), 0 2px 6px 2px rgba(60,64,67,.15);
   --drawer: 288px; --slide: .25s cubic-bezier(.4, 0, .2, 1);
   /* The station panel's width, in a token because three other pieces of map furniture step aside by
@@ -120,7 +120,7 @@
 :root[data-theme="dark"] {
   color-scheme: dark;
   --surface: #202124; --on-surface: #e8eaed; --muted: #9aa0a6; --outline: #3c4043;
-  --hover: #303134; --accent: #8ab4f8;
+  --hover: #303134; --accent: #8ab4f8; --on-accent: #202124;
   --shadow: 0 1px 2px rgba(0,0,0,.6), 0 2px 6px 2px rgba(0,0,0,.3);
   /* The river lines js/map.js draws over the dark basemap, read from here by name so no hex lands
      in a JS file. **Exactly the colour the tint paints the sea and the lakes**, so a river reads as
@@ -452,11 +452,6 @@ dialog:focus, dialog:focus-visible { outline: none; }
    either list. `#districtList`'s copy needs none of this — that one is `display: none` on touch. */
 #ignoredList .solo::after, #favList .solo::after { content: ''; position: absolute; inset: -10px -6px; }
 
-/* The one divider in the drawer. It separates the five sensor kinds from the two filters that share
-   their section. A rule rather than a second `.sect`: they belong to the same fold, and a heading
-   over two chips is a heading with nothing to hold. */
-#kinds hr { margin: 12px 0 8px; border: 0; border-top: 1px solid var(--outline); }
-
 .rowbtns { display: flex; gap: 8px; margin-top: 8px; }
 .rowbtns .link { justify-content: center; }
 .link:disabled { opacity: .45; cursor: default; background: color-mix(in srgb, var(--accent) 10%, transparent); }
@@ -468,6 +463,49 @@ dialog:focus, dialog:focus-visible { outline: none; }
   font-size: 22px;
 }
 .icon:hover, body.drawer #menu { background: var(--hover); }
+
+/* --- FAB ---------------------------------------------------------------------------------------
+   M3's floating action button: filled, elevated, and it stands OFF the surface it floats over. The
+   glyph is `layers` at every state and never the layer currently painting. It carried the water drop
+   and the rain cloud first, and those are the two glyphs the river and rainfall PINS draw. So the
+   control read as a station, on a map covered in stations, in the corner where the eye looks for a
+   control. **A control has to look like a control.** The label under the glyph says which control.
+   `--accent` rather than `--surface`, because a surface-coloured plate on a dark basemap is the
+   same tone as the ground behind it. That was the second half of the same fault.
+   It takes no status hue and it is not allowed one. The status ladder is reserved, and an amber or
+   red control on a flood map reads as an alert on the water. `--accent` is the colour this app
+   already paints a control that is doing something, on `#locate.on` and on a checked chip.
+   `--on-accent` is a real token in both themes rather than a literal white. The dark theme's accent
+   is a pale blue, so white on it fails contrast the moment somebody switches theme. */
+.fab {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  width: 64px; padding: 10px 6px; cursor: pointer;
+  background: var(--accent); color: var(--on-accent);
+  border: 0; border-radius: 16px; box-shadow: var(--shadow);
+}
+.fab .i { font-size: 24px; }
+.fab b { font: 500 10px/1.2 Roboto, sans-serif; letter-spacing: .02em; }
+/* M3's state layer: the on-colour at 8% over the container, rather than a brightness filter. A
+   filter on this box would also be discarded on the glyph inside it — see the mask gotcha. */
+.fab:hover { background: color-mix(in srgb, var(--on-accent) 8%, var(--accent)); }
+.fab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* --- a labelled group inside a menu ------------------------------------------------------------
+   The same words as a drawer section heading, so the two panels speak one language: 11px, 500,
+   uppercase, tracked, muted. `.sect > summary` is the original and this cannot reuse it, because
+   that selector carries a chevron, a flex row and a pointer for a <details> that is not here. */
+.mgroup {
+  display: flex; align-items: center; gap: 6px; margin: 6px 6px 4px;
+  font: 500 11px Roboto, sans-serif; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--muted);
+}
+.mgrp + .mgrp { margin-top: 10px; }
+/* Shown by the weather rule in chrome.css and hidden the rest of the time. It is not uppercase and
+   not tracked: it is a sentence about the group, not a second heading. */
+.mgroup .mhint {
+  display: none; margin-left: auto; text-transform: none; letter-spacing: 0;
+  font-weight: 400; font-size: 10px; opacity: .8;
+}
 
 .link {
   display: flex; align-items: center; gap: 6px; width: 100%; padding: 8px 10px;

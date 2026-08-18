@@ -700,8 +700,15 @@ document.addEventListener('toggle', e => {
   const btn = document.querySelector(`[popovertarget="${box.id}"]`);
   if (!btn) return;
   const r = btn.getBoundingClientRect();
+  /* Away from the nearest edge, which is what every menu does. A button in the left half aligns its
+     menu's LEFT edge to its own, and one in the right half aligns the right edges. Right was the
+     only rule here, because every caller was the ⋮ on a station card and `#side` is on the right.
+     `#paint` is a FAB on the map's left edge, and a right-aligned menu grew leftward across the
+     drawer from a button 64px wide. It read as the drawer's menu rather than the button's. The
+     clamps below still keep the whole box on screen either way. */
+  const wantLeft = r.left < innerWidth / 2 ? r.left : r.right - box.offsetWidth;
   box.style.left = `${Math.max(8,
-    Math.min(r.right - box.offsetWidth, innerWidth - box.offsetWidth - 8))}px`;
+    Math.min(wantLeft, innerWidth - box.offsetWidth - 8))}px`;
   /* Always below the button, then slid up only as far as the viewport needs. It used to flip above
      the button when the space below ran short, and a phone has short space below almost everywhere.
      The ⋮ on a station card sits near the top of `#side`, so the flip put the menu above the top

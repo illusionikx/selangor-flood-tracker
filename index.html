@@ -69,9 +69,9 @@
 <link rel="stylesheet" href="vendor/leaflet.css">
 <link rel="stylesheet" href="vendor/markercluster.css">
 <link rel="stylesheet" href="vendor/fonts.css?v=51">
-<link rel="stylesheet" href="css/icons.css?v=89">
-<link rel="stylesheet" href="css/base.css?v=128">
-<link rel="stylesheet" href="css/chrome.css?v=182">
+<link rel="stylesheet" href="css/icons.css?v=90">
+<link rel="stylesheet" href="css/base.css?v=129">
+<link rel="stylesheet" href="css/chrome.css?v=183">
 <link rel="stylesheet" href="css/map.css?v=150">
 
 <!-- Water tint for the dark basemap. CARTO's dark_all is greyscale — all 18 of its tones have zero
@@ -981,28 +981,14 @@
     </details>
   </div>
   <div>
-    <!-- The three paint choices left this drawer for the map's own top-left corner. See #paint
-         below. What is left here filters the pins, so it is one section and not two.
-         The two chips under the rule are not a sixth kind. The kinds above say which sensors draw.
-         These two say which stations draw at all. A rule rather than a section of their own,
-         because a heading over two chips is a heading with nothing to hold.
-         No `checked` attribute on any box. `PREFS` is the source of truth and render.js writes the
-         boxes from it. A hard-coded state here is a second source that can only disagree.
-         `autocomplete="off"` stops the other writer. A browser restores a checkbox across a reload
-         without firing `change`. Every checkbox a preference owns carries it. -->
+    <!-- Which sensor kinds draw, and nothing else. The paint choice and the two pin filters left
+         this drawer for the map's own top-left corner. See #paint below.
+         A kind is not a filter over stations. It is which of a station's sensors this map is
+         willing to draw at all, which is why it stayed here beside the district picker while
+         Favorites and On alert went to the map. -->
     <details id="kinds" class="sect" open>
       <summary><i class="i i-apps"></i>Sensor kinds<b id="kindN"></b></summary>
       <div id="layers"></div>
-      <hr>
-      <label class="chip"><input type="checkbox" id="risingOnly" autocomplete="off">
-        <i class="glyph i i-warning"></i>Rising stations only <span id="risingHint" class="hint"></span></label>
-      <!-- A view filter, like the district picker and unlike the ignored list. It hides pins and
-           changes no alert. Two things say it is on: this panel, and the `· favorites only` note
-           in #shown below. That is the pair the ignored list uses. It needs no standing pill the
-           way the rising filter does. That one is a lone checkbox with no list under it saying
-           what it took away. This one has exactly that list. -->
-      <label class="chip"><input type="checkbox" id="favOnly" autocomplete="off">
-        <i class="glyph i i-favorite"></i>Favorites only <span id="favHint" class="hint"></span></label>
     </details>
     <!-- Outside the section on purpose: the `· N ignored` count is one of the two always-visible
          indications that an alarm has been silenced, and a collapsed section would hide it. -->
@@ -1013,35 +999,54 @@
      the alert list behind the app bar's warning glyph carries the same information without a time
      limit. -->
 <div id="toast" class="surface" role="status" aria-live="polite"></div>
-<!-- Top-left of the map. The three choices under it are one mutually-exclusive answer to one
-     question: what does the map paint. Weather is a mode rather than a wash, because it hides every
-     station, and it is still the third answer to that same question.
+<!-- Top-left of the map. Two groups, because the five controls under it answer two questions.
+     Heatmap is what the map WASHES, and the two in it are one mutually-exclusive choice.
+     Icons is what the map DRAWS, and the three in it are independent.
      They sit here rather than in the drawer for the reason the go-to box does: this is a control you
-     reach for *while looking at the map*, and behind the hamburger it meant opening a panel to use
-     it and closing it again to see the result. Their key is already on the map, bottom-left.
+     reach for *while looking at the map*. Behind the hamburger it meant opening a panel to use it,
+     then closing that panel to see the result.
      `popover` carries the open state, the light dismiss and the Escape key, and the top layer with
      them. The `toggle` handler in js/ui.js places any `.menu` under its own `[popovertarget]`
      button, so there is no script here at all.
-     No `checked` attribute on any box. `PREFS.heatLayer` and `PREFS.wx` are the source of truth, and
-     syncHeat() and syncWx() write the boxes from them. A hard-coded state here is a second source
-     that can only disagree. It disagrees during the window before the deferred module runs.
-     `autocomplete="off"` stops the other writer. A browser restores a checkbox across a reload
-     without firing `change`. Every checkbox a preference owns carries it. -->
-<button id="paint" class="icon surface" popovertarget="paintmenu"
-        title="Map layers" aria-label="Map layers"></button>
+     No `checked` attribute on any box. `PREFS` is the source of truth, and syncHeat(), syncWx(),
+     syncRisingChip() and syncFavChip() write the boxes from it. A hard-coded state here is a second
+     source that can only disagree. `autocomplete="off"` stops the other writer. A browser restores
+     a checkbox across a reload without firing `change`. Every checkbox a preference owns carries
+     it. -->
+<button id="paint" class="fab" popovertarget="paintmenu" aria-label="Map layers">
+  <i class="i i-layers"></i><b>Layers</b></button>
 <div id="paintmenu" class="menu surface" popover>
-  <label class="chip"><input type="checkbox" id="heat" autocomplete="off">
-    <i class="glyph i i-water_drop"></i>Water-level heatmap</label>
-  <label class="chip"><input type="checkbox" id="rainHeat" autocomplete="off">
-    <i class="glyph i i-rainy"></i>Rainfall heatmap</label>
-  <label class="chip"><input type="checkbox" id="wxLayer" autocomplete="off">
-    <i class="glyph i i-sunny"></i>MET nowcast map <span id="wxHint" class="hint"></span></label>
+  <!-- The two heat canvases. Weather takes the map from both of them and leaves the preference
+       alone, which is the whole of "turn the previous heatmap back on". So these two chips stay
+       checked while weather is on, and the hint says so rather than letting them claim a wash that
+       is not there. -->
+  <div class="mgrp heatgrp">
+    <p class="mgroup">Heatmap<span class="mhint">off while weather is on</span></p>
+    <label class="chip"><input type="checkbox" id="heat" autocomplete="off">
+      <i class="glyph i i-water_drop"></i>Water level</label>
+    <label class="chip"><input type="checkbox" id="rainHeat" autocomplete="off">
+      <i class="glyph i i-rainy"></i>Rainfall</label>
+  </div>
+  <!-- Three independent controls over what draws on the map rather than what washes it. Favorites
+       and On alert filter the station pins. Weather replaces them with its own. -->
+  <div class="mgrp">
+    <p class="mgroup">Icons</p>
+    <label class="chip"><input type="checkbox" id="favOnly" autocomplete="off">
+      <i class="glyph i i-favorite"></i>Favorites <span id="favHint" class="hint"></span></label>
+    <label class="chip"><input type="checkbox" id="wxLayer" autocomplete="off">
+      <i class="glyph i i-sunny"></i>Weather <span id="wxHint" class="hint"></span></label>
+    <label class="chip"><input type="checkbox" id="risingOnly" autocomplete="off">
+      <i class="glyph i i-warning"></i>On alert <span id="risingHint" class="hint"></span></label>
+  </div>
 </div>
 <!-- Standing indications that the map is showing less than it holds. One strip, because test mode
      and the rising filter can be on at the same time and two fixed pills would sit on each other.
      The test badge appends itself here from test.js. -->
 <div id="pills">
-  <div id="risebadge"><i class="i i-visibility_off"></i><b>RISING ONLY</b>
+  <!-- ON ALERT, matching the chip in #paint that raises it. One name for one thing. The sentence
+       under it states what the filter actually does, which is narrower than the app bar's own
+       "on alert" count: this hides every station that is not forecast to reach danger. -->
+  <div id="risebadge"><i class="i i-visibility_off"></i><b>ON ALERT</b>
     <span>Every station not climbing is hidden</span>
     <button id="riseOff">Show all</button></div>
 </div>

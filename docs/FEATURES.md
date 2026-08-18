@@ -10332,70 +10332,114 @@ that reports a change in feed order.
 
 ## The paint chooser moved onto the map
 
-**The three choices left the drawer.** Water-level heat, rainfall heat and the MET nowcast are one
-mutually-exclusive answer to one question: what does the map paint. They now sit behind a 40px
-button on the map's own top-left corner, `#paint`, with a popover under it.
+**The layer controls left the drawer.** They sit behind a FAB on the map's own top-left corner,
+`#paint`, with a popover under it. Five controls in two labelled groups.
+
+| group | holds | shape |
+|---|---|---|
+| Heatmap | Water level, Rainfall | one mutually-exclusive choice, `PREFS.heatLayer` |
+| Icons | Favorites, Weather, On alert | three independent controls |
 
 **The argument is the go-to box's argument.** This is a control you reach for *while looking at the
-map*. Behind the hamburger it meant opening a panel to use it and closing that panel to see the
-result. Filters shape the view and this paints it. Their key was already on the map, bottom-left.
+map*. Behind the hamburger it meant opening a panel to use it, then closing that panel to see the
+result. Filters shape the view and this paints it. The key was already on the map, bottom-left.
 
 **Top-left is the one free corner.** `#legend` is bottom-left, `#credit` and the zoom buttons are
 bottom-right, `#toast` is top-right and `#pills` is top-centre. `z-index: 401` puts it over the
-legend and the alert panel, one rung under `#gotoBox`'s results list and well under the app bar.
+legend and the alert panel, one rung under `#gotoBox`'s results list and under the app bar.
 It rides the drawer shift the way `#legend` does.
 
 **No JavaScript at all.** The panel is a `popover`, so the open state, the light dismiss, the Escape
 key and the top layer are the platform's.
 
-The `toggle` handler in `js/ui.js` already places any `.menu` under its own `[popovertarget]`
-button. Nothing in that handler names one menu. The three checkboxes keep their ids, so
-`syncHeat()` and `syncWx()` still write them, and remain the only writer of them.
+The `toggle` handler in `js/ui.js` places any `.menu` under its own `[popovertarget]` button. Nothing
+in that handler names one menu. The five checkboxes keep their ids, so `syncHeat()`, `syncWx()`,
+`syncRisingChip()` and `syncFavChip()` still write them, and remain the only writer of them.
 
-### The resting glyph is the state, and it is CSS
+### The button is a control, and the first one was not
 
-The button draws the active layer's own glyph: the water drop, the rain cloud, the sun, or the
-layers glyph when nothing paints. `--accent` marks it on, which is `#locate`'s own shape.
+**It shipped with the active layer's glyph on it, and that was wrong twice over.**
 
-So the button states what the map paints, and nobody has to open it first. A `title` cannot do that
-job. It never opens on touch. That is why `#layerN`, the drawer summary that carried this before,
-went away rather than moved, and its line in `syncHeat()` with it.
+The glyph followed the layer: the water drop, the rain cloud, the sun. Two of those three are the
+glyphs the river and rainfall PINS draw.
 
-It is a `:has()` ladder on the three checkboxes rather than a fourth line in `syncHeat()`. Two
-writers on one fact age apart, which is the fault that function exists to prevent.
+So the control drew a rain cloud, on a map covered in rain clouds, in the corner where a reader
+looks for a control.
 
-**The `:not(:has(#wxLayer:checked))` on the two heatmap rungs is load-bearing.** `syncHeat()` leaves
-`#heat` checked *during* weather mode. The preference it reports is what "turn the previous heatmap
-back on" restores.
+The plate made it worse. `--surface` on the dark theme is the tone of the basemap under it. A reader
+named the result: indistinguishable from a map icon.
 
-So two rules match at once. Without the exclusion, source order alone decides which glyph draws.
-Reorder the stylesheet and the button states a different layer, with nothing to report it. The
-exclusion makes the three mutually exclusive in the selector, which leaves nothing to guard.
+**A control has to look like a control.** So the glyph is `layers` at every state, the label under
+it reads `Layers`, and `.fab` fills the plate with `--accent`.
 
-**A pseudo-element that sets `--i` paints nothing on its own.** The mask lives in an explicit
-selector list in `css/icons.css` — `#locate::before, #paint::before, #gotoBox::after, .spark::before,
-.sparktip.warn::before`. `#paint::before` shipped for one run without joining it. `--i` resolved
-correctly at every rung and the button drew an empty white plate.
+**It takes no status hue, and nothing gives it one.** This app reserves that ladder. An amber
+or red control on a flood map reads as an alert on the water. `--accent` is what this app already
+paints a control at work, on `#locate.on` and on a checked chip.
+
+`--on-accent` is a real token in both themes rather than a literal white. The dark theme's accent is
+a pale blue, so white on it fails contrast the moment somebody switches theme.
+
+**The state went with the glyph, and nothing was lost.** `#legend` names the wash and draws its
+ramp, bottom-left. `#risebadge` states the filter, top-centre. `#shown` counts what the drawer hides.
+Every one of those was already on screen. `#layerN`, the drawer summary that named the layer, is
+gone with its line in `syncHeat()`.
+
+### Weather dims the heatmap group rather than unchecking it
+
+Weather takes the map from both heat canvases and deliberately leaves `PREFS.heatLayer` alone. That
+is the whole of "turn the previous heatmap back on".
+
+So `syncHeat()` leaves the two heat chips checked while weather runs. Grouped under a heading, two
+checked chips claim a wash that is not on the map. The group dims and captions itself instead:
+`off while weather is on`.
+
+**Dimmed and captioned, never unchecked.** The check is the preference, and the preference is what
+leaving weather mode restores. It is a `:has()` rule rather than a line in `syncHeat()`, because two
+writers on one fact age apart.
+
+### A menu opens away from the nearest edge
+
+The placement handler right-aligned every menu to its button. Every caller was the ⋮ on a station
+card, and `#side` is on the right edge, so that rule was invisible.
+
+`#paint` is 64px wide on the map's left edge. A 236px menu right-aligned to it grew leftward across
+the drawer, and read as the drawer's menu rather than the button's. A button in the left half of the
+viewport now aligns the LEFT edges.
+
+Measured: `#appMenu` holds its place at 1400px and at 360px. So does the ⋮, because `#side` anchors
+to the right edge at both widths.
 
 ### What was left behind
 
-`#layersect` kept the heading *Layers* over two pin filters. So it is gone.
+`#kinds` holds the five sensor kinds and nothing else. A kind is not a filter over stations. It is
+which of a station's sensors this map draws at all, which is why it stayed beside the district
+picker while Favorites and On alert went to the map.
 
-`#risingOnly` and `#favOnly` moved into `#kinds`, under the same `<hr>` they already sat under. They
-answer the question the kinds above them answer: which pins draw. The drawer holds three sections
-now. They are Districts, Ignored sensors and Sensor kinds, plus Favorites and the `#shown` line.
+`#layersect` kept the heading *Layers* over two pin filters, so it is gone.
 
-Both keep the standing indication the alert standard asks for. Rising has `#risebadge` over the map
-and favorites has the `· favorites only` note in `#shown`. Neither depended on the section it left.
+### Naming, and one mismatch that is deliberate
+
+`#risebadge` reads `ON ALERT` now, matching the chip that raises it. One name for one thing.
+
+**That chip still filters on `s.rising`, which is narrower than what this app calls "on alert"
+everywhere else.** `isHot()` is `isCritical(s) || (river && rising)`. That is what the app bar
+counts, the badge shows and the panel lists.
+
+So the map chip hides stations the app bar counts. The pill's own sentence states the real rule:
+`Every station not climbing is hidden`.
+
+Widening the chip to `isHot()` is one line in `render.js`. The repository owner heard that
+trade-off and chose the narrow filter. Read this as a decision on record, not an oversight.
 
 ### Measured
 
 **Nothing moves `#pills` for this button, and one revision did.** The strip centres on the viewport.
-`#risebadge` measures 180px at 360px wide, so it runs 90 to 270 against a button ending at 56. It
-clears by 34px.
+`#risebadge` measures 180px at 360px wide, so it runs 90 to 270 against a button ending at 76. It
+clears by 14px.
 
 The rule that pushed the whole strip down 48px aimed at an estimate of the pill's width, never at
-the pill. Measure the pair before moving either.
+the pill. `paint-check.html` measures the pair and prints the clearance, so a wider pill fails a
+check rather than landing on the button.
 
 ### Not built
 
@@ -10403,8 +10447,8 @@ the pill. Measure the pair before moving either.
 this project's breakpoint, and a box that opens on hover over a map opens while somebody pans it.
 One press, both platforms.
 
-*No copy left in the drawer.* Two controls on one preference is the fault `syncHeat()`'s own
-comment describes at length.
+*No copy left in the drawer.* Two controls on one preference is the fault `syncHeat()`'s own comment
+describes at length.
 
-*The `<hr>` under the kinds is still a rule and not a fourth section.* A heading over two chips is
-a heading with nothing to hold.
+*No thumbnail on the FAB.* Google Maps previews the basemap there. This app has one basemap, and it
+follows the theme. So the picture carries no information.

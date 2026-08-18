@@ -2,11 +2,15 @@
 <meta charset="utf-8">
 <title>paint chooser check</title>
 <!--
-  The paint chooser lives on the map and states what the map paints through one glyph on its
-  resting button. That glyph is a `:has()` ladder in css/chrome.css, and every way it fails is
-  silent. A wrong rung draws a real glyph for a real layer, just not the one painting. A missed
-  `:not()` hands the answer to source order, so reordering the stylesheet changes what the button
-  says. Neither shows in `php -l`, in `node --check`, or in any query over .cache.json.
+  The paint chooser is a FAB on the map holding five controls in two groups. What it guards is
+  rendered pixels, which `php -l`, `node --check` and any query over .cache.json all miss.
+
+  The button must not read as a map pin. It did: it drew the water drop and the rain cloud, which
+  are the glyphs the river and rainfall pins draw, on a `--surface` plate the same tone as the dark
+  basemap under it. So it asserts the layers glyph, a real label, and a fill that is neither the
+  surface behind it nor any status hue.
+
+  The rest is placement. Nothing else floats in that corner, at either width.
 
   Run:
   "/c/Program Files/Google/Chrome/Application/chrome.exe" --headless=new --disable-gpu \
@@ -59,37 +63,42 @@ is(menu.matches(':popover-open'), true, 'the button opens the panel');
 const mb = menu.getBoundingClientRect(), bb = btn.getBoundingClientRect();
 is(mb.top >= bb.bottom && mb.top - bb.bottom < 16, true, 'the panel is placed just under the button');
 is(mb.left >= 8, true, 'and clamped onto the screen rather than off its left edge');
+/* A FAB on the left edge opens its menu rightward. Right-aligned, a 236px menu grew leftward from a
+   64px button across the drawer, and read as the drawer's menu. */
+is(Math.abs(mb.left - bb.left) < 2, true, 'a left-edge button opens its menu to the right');
 is(mb.width > 0 && mb.height > 0, true, 'it has a size, so the three chips laid out');
 // A press inside must not dismiss it: three mutually-exclusive choices means trying another one.
-el('rainHeat').closest('label').click();
+el('favOnly').closest('label').click();
 await wait(120);
 is(menu.matches(':popover-open'), true, 'picking a layer leaves the panel open to pick another');
-el('rainHeat').checked = false;
+el('favOnly').checked = false;
 menu.hidePopover();
 await wait(120);
 is(menu.matches(':popover-open'), false, 'and it closes again');
 
 // --- the three choices moved, and none of them is in two places --------------------------------
 
-is(d.querySelectorAll('#heat, #rainHeat, #wxLayer').length, 3, 'all three boxes are on the page once');
-for (const id of ['heat', 'rainHeat', 'wxLayer'])
-  is(el(id).closest('#paintmenu') !== null, true, `#${id} is in the map panel`);
+const BOXES = ['heat', 'rainHeat', 'favOnly', 'wxLayer', 'risingOnly'];
+is(d.querySelectorAll(BOXES.map(i => '#' + i).join(', ')).length, 5, 'all five boxes exist once');
+for (const id of BOXES)
+  is(el(id).closest('#paintmenu') !== null, true, id + ' is in the map panel');
 is(el('bar').contains(el('heat')), false, 'and no copy is left in the drawer');
 is(!!el('layersect'), false, '#layersect is gone');
 is(!!el('layerN'), false, '#layerN is gone with the summary it fed');
 
-// --- the two pin filters stayed behind ---------------------------------------------------------
+// --- the drawer keeps the kinds and nothing else -----------------------------------------------
 
-is(el('risingOnly').closest('#kinds') !== null, true, 'rising only stayed in the drawer');
-is(el('favOnly').closest('#kinds') !== null, true, 'favorites only stayed in the drawer');
-is(d.querySelector('#kinds hr') !== null, true, 'the rule that separates them came with them');
+is(el('bar').contains(el('risingOnly')), false, 'on alert left the drawer');
+is(el('bar').contains(el('favOnly')), false, 'favorites left the drawer');
+is(d.querySelector('#kinds input[data-kind]') !== null, true, 'the sensor kinds stayed');
+is(d.querySelector('#kinds hr'), null, 'and the rule that split them went with them');
 
 // --- placement, in rendered pixels -------------------------------------------------------------
 
 const r = btn.getBoundingClientRect();
 const hdr = parseFloat(w.getComputedStyle(d.documentElement).getPropertyValue('--hdr'));
 is(Math.round(r.top - hdr), 12, 'the top edge clears the app bar by the gutter');
-is(r.width >= 40 && r.height >= 40, true, 'the button is at least 40px square');
+is(r.width >= 44 && r.height >= 44, true, 'the button clears the 44px touch target');
 // The desktop drawer opens by default, and the button rides its shift the way #legend does.
 const drawerOpen = d.body.classList.contains('drawer');
 const shift = drawerOpen ? parseFloat(w.getComputedStyle(d.documentElement).getPropertyValue('--drawer')) : 0;
@@ -103,42 +112,62 @@ for (const id of ['legend', 'pills', 'toast', 'credit', 'bar']) {
      `does not overlap #${id}`);
 }
 
-// --- the glyph ladder --------------------------------------------------------------------------
-/* Driven on the checkbox property, because that is what the CSS reads. `:checked` matches the live
-   IDL state rather than the attribute, so assigning it here exercises the same selector a real
-   press does. The four states below are the four syncHeat() produces. */
-const set = async (heat, rain, wx) => {
-  el('heat').checked = heat; el('rainHeat').checked = rain; el('wxLayer').checked = wx;
-  await wait(60);
-};
+// --- the button is a control, not a pin ------------------------------------------------------
+/* The fault this replaced: the glyph followed the active layer, so it drew `water_drop` or `rainy`
+   - the river and rainfall PIN glyphs - beside real pins carrying the same shape. And the plate was
+   `--surface`, which on the dark theme is the tone of the basemap under it. */
+const ico = btn.querySelector('.i');
+is(!!ico, true, 'the button carries a glyph element');
+is(ico.classList.contains('i-layers'), true, 'and it is the layers glyph');
+is(/water_drop|rainy|sunny/.test(ico.className), false, 'never a station-pin glyph');
+is(w.getComputedStyle(ico).maskImage !== 'none', true, 'the glyph is masked, so it paints');
+const label = btn.querySelector('b');
+is(!!label && label.textContent.trim().length > 0, true, 'it carries a text label');
+is(label.textContent.trim(), 'Layers', 'and the label names the control');
 
-await set(false, false, false);
-const resting = ink();
-/* The glyph has to be PAINTED, not merely named. `--i` resolving proves nothing on its own: the
-   mask that turns it into pixels is an explicit selector list in css/icons.css, and a pseudo-element
-   left off it sets --i, sizes itself and draws an empty plate. That shipped here for one run. */
-const pre = () => w.getComputedStyle(btn, '::before');
-is(pre().content !== 'none', true, 'the glyph pseudo-element exists');
-is(pre().maskImage !== 'none' && pre().maskImage !== '', true, 'and it carries the mask that paints it');
-is(parseFloat(pre().width) > 0 && parseFloat(pre().height) > 0, true, 'and it has a box to paint in');
-is(glyph(), token('layers'), 'nothing painting -> the layers glyph');
+const fab = w.getComputedStyle(btn);
+const surface = w.getComputedStyle(d.getElementById('legend')).backgroundColor;
+is(fab.backgroundColor !== 'rgba(0, 0, 0, 0)' && fab.backgroundColor !== 'transparent', true,
+   'the plate is opaque');
+is(fab.backgroundColor !== surface, true, 'and it is not the surface tone the basemap sits under');
+is(parseFloat(fab.borderTopLeftRadius) >= 12, true, 'FAB corner radius');
+is(fab.boxShadow !== 'none', true, 'and it is elevated off the map');
 
-await set(true, false, false);
-is(glyph(), token('water_drop'), 'water level -> the water drop');
-is(ink() !== resting, true, 'water level -> the accent, not the resting ink');
+/* The glyph holds whatever paints. That is the whole point of the change. */
+const seen = new Set();
+for (const [h, r, x] of [[1, 0, 0], [0, 1, 0], [0, 0, 1], [0, 0, 0]]) {
+  el('heat').checked = !!h; el('rainHeat').checked = !!r; el('wxLayer').checked = !!x;
+  await wait(50);
+  seen.add(w.getComputedStyle(ico).maskImage);
+}
+is(seen.size, 1, 'the glyph holds at all four states, so it can never name a layer');
 
-await set(false, true, false);
-is(glyph(), token('rainy'), 'rainfall -> the rain cloud');
+// --- the two groups ----------------------------------------------------------------------------
 
-/* The state no source ordering can be trusted with. syncHeat() writes `#heat.checked = wet`
-   whatever `PREFS.wx` says, because the pref it reports is what leaving weather mode restores. So
-   both boxes really are checked here, and two rules match unless the `:not()` holds. */
-await set(true, false, true);
-is(glyph(), token('sunny'), 'weather mode beats the heatmap it is holding for the reader');
-await set(false, true, true);
-is(glyph(), token('sunny'), 'and beats the rainfall one too');
+const groups = [...menu.querySelectorAll('.mgroup')].map(g => g.firstChild.textContent.trim());
+is(groups.length, 2, 'the panel is two labelled groups');
+is(groups[0], 'Heatmap', 'the wash group comes first');
+is(groups[1], 'Icons', 'then the group that changes what draws');
+is(el('heat').closest('.mgrp') === el('rainHeat').closest('.mgrp'), true,
+   'the two heat layers share a group');
+for (const id of ['favOnly', 'wxLayer', 'risingOnly'])
+  is(el(id).closest('.mgrp') !== el('heat').closest('.mgrp'), true, id + ' is in the icon group');
 
-await set(true, false, false);
+/* Weather leaves PREFS.heatLayer alone, so syncHeat() leaves the heat chips checked while it runs.
+   Without the dim and the caption the group claims a wash that is not on the map. */
+el('heat').checked = true; el('wxLayer').checked = false;
+await wait(60);
+const hg = menu.querySelector('.heatgrp');
+is(w.getComputedStyle(hg).opacity, '1', 'the heatmap group is live with weather off');
+is(w.getComputedStyle(hg.querySelector('.mhint')).display, 'none', 'and says nothing');
+el('wxLayer').checked = true;
+await wait(60);
+is(parseFloat(w.getComputedStyle(hg).opacity) < 1, true, 'weather on -> the heatmap group dims');
+is(w.getComputedStyle(hg.querySelector('.mhint')).display !== 'none', true, 'and says why');
+is(el('heat').checked, true, 'and the chip stays checked, because the preference is what returns');
+el('wxLayer').checked = false;
+el('heat').checked = true; el('rainHeat').checked = false;
+await wait(60);
 
 // --- phone width -------------------------------------------------------------------------------
 /* 360px, the width the app bar is measured against. Two claims. The button grows to the touch
@@ -158,7 +187,7 @@ await wait(300);
 
 is(pd.body.classList.contains('drawer'), false, 'phone: lands with the drawer shut');
 const pr = pbtn.getBoundingClientRect();
-is(pr.width >= 44 && pr.height >= 44, true, 'phone: the button is at least a 44px touch target');
+is(pr.width >= 44 && pr.height >= 44, true, 'phone: the button clears the touch target unchanged');
 is(Math.round(pr.left), 12, 'phone: still the map gutter — the drawer is shut at this width');
 
 const pb = pd.getElementById('pills').getBoundingClientRect();
