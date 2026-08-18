@@ -2166,10 +2166,17 @@ it. The weather section stretches nothing. It is five fixed keys measuring 231px
 - All user settings live in one `prefs` blob in `localStorage` (`PREFS` + `save()`).
 - **The layer controls live on the map, in two groups, and the drawer keeps the sensor kinds.**
   `#paint` is a `.mapbtn` in the map's bottom zoom cluster. Its popover holds two layers at the top
-  level and no headings over them: `Stations` and `Weather`, one at a time. Inside `Stations` sit two
-  labelled sections, `Heatmap` (water level, rainfall) and `Icon` (favorites, on alert).
-  **Every chip carries a line of flavour text**, which says what the reader gets. A `.hint` beside
-  the label is a different thing: JS writes it and it reports a state, such as `none starred`.
+  level and no headings over them: `Stations` and `Weather`. Inside `Stations` sit two labelled
+  sections, `Heatmap` (water level, rainfall) and `Icon` (favorites, on alert).
+  **Exactly one layer is on at every moment, so those two chips are RADIOS.** Clicking a member of a
+  radio group cannot clear it, which is the rule. A map with neither layer is a basemap with no
+  answer on it. `PREFS.mapLayer` therefore has no empty value, `''` was reachable for one revision
+  and is gone, and Stations is the landing default. **The pairs inside Stations stay checkboxes**,
+  because "no wash" and "no filter" are both answers a reader wants.
+  **Every chip carries a line under its label**, which says what the reader gets. On the two layers
+  that line has two forms: what the layer draws, and why it is quiet while the other one draws. A
+  `.hint` beside the label is a third thing: JS writes it and it reports a state, such as
+  `none starred`.
   **The rule for what goes where: a control the reader reaches for WHILE LOOKING AT THE MAP goes on
   `#paint`. A control that shapes which stations exist at all stays in the drawer**, beside the
   district picker and the ignored list. `#layersect` and `#layerN` are gone.
@@ -2178,11 +2185,15 @@ it. The weather section stretches nothing. It is five fixed keys measuring 231px
   the panel cannot draw, and this repo already paid for it once — see `syncHeat()`'s own comment for
   the two repairs that failed. `syncPins()` and `render()` are the other two writers, and each one
   writes its pair of boxes from its own string.
-  **`PREFS.wx` and `PREFS.stations` are gone.** `PREFS.mapLayer === 'weather'` and
-  `=== 'stations'` replace them everywhere, and `''` means neither. Leaving weather goes back to
-  `'stations'`, never to `''` — in the toggle, in `flashTo()` and in the failed-import rollback. A
-  reader leaving a weather map wants the map back. `syncWx()` no longer writes the weather box:
-  `render()` writes both layer boxes, so the pair has one writer.
+  **`PREFS.wx` and `PREFS.stations` are gone.** `PREFS.mapLayer === 'weather'` and `=== 'stations'`
+  replace them everywhere, and those are the only two values. Leaving weather goes back to
+  `'stations'`, in `flashTo()` and in the failed-import rollback. A reader leaving a weather map
+  wants the map back. `syncWx()` no longer writes the weather box: `render()` writes both layer
+  boxes, so the pair has one writer.
+  **A menu takes the edge it opens FROM as the edge that pins it**, `bottom` upward and `top`
+  downward — see the placement handler in `js/ui.js`. `#paintmenu` changes height on a press, and the
+  far edge pinned it off the button that opened it. The branch collapse is a grid row between `0fr`
+  and `1fr`. `interpolate-size` with `height: auto` came first and does not come back.
   **`Stations` gates the wash as well as the pins.** `render()` and `syncHeat()` share the test
   `PREFS.mapLayer === 'stations'`. Everything under that chip is a choice ABOUT the station layer, so
   with the layer off none of them has anything to act on and the branch collapses.
@@ -2935,6 +2946,15 @@ preference is one string rather than a pair of booleans.
 **A resolved token is not a painted pixel.** An early version asserted `--i` alone and passed on a
 button drawing an empty plate, because `#paint::before` had never joined the mask list in
 `css/icons.css`. It reads `mask-image` and the box size too now.
+
+**Headless virtual time does not run CSS transitions faithfully, so no check here can measure one
+mid-flight.** Reading the animated branch 120ms into its collapse returned a value that then stuck at
+0 for the rest of the run, on markup that works in a real browser. Two runs agreed, and a probe that
+did not read mid-flight reported the correct 309px from the same code.
+
+So an animation is asserted as a DECLARATION, once, and then `paint-check.html` injects
+`* { transition: none !important }` into the frame and measures every state settled. Assert the
+declaration BEFORE that override, or the override is what gets read.
 
 **Geometry is measured with the panel OPEN.** A closed popover is `display: none`, so every rect
 inside it reads zero. An indent assertion then compares 0 against 0 and reports a working indent as

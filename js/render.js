@@ -57,7 +57,10 @@ export function render() {
      the two chips below and syncHeat() all obey. A browser restores a checkbox across a reload
      without firing `change`, so the control cannot be the source of truth. */
   /* Both layer boxes, written from the one preference that holds the choice. syncWx() no longer
-     touches the weather box, so there is one writer for the pair and both-on cannot be drawn. */
+     touches the weather box, so there is one writer for the pair.
+     They are radios, so the browser already refuses both-on and refuses neither. This still writes
+     both, because a radio restored across a reload is form state this app does not own, and because
+     the rollback in the weather handler moves the preference without touching a box. */
   el('stations').checked = PREFS.mapLayer === 'stations';
   el('wxLayer').checked = PREFS.mapLayer === 'weather';
   const pinFilter = syncPins();
@@ -388,13 +391,12 @@ function counts() {
   // answer it should give.
   const ign = ignoredIds();
   const nIgn = state.data.filter(s => ign.has(s.id)).length;
-  /* Either way of hiding the pins makes the station tally read "0 of 729", which explains nothing.
-     This line is the one the eye lands on to ask why the map is empty, so it answers instead.
-     Weather is named first because it is the stronger claim. It takes the heat as well. */
+  /* Weather hides every station, so the tally would read "0 of 729" and explain nothing. This line
+     is the one the eye lands on to ask why the map is empty, so it answers instead.
+     There is no third branch any more. `PREFS.mapLayer` holds one of two values, so a map with no
+     layer at all is unreachable and the line that named it had nothing left to say. */
   el('shown').textContent = PREFS.mapLayer === 'weather'
     ? 'Weather map · flood stations hidden'
-    : PREFS.mapLayer !== 'stations'
-    ? 'Stations off · turn them on under Layers'
     : `${total} of ${state.data.length} stations on the map` +
       (pins && pins < total ? ` · ${pins} pins` : '') +
       (PREFS.pinFilter === 'fav' ? ' · favorites only' : '') +

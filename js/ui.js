@@ -463,12 +463,16 @@ delete PREFS.heat; delete PREFS.rainHeat;   // dropped from the blob on the next
 PREFS.pinFilter ??= PREFS.favOnly ? 'fav' : PREFS.risingOnly ? 'alert' : '';
 delete PREFS.favOnly; delete PREFS.risingOnly;
 
-/* The two map layers are one choice for the same reason: `'stations'`, `'weather'` or `''`. Weather
+/* The two map layers are one choice, and **exactly one of them is on at every moment**. Weather
    emptied the map of stations long before the panel said so, and a pair of booleans could hold both
-   on, which is a state neither the map nor the panel can draw. Weather wins the migration where an
-   old blob held both, because it is the mode a reader is inside rather than the default they never
-   turned off. `''` stays reachable: a reader can have the basemap and nothing over it. */
-PREFS.mapLayer ??= PREFS.wx ? 'weather' : PREFS.stations === false ? '' : 'stations';
+   on — a state neither the map nor the panel can draw.
+   `''` is not a value. A map with neither layer is a basemap with no answer on it, and nothing is
+   worth reaching that state by accident. The chips are radios for the same reason: clicking a
+   member of a radio group cannot clear it.
+   So an old blob resolves to weather only if it was inside weather mode, and to stations otherwise
+   — including the `stations: false` case, which was the reachable empty map. **Stations is also the
+   landing default**, through the same expression, because it is what this page is for. */
+PREFS.mapLayer = PREFS.mapLayer === 'weather' || PREFS.wx ? 'weather' : 'stations';
 delete PREFS.wx; delete PREFS.stations;
 // Before the first payload, not after it: render() is a whole poll away, and until it ran the map
 // carried the water layer and the legend carried both ramps whatever the pref said. This is also
@@ -514,14 +518,14 @@ el('heat').onchange = el('rainHeat').onchange = el('risingOnly').onchange =
   if (e.target === el('favOnly') || e.target === el('risingOnly'))
     PREFS.pinFilter = !e.target.checked ? '' : e.target === el('favOnly') ? 'fav' : 'alert';
 
-  /* The two map layers, read off the box that fired, exactly as the two pairs above are. Nothing
-     inside Stations is cleared with it — the branch collapses in `#paintmenu` and every preference
-     in it stands, so switching Stations back on restores the view that was there before. Clearing
-     them would make the parent a destructive control.
+  /* The station layer. A radio only fires `change` when it becomes the checked one, so there is no
+     "unchecked" case to write here and no way for a reader to reach a map with no layer at all.
+     Nothing inside Stations is cleared with it — the branch collapses in `#paintmenu` and every
+     preference in it stands, so coming back to Stations restores the view that was there before.
+     Clearing them would make the parent a destructive control.
      Weather is NOT handled here. It has its own handler below, because turning it on has to await a
      deferred module and roll back when that import fails. */
-  if (e.target === el('stations'))
-    PREFS.mapLayer = e.target.checked ? 'stations' : '';
+  if (e.target === el('stations')) PREFS.mapLayer = 'stations';
   syncHeat();
   risePill();
   save();
@@ -538,10 +542,10 @@ el('heat').onchange = el('rainHeat').onchange = el('risingOnly').onchange =
    test toggle and the two dialogs already use. lazy() rethrows on purpose, because it does not
    know which surface a caller owns, and this one owns #wxHint. */
 el('wxLayer').onchange = async e => {
-  /* One choice with the station layer, so turning weather ON turns stations off by writing the same
-     string. Turning it off returns to the stations, which is what a reader leaving a weather map
-     wants to see — not a bare basemap they then have to switch back on. */
-  PREFS.mapLayer = e.target.checked ? 'weather' : 'stations';
+  /* One choice with the station layer, so picking weather takes the map from the stations by writing
+     the same string. A radio fires only on the way in, so this handler never has to answer "off".
+     The way out is the Stations radio, and the rollback below. */
+  PREFS.mapLayer = 'weather';
   save();
   el('wxHint').textContent = '';
   try {
@@ -750,10 +754,24 @@ document.addEventListener('toggle', e => {
      menu above the top edge of the screen, where a reader could not reach it. A button in the
      bottom half always has more than half a viewport above it, so this rule cannot repeat that.
      `#paint` is what needs it: the button sits 36px off the bottom edge beside the zoom control, and
-     a menu opened downward from there is clamped up over the button it came from. */
-  const wantTop = r.top > innerHeight / 2 ? r.top - box.offsetHeight - 4 : r.bottom + 4;
-  box.style.top = `${Math.max(8,
-    Math.min(wantTop, innerHeight - box.offsetHeight - 8))}px`;
+     a menu opened downward from there is clamped up over the button it came from.
+
+     **The edge it opens FROM is the edge it is anchored BY, and that is not tidiness.** A menu whose
+     contents can change height while it is open drifts away from its button if the far edge is the
+     fixed one. `#paintmenu` collapses and expands a whole branch on a press, so an upward menu
+     pinned by `top` would leave its bottom edge sliding up the screen, away from the button that
+     opened it. Pinned by `bottom` it grows and shrinks upward instead, and the two stay together
+     with no observer and no second placement pass.
+     Both are cleared each time, because the same box can be placed either way over its life. */
+  const up = r.top > innerHeight / 2;
+  const h = box.offsetHeight;
+  box.style.top = box.style.bottom = '';
+  if (up) {
+    box.style.bottom = `${Math.max(8,
+      Math.min(innerHeight - r.top + 4, innerHeight - h - 8))}px`;
+  } else {
+    box.style.top = `${Math.max(8, Math.min(r.bottom + 4, innerHeight - h - 8))}px`;
+  }
 }, true);
 
 // --- alert list ------------------------------------------------------------------------------

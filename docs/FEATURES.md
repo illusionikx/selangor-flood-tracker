@@ -10339,9 +10339,9 @@ that reports a change in feed order.
 cluster, with a popover on it. Two layers at the top level, and everything else inside one of them.
 
 ```
-Stations                      the station layer          ┐ one at a time
-   HEATMAP                      how its readings wash     │
-     Water level                  one at a time           │
+Stations                      the station layer          ┐ radios: exactly
+   HEATMAP                      how its readings wash     │ one, at every
+     Water level                  one at a time           │ moment
      Rainfall                                             │
    ICON                         which of its pins draw    │
      Favorites                    one at a time           │
@@ -10349,11 +10349,20 @@ Stations                      the station layer          ┐ one at a time
 Weather                       the MET nowcast layer      ┘
 ```
 
-Every chip carries a line of flavour text under its label. The label names the control and the line
-says what the reader gets. `Nowcast from MET` is the weather one.
+Every chip carries a line under its label. The label names the control and the line says what the
+reader gets.
 
-**`.hint` beside a label is a different thing.** JS writes it and it reports a state, such as
-`none starred` on a filter with nothing to match. Flavour text is static and describes the layer.
+**On the two layers that line has two forms.** The layer drawing says what it draws. The layer
+standing by says why it is quiet. Exactly one layer is on, so exactly one form of each shows, and
+the pair never both explains itself and excuses itself at once.
+
+| layer | drawing | standing by |
+|---|---|---|
+| Stations | `Live river, rain and camera sites` | `Off while weather is on` |
+| Weather | `Nowcast from MET` | `Off while stations are on` |
+
+**`.hint` beside a label is a third thing.** JS writes it and it reports a state, such as
+`none starred` on a filter with nothing to match. The line under the label is static.
 
 **No headings over the top level.** Stations and Weather are the two things this map draws, and one
 draws at a time. Every other control answers a question ABOUT the station layer, so it lives inside
@@ -10429,9 +10438,11 @@ back on has to restore the view that was there before, and a parent that clears 
 destructive control wearing a checkbox. Both the collapse and the weather dim are `:has()` rules, so
 nothing in `js/` can get either wrong.
 
-**`#shown` answers for both ways of emptying the map.** Weather gives
-`Weather map · flood stations hidden`. Stations off gives `Stations off · turn them on under
-Layers`. Without either, the tally reads `0 of 743` and explains nothing.
+**`#shown` answers the one way of emptying the map.** Weather gives `Weather map · flood stations
+hidden`. Without it the tally reads `0 of 743` and explains nothing.
+
+There is no second branch any more. `PREFS.mapLayer` holds one of two values, so a map with no layer
+at all is unreachable and the line that named it had nothing left to say.
 
 ### One at a time, in both sections
 
@@ -10459,28 +10470,63 @@ returns on the next reload.
 *Migration:* a blob holding both booleans resolves to Favorites. It is the narrower set, and the one
 a reader picks deliberately, station by station.
 
-### Stations and Weather became one choice, and a caption went with it
+### One layer at every moment, and the chips are radios
 
-`PREFS.mapLayer` holds `'stations'`, `'weather'` or `''`. Two preferences in this panel already had
-that shape, `PREFS.heatLayer` and `PREFS.pinFilter`. This is the third.
+`PREFS.mapLayer` holds `'stations'` or `'weather'`. Two preferences in this panel already had that
+shape, `PREFS.heatLayer` and `PREFS.pinFilter`. This is the third, and the strictest.
 
 **Weather emptied the map of stations long before the panel said so.** Saying so lets the station
-branch collapse rather than dim, and takes a line of text off the screen.
+branch collapse rather than dim, and takes a caption off the screen.
 
-**What went:** the two dim rules and the `off while weather is on` caption. They existed for a state
-that is now unrepresentable, which is a checked Stations box beside a weather map. A rule that cannot
-fire is a rule that goes.
+**There is no empty value.** A map with neither layer is a basemap with no answer on it, and nothing
+is worth reaching that state by accident. `''` was reachable for one revision and is gone.
 
-**Leaving weather returns to the stations, never to a bare map.** `PREFS.mapLayer = 'stations'` on
-the way out, in the toggle, in `flashTo()` and in the failed-import rollback. A reader who leaves a
-weather map wants the map back, not an empty one to switch on again.
+**So the two chips are radios, and that is the difference from the pairs inside Stations.** Clicking
+a member of a radio group cannot clear it, which is exactly the rule here. The heatmap pair and the
+icon pair stay checkboxes, because "no wash" and "no filter" are both answers a reader wants.
 
-`''` stays reachable. Turning Stations off with weather already off leaves the basemap and nothing
-over it, and `#shown` says so.
+The handlers get simpler with them. A radio fires `change` only on the way in, so neither handler has
+an "off" case to write, and neither can reach a map with no layer.
+
+**Stations is the landing default**, through the same expression that migrates an old blob. A blob
+holding the old empty map resolves to Stations too.
+
+**Leaving weather returns to the stations.** `PREFS.mapLayer = 'stations'` in `flashTo()` and in the
+failed-import rollback. A reader who leaves a weather map wants the map back.
+
+**What went with the exclusivity:** the two dim rules, the caption, and `#shown`'s third branch. Each
+existed for a state that is now unrepresentable. A rule that cannot fire is a rule that goes.
 
 **`syncWx()` no longer writes the weather box.** `render()` writes both layer boxes from the one
-preference, so the pair has a single writer and both-on cannot reach the screen. `wx.js` defers its
-load and can fail it. That is a second reason the boxes cannot depend on it.
+preference, so the pair has a single writer. `wx.js` defers its load and can fail it. That is a
+second reason the boxes cannot depend on it.
+
+### The branch animates, and the panel stays glued to its button
+
+**Pin a menu by its far edge and it drifts off its button whenever the contents change height.**
+`#paintmenu` collapses and expands a whole branch on a press. Opening upward and pinned by `top`, its
+bottom edge slid up the screen, away from the button that opened it.
+
+**So the edge it opens FROM is the edge that pins it.** An upward menu takes `bottom` and a downward
+one takes `top`.
+
+The branch then grows and shrinks away from the button, and the two stay together with no observer
+and no second placement pass. Measured: 4px, unchanged across a collapse and an expand.
+
+**The collapse is a grid row running between `0fr` and `1fr`**, with `.subin` clipping inside it.
+That is the collapse technique that needs no new CSS feature, and it is the one that works here.
+
+**`interpolate-size: allow-keywords` with `height: auto` came first, and it does not come back.**
+Headless Chrome reports the property as supported. Measured there, the branch collapsed to 0 and then
+held 0 for good.
+
+The collapse rule no longer matched, and `scrollHeight` still reported its full 309px. Going out
+worked and coming back did not. Do not reach for it here again without measuring both directions.
+
+`visibility` carries the tab order, with explicit timings on both sides. A transitioned `visibility`
+holds its start value for the whole duration, so a bare transition leaves the collapsed rows
+focusable for the length of the slide. That is the trap `#splash` and `#gotoBox` both hit.
+`prefers-reduced-motion` drops the transition.
 
 ### A menu opens away from the nearest edge, on both axes
 

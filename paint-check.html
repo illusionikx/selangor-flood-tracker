@@ -43,6 +43,20 @@ await wait(4000);
 const w = f.contentWindow, d = f.contentDocument;
 const el = id => d.getElementById(id);
 
+/* **Headless virtual time does not run CSS transitions faithfully**, so nothing here can measure one
+   mid-flight. Reading the branch at 120ms returned a value that then stuck at 0 for the rest of the
+   run, on markup that works in a real browser. So the animation is asserted as a DECLARATION, once,
+   and then transitions come out of the way and every state below is measured settled.
+   Assert the declaration BEFORE the override, or the override is what gets read. */
+{
+  const t = w.getComputedStyle(d.querySelector('.subgrp')).transitionProperty;
+  is(t.includes('grid-template-rows'), true, 'the branch animates its collapse');
+  is(t.includes('visibility'), true, 'and carries visibility, which holds the tab order');
+}
+const noAnim = d.createElement('style');
+noAnim.textContent = '*{transition:none !important}';
+d.head.appendChild(noAnim);
+
 const btn = el('paint'), menu = el('paintmenu');
 if (!btn || !menu) {
   out.textContent = 'FAIL  the paint chooser did not render at all';
@@ -197,8 +211,25 @@ for (const id of BOXES) {
   is(!!small && small.textContent.trim().length > 0, true, id + ' carries flavour text');
   is(chip.querySelector('.lab') !== null, true, id + ' keeps its label in its own row');
 }
-is(el('wxLayer').closest('.chip').querySelector('small').textContent.trim(), 'Nowcast from MET',
-   'and the weather chip names its source');
+/* The two layer chips carry that line in two forms: what the layer draws while it is drawing, and
+   why it is quiet while the other one is. Exactly one layer is on, so exactly one form of each
+   shows, and the pair never both explains and excuses itself at once. */
+const shownLine = id => [...el(id).closest('.chip').querySelectorAll('small span')]
+  .filter(s => w.getComputedStyle(s).display !== 'none')
+  .map(s => s.textContent.trim()).join(' | ');
+el('stations').checked = true;
+el('stations').dispatchEvent(new w.Event('change'));
+await wait(1200);
+is(shownLine('stations'), 'Live river, rain and camera sites', 'the layer drawing says what it draws');
+is(shownLine('wxLayer'), 'Off while stations are on', 'and the quiet one says why');
+el('wxLayer').checked = true;
+el('wxLayer').dispatchEvent(new w.Event('change'));
+await wait(2500);
+is(shownLine('wxLayer'), 'Nowcast from MET', 'weather drawing names its source');
+is(shownLine('stations'), 'Off while weather is on', 'and stations says why it is quiet');
+el('stations').checked = true;
+el('stations').dispatchEvent(new w.Event('change'));
+await wait(1500);
 /* The weather chip takes the hue its own clear-sky pin draws in, never a status hue. `--wx-clear`
    is muted away from `--s-alert` on purpose, so an amber chip here cannot read as an alert.
    Compared against the RESOLVED token, because a custom property substitutes its `var()` at computed
@@ -231,13 +262,27 @@ is(el('favOnly').closest('.chip').getBoundingClientRect().left > subBox.left, tr
    'the chips themselves clear the spine');
 is(w.getComputedStyle(sub).borderLeftStyle !== 'none', true, 'with a spine carrying the nesting');
 
-el('stations').checked = false;
-await wait(60);
-is(w.getComputedStyle(sub).display, 'none', 'Stations off -> the whole branch collapses');
-is(el('favOnly').checked === false && el('risingOnly').checked === false, true,
-   'collapsing does not silently check anything');
+/* Driven by picking the OTHER layer, because that is the only way a reader can put Stations away.
+   The chips are radios: clicking the checked one cannot clear it. */
+const favWas = el('favOnly').checked, alertWas = el('risingOnly').checked;
+el('wxLayer').checked = true;
+el('wxLayer').dispatchEvent(new w.Event('change'));
+await wait(2500);
+is(sub.offsetHeight, 0, 'weather picked -> the whole branch collapses');
+is(w.getComputedStyle(sub).visibility, 'hidden', 'and leaves the tab order with it');
+is(el('favOnly').checked === favWas && el('risingOnly').checked === alertWas, true,
+   'collapsing changes nothing inside it');
+/* The panel is anchored by its bottom edge, so a branch that grows or shrinks moves away from the
+   button rather than dragging the box off it. */
+const glued = () => Math.round(el('paint').getBoundingClientRect().top
+                             - menu.getBoundingClientRect().bottom);
+const gapCollapsed = glued();
 el('stations').checked = true;
-await wait(60);
+el('stations').dispatchEvent(new w.Event('change'));
+await wait(1500);
+is(sub.offsetHeight > 0, true, 'stations picked -> the branch comes back');
+is(glued(), gapCollapsed, 'and the panel stays the same distance off the button either way');
+is(glued() >= 0 && glued() <= 12, true, 'which is hard against it');
 menu.hidePopover();
 await wait(60);
 
@@ -260,19 +305,29 @@ for (const id of ['favOnly', 'risingOnly', 'favOnly', 'rainHeat', 'heat', 'rainH
   await pick(id);
   is(onCount(['favOnly', 'risingOnly']) <= 1, true, 'after ' + id + ': at most one pin filter on');
   is(onCount(['heat', 'rainHeat']) <= 1, true, 'after ' + id + ': at most one heatmap on');
-  is(onCount(['stations', 'wxLayer']) <= 1, true, 'after ' + id + ': at most one map layer on');
+  /* **The layers are the stricter rule: EXACTLY one, never none.** A map with neither is a basemap
+     with no answer on it. Radios are what enforce it, so this holds through every press above. */
+  is(onCount(['stations', 'wxLayer']), 1, 'after ' + id + ': exactly one map layer on');
 }
-/* The two map layers are a pair as well. Weather emptied the map of stations long before the panel
-   said so. Weather needs a longer wait: turning it on awaits a deferred module. */
+/* Radios rather than checkboxes, and that is the difference from the two pairs above. The pairs
+   inside Stations keep "neither" reachable, so they stay checkboxes. */
+for (const id of ['stations', 'wxLayer']) {
+  is(el(id).type, 'radio', id + ' is a radio, so a press cannot clear it');
+  is(el(id).name, el('stations').name, 'and both sit in one group');
+}
+for (const id of ['heat', 'rainHeat', 'favOnly', 'risingOnly'])
+  is(el(id).type, 'checkbox', id + ' stays a checkbox, because "neither" is a real answer there');
+
+// Weather needs a longer wait: picking it awaits a deferred module.
 el('wxLayer').checked = true;
 el('wxLayer').dispatchEvent(new w.Event('change'));
 await wait(2500);
-is(onCount(['stations', 'wxLayer']) <= 1, true, 'weather on -> at most one map layer on');
-is(w.getComputedStyle(sub).display, 'none', 'and the station branch collapses with its parent');
-el('wxLayer').checked = false;
-el('wxLayer').dispatchEvent(new w.Event('change'));
-await wait(2000);
-is(el('stations').checked, true, 'leaving weather returns to the stations, never to a bare map');
+is(onCount(['stations', 'wxLayer']), 1, 'weather picked -> exactly one map layer on');
+is(sub.offsetHeight, 0, 'and the station branch collapses with its parent');
+el('stations').checked = true;
+el('stations').dispatchEvent(new w.Event('change'));
+await wait(1500);
+is(el('stations').checked, true, 'picking stations returns to them');
 /* And the mechanism behind it: one preference holding one string. A pair of booleans can hold
    both-on, which is the state this panel cannot draw. */
 const prefs = JSON.parse(w.localStorage.getItem('prefs') || '{}');
@@ -281,6 +336,8 @@ is('favOnly' in prefs, false, 'and the old favOnly boolean is migrated away');
 is('risingOnly' in prefs, false, 'and the old risingOnly boolean with it');
 is(typeof prefs.heatLayer, 'string', 'the heatmaps are the same shape, which this copies');
 is(typeof prefs.mapLayer, 'string', 'and the two map layers are one string too');
+is(['stations', 'weather'].includes(prefs.mapLayer), true,
+   'which is only ever one of the two — there is no empty map layer');
 is('wx' in prefs, false, 'the old wx boolean is migrated away');
 is('stations' in prefs, false, 'and the old stations boolean with it');
 // Leave the map unfiltered and the water wash on, or later assertions read a filtered payload.

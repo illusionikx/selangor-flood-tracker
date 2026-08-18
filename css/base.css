@@ -508,7 +508,7 @@ dialog:focus, dialog:focus-visible { outline: none; }
 /* The headings inside that branch. `.mgroup`'s own top margin is written for a group that follows
    another group; here the first one follows the parent chip and wants less. */
 .subgrp .mgroup { margin: 8px 6px 4px; }
-.subgrp > .mgroup:first-child { margin-top: 4px; }
+.subgrp .mgroup:first-child { margin-top: 4px; }
 /* Every chip in the paint panel carries a line of flavour text, so those chips are a two-row grid
    rather than the drawer's single row. Scoped to `#paintmenu`, because `.chip` is shared with the
    Sensor kinds list in the drawer, and those rows hold a count rather than a description.
@@ -526,6 +526,13 @@ dialog:focus, dialog:focus-visible { outline: none; }
 #paintmenu .chip small {
   grid-column: 2; font-size: 11px; line-height: 1.35; opacity: .72;
 }
+/* The two layer chips carry that line in two forms. The one drawing says what it draws. The one
+   standing by says why. Exactly one layer is ever on, so exactly one form of each shows, and the
+   pair never both explains itself and excuses itself at once.
+   Written as two spans under one rule rather than as JS, so nothing has to stay in step with the
+   preference. `:has()` on the chip's own input is the whole test. */
+#paintmenu .layer:has(input:checked) small .off,
+#paintmenu .layer:not(:has(input:checked)) small .on { display: none; }
 
 .link {
   display: flex; align-items: center; gap: 6px; width: 100%; padding: 8px 10px;

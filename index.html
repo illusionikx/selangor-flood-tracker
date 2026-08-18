@@ -70,8 +70,8 @@
 <link rel="stylesheet" href="vendor/markercluster.css">
 <link rel="stylesheet" href="vendor/fonts.css?v=51">
 <link rel="stylesheet" href="css/icons.css?v=93">
-<link rel="stylesheet" href="css/base.css?v=135">
-<link rel="stylesheet" href="css/chrome.css?v=188">
+<link rel="stylesheet" href="css/base.css?v=137">
+<link rel="stylesheet" href="css/chrome.css?v=190">
 <link rel="stylesheet" href="css/map.css?v=153">
 
 <!-- Water tint for the dark basemap. CARTO's dark_all is greyscale — all 18 of its tones have zero
@@ -1019,24 +1019,31 @@
 <button id="paint" class="mapbtn" popovertarget="paintmenu"
         title="Map layers" aria-label="Map layers"><i class="i i-layers"></i></button>
 <div id="paintmenu" class="menu surface" popover>
-  <!-- Two layers, and one at a time. `PREFS.mapLayer` holds `'stations'`, `'weather'` or `''` for
-       neither, which is the shape the two sections inside already use. Weather empties the map of
-       stations, so the pair was mutually exclusive in effect long before it said so. Saying so lets
-       the branch collapse rather than dim, and takes a caption off the screen.
+  <!-- Two layers, and **exactly one of them at every moment**. `PREFS.mapLayer` holds `'stations'`
+       or `'weather'` and nothing else. A map with neither is a basemap with no answer on it, which
+       is not a view worth being able to reach by accident.
+       **Radios, not checkboxes, and that is the difference from the two pairs below.** Clicking a
+       member of a radio group cannot clear it, which is exactly the rule here. The pairs inside
+       Stations stay checkboxes, because "no wash" and "no filter" are both states a reader wants.
        Everything else in here is a choice ABOUT the station layer, so it lives inside that branch.
-       Each chip carries a line of flavour text. The label names the control and the line under it
-       says what the reader gets. `.hint` beside the label is a different thing: it is written by JS
-       and it reports a STATE, such as a filter with nothing to match.
+       Each chip carries a line under its label. On the two layers that line has two forms: what the
+       layer draws while it is the one drawing, and why it is quiet while the other one is.
+       `.hint` beside a label is a third thing. JS writes it and it reports a state, such as a
+       filter with nothing to match.
        No `checked` attribute on any box. `PREFS` is the source of truth, and syncPins(), syncHeat()
        and render() write the boxes from it. `autocomplete="off"` stops the other writer: a browser
-       restores a checkbox across a reload without firing `change`. -->
-  <label class="chip"><input type="checkbox" id="stations" autocomplete="off">
+       restores form state across a reload without firing `change`. -->
+  <label class="chip layer"><input type="radio" name="maplayer" id="stations" autocomplete="off">
     <i class="glyph i i-place"></i><span class="lab">Stations</span>
-    <small>Live river, rain and camera sites</small></label>
+    <small><span class="on">Live river, rain and camera sites</span>
+      <span class="off">Off while weather is on</span></small></label>
   <!-- Collapses with its parent. Every control in here is a choice about the station layer, so with
        that layer off there is nothing for any of them to act on. Nothing in here is ever unchecked
        by the collapse: switching Stations back on has to restore the view that was there before. -->
-  <div class="subgrp">
+  <!-- `.subin` exists only so the branch can animate. A grid row goes from `0fr` to `1fr`
+       and the wrapper inside it clips, which is the one collapse technique that needs no
+       new CSS feature. See the rule in chrome.css for what was tried before it. -->
+  <div class="subgrp"><div class="subin">
     <!-- How the station readings wash over the map. One at a time: stacked, two heat layers are two
          answers to two questions in one picture, and leaflet.heat adds their alpha into a colour
          that belongs to neither scale. -->
@@ -1058,15 +1065,16 @@
       <i class="glyph i i-warning"></i><span class="lab">On alert
         <span id="risingHint" class="hint"></span></span>
       <small>Only sites forecast to reach danger</small></label>
-  </div>
+  </div></div>
   <!-- `--c` is the weather layer's own hue, the one its clear-sky pin draws in. It is not a status
        hue and it must never become one: see the colour language in CLAUDE.md. `--wx-clear` is muted
        away from `--s-alert` on purpose, so an amber chip here cannot read as an alert on the water. -->
-  <label class="chip" style="--c: var(--wx-clear)">
-    <input type="checkbox" id="wxLayer" autocomplete="off">
+  <label class="chip layer" style="--c: var(--wx-clear)">
+    <input type="radio" name="maplayer" id="wxLayer" autocomplete="off">
     <i class="glyph i i-sunny"></i><span class="lab">Weather
       <span id="wxHint" class="hint"></span></span>
-    <small>Nowcast from MET</small></label>
+    <small><span class="on">Nowcast from MET</span>
+      <span class="off">Off while stations are on</span></small></label>
 </div>
 <!-- Standing indications that the map is showing less than it holds. One strip, because test mode
      and the rising filter can be on at the same time and two fixed pills would sit on each other.
