@@ -1936,8 +1936,8 @@ and `--muted` flip with the theme while the picture behind them does not. White 
 - **A JPS notice feed is an archive of reissues, not a picture of now.** MET reissues one standing
   bulletin every few hours, under one heading and one validity window. `met_gelora.json` held 18
   rows on 2026-08-18. Eight of those rows were one bulletin, valid 17 August to 21 August. Each
-  reissue rewords its own list of areas, and `hereParts()` then narrows each row to the sentences
-  naming somewhere this map covers. Three of the eight reissues named Selangor, and each narrowed
+  reissue rewords its own list of areas. `hereParts()` then narrows each row to the sentences naming
+  somewhere this map covers. Three of the eight reissues named Selangor, and each narrowed
   to a different string. `mergeNotices()` keyed on the title and the text at the time. Three
   different strings made three different keys, so a reader met one bulletin as three cards.
   **The key is the title and the validity window now. It is never the text.** The window identifies
