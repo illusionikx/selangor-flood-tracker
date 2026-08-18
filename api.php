@@ -2680,9 +2680,9 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
                . '"hide":"0"}]';
     $ok('a raw newline in POINew still parses', count(floodAlerts($rawNlBody, time())) === 1);
 
-    /* --- mergeNotices(): one array, fresher first, duplicates dropped --- */
-    $mk = fn(string $t, string $x, string $from, string $src = 'met') =>
-        ['title' => $t, 'text' => $x, 'from' => $from, 'to' => $from,
+    /* --- mergeNotices(): one array, newest first, reissues dropped --- */
+    $mk = fn(string $t, string $x, string $from, string $src = 'met', ?string $to = null) =>
+        ['title' => $t, 'text' => $x, 'from' => $from, 'to' => $to ?? $from,
          'fresh' => true, 'kind' => 'weather', 'src' => $src];
 
     $m = mergeNotices([$mk('B', 'older', '2026-08-10T09:00:00')],
@@ -2695,13 +2695,29 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
         count(mergeNotices([$mk('A', 'x', '2026-08-17T08:00:00'),
                             $mk('A', 'x', '2026-08-17T08:00:00')])) === 1);
 
-    /* JPS writes a heading in capitals and data.gov.my does not, so the key lowercases. */
+    /* A JPS notice feed is an archive of reissues. MET reissues one standing bulletin every few
+       hours and rewords its list of areas each time. So three reissues of one sea warning reached
+       the panel as three cards on 2026-08-18. The key reads the window, never the text. */
+    $W = ['2026-08-17T00:00:00', 'jps', '2026-08-21T00:00:00'];
+    $reissue = [$mk('ROUGH SEAS', 'Selangor and Perak', ...$W),
+                $mk('ROUGH SEAS', 'Selangor, Perak and Pahang', ...$W),
+                $mk('ROUGH SEAS', 'Selangor, Perak, Penang and Kedah', ...$W)];
+    $ok('three reissues of one bulletin make one row', count(mergeNotices($reissue)) === 1);
+    /* JPS publishes newest first and usort() is stable, so the first row for a key is the newest
+       issue of it. This assertion is the whole of what holds that claim. */
+    $ok('and the newest issue is the one kept',
+        mergeNotices($reissue)[0]['text'] === 'Selangor and Perak');
+    /* One heading can carry a short-fuse warning inside a standing one. Rows 0 and 1 of
+       met_gelora.json were exactly that on 2026-08-18, so the window has to separate them. */
+    $ok('a different window is a different bulletin',
+        count(mergeNotices($reissue, [$mk('ROUGH SEAS', 'Selangor and Perak',
+              '2026-08-18T13:00:00', 'jps', '2026-08-18T17:00:00')])) === 2);
+
+    /* JPS writes a heading in capitals and data.gov.my does not, so the key lowercases. Both rows
+       carry one window here, because the window is the other half of the key. */
     $ok('a duplicate in another case drops',
         count(mergeNotices([$mk('STORM WARNING', 'x', '2026-08-17T09:00:00', 'jps')],
-                           [$mk('Storm Warning', 'x', '2026-08-10T09:00:00')])) === 1);
-    $ok('and the fresher copy is the one kept',
-        mergeNotices([$mk('STORM WARNING', 'x', '2026-08-17T09:00:00', 'jps')],
-                     [$mk('Storm Warning', 'x', '2026-08-10T09:00:00')])[0]['src'] === 'jps');
+                           [$mk('Storm Warning', 'y', '2026-08-17T09:00:00')])) === 1);
 
     // Both sources emit ISO, so a strcmp orders two rows on one day correctly. A JPS stamp left
     // verbatim reads `17-08-2026 08:00:00`, and `T` sorts above a space at that position.

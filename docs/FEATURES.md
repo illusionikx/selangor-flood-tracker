@@ -9979,8 +9979,12 @@ never seen, because its own source had stopped moving three days before.
 forecast. Every row from every producer carries the same seven fields: `title`, `text`, `from`, `to`,
 `fresh`, `kind` and `src`.
 
+**The key moved after this shipped.** It reads the title and the validity window now. It does not
+read the text. See *One bulletin, three cards* at the foot of this file for the reason. The rest of
+this section still holds.
+
 The merge does not pick one source over the other. It keeps both running, sorts every row newest
-first, and drops a row whose lowercased `title` and `text` match a row it already kept. Either source
+first, and drops a row whose lowercased `title` matches a row it already kept. Either source
 can go quiet on its own, the way `api.data.gov.my` just did. The merge survives that, because it
 never depends on one source alone.
 
@@ -10276,3 +10280,52 @@ keeps the distinct heavy glyph, at its own larger size.
   the chip with a `no data yet` hint instead.
 - **A district clip by state.** `wx-build.php` already bakes a state for each point. Nothing
   reads it today. A future filter by state is one line, over data already on disk.
+
+
+## One bulletin, three cards: the warning key reads the window
+
+**What changed.** `mergeNotices()` in `sources.php` keys a notice on its title and its validity
+window. It no longer keys on the text.
+
+**What a reader saw.** The alert panel drew three cards on 2026-08-18. All three read `FIRST
+CATEGORY WARNING ON STRONG WINDS AND ROUGH SEAS`. All three carried one validity window, 17 August
+to 21 August. Only the list of areas was different on each card.
+
+**Why.** A JPS notice feed is an archive of reissues. It is not a picture of now. MET reissues a
+standing bulletin every few hours. `met_gelora.json` held 18 rows on that day. Eight of those rows
+were one bulletin, reissued eight times under one heading and one window.
+
+Each reissue rewords its own list of areas. `hereParts()` then narrows each row to the sentences
+that name somewhere this map covers. Three of the eight reissues named Selangor. Each of the three
+narrowed to a different string:
+
+| issued | areas after `hereParts()` |
+|---|---|
+| 17 Aug 12:02 | Northern Sarawak, Western Sabah, Selangor, Perak |
+| 18 Aug 05:54 | Southeastern Samui, Kelantan, Terengganu, Penang, Perlis and Kedah, Selangor, Perak |
+| 18 Aug 08:37 | the same list, with Pahang added and the order changed |
+
+The old key was the lowercased title and the lowercased text. Three different strings made three
+different keys. So the duplicate test kept all three rows.
+
+**The rule.** The window identifies a bulletin. The text is what changes between issues of it.
+
+**The newest issue wins, and the order is what decides that.** `usort()` is stable in PHP 8. JPS
+publishes the newest row first. `jpsMetWarnings()` keeps that order. So the first row for a key is
+the newest issue of it. Check that claim again before you sort that array anywhere else.
+
+**One heading can carry two bulletins, and the window separates them.** Rows 0 and 1 of
+`met_gelora.json` did that on 2026-08-18. They named a window of 13:00 to 17:00, inside a bulletin
+valid for four days. Both survive the merge.
+
+**Trade-off accepted.** Two rows that share a heading and a window now collapse to one, even where
+they describe two events. No such row is on record. MET reissues a complete bulletin each time,
+and never a part of one. So the newest row is the complete picture.
+
+**Not built.** `jpsMetWarnings()` still discards the `Date` field the feed carries. That field is
+the issue stamp. It names the newest row and does not depend on feed order. Add it the day JPS
+stops publishing newest first.
+
+**Measured.** The live payload fell from 3 warnings to 1 on 2026-08-18. `php api.php --selftest`
+gained three assertions. One of them holds the newest-issue-wins claim above. It is the only thing
+that reports a change in feed order.

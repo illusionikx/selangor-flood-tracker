@@ -1933,6 +1933,23 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   modal. The merge sort is a `strcmp` over the same field. So a JPS stamp left in the shape JPS uses
   also misorders the merge. `jpsMetWarnings()` converts the stamp with `date('Y-m-d\TH:i:s', $from)`,
   the same shape `metWarnings()` already emits.
+- **A JPS notice feed is an archive of reissues, not a picture of now.** MET reissues one standing
+  bulletin every few hours, under one heading and one validity window. `met_gelora.json` held 18
+  rows on 2026-08-18. Eight of those rows were one bulletin, valid 17 August to 21 August. Each
+  reissue rewords its own list of areas, and `hereParts()` then narrows each row to the sentences
+  naming somewhere this map covers. Three of the eight reissues named Selangor, and each narrowed
+  to a different string. `mergeNotices()` keyed on the title and the text at the time. Three
+  different strings made three different keys, so a reader met one bulletin as three cards.
+  **The key is the title and the validity window now. It is never the text.** The window identifies
+  a bulletin. The text is what changes between issues of it. One heading can still carry two
+  bulletins, because a short warning sits inside a standing one. Rows 0 and 1 of that same file did
+  exactly that, over 13:00 to 17:00. The window separates them and both survive.
+  **The newest issue wins, and the order is what decides that.** `usort()` is stable in PHP 8. JPS
+  publishes the newest row first, and `jpsMetWarnings()` keeps that order. So the first row for a
+  key is the newest issue of it. `jpsMetWarnings()` discards the `Date` field the feed carries, so
+  nothing else can tell one issue from another. Check the order claim again before sorting that
+  array anywhere else. `--selftest` holds one assertion on it, and that assertion is the only
+  thing that reports a change of feed order.
 - **A national bulletin names several regions, and only one of them is ours.** A row-level place
   test keeps the whole bulletin once it names one place this map covers. `met_gelora.json` carried a
   1,795-character bulletin across 16 lines on 2026-08-17. It named Sarawak, Sabah, Selangor, Perlis,

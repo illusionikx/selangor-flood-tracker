@@ -1000,12 +1000,23 @@ function floodAlerts(string $json, int $now): array {
 /* Every producer emits one row shape. So the merge is a concatenation, a sort and the duplicate
  * test `metWarnings()` already ran inside one source.
  *
- * The sort puts the fresher copy of a repeated bulletin first, so the duplicate test drops the
- * older one. That is the whole of "prefer the fresher row". It is an order, not a comparison.
+ * The key is the title and the validity window. It is NOT the text.
+ *
+ * A JPS notice feed is an archive of reissues, not a picture of now. MET reissues one standing
+ * bulletin every few hours, under one heading and one window. `met_gelora.json` held 18 rows on
+ * 2026-08-18. Eight of those were one bulletin valid 17 August to 21 August, reissued eight times.
+ *
+ * Each reissue rewords its own list of areas. `hereParts()` then narrows each one to the sentences
+ * that name somewhere this map covers. So three of those eight reached three different strings. A
+ * key over the text read them as three warnings, and a reader met one bulletin three times.
+ *
+ * The window is what identifies a bulletin. The text is what changes between issues of it.
+ *
+ * The newest issue wins, and the order is what decides that. `usort()` is stable in PHP 8. JPS
+ * publishes newest first, and `jpsMetWarnings()` keeps that order. So the first row for a key is
+ * the newest issue of it. Check that claim again before you sort this array anywhere else.
  *
  * The key lowercases the title. JPS writes a heading in capitals and `data.gov.my` does not.
- * `met_gelora.json` held two identical rows on 2026-08-17, so the test earns its place inside one
- * source as well as across two.
  *
  * KNOWN LIMIT. The two MET sources word one bulletin differently. JPS writes "SECOND CATEGORY
  * WARNING ON STRONG WINDS AND ROUGH SEAS" where data.gov.my writes "Warning on Strong Wind and
@@ -1022,7 +1033,8 @@ function mergeNotices(array ...$sets): array {
     $out  = [];
     $seen = [];
     foreach ($all as $r) {
-        $k = strtolower(trim((string)$r['title'])) . "\x00" . strtolower(trim((string)$r['text']));
+        $k = strtolower(trim((string)$r['title'])) . "\x00"
+           . (string)$r['from'] . "\x00" . (string)$r['to'];
         if (isset($seen[$k])) continue;
         $seen[$k] = true;
         $out[] = $r;
