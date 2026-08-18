@@ -469,7 +469,7 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   compound in the same, understating, direction. That is the opposite of this repo's safe way to be
   wrong, and no `derived` marker communicates it.
 - **Never `file_get_contents()` a JPS URL — always curl.** `infobanjirjps.selangor.gov.my` resolves
-  to *two* A records and one of them (`58.27.97.62`) blackholes SYNs. curl races both (happy
+  to *two* A records. One of them (`58.27.97.62`) blackholes SYNs. curl races both (happy
   eyeballs) and connects in ~10 ms. PHP's stream wrapper tries addresses serially, with no connect
   timeout of its own. So it eats the OS TCP timeout — 21 s on Windows — whenever it draws the dead
   one. `?cam=` was the only outbound call in the repo not going through `fetchAll()`. It was
@@ -511,8 +511,7 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   every ~25 min and we poll every ~8.5 min. So a level is a staircase, and the same number arrives
   four or five times. Stamping each arrival `now` puts the step where we noticed it. That put up to
   a poll interval of error on *both* ends of a rate. A rate came out wrong by over 100% on a short
-  baseline. That is why a station whose level had not moved in five polls reported a 0.9 h ETA to
-  danger. `readTs()` reads `updated`, clamps a future stamp (JPS stamps to the upcoming slot) and
+  baseline. That is why a station whose level had not moved in five polls reported a 0.9 h ETA. `readTs()` reads `updated`, clamps a future stamp (JPS stamps to the upcoming slot) and
   falls back to `now` only when the parse fails. Anything new that writes to `level` must go through
   it. Two side effects to keep. The `(station, ts)` PK now dedupes a repeated reading to one row. A
   station frozen on an old reading stores that old stamp. So `RETAIN` prunes it, and `SPARK_WIN`
@@ -590,7 +589,7 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
 - **The accumulation chart carries no threshold mark, and three sources failed to supply one.** It
   says how much rain fell and never how bad that is. `rainBars()` above it already draws the JPS
   intensity classes. `rainState()` above that prints the word. A curve fitted between
-  `spVeryHeavy` (61 mm/h) and MET's figure of 240 mm/day joins a **1.7-year event to a 216-year
+  `spVeryHeavy` (61 mm/h) and MET's 240 mm/day joins a **1.7-year event to a 216-year
   one**. Those are two
   orders of magnitude apart in rarity. So it measures the gap between two definitions, and nothing
   about rain. JPS publishes MSMA 2nd Edition Equation 2.2, which covers 5 minutes to 72 hours
@@ -806,7 +805,7 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
 - **iOS has its own icon, `icon-180.png`, and needs it.** Safari does not honour alpha on a
   home-screen icon. It flattens it onto a colour of its own choosing, historically black. That is the
   exact plate that was deliberately removed. So `apple-touch-icon` points at an opaque white tile
-  with a smaller glyph. iOS rounds the corners itself, and the squircle bites anything near the edge.
+  with a smaller glyph. iOS rounds the corners itself. The squircle bites anything near the edge.
   The favicon and the manifest keep the transparent pair. **Do not point `apple-touch-icon` back at
   `icon-192.png`.** It looks right in every browser you can test locally, and black on a phone.
 - **The icon badge follows the app bar's alert count and nothing else.** `navigator.setAppBadge()` in
@@ -968,8 +967,8 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   So a chip goes neutral when the only critical pin near it is an unclustered favorite drawing itself
   red. Nothing leaves the screen. Do not "fix" the count by folding the favorites back in. That
   makes the badge claim to hide pins that are visible.
-- **Offline gauges are frozen on old flood readings** (3.55m from April) — so they are *not sampled
-  into `.history.db`* and carry no `history`. A flat line at a number from months ago reads as
+- **Offline gauges are frozen on old flood readings** (3.55m from April). So they are *not sampled
+  into `.history.db`*, and carry no `history`. A flat line at a number from months ago reads as
   "steady". That is the one thing a graph of a dead sensor must not say. Anything offline or
   >24h old renders grey with an explicit `OFFLINE` block, the date in the footer. Never show these
   as live. **A graph is still drawn for them**, and that does not breach the rule above. An offline
@@ -1009,8 +1008,8 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   and the band states all three. A rail with no bar on it is silence. A red bar shows when
   it started. A red bar that reaches the right edge means the siren sounds now.
 - **A siren reading 1 is a claim, not a fact, and the river behind it is the check.** JPS sounds a
-  siren for one minute at the Amaran mark, repeating every 3 hours while the water stays there, and
-  every 5 at Bahaya. So the alarm is a claim about a river level the payload already holds.
+  siren for one minute at the Amaran mark. It repeats every 3 hours while the water stays there,
+  and every 5 at Bahaya. So the alarm is a claim about a river level the payload already holds.
   `sirenBacked()` in `api.php` asks it. `backed` is true when a river within `SIREN_KM` (5 km) is at
   status ≥ 2. It is false when rivers are in reach and none is. It is **null when there is none to
   ask**. `sounding()` in `util.js` reads `backed !== false`. The null case keeps the benefit of the
@@ -1029,7 +1028,7 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   `hourlyRainfall` is a *rolling* one-hour total and `cumulativeRainfall` only climbs. So rain the
   first claims has to appear in the second across that hour. `rainBacked()` in `api.php` asks it and
   publishes `backed`. It is true where the odometer rose. It is false where the odometer did not
-  move while the gauge still claimed rain. It is **null where nothing can be asked** — a young
+  move while the gauge still claimed rain. It is **null where nothing can be asked**. That is a young
   archive, or a station with no odometer, which is every KL gauge. `raining()` in `util.js` reads
   `backed !== false`, exactly as `sounding()` does. A gauge nobody can check keeps its reading.
   Measured 2026-08-14: 5 of the 48 gauges that could be asked were claiming rain their own total
@@ -1044,7 +1043,7 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   unbacked gauge **neither paints nor erases**. A reading nobody can stand behind is no evidence
   that the ground under it is dry either. The card keeps printing what JPS publishes and adds
   `Faulty signal.`, the same shape the siren block above uses. **`soak()` in `test.js` sets
-  `backed: true`.** Without it, a faked storm on one of those gauges draws as a faulty signal with no
+  `backed: true`.** Without it, a faked storm on one of those gauges draws as a faulty signal. It gets no
   pin and no blob. Do not widen this to a duration cutoff, and do not let it silence a gauge it
   cannot ask.
 - **Nothing outranks a popover except another popover.** The table draws its graphs inside `.tipbox`,
@@ -1060,9 +1059,9 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   the same attribute. Any that does not simply has no `[data-pts]` to match.
 - **A flood gauge's status colour comes from `gaugeColor()` in `util.js` and nowhere else.** Upstream
   publishes 3 codes against 2 marks. So any depth under 0.15 m shared code 0 with *dry ground*. A
-  wet spot painted the same taupe as a dry one, which is the colour this app reserves for a sensor
-  that cannot report. `gaugeTone()` gives the rung (dry → 0, any water → 1, the warning mark → 2,
-  danger → 3) and `GAUGE_COLOR` gives the colour, which is **not** `STATUS_COLOR`. Rung 1 is
+  wet spot painted the same taupe as a dry one. That is the colour this app reserves for a sensor
+  that cannot report. `gaugeTone()` gives the rung: dry → 0, any water → 1, the warning mark → 2,
+  danger → 3. `GAUGE_COLOR` gives the colour, which is **not** `STATUS_COLOR`. Rung 1 is
   `--s-trace`, because upstream published no mark down there and amber claims one. Four
   surfaces read it: pin, card, table cell, table hover panel. It deliberately changes **no alert
   surface**. `isHot()` never covered gauges, so the count, the badge and the ticker do not move. If
@@ -1134,16 +1133,16 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   with the camera name and distance in a `title` alone. That is a fact a phone cannot reach. The
   fix was not a better tooltip but a different control. A menu row states the name, the
   distance and the reading as text. Reach for the row shape before the glyph shape.
-- **A timestamp is printed inside a ⋮ menu and nowhere else.** `sourceInfo()` does it for a sensor
-  and `wxDots()` does it for the weather section, which is the only other reading on a card. Three
-  facts, all about the plumbing: are we hearing from this station, what was the stamp on the last
-  thing it sent, which of the three feeds won. None of them changes what the water is doing. As a
+- **A timestamp is printed inside a ⋮ menu and nowhere else.** `sourceInfo()` does it for a sensor.
+  `wxDots()` does it for the weather section, the only other reading on a card. Three
+  facts ride there, all about the plumbing. Are we hearing from this station? What was the stamp on
+  the last thing it sent? Which of the three feeds won? None of them changes what the water is doing. As a
   footer line they repeated per sensor down a six-sensor mast. They are what you check when you doubt
   the number, so they sit where you go to look. The stale state blocks (siren, rainfall, gauge) print
   no time at all. **The stamp is printed at the precision its age needs, and `stamp()` in `popup.js`
   is the one rule.** A reading taken today is answered by its clock. A reading from any other day is
   answered by its date. This reverses what stood here. That said elapsed time was appended only on
-  a stale station, "because on a live one the date is the answer". The live case is the one where
+  a stale station. The reason given was that on a live one the date is the answer. The live case is the one where
   the date says least, since it is today on every live station. `Updated 14/08/2026 15:45` spent
   ten characters saying so. The stale case was worse. `Last reported 19/09/2025 12:15 · 7892.0h ago`
   put a minute hand and an elapsed figure on a sensor eleven months dead. Four stations in the
@@ -1157,17 +1156,17 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   has no caller in `popup.js` any more, and `js/clip.js` is the module that still uses it. **The
   glyph names what is in the menu, and it has changed twice on that one rule.** It was a ⋮ over a
   single "ignore" item, which promised actions and held one. So it became an ⓘ when the provenance
-  moved in. It is a `more_vert` ⋮ now that the menu also carries the favorite, the nearest webcam or
+  moved in. It is a `more_vert` ⋮ now. The menu also carries the favorite, the nearest webcam or
   water level, the map link and the ignore. Four actions is not an information glyph. Count the
   actions before changing it again.
 - **A marquee needs three things measured, not guessed.** `js/ticker.js` renders the item set twice
-  and translates `-50%`, which is only seamless if one copy is at least as wide as the box. So it
+  and translates `-50%`. That is only seamless if one copy is at least as wide as the box. So it
   repeats the set to cover the box *before* doubling. Width alone is not enough. A single wide item
   still pops, because the tile leaving the left edge is the whole strip leaving. `MIN_TILES` (3)
   guarantees a follower. And `#ticker` must have a **fixed flex basis**. Sized to content, the
   header re-laid itself out every poll as the alert count changed.
-- **`.solo` is hidden until hover, globally.** The rule lives on the class, not on `#districtList`,
-  so any new list reusing that pill button gets an invisible control on a mouse. `#ignoredList` and
+- **`.solo` is hidden until hover, globally.** The rule lives on the class, not on `#districtList`.
+  So any new list reusing that pill button gets an invisible control on a mouse. `#ignoredList` and
   `#favList` both override it back to `visible`, because restoring is the whole point of either
   panel. They share one `::after` that grows the hit area past the small pill, `inset: -10px -6px`.
   A two-line row must not grow around the control to make it a real touch target. The two selectors
@@ -1183,32 +1182,32 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   pixels per zoom so blobs stay ground-fixed. Do **not** also call `heat.redraw()`. The plugin
   repaints on the following `moveend`, and doing both painted twice per zoom. Radius is capped at
   `HEAT_MAX_PX` because blur cost is quadratic. Past that cap the layer *fades out* rather than
-  quietly covering less ground, and the fade is per layer because the cap is. `maxZoom` on the layer
+  quietly covering less ground. The fade is per layer because the cap is. `maxZoom` on the layer
   is **not** a display limit. It divides every weight by `2^(maxZoom − zoom)`, so anything inside
   the usable zoom range dims blobs as you zoom out. Pinned to 0.
-- **A blob is painted `radius + blur` across, not `radius`, so the two must sum to the ground
-  distance and may never be set apart from each other.** simpleheat's `radius(t, i)` fills an arc of
+- **A blob is painted `radius + blur` across, not `radius`.** The two must sum to the ground
+  distance, and may never be set apart from each other. simpleheat's `radius(t, i)` fills an arc of
   radius `t`, blurs it by `i`, then stamps a sprite of half-width `t + i`. `heatScale()` handed
   `radius` the whole of `HEAT_KM` and added `blur = radius * 0.8` on top. So every blob on both
   layers reached 1.8× its stated size and covered 3.24× the area. One rain gauge reading 19 mm/h
   washed 250 km² of Kuala Lumpur violet, over twenty gauges reporting 0.0 mm. The nearest of them was
   1.6 km away. **Three places asserted the 5 km and the code painted 9.** They are the constant's
-  comment, `heatScale()`'s own comment, and `thinHeat()`, which drops a weaker neighbour on the claim
-  that the stronger point's blob already covers it. That last one is the compounding fault. Thinning
+  comment, `heatScale()`'s own comment, and `thinHeat()`. That last one drops a weaker neighbour on
+  the claim that the stronger point's blob already covers it. That last one is the compounding fault. Thinning
   at 5 km while painting at 9 let every pair between the two distances stack its alpha. That is the
   bug `thinHeat()` exists to prevent, moved out one ring. **`SoftHeat._redraw()` paints the blobs
   itself now and never draws that sprite.** So the trap is gone rather than tuned. One `blobPx()`
   is the radius, `thinHeat()` takes the same ground distance, and `HEAT_MAX_PX` bounds what it
   names. The `radius` and `blur` options stay in `BASE` only because `_updateOptions()` builds
   `_grad` from `gradient` in the same call, and `_grad` is where the colours come from.
-- **"Gauge" in the rain heat entries below means a rainfall station, and this is the one place two
-  kinds share a word.** A rainfall station measures `hourly` in mm/h and is the only kind the rain
+- **"Gauge" in the rain heat entries below means a rainfall station.** This is the one place two
+  kinds share a word. A rainfall station measures `hourly` in mm/h. It is the only kind the rain
   layer reads, on both sides of the argument. `render.js` gates every one of them on
   `kind === 'rainfall'`. A **flood gauge** is the kind spelled `gauge`, labelled `Flood gauge`,
   measuring `depth` in metres over a flood-prone spot. It feeds the **water level** layer beside the
   rivers and no rain rule touches it. The collision is not theoretical. The JPS field notes above
-  record that a flood gauge reading negative means **dry ground**. So "a dry gauge" reads as a
-  rainfall station saying 0 mm/h in one entry, and as a flood gauge on dry land in another. Name the
+  record that a flood gauge reading negative means **dry ground**. So "a dry gauge" reads two ways. It is a
+  rainfall station saying 0 mm/h in one entry, and a flood gauge on dry land in another. Name the
   kind in any sentence that reads both ways.
   **A flood gauge is never evidence about rain, in either direction.** It measures what the drainage
   failed to carry away, which is not what fell. Where the drainage is good, rain falls as hard as
@@ -1218,8 +1217,8 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   tree: no rain conclusion reads `depth`, and `rainBacked()` tests the station's own
   `cumulativeRainfall` odometer rather than any gauge. Keep it that way. The tempting mistake is to
   read a dry flood gauge as proof that the rain layer is overclaiming. Good drainage is the
-  whole reason it is not. This is the same rule the siren already obeys from the other side, where
-  flood gauges are not backing evidence either.
+  whole reason it is not. The siren already obeys the same rule from the other side. Flood gauges are not backing
+  evidence there either.
 - **A rain gauge reporting zero is a reading, and the rain heat layer draws it.** The network says
   two things: 12 gauges reporting rain and 218 reporting none, on the payload this was built from.
   The layer used to draw only the first. So the wash covered ground that 218 stations had
@@ -1248,20 +1247,21 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   **simpleheat leaves `globalAlpha` set.** Its draw loop assigns each point's weight and never puts
   it back. So an eraser inherits the last blob's weight and removes that fraction rather than all of
   it. A 0.9 blob left 22 of 229 alpha on a dry gauge. The pass runs inside `save()`/`restore()`.
-  **A gauge reporting no rain reaches exactly as far as a gauge reporting rain, and the boundary
-  between two that disagree is halfway between them.** Both rules are old. The `destination-out`
+  **A gauge reporting no rain reaches exactly as far as a gauge reporting rain.** The boundary
+  between two that disagree is halfway between them. Both rules are old. The `destination-out`
   stamp that carried them held the second alone, and it bought that by breaking the first.
   Its radius was one scalar, `min(r, nearest_wet / 2)`, applied to a circle. So a dry gauge with a
-  wet neighbour to the east shrank in **every** direction, including west where nothing disputed it.
+  wet neighbour to the east shrank in **every** direction. That included west, where nothing
+  disputed it.
   Measured on the live network: 143 of 191 dry gauges capped, at a median of 0.54 of the radius. They
   denied 35% of the ground they were entitled to deny.
   `_field()` decides it per pixel now and the stamp is gone. `keep = 1 - dcov * gate`, where `dcov`
   is the dry coverage shaped exactly like `cov`. `gate` is inverse-square distance to each side, which
   is Shepard's weighting, chosen for the one property that matters. **A gauge's own point is a
   singularity.** So the gate is 0 at a wet gauge and its reading survives whole. It is 1 at a dry
-  gauge, 0.5 exactly halfway between the two, and 1 with no wet gauge in reach. The protection and
+  gauge. It is 0.5 exactly halfway between the two, and 1 with no wet gauge in reach. The protection and
   the reach come from the same expression instead of fighting each other. Measured after: 77% of the
-  wet reach kept against 96% under the cap. Only 2 of 193 dry gauges are left under paint, and both
+  wet reach kept against 96% under the cap. Only 2 of 193 dry gauges are left under paint. Both
   of those share a pole with a wet gauge.
   **The cap existed for a real reason, so keep the reason when touching this.** A dry gauge on the
   same pole once erased its neighbour off the map outright. A wet gauge 2 km from a dry one lost
@@ -1273,10 +1273,10 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   replace any of this with interpolation. A dry gauge can deny
   ground, never supply a value. See `docs/FEATURES.md`, *The rainfall heatmap claimed rain over
   250 km² from one gauge*.
-- **A heat blob's alpha is its colour as well as its size, so the brush's own falloff walks down the
-  legend.** simpleheat's `_colorize()` looks the gradient up by alpha, and the stock brush fades
+- **A heat blob's alpha is its colour as well as its size.** So the brush's own falloff walks down
+  the legend. simpleheat's `_colorize()` looks the gradient up by alpha, and the stock brush fades
   across most of a blob. So one rain gauge reading 27 mm/h, JPS's *heavy* class, painted heavy at
-  the gauge, moderate 4 km out and light 6 km out. That is three classes from one number, with a
+  the gauge. It painted moderate 4 km out and light 6 km out. That is three classes from one number, with a
   legend beside them naming those colours in
   millimetres. In IDW or kriging a value falls off because the estimate falls off. Here it fell off
   because that is how a brush is drawn.
@@ -1284,27 +1284,27 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   It reads the class colour out of `_grad`, the 256-entry ramp simpleheat builds from
   `options.gradient`, so the legend stays the one definition. It draws each blob in that **one**
   colour with only its alpha ramping. The alpha holds full strength across an inner core before
-  it smoothsteps out. Measured on one gauge at 27 mm/h: one hue from the centre to 8 km with alpha
+  it smoothsteps out. Measured on one gauge at 27 mm/h. One hue runs from the centre to 8 km, with alpha
   falling 182 to 20. A river at its danger mark paints `#ff4e4d` across its whole 5 km, 255 to 0.
   **Two shorter fixes were built and thrown away, and both are worth not repeating.** Cutting the
   sprite's blur to 0.04 got one class per blob and drew hard discs. Softening those back with a
   `destination-out` pass got the look and broke the neighbours. A `destination-out` brush is a claim
   about the canvas, not about one blob. So each blob's own feather ate whatever its neighbours had
-  painted under it. Measured on two gauges one blob apart, which is the closest `thinHeat()` ever
-  leaves them, **each centre was erased to alpha 5 of 177 by the other one's feather**. The
+  painted under it. Measure two gauges one blob apart, the closest `thinHeat()` ever
+  leaves them. **Each centre was erased to alpha 5 of 177 by the other one's feather.** The
   ground between them stacked to 200 in a class neither gauge reported. Painting is additive over a
   neighbour and erasing is not, so a fade has to be painted. After the rewrite the same two gauges
   hold 179 at both centres, one hue end to end. The largest step between 1 km samples is 53
   inside the smooth falloff, against 172 before.
   **And the layer computes a field rather than stamping shapes, because two readings are not twice
   one reading.** Every Porter-Duff `over` adds alpha. So two gauges reading the same rain over the
-  same ground came out heavier than either reported, at 227 where two 179 blobs met. No composite
+  same ground came out heavier than either reported. Two 179 blobs met at 227. No composite
   operation blends colour while taking the *larger* alpha. So `SoftHeat._field()` asks the readings
   per cell instead. `v` is the blended reading, every gauge in reach weighted by nearness and
-  **normalised**, so two gauges reading the same thing give that thing back. `cov` asks whether any
+  **normalised**. So two gauges reading the same thing give that thing back. `cov` asks whether any
   reading reaches this ground at all. That carries the soft edge, and is why an isolated blob fades
   while an overlap does not brighten. Colour is `_grad[v]`, opacity is `v * cov`. Measured on
-  two gauges one blob apart: both at 0.70 gives alpha 179 flat end to end, largest step over a
+  two gauges one blob apart, both at 0.70: alpha 179 flat end to end, largest step over a
   kilometre one count. One at 0.95 and one at 0.35 walks `#f35772` to `#7b7bff` with alpha 242 to
   89. The smoothness between neighbours is the browser's bilinear filter on a 4 px grid. Raise
   `CELL` and the edges go blocky. Lower it and the cost climbs with the square.
@@ -1321,20 +1321,20 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   The replacement is a **clamped sum**, and it cannot pass 1. So an overlap still never paints
   brighter than a gauge centre. After it, 179 flat at 1.13 and 1.48 radii, and the unequal pair
   walks 242 → 149 → 89.
-- **A rim facing empty ground and a join between two blobs are different edges, and only the combine
-  can tell them apart.** `FEATHER` is one radial curve, so lowering it to soften the rim hollows out
+- **A rim facing empty ground and a join between two blobs are different edges.** Only the combine
+  can tell them apart. `FEATHER` is one radial curve, so lowering it to soften the rim hollows out
   every join by the same amount. Measured, 0.75 to 0.50 under a union took the share of solid joins
   from 84% to 45%. The combine sees something the curve cannot: how many readings arrive. A rim has
   one and a join has two. So `cov` sums the per-gauge coverage rather than unioning it. One gauge at
   half strength stays half covered, and two blobs meeting at half strength each add up to covered.
   **The clamp is `1-(1-s)²` and not `min(1, s)`.** A bare clamp breaks its first derivative where it
   bites. That is a crease along an iso-contour, the Voronoi fault on a different line. Squared has
-  slope 0 at s=1. It is also the highest power that still fades the rim gently, because a higher one
-  holds full opacity further out and hardens the edge it exists to soften. That bought `FEATHER` at
+  slope 0 at s=1. It is also the highest power that still fades the rim gently. A higher one
+  holds full opacity further out, and hardens the edge it exists to soften. That bought `FEATHER` at
   0.50 while `RAIN_KM` was 9. The rim fade went from 1.38 km to 2.20 km with a 34% gentler slope.
   **It sits at 0.20 now, and the value only means anything beside `RAIN_KM`.** A 6 km blob at 0.50
-  fades over 1.47 km, which is less gentle in metres than the 9 km blob it replaced. At 0.20 it
-  fades over 2.35 km at a slope of 0.413 per km, gentler than the 9 km layer on both counts. The
+  fades over 1.47 km. That is less gentle in metres than the 9 km blob it replaced. At 0.20 it
+  fades over 2.35 km, at a slope of 0.413 per km. That is gentler than the 9 km layer on both counts. The
   cost is stated in the next line and is real.
   **A 6 km blob with a 2.35 km rim does not merge into one sheet. That is arithmetic, not a fault.**
   A join at the median spacing holds 178 of 179. At the 90th percentile the two gauges are 10 km
@@ -1350,7 +1350,7 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   percentiles differ**, so name which one a number came from. The first is nearest neighbour, which
   is where a seam shows first and where `heat-test.html` takes its probe distances. At `RAIN_KM` 6
   that is 82 pairs, median 1.21 r, p90 1.66 r, widest 1.95 r. The second is every overlapping pair,
-  which is what join solidity is scored over, since any two blobs that meet can show a seam. That is
+  which is what join solidity is scored over. Any two blobs that meet can show a seam. That is
   143 pairs, median 1.54 r, p90 1.89 r.
   The Verify block prints both. A constant tuned against one snapshot is tuned against one
   afternoon's rain.
@@ -1370,69 +1370,69 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
 - **A canvas radial gradient clamps past its last stop, so never `fillRect` one.** Beyond `r` the
   gradient does not stop. It keeps painting whatever the outermost colour was. The old eraser's
   outermost colour was full erase. Filled as a square, the four corners outside the
-  circle — 21% of the box — erased everything under them, **including the paint belonging to the next
-  blob along**. `thinHeat()` places that blob exactly one blob away, and therefore right in that
+  circle are 21% of the box. They erased everything under them, **including the paint belonging to
+  the next blob along**. `thinHeat()` places that blob exactly one blob away, and therefore right in that
   corner. It drew as hard rectangles cut out of the wash, axis-aligned and about 2r on a side. That
   reads as a tiling fault or a canvas-tile seam, and is neither. It went unseen for weeks first,
   because the *erase* clamps to transparent and clamping to "no erase" is invisible. That is luck,
   not design. **This layer stamps nothing any more.** `_field()` computes every pixel, so there is no
   sprite and no disc left to get wrong. The `stamp()` helper that guarded the trap went with the
   pass. Anything that brings a gradient back needs it back too.
-  `heat-test.html` still puts a second gauge 1.2 blobs away on the diagonal, outside the first blob's
-  circle and inside its square.
+  `heat-test.html` still puts a second gauge 1.2 blobs away on the diagonal. That is outside the first
+  blob's circle and inside its square.
 - **`heatScale()` may only size a layer the map is holding.** `setOptions()` ends in `redraw()`,
   which reads `this._map._animating`. Leaflet nulls `_map` when it removes a layer. So sizing a
-  layer that is off throws a `TypeError`. It hid for a long time because the layer that is off has
+  layer that is off throws a `TypeError`. It hid for a long time. The layer that is off has
   usually never been added, and a layer with no canvas returns from `redraw()` one test earlier.
-  **Switching the heat chip from rainfall to water is what reaches it**, since that leaves `rainHeat`
+  **Switching the heat chip from rainfall to water is what reaches it.** That leaves `rainHeat`
   added-then-removed, holding a canvas and no map. `syncHeat()` adds and removes before it calls
-  `heatScale()`, so a layer just switched on is on the map by then and still gets sized.
+  `heatScale()`. So a layer just switched on is on the map by then, and still gets sized.
 - **The water layer has no denial and must not get one, and everything else it shares.** Both layers
   are `SoftHeat`. So the field render, `BLEND`, `FEATHER`, the clamped-sum coverage and the bucket
   index are one implementation and reach both. Only `setDry()` is called on one of them, from
   `render.js`. **A river reading low says nothing about the river beside it.** A rain gauge is the
   only sensor here whose zero is evidence about the ground next to it. That is why that argument
   exists on one layer alone. A flood gauge is not that sensor either — see the drainage rule in the
-  rain heat entry above. Anything added to `SoftHeat` lands on both layers, so check it against both
-  before assuming it is a rain change.
+  rain heat entry above. Anything added to `SoftHeat` lands on both layers. Check it against both
   before assuming it is a rain change.
 - **Leaflet paints its container `#ddd` in both themes.** That is what shows through wherever a tile
-  has not arrived, and a zoom out has nothing to retain over the newly revealed area — so the
+  has not arrived. A zoom out has nothing to retain over the newly revealed area. So the
   missing tiles read as a grid of pale boxes on the dark basemap. `.leaflet-container` takes
   `var(--surface)` in `map.css`. Anything that changes the basemap has to keep a gap looking like
   the page rather than like a table.
 - **`maxZoom` belongs on the map, not only the tile layer.** `cluster` is created and added at
-  `map.js` load time, before `setBasemap()` adds any tile layer, and markercluster throws
-  *"Map has no maxZoom specified"* if nothing has declared one by then.
+  `map.js` load time, before `setBasemap()` adds any tile layer. If nothing has declared a
+  `maxZoom` by then, markercluster throws *"Map has no maxZoom specified"*.
 - **The heat canvas is padded (PATCH 3), so raw container points are not canvas points.** Anything
-  touching `_reset`/`_redraw` must add `_pad()` to point coords and keep grid indices non-negative —
-  the flush loop iterates the array, so a negative key silently drops those blobs. `_animateZoom`
-  is padded too; it writes an absolute transform, so forgetting it detaches the layer mid-zoom.
+  touching `_reset`/`_redraw` must add `_pad()` to point coords and keep grid indices non-negative.
+  The flush loop iterates the array, so a negative key silently drops those blobs. `_animateZoom`
+  is padded too. It writes an absolute transform, so forgetting it detaches the layer mid-zoom.
 - **simpleheat's blob is a shadow, and it leaks past `radius + blur > 200`.** It draws an arc
-  off-canvas and offsets the shadow back on. Stock offset is 200, so any blob wider than that puts
-  the *source* arc back on the canvas — a hard-edged circle clipped by the corner. Our vendored
+  off-canvas and offsets the shadow back on. Stock offset is 200. So any blob wider than that puts
+  the *source* arc back on the canvas. It draws as a hard-edged circle clipped by the corner. Our vendored
   copy patches the offset to `1e4`. Second reason not to overwrite `leaflet-heat.js`.
 - **`?shots=` returns `[ts, tier, stationId]`, not a bare timestamp.** The reader still accepts a
   bare number: `timeline.js` guards with `Array.isArray(r)`. The response is cached for 60 seconds,
   so a deploy leaves the old shape in flight. Do not remove that fallback while the cache header
-  stands. `wall.js` and `clip.js` no longer call `?shots=` at all — see the strip gotcha below —
-  so `timeline.js`'s lightbox is the only reader left with this shape to guard against.
+  stands. `wall.js` and `clip.js` no longer call `?shots=` at all — see the strip gotcha below.
+  So `timeline.js`'s lightbox is the only reader left with this shape to guard against.
 - **Two image endpoints answer for one camera, `?shot=` and `?sheet=`, and they deliberately
   disagree about how long a browser may cache them.** `?shot=<id>&t=<ts>` names one immutable,
-  already-captured frame, so `Cache-Control: public, max-age=31536000, immutable` is honest — that
-  exact file never changes again. `?sheet=<id>` names the strip `buildSheet()` in `shots.php`
-  builds on request — every frame inside the clip window, laid out side by side in one WebP, which
-  is what `js/wall.js` and `js/clip.js` play instead of fetching a frame at a time (see
+  already-captured frame. So `Cache-Control: public, max-age=31536000, immutable` is honest, because
+  that exact file never changes again. `?sheet=<id>` names the strip `buildSheet()` in `shots.php`
+  builds on request. That is every frame inside the clip window, laid out side by side in one WebP.
+  It is what `js/wall.js` and `js/clip.js` play instead of fetching a frame at a time (see
   `docs/FEATURES.md`). The same URL's *bytes* change under it every time `captureShots()` lays a
-  new frame and the strip goes stale, up to once every `SHOT_EVERY` (30 min), so `?sheet=` carries
-  `public, max-age=900` instead — half of `SHOT_EVERY`, so a reopen inside that window is free and a
-  cached strip can never outlive one capture cycle by more than that same margin. Copy `immutable`
-  onto `?sheet=` and a reader who opens a camera twice in one capture window keeps seeing the strip
-  from before it, for up to a year, with nothing to tell them it went stale — the exact failure the
-  frame endpoint's own header is right to invite and the strip endpoint exists to avoid.
+  new frame and the strip goes stale. That happens up to once every `SHOT_EVERY` (30 min). So
+  `?sheet=` carries `public, max-age=900` instead. That is half of `SHOT_EVERY`. A reopen inside
+  that window is free, and a cached strip can never outlive one capture cycle by much more. Copy
+  `immutable` onto `?sheet=` and a reader who opens a camera twice in one capture window keeps
+  seeing the strip from before it. That lasts up to a year, with nothing to tell them it went
+  stale. It is the exact failure the frame endpoint's own header is right to invite. The strip
+  endpoint exists to avoid it.
 - **`clip.start()` must stay idempotent by camera id *and* by generation.** `render()` calls
-  `openSide()` on every poll for the card on screen. A clip that restarted there would jump back to
-  frame 0 while somebody watched. So `start()` rebinds to the fresh nodes and keeps its place. The
+  `openSide()` on every poll for the card on screen. A clip that restarted there jumps back to
+  frame 0 while somebody watches. So `start()` rebinds to the fresh nodes and keeps its place. The
   id alone is not enough. A reader can close a card and reopen the same camera before the fetch
   returns. `stop()` clears the id and the second `start()` sets it back, so both continuations
   match. `gen` catches that case. `stop()` bumps it on every call, so a stale run can never match
@@ -1440,121 +1440,123 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
 - **`.shotwrap` clips its overflow and holds two children, so nothing may pin its height to one of
   them.** The box carries the picture *and* the `<p class="clipcap">` caption under it. `.done`
   relaxes it to `aspect-ratio: auto` so it measures both. `.shotwrap.strip` used to pin it back to
-  `16 / 9` — giving the strip `<img>` a definite box to resolve `height: 100%` against — which made
-  the box exactly the picture's height, started the caption on its bottom edge and cut it off.
-  `tick()` toggles `.strip` once a lap, so the caption flashed on for the one second a lap spends on
-  the live still and vanished for the other six. **Nothing in `js/clip.js` was wrong**: `capText` is
-  held at module scope precisely so a rebuild repaints it, and the text never changed — two JS
-  explanations were chased first (`stop()` blanking `capText`, `finishEmpty()`'s `id = null` forcing
-  a re-probe) and neither fires, because every camera serves a strip. The ratio still has to be
-  stated, or `.shot`'s own `16 / 9` computes a height off the `--n`-times-wider width and grows the
-  picture taller per cell — so state it **on the image**, `aspect-ratio: calc(var(--n, 1) * 16 / 9)`,
-  where widening the ratio by the same factor as the width holds one cell at a single frame's height
-  and leaves the wrapper free. `.shotwrap.strip { aspect-ratio: auto }` is then explicit rather than
-  left to `.done`: `bind()` re-adds `.strip` to a fresh `<img>` on every poll, before that image has
-  fired `load`, and the base rule would otherwise clip the caption once per poll instead of once per
-  lap. Anything added to that box gets the same treatment.
+  `16 / 9`, which gives the strip `<img>` a definite box to resolve `height: 100%` against. That
+  made the box exactly the picture's height. It started the caption on its bottom edge and cut it
+  off. `tick()` toggles `.strip` once a lap. So the caption flashed on for the one second a lap
+  spends on the live still. It vanished for the other six. **Nothing in `js/clip.js` was wrong.**
+  `capText` is held at module scope precisely so a rebuild repaints it, and the text never changed.
+  Two JS explanations were chased first: `stop()` blanking `capText`, and `finishEmpty()`'s
+  `id = null` forcing a re-probe. Neither fires, because every camera serves a strip. The ratio
+  still has to be stated. Otherwise `.shot`'s own `16 / 9` computes a height off the
+  `--n`-times-wider width, and grows the picture taller per cell. So state it **on the image**, as
+  `aspect-ratio: calc(var(--n, 1) * 16 / 9)`. Widening the ratio by the same factor as the width
+  holds one cell at a single frame's height. It leaves the wrapper free.
+  `.shotwrap.strip { aspect-ratio: auto }` is then explicit rather than left to `.done`. `bind()`
+  re-adds `.strip` to a fresh `<img>` on every poll, before that image has fired `load`. The base
+  rule would otherwise clip the caption once per poll instead of once per lap. Anything added to
+  that box gets the same treatment.
 - **`position: relative` does not scope a `z-index`, so `.camtile` carries `isolation: isolate`.** A
   positioned box opens a stacking context only when its `z-index` is something other than `auto`.
-  `.camtile` had `position: relative` and no `z-index`, so the numbers written *inside* a tile
-  (`.camsay` 1, `.camtile::before` 2, `.camfail` 3) resolved against `#camBox` and competed with the
-  dialog's own chrome. `#camBar` at `z-index: 1` therefore drew **behind the skeleton shimmer on
-  every tile** — `::before` at 2 — which is exactly the state a tile is in while that bar is on
-  screen, so the bar showed only through the 6px gaps between columns. The fix is one declaration on
-  the tile, not a bigger number on the chrome: raising `#camBar` to 4 wins one race and leaves the
-  leak for the next thing that paints near a tile. This is the mirror of the map-pin gotcha above,
-  where `position` had to be *added* before a `z-index` would apply at all — same spec sentence,
+  `.camtile` had `position: relative` and no `z-index`. So the numbers written *inside* a tile
+  (`.camsay` 1, `.camtile::before` 2, `.camfail` 3) resolved against `#camBox`, and competed with
+  the dialog's own chrome. `#camBar` at `z-index: 1` therefore drew **behind the skeleton shimmer on
+  every tile**, which is `::before` at 2. That is exactly the state a tile is in while that bar is
+  on screen. So the bar showed only through the 6px gaps between columns. The fix is one declaration
+  on the tile, not a bigger number on the chrome. Raising `#camBar` to 4 wins one race, and leaves
+  the leak for the next thing that paints near a tile. This is the mirror of the map-pin gotcha
+  above, where `position` had to be *added* before a `z-index` applies at all. Same spec sentence,
   opposite symptom.
 - **The lightbox reads its camera from `data-clip`, not from the clicked image's `src`.** The panel
-  clip plays a strip for its archived cells (see the `?sheet=` gotcha above) but still ends every
-  lap on a fresh live still, so `img.src` cycles between the strip's own URL and a `?cam=<id>` one
-  every few seconds for as long as the card stays open — matching `?cam=` against whatever `src`
-  happens to be showing catches the camera on some ticks and misses it on others, which is worse
-  than failing outright: a match that sometimes works reads as a bug in the lightbox, not as a wrong
+  clip plays a strip for its archived cells (see the `?sheet=` gotcha above). It still ends every
+  lap on a fresh live still. So `img.src` cycles between the strip's own URL and a `?cam=<id>` one
+  every few seconds, for as long as the card stays open. Matching `?cam=` against whatever `src`
+  happens to be showing catches the camera on some ticks and misses it on others. That is worse
+  than failing outright. A match that sometimes works reads as a bug in the lightbox, not as a wrong
   approach. That is what opened a lightbox with no scrubber, no compare and no warning glyph before
   `data-clip` replaced it. Only the table's "show image" button has no such wrapper, and it keeps
   the old path.
 - **`.stage` is exactly the picture's box, and nothing that sits beside the picture may live in it.**
   `.ab` is `inset: 0` of `.stage` and `.abgrip` spans its full height — that is what lines the two
   A/B halves up pixel for pixel, and it holds only while `.stage` is the frame and nothing else. The
-  control bar and the warning pill are therefore siblings of it inside **`.player`**, which is the
+  control bar and the warning pill are therefore siblings of it, inside **`.player`**. That is the
   box both overlays are positioned against. `ui.js` injects `camWarn()` into `.player`, not
   `.stage`, for the same reason.
   **`.camfail` is the one child that is allowed, because it stands *instead of* the picture rather
   than beside it** — `inset: 0`, drawn only under `#lightbox.nopic`. That class is also the only
   thing that may give `.stage` a size of its own. A failed `<img>` lays out at 0×0, and `.stage` and
-  `.player` are both shrink-to-fit, so a dead feed folded the frame, the control bar and the warning
-  pill up together and left the dialog wrapped around its title. **Do not fix that with a floor on
-  `.stage`** — the box has to keep matching the picture, or every frame narrower than the floor draws
-  its A/B halves out of line. `ui.js` sets the class from `naturalWidth` in one handler for `load`
+  `.player` are both shrink-to-fit. So a dead feed folded the frame, the control bar and the warning
+  pill up together. It left the dialog wrapped around its title. **Do not fix that with a floor on
+  `.stage`.** The box has to keep matching the picture. Otherwise every frame narrower than the
+  floor draws its A/B halves out of line. `ui.js` sets the class from `naturalWidth` in one handler for `load`
   and `error`, so it lifts again the moment a later frame loads.
 - **The overlay bar is the special case and lives behind a query; the in-flow bar is the default.**
   `@media (hover: hover) and (min-width: 601px)` — marked `PLAYER_OVERLAY` in `chrome.css` — is the
   only place `#tl` is absolute, white, scrimmed and self-hiding. Everything outside it is the plain
-  shape: in flow under the frame, on the dialog surface, in `var(--muted)` / `var(--hover)` /
-  `var(--outline)` like every other control. **Do not invert this.** It was written the other way
-  first (overlay by default, footer under `@media (hover: none)`), and any device that reports
-  `hover: hover` when it should not — a touchscreen laptop, a paired stylus, an Android browser in
-  desktop mode — fell through to a permanent black bar on the photograph that no pointer could
-  dismiss. The safe shape has to be the one a misread lands on. Both halves of the query earn their
-  place: the pointer test, because a bar that hides itself needs something to bring it back; the
-  width test, because a phone can lie about the first one. The literal whites belong **inside** that
-  block only — they cannot be tokens over a photograph, since tokens flip with the theme and the
+  shape. It is in flow under the frame, on the dialog surface, in `var(--muted)` / `var(--hover)` /
+  `var(--outline)`, like every other control. **Do not invert this.** It was written the other way
+  first: overlay by default, footer under `@media (hover: none)`. Any device that reports
+  `hover: hover` when it must not then fell through to a permanent black bar on the photograph. No
+  pointer can dismiss that bar. A touchscreen laptop, a paired stylus and an Android browser in
+  desktop mode all report it. The safe shape has to be the one a misread lands on. Both halves of the query earn their
+  place. The pointer test is there because a bar that hides itself needs something to bring it back.
+  The width test is there because a phone can lie about the first one. The literal whites belong **inside** that
+  block only. They cannot be tokens over a photograph. Tokens flip with the theme and the
   picture does not.
 - **The seek bar is painted by `.tltrack`, not by the input.** The alert spans have to sit inside the
-  bar and under the thumb, and `accent-color` cannot draw them — so `#tlscrub` is transparent
-  (`appearance: none`, no track background) and the rail, the played part and the spans are three
-  layers below it. `paint()` writes the play position to `--p` **on the track**, not on the input:
-  the pseudo-elements that read it belong to the parent. There is no tick per frame any more, and
-  there must not be one again — 60 hairlines over a control you drag is a graduation, and the frames
+  bar and under the thumb, and `accent-color` cannot draw them. So `#tlscrub` is transparent
+  (`appearance: none`, no track background). The rail, the played part and the spans are three
+  layers below it. `paint()` writes the play position to `--p` **on the track**, not on the input.
+  The pseudo-elements that read it belong to the parent. There is no tick per frame any more, and
+  there must not be one again. 60 hairlines over a control you drag is a graduation. The frames
   are already an even grid, so the marks measured nothing the spacing did not. Colour is the whole
-  message: a span is red or amber because a river near that lens was in trouble then.
+  message. A span is red or amber because a river near that lens was in trouble then.
 - **The control bar's colours are literal, not tokens.** It sits on a photograph, so `--on-surface`
   and `--muted` would flip with the theme while the picture behind them did not. White and
   `#ffffffb3` in both themes. `--accent` is the one token that stays, on the thumb and the played
-  rail, and it is legible on the scrim in either theme.
+  rail. It is legible on the scrim in either theme.
 - **The lightbox's warning pill belongs to the frame on screen, not to the clock.** `paint()` in
-  `timeline.js` rewrites it from `tierAt` — the same per-frame tiers the seek bar's coloured spans are
-  drawn from, so the picture and the bar under it cannot disagree. Live is the only position that asks
-  the live question. The metre figure comes from the station's `history` within half an hour of that
-  frame and is **omitted** past the 12 hours of samples the payload carries, which is why `camWarn()`
-  tests `'level' in a` rather than `??`: falling back to the live number there would print today's
-  water on a picture from last week. A calm frame gets a `hidden` pill rather than none, so the mobile
-  strip that `.player:has(.camwarn)` opens does not shut mid-clip and shift the picture 30px.
-  **The pill is the lightbox's alone** — `camImg()` used to put one on the station panel's still too,
-  and that picture is a 3-hour clip playing itself with nowhere to state a warning per frame. The
+  `timeline.js` rewrites it from `tierAt`. Those are the same per-frame tiers the seek bar's coloured
+  spans are drawn from. So the picture and the bar under it cannot disagree. Live is the only
+  position that asks the live question. The metre figure comes from the station's `history` within
+  half an hour of that frame. It is **omitted** past the 12 hours of samples the payload carries.
+  That is why `camWarn()` tests `'level' in a` rather than `??`. Falling back to the live number
+  there prints today's water on a picture from last week. A calm frame gets a `hidden` pill rather
+  than none. So the mobile strip that `.player:has(.camwarn)` opens does not shut mid-clip and shift
+  the picture 30px.
+  **The pill is the lightbox's alone.** `camImg()` used to put one on the station panel's still too.
+  That picture is a 3-hour clip playing itself, with nowhere to state a warning per frame. The
   card around it already gives the alerting sensor a section with the reading, the meter and the
   graph. Do not put it back there without a way to score the frame on screen.
   **Its words are `ALERT_TITLE` in `config.js`**, the same table the alert panel groups its rows
-  under — `Water level at danger` / `Forecast to reach danger` / `Triggered siren`, with the reading
-  appended where there is one. It lives in `config.js` rather than `alerts.js` because two surfaces
+  under. They are `Water level at danger` / `Forecast to reach danger` / `Triggered siren`, with the
+  reading appended where there is one. It lives in `config.js` rather than `alerts.js` because two surfaces
   read it and `popup.js` cannot import `alerts.js` (that module already imports `popup.js`). Change
   the phrase in one place or the panel and the picture start making two claims about one river.
 - **The camera pill is the one alert surface that reads `atDanger()`, not `isHot()`.**
-  `camAlert()` takes `isHot(s) || atDanger(s)`, so a flood gauge under water and rainfall in JPS's
-  top class put a warning on the picture — because `atDanger()` is what already paints that camera's
-  neighbour red on the map, and a clean picture beside a red pin reads as the map being wrong.
-  **`isHot()` is untouched**: the alert panel, the icon badge, the ticker and the toast list exactly
-  what they listed before, and widening *those* still goes through the alert design standard. Every
-  kind `atDanger()` adds is observed, so it is `now` — only a river publishes a rate, so only a river
-  gets `soon`. Each kind reads its own field and unit through `CAM_READ` in `popup.js` (`level` m,
-  `depth` m, `hourly` mm/h); a siren prints no figure, because its samples are 0 and 1 and an archive
-  frame hands that 1 straight in. `?shots=` scores the same four kinds server-side, or the pill would
-  show on the live frame only — and the lightbox opens three hours back, so nobody would see it.
-- **`.abtime` must stay outside `.ab`.** `.ab` is the older frame clipped to the divider, so a label
-  inside it is cut in half whenever the divider comes near the left edge — and the right-hand label,
-  which lives in the unclipped box, never is, which is what made it look like a bug. Both labels are
+  `camAlert()` takes `isHot(s) || atDanger(s)`. So a flood gauge under water and rainfall in JPS's
+  top class put a warning on the picture. `atDanger()` is what already paints that camera's
+  neighbour red on the map. A clean picture beside a red pin reads as the map being wrong.
+  **`isHot()` is untouched.** The alert panel, the icon badge, the ticker and the toast list exactly
+  what they listed before. Widening *those* still goes through the alert design standard. Every
+  kind `atDanger()` adds is observed, so it is `now`. Only a river publishes a rate, so only a river
+  gets `soon`. Each kind reads its own field and unit through `CAM_READ` in `popup.js`: `level` m,
+  `depth` m, `hourly` mm/h. A siren prints no figure, because its samples are 0 and 1, and an archive
+  frame hands that 1 straight in. `?shots=` scores the same four kinds server-side. Otherwise the
+  pill shows on the live frame only, and the lightbox opens three hours back, so nobody sees it.
+- **`.abtime` must stay outside `.ab`.** `.ab` is the older frame clipped to the divider. So a label
+  inside it is cut in half whenever the divider comes near the left edge. The right-hand label lives
+  in the unclipped box and never is. That is what made it look like a bug. Both labels are
   children of `.stage` now, and `#lightbox:not(.cmp) .abtime` does the hiding that `.ab[hidden]` did.
 - **The opening play delay is cancelled by `stop()`, and that is the only guard it has.**
   `openTimeline()` parks the scrubber three hours back and starts the clip two seconds later. Every
   deliberate move — a step, the scrubber, the compare button, `reset()` — reaches `stop()`, which
-  clears `lead`. Anything new that means "I am looking at this frame" must go through `stop()` too,
-  or it will be carried off that frame two seconds after landing on it.
+  clears `lead`. Anything new that means "I am looking at this frame" must go through `stop()` too.
+  Otherwise it is carried off that frame two seconds after landing on it.
 - **A range segment holds two labels, and `setRange()` must never write over the button itself.**
   The short label is `.tls`, the long one `.tll`, and the pill grows because the CSS transitions each
   from `width: 0` to `width: auto` — which is only animatable because `interpolate-size:
-  allow-keywords` is set on `.tlr`. Setting `b.textContent` would remove both spans, and the control
-  would go back to jumping on every click with nothing in the console to say why.
+  allow-keywords` is set on `.tlr`. Setting `b.textContent` removes both spans. The control then goes
+  back to jumping on every click, with nothing in the console to say why.
 - **A claim about what the app does not do needs a check that lists what it does do.** The About
   pane once said "It loads nothing from a third party." A grep for known CDN prefixes verified it:
   `https?://(cdn|unpkg|jsdelivr|fonts\.googleapis)`. That pattern matches only a host starting `cdn`
@@ -1563,9 +1565,10 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   same pane already names CARTO for exactly those tiles. The claim shipped false anyway. A guess at
   what a violation looks like proves nothing. The check must list every absolute URL the code
   contains, then classify each one as fetched or merely linked. Any future "we send no X" or "we load
-  nothing from Y" sentence needs that same full sweep, not a short grep aimed at known offenders.
-- **A value read back out of the cache must default inside the one function every cached read passes
-  through, not at each call site.** `?force=1` stamps `forced: true` into the payload it triggers,
+  nothing from Y" sentence needs that same full sweep. A short grep aimed at known offenders is not
+  enough.
+- **A value read back out of the cache must default inside one function.** That is the function
+  every cached read passes through, not each call site. `?force=1` stamps `forced: true` into the payload it triggers,
   and that payload is what `.cache.json` stores afterward. The first fix defaulted
   `forced`/`forceWhy` back to false inside `serveCache()` alone. Every ordinary poll that read
   through the other cached-read exit kept reporting `forced: true` for five minutes after any real
@@ -1579,13 +1582,13 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   `cacheAge` key, and the rebuild write sets it to `0` every time. So the computed value on the
   right never survived the merge, and every cached read reported `cacheAge: 0` however long the file
   had sat. The status popover reads that field to say whether a poll came from JPS or from the file
-  cache, so it said JPS on every poll. `cacheAge` sits on the LEFT now.
+  cache. So it said JPS on every poll. `cacheAge` sits on the LEFT now.
   **The `ETag` was stable only because of that bug.** `payloadValidators()` hashed the whole body,
   and a field frozen at `0` is a field that cannot move a hash. Repair `cacheAge` by itself and a
-  rising number changes the body every second, which changes the `ETag` every second, and the `304`
-  in `sendPayload()` stops firing. Nothing errors. A validator that never matches is not a failure,
-  just a full 33 KB body on every poll for as long as a tab stays open. `payloadEtag()` is the other
-  half: it blanks `"cacheAge":N` to `"cacheAge":0` before hashing, so the tag names the build rather
+  rising number changes the body every second. That changes the `ETag` every second, and the `304`
+  in `sendPayload()` stops firing. Nothing errors. A validator that never matches is not a failure.
+  It is a full 33 KB body on every poll, for as long as a tab stays open. `payloadEtag()` is the other
+  half. It blanks `"cacheAge":N` to `"cacheAge":0` before hashing. So the tag names the build rather
   than the moment somebody read it. **It blanks the field rather than cutting it**, so the hash
   still depends on that field being present.
   It sits apart from the header writing so `--selftest` can call the rule instead
@@ -1593,50 +1596,50 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   Five
   assertions guard it, and `cacheAge does not move the ETag` is the one that keeps the `304` alive.
   **Any diagnostic added to this payload that changes without the data changing needs the same
-  treatment**, or it silently costs every reader the full body on every poll.
-- **Moving an element to a new parent can change which flex rule governs it, even when the
-  element's own rules stay the same.** `.testtog` was a flex item inside `.modalhead`. There,
+  treatment.** Otherwise it silently costs every reader the full body on every poll.
+- **Moving an element to a new parent can change which flex rule governs it.** That holds even when
+  the element's own rules stay the same. `.testtog` was a flex item inside `.modalhead`. There,
   `flex: none` sized it to its own content, and it drew as a pill. Moved to sit as a block child of
-  `#aboutBox`, its own `display: flex` made it a flex container instead, one that stretches to the
-  width of its new parent. Left as is, `.testtog:has(:checked)` paints a full-width amber bar across
+  `#aboutBox`, its own `display: flex` made it a flex container instead. That container stretches to
+  the width of its new parent. Left as is, `.testtog:has(:checked)` paints a full-width amber bar across
   the pane. `#aboutBox .testtog { width: fit-content }` pins it back down at the new site. A
   component moved between a flex-item role and a flex-container role needs its sizing rule restated.
   The old rule does not travel with it.
 - **The go-to box lists sites, and `hits` holds row objects rather than stations.** Six row shapes
-  share one array: `site`, `sensor`, `near`, `ask`, `place` and `msg`. `pick()` switches on `r.t`,
-  and anything new added to that list must add a branch there as well as in `rowHtml()`, or a reader
-  will select a row that does nothing. The sub-rows are spliced into `hits` itself rather than hidden
-  with CSS, which is what lets the existing arrow keys keep walking visible rows with no new code.
+  share one array: `site`, `sensor`, `near`, `ask`, `place` and `msg`. `pick()` switches on `r.t`.
+  Anything new added to that list must add a branch there as well as in `rowHtml()`. Otherwise a
+  reader selects a row that does nothing. The sub-rows are spliced into `hits` itself rather than hidden
+  with CSS. That is what lets the existing arrow keys keep walking visible rows with no new code.
 - **A picked place refills the list; it opens no card.** `place` and `ask` are the two rows that
   close nothing and keep focus in the box — every other row ends the search. Picking a place sets
-  `nearPlace`, drops the pin and moves the map, and `search()` then answers about that point instead
-  of about the query: the sites within `NEAR_MAX_KM`, nearest first. There **was** a card here, a
-  copy of "You are here" under the key `@place`, and it is gone — four sensor sections with a meter
-  and a graph each, when the question a place search asks is "which station covers here". Do not put
+  `nearPlace`, drops the pin and moves the map. `search()` then answers about that point instead
+  of about the query. It lists the sites within `NEAR_MAX_KM`, nearest first. There **was** a card here, a
+  copy of "You are here" under the key `@place`, and it is gone. It drew four sensor sections with a
+  meter and a graph each. The question a place search asks is "which station covers here". Do not put
   it back. `nearPlace` is cleared by `oninput` and by `setFind(false)`, or the next open answers about
   a place the reader typed away from. The pin is not cleared: it marks somewhere they asked about,
   and it lives until another place replaces it.
 - **Nothing calls `?place=` until the reader asks.** Nominatim's usage policy names per-keystroke
-  autocomplete, so the lookup hangs off an explicit row at the foot of the list and never off
+  autocomplete. So the lookup hangs off an explicit row at the foot of the list, and never off
   `oninput`. `lookup()` carries a generation counter for the same reason `clip.js` does. Do not
-  "improve" this into a debounced auto-search: every abandoned query would still leave the machine,
-  and a fast typist would fire several.
+  "improve" this into a debounced auto-search. Every abandoned query still leaves the machine,
+  and a fast typist fires several.
 - **The camera wall is painted on a poll, never rebuilt.** `render()` calls `paint()` in
   `js/wall.js`, which swaps the tier class and the phrase on the tiles that already exist. A tile
-  holds three things the payload does not: which cell of its strip it is showing, how many cells
-  that strip has, and whether the observer reached it. A rebuild throws all three away and drops
-  every visible tile back to the start of its lap, which is the failure `js/clip.js` was written to
-  prevent on one camera, arriving a dozen at a time. The filter obeys the same rule: a hidden tile
-  stays in the grid. **Do not add `wall.open()` to the poll path** beside `dataTable()` — the table
-  is safe to rebuild because a row is a pure function of the payload, and a tile is not.
+  holds three things the payload does not. They are which cell of its strip it is showing, how many
+  cells that strip has, and whether the observer reached it. A rebuild throws all three away. It
+  drops every visible tile back to the start of its lap. That is the failure `js/clip.js` was
+  written to prevent on one camera, arriving a dozen at a time. The filter obeys the same rule: a hidden tile
+  stays in the grid. **Do not add `wall.open()` to the poll path** beside `dataTable()`. The table
+  is safe to rebuild because a row is a pure function of the payload. A tile is not.
 - **A grid row does not follow its item's `aspect-ratio`, so `#camGrid` sets `grid-auto-rows`.**
   `.camtile` takes its whole height from `aspect-ratio: 16 / 9`, and an `auto` row measures the item
-  some other way. Measured on the live wall of ninety tiles: a **27.86px row against a 110px tile**,
-  so every tile overlapped the two below it and the wall read as a stack of cards. The same markup
-  with ten tiles gave a **283px row against the same 110px tile** — one fault, drawn twice, once as
-  overlap and once as gaps. Neither number tracks the column width, and neither moves when the
+  some other way. Measured on the live wall of ninety tiles: a **27.86px row against a 110px tile**.
+  So every tile overlapped the two below it, and the wall read as a stack of cards. The same markup
+  with ten tiles gave a **283px row against the same 110px tile**. That is one fault, drawn twice,
+  once as overlap and once as gaps. Neither number tracks the column width, and neither moves when the
   breakpoints change the column count. `grid-auto-rows: min-content` in `css/chrome.css` pins the
-  row to what the tile needs. Every overlay inside a tile is absolutely positioned, so no tile can
+  row to what the tile needs. Every overlay inside a tile is absolutely positioned. So no tile can
   ask for a taller row than its own ratio. **Measure the row against the tile before believing
   either.** The gap version reads as a spacing mistake and the overlap version reads as a `z-index`
   mistake, and both are this. Three other explanations were tried first and all three were wrong:
@@ -1644,7 +1647,7 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   ratio. Each left the row exactly where it was.
 
 - **Under `NARROW_PX` (300) the app blocks the whole page, and that block is a `<dialog>` for one
-  reason.** `showModal()` puts it in the **top layer**, which is not part of any stacking context, so
+  reason.** `showModal()` puts it in the **top layer**, which is not part of any stacking context. So
   it covers an open About box, the all-stations table and the camera wall. No `z-index` can do that —
   the same rule `js/sparktip.js` already obeys from the other side. It also makes the rest of the
   page inert for free, so no `inert` attribute has to travel over the page. A plain `show()` paints
@@ -1653,45 +1656,45 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   reader a broken map and calls it a choice. `js/ui.js` refuses the `cancel` event, which is what
   Escape and the phone back gesture raise. The media query is live, so the box opens and closes
   itself and no resize listener runs. `:root:has(#narrowBox[open])` hides the overflow, because the
-  page behind is inert and still laid out, and under 245px it drew a scrollbar along the bottom of
-  the block for a map nobody can reach.
+  page behind is inert and still laid out. Under 245px it drew a scrollbar along the bottom of
+  the block, for a map nobody can reach.
   **300 is a floor somebody chose and not the width where the layout breaks.** Measured: the app bar
-  holds together to 245px and the document overflows below that, so the block takes 55 pixels of
-  width that work today. A Galaxy Fold cover screen is 280 CSS pixels wide and lands inside it, and
-  a reader locked out of a flood map is a reader with no water levels. Weigh that against a map in a
+  holds together to 245px and the document overflows below that. So the block takes 55 pixels of
+  width that work today. A Galaxy Fold cover screen is 280 CSS pixels wide, and lands inside it. A
+  reader locked out of a flood map is a reader with no water levels. Weigh that against a map in a
   240px keyhole before moving the number, and move it in `js/config.js` only.
   `narrow-test.html` reads `NARROW_PX` out of the source and guards all three silent faults.
-- **The app bar wordmark has four spellings and the title rail picks one, so a specificity slip
-  draws none of them.** `Klang Valley Flood Watch` → `KV Flood Watch` → `KVFW` → the drop alone, at
-  282px, 190px and 94px of `header h1`. That is a **container query and not a media query**, because
-  the rail is what is left after the ticker and the controls, and both of those move on their own.
-  Below 600px the ticker takes a row of its own, so the rail WIDENS as the viewport narrows, from
-  77px at 601px to 272px at 600px — no viewport threshold can follow that. The ticker then proved
-  the rest: it went from `min(58vw, 656px)` to a flat `50vw`, with a `40vw` candidate in and out
-  beside it, and then to `flex: 1 1 0` under a 300px cap on this rail. Each move changed the rail at
-  every width above 600px, and not one threshold here needed an edit. The phone rule
+- **The app bar wordmark has four spellings and the title rail picks one.** So a specificity slip
+  draws none of them. `Klang Valley Flood Watch` → `KV Flood Watch` → `KVFW` → the drop alone, at
+  282px, 190px and 94px of `header h1`. That is a **container query and not a media query**. The
+  rail is what is left after the ticker and the controls, and both of those move on their own.
+  Below 600px the ticker takes a row of its own. So the rail WIDENS as the viewport narrows, from
+  77px at 601px to 272px at 600px. No viewport threshold can follow that. The ticker then proved
+  the rest. It went from `min(58vw, 656px)` to a flat `50vw`, with a `40vw` candidate in and out
+  beside it. Then it went to `flex: 1 1 0` under a 300px cap on this rail. Each move changed the
+  rail at every width above 600px, and not one threshold here needed an edit. The phone rule
   that hid the title whole is gone, since the container now measures what that rule assumed.
   `container-type: inline-size` is safe on that flex item because `flex: 1 1 0` with `min-width: 0`
   already takes the width from the flex algorithm and never from the content. **That is also why the
-  cap sits on this rail and never as a basis on the strip** — containment collapses an element whose
-  width comes from its own content, so `header h1 { flex: 0 1 auto }` draws no wordmark at all.
+  cap sits on this rail and never as a basis on the strip.** Containment collapses an element whose
+  width comes from its own content. So `header h1 { flex: 0 1 auto }` draws no wordmark at all.
   **Every selector in the ladder goes through `.word >`, and that is specificity rather than
-  tidiness.** `header h1 .word > span { display: none }` is one class and three elements, and
-  `header h1 .w-sm` is one class and two, so the hide rule won and every width drew the drop alone —
-  which looks exactly like the bottom rung and errors nowhere. Two classes beat one class and any
-  number of elements. The thresholds are measured font widths (247, 156 and 59px at 22px Roboto,
-  plus 32 for the drop and its gap), so **remeasure them if the font, the size or the words change**
-  — a threshold set too low draws a spelling wider than its rail and the ellipsis hides the overflow.
+  tidiness.** `header h1 .word > span { display: none }` is one class and three elements.
+  `header h1 .w-sm` is one class and two. So the hide rule won and every width drew the drop alone.
+  That looks exactly like the bottom rung and errors nowhere. Two classes beat one class and any
+  number of elements. The thresholds are measured font widths: 247, 156 and 59px at 22px Roboto,
+  plus 32 for the drop and its gap. **Remeasure them if the font, the size or the words change.**
+  A threshold set too low draws a spelling wider than its rail, and the ellipsis hides the overflow.
   `title-test.html` is the check for both faults.
 - **`.muted` carries a `font-size`, so it beats whatever size its context passes down.**
   `.muted { color: var(--muted); font-size: 12px }` in `css/base.css`. A declaration on the element
   always wins against an inherited value, however specific the parent's selector is. `.accx` sets
-  `font-size: 10px` on the rain chart's label row and every label inherits it — but an unanswered
-  window's label also carried `class="muted"`, so `24 h` and `72 h` drew at 12px beside three
+  `font-size: 10px` on the rain chart's label row and every label inherits it. But an unanswered
+  window's label also carried `class="muted"`. So `24 h` and `72 h` drew at 12px beside three
   neighbours at 10. The two labels a reader is most likely to question drew biggest. The class was
   doing no work there either, since `.accx` already paints all five `--muted`. **This is not the
-  first site**: `#ignoredList .nm .muted` patches the same trap by restating 11px. Read that rule as
-  evidence rather than as a one-off, and treat `.muted` as a colour-plus-size pair. In a compact
+  first site.** `#ignoredList .nm .muted` patches the same trap by restating 11px. Read that rule as
+  evidence rather than as a one-off. Treat `.muted` as a colour-plus-size pair. In a compact
   context, either state the size on the element or reach for the token instead of the class.
 
 - **A graph's viewBox is stretched, so a mark on the plot goes in HTML over it, not in the SVG.**
