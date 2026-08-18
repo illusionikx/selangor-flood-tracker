@@ -13,7 +13,18 @@
 ## Global Constraints
 
 - **Work on `main` directly.** No feature branch.
-- **Bump `?v=` on the touched stylesheet in `index.html` in every commit that edits CSS.** Current values: `css/base.css?v=128`, `css/chrome.css?v=182`, `css/map.css?v=150`. Herd serves CSS with `max-age=10800`, so an unbumped edit is invisible for three hours.
+- **The selector is authoritative. A line number is not.** Every `file:line` reference in this plan was correct when it was written. Parallel work moved two of five spot-checked lines within the hour. Find each declaration by its selector, and treat the line number as a hint. Re-enumerate before starting any task:
+
+  ```bash
+  cd /d/Herd/flood-exp
+  grep -n 'font-size:'    css/base.css css/chrome.css css/map.css   # Tasks 3 and 4
+  grep -n 'border-radius:' css/base.css css/chrome.css css/map.css  # Task 5
+  grep -n 'padding:'       css/base.css css/chrome.css css/map.css  # Task 6
+  ```
+
+  If the count differs from what a task states, the stylesheets moved. Work from the fresh list, and note the new count in the commit message.
+
+- **Bump `?v=` on the touched stylesheet in `index.html` in every commit that edits CSS.** Read the current value first with `grep -n 'css/.*\.css?v=' index.html` and add one. The `sed` commands in this plan carry the values current at writing time, and those go stale the same way line numbers do. Herd serves CSS with `max-age=10800`, so an unbumped edit stays invisible for three hours.
 - **Do not touch the palette.** Every `--k-*`, `--s-*`, `--me`, `--fav` and `--wx-*` token stays exactly as it is.
 - **Do not touch `css/icons.css`** (a script generates it) or anything under `vendor/`.
 - **Do not add `clamp()`, `oklch()`, `@layer`, `@starting-style` or view transitions.** This pass changes sizes only.
