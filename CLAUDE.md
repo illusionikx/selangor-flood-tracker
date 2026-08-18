@@ -510,8 +510,9 @@ frames only exist because we ran when they were taken. To re-test the capture pa
   every ~25 min and we poll every ~8.5 min. So a level is a staircase, and the same number arrives
   four or five times. Stamping each arrival `now` puts the step where we noticed it. That put up to
   a poll interval of error on *both* ends of a rate. A rate came out wrong by over 100% on a short
-  baseline. That is why a station whose level had not moved in five polls reported a 0.9 h ETA. The `readTs()` helper reads `updated`, clamps a future stamp (JPS stamps to the upcoming slot) and
-  falls back to `now` only when the parse fails. Anything new that writes to `level` must go through
+  baseline. That is why a station whose level had not moved in five polls reported a 0.9 h ETA. The
+  `readTs()` helper reads `updated` and clamps a future stamp, because JPS stamps to the upcoming
+  slot. It falls back to `now` only when the parse fails. Anything new that writes to `level` must go through
   it. Two side effects to keep. The `(station, ts)` PK now dedupes a repeated reading to one row. A
   station frozen on an old reading stores that old stamp. So `RETAIN` prunes it, and `SPARK_WIN`
   excludes it instead of drawing a flat live-looking line.
