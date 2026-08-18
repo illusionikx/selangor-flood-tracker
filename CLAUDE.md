@@ -19,13 +19,14 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `api.php` | server-side proxy + cache + source merge + poll history + camera image proxy + rate-limited `?force=1` + place lookup (`?place=`, proxies Nominatim) + weather layer lookup (`?wx=1`) |
 | `sources.php` | scrapers for the two HTML-only upstreams (national portal, JPS WP) and the three MET feeds (nowcast, forecast, warning). Also the national portal's rainfall table, gazetteer and 7-day history endpoints. Also the two JPS notice parsers: the MET mirror, the flood alert |
 | `shots.php` | camera archive: capture, retention tiers, lookup, and the on-request strip (`buildSheet()`) the wall and the clip play. Required by `api.php` |
-| `shots-test.php` | `php shots-test.php` — one of five runnable checks. Guards retention. Exercises `pruneShots()` |
+| `shots-test.php` | `php shots-test.php` — one of six runnable checks. Guards retention. Exercises `pruneShots()` |
 | `log.php` | where a browser error lands. `js/oops.js` is the only caller. Appends one JSON line to `.client-errors.log` |
 | `watch.php` | reads a payload on stdin and complains when it is wrong. The poll cron pipes into it. Reports a change of state, never a state |
 | `.user.ini` | per-directory PHP settings. Holds one line, `session.auto_start=0`, and the reason it is there |
 | `index.html` | markup only — no inline CSS or JS |
-| `title-test.html` | `chrome --headless --dump-dom` — one of five runnable checks. Guards the app bar wordmark ladder, in rendered pixels |
-| `narrow-test.html` | `chrome --headless --dump-dom` — one of five runnable checks. Guards the narrow-window block: its threshold, its coverage, its refusal to be dismissed, and that it is modal |
+| `title-test.html` | `chrome --headless --dump-dom` — one of six runnable checks. Guards the app bar wordmark ladder, in rendered pixels |
+| `narrow-test.html` | `chrome --headless --dump-dom` — one of six runnable checks. Guards the narrow-window block: its threshold, its coverage, its refusal to be dismissed, and that it is modal |
+| `paint-check.html` | `chrome --headless --dump-dom` — one of six runnable checks. Guards the on-map paint chooser: that its glyph paints, that the glyph names the layer on screen, and that it clears the other map furniture at both widths |
 | `css/icons.css` | every icon, as an SVG mask. Generated — see docs/FEATURES.md for the fetch |
 | `css/base.css` | tokens, reset, controls, blocks shared by popup + alert panel |
 | `css/chrome.css` | page furniture: app bar, status dot, drawer, legend, splash |
@@ -38,7 +39,7 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `js/stations.js` | queries over the station set (`nearestOf`, `nearestCam`, `byId`) |
 | `js/map.js` | map instance, basemap/theme, cluster, the station panel (`openSide`), `focusOn` / `flashTo` |
 | `js/heat.js` | both heat layers (water level, rainfall), ground-fixed sizing per layer, shared opacity. Also the field pass where a gauge reporting no rain denies the ground a wet one claims |
-| `heat-test.html` | `chrome --headless --dump-dom` — one of five runnable checks. Guards the rain layer's paint distance, its dry-gauge erase and its handover between neighbours, in canvas pixels |
+| `heat-test.html` | `chrome --headless --dump-dom` — one of six runnable checks. Guards the rain layer's paint distance, its dry-gauge erase and its handover between neighbours, in canvas pixels |
 | `js/popup.js` | popup + meter + gauge + sparkline templates |
 | `js/sparktip.js` | the hover/tap readout on every graph, and the label on any `data-tip`. One delegated listener, no imports |
 | `js/render.js` | rebuilds markers and heat points, and the drawer summary table |
@@ -741,6 +742,15 @@ frames only exist because we ran when they were taken. To re-test the capture pa
   two `icons[].src` in `manifest.json`. `icon-build.php` rewrites the PNGs under the same names. A
   browser holds a favicon for far longer than three hours. So bumping that number is the only
   thing that makes a new mark appear. The script prints the reminder when it finishes.
+- **A pseudo-element that sets `--i` paints nothing until its selector joins the list in
+  `css/icons.css`.** An `.i` element gets the mask from the `.i` class. A pseudo-element cannot,
+  so the mask lives in one explicit selector list instead: `#locate::before, #paint::before,
+  #gotoBox::after, .spark::before, .sparktip.warn::before`. That list is the answer to "how do icons
+  work", kept in one file rather than repeated in three. A rule that sets `--i` and a size, and
+  never joins it, has no `content` and no `mask`. So it draws an empty box. `#paint::before` shipped
+  that way for one run. Every rung of its glyph ladder resolved the right `--i`, and the button drew
+  a blank white plate on the map. **A computed `--i` is not evidence that anything painted.**
+  `paint-check.html` reads `content` and `mask-image` for that reason, not just the token.
 - **`filter` runs before `mask`, so a filter on an `.i` is discarded.** The spec order is: paint the
   element, apply the filter, *then* clip with the mask. An `.i` is a box of `currentColor` with the
   glyph masked out of it. So a `drop-shadow` on it is computed from the box, lands outside the box,
@@ -2066,6 +2076,13 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   `HEAVY RAIN`, `HAPPENING NOW`) are a deliberate visual language and are **not** messages — leave
   them.
 - All user settings live in one `prefs` blob in `localStorage` (`PREFS` + `save()`).
+- **The paint choice lives on the map, and the drawer holds only filters.** `#paint`, top-left,
+  carries the three mutually-exclusive layers: water-level heat, rainfall heat and the MET nowcast.
+  Its resting glyph names the one painting, so nothing has to open to answer that. The drawer keeps
+  Districts, Favorites, Ignored sensors and Sensor kinds, and the last of those took `#risingOnly`
+  and `#favOnly` under its rule. **Anything that changes what the map PAINTS belongs on `#paint`.
+  Anything that changes WHICH STATIONS draw belongs in the drawer.** `#layersect` and `#layerN` are
+  gone. See `docs/FEATURES.md`, *The paint chooser moved onto the map*.
 - **`PREFS.ignored` is the only alarm-suppression control**, and it is applied *further* than the
   district filter: `isIgnored()` gates pins, heat, the alert panel, the ticker **and** the toast. The
   last two deliberately ignore the district picker. Ignoring one named sensor is a request about
@@ -2404,7 +2421,7 @@ foreach($r as $s){$la=(float)$s["latitude"];$ln=(float)$s["longitude"];if(!$la)c
 $b=null;$bd=1e9;foreach($non as $n){$d=$km($la,$ln,$n["lat"],$n["lng"]);if($d<$bd){$bd=$d;$b=$n;}}
 printf("%-5d %-28s %6.0f m  %-30s %s\n",$s["stationId"],$s["stationName"],$bd*1000,$b["name"],$b["district"]);}'
 
-php shots-test.php            # one of five runnable checks. Guards camera retention. Must stay green.
+php shots-test.php            # one of six runnable checks. Guards camera retention. Must stay green.
 php api.php --selftest       # another. Guards the force-refresh rate limit, cache choice, and the
                               # place-lookup validator/rate limit. Must stay green.
 curl -sk "https://flood-exp.test/api.php?shots=1"                          # frame timestamps
@@ -2536,6 +2553,15 @@ printf("rows: %d, points: %d, newest: %s\n",
 "/c/Program Files/Google/Chrome/Application/chrome.exe" --headless=new --disable-gpu \
   --ignore-certificate-errors --virtual-time-budget=35000 --window-size=1200,900 --dump-dom \
   https://flood-exp.test/narrow-test.html | perl -0777 -ne 'print $1 if /<pre id="out">(.*?)<\/pre>/s'
+
+# The on-map paint chooser. Its button states what the map paints with one glyph, off a `:has()`
+# ladder in css/chrome.css. Three silent faults: a wrong rung draws a real glyph for the wrong layer,
+# a missing `:not()` hands the answer to stylesheet order, and a rule left off the mask list in
+# css/icons.css draws an empty plate. The last one shipped. Also measures the button against every
+# other floating box, at 1536 and again at 360. Reads PASS.
+"/c/Program Files/Google/Chrome/Application/chrome.exe" --headless=new --disable-gpu \
+  --ignore-certificate-errors --virtual-time-budget=40000 --window-size=1600,1000 --dump-dom \
+  https://flood-exp.test/paint-check.html | perl -0777 -ne 'print $1 if /<pre id="out">(.*?)<\/pre>/s'
 
 # The app bar wordmark ladder, in rendered pixels. Loads the app in an iframe at fifteen widths and
 # asserts one spelling at a time, never wider than its rail, and never a longer spelling on a
@@ -2674,8 +2700,9 @@ done
 There is otherwise no test suite. Changes are verified four ways. Lint the PHP. Syntax-check the modules. Query `.cache.json` for
 the data shape being relied on. Then look at the page.
 
-`shots-test.php`, `php api.php --selftest`, `heat-test.html`, `title-test.html` and
-`narrow-test.html` are the five runnable checks here, and each guards a different risk.
+`shots-test.php`, `php api.php --selftest`, `heat-test.html`, `title-test.html`,
+`narrow-test.html` and `paint-check.html` are the six runnable checks here, and each guards a
+different risk.
 
 `shots-test.php` is deliberately narrow: retention is the only rule in this repo that can *quietly
 destroy* data. Everything else either works or visibly does not. A prune that buckets a frame
@@ -2745,3 +2772,22 @@ time supplies no reliable clock to wait on.
 
 Focus is the property. A modal dialog makes the page behind it inert, and a modal dialog is in the
 top layer by definition.
+
+`paint-check.html` guards the on-map paint chooser. Its resting button states what the map paints
+through one glyph, and that glyph is a `:has()` ladder in `css/chrome.css`. Every way it fails is
+silent.
+
+A wrong rung draws a real glyph for a real layer, and not the one painting. A missing
+`:not(:has(#wxLayer:checked))` hands the answer to source order, so reordering the stylesheet
+changes what the button says. A rule left off the mask list in `css/icons.css` draws nothing at all.
+
+None of those reach `php -l`, `node --check`, or any query over `.cache.json`. The last one shipped.
+
+**A resolved token is not a painted pixel.** The first version of this check asserted `--i` alone.
+It passed on a button drawing an empty plate. It reads `content`, `mask-image` and the box size now,
+and then the token.
+
+**It measures the corner rather than trusts an estimate of it.** A first revision pushed `#pills`
+down 48px to clear the button, on a guess at `#risebadge`'s width. Measured, that pill is 180px
+against a 256px budget, and it clears the button by 34px with nothing moved. The rule went and the
+measurement stayed.

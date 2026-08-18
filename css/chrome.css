@@ -1056,10 +1056,44 @@ header:has(#net.open) #netstats { opacity: 1; visibility: visible; }
 /* Map furniture slides with the drawer instead of hiding under it. */
 /* `translate` too: a swipe writes the drag there rather than to `transform`, which is holding the
    open/shut position — see swipeOff() in ui.js. This is what carries a half-swiped panel home. */
-#bar, #legend { transition: transform var(--slide), translate var(--slide), visibility var(--slide); }
-body:not(.ready) #bar, body:not(.ready) #legend { transition: none; }
+#bar, #legend, #paint { transition: transform var(--slide), translate var(--slide), visibility var(--slide); }
+body:not(.ready) #bar, body:not(.ready) #legend, body:not(.ready) #paint { transition: none; }
 body.drawer #bar { transform: none; visibility: visible; }
-body.drawer #legend { transform: translateX(var(--drawer)); }
+body.drawer #legend, body.drawer #paint { transform: translateX(var(--drawer)); }
+
+/* --- the paint chooser ------------------------------------------------------------------------ */
+
+/* Top-left, the one corner of the map that carries nothing. #legend is bottom-left, #credit and the
+   zoom buttons bottom-right, #toast top-right and #pills top-centre.
+   401, not 400: it stands over the legend and the alert panel, one rung under #gotoBox's results
+   list at 402 and well under the app bar at 600. */
+#paint {
+  position: absolute; z-index: 401; top: calc(var(--hdr) + 12px); left: 12px;
+  width: 40px; height: 40px; border-radius: 10px; box-shadow: var(--shadow);
+}
+/* The `.icon` hover disc is round and the width of its box, which is wrong on a square plate that
+   is already painted. The plate takes the wash instead. */
+#paint:hover { background: var(--hover); }
+
+/* The resting glyph names the layer on screen, so what the map paints is answered without opening
+   anything. That is the rule a `title` cannot obey — it never opens on touch. `--accent` for on is
+   #locate's own. This is CSS off the three checkboxes rather than a line in syncHeat(), so there is
+   no second writer to age apart from the first.
+   **The `:not()` is load-bearing.** syncHeat() leaves `#heat` checked *during* weather mode, because
+   the pref it reports is what "turn the previous heatmap back on" restores. So without it two rules
+   match at once and source order alone decides which glyph draws. Excluding weather makes the three
+   mutually exclusive in the selector, and reordering this file cannot break it. */
+#paint::before { --i: var(--i-layers); width: 22px; height: 22px; }
+body:has(#heat:checked):not(:has(#wxLayer:checked)) #paint { color: var(--accent); }
+body:has(#heat:checked):not(:has(#wxLayer:checked)) #paint::before { --i: var(--i-water_drop); }
+body:has(#rainHeat:checked):not(:has(#wxLayer:checked)) #paint { color: var(--accent); }
+body:has(#rainHeat:checked):not(:has(#wxLayer:checked)) #paint::before { --i: var(--i-rainy); }
+body:has(#wxLayer:checked) #paint { color: var(--accent); }
+body:has(#wxLayer:checked) #paint::before { --i: var(--i-sunny); }
+
+/* `.menu` is a row list of `.mi` buttons and this one holds three `.chip` labels, which bring their
+   own padding. So the 4px the shared rule pads with would sit inside the chips' own. */
+#paintmenu { min-width: 232px; padding: 6px; }
 
 /* --- heatmap legend ------------------------------------------------------------------------- */
 
@@ -1940,6 +1974,14 @@ body.finding #find { display: none; }
   /* The popover clears the two-row header rather than the one-row one; --hdr already carries the
      difference, so this only has to stop sitting under the ticker's rule. */
   #netstats { left: 8px; }
+  /* 44, the same touch target the zoom buttons take at this width. */
+  #paint { width: 44px; height: 44px; }
+  #paint::before { width: 24px; height: 24px; }
+  /* #pills is NOT moved for this button, and it was, for one revision. The strip is centred on the
+     viewport and #risebadge measures 180px at 360px wide, so it runs 90 to 270 against a button
+     that ends at 56. It clears by 34px on its own. The rule that pushed the strip down 48px was
+     written against an estimate of the pill's width and never against the pill. paint-check.html
+     measures the pair now, so a wider pill fails a check rather than landing on the button. */
   /* The legend earns its space: the heatmap is the one layer whose colours mean nothing without it,
      and it is the layer a phone shows most of. Compacted rather than dropped — full width beside the
      zoom buttons, and the sentence explaining the doubling goes, since the tip already says it. */

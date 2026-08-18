@@ -452,10 +452,10 @@ dialog:focus, dialog:focus-visible { outline: none; }
    either list. `#districtList`'s copy needs none of this — that one is `display: none` on touch. */
 #ignoredList .solo::after, #favList .solo::after { content: ''; position: absolute; inset: -10px -6px; }
 
-/* The one divider in the drawer. It separates the three layer chips from the two filters that
-   share their section. A rule rather than a second `.sect`: they belong to the same fold, and a
-   heading for one chip is a heading with nothing to hold. */
-#layersect hr { margin: 12px 0 8px; border: 0; border-top: 1px solid var(--outline); }
+/* The one divider in the drawer. It separates the five sensor kinds from the two filters that share
+   their section. A rule rather than a second `.sect`: they belong to the same fold, and a heading
+   over two chips is a heading with nothing to hold. */
+#kinds hr { margin: 12px 0 8px; border: 0; border-top: 1px solid var(--outline); }
 
 .rowbtns { display: flex; gap: 8px; margin-top: 8px; }
 .rowbtns .link { justify-content: center; }

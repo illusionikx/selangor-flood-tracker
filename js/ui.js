@@ -496,7 +496,9 @@ el('heat').onchange = el('rainHeat').onchange = el('risingOnly').onchange =
   syncHeat();
   risePill();
   save();
-  // Both heatmaps are display options, not filters — only the two pin filters close the drawer.
+  /* Only the two pin filters can close the drawer, and they are also the only two of the four
+     boxes on this handler that still live in it. The two heatmaps moved to #paint on the map,
+     where there is no drawer to close and nothing hiding the effect of the press. */
   applyFilter(e.target === el('risingOnly') || e.target === el('favOnly'));
 };
 

@@ -1,0 +1,173 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>paint chooser check</title>
+<!--
+  The paint chooser lives on the map and states what the map paints through one glyph on its
+  resting button. That glyph is a `:has()` ladder in css/chrome.css, and every way it fails is
+  silent. A wrong rung draws a real glyph for a real layer, just not the one painting. A missed
+  `:not()` hands the answer to source order, so reordering the stylesheet changes what the button
+  says. Neither shows in `php -l`, in `node --check`, or in any query over .cache.json.
+
+  Run:
+  "/c/Program Files/Google/Chrome/Application/chrome.exe" --headless=new --disable-gpu \
+    --ignore-certificate-errors --virtual-time-budget=30000 --window-size=1600,1000 --dump-dom \
+    https://flood-exp.test/paint-check.html | perl -0777 -ne 'print $1 if /<pre id="out">(.*?)<\/pre>/s'
+-->
+<style>html, body { margin: 0 } iframe { width: 1536px; height: 900px; border: 0 }</style>
+<pre id="out">running…</pre>
+<iframe id="f" src="/index.html"></iframe>
+<script type="module">
+const out = document.getElementById('out'), lines = [];
+let bad = 0;
+const is = (got, want, name) => {
+  const ok = got === want; if (!ok) bad++;
+  lines.push((ok ? 'ok  ' : 'FAIL') + '  ' + name + '  -> ' + JSON.stringify(got)
+    + (ok ? '' : '  want ' + JSON.stringify(want)));
+};
+const wait = ms => new Promise(r => setTimeout(r, ms));
+
+const f = document.getElementById('f');
+await new Promise(r => f.addEventListener('load', r, { once: true }));
+await wait(4000);
+const w = f.contentWindow, d = f.contentDocument;
+const el = id => d.getElementById(id);
+
+const btn = el('paint'), menu = el('paintmenu');
+if (!btn || !menu) {
+  out.textContent = 'FAIL  the paint chooser did not render at all';
+  throw new Error('no control');
+}
+/* `getPropertyValue` hands back the substituted value, never the `var(...)` that was written. So
+   the expected side has to be the same token resolved off :root, or every rung reports a mismatch
+   between two spellings of one correct answer. */
+const glyph = () => w.getComputedStyle(btn, '::before').getPropertyValue('--i').trim();
+const token = n => w.getComputedStyle(d.documentElement).getPropertyValue('--i-' + n).trim();
+const ink = () => w.getComputedStyle(btn).color;
+
+// --- the control -------------------------------------------------------------------------------
+
+is(menu.hasAttribute('popover'), true, 'the panel is a popover, so Escape and light dismiss are free');
+is(btn.getAttribute('popovertarget'), 'paintmenu', 'the button is the popover invoker');
+is(menu.classList.contains('menu'), true, 'it carries .menu, which is what places it under the button');
+
+// --- it opens, and the shared placement handler catches it -------------------------------------
+/* The handler in js/ui.js keys on `.menu` and on a `[popovertarget]` pointing back at the box. Miss
+   either and the popover still opens, at the UA's own centred position, over the middle of the map. */
+btn.click();
+await wait(200);
+is(menu.matches(':popover-open'), true, 'the button opens the panel');
+const mb = menu.getBoundingClientRect(), bb = btn.getBoundingClientRect();
+is(mb.top >= bb.bottom && mb.top - bb.bottom < 16, true, 'the panel is placed just under the button');
+is(mb.left >= 8, true, 'and clamped onto the screen rather than off its left edge');
+is(mb.width > 0 && mb.height > 0, true, 'it has a size, so the three chips laid out');
+// A press inside must not dismiss it: three mutually-exclusive choices means trying another one.
+el('rainHeat').closest('label').click();
+await wait(120);
+is(menu.matches(':popover-open'), true, 'picking a layer leaves the panel open to pick another');
+el('rainHeat').checked = false;
+menu.hidePopover();
+await wait(120);
+is(menu.matches(':popover-open'), false, 'and it closes again');
+
+// --- the three choices moved, and none of them is in two places --------------------------------
+
+is(d.querySelectorAll('#heat, #rainHeat, #wxLayer').length, 3, 'all three boxes are on the page once');
+for (const id of ['heat', 'rainHeat', 'wxLayer'])
+  is(el(id).closest('#paintmenu') !== null, true, `#${id} is in the map panel`);
+is(el('bar').contains(el('heat')), false, 'and no copy is left in the drawer');
+is(!!el('layersect'), false, '#layersect is gone');
+is(!!el('layerN'), false, '#layerN is gone with the summary it fed');
+
+// --- the two pin filters stayed behind ---------------------------------------------------------
+
+is(el('risingOnly').closest('#kinds') !== null, true, 'rising only stayed in the drawer');
+is(el('favOnly').closest('#kinds') !== null, true, 'favorites only stayed in the drawer');
+is(d.querySelector('#kinds hr') !== null, true, 'the rule that separates them came with them');
+
+// --- placement, in rendered pixels -------------------------------------------------------------
+
+const r = btn.getBoundingClientRect();
+const hdr = parseFloat(w.getComputedStyle(d.documentElement).getPropertyValue('--hdr'));
+is(Math.round(r.top - hdr), 12, 'the top edge clears the app bar by the gutter');
+is(r.width >= 40 && r.height >= 40, true, 'the button is at least 40px square');
+// The desktop drawer opens by default, and the button rides its shift the way #legend does.
+const drawerOpen = d.body.classList.contains('drawer');
+const shift = drawerOpen ? parseFloat(w.getComputedStyle(d.documentElement).getPropertyValue('--drawer')) : 0;
+is(Math.round(r.left - shift), 12, 'the left edge is the map gutter, plus the drawer shift if open');
+// Nothing else floats in this corner. An overlap here is a control a reader cannot press.
+for (const id of ['legend', 'pills', 'toast', 'credit', 'bar']) {
+  const o = el(id); if (!o) continue;
+  const b = o.getBoundingClientRect();
+  if (!b.width || !b.height || w.getComputedStyle(o).visibility === 'hidden') continue;
+  is(r.left < b.right && b.left < r.right && r.top < b.bottom && b.top < r.bottom, false,
+     `does not overlap #${id}`);
+}
+
+// --- the glyph ladder --------------------------------------------------------------------------
+/* Driven on the checkbox property, because that is what the CSS reads. `:checked` matches the live
+   IDL state rather than the attribute, so assigning it here exercises the same selector a real
+   press does. The four states below are the four syncHeat() produces. */
+const set = async (heat, rain, wx) => {
+  el('heat').checked = heat; el('rainHeat').checked = rain; el('wxLayer').checked = wx;
+  await wait(60);
+};
+
+await set(false, false, false);
+const resting = ink();
+/* The glyph has to be PAINTED, not merely named. `--i` resolving proves nothing on its own: the
+   mask that turns it into pixels is an explicit selector list in css/icons.css, and a pseudo-element
+   left off it sets --i, sizes itself and draws an empty plate. That shipped here for one run. */
+const pre = () => w.getComputedStyle(btn, '::before');
+is(pre().content !== 'none', true, 'the glyph pseudo-element exists');
+is(pre().maskImage !== 'none' && pre().maskImage !== '', true, 'and it carries the mask that paints it');
+is(parseFloat(pre().width) > 0 && parseFloat(pre().height) > 0, true, 'and it has a box to paint in');
+is(glyph(), token('layers'), 'nothing painting -> the layers glyph');
+
+await set(true, false, false);
+is(glyph(), token('water_drop'), 'water level -> the water drop');
+is(ink() !== resting, true, 'water level -> the accent, not the resting ink');
+
+await set(false, true, false);
+is(glyph(), token('rainy'), 'rainfall -> the rain cloud');
+
+/* The state no source ordering can be trusted with. syncHeat() writes `#heat.checked = wet`
+   whatever `PREFS.wx` says, because the pref it reports is what leaving weather mode restores. So
+   both boxes really are checked here, and two rules match unless the `:not()` holds. */
+await set(true, false, true);
+is(glyph(), token('sunny'), 'weather mode beats the heatmap it is holding for the reader');
+await set(false, true, true);
+is(glyph(), token('sunny'), 'and beats the rainfall one too');
+
+await set(true, false, false);
+
+// --- phone width -------------------------------------------------------------------------------
+/* 360px, the width the app bar is measured against. Two claims. The button grows to the touch
+   target the zoom buttons already take. And #pills clears it with nothing moved for it: that strip
+   is centred on the viewport and #risebadge measures 180px here, so it runs 90 to 270 against a
+   button ending at 56. The clearance is 34px and it is measured rather than assumed — an earlier
+   revision pushed the whole strip down 48px on an estimate that was 76px too wide. */
+/* Reloaded at this width rather than resized to it. A phone LANDS here, and landing is the path
+   that leaves the drawer shut — resizing an open one only exercises the breakpoint listener. */
+f.style.width = '360px';
+f.contentWindow.location.reload();
+await new Promise(r => f.addEventListener('load', r, { once: true }));
+await wait(4000);
+const pd = f.contentDocument, pbtn = pd.getElementById('paint');
+pd.body.classList.add('rising');          // the state that puts #risebadge on screen
+await wait(300);
+
+is(pd.body.classList.contains('drawer'), false, 'phone: lands with the drawer shut');
+const pr = pbtn.getBoundingClientRect();
+is(pr.width >= 44 && pr.height >= 44, true, 'phone: the button is at least a 44px touch target');
+is(Math.round(pr.left), 12, 'phone: still the map gutter — the drawer is shut at this width');
+
+const pb = pd.getElementById('pills').getBoundingClientRect();
+is(pb.width > 0, true, 'phone: the rising pill is on screen, so there is something to clear');
+is(pr.left < pb.right && pb.left < pr.right && pr.top < pb.bottom && pb.top < pr.bottom, false,
+   'phone: the rising pill clears the button');
+// Named rather than left implicit: 34px is the whole margin, and a pill 68px wider takes it.
+lines.push(`      (clearance: ${Math.round(pb.left - pr.right)}px, pill ${Math.round(pb.width)}px)`);
+
+lines.push(bad ? `FAIL: ${bad}` : 'PASS');
+out.textContent = lines.join('\n');
+</script>

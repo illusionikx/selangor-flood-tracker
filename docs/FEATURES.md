@@ -10329,3 +10329,82 @@ stops publishing newest first.
 **Measured.** The live payload fell from 3 warnings to 1 on 2026-08-18. `php api.php --selftest`
 gained three assertions. One of them holds the newest-issue-wins claim above. It is the only thing
 that reports a change in feed order.
+
+## The paint chooser moved onto the map
+
+**The three choices left the drawer.** Water-level heat, rainfall heat and the MET nowcast are one
+mutually-exclusive answer to one question: what does the map paint. They now sit behind a 40px
+button on the map's own top-left corner, `#paint`, with a popover under it.
+
+**The argument is the go-to box's argument.** This is a control you reach for *while looking at the
+map*. Behind the hamburger it meant opening a panel to use it and closing that panel to see the
+result. Filters shape the view and this paints it. Their key was already on the map, bottom-left.
+
+**Top-left is the one free corner.** `#legend` is bottom-left, `#credit` and the zoom buttons are
+bottom-right, `#toast` is top-right and `#pills` is top-centre. `z-index: 401` puts it over the
+legend and the alert panel, one rung under `#gotoBox`'s results list and well under the app bar.
+It rides the drawer shift the way `#legend` does.
+
+**No JavaScript at all.** The panel is a `popover`, so the open state, the light dismiss, the Escape
+key and the top layer are the platform's.
+
+The `toggle` handler in `js/ui.js` already places any `.menu` under its own `[popovertarget]`
+button. Nothing in that handler names one menu. The three checkboxes keep their ids, so
+`syncHeat()` and `syncWx()` still write them, and remain the only writer of them.
+
+### The resting glyph is the state, and it is CSS
+
+The button draws the active layer's own glyph: the water drop, the rain cloud, the sun, or the
+layers glyph when nothing paints. `--accent` marks it on, which is `#locate`'s own shape.
+
+So the button states what the map paints, and nobody has to open it first. A `title` cannot do that
+job. It never opens on touch. That is why `#layerN`, the drawer summary that carried this before,
+went away rather than moved, and its line in `syncHeat()` with it.
+
+It is a `:has()` ladder on the three checkboxes rather than a fourth line in `syncHeat()`. Two
+writers on one fact age apart, which is the fault that function exists to prevent.
+
+**The `:not(:has(#wxLayer:checked))` on the two heatmap rungs is load-bearing.** `syncHeat()` leaves
+`#heat` checked *during* weather mode. The preference it reports is what "turn the previous heatmap
+back on" restores.
+
+So two rules match at once. Without the exclusion, source order alone decides which glyph draws.
+Reorder the stylesheet and the button states a different layer, with nothing to report it. The
+exclusion makes the three mutually exclusive in the selector, which leaves nothing to guard.
+
+**A pseudo-element that sets `--i` paints nothing on its own.** The mask lives in an explicit
+selector list in `css/icons.css` — `#locate::before, #paint::before, #gotoBox::after, .spark::before,
+.sparktip.warn::before`. `#paint::before` shipped for one run without joining it. `--i` resolved
+correctly at every rung and the button drew an empty white plate.
+
+### What was left behind
+
+`#layersect` kept the heading *Layers* over two pin filters. So it is gone.
+
+`#risingOnly` and `#favOnly` moved into `#kinds`, under the same `<hr>` they already sat under. They
+answer the question the kinds above them answer: which pins draw. The drawer holds three sections
+now. They are Districts, Ignored sensors and Sensor kinds, plus Favorites and the `#shown` line.
+
+Both keep the standing indication the alert standard asks for. Rising has `#risebadge` over the map
+and favorites has the `· favorites only` note in `#shown`. Neither depended on the section it left.
+
+### Measured
+
+**Nothing moves `#pills` for this button, and one revision did.** The strip centres on the viewport.
+`#risebadge` measures 180px at 360px wide, so it runs 90 to 270 against a button ending at 56. It
+clears by 34px.
+
+The rule that pushed the whole strip down 48px aimed at an estimate of the pill's width, never at
+the pill. Measure the pair before moving either.
+
+### Not built
+
+*No hover-to-expand.* Leaflet's own layers control opens on hover. It needs a tap path anyway at
+this project's breakpoint, and a box that opens on hover over a map opens while somebody pans it.
+One press, both platforms.
+
+*No copy left in the drawer.* Two controls on one preference is the fault `syncHeat()`'s own
+comment describes at length.
+
+*The `<hr>` under the kinds is still a rule and not a fourth section.* A heading over two chips is
+a heading with nothing to hold.
