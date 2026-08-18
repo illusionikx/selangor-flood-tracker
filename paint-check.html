@@ -78,8 +78,8 @@ is(menu.matches(':popover-open'), false, 'and it closes again');
 
 // --- the three choices moved, and none of them is in two places --------------------------------
 
-const BOXES = ['heat', 'rainHeat', 'favOnly', 'wxLayer', 'risingOnly'];
-is(d.querySelectorAll(BOXES.map(i => '#' + i).join(', ')).length, 5, 'all five boxes exist once');
+const BOXES = ['heat', 'rainHeat', 'stations', 'favOnly', 'wxLayer', 'risingOnly'];
+is(d.querySelectorAll(BOXES.map(i => '#' + i).join(', ')).length, 6, 'all six boxes exist once');
 for (const id of BOXES)
   is(el(id).closest('#paintmenu') !== null, true, id + ' is in the map panel');
 is(el('bar').contains(el('heat')), false, 'and no copy is left in the drawer');
@@ -150,8 +150,59 @@ is(groups[0], 'Heatmap', 'the wash group comes first');
 is(groups[1], 'Icons', 'then the group that changes what draws');
 is(el('heat').closest('.mgrp') === el('rainHeat').closest('.mgrp'), true,
    'the two heat layers share a group');
-for (const id of ['favOnly', 'wxLayer', 'risingOnly'])
+for (const id of ['stations', 'favOnly', 'wxLayer', 'risingOnly'])
   is(el(id).closest('.mgrp') !== el('heat').closest('.mgrp'), true, id + ' is in the icon group');
+
+// --- Favorites and On alert are children of Stations -------------------------------------------
+/* Each one narrows the station pins to a subset, so neither has anything to narrow while the pins
+   are off. The nesting has to be visible, and the collapse must not be destructive. */
+const sub = menu.querySelector('.subgrp');
+is(!!sub, true, 'the two filters sit in a subgroup');
+for (const id of ['favOnly', 'risingOnly'])
+  is(el(id).closest('.subgrp') === sub, true, id + ' is inside it');
+is(el('stations').closest('.subgrp'), null, 'and Stations itself is not — it is the parent');
+is(el('wxLayer').closest('.subgrp'), null, 'nor is Weather, which is a sibling of Stations');
+// The parent has to come first, or the indent points at nothing above it.
+const rows = [...menu.querySelectorAll('.chip, .subgrp')];
+is(rows.indexOf(el('stations').closest('.chip')) < rows.indexOf(sub), true,
+   'Stations is drawn above its children');
+
+el('stations').checked = true; el('wxLayer').checked = false;
+/* Geometry has to be measured with the panel OPEN. A closed popover is `display: none`, so every
+   rect inside it is zero and an indent assertion compares 0 against 0. That passed as a failure
+   here once, on an indent that was working. */
+if (!menu.matches(':popover-open')) menu.showPopover();
+await wait(120);
+is(w.getComputedStyle(sub).display !== 'none', true, 'Stations on -> the children show');
+const subBox = sub.getBoundingClientRect();
+const parBox = el('stations').closest('.chip').getBoundingClientRect();
+is(subBox.width > 0 && parBox.width > 0, true, 'the panel is open, so these rects are real');
+is(subBox.left > parBox.left, true, 'and the children are indented under Stations');
+is(el('favOnly').closest('.chip').getBoundingClientRect().left > subBox.left, true,
+   'the chips themselves clear the spine');
+is(w.getComputedStyle(sub).borderLeftStyle !== 'none', true, 'with a spine carrying the nesting');
+
+el('stations').checked = false;
+await wait(60);
+is(w.getComputedStyle(sub).display, 'none', 'Stations off -> the children collapse');
+is(el('favOnly').checked === false && el('risingOnly').checked === false, true,
+   'collapsing does not silently check them');
+el('stations').checked = true;
+await wait(60);
+menu.hidePopover();
+await wait(60);
+
+/* Weather takes the station pins too, through the same `!PREFS.wx` gate in render(). So the branch
+   dims rather than leaving a checked Stations box claiming pins that are not drawn. */
+el('wxLayer').checked = true;
+await wait(60);
+is(parseFloat(w.getComputedStyle(el('stations')).opacity) < 1, true,
+   'weather on -> the Stations branch dims');
+is(w.getComputedStyle(menu.querySelector('.stationgrp .mhint')).display !== 'none', true,
+   'and the group says why');
+is(el('stations').checked, true, 'and Stations stays checked, because the preference is what returns');
+el('wxLayer').checked = false;
+await wait(60);
 
 /* Weather leaves PREFS.heatLayer alone, so syncHeat() leaves the heat chips checked while it runs.
    Without the dim and the caption the group claims a wash that is not on the map. */

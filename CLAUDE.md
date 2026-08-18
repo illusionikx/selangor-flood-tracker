@@ -26,7 +26,7 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `index.html` | markup only — no inline CSS or JS |
 | `title-test.html` | `chrome --headless --dump-dom` — one of six runnable checks. Guards the app bar wordmark ladder, in rendered pixels |
 | `narrow-test.html` | `chrome --headless --dump-dom` — one of six runnable checks. Guards the narrow-window block: its threshold, its coverage, its refusal to be dismissed, and that it is modal |
-| `paint-check.html` | `chrome --headless --dump-dom` — one of six runnable checks. Guards the on-map paint chooser: that it reads as a control and not as a map pin, that its two groups hold the right five boxes, and that it clears the other map furniture at both widths |
+| `paint-check.html` | `chrome --headless --dump-dom` — one of six runnable checks. Guards the on-map paint chooser: that it reads as a control and not as a map pin, that its two groups hold the right six boxes with the two filters nested under `Stations`, and that it clears the other map furniture at both widths |
 | `css/icons.css` | every icon, as an SVG mask. Generated — see docs/FEATURES.md for the fetch |
 | `css/base.css` | tokens, reset, controls, blocks shared by popup + alert panel |
 | `css/chrome.css` | page furniture: app bar, status dot, drawer, legend, splash |
@@ -2083,10 +2083,17 @@ and `--muted` flip with the theme while the picture behind them does not. White 
 - All user settings live in one `prefs` blob in `localStorage` (`PREFS` + `save()`).
 - **The layer controls live on the map, in two groups, and the drawer keeps the sensor kinds.**
   `#paint` is a `.fab` on the map's top-left. Its popover holds `Heatmap` (water level, rainfall —
-  one mutually-exclusive choice) and `Icons` (favorites, weather, on alert — three independent
-  controls). **The rule for what goes where: a control the reader reaches for WHILE LOOKING AT THE
-  MAP goes on `#paint`. A control that shapes which stations exist at all stays in the drawer**,
-  beside the district picker and the ignored list. `#layersect` and `#layerN` are gone.
+  one mutually-exclusive choice) and `Icons` (`Stations`, with `Favorites` and `On alert` indented
+  under it, then `Weather`). **The rule for what goes where: a control the reader reaches for WHILE
+  LOOKING AT THE MAP goes on `#paint`. A control that shapes which stations exist at all stays in
+  the drawer**, beside the district picker and the ignored list. `#layersect` and `#layerN` are
+  gone.
+  **A parent chip collapses its children and never unchecks them.** `Favorites` and `On alert` each
+  narrow the station pins to a subset, so they collapse when `Stations` goes off. Their preferences
+  stand, because switching the pins back on has to restore the view that was there before. Both the
+  collapse and the weather dim are `:has()` rules in `chrome.css`, so no JS can get either wrong.
+  `render()` gates the pins on `!PREFS.wx && PREFS.stations !== false`, and `#shown` names whichever
+  of the two emptied the map.
   **The FAB's glyph is `layers` at every state and must never name the active layer.** It carried
   the water drop and the rain cloud first, which are the glyphs the river and rainfall PINS draw, on
   a `--surface` plate the same tone as the dark basemap. A reader called it indistinguishable from a
@@ -2806,6 +2813,10 @@ behind it nor transparent.
 **A resolved token is not a painted pixel.** An early version asserted `--i` alone and passed on a
 button drawing an empty plate, because `#paint::before` had never joined the mask list in
 `css/icons.css`. It reads `mask-image` and the box size too now.
+
+**Geometry is measured with the panel OPEN.** A closed popover is `display: none`, so every rect
+inside it reads zero. An indent assertion then compares 0 against 0 and reports a working indent as
+broken. That happened here.
 
 **It measures the corner rather than trusts an estimate of it.** A first revision pushed `#pills`
 down 48px to clear the button, on a guess at `#risebadge`'s width. Measured, that pill is 180px and

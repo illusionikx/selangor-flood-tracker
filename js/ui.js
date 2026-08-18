@@ -476,7 +476,7 @@ el('riseOff').onclick = () => {
 };
 
 el('heat').onchange = el('rainHeat').onchange = el('risingOnly').onchange =
-  el('favOnly').onchange = e => {
+  el('favOnly').onchange = el('stations').onchange = e => {
   /* One heatmap at a time. Stacked, they are two answers to two questions in one picture — and
      worse, leaflet.heat accumulates alpha across layers, so overlapping blobs blend into a colour
      that belongs to neither scale and reads as an intensity neither reading supports.
@@ -493,13 +493,18 @@ el('heat').onchange = el('rainHeat').onchange = el('risingOnly').onchange =
 
   PREFS.risingOnly = el('risingOnly').checked;
   PREFS.favOnly = el('favOnly').checked;
+  /* The station pins as a layer. Its two children are NOT cleared with it — they collapse in
+     `#paintmenu` and their preferences stand, so switching the pins back on restores the view that
+     was there before. Clearing them would make the parent a destructive control. */
+  PREFS.stations = el('stations').checked;
   syncHeat();
   risePill();
   save();
-  /* Only the two pin filters can close the drawer, and they are also the only two of the four
-     boxes on this handler that still live in it. The two heatmaps moved to #paint on the map,
-     where there is no drawer to close and nothing hiding the effect of the press. */
-  applyFilter(e.target === el('risingOnly') || e.target === el('favOnly'));
+  /* Nothing on this handler closes the drawer any more. All five boxes moved to #paint on the map,
+     where there is no drawer over the result of the press. The argument for closing it was that at
+     phone width the drawer IS the screen, so a filter whose effect you cannot see is one you have
+     to close the drawer to judge. These are not behind it now. */
+  applyFilter(false);
 };
 
 /* The weather mode toggle. The pref is written first and the module reads it, so the box can never

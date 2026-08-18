@@ -59,6 +59,10 @@ function syncFavChip() {
 
 export function render() {
   const hidden = new Set(PREFS.hidden || []);
+  /* Written from the preference on every render and never read back off the box. That is the rule
+     the two chips below and syncHeat() all obey. A browser restores a checkbox across a reload
+     without firing `change`, so the control cannot be the source of truth. */
+  el('stations').checked = PREFS.stations !== false;
   const risingOnly = syncRisingChip();
   const favOnly = syncFavChip();
   Object.keys(marks).forEach(k => marks[k] = []);
@@ -133,10 +137,13 @@ export function render() {
   }
   state.perKind = perKind;
 
-  /* Weather mode takes the map: no station pin and no heat. The counts above still run, because
-     they describe the station set and the drawer still reports it. See #shown, which says in
-     words that the stations are hidden. */
-  if (!PREFS.wx) for (const [key, members] of sites) {
+  /* Two ways the station pins come off the map, and the counts above still run for both. They
+     describe the station set rather than the pins, and #shown reports that set in words.
+     Weather mode takes the map: no station pin and no heat. `Stations` is the reader switching the
+     pins off on their own, with the wash left alone. `!== false`, so an unset preference counts as
+     on. That is the test `PREFS.drawer` uses, and it is why a first visit lands on a map with pins
+     rather than an empty one. */
+  if (!PREFS.wx && PREFS.stations !== false) for (const [key, members] of sites) {
     members.sort(leads);
     const lead = members[0];
     const rising = members.some(m => m.rising);
@@ -384,10 +391,13 @@ function counts() {
   // answer it should give.
   const ign = ignoredIds();
   const nIgn = state.data.filter(s => ign.has(s.id)).length;
-  /* Weather mode hides every station, so the station tally would read "0 of 729" and explain
-     nothing. This line is the one the eye lands on to ask why the map is empty, so it answers. */
+  /* Either way of hiding the pins makes the station tally read "0 of 729", which explains nothing.
+     This line is the one the eye lands on to ask why the map is empty, so it answers instead.
+     Weather is named first because it is the stronger claim. It takes the heat as well. */
   el('shown').textContent = PREFS.wx
     ? 'Weather map · flood stations hidden'
+    : PREFS.stations === false
+    ? 'Station pins off · turn them on under Layers'
     : `${total} of ${state.data.length} stations on the map` +
       (pins && pins < total ? ` · ${pins} pins` : '') +
       (el('favOnly').checked ? ' · favorites only' : '') +

@@ -1078,6 +1078,23 @@ body.drawer #legend, body.drawer #paint { transform: translateX(var(--drawer)); 
 #paintmenu:has(#wxLayer:checked) .heatgrp { opacity: .55; }
 #paintmenu:has(#wxLayer:checked) .heatgrp .mhint { display: block; }
 
+/* The station branch collapses with its parent rather than greying with it. Favorites and On alert
+   each narrow the station pins to a subset, so with the pins off they have nothing to narrow. Two
+   dead rows under a switched-off parent is furniture for the state the reader just left.
+   Neither box is unchecked by this. The check is the preference, and turning Stations back on has
+   to restore the view that was there before it went off. That is the rule the heatmap group states
+   for weather, at a second site. */
+#paintmenu:not(:has(#stations:checked)) .subgrp { display: none; }
+
+/* Weather takes the map from the station pins too — see the `!PREFS.wx` gate in render(). So the
+   whole station branch dims under it, exactly as the heatmap group above does, rather than leaving
+   a checked Stations box claiming pins that are not drawn. The caption rides the group heading
+   because this group holds Weather itself, and a caption on the chip that caused the state would
+   sit inside the part that is dimmed. */
+#paintmenu:has(#wxLayer:checked) #stations,
+#paintmenu:has(#wxLayer:checked) .subgrp { opacity: .55; }
+#paintmenu:has(#wxLayer:checked) .stationgrp .mhint { display: block; }
+
 /* `.menu` is a row list of `.mi` buttons and this one holds five `.chip` labels, which bring their
    own padding. So the 4px the shared rule pads with would sit inside the chips' own. */
 #paintmenu { min-width: 236px; padding: 6px; }

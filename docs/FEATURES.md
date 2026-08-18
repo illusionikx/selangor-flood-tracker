@@ -911,7 +911,8 @@ with no referent — and on both arrival paths, a fresh fix and a restored one. 
 fix, if it becomes a problem, is to check `navigator.permissions` first.
 
 **Preferences** — one `prefs` blob in `localStorage`: theme, hidden districts, ignored sensors, layer
-toggles, heatmap on/off and opacity, drawer state, alert-panel state, map centre and zoom.
+toggles, heatmap on/off and opacity, station pins on/off, drawer state, alert-panel state, map
+centre and zoom.
 
 ### Collapsible filter sections
 
@@ -10338,7 +10339,7 @@ that reports a change in feed order.
 | group | holds | shape |
 |---|---|---|
 | Heatmap | Water level, Rainfall | one mutually-exclusive choice, `PREFS.heatLayer` |
-| Icons | Favorites, Weather, On alert | three independent controls |
+| Icons | Stations (Favorites, On alert), Weather | two layers, one with two filters under it |
 
 **The argument is the go-to box's argument.** This is a control you reach for *while looking at the
 map*. Behind the hamburger it meant opening a panel to use it, then closing that panel to see the
@@ -10384,10 +10385,44 @@ ramp, bottom-left. `#risebadge` states the filter, top-centre. `#shown` counts w
 Every one of those was already on screen. `#layerN`, the drawer summary that named the layer, is
 gone with its line in `syncHeat()`.
 
+### Stations owns Favorites and On alert
+
+**`Stations` is the station-pin layer.** It stays on until somebody turns it off. The test is
+`PREFS.stations !== false`, which is the one `PREFS.drawer` uses. So an unset preference counts as
+on, and a first visit lands on a map with pins.
+
+Favorites and On alert each narrow those pins to a subset. Neither has anything to narrow while the
+pins are off, so they sit **indented under Stations**, behind a spine, and collapse with it.
+
+**Collapse, not grey.** Two dead rows under a switched-off parent is furniture for the state the
+reader just left.
+
+**Neither box is ever unchecked by the parent.** The check is the preference. Switching Stations
+back on has to restore the view that was there before, and a parent that clears its children is a
+destructive control wearing a checkbox. It is a `:has()` rule in `css/chrome.css`, so nothing in
+`js/` can get this wrong.
+
+`render()` gates the pins on `!PREFS.wx && PREFS.stations !== false`. The station counts above that
+gate still run either way. They describe the station set rather than the pins, and `#shown` reports
+the set in words.
+
+**`#shown` answers for both ways of emptying the map.** Weather gives
+`Weather map · flood stations hidden`. Stations off gives `Station pins off · turn them on under
+Layers`. Without either, the tally reads `0 of 743` and explains nothing.
+
+This app names weather first, because it makes the stronger claim. It takes the heat as well.
+
+*Not built:* no third state on the parent. A tri-state parent that shows "some children on" is a
+control with a meaning nobody reads correctly at a glance, for two children whose own boxes are
+already on screen whenever the parent is on.
+
 ### Weather dims the heatmap group rather than unchecking it
 
-Weather takes the map from both heat canvases and deliberately leaves `PREFS.heatLayer` alone. That
-is the whole of "turn the previous heatmap back on".
+Weather takes the map from both heat canvases **and from the station pins**, and deliberately leaves
+`PREFS.heatLayer` and `PREFS.stations` alone. That is the whole of "turn the previous view back on".
+
+So the station branch dims under weather too, on the same rule and for the same reason as the
+heatmap group below.
 
 So `syncHeat()` leaves the two heat chips checked while weather runs. Grouped under a heading, two
 checked chips claim a wash that is not on the map. The group dims and captions itself instead:

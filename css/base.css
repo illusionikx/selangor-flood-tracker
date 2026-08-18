@@ -500,6 +500,13 @@ dialog:focus, dialog:focus-visible { outline: none; }
   color: var(--muted);
 }
 .mgrp + .mgrp { margin-top: 10px; }
+/* Children of the chip above them. The indent says whose they are and the spine carries it down
+   past both rows, so the pair reads as one branch rather than two chips that happen to sit in.
+   The rule is inset to land under the parent chip's own glyph. */
+.subgrp {
+  margin: 2px 0 2px 14px; padding-left: 12px;
+  border-left: 1px solid var(--outline);
+}
 /* Shown by the weather rule in chrome.css and hidden the rest of the time. It is not uppercase and
    not tracked: it is a sentence about the group, not a second heading. */
 .mgroup .mhint {
