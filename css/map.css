@@ -495,6 +495,8 @@
    so `2em` against this row's 11px is a 22px mark against an 11px label. Centred in a column
    rather than beside the word, because four keys on one row have to scan as four marks and not as
    four phrases. `gap` grew with them: at 12px the 22px glyphs read as one strip. */
-.wxkey { display: flex; gap: 16px; font-size: 11px; }
+/* Wraps rather than squashes. Below about 320px the strip beside the zoom buttons is narrower
+   than the five keys, and a squashed key breaks its own word before it drops a whole one. */
+.wxkey { display: flex; flex-wrap: wrap; gap: 8px 16px; font-size: 11px; }
 .wxkey span { display: inline-flex; flex-direction: column; align-items: center; gap: 3px; }
 .wxkey .i { font-size: 2em; }

@@ -255,13 +255,17 @@ export const camSrc = s =>
 
 /* The three rungs MET publishes. `word` fills the narrow "now" column, so it has to be one word at
    about 64px. `line` opens the worst-rung sentence, which is why the two differ.
-   `pin` is the map's own ladder and it exists because `rainy_heavy` carries no cloud. Beside
-   `rainy` at a 31px pin it reads as hatching rather than as more of one thing. So the map states
-   heavy by color instead. The card keeps the streaks: at `wxbig` size they read. The card has
-   no color ladder to carry intensity with. */
+   **`pin` and `icon` agree on every rung now, and they did not always.** The map used to draw both
+   wet rungs as `rainy`, because `rainy_heavy` carries no cloud of its own. Beside `rainy` at a
+   31px pin it read as hatching rather than as more of one thing, so color carried the intensity.
+   A fifth key on the legend reversed that. Color alone cannot separate five marks, and two of the
+   five are the wet rungs it already separated by the smallest step on the ramp. The three wet
+   glyphs are `rainy_light`, `rainy_heavy` and the bolt now, and they differ by shape first.
+   `rainy_light` is one streak where `rainy` is two, so the pair reads as less and more of one
+   thing rather than as two hatchings of the same weight. */
 export const WEATHER = [
   { icon: 'sunny', night: 'clear_night', pin: 'sunny', word: 'Clear', line: '' },
-  { icon: 'rainy',       pin: 'rainy', word: 'Rain',  line: 'Rain' },
+  { icon: 'rainy_light', pin: 'rainy_light', word: 'Rain',  line: 'Rain' },
   { icon: 'rainy_heavy', pin: 'rainy_heavy', word: 'Heavy', line: 'Heavy rain' },
 ];
 

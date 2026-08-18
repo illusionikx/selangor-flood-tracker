@@ -2022,7 +2022,10 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   already separated by the smallest step on the ramp. So `WEATHER[2].pin` is
   `rainy_heavy` now, and the two ladders agree on every rung. The hatching argument still holds at
   31px. It is accepted. A reader counting marks on a five-key legend is worse off than a reader
-  squinting at one.
+  squinting at one. **Rung 1 draws `rainy_light` rather than `rainy`, and that is what answers the
+  hatching.** One streak against two reads as less and more of one thing. Two streaks against three
+  reads as two weights of the same hatching, which is the fault above. The three wet glyphs now step
+  `rainy_light`, `rainy_heavy`, bolt, and they differ by shape before they differ by color.
   **The weather pins sit in warm hues without joining the status set.** The status rule above
   reserves `--s-alert` and its neighbors for status, and states there is no exception. This does
   not breach it. `--wx-clear` is its own token, muted away from `--s-alert` so it cannot read as
@@ -2073,6 +2076,16 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   share a surface. Weather mode draws no station pin, and `syncHeat()` shows `#lgWx` only while
   every other legend section is hidden. It is lighter than `--wx-heavy` rather than darker, which
   is the rule the palette block below states for the whole set.
+- **The legend box states 288px for the heat sections and fits itself for the weather one.** A heat
+section is sized by its ramp. A ramp has no intrinsic width, so the box has to carry a number for
+it. The weather section stretches nothing. It is five fixed keys measuring 231px, so the other
+  57 were dead surface over the map.
+  `#legend:has(> #lgWx:not([style*="none"]))` in `chrome.css` is the selector. `syncHeat()` shows
+  `#lgWx` only while both heat sections are hidden, so the two cases cannot overlap. The box then
+  sizes on the section rather than on a class somebody has to remember to set.
+  `.wxkey` wraps. Below about 320px the strip beside the zoom buttons is narrower than five keys. A
+  squashed key breaks its own word before it drops a whole one. Measured in a 210px box: two
+  rows, no overflow, nothing outside the box.
 - **Weather mode never writes `PREFS.heatLayer`.** `syncHeat()` reads `PREFS.wx` as one more input
   and drops both canvases while the mode is on. So leaving the mode restores whatever heatmap the
   reader had, with nothing remembered and nothing to get wrong. Do not add a "previous layer" field.

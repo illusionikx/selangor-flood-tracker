@@ -1115,6 +1115,13 @@ body.drawer #legend { transform: translateX(var(--drawer)); }
   position: absolute; z-index: 400; left: 12px; bottom: 12px; width: 288px;
   margin-top: 10px; padding: 12px 14px; border-radius: 12px;
 }
+/* The heat sections are sized by their ramp, and a ramp has no intrinsic width, so the box has to
+   state 288px for them. The weather section stretches nothing. It is five fixed keys that measure
+   231px, so the other 57 were dead surface over the map.
+   `syncHeat()` shows `#lgWx` only while both heat sections are hidden, so the two cases cannot
+   overlap and this can size on the section rather than on a class somebody has to remember to set.
+   `max-width` keeps it inside the strip the phone rule leaves beside the zoom buttons. */
+#legend:has(> #lgWx:not([style*="none"])) { width: fit-content; max-width: 100%; }
 #legend .title {
   display: flex; align-items: center; gap: 6px;
   font-weight: 500; font-size: 12px; margin-bottom: 6px;
