@@ -1702,47 +1702,47 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   one template serve any width — and it stretches everything drawn inside it. A line survives on
   `vector-effect: non-scaling-stroke`, and nothing else does: a glyph comes out squashed and a
   one-unit rule comes out wide. The rainfall peak mark is the worked example. `.spark` is already
-  `position: relative` for the axis labels, so a percentage off the same `x()` the polyline uses
-  lands on the same column, and `.peak` is a plain `<b>` with a `border-left` and an `<i>` on top.
+  `position: relative` for the axis labels. So a percentage off the same `x()` the polyline uses
+  lands on the same column. `.peak` is a plain `<b>` with a `border-left` and an `<i>` on top.
   Its words go in `data-tip`, because `show()` in `js/sparktip.js` tests `[data-tip]` before
-  `.spark[data-pts]` — the label wins while the pointer is on the glyph and the per-sample readout
-  keeps every other column. **A mark near an edge moves the glyph, never the rule**: the newest
-  sample is the last column, so rain peaking right now is the ordinary case rather than an edge case,
-  and a centred glyph there hangs half its width off the plate.
+  `.spark[data-pts]`. The label wins while the pointer is on the glyph, and the per-sample readout
+  keeps every other column. **A mark near an edge moves the glyph, never the rule.** The newest
+  sample is the last column. So rain peaking right now is the ordinary case rather than an edge
+  case, and a centred glyph there hangs half its width off the plate.
   **The caption it replaced read the wrong maximum**, and that is the part worth remembering.
-  `rainBars()` holds `hi0`, the peak of the readings, and `hi`, the axis maximum — which is the
-  taller of `hi0` and the highest intensity class drawn across the plot. The caption printed `hi`, so
-  a station peaking at 37.5 mm with the 60 mm class on screen said `Peak 60 mm in an hour`, a figure
-  no gauge had reported. Anything stating a graph's peak reads the data, never the scale.
-- **A label sharing a box with a percentage-height bar has to be reserved with `padding`, and a
-  raised `sup` beside it grows the box that reserves it.** Two rules, both on `.acccol` in
+  `rainBars()` holds `hi0`, the peak of the readings, and `hi`, the axis maximum. `hi` is the
+  taller of `hi0` and the highest intensity class drawn across the plot. The caption printed `hi`.
+  So a station peaking at 37.5 mm with the 60 mm class on screen said `Peak 60 mm in an hour`. No
+  gauge had reported that figure. Anything stating a graph's peak reads the data, never the scale.
+- **A label sharing a box with a percentage-height bar has to be reserved with `padding`.** A
+  raised `sup` beside it then grows the box that reserves it. Two rules, both on `.acccol` in
   `css/base.css`, and the rain accumulation chart needs each. Its five totals print inside the plate
-  rather than on a row above it, and a bar states its total as a percentage height — which resolves
+  rather than on a row above it. A bar states its total as a percentage height, which resolves
   against the **content box** of its container. So `padding-top: 16px` shortens the scale of all five
   bars at once, and the tallest fills the 42px under its own number. A margin, or a shorter plate,
-  leaves the percentage measuring the full box and the tallest bar covers the value it belongs to.
+  leaves the percentage measuring the full box. The tallest bar then covers the value it belongs to.
   The second rule is the provenance asterisk. A bare `sup` lifts itself with `vertical-align: super`,
-  and a raised inline box **grows the line box that holds it** — the value measured 17.3px against
-  the 16px strip, so the tallest bar started 1.3px inside its own number. `line-height: 0` with
+  and a raised inline box **grows the line box that holds it**. The value measured 17.3px against
+  the 16px strip. So the tallest bar started 1.3px inside its own number. `line-height: 0` with
   `position: relative; top: -4px` lifts the mark and contributes nothing to the measurement. **That
-  is the normal case and not an edge case**: the 24h and 72h totals are both derived, so both carry
-  the mark, and the five windows nest, so the longest is the tallest column. Anything new that prints
+  is the normal case and not an edge case.** The 24h and 72h totals are both derived, so both carry
+  the mark. The five windows nest, so the longest is the tallest column. Anything new that prints
   a value inside a plot needs both halves.
 
 - **The dark basemap is greyscale, and its *filled* water is the brighter tone, not the darker one.**
   All 18 colors in CARTO `dark_all` have a chroma of zero, so `saturate()` and `hue-rotate()` have
   nothing to act on. Filled water is luminance 38 and land is luminance 9. Read the river gotcha
   below before assuming this covers every river on screen. It does not. Two guesses got both facts wrong before any
-  measurement. The first reached for `saturate()`. The second assumed water was the dark tone. Draw a tile as ASCII art, one character per tone, and the coastline names itself — the
+  measurement. The first reached for `saturate()`. The second assumed water was the dark tone. Draw a tile as ASCII art, one character per tone, and the coastline names itself. The
   Straits of Malacca is a solid block of 38 on the west edge of tile `dark_all/10/800/503`.
   `#watertint` in `index.html` keys on that one value. **Four rules hold it together and each one
-  fails silently.** The band table has **64 entries** because 64 is the smallest count that isolates
+  fails silently.** The band table has **64 entries**. 64 is the smallest count that isolates
   38 from 34 and 42, the road and boundary tones. At 32 bands 34 and 38 merge. At 48 bands 38 and
-  42 merge. The filter carries **`color-interpolation-filters="sRGB"`**, because SVG filters run in
-  linearRGB by default and move every tone into a different band before the table reads it.
+  42 merge. The filter carries **`color-interpolation-filters="sRGB"`**. SVG filters run in
+  linearRGB by default, and move every tone into a different band before the table reads it.
   The tint and the existing `brightness(1.75) contrast(.92)` lift are **one `filter` declaration in
-  `css/map.css`, tint first** — a second rule setting `filter` on the same element replaces this
-  value rather than adding to it, and the tint has to read the raw tones before the lift moves them.
+  `css/map.css`, tint first**. A second rule setting `filter` on the same element replaces this
+  value rather than adding to it. The tint has to read the raw tones before the lift moves them.
   And the emitted color is **darker than what lands on screen**, because that lift multiplies it:
   `#071b2a` draws as `#15364e`. Preview the whole chain against a real tile, never the tint
   alone. CARTO owns this tone, so a restyle upstream aims the tint at nothing and errors nowhere.
@@ -1753,38 +1753,38 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
 
 - **The dark basemap loses water two different ways, and neither one is fixable with a filter.**
   `#watertint` gets the sea and the large lakes because CARTO fills those with one exact tone.
-  **CARTO antialiases a river into the road tones.** A river is one pixel wide, so the style draws
-  it as a line that blends toward the land tone by however much of each pixel it covers. **Measure before
+  **CARTO antialiases a river into the road tones.** A river is one pixel wide. So the style draws
+  it as a line that blends toward the land tone, by however much of each pixel it covers. **Measure before
   assuming a tone means what it looks like.** Mark every pixel Voyager paints as water, then read
   the dark tile at those same positions. At zoom 10 the sea maps to tone 38 for 80% of its pixels.
   At zoom 12 and 13 over Kuala Lumpur, tone 38 is not in the tile at all. The river pixels
-  spread over tones 33 to 50 instead. Tone 37 is the peak and is only 20% to 27% river — the rest is roads
+  spread over tones 33 to 50 instead. Tone 37 is the peak and is only 20% to 27% river. The rest is roads
   and buildings, so keying it paints three wrong pixels per right one.
   **A retention pond is not drawn at all.** That is a separate fault with a separate cause: CARTO
   drops small water on area, not on screen size. Tasik Taman Desa at 0.115 km² holds 2,036 water
-  pixels at zoom 13. A median pond at 0.0017 km² holds **zero** at zoom 13, 14 and 15 alike, and it
+  pixels at zoom 13. A median pond at 0.0017 km² holds **zero** at zoom 13, 14 and 15 alike. It
   is 8 screen pixels wide at the last of those. No zoom brings it back, and a filter cannot recolour
   something absent from the picture. The box holds 6,489 water bodies with a median area of 0.0037
-  km², so this is most of them.
+  km². So this is most of them.
   So `js/map.js` draws both from `water.json`, on the dark theme alone. **Five things about that
-  layer are load-bearing.** It uses a **canvas** renderer, because 6,635 shapes through the default
+  layer are load-bearing.** It uses a **canvas** renderer. 6,635 shapes through the default
   one is 6,635 DOM nodes carried through every pan. It has **its own pane at z-index 250**, between
-  the tiles at 200 and the overlays at 400, so heat, pins and the accuracy circle draw over the
+  the tiles at 200 and the overlays at 400. So heat, pins and the accuracy circle draw over the
   water. It reads **`--water` from `css/base.css` at the moment it builds the layer**, not when the
-  fetch returns, because that token exists on the dark theme only. That token is the **finished**
+  fetch returns. That token exists on the dark theme only. That token is the **finished**
   colour and the tint in `index.html` is the raw one, since the tile pane filter cannot reach this
-  pane — move one and move the other. And the fetch stays **lazy and swallows its own failure** — a
+  pane. Move one and move the other. And the fetch stays **lazy and swallows its own failure**. A
   light-theme reader never pays the 234 KB, and a failure leaves a plainer map rather than a broken
   one. `water.json` has no `?v=`, so a rebake needs a hard reload.
 - **Tolerance and scope are different knobs on `water-build.php`, and the wrong one costs bytes for
   nothing.** Douglas-Peucker controls the detail inside a shape the query already returned. Taking
   the rivers from 33 m to 11 m grows them from 105 KB to 199 KB. It adds no pond, because a pond was
   never a line in that query. If something is **missing**, change the query. If something looks
-  **crude**, change the tolerance. There is also no area floor, on purpose: a small pond simplifies
-  to a handful of points, so keeping every one costs the same 130 KB as a 0.001 km² cutoff.
+  **crude**, change the tolerance. There is also no area floor, on purpose. A small pond simplifies
+  to a handful of points. So keeping every one costs the same 130 KB as a 0.001 km² cutoff.
 - **A lake's outline is several ways in one relation, so closing each one separately draws wedges.**
-  `rings()` in `water-build.php` chains member ways end to end, flipping one that joins backwards,
-  and keeps only what closes. An open chain means the relation is broken upstream, and the script
+  `rings()` in `water-build.php` chains member ways end to end, flipping one that joins backwards.
+  It keeps only what closes. An open chain means the relation is broken upstream. The script
   drops it rather than guess at a shape. Inner rings become holes, so an island stays dry.
 - **The MET nowcast page has no endpoint to find.** It renders its Leaflet map on the server and
   bakes all 294 points into `L.marker(...)` statements. There is no request to intercept, so
@@ -1797,7 +1797,7 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   one way a scraper must not fail.
 - **`MET_KM` is a flat 15 km, not a radius scaled to how far each point reaches.** A cell-scaled cutoff
   came first, sized to the area a point covers, and it failed in both directions. Sabak Bernam sits
-  in a 28.5 km cell. A cell-scaled rule there accepts a station 22.8 km from its point — the weakest
+  in a 28.5 km cell. A cell-scaled rule there accepts a station 22.8 km from its point. That is the weakest
   claim on the map, admitted only because MET built nothing nearby. Central Kuala Lumpur holds
   points 0.1 km apart, two MET offices and a convention centre. The same rule silences stations 3 km
   out, where the reading is most reliable. Point density records where MET chose to build. It says
@@ -1812,16 +1812,17 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   water there reaches this map. Water off Phuket, Samui, Layang-Layang, Palawan and Sulu does not.
   **Naming the straits is not the same as naming our stretch of them.** They run about 800 km. MET
   writes "the waters of Northern Straits of Melaka and Samui" for water off Kedah, Penang and
-  Thailand, about 300 km from Port Klang, and that row holds the three words `straits of melaka`. It
+  Thailand. That is about 300 km from Port Klang, and the row holds the three words
+  `straits of melaka`. It
   passed on them alone and put Thai water on the ticker. `WARN_SEA_FAR` is **cut out of the text**
   before the keep test reads it, rather than tested for. Cutting is what keeps a row that names two
-  stretches: strip the northern mention from "Northern Straits of Melaka and Central Straits of
-  Melaka" and the central one still answers. A row naming only the far stretch has nothing left.
+  stretches. Strip the northern mention from "Northern Straits of Melaka and Central Straits of
+  Melaka", and the central one still answers. A row naming only the far stretch has nothing left.
   **The sea test cannot read the heading alone.** MET files a storm over water as "Warning on
-  Thunderstorms", the same words it uses over land, so a heading test read a marine row as a land
-  one and judged it by the wrong list. `WARN_WATER` reads the text for "waters of" or "perairan",
+  Thunderstorms", the same words it uses over land. So a heading test read a marine row as a land
+  one, and judged it by the wrong list. `WARN_WATER` reads the text for "waters of" or "perairan",
   which MET writes on every marine row. Measured on a seven-row feed: one row survived before these
-  two rules and none after, and the one that survived was the Thai-water row.
+  two rules and none after. The one that survived was the Thai-water row.
   A land row must name a place this map covers (`WARN_HERE`). That list
   includes `west coast` and `pantai barat`. MET names some warnings by coast rather than by state,
   and Selangor sits on the west coast. **A warning for the whole peninsula still drops.** That gap
@@ -1831,7 +1832,7 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   **A live payload tested the southern stretch, and the rule answered correctly.** Before this work,
   `data.gov.my` was the only warning source this app had, and it had published nothing for seven days.
   No row reached the geography filter at all, so nothing exercised this rule. The JPS mirror delivers
-  rows now, and on 2026-08-17 the ticker carried "Northern part of Phuket, Northern Straits Of
+  rows now. On 2026-08-17 the ticker carried "Northern part of Phuket, Northern Straits Of
   Melaka, Southern Straits Of Melaka, Northern Reef South, Southeastern Reef North and Labuan".
   `WARN_SEA_FAR` cuts `northern straits of melaka`, and MET's `Southern Straits Of Melaka` then
   matches `WARN_SEA_KEEP`. **That is the right answer. The southern stretch reaches this map, and the
@@ -1840,22 +1841,22 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   that, on the assumption that the row named nowhere here.
   **What else the sentence names is a granularity floor, not a fault.** `hereParts()` splits on
   sentence and line boundaries. So one sentence naming six places survives whole once any one of them
-  is in reach, and this row puts Phuket, two reefs and Labuan on the ticker beside our own water.
-  Cutting inside a sentence needs per-place surgery on MET's wording, and that is a larger change than
+  is in reach. This row puts Phuket, two reefs and Labuan on the ticker beside our own water.
+  Cutting inside a sentence needs per-place surgery on MET's wording. That is a larger change than
   the paragraph filter this app has.
 - **The two warning surfaces disagree about time on purpose, and `fresh` is the seam.** The panel
-  lists a warning for its whole validity. The ticker carries it only while `fresh` — the first
-  `WARN_FRESH` (6 h) of that validity, measured from the warning's own start and **not** from when
-  we first read it. A sample valid for three days would otherwise scroll for three days, which is
+  lists a warning for its whole validity. The ticker carries it only while `fresh`. That is the first
+  `WARN_FRESH` (6 h) of that validity, measured from the warning's own start. It is **not**
+  measured from when we first read it. A sample valid for three days otherwise scrolls for three days. That is
   the standing banner the alert design standard rejects. The panel is a directory somebody opens.
   The ticker is an interruption nobody asked for, and an interruption has to end.
-  `fresh` is scored in `sources.php` because MET stamps Malaysian wall clock with no offset, so a
-  browser would age it by the reader's clock. **The ticker numbers its tiles before it filters**:
+  `fresh` is scored in `sources.php`, because MET stamps Malaysian wall clock with no offset. A
+  browser ages it by the reader's clock instead. **The ticker numbers its tiles before it filters**:
   `data-warn` indexes `state.warnings`, which the panel and the modal share, so renumbering after
   the filter opens the wrong warning.
-  The panel section sits **under the `HAPPENING NOW` groups**, not above them. It led once, which
-  put a regional forecast above a river over its danger mark — the same thing the tier sort already
-  refuses to do to a forecast two streets away. `alerts()` splices it at the first group that is not
+  The panel section sits **under the `HAPPENING NOW` groups**, not above them. It led once. That
+  put a regional forecast above a river over its danger mark. The tier sort already
+  refuses to do that to a forecast two streets away. `alerts()` splices it at the first group that is not
   `now`, so with nothing happening it still leads.
 - **A MET warning counts toward nothing.** It draws two surfaces: a section in the station list
   in `#side`, and tiles on the ticker. Both open the same modal, with the full text. Neither surface
@@ -1867,9 +1868,9 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   raise the count goes through the alert design standard first.
 - **The payload poll must never pass `cache: 'no-store'`.** The server sends an `ETag` with every
   response. An unchanged poll then costs one 304 and about 200 bytes instead of the full body.
-  `no-store` skips that check and forces a full fetch every time, on a poll that runs every few
-  minutes for as long as the tab stays open. `js/ask.js`'s `askJson()` passes `cache` through only
-  when a caller asks for it, so the payload poll must call it with no `cache` option at all. The
+  `no-store` skips that check and forces a full fetch every time. That poll runs every few
+  minutes, for as long as the tab stays open. `js/ask.js`'s `askJson()` passes `cache` through only
+  when a caller asks for it. So the payload poll must call it with no `cache` option at all. The
   force-refresh button sets `no-store` on purpose, because defeating the cache is the whole point
   of that one button.
 - **The `modulepreload` list has no build step, and it drifts silently.** `index.html` lists every
@@ -1893,61 +1894,61 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   box the caller owns. Three of the four callers answer that: `#dataBox` and `#camBox` take a
   `loadfail` banner, and the test toggle puts `state.test` back. The lightbox answered nothing for a
   while, and it is the one to copy the shape from. It awaited the raw import promise a second time,
-  inside an `async` listener with no `try`, so a failed import raised one unhandled rejection per
-  open and said nothing on screen. **`withTimeline`'s own rejection handler does not cover that
-  second `await`** — a handler on a promise settles that one continuation, never a separate one, and
-  the shape reads as guarded because the word `catch` is already on the line above. Measured in node
+  inside an `async` listener with no `try`. So a failed import raised one unhandled rejection per
+  open, and said nothing on screen. **`withTimeline`'s own rejection handler does not cover that
+  second `await`.** A handler on a promise settles that one continuation, never a separate one. The
+  shape reads as guarded because the word `catch` is already on the line above. Measured in node
   on the two shapes: one unhandled rejection before the `try`, none after. Its surface is `#tlfail`,
-  the line `openTimeline()` already prints when the archive is out of reach, cleared before every
-  attempt because `reset()` clears it only on the path that did not run. Anything new behind
+  the line `openTimeline()` already prints when the archive is out of reach. It is cleared before
+  every attempt, because `reset()` clears it only on the path that did not run. Anything new behind
   `lazy()` needs both halves, and a surface a reader can see beats a `console.warn`.
 - **The JPS MET mirror answers JSON that is not valid JSON.** `met_gelora.json` and its siblings hold
   raw newline characters inside string values, so `json_decode()` returns null on a page that holds
-  real rows. A null decode looks exactly like an empty feed to a caller that only tests `is_array()`,
-  so a good page reads as an outage. `jsonLoose()` in `sources.php` walks the text, tracks whether the
+  real rows. A null decode looks exactly like an empty feed to a caller that only tests `is_array()`.
+  So a good page reads as an outage. `jsonLoose()` in `sources.php` walks the text, tracks whether the
   cursor sits inside a string, and escapes any control character it finds there. `pageHasData()` must
   test a `jps-` key with `jsonLoose()`, never with `json_decode()` alone, or a good page reads as an
   outage. **A second fault hid inside the first fix.** Inside a string, a backslash sets an escape
   flag. The old rule then copied the next character through raw. A raw control byte straight after a
-  backslash skipped the sanitizer that way, and the function returned null on readable data. The
+  backslash skipped the sanitizer that way. The function then returned null on readable data. The
   escaped character now runs through the same control-character test the rest of the string uses.
-  Measured 2026-08-17 against all five JPS MET files: four decode the same either way, and
+  Measured 2026-08-17 against all five JPS MET files. Four decode the same either way, and
   `met_gelora.json` goes from a parse failure to 2 rows.
 - **A stale feed and a calm feed look the same, and `parsed: 0` cannot tell them apart.**
   `api.data.gov.my/weather/warning` sat seven days dead on 2026-08-17. Every counter stayed quiet,
   because the fetch had succeeded and the geography filter correctly refused week-old warnings about
-  Phuket. `sources.stale` names a page that did not answer at all. `sources.old` is the new signal: it
+  Phuket. `sources.stale` names a page that did not answer at all. `sources.old` is the new signal. It
   names a page that answered with nothing recent, scored off the stamp on the newest row. An age test
-  cannot live in `pageHasData()`. That function decides what kind of document arrived, and a failure
-  there discards the stored copy and delays the retry, the wrong outcome for a week-old bulletin,
-  which is a real bulletin and not a broken fetch.
+  cannot live in `pageHasData()`. That function decides what kind of document arrived. A failure
+  there discards the stored copy and delays the retry. That is the wrong outcome for a week-old
+  bulletin, which is a real bulletin and not a broken fetch.
 - **Zero rows is not old.** An alarm on a quiet warning feed is the cry-wolf failure the alert design
-  standard rejects, so `noticeOld()` never reads an empty JSON array as a sign the feed has decayed.
-  `jps-beat` (`met_cyclone.json`) covers the case a genuinely empty feed cannot cover for itself: it
-  carries a row at all times, so an empty or unreadable heartbeat marks the whole JPS MET mirror old
+  standard rejects. So `noticeOld()` never reads an empty JSON array as a sign the feed decayed.
+  `jps-beat` (`met_cyclone.json`) covers the case a genuinely empty feed cannot cover for itself. It
+  carries a row at all times. So an empty or unreadable heartbeat marks the whole JPS MET mirror old
   on its own. `jps-rain` is legitimately empty on most days, so the heartbeat is the only liveness
   evidence it has.
 - **A warning stamp needs the ISO shape, or the merge and the modal both misread it.** `warnWhen()` in
   `js/ui.js` matches `^\d{4}-\d\d-\d\dT\d\d:\d\d` and prints the raw string when a stamp does not
   match it. JPS stamps `17-08-2026 08:00:00`. Left verbatim, that puts two date formats inside one
-  modal. The merge sort is a `strcmp` over the same field, so a JPS stamp left in the shape JPS uses
+  modal. The merge sort is a `strcmp` over the same field. So a JPS stamp left in the shape JPS uses
   also misorders the merge. `jpsMetWarnings()` converts the stamp with `date('Y-m-d\TH:i:s', $from)`,
   the same shape `metWarnings()` already emits.
 - **A national bulletin names several regions, and only one of them is ours.** A row-level place
   test keeps the whole bulletin once it names one place this map covers. `met_gelora.json` carried a
-  1,795-character bulletin across 16 lines on 2026-08-17, naming Sarawak, Sabah, Selangor, Perlis,
-  Kedah and Perak together, and the panel printed a wall of text mostly about Borneo. `hereParts()`
+  1,795-character bulletin across 16 lines on 2026-08-17. It named Sarawak, Sabah, Selangor, Perlis,
+  Kedah and Perak together. The panel printed a wall of text mostly about Borneo. `hereParts()`
   splits the text on sentence and line boundaries, keeps only the parts naming somewhere this map
   covers, and rejoins them. On that row it returns a single 203-character sentence. The gate itself
   stays on the combined English and Malay text, so every row that used to survive still survives.
   Only the display narrows.
 - **`floodAlerts()` has never seen a row.** `getdisse.php` answered `[]` on every fetch made during
-  design. The field names come from the consumer JavaScript JPS publishes on its own page, which is
-  evidence and not a guess, but nobody has tested the parser against real data yet. The first
+  design. The field names come from the consumer JavaScript JPS publishes on its own page. That is
+  evidence and not a guess. But nobody tested the parser against real data yet. The first
   non-empty response is the moment to check it by hand. **It also skips a check its sibling parser
   keeps, on purpose.** `jpsMetWarnings()` drops a row where `$now < $from`, because a MET bulletin
-  describes weather already underway. `floodAlerts()` does not: an `NT_7D` Early alert forecasts a
-  flood up to seven days ahead, and dropping it before its own window opens hides a seven-day warning
+  describes weather already underway. `floodAlerts()` does not. An `NT_7D` Early alert forecasts a
+  flood up to seven days ahead. Dropping it before its own window opens hides a seven-day warning
   until the day it starts. Do not add the missing-looking check back without checking which parser it
   belongs on.
 - **MET publishes no past, and the weather panel needs one.** A nowcast marker holds the current
@@ -1997,9 +1998,10 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
 ## Conventions
 
 - **Anything that alerts is checked against the alert design standard** in
-  [`docs/FEATURES.md`](docs/FEATURES.md#alert-design-standard) — CAP's separate severity / urgency /
-  certainty axes, ISA-18.2's "an alarm requires a response" and its 10-in-10-minutes flood
-  threshold, and the cry-wolf finding that false alarms cost more trust than they buy attention.
+  [`docs/FEATURES.md`](docs/FEATURES.md#alert-design-standard). That standard holds three things.
+  It holds CAP's separate severity / urgency / certainty axes. It holds ISA-18.2's "an alarm
+  requires a response" and its 10-in-10-minutes flood threshold. And it holds the cry-wolf finding
+  that false alarms cost more trust than they buy attention.
   Four gaps are open there. Raise them when alert work comes up rather than adding a fifth surface.
 - **Two of the three JPS notice feeds now reach the map, and the third became a link.** The flood
   forecast and the weather-alert mirror at
@@ -2007,127 +2009,129 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   through `floodAlerts()` and `jpsMetWarnings()` in `sources.php`. The media statement at
   `.../ramalan/pernyataan-media/` became one outbound link in the About dialog, because a document
   list is not an alarm. See "The JPS notice feeds join the warning surface" in `docs/FEATURES.md` for
-  what shipped and why, and the alert design standard section there for how both cleared it.
+  what shipped and why. The alert design standard section there says how both cleared it.
   **`floodAlerts()` has never seen a row.** `getdisse.php` answered `[]` on every fetch made during
   design, so the parser ships checked against evidence, not against a real response. A parser that has
   never met one real row cannot tell a quiet feed from a moved layout. The first non-empty response
   from that endpoint is the moment to check it by hand.
 - **Material Design 3 is the reference for every UI decision.** Where M3 names a component, take its
-  behaviour from the spec instead of inventing one — a reader already knows the platform convention,
-  and a hand-made control costs them that knowledge. The modal drawer is the worked example: both
-  panels dismiss on a tap on `#scrim` or a swipe toward the edge they are anchored to, and the edge
+  behaviour from the spec instead of inventing one. A reader already knows the platform convention,
+  and a hand-made control costs them that knowledge. The modal drawer is the worked example. Both
+  panels dismiss on a tap on `#scrim`, or on a swipe toward the edge they are anchored to. The edge
   tab that did the job before is gone. This does **not** override the two rules below it. The colour
-  language here is a status language, so M3's tonal palette never gets to paint a station kind, and
+  language here is a status language. So M3's tonal palette never gets to paint a station kind, and
   the writing standard still governs every word on screen. Where the spec and this file disagree,
   this file wins and the disagreement is written down.
 - Responsive is a standing requirement (breakpoint 600px), including touch equivalents for every
   hover-only affordance.
 - **A message on screen is written for the reader, not for the system.** Four rules, and the station
-  panel was swept for them twice. **Sentence case** — a capital at the front of every rendered
+  panel was swept for them twice. **Sentence case.** That is a capital at the front of every rendered
   string, including the small `.muted` helper lines, which were all lowercase fragments. The first
   sweep missed five, all in `popup.js`: `water is … below the gauge marker` and `water is level with
   the gauge marker` in `gaugeBlock()`, and `silent for the last …` / `last sounded …` / `sounding
   since …` in `sirenBand()`. The second sweep caught every one of them as a side effect of
-  *shortening* them, which is the usual way — a line nobody has reworded is a line nobody has
-  re-read. Do not trust a past sweep over a grep. **No hedging** —
-  the writing standard bans "probably", and a hedge is dishonest anyway where the app has already
+  *shortening* them, which is the usual way. A line nobody reworded is a line nobody
+  re-read. Do not trust a past sweep over a grep. **No hedging.**
+  The writing standard bans "probably". A hedge is dishonest anyway where the app already
   acted on the judgement it is hedging about. **None of our vocabulary**: `proxy`, `cold start`,
   `as we poll`, `stuck relay`, `warning mark`, `the alert list` and `5 km` are how *we* describe the
   plumbing, and a reader wants the verdict and one fact behind it. The siren line is the model —
   `Faulty signal. No river nearby is high.` replaced a 28-word sentence that never answered whether
   there was a flood. **The precision the fact needs, and no more.** A live station's stamp needs its
   clock and not today's date. A sensor eleven months dead needs its date and neither a minute hand
-  nor `· 7892.0h ago`. A graph window measured over 9.6 hours is `9 h`, because a decimal claims
-  six-minute precision on a span nobody measures that finely — and it rounds **down**, since a span
-  is read as ground covered and a long one claims minutes that were never in the record. A number
+  nor `· 7892.0h ago`. A graph window measured over 9.6 hours is `9 h`. A decimal claims
+  six-minute precision on a span nobody measures that finely. It rounds **down**, since a span
+  is read as ground covered, and a long one claims minutes that were never in the record. A number
   already drawn on the scale 20px below is not repeated in the line above it. A distance needs no
   `away` after it, an accuracy radius no `about` before it, and `mm/h` says what `mm in an hour`
-  spells. Sweeping the station panel on this one rule cut or trimmed 18 strings, and deleted
-  `basin n/a` from 287 of 679 cards — a line stating a gap in the feed rather than a fact about the
-  place, beside `district n/a`, which no station could ever reach. The ALL-CAPS blocks (`TRIGGERED`,
+  spells. Sweeping the station panel on this one rule cut or trimmed 18 strings. It also deleted
+  `basin n/a` from 287 of 679 cards. That line stated a gap in the feed rather than a fact about the
+  place, beside `district n/a`, which no station can ever reach. The ALL-CAPS blocks (`TRIGGERED`,
   `HEAVY RAIN`, `HAPPENING NOW`) are a deliberate visual language and are **not** messages — leave
   them.
 - All user settings live in one `prefs` blob in `localStorage` (`PREFS` + `save()`).
 - **`PREFS.ignored` is the only alarm-suppression control**, and it is applied *further* than the
   district filter: `isIgnored()` gates pins, heat, the alert panel, the ticker **and** the toast. The
-  last two deliberately ignore the district picker; ignoring one named sensor is a request about that
-  sensor, so it holds there too. Anything that suppresses an alert must keep both always-visible
-  indications — the drawer's "Ignored sensors" panel (drawn even when empty) and the `· N ignored`
-  count in `#shown` — and the all-clear must keep saying when a silenced sensor is itself on alert.
+  last two deliberately ignore the district picker. Ignoring one named sensor is a request about
+  that sensor, so it holds there too. Anything that suppresses an alert must keep both always-visible
+  indications. They are the drawer's "Ignored sensors" panel, drawn even when empty, and the
+  `· N ignored` count in `#shown`. The all-clear must keep saying when a silenced sensor is itself
+  on alert.
 - **A place with several sensors is a Monitoring Station. A place with one sensor is a Monitoring
-  Node, or the name of its kind** — Water level, Rainfall, Siren, Flood gauge, Camera. The word
-  *mast* is gone from every rendered string: the hardware is usually a small gated shed, so the
+  Node, or the name of its kind.** The kinds are Water level, Rainfall, Siren, Flood gauge, Camera. The word
+  *mast* is gone from every rendered string. The hardware is usually a small gated shed, so the
   word described a pole that is not there. The kind names come from `KINDS[...].label` and
-  `.one` in `config.js`, so a card, a chip and the glossary cannot spell one kind three ways —
+  `.one` in `config.js`. So a card, a chip and the glossary cannot spell one kind three ways.
   `flood-depth gauge` was the drift this rule caught, on six lines of Help against a badge reading
   `Flood gauge`. **The code still spells the concept `mast`**: `MAST` in `config.js`, `--k-mast`,
   `showMast()` / `hideMast()` / `.mastring` in `map.js`, `data-mast` in `table.js`. Renaming those
   moves no pixel and touches ten files, so they keep the old spelling on purpose. Read `mast` in
   code as *Monitoring Station*, and never print it.
 - **All times are 24-hour, and Malaysian.** JPS stamps readings MYT with no offset and we print them
-  verbatim, so anything computed from a unix timestamp must be formatted with
-  `timeZone: 'Asia/Kuala_Lumpur'` (see `MYT_HOUR` in `popup.js`) or it will disagree with the
-  strings next to it for any viewer outside MYT. No `hour12` anywhere.
+  verbatim. So anything computed from a unix timestamp must be formatted with
+  `timeZone: 'Asia/Kuala_Lumpur'` — see `MYT_HOUR` in `popup.js`. Otherwise it disagrees with the
+  strings next to it, for any viewer outside MYT. No `hour12` anywhere.
 - **leaflet.heat composites overlapping blobs, and both our layers plot an intensity, not a density.**
-  Two gauges both reading 4 mm/h still means 4 mm/h, not 8 — but the canvas accumulates alpha, so N
+  Two gauges both reading 4 mm/h still means 4 mm/h, not 8. But the canvas accumulates alpha. So N
   stations reporting the same thing paint something stronger than any of them reported. Measured:
-  233 rain gauges, a median of 4 inside one 5 km blob and up to 14, stacking light rain (0.26) to
-  0.97 — solid red over a state where nothing worse than light rain was reported. `thinHeat()` in
-  `heat.js` fixes it by keeping the strongest reading and dropping anything its own blob already
-  covers, which *is* "the highest reading within a blob radius" — the thing the colour claims to
-  mean. **Any new heat layer must go through it**, and the water layer does too even though it has
-  one point on a calm day: the flaw only appears when many stations alert at once, which is the one
+  233 rain gauges, a median of 4 inside one 5 km blob and up to 14. That stacked light rain (0.26)
+  to 0.97, which is solid red over a state where nothing worse than light rain was reported. `thinHeat()` in
+  `heat.js` fixes it. It keeps the strongest reading and drops anything its own blob already
+  covers. That *is* "the highest reading within a blob radius", the thing the colour claims to
+  mean. **Any new heat layer must go through it.** The water layer does too, even though it has
+  one point on a calm day. The flaw only appears when many stations alert at once, which is the one
   moment the map has to be right. **It takes the distance as a parameter, and a caller must pass the
   one its own layer paints at.** A thinning distance shorter than the paint leaves the stacking
-  alive in the ring between the two — see the `radius + blur` gotcha above, which is how that
+  alive in the ring between the two. See the `radius + blur` gotcha above, which is how that
   happened.
-- **A heat layer's weight is its alpha.** leaflet.heat draws each point at its weight, so a scale
-  that starts at 0 draws real readings as nothing. The water layer never hit this because its floor
-  is the alert slot (0.38); the rain layer's first class therefore *starts at 0.25* (`RAIN_STOPS`)
-  rather than counting up from zero. Light rain is most of the rain most of the time — 10 of 233
-  gauges reporting and none above 4 mm/h on the day it was built — so a scale from zero would have
-  shipped an empty-looking layer. Any new heat layer needs a floor chosen the same way.
+- **A heat layer's weight is its alpha.** leaflet.heat draws each point at its weight. So a scale
+  that starts at 0 draws real readings as nothing. The water layer never hit this, because its floor
+  is the alert slot (0.38). The rain layer's first class therefore *starts at 0.25* (`RAIN_STOPS`)
+  rather than counting up from zero. Light rain is most of the rain most of the time. On the day it
+  was built, 10 of 233 gauges reported and none was above 4 mm/h. A scale from zero ships an
+  empty-looking layer. Any new heat layer needs a floor chosen the same way.
 - **A control owned by a preference must not also state that state in the markup.** `#heat` carried
   a `checked` attribute while `PREFS.heatLayer` was the source of truth. `js/ui.js` writes both heat
-  boxes from that pref, but it is a **deferred module**, so between parse and run the DOM held both
-  boxes on — the one state the pair is not allowed to be in, since the two heatmaps are one choice.
+  boxes from that pref, but it is a **deferred module**. So between parse and run the DOM held both
+  boxes on. That is the one state the pair is not allowed to be in, since the two heatmaps are one
+  choice.
   A browser restoring form state across a reload stacks on top of that. Neither box carries `checked`
   now. **And an invariant repaired on one path through a shared handler is repaired on none of the
-  others**: the exclusivity guard read `e.target === el('heat') && …`, so it only fixed the pair when
-  one of those two boxes was what changed. A pair that arrived already both-on survived every toggle
-  of the two pin filters that share that handler, while `PREFS.heatLayer` saved `water` and the
+  others.** The exclusivity guard read `e.target === el('heat') && …`. So it only fixed the pair
+  when one of those two boxes was what changed. A pair that arrived already both-on survived every toggle
+  of the two pin filters that share that handler. Meanwhile `PREFS.heatLayer` saved `water`, and the
   drawer went on showing both. The test moved to the pair, whoever fired the event.
   **Both of those repairs failed, because a handler is not the only writer of a checkbox.** The bug
-  came back showing two answers at once: both ramps on the legend, both chips lit, and the section
-  summary still naming one. `syncHeat()` re-read the boxes on every poll, and the summary was written
-  from the change handler alone, so the two surfaces aged apart. Nothing in this app checked that
-  box. **A browser restores form state across a reload and fires no `change`**, so a repair that
+  came back showing two answers at once. Both ramps drew on the legend, both chips lit, and the
+  section summary still named one. `syncHeat()` re-read the boxes on every poll, and the summary was written
+  from the change handler alone. So the two surfaces aged apart. Nothing in this app checked that
+  box. **A browser restores form state across a reload and fires no `change`.** So a repair that
   lives in a change handler never runs on that path. **Repair an invariant where the state is read,
-  not where the reader changes it.** `syncHeat()` in `js/heat.js` now reads `PREFS.heatLayer` and
-  writes the two boxes, the legend, the layers and the summary from it, the way `syncRisingChip()`
-  and `syncFavChip()` in `js/render.js` already re-assert their own chips every poll. The handler
+  not where the reader changes it.** `syncHeat()` in `js/heat.js` now reads `PREFS.heatLayer`. It
+  writes the two boxes, the legend, the layers and the summary from it. `syncRisingChip()`
+  and `syncFavChip()` in `js/render.js` already re-assert their own chips every poll the same way. The handler
   writes the pref from the box that fired and reads neither box back, so both-on is unrepresentable.
   The four preference-owned checkboxes also carry `autocomplete="off"`, which stops the browser
-  writing them at all — the three text inputs already had it. **Any new control whose state a
-  preference owns needs both halves**: the attribute, and a reader that writes the control from the
-  preference rather than the reverse.
+  writing them at all. The three text inputs already had it. **Any new control whose state a
+  preference owns needs both halves.** Those are the attribute, and a reader that writes the control
+  from the preference rather than the reverse.
   **The theme control is the same rule at a second site.** It lives in `#appMenu` as `#themeRow`,
   three `<input type="radio" name="theme">` in a segmented pill, none of them carrying `checked`.
-  **That pill is the lightbox range selector's shape, shared and not copied** — `.seg` and
-  `.seg label` are grouped into the `.tlranges` and `.tlr` rules, so a change there restyles the
-  theme picker too. The `PLAYER_OVERLAY` block is the safe half: it names `.tlranges` and `.tlr`
-  alone, in literal whites for a photograph, and none of that must ever be widened to `.seg`.
+  **That pill is the lightbox range selector's shape, shared and not copied.** `.seg` and
+  `.seg label` are grouped into the `.tlranges` and `.tlr` rules. So a change there restyles the
+  theme picker too. The `PLAYER_OVERLAY` block is the safe half. It names `.tlranges` and `.tlr`
+  alone, in literal whites for a photograph. None of that must ever be widened to `.seg`.
   **`label` is a styled element in `css/base.css`, and it carries a margin.** `label { display: flex;
   align-items: center; gap: 8px; margin: 6px 0 }` is written for the drawer's stacked filter rows.
   It lands on every `<label>` in the app. Measured on the theme picker, that margin made the track
-  37px tall around 21px pills — 6px of dead air above and below each one, inside a shape whose whole
-  point is that the fill hugs the segment. The lightbox's own pills are `<button>`s and never met it.
-  **Any `<label>` used as a compact control needs `margin: 0` stated**, and the symptom is spacing
+  37px tall around 21px pills. That is 6px of dead air above and below each one, inside a shape
+  whose whole point is that the fill hugs the segment. The lightbox's own pills are `<button>`s and never met it.
+  **Any `<label>` used as a compact control needs `margin: 0` stated.** The symptom is spacing
   around the control rather than in it, which reads as a padding mistake on the parent. Three other
-  explanations were measured first and all three were wrong: the row's own padding (symmetric at 8px),
-  `align-items` on the row (already `center`), and the flex item stretching (`align-self: auto` on a
-  centred row cannot stretch).
-  `applyTheme()` in `map.js` returns the stored pick and `ui.js` checks the matching radio from that
+  explanations were measured first and all three were wrong. They were the row's own padding
+  (symmetric at 8px), `align-items` on the row (already `center`), and the flex item stretching.
+  `align-self: auto` on a centred row cannot stretch.
+  `applyTheme()` in `map.js` returns the stored pick. `ui.js` checks the matching radio from that
   return value, which is also what corrects a browser that restored a different one.
 - **The theme has three states and two of them are the same colour.** `PREFS.theme` holds the
   *pick* — `system`, `light` or `dark` — and `applyTheme()` resolves it to one of the two real
