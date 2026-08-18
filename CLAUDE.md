@@ -1072,139 +1072,143 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   code from the reading, through the same `rainStatus()` / `wlStatus()` the two scraped feeds already
   use. It is server-side, because there is one definition of a status and it is that file's. `band()`
   in `table.js` clamps `-1` to 0 as the guard behind it. Never re-derive a status client-side.
-  and must not be merged. `atDanger()` asks "is this sensor at the top of its own scale" — a river
-  over its mark, a sounding siren, a flood gauge under water, rainfall in JPS's top class — and it
-  drives the pin colour, the `.danger` halo, the cluster badge and `leads()`. A pin has to be red
-  whenever anything at that place is at its worst, and a mast led by a quiet river used to draw blue
-  over a flooded gauge beside it. `isCritical()` is narrower, and feeds `isHot()` and through it the
-  alert panel, the icon badge, the ticker and the toast. **Widening `isCritical()` widens every alert
-  surface at once** — that is an alert-design decision, and it goes through the standard first.
-  `render.js` states the red explicitly (`critical ? statusColor(3) : …`) rather than trusting
-  `leads()` to elect the worst sensor and `color()` to return red for it.
-- **Test mode makes a place tell one story.** `seedTest()` walks stations, so its first pass could
-  leave a river over its danger mark on the same mast as a dry gauge and an idle siren — four
-  unrelated faults on one pole, which reads as a bug rather than as weather. A second pass over
+- **`atDanger()` is the map's red. `isCritical()` is the alert path's.** They are different
+  questions and must not be merged. `atDanger()` asks whether this sensor is at the top of its own
+  scale. It covers a river over its mark and a sounding siren. It also covers a flood gauge under
+  water, and rainfall in JPS's top class. It drives the pin colour, the `.danger` halo, the cluster
+  badge and `leads()`. A pin has to be red whenever anything at that place is at its worst. A mast
+  led by a quiet river used to draw blue over a flooded gauge beside it. `isCritical()` is narrower,
+  and feeds `isHot()` and through it the alert panel, the icon badge, the ticker and the toast.
+  **Widening `isCritical()` widens every alert surface at once** — that is an alert-design decision,
+  and it goes through the standard first. `render.js` states the red explicitly
+  (`critical ? statusColor(3) : …`) rather than trusting `leads()` to elect the worst sensor and
+  `color()` to return red for it.
+- **Test mode makes a place tell one story.** `seedTest()` walks stations. So its first pass can
+  leave a river over its danger mark. The same mast can carry a dry gauge and an idle siren. That is
+  four unrelated faults on one pole, which reads as a bug rather than as weather. A second pass over
   `site` brings every online member of a flooded site up to match, through one idempotent `drown()`.
   Offline members stay offline on purpose: a sensor down on an alerting mast is a real rendering
-  path. **A camera has nothing of its own to fake** — `camAlert()` measures from the alert to the
-  lens — so `CAM_EVERY` floods every third site that holds both a camera and a river. Without it the
+  path. **A camera has nothing of its own to fake.** `camAlert()` measures from the alert to the
+  lens. So `CAM_EVERY` floods every third site that holds both a camera and a river. Without it the
   camera warning was faked by luck, on 6 of the 31 such sites. Anything new that alerts needs a knob
-  here, or it ships unseen: that is why the gauge has one, at a rung real data almost never reaches.
+  here, or it ships unseen. That is why the gauge has one, at a rung real data almost never reaches.
   **A faked level is placed against the station's own marks, never as a fraction of the danger
-  mark.** `danger × 0.82` is 29.36 m on a river that alerts at 35.80, so the fake stamped an alert on
-  a station the scale put in the safe stretch, and the row drew an amber number over an empty bar.
-  **A fake sample carries a status code too**, the third element real samples get from
-  `sparkPoints()` — `wlCode()` / `gaugeCode()` / `rainCode()` in `test.js` copy the cutoffs in
-  `sources.php` (a siren needs none — its value is its status). That is the one place a status is
-  scored client-side, and it is allowed because
-  nothing in test mode reaches a server. Without it the hover readout printed a faked flood in plain
-  ink, which hid the very crossing the fake exists to show.
+  mark.** `danger × 0.82` is 29.36 m on a river that alerts at 35.80. So the fake stamped an alert on
+  a station the scale put in the safe stretch. The row drew an amber number over an empty bar.
+  **A fake sample carries a status code too.** That is the third element real samples get from
+  `sparkPoints()`. `wlCode()` / `gaugeCode()` / `rainCode()` in `test.js` copy the cutoffs in
+  `sources.php`. A siren needs none, because its value is its status. That is the one place a status
+  is scored client-side. It is allowed because nothing in test mode reaches a server. Without it the
+  hover readout printed a faked flood in plain ink. That hid the very crossing the fake exists to
+  show.
   **A fake that moves one field of a sensor has to move every field the card draws beside it.**
-  `soak()` is the single door for a rain gauge — the hour, the day, the status, the graph and the
-  `acc` chart all leave through it, because `rainState()` prints `HEAVY RAIN` and `rainBars()` draws
-  the hour directly above a 1 h column that states it as a number, and the two disagreeing reads as a
-  bug in the chart rather than as a fake. Two callers had already drifted.
+  `soak()` is the single door for a rain gauge. The hour, the day, the status, the graph and the
+  `acc` chart all leave through it. `rainState()` prints `HEAVY RAIN`, and `rainBars()` draws
+  the hour directly above a 1 h column that states it as a number. The two disagreeing reads as a
+  bug in the chart, rather than as a fake. Two callers had already drifted.
   `drown()` hard-coded a 158 mm day where the storm cell applies a multiplier that gives 157.5.
-  **`stormAcc()` shapes the five windows rather than scaling them.** A violent cell is short, so its
-  3-hour multiplier falls as the hour gets heavier — 75 mm held for three hours is a once-in-decades
-  total, while 4 mm/h of drizzle really does run all afternoon. The two long windows carry a
-  per-station `seed()`, because antecedent rain is the one thing that does *not* follow from the
-  hour on the gauge, and scaling it off that hour gave every faked gauge one silhouette. That seed
-  is **FNV-1a and not `h * 31 + c`**: ids run `rf-153`, `rf-154`, `rf-156`, so the simple hash put
-  adjacent ids on adjacent values and twenty gauges in a row drew the same chart. Test mode fakes the
-  `derived` flags and the measured spans too. Both reach real data only once the odometer fills, so
-  without a knob the asterisk and its footnote ship unseen.
+  **`stormAcc()` shapes the five windows rather than scaling them.** A violent cell is short. So its
+  3-hour multiplier falls as the hour gets heavier. 75 mm held for three hours is a once-in-decades
+  total. 4 mm/h of drizzle really does run all afternoon. The two long windows carry a
+  per-station `seed()`. Antecedent rain is the one thing that does *not* follow from the
+  hour on the gauge. Scaling it off that hour gave every faked gauge one silhouette. That seed
+  is **FNV-1a and not `h * 31 + c`**. Ids run `rf-153`, `rf-154`, `rf-156`. So the simple hash put
+  adjacent ids on adjacent values, and twenty gauges in a row drew the same chart. Test mode fakes
+  the `derived` flags and the measured spans too. Both reach real data only once the odometer fills,
+  so without a knob the asterisk and its footnote ship unseen.
 - **The alert panel is a directory, not a stack of readings.** `groupCard()` in `alerts.js` draws one
-  card per kind per tier — five at most, usually two — and **every row in it is a place**, grouped on
-  `site` so a mast with two gauges over their marks is one row. One card per station carried a meter,
-  a trend line and a 12-hour graph each, which is right for one alert and wrong for forty: test mode
-  makes 64, and they now fill 3 cards. The meter and the graph are on the station card, which every
-  row opens with one tap. **Do not put a reading back in this panel** — the row's number (percent of
-  danger / hours to it / the stamp on a stale one) is the whole of what a scan needs.
-- **`title` is not a tooltip on a phone.** It never opens on touch, waits about a second on a mouse
-  and takes no styling — so anything whose meaning lives in a `title` means nothing on half the
+  card per kind per tier, five at most and usually two. **Every row in it is a place**, grouped on
+  `site`. So a mast with two gauges over their marks is one row. One card per station carried a
+  meter, a trend line and a 12-hour graph each. That is right for one alert and wrong for forty.
+  Test mode makes 64, and they now fill 3 cards. The meter and the graph are on the station card,
+  which every row opens with one tap. **Do not put a reading back in this panel.** The row's number
+  is the whole of what a scan needs. That number is a percent of danger, hours to it, or the stamp
+  on a stale one.
+- **`title` is not a tooltip on a phone.** It never opens on touch. It waits about a second on a
+  mouse, and takes no styling. So anything whose meaning lives in a `title` means nothing on half the
   devices this runs on. That is why the camera warning prints its words on the picture (`Water level
-  3.42 m`), why the table uses a `popover` panel instead, and why a new affordance that needs
-  explaining needs it *on screen*. A `title` is acceptable only as a duplicate of something already
-  visible — the jump hint on an alert row, the count on a chip.
+  3.42 m`). It is why the table uses a `popover` panel instead. And it is why a new affordance that
+  needs explaining needs it *on screen*. A `title` is acceptable only as a duplicate of something
+  already visible. Examples are the jump hint on an alert row, and the count on a chip.
   **The nearest-webcam offer tested this rule and lost.** It spent one revision as a corner glyph
-  with the camera name and distance in a `title` alone. That is a fact a phone cannot reach, and the
-  fix was not a better tooltip but a different control: a menu row, which states the name, the
+  with the camera name and distance in a `title` alone. That is a fact a phone cannot reach. The
+  fix was not a better tooltip but a different control. A menu row states the name, the
   distance and the reading as text. Reach for the row shape before the glyph shape.
 - **A timestamp is printed inside a ⋮ menu and nowhere else.** `sourceInfo()` does it for a sensor
   and `wxDots()` does it for the weather section, which is the only other reading on a card. Three
   facts, all about the plumbing: are we hearing from this station, what was the stamp on the last
-  thing it sent, which of the three feeds won. None of them changes what the water is doing, and as a
+  thing it sent, which of the three feeds won. None of them changes what the water is doing. As a
   footer line they repeated per sensor down a six-sensor mast. They are what you check when you doubt
   the number, so they sit where you go to look. The stale state blocks (siren, rainfall, gauge) print
   no time at all. **The stamp is printed at the precision its age needs, and `stamp()` in `popup.js`
   is the one rule.** A reading taken today is answered by its clock. A reading from any other day is
-  answered by its date. This reverses what stood here, which said elapsed time was appended only on
-  a stale station "because on a live one the date is the answer" — the live case is the one where
-  the date says least, since it is today on every live station, and `Updated 14/08/2026 15:45` spent
-  ten characters saying so. The stale case was worse: `Last reported 19/09/2025 12:15 · 7892.0h ago`
+  answered by its date. This reverses what stood here. That said elapsed time was appended only on
+  a stale station, "because on a live one the date is the answer". The live case is the one where
+  the date says least, since it is today on every live station. `Updated 14/08/2026 15:45` spent
+  ten characters saying so. The stale case was worse. `Last reported 19/09/2025 12:15 · 7892.0h ago`
   put a minute hand and an elapsed figure on a sensor eleven months dead. Four stations in the
   payload are past 6,500 hours. **Elapsed time is gone from both callers**, and `ago()` was
-  deliberately **not** given a unit above hours to fix `7892.0h` — this was its only caller that
-  could overflow, and the two that remain (`clip.js`'s frame age, `net.js`'s poll clock) stay inside
+  deliberately **not** given a unit above hours to fix `7892.0h`. This was its only caller that
+  could overflow. The two that remain (`clip.js`'s frame age, `net.js`'s poll clock) stay inside
   the range it was written for. A day unit there would be unreachable code. The same-day test is a
-  `startsWith` and not a parse: JPS stamps `DD/MM/YYYY HH:MM:SS` in MYT and `en-GB` formats a date
-  the same way, so one expression reads both that string and MET's unix instant. Seconds are trimmed
-  for display by `noSec()`; the underlying string stays verbatim, so `parseMY()` is unaffected — it
-  has no caller in `popup.js` any more, and `js/clip.js` is the module that still uses it. **The glyph names
-  what is in the menu, and it has changed twice on that one rule.** It was a ⋮ over a single "ignore"
-  item, which promised actions and held one, so it became an ⓘ when the provenance moved in. It is a
-  `more_vert` ⋮ now that the menu also carries the favorite, the nearest webcam or water level, the
-  map link and the ignore — four actions is not an information glyph. Count the actions before
-  changing it again.
+  `startsWith` and not a parse. JPS stamps `DD/MM/YYYY HH:MM:SS` in MYT and `en-GB` formats a date
+  the same way. So one expression reads both that string and MET's unix instant. Seconds are trimmed
+  for display by `noSec()`. The underlying string stays verbatim, so `parseMY()` is unaffected. It
+  has no caller in `popup.js` any more, and `js/clip.js` is the module that still uses it. **The
+  glyph names what is in the menu, and it has changed twice on that one rule.** It was a ⋮ over a
+  single "ignore" item, which promised actions and held one. So it became an ⓘ when the provenance
+  moved in. It is a `more_vert` ⋮ now that the menu also carries the favorite, the nearest webcam or
+  water level, the map link and the ignore. Four actions is not an information glyph. Count the
+  actions before changing it again.
 - **A marquee needs three things measured, not guessed.** `js/ticker.js` renders the item set twice
-  and translates `-50%`, which is only seamless if one copy is at least as wide as the box — so it
-  repeats the set to cover the box *before* doubling. Width alone isn't enough: a single wide item
+  and translates `-50%`, which is only seamless if one copy is at least as wide as the box. So it
+  repeats the set to cover the box *before* doubling. Width alone is not enough. A single wide item
   still pops, because the tile leaving the left edge is the whole strip leaving. `MIN_TILES` (3)
-  guarantees a follower. And `#ticker` must have a **fixed flex basis** — sized to content the
+  guarantees a follower. And `#ticker` must have a **fixed flex basis**. Sized to content, the
   header re-laid itself out every poll as the alert count changed.
 - **`.solo` is hidden until hover, globally.** The rule lives on the class, not on `#districtList`,
   so any new list reusing that pill button gets an invisible control on a mouse. `#ignoredList` and
-  `#favList` both override it back to `visible` — restoring is the whole point of either panel — and
-  share one `::after` that grows the hit area past the small pill, `inset: -10px -6px`, because a
-  two-line row must not grow around the control to make it a real touch target. The two selectors are
-  merged in `css/base.css` on purpose, so the ignored list and the favorites list cannot drift apart.
-- **`<details>` can't animate closed** (children go `display:none`) and hides non-`<summary>`
-  children entirely — that's why the drawer is a `body.drawer` class and the credit sits outside.
+  `#favList` both override it back to `visible`, because restoring is the whole point of either
+  panel. They share one `::after` that grows the hit area past the small pill, `inset: -10px -6px`.
+  A two-line row must not grow around the control to make it a real touch target. The two selectors
+  are merged in `css/base.css` on purpose, so the ignored list and the favorites list cannot drift
+  apart.
+- **`<details>` cannot animate closed** (children go `display:none`) and hides non-`<summary>`
+  children entirely. That is why the drawer is a `body.drawer` class and the credit sits outside.
   The two filter sections *inside* the drawer (`#districts`, `#ignored`) are `<details>` precisely
   because they want no animation. Their counts live on the `<summary>`, so a collapsed section still
-  reports what it is holding — do not move a count into the body.
+  reports what it is holding. Do not move a count into the body.
 - **`border-collapse: collapse` drops padding on the table box** — `#netstats` uses `separate`.
 - **leaflet.heat sizes in screen pixels.** `heatScale()` converts a layer's ground distance to
-  pixels per zoom so blobs stay ground-fixed. Do **not** also call `heat.redraw()` — the plugin
-  repaints on the following `moveend`, and doing both painted twice per zoom. Radius capped at
-  `HEAT_MAX_PX` because blur cost is quadratic; past that cap the layer *fades out* rather than
+  pixels per zoom so blobs stay ground-fixed. Do **not** also call `heat.redraw()`. The plugin
+  repaints on the following `moveend`, and doing both painted twice per zoom. Radius is capped at
+  `HEAT_MAX_PX` because blur cost is quadratic. Past that cap the layer *fades out* rather than
   quietly covering less ground, and the fade is per layer because the cap is. `maxZoom` on the layer
-  is **not** a display limit — it divides every weight by `2^(maxZoom − zoom)`, so anything inside
+  is **not** a display limit. It divides every weight by `2^(maxZoom − zoom)`, so anything inside
   the usable zoom range dims blobs as you zoom out. Pinned to 0.
 - **A blob is painted `radius + blur` across, not `radius`, so the two must sum to the ground
   distance and may never be set apart from each other.** simpleheat's `radius(t, i)` fills an arc of
   radius `t`, blurs it by `i`, then stamps a sprite of half-width `t + i`. `heatScale()` handed
-  `radius` the whole of `HEAT_KM` and added `blur = radius * 0.8` on top, so every blob on both
+  `radius` the whole of `HEAT_KM` and added `blur = radius * 0.8` on top. So every blob on both
   layers reached 1.8× its stated size and covered 3.24× the area. One rain gauge reading 19 mm/h
-  washed 250 km² of Kuala Lumpur violet, over twenty gauges reporting 0.0 mm, the nearest of them
-  1.6 km away. **Three places asserted the 5 km and the code painted 9** — the constant's comment,
-  `heatScale()`'s own comment, and `thinHeat()`, which drops a weaker neighbour on the claim that
-  the stronger point's blob already covers it. That last one is the compounding fault: thinning at
-  5 km while painting at 9 let every pair between the two distances stack its alpha, which is the
+  washed 250 km² of Kuala Lumpur violet, over twenty gauges reporting 0.0 mm. The nearest of them was
+  1.6 km away. **Three places asserted the 5 km and the code painted 9.** They are the constant's
+  comment, `heatScale()`'s own comment, and `thinHeat()`, which drops a weaker neighbour on the claim
+  that the stronger point's blob already covers it. That last one is the compounding fault. Thinning
+  at 5 km while painting at 9 let every pair between the two distances stack its alpha. That is the
   bug `thinHeat()` exists to prevent, moved out one ring. **`SoftHeat._redraw()` paints the blobs
-  itself now and never draws that sprite**, so the trap is gone rather than tuned — one `blobPx()`
+  itself now and never draws that sprite.** So the trap is gone rather than tuned. One `blobPx()`
   is the radius, `thinHeat()` takes the same ground distance, and `HEAT_MAX_PX` bounds what it
   names. The `radius` and `blur` options stay in `BASE` only because `_updateOptions()` builds
   `_grad` from `gradient` in the same call, and `_grad` is where the colours come from.
 - **"Gauge" in the rain heat entries below means a rainfall station, and this is the one place two
   kinds share a word.** A rainfall station measures `hourly` in mm/h and is the only kind the rain
-  layer reads, on both sides of the argument — `render.js` gates every one of them on
+  layer reads, on both sides of the argument. `render.js` gates every one of them on
   `kind === 'rainfall'`. A **flood gauge** is the kind spelled `gauge`, labelled `Flood gauge`,
   measuring `depth` in metres over a flood-prone spot. It feeds the **water level** layer beside the
-  rivers and no rain rule touches it. The collision is not theoretical: the JPS field notes above
-  record that a flood gauge reading negative means **dry ground**, so "a dry gauge" reads as a
-  rainfall station saying 0 mm/h in one entry and as a flood gauge on dry land in another. Name the
+  rivers and no rain rule touches it. The collision is not theoretical. The JPS field notes above
+  record that a flood gauge reading negative means **dry ground**. So "a dry gauge" reads as a
+  rainfall station saying 0 mm/h in one entry, and as a flood gauge on dry land in another. Name the
   kind in any sentence that reads both ways.
   **A flood gauge is never evidence about rain, in either direction.** It measures what the drainage
   failed to carry away, which is not what fell. Where the drainage is good, rain falls as hard as
@@ -1212,121 +1216,122 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   no rain overhead. **So a clear flood gauge must never join `dryPoints` and deny the wash, and a
   submerged one must never paint.** Only a rainfall station reports rain. Checked on the current
   tree: no rain conclusion reads `depth`, and `rainBacked()` tests the station's own
-  `cumulativeRainfall` odometer rather than any gauge. Keep it that way — the tempting mistake is to
-  read a dry flood gauge as proof that the rain layer is overclaiming, and good drainage is the
+  `cumulativeRainfall` odometer rather than any gauge. Keep it that way. The tempting mistake is to
+  read a dry flood gauge as proof that the rain layer is overclaiming. Good drainage is the
   whole reason it is not. This is the same rule the siren already obeys from the other side, where
   flood gauges are not backing evidence either.
 - **A rain gauge reporting zero is a reading, and the rain heat layer draws it.** The network says
-  two things — 12 gauges reporting rain and 218 reporting none, on the payload this was built from
-  — and the layer used to draw only the first, so the wash covered ground that 218 stations had
-  already measured and found dry. `SoftHeat` in `js/heat.js` runs the second pass for this reason: it
-  paints the wet gauges, then runs a second pass in `destination-out` stamping a soft brush at every
+  two things: 12 gauges reporting rain and 218 reporting none, on the payload this was built from.
+  The layer used to draw only the first. So the wash covered ground that 218 stations had
+  already measured and found dry. `SoftHeat` in `js/heat.js` runs the second pass for this reason. It
+  paints the wet gauges, then runs a second pass in `destination-out`, stamping a soft brush at every
   dry one. **`RAIN_KM` (6 km) is one number and covers both readings.** A gauge reporting rain
   paints that far and a gauge reporting none erases that far. Two numbers stood here first, 9 km of
-  paint against 4 km of erase, and there is no defending that — it is the same instrument, the same
-  minute and the same question, so the answer "none" cannot carry less ground than the answer
+  paint against 4 km of erase. There is no defending that. It is the same instrument, the same
+  minute and the same question. So the answer "none" cannot carry less ground than the answer
   "12 mm". Symmetry cost 4% of the painted area, 2,005 km² against 1,906. **Do not split them
   again.**
   **The number itself was 9 km until 2026-08-14, and the evidence for 6 was already in the file.**
   The co-wetness study in `config.js` puts the halving distance at 6 km and the background rate at
-  12, so 9 was the outer edge of a claim that survives rather than the middle of one. A convective
-  cell here is 1 to 2 km across. **Moving it moves four things at once** — the paint, the erase,
-  `thinHeat()`'s spacing and the blob — and it changes gauge spacing *measured in blob radii*, which
+  12. So 9 was the outer edge of a claim that survives, rather than the middle of one. A convective
+  cell here is 1 to 2 km across. **Moving it moves four things at once**: the paint, the erase,
+  `thinHeat()`'s spacing and the blob. It also changes gauge spacing *measured in blob radii*, which
   is what `FEATHER` is sized against. Thinning at a shorter distance keeps gauges that are
-  relatively further apart: the 90th-percentile join went from 1.48 radii at 9 km to 1.66 at 6.
-  **The first fix used 4 km as the blob size instead, and it is the wrong shape of answer** — a
-  smaller brush charges the same ground everywhere, including Sabak Bernam where the nearest other
-  gauge is 12 km off and nothing disputes anything. It cost three quarters of the map's area to fix
-  a problem that only existed where a dry gauge stood. Measured: 2,747 km² before, 503 km² under
-  the small brush, 1,906 km² now, with 58 dry gauges under paint before and 1 after. **Three
-  details are load-bearing and all three were found by running `heat-test.html`, not by reading the
-  code.**
-  **simpleheat leaves `globalAlpha` set** — its draw loop assigns each point's weight and never puts
-  it back, so an eraser inherits the last blob's weight and removes that fraction rather than all of
+  relatively further apart. The 90th-percentile join went from 1.48 radii at 9 km to 1.66 at 6.
+  **The first fix used 4 km as the blob size instead, and it is the wrong shape of answer.** A
+  smaller brush charges the same ground everywhere. That includes Sabak Bernam, where the nearest
+  other gauge is 12 km off and nothing disputes anything. It cost three quarters of the map's area
+  to fix a problem that only existed where a dry gauge stood. Measured: 2,747 km² before, 503 km²
+  under the small brush, and 1,906 km² now. 58 dry gauges sat under paint before and 1 after.
+  **Three details are load-bearing and all three were found by running `heat-test.html`, not by
+  reading the code.**
+  **simpleheat leaves `globalAlpha` set.** Its draw loop assigns each point's weight and never puts
+  it back. So an eraser inherits the last blob's weight and removes that fraction rather than all of
   it. A 0.9 blob left 22 of 229 alpha on a dry gauge. The pass runs inside `save()`/`restore()`.
   **A gauge reporting no rain reaches exactly as far as a gauge reporting rain, and the boundary
   between two that disagree is halfway between them.** Both rules are old. The `destination-out`
   stamp that carried them held the second alone, and it bought that by breaking the first.
-  Its radius was one scalar, `min(r, nearest_wet / 2)`, applied to a circle — so a dry gauge with a
+  Its radius was one scalar, `min(r, nearest_wet / 2)`, applied to a circle. So a dry gauge with a
   wet neighbour to the east shrank in **every** direction, including west where nothing disputed it.
-  Measured on the live network: 143 of 191 dry gauges capped, a median of 0.54 of the radius, and
-  35% of the ground they were entitled to deny actually denied.
+  Measured on the live network: 143 of 191 dry gauges capped, at a median of 0.54 of the radius. They
+  denied 35% of the ground they were entitled to deny.
   `_field()` decides it per pixel now and the stamp is gone. `keep = 1 - dcov * gate`, where `dcov`
-  is the dry coverage shaped exactly like `cov`, and `gate` is inverse-square distance to each side —
-  Shepard's weighting, chosen for the one property that matters. **A gauge's own point is a
-  singularity**, so the gate is 0 at a wet gauge and its reading survives whole, 1 at a dry gauge,
-  0.5 exactly halfway between the two, and 1 with no wet gauge in reach. The protection and the
-  reach come from the same expression instead of fighting each other. Measured after: 77% of the wet
-  reach kept against 96% under the cap, and still only 2 of 193 dry gauges left under paint — both
+  is the dry coverage shaped exactly like `cov`. `gate` is inverse-square distance to each side, which
+  is Shepard's weighting, chosen for the one property that matters. **A gauge's own point is a
+  singularity.** So the gate is 0 at a wet gauge and its reading survives whole. It is 1 at a dry
+  gauge, 0.5 exactly halfway between the two, and 1 with no wet gauge in reach. The protection and
+  the reach come from the same expression instead of fighting each other. Measured after: 77% of the
+  wet reach kept against 96% under the cap. Only 2 of 193 dry gauges are left under paint, and both
   of those share a pole with a wet gauge.
   **The cap existed for a real reason, so keep the reason when touching this.** A dry gauge on the
   same pole once erased its neighbour off the map outright. A wet gauge 2 km from a dry one lost
   half its alpha. `heat-test.html` asserts the wet gauge keeps 229 of 230 with a dry gauge 1.5 km
   away.
-  **The brush holds full strength over its first 15%** — now `FEATHER`'s flat core, and once a
-  gradient stop — because a ramp peaking at the exact centre honours the reading at a mathematical
-  point and no pixel is one. The gauge kept 5 of 206 alpha on a half-pixel sampling offset. Do not
-  replace any of this with interpolation: a dry gauge may deny
+  **The brush holds full strength over its first 15%.** That is now `FEATHER`'s flat core, and once
+  a gradient stop. A ramp peaking at the exact centre honours the reading at a mathematical
+  point, and no pixel is one. The gauge kept 5 of 206 alpha on a half-pixel sampling offset. Do not
+  replace any of this with interpolation. A dry gauge can deny
   ground, never supply a value. See `docs/FEATURES.md`, *The rainfall heatmap claimed rain over
   250 km² from one gauge*.
 - **A heat blob's alpha is its colour as well as its size, so the brush's own falloff walks down the
   legend.** simpleheat's `_colorize()` looks the gradient up by alpha, and the stock brush fades
-  across most of a blob — so one rain gauge reading 27 mm/h, JPS's *heavy* class, painted heavy at
-  the gauge, moderate 4 km out and light 6 km out. Three classes from one number, with a legend beside them naming those colours in
+  across most of a blob. So one rain gauge reading 27 mm/h, JPS's *heavy* class, painted heavy at
+  the gauge, moderate 4 km out and light 6 km out. That is three classes from one number, with a
+  legend beside them naming those colours in
   millimetres. In IDW or kriging a value falls off because the estimate falls off. Here it fell off
   because that is how a brush is drawn.
   **So `SoftHeat._redraw()` in `js/heat.js` paints the blobs itself and never calls `_colorize()`.**
-  It reads the class colour out of `_grad` — the 256-entry ramp simpleheat builds from
-  `options.gradient`, so the legend stays the one definition — and draws each blob in that **one**
-  colour with only its alpha ramping, and the alpha holds full strength across an inner core before
+  It reads the class colour out of `_grad`, the 256-entry ramp simpleheat builds from
+  `options.gradient`, so the legend stays the one definition. It draws each blob in that **one**
+  colour with only its alpha ramping. The alpha holds full strength across an inner core before
   it smoothsteps out. Measured on one gauge at 27 mm/h: one hue from the centre to 8 km with alpha
   falling 182 to 20. A river at its danger mark paints `#ff4e4d` across its whole 5 km, 255 to 0.
   **Two shorter fixes were built and thrown away, and both are worth not repeating.** Cutting the
   sprite's blur to 0.04 got one class per blob and drew hard discs. Softening those back with a
-  `destination-out` pass got the look and broke the neighbours: a `destination-out` brush is a claim
-  about the canvas, not about one blob, so each blob's own feather ate whatever its neighbours had
+  `destination-out` pass got the look and broke the neighbours. A `destination-out` brush is a claim
+  about the canvas, not about one blob. So each blob's own feather ate whatever its neighbours had
   painted under it. Measured on two gauges one blob apart, which is the closest `thinHeat()` ever
-  leaves them, **each centre was erased to alpha 5 of 177 by the other one's feather**, and the
+  leaves them, **each centre was erased to alpha 5 of 177 by the other one's feather**. The
   ground between them stacked to 200 in a class neither gauge reported. Painting is additive over a
   neighbour and erasing is not, so a fade has to be painted. After the rewrite the same two gauges
-  hold 179 at both centres, one hue end to end, and the largest step between 1 km samples is 53
-  inside the smooth falloff against 172 before.
+  hold 179 at both centres, one hue end to end. The largest step between 1 km samples is 53
+  inside the smooth falloff, against 172 before.
   **And the layer computes a field rather than stamping shapes, because two readings are not twice
-  one reading.** Every Porter-Duff `over` adds alpha, so two gauges reading the same rain over the
-  same ground came out heavier than either reported — 227 where two 179 blobs met. No composite
-  operation blends colour while taking the *larger* alpha, so `SoftHeat._field()` asks the readings
-  per cell instead: `v` is the blended reading, every gauge in reach weighted by nearness and
+  one reading.** Every Porter-Duff `over` adds alpha. So two gauges reading the same rain over the
+  same ground came out heavier than either reported, at 227 where two 179 blobs met. No composite
+  operation blends colour while taking the *larger* alpha. So `SoftHeat._field()` asks the readings
+  per cell instead. `v` is the blended reading, every gauge in reach weighted by nearness and
   **normalised**, so two gauges reading the same thing give that thing back. `cov` asks whether any
-  reading reaches this ground at all, which carries the soft edge and is why an isolated blob fades
+  reading reaches this ground at all. That carries the soft edge, and is why an isolated blob fades
   while an overlap does not brighten. Colour is `_grad[v]`, opacity is `v * cov`. Measured on
   two gauges one blob apart: both at 0.70 gives alpha 179 flat end to end, largest step over a
   kilometre one count. One at 0.95 and one at 0.35 walks `#f35772` to `#7b7bff` with alpha 242 to
-  89. The smoothness between neighbours is the browser's bilinear filter on a 4 px grid — raise
-  `CELL` and the edges go blocky, lower it and the cost climbs with the square.
+  89. The smoothness between neighbours is the browser's bilinear filter on a 4 px grid. Raise
+  `CELL` and the edges go blocky. Lower it and the cost climbs with the square.
   **`cov` is a union, and it must never go back to a max — that is a Voronoi border.** A cell asks
-  two questions and one curve cannot answer both, so `BLEND` (0.45) sizes each reading's say in the
+  two questions and one curve cannot answer both. So `BLEND` (0.45) sizes each reading's say in the
   mean and `FEATHER` (0.75) sizes the coverage. One curve served both at first, joined by `max`, and
   that failed twice over. `max` follows whichever gauge is nearer, so its slope flips sign on the
-  equidistant locus — the Voronoi edge. A sign flip is a crease, and the eye reads a crease as a
-  line. The blend weight is also down to 0.30 at 0.8 of a radius. That is right for a weight and far
-  too steep for coverage. `thinHeat()` guarantees one radius between two gauges and no more.
+  equidistant locus, which is the Voronoi edge. A sign flip is a crease, and the eye reads a crease
+  as a line. The blend weight is also down to 0.30 at 0.8 of a radius. That is right for a weight and
+  far too steep for coverage. `thinHeat()` guarantees one radius between two gauges and no more.
   Measured on two gauges reading the same 0.70, against 179 at each of them: 107 between them at 1.4
   radii, 61 at 1.6, 20 at 1.8. An unequal pair states it more plainly. 0.95 and 0.35 painted 242 and
-  89 with **54 between them**, and a midpoint darker than both ends is a border, not a transition.
-  The replacement is a **clamped sum**, and it cannot pass 1, so an overlap still never paints
+  89 with **54 between them**. A midpoint darker than both ends is a border, not a transition.
+  The replacement is a **clamped sum**, and it cannot pass 1. So an overlap still never paints
   brighter than a gauge centre. After it, 179 flat at 1.13 and 1.48 radii, and the unequal pair
   walks 242 → 149 → 89.
 - **A rim facing empty ground and a join between two blobs are different edges, and only the combine
   can tell them apart.** `FEATHER` is one radial curve, so lowering it to soften the rim hollows out
-  every join by the same amount — measured, 0.75 to 0.50 under a union took the share of solid joins
+  every join by the same amount. Measured, 0.75 to 0.50 under a union took the share of solid joins
   from 84% to 45%. The combine sees something the curve cannot: how many readings arrive. A rim has
   one and a join has two. So `cov` sums the per-gauge coverage rather than unioning it. One gauge at
   half strength stays half covered, and two blobs meeting at half strength each add up to covered.
   **The clamp is `1-(1-s)²` and not `min(1, s)`.** A bare clamp breaks its first derivative where it
-  bites, which is a crease along an iso-contour — the Voronoi fault on a different line. Squared has
+  bites. That is a crease along an iso-contour, the Voronoi fault on a different line. Squared has
   slope 0 at s=1. It is also the highest power that still fades the rim gently, because a higher one
   holds full opacity further out and hardens the edge it exists to soften. That bought `FEATHER` at
-  0.50 while `RAIN_KM` was 9: the rim fade went from 1.38 km to 2.20 km with a 34% gentler slope.
+  0.50 while `RAIN_KM` was 9. The rim fade went from 1.38 km to 2.20 km with a 34% gentler slope.
   **It sits at 0.20 now, and the value only means anything beside `RAIN_KM`.** A 6 km blob at 0.50
   fades over 1.47 km, which is less gentle in metres than the 9 km blob it replaced. At 0.20 it
   fades over 2.35 km at a slope of 0.413 per km, gentler than the 9 km layer on both counts. The
@@ -1340,54 +1345,56 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   alike.
   **Read gauge spacing off the station geometry, never off the gauges reporting rain.** The wet set
   changes with the weather. Two snapshots an hour apart put the widest overlapping pair at 1.58 and
-  at 1.90 radii, and one sweep scored the same candidate at 71% and then 11% with no code change
+  at 1.90 radii. One sweep scored the same candidate at 71% and then 11% with no code change
   between. Thin *every* rain gauge instead. **Two populations answer two questions and their
-  percentiles differ**, so name which one a number came from. Nearest neighbour, which is where a
-  seam shows first and where `heat-test.html` takes its probe distances: at `RAIN_KM` 6, 82 pairs,
-  median 1.21 r, p90 1.66 r, widest 1.95 r. Every overlapping pair, which is what join solidity is
-  scored over since any two blobs that meet can show a seam: 143 pairs, median 1.54 r, p90 1.89 r.
+  percentiles differ**, so name which one a number came from. The first is nearest neighbour, which
+  is where a seam shows first and where `heat-test.html` takes its probe distances. At `RAIN_KM` 6
+  that is 82 pairs, median 1.21 r, p90 1.66 r, widest 1.95 r. The second is every overlapping pair,
+  which is what join solidity is scored over, since any two blobs that meet can show a seam. That is
+  143 pairs, median 1.54 r, p90 1.89 r.
   The Verify block prints both. A constant tuned against one snapshot is tuned against one
   afternoon's rain.
   **The bucket index in `_field()` is load-bearing, not tidiness.** Without it the cost is cells
-  times readings, and `thinHeat()` packs readings one radius apart, so zooming out shrinks the
+  times readings. `thinHeat()` packs readings one radius apart, so zooming out shrinks the
   radius and multiplies the readings together. Measured on a full viewport at that spacing: 52 ms at
-  30 readings, 785 ms at 638, 3.0 s at 2,655 — against a flat 33 to 38 ms bucketed at every one of
+  30 readings, 785 ms at 638, and 3.0 s at 2,655. Bucketed, it is a flat 33 to 38 ms at every one of
   them. A flood is when a lot of stations report at once and when the map must not seize.
 - **The denial touches alpha and never colour, and that survived the move out of `destination-out`.**
   A dry reading denies the ground, not one neighbour's contribution to it. The old pass ran last, so
   a denied edge faded at the colour already settled beneath it. `_field()` gets the same result by
-  construction rather than by ordering: hue is `_grad[v]`, `keep` multiplies only the alpha, and `v`
-  never sees a dry gauge at all. **Do not let a dry gauge into `v`.** It would restate the rainfall
-  as a lighter class, which is the thing this layer exists not to do — and with `BLEND`'s flat core a
-  dry gauge 2 km away would carry equal weight and halve the reading. A dry gauge may deny ground and
+  construction rather than by ordering. Hue is `_grad[v]`, `keep` multiplies only the alpha, and `v`
+  never sees a dry gauge at all. **Do not let a dry gauge into `v`.** It restates the rainfall
+  as a lighter class, which is the thing this layer exists not to do. With `BLEND`'s flat core a
+  dry gauge 2 km away carries equal weight and halves the reading. A dry gauge can deny ground and
   never supply a value. `heat-test.html` asserts the hue at three radii and across a denied boundary.
 - **A canvas radial gradient clamps past its last stop, so never `fillRect` one.** Beyond `r` the
-  gradient does not stop, it keeps painting whatever the outermost colour was. The old eraser's
+  gradient does not stop. It keeps painting whatever the outermost colour was. The old eraser's
   outermost colour was full erase. Filled as a square, the four corners outside the
   circle — 21% of the box — erased everything under them, **including the paint belonging to the next
-  blob along**, which `thinHeat()` places exactly one blob away and therefore right in that corner.
-  It drew as hard rectangles cut out of the wash, axis-aligned and about 2r on a side, which reads
-  as a tiling fault or a canvas-tile seam and is neither. It went unseen for weeks first, because
-  the *erase* clamps to transparent and clamping to "no erase" is invisible. That is luck, not
-  design. **This layer stamps nothing any more** — `_field()` computes every pixel, so there is no
-  sprite and no disc left to get wrong, and the `stamp()` helper that guarded the trap went with the
+  blob along**. `thinHeat()` places that blob exactly one blob away, and therefore right in that
+  corner. It drew as hard rectangles cut out of the wash, axis-aligned and about 2r on a side. That
+  reads as a tiling fault or a canvas-tile seam, and is neither. It went unseen for weeks first,
+  because the *erase* clamps to transparent and clamping to "no erase" is invisible. That is luck,
+  not design. **This layer stamps nothing any more.** `_field()` computes every pixel, so there is no
+  sprite and no disc left to get wrong. The `stamp()` helper that guarded the trap went with the
   pass. Anything that brings a gradient back needs it back too.
   `heat-test.html` still puts a second gauge 1.2 blobs away on the diagonal, outside the first blob's
   circle and inside its square.
 - **`heatScale()` may only size a layer the map is holding.** `setOptions()` ends in `redraw()`,
-  which reads `this._map._animating`, and Leaflet nulls `_map` when it removes a layer — so sizing a
+  which reads `this._map._animating`. Leaflet nulls `_map` when it removes a layer. So sizing a
   layer that is off throws a `TypeError`. It hid for a long time because the layer that is off has
   usually never been added, and a layer with no canvas returns from `redraw()` one test earlier.
   **Switching the heat chip from rainfall to water is what reaches it**, since that leaves `rainHeat`
   added-then-removed, holding a canvas and no map. `syncHeat()` adds and removes before it calls
   `heatScale()`, so a layer just switched on is on the map by then and still gets sized.
 - **The water layer has no denial and must not get one, and everything else it shares.** Both layers
-  are `SoftHeat`, so the field render, `BLEND`, `FEATHER`, the clamped-sum coverage and the bucket
+  are `SoftHeat`. So the field render, `BLEND`, `FEATHER`, the clamped-sum coverage and the bucket
   index are one implementation and reach both. Only `setDry()` is called on one of them, from
   `render.js`. **A river reading low says nothing about the river beside it.** A rain gauge is the
-  only sensor here whose zero is evidence about the ground next to it, which is why that argument
+  only sensor here whose zero is evidence about the ground next to it. That is why that argument
   exists on one layer alone. A flood gauge is not that sensor either — see the drainage rule in the
   rain heat entry above. Anything added to `SoftHeat` lands on both layers, so check it against both
+  before assuming it is a rain change.
   before assuming it is a rain change.
 - **Leaflet paints its container `#ddd` in both themes.** That is what shows through wherever a tile
   has not arrived, and a zoom out has nothing to retain over the newly revealed area — so the
