@@ -37,15 +37,15 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `js/util.js` | pure helpers + `hasInfo()` / `color()` / `isIgnored()` |
 | `js/stations.js` | queries over the station set (`nearestOf`, `nearestCam`, `byId`) |
 | `js/map.js` | map instance, basemap/theme, cluster, the station panel (`openSide`), `focusOn` / `flashTo` |
-| `js/heat.js` | both heat layers (water level, rainfall), ground-fixed sizing per layer, shared opacity, and the field pass where a gauge reporting no rain denies the ground a wet one claims |
+| `js/heat.js` | both heat layers (water level, rainfall), ground-fixed sizing per layer, shared opacity. Also the field pass where a gauge reporting no rain denies the ground a wet one claims |
 | `heat-test.html` | `chrome --headless --dump-dom` — one of five runnable checks. Guards the rain layer's paint distance, its dry-gauge erase and its handover between neighbours, in canvas pixels |
 | `js/popup.js` | popup + meter + gauge + sparkline templates |
 | `js/sparktip.js` | the hover/tap readout on every graph, and the label on any `data-tip`. One delegated listener, no imports |
-| `js/render.js` | rebuilds markers and heat points; drawer summary table |
-| `js/alerts.js` | "On alert": the app bar's warning glyph, the list it opens in `#side`, the icon badge, the red favicon, and the MET warning cards above that list |
+| `js/render.js` | rebuilds markers and heat points, and the drawer summary table |
+| `js/alerts.js` | "On alert": the app bar's warning glyph, the list it opens in `#side`, the icon badge, the red favicon. Also the MET warning cards above that list |
 | `js/table.js` | the all-stations table dialog, grouped district → mast → sensor |
 | `js/locate.js` | geolocation, the "You are here" marker, and the amber button a failed fix leaves behind |
-| `js/ticker.js` | header alert marquee — measured, seamless, speed scales with the alert count, draws the MET warning tiles into the strip, and closes every set with the app's own name as a divider |
+| `js/ticker.js` | header alert marquee — measured, no visible seam, speed scales with the alert count. Draws the MET warning tiles into the strip. Closes every set with the app's own name as a divider |
 | `js/timeline.js` | camera archive replay + A/B compare, inside the lightbox and nowhere else |
 | `js/clip.js` | the station panel's 3-hour camera clip — no controls, that is the lightbox's job |
 | `js/toast.js` | desktop-only "new alert since last poll" toast |
@@ -68,9 +68,9 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `img/` | optional. Only `egg.webp` (the About easter egg). Absent is a supported state — see below |
 | `vendor/` | Leaflet, leaflet.heat (patched), markercluster, subsetted fonts — no CDN, hand-managed |
 | `lib/` | Composer's vendor dir (`symfony/dom-crawler`), gitignored — **not** `vendor/` |
-| `composer.json` | the one server-side dependency; `composer install` before first run |
+| `composer.json` | the one server-side dependency. Run `composer install` before first run |
 | `.github/workflows/pages.yml` | bakes the static GitHub Pages build — runs the PHP on cron, publishes `api.json` |
-| `docs/DEPLOY.md` | both targets: Pages (what it can't do) and a Debian box / Proxmox LXC (spec, nginx, cron, container traps) |
+| `docs/DEPLOY.md` | both targets: Pages (what it cannot do) and a Debian box / Proxmox LXC (spec, nginx, cron, container traps) |
 | `.cache.json` | last payload (gitignored) |
 | `.php-error.log` | this app's own PHP errors, and nothing else (gitignored) |
 | `.client-errors.log` | one JSON line per browser error, written by `log.php` (gitignored) |
@@ -103,8 +103,8 @@ point and by district name, and they never touch a reading.
 | source | gives | shape |
 |---|---|---|
 | `infobanjirjps.selangor.gov.my/JPSAPI/api/` | Selangor: everything, incl. the only cameras, sirens and gauges | JSON |
-| `publicinfobanjir.water.gov.my` | national water levels + thresholds; **authoritative reading** | HTML table |
-| `publicinfobanjir.water.gov.my` (rainfall table) | national rainfall + a per-day running total; **preferred rainfall source** | HTML fragment |
+| `publicinfobanjir.water.gov.my` | national water levels + thresholds, the **authoritative reading** | HTML table |
+| `publicinfobanjir.water.gov.my` (rainfall table) | national rainfall + a per-day running total, the **preferred rainfall source** | HTML fragment |
 | `publicinfobanjir.water.gov.my` (station search + 7-day history) | the portal's own gazetteer, and the backfill for a rainfall archive | JSON |
 | `infobanjirjpskl.water.gov.my` (SPHTN) | KL + Putrajaya water level and rainfall | HTML table |
 | `met.gov.my/nowcasting` | rain now and every 30 min to +3 h, 294 points | HTML with baked-in JS |
@@ -265,8 +265,7 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   The rate is `≥ RISE_FLOOR` (0.1 m/h). The level is strictly above the sample two back. The level is
   at or above its own 24h high, which is what keeps a tide out. The `eta` — hours to its *own* danger
   mark at that rate — is within `RISE_ETA` (3 h). The same was true on the previous poll (on-delay).
-  `eta` is published whenever a station is climbing, so the UI can show what the cutoff is cutting
-  off. The client reads `s.rising`. It never re-derives it, and nothing mirrors `RISE_ETA`
+  `eta` is published whenever a station climbs, so the UI can show what the cutoff cuts off. The client reads `s.rising`. It never re-derives it, and nothing mirrors `RISE_ETA`
   client-side any more. `$assess()` takes a sample *index* precisely so the on-delay needs nothing
   persisted between requests.
 - **Rain totals over five nested windows** ride on every rainfall station as `acc`, keyed
@@ -491,7 +490,7 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   or a silent fallback to something already visible. Never a bare broken image, and never a handler
   that lets the box shrink to nothing.
 - **`rm -rf shots/` is a year of camera history**, and unlike `.history.db` it cannot rebuild. The
-  frames only exist because we were running when they were taken. To re-test the capture path,
+frames only exist because we ran when they were taken. To re-test the capture path,
   `rm shots/.last` (the 30-minute stamp), not the directory.
 - **A retention bucket aims at a clock time, and both sides must aim at the same one.** `SHOT_TIERS`
   carries a third number per tier. That is the anchor, the target time in UTC modulo the step. A
@@ -511,7 +510,7 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   every ~25 min and we poll every ~8.5 min. So a level is a staircase, and the same number arrives
   four or five times. Stamping each arrival `now` puts the step where we noticed it. That put up to
   a poll interval of error on *both* ends of a rate. A rate came out wrong by over 100% on a short
-  baseline. That is why a station whose level had not moved in five polls reported a 0.9 h ETA. `readTs()` reads `updated`, clamps a future stamp (JPS stamps to the upcoming slot) and
+  baseline. That is why a station whose level had not moved in five polls reported a 0.9 h ETA. The `readTs()` helper reads `updated`, clamps a future stamp (JPS stamps to the upcoming slot) and
   falls back to `now` only when the parse fails. Anything new that writes to `level` must go through
   it. Two side effects to keep. The `(station, ts)` PK now dedupes a repeated reading to one row. A
   station frozen on an old reading stores that old stamp. So `RETAIN` prunes it, and `SPARK_WIN`
@@ -600,7 +599,7 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   sentence. Any sentence has to name a window. Take "No rain in the last 72 hours" on a station whose
   72-hour total is unknown. That is the exact claim this refuses to make. Five columns keep a measured
   zero and an unanswered window apart. See `docs/superpowers/specs/2026-08-12-cumulative-rainfall-chart-design.md`.
-  **`rainBars()` above it now obeys the same rule and for the same reason.** It printed `No rain in
+  **`rainBars()` above it now obeys the same rule and for the same reason**. It printed `No rain in
   the last 11 h` on an all-zero history and draws the zeros instead. A sentence about a window can
   only make one claim about the whole of it. This graph holds two facts that have to stay apart.
   A run of measured zeros is a line along the floor. A station we cannot reach is a break in
@@ -633,8 +632,8 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   server did not ask for.** A stamp on a fresh row pushes its next fetch out forever. The stamp then
   costs the one signal a reader had. The `ts` column now advances whether or not the page
   answered. **`sources.stale` is the replacement, and it is the alarm to read.** It lists the page
-  keys this server asked for and did not get. A key there means the map is drawing a stored copy
-  of that table. The parse counters cannot say it. A stored copy parses as well as a fresh one, so
+  keys this server asked for and did not get. A key there means the map draws a stored copy of that
+  table. The parse counters cannot say it. A stored copy parses as well as a fresh one, so
   `kl.parsed` stayed above zero through the whole outage. `sources.stale` is empty on a healthy poll.
   **A status code cannot decide what a body is, so `pageHasData()` decides it.** The national portal
   serves a maintenance window as a 320-byte `Notis Gangguan` notice under **HTTP 200**. That
@@ -826,11 +825,11 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   So "everything returns 200" proves nothing. Check `%{content_type}` instead. This is why a
   missing `js/*.js` shows up as a module parse error in the console rather than a failed request.
 - **A multi-click gesture needs `user-select: none` on everything it touches.** The browser counts
-  clicks whatever you are doing with them. So the third of any fast burst is a triple-click, and it
+clicks whatever you do with them. So the third of any fast burst is a triple-click, and it
   selects. The About egg is opened by seven fast clicks and then ignores clicks for 1.5s. So people
   keep clicking, and the selection wash rendered the picture blue. Both `#aboutBox .logo` and
   `#eggBox` carry the rule. Anything else driven by repeated clicks will need it too.
-- **Nothing optional may be able to fail the Pages bake.** `img/` holds one decoration and can be
+- **Nothing optional can fail the Pages bake.** `img/` holds one decoration and can be
   absent. So the staging step copies it with `[ -d img ] && cp -r img site/ || true`. An unconditional
   `cp` of a missing directory fails the step. A failed bake keeps the *last* deployment. So the
   map sits on stale readings because an easter egg was absent. Same rule for anything added to
@@ -902,7 +901,7 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   (see the still-open branch in ui.js). `ids.has('a,b,c')` is false forever.
 - **`render()` refreshes the open card in place, so `openSide()` must stay idempotent.** It runs on
   every poll for the site currently on screen. It resets `scrollTop` **only** when the key changes.
-  Otherwise a poll throws you back to the top of a card you were reading. Anything stateful
+  Otherwise a poll throws you back to the top of a card you read. Anything stateful
   added to the card is lost on that rebuild, unless it is keyed the same way. That covers an open
   `<details>`, a scroll position and a text selection.
 - **Nothing can close the card except the reader**, and there is no `map.on('click', closeSide)`.
@@ -924,7 +923,7 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   collapse the panel on a phone first. Two consequences. Its head must stay the first element and
   must be `.pophead`, the same seam every station card obeys — `openSide()` lifts it into
   `#sideHead`. And **nothing springs it open by itself**. On the right edge it lands on a card
-  someone is reading, which is the rule directly above. The button's colour and count are on screen
+  someone reads, which is the rule directly above. The button's colour and count are on screen
   the whole time, and the interruption for news is still the toast.
 - **`#alertBtn`'s `aria-expanded` is synced from `openSide()`/`closeSide()` in map.js**, not from the
   click that opened it. The panel has half a dozen other ways to change what is in it. They are a
@@ -941,7 +940,7 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   button that is about to become `display: none`. That returns focus to `<body>` *after* the
   handler returns. So the focus must follow a style flush (`el.offsetWidth`). `requestAnimationFrame`
   does **not** work here: its callbacks run before the frame's style recalc.
-  **The same interpolation eats clicks on the way out, and `#splash` was doing it.** `visibility`
+  **The same interpolation eats clicks on the way out, and `#splash` did it.** `visibility`
   holds its *start* value for the whole duration, so `visible → hidden` stays `visible` until the
   transition ends. `opacity: 0` does not stop hit-testing. Paired with it, `#splash.gone` left an
   invisible `inset: 0`, `z-index: 900` sheet over the entire viewport for 300ms after the map
@@ -960,9 +959,9 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   never take a whole mast off the map. That is why layer chips call `render()`, not `syncCluster()`.
 - Clustering still never fully disables: sites can sit metres apart. `maxClusterRadius` tightens
   with zoom and co-located pins spiderfy on click.
-- **A cluster badge counts what it is hiding, not what is in the area.** Favorites are drawn on
+- **A cluster badge counts what it hides, not what is in the area.** Favorites are drawn on
   `favLayer` in `map.js` and never enter `cluster`, so a chip over a patch holding 13 pins can read
-  12. That is the correct number: the chip is hiding 12 pins and the 13th is drawn beside it. The
+  12. That is the correct number: the chip hides 12 pins and the 13th is drawn beside it. The
   same holds for the badge's red. `iconCreateFunction` ORs `m.options.critical` across its children.
   So a chip goes neutral when the only critical pin near it is an unclustered favorite drawing itself
   red. Nothing leaves the screen. Do not "fix" the count by folding the favorites back in. That
@@ -1007,7 +1006,7 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   There is **no caption**. It read `Silent for 9 h`, `Last sounded 14:22` or `Sounding since 13:50`,
   and the band states all three. A rail with no bar on it is silence. A red bar shows when
   it started. A red bar that reaches the right edge means the siren sounds now.
-- **A siren reading 1 is a claim, not a fact, and the river behind it is the check.** JPS sounds a
+- **A siren reading 1 is a claim, not a fact, and the river behind it is the check**. JPS sounds a
   siren for one minute at the Amaran mark. It repeats every 3 hours while the water stays there,
   and every 5 at Bahaya. So the alarm is a claim about a river level the payload already holds.
   `sirenBacked()` in `api.php` asks it. `backed` is true when a river within `SIREN_KM` (5 km) is at
@@ -1031,8 +1030,7 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   move while the gauge still claimed rain. It is **null where nothing can be asked**. That is a young
   archive, or a station with no odometer, which is every KL gauge. `raining()` in `util.js` reads
   `backed !== false`, exactly as `sounding()` does. A gauge nobody can check keeps its reading.
-  Measured 2026-08-14: 5 of the 48 gauges that could be asked were claiming rain their own total
-  denied. T.K.P.M SG. KELAMBU held 4.5 mm for **twelve hours**, against an odometer that never moved
+  Measured 2026-08-14: 5 of the 48 gauges this app can ask claimed rain their own total denied. T.K.P.M SG. KELAMBU held 4.5 mm for **twelve hours**, against an odometer that never moved
   and a daily total of 0.
   **The window is the hour the reading names, and a longer one is wrong.** A real burst leaves the
   odometer flat straight afterwards while the rolling hour still carries the total. So any window
@@ -1066,7 +1064,7 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   surfaces read it: pin, card, table cell, table hover panel. It deliberately changes **no alert
   surface**. `isHot()` never covered gauges, so the count, the badge and the ticker do not move. If
   a gauge ever needs to alert, that goes through the alert design standard first.
-- **The Selangor list publishes `-1` for "no status" on stations that are reporting a number.** 144
+- **The Selangor list publishes `-1` for "no status" on stations that report a number.** 144
   of 233 rain gauges and 15 rivers, on the payload this was found. `api.php` now derives the missing
   code from the reading, through the same `rainStatus()` / `wlStatus()` the two scraped feeds already
   use. It is server-side, because there is one definition of a status and it is that file's. `band()`
@@ -1136,7 +1134,7 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
 - **A timestamp is printed inside a ⋮ menu and nowhere else.** `sourceInfo()` does it for a sensor.
   `wxDots()` does it for the weather section, the only other reading on a card. Three
   facts ride there, all about the plumbing. Are we hearing from this station? What was the stamp on
-  the last thing it sent? Which of the three feeds won? None of them changes what the water is doing. As a
+  the last thing it sent? Which of the three feeds won? None of them changes what the water does. As a
   footer line they repeated per sensor down a six-sensor mast. They are what you check when you doubt
   the number, so they sit where you go to look. The stale state blocks (siren, rainfall, gauge) print
   no time at all. **The stamp is printed at the precision its age needs, and `stamp()` in `popup.js`
@@ -1147,20 +1145,20 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   ten characters saying so. The stale case was worse. `Last reported 19/09/2025 12:15 · 7892.0h ago`
   put a minute hand and an elapsed figure on a sensor eleven months dead. Four stations in the
   payload are past 6,500 hours. **Elapsed time is gone from both callers**, and `ago()` was
-  deliberately **not** given a unit above hours to fix `7892.0h`. This was its only caller that
-  could overflow. The two that remain (`clip.js`'s frame age, `net.js`'s poll clock) stay inside
-  the range it was written for. A day unit there would be unreachable code. The same-day test is a
+  deliberately **not** given a unit above hours to fix `7892.0h`. This was its only caller that can
+  overflow. The two that remain (`clip.js`'s frame age, `net.js`'s poll clock) stay inside
+  the range it was written for. A day unit there is unreachable code. The same-day test is a
   `startsWith` and not a parse. JPS stamps `DD/MM/YYYY HH:MM:SS` in MYT and `en-GB` formats a date
   the same way. So one expression reads both that string and MET's unix instant. Seconds are trimmed
   for display by `noSec()`. The underlying string stays verbatim, so `parseMY()` is unaffected. It
   has no caller in `popup.js` any more, and `js/clip.js` is the module that still uses it. **The
-  glyph names what is in the menu, and it has changed twice on that one rule.** It was a ⋮ over a
+  glyph names what is in the menu, and it has changed twice on that one rule**. It was a ⋮ over a
   single "ignore" item, which promised actions and held one. So it became an ⓘ when the provenance
   moved in. It is a `more_vert` ⋮ now. The menu also carries the favorite, the nearest webcam or
   water level, the map link and the ignore. Four actions is not an information glyph. Count the
   actions before changing it again.
 - **A marquee needs three things measured, not guessed.** `js/ticker.js` renders the item set twice
-  and translates `-50%`. That is only seamless if one copy is at least as wide as the box. So it
+  and translates `-50%`. That shows no seam only if one copy is at least as wide as the box. So it
   repeats the set to cover the box *before* doubling. Width alone is not enough. A single wide item
   still pops, because the tile leaving the left edge is the whole strip leaving. `MIN_TILES` (3)
   guarantees a follower. And `#ticker` must have a **fixed flex basis**. Sized to content, the
@@ -1176,7 +1174,7 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   children entirely. That is why the drawer is a `body.drawer` class and the credit sits outside.
   The two filter sections *inside* the drawer (`#districts`, `#ignored`) are `<details>` precisely
   because they want no animation. Their counts live on the `<summary>`, so a collapsed section still
-  reports what it is holding. Do not move a count into the body.
+  reports what it holds. Do not move a count into the body.
 - **`border-collapse: collapse` drops padding on the table box** — `#netstats` uses `separate`.
 - **leaflet.heat sizes in screen pixels.** `heatScale()` converts a layer's ground distance to
   pixels per zoom so blobs stay ground-fixed. Do **not** also call `heat.redraw()`. The plugin
@@ -1186,8 +1184,8 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   is **not** a display limit. It divides every weight by `2^(maxZoom − zoom)`, so anything inside
   the usable zoom range dims blobs as you zoom out. Pinned to 0.
 - **A blob is painted `radius + blur` across, not `radius`.** The two must sum to the ground
-  distance, and may never be set apart from each other. simpleheat's `radius(t, i)` fills an arc of
-  radius `t`, blurs it by `i`, then stamps a sprite of half-width `t + i`. `heatScale()` handed
+  distance. They must never be set apart from each other. simpleheat's `radius(t, i)` fills an arc of
+  radius `t`. It blurs that by `i`, then stamps a sprite of half-width `t + i`. `heatScale()` handed
   `radius` the whole of `HEAT_KM` and added `blur = radius * 0.8` on top. So every blob on both
   layers reached 1.8× its stated size and covered 3.24× the area. One rain gauge reading 19 mm/h
   washed 250 km² of Kuala Lumpur violet, over twenty gauges reporting 0.0 mm. The nearest of them was
@@ -1216,7 +1214,7 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   submerged one must never paint.** Only a rainfall station reports rain. Checked on the current
   tree: no rain conclusion reads `depth`, and `rainBacked()` tests the station's own
   `cumulativeRainfall` odometer rather than any gauge. Keep it that way. The tempting mistake is to
-  read a dry flood gauge as proof that the rain layer is overclaiming. Good drainage is the
+  read a dry flood gauge as proof that the rain layer overclaims. Good drainage is the
   whole reason it is not. The siren already obeys the same rule from the other side. Flood gauges are not backing
   evidence there either.
 - **A rain gauge reporting zero is a reading, and the rain heat layer draws it.** The network says
@@ -1274,7 +1272,7 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   ground, never supply a value. See `docs/FEATURES.md`, *The rainfall heatmap claimed rain over
   250 km² from one gauge*.
 - **A heat blob's alpha is its colour as well as its size.** So the brush's own falloff walks down
-  the legend. simpleheat's `_colorize()` looks the gradient up by alpha, and the stock brush fades
+  the legend. simpleheat's `_colorize()` looks the gradient up by alpha. The stock brush fades
   across most of a blob. So one rain gauge reading 27 mm/h, JPS's *heavy* class, painted heavy at
   the gauge. It painted moderate 4 km out and light 6 km out. That is three classes from one number, with a
   legend beside them naming those colours in
@@ -1304,8 +1302,8 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   **normalised**. So two gauges reading the same thing give that thing back. `cov` asks whether any
   reading reaches this ground at all. That carries the soft edge, and is why an isolated blob fades
   while an overlap does not brighten. Colour is `_grad[v]`, opacity is `v * cov`. Measured on
-  two gauges one blob apart, both at 0.70: alpha 179 flat end to end, largest step over a
-  kilometre one count. One at 0.95 and one at 0.35 walks `#f35772` to `#7b7bff` with alpha 242 to
+  two gauges one blob apart, both at 0.70. Alpha is 179 flat end to end. The largest step over a
+  kilometre is one count. One at 0.95 and one at 0.35 walks `#f35772` to `#7b7bff` with alpha 242 to
   89. The smoothness between neighbours is the browser's bilinear filter on a 4 px grid. Raise
   `CELL` and the edges go blocky. Lower it and the cost climbs with the square.
   **`cov` is a union, and it must never go back to a max — that is a Voronoi border.** A cell asks
@@ -1380,10 +1378,10 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   pass. Anything that brings a gradient back needs it back too.
   `heat-test.html` still puts a second gauge 1.2 blobs away on the diagonal. That is outside the first
   blob's circle and inside its square.
-- **`heatScale()` may only size a layer the map is holding.** `setOptions()` ends in `redraw()`,
+- **`heatScale()` must only size a layer the map holds.** `setOptions()` ends in `redraw()`,
   which reads `this._map._animating`. Leaflet nulls `_map` when it removes a layer. So sizing a
   layer that is off throws a `TypeError`. It hid for a long time. The layer that is off has
-  usually never been added, and a layer with no canvas returns from `redraw()` one test earlier.
+  usually never been added. A layer with no canvas returns from `redraw()` one test earlier.
   **Switching the heat chip from rainfall to water is what reaches it.** That leaves `rainHeat`
   added-then-removed, holding a canvas and no map. `syncHeat()` adds and removes before it calls
   `heatScale()`. So a layer just switched on is on the map by then, and still gets sized.
@@ -1417,7 +1415,7 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   stands. `wall.js` and `clip.js` no longer call `?shots=` at all — see the strip gotcha below.
   So `timeline.js`'s lightbox is the only reader left with this shape to guard against.
 - **Two image endpoints answer for one camera, `?shot=` and `?sheet=`, and they deliberately
-  disagree about how long a browser may cache them.** `?shot=<id>&t=<ts>` names one immutable,
+  disagree about how long a browser can cache them.** `?shot=<id>&t=<ts>` names one immutable,
   already-captured frame. So `Cache-Control: public, max-age=31536000, immutable` is honest, because
   that exact file never changes again. `?sheet=<id>` names the strip `buildSheet()` in `shots.php`
   builds on request. That is every frame inside the clip window, laid out side by side in one WebP.
@@ -1426,7 +1424,7 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   new frame and the strip goes stale. That happens up to once every `SHOT_EVERY` (30 min). So
   `?sheet=` carries `public, max-age=900` instead. That is half of `SHOT_EVERY`. A reopen inside
   that window is free, and a cached strip can never outlive one capture cycle by much more. Copy
-  `immutable` onto `?sheet=` and a reader who opens a camera twice in one capture window keeps
+  `immutable` onto `?sheet=`. A reader who opens a camera twice in one capture window then keeps
   seeing the strip from before it. That lasts up to a year, with nothing to tell them it went
   stale. It is the exact failure the frame endpoint's own header is right to invite. The strip
   endpoint exists to avoid it.
@@ -1437,8 +1435,8 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   returns. `stop()` clears the id and the second `start()` sets it back, so both continuations
   match. `gen` catches that case. `stop()` bumps it on every call, so a stale run can never match
   again.
-- **`.shotwrap` clips its overflow and holds two children, so nothing may pin its height to one of
-  them.** The box carries the picture *and* the `<p class="clipcap">` caption under it. `.done`
+- **`.shotwrap` clips its overflow and holds two children.** Nothing can pin its height to one of
+them. The box carries the picture *and* the `<p class="clipcap">` caption under it. `.done`
   relaxes it to `aspect-ratio: auto` so it measures both. `.shotwrap.strip` used to pin it back to
   `16 / 9`, which gives the strip `<img>` a definite box to resolve `height: 100%` against. That
   made the box exactly the picture's height. It started the caption on its bottom edge and cut it
@@ -1453,7 +1451,7 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   holds one cell at a single frame's height. It leaves the wrapper free.
   `.shotwrap.strip { aspect-ratio: auto }` is then explicit rather than left to `.done`. `bind()`
   re-adds `.strip` to a fresh `<img>` on every poll, before that image has fired `load`. The base
-  rule would otherwise clip the caption once per poll instead of once per lap. Anything added to
+  rule otherwise clips the caption once per poll instead of once per lap. Anything added to
   that box gets the same treatment.
 - **`position: relative` does not scope a `z-index`, so `.camtile` carries `isolation: isolate`.** A
   positioned box opens a stacking context only when its `z-index` is something other than `auto`.
@@ -1469,13 +1467,13 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
 - **The lightbox reads its camera from `data-clip`, not from the clicked image's `src`.** The panel
   clip plays a strip for its archived cells (see the `?sheet=` gotcha above). It still ends every
   lap on a fresh live still. So `img.src` cycles between the strip's own URL and a `?cam=<id>` one
-  every few seconds, for as long as the card stays open. Matching `?cam=` against whatever `src`
-  happens to be showing catches the camera on some ticks and misses it on others. That is worse
+  every few seconds. That lasts as long as the card stays open. Matching `?cam=` against whatever
+  `src` happens to show catches the camera on some ticks and misses it on others. That is worse
   than failing outright. A match that sometimes works reads as a bug in the lightbox, not as a wrong
   approach. That is what opened a lightbox with no scrubber, no compare and no warning glyph before
   `data-clip` replaced it. Only the table's "show image" button has no such wrapper, and it keeps
   the old path.
-- **`.stage` is exactly the picture's box, and nothing that sits beside the picture may live in it.**
+- **`.stage` is exactly the picture's box.** Nothing that sits beside the picture can live in it.
   `.ab` is `inset: 0` of `.stage` and `.abgrip` spans its full height — that is what lines the two
   A/B halves up pixel for pixel, and it holds only while `.stage` is the frame and nothing else. The
   control bar and the warning pill are therefore siblings of it, inside **`.player`**. That is the
@@ -1483,13 +1481,13 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   `.stage`, for the same reason.
   **`.camfail` is the one child that is allowed, because it stands *instead of* the picture rather
   than beside it** — `inset: 0`, drawn only under `#lightbox.nopic`. That class is also the only
-  thing that may give `.stage` a size of its own. A failed `<img>` lays out at 0×0, and `.stage` and
+  thing that can give `.stage` a size of its own. A failed `<img>` lays out at 0×0, and `.stage` and
   `.player` are both shrink-to-fit. So a dead feed folded the frame, the control bar and the warning
   pill up together. It left the dialog wrapped around its title. **Do not fix that with a floor on
   `.stage`.** The box has to keep matching the picture. Otherwise every frame narrower than the
   floor draws its A/B halves out of line. `ui.js` sets the class from `naturalWidth` in one handler for `load`
   and `error`, so it lifts again the moment a later frame loads.
-- **The overlay bar is the special case and lives behind a query; the in-flow bar is the default.**
+- **The overlay bar is the special case and lives behind a query. The in-flow bar is the default.**
   `@media (hover: hover) and (min-width: 601px)` — marked `PLAYER_OVERLAY` in `chrome.css` — is the
   only place `#tl` is absolute, white, scrimmed and self-hiding. Everything outside it is the plain
   shape. It is in flow under the frame, on the dialog surface, in `var(--muted)` / `var(--hover)` /
@@ -1510,8 +1508,8 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   there must not be one again. 60 hairlines over a control you drag is a graduation. The frames
   are already an even grid, so the marks measured nothing the spacing did not. Colour is the whole
   message. A span is red or amber because a river near that lens was in trouble then.
-- **The control bar's colours are literal, not tokens.** It sits on a photograph, so `--on-surface`
-  and `--muted` would flip with the theme while the picture behind them did not. White and
+- **The control bar's colours are literal, not tokens.** It sits on a photograph. So `--on-surface`
+and `--muted` flip with the theme while the picture behind them does not. White and
   `#ffffffb3` in both themes. `--accent` is the one token that stays, on the thumb and the played
   rail. It is legible on the scrim in either theme.
 - **The lightbox's warning pill belongs to the frame on screen, not to the clock.** `paint()` in
@@ -1540,7 +1538,7 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   what they listed before. Widening *those* still goes through the alert design standard. Every
   kind `atDanger()` adds is observed, so it is `now`. Only a river publishes a rate, so only a river
   gets `soon`. Each kind reads its own field and unit through `CAM_READ` in `popup.js`: `level` m,
-  `depth` m, `hourly` mm/h. A siren prints no figure, because its samples are 0 and 1, and an archive
+  `depth` m, `hourly` mm/h. A siren prints no figure. Its samples are 0 and 1, and an archive
   frame hands that 1 straight in. `?shots=` scores the same four kinds server-side. Otherwise the
   pill shows on the live frame only, and the lightbox opens three hours back, so nobody sees it.
 - **`.abtime` must stay outside `.ab`.** `.ab` is the older frame clipped to the divider. So a label
@@ -1587,7 +1585,7 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   and a field frozen at `0` is a field that cannot move a hash. Repair `cacheAge` by itself and a
   rising number changes the body every second. That changes the `ETag` every second, and the `304`
   in `sendPayload()` stops firing. Nothing errors. A validator that never matches is not a failure.
-  It is a full 33 KB body on every poll, for as long as a tab stays open. `payloadEtag()` is the other
+  It is a full 33 KB body on every poll, for as long as a tab stays open. The `payloadEtag()` helper is the other
   half. It blanks `"cacheAge":N` to `"cacheAge":0` before hashing. So the tag names the build rather
   than the moment somebody read it. **It blanks the field rather than cutting it**, so the hash
   still depends on that field being present.
@@ -1610,7 +1608,7 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   Anything new added to that list must add a branch there as well as in `rowHtml()`. Otherwise a
   reader selects a row that does nothing. The sub-rows are spliced into `hits` itself rather than hidden
   with CSS. That is what lets the existing arrow keys keep walking visible rows with no new code.
-- **A picked place refills the list; it opens no card.** `place` and `ask` are the two rows that
+- **A picked place refills the list. It opens no card.** `place` and `ask` are the two rows that
   close nothing and keep focus in the box — every other row ends the search. Picking a place sets
   `nearPlace`, drops the pin and moves the map. `search()` then answers about that point instead
   of about the query. It lists the sites within `NEAR_MAX_KM`, nearest first. There **was** a card here, a
@@ -1626,8 +1624,8 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   and a fast typist fires several.
 - **The camera wall is painted on a poll, never rebuilt.** `render()` calls `paint()` in
   `js/wall.js`, which swaps the tier class and the phrase on the tiles that already exist. A tile
-  holds three things the payload does not. They are which cell of its strip it is showing, how many
-  cells that strip has, and whether the observer reached it. A rebuild throws all three away. It
+  holds three things the payload does not. They are which cell of its strip it shows, and how many
+  cells that strip has. The third is whether the observer reached it. A rebuild throws all three away. It
   drops every visible tile back to the start of its lap. That is the failure `js/clip.js` was
   written to prevent on one camera, arriving a dozen at a time. The filter obeys the same rule: a hidden tile
   stays in the grid. **Do not add `wall.open()` to the poll path** beside `dataTable()`. The table
@@ -1691,8 +1689,8 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   always wins against an inherited value, however specific the parent's selector is. `.accx` sets
   `font-size: 10px` on the rain chart's label row and every label inherits it. But an unanswered
   window's label also carried `class="muted"`. So `24 h` and `72 h` drew at 12px beside three
-  neighbours at 10. The two labels a reader is most likely to question drew biggest. The class was
-  doing no work there either, since `.accx` already paints all five `--muted`. **This is not the
+  neighbours at 10. The two labels a reader is most likely to question drew biggest. The class did
+  no work there either, since `.accx` already paints all five `--muted`. **This is not the
   first site.** `#ignoredList .nm .muted` patches the same trap by restating 11px. Read that rule as
   evidence rather than as a one-off. Treat `.muted` as a colour-plus-size pair. In a compact
   context, either state the size on the element or reach for the token instead of the class.
@@ -1708,7 +1706,7 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   `.spark[data-pts]`. The label wins while the pointer is on the glyph, and the per-sample readout
   keeps every other column. **A mark near an edge moves the glyph, never the rule.** The newest
   sample is the last column. So rain peaking right now is the ordinary case rather than an edge
-  case, and a centred glyph there hangs half its width off the plate.
+  case. A centred glyph there hangs half its width off the plate.
   **The caption it replaced read the wrong maximum**, and that is the part worth remembering.
   `rainBars()` holds `hi0`, the peak of the readings, and `hi`, the axis maximum. `hi` is the
   taller of `hi0` and the highest intensity class drawn across the plot. The caption printed `hi`.
@@ -1754,7 +1752,7 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
 - **The dark basemap loses water two different ways, and neither one is fixable with a filter.**
   `#watertint` gets the sea and the large lakes because CARTO fills those with one exact tone.
   **CARTO antialiases a river into the road tones.** A river is one pixel wide. So the style draws
-  it as a line that blends toward the land tone, by however much of each pixel it covers. **Measure before
+  it as a line. That line blends toward the land tone, by however much of each pixel it covers. **Measure before
   assuming a tone means what it looks like.** Mark every pixel Voyager paints as water, then read
   the dark tile at those same positions. At zoom 10 the sea maps to tone 38 for 80% of its pixels.
   At zoom 12 and 13 over Kuala Lumpur, tone 38 is not in the tile at all. The river pixels
@@ -1772,7 +1770,7 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   the tiles at 200 and the overlays at 400. So heat, pins and the accuracy circle draw over the
   water. It reads **`--water` from `css/base.css` at the moment it builds the layer**, not when the
   fetch returns. That token exists on the dark theme only. That token is the **finished**
-  colour and the tint in `index.html` is the raw one, since the tile pane filter cannot reach this
+  colour and the tint in `index.html` is the raw one. The tile pane filter cannot reach this
   pane. Move one and move the other. And the fetch stays **lazy and swallows its own failure**. A
   light-theme reader never pays the 234 KB, and a failure leaves a plainer map rather than a broken
   one. `water.json` has no `?v=`, so a rebake needs a hard reload.
@@ -1832,7 +1830,7 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   **A live payload tested the southern stretch, and the rule answered correctly.** Before this work,
   `data.gov.my` was the only warning source this app had, and it had published nothing for seven days.
   No row reached the geography filter at all, so nothing exercised this rule. The JPS mirror delivers
-  rows now. On 2026-08-17 the ticker carried "Northern part of Phuket, Northern Straits Of
+  rows now. On 2026-08-17 the ticker carried this row. "Northern part of Phuket, Northern Straits Of
   Melaka, Southern Straits Of Melaka, Northern Reef South, Southeastern Reef North and Labuan".
   `WARN_SEA_FAR` cuts `northern straits of melaka`, and MET's `Southern Straits Of Melaka` then
   matches `WARN_SEA_KEEP`. **That is the right answer. The southern stretch reaches this map, and the
@@ -2019,34 +2017,34 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   and a hand-made control costs them that knowledge. The modal drawer is the worked example. Both
   panels dismiss on a tap on `#scrim`, or on a swipe toward the edge they are anchored to. The edge
   tab that did the job before is gone. This does **not** override the two rules below it. The colour
-  language here is a status language. So M3's tonal palette never gets to paint a station kind, and
-  the writing standard still governs every word on screen. Where the spec and this file disagree,
+  language here is a status language. So M3's tonal palette never gets to paint a station kind.
+  The writing standard still governs every word on screen. Where the spec and this file disagree,
   this file wins and the disagreement is written down.
 - Responsive is a standing requirement (breakpoint 600px), including touch equivalents for every
   hover-only affordance.
 - **A message on screen is written for the reader, not for the system.** Four rules, and the station
   panel was swept for them twice. **Sentence case.** That is a capital at the front of every rendered
-  string, including the small `.muted` helper lines, which were all lowercase fragments. The first
+  string. It includes the small `.muted` helper lines, which were all lowercase fragments. The first
   sweep missed five, all in `popup.js`: `water is … below the gauge marker` and `water is level with
   the gauge marker` in `gaugeBlock()`, and `silent for the last …` / `last sounded …` / `sounding
   since …` in `sirenBand()`. The second sweep caught every one of them as a side effect of
   *shortening* them, which is the usual way. A line nobody reworded is a line nobody
   re-read. Do not trust a past sweep over a grep. **No hedging.**
-  The writing standard bans "probably". A hedge is dishonest anyway where the app already
-  acted on the judgement it is hedging about. **None of our vocabulary**: `proxy`, `cold start`,
+  The writing standard bans "probably". A hedge is dishonest anyway where the app already acted on
+  the judgement it hedges about. **None of our vocabulary**: `proxy`, `cold start`,
   `as we poll`, `stuck relay`, `warning mark`, `the alert list` and `5 km` are how *we* describe the
   plumbing, and a reader wants the verdict and one fact behind it. The siren line is the model —
   `Faulty signal. No river nearby is high.` replaced a 28-word sentence that never answered whether
   there was a flood. **The precision the fact needs, and no more.** A live station's stamp needs its
   clock and not today's date. A sensor eleven months dead needs its date and neither a minute hand
   nor `· 7892.0h ago`. A graph window measured over 9.6 hours is `9 h`. A decimal claims
-  six-minute precision on a span nobody measures that finely. It rounds **down**, since a span
+  six-minute precision on a span nobody measures that finely. It rounds **down**. A span
   is read as ground covered, and a long one claims minutes that were never in the record. A number
   already drawn on the scale 20px below is not repeated in the line above it. A distance needs no
   `away` after it, an accuracy radius no `about` before it, and `mm/h` says what `mm in an hour`
   spells. Sweeping the station panel on this one rule cut or trimmed 18 strings. It also deleted
   `basin n/a` from 287 of 679 cards. That line stated a gap in the feed rather than a fact about the
-  place, beside `district n/a`, which no station can ever reach. The ALL-CAPS blocks (`TRIGGERED`,
+  place. It sat beside `district n/a`, which no station can ever reach. The ALL-CAPS blocks (`TRIGGERED`,
   `HEAVY RAIN`, `HAPPENING NOW`) are a deliberate visual language and are **not** messages — leave
   them.
 - All user settings live in one `prefs` blob in `localStorage` (`PREFS` + `save()`).
@@ -2075,11 +2073,11 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   Two gauges both reading 4 mm/h still means 4 mm/h, not 8. But the canvas accumulates alpha. So N
   stations reporting the same thing paint something stronger than any of them reported. Measured:
   233 rain gauges, a median of 4 inside one 5 km blob and up to 14. That stacked light rain (0.26)
-  to 0.97, which is solid red over a state where nothing worse than light rain was reported. `thinHeat()` in
+  to 0.97. That is solid red over a state where nothing worse than light rain was reported. `thinHeat()` in
   `heat.js` fixes it. It keeps the strongest reading and drops anything its own blob already
   covers. That *is* "the highest reading within a blob radius", the thing the colour claims to
   mean. **Any new heat layer must go through it.** The water layer does too, even though it has
-  one point on a calm day. The flaw only appears when many stations alert at once, which is the one
+  one point on a calm day. The flaw only appears when many stations alert at once. That is the one
   moment the map has to be right. **It takes the distance as a parameter, and a caller must pass the
   one its own layer paints at.** A thinning distance shorter than the paint leaves the stacking
   alive in the ring between the two. See the `radius + blur` gotcha above, which is how that
@@ -2124,8 +2122,8 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   **`label` is a styled element in `css/base.css`, and it carries a margin.** `label { display: flex;
   align-items: center; gap: 8px; margin: 6px 0 }` is written for the drawer's stacked filter rows.
   It lands on every `<label>` in the app. Measured on the theme picker, that margin made the track
-  37px tall around 21px pills. That is 6px of dead air above and below each one, inside a shape
-  whose whole point is that the fill hugs the segment. The lightbox's own pills are `<button>`s and never met it.
+  37px tall around 21px pills. That is 6px of dead air above and below each one. The whole point of the shape
+  is that the fill hugs the segment. The lightbox's own pills are `<button>`s and never met it.
   **Any `<label>` used as a compact control needs `margin: 0` stated.** The symptom is spacing
   around the control rather than in it, which reads as a padding mistake on the parent. Three other
   explanations were measured first and all three were wrong. They were the row's own padding
@@ -2136,85 +2134,86 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
 - **The theme has three states and two of them are the same colour.** `PREFS.theme` holds the
   *pick* — `system`, `light` or `dark` — and `applyTheme()` resolves it to one of the two real
   themes. Anything that is not `light` or `dark` means system, so an absent pref needs no special
-  case and `system` is the default. **`setTheme()` no longer applies anything**: it stores the pick
-  and calls `applyTheme()`, which is also the `change` listener on
-  `matchMedia('(prefers-color-scheme: dark)')` — the system can move the answer with nobody picking
-  anything, and that listener needs no test of its own because `applyTheme()` re-reads the pref every
+  case and `system` is the default. **`setTheme()` no longer applies anything.** It stores the pick
+  and calls `applyTheme()`. That is also the `change` listener on
+  `matchMedia('(prefers-color-scheme: dark)')`. The system can move the answer with nobody picking
+  anything. That listener needs no test of its own, because `applyTheme()` re-reads the pref every
   time. Anything that wants to know the theme on screen reads `document.documentElement.dataset.theme`
   as before. **Never read `PREFS.theme` as if it were a theme** — on the default it is not one.
-  A one-time clear in `map.js` guards `themePick`: the old two-state toggle wrote a *resolved*
-  `light`/`dark` back on every load, so every stored value predating this control was the system's
-  answer rather than a reader's, and honouring it would have left Auto reachable by new visitors
-  alone. Do not delete that line until nobody can still be carrying a pre-Auto `prefs` blob.
+  A one-time clear in `map.js` guards `themePick`. The old two-state toggle wrote a *resolved*
+  `light`/`dark` back on every load. So every stored value predating this control was the system's
+  answer rather than a reader's. Honouring it leaves Auto reachable by new visitors
+  alone. Do not delete that line until nobody can still carry a pre-Auto `prefs` blob.
 - **`#appMenu` closes itself on any click inside it, in the capture phase, and a setting must opt
   out.** The handler in `ui.js` exists so a menu item's `showModal()` never runs while its opener is
-  still in the top layer. That is right for the four tiles, which are destinations, and wrong for the
-  theme row, which is a setting — closing the menu takes the control off screen at the moment you
-  want to see what it did and try another one. The guard is `e.target.closest('.swrow')`. **Anything else
-  added to that menu that is not a destination needs `.swrow` or its own exemption**, or it will
-  fire once and vanish. `.swrow` also carries `grid-column: 1 / -1`, as does the `<hr>` above it:
+  still in the top layer. That is right for the four tiles, which are destinations. It is wrong for the
+  theme row, which is a setting. Closing the menu takes the control off screen. That is the moment
+  you want to see what it did and try another one. The guard is `e.target.closest('.swrow')`. **Anything else
+  added to that menu that is not a destination needs `.swrow` or its own exemption.** Otherwise it
+  fires once and vanishes. `.swrow` also carries `grid-column: 1 / -1`, as does the `<hr>` above it:
   `#appMenu` is a two-column grid and a row that does not span both lands in a tile slot.
 - **A river's sparkline draws every mark it publishes, and the axis grows to hold them.** This
-  reverses the earlier rule, which drew a mark only within one *data span* of the readings so the
-  readings kept half the graph's height. That rule left 89 of 105 rivers with no mark at all on a
-  quiet day, and "how far is this from trouble" is the question a river graph is opened with. The
-  accepted cost is that a calm river draws as a near-flat line at the foot of the graph — a true
-  picture, with the trend figure beside it stating the movement in m/h. **A flood gauge keeps the
-  proximity rule**: its marks are 0.15 m and 0.3 m of depth over a spot, never far from the readings,
-  and its axis crosses zero where a river's does not. With no readings to be near, that filter has
+  reverses the earlier rule. That rule drew a mark only within one *data span* of the readings. The
+  readings then kept half the graph's height. It left 89 of 105 rivers with no mark at all on a
+  quiet day. "How far is this from trouble" is the question a river graph is opened with. The
+  accepted cost is that a calm river draws as a near-flat line at the foot of the graph. That is a
+  true picture, with the trend figure beside it stating the movement in m/h. **A flood gauge keeps
+  the proximity rule**. Its marks are 0.15 m and 0.3 m of depth over a spot, never far from the
+  readings. Its axis crosses zero where a river's does not. With no readings to be near, that filter has
   nothing to measure and every mark is drawn.
   **The caption under the graph states the readings, never the axis.** It read `lo` and `hi`, which
-  are the axis — and this very rule grows the axis to hold every mark, so T.T.D.I JAYA captioned
-  itself `3.42–8.30 m` over readings of 3.42 to 5.32 and named its danger mark as water that had
+  are the axis. This very rule grows the axis to hold every mark. So T.T.D.I JAYA captioned
+  itself `3.42–8.30 m` over readings of 3.42 to 5.32. It named its danger mark as water that had
   arrived. **102 of 104 river graphs stated a range no reading reached.** It reads `lo0` and `hi0`
-  now. This is the same rule the rain peak already carried, broken at a second site by the change
-  that let the axis grow — see the peak-mark gotcha. Anything stating a graph's range reads the data.
+  now. This is the same rule the rain peak already carried. The change that let the axis grow broke
+  it at a second site — see the peak-mark gotcha. Anything stating a graph's range reads the data.
   Two readings or it is not a range, so a graph holding one or none carries no caption.
 - **A graph always draws, and no state of the station suppresses it.** `sparkline()`, `rainBars()`
-  and `sirenBand()` each frame on the readings they hold, and a window needs two readings to have a
-  width — so with fewer than two the clock supplies one, through the `frame` parameter on
-  `timeAxis()`. With two or more nothing changed. A graph holding nothing is not an empty box: it
+  and `sirenBand()` each frame on the readings they hold. A window needs two readings to have a
+  width. So with fewer than two the clock supplies one, through the `frame` parameter on
+  `timeAxis()`. With two or more nothing changed. A graph holding nothing is not an empty box. It
   draws the plate, the axis and the station's own marks, which is the scale with nothing on it.
   **The flood gauge is why.** All 36 of its stations were broken. 15 drew nothing behind a
   `history?.length` gate in `sensorBody()` and another in `table.js`. 18 hold a single sample. Even
   the 3 holding more have a data span of 0.0 h. JPS stamps a batch of them to one time.
   Three rivers and eighteen rainfall stations sat in the same state, and the siren was the whole 212.
-  **A lone reading draws as a dash and never a dot.** The viewBox stretches everything inside it, so a `<circle>`
-  comes out an ellipse — the same reason the rain peak mark sits in HTML over the plot. A `<rect>`
+  **A lone reading draws as a dash and never a dot.** The viewBox stretches everything inside it. So a `<circle>`
+  comes out an ellipse, the same reason the rain peak mark sits in HTML over the plot. A `<rect>`
   stretches too, and it is a dash either way.
   **The two sentences are gone**: `Graph builds as readings arrive` and `No readings in the last 12
   hours`. The second was already unreachable, because the server windows `SPARK_WIN` against now and
   no delivered sample is older than it. **`rainAcc()` keeps its `!isStale(s)` gate and is not covered
-  by this rule** — it draws five current totals rather than a history, and one gauge in the payload
-  holds 27 mm in an hour stamped last October.
+  by this rule.** It draws five current totals rather than a history. One gauge in the payload
+  holds 27 mm in an hour, stamped last October.
 - **Rainfall is an interval quantity, not a level.** It gets `rainBars()`, never `sparkline()` — a
   line between two rain readings claims a value in between that never existed. And `hourlyRainfall`
   is a *rolling* hour, so it buckets by `RAIN_BUCKET` (1 h): finer buckets show the same rain twice.
 - `history` is `[[unix seconds, value], …]` on rivers (metres), rainfall (mm/h) and gauges (metres of
   depth, negative = dry). Rivers, rainfall and gauges carry a **third element, the status that
-  sample was at**, scored in `sparkPoints()` through `wlStatus()` / `rainStatus()` / `gaugeStatus()` —
-  the hover readout prints a normal sample in its own ink and colours only a sample past a published
-  mark, with the warning glyph on every sample that takes a colour (`TONE` in `popup.js`, and a flood
-  gauge's `--s-trace` rung is the one exception). A siren carries no third element and needs none —
-  its samples are 0 and 1, which *is* the status, so `TONE.siren` reads the value. **Never score a historical
-  value client-side**; add a scorer in `api.php` instead. Every reader destructures `[ts, value]`, so
+  sample was at**. `sparkPoints()` scores it through `wlStatus()` / `rainStatus()` / `gaugeStatus()`.
+  The hover readout prints a normal sample in its own ink, and colours only a sample past a published
+  mark. The warning glyph goes on every sample that takes a colour. See `TONE` in `popup.js`. A
+  flood gauge's `--s-trace` rung is the one exception. A siren carries no third element and needs none.
+  Its samples are 0 and 1, which *is* the status, so `TONE.siren` reads the value. **Never score a
+  historical value client-side.** Add a scorer in `api.php` instead. Every reader destructures `[ts, value]`, so
   a kind without one is not a special case anywhere. The graphs
   plot against the clock, not against sample index. Windowed to `SPARK_WIN` (12h) and thinned to one point per `SPARK_BUCKET` (15 min)
-  server-side; `SPARK_H` in `config.js` is a **cap**, not a fixed frame — the axis spans the points
-  actually held and only starts sliding once they exceed it. It must not exceed `SPARK_WIN`.
-- Station cards share one template: name → region → one badge per sensor in `.pophead`, then one
-  `.sensor` section per sensor, each headed by its glyph and kind. A place with one sensor draws the
-  same way as a place with four. The kind is on the card twice on purpose: the badge answers what
-  the place is, and the heading names the reading under it. `meter()` renders
-  water level on a **piecewise** scale (alert 38%, warning 68%, danger 100%) because real
-  thresholds bunch above 88% on a linear bar. **The scale does not start at 0 m** — most stations read
-  against an absolute datum (SERENDAH alerts at 35.80 m), so a bar from zero put every calm one hard
-  against the alert tick and froze it there. `levelStops()` floors it `LEVEL_FLOOR` (6) alert→danger
+  server-side. `SPARK_H` in `config.js` is a **cap**, not a fixed frame. The axis spans the points
+  actually held, and only starts sliding once they exceed it. It must not exceed `SPARK_WIN`.
+- Station cards share one template. It runs name → region → one badge per sensor in `.pophead`. Then
+comes one `.sensor` section per sensor, each headed by its glyph and kind. A place with one sensor draws
+  the same way as a place with four. The kind is on the card twice on purpose. The badge answers what
+  the place is, and the heading names the reading under it. `meter()` renders water level on a
+  **piecewise** scale: alert 38%, warning 68%, danger 100%. Real thresholds bunch above 88% on a
+  linear bar. **The scale does not start at 0 m.** Most stations read
+  against an absolute datum (SERENDAH alerts at 35.80 m). So a bar from zero put every calm one hard
+  against the alert tick, and froze it there. `levelStops()` floors it `LEVEL_FLOOR` (6) alert→danger
   gaps below the first mark. One definition, in `util.js`: the meter, the table bar, the table's sort
   key and the heat weight all read it. Do not hand-copy the stops — `table.js` did, and its sort and
   its bar then disagreed.
 - Vendored assets only — no CDN, so Tracking Prevention has nothing to block. `leaflet-heat.js` is
-  **patched** (`willReadFrequently` on 3 `getContext` calls); don't overwrite it with a fresh copy.
+**patched**, with `willReadFrequently` on 3 `getContext` calls. Do not overwrite it with a fresh
+copy.
 
 ## Verify
 
@@ -2654,46 +2653,51 @@ for f in js/*.js; do
 done
 ```
 
-There is otherwise no test suite. Changes are verified by linting, syntax-checking the modules,
-querying `.cache.json` for the data shape being relied on, and looking at the page.
+There is otherwise no test suite. Changes are verified four ways. Lint the PHP. Syntax-check the modules. Query `.cache.json` for
+the data shape being relied on. Then look at the page.
 
 `shots-test.php`, `php api.php --selftest`, `heat-test.html`, `title-test.html` and
 `narrow-test.html` are the five runnable checks here, and each guards a different risk.
 
 `shots-test.php` is deliberately narrow: retention is the only rule in this repo that can *quietly
-destroy* data. Everything else either works or visibly does not, but a prune that buckets a frame
-wrongly deletes months of camera history and looks identical to one that worked — and because it
-runs on every capture, a rule that shaves one extra frame per pass empties the archive over a week
-without ever being wrong in a single run. Hence the idempotence assertion.
+destroy* data. Everything else either works or visibly does not. A prune that buckets a frame
+wrongly deletes months of camera history, and looks identical to one that worked. It also runs on
+every capture. So a rule that shaves one extra frame per pass empties the archive over a week. It is
+never wrong in a single run. Hence the idempotence assertion.
 
 `api.php --selftest` guards the decisions that gate a request to an upstream — JPS **or** Nominatim,
 now that `?place=` reaches a second one. `forceAllowed()`'s rate limit and `serveFromCache()`'s
-cache-or-rebuild choice are the original two, both arithmetic on a few integers so the check runs
-offline in milliseconds rather than through a 270-request fan-out. The place lookup added its own
-block of the same shape: `placeQuery()`'s validation (length, whitespace collapse, the invalid-UTF-8
-case with no PHP notice), `placeParam()`'s array-cast guard (see the gotcha above), and
-`forceAllowed()` reused at `PLACE_EVERY`'s window for the per-second Nominatim limit — fifteen
-assertions in all, half the check's total, and all offline for the same reason: no test here should
-cost a real request to either upstream.
+cache-or-rebuild choice are the original two. Both are arithmetic on a few integers. So the check
+runs offline in milliseconds, rather than through a 270-request fan-out. The place lookup added its
+own block of the same shape. It covers `placeQuery()`'s validation: length, whitespace collapse, and
+the invalid-UTF-8 case with no PHP notice. It covers `placeParam()`'s array-cast guard, from the
+gotcha above. And it covers `forceAllowed()` reused at `PLACE_EVERY`'s window, for the per-second
+Nominatim limit. That is fifteen assertions in all, half the check's total. All are offline for the
+same reason. No test here must cost a real request to either upstream.
 
 `heat-test.html` guards the one part of this app that lives in canvas pixels. The rain heat layer
 paints a distance and then erases what a gauge reporting no rain denies. Neither rule is visible to
 `php -l`, to `node --check`, or to any query over `.cache.json`. Both are wrong only on screen.
 It needs a browser, so it runs headless and prints its own verdict rather than a picture. It earned
-its place immediately. Six faults survived the code review that wrote the layer, and the check and
-its probes found all six: simpleheat's leaked `globalAlpha`, an eraser reaching across a wet gauge
-and restating its rainfall as a lighter class, a brush that peaked where no pixel sits, a paint
-falloff that drew four rain classes out of one reading, `heatScale()` sizing a layer the map had
-already dropped, and a gradient filled as a square erasing its neighbour's blob. Two of the six had
-shipped for months and no amount of reading found either. Anything else added to a canvas here needs the same treatment. A canvas
-is where reading the code stops working.
+its place immediately. Six faults survived the code review that wrote the layer. The check and its
+probes found all six:
+
+- simpleheat's leaked `globalAlpha`
+- an eraser reaching across a wet gauge and restating its rainfall as a lighter class
+- a brush that peaked where no pixel sits
+- a paint falloff that drew four rain classes out of one reading
+- `heatScale()` sizing a layer the map had already dropped
+- a gradient filled as a square, erasing its neighbour's blob
+
+Two of the six had shipped for months, and no amount of reading found either. Anything else added to
+a canvas here needs the same treatment. A canvas is where reading the code stops working.
 
 **A seventh fault got past it, and how it did is the lesson.** `cov` took the max of the blend
 weights and drew a Voronoi border on every equidistant line. The check held two assertions over
 overlapping gauges and both passed. Both probe two gauges exactly one radius apart, which is the one
 spacing where a max behaves. A reader found it on screen instead. **`thinHeat()` guarantees one
 radius and nothing more, so one radius is the best case and never the typical one.** The assertions
-added after it probe at 1.48 and 1.60 radii, which the spacing sweep takes off the station geometry.
+added after it probe at 1.48 and 1.60 radii. The spacing sweep takes both off the station geometry.
 Pick a probe distance from measured data. Otherwise the check reports on a case the map never draws.
 
 `title-test.html` guards the app bar wordmark ladder, which is the same class of problem one layer
@@ -2713,7 +2717,8 @@ block covers nothing. A `cancel` that goes through hands back a broken map on on
 threshold in `js/ui.js` that drifts from `NARROW_PX` blocks a width that works.
 
 It reads `NARROW_PX` out of `js/config.js` rather than carrying a copy. A check that holds its own
-copy of a constant reports on the number it remembers and not on the number the app uses.
+copy of a constant reports on the number it remembers. It does not report on the number the app
+uses.
 
 **Assert the property, not the scenario, and two attempts here show why.** A `showModal()` call from
 the check asserts a call the check made. It passes against an app put back to a plain `show()`.

@@ -10,16 +10,16 @@ import { heat, rainHeat, syncHeat, thinHeat } from './heat.js';
 import { sitePopup } from './popup.js';
 
 state.rerender = () => render();
-
-/* True once weather mode has run at least once this session. render() reads it below to decide
+/* True once weather mode has run at least once this session. render() reads it below. It decides
    whether wx.js still needs a tick(), even after PREFS.wx has gone false. It never resets. So a
    reader who leaves weather mode still gets the one extra tick that tears the layer down. */
 let wxSeen = false;
 
-/* A filter that can legitimately match nothing must never silently empty the map — an empty map
-   reads as "the app is broken", or worse during a flood, as "nothing is happening". So the chip
-   turns itself off and says why: either nothing is climbing, or `rate` is null everywhere because
-   the sample history hasn't reached an hour yet (a fresh install, or a wiped `.history.db`). */
+/* A filter that can legitimately match nothing must never silently empty the map. An empty map
+   reads as "the app is broken". During a flood it reads worse, as "nothing is happening". So the
+   chip turns itself off and says why. Either nothing is climbing, or `rate` is null everywhere
+   because the sample history has not reached an hour yet. That is a fresh install, or a wiped
+   `.history.db`. */
 function syncRisingChip() {
   const chip = el('risingOnly');
   const rising = state.data.filter(s => s.rising).length;
@@ -32,14 +32,15 @@ function syncRisingChip() {
   return chip.checked;
 }
 
-/* A filter that empties the map and cannot be reasoned about reads as a bug, so the chip is dead
-   while nothing is starred and says why. It also un-checks itself in that state, or a reader who
-   cleared their favorites would come back to a blank map and a control they could not press.
+/* A filter that empties the map and cannot be reasoned about reads as a bug. So the chip is dead
+   while nothing is starred, and says why. It also un-checks itself in that state. Otherwise a
+   reader who cleared their favorites comes back to a blank map and a control they cannot press.
    The un-check has to be saved, not just displayed. `el('favOnly').checked = !!PREFS.favOnly` in
-   ui.js reads the stored preference on every load, so an un-check this function performs on the
-   reader's behalf and never writes to PREFS is one the next reload silently reverses: clear every
-   favorite, the chip goes off on screen but PREFS.favOnly stays true, then reload and the filter
-   comes back on with no favorite behind it, hiding most of the map for no reason the reader chose. */
+   ui.js reads the stored preference on every load. So an un-check this function performs on the
+   reader's behalf is one the next reload silently reverses. It never writes to PREFS. Clear every
+   favorite and the chip goes off on screen, but PREFS.favOnly stays true. Reload and the filter
+   comes back on with no favorite behind it. It hides most of the map for no reason the reader
+   chose. */
 function syncFavChip() {
   const chip = el('favOnly');
   const n = state.data.filter(isFav).length;
@@ -112,15 +113,15 @@ export function render() {
     if (near >= HEAT_FLOOR) points.push([s.lat, s.lng, near]);
 
     /* Rainfall drives its own layer, on its own scale — see heat.js for why the two aren't summed.
-       A wet gauge paints. A gauge reporting no rain does not paint the palest violet, which would
-       make the whole state look wet — it erases, and heat.js says how.
-       `hasInfo()` gates the dry side as hard as the wet side, and for a stronger reason: a station
-       that is offline or has sent no number is not saying it is dry. Only a live zero denies rain.
-       Both sides also sit under the same filters above, so a district switched off takes its wet
-       gauges and its dry ones out together and cannot leave one half of the argument standing.
-       `backed === false` leaves out both sides for the same reason, one step further back: the
-       station's own total denies the reading, so it cannot paint — and it must not erase either,
-       because a reading nobody can stand behind is no evidence that the ground under it is dry.
+       A wet gauge paints. A gauge reporting no rain does not paint the palest violet. That makes
+       the whole state look wet. It erases instead, and heat.js says how.
+       `hasInfo()` gates the dry side as hard as the wet side, and for a stronger reason. A station
+       that is offline, or that sent no number, does not say it is dry. Only a live zero denies rain.
+       Both sides also sit under the same filters above. So a district switched off takes its wet
+       gauges and its dry ones out together. It cannot leave one half of the argument standing.
+       `backed === false` leaves out both sides for the same reason, one step further back. The
+       station's own total denies the reading, so it cannot paint. It must not erase either. A
+       reading nobody can stand behind is no evidence that the ground under it is dry.
        See `rainBacked()` in api.php and `raining()` in util.js. */
     if (s.kind === 'rainfall' && hasInfo(s) && s.backed !== false)
       s.hourly > 0 ? rainPoints.push([s.lat, s.lng, scalePos(s.hourly, RAIN_STOPS) / 100])
@@ -145,16 +146,17 @@ export function render() {
     // outranks it, and a mast with no reading must stay grey rather than look confident.
     const multi = members.length > 1;
     const quiet = multi && hasInfo(lead) && members.every(m => !(m.status > 0));
-    /* A heart on the pin when **any** sensor here is a favorite — not when all of them are, which is
-       the mast header button's rule. The two answer different questions. The button is a control and
-       acts on every sensor at the mast, so it has to state exactly what one press will undo. This is
+    /* A heart on the pin when **any** sensor here is a favorite. It is not when all of them are,
+    which is the mast header button's rule. The two answer different questions. The button is a
+    control and acts on every sensor at the mast. So it has to state exactly what one press will
+    undo. This is
        an indication, and it says "something of yours is here". A mast where the reader favorited
        only the river must still be findable at a glance. */
     const fav = members.some(isFav);
-    /* Danger outranks everything, and it is stated here rather than left to `leads()` picking the
-       worst sensor and `color()` happening to return red for it. Anything at the top of its own
-       scale — a river over its mark, a sounding siren, a flood gauge under water, rainfall in the
-       top class — paints the whole place red, whichever of them is speaking for it. A pin the eye
+    /* Danger outranks everything, and it is stated here. It is not left to `leads()` electing the
+    worst sensor and `color()` returning red for it. Anything at the top of its own scale paints the
+    whole place red, whichever of them speaks for it. That covers a river over its mark and a
+    sounding siren. It covers a flood gauge under water, and rainfall in the top class. A pin the eye
        has to decode is a pin nobody reads in the ten seconds that matter. */
     const c = critical ? statusColor(3) : quiet ? MAST.color : color(lead);
     const marker = L.marker([lead.lat, lead.lng], {
@@ -163,10 +165,10 @@ export function render() {
       icon: L.divIcon({
         // Matches `.pin`'s box in map.css — Leaflet positions the marker off this, not off the CSS.
         className: '', iconSize: [39, 39], iconAnchor: [19.5, 19.5],
-        /* Every pin is the glyph alone. A mast was a filled disc carrying a sensor count, and it
-           is the same bare glyph as the rest now — the `layers` mark is what says "a stack stands
-           here", and the count went with the plate it sat on. `.multi` still rides on the span,
-           because the hover ring and the panel key both ask whether this pin is a mast. */
+        /* Every pin is the glyph alone. A mast was a filled disc carrying a sensor count. It is the
+        same bare glyph as the rest now. The `layers` mark is what says "a stack stands here", and
+        the count went with the plate it sat on. `.multi` still rides on the span. The hover ring
+        and the panel key both ask whether this pin is a mast. */
         html: `<span class="pin${multi ? ' multi' : ''}${lead.online ? '' : ' off'}${
                      rising ? ' rise' : ''}${critical ? ' danger' : ''}" style="--c:${c}">${
                pinGlyph(multi ? MAST.icon : KINDS[lead.kind].icon)}${
@@ -179,10 +181,11 @@ export function render() {
       openSide(key, sitePopup(members), multi ? [lead.lat, lead.lng] : null);
       focusOn([lead.lat, lead.lng], 13);
     });
-    /* Show the grouping radius while the mast is pointed at — and while its card is open, which is
-       the touch equivalent, since a finger has no hover. mouseout defers to the panel for the same
-       reason: moving the mouse off a pin you have just opened should not pull the ring out from
-       under the list it explains. (openSide draws it; this is only the hover case.) */
+    /* Show the grouping radius while the mast is pointed at. Show it while its card is open too.
+    That is the touch equivalent, since a finger has no hover. The mouseout handler defers to the
+    panel for the same reason. Moving the mouse off a pin you just opened must not pull the ring
+    away. That ring explains the list under it. The openSide function draws it, and this is only the hover
+    case. */
     if (multi) {
       marker.on('mouseover', () => showMast([lead.lat, lead.lng]));
       marker.on('mouseout', () => { if (side.key !== key) hideMast(); });
@@ -191,15 +194,15 @@ export function render() {
     siteMark.set(key, marker);
   }
 
-  /* The open card, refreshed in place. A popup died with the marker it hung off, so every poll and
-     every zoom closed whatever you were reading; the panel is a page element, so the only thing it
-     needs from a rebuild is fresh numbers.
-     If the place has left `sites` — a filter hid it, or the feeds dropped it — the card is left
-     exactly as it was rather than closed. Nothing here may vanish on its own while it is being
-     read, and a card that stops updating is not lying: every reading in it is stamped, and
-     the sensor's info menu says how old it is. Closing is the reader's to do.
-     Keys beginning `@` belong to the panel's non-station users (locate.js's "you are here"), which
-     own their own contents and are not in `sites`. */
+  /* The open card, refreshed in place. A popup died with the marker it hung off. So every poll and
+  every zoom closed whatever you had open. The panel is a page element, so the only thing it needs
+  from a rebuild is fresh numbers.
+     If the place left `sites`, the card is left exactly as it was rather than closed. A filter hid
+     it, or the feeds dropped it. Nothing here can vanish on its own while a reader has it open. A
+     card that stops updating is not lying. Every reading in it is stamped, and the sensor's info
+     menu says how old it is. Closing is the reader's to do.
+     Keys beginning `@` belong to the panel's non-station users, such as locate.js's "you are here".
+     They own their own contents and are not in `sites`. */
   const open = side.key && side.key[0] !== '@' && sites.get(side.key);
   if (open) openSide(side.key, sitePopup(open), open.length > 1 ? [open[0].lat, open[0].lng] : null);
 
@@ -212,26 +215,27 @@ export function render() {
   // for, and neither call is the one that draws.
   rainHeat.setDry(dryPoints);
   rainHeat.setLatLngs(thinHeat(rainPoints, RAIN_KM));
-  /* Weather mode must tear itself down when a reader leaves it, not just paint while inside it.
-     flashTo() sets PREFS.wx to false and calls state.rerender() on every jump to a station. The old
+  /* Weather mode must tear itself down when a reader leaves it, not just paint while inside it. The
+  flashTo() helper sets PREFS.wx to false. It calls state.rerender() on every jump to a station. The old
      check here was `if (PREFS.wx)` alone, and that was already false by the time this line ran. So
      tick() never fired, and the layer and the checked #wxLayer box were both left on screen.
 
-     wxSeen fixes that. It stays true once weather mode has run once this session. So render()
-     still calls tick() on the render right after PREFS.wx flips false. tick() already handles that
-     case. syncWx() removes the layer and unchecks the box whenever PREFS.wx reads false.
+     wxSeen fixes that. It stays true once weather mode has run once this session. So render() still
+     calls tick() on the render right after PREFS.wx flips false. The tick() call already handles
+     that case. The syncWx() helper removes the layer whenever PREFS.wx reads false. It unchecks the
+     box too.
 
      `.then(m => m.tick()).catch(...)`, not a second argument to `.then()`. A second argument only
      catches the import failing. tick() is async, so its own rejection is a separate promise. A
      second `.then()` argument never sees that rejection. This is the same gap the withTimeline
      gotcha in CLAUDE.md records, at a new call site.
 
-     A failed import must not leave a blank map under a checked box. render() already skips every
-     station pin while PREFS.wx is true, so a wx.js that never loads draws nothing at all. The catch
+     A failed import must not leave a blank map under a checked box. The render() pass already skips
+     every station pin while PREFS.wx is true. So a wx.js that never loads draws nothing at all. The catch
      rolls back the same way js/ui.js's own toggle handler does. It turns the pref off and saves it.
      It writes the reason into #wxHint. Then it renders once more, so the station pins return.
 
-     The rollback checks that PREFS.wx is still true before it runs. wxSeen never resets, so every
+     The rollback checks that PREFS.wx is still true before it runs. wxSeen never resets. So every
      later render calls import('./wx.js') again. A rejected dynamic import stays rejected in the
      module cache. So it keeps rejecting on every later render too.
 
@@ -253,19 +257,19 @@ export function render() {
   // Every poll rebuilds the map; the table has to follow or it sits on readings the map has already
   // replaced. Only while it is open — no point rendering 435 rows into a closed dialog.
   /* `.then()`, not `await`. A dialog can only be open because its opener already imported the
-     module, so these resolve from the module map with no request. Making render() async would move
+  module. So these resolve from the module map with no request. Making render() async would move
      everything after it into a later task on every poll.
-     A rejection handler on both: this runs on every poll, has no surface to report a failure on,
-     and a bare `import().then()` here would raise an unhandled rejection every poll for as long as
-     the reader leaves a failed dialog open. */
+     A rejection handler on both. This runs on every poll and has no surface to report a failure on.
+     A bare `import().then()` here raises an unhandled rejection every poll, for as long as the
+     reader leaves a failed dialog open. */
   if (el('dataBox').open) import('./table.js').then(m => m.dataTable(), () => {});
   // The wall is painted, never rebuilt. See paint() in js/wall.js for what a rebuild costs.
   if (el('camBox').open) import('./wall.js').then(m => m.paint(), () => {});
 }
 
 /* The district filter: every district the feeds returned, grouped under its state, each with the
-   number of stations it holds. Multi-select rather than a <select> because the useful actions are
-   "hide these three" and "only this one", and a dropdown makes both a series of round trips.
+   number of stations it holds. Multi-select rather than a <select>, because the useful actions are
+   "hide these three" and "only this one". A dropdown makes both a series of round trips.
    Rebuilt from state.data on every render — 24 rows is not worth diffing. */
 export function districts() {
   const q = el('districtFind').value.trim().toLowerCase();
@@ -302,17 +306,17 @@ export function districts() {
 }
 
 /* The sensors switched off from a station card's Details button, listed so they can be switched back on.
-   Always drawn, never hidden when empty — an ignored sensor is a muted alarm, and a muted alarm you
-   cannot find is the failure ISA-18.2 spends a chapter on. This list plus the count on the line
-   below the layer chips are the only two places on the page that say a sensor has been silenced, so
-   neither of them gets to disappear. Row order is the order they were ignored in: it is a short
-   list, and "the one I just switched off" is at the bottom where you left it.
+   Always drawn, never hidden when empty. An ignored sensor is a muted alarm. A muted alarm you
+   cannot find is the failure ISA-18.2 spends a chapter on. This list and the count below the layer
+   chips are the only two places that name a silenced sensor. So neither of them gets to
+   disappear. Row order is the order they were ignored in. It is a short list, and "the one I just
+   switched off" is at the bottom where you left it.
    That promise means walking `ids` — a `Set` built by insertion order — rather than filtering
    `state.data`, the shape this had before: `state.data` is the merged payload's own order, which is
    arbitrary from a reader's chair and silently broke the promise above. `.filter(Boolean)` is
-   load-bearing, not defensive filler: the feeds drop and restore stations between polls, and
-   `PREFS` deliberately keeps an id through a poll where it is missing, so `find()` returning
-   `undefined` here is routine, not a bug. */
+   load-bearing, not defensive filler. The feeds drop and restore stations between polls. `PREFS`
+   deliberately keeps an id through a poll where it is missing. So `find()` returning `undefined`
+   here is routine, not a bug. */
 function ignoredPanel() {
   const ids = ignoredIds();
   const rows = [...ids].map(id => state.data.find(s => s.id === id)).filter(Boolean);
@@ -331,12 +335,12 @@ function ignoredPanel() {
 }
 
 /* The sensors starred from a station card, listed so they can be found and unstarred. One row per
-   sensor: this panel manages the saved list, and a list that hid five of a mast's six entries could
-   not be used to remove one of them. Row order is the order they were starred in — a short list, and
-   "the one I just added" is at the bottom where it was left.
+sensor. This panel manages the saved list. A list that hid five of a mast's six entries cannot be
+used to remove one of them. Row order is the order they were starred in. It is a short list, and
+"the one I just added" is at the bottom where it was left.
    Same reasoning as `ignoredPanel()` above: walk `ids` (insertion order), not `state.data` (merged
    payload order, arbitrary from a reader's chair). `.filter(Boolean)` drops any id the current
-   payload does not carry — a normal state, not an error, since a station can be missing from one
+   payload does not carry. That is a normal state, not an error. A station can be missing from one
    poll and back on the next. */
 function favPanel() {
   const ids = favIds();
@@ -351,8 +355,8 @@ function favPanel() {
       <button class="solo" data-unfav="${s.id}"
               aria-label="Remove ${s.name} from favorites">remove</button>
     </li>`).join('')
-    /* One control, named once. There is no star on a card any more — the favorite is a row in the
-       Details menu, in the card's own corner and on every sensor listed under it. A message naming
+    /* One control, named once. There is no star on a card any more. The favorite is a row in the
+    Details menu. It sits in the card's own corner and on every sensor listed under it. A message naming
        a control the reader cannot find is worse than no message. */
     || '<li class="none">Nothing starred yet. Use the Details button on a station, or on any sensor '
      + 'in its card.</li>';
