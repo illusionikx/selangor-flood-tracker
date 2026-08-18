@@ -744,263 +744,266 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   thing that makes a new mark appear. The script prints the reminder when it finishes.
 - **`filter` runs before `mask`, so a filter on an `.i` is discarded.** The spec order is: paint the
   element, apply the filter, *then* clip with the mask. An `.i` is a box of `currentColor` with the
-  glyph masked out of it, so a `drop-shadow` on it is computed from the box, lands outside the box,
+  glyph masked out of it. So a `drop-shadow` on it is computed from the box, lands outside the box,
   and the mask clips it off. Nothing renders and nothing errors — the pin stroke shipped invisible on
   both themes this way. The favorite heart works because its filter is on the `<b class="fv">`
-  wrapper and the mask is on the `.i` inside it — `.pin`'s own soft shadow works for the same reason,
+  wrapper and the mask is on the `.i` inside it. `.pin`'s own soft shadow works for the same reason,
   since `.pin` is a plain `<span>`. Anything that wants an effect on an icon needs that wrapper.
 - **A map pin's glyph is an inline `<svg><use>`, not a masked `<i>`, and the outline is the reason.**
-  A CSS mask keeps only the alpha of the picture and paints the box in `currentColor`, so there is no
+  A CSS mask keeps only the alpha of the picture and paints the box in `currentColor`. So there is no
   fill and no stroke to address. Two attempts faked one and both were reverted. Four hard drop
   shadows cover four directions, so a water drop's diagonals come out thinner than its sides. A
-  scaled copy of the mask behind the glyph is even at every angle and worse for it: a mask has no
-  path to offset, so it grows away from its own centre rather than outward from its edge, and at 400
+  scaled copy of the mask behind the glyph is even at every angle and worse for it. A mask has no
+  path to offset. So it grows away from its own centre rather than outward from its edge. At 400
   pins that is 400 grey silhouettes with a coloured shape laid on them. A real `stroke` on a real
-  path is neither — one shape, offset along its own outline, with `paint-order: stroke` putting it
-  under the fill and `vector-effect: non-scaling-stroke` holding the width at 1 screen pixel through
-  `.pin`'s `scale(.8)` and the 48px `.me` pin alike — that property does **not** inherit, so it is
-  stamped on the path in `pinGlyph()` and cannot be declared on `.pinglyph`. The pins lost their
+  path is neither. It is one shape, offset along its own outline. `paint-order: stroke` puts it
+  under the fill. `vector-effect: non-scaling-stroke` holds the width at 1 screen pixel, through
+  `.pin`'s `scale(.8)` and the 48px `.me` pin alike. That property does **not** inherit. So it is
+  stamped on the path in `pinGlyph()`, and cannot be declared on `.pinglyph`. The pins lost their
   `drop-shadow` when they gained the stroke: two marks around one 29px glyph is one too many.
-  **Do not go back to a second copy of the shape**, and keep the stroke thin and in `--surface`: it
-  is the gap between the mark and the tile, and one wide enough to read as a border is the 400-blob
+  **Do not go back to a second copy of the shape**, and keep the stroke thin and in `--surface`. It
+  is the gap between the mark and the tile. One wide enough to read as a border is the 400-blob
   failure in a better technique.
-  `pinGlyph()` in `js/map.js` lifts each symbol out of `css/icons.css` at first use, so the path data
-  still lives in one place and adding an icon is still one line there. **Only the map pins take this
-  path** — every other icon in the app is still a mask, because nothing else needs a second colour.
+  `pinGlyph()` in `js/map.js` lifts each symbol out of `css/icons.css` at first use. So the path data
+  still lives in one place, and adding an icon is still one line there. **Only the map pins take this
+  path.** Every other icon in the app is still a mask, because nothing else needs a second colour.
   See `docs/FEATURES.md`, *Three attempts at an outline on a station glyph*.
 - **Both glyphs on a map pin carry an explicit `z-index`, and the painting order alone did not hold
   them.** `.pin` draws the station mark and, on a favorited place, a heart badge over its bottom-right
-  corner. The heart is the last child *and* it is positioned, so CSS2.1 painting order puts it at
-  step 7 and the unpositioned station `<svg>` at step 3 — the heart could not be underneath, and it
+  corner. The heart is the last child *and* it is positioned. So CSS2.1 painting order puts it at
+  step 7, and the unpositioned station `<svg>` at step 3. The heart cannot be underneath, and it
   was, on every favorited pin. `.pin > .pinglyph` now takes `position: relative; z-index: 0` and
-  `.pin .fv` takes 2. **The `position` is not decoration** — an unpositioned box cannot take a
-  `z-index` at all, so the station mark had to be positioned before it could be pushed down a rung.
+  `.pin .fv` takes 2. **The `position` is not decoration.** An unpositioned box cannot take a
+  `z-index` at all. So the station mark had to be positioned before anything can push it down a rung.
   Do not delete either declaration as redundant on the strength of the spec. It reads redundant and
-  is not. Two other explanations were chased first and both are wrong: a `filter` on `.pin` creates a
-  containing block but not a z-order change, and the heart's own `drop-shadow` is about lifting it
+  is not. Two other explanations were chased first and both are wrong. A `filter` on `.pin` creates a
+  containing block but not a z-order change. The heart's own `drop-shadow` is about lifting it
   off the glyph, not about which one paints first.
 - **There is no icon font any more, and there must not be one again.** Icons are SVG masks in
   `css/icons.css` (`<i class="i i-warning">`, or `--i: var(--i-warning)` on a pseudo-element).
-  A ligature font renders *text* that only becomes a picture if shaping cooperates, so a stray
-  `text-transform`, a glyph missing from the subset or one stale cached subset put the raw word on
-  screen — that happened three times, with three different triggers. Adding an icon is one rule in
-  `icons.css`; there is no binary to refetch and no `?v=` to bump.
+  A ligature font renders *text* that only becomes a picture if shaping cooperates. So a stray
+  `text-transform`, a glyph missing from the subset, or one stale cached subset put the raw word on
+  screen. That happened three times, with three different triggers. Adding an icon is one rule in
+  `icons.css`. There is no binary to refetch and no `?v=` to bump.
 - **The service worker must never cache a reading.** `sw.js` deliberately returns without calling
   `respondWith()` for `api.php` and `api.json`, so those requests behave as if no worker existed.
-  The splash refuses to draw a map with no connection because a stale water level during a flood is
-  worse than none; a worker answering from cache would defeat that from a layer the page cannot see.
-  It is network-first for everything else too, so a `?v=` bump is still the only cache ritual —
-  **do not "optimise" it to cache-first**, or an edit goes live for nobody until a cache name moves.
+  The splash refuses to draw a map with no connection. A stale water level during a flood is
+  worse than none. A worker answering from cache defeats that from a layer the page cannot see.
+  It is network-first for everything else too, so a `?v=` bump is still the only cache ritual.
+  **Do not "optimise" it to cache-first.** An edit then goes live for nobody until a cache name moves.
 - **The app icons are transparent, so `purpose` must stay `any` — never `any maskable`.** A maskable
-  icon is required to be opaque edge to edge; declaring a transparent one maskable hands the
-  platform a background of its own choosing, which destroys the reason it is transparent. Same
-  chain: `background_color` is white because it is the *splash* colour and a blue glyph on a blue
-  splash is invisible, and the glyph is blue rather than white because with no plate it lands on a
-  tab strip, a wallpaper and a launcher, and white survives only some of those.
+  icon is required to be opaque edge to edge. Declaring a transparent one maskable hands the
+  platform a background of its own choosing. That destroys the reason it is transparent. Same
+  chain. `background_color` is white because it is the *splash* colour, and a blue glyph on a blue
+  splash is invisible. The glyph is blue rather than white. With no plate it lands on a
+  tab strip, a wallpaper and a launcher. White survives only some of those.
 - **Do not add `mobile-web-app-capable` — or put `apple-mobile-web-app-capable` back.** Chrome's
-  console deprecates the Apple tag and suggests the unprefixed one; both are the pre-manifest way of
-  asking for standalone, and `display: standalone` in `manifest.json` has covered it since iOS 11.3.
-  Adding the suggested tag would be a second legacy mechanism for something already declared. The
-  only thing still tied to the Apple tag is `apple-touch-startup-image`; if iOS splash screens are
+  console deprecates the Apple tag and suggests the unprefixed one. Both are the pre-manifest way of
+  asking for standalone. `display: standalone` in `manifest.json` covers it since iOS 11.3.
+  The suggested tag is a second legacy mechanism for something already declared. The
+  only thing still tied to the Apple tag is `apple-touch-startup-image`. If iOS splash screens are
   ever wanted, that tag comes back *with* them and not before.
 - **iOS has its own icon, `icon-180.png`, and needs it.** Safari does not honour alpha on a
-  home-screen icon; it flattens it onto a colour of its own choosing, historically black — the exact
-  plate that was deliberately removed. So `apple-touch-icon` points at an opaque white tile with a
-  smaller glyph (iOS rounds the corners itself and the squircle bites anything near the edge), while
-  the favicon and the manifest keep the transparent pair. **Do not point `apple-touch-icon` back at
-  `icon-192.png`** — it will look right in every browser you can test locally and black on a phone.
+  home-screen icon. It flattens it onto a colour of its own choosing, historically black. That is the
+  exact plate that was deliberately removed. So `apple-touch-icon` points at an opaque white tile
+  with a smaller glyph. iOS rounds the corners itself, and the squircle bites anything near the edge.
+  The favicon and the manifest keep the transparent pair. **Do not point `apple-touch-icon` back at
+  `icon-192.png`.** It looks right in every browser you can test locally, and black on a phone.
 - **The icon badge follows the app bar's alert count and nothing else.** `navigator.setAppBadge()` in
-  `alerts()`, on `live` — the same number the panel's warning glyph is coloured by, with the district
-  filter and `PREFS.ignored` already applied and stale stations excluded. Never badge `hot`: stations
-  we can no longer read are a maintenance problem, not a flood. It deliberately does **not** request
-  notification permission (iOS needs it and simply goes without) — a prompt on landing is the
-  trust-spending the alert standard warns about, for a number already on screen. The badge is not an
-  alert channel; anything that wants to make it one goes through the alert design standard first.
-- **The PWA paths are all relative** (`start_url: "."`, `new URL('../sw.js', import.meta.url)`),
-  because the same files serve from the root of a Herd host *and* a GitHub Pages sub-path. An
-  absolute `/sw.js` is a 404 on one of the two, and a worker that fails to register just quietly
-  removes the install button.
+  `alerts()`, on `live`. That is the same number the panel's warning glyph is coloured by. The
+  district filter and `PREFS.ignored` are already applied, and stale stations are excluded. Never
+  badge `hot`: stations we can no longer read are a maintenance problem, not a flood. It deliberately
+  does **not** request notification permission. iOS needs it and simply goes without. A prompt on
+  landing is the trust-spending the alert standard warns about, for a number already on screen. The
+  badge is not an alert channel. Anything that wants to make it one goes through the alert design
+  standard first.
+- **The PWA paths are all relative** (`start_url: "."`, `new URL('../sw.js', import.meta.url)`). The
+  same files serve from the root of a Herd host *and* a GitHub Pages sub-path. An absolute `/sw.js`
+  is a 404 on one of the two. A worker that fails to register quietly removes the install button.
 - **The manifest is `manifest.json`, not `.webmanifest`.** Herd types an unknown extension
-  `application/octet-stream`; the correct type would have to be added to every web server this ever
+  `application/octet-stream`. The correct type has to be added to every web server this ever
   runs behind. `.json` is right everywhere already, and no browser cares about the name.
-- **Herd serves `index.html` with HTTP 200 for missing files.** A typo'd asset path is *not* a 404,
-  so "everything returns 200" proves nothing — check `%{content_type}` instead. This is why a
+- **Herd serves `index.html` with HTTP 200 for missing files.** A mistyped asset path is *not* a 404.
+  So "everything returns 200" proves nothing. Check `%{content_type}` instead. This is why a
   missing `js/*.js` shows up as a module parse error in the console rather than a failed request.
 - **A multi-click gesture needs `user-select: none` on everything it touches.** The browser counts
-  clicks whatever you are doing with them, so the third of any fast burst is a triple-click and
-  selects. The About egg is opened by seven fast clicks and then ignores clicks for 1.5s, so people
-  keep clicking — and the selection wash rendered the picture blue. Both `#aboutBox .logo` and
-  `#eggBox` carry the rule; anything else driven by repeated clicks will need it too.
-- **Nothing optional may be able to fail the Pages bake.** `img/` holds one decoration and may not
-  exist, so the staging step copies it with `[ -d img ] && cp -r img site/ || true`. An unconditional
-  `cp` of a missing directory fails the step, and a failed bake keeps the *last* deployment — so the
-  map would sit on stale readings because an easter egg was absent. Same rule for anything added to
-  that `cp` line: if it can go missing, it must not be able to stop the map updating. Under Herd the
+  clicks whatever you are doing with them. So the third of any fast burst is a triple-click, and it
+  selects. The About egg is opened by seven fast clicks and then ignores clicks for 1.5s. So people
+  keep clicking, and the selection wash rendered the picture blue. Both `#aboutBox .logo` and
+  `#eggBox` carry the rule. Anything else driven by repeated clicks will need it too.
+- **Nothing optional may be able to fail the Pages bake.** `img/` holds one decoration and can be
+  absent. So the staging step copies it with `[ -d img ] && cp -r img site/ || true`. An unconditional
+  `cp` of a missing directory fails the step. A failed bake keeps the *last* deployment. So the
+  map sits on stale readings because an easter egg was absent. Same rule for anything added to
+  that `cp` line. If it can go missing, it must not be able to stop the map updating. Under Herd the
   same missing file is invisible (see above), so this only ever shows up in CI.
 - **A `<dialog>`'s `display` goes on `[open]`, and a popover's on `:popover-open` — never on the
   element.** The browser closes a dialog
   with `dialog:not([open]) { display: none }` in its own stylesheet, and any author rule setting
   `display` beats it. `#dataBox { display: flex }` therefore laid the closed table dialog out on the
-  page — 450 rows, in the tab order and read by screen readers — invisible only because `#map` is
-  absolutely positioned and painted over it. It surfaced through the map whenever a tile was missing,
-  which read as a Leaflet zoom bug and was chased as one. `#dataBox[open]`, `#lightbox[open]` and
-  `.sparktip:popover-open` are the pattern. The same trap caught a plain `[hidden]` attribute too:
-  `.link { display: flex }` in `base.css` beats the browser's own `[hidden] { display: none }`, so
-  the Developer section's "Refresh now" button — hidden on the GitHub Pages build, where the query it
-  needs does nothing — needed `.rowbtns .link[hidden] { display: none }` to actually disappear.
+  page. That is 450 rows, in the tab order and read by screen readers. It was invisible only because
+  `#map` is absolutely positioned and painted over it. It surfaced through the map whenever a tile
+  was missing. That read as a Leaflet zoom bug, and was chased as one. `#dataBox[open]`,
+  `#lightbox[open]` and `.sparktip:popover-open` are the pattern. The same trap caught a plain
+  `[hidden]` attribute too. `.link { display: flex }` in `base.css` beats the browser's own
+  `[hidden] { display: none }`. So the Developer section's "Refresh now" button needed
+  `.rowbtns .link[hidden] { display: none }` to actually disappear. That button is hidden on the
+  GitHub Pages build, where the query it needs does nothing.
 - **A popover inherits ten declarations from the UA sheet, and `height: fit-content` is the one that
   gets forgotten.** `.menu` restates `position`, `inset`, `margin`, `padding`, `overflow`, `border`
   and the colors, and left the height alone. WebKit reads `fit-content` on the block axis of an
-  out-of-flow box as the space available under `top`, not as the content height, so `#appMenu`
-  measured one viewport tall on iOS Safari — and a grid with a definite height stretches its rows to
-  fill, which drew the four tiles and the theme row spread down the whole screen. Chrome and Firefox
-  drew the same markup at 157px. `.menu` carries `height: auto` now, which changes nothing on the
-  engines that were already right. **Do not reach for `align-content: start`** — it closes the gaps
-  and keeps the full-height box, so an invisible panel goes on swallowing taps over the map.
+  out-of-flow box as the space available under `top`. It does not read it as the content height. So
+  `#appMenu` measured one viewport tall on iOS Safari. A grid with a definite height stretches its
+  rows to fill. That drew the four tiles and the theme row spread down the whole screen. Chrome and
+  Firefox drew the same markup at 157px. `.menu` carries `height: auto` now, which changes nothing on
+  the engines that were already right. **Do not reach for `align-content: start`.** It closes the gaps
+  and keeps the full-height box. So an invisible panel goes on swallowing taps over the map.
 - **There is no map popup any more, and there must not be one again.** Station detail is `#side`, a
   fixed panel on the right edge of the viewport, filled by `openSide(key, html, mastAt)` in `map.js`.
-  Everything a Leaflet popup needed — `autoPan` racing `setView`'s animation, `openStable()`
-  re-opening what a zoom had torn down, `cluster.zoomToShowLayer()` waiting for a marker to have a
-  DOM node at all, a `keepPopupVisible()` that nudged the view on phones — existed because the card
-  was anchored to a marker. The panel is a page element: nothing to pan into view, nothing to
+  A Leaflet popup needed four things, and all four existed because the card was anchored to a marker.
+  `autoPan` raced `setView`'s animation. `openStable()` re-opened what a zoom had torn down.
+  `cluster.zoomToShowLayer()` waited for a marker to have a DOM node at all. A `keepPopupVisible()`
+  nudged the view on phones. The panel is a page element: nothing to pan into view, nothing to
   destroy. Anything that wants to *show a station* calls `flashTo()`, which fires the marker's own
-  click; anything that wants to show something else calls `openSide()` with a key starting `@`
-  (see locate.js), which keeps `render()`'s refresh pass off it.
+  click. Anything that wants to show something else calls `openSide()` with a key starting `@`
+  (see locate.js). That keeps `render()`'s refresh pass off it.
   **The name chip `flashTo()` leaves over the ripple is not a popup either.** `ping()` draws it
-  inside its own throwaway marker, which is `interactive: false` and removed after `FLASH_MS` —
-  nothing anchors it to a station's pin and nothing outlives the flash. It exists because the panel
-  is fixed to the right edge while the map moves under it, so the card's title carries `data-go`
-  (`goName()` in `popup.js`) as the way back to the pin, and a bare ring says "here" without saying
+  inside its own throwaway marker, which is `interactive: false` and removed after `FLASH_MS`.
+  Nothing anchors it to a station's pin, and nothing outlives the flash. It exists because the panel
+  is fixed to the right edge while the map moves under it. So the card's title carries `data-go`
+  (`goName()` in `popup.js`) as the way back to the pin. A bare ring says "here" without saying
   what "here" is. Anything that wants a *persistent* label on the map is the thing this rule forbids.
 - **The card arrives as one string and is split into two boxes.** `openSide()` moves the card's
-  `.pophead` — the place name, region and one badge per sensor — out of `#sideBody` and into
-  `#sideHead`, which is not inside anything that scrolls. `position: sticky` on it was tried first
-  and is one line rather than three, but a header that stays put only while nothing defeats sticky
-  is a header that can come loose; this one has no scroll to come loose from. **Anything that
+  `.pophead` out of `#sideBody` and into `#sideHead`, which is not inside anything that scrolls.
+  `.pophead` is the place name, the region and one badge per sensor. `position: sticky` on it was
+  tried first, and is one line rather than three. A header that stays put only while nothing defeats
+  sticky is a header that can come loose. This one has no scroll to come loose from. **Anything that
   reshapes `sitePopup()` must keep `.pophead` as its first element** — that is the seam.
-- **Three numbers put the place name on the close button's line and move together:** `#sideClose`'s
-  `top: 8px`, `#sideHead .pophead`'s `padding-top: 18px` (8 + half the button's 40 − half a 15px/1.3
-  line) and `.pophead > .dots`'s `top: 8px` (18 + half that line − half the button's 40 = 7.75, which
-  is `#sideClose`'s own number). **That ⓘ takes the full `.icon` box, not `.dots`'s 28px one** — it
-  stands beside the ×, and `.icon` paints a round `--hover` disc the width of its box, so the smaller
-  shape drew two discs of two sizes under two glyphs of two sizes. `.dots` stays 28px everywhere it
+- **Three numbers put the place name on the close button's line and move together.** `#sideClose`
+  takes `top: 8px`. `#sideHead .pophead` takes `padding-top: 18px`, which is 8 plus half the button's
+  40, less half a 15px/1.3 line. `.pophead > .dots` takes `top: 8px`, which is 18 plus half that
+  line, less half the button's 40, giving 7.75 — `#sideClose`'s own number.
+  **That ⓘ takes the full `.icon` box, not `.dots`'s 28px one.** It stands beside the ×, and `.icon`
+  paints a round `--hover` disc the width of its box. So the smaller shape drew two discs of two
+  sizes, under two glyphs of two sizes. `.dots` stays 28px everywhere it
   is alone on a row. `right: 32px` puts the two boxes edge to edge, the way two toolbar icons meet.
   **That corner holds exactly one control besides the ×, and it is the ⋮.** A sensor-count chip held
-  the slot first, then the favorite heart, then the heart and a nearest-webcam glyph together — and
-  the pair reserved `padding-right: 108px` of a 328px line and stood 4.5px into the district line
+  the slot first, then the favorite heart, then the heart and a nearest-webcam glyph together. The
+  pair reserved `padding-right: 108px` of a 328px line. It stood 4.5px into the district line
   below, which is what a reader sees as a collision. **Every card control is a row inside that one
-  menu now.** `dots(s, extra)` takes the nearest webcam or water level as its optional row, and a
+  menu now.** `dots(s, extra)` takes the nearest webcam or water level as its optional row. A
   mast gets `siteDots()`, which holds the favorite that acts on all its sensors. The rows state the
-  station name, the distance and the reading in visible text, which a glyph could only put in a
-  `title`. One control costs the title 68px instead of 108, and the card loses a glance at the
-  favorite state — the map pin still draws a heart on a favorited site.
+  station name, the distance and the reading in visible text. A glyph can only put those in a
+  `title`. One control costs the title 68px instead of 108. The card loses a glance at the
+  favorite state. The map pin still draws a heart on a favorited site.
   **The reservation is `~`, not `+`**: `dots()` emits the button *and* the popover it targets, so the
   menu div sits between the button and `.popname`. **The region line takes the same 78px as the
-  name** — it is a line lower, but a 40px button reaches 48px down and the region starts at 37.5.
-  **A menu row's `[data-fav]` may hold a comma list**, so anything reading it back tests every id
+  name.** It is a line lower. But a 40px button reaches 48px down, and the region starts at 37.5.
+  **A menu row's `[data-fav]` can hold a comma list.** So anything reading it back tests every id
   (see the still-open branch in ui.js). `ids.has('a,b,c')` is false forever.
 - **`render()` refreshes the open card in place, so `openSide()` must stay idempotent.** It runs on
-  every poll for the site currently on screen. It resets `scrollTop` **only** when the key changes —
-  otherwise a poll would throw you back to the top of a card you were reading. Anything stateful
-  added to the card (an open `<details>`, a scroll position, a text selection) is lost on that
-  rebuild unless it is keyed the same way.
-- **Nothing may close the card except the reader**, and there is no `map.on('click', closeSide)` —
-  that was carried over from the popup, where it belonged, and it dismissed the panel mid-read. The
-  "you are here" card was hit hardest: locate.js draws an accuracy circle, and `L.Path` bubbles its
-  clicks to the map where `L.Marker` does not (`bubblingMouseEvents: false`), so at a coarse fix most
-  of the viewport closed it. `render()` no longer closes it either when the site leaves `sites`.
-  The ways out are the ×, a dialog taking the screen (About, the table — both call `closeSide()` in
-  ui.js), ⋮ → ignore, and at phone width the two gestures a modal drawer owes a reader: a swipe
-  toward the right edge, and a tap on `#scrim`. **Do not add another without a reason that survives
+  every poll for the site currently on screen. It resets `scrollTop` **only** when the key changes.
+  Otherwise a poll throws you back to the top of a card you were reading. Anything stateful
+  added to the card is lost on that rebuild, unless it is keyed the same way. That covers an open
+  `<details>`, a scroll position and a text selection.
+- **Nothing can close the card except the reader**, and there is no `map.on('click', closeSide)`.
+  That was carried over from the popup, where it belonged. It dismissed the panel mid-read. The
+  "you are here" card was hit hardest. The `js/locate.js` module draws an accuracy circle. `L.Path`
+  bubbles its clicks to the map where `L.Marker` does not (`bubblingMouseEvents: false`). So at a
+  coarse fix most of the viewport closed it. `render()` no longer closes it either when the site
+  leaves `sites`. The ways out are the ×, a dialog taking the screen, ⋮ → ignore, and two gestures
+  at phone width. About and the table are the dialogs, and both call `closeSide()` in ui.js. The two
+  gestures are the ones a modal drawer owes a reader. They are a swipe toward the right edge, and a
+  tap on `#scrim`. **Do not add another without a reason that survives
   "it vanished while I was reading it".** The last two carry theirs. Both exist only below 600px,
-  where the panel takes 84vw and there is nothing behind it left to read, and the scrim is a real box
-  over the map rather than a map click — so no pan, no marker and no accuracy circle can fire it.
+  where the panel takes 84vw and there is nothing behind it left to read. The scrim is a real box
+  over the map, rather than a map click. So no pan, no marker and no accuracy circle can fire it.
 - **The alert list is a tenant of `#side`, under the key `@alerts`.** It is not a panel of its own
-  any more, so there is nothing to place, slide past the drawer or collapse on a phone — and a
-  station picked out of the list *replaces* the list, which is why nothing binds the rows any more
-  (ui.js's delegated `[data-go]` handler reaches them, and the old per-row handler existed only to
-  collapse the panel on a phone first). Two consequences. Its head must stay the first element and
+  any more. So there is nothing to place, slide past the drawer or collapse on a phone. A
+  station picked out of the list *replaces* the list. That is why nothing binds the rows any more.
+  The delegated `[data-go]` handler in ui.js reaches them. The old per-row handler existed only to
+  collapse the panel on a phone first. Two consequences. Its head must stay the first element and
   must be `.pophead`, the same seam every station card obeys — `openSide()` lifts it into
-  `#sideHead`. And **nothing springs it open by itself**: on the right edge it would land on a card
+  `#sideHead`. And **nothing springs it open by itself**. On the right edge it lands on a card
   someone is reading, which is the rule directly above. The button's colour and count are on screen
   the whole time, and the interruption for news is still the toast.
 - **`#alertBtn`'s `aria-expanded` is synced from `openSide()`/`closeSide()` in map.js**, not from the
-  click that opened it — the panel has half a dozen other ways to change what is in it (a pin, the
-  table, "you are here", the ×) and every one of them would have left the button lying.
+  click that opened it. The panel has half a dozen other ways to change what is in it. They are a
+  pin, the table, "you are here" and the ×. Every one of them left the button lying.
 - **`#netstats` is a sibling of the `<h1>`, not a child of the dot that opens it.** A `<table>` is
-  flow content and cannot legally sit inside a heading, so the popover is anchored to `header` and
-  revealed by `header:has(h1 .mark:hover)` — there is no combinator that walks back out of the
-  heading to a sibling. The touch path toggles `.open` on `#net`, and `#netstats` has to stop its own
-  clicks (ui.js) because it is no longer inside the element the document handler exempts.
+  flow content and cannot legally sit inside a heading. So the popover is anchored to `header` and
+  revealed by `header:has(h1 .mark:hover)`. There is no combinator that walks back out of the
+  heading to a sibling. The touch path toggles `.open` on `#net`. `#netstats` has to stop its own
+  clicks (ui.js), because it is no longer inside the element the document handler exempts.
 - **You cannot focus something you are still animating into view.** Two separate traps, both silent,
   and `#gotoBox` hit each in turn. A transitioned `visibility` *interpolates*: at t=0 of
   hidden→visible it still computes to `hidden`, so `focus()` is refused — hence `visibility 0s .25s`
-  rather than `visibility var(--slide)`. And the click that opened the control leaves focus on the
-  button that is about to become `display: none`, which returns focus to `<body>` *after* the
-  handler returns — so the focus must follow a style flush (`el.offsetWidth`). `requestAnimationFrame`
+  rather than `visibility var(--slide)`. The click that opened the control leaves focus on the
+  button that is about to become `display: none`. That returns focus to `<body>` *after* the
+  handler returns. So the focus must follow a style flush (`el.offsetWidth`). `requestAnimationFrame`
   does **not** work here: its callbacks run before the frame's style recalc.
   **The same interpolation eats clicks on the way out, and `#splash` was doing it.** `visibility`
   holds its *start* value for the whole duration, so `visible → hidden` stays `visible` until the
-  transition ends. Paired with `opacity: 0`, which does not stop hit-testing, `#splash.gone` left an
+  transition ends. `opacity: 0` does not stop hit-testing. Paired with it, `#splash.gone` left an
   invisible `inset: 0`, `z-index: 900` sheet over the entire viewport for 300ms after the map
-  appeared. The first press of anything in the app bar did nothing and the second worked, which
-  reads as a slow button rather than as something on top of it. The fix is `pointer-events: none` on
+  appeared. The first press of anything in the app bar did nothing and the second worked. That
+  reads as a slow button, rather than as something on top of it. The fix is `pointer-events: none` on
   the `.gone` state, kept **out** of the transition list so it applies at once. Any overlay that
-  fades itself out needs that declaration — `opacity` and a transitioned `visibility` together never
-  stop a click, and both of this app's full-screen fades were written that way.
-- **`focusOn()` centres on the strip of map that is actually visible**, which is now bounded on both
-  sides: the drawer takes the left, the panel the right, and the two shifts subtract. Skipped below
-  600px, where the panel covers the map outright and there is no strip to aim at.
-- **Stations within `SITE_M` (50 m) are one place.** `api.php` stamps a `site` key; the map draws one
+  fades itself out needs that declaration. `opacity` and a transitioned `visibility` together never
+  stop a click. Both of this app's full-screen fades were written that way.
+- **`focusOn()` centres on the strip of map that is actually visible.** That strip is now bounded on
+  both sides. The drawer takes the left, the panel the right, and the two shifts subtract. Skipped
+  below 600px, where the panel covers the map outright and there is no strip to aim at.
+- **Stations within `SITE_M` (50 m) are one place.** `api.php` stamps a `site` key. The map draws one
   pin per site, not per station (671 → 417). Anything reaching for a marker must go through
-  `siteMark` in `map.js` — a station's pin may be filed under another kind's bucket, because the
+  `siteMark` in `map.js`. A station's pin can be filed under another kind's bucket, because the
   bucket is the *lead* sensor's kind. Sites are built **after** filtering, so a hidden layer can
-  never take a whole mast off the map; that is why layer chips call `render()`, not `syncCluster()`.
+  never take a whole mast off the map. That is why layer chips call `render()`, not `syncCluster()`.
 - Clustering still never fully disables: sites can sit metres apart. `maxClusterRadius` tightens
   with zoom and co-located pins spiderfy on click.
 - **A cluster badge counts what it is hiding, not what is in the area.** Favorites are drawn on
   `favLayer` in `map.js` and never enter `cluster`, so a chip over a patch holding 13 pins can read
   12. That is the correct number: the chip is hiding 12 pins and the 13th is drawn beside it. The
-  same holds for the badge's red — `iconCreateFunction` ORs `m.options.critical` across its children,
-  so a chip goes neutral when the only critical pin near it is an unclustered favorite drawing itself
-  red. Nothing leaves the screen. Do not "fix" the count by folding the favorites back in; that would
-  make the badge claim to hide pins that are visible.
+  same holds for the badge's red. `iconCreateFunction` ORs `m.options.critical` across its children.
+  So a chip goes neutral when the only critical pin near it is an unclustered favorite drawing itself
+  red. Nothing leaves the screen. Do not "fix" the count by folding the favorites back in. That
+  makes the badge claim to hide pins that are visible.
 - **Offline gauges are frozen on old flood readings** (3.55m from April) — so they are *not sampled
   into `.history.db`* and carry no `history`. A flat line at a number from months ago reads as
-  "steady", which is the one thing a graph of a dead sensor must not say. Anything offline or
+  "steady". That is the one thing a graph of a dead sensor must not say. Anything offline or
   >24h old renders grey with an explicit `OFFLINE` block, the date in the footer. Never show these
-  as live. **A graph is still drawn for them**, and that does not breach the rule above: an offline
-  gauge holds no samples at all, so what draws is its two marks against an empty plot rather than a
+  as live. **A graph is still drawn for them**, and that does not breach the rule above. An offline
+  gauge holds no samples at all. So what draws is its two marks against an empty plot. It is not a
   flat line through a number from April. The gate that used to suppress it took the timeline from 15
   of 36 gauges. See the always-draw rule under Conventions.
 - **41 sirens last reported months ago** (one in July 2025). They render `OUT OF CONTACT`, never
   `IDLE` — a silent siren and a dead siren look identical, and only one is safe.
 - **The siren band frames on the clock, and it is the only graph here that does.** Every other graph
   spans the readings it holds, because a reading exists only where somebody took it. A state exists at
-  every instant. `sirenBand()` therefore spans the last `SPARK_H` hours ending **now** and lets the
-  samples colour parts of it, through the `frame` parameter on `timeAxis()` that no other caller
-  passes. Measured on the live payload: 212 sirens, of which 86 hold no history at all and 103 hold
-  exactly one sample, and the median newest sample is 9.3 hours old — a siren heartbeats daily and
-  `.history.db` keys on the reading's own stamp, so an unchanged siren stores one row. Framed on its
-  data the way a river graph is, the median siren drew a window of **zero width**.
+  every instant. `sirenBand()` therefore spans the last `SPARK_H` hours ending **now**, and lets the
+  samples colour parts of it. It does that through the `frame` parameter on `timeAxis()` that no
+  other caller passes. Measured on the live payload: 212 sirens, of which 86 hold no history at all
+  and 103 hold exactly one sample. The median newest sample is 9.3 hours old. A siren heartbeats
+  daily, and `.history.db` keys on the reading's own stamp. So an unchanged siren stores one row.
+  Framed on its data the way a river graph is, the median siren drew a window of **zero width**.
   **A reading holds until the next one, and that reverses the rule that stood here.** The band used
-  to cut each bar 15 minutes after its sample and leave the rest blank, on the argument that an
-  unbroken quiet band across a hole says the siren was silent in the same shape as one measured
-  silent. That argument assumed a hole meant lost contact. It does not: this app polls an online
-  siren every few minutes and only stores a row when the siren's own stamp moves, so a hole is the
-  value not changing. The cost of the old assumption was 103 sirens drawn as one sliver.
-  **A hairline rail in `--s-none` covers what the samples do not**, and that is the token this app
-  already uses for no reading — a rail and not a bar, because it is the absence of a state rather
+  to cut each bar 15 minutes after its sample and leave the rest blank. The argument was that an
+  unbroken quiet band across a hole says the siren was silent. It says it in the same shape as one
+  measured silent. That argument assumed a hole meant lost contact. It does not. This app polls an
+  online siren every few minutes, and only stores a row when the siren's own stamp moves. So a hole
+  is the value not changing. The cost of the old assumption was 103 sirens drawn as one sliver.
+  **A hairline rail in `--s-none` covers what the samples do not.** That is the token this app
+  already uses for no reading. It is a rail and not a bar. It is the absence of a state, rather
   than a third one. **The out-of-contact case needs no flag and must never grow one.** `SPARK_WIN`
-  is 12 hours and `SIREN_STALE` is 48, so a siren's last sample leaves the window a day and a half
-  before this app calls the station out of contact. All 65 out-of-contact sirens hold zero history, so
-  the whole band is rail by geometry. A `hasInfo()` test here states one fact in two places, and
-  the copy then drifts from the block above it.
+  is 12 hours and `SIREN_STALE` is 48. So a siren's last sample leaves the window a day and a half
+  early. Only then does this app call the station out of contact. All 65 out-of-contact sirens hold
+  zero history, so the whole band is rail by geometry. A `hasInfo()` test here states one fact in two
+  places, and the copy then drifts from the block above it.
   **The band draws for an out-of-contact siren too** — it sits outside the state ternary in
-  `sensorBody()`. It used to sit inside, which left the one kind whose whole question is "for how
+  `sensorBody()`. It used to sit inside. That left the one kind whose whole question is "for how
   long" as the one kind with no timeline.
   **An empty band ships no `data-pts`.** `show()` in `js/sparktip.js` takes the last sample at or
-  before the pointer and destructures it, so an empty array is a `TypeError` on every pointermove
+  before the pointer and destructures it. So an empty array is a `TypeError` on every pointermove
   across the plate. A graph with nothing to say ships no attribute.
   There is **no caption**. It read `Silent for 9 h`, `Last sounded 14:22` or `Sounding since 13:50`,
   and the band states all three. A rail with no bar on it is silence. A red bar shows when
@@ -1008,66 +1011,67 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
 - **A siren reading 1 is a claim, not a fact, and the river behind it is the check.** JPS sounds a
   siren for one minute at the Amaran mark, repeating every 3 hours while the water stays there, and
   every 5 at Bahaya. So the alarm is a claim about a river level the payload already holds.
-  `sirenBacked()` in `api.php` asks it: `backed` is true when a river within `SIREN_KM` (5 km) is at
-  status ≥ 2, false when rivers are in reach and none is, **null when there is none to ask**.
-  `sounding()` in `util.js` reads `backed !== false` — the null case keeps the benefit of the doubt,
-  because silencing a real evacuation alarm beats carrying a doubtful one. 15 of the 17 alarms in our
-  archive were unbacked, including one held 127 hours with its own gauge 2 m under the mark, and
-  believing them kept the app bar red every day of the week. **Do not replace this with a duration
-  cutoff** — that was the first attempt, and JPS's repeat cadence means a genuine flood holds a siren
-  on all day, so any cutoff short enough to catch the stuck ones discards the real one. Both reds
-  read `sounding()`, `isCritical()` and `atDanger()` — a red pin beside a panel that refuses to list
+  `sirenBacked()` in `api.php` asks it. `backed` is true when a river within `SIREN_KM` (5 km) is at
+  status ≥ 2. It is false when rivers are in reach and none is. It is **null when there is none to
+  ask**. `sounding()` in `util.js` reads `backed !== false`. The null case keeps the benefit of the
+  doubt, because silencing a real evacuation alarm beats carrying a doubtful one. 15 of the 17 alarms
+  in our archive were unbacked. One was held 127 hours with its own gauge 2 m under the mark.
+  Believing them kept the app bar red every day of the week. **Do not replace this with a duration
+  cutoff.** That was the first attempt. JPS's repeat cadence means a genuine flood holds a siren
+  on all day. So any cutoff short enough to catch the stuck ones discards the real one. Both reds
+  read `sounding()`, `isCritical()` and `atDanger()`. A red pin beside a panel that refuses to list
   it is the map contradicting the panel. **`?shots=` asks the same question per frame**, through
   `$sirenFrames` — `frameTiers` against each nearby river's *warning* mark, intersected with the
-  siren's frames. It must never fall back to the live `backed` flag: a picture from last week is
+  siren's frames. It must never fall back to the live `backed` flag. A picture from last week is
   judged by last week's water, the same rule `camWarn()` obeys. Flood gauges are **not** backing
   evidence — measured, they hold no samples across any alarm window on record.
 - **A rain gauge's hourly reading is a claim too, and its own odometer is the check.**
-  `hourlyRainfall` is a *rolling* one-hour total and `cumulativeRainfall` only climbs, so rain the
+  `hourlyRainfall` is a *rolling* one-hour total and `cumulativeRainfall` only climbs. So rain the
   first claims has to appear in the second across that hour. `rainBacked()` in `api.php` asks it and
-  publishes `backed`: true where the odometer rose, false where it did not move while the gauge
-  still claimed rain, **null where nothing can be asked** — a young archive, or a station with no
-  odometer, which is every KL gauge. `raining()` in `util.js` reads `backed !== false`, exactly as
-  `sounding()` does, and a gauge nobody can check keeps its reading. Measured 2026-08-14: 5 of the
-  48 gauges that could be asked were claiming rain their own total denied, and T.K.P.M SG. KELAMBU
-  had held 4.5 mm for **twelve hours** against an odometer that never moved and a daily total of 0.
+  publishes `backed`. It is true where the odometer rose. It is false where the odometer did not
+  move while the gauge still claimed rain. It is **null where nothing can be asked** — a young
+  archive, or a station with no odometer, which is every KL gauge. `raining()` in `util.js` reads
+  `backed !== false`, exactly as `sounding()` does. A gauge nobody can check keeps its reading.
+  Measured 2026-08-14: 5 of the 48 gauges that could be asked were claiming rain their own total
+  denied. T.K.P.M SG. KELAMBU held 4.5 mm for **twelve hours**, against an odometer that never moved
+  and a daily total of 0.
   **The window is the hour the reading names, and a longer one is wrong.** A real burst leaves the
-  odometer flat straight afterwards while the rolling hour still carries the total, so any window
+  odometer flat straight afterwards while the rolling hour still carries the total. So any window
   wider than the claim calls live rain faulty. `accWindow()` does the reading, so a sparse archive
-  widens the window instead of failing, and a wider window can only add rain — it can only move the
+  widens the window instead of failing. A wider window can only add rain. It can only move the
   answer toward true, which is the safe way to be wrong. Three surfaces read the flag: the pin
-  colour through `color()`, `atDanger()` at the top class, and the rain heat layer, where an
-  unbacked gauge **neither paints nor erases** — a reading nobody can stand behind is no evidence
+  colour through `color()`, `atDanger()` at the top class, and the rain heat layer. There an
+  unbacked gauge **neither paints nor erases**. A reading nobody can stand behind is no evidence
   that the ground under it is dry either. The card keeps printing what JPS publishes and adds
   `Faulty signal.`, the same shape the siren block above uses. **`soak()` in `test.js` sets
-  `backed: true`**, or a faked storm on one of those gauges draws as a faulty signal with no pin and
-  no blob. Do not widen this to a duration cutoff, and do not let it silence a gauge it cannot ask.
+  `backed: true`.** Without it, a faked storm on one of those gauges draws as a faulty signal with no
+  pin and no blob. Do not widen this to a duration cutoff, and do not let it silence a gauge it
+  cannot ask.
 - **Nothing outranks a popover except another popover.** The table draws its graphs inside `.tipbox`,
-  which is a `popover` and therefore in the **top layer** — above every `z-index` on the page, because
-  the top layer is not part of the stacking context at all. So `js/sparktip.js`'s readout is itself a
-  popover (`manual`, so it cannot light-dismiss the panel it sits on). Anything new that has to paint
-  over the table's panels, the ⋮ menus or the lightbox needs the same treatment; raising a z-index
-  will look like it works everywhere except over a popover, which is the one place it matters.
+  which is a `popover` and therefore in the **top layer**. That is above every `z-index` on the page,
+  because the top layer is not part of the stacking context at all. So `js/sparktip.js`'s readout is
+  itself a popover (`manual`, so it cannot light-dismiss the panel it sits on). Anything new that has
+  to paint over the table's panels, the ⋮ menus or the lightbox needs the same treatment. Raising a
+  z-index will look like it works everywhere except over a popover, which is the one place it matters.
 - **A graph's samples ride on the element, in `data-pts`.** `readout()` in `popup.js` writes
-  `[x%, label]` per sample and words the label itself (`1.74 m · 14:15`, `sounding · 22:30`), so the
+  `[x%, label]` per sample and words the label itself (`1.74 m · 14:15`, `sounding · 22:30`). So the
   one listener that reads them needs no units, no clock and no sensor kind. The attribute is
   **single-quoted** because JSON quotes with double ones. Any new graph that wants the readout emits
-  the same attribute; any that does not simply has no `[data-pts]` to match.
+  the same attribute. Any that does not simply has no `[data-pts]` to match.
 - **A flood gauge's status colour comes from `gaugeColor()` in `util.js` and nowhere else.** Upstream
-  publishes 3 codes against 2 marks, so any depth under 0.15 m shared code 0 with *dry ground* — and
-  a wet spot painted the same taupe as a dry one, which is the colour this app reserves for a sensor
+  publishes 3 codes against 2 marks. So any depth under 0.15 m shared code 0 with *dry ground*. A
+  wet spot painted the same taupe as a dry one, which is the colour this app reserves for a sensor
   that cannot report. `gaugeTone()` gives the rung (dry → 0, any water → 1, the warning mark → 2,
-  danger → 3) and `GAUGE_COLOR` gives the colour, which is **not** `STATUS_COLOR` — rung 1 is
-  `--s-trace`, because upstream published no mark down there and amber would claim one. Four
+  danger → 3) and `GAUGE_COLOR` gives the colour, which is **not** `STATUS_COLOR`. Rung 1 is
+  `--s-trace`, because upstream published no mark down there and amber claims one. Four
   surfaces read it: pin, card, table cell, table hover panel. It deliberately changes **no alert
-  surface** — `isHot()` never covered gauges, so the count, the badge and the ticker do not move. If
+  surface**. `isHot()` never covered gauges, so the count, the badge and the ticker do not move. If
   a gauge ever needs to alert, that goes through the alert design standard first.
 - **The Selangor list publishes `-1` for "no status" on stations that are reporting a number.** 144
   of 233 rain gauges and 15 rivers, on the payload this was found. `api.php` now derives the missing
   code from the reading, through the same `rainStatus()` / `wlStatus()` the two scraped feeds already
-  use — server-side, because there is one definition of a status and it is that file's. `band()` in
-  `table.js` clamps `-1` to 0 as the guard behind it. Never re-derive a status client-side.
-- **`atDanger()` is the map's red; `isCritical()` is the alert path's.** They are different questions
+  use. It is server-side, because there is one definition of a status and it is that file's. `band()`
+  in `table.js` clamps `-1` to 0 as the guard behind it. Never re-derive a status client-side.
   and must not be merged. `atDanger()` asks "is this sensor at the top of its own scale" — a river
   over its mark, a sounding siren, a flood gauge under water, rainfall in JPS's top class — and it
   drives the pin colour, the `.danger` halo, the cluster badge and `leads()`. A pin has to be red
