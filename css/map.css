@@ -112,11 +112,17 @@
    quarter share falls to about 65px and the glyph would stand outside its own cell. `Later` gives up
    those pixels instead, and its sentence wraps, which is what a sentence does. The floor is still
    off every item inside a cell — see `.wxrow > *` below, where a forecast line does have to shrink. */
-.wx { display: grid; grid-template-columns: 1fr 3fr; gap: 10px; --g: 28px; }
+.wx { display: grid; grid-template-columns: 1fr 3fr; gap: 10px; }
 /* 12px of side padding rather than 10. At 1:3 the `Now` cell is about the width of its own content,
-   so the padding is the whole of what centres the pair inside it. */
+   so the padding is the whole of what centres the pair inside it.
+   `--g` is the glyph box, and it is declared HERE rather than on `.wx`. Two surfaces draw this
+   card: the station panel's weather section, and the weather panel's half-hour stack. Only the
+   first has a `.wx` grid over it. So a `--g` on `.wx` resolved for one surface and not the
+   other. `.wxbig` then fell back to this rule's own 12px. That is a glyph the size of the
+   words beside it, on the surface that is nothing but glyphs.
+   `.wxcol` is the one box both surfaces share. */
 .wxcol { display: flex; flex-direction: column; gap: 6px; font-size: 12px; line-height: 1.35;
-  padding: 8px 12px; border-radius: 8px; background: var(--hover); }
+  padding: 8px 12px; border-radius: 8px; background: var(--hover); --g: 28px; }
 /* One gap for both cells. `space-between` spent `Now`'s slack between the glyph and the numbers
    first, which put a 30px gap in one cell beside a small one in the other — the same distance stated
    twice, differently, on one row. */
