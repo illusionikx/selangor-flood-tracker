@@ -11,7 +11,7 @@ import { sitePopup } from './popup.js';
 
 state.rerender = () => render();
 /* True once weather mode has run at least once this session. render() reads it below. It decides
-   whether wx.js still needs a tick(), even after PREFS.wx has gone false. It never resets. So a
+   whether wx.js still needs a tick(), even after the weather layer has gone. It never resets. So a
    reader who leaves weather mode still gets the one extra tick that tears the layer down. */
 let wxSeen = false;
 
@@ -56,7 +56,10 @@ export function render() {
   /* Written from the preference on every render and never read back off the box. That is the rule
      the two chips below and syncHeat() all obey. A browser restores a checkbox across a reload
      without firing `change`, so the control cannot be the source of truth. */
-  el('stations').checked = PREFS.stations !== false;
+  /* Both layer boxes, written from the one preference that holds the choice. syncWx() no longer
+     touches the weather box, so there is one writer for the pair and both-on cannot be drawn. */
+  el('stations').checked = PREFS.mapLayer === 'stations';
+  el('wxLayer').checked = PREFS.mapLayer === 'weather';
   const pinFilter = syncPins();
   Object.keys(marks).forEach(k => marks[k] = []);
   siteMark.clear();
@@ -136,7 +139,7 @@ export function render() {
      pins off on their own, with the wash left alone. `!== false`, so an unset preference counts as
      on. That is the test `PREFS.drawer` uses, and it is why a first visit lands on a map with pins
      rather than an empty one. */
-  if (!PREFS.wx && PREFS.stations !== false) for (const [key, members] of sites) {
+  if (PREFS.mapLayer === 'stations') for (const [key, members] of sites) {
     members.sort(leads);
     const lead = members[0];
     const rising = members.some(m => m.rising);
@@ -216,35 +219,36 @@ export function render() {
   rainHeat.setDry(dryPoints);
   rainHeat.setLatLngs(thinHeat(rainPoints, RAIN_KM));
   /* Weather mode must tear itself down when a reader leaves it, not just paint while inside it. The
-  flashTo() helper sets PREFS.wx to false. It calls state.rerender() on every jump to a station. The old
-     check here was `if (PREFS.wx)` alone, and that was already false by the time this line ran. So
-     tick() never fired, and the layer and the checked #wxLayer box were both left on screen.
+     flashTo() helper moves `PREFS.mapLayer` back to `'stations'`. It calls state.rerender() on every
+     jump to a station. The old check here read the preference alone, and that had already moved by
+     the time this line ran. So tick() never fired, and the layer was left on screen.
 
      wxSeen fixes that. It stays true once weather mode has run once this session. So render() still
-     calls tick() on the render right after PREFS.wx flips false. The tick() call already handles
-     that case. The syncWx() helper removes the layer whenever PREFS.wx reads false. It unchecks the
-     box too.
+     calls tick() on the render right after the preference moves. The tick() call already handles
+     that case. The syncWx() helper removes the layer whenever the preference is not `'weather'`.
+     render() writes the box, above.
 
      `.then(m => m.tick()).catch(...)`, not a second argument to `.then()`. A second argument only
      catches the import failing. tick() is async, so its own rejection is a separate promise. A
      second `.then()` argument never sees that rejection. This is the same gap the withTimeline
      gotcha in CLAUDE.md records, at a new call site.
 
-     A failed import must not leave a blank map under a checked box. The render() pass already skips
-     every station pin while PREFS.wx is true. So a wx.js that never loads draws nothing at all. The catch
-     rolls back the same way js/ui.js's own toggle handler does. It turns the pref off and saves it.
-     It writes the reason into #wxHint. Then it renders once more, so the station pins return.
+     A failed import must not leave a blank map under a checked box. The render() pass draws no
+     station pin while the preference reads `'weather'`. So a wx.js that never loads draws nothing at
+     all. The catch rolls back the same way js/ui.js's own toggle handler does. It puts the
+     preference back to `'stations'` and saves it. It writes the reason into #wxHint. Then it renders
+     once more, so the station pins return.
 
-     The rollback checks that PREFS.wx is still true before it runs. wxSeen never resets. So every
-     later render calls import('./wx.js') again. A rejected dynamic import stays rejected in the
-     module cache. So it keeps rejecting on every later render too.
+     The rollback checks the preference still reads `'weather'` before it runs. wxSeen never resets.
+     So every later render calls import('./wx.js') again. A rejected dynamic import stays rejected in
+     the module cache. So it keeps rejecting on every later render too.
 
-     Without the guard, each later render flips PREFS.wx off again and calls render() again. That
-     repeats forever. The guard lets the rollback run once and then stop. */
-  if (PREFS.wx) wxSeen = true;
+     Without the guard, each later render rolls the preference back again and calls render() again.
+     That repeats forever. The guard lets the rollback run once and then stop. */
+  if (PREFS.mapLayer === 'weather') wxSeen = true;
   if (wxSeen) import('./wx.js').then(m => m.tick()).catch(() => {
-    if (!PREFS.wx) return;
-    PREFS.wx = false;
+    if (PREFS.mapLayer !== 'weather') return;
+    PREFS.mapLayer = 'stations';
     save();
     el('wxHint').textContent = 'could not load';
     render();
@@ -387,9 +391,9 @@ function counts() {
   /* Either way of hiding the pins makes the station tally read "0 of 729", which explains nothing.
      This line is the one the eye lands on to ask why the map is empty, so it answers instead.
      Weather is named first because it is the stronger claim. It takes the heat as well. */
-  el('shown').textContent = PREFS.wx
+  el('shown').textContent = PREFS.mapLayer === 'weather'
     ? 'Weather map · flood stations hidden'
-    : PREFS.stations === false
+    : PREFS.mapLayer !== 'stations'
     ? 'Stations off · turn them on under Layers'
     : `${total} of ${state.data.length} stations on the map` +
       (pins && pins < total ? ` · ${pins} pins` : '') +

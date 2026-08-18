@@ -1088,14 +1088,11 @@ body.drawer #legend { transform: translateX(var(--drawer)); }
    has to restore the view that was there before it went off. */
 #paintmenu:not(:has(#stations:checked)) .subgrp { display: none; }
 
-/* Weather takes the map from the whole station branch — pins and heat alike, through the one gate
-   `syncHeat()` and `render()` share. So the branch dims under it rather than leaving a checked
-   Stations box claiming a layer that is not drawn. The caption rides the Stations chip, which is
-   the thing weather switches off. It is outside `.subgrp`, so it still reads when the branch is
-   collapsed as well as when it is dimmed. */
-#paintmenu:has(#wxLayer:checked) #stations,
-#paintmenu:has(#wxLayer:checked) .subgrp { opacity: .55; }
-#paintmenu:has(#wxLayer:checked) .chip .mhint { display: inline; }
+/* **No weather dim here any more, and no caption.** Stations and Weather are one choice now, so
+   weather unchecks Stations rather than overruling it, and the collapse rule above does the rest.
+   The dim existed because a checked Stations box could claim a layer weather had taken. That state
+   is unreachable: `PREFS.mapLayer` holds one of the two, never both. A rule that cannot fire is a
+   rule that goes. */
 
 /* `.menu` is a row list of `.mi` buttons and this one holds five `.chip` labels, which bring their
    own padding. So the 4px the shared rule pads with would sit inside the chips' own. */

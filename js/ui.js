@@ -462,6 +462,14 @@ delete PREFS.heat; delete PREFS.rainHeat;   // dropped from the blob on the next
    it, off the preference, on every render. */
 PREFS.pinFilter ??= PREFS.favOnly ? 'fav' : PREFS.risingOnly ? 'alert' : '';
 delete PREFS.favOnly; delete PREFS.risingOnly;
+
+/* The two map layers are one choice for the same reason: `'stations'`, `'weather'` or `''`. Weather
+   emptied the map of stations long before the panel said so, and a pair of booleans could hold both
+   on, which is a state neither the map nor the panel can draw. Weather wins the migration where an
+   old blob held both, because it is the mode a reader is inside rather than the default they never
+   turned off. `''` stays reachable: a reader can have the basemap and nothing over it. */
+PREFS.mapLayer ??= PREFS.wx ? 'weather' : PREFS.stations === false ? '' : 'stations';
+delete PREFS.wx; delete PREFS.stations;
 // Before the first payload, not after it: render() is a whole poll away, and until it ran the map
 // carried the water layer and the legend carried both ramps whatever the pref said. This is also
 // what puts the two chips and the section summary on the pref — see syncHeat() in heat.js.
@@ -506,10 +514,14 @@ el('heat').onchange = el('rainHeat').onchange = el('risingOnly').onchange =
   if (e.target === el('favOnly') || e.target === el('risingOnly'))
     PREFS.pinFilter = !e.target.checked ? '' : e.target === el('favOnly') ? 'fav' : 'alert';
 
-  /* The station layer. Nothing inside it is cleared with it — the branch collapses in `#paintmenu`
-     and every preference in it stands, so switching Stations back on restores the view that was
-     there before. Clearing them would make the parent a destructive control. */
-  PREFS.stations = el('stations').checked;
+  /* The two map layers, read off the box that fired, exactly as the two pairs above are. Nothing
+     inside Stations is cleared with it — the branch collapses in `#paintmenu` and every preference
+     in it stands, so switching Stations back on restores the view that was there before. Clearing
+     them would make the parent a destructive control.
+     Weather is NOT handled here. It has its own handler below, because turning it on has to await a
+     deferred module and roll back when that import fails. */
+  if (e.target === el('stations'))
+    PREFS.mapLayer = e.target.checked ? 'stations' : '';
   syncHeat();
   risePill();
   save();
@@ -526,14 +538,17 @@ el('heat').onchange = el('rainHeat').onchange = el('risingOnly').onchange =
    test toggle and the two dialogs already use. lazy() rethrows on purpose, because it does not
    know which surface a caller owns, and this one owns #wxHint. */
 el('wxLayer').onchange = async e => {
-  PREFS.wx = e.target.checked;
+  /* One choice with the station layer, so turning weather ON turns stations off by writing the same
+     string. Turning it off returns to the stations, which is what a reader leaving a weather map
+     wants to see — not a bare basemap they then have to switch back on. */
+  PREFS.mapLayer = e.target.checked ? 'weather' : 'stations';
   save();
   el('wxHint').textContent = '';
   try {
     const m = await lazy(() => import('./wx.js'), e.target.closest('label'));
     await m.tick();
   } catch {
-    PREFS.wx = false;
+    PREFS.mapLayer = 'stations';
     save();
     e.target.checked = false;
     el('wxHint').textContent = 'could not load';

@@ -70,8 +70,8 @@
 <link rel="stylesheet" href="vendor/markercluster.css">
 <link rel="stylesheet" href="vendor/fonts.css?v=51">
 <link rel="stylesheet" href="css/icons.css?v=93">
-<link rel="stylesheet" href="css/base.css?v=134">
-<link rel="stylesheet" href="css/chrome.css?v=187">
+<link rel="stylesheet" href="css/base.css?v=135">
+<link rel="stylesheet" href="css/chrome.css?v=188">
 <link rel="stylesheet" href="css/map.css?v=153">
 
 <!-- Water tint for the dark basemap. CARTO's dark_all is greyscale — all 18 of its tones have zero
@@ -1019,35 +1019,54 @@
 <button id="paint" class="mapbtn" popovertarget="paintmenu"
         title="Map layers" aria-label="Map layers"><i class="i i-layers"></i></button>
 <div id="paintmenu" class="menu surface" popover>
-  <!-- Two things at the top level and no headings over them: the station layer and the weather
-       layer. Everything else in here is a choice ABOUT the station layer, so it lives inside it.
-       Weather takes the map from the whole station branch, which is why that branch dims under it
-       rather than unchecking. The check is the preference, and the preference is what returns. -->
+  <!-- Two layers, and one at a time. `PREFS.mapLayer` holds `'stations'`, `'weather'` or `''` for
+       neither, which is the shape the two sections inside already use. Weather empties the map of
+       stations, so the pair was mutually exclusive in effect long before it said so. Saying so lets
+       the branch collapse rather than dim, and takes a caption off the screen.
+       Everything else in here is a choice ABOUT the station layer, so it lives inside that branch.
+       Each chip carries a line of flavour text. The label names the control and the line under it
+       says what the reader gets. `.hint` beside the label is a different thing: it is written by JS
+       and it reports a STATE, such as a filter with nothing to match.
+       No `checked` attribute on any box. `PREFS` is the source of truth, and syncPins(), syncHeat()
+       and render() write the boxes from it. `autocomplete="off"` stops the other writer: a browser
+       restores a checkbox across a reload without firing `change`. -->
   <label class="chip"><input type="checkbox" id="stations" autocomplete="off">
-    <i class="glyph i i-place"></i>Stations <span class="mhint">off while weather is on</span></label>
-  <!-- Collapses with its parent rather than greying. Every control in here is a choice about the
-       station layer, so with that layer off there is nothing for any of them to act on. Nothing in
-       here is ever unchecked by the collapse: switching Stations back on has to restore the view
-       that was there before it went off. -->
+    <i class="glyph i i-place"></i><span class="lab">Stations</span>
+    <small>Live river, rain and camera sites</small></label>
+  <!-- Collapses with its parent. Every control in here is a choice about the station layer, so with
+       that layer off there is nothing for any of them to act on. Nothing in here is ever unchecked
+       by the collapse: switching Stations back on has to restore the view that was there before. -->
   <div class="subgrp">
     <!-- How the station readings wash over the map. One at a time: stacked, two heat layers are two
          answers to two questions in one picture, and leaflet.heat adds their alpha into a colour
          that belongs to neither scale. -->
     <p class="mgroup">Heatmap</p>
     <label class="chip"><input type="checkbox" id="heat" autocomplete="off">
-      <i class="glyph i i-water_drop"></i>Water level</label>
+      <i class="glyph i i-water_drop"></i><span class="lab">Water level</span>
+      <small>How near each reading is to its own mark</small></label>
     <label class="chip"><input type="checkbox" id="rainHeat" autocomplete="off">
-      <i class="glyph i i-rainy"></i>Rainfall</label>
+      <i class="glyph i i-rainy"></i><span class="lab">Rainfall</span>
+      <small>Rain in the last hour</small></label>
     <!-- Which station pins draw. One at a time for the same reason as the pair above. Each one
          answers "show me only these", and two of those at once answers neither question. -->
     <p class="mgroup">Icon</p>
     <label class="chip"><input type="checkbox" id="favOnly" autocomplete="off">
-      <i class="glyph i i-favorite"></i>Favorites <span id="favHint" class="hint"></span></label>
+      <i class="glyph i i-favorite"></i><span class="lab">Favorites
+        <span id="favHint" class="hint"></span></span>
+      <small>Only the sites you starred</small></label>
     <label class="chip"><input type="checkbox" id="risingOnly" autocomplete="off">
-      <i class="glyph i i-warning"></i>On alert <span id="risingHint" class="hint"></span></label>
+      <i class="glyph i i-warning"></i><span class="lab">On alert
+        <span id="risingHint" class="hint"></span></span>
+      <small>Only sites forecast to reach danger</small></label>
   </div>
-  <label class="chip"><input type="checkbox" id="wxLayer" autocomplete="off">
-    <i class="glyph i i-sunny"></i>Weather <span id="wxHint" class="hint"></span></label>
+  <!-- `--c` is the weather layer's own hue, the one its clear-sky pin draws in. It is not a status
+       hue and it must never become one: see the colour language in CLAUDE.md. `--wx-clear` is muted
+       away from `--s-alert` on purpose, so an amber chip here cannot read as an alert on the water. -->
+  <label class="chip" style="--c: var(--wx-clear)">
+    <input type="checkbox" id="wxLayer" autocomplete="off">
+    <i class="glyph i i-sunny"></i><span class="lab">Weather
+      <span id="wxHint" class="hint"></span></span>
+    <small>Nowcast from MET</small></label>
 </div>
 <!-- Standing indications that the map is showing less than it holds. One strip, because test mode
      and the rising filter can be on at the same time and two fixed pills would sit on each other.

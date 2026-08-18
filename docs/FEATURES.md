@@ -10339,18 +10339,25 @@ that reports a change in feed order.
 cluster, with a popover on it. Two layers at the top level, and everything else inside one of them.
 
 ```
-Stations                      the station layer
-   HEATMAP                      how its readings wash over the map
-     Water level                  one at a time
-     Rainfall
-   ICON                         which of its pins draw
-     Favorites                    one at a time
-     On alert
-Weather                       the MET nowcast layer
+Stations                      the station layer          ┐ one at a time
+   HEATMAP                      how its readings wash     │
+     Water level                  one at a time           │
+     Rainfall                                             │
+   ICON                         which of its pins draw    │
+     Favorites                    one at a time           │
+     On alert                                             │
+Weather                       the MET nowcast layer      ┘
 ```
 
-**No headings over the top level.** Stations and Weather are the two things this map draws. Every
-other control answers a question ABOUT the station layer, so it lives inside it.
+Every chip carries a line of flavour text under its label. The label names the control and the line
+says what the reader gets. `Nowcast from MET` is the weather one.
+
+**`.hint` beside a label is a different thing.** JS writes it and it reports a state, such as
+`none starred` on a filter with nothing to match. Flavour text is static and describes the layer.
+
+**No headings over the top level.** Stations and Weather are the two things this map draws, and one
+draws at a time. Every other control answers a question ABOUT the station layer, so it lives inside
+it.
 
 **The argument for leaving the drawer is the go-to box's argument.** This is a control you reach for
 *while looking at the map*. Behind the hamburger it meant opening a panel to use it, then closing
@@ -10410,9 +10417,9 @@ Everything under it is a choice about that layer. The heatmap is how its reading
 The icon filters are which of its pins draw. With the layer off, none of them has anything to act
 on, so the whole branch collapses.
 
-**One gate serves both.** `render()` draws pins on `!PREFS.wx && PREFS.stations !== false` and
-`syncHeat()` draws the wash on the same test. A wash still painting under a switched-off Stations
-hides the control that governs it. That is worse than a control with nothing under it.
+**One gate serves both.** `render()` draws pins on `PREFS.mapLayer === 'stations'` and `syncHeat()`
+draws the wash on the same test. A wash still painting under a switched-off Stations hides the
+control that governs it. That is worse than a control with nothing under it.
 
 **Collapse, not grey.** A column of dead rows under a switched-off parent is furniture for the state
 the reader just left.
@@ -10428,8 +10435,9 @@ Layers`. Without either, the tally reads `0 of 743` and explains nothing.
 
 ### One at a time, in both sections
 
-**Each section holds one choice, stored as one string.** `PREFS.heatLayer` is `'water'`, `'rain'` or
-`''`. `PREFS.pinFilter` is `'fav'`, `'alert'` or `''`.
+**Every mutually-exclusive group in this panel is one string.** `PREFS.mapLayer` is `'stations'`,
+`'weather'` or `''`. `PREFS.heatLayer` is `'water'`, `'rain'` or `''`. `PREFS.pinFilter` is `'fav'`,
+`'alert'` or `''`.
 
 **A pair of booleans is the shape this must never go back to.** That shape holds a state the panel
 cannot draw, which is both on. This repo has the scar. The two heatmaps were a pair, two repairs
@@ -10437,7 +10445,8 @@ inside the change handler both failed, and the fix was one string with one funct
 boxes from it.
 
 `syncPins()` in `render.js` is that shape at a second site. It replaced `syncRisingChip()` and
-`syncFavChip()`, and it writes both boxes from the preference on every render.
+`syncFavChip()`, and it writes both boxes from the preference on every render. `render()` itself is
+the third, for the two layer boxes.
 
 **Checkboxes rather than radios, because "neither" has to stay reachable.** Clicking a member of a
 radio group cannot clear that group.
@@ -10450,13 +10459,28 @@ returns on the next reload.
 *Migration:* a blob holding both booleans resolves to Favorites. It is the narrower set, and the one
 a reader picks deliberately, station by station.
 
-### Weather dims the station branch rather than unchecking it
+### Stations and Weather became one choice, and a caption went with it
 
-Weather takes the map from the whole station branch, pins and wash alike, and deliberately leaves
-`PREFS.stations` and `PREFS.heatLayer` alone. That is the whole of "turn the previous view back on".
+`PREFS.mapLayer` holds `'stations'`, `'weather'` or `''`. Two preferences in this panel already had
+that shape, `PREFS.heatLayer` and `PREFS.pinFilter`. This is the third.
 
-So the branch dims under it and the Stations chip captions itself `off while weather is on`. The
-caption rides that chip rather than a heading. So it still reads while the branch stays collapsed.
+**Weather emptied the map of stations long before the panel said so.** Saying so lets the station
+branch collapse rather than dim, and takes a line of text off the screen.
+
+**What went:** the two dim rules and the `off while weather is on` caption. They existed for a state
+that is now unrepresentable, which is a checked Stations box beside a weather map. A rule that cannot
+fire is a rule that goes.
+
+**Leaving weather returns to the stations, never to a bare map.** `PREFS.mapLayer = 'stations'` on
+the way out, in the toggle, in `flashTo()` and in the failed-import rollback. A reader who leaves a
+weather map wants the map back, not an empty one to switch on again.
+
+`''` stays reachable. Turning Stations off with weather already off leaves the basemap and nothing
+over it, and `#shown` says so.
+
+**`syncWx()` no longer writes the weather box.** `render()` writes both layer boxes from the one
+preference, so the pair has a single writer and both-on cannot reach the screen. `wx.js` defers its
+load and can fail it. That is a second reason the boxes cannot depend on it.
 
 ### A menu opens away from the nearest edge, on both axes
 
@@ -10518,6 +10542,19 @@ an estimate of the pill's width and never at the pill. Measured, it cleared alre
 
 The button is at the bottom now, so the two cannot meet at all. `paint-check.html` keeps the
 assertion rather than dropping it, because this button has moved twice.
+
+### The weather chip wears the weather layer's own hue
+
+`--c: var(--wx-clear)` on that chip, which is the colour its clear-sky pin draws in. The glyph and
+the checked chip both take it.
+
+**It takes no status hue, and nothing gives it one.** This app mutes `--wx-clear` away from
+`--s-alert` on purpose, and it already measured and rejected a gold that sat too close. An amber chip
+in a layer panel on a flood map reads as an alert on the water.
+
+`paint-check.html` compares the resolved value against `--wx-clear` and against all four status
+tokens. It reads the RESOLVED value, because a custom property substitutes its `var()` at computed
+time. Asserting the literal is the mistake the glyph ladder made once.
 
 ### Naming, and one mismatch that is deliberate
 

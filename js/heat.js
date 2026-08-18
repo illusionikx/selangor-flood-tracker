@@ -419,7 +419,7 @@ export function syncHeat() {
      and the heatmap is a choice about that layer — it sits inside it in `#paintmenu` — so it goes
      with it. A wash still drawn under a switched-off Stations is a layer with its control hidden,
      which is worse than a control with nothing under it. */
-  const show = !PREFS.wx && PREFS.stations !== false;
+  const show = PREFS.mapLayer === 'stations';
   /* No summary line here any more. This choice left the drawer for the map's own top-left corner,
      and the button there draws the active layer's own glyph. So what the map paints is on screen
      without opening anything, which is what the drawer summary was for. That glyph is CSS, off the
@@ -429,17 +429,18 @@ export function syncHeat() {
   el('lgWater').style.display = wet && show ? '' : 'none';
   el('lgRain').style.display  = rainy && show ? '' : 'none';
   // The legend box holds three sections now, so one function decides whether the box itself shows.
-  el('lgWx').style.display = PREFS.wx ? '' : 'none';
+  el('lgWx').style.display = PREFS.mapLayer === 'weather' ? '' : 'none';
   /* The opacity slider drives whichever canvas is on the map, through the LAYERS loop in
      heatOpacity() below. Weather mode and the "off" choice both leave neither canvas on the map.
      A slider left on screen there acts on nothing. That is worse than no slider at all. */
   el('heatOpacityRow').style.display = (wet || rainy) && show ? '' : 'none';
-  /* **`show` stopped being the same question as `!PREFS.wx` when Stations gained a switch**, and
-     this line and the one above both used it as if it were. With Stations off and weather off,
-     `!show` was true, so the box drew with all three of its sections hidden — an empty plate on the
-     map. It asks what it means now: the weather key when weather is on, a ramp when a wash is
-     actually drawn, and nothing otherwise. */
-  el('legend').style.display = PREFS.wx || ((wet || rainy) && show) ? '' : 'none';
+  /* **`show` once meant "not weather mode", and this line and the one above both used it that
+     way.** Then Stations gained a switch, and `show` came to mean "the wash can draw" instead. With
+     Stations off and weather off, the old test drew the box with all three of its sections hidden,
+     which is an empty plate on the map. Both lines ask what they mean now: the weather key while
+     weather is the layer, a ramp while a wash is actually drawn, and nothing otherwise. */
+  el('legend').style.display =
+    PREFS.mapLayer === 'weather' || ((wet || rainy) && show) ? '' : 'none';
   heatScale();   // sizes whichever is on, and re-applies opacity
   heatOpacity();
 }

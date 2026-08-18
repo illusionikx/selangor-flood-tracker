@@ -509,11 +509,22 @@ dialog:focus, dialog:focus-visible { outline: none; }
    another group; here the first one follows the parent chip and wants less. */
 .subgrp .mgroup { margin: 8px 6px 4px; }
 .subgrp > .mgroup:first-child { margin-top: 4px; }
-/* Shown by the weather rule in chrome.css and hidden the rest of the time. It rides the Stations
-   chip, which is the thing weather switches off, rather than a heading over it. */
-.chip .mhint {
-  display: none; margin-left: auto; font-size: 10px; font-weight: 400; opacity: .75;
-  white-space: nowrap;
+/* Every chip in the paint panel carries a line of flavour text, so those chips are a two-row grid
+   rather than the drawer's single row. Scoped to `#paintmenu`, because `.chip` is shared with the
+   Sensor kinds list in the drawer, and those rows hold a count rather than a description.
+   The glyph spans both rows so it sits against the pair rather than against the label alone. */
+#paintmenu .chip {
+  display: grid; grid-template-columns: auto 1fr; column-gap: 8px; align-items: center;
+  padding: 8px 14px 8px 10px;
+}
+#paintmenu .chip .glyph { grid-row: span 2; }
+/* The label row. It is a flex line of its own so `.hint`'s `margin-left: auto` still reaches the
+   right edge of the chip, which is where a state note belongs. */
+#paintmenu .chip .lab { grid-column: 2; display: flex; align-items: center; gap: 6px; }
+/* What the reader gets, in a sentence. `.hint` beside the label is the other thing: JS writes it and
+   it reports a state, such as a filter with nothing to match. */
+#paintmenu .chip small {
+  grid-column: 2; font-size: 11px; line-height: 1.35; opacity: .72;
 }
 
 .link {

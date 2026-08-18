@@ -2166,18 +2166,29 @@ it. The weather section stretches nothing. It is five fixed keys measuring 231px
 - All user settings live in one `prefs` blob in `localStorage` (`PREFS` + `save()`).
 - **The layer controls live on the map, in two groups, and the drawer keeps the sensor kinds.**
   `#paint` is a `.mapbtn` in the map's bottom zoom cluster. Its popover holds two layers at the top
-  level and no headings over them: `Stations` and `Weather`. Inside `Stations` sit two labelled
-  sections, `Heatmap` (water level, rainfall) and `Icon` (favorites, on alert).
+  level and no headings over them: `Stations` and `Weather`, one at a time. Inside `Stations` sit two
+  labelled sections, `Heatmap` (water level, rainfall) and `Icon` (favorites, on alert).
+  **Every chip carries a line of flavour text**, which says what the reader gets. A `.hint` beside
+  the label is a different thing: JS writes it and it reports a state, such as `none starred`.
   **The rule for what goes where: a control the reader reaches for WHILE LOOKING AT THE MAP goes on
   `#paint`. A control that shapes which stations exist at all stays in the drawer**, beside the
   district picker and the ignored list. `#layersect` and `#layerN` are gone.
-  **Each section is ONE choice held in ONE string**, `PREFS.heatLayer` and `PREFS.pinFilter`. Never
-  a pair of booleans: that shape holds both-on, which the panel cannot draw, and this repo already
-  paid for it once — see `syncHeat()`'s own comment for the two repairs that failed. `syncPins()` in
-  `render.js` is the second site.
+  **Every mutually-exclusive group here is ONE choice held in ONE string**: `PREFS.mapLayer`,
+  `PREFS.heatLayer` and `PREFS.pinFilter`. Never a pair of booleans: that shape holds both-on, which
+  the panel cannot draw, and this repo already paid for it once — see `syncHeat()`'s own comment for
+  the two repairs that failed. `syncPins()` and `render()` are the other two writers, and each one
+  writes its pair of boxes from its own string.
+  **`PREFS.wx` and `PREFS.stations` are gone.** `PREFS.mapLayer === 'weather'` and
+  `=== 'stations'` replace them everywhere, and `''` means neither. Leaving weather goes back to
+  `'stations'`, never to `''` — in the toggle, in `flashTo()` and in the failed-import rollback. A
+  reader leaving a weather map wants the map back. `syncWx()` no longer writes the weather box:
+  `render()` writes both layer boxes, so the pair has one writer.
   **`Stations` gates the wash as well as the pins.** `render()` and `syncHeat()` share the test
-  `!PREFS.wx && PREFS.stations !== false`. Everything under that chip is a choice ABOUT the station
-  layer, so with the layer off none of them has anything to act on and the branch collapses.
+  `PREFS.mapLayer === 'stations'`. Everything under that chip is a choice ABOUT the station layer, so
+  with the layer off none of them has anything to act on and the branch collapses.
+  **The weather chip takes `--c: var(--wx-clear)`, its own layer's hue, and never a status hue.**
+  This app reserves that ladder. An amber chip in a layer panel on a flood map reads as an alert on
+  the water.
   **A parent collapses its children and never unchecks them.** The check is the preference, and
   switching `Stations` back on has to restore the view that was there before. Both the collapse and
   the weather dim are `:has()` rules in `chrome.css`, so no JS can get either wrong. `#shown` names

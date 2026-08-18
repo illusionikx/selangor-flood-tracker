@@ -342,8 +342,8 @@ export function flashTo(t) {
   /* Leaving weather mode always needs a rebuild, whatever `state.pinned` holds. The mode
      emptied `siteMark`. A second jump to the station already pinned would find no marker
      and open no card. Nothing clears `state.pinned` when the mode turns on. */
-  const wasWx = PREFS.wx;
-  if (wasWx) { PREFS.wx = false; save(); }
+  const wasWx = PREFS.mapLayer === 'weather';
+  if (wasWx) { PREFS.mapLayer = 'stations'; save(); }
   if (wasWx || state.pinned !== t.id) { state.pinned = t.id; state.rerender(); }
 
   /* One way in: the marker's own click handler centres the map and fills the panel, so a jump from

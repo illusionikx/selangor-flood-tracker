@@ -187,6 +187,28 @@ is(rows.indexOf(el('stations').closest('.chip')) < rows.indexOf(sub), true,
 is(rows.indexOf(sub) < rows.indexOf(el('wxLayer').closest('.chip')), true,
    'and Weather below it, so the branch cannot look like Weather\'s');
 
+// --- every chip says what the reader gets ---------------------------------------------------------
+/* The label names the control. The line under it says what the layer draws. `.hint` beside the
+   label is a different thing: JS writes it and it reports a state, such as a filter with nothing
+   to match, so it is not required here. */
+for (const id of BOXES) {
+  const chip = el(id).closest('.chip');
+  const small = chip.querySelector('small');
+  is(!!small && small.textContent.trim().length > 0, true, id + ' carries flavour text');
+  is(chip.querySelector('.lab') !== null, true, id + ' keeps its label in its own row');
+}
+is(el('wxLayer').closest('.chip').querySelector('small').textContent.trim(), 'Nowcast from MET',
+   'and the weather chip names its source');
+/* The weather chip takes the hue its own clear-sky pin draws in, never a status hue. `--wx-clear`
+   is muted away from `--s-alert` on purpose, so an amber chip here cannot read as an alert.
+   Compared against the RESOLVED token, because a custom property substitutes its `var()` at computed
+   time. Reading the literal back is the same mistake the glyph assertion made once. */
+const wxc = w.getComputedStyle(el('wxLayer').closest('.chip')).getPropertyValue('--c').trim();
+const tok = n => w.getComputedStyle(d.documentElement).getPropertyValue(n).trim();
+is(wxc, tok('--wx-clear'), 'the weather chip is painted its own weather hue');
+for (const s of ['--s-normal', '--s-alert', '--s-warning', '--s-danger'])
+  is(wxc === tok(s), false, 'and never ' + s + ', which is reserved for status');
+
 // --- the branch is two labelled sections ----------------------------------------------------------
 const groups = [...sub.querySelectorAll('.mgroup')].map(g => g.textContent.trim());
 is(groups.length, 2, 'the branch is two labelled sections');
@@ -238,7 +260,19 @@ for (const id of ['favOnly', 'risingOnly', 'favOnly', 'rainHeat', 'heat', 'rainH
   await pick(id);
   is(onCount(['favOnly', 'risingOnly']) <= 1, true, 'after ' + id + ': at most one pin filter on');
   is(onCount(['heat', 'rainHeat']) <= 1, true, 'after ' + id + ': at most one heatmap on');
+  is(onCount(['stations', 'wxLayer']) <= 1, true, 'after ' + id + ': at most one map layer on');
 }
+/* The two map layers are a pair as well. Weather emptied the map of stations long before the panel
+   said so. Weather needs a longer wait: turning it on awaits a deferred module. */
+el('wxLayer').checked = true;
+el('wxLayer').dispatchEvent(new w.Event('change'));
+await wait(2500);
+is(onCount(['stations', 'wxLayer']) <= 1, true, 'weather on -> at most one map layer on');
+is(w.getComputedStyle(sub).display, 'none', 'and the station branch collapses with its parent');
+el('wxLayer').checked = false;
+el('wxLayer').dispatchEvent(new w.Event('change'));
+await wait(2000);
+is(el('stations').checked, true, 'leaving weather returns to the stations, never to a bare map');
 /* And the mechanism behind it: one preference holding one string. A pair of booleans can hold
    both-on, which is the state this panel cannot draw. */
 const prefs = JSON.parse(w.localStorage.getItem('prefs') || '{}');
@@ -246,6 +280,9 @@ is(typeof prefs.pinFilter, 'string', 'the pin filters are one preference holding
 is('favOnly' in prefs, false, 'and the old favOnly boolean is migrated away');
 is('risingOnly' in prefs, false, 'and the old risingOnly boolean with it');
 is(typeof prefs.heatLayer, 'string', 'the heatmaps are the same shape, which this copies');
+is(typeof prefs.mapLayer, 'string', 'and the two map layers are one string too');
+is('wx' in prefs, false, 'the old wx boolean is migrated away');
+is('stations' in prefs, false, 'and the old stations boolean with it');
 // Leave the map unfiltered and the water wash on, or later assertions read a filtered payload.
 el('risingOnly').checked = false;
 el('risingOnly').dispatchEvent(new w.Event('change'));
@@ -254,17 +291,11 @@ el('heat').checked = true;
 el('heat').dispatchEvent(new w.Event('change'));
 await wait(400);
 
-/* Weather takes the station pins too, through the same `!PREFS.wx` gate in render(). So the branch
-   dims rather than leaving a checked Stations box claiming pins that are not drawn. */
-el('wxLayer').checked = true;
-await wait(60);
-is(parseFloat(w.getComputedStyle(el('stations')).opacity) < 1, true,
-   'weather on -> the Stations branch dims');
-is(w.getComputedStyle(menu.querySelector('.chip .mhint')).display !== 'none', true,
-   'and the Stations chip says why');
-is(el('stations').checked, true, 'and Stations stays checked, because the preference is what returns');
-el('wxLayer').checked = false;
-await wait(60);
+/* **No dim and no caption any more.** Weather and Stations are one choice, so weather unchecks
+   Stations rather than overruling it, and the collapse above is the whole of what a reader sees.
+   The dim existed for a state that is now unrepresentable: a checked Stations box beside a weather
+   map. The exclusivity assertions further up are what guard it. */
+is(menu.querySelector('.mhint'), null, 'the weather caption is gone, because the state it named is');
 
 // --- phone width -------------------------------------------------------------------------------
 /* 360px, the width the app bar is measured against. The button is ABOVE the zoom box here rather

@@ -47,7 +47,7 @@ const tone = (r, sky) => wxSky(r, sky)?.tone
 
 function paint() {
   layer.clearLayers();
-  if (!PREFS.wx) return;
+  if (PREFS.mapLayer !== 'weather') return;
   for (const p of thin(pts)) {
     const r = p.rungs[0];
     L.marker([p.lat, p.lng], {
@@ -142,8 +142,10 @@ function card(p) {
    change handler is repaired on none of the paths the browser takes. This is the rule syncHeat()
    exists to state. */
 export function syncWx() {
-  const on = !!PREFS.wx;
-  el('wxLayer').checked = on;
+  /* The box is NOT written here any more. render() writes both layer boxes from `PREFS.mapLayer`,
+     so the pair has one writer and cannot be drawn both-on. This module is deferred and may never
+     load, which is a second reason the boxes cannot depend on it. */
+  const on = PREFS.mapLayer === 'weather';
   on ? layer.addTo(map) : layer.remove();
 }
 
@@ -151,7 +153,7 @@ export function syncWx() {
    A failed fetch keeps the last answer. A poll that missed is not a forecast of clear skies. */
 export async function tick() {
   syncWx();
-  if (!PREFS.wx) { paint(); return; }
+  if (PREFS.mapLayer !== 'weather') { paint(); return; }
   const mine = ++gen;
   try {
     const j = await askJson(FEED_WX);
