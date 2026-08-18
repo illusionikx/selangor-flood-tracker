@@ -595,11 +595,16 @@ function metDaily(string $json): array {
            So the map drew a sun over an overcast afternoon and had nothing else to draw.
            This feed does carry cloud. Measured 2026-08-18 over 500 rows, `summary_forecast` holds
            nine values built from four phenomena: no rain, `Mendung`, `Hujan` and `Ribut petir`.
-           The four are mutually exclusive on a row, so naming `mendung` names the day's headline.
-           Only cloud is read. A thunderstorm is a claim this app has no rung for, and rain the
-           nowcast already answers for the instant the map draws. */
-        if (str_contains(strtolower((string)($r['summary_forecast'] ?? '')), 'mendung'))
-            $row['sky'] = 'cloud';
+           The four are mutually exclusive on a row, so one word names the day's headline.
+           Two of the four are read. `mendung` is cloud and `ribut petir` is a thunderstorm. Rain is
+           not, because the nowcast already answers for the instant the map draws, and no rain is
+           the absence of a headline. `wxSky()` in js/config.js decides which rungs each of the two
+           may touch: cloud refines a dry rung and a storm refines a wet one. The order here is
+           belt and braces. The four phenomena do not co-occur on a row, so nothing tested first
+           can steal a row from the test after it. */
+        $sum = strtolower((string)($r['summary_forecast'] ?? ''));
+        if (str_contains($sum, 'ribut petir'))   $row['sky'] = 'storm';
+        elseif (str_contains($sum, 'mendung'))   $row['sky'] = 'cloud';
         $out[strtolower(trim($name))] = $row;
     }
     return $out;

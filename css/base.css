@@ -110,12 +110,13 @@
      is deeper and more magenta than the siren's, which is all the room the band has.
      Deep enough to clear the 3:1 non-text floor on white, which the brighter pinks do not. */
   --fav: #cc1f7a;
-  /* These four tokens repeat the dark and .pin block below. They must stay identical, because a
+  /* These five tokens repeat the dark and .pin block below. They must stay identical, because a
      pin has to win over the basemap on both themes. This app keeps one weather palette, not two.
      See the note beside --wx-clear in the dark block for the full reasoning.
      Without this pair, the #lgWx legend swatches inherit one grey on this theme. They are plain
-     `<i>` elements, not `.pin`, so these four names resolved to nothing there. */
+     `<i>` elements, not `.pin`, so these five names resolved to nothing there. */
   --wx-clear: #d8a93f; --wx-cloud: #b8ae9e; --wx-rain: #93a9bb; --wx-heavy: #2f7fc9;
+  --wx-storm: #8a6dff;
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
@@ -184,6 +185,7 @@
      the basemap. Heavy differs from rain by SATURATION, never by lightness: a darker heavy pin
      disappears into the dark tile. */
   --wx-clear: #d8a93f; --wx-cloud: #b8ae9e; --wx-rain: #93a9bb; --wx-heavy: #2f7fc9;
+  --wx-storm: #8a6dff;
 }
 
 * { box-sizing: border-box; }

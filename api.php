@@ -2357,7 +2357,10 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
     $ok('a bare mendung is cloud',          $sky('Mendung') === 'cloud');
     $ok('case does not matter',             $sky('MENDUNG DI KAWASAN PEDALAMAN') === 'cloud');
     $ok('no rain is not cloud',             $sky('Tiada Hujan') === null);
-    $ok('a thunderstorm is not cloud',      $sky('Ribut petir di beberapa tempat') === null);
+    $ok('a thunderstorm is storm',          $sky('Ribut petir di beberapa tempat') === 'storm');
+    $ok('an inland thunderstorm is storm',  $sky('Ribut petir di beberapa tempat di kawasan pedalaman') === 'storm');
+    $ok('a widespread thunderstorm is storm', $sky('Ribut petir menyeluruh') === 'storm');
+    $ok('a thunderstorm is not cloud',      $sky('Ribut petir di beberapa tempat') !== 'cloud');
     $ok('rain is not cloud',                $sky('Hujan di beberapa tempat') === null);
     $ok('a row with no summary has no sky', !isset($day['petaling']['sky']));
     $ok('rubbish parses to nothing',        metDaily('not json') === []);

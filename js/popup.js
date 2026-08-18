@@ -2,7 +2,7 @@
 // status footer. The same meter/state blocks are reused by the alert panel.
 
 import { KINDS, SOURCES, SPARK_H, NO_INFO, ALERT_TITLE, RIVER_COLOR, RAIN_COLOR,
-         GAUGE_COLOR, RAIN_STOPS, NEAR_MAX_KM, camSrc, WEATHER, WX_CLOUD, MET_NAME,
+         GAUGE_COLOR, RAIN_STOPS, NEAR_MAX_KM, camSrc, WEATHER, wxSky, MET_NAME,
          ACC_ROWS } from './config.js';
 import { noSec, distKm, hasInfo, hasWx, isStale, statusColor, scalePos,
          levelStops, gaugeStops, gaugeColor, color, isFav } from './util.js';
@@ -511,9 +511,11 @@ const night = clock => {
 /* One glyph name for a rung. Only a clear sky has a night form.
    `pin` picks the map's ladder — see WEATHER in config.js for why the two differ at rung 2. */
 export const wxIcon = (r, { clock, pin, sky } = {}) => {
-  /* Cloud first, and only on rung 0. It outranks the night glyph on purpose: a moon says the sky is
-     clear, which is the one thing an overcast night is not. See WX_CLOUD in config.js. */
-  if (r === 0 && sky === 'cloud') return WX_CLOUD.icon;
+  /* A refinement first, where there is one. It outranks the night glyph on purpose: a moon says the
+     sky is clear, which is the one thing an overcast night is not. `wxSky()` in config.js holds
+     which rungs each refinement may touch, so this function does not restate the rule. */
+  const s = wxSky(r, sky);
+  if (s) return s.icon;
   const w = WEATHER[r] || WEATHER[0];
   if (night(clock) && w.night) return w.night;
   return (pin && w.pin) || w.icon;

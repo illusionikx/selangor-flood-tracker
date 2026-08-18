@@ -10253,8 +10253,10 @@ saturated. The two separate by vividness, as well as by hue. This app measured a
 and matches `#ffc000` on the dark theme.
 
 `rainy_heavy` carries no cloud of its own. Beside `rainy` at a 31px pin it read as hatching,
-rather than as more of one thing. So the pin ladder collapses both wet rungs to `rainy`. The card
-keeps the distinct heavy glyph, at its own larger size.
+rather than as more of one thing. So the pin ladder collapsed both wet rungs to `rainy`, and the
+card kept the distinct heavy glyph at its own larger size.
+
+**That was reversed when the legend reached five keys.** See *A bolt on the strip* below.
 
 ### What ships unverified
 
@@ -10583,3 +10585,57 @@ cloud, and no rain, rain and a thunderstorm each read as nothing. One more holds
 
 **Measured on 2026-08-18 the legend key drew nothing new.** None of the sixteen districts this map
 covers was cloudy that day. Four of MET's 170 were, all of them in Melaka.
+
+
+## A bolt on the strip: thunderstorm, and the heavy pin gets its glyph back
+
+**What changed.** The weather legend reads Clear, Cloudy, Rain, Heavy, Storm. Heavy draws
+`rainy_heavy` on the pin as well as on the card. Storm draws `flash_on`, the bare bolt.
+
+**Why a bolt.** `Ribut petir` is the daily forecast's most common value by a distance. Measured
+2026-08-18 over 500 rows it appears 331 times. It is the day's headline in 13 of the 16 districts
+this map covers. The nowcast cannot observe lightning at all. Its three words are about rain and
+nothing else. So the map drew that afternoon as plain rain, or as clear.
+
+**When it draws.** `sky: 'storm'` refines rung 1 and rung 2 only. Both sources have to agree that
+something is falling. The nowcast says it rains here now, and the district's day is forecast to
+carry storms. Calling that rain a thunderstorm then adds the one fact the nowcast has no word for.
+
+At rung 0 nothing is falling, and a bolt over a dry point is the forecast overruling the
+observation. That is the line this does not cross. Measured on the 2026-08-18 18:00 poll:
+
+| | points |
+|---|---|
+| carried `sky: 'storm'` | 28 of 50 |
+| of those, wet at rung 1 or 2 | 3 |
+| bolts drawn | 3 |
+| storm-forecast points drawn clear | 25 |
+
+**Cloud is the mirror of it.** Cloud refines the dry rung, storm refines the wet ones, and neither
+crosses. `wxSky()` in `js/config.js` is the one function that decides. The pin glyph, the pin colour
+and the card word all read it, so the three cannot drift. `wxIcon()` and `tone()` state no rung test
+of their own any more.
+
+**Why `flash_on` and not `thunderstorm`.** The second glyph is a cloud with bolts under it. At pin
+size its cloud reads as the same cloud `rainy` and `cloud` already draw. The three would then differ
+only in their hatching. That is the fault which collapsed the pin ladder in the first place.
+
+**Why the heavy pin changed back.** With a fifth mark on the strip, colour alone has to separate
+five things. Two of them are the wet rungs, already separated by the smallest step on the ramp.
+The hatching argument still holds at 31px. It is accepted. A reader counting marks on a five-key
+legend is worse off than a reader squinting at one.
+
+**`--wx-storm` is `#8a6dff`.** It is the closest token here to `--k-rainfall`, and the two never
+share a surface. Weather mode draws no station pin, and `syncHeat()` shows `#lgWx` only while every
+other legend section is hidden. It is lighter than `--wx-heavy` rather than darker, which is the
+rule this palette states for the whole set.
+
+**Checks.** Four `--selftest` assertions hold the `ribut petir` parse in three shapes. A throwaway
+headless probe checked all 25 render facts. They are five masks, five tokens, five distinct colours
+and five distinct glyphs. They also cover every key at 2x in a column, and `wxSky()` refusing to
+refine the wrong rung. It
+is gone.
+
+**Not built.** Coverage is dropped. MET writes `di beberapa tempat`, `di kebanyakan tempat`,
+`menyeluruh` and `di kawasan pedalaman`, and all four read as one storm here. A pin has one mark.
+The district that mark stands in is not the district the reader is looking at.

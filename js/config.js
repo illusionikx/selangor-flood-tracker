@@ -262,7 +262,7 @@ export const camSrc = s =>
 export const WEATHER = [
   { icon: 'sunny', night: 'clear_night', pin: 'sunny', word: 'Clear', line: '' },
   { icon: 'rainy',       pin: 'rainy', word: 'Rain',  line: 'Rain' },
-  { icon: 'rainy_heavy', pin: 'rainy', word: 'Heavy', line: 'Heavy rain' },
+  { icon: 'rainy_heavy', pin: 'rainy_heavy', word: 'Heavy', line: 'Heavy rain' },
 ];
 
 /* Cloud is a refinement of rung 0, never a rung of its own. The rungs are an intensity ladder, and
@@ -279,6 +279,26 @@ export const WEATHER = [
    district over a day, drawn here on one point at one moment. It is accepted only inside the case
    where MET itself makes no claim about the sky at all. */
 export const WX_CLOUD = { icon: 'cloud', word: 'Cloudy', line: 'Cloudy', tone: 'cloud' };
+
+/* Thunderstorm is the mirror of cloud, and it refines the WET rungs for the same kind of reason.
+   The nowcast cannot observe lightning. Its three words are about rain and nothing else. The daily
+   forecast can, and `Ribut petir` is its most common value by far: 331 of 500 rows on 2026-08-18,
+   and 13 of the 16 districts this map covers.
+   **It applies only from rung 1 up.** Both sources have to agree that something is falling. The
+   nowcast says it rains here now, and the district's day is forecast to carry storms, so calling
+   that rain a thunderstorm adds the one fact the nowcast has no word for. At rung 0 nothing is
+   falling, and a bolt over a dry point would be the forecast overruling the observation.
+   `flash_on` is the bare bolt rather than `thunderstorm`, which is a cloud with bolts under it. At
+   pin size the cloud in that glyph reads as the same cloud `rainy` and `cloud` already draw, and
+   the three then differ only in their hatching. */
+export const WX_STORM = { icon: 'flash_on', word: 'Storm', line: 'Thunderstorm', tone: 'storm' };
+
+/* The one place that decides whether a point takes a refinement instead of its rung. The pin
+   glyph, the pin colour and the card word all read it, so the three cannot drift. Returns null
+   where the rung answers for itself. */
+export const wxSky = (r, sky) =>
+  r === 0 && sky === 'cloud' ? WX_CLOUD :
+  r >= 1  && sky === 'storm' ? WX_STORM : null;
 
 /* How close two weather pins may draw before the map keeps only the first. A pin draws 31.2px
    wide, so 40 leaves about 9px of air. Measured at latitude 3.1, this thins hard at zoom 11 and

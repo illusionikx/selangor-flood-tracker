@@ -3,7 +3,7 @@
 // Loaded on demand. A reader who never opens weather mode loads none of this and fetches none of
 // its data. That is why the points ride ?wx=1 and not the payload every poll already carries.
 
-import { FEED_WX, WX_THIN_PX, WEATHER, WX_CLOUD, MET_NAME } from './config.js';
+import { FEED_WX, WX_THIN_PX, WEATHER, wxSky, MET_NAME } from './config.js';
 import { PREFS } from './state.js';
 import { map, pinGlyph, openSide, side, focusOn } from './map.js';
 import { wxIcon, stamp } from './popup.js';
@@ -40,10 +40,10 @@ function thin(list) {
   return kept;
 }
 
-/* The `--wx-*` half of the pin colour. Cloud rides on rung 0 alone, the same rule wxIcon()
-   obeys, so a wet pin can never take the dry tone. */
-const tone = (r, sky) => (r >= 2 ? 'heavy' : r === 1 ? 'rain'
-                        : sky === 'cloud' ? WX_CLOUD.tone : 'clear');
+/* The `--wx-*` half of the pin colour. It reads `wxSky()` first, the same rule the glyph obeys, so
+   a pin can never take one kind's mark and another's colour. */
+const tone = (r, sky) => wxSky(r, sky)?.tone
+                      ?? (r >= 2 ? 'heavy' : r === 1 ? 'rain' : 'clear');
 
 function paint() {
   layer.clearLayers();
@@ -87,7 +87,7 @@ const dots = p => `<button class="icon dots" popovertarget="mnu-wx"
    `aria-hidden` on the glyph, because the word beside it already says the same thing. A screen
    reader must not say it twice. */
 const stepCard = (rung, clock, now, sky) => {
-  const w = rung === 0 && sky === 'cloud' ? WX_CLOUD : (WEATHER[rung] || WEATHER[0]);
+  const w = wxSky(rung, sky) || WEATHER[rung] || WEATHER[0];
   return `<div class="wxcol${now ? ' now' : ''}">
       <div class="wxrow">
         <i class="i wxbig i-${wxIcon(rung, { clock, sky })}" aria-hidden="true"></i>

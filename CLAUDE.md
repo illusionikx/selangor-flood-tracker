@@ -2013,10 +2013,16 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   town prints a Selangor temperature instead. `wx-build.php` bakes the district from Nominatim,
   through `district` then `city` then `state`. Kuala Lumpur is a federal territory with no daerah,
   so `city` answers there. Putrajaya answers on `state`.
-- **`rainy_heavy` carries no cloud, so the map states heavy rain by color.** Rendered at 31px
-  beside `rainy` it reads as hatching rather than as more of one thing. The map reads its ladder
-  from `WEATHER[].pin`. The card reads its own ladder from `WEATHER[].icon`. The card keeps the
-  streaks, because they read at `wxbig` size. The card also has no color ladder to carry intensity.
+- **The pin ladder used to collapse both wet rungs to `rainy`, and it does not any more.** The
+  argument for collapsing was that `rainy_heavy` carries no cloud of its own. Beside `rainy` at a
+  31px pin it read as hatching rather than as more of one thing. Color carried the intensity, and
+  `WEATHER[].pin` differed from `WEATHER[].icon` for that one rung.
+  **A fifth key is what reversed it.** With a bolt on the strip, the map draws five marks and no
+  longer four. Color alone has to separate five things at once. Two of the five are the wet rungs,
+  already separated by the smallest step on the ramp. So `WEATHER[2].pin` is
+  `rainy_heavy` now, and the two ladders agree on every rung. The hatching argument still holds at
+  31px. It is accepted. A reader counting marks on a five-key legend is worse off than a reader
+  squinting at one.
   **The weather pins sit in warm hues without joining the status set.** The status rule above
   reserves `--s-alert` and its neighbors for status, and states there is no exception. This does
   not breach it. `--wx-clear` is its own token, muted away from `--s-alert` so it cannot read as
@@ -2044,10 +2050,29 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   **Cloud only ever replaces Clear.** `wxIcon()` and `tone()` both test `r === 0` first, so a wet
   pin can never take the dry glyph or the dry tone. It also outranks the night glyph. A moon says
   the sky is clear, which is the one thing an overcast night is not.
-  **The trade-off is real and it runs one way.** `Mendung di beberapa tempat` is a claim about a
-  district across a day, drawn on one point at one moment. It is accepted only inside the case
-  where MET itself makes no claim about the sky at all. Widening it to rain or to a thunderstorm
-  puts a day-scale forecast over an observation. That is a different decision.
+  **The trade-off is real.** `Mendung di beberapa tempat` is a claim about a district across a day,
+  drawn on one point at one moment. It is accepted only inside the case where MET itself makes no
+  claim about the sky at all.
+- **A thunderstorm is the mirror of cloud, and it refines the WET rungs.** The nowcast cannot
+  observe lightning. Its three words are about rain and nothing else. `Ribut petir` is the daily
+  feed's most common value by a distance: 331 of 500 rows on 2026-08-18, and 13 of the 16 districts
+  this map covers. `metDaily()` reads it as `sky: 'storm'`.
+  **It applies only from rung 1 up, and that is what keeps it honest.** Both sources have to agree
+  that something is falling. The nowcast says it rains here now, and the district's day is forecast
+  to carry storms. So calling that rain a thunderstorm adds the one fact the nowcast has no word
+  for. At rung 0 nothing is falling, and a bolt over a dry point is the forecast overruling the
+  observation. Measured on the 2026-08-18 18:00 poll: 28 of 50 points carried `storm`, 3 of them
+  were wet, and 3 bolts drew. The other 25 drew clear.
+  **`wxSky()` in `config.js` is the one place that decides a refinement.** The pin glyph, the pin
+  colour and the card word all read it, so the three cannot drift. `wxIcon()` and `tone()` state no
+  rung test of their own any more.
+  **The glyph is `flash_on` and not `thunderstorm`.** The second is a cloud with bolts under it. At
+  pin size its cloud reads as the same cloud `rainy` and `cloud` already draw. The three then differ
+  only in their hatching. That is the fault the entry above this one describes.
+  **`--wx-storm` is a violet, and it sits closest to `--k-rainfall` of any token here.** They never
+  share a surface. Weather mode draws no station pin, and `syncHeat()` shows `#lgWx` only while
+  every other legend section is hidden. It is lighter than `--wx-heavy` rather than darker, which
+  is the rule the palette block below states for the whole set.
 - **Weather mode never writes `PREFS.heatLayer`.** `syncHeat()` reads `PREFS.wx` as one more input
   and drops both canvases while the mode is on. So leaving the mode restores whatever heatmap the
   reader had, with nothing remembered and nothing to get wrong. Do not add a "previous layer" field.
