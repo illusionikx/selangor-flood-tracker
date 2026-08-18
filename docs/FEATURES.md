@@ -10335,172 +10335,180 @@ that reports a change in feed order.
 
 ## The paint chooser moved onto the map
 
-**The layer controls left the drawer.** They sit behind `#paint`, a button in the map's own
-zoom-control cluster, with a popover on it. Six controls in two labelled groups.
+**The layer controls left the drawer.** They sit behind `#paint`, a FAB in the map's own zoom-control
+cluster, with a popover on it. Two layers at the top level, and everything else inside one of them.
 
-| group | holds | shape |
-|---|---|---|
-| Heatmap | Water level, Rainfall | one mutually-exclusive choice, `PREFS.heatLayer` |
-| Icons | Stations (Favorites, On alert), Weather | two layers, one with two filters under it |
+```
+Stations                      the station layer
+   HEATMAP                      how its readings wash over the map
+     Water level                  one at a time
+     Rainfall
+   ICON                         which of its pins draw
+     Favorites                    one at a time
+     On alert
+Weather                       the MET nowcast layer
+```
 
-**The argument is the go-to box's argument.** This is a control you reach for *while looking at the
-map*. Behind the hamburger it meant opening a panel to use it, then closing that panel to see the
-result. Filters shape the view and this paints it. The key was already on the map, bottom-left.
+**No headings over the top level.** Stations and Weather are the two things this map draws. Every
+other control answers a question ABOUT the station layer, so it lives inside it.
 
-**It sits with the zoom control, not alone in a corner.** Beside it on a desktop, above it on a
-phone where `#legend` takes the width. It is map furniture, so it stands in the furniture cluster
-and wears that cluster's look.
+**The argument for leaving the drawer is the go-to box's argument.** This is a control you reach for
+*while looking at the map*. Behind the hamburger it meant opening a panel to use it, then closing
+that panel to see the result.
+
+### Where it sits
+
+**With the zoom control, not alone in a corner.** Beside it on a desktop, above it on a phone where
+`#legend` takes the width. It is map furniture, so it stands in the furniture cluster.
 
 The offsets come off Leaflet's own margins. `.leaflet-bottom.leaflet-right` carries
 `margin-bottom: 26px` and Leaflet adds a 10px gutter, so the zoom box sits 36px up and 10px in with
 30px buttons. Desktop puts this button 48px in on the same baseline. A phone puts it 136px up on the
 same right edge, over an 88px box.
 
-`paint-check.html` asserts the adjacency in rendered pixels at both widths, so a change to either
+`paint-check.html` asserts the adjacency in rendered pixels at both widths. So a change to either
 margin fails a check rather than drifting apart on screen.
 
 `z-index: 401` puts it over the legend and the alert panel, one rung under `#gotoBox`'s results list
-and under the app bar. It steps aside for the station panel exactly as the zoom buttons and the
-credit do. It does not ride the drawer, which is on the other side.
+and under the app bar. It steps aside for the station panel exactly as the zoom buttons do. It does
+not ride the drawer, which is on the other side.
 
-**No JavaScript at all.** The panel is a `popover`, so the open state, the light dismiss, the Escape
-key and the top layer are the platform's.
-
-The `toggle` handler in `js/ui.js` places any `.menu` under its own `[popovertarget]` button. Nothing
-in that handler names one menu. The five checkboxes keep their ids, so `syncHeat()`, `syncWx()`,
-`syncRisingChip()` and `syncFavChip()` still write them, and remain the only writer of them.
-
-### The button took three tries, and both failures had one cause
+### The button took three tries, and two failures had one cause
 
 **First it drew the active layer's glyph.** The water drop, the rain cloud, the sun. Two of those
 three are the glyphs the river and rainfall PINS draw.
 
-So the control drew a rain cloud, on a map covered in rain clouds, in the corner where a reader
-looks for a control. `--surface` on the dark theme is the tone of the basemap under it. A reader
-named the result: indistinguishable from a map icon.
+So the control drew a rain cloud, on a map covered in rain clouds. It stood in the corner where a
+reader looks for a control. `--surface` on the dark theme is the tone of the basemap under it. A
+reader named the result: indistinguishable from a map icon.
 
-**Then it became an M3 FAB**, filled `--accent`, with `Layers` under the glyph, still alone in the
-top-left corner. The same reader: it stands out too much.
+**Then it became an accent-filled FAB with a label**, still alone in the top-left corner. The same
+reader: it stands out too much.
 
-**Both failures came from the same thing.** A control on its own in the middle of a map has to
-shout to read as a control. Neither the whisper nor the shout is the answer to that.
+**Both failures came from the same thing.** A control alone in the middle of a map has to shout to
+read as a control. Neither the whisper nor the shout answers that.
 
-**So it moved into the zoom control's cluster and stopped doing either.** `.mapbtn` is the zoom
-control's own look: `--surface`, `--on-surface`, an 8px radius and `var(--shadow)`. No text and no
-accent. Standing against the zoom box, it reads as one more map control, which is what it is.
+**So it moved into the zoom cluster.** `.mapbtn` keeps the cluster's `--surface` fill, `--on-surface`
+ink and `var(--shadow)`, with no text and no accent. It takes M3's FAB size instead: 56px on a 16px
+radius, against the strip's 30px buttons on 8px.
 
-**The state left with the glyph, and nothing was lost.** `#legend` names the wash and draws its
-ramp, bottom-left. `#risebadge` states the filter, top-centre. `#shown` counts what the drawer
-hides. Every one of those was already on screen. `#layerN`, the drawer summary that named the layer, is gone with
-its line in `syncHeat()`.
+**It stands out by size and never by colour.** It opens the map's own settings and it is the one
+control in that cluster that is not a zoom. Size says that. An accent fill said something louder,
+and a status hue is not available to it at all.
 
-### The zoom control had lost its own shadow and its touch targets
+**The state left with the glyph, and nothing was lost.** `#legend` names the wash and draws its ramp.
+`#risebadge` states the filter. `#shown` counts what the drawer hides. Every one of those was already
+on screen. `#layerN`, the drawer summary that named the layer, is gone with its line in `syncHeat()`.
 
-Moving in beside it surfaced this. Leaflet puts `.leaflet-touch` on its container, and its
-two-class rules beat every one-class rule in `css/map.css`.
+### Stations owns the wash as well as the pins
 
-`.leaflet-touch .leaflet-bar` sets `box-shadow: none`. `.leaflet-touch .leaflet-bar a` sets 30px.
-So this app's `box-shadow: var(--shadow)` and its 44px phone rule both lost, on every touch-capable
-browser. That is every phone, and any laptop with a touchscreen.
-
-Measured in headless Chrome at 360px: 30px buttons against the 44 the file asks for, and no shadow
-at all.
-
-**It went unseen because both faults look like a choice.** A flat zoom control reads as a style, and
-a 30px button reads as Leaflet's default rather than as this app's rule losing a cascade.
-
-The shadow takes `!important`, matching the `border` declaration beside it. The rule names both
-touch states rather than leaving the size to Leaflet. The layers button wears the same look, so the two
-have to agree, and `paint-check.html` now compares them declaration by declaration.
-
-### Stations owns Favorites and On alert
-
-**`Stations` is the station-pin layer.** It stays on until somebody turns it off. The test is
+**`Stations` is the station layer.** It stays on until somebody turns it off. The test is
 `PREFS.stations !== false`, which is the one `PREFS.drawer` uses. So an unset preference counts as
-on, and a first visit lands on a map with pins.
+on, and a first visit lands on a map with stations.
 
-Favorites and On alert each narrow those pins to a subset. Neither has anything to narrow while the
-pins are off, so they sit **indented under Stations**, behind a spine, and collapse with it.
+Everything under it is a choice about that layer. The heatmap is how its readings wash over the map.
+The icon filters are which of its pins draw. With the layer off, none of them has anything to act
+on, so the whole branch collapses.
 
-**Collapse, not grey.** Two dead rows under a switched-off parent is furniture for the state the
-reader just left.
+**One gate serves both.** `render()` draws pins on `!PREFS.wx && PREFS.stations !== false` and
+`syncHeat()` draws the wash on the same test. A wash still painting under a switched-off Stations
+hides the control that governs it. That is worse than a control with nothing under it.
 
-**Neither box is ever unchecked by the parent.** The check is the preference. Switching Stations
+**Collapse, not grey.** A column of dead rows under a switched-off parent is furniture for the state
+the reader just left.
+
+**Nothing inside is ever unchecked by the parent.** The check is the preference. Switching Stations
 back on has to restore the view that was there before, and a parent that clears its children is a
-destructive control wearing a checkbox. It is a `:has()` rule in `css/chrome.css`, so nothing in
-`js/` can get this wrong.
-
-`render()` gates the pins on `!PREFS.wx && PREFS.stations !== false`. The station counts above that
-gate still run either way. They describe the station set rather than the pins, and `#shown` reports
-the set in words.
+destructive control wearing a checkbox. Both the collapse and the weather dim are `:has()` rules, so
+nothing in `js/` can get either wrong.
 
 **`#shown` answers for both ways of emptying the map.** Weather gives
-`Weather map · flood stations hidden`. Stations off gives `Station pins off · turn them on under
+`Weather map · flood stations hidden`. Stations off gives `Stations off · turn them on under
 Layers`. Without either, the tally reads `0 of 743` and explains nothing.
 
-This app names weather first, because it makes the stronger claim. It takes the heat as well.
+### One at a time, in both sections
 
-*Not built:* no third state on the parent. A tri-state parent that shows "some children on" is a
-control with a meaning nobody reads correctly at a glance, for two children whose own boxes are
-already on screen whenever the parent is on.
+**Each section holds one choice, stored as one string.** `PREFS.heatLayer` is `'water'`, `'rain'` or
+`''`. `PREFS.pinFilter` is `'fav'`, `'alert'` or `''`.
 
-### Weather dims the heatmap group rather than unchecking it
+**A pair of booleans is the shape this must never go back to.** That shape holds a state the panel
+cannot draw, which is both on. This repo has the scar. The two heatmaps were a pair, two repairs
+inside the change handler both failed, and the fix was one string with one function writing both
+boxes from it.
 
-Weather takes the map from both heat canvases **and from the station pins**, and deliberately leaves
-`PREFS.heatLayer` and `PREFS.stations` alone. That is the whole of "turn the previous view back on".
+`syncPins()` in `render.js` is that shape at a second site. It replaced `syncRisingChip()` and
+`syncFavChip()`, and it writes both boxes from the preference on every render.
 
-So the station branch dims under weather too, on the same rule and for the same reason as the
-heatmap group below.
+**Checkboxes rather than radios, because "neither" has to stay reachable.** Clicking a member of a
+radio group cannot clear that group.
 
-So `syncHeat()` leaves the two heat chips checked while weather runs. Grouped under a heading, two
-checked chips claim a wash that is not on the map. The group dims and captions itself instead:
-`off while weather is on`.
+**A filter with nothing behind it clears itself, and `syncPins()` saves that clear.** Nothing starred
+means Favorites cannot stand. So `syncPins()` writes the preference in that case, not just the box.
+A clear that touches only the box returns on the next render. A clear that touches only the screen
+returns on the next reload.
 
-**Dimmed and captioned, never unchecked.** The check is the preference, and the preference is what
-leaving weather mode restores. It is a `:has()` rule rather than a line in `syncHeat()`, because two
-writers on one fact age apart.
+*Migration:* a blob holding both booleans resolves to Favorites. It is the narrower set, and the one
+a reader picks deliberately, station by station.
+
+### Weather dims the station branch rather than unchecking it
+
+Weather takes the map from the whole station branch, pins and wash alike, and deliberately leaves
+`PREFS.stations` and `PREFS.heatLayer` alone. That is the whole of "turn the previous view back on".
+
+So the branch dims under it and the Stations chip captions itself `off while weather is on`. The
+caption rides that chip rather than a heading. So it still reads while the branch stays collapsed.
 
 ### A menu opens away from the nearest edge, on both axes
 
-The placement handler right-aligned every menu to its button and always opened downward. Every
-caller was the ⋮ on a station card. Those sit near the top of a panel on the right edge, so neither
-rule ever showed.
+The placement handler right-aligned every menu to its button and always opened downward. Every caller
+was the ⋮ on a station card. Those sit near the top of a panel on the right edge, so neither rule
+ever showed.
 
 `#paint` exercised both. On the left edge it grew a menu leftward across the drawer, and read as the
-drawer's menu. At the bottom edge the clamp drags a downward menu back over the button it came
-from.
+drawer's menu. At the bottom edge the clamp drags a downward menu back over the button it came from.
 
 So a button in the left half aligns the LEFT edges, and a button in the bottom half opens UPWARD.
 
-**Both are position tests, never space tests, and that is the whole of it.** The handler used to
-flip above the button when the space BELOW ran short. A phone has short space below almost
-everywhere, so that flip put the ⋮ menu above the top edge of the screen. A button in the bottom
-half always has more than half a viewport above it, so a position test cannot repeat that.
+**Both are position tests, never space tests, and that is the whole of it.** The handler used to flip
+above the button when the space BELOW ran short. A phone has short space below almost everywhere, so
+that flip put the ⋮ menu above the top edge of the screen. A button in the bottom half always has
+more than half a viewport above it, so a position test cannot repeat that.
 
-Measured: `#appMenu` holds its place at 1400px and at 360px. So does the ⋮, because `#side` anchors
-to the right edge at both widths and its buttons sit near the top of it.
+Measured: `#appMenu` holds its place at 1400px and at 360px. So does the ⋮.
 
-### What was left behind
+### Two faults this work surfaced in code it did not write
 
-`#kinds` holds the five sensor kinds and nothing else. A kind is not a filter over stations. It is
-which of a station's sensors this map draws at all, which is why it stayed beside the district
-picker while Favorites and On alert went to the map.
+**The zoom control had lost its own shadow and its touch targets.** Leaflet puts `.leaflet-touch` on
+its container, and its two-class rules beat every one-class rule in `css/map.css`.
 
-`#layersect` kept the heading *Layers* over two pin filters, so it is gone.
+`.leaflet-touch .leaflet-bar` sets `box-shadow: none`. `.leaflet-touch .leaflet-bar a` sets 30px. So
+this app's `box-shadow: var(--shadow)` and its 44px phone rule both lost, on every touch-capable
+browser. That is every phone, and any laptop with a touchscreen.
 
-### Naming, and one mismatch that is deliberate
+Measured in headless Chrome at 360px: 30px buttons against the 44 the file asks for, and no shadow at
+all. **Both faults look like a choice**, which is why they went unseen. A flat zoom control reads as
+a style, and a 30px button reads as Leaflet's default.
 
-`#risebadge` reads `ON ALERT` now, matching the chip that raises it. One name for one thing.
+**Switching a heatmap off froze the map.** The vendored `redraw()` reads `this._map._animating` with
+no guard, and Leaflet nulls `_map` on remove. The first add builds `_heat`, and nothing tears it
+down.
 
-**That chip still filters on `s.rising`, which is narrower than what this app calls "on alert"
-everywhere else.** `isHot()` is `isCritical(s) || (river && rising)`. That is what the app bar
-counts, the badge shows and the panel lists.
+So `!this._heat` short-circuits for a layer that was never added, which is why this hid. Add a layer
+and then remove it, and the same call throws.
 
-So the map chip hides stations the app bar counts. The pill's own sentence states the real rule:
-`Every station not climbing is hidden`.
+`render()` calls `setLatLngs()` on both layers on every poll, and `setLatLngs()` ends in `redraw()`.
+So the next poll after switching a heatmap off threw partway through `render()`. The markers, the
+cluster, the alert panel and `#shown` all stopped. The map froze on its last good poll until somebody
+reloaded, with only `js/oops.js` to say why.
 
-Widening the chip to `isHot()` is one line in `render.js`. The repository owner heard that
-trade-off and chose the narrow filter. Read this as a decision on record, not an oversight.
+`SoftHeat.redraw()` bails when there is no map. The fix is in `js/heat.js` rather than in
+`vendor/leaflet-heat.js`, so the vendored file keeps its three patches as the only edits to it.
+
+**`show` in `syncHeat()` stopped meaning one thing.** It read `!PREFS.wx`, and two lines used it as
+if that were its meaning. Once Stations gained a switch it meant "the wash can draw" instead.
+
+With Stations off and weather off, the legend box drew with all three sections hidden. That is an
+empty plate on the map. Both lines ask what they mean now.
 
 ### Measured
 
@@ -10511,14 +10519,31 @@ an estimate of the pill's width and never at the pill. Measured, it cleared alre
 The button is at the bottom now, so the two cannot meet at all. `paint-check.html` keeps the
 assertion rather than dropping it, because this button has moved twice.
 
+### Naming, and one mismatch that is deliberate
+
+`#risebadge` reads `ON ALERT`, matching the chip that raises it. One name for one thing.
+
+**That chip still filters on `s.rising`, which is narrower than what this app calls "on alert"
+everywhere else.** `isHot()` is `isCritical(s) || (river && rising)`. That is what the app bar counts,
+the badge shows and the panel lists.
+
+So the map chip hides stations the app bar counts. The pill's own sentence states the real rule:
+`Every station not climbing is hidden`.
+
+Widening the chip to `isHot()` is one line in `render.js`. The repository owner heard that trade-off
+and chose the narrow filter. Read this as a decision on record, not an oversight.
+
 ### Not built
 
-*No hover-to-expand.* Leaflet's own layers control opens on hover. It needs a tap path anyway at
-this project's breakpoint, and a box that opens on hover over a map opens while somebody pans it.
-One press, both platforms.
+*No hover-to-expand.* Leaflet's own layers control opens on hover. It needs a tap path anyway at this
+project's breakpoint, and a box that opens on hover over a map opens while somebody pans it. One
+press, both platforms.
 
 *No copy left in the drawer.* Two controls on one preference is the fault `syncHeat()`'s own comment
 describes at length.
+
+*No third state on the Stations chip.* A tri-state parent showing "some children on" is a control
+nobody reads correctly at a glance, for children whose own boxes are on screen whenever it is on.
 
 *No thumbnail on the button.* Google Maps previews the basemap there. This app has one basemap, and
 it follows the theme. So the picture carries no information.
@@ -10639,3 +10664,19 @@ is gone.
 **Not built.** Coverage is dropped. MET writes `di beberapa tempat`, `di kebanyakan tempat`,
 `menyeluruh` and `di kawasan pedalaman`, and all four read as one storm here. A pin has one mark.
 The district that mark stands in is not the district the reader is looking at.
+
+**Two follow-ups, same day.** Rung 1 draws `rainy_light` rather than `rainy`. One streak against
+two reads as less and more of one thing. Two streaks against three reads as two weights of the same
+hatching, which is the fault that collapsed the pin ladder in the first place. The three wet glyphs
+now step `rainy_light`, `rainy_heavy`, bolt, and they differ by shape before they differ by colour.
+
+And the legend box fits the weather section. It states 288px for a heat section, because a heat
+section is sized by its ramp and a ramp has no intrinsic width. The weather section stretches
+nothing. Five fixed keys measure 231px, so the other 57 were dead surface over the map.
+`#legend:has(> #lgWx:not([style*="none"]))` narrows it. `syncHeat()` shows `#lgWx` only while both
+heat sections are hidden, so the two cases cannot overlap.
+
+`.wxkey` wraps as well. Below about 320px the strip beside the zoom buttons is narrower than five
+keys. A squashed key breaks its own word before it drops a whole one. Measured at four widths: the
+heat legend holds 288px unchanged, the weather legend fits at 231.3px with 0.3px to spare, and in a
+210px box the keys take two rows with nothing outside it.

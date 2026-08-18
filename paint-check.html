@@ -118,8 +118,13 @@ const zbtn = d.querySelector('.leaflet-control-zoom a').getBoundingClientRect();
 is(Math.round(r.bottom), Math.round(zoom.bottom), 'desktop: shares the zoom control baseline');
 is(r.right < zoom.left, true, 'desktop: sits to the LEFT of the zoom box');
 is(Math.round(zoom.left - r.right) <= 12, true, 'desktop: and up against it, not adrift');
-is(Math.round(r.width), Math.round(zbtn.width), 'desktop: the same width as a zoom button');
-is(Math.round(r.height), Math.round(zbtn.height), 'desktop: and the same height');
+/* FAB-sized, not zoom-sized. It opens the map's own settings and is the one control in the cluster
+   that is not a zoom, so it is the one that gets M3's 56px. It stands out by size, never by colour
+   — a reader cut the accent fill that tried the other way. */
+is(Math.round(r.width), 56, 'desktop: M3 FAB width');
+is(Math.round(r.height), 56, 'desktop: and FAB height');
+is(parseFloat(w.getComputedStyle(btn).borderTopLeftRadius), 16, 'desktop: on the FAB radius');
+is(r.width > zbtn.width, true, 'desktop: and larger than a zoom button, which is the point');
 // Nothing else floats here. An overlap is a control a reader cannot press.
 for (const id of ['legend', 'pills', 'toast', 'credit', 'bar']) {
   const o = el(id); if (!o) continue;
@@ -151,8 +156,10 @@ is(me.backgroundColor !== 'rgba(0, 0, 0, 0)' && me.backgroundColor !== 'transpar
    rules in two files paint them, because Leaflet's sheet needs beating and this does not. */
 is(me.backgroundColor, za.backgroundColor, 'it wears the zoom control fill');
 is(me.color, za.color, 'and its ink');
-is(me.borderTopLeftRadius, zc.borderTopLeftRadius, 'and its corner radius');
 is(me.boxShadow, zc.boxShadow, 'and its elevation');
+/* NOT its radius. This one is a FAB, so it takes M3's 16px against the control strip's 8px. That
+   difference is deliberate and the assertion above pins the number. */
+is(me.borderTopLeftRadius !== zc.borderTopLeftRadius, true, 'but its own FAB radius');
 
 /* The glyph holds whatever paints. That is the whole point of the change. */
 const seen = new Set();
@@ -163,30 +170,29 @@ for (const [h, r, x] of [[1, 0, 0], [0, 1, 0], [0, 0, 1], [0, 0, 0]]) {
 }
 is(seen.size, 1, 'the glyph holds at all four states, so it can never name a layer');
 
-// --- the two groups ----------------------------------------------------------------------------
-
-const groups = [...menu.querySelectorAll('.mgroup')].map(g => g.firstChild.textContent.trim());
-is(groups.length, 2, 'the panel is two labelled groups');
-is(groups[0], 'Heatmap', 'the wash group comes first');
-is(groups[1], 'Icons', 'then the group that changes what draws');
-is(el('heat').closest('.mgrp') === el('rainHeat').closest('.mgrp'), true,
-   'the two heat layers share a group');
-for (const id of ['stations', 'favOnly', 'wxLayer', 'risingOnly'])
-  is(el(id).closest('.mgrp') !== el('heat').closest('.mgrp'), true, id + ' is in the icon group');
-
-// --- Favorites and On alert are children of Stations -------------------------------------------
-/* Each one narrows the station pins to a subset, so neither has anything to narrow while the pins
-   are off. The nesting has to be visible, and the collapse must not be destructive. */
+// --- two layers at the top, and everything else is a choice about one of them --------------------
+/* There are no headings over the top level. Stations and Weather are the two things this map can
+   draw, and every other control in the panel answers a question ABOUT the station layer, so it
+   lives inside it. */
 const sub = menu.querySelector('.subgrp');
-is(!!sub, true, 'the two filters sit in a subgroup');
-for (const id of ['favOnly', 'risingOnly'])
-  is(el(id).closest('.subgrp') === sub, true, id + ' is inside it');
-is(el('stations').closest('.subgrp'), null, 'and Stations itself is not — it is the parent');
-is(el('wxLayer').closest('.subgrp'), null, 'nor is Weather, which is a sibling of Stations');
+is(!!sub, true, 'Stations carries a branch');
+for (const id of ['heat', 'rainHeat', 'favOnly', 'risingOnly'])
+  is(el(id).closest('.subgrp') === sub, true, id + ' is inside that branch');
+is(el('stations').closest('.subgrp'), null, 'Stations itself is not — it is the parent');
+is(el('wxLayer').closest('.subgrp'), null, 'and Weather is a layer of its own, not a child');
 // The parent has to come first, or the indent points at nothing above it.
 const rows = [...menu.querySelectorAll('.chip, .subgrp')];
 is(rows.indexOf(el('stations').closest('.chip')) < rows.indexOf(sub), true,
-   'Stations is drawn above its children');
+   'Stations is drawn above its branch');
+is(rows.indexOf(sub) < rows.indexOf(el('wxLayer').closest('.chip')), true,
+   'and Weather below it, so the branch cannot look like Weather\'s');
+
+// --- the branch is two labelled sections ----------------------------------------------------------
+const groups = [...sub.querySelectorAll('.mgroup')].map(g => g.textContent.trim());
+is(groups.length, 2, 'the branch is two labelled sections');
+is(groups[0], 'Heatmap', 'the wash comes first');
+is(groups[1], 'Icon', 'then which pins draw');
+is(menu.querySelectorAll(':scope > .mgroup').length, 0, 'and nothing is labelled at the top level');
 
 el('stations').checked = true; el('wxLayer').checked = false;
 /* Geometry has to be measured with the panel OPEN. A closed popover is `display: none`, so every
@@ -205,13 +211,48 @@ is(w.getComputedStyle(sub).borderLeftStyle !== 'none', true, 'with a spine carry
 
 el('stations').checked = false;
 await wait(60);
-is(w.getComputedStyle(sub).display, 'none', 'Stations off -> the children collapse');
+is(w.getComputedStyle(sub).display, 'none', 'Stations off -> the whole branch collapses');
 is(el('favOnly').checked === false && el('risingOnly').checked === false, true,
-   'collapsing does not silently check them');
+   'collapsing does not silently check anything');
 el('stations').checked = true;
 await wait(60);
 menu.hidePopover();
 await wait(60);
+
+/* **One at a time in each section**, and driven through the real `change` path rather than by
+   assignment: the preference is what makes both-on unrepresentable, and only the handler writes it.
+   A pair of booleans is the shape this must never go back to — see syncHeat()'s own comment for the
+   two repairs that failed before the pair became one string. */
+const pick = async id => {
+  const box = el(id);
+  box.checked = true;
+  box.dispatchEvent(new w.Event('change'));
+  await wait(400);
+};
+/* **Assert the property, not the scenario.** A pick only takes when its set has members: the live
+   payload usually has nothing starred, so Favorites is disabled and syncPins() clears any attempt
+   to select it. That is correct behaviour, and a scenario test reads it as a failure. What must
+   hold either way is that a pair can never both be checked. */
+const onCount = pair => pair.filter(id => el(id).checked).length;
+for (const id of ['favOnly', 'risingOnly', 'favOnly', 'rainHeat', 'heat', 'rainHeat']) {
+  await pick(id);
+  is(onCount(['favOnly', 'risingOnly']) <= 1, true, 'after ' + id + ': at most one pin filter on');
+  is(onCount(['heat', 'rainHeat']) <= 1, true, 'after ' + id + ': at most one heatmap on');
+}
+/* And the mechanism behind it: one preference holding one string. A pair of booleans can hold
+   both-on, which is the state this panel cannot draw. */
+const prefs = JSON.parse(w.localStorage.getItem('prefs') || '{}');
+is(typeof prefs.pinFilter, 'string', 'the pin filters are one preference holding one string');
+is('favOnly' in prefs, false, 'and the old favOnly boolean is migrated away');
+is('risingOnly' in prefs, false, 'and the old risingOnly boolean with it');
+is(typeof prefs.heatLayer, 'string', 'the heatmaps are the same shape, which this copies');
+// Leave the map unfiltered and the water wash on, or later assertions read a filtered payload.
+el('risingOnly').checked = false;
+el('risingOnly').dispatchEvent(new w.Event('change'));
+await wait(400);
+el('heat').checked = true;
+el('heat').dispatchEvent(new w.Event('change'));
+await wait(400);
 
 /* Weather takes the station pins too, through the same `!PREFS.wx` gate in render(). So the branch
    dims rather than leaving a checked Stations box claiming pins that are not drawn. */
@@ -219,34 +260,16 @@ el('wxLayer').checked = true;
 await wait(60);
 is(parseFloat(w.getComputedStyle(el('stations')).opacity) < 1, true,
    'weather on -> the Stations branch dims');
-is(w.getComputedStyle(menu.querySelector('.stationgrp .mhint')).display !== 'none', true,
-   'and the group says why');
+is(w.getComputedStyle(menu.querySelector('.chip .mhint')).display !== 'none', true,
+   'and the Stations chip says why');
 is(el('stations').checked, true, 'and Stations stays checked, because the preference is what returns');
 el('wxLayer').checked = false;
 await wait(60);
 
-/* Weather leaves PREFS.heatLayer alone, so syncHeat() leaves the heat chips checked while it runs.
-   Without the dim and the caption the group claims a wash that is not on the map. */
-el('heat').checked = true; el('wxLayer').checked = false;
-await wait(60);
-const hg = menu.querySelector('.heatgrp');
-is(w.getComputedStyle(hg).opacity, '1', 'the heatmap group is live with weather off');
-is(w.getComputedStyle(hg.querySelector('.mhint')).display, 'none', 'and says nothing');
-el('wxLayer').checked = true;
-await wait(60);
-is(parseFloat(w.getComputedStyle(hg).opacity) < 1, true, 'weather on -> the heatmap group dims');
-is(w.getComputedStyle(hg.querySelector('.mhint')).display !== 'none', true, 'and says why');
-is(el('heat').checked, true, 'and the chip stays checked, because the preference is what returns');
-el('wxLayer').checked = false;
-el('heat').checked = true; el('rainHeat').checked = false;
-await wait(60);
-
 // --- phone width -------------------------------------------------------------------------------
-/* 360px, the width the app bar is measured against. Two claims. The button grows to the touch
-   target the zoom buttons already take. And #pills clears it with nothing moved for it: that strip
-   is centred on the viewport and #risebadge measures 180px here, so it runs 90 to 270 against a
-   button ending at 56. The clearance is 34px and it is measured rather than assumed — an earlier
-   revision pushed the whole strip down 48px on an estimate that was 76px too wide. */
+/* 360px, the width the app bar is measured against. The button is ABOVE the zoom box here rather
+   than beside it, because #legend takes the width left of those buttons. Same 56px at both widths,
+   which is M3's FAB and already clears the 44px touch target. */
 /* Reloaded at this width rather than resized to it. A phone LANDS here, and landing is the path
    that leaves the drawer shut — resizing an open one only exercises the breakpoint listener. */
 f.style.width = '360px';
@@ -261,8 +284,8 @@ is(pd.body.classList.contains('drawer'), false, 'phone: lands with the drawer sh
 const pr = pbtn.getBoundingClientRect();
 const pz = pd.querySelector('.leaflet-control-zoom').getBoundingClientRect();
 const pza = pd.querySelector('.leaflet-control-zoom a').getBoundingClientRect();
-is(pr.width >= 44 && pr.height >= 44, true, 'phone: the button clears the 44px touch target');
-is(Math.round(pr.width), Math.round(pza.width), 'phone: the same size as a zoom button');
+is(Math.round(pr.width), 56, 'phone: the same 56px FAB, no width override');
+is(pr.width > pza.width, true, 'phone: still larger than a zoom button, which is 44 here');
 /* ABOVE the zoom box here, not beside it. #legend takes `left: 12px; right: 68px` at this width, so
    the strip left of the zoom buttons belongs to the legend and there is nowhere to stand. */
 is(pr.bottom <= pz.top, true, 'phone: sits ABOVE the zoom box');

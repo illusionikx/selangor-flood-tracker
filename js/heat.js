@@ -113,6 +113,19 @@ function ramp(t, k) { const u = (t - k) / (1 - k); return 1 - u * u * (3 - 2 * u
    existed and went with it. */
 
 const SoftHeat = L.HeatLayer.extend({
+  /* **A layer that has been added and then removed still has a canvas and no map, and the vendored
+     `redraw()` reads `this._map._animating` with no guard for it.** Leaflet nulls `_map` on remove.
+     `_heat` is built on the first add and never torn down. So `!this._heat` short-circuits for a
+     layer that was never added, which is why this hid for so long, and throws for one that was.
+     `render()` calls `setLatLngs()` on both layers unconditionally, and `setLatLngs()` ends in
+     `redraw()`. So switching a heatmap OFF made the next poll throw partway through `render()`.
+     Everything after that line stopped: the markers, the cluster, the alert panel and `#shown`. The
+     map froze on the last good poll until somebody reloaded, with only `js/oops.js` to say why.
+     Fixed here rather than in `vendor/leaflet-heat.js`, so the vendored file stays a vendored file
+     and the three patches in it stay the only edits to it. `heatScale()` states the same rule from
+     the other side, with `map.hasLayer()`. */
+  redraw() { return this._map ? L.HeatLayer.prototype.redraw.call(this) : this; },
+
   setDry(latlngs) { this._dry = latlngs; return this.redraw(); },
 
   /* Paint the readings as a field rather than as a pile of shapes. **Two gauges over one patch of
@@ -393,17 +406,20 @@ export function heatOpacity() {
    how the pair reached both-on and stayed there — the legend drew both ramps, the two layers
    composited into a colour neither scale defines, and the summary went on naming the one the reader
    had picked, because it alone was written from the handler. Deriving the pair from one string
-   makes both-on unrepresentable whoever wrote the DOM. `syncRisingChip()` and `syncFavChip()` in
-   render.js re-assert their own chips on every poll for the same reason. */
+   makes both-on unrepresentable whoever wrote the DOM. `syncPins()` in render.js is this same shape
+   at a second site, for the two pin filters, and it exists because of this entry. */
 export function syncHeat() {
   const wet = PREFS.heatLayer === 'water', rainy = PREFS.heatLayer === 'rain';
   el('heat').checked = wet;
   el('rainHeat').checked = rainy;
-  /* Weather mode takes the map, so both canvases come off — but PREFS.heatLayer is NOT written.
-     That is the whole of "turn the previous heatmap back on": the reader's choice never left. So
-     leaving weather mode restores it with no state to remember. The summary names what is stored
-     rather than what is drawn. That is because the pref is what the two boxes above report. */
-  const show = !PREFS.wx;
+  /* Two things take the wash off the map, and NEITHER writes PREFS.heatLayer. That is the whole of
+     "turn the previous heatmap back on": the reader's choice never left, so restoring it needs no
+     state remembered anywhere.
+     Weather mode takes the map outright. `Stations` is the reader switching the station layer off,
+     and the heatmap is a choice about that layer — it sits inside it in `#paintmenu` — so it goes
+     with it. A wash still drawn under a switched-off Stations is a layer with its control hidden,
+     which is worse than a control with nothing under it. */
+  const show = !PREFS.wx && PREFS.stations !== false;
   /* No summary line here any more. This choice left the drawer for the map's own top-left corner,
      and the button there draws the active layer's own glyph. So what the map paints is on screen
      without opening anything, which is what the drawer summary was for. That glyph is CSS, off the
@@ -413,12 +429,17 @@ export function syncHeat() {
   el('lgWater').style.display = wet && show ? '' : 'none';
   el('lgRain').style.display  = rainy && show ? '' : 'none';
   // The legend box holds three sections now, so one function decides whether the box itself shows.
-  el('lgWx').style.display = show ? 'none' : '';
+  el('lgWx').style.display = PREFS.wx ? '' : 'none';
   /* The opacity slider drives whichever canvas is on the map, through the LAYERS loop in
      heatOpacity() below. Weather mode and the "off" choice both leave neither canvas on the map.
      A slider left on screen there acts on nothing. That is worse than no slider at all. */
   el('heatOpacityRow').style.display = (wet || rainy) && show ? '' : 'none';
-  el('legend').style.display = !show || wet || rainy ? '' : 'none';
+  /* **`show` stopped being the same question as `!PREFS.wx` when Stations gained a switch**, and
+     this line and the one above both used it as if it were. With Stations off and weather off,
+     `!show` was true, so the box drew with all three of its sections hidden — an empty plate on the
+     map. It asks what it means now: the weather key when weather is on, a ramp when a wash is
+     actually drawn, and nothing otherwise. */
+  el('legend').style.display = PREFS.wx || ((wet || rainy) && show) ? '' : 'none';
   heatScale();   // sizes whichever is on, and re-applies opacity
   heatOpacity();
 }

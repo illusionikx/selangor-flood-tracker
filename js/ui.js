@@ -454,8 +454,14 @@ el('heatOpacity').oninput = () => {
    ask where the water is coming from. */
 PREFS.heatLayer ??= PREFS.rainHeat ? 'rain' : PREFS.heat === false ? '' : 'water';
 delete PREFS.heat; delete PREFS.rainHeat;   // dropped from the blob on the next save()
-el('risingOnly').checked = !!PREFS.risingOnly;
-el('favOnly').checked = !!PREFS.favOnly;
+
+/* The two pin filters are one choice too, and for the same reason: `'fav'`, `'alert'` or `''`. A
+   blob saved before this change can hold both booleans true, which is a state the panel cannot
+   draw. Favorites wins that migration because it is the narrower set and the one a reader picks
+   deliberately, station by station. Nothing writes these boxes here — syncPins() in render.js does
+   it, off the preference, on every render. */
+PREFS.pinFilter ??= PREFS.favOnly ? 'fav' : PREFS.risingOnly ? 'alert' : '';
+delete PREFS.favOnly; delete PREFS.risingOnly;
 // Before the first payload, not after it: render() is a whole poll away, and until it ran the map
 // carried the water layer and the legend carried both ramps whatever the pref said. This is also
 // what puts the two chips and the section summary on the pref — see syncHeat() in heat.js.
@@ -466,13 +472,16 @@ syncHeat();
    So it gets a standing pill over the map with the way out on it, the same shape test mode uses.
    The same reasoning as the ignored-sensors panel: anything that suppresses stations has to say so
    somewhere you cannot miss, and has to be undoable from there. */
-const risePill = () => document.body.classList.toggle('rising', el('risingOnly').checked);
+const risePill = () => document.body.classList.toggle('rising', PREFS.pinFilter === 'alert');
 risePill();
-// Dispatching rather than calling the handler: it keys off `e.target` to work out which control
-// moved, and it is the one place that persists, re-filters and closes the drawer on a phone.
+/* Straight to the preference, because the preference is what the box is drawn from. Dispatching a
+   `change` on a box this line had to uncheck first would ask the handler to read back a state this
+   line just invented. */
 el('riseOff').onclick = () => {
-  el('risingOnly').checked = false;
-  el('risingOnly').dispatchEvent(new Event('change'));
+  PREFS.pinFilter = '';
+  save();
+  risePill();
+  applyFilter(false);
 };
 
 el('heat').onchange = el('rainHeat').onchange = el('risingOnly').onchange =
@@ -491,11 +500,15 @@ el('heat').onchange = el('rainHeat').onchange = el('risingOnly').onchange =
   if (e.target === el('heat') || e.target === el('rainHeat'))
     PREFS.heatLayer = !e.target.checked ? '' : e.target === el('heat') ? 'water' : 'rain';
 
-  PREFS.risingOnly = el('risingOnly').checked;
-  PREFS.favOnly = el('favOnly').checked;
-  /* The station pins as a layer. Its two children are NOT cleared with it — they collapse in
-     `#paintmenu` and their preferences stand, so switching the pins back on restores the view that
-     was there before. Clearing them would make the parent a destructive control. */
+  /* The two pin filters are the same shape as the two heatmaps above, and are read the same way:
+     off the box that fired, never off the pair. syncPins() in render.js puts both boxes back on the
+     preference. */
+  if (e.target === el('favOnly') || e.target === el('risingOnly'))
+    PREFS.pinFilter = !e.target.checked ? '' : e.target === el('favOnly') ? 'fav' : 'alert';
+
+  /* The station layer. Nothing inside it is cleared with it — the branch collapses in `#paintmenu`
+     and every preference in it stands, so switching Stations back on restores the view that was
+     there before. Clearing them would make the parent a destructive control. */
   PREFS.stations = el('stations').checked;
   syncHeat();
   risePill();

@@ -1069,8 +1069,9 @@ body.drawer #legend { transform: translateX(var(--drawer)); }
    carries `margin-bottom: 26px` and Leaflet's own corner adds a 10px gutter, so the zoom box sits
    36px up and 10px in. Its buttons are 30px, so the box is 30 wide and 60 tall.
    Desktop puts this button to the LEFT of that box: 10 + 30 + 8 = 48px in, on the same 36px
-   baseline. paint-check.html asserts the adjacency in rendered pixels, so a change to either margin
-   fails a check rather than drifting apart on screen.
+   baseline. It is 56px against the zoom box's 60, so the two read as one cluster with the settings
+   control given the FAB's size. paint-check.html asserts the adjacency in rendered pixels, so a
+   change to either margin fails a check rather than drifting apart on screen.
    401, not 400: it stands over the legend and the alert panel, one rung under #gotoBox's results
    list at 402 and well under the app bar at 600. */
 #paint { position: absolute; z-index: 401; right: 48px; bottom: 36px; }
@@ -1079,31 +1080,22 @@ body.drawer #legend { transform: translateX(var(--drawer)); }
    `body.side` block further down, which this joins. Nothing here rides the drawer any more: that
    panel is on the left and this button is not. */
 
-/* Weather takes the map from both heat canvases and deliberately leaves `PREFS.heatLayer` alone —
-   that is the whole of "turn the previous heatmap back on". So syncHeat() leaves the two chips above
-   checked while weather is on, and without this the group claims a wash that is not on the map.
-   The group states that it is standing by instead. Dimmed and captioned, never unchecked: the
-   check is the preference, and the preference is what leaving weather mode restores.
-   `:has()` rather than a line in syncHeat(), because two writers on one fact age apart. */
-#paintmenu:has(#wxLayer:checked) .heatgrp { opacity: .55; }
-#paintmenu:has(#wxLayer:checked) .heatgrp .mhint { display: block; }
-
-/* The station branch collapses with its parent rather than greying with it. Favorites and On alert
-   each narrow the station pins to a subset, so with the pins off they have nothing to narrow. Two
-   dead rows under a switched-off parent is furniture for the state the reader just left.
-   Neither box is unchecked by this. The check is the preference, and turning Stations back on has
-   to restore the view that was there before it went off. That is the rule the heatmap group states
-   for weather, at a second site. */
+/* The station branch collapses with its parent rather than greying with it. Every control in it is
+   a choice about the station layer — how it washes, which pins draw — so with that layer off there
+   is nothing for any of them to act on. A column of dead rows under a switched-off parent is
+   furniture for the state the reader just left.
+   Nothing in there is unchecked by this. The check is the preference, and turning Stations back on
+   has to restore the view that was there before it went off. */
 #paintmenu:not(:has(#stations:checked)) .subgrp { display: none; }
 
-/* Weather takes the map from the station pins too — see the `!PREFS.wx` gate in render(). So the
-   whole station branch dims under it, exactly as the heatmap group above does, rather than leaving
-   a checked Stations box claiming pins that are not drawn. The caption rides the group heading
-   because this group holds Weather itself, and a caption on the chip that caused the state would
-   sit inside the part that is dimmed. */
+/* Weather takes the map from the whole station branch — pins and heat alike, through the one gate
+   `syncHeat()` and `render()` share. So the branch dims under it rather than leaving a checked
+   Stations box claiming a layer that is not drawn. The caption rides the Stations chip, which is
+   the thing weather switches off. It is outside `.subgrp`, so it still reads when the branch is
+   collapsed as well as when it is dimmed. */
 #paintmenu:has(#wxLayer:checked) #stations,
 #paintmenu:has(#wxLayer:checked) .subgrp { opacity: .55; }
-#paintmenu:has(#wxLayer:checked) .stationgrp .mhint { display: block; }
+#paintmenu:has(#wxLayer:checked) .chip .mhint { display: inline; }
 
 /* `.menu` is a row list of `.mi` buttons and this one holds five `.chip` labels, which bring their
    own padding. So the 4px the shared rule pads with would sit inside the chips' own. */
@@ -1998,13 +1990,13 @@ body.finding #find { display: none; }
   #netstats { left: 8px; }
   /* ABOVE the zoom box here rather than beside it. `#legend` takes `left: 12px; right: 68px` at this
      width, so the strip left of the zoom buttons is the legend's and there is nowhere to stand.
-     44px to match the zoom buttons, which take that size here for the same reason.
+     No size override: `.mapbtn` is 56px at every width, which is M3's FAB and already clears the
+     44px touch target.
      Measured off the same two rules the desktop offset uses. `.leaflet-bottom.leaflet-right` carries
      `margin-bottom: 30px` here and Leaflet's gutter adds 10, so the zoom box sits 40px up. Two 44px
      buttons make it 88 tall. 40 + 88 + 8 = 136. paint-check.html asserts the adjacency, so a change
      to either number fails a check rather than drifting apart on screen. */
-  #paint { right: 10px; bottom: 136px; width: 44px; height: 44px; }
-  #paint .i { font-size: 22px; }
+  #paint { right: 10px; bottom: 136px; }
   /* The legend earns its space: the heatmap is the one layer whose colours mean nothing without it,
      and it is the layer a phone shows most of. Compacted rather than dropped — full width beside the
      zoom buttons, and the sentence explaining the doubling goes, since the tip already says it. */

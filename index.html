@@ -70,8 +70,8 @@
 <link rel="stylesheet" href="vendor/markercluster.css">
 <link rel="stylesheet" href="vendor/fonts.css?v=51">
 <link rel="stylesheet" href="css/icons.css?v=93">
-<link rel="stylesheet" href="css/base.css?v=133">
-<link rel="stylesheet" href="css/chrome.css?v=186">
+<link rel="stylesheet" href="css/base.css?v=134">
+<link rel="stylesheet" href="css/chrome.css?v=187">
 <link rel="stylesheet" href="css/map.css?v=153">
 
 <!-- Water tint for the dark basemap. CARTO's dark_all is greyscale — all 18 of its tones have zero
@@ -1000,9 +1000,9 @@
      limit. -->
 <div id="toast" class="surface" role="status" aria-live="polite"></div>
 <!-- Bottom of the map, in the zoom control's own cluster: beside it on a desktop, above it on a
-     phone where the legend takes the width. It is map furniture, so it sits with the map furniture
-     and wears the zoom control's own look. Two groups, because the six controls under it answer two
-     questions.
+     phone where the legend takes the width. FAB-sized, because it opens the map's own settings and
+     is the one control in that cluster that is not a zoom. It keeps the cluster's surface rather
+     than an accent fill, so it stands out by size and never by colour.
      Heatmap is what the map WASHES, and the two in it are one mutually-exclusive choice.
      Icons is what the map DRAWS, and the three in it are independent.
      They sit here rather than in the drawer for the reason the go-to box does: this is a control you
@@ -1012,45 +1012,42 @@
      them. The `toggle` handler in js/ui.js places any `.menu` under its own `[popovertarget]`
      button, so there is no script here at all.
      No `checked` attribute on any box. `PREFS` is the source of truth, and syncHeat(), syncWx(),
-     syncRisingChip() and syncFavChip() write the boxes from it. A hard-coded state here is a second
+     syncPins() write the boxes from it. A hard-coded state here is a second
      source that can only disagree. `autocomplete="off"` stops the other writer. A browser restores
      a checkbox across a reload without firing `change`. Every checkbox a preference owns carries
      it. -->
 <button id="paint" class="mapbtn" popovertarget="paintmenu"
         title="Map layers" aria-label="Map layers"><i class="i i-layers"></i></button>
 <div id="paintmenu" class="menu surface" popover>
-  <!-- The two heat canvases. Weather takes the map from both of them and leaves the preference
-       alone, which is the whole of "turn the previous heatmap back on". So these two chips stay
-       checked while weather is on, and the hint says so rather than letting them claim a wash that
-       is not there. -->
-  <div class="mgrp heatgrp">
-    <p class="mgroup">Heatmap<span class="mhint">off while weather is on</span></p>
+  <!-- Two things at the top level and no headings over them: the station layer and the weather
+       layer. Everything else in here is a choice ABOUT the station layer, so it lives inside it.
+       Weather takes the map from the whole station branch, which is why that branch dims under it
+       rather than unchecking. The check is the preference, and the preference is what returns. -->
+  <label class="chip"><input type="checkbox" id="stations" autocomplete="off">
+    <i class="glyph i i-place"></i>Stations <span class="mhint">off while weather is on</span></label>
+  <!-- Collapses with its parent rather than greying. Every control in here is a choice about the
+       station layer, so with that layer off there is nothing for any of them to act on. Nothing in
+       here is ever unchecked by the collapse: switching Stations back on has to restore the view
+       that was there before it went off. -->
+  <div class="subgrp">
+    <!-- How the station readings wash over the map. One at a time: stacked, two heat layers are two
+         answers to two questions in one picture, and leaflet.heat adds their alpha into a colour
+         that belongs to neither scale. -->
+    <p class="mgroup">Heatmap</p>
     <label class="chip"><input type="checkbox" id="heat" autocomplete="off">
       <i class="glyph i i-water_drop"></i>Water level</label>
     <label class="chip"><input type="checkbox" id="rainHeat" autocomplete="off">
       <i class="glyph i i-rainy"></i>Rainfall</label>
+    <!-- Which station pins draw. One at a time for the same reason as the pair above. Each one
+         answers "show me only these", and two of those at once answers neither question. -->
+    <p class="mgroup">Icon</p>
+    <label class="chip"><input type="checkbox" id="favOnly" autocomplete="off">
+      <i class="glyph i i-favorite"></i>Favorites <span id="favHint" class="hint"></span></label>
+    <label class="chip"><input type="checkbox" id="risingOnly" autocomplete="off">
+      <i class="glyph i i-warning"></i>On alert <span id="risingHint" class="hint"></span></label>
   </div>
-  <!-- What the map DRAWS, against the wash above. Two things at this level: the station pins and
-       the weather pins. Weather still takes the map from the stations, so the station branch dims
-       under it the same way the heatmap group does.
-       Favorites and On alert are children of Stations, not siblings. Each one narrows the station
-       pins to a subset, so neither has anything to say while the pins themselves are off. They
-       collapse rather than grey, because two dead rows under a switched-off parent is furniture
-       for a state the reader just left. They are never unchecked: the check is the preference, and
-       turning Stations back on has to bring back the view that was there before. -->
-  <div class="mgrp stationgrp">
-    <p class="mgroup">Icons<span class="mhint">stations off while weather is on</span></p>
-    <label class="chip"><input type="checkbox" id="stations" autocomplete="off">
-      <i class="glyph i i-place"></i>Stations</label>
-    <div class="subgrp">
-      <label class="chip"><input type="checkbox" id="favOnly" autocomplete="off">
-        <i class="glyph i i-favorite"></i>Favorites <span id="favHint" class="hint"></span></label>
-      <label class="chip"><input type="checkbox" id="risingOnly" autocomplete="off">
-        <i class="glyph i i-warning"></i>On alert <span id="risingHint" class="hint"></span></label>
-    </div>
-    <label class="chip"><input type="checkbox" id="wxLayer" autocomplete="off">
-      <i class="glyph i i-sunny"></i>Weather <span id="wxHint" class="hint"></span></label>
-  </div>
+  <label class="chip"><input type="checkbox" id="wxLayer" autocomplete="off">
+    <i class="glyph i i-sunny"></i>Weather <span id="wxHint" class="hint"></span></label>
 </div>
 <!-- Standing indications that the map is showing less than it holds. One strip, because test mode
      and the rising filter can be on at the same time and two fixed pills would sit on each other.

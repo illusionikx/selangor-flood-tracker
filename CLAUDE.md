@@ -26,7 +26,7 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `index.html` | markup only — no inline CSS or JS |
 | `title-test.html` | `chrome --headless --dump-dom` — one of six runnable checks. Guards the app bar wordmark ladder, in rendered pixels |
 | `narrow-test.html` | `chrome --headless --dump-dom` — one of six runnable checks. Guards the narrow-window block: its threshold, its coverage, its refusal to be dismissed, and that it is modal |
-| `paint-check.html` | `chrome --headless --dump-dom` — one of six runnable checks. Guards the on-map paint chooser: that it reads as a control and not as a map pin, that its two groups hold the right six boxes with the two filters nested under `Stations`, and that it clears the other map furniture at both widths |
+| `paint-check.html` | `chrome --headless --dump-dom` — one of six runnable checks. Guards the on-map paint chooser: that it reads as a control and not as a map pin, that its two layers and the four boxes nested under `Stations` sit where they belong, that each section holds one choice at a time, and that it clears the zoom cluster at both widths |
 | `css/icons.css` | every icon, as an SVG mask. Generated — see docs/FEATURES.md for the fetch |
 | `css/base.css` | tokens, reset, controls, blocks shared by popup + alert panel |
 | `css/chrome.css` | page furniture: app bar, status dot, drawer, legend, splash |
@@ -1394,6 +1394,18 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
   pass. Anything that brings a gradient back needs it back too.
   `heat-test.html` still puts a second gauge 1.2 blobs away on the diagonal. That is outside the first
   blob's circle and inside its square.
+- **Switching a heatmap off used to freeze the whole map, and the reason is one missing null check
+  in the vendored layer.** `redraw()` in `vendor/leaflet-heat.js` reads `this._map._animating` with
+  no guard, and Leaflet nulls `_map` on remove. The first add builds `_heat` and nothing tears it
+  down. So `!this._heat` short-circuits for a layer that was never added, which is why this hid for
+  so long. Add a layer and then remove it, and the same call throws. **`render()` calls
+  `setLatLngs()` on both heat layers on every poll, and `setLatLngs()` ends in `redraw()`.** So the
+  next poll after switching a heatmap off threw partway through `render()`, and every line after it
+  stopped: the markers, the cluster, the alert panel and `#shown`. The map froze on its last good
+  poll until somebody reloaded, with only `js/oops.js` to say why. `SoftHeat.redraw()` in
+  `js/heat.js` bails when there is no map. **The fix is app-side on purpose**, so the vendored file
+  keeps its three patches as the only edits to it. `heatScale()` states the same rule from the other
+  side, with `map.hasLayer()`. Anything new that calls into a heat layer needs one of the two.
 - **`heatScale()` must only size a layer the map holds.** `setOptions()` ends in `redraw()`,
   which reads `this._map._animating`. Leaflet nulls `_map` when it removes a layer. So sizing a
   layer that is off throws a `TypeError`. It hid for a long time. The layer that is off has
@@ -2153,18 +2165,23 @@ it. The weather section stretches nothing. It is five fixed keys measuring 231px
   them.
 - All user settings live in one `prefs` blob in `localStorage` (`PREFS` + `save()`).
 - **The layer controls live on the map, in two groups, and the drawer keeps the sensor kinds.**
-  `#paint` is a `.fab` on the map's top-left. Its popover holds `Heatmap` (water level, rainfall —
-  one mutually-exclusive choice) and `Icons` (`Stations`, with `Favorites` and `On alert` indented
-  under it, then `Weather`). **The rule for what goes where: a control the reader reaches for WHILE
-  LOOKING AT THE MAP goes on `#paint`. A control that shapes which stations exist at all stays in
-  the drawer**, beside the district picker and the ignored list. `#layersect` and `#layerN` are
-  gone.
-  **A parent chip collapses its children and never unchecks them.** `Favorites` and `On alert` each
-  narrow the station pins to a subset, so they collapse when `Stations` goes off. Their preferences
-  stand, because switching the pins back on has to restore the view that was there before. Both the
-  collapse and the weather dim are `:has()` rules in `chrome.css`, so no JS can get either wrong.
-  `render()` gates the pins on `!PREFS.wx && PREFS.stations !== false`, and `#shown` names whichever
-  of the two emptied the map.
+  `#paint` is a `.mapbtn` in the map's bottom zoom cluster. Its popover holds two layers at the top
+  level and no headings over them: `Stations` and `Weather`. Inside `Stations` sit two labelled
+  sections, `Heatmap` (water level, rainfall) and `Icon` (favorites, on alert).
+  **The rule for what goes where: a control the reader reaches for WHILE LOOKING AT THE MAP goes on
+  `#paint`. A control that shapes which stations exist at all stays in the drawer**, beside the
+  district picker and the ignored list. `#layersect` and `#layerN` are gone.
+  **Each section is ONE choice held in ONE string**, `PREFS.heatLayer` and `PREFS.pinFilter`. Never
+  a pair of booleans: that shape holds both-on, which the panel cannot draw, and this repo already
+  paid for it once — see `syncHeat()`'s own comment for the two repairs that failed. `syncPins()` in
+  `render.js` is the second site.
+  **`Stations` gates the wash as well as the pins.** `render()` and `syncHeat()` share the test
+  `!PREFS.wx && PREFS.stations !== false`. Everything under that chip is a choice ABOUT the station
+  layer, so with the layer off none of them has anything to act on and the branch collapses.
+  **A parent collapses its children and never unchecks them.** The check is the preference, and
+  switching `Stations` back on has to restore the view that was there before. Both the collapse and
+  the weather dim are `:has()` rules in `chrome.css`, so no JS can get either wrong. `#shown` names
+  whichever of the two emptied the map.
   **Its glyph is `layers` at every state and must never name the active layer.** It carried the
   water drop and the rain cloud first, which are the glyphs the river and rainfall PINS draw. A
   reader called it indistinguishable from a map icon, and they were right.
@@ -2173,10 +2190,13 @@ it. The weather section stretches nothing. It is five fixed keys measuring 231px
   `#risebadge` states the filter, and `#shown` counts what the drawer hides. A control states which
   control it is.
 
-  **It sits in the zoom control's cluster and wears that cluster's look — no text, no accent.** See
-  `.mapbtn` in `base.css`, which restates `.leaflet-control-zoom`'s fill, ink, radius and shadow.
-  **Keep the two in step.** They stand against each other, and a mismatch of one shade or one pixel
-  reads as a mistake at that distance. `paint-check.html` compares them declaration by declaration.
+  **It sits in the zoom control's cluster and wears that cluster's fill, ink and shadow — no text,
+  no accent.** See `.mapbtn` in `base.css`. **Keep those in step** with
+  `.leaflet-control-zoom`: the two stand against each other, and a mismatch of one shade reads as a
+  mistake at that distance. `paint-check.html` compares them declaration by declaration.
+  **The size and the radius deliberately do NOT match.** It takes M3's FAB, 56px on a 16px radius,
+  against the strip's 30px on 8px. It opens the map's own settings and is the one control there that
+  is not a zoom, so it stands out by size. It must never stand out by colour.
   A second try made it an accent FAB with a label, still alone in that corner. A reader said it
   stood out too much. **Both failures came from putting a control on its own in the middle of a map.
   One had to whisper and the other had to shout. Neither is the answer.** See `docs/FEATURES.md`,
@@ -2891,8 +2911,15 @@ That comparison found a fault in the zoom control rather than in the button — 
 `.leaflet-touch` gotcha above.
 
 **Placement is asserted against the zoom box, never against a constant.** Beside it on a desktop,
-above it on a phone, hard up against it either way. The offsets in `chrome.css` are derived from
-Leaflet's own margins, so a change to either drifts the two apart on screen and nowhere else.
+above it on a phone, hard up against it either way. The offsets in `chrome.css` come off Leaflet's
+own margins, so a change to either drifts the two apart on screen and nowhere else.
+
+**One-at-a-time is asserted as a property, never as a scenario.** A pick only takes when its set has
+members, and the live payload usually has nothing starred. So Favorites is disabled, `syncPins()`
+clears any attempt to select it, and a scenario test reads that correct behaviour as a failure. What
+holds either way is that a pair can never both be checked. The check drives six picks through the
+real `change` path and asserts that after each one, and it reads the stored blob to confirm the
+preference is one string rather than a pair of booleans.
 
 **A resolved token is not a painted pixel.** An early version asserted `--i` alone and passed on a
 button drawing an empty plate, because `#paint::before` had never joined the mask list in

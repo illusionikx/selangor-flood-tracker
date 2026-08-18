@@ -15,45 +15,39 @@ state.rerender = () => render();
    reader who leaves weather mode still gets the one extra tick that tears the layer down. */
 let wxSeen = false;
 
-/* A filter that can legitimately match nothing must never silently empty the map. An empty map
-   reads as "the app is broken". During a flood it reads worse, as "nothing is happening". So the
-   chip turns itself off and says why. Either nothing is climbing, or `rate` is null everywhere
-   because the sample history has not reached an hour yet. That is a fresh install, or a wiped
-   `.history.db`. */
-function syncRisingChip() {
-  const chip = el('risingOnly');
+/* The two pin filters are ONE choice, stored as one preference: `'fav'`, `'alert'` or `''` for
+   neither. Each answers "show me only these", and two of those at once answers neither question.
+   **A pair of booleans is what this must not go back to.** That shape can hold a state the panel
+   cannot draw — both on — and this repo has the scar: the two heatmaps were a pair, two repairs
+   inside the change handler both failed, and the fix was one string with one function writing both
+   boxes from it. This is that shape at a second site. See `syncHeat()` in heat.js.
+   **A filter that can legitimately match nothing must never silently empty the map.** An empty map
+   reads as "the app is broken", and during a flood it reads worse, as "nothing is happening". So a
+   chip with nothing behind it is dead and says why, and a preference with nothing behind it is
+   cleared rather than displayed.
+   That clear has to be SAVED, not just drawn. This function writes the boxes from the preference on
+   every render, so a clear that only touched a box would be undone by the next render, and a clear
+   that only touched the screen would come back on the next reload. */
+function syncPins() {
   const rising = state.data.filter(s => s.rising).length;
+  const starred = state.data.filter(isFav).length;
   const measurable = state.data.some(s => s.rate != null);
 
-  chip.disabled = !rising;
-  if (!rising) chip.checked = false;
+  // Only on the way into the empty state. This runs on every poll for every reader who has starred
+  // nothing — which is every new visitor — so an unguarded write puts a localStorage write on the
+  // poll loop forever, for a preference that has not moved.
+  if ((PREFS.pinFilter === 'alert' && !rising) || (PREFS.pinFilter === 'fav' && !starred)) {
+    PREFS.pinFilter = '';
+    save();
+  }
+  el('risingOnly').checked = PREFS.pinFilter === 'alert';
+  el('favOnly').checked = PREFS.pinFilter === 'fav';
+  el('risingOnly').disabled = !rising;
+  el('favOnly').disabled = !starred;
   el('risingHint').textContent = rising ? `· ${rising}`
     : measurable ? '· none climbing' : '· needs an hour of history';
-  return chip.checked;
-}
-
-/* A filter that empties the map and cannot be reasoned about reads as a bug. So the chip is dead
-   while nothing is starred, and says why. It also un-checks itself in that state. Otherwise a
-   reader who cleared their favorites comes back to a blank map and a control they cannot press.
-   The un-check has to be saved, not just displayed. `el('favOnly').checked = !!PREFS.favOnly` in
-   ui.js reads the stored preference on every load. So an un-check this function performs on the
-   reader's behalf is one the next reload silently reverses. It never writes to PREFS. Clear every
-   favorite and the chip goes off on screen, but PREFS.favOnly stays true. Reload and the filter
-   comes back on with no favorite behind it. It hides most of the map for no reason the reader
-   chose. */
-function syncFavChip() {
-  const chip = el('favOnly');
-  const n = state.data.filter(isFav).length;
-  chip.disabled = !n;
-  el('favHint').textContent = n ? '' : 'none starred';
-  if (!n) {
-    chip.checked = false;
-    // Only on the way into the empty state. This branch runs on every poll for every reader who
-    // has starred nothing — which is every new visitor — so writing here unguarded put a
-    // localStorage write on the poll loop forever, for a preference that had not moved.
-    if (PREFS.favOnly) { PREFS.favOnly = false; save(); }
-  }
-  return chip.checked;
+  el('favHint').textContent = starred ? '' : 'none starred';
+  return PREFS.pinFilter;
 }
 
 
@@ -63,8 +57,7 @@ export function render() {
      the two chips below and syncHeat() all obey. A browser restores a checkbox across a reload
      without firing `change`, so the control cannot be the source of truth. */
   el('stations').checked = PREFS.stations !== false;
-  const risingOnly = syncRisingChip();
-  const favOnly = syncFavChip();
+  const pinFilter = syncPins();
   Object.keys(marks).forEach(k => marks[k] = []);
   siteMark.clear();
   // Every marker below is about to be replaced, and one torn down mid-hover never fires its
@@ -87,8 +80,8 @@ export function render() {
       // from the table or the go-to box is never a flight to an empty patch of map.
       if (isIgnored(s)) continue;
       if (hidden.has(dkey(s))) continue;
-      if (risingOnly && !s.rising) continue;
-      if (favOnly && !isFav(s)) continue;
+      if (pinFilter === 'alert' && !s.rising) continue;
+      if (pinFilter === 'fav' && !isFav(s)) continue;
     }
 
     // Counted before the layer check: the chip's number is "what this layer would add".
@@ -397,9 +390,9 @@ function counts() {
   el('shown').textContent = PREFS.wx
     ? 'Weather map · flood stations hidden'
     : PREFS.stations === false
-    ? 'Station pins off · turn them on under Layers'
+    ? 'Stations off · turn them on under Layers'
     : `${total} of ${state.data.length} stations on the map` +
       (pins && pins < total ? ` · ${pins} pins` : '') +
-      (el('favOnly').checked ? ' · favorites only' : '') +
+      (PREFS.pinFilter === 'fav' ? ' · favorites only' : '') +
       (nIgn ? ` · ${nIgn} ignored` : '');
 }
