@@ -133,7 +133,7 @@ Five commits. Each one reverts on its own.
 | 2 | Sweep type and icons, 136 declarations | high |
 | 3 | Sweep the radii, about 50 declarations | low |
 | 4 | Sweep the padding, and honor the held list | medium |
-| 5 | Remeasure the thresholds in `title-test.html` | none |
+| 5 | Remeasure the wordmark thresholds in `css/chrome.css` | none |
 
 Commit 1 lands alone on purpose. That makes commits 2 to 4 pure substitutions. A reader of the diff
 then sees values and nothing else.
@@ -181,14 +181,22 @@ Shoot before commit 1. Shoot again after commit 4. Read the pairs.
 
 | check | expectation |
 |---|---|
-| `title-test.html` | breaks by design. Commit 5 repairs it. |
+| `title-test.html` | reports a failure by design. Commit 5 repairs the cause. |
 | `narrow-test.html` | stays green. It asserts coverage and modality, never spacing. |
 | `heat-test.html` | unaffected. It reads canvas pixels. |
 | `shots-test.php` | unaffected |
 | `php api.php --selftest` | unaffected |
 
-`title-test.html` measures font widths at 22px Roboto. This work moves the heading size. So that
-check must fail until commit 5 lands.
+**The check itself needs no edit, and an earlier draft of this spec said it did.** `title-test.html`
+hardcodes no threshold. It measures the drawn spelling at fifteen widths. It then asserts three
+properties. One spelling draws at a time. That spelling fits its rail. A narrower rail never draws a
+longer spelling.
+
+The three numbers that need remeasuring live in `css/chrome.css`. They are the container query
+values 190, 282 and 93, at lines 46, 49 and 54. Each one is a measured font width at 22px Roboto,
+plus 32 for the drop and its gap. This work moves the heading size, so all three go stale.
+
+So the check reports a failure until commit 5 lands. Commit 5 edits the stylesheet, never the check.
 
 ## Documentation
 
@@ -222,7 +230,6 @@ Do not add any of these to this pass.
 | `css/chrome.css` | sweep |
 | `css/map.css` | sweep |
 | `index.html` | the version bump on each stylesheet link |
-| `title-test.html` | remeasured thresholds |
 | `docs/FEATURES.md` | the record of this work |
 | `CLAUDE.md` | one Conventions entry |
 | `shot-tmp.html` | added, then deleted |
@@ -246,5 +253,5 @@ Run `heat-test.html` and `narrow-test.html` from the Verify block of CLAUDE.md. 
 
 ## What this ships unverified
 
-Nobody has measured the thresholds in `title-test.html` against the new heading size. Commit 5 does
-that work. Until it lands, that check reports the failure this spec predicts.
+Nobody has measured the three wordmark thresholds against the new heading size. Commit 5 does that
+work, in `css/chrome.css`. Until it lands, `title-test.html` reports the failure this spec predicts.
