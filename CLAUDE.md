@@ -1,16 +1,16 @@
 # Klang Valley Flood Watch
 
 Single-page map of live flood telemetry for Selangor, Kuala Lumpur and Putrajaya, from three JPS
-sources. `api.php` reaches three more hosts server-side, and each one answers a different question:
-OpenStreetMap Nominatim for the go-to box's place search (`?place=`), `met.gov.my` for the rain
-outlook, and `api.data.gov.my` for the day's temperature and MET's own warnings. Six upstream hosts
-in all. **PHP contacts every one of them. The browser contacts none.**
+sources. `api.php` reaches three more hosts server-side. Each one answers a different question.
+OpenStreetMap Nominatim answers the go-to box's place search (`?place=`). `met.gov.my` answers the
+rain outlook. `api.data.gov.my` answers the day's temperature and MET's own warnings. Six upstream
+hosts in all. **PHP contacts every one of them. The browser contacts none.**
 No auth, no build step, no framework. Served by Laravel Herd at `https://flood-exp.test`.
 
 > **Keep the docs current.** When a feature lands or a decision is made, append it to
-> [`docs/FEATURES.md`](docs/FEATURES.md) — what it does and *why*, including trade-offs accepted
-> and things deliberately not built. New gotchas go in the gotcha list below. Do this as part of
-> the change, not as a follow-up task.
+> [`docs/FEATURES.md`](docs/FEATURES.md). State what it does and *why*. Include the trade-offs
+> accepted and the things deliberately not built. New gotchas go in the gotcha list below. Do this
+> as part of the change, not as a follow-up task.
 
 ## Files
 
@@ -80,22 +80,22 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 
 **Composer is server-side only.** `composer install` writes to `lib/`, because `vendor/` already
 holds hand-vendored browser assets that Composer must never manage. The front end is still
-build-free and dependency-free; nothing in `lib/` is ever sent to a browser.
+build-free and dependency-free. Nothing in `lib/` is ever sent to a browser.
 
 **No build step.** The browser loads `js/app.js` as `<script type="module">` and resolves the
 `import`s itself. Vendored libraries stay classic `<script>` tags because they publish globals
 (`L`). Keep relative specifiers with the `.js` extension — there is no resolver to guess them.
-Dependencies must stay acyclic; anything two modules both need lives in `state.js` or `config.js`.
+Dependencies must stay acyclic. Anything two modules both need lives in `state.js` or `config.js`.
 
 ## Data sources
 
 Three JPS feeds, joined on the national station code (`station_Id` in the Selangor API, `Station ID`
 in both HTML tables). The national portal is now the **preferred rainfall source** as well as the
-authoritative river reading: priority for a *reading* is national/portal → whichever feed placed the
-pin. Coordinates for a station another feed already placed still come only from Selangor or WP; the
-portal publishes none there. The portal can place a station no other feed carries, but only through
-its own station search — a small gazetteer this app drips in slowly, never a per-poll coordinate. See
-the `## api.php` section below.
+authoritative river reading. Priority for a *reading* is national/portal, then whichever feed placed
+the pin. Coordinates for a station another feed already placed still come only from Selangor or WP.
+The portal publishes none there. The portal can place a station no other feed carries. It does so
+only through its own station search. That search feeds a small gazetteer this app drips in slowly,
+never a per-poll coordinate. See the `## api.php` section below.
 Only these three carry water. The other three hosts in the table below are not flood-data sources.
 Nominatim answers `?place=` and joins nothing at all. The two MET hosts join a station by nearest
 point and by district name, and they never touch a reading.
@@ -136,8 +136,8 @@ Base: `https://infobanjirjps.selangor.gov.my/JPSAPI/api/` — public, no auth, *
 client script ever read one. Add the URL back to `$lists` the day something plots them.
 
 **Detail endpoints** `…/{id}` carry the actual values. Fetched for rainfall, river, gauge, camera
-via `curl_multi` (~270 requests, ~3s cold). **The lists alone are not enough** — e.g. flood gauges
-return `lastReading: null` in the list but a real `floodLevel` in the detail.
+via `curl_multi` (~270 requests, ~3s cold). **The lists alone are not enough.** For example, flood
+gauges return `lastReading: null` in the list but a real `floodLevel` in the detail.
 
 Field notes:
 - Rainfall detail carries more than `hourlyRainfall`. `threeHoursRainfall` is a 3-hour total and
@@ -145,21 +145,21 @@ Field notes:
   This app reads both now — see the accumulation gotcha below. `spLight` 5 / `spModerate` 11 /
   `spHeavy` 31 / `spVeryHeavy` 61 are the intensity classes for that one station. Nothing reads
   them. `RAIN_STOPS` hard-codes 10/30/60 for everyone. Moving to the published per-station numbers
-  changes pin colour, heat weight and `rainStatus()`, so it goes through the alert design standard
-  first. `rfSpike15`/`rfSpike60` are unread and nothing has looked at them.
+  changes pin colour, heat weight and `rainStatus()`. So it goes through the alert design standard
+  first. `rfSpike15` and `rfSpike60` are unread, and nobody examined them.
 - River detail: `waterLevel1`, `wL1SPAlert/Warning/Danger`, `waterLevel1LastUpdate`.
-- Gauge detail: `floodLevel` = depth **over** a flood-prone spot; **negative means dry ground**.
+- Gauge detail: `floodLevel` is the depth **over** a flood-prone spot. **Negative means dry ground**.
   Thresholds `spWarning` 0.15m / `spDanger` 0.3m.
-- Camera detail: `imageUrl` is **plain http**, so it can't be hotlinked from https — proxied.
+- Camera detail: `imageUrl` is **plain http**, so https cannot hotlink it — proxied.
 - **No feed publishes a state.** `api.php` stamps `state` from which feed placed the pin, at the
-  point the station is built — not later, because `source` is overwritten to `national` wherever
-  that portal's reading wins. District case is normalised to Title Case there too. District names
-  collide across states (KL and Selangor both have a Gombak), so anything keyed by district must
-  key by `state|district` — see `dkey()` in `js/util.js`.
-- Siren **list** has no timestamp of any kind; only the detail carries `statusLastUpdate`. That is
+  point the station is built. It does not stamp it later, because `source` is overwritten to
+  `national` wherever that portal's reading wins. District case is normalised to Title Case there
+  too. District names collide across states. KL and Selangor both have a Gombak. So anything keyed
+  by district must key by `state|district` — see `dkey()` in `js/util.js`.
+- Siren **list** has no timestamp of any kind. Only the detail carries `statusLastUpdate`. That is
   the sole reason all 212 sirens are in the detail fan-out. Stamped >48h ago (`SIREN_STALE`) forces
   `online: false` — sirens heartbeat daily, so two missed days is out of contact, not idle.
-- Timestamps are MYT with no offset; `api.php` pins `Asia/Kuala_Lumpur`. JPS stamps readings to
+- Timestamps are MYT with no offset. `api.php` pins `Asia/Kuala_Lumpur`. JPS stamps readings to
   the *upcoming* slot (17:45 at 17:36), so reading-age is floored at 0.
 - `station_Id` (note the underscore — *not* `stationId`) is the national code the other feeds use.
 
@@ -174,16 +174,17 @@ The portal also publishes rainfall, at `wp-content/themes/shapely/agency/searchr
 `portalRainUrls()` / `portalRows()` / `portalRain()` in `sources.php`. It once answered only headers
 and no rows for every parameter tried. The missing piece was two hidden form inputs, `loginStatus`
 and `language`, that the site's own page always submits alongside the query. With those added it is
-now the **preferred rainfall source**: an authoritative reading and a per-day running total that
-neither Selangor nor SPHTN publishes. See the gotcha list for the row-parsing fault this table hides.
+now the **preferred rainfall source**. It gives an authoritative reading and a per-day running total
+that neither Selangor nor SPHTN publishes. See the gotcha list for the row-parsing fault this table
+hides.
 
 The portal publishes a coordinate too, but only through a separate endpoint, its own station search
 at `wp-content/themes/enlighten/query/searchstation_control.php` — `gazUrl()` / `gazParse()` in
 `sources.php`. That endpoint answers a substring search over station names. It is not a per-poll
-feed, so `api.php` drips it slowly into a small gazetteer table and reads it only to place a station
-no other feed carries. A sibling endpoint, `getrainfalllast7days.php` — `seriesUrl()` /
-`seriesParse()` — answers one station's own 5-minute rainfall history for the last 7 days, and seeds
-a running total for a station this app has never polled before. See the `## api.php` section below
+feed. So `api.php` drips it slowly into a small gazetteer table. It reads that table only to place a
+station no other feed carries. A sibling endpoint, `getrainfalllast7days.php` — `seriesUrl()` /
+`seriesParse()` — answers one station's own 5-minute rainfall history for the last 7 days. It also
+seeds a running total for a station this app never polled before. See the `## api.php` section below
 for both drips.
 
 ### 3. JPS Wilayah Persekutuan / SPHTN — `sources.php`
@@ -191,14 +192,13 @@ for both drips.
 `WaterLevel/LatestData/All` and `Rainfall/LatestData/<district>` return HTML fragments. No `data-th`
 here, so columns are read by **position, guarded on row width** (14 cells for both). Coordinates
 appear only inside the row's `onclick="loadMapPage(lat, lng, …)"`.
-
 **Rainfall has no working `All` route, and must be fetched one district at a time.** That handler
-holds the connection open until the client gives up, and it has done so since 07/08/2026, while its
+holds the connection open until the client gives up. It behaved that way since 07/08/2026. Its
 water-level twin answers in 3.9 s on the same host. `KL_RAIN` in `sources.php` holds the ids, and
 `klStations()` merges the rows of every `kl-rain-*` page before it reads them. **The ids are not a
-range**: 1 to 11 are what the site's own dropdown offers, and 23, 24, 25 and 27 carry seven more
-stations — in Gombak, Pandan, Ampang and Bentong — that the dropdown never lists. Measured
-2026-08-12: 12 to 22, 28 and 30 answer 500, 26 and 29 answer 200 with no rows, and nothing from 31
+range**: 1 to 11 are what the site's own dropdown offers. Ids 23, 24, 25 and 27 carry seven more
+stations the dropdown never lists, in Gombak, Pandan, Ampang and Bentong. Measured
+2026-08-12: 12 to 22, 28 and 30 answer 500. Ids 26 and 29 answer 200 with no rows. Nothing from 31
 to 60 carries a row. Do not restore the `All` URL because it is one request rather than fifteen. It
 cost 25 s on every rebuild, which is the gotcha below.
 
@@ -213,33 +213,34 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
 
 ## api.php
 
-- 5-minute file cache; serves stale cache (flagged `upstreamOk: false`) if upstream dies.
-- Scraped pages get their **own** 15-min cache in the `page` table of `.history.db`: the KL rainfall
-  table takes ~10s to render upstream (vs ~0.3s for a JSON call), so refetching it every poll would
-  triple the cost of a refresh for data that can't have changed. A page that fails to fetch falls
+- 5-minute file cache. If upstream dies, it serves stale cache, flagged `upstreamOk: false`.
+- Scraped pages get their **own** 15-min cache in the `page` table of `.history.db`. The KL rainfall
+  table takes ~10s to render upstream, against ~0.3s for a JSON call. A refetch every poll triples
+  the cost of a refresh, for data that cannot have changed. A page that fails to fetch falls
   back to the stored copy. Warm poll ~3.5s, and one poll per quarter hour pays the ~15s.
-- Merge order: Selangor API → KL (skipping any station within ~200 m of one we already have, since
-  the two feeds share no station codes) → national override by code (rivers) → portal override by
-  match (rainfall) → new rows the national portal alone knows, placed from its own gazetteer → trend
-  pass over the winner.
+- Merge order, in six steps. Selangor API first. Then KL, which skips any station within ~200 m of
+  one we already have. The two feeds share no station codes. Then the national override by code
+  (rivers). Then the portal override by match (rainfall). Then new rows the national portal alone
+  knows, placed from its own gazetteer. Last, a trend pass over the winner.
 - Every station carries `source` (`selangor` / `kl` / `national` / `portal`) and, where known, `code`.
 - **Two drips run at the end of a refresh, inside the same lock, the shape `captureShots()` already
-  uses:** at most `GAZ_FILL` (5) prefixes and `HIST_FILL` (5) stations per refresh, at most once per
-  `GAZ_EVERY` / `HIST_EVERY` (600 s each), site-wide, behind `.gaz.stamp` and `.hist.stamp`. The
-  gazetteer drip queries the portal's own station search. It writes a `station(name, lat, lng,
-  district, state)` row in `.history.db`, which `gazPlace()` reads to place a rainfall or river row
-  the portal alone knows about. The history drip fetches one station's 7-day series and writes it
-  into `level` under a `<id>#c` key, through `seedRebase()` — see the gotcha list for why the seed
-  must join the running total this app already keeps rather than restart it. Both drips reuse the
-  `page` table's reserved-prefix pattern (`gazdone:`, `histdone:`), the same one `notice:` and
-  `place:` already use, so each row marks a prefix or a station asked whether or not it answered —
-  the rule `pageRow()` already states for a scraped page.
-- **`camFix()` corrects or supplies twenty-five camera coordinates, across two faults in JPS's feed:**
-  fourteen swapped between cameras, and eleven published with no coordinate at all. It is the only
-  place this app overrides a value the feed states. See the gotcha below for the rule that admits an
-  entry to `CAM_FIX`, and for the seven cameras confirmed correct and deliberately left out of it.
-- `?cam=<id>` streams a camera still. Validates the id is an integer, looks the URL up in the
-  cached payload, and rejects any host that isn't JPS. Never proxies an arbitrary URL.
+  uses.** Each refresh takes at most `GAZ_FILL` (5) prefixes and `HIST_FILL` (5) stations. Each runs
+  at most once per `GAZ_EVERY` / `HIST_EVERY` (600 s each), site-wide, behind `.gaz.stamp` and
+  `.hist.stamp`. The gazetteer drip queries the portal's own station search. It writes a
+  `station(name, lat, lng, district, state)` row in `.history.db`. `gazPlace()` reads that row to
+  place a rainfall or river row the portal alone knows about. The history drip fetches one station's
+  7-day series and writes it into `level` under a `<id>#c` key, through `seedRebase()`. See the
+  gotcha list for why the seed must join the running total this app keeps, rather than restart it.
+  Both drips reuse the `page` table's reserved-prefix pattern (`gazdone:`, `histdone:`), the same one
+  `notice:` and `place:` already use. So each row marks a prefix or a station asked, whether or not
+  it answered. That is the rule `pageRow()` already states for a scraped page.
+- **`camFix()` corrects or supplies twenty-five camera coordinates, across two faults in JPS's
+  feed.** Fourteen are swapped between cameras. Eleven are published with no coordinate at all. It
+  is the only place this app overrides a value the feed states. See the gotcha below for the rule
+  that admits an entry to `CAM_FIX`. It also names the seven cameras confirmed correct and
+  deliberately left out of it.
+- `?cam=<id>` streams a camera still. It validates that the id is an integer. It looks the URL up in
+  the cached payload. It rejects any host that is not JPS. It never proxies an arbitrary URL.
 - `?force=1` treats the 5-minute file cache as expired, inside the existing `flock` on
   `.refresh.lock` — never a second path to JPS. `forceAllowed()` caps it at one force per 60
   seconds, site-wide, through a stamp file. `serveFromCache()` then makes the same cache-or-rebuild
@@ -250,51 +251,53 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
 - **Camera archive** (`shots.php`): `?shots=<id>` lists a camera's stored frames, `?shot=<id>&t=<ts>`
   serves one. Both parameters are cast to `int` before touching the filesystem, so the path cannot
   leave `shots/` — the same rule as `?cam=`. A frame is stored as **`.webp` or `.jpg`, whichever came
-  out smaller** at 720p (the two are within 2% on this footage), so nothing may assume an extension —
-  go through `shotFile()`, and take the content type off the file it found. Capture runs at the *end* of a refresh, at most once per
-  `SHOT_EVERY` (30 min) however often the payload rebuilds, and is why one poll in six is several
-  seconds slower. **Do not tie capture to the poll**: 90 cameras × 250 KB × 288 polls is 6.5 GB/day
-  aimed at JPS from one address, which is the stampede the lock exists to prevent, in slow motion.
-- Trend is **derived here**, not upstream: `.history.db` (sqlite, `level(station, ts, level)`,
-  PK-deduped, 30-day retention, WAL) holds the samples; each poll loads the last 24h. **`ts` is the
+  out smaller** at 720p. The two are within 2% on this footage. So nothing can assume an extension.
+  Go through `shotFile()`, and take the content type off the file it found. Capture runs at the
+  *end* of a refresh, at most once per `SHOT_EVERY` (30 min), however often the payload rebuilds.
+  That is why one poll in six is several seconds slower. **Do not tie capture to the poll**: 90
+  cameras × 250 KB × 288 polls is 6.5 GB/day aimed at JPS from one address. That is the stampede the
+  lock exists to prevent, in slow motion.
+- Trend is **derived here**, not upstream. `.history.db` (sqlite, `level(station, ts, level)`,
+  PK-deduped, 30-day retention, WAL) holds the samples. Each poll loads the last 24h. **`ts` is the
   reading's own stamp (`readTs()`), never the poll time** — see the gotcha below. `rate` = the
   **median of every pairwise slope** in a 3h window (Theil–Sen, pairs ≥ `TREND_MIN` apart), not a
-  chord between two samples. `rising` is a **forecast, not a rate**, and needs all five: rate
-  `≥ RISE_FLOOR` (0.1 m/h), level strictly above the sample two back, level ≥ its own 24h high (this
-  is what keeps a tide out), `eta` — hours to its *own* danger mark at that rate — within `RISE_ETA`
-  (3 h), and the same true on the previous poll (on-delay). `eta` is published whenever a station is
-  climbing, so the UI can show what the cutoff is cutting off. The client reads `s.rising`; it never
-  re-derives it, and nothing mirrors `RISE_ETA` client-side any more. `$assess()` takes a sample
-  *index* precisely so the on-delay needs nothing persisted between requests.
+  chord between two samples. `rising` is a **forecast, not a rate**, and it needs all five of these.
+  The rate is `≥ RISE_FLOOR` (0.1 m/h). The level is strictly above the sample two back. The level is
+  at or above its own 24h high, which is what keeps a tide out. The `eta` — hours to its *own* danger
+  mark at that rate — is within `RISE_ETA` (3 h). The same was true on the previous poll (on-delay).
+  `eta` is published whenever a station is climbing, so the UI can show what the cutoff is cutting
+  off. The client reads `s.rising`. It never re-derives it, and nothing mirrors `RISE_ETA`
+  client-side any more. `$assess()` takes a sample *index* precisely so the on-delay needs nothing
+  persisted between requests.
 - **Rain totals over five nested windows** ride on every rainfall station as `acc`, keyed
   `h1` / `h3` / `day` / `h24` / `h72`. Each is `[mm, derived, spanHours]` or `null` where nothing can
   answer. `derived` is 1 where this app worked the number out, and the card prints an asterisk on
   it. 1 hour and today come off the feed, and so does 3 hours where Selangor publishes its own
   total. Every other window goes through `accWindow()`, which subtracts two samples off a running
-  total: `portalOdo()`'s total for a station the national portal carries, or the year-to-date
-  `cumulativeRainfall` odometer for a Selangor station the portal does not. Those totals live in the
-  `level` table under `#c` and `#d` suffixes, so there is no schema change and `RETAIN` prunes them
-  with the rest.
+  total. That total is `portalOdo()`'s figure for a station the national portal carries. For a
+  Selangor station the portal does not carry, it is the year-to-date `cumulativeRainfall` odometer.
+  Those totals live in the `level` table under `#c` and `#d` suffixes. So there is no schema change,
+  and `RETAIN` prunes them with the rest.
   `ACC_READ` (80 h) is their own load window, because `READ` is 24 h and too short.
 - Response also carries real diagnostics used by the status popover: `tookMs`, `details.ok/requested`,
   `offline`, `cacheAge`, `sourceUpdated`.
-- **`?place=<query>` — the go-to box's place search.** Proxies OpenStreetMap Nominatim server-side, so
-  this adds no new third party to the *browser*: the browser still talks only to this origin and to
-  CARTO's basemap tiles (see the third-party gotcha below), and Nominatim is reached only from PHP.
-  `placeQuery()` trims, collapses, lowercases and rejects the query outside 2–80 characters or on
-  invalid UTF-8, and `placeParam()` guards the one call site that turns `$_GET['place']` into the
-  string it expects — see the array-cast gotcha below. Results are bounded to `BOX`, the coverage
-  area with about 0.1 degrees of margin on the station extent, and only four fields survive per
-  result (`name`, `detail`, `lat`, `lon`) — the raw Nominatim response is large and its shape is not
-  ours to depend on. Each answer is cached in the `page` table of `.history.db` for **30 days**
-  (`PLACE_TTL`), because place names do not move — a much longer life than the scraped pages' 15
-  minutes. The uncached path is rate-limited to one lookup per second, site-wide, guarded by
-  `.place.lock` (taken, used and released around the check only, never across the fetch) and stamped
-  in `.place.stamp` via the same `forceAllowed()` the force-refresh button uses, at its own
-  `PLACE_EVERY` window. The connect to `.history.db` is wrapped in try/catch: this handler has
-  already sent `Content-Type: application/json` by the time it runs, so an uncaught `PDOException`
-  would put a PHP fatal-error page inside a response a client expects to parse as JSON — a connect
-  failure degrades to "no cache" rather than a broken response.
+- **`?place=<query>` — the go-to box's place search.** It proxies OpenStreetMap Nominatim
+  server-side, so this adds no new third party to the *browser*. The browser still talks only to this
+  origin and to CARTO's basemap tiles. See the third-party gotcha below. PHP alone reaches Nominatim.
+  `placeQuery()` trims, collapses and lowercases the query. It rejects a query outside 2–80
+  characters, or one with invalid UTF-8. `placeParam()` guards the one call site that turns
+  `$_GET['place']` into the string it expects — see the array-cast gotcha below. Results are bounded
+  to `BOX`, the coverage area with about 0.1 degrees of margin on the station extent. Only four
+  fields survive per result (`name`, `detail`, `lat`, `lon`). The raw Nominatim response is large,
+  and its shape is not ours to depend on. Each answer is cached in the `page` table of `.history.db`
+  for **30 days** (`PLACE_TTL`), because place names do not move. That is a much longer life than the
+  scraped pages' 15 minutes. The uncached path is rate-limited to one lookup per second, site-wide.
+  `.place.lock` guards it, taken, used and released around the check only, never across the fetch.
+  The stamp lands in `.place.stamp`, through the same `forceAllowed()` the force-refresh button uses,
+  at its own `PLACE_EVERY` window. The connect to `.history.db` is wrapped in try/catch. This handler
+  already sent `Content-Type: application/json` by the time it runs. So an uncaught `PDOException`
+  puts a PHP fatal-error page inside a response a client expects to parse as JSON. A connect failure
+  degrades to "no cache" rather than a broken response.
 - **`?wx=1` — the weather layer.** Serves the row a refresh already wrote in the `page` table,
   keyed `wx:box`. This handler parses nothing and reaches no upstream. So it cannot be slow, and it
   cannot fail in a new way. A try/catch wraps the connect to `.history.db`, the same shape `?place=`
@@ -309,65 +312,65 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
 - **Status only**: green → amber → orange → red (`--s-normal` / `--s-alert` / `--s-warning` /
   `--s-danger`, exposed as `STATUS_COLOR`), plus grey `--s-none` for offline / no reading.
   **There is no exception. A reader cut the one this app tried.** `#locate.fail` painted `--s-alert`
-  for a location this app could not get, which is a fault in a control rather than a station in
+  for a location this app failed to get. That is a fault in a control, rather than a station in
   trouble. On a flood map an amber glyph in the app bar reads as an alert on the water.
   **A broken control changes its glyph, never its hue.** See `--i-location_disabled`.
 - **The values live in `css/base.css` and nowhere else**, two sets, one per theme — except on a map
   pin. `.pin` shares the dark theme's set on both themes, through the selector
-  `:root[data-theme="dark"], .pin` on the map-palette block, because the pin glyph carries a real
-  `stroke` and its fill no longer has to hold 3:1 against white paper alone. Every other surface that
+  `:root[data-theme="dark"], .pin` on the map-palette block. The pin glyph carries a real `stroke`,
+  so its fill no longer has to hold 3:1 against white paper alone. Every other surface that
   paints a kind or a status still swaps with the theme. Any token a pin resolves must be in that
-  block: `--c` arrives as an inline style on `.pin` itself, so a missing one falls back to the theme
-  value and draws a single pin off-palette. Do not write a hex
-  into a JS file or copy one into a doc — every hex outside that block is a value that will go stale
-  the next time the palette moves, and it has moved four times. The one exception is a **canvas**:
-  the heat gradient cannot resolve a token, so `RAIN_HEAT` in `config.js` keeps real values.
+  block: `--c` arrives as an inline style on `.pin` itself. So a missing one falls back to the theme
+  value, and draws a single pin off-palette. Do not write a hex into a JS file, or copy one into a
+  doc. Every hex outside that block goes stale the next time the palette moves. The palette moved
+  four times. The one exception is a **canvas**: the heat gradient cannot resolve a token, so
+  `RAIN_HEAT` in `config.js` keeps real values.
 - `--s-trace` is a fifth rung, sitting between normal and alert, and a flood gauge is its only user.
-  It exists because JPS marks a gauge at 0.15 m and 0.3 m, so water under the first mark is a real
+  It exists because JPS marks a gauge at 0.15 m and 0.3 m. So water under the first mark is a real
   reading with no published name. See `GAUGE_COLOR` in `config.js`.
 - `hasInfo(s)` decides colour vs grey. A station with no reading must never look confident.
 
 ## Gotchas that have already bitten
 
 - **`-9999` means "no reading"** in both scraped feeds, rendered as `-9,999.00` in one of them.
-  `numOrNull()` strips separators and nulls anything ≤ −9990. Treated as a level, it would render a
-  station as catastrophically dry and poison its trend history.
+  `numOrNull()` strips separators and nulls anything ≤ −9990. Treated as a level, it renders a
+  station as catastrophically dry and poisons its trend history.
 - **JPS shuffled the coordinates inside one batch of cameras, so a pin can be 83 km from its name.**
-  The coordinate the feed publishes for camera 1285 points at Kayu Ara, and the one for camera 1287
-  points at Tanjung Karang. So camera 1279 drew in Sepang and camera 1288 in Bangi, each one filed
-  under a district it was nowhere near. The list endpoint and the detail endpoint carry the same
-  wrong value, so there is no better source to prefer. `CAM_FIX` in `api.php` corrects fourteen of them,
-  and an entry gets in one of two ways. **Most must pass two checks that fail in different ways**:
-  the station name must geocode to the point, and that point must sit near the median of the
+  The coordinate the feed publishes for camera 1285 points at Kayu Ara. The one for camera 1287
+  points at Tanjung Karang. So camera 1279 drew in Sepang and camera 1288 in Bangi. Each one was
+  filed under a district it was nowhere near. The list endpoint and the detail endpoint carry the
+  same wrong value, so there is no better source to prefer. `CAM_FIX` in `api.php` corrects fourteen
+  of them, and an entry gets in one of two ways. **Most must pass two checks that fail in different
+  ways.** The station name must geocode to the point. That point must sit near the median of the
   non-camera stations in the district JPS itself assigns. A name alone is not enough. `Bukit Serdang`
   (camera 1285) geocodes cleanly to Seri Kembangan, 30 km outside the Kuala Langat district JPS gives
-  it, because a second place carries that name. **A same-named station of another kind beats both**,
+  it. A second place carries that name. **A same-named station of another kind beats both**,
   and camera 1277 came in that way: JPS already publishes a TAMAN DESA KEMUNING mast, so the camera
   takes that coordinate rather than a gazetteer guess. The geocode landed 200 m off, which is outside
-  `SITE_M`, so the camera drew as a place of its own beside a mast it belongs on. Camera 1282 took
-  the same route on a name that is only close: it reads `Kg Simpang Balak` and the siren reads
+  `SITE_M`. So the camera drew as a place of its own, beside a mast it belongs on. Camera 1282 took
+  the same route on a name that is only close. It reads `Kg Simpang Balak` and the siren reads
   `SIREN KG. SG. BALAK`, which is Sungai and not Simpang. What carries it is the district. The
   published point was not in Hulu Langat at all. The siren of the near name is. **A near name is
   weaker evidence than an equal one**, so the table marks that entry `SOMEWHAT CONFIRMED`. A near
   name never gets in on its own.
   **The third way in is the swap, read from the other end.** Correcting camera 1279 orphans the
-  point JPS published for it. The five stations nearest that point are all in Kuala Langat, which is the district JPS gives
-  camera 1285. That camera is also the only Kuala Langat one in the batch, so exactly one station can
-  own the orphaned point. Use that rule
-  only when both halves hold: the neighbours agree on a district, and the batch holds exactly one
-  uncorrected camera that JPS files under it.
+  point JPS published for it. The five stations nearest that point are all in Kuala Langat, which is
+  the district JPS gives camera 1285. That camera is also the only Kuala Langat one in the batch. So
+  exactly one station can own the orphaned point. Use that rule only when both halves hold. The
+  neighbours agree on a district. The batch holds exactly one uncorrected camera that JPS files
+  under it.
   **The strongest way in is that same swap solved for the whole batch at once.** The shuffle is one
-  closed permutation. Name the station nearest each suspect camera's published point, and thirteen of
+  closed permutation. Name the station nearest each suspect camera's published point. Thirteen of
   the fourteen points name another camera in the batch, inside 550 m. The cycle runs
-  1276→1280→1287→1288→1284→1278→1282→1277→1281→1286→1289→1283→1276, with 1279 and 1285 swapped as a
-  pair. One camera and one point are then left over and can only be each other, which is how camera
-  1281 got in with no gazetteer hit and no same-named mast. **Rebuild the whole map before you argue
-  about one pin** — solving them one at a time took ten rounds and left four wrong.
+  1276→1280→1287→1288→1284→1278→1282→1277→1281→1286→1289→1283→1276. Cameras 1279 and 1285 are
+  swapped as a pair. One camera and one point are then left over, and can only be each other. That
+  is how camera 1281 got in, with no gazetteer hit and no same-named mast. **Rebuild the whole map
+  before you argue about one pin.** Solving them one at a time took ten rounds, and left four wrong.
   The cycle also names the cameras that are **not** in the shuffle: 1271, 1272, 1273, 1274, 1275,
-  1315 and 1316 each sit near a station of their own name, and the cycle closes without them. Two of
+  1315 and 1316. Each sits near a station of its own name, and the cycle closes without them. Two of
   those (1272, 1315) were called wrong here for months on a failed gazetteer lookup alone. **A name
   a gazetteer misses is not a wrong coordinate.** Camera 1289 makes the same point from the other
-  side: no gazetteer holds `Rimba KDR`, and JPS publishes a RIMBA KDR mast in the district it files
+  side. No gazetteer holds `Rimba KDR`. JPS publishes a RIMBA KDR mast in the district it files
   the camera under. Search the payload first, then the gazetteer.
   A coordinate we invent is worse than one we can show belongs to upstream.
   `CAM_FIX_KM` retires the table by itself: an override applies only while the feed still disagrees
@@ -375,85 +378,85 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   somebody to delete it. Do not extend this to another kind without the same evidence — the shuffle
   touched cameras only.
   **A second and unrelated fault sits beside the shuffle.** JPS also publishes some cameras with no
-  coordinate at all, `lat: 0, lng: 0` rather than a wrong one, and `CAM_FIX` now carries entries for
-  those too. Seven of the eleven came in by the route this entry already calls strongest — a station
-  of another kind, already in the payload, carrying the same name. Two more, cameras 241 and 247,
-  carry a name only close to a station JPS already publishes rather than an equal one, and a near
-  name is weaker evidence than an equal one, the same rule camera 1282 states above — what carries
-  each of those two is the district, since the near-named station sits inside the district JPS files
-  the camera under, and both are marked `SOMEWHAT CONFIRMED` in the table for it. The other two,
-  cameras 244 and 246, carry the median of their district's non-camera stations instead, which is a
-  coordinate this file invented, and the rule above says to delete an invented coordinate rather than
-  keep it if nobody can confirm where the camera actually stands. Anything that draws a station from
-  this payload must still tolerate a camera with no coordinate — the next one JPS publishes that way
+  coordinate at all, `lat: 0, lng: 0` rather than a wrong one. `CAM_FIX` now carries entries for
+  those too. Seven of the eleven came in by the route this entry already calls strongest. That route
+  is a station of another kind, already in the payload, carrying the same name. Two more, cameras
+  241 and 247, carry a name only close to a station JPS publishes, not an equal one. A near
+  name is weaker evidence than an equal one, the same rule camera 1282 states above. What carries
+  each of those two is the district. The near-named station sits inside the district JPS files
+  the camera under. Both are marked `SOMEWHAT CONFIRMED` in the table for it. The other two,
+  cameras 244 and 246, carry the median of their district's non-camera stations instead. That is a
+  coordinate this file invented. If nobody can confirm where the camera stands, the rule above says
+  to delete an invented coordinate. Do not keep it. Anything that draws a station from
+  this payload must still tolerate a camera with no coordinate. The next one JPS publishes that way
   has no entry here yet.
 - **A `(string)` cast on `$_GET[...]` does not throw on an array — it emits a warning and coerces
   silently.** `?place[]=x` makes `$_GET['place']` an array. `(string)` on it prints
-  `Warning: Array to string conversion` and yields the literal string `"Array"`, five characters that
-  pass `placeQuery()`'s length check clean — so the warning lands inside a response whose
-  `Content-Type` is already `application/json`, breaking the parse for a client that sent one
-  malformed query string, and the request still spends the site-wide rate limit on a garbage query.
+  `Warning: Array to string conversion`. It yields the literal string `"Array"`, five characters that
+  pass `placeQuery()`'s length check clean. So the warning lands inside a response whose
+  `Content-Type` is already `application/json`. That breaks the parse for a client that sent one
+  malformed query string. The request still spends the site-wide rate limit on a garbage query.
   `?cam=` and `?shots=` never had this problem because `(int)` on an array is silent. `placeParam()`
   in `api.php` is the guard: refuse anything that is not already a `string` before it reaches
   `placeQuery()`, rather than cast and hope. Any future endpoint that reads a `$_GET` value as a
-  string needs the same check at the call site — the validator downstream cannot fix a type problem
+  string needs the same check at the call site. The validator downstream cannot fix a type problem
   that already corrupted the response.
 - **The KL endpoints return bare `<tr>` fragments.** Both libxml and the HTML5 parser discard rows
-  that aren't inside a table, so `crawl()` wraps every page in `<table>` before parsing. Drop the
+  that are not inside a table. So `crawl()` wraps every page in `<table>` before parsing. Drop the
   wrap and the KL feeds silently return nothing.
-- **`children('td')`, not `filter('td')`,** when counting a row's width — these pages nest tables,
-  and a descendant search counts the inner table's cells too, blowing the 14-cell guard.
+- **`children('td')`, not `filter('td')`,** when counting a row's width. These pages nest tables,
+  and a descendant search counts the inner table's cells too. That blows the 14-cell guard.
 - **Iterating a `Crawler` yields raw `DOMNode`s**, which have no `attr()`. Use `->each(fn(Crawler
   $n) => $n->attr(…))` to stay in Crawler-land, or you get a fatal on the first attribute read.
 - **`crawl()` reads nothing from the national portal's rainfall table.** No data row carries an
-  opening `<tr>`. The `<tbody>` holds one empty row, then about 31 stray closing tags, then every row
-  as a bare run of `<td>` cells ending in `</tr>`. Measured on the live page,
+  opening `<tr>`. The `<tbody>` holds one empty row, then about 31 stray closing tags. Every row
+  follows as a bare run of `<td>` cells ending in `</tr>`. Measured on the live page,
   `crawl($html)->filter('tr')` finds 4 elements, and none holds a `td` child, against 239 real rows.
   The existing wrap in `crawl()` cannot repair this. It supplies a missing table, and this page
   lacks the rows instead. `portalRows()` splits the body on `</tr>` and wraps each chunk as a row
-  of its own, then keeps only chunks of exactly 13 cells. The width guard checks that the repair
+  of its own. It then keeps only chunks of exactly 13 cells. The width guard checks that the repair
   produced the shape expected.
 - **`pageHasData()`'s `<tr` test cannot answer for the portal rainfall page.** Its header block holds
-  four instances of `<tr`, and the empty form page — what the endpoint returns without its two hidden
-  inputs — holds the same four. A shared test cannot tell the two apart. Those keys test
+  four instances of `<tr`. The empty form page holds the same four. That page is what the endpoint
+  returns without its two hidden inputs. A shared test cannot tell the two apart. Those keys test
   `data-th='No'` instead, which appears once per data row and nowhere else.
 - **`clean_rainfall` is the disjoint 5-minute bucket in the 7-day history series, not `raw`.** The
   field names guessed before the endpoint was read — `tarikh`, `raw`, `clean`, `chourly` — do not
   exist on the live feed. The real fields are `date_time` (no seconds), `clean_rainfall`,
   `cum_hourly` and `cum_daily`. `cum_hourly` is a rolling 60-minute total and `cum_daily` is the
-  running day total, so there is no single rolling field to confuse with the disjoint one. There are
+  running day total. So there is no single rolling field to confuse with the disjoint one. There are
   two, and neither is the one to sum. Measured against the live endpoint on three stations across up
-  to 8 days, `clean_rainfall` summed across one calendar day reproduced `cum_daily`'s own end-of-day
+  to 8 days: `clean_rainfall` summed across one calendar day reproduced `cum_daily`'s own end-of-day
   figure exactly, every time. **Score this identity on a station with rain in the window.** An
-  earlier pass scored it on a station holding 15 non-zero buckets out of 1,815, and the rolling field
+  earlier pass scored it on a station holding 15 non-zero buckets out of 1,815. The rolling field
   passed, because twelve zeros sum to a zero.
 - **A `graphId` is a string, and casting it to `int` silently breaks the history backfill.** Some ids
   carry a trailing underscore the site's own link puts there, `stationid=3015084_`. Measured against
   the live SEL/WLH/PTJ pages: 58 of 176 ids on the Selangor page alone carry one, 72 of 308 across all
   three state pages. The digit run alone is a *different* id to the endpoint the id names. It answers
   with an empty series, while the id with its underscore answers with the station's own 7-day
-  history. This app stamps a station `histdone:` whether or not its fetch answered, so an `(int)`
+  history. This app stamps a station `histdone:` whether or not its fetch answered. So an `(int)`
   cast here silently empties the backfill for 23% of stations, for good.
 - **A running total must never restart when this app cannot advance it.** Before this work a
   Selangor station stored a year-to-date odometer under `#c`. A portal station starts a total near
   zero. Without a guard, restarting on deploy writes a small number after a large one. `accWindow()`
   reads the total going backwards and answers null, so 140 stations sit dark for 72 hours. It held
   here only because `INSERT OR IGNORE` collided on `(station, ts)`, which is luck, not a guard.
-  `portalOdo()` holds the total instead of restarting it whenever it has no `prevDaily` to measure the
-  rise against — the exact case a fresh deploy meets — and that costs one poll of rain, once.
+  `portalOdo()` holds the total instead of restarting it, whenever it has no `prevDaily` to measure
+  the rise against. That is the exact case a fresh deploy meets. It costs one poll of rain, once.
 - **A name alone cannot place a station.** The portal's own gazetteer holds two entries for one
   station, 81 km apart: `Sg. Bernam di Tanjung Malim`, 1.1 km from the real town, and `Sg. Bernam di
   Tanjung Malim (F2)`, beside Putrajaya. `gazCorroborated()` requires the point to sit within
   `GAZ_DISTRICT_KM` (50 km) of the median of stations in the district the portal itself assigns. This
   is the rule `CAM_FIX` already states for a camera, above, so nothing here restates it in full.
-  Evidence for 50 km: zero of about 470 stations this app already holds sit past it, the check
-  refuses the same two rows at 40, 50 and 60 km alike, and the worst legitimate outlier measured,
-  34.6 km, leaves a wide gap under the closest rejected placement, at 67.5 km.
+  Evidence for 50 km. Zero of about 470 stations this app already holds sit past it. The check
+  refuses the same two rows at 40, 50 and 60 km alike. The worst legitimate outlier measured
+  34.6 km. That leaves a wide gap under the closest rejected placement, at 67.5 km.
 - **The corroboration check has a floor, and the floor is a hole.** A `state|district` bucket
   holding fewer than 3 known stations passes `gazCorroborated()` unchecked. Refusing there has no
   evidence behind it, and that invents a check rather than makes one. 8 buckets are that small: 7
-  Kuala Lumpur districts, and Putrajaya, whose only two stations are new placements from this same
-  source — so its own baseline started at zero.
+  Kuala Lumpur districts, and Putrajaya. Putrajaya's only two stations are new placements from this
+  same source. So its own baseline started at zero.
 - **A skipped rainfall bucket understates the seeded history, and nothing marks it.**
   `seriesParse()` drops a bucket that fails `numOrNull()` or reads negative, which keeps the running
   sum non-decreasing. The drop happens before `seedRebase()`'s accumulator ever sees the bucket. So
@@ -461,89 +464,89 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   sum, not in the offset. The offset is one constant, computed once per station and added to every
   point. It cancels out of any window, skip or no skip — the identical rule `sources.php`'s own
   comment on `seedRebase()` already states. A window with both ends on the same side of a skipped
-  bucket still nets the shortfall out, because both ends carry the same short `$run`. A window
-  straddling the skip does not, because only the later end has absorbed the loss, and several skips
+  bucket still nets the shortfall out. Both ends carry the same short `$run`. A window
+  straddling the skip does not. Only the later end absorbed the loss. Several skips
   compound in the same, understating, direction. That is the opposite of this repo's safe way to be
   wrong, and no `derived` marker communicates it.
 - **Never `file_get_contents()` a JPS URL — always curl.** `infobanjirjps.selangor.gov.my` resolves
   to *two* A records and one of them (`58.27.97.62`) blackholes SYNs. curl races both (happy
-  eyeballs) and connects in ~10 ms; PHP's stream wrapper tries addresses serially with no connect
-  timeout of its own, so it eats the OS TCP timeout — 21 s on Windows — whenever it draws the dead
-  one. `?cam=` was the only outbound call in the repo not going through `fetchAll()`, and it was
-  therefore the only slow endpoint: ~21 s per still, 42 s when the https attempt lost and the http
-  fallback lost too. Stills now take ~0.8 s. The dead record may be removed or may move to the other
-  IP; the rule is about the mechanism, not that address.
+  eyeballs) and connects in ~10 ms. PHP's stream wrapper tries addresses serially, with no connect
+  timeout of its own. So it eats the OS TCP timeout — 21 s on Windows — whenever it draws the dead
+  one. `?cam=` was the only outbound call in the repo not going through `fetchAll()`. It was
+  therefore the only slow endpoint, at ~21 s per still. It took 42 s when the https attempt lost and
+  the http fallback lost too. Stills now take ~0.8 s. The dead record can be removed, or it can move
+  to the other IP. The rule is about the mechanism, not that address.
 - **Every picture in this app fails into `.camfail`, and a failed `<img>` must never be left to size
-  its own box.** Four surfaces draw a picture — the lightbox frame, the lightbox's compare frame, the
-  station card still and a camera wall tile — and each one keeps the box the picture would have taken
+  its own box.** Four surfaces draw a picture. They are the lightbox frame, the lightbox's compare
+  frame, the station card still and a camera wall tile. Each one keeps the box the picture takes,
   and puts the same `videocam_off` / `No picture` panel in it. The look is `.camfail` in
-  `css/base.css` and only the placement belongs to each surface. **One fact must not get two looks**:
-  the card printed `image unavailable` instead, on a box that collapsed to the height of that line.
-  The compare frame is the exception that shows why an empty box is not enough on its own — it is
-  clipped to the divider and held no fill, so a failed frame let the *other* frame show through and
+  `css/base.css` and only the placement belongs to each surface. **One fact must not get two looks.**
+  The card printed `image unavailable` instead, on a box that collapsed to the height of that line.
+  The compare frame is the exception that shows why an empty box is not enough on its own. It is
+  clipped to the divider and held no fill. So a failed frame let the *other* frame show through, and
   compare drew one picture twice under two timestamps. A false match is worse than a visible gap.
-  Three image paths are deliberately silent instead, and all three have a picture already on screen
-  to fall back to: the wall's strip probe, the clip's strip probe, and the lightbox's frame prefetch.
-  **Anything new that draws a picture picks one of those two shapes** — the panel, or a silent
-  fallback to something already visible. Never a bare broken image, and never a handler that lets the
-  box shrink to nothing.
-- **`rm -rf shots/` is a year of camera history**, and unlike `.history.db` it cannot rebuild —
-  the frames only exist because we were running when they were taken. To re-test the capture path,
+  Three image paths are deliberately silent instead. All three have a picture already on screen to
+  fall back to. They are the wall's strip probe, the clip's strip probe, and the lightbox's frame
+  prefetch. **Anything new that draws a picture picks one of those two shapes.** It takes the panel,
+  or a silent fallback to something already visible. Never a bare broken image, and never a handler
+  that lets the box shrink to nothing.
+- **`rm -rf shots/` is a year of camera history**, and unlike `.history.db` it cannot rebuild. The
+  frames only exist because we were running when they were taken. To re-test the capture path,
   `rm shots/.last` (the 30-minute stamp), not the directory.
 - **A retention bucket aims at a clock time, and both sides must aim at the same one.** `SHOT_TIERS`
-  carries a third number per tier — the anchor, which is the target time in UTC modulo the step — and
-  a frame's slot is the **next target at or after it**, so what survives is the last frame taken
-  *before* that target. Not the nearest one to it: with frames at 15:24 and 16:10 the nearest to
-  16:00 is 16:10, and a picture taken after the time it is labelled with is the one thing this must
-  not do. `thin()` in
-  `js/timeline.js` repeats the same expression and the same numbers, so the ruler and the clip cannot
-  file one frame in two slots. Week aims at 01:00 MYT, month at 04:00 and 16:00, year at Monday
-  16:00, and the three nest, so a frame keeps hitting its target as it ages between tiers. The old
-  rule bucketed on `floor(ts / step)`, which aligns to **UTC** midnight: at +8 that put the week
-  range on 01:30, the month on 07:30 and 19:30, and the year on a Thursday. Change an anchor in one
-  file only and the two sides disagree about where a slot starts. `shots-test.php` asserts each
-  anchor against `time()` — **never against the epoch**, because Malaysia ran UTC+7:30 until 1982 and
-  PHP renders a 1970 instant 30 minutes early, which makes a correct constant look broken.
+  carries a third number per tier. That is the anchor, the target time in UTC modulo the step. A
+  frame's slot is the **next target at or after it**. So what survives is the last frame taken
+  *before* that target. It is not the nearest one to it. With frames at 15:24 and 16:10, the nearest
+  to 16:00 is 16:10. A picture taken after the time it is labelled with is the one thing this must
+  not do. `thin()` in `js/timeline.js` repeats the same expression and the same numbers. So the ruler
+  and the clip cannot file one frame in two slots. Week aims at 01:00 MYT, month at 04:00 and 16:00,
+  year at Monday 16:00. The three nest, so a frame keeps hitting its target as it ages between
+  tiers. The old rule bucketed on `floor(ts / step)`, which aligns to **UTC** midnight. At +8 that
+  put the week range on 01:30, and the month on 07:30 and 19:30. It put the year on a Thursday.
+  Change an anchor in one file only and the two sides disagree about where a slot starts.
+  `shots-test.php` asserts each anchor against `time()` — **never against the epoch**. Malaysia ran
+  UTC+7:30 until 1982, and PHP renders a 1970 instant 30 minutes early. That makes a correct constant
+  look broken.
 - **A sample's `ts` is when the reading was taken, not when we polled.** Upstream changes a value
-  every ~25 min and we poll every ~8.5 min, so a level is a staircase and the same number arrives
-  four or five times. Stamping each arrival `now` puts the step where we noticed it, which put up to
-  a poll interval of error on *both* ends of a rate — a rate wrong by over 100% on a short baseline,
-  and the reason a station whose level had not moved in five polls reported a 0.9 h ETA to danger.
-  `readTs()` reads `updated`, clamps a future stamp (JPS stamps to the upcoming slot) and falls back
-  to `now` only when the parse fails. Anything new that writes to `level` must go through it.
-  Two side effects to keep: the `(station, ts)` PK now dedupes a repeated reading to one row, and a
-  station frozen on an old reading stores that old stamp, so `RETAIN` prunes it and `SPARK_WIN`
+  every ~25 min and we poll every ~8.5 min. So a level is a staircase, and the same number arrives
+  four or five times. Stamping each arrival `now` puts the step where we noticed it. That put up to
+  a poll interval of error on *both* ends of a rate. A rate came out wrong by over 100% on a short
+  baseline. That is why a station whose level had not moved in five polls reported a 0.9 h ETA to
+  danger. `readTs()` reads `updated`, clamps a future stamp (JPS stamps to the upcoming slot) and
+  falls back to `now` only when the parse fails. Anything new that writes to `level` must go through
+  it. Two side effects to keep. The `(station, ts)` PK now dedupes a repeated reading to one row. A
+  station frozen on an old reading stores that old stamp. So `RETAIN` prunes it, and `SPARK_WIN`
   excludes it instead of drawing a flat live-looking line.
 - **A rain total over 24 or 72 hours is a difference, never a sum.** `cumulativeRainfall` only
   climbs, so `accWindow()` subtracts two samples. **Do not add up `hourly` buckets instead.** A sum
   loses the rain in every gap and reports a small number with nothing to say it is short.
   Measured on this box, the archive held 9 of the last 24 clock hours and a 15-hour hole.
-  A sum renders that as a dry day. The scrapers already fail silently by design, and a total with no alarm behind
-  it is worse than none. A difference cannot lose rain: a missed poll widens the window instead, and
-  the payload measures that wider window, so the card states `measured over 26.1 h` rather than
-  claiming 24. Three things return `null` rather than a number: an empty series, a backwards odometer
-  (the 1 January reset), and both ends on one sample.
+  A sum renders that as a dry day. The scrapers already fail silently by design, and a total with no
+  alarm behind it is worse than none. A difference cannot lose rain. A missed poll widens the window
+  instead, and the payload measures that wider window. So the card states `measured over 26.1 h`
+  rather than claiming 24. Three things return `null` rather than a number. They are an empty series,
+  a backwards odometer (the 1 January reset), and both ends on one sample.
   **The national portal supplies a per-day running total, and `accHours()` is gone.** A station the
-  portal carries builds the total from its midnight column — see `portalOdo()` — and answers both
-  long windows the same way a Selangor station with its own year-to-date odometer always did.
+  portal carries builds the total from its midnight column — see `portalOdo()`. It answers both long
+  windows the same way a Selangor station always did, with its own year-to-date odometer.
   `accHours()` added one rolling hour per clock hour. `hourlyRainfall` is a rolling 60 minute total,
-  and the readings sit a median 46 minutes apart, so every hour boundary counted about 14 minutes of
-  rain twice. Scored against the 3 hour total Selangor publishes for itself, 14 of 176 stations were
-  out by more than 5 mm, the worst by 60 mm. The error was zero on a dry station and large during
-  heavy rain, the worst shape an error can take here.
+  and the readings sit a median 46 minutes apart. So every hour boundary counted about 14 minutes of
+  rain twice. Scored against the 3 hour total Selangor publishes, 14 of 176 stations were
+  out by more than 5 mm. The worst was out by 60 mm. The error was zero on a dry station and large
+  during heavy rain. That is the worst shape an error can take here.
   **The permanent dash now marks the stations the portal does not carry**, not a fixed block of 38
   KL gauges. Two `—` columns on such a station are still the right answer, and the readout on the
-  dash still says why: `Not measured. This gauge keeps no running total.` Measured 2026-08-15: of
-  204 gauges that draw this chart, 3 carry that dash, all Kuala Lumpur stations the portal search
-  never matched. **That is still the only empty long window a reader ever meets.**
+  dash still says why: `Not measured. This gauge keeps no running total.` Measured 2026-08-15. Of
+  204 gauges that draw this chart, 3 carry that dash. All three are Kuala Lumpur stations the portal
+  search never matched. **That is still the only empty long window a reader ever meets.**
   **The `#d` series holds the previous daily reading.** It carries its own suffix for the same
   reason `#c` has one: no station id ends in `#d`. `portalOdo()` needs both the last running total
-  and the last daily reading to bridge a midnight, so the next poll stores `#d` to know what it
+  and the last daily reading to bridge a midnight. So the next poll stores `#d` to know what it
   already counted.
 - **A window can also cover LESS ground than it names, and then it says so.** `accWindow()`
   takes `$partial`. With no sample at or before the far end it measures from the oldest sample there
-  is and returns `short`. `derived` is a ladder of three rungs rather than a flag — 0 off the feed,
-  1 worked out over the whole window, 2 worked out over a shorter one — and the card prints one
+  is and returns `short`. `derived` is a ladder of three rungs rather than a flag. 0 is off the feed.
+  1 is worked out over the whole window. 2 is worked out over a shorter one. The card prints one
   asterisk per rung. This is still a difference, so it still cannot lose rain. **The `#c` series began
   2026-08-13 18:30 and nothing can fill it in**, because no earlier poll stored `cumulativeRainfall`.
   Before this, both long windows drew a dash for two days. On the 2026-08-14 15:45 poll, with the
@@ -553,13 +556,13 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   the safe way to be wrong.
   **Both long windows anchor to the earliest record, and both publish it even when that is one number
   twice.** An archive 21 h deep answers 24 h and 72 h with the same 21 h difference, each marked
-  short. On the 2026-08-14 16:20 poll, 180 stations of 231 answer both windows over one span, which is
+  short. On the 2026-08-14 16:20 poll, 180 stations of 231 answer both windows over one span. That is
   every Selangor gauge that can answer at all. The earliest record is the earliest record, and a dash
   tells a reader nothing. The mark and the span in the readout carry the shortfall on each column.
   **Neither surface names a clock time, and an early version named it twice.** The footnote printed
   `Measured from 13 Aug, 19:11` and the readout repeated it. A reader cut both. The shortfall changes
-  how to read the number, and the hour this one server first stored an odometer reading does not.
-  `accFrom` still rides on every station with a running total, because the card tests whether the key
+  how to read the number. The hour this one server first stored an odometer reading does not.
+  `accFrom` still rides on every station with a running total. The card tests whether the key
   is THERE, which is how the card names the KL gauges. Nothing prints its value, so do not delete the
   field on the strength of that. `MYT_WHEN` in `popup.js` existed only to format it and is gone.
   **The `!from` guard covers one poll in the life of a server, and that is not a state.** A fresh
@@ -568,53 +571,53 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   for eight minutes. Do not give it a message of its own, and do not delete it either.
   **Two filters tried to suppress the pair and both are gone. Do not build a third.** The first
   was a floor in hours: a partial had to cover more ground than the fixed window under it. The live
-  payload broke it at once, because a floor compares one span to a constant and the fault is two spans
-  landing on each other. PUNCAK ATHENEUM holds 27 h, so its 24-hour window WIDENED to 27 and its
+  payload broke it at once. A floor compares one span to a constant, and the fault is two spans
+  landing on each other. PUNCAK ATHENEUM holds 27 h. So its 24-hour window WIDENED to 27, and its
   72-hour window fell SHORT to that same sample. A widened window can meet a short one at any depth.
   The second compared the two spans and dropped the longer. That is the one this reverses on a
-  reader's instruction, and the instruction is right: suppression trades a true short measurement for
-  no measurement, and the remark already states what the columns share.
+  reader's instruction, and the instruction is right. Suppression trades a true short measurement for
+  no measurement. The remark already states what the columns share.
   **A widened window is not a short one, so the pair can carry different marks over one number.**
   PUNCAK ATHENEUM draws `24 h*` and `72 h**` at 6.5 mm each. The first covered more ground than it
   names and the second covered less. Four assertions in `--selftest` hold both halves.
   **A short window can undershoot a window nested inside it, and this app does not suppress that.**
-  On the same poll, 4 stations of 180 report less over 24 h than over today, three of them
-  by 0.5 to 1.0 mm and TAMAN MAYANG by 12.5. The odometer and the feed's own daily total disagree,
+  On the same poll, 4 stations of 180 report less over 24 h than over today. Three of them are out
+  by 0.5 to 1.0 mm, and TAMAN MAYANG by 12.5. The odometer and the feed's own daily total disagree,
   and nothing here can say which is wrong. Do not suppress the odometer figure. That trusts the feed
   over it, and those two fields already carry the opposite trust. For scale, 17
-  stations on that poll report less today than in the last 3 hours, with both sides straight off the
-  feed. The chart has always drawn windows that disagree.
+  stations on that poll report less today than in the last 3 hours. Both sides come straight off the
+  feed. The chart always drew windows that disagree.
 - **The accumulation chart carries no threshold mark, and three sources failed to supply one.** It
-  says how much rain fell and never how bad that is — `rainBars()` above it already draws the JPS
-  intensity classes and `rainState()` above that prints the word. A curve fitted between
-  `spVeryHeavy` (61 mm/h) and the MET figure of 240 mm/day joins a **1.7-year event to a 216-year
-  one**, two
-  orders of magnitude apart in rarity, so it measures the gap between two definitions and nothing
+  says how much rain fell and never how bad that is. `rainBars()` above it already draws the JPS
+  intensity classes. `rainState()` above that prints the word. A curve fitted between
+  `spVeryHeavy` (61 mm/h) and MET's figure of 240 mm/day joins a **1.7-year event to a 216-year
+  one**. Those are two
+  orders of magnitude apart in rarity. So it measures the gap between two definitions, and nothing
   about rain. JPS publishes MSMA 2nd Edition Equation 2.2, which covers 5 minutes to 72 hours
-  exactly, and it still loses: an IDF curve needs 20–30 years of record at one spot, JPS published
+  exactly. It still loses. An IDF curve needs 20–30 years of record at one spot. JPS published
   12 such gauges in this area, and **only 11 of 230 stations stand on one**. The rest borrow
   climatology from another place at a median of 11 km. `spVeryHeavy` alone is per-station and honest
   but marks the 1-hour bar only. A dry station therefore draws five flat columns and **not** a
-  sentence: any sentence has to name a window, and "No rain in the last 72 hours" on a station whose
-  72-hour total is unknown is the exact claim this refuses to make. Five columns keep a measured
+  sentence. Any sentence has to name a window. Take "No rain in the last 72 hours" on a station whose
+  72-hour total is unknown. That is the exact claim this refuses to make. Five columns keep a measured
   zero and an unanswered window apart. See `docs/superpowers/specs/2026-08-12-cumulative-rainfall-chart-design.md`.
   **`rainBars()` above it now obeys the same rule and for the same reason.** It printed `No rain in
   the last 11 h` on an all-zero history and draws the zeros instead. A sentence about a window can
-  only make one claim about the whole of it, and this graph holds two facts that have to stay apart:
-  a run of measured zeros is a line along the floor, and a station we could not reach is a break in
-  that line. Its `hi` therefore ends `|| 1` — with no peak and no class in range the axis is zero,
-  and `y()` divides by it, so every point came out `NaN` and nothing rendered. Any positive number
+  only make one claim about the whole of it. This graph holds two facts that have to stay apart.
+  A run of measured zeros is a line along the floor. A station we cannot reach is a break in
+  that line. Its `hi` therefore ends `|| 1`. With no peak and no class in range the axis is zero,
+  and `y()` divides by it. So every point came out `NaN` and nothing rendered. Any positive number
   puts a zero on the floor. The two remaining sentences are the case where there is nothing at all to
-  plot, which is the one thing a graph cannot state for itself.
-- **A tide is a rise, and three of these stations are tidal.** PINTU AIR IJOK is a water gate;
+  plot. That is the one thing a graph cannot state for itself.
+- **A tide is a rise, and three of these stations are tidal.** PINTU AIR IJOK is a water gate.
   BANDAR KLANG and TELUK PENYAMUN (JETI) are estuarine. They climb 0.5–0.7 m/h twice a day forever,
   so any rate-based forecast flags them daily. The guard is `level ≥ its own 24h high`, not a
-  blocklist — a list needs maintaining, is wrong the day JPS adds a gauge, and says nothing about
+  blocklist. A list needs maintaining. It is wrong the day JPS adds a gauge. It says nothing about
   rivers that are mildly tidal at the mouth. **Do not replace it with a station list.**
-- **Never `rm .history.db` to test a cold start** — it destroys the accumulated samples, every
-  `rising` flag goes false for an hour, and anything keyed off `rising` (the filter, alert panel,
-  drawer counts, heat weighting) goes quiet at once. To re-test the scrape path, expire the page
-  cache instead: `UPDATE page SET ts=0`. Copy the file first if you must delete it.
+- **Never `rm .history.db` to test a cold start.** It destroys the accumulated samples. Every
+  `rising` flag goes false for an hour. Anything keyed off `rising` goes quiet at once: the filter,
+  the alert panel, the drawer counts, the heat weighting. To re-test the scrape path, expire the page
+  cache instead: `UPDATE page SET ts=0`. If you must delete it, copy the file first.
 - **The scrapers fail silently by design** — a layout change yields zero rows, not an error. The
   payload's `sources` counters (`kl.parsed/added`, `national.parsed/applied`) are the alarm: if
   `parsed` hits 0, a table moved. Check those before believing "the rivers went quiet".
@@ -622,32 +625,32 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   whose stored `ts` is older than its TTL. The write used to run only on a non-empty body. So a dead
   upstream re-entered `$want` on every rebuild. It then held a slot in the shared `curl_multi` batch
   for the full `CURLOPT_TIMEOUT` of 25 s. A batch finishes no sooner than its slowest member, so one
-  hung page put 25 s on every cache miss. Measured: 0.13 s for a cached poll, 28.6 s for a rebuild,
-  and 45.1 s when the half-hourly camera capture landed in the same request.
+  hung page put 25 s on every cache miss. Measured: 0.13 s for a cached poll, and 28.6 s for a
+  rebuild. It reached 45.1 s when the half-hourly camera capture landed in the same request.
   `infobanjirjpskl.water.gov.my/Rainfall/LatestData/All` hung that way for four days.
   `WaterLevel/LatestData/All` answered in 3.9 s on the same host through all of it. `pageRow()` stamps
   every page the server asked for, answer or not, and keeps the stored copy on a failure. A dead page
   now costs the timeout once per `SCRAPE_TTL` rather than once per rebuild. **Never stamp a page the
-  server did not ask for** — a stamp on a fresh row pushes its next fetch out forever. The stamp then
-  costs the one signal a reader had, because the `ts` column now advances whether or not the page
+  server did not ask for.** A stamp on a fresh row pushes its next fetch out forever. The stamp then
+  costs the one signal a reader had. The `ts` column now advances whether or not the page
   answered. **`sources.stale` is the replacement, and it is the alarm to read.** It lists the page
-  keys this server asked for and did not get, so a key there means the map is drawing a stored copy
-  of that table. The parse counters cannot say it — a stored copy parses as well as a fresh one, so
+  keys this server asked for and did not get. A key there means the map is drawing a stored copy
+  of that table. The parse counters cannot say it. A stored copy parses as well as a fresh one, so
   `kl.parsed` stayed above zero through the whole outage. `sources.stale` is empty on a healthy poll.
   **A status code cannot decide what a body is, so `pageHasData()` decides it.** The national portal
-  serves a maintenance window as a 320-byte `Notis Gangguan` notice under **HTTP 200**, and that
+  serves a maintenance window as a 320-byte `Notis Gangguan` notice under **HTTP 200**. That
   notice overwrote the stored tables for KL and Putrajaya while this work was measured.
-  `national.applied` fell from 71 to 47 and nothing said why, because the fetch had succeeded. A
+  `national.applied` fell from 71 to 47 and nothing said why, because the fetch succeeded. A
   table page must hold a `<tr`, `met-day` and `met-warn` must decode as JSON, and `met-now` must hold
-  `map.setView`. **`met-now` is tested on the map scaffolding and never on a marker** — a nowcast
+  `map.setView`. **`met-now` is tested on the map scaffolding and never on a marker.** A nowcast
   with nothing to report is weather, not an outage. `fetchAll()` covers the other shape and blanks
-  any status at 400 or above, which also stops `?cam=` serving an HTML error page as `image/jpeg`.
+  any status at 400 or above. That also stops `?cam=` serving an HTML error page as `image/jpeg`.
   The first guess named the camera strips and was wrong. `buildSheet()` runs from `?sheet=` alone,
   never from the payload route, and one strip takes 0.054 s.
   **The weather section prints MET's own issue time, `met.stamp`, and never our poll time.** The
-  nowcast page is cached for `SCRAPE_TTL` and MET issues about every 30 minutes, so the two are
-  different by up to 45 minutes. Printing the poll time would tell a reader a forecast was fresh
-  when it was three quarters of an hour old. `metPoints()` drops any marker whose stamp fails to
+  nowcast page is cached for `SCRAPE_TTL`, and MET issues about every 30 minutes. So the two are
+  different by up to 45 minutes. The poll time tells a reader a forecast is fresh
+  when it is three quarters of an hour old. `metPoints()` drops any marker whose stamp fails to
   parse, so a point that reaches the payload always carries one.
   This app publishes a notice it can name as `notices[]`. The reader then sees it on screen. Every
   other failure still stays in `sources.stale` alone.
@@ -662,22 +665,22 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   `.user.ini` sets `session.auto_start=0` for this directory now, so there is usually no session at
   all. Measured after the change: three requests grew the shared log by zero bytes.
   `api.php` still calls `session_write_close()` as its first statement, above the two `require_once`
-  lines, because nothing in this app reads `$_SESSION` and a server that ignores `.user.ini` still
+  lines. Nothing in this app reads `$_SESSION`. A server that ignores `.user.ini` still
   needs the release. Do not move it later in the file. Code added above it runs inside the lock
   again. `session_write_close()` is silent when no session is active, so the call costs nothing once
   `.user.ini` applies. Note that PHP caches `.user.ini` for `user_ini.cache_ttl` seconds, 300 by
   default.
 - **`error_log()` writes to standard error, and a FastCGI server folds that into its own log.**
-  `api.php` has called `error_log()` correctly the whole time. PHP ran with no `error_log` set, so
+  `api.php` called `error_log()` correctly the whole time. PHP ran with no `error_log` set. So
   every one of those lines landed in the log of the web server, beside every unrelated line it
   writes. An uncaught exception from this app was one line among about 28,000.
   `api.php` and `log.php` each call `ini_set('error_log', __DIR__ . '/.php-error.log')` now. This is
   `ini_set()` rather than an ini file because `__DIR__` resolves on both deploy targets. A committed
-  absolute path is correct on one target at most. **Any new PHP entry point needs that line**, or its
-  errors go back to the shared log and nobody finds them.
+  absolute path is correct on one target at most. **Any new PHP entry point needs that line.**
+  Without it, its errors go back to the shared log and nobody finds them.
 - **A geolocation permission can read `granted` and still yield nothing, because the operating
   system refuses the browser underneath it.** Measured on one Windows desktop reaching this app over
-  https: the permission query returned `granted`, and `getCurrentPosition` timed out at both accuracy
+  https. The permission query returned `granted`. `getCurrentPosition` timed out at both accuracy
   settings, 10 s and 30 s. Windows held `lfsvc` disabled and the machine consent key at `Deny`. Edge
   inherited that `Deny` and had no source left, network fallback included.
   Leaflet adds no timer of its own, so `map.locate()` reports what the browser reports and no sooner.
@@ -689,7 +692,7 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   device refuses. `failTip()` in `js/locate.js` splits three ways instead, on the answer
   `navigator.permissions` gives for the site half. A `granted` beside a failed fix names the device
   and never the browser. A `denied` names the site. No answer from that API names both. On Windows
-  the tip also names the path, because a reader told to open the settings for a device still has to
+  the tip also names the path. A reader told to open the settings for a device still has to
   find them. **A repair a reader runs in a terminal is not a fix.** The first draft of this entry
   ended in three PowerShell lines.
   **A one-page probe found the fault and is gone now. The method is the part to keep.** Put a wall
@@ -700,44 +703,44 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   `location_disabled` and keeps the ink, and `js/sparktip.js` names anything carrying that attribute
   on hover and on tap alike. The surface took three tries. A panel card came first and it was too
   much furniture for a button that did not answer. Amber came second and read as an alert on the
-  water. The glyph is the third, and it is the crosshair of the resting state with a line through it,
-  so the two read as one control in two states. `setBtn()` writes all three button states through one
-  function, so no attribute outlives the state that set it — a tip left over from a failure names a
-  fault on a button that has since found you.
+  water. The glyph is the third. It is the crosshair of the resting state with a line through it.
+  So the two read as one control in two states. `setBtn()` writes all three button states through one
+  function. So no attribute outlives the state that set it. A tip left over from a failure names a
+  fault on a button that already found you.
 - **`js/oops.js` must stay the first import in `app.js`.** A static import runs before the body of
   the file that imports it. A handler written inside `app.js` therefore starts after every other
-  module has evaluated, and a throw during that evaluation reaches nobody. This is a real case rather
+  module evaluated. A throw during that evaluation reaches nobody. This is a real case rather
   than a theoretical one. `state.js` reads the saved preferences with `JSON.parse`, so corrupt
   storage throws there before the map draws anything. `oops.js` imports nothing, so it evaluates
   first. Moving it down the import list, or folding it into `app.js`, gives up the one case it exists
-  for and breaks nothing visible.
-  The third argument on its `error` listener is the capture phase, and it is what catches a file that
+  for. It also breaks nothing visible.
+  The third argument on its `error` listener is the capture phase. That is what catches a file that
   failed to load. That event does not bubble, so a listener without capture sees a throw alone.
   **A headless check with `--dump-dom` captures nothing, and the fault there is the harness.** Chrome
   exits at the dump and discards the queued beacon, so the log stays empty and the code looks broken.
   Keep the browser alive for a few seconds instead, then stop it.
 - **No `fastcgi_finish_request` under Herd** — the SAPI is `cgi-fcgi`, so there is no way to close
-  the connection and keep working. Stale-while-revalidate is impossible in-process; the page cache
-  is the workaround. A cron hitting `api.php` every 5 min would keep the cache warm for good.
+  the connection and keep working. Stale-while-revalidate is impossible in-process. The page cache
+  is the workaround. A cron that hits `api.php` every 5 min keeps the cache warm for good.
   **Never put logic that must always run inside `if (function_exists('fastcgi_finish_request'))`** —
   that branch is dead code on the machine this runs on. The stampede guard lived there for weeks and
-  therefore never guarded anything; see the lock below. It caught a second fix the same way: the
-  `?force=1` feature's defaults for `forced`/`forceWhy` were first added only to `serveCache()`, and
-  this branch echoes `cachedPayload()` directly, so it kept replaying a stale `forced: true` for five
+  therefore never guarded anything. See the lock below. It caught a second fix the same way. The
+  `?force=1` feature's defaults for `forced`/`forceWhy` were first added only to `serveCache()`. This
+  branch echoes `cachedPayload()` directly. So it kept replaying a stale `forced: true` for five
   minutes after every real force. Dead here, live on the nginx/php-fpm target `docs/DEPLOY.md`
   describes. Whatever a fix touches in `serveCache()` must be checked against this branch too.
 - **One rebuild at a time, enforced by `flock` on `.refresh.lock`.** A cold rebuild is ~270 requests
-  at JPS, so N concurrent cache misses is 270N — the shape of a flood from one IP, aimed at the
-  source the whole page depends on. The loser of the race serves stale cache and does *not* queue,
-  except on a true cold start when there is nothing to serve. Anything added to the refresh path
-  must stay inside the lock, and any new upstream fan-out needs the same treatment.
+  at JPS. So N concurrent cache misses is 270N. That is the shape of a flood from one IP, aimed at
+  the source the whole page depends on. The loser of the race serves stale cache and does *not*
+  queue. The exception is a true cold start, when there is nothing to serve. Anything added to the
+  refresh path must stay inside the lock, and any new upstream fan-out needs the same treatment.
 - **Herd serves everything `Cache-Control: max-age=10800`.** Three hours of stale CSS/JS after an
   edit unless the URL changes. The stylesheet links carry `?v=` — **bump it when you touch a css
-  file**, the same as `vendor/fonts.css`. ES module imports have no such guard: hard-reload
-  (Ctrl+Shift+R) after a `js/` change, or the browser may run the old module.
+  file**, the same as `vendor/fonts.css`. ES module imports have no such guard. Hard-reload
+  (Ctrl+Shift+R) after a `js/` change, or the browser can run the old module.
   **The app icons carry `?v=` too**, in four places — the two `<link>` tags in `index.html` and the
-  two `icons[].src` in `manifest.json`. `icon-build.php` rewrites the PNGs under the same names, and
-  a browser holds a favicon for far longer than three hours, so bumping that number is the only
+  two `icons[].src` in `manifest.json`. `icon-build.php` rewrites the PNGs under the same names. A
+  browser holds a favicon for far longer than three hours. So bumping that number is the only
   thing that makes a new mark appear. The script prints the reminder when it finishes.
 - **`filter` runs before `mask`, so a filter on an `.i` is discarded.** The spec order is: paint the
   element, apply the filter, *then* clip with the mask. An `.i` is a box of `currentColor` with the
