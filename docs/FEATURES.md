@@ -10524,3 +10524,62 @@ it follows the theme. So the picture carries no information.
 *No Leaflet control wrapper.* `L.Control` stacks a control above the zoom box for free, which is the
 phone layout. It cannot put one beside the box, which is the desktop layout. Two placements from one
 CSS rule beat a control class that answers half the question.
+
+## Cloudy: the legend gained a fourth key, and it does not come from the nowcast
+
+**What changed.** The weather legend reads Clear, Cloudy, Rain, Heavy. Its glyphs draw at twice the
+label size, with the word under each one.
+
+**Why cloud needed a second source.** MET's nowcast is the feed behind the map layer, and its whole
+vocabulary is three words. Measured 2026-08-18 across all 294 markers and all 1,764 forecast steps:
+
+| value | meaning | markers |
+|---|---|---|
+| `Tiada Hujan` | no rain | 252 |
+| `Hujan` | rain | 38 |
+| `Hujan Lebat` | heavy rain | 4 |
+
+The page declares a fourth icon, `/images/icon/icon-na.svg`, and no marker used it.
+
+`Tiada Hujan` means no rain. It does not mean clear sky. So the sun this app drew on rung 0 was
+already the wider claim of the two. The nowcast had no word that could correct it.
+
+**Where cloud comes from.** `api.data.gov.my/weather/forecast` does carry it. Measured over 500
+rows, `summary_forecast` holds nine values built from four phenomena:
+
+| phenomenon | coverage words seen |
+|---|---|
+| no rain (`Tiada Hujan`) | — |
+| cloud (`Mendung`) | `di beberapa tempat` |
+| rain (`Hujan`) | `di beberapa tempat`, `di kebanyakan tempat` |
+| thunderstorm (`Ribut petir`) | `di beberapa tempat`, `di kebanyakan tempat`, `menyeluruh`, each also `di kawasan pedalaman` |
+
+That feed already reaches every weather point, by the district join that supplies the temperature.
+`metDaily()` now also reads `mendung` from it and sets `sky` on the point.
+
+**Only cloud is read.** A thunderstorm has no rung here, and rain the nowcast already answers for
+the instant the map draws. The four phenomena are mutually exclusive on a row, so naming `mendung`
+names the day's headline.
+
+**Cloud is not a rung.** `api.php` writes `rungs[0]` into the `level` table on every refresh. A
+fourth rung changes what every stored row means, and nothing can go back and rescore them.
+`WX_CLOUD` in `js/config.js` sits beside the ladder instead. `wxIcon()` and `tone()` both test `r
+=== 0` before they look at `sky`. So a wet pin can never take the dry glyph or the dry tone.
+Cloud also outranks the night glyph. A moon says the sky is clear, which is the one thing an
+overcast night is not.
+
+**Trade-off accepted, and it runs one way.** `Mendung di beberapa tempat` is a claim about a
+district across a day, drawn here on one point at one moment. It is taken only inside the case
+where MET itself makes no claim about the sky at all. Widening it to rain or to a thunderstorm puts
+a day-scale forecast over an observation. That is a different decision, and it is not made here.
+
+**Not built.** No thunderstorm rung. It is the dominant forecast condition, at 331 of those 500
+rows. The map still cannot show it, because the nowcast cannot observe it. A
+thunderstorm key would need the forecast to drive a wet rung, which is the line above.
+
+**Seven assertions** in `php api.php --selftest` hold the parse: `mendung` in three shapes reads as
+cloud, and no rain, rain and a thunderstorm each read as nothing. One more holds that a row with no
+`summary_forecast` still yields its temperature.
+
+**Measured on 2026-08-18 the legend key drew nothing new.** None of the sixteen districts this map
+covers was cloudy that day. Four of MET's 170 were, all of them in Melaka.

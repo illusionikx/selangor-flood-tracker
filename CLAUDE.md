@@ -2027,6 +2027,27 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   **Heavy differs from rain by saturation and never by lightness.** `.pin` uses one palette on both
   themes, because a pin has to win over the basemap. So a darker heavy pin disappears into the dark
   tile.
+- **Cloud is a refinement of rung 0, never a rung of its own.** The nowcast's whole vocabulary is
+  `Tiada Hujan`, `Hujan` and `Hujan Lebat`. Measured 2026-08-18 over all 294 markers, those three
+  are the only values it publishes. The page declares a fourth icon, `icon-na.svg`, and no marker
+  used it. `Tiada Hujan` means no rain. It does not mean clear sky. So the sun this app drew on
+  rung 0 was already the wider claim of the two.
+  The word comes from `summary_forecast` on the MET daily feed, through `sky` on the weather point.
+  That is the same feed and the same district join that already carry the temperature.
+  `metDaily()` reads `mendung` alone. Measured over 500 rows, that feed holds nine values built
+  from four phenomena: no rain, `Mendung`, `Hujan` and `Ribut petir`. The four are mutually
+  exclusive on a row, so naming `mendung` names the day's headline. A thunderstorm has no rung
+  here, and rain the nowcast already answers for the instant the map draws.
+  **A fourth rung was the wrong shape and here is why.** `api.php` writes `rungs[0]` into the
+  `level` table on every refresh. A new rung changes what every stored row means, and nothing can
+  go back and rescore them. `WX_CLOUD` in `config.js` is a descriptor beside the ladder instead.
+  **Cloud only ever replaces Clear.** `wxIcon()` and `tone()` both test `r === 0` first, so a wet
+  pin can never take the dry glyph or the dry tone. It also outranks the night glyph. A moon says
+  the sky is clear, which is the one thing an overcast night is not.
+  **The trade-off is real and it runs one way.** `Mendung di beberapa tempat` is a claim about a
+  district across a day, drawn on one point at one moment. It is accepted only inside the case
+  where MET itself makes no claim about the sky at all. Widening it to rain or to a thunderstorm
+  puts a day-scale forecast over an observation. That is a different decision.
 - **Weather mode never writes `PREFS.heatLayer`.** `syncHeat()` reads `PREFS.wx` as one more input
   and drops both canvases while the mode is on. So leaving the mode restores whatever heatmap the
   reader had, with nothing remembered and nothing to get wrong. Do not add a "previous layer" field.

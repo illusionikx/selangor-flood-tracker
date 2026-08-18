@@ -491,5 +491,10 @@
 /* The temperature, above the cards. `.wxtemp` already stacks high over low. */
 .wxtoday { margin-bottom: 8px; }
 /* The legend key. One row per rung, glyph then word. */
-.wxkey { display: flex; gap: 12px; font-size: 11px; }
-.wxkey span { display: inline-flex; align-items: center; gap: 4px; }
+/* The glyph carries the meaning here, so it leads and the word sits under it. `.i` sizes in `em`,
+   so `2em` against this row's 11px is a 22px mark against an 11px label. Centred in a column
+   rather than beside the word, because four keys on one row have to scan as four marks and not as
+   four phrases. `gap` grew with them: at 12px the 22px glyphs read as one strip. */
+.wxkey { display: flex; gap: 16px; font-size: 11px; }
+.wxkey span { display: inline-flex; flex-direction: column; align-items: center; gap: 3px; }
+.wxkey .i { font-size: 2em; }

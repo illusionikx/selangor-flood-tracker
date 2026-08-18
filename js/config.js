@@ -265,6 +265,21 @@ export const WEATHER = [
   { icon: 'rainy_heavy', pin: 'rainy', word: 'Heavy', line: 'Heavy rain' },
 ];
 
+/* Cloud is a refinement of rung 0, never a rung of its own. The rungs are an intensity ladder, and
+   `api.php` writes `rungs[0]` into the `level` table on every refresh. A fourth rung would change
+   what every stored row means, and nothing can go back and rescore them.
+   It exists because the nowcast has no word for cloud. Its whole vocabulary is `Tiada Hujan`,
+   `Hujan` and `Hujan Lebat`, and `Tiada Hujan` means no rain. It does not mean clear sky. So the
+   sun this app drew on rung 0 was already the wider claim of the two.
+   The word comes from the MET daily forecast, through `sky` on the point — the same feed and the
+   same district join that already supply the temperature on that card. **It only ever replaces
+   Clear.** Rain and heavy rain are what the nowcast observed for the instant the map draws, and a
+   day-scale forecast does not get to overrule them.
+   The trade-off is real and it is one way round. `Mendung di beberapa tempat` is a claim about a
+   district over a day, drawn here on one point at one moment. It is accepted only inside the case
+   where MET itself makes no claim about the sky at all. */
+export const WX_CLOUD = { icon: 'cloud', word: 'Cloudy', line: 'Cloudy', tone: 'cloud' };
+
 /* How close two weather pins may draw before the map keeps only the first. A pin draws 31.2px
    wide, so 40 leaves about 9px of air. Measured at latitude 3.1, this thins hard at zoom 11 and
    below, which is the Klang valley overview. It changes almost nothing above zoom 12.

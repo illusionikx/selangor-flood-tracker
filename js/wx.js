@@ -3,7 +3,7 @@
 // Loaded on demand. A reader who never opens weather mode loads none of this and fetches none of
 // its data. That is why the points ride ?wx=1 and not the payload every poll already carries.
 
-import { FEED_WX, WX_THIN_PX, WEATHER, MET_NAME } from './config.js';
+import { FEED_WX, WX_THIN_PX, WEATHER, WX_CLOUD, MET_NAME } from './config.js';
 import { PREFS } from './state.js';
 import { map, pinGlyph, openSide, side, focusOn } from './map.js';
 import { wxIcon, stamp } from './popup.js';
@@ -40,7 +40,10 @@ function thin(list) {
   return kept;
 }
 
-const tone = r => (r >= 2 ? 'heavy' : r === 1 ? 'rain' : 'clear');
+/* The `--wx-*` half of the pin colour. Cloud rides on rung 0 alone, the same rule wxIcon()
+   obeys, so a wet pin can never take the dry tone. */
+const tone = (r, sky) => (r >= 2 ? 'heavy' : r === 1 ? 'rain'
+                        : sky === 'cloud' ? WX_CLOUD.tone : 'clear');
 
 function paint() {
   layer.clearLayers();
@@ -52,8 +55,8 @@ function paint() {
         // Matches `.pin`'s box in map.css, the same way render.js does. Leaflet positions the
         // marker off this and not off the CSS.
         className: '', iconSize: [39, 39], iconAnchor: [19.5, 19.5],
-        html: `<span class="pin" style="--c:var(--wx-${tone(r)})">${
-          pinGlyph(wxIcon(r, { pin: true }))}</span>`,
+        html: `<span class="pin" style="--c:var(--wx-${tone(r, p.sky)})">${
+          pinGlyph(wxIcon(r, { pin: true, sky: p.sky }))}</span>`,
       }),
     })
       .on('click', () => { openSide('@wx-' + p.id, card(p)); focusOn([p.lat, p.lng], 12); })
@@ -83,11 +86,11 @@ const dots = p => `<button class="icon dots" popovertarget="mnu-wx"
    longer one. Rung 0 has no `line`, so `word` answers there.
    `aria-hidden` on the glyph, because the word beside it already says the same thing. A screen
    reader must not say it twice. */
-const stepCard = (rung, clock, now) => {
-  const w = WEATHER[rung] || WEATHER[0];
+const stepCard = (rung, clock, now, sky) => {
+  const w = rung === 0 && sky === 'cloud' ? WX_CLOUD : (WEATHER[rung] || WEATHER[0]);
   return `<div class="wxcol${now ? ' now' : ''}">
       <div class="wxrow">
-        <i class="i wxbig i-${wxIcon(rung, { clock })}" aria-hidden="true"></i>
+        <i class="i wxbig i-${wxIcon(rung, { clock, sky })}" aria-hidden="true"></i>
         <span class="wxline">${w.line || w.word}</span>
         ${now ? '<b class="wxnow">NOW</b>' : ''}
       </div>
@@ -103,9 +106,9 @@ function card(p) {
     </div>`;
 
   const cards = [
-    ...p.past.map(([ts, r]) => stepCard(r, hhmm(ts * 1000), false)),
-    stepCard(p.rungs[0], hhmm(p.stamp * 1000), true),
-    ...p.rungs.slice(1).map((r, i) => stepCard(r, p.clocks[i + 1], false)),
+    ...p.past.map(([ts, r]) => stepCard(r, hhmm(ts * 1000), false, p.sky)),
+    stepCard(p.rungs[0], hhmm(p.stamp * 1000), true, p.sky),
+    ...p.rungs.slice(1).map((r, i) => stepCard(r, p.clocks[i + 1], false, p.sky)),
   ].join('');
 
   /* `.pophead` first, always. openSide() lifts it out into #sideHead, and that seam is what keeps
@@ -125,7 +128,7 @@ function card(p) {
     </div>
     <div class="sensor">
       <div class="sensorhead">
-        <i class="glyph i i-${wxIcon(p.rungs[0])}" style="color:var(--k-weather)"></i>
+        <i class="glyph i i-${wxIcon(p.rungs[0], { sky: p.sky })}" style="color:var(--k-weather)"></i>
         <b>Weather</b>
       </div>
       ${temp}

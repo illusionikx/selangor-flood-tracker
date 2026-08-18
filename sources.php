@@ -589,7 +589,18 @@ function metDaily(string $json): array {
         $name = $r['location']['location_name'] ?? '';
         if (!str_starts_with($id, 'Ds') || $name === '') continue;
         if (!isset($r['min_temp'], $r['max_temp'])) continue;
-        $out[strtolower(trim($name))] = ['tmin' => (int)$r['min_temp'], 'tmax' => (int)$r['max_temp']];
+        $row = ['tmin' => (int)$r['min_temp'], 'tmax' => (int)$r['max_temp']];
+        /* `sky` exists because the nowcast has no word for cloud. Its whole vocabulary is
+           `Tiada Hujan`, `Hujan` and `Hujan Lebat`, and `Tiada Hujan` means no rain, not clear sky.
+           So the map drew a sun over an overcast afternoon and had nothing else to draw.
+           This feed does carry cloud. Measured 2026-08-18 over 500 rows, `summary_forecast` holds
+           nine values built from four phenomena: no rain, `Mendung`, `Hujan` and `Ribut petir`.
+           The four are mutually exclusive on a row, so naming `mendung` names the day's headline.
+           Only cloud is read. A thunderstorm is a claim this app has no rung for, and rain the
+           nowcast already answers for the instant the map draws. */
+        if (str_contains(strtolower((string)($r['summary_forecast'] ?? '')), 'mendung'))
+            $row['sky'] = 'cloud';
+        $out[strtolower(trim($name))] = $row;
     }
     return $out;
 }
