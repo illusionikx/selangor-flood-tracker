@@ -536,6 +536,38 @@ el('heat').onchange = el('rainHeat').onchange = el('risingOnly').onchange =
   applyFilter(false);
 };
 
+/* **Hover opens the paint panel, on a pointer device and nowhere else.** `popovertarget` keeps the
+   press path for touch and for the keyboard, so this only adds a way in, never the only way.
+   Two guards, and both earn their place. The media query is `PLAYER_OVERLAY`'s own, because a phone
+   can report `hover: hover` and a bar that hides itself needs something to bring it back. The
+   `pointerType` test is because a tap fires `pointerenter` too, and a tap already has the press.
+   The pointer crosses a 4px gap between the button and the panel, so leaving either one schedules
+   the close rather than doing it, and entering either one cancels that. Without the delay the panel
+   shuts in the gap on the way to the chip the reader is reaching for. */
+{
+  const canHover = matchMedia('(hover: hover) and (min-width: 601px)');
+  const menu = el('paintmenu'), btn = el('paint');
+  let shut;
+  const enter = e => {
+    if (e.pointerType !== 'mouse') return;
+    clearTimeout(shut);
+    // showPopover() throws on an already-open popover, which is the ordinary case here: the pointer
+    // crosses from the button to the panel and enters the second one while the first is still open.
+    if (canHover.matches && !menu.matches(':popover-open')) menu.showPopover();
+  };
+  const leave = e => {
+    if (e.pointerType !== 'mouse') return;
+    clearTimeout(shut);
+    shut = setTimeout(() => {
+      if (canHover.matches && menu.matches(':popover-open')) menu.hidePopover();
+    }, 180);
+  };
+  for (const box of [btn, menu]) {
+    box.addEventListener('pointerenter', enter);
+    box.addEventListener('pointerleave', leave);
+  }
+}
+
 /* The weather mode toggle. The pref is written first and the module reads it, so the box can never
    be the source of truth. This is the rule syncHeat() and syncWx() both state.
    A failed import puts the pref back and writes the hint on the chip. It is the same shape the

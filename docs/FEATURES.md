@@ -10528,6 +10528,38 @@ holds its start value for the whole duration, so a bare transition leaves the co
 focusable for the length of the slide. That is the trap `#splash` and `#gotoBox` both hit.
 `prefers-reduced-motion` drops the transition.
 
+### Hover opens it on a pointer device
+
+`popovertarget` keeps the press path for touch and for the keyboard, so hover only adds a way in and
+never becomes the only one.
+
+**Two guards, and both earn their place.** The media query is `PLAYER_OVERLAY`'s own,
+`(hover: hover) and (min-width: 601px)`, because a phone can report `hover: hover`. The handler also
+tests `pointerType`, because a tap fires `pointerenter` as well, and a tap already has the press.
+Without that second test a phone that lies opens the panel under the finger before the press lands.
+
+**Leaving schedules the close rather than doing it.** The pointer crosses a 4px gap between the
+button and the panel, and entering either one cancels the timer. Without the delay the panel shuts
+in the gap, on the way to the chip the reader wants.
+
+Measured: touch and pen do not open it, a mouse does, the panel survives the gap, leaving both closes
+it, and the press path still works.
+
+### The panel drew a scrollbar with nothing to scroll
+
+`.menu` is `overflow-y: auto`, so anything that leaks into its scroll height draws a scrollbar down a
+box that already fits.
+
+The collapsed branch did exactly that. With Stations put away the panel measured 157px tall and
+reported a 352px `scrollHeight`, so a 17px scrollbar ran down two chips that fitted.
+
+**`overflow: hidden` clips the paint and does not make that claim on its own.** `contain: layout` on
+`.subin` is what keeps the clipped rows out of the ancestor's scroll height. Measured: 352 against
+157 before, 157 against 157 after, with the expanded branch unchanged at 309px.
+
+**`contain: size` also clears it, and nothing here uses it.** It sizes the item as if it held
+nothing, so the open branch draws nothing.
+
 ### A menu opens away from the nearest edge, on both axes
 
 The placement handler right-aligned every menu to its button and always opened downward. Every caller
@@ -10617,10 +10649,6 @@ Widening the chip to `isHot()` is one line in `render.js`. The repository owner 
 and chose the narrow filter. Read this as a decision on record, not an oversight.
 
 ### Not built
-
-*No hover-to-expand.* Leaflet's own layers control opens on hover. It needs a tap path anyway at this
-project's breakpoint, and a box that opens on hover over a map opens while somebody pans it. One
-press, both platforms.
 
 *No copy left in the drawer.* Two controls on one preference is the fault `syncHeat()`'s own comment
 describes at length.

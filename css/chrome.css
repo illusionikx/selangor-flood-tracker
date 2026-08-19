@@ -1105,8 +1105,15 @@ body.drawer #legend { transform: translateX(var(--drawer)); }
   transition: grid-template-rows .22s ease, opacity .16s, visibility 0s;
 }
 /* `min-height: 0` because a grid item refuses to shrink below its content without it, which is the
-   whole mechanism here. */
-#paintmenu .subin { overflow: hidden; min-height: 0; }
+   whole mechanism here.
+   **`contain: layout` is what keeps the collapsed branch out of the panel's scroll height.** Without
+   it the clipped rows still counted: with the branch collapsed the panel measured 157px tall and
+   reported a 352px `scrollHeight`, so `.menu`'s `overflow-y: auto` drew a 17px scrollbar down a box
+   with nothing to scroll. `overflow: hidden` clips the paint and does not make that claim on its
+   own. Measured: 352 against 157 before, 157 against 157 after, with the expanded branch unchanged
+   at 309px. `contain: size` also clears it and must NOT be used — it sizes the item as if it were
+   empty, so the open branch collapses to nothing. */
+#paintmenu .subin { overflow: hidden; min-height: 0; contain: layout; }
 #paintmenu:not(:has(#stations:checked)) .subgrp {
   grid-template-rows: 0fr; opacity: 0; visibility: hidden;
   margin-top: 0; margin-bottom: 0; border-left-color: transparent;

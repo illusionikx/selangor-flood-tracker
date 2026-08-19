@@ -104,6 +104,41 @@ menu.hidePopover();
 await wait(120);
 is(menu.matches(':popover-open'), false, 'and it closes again');
 
+// --- hover opens it on a pointer device, and only a mouse does -------------------------------
+/* `popovertarget` keeps the press path for touch and the keyboard. Hover only adds a way in. A tap
+   fires `pointerenter` too, so the handler tests `pointerType` as well as the media query — without
+   that test a phone reporting `hover: hover` opens the panel under the finger before the press. */
+const ptr = (type, node, kind) =>
+  node.dispatchEvent(new w.PointerEvent(type, { pointerType: kind }));
+if (menu.matches(':popover-open')) menu.hidePopover();
+await wait(200);
+for (const kind of ['touch', 'pen']) {
+  ptr('pointerenter', btn, kind);
+  await wait(250);
+  is(menu.matches(':popover-open'), false, `a ${kind} pointer does not open it`);
+}
+ptr('pointerenter', btn, 'mouse');
+await wait(250);
+is(menu.matches(':popover-open'), true, 'a mouse pointer does');
+/* The pointer crosses a 4px gap on the way to a chip. Leaving the button must not shut the panel
+   the reader is reaching for. */
+ptr('pointerleave', btn, 'mouse');
+ptr('pointerenter', menu, 'mouse');
+await wait(400);
+is(menu.matches(':popover-open'), true, 'and it survives the gap between button and panel');
+ptr('pointerleave', menu, 'mouse');
+await wait(500);
+is(menu.matches(':popover-open'), false, 'leaving both closes it');
+btn.click();
+await wait(200);
+is(menu.matches(':popover-open'), true, 'and the press path still works');
+
+// --- the panel never scrolls with nothing to scroll --------------------------------------------
+/* `.menu` is `overflow-y: auto`, so anything that leaks into its scroll height draws a scrollbar
+   down a box that fits. The collapsed branch did exactly that: 157px tall, 352px claimed. */
+const fits = () => menu.scrollHeight <= menu.clientHeight + 1;
+const gutter = () => menu.offsetWidth - menu.clientWidth;
+
 // --- the three choices moved, and none of them is in two places --------------------------------
 
 const BOXES = ['heat', 'rainHeat', 'stations', 'favOnly', 'wxLayer', 'risingOnly'];
@@ -269,6 +304,8 @@ el('wxLayer').checked = true;
 el('wxLayer').dispatchEvent(new w.Event('change'));
 await wait(2500);
 is(sub.offsetHeight, 0, 'weather picked -> the whole branch collapses');
+is(fits(), true, 'collapsed: the clipped rows stay out of the scroll height');
+is(gutter() < 10, true, 'so no scrollbar is drawn down a box that fits');
 is(w.getComputedStyle(sub).visibility, 'hidden', 'and leaves the tab order with it');
 is(el('favOnly').checked === favWas && el('risingOnly').checked === alertWas, true,
    'collapsing changes nothing inside it');
@@ -283,6 +320,8 @@ await wait(1500);
 is(sub.offsetHeight > 0, true, 'stations picked -> the branch comes back');
 is(glued(), gapCollapsed, 'and the panel stays the same distance off the button either way');
 is(glued() >= 0 && glued() <= 12, true, 'which is hard against it');
+is(fits(), true, 'expanded: the panel does not claim more than it holds');
+is(gutter() < 10, true, 'so no scrollbar is drawn');
 menu.hidePopover();
 await wait(60);
 

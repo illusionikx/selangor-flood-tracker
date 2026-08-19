@@ -2194,6 +2194,15 @@ it. The weather section stretches nothing. It is five fixed keys measuring 231px
   downward — see the placement handler in `js/ui.js`. `#paintmenu` changes height on a press, and the
   far edge pinned it off the button that opened it. The branch collapse is a grid row between `0fr`
   and `1fr`. `interpolate-size` with `height: auto` came first and does not come back.
+  **A collapsed branch stays out of the panel's scroll height through `contain: layout`, not through
+  `overflow: hidden`.** The second clips the paint and makes no claim about layout, so `.menu`'s
+  `overflow-y: auto` drew a 17px scrollbar down a 157px box reporting 352. `contain: size` also
+  clears it, and nothing here uses it: it sizes the item as if empty, so the open branch draws
+  nothing.
+  **Hover opens the panel on a pointer device**, behind
+  `(hover: hover) and (min-width: 601px)` AND a `pointerType === 'mouse'` test. A tap fires
+  `pointerenter` too, and a tap already has the press. Leaving schedules the close so the pointer can
+  cross the 4px gap to the panel.
   **`Stations` gates the wash as well as the pins.** `render()` and `syncHeat()` share the test
   `PREFS.mapLayer === 'stations'`. Everything under that chip is a choice ABOUT the station layer, so
   with the layer off none of them has anything to act on and the branch collapses.
