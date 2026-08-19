@@ -2203,6 +2203,12 @@ it. The weather section stretches nothing. It is five fixed keys measuring 231px
   `(hover: hover) and (min-width: 601px)` AND a `pointerType === 'mouse'` test. A tap fires
   `pointerenter` too, and a tap already has the press. Leaving schedules the close so the pointer can
   cross the 4px gap to the panel.
+  **Hover then frees the press, so one press switches the layer.** The gate is the pointer being on
+  the button, never the media query: a tap and a keyboard press keep the native `popovertarget`
+  toggle, which is the only way in either of them has. `preventDefault()` is what stops that toggle,
+  because a popover invoker runs as the click's activation behavior. The handler presses the radio
+  rather than writing `PREFS.mapLayer`, because the weather radio owns the deferred import and its
+  rollback.
   **`Stations` gates the wash as well as the pins.** `render()` and `syncHeat()` share the test
   `PREFS.mapLayer === 'stations'`. Everything under that chip is a choice ABOUT the station layer, so
   with the layer off none of them has anything to act on and the branch collapses.

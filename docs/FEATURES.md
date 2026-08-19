@@ -10545,6 +10545,29 @@ in the gap, on the way to the chip the reader wants.
 Measured: touch and pen do not open it, a mouse does, the panel survives the gap, leaving both closes
 it, and the press path still works.
 
+### Which is what frees the press to switch the layer
+
+Hover is not the feature. It is what makes the press free. On a pointer device the panel is already
+open, so the button no longer has to open it, and one press switches between the two layers instead.
+
+**The gate is the pointer, never the media query.** A tap and a keyboard press keep the native
+`popovertarget` toggle, because neither one has another way to open the panel. So the handler acts
+only where hover put the panel on screen, and the press falls through everywhere else.
+
+**`preventDefault()` is what stops that toggle.** A popover invoker runs as the click's activation
+behavior, and a cancelled click has none. Without it the press switches the layer and then shuts the
+panel it switched in.
+
+**It presses the radio rather than writing the preference.** Turning weather on awaits a deferred
+module, and rolls back when that import fails. That rule lives on the radio's own handler, and a
+second writer here is a second copy of it.
+
+The trade-off is that the shortcut is not announced. A reader who never presses the button loses
+nothing, because the chip in the open panel does the same thing.
+
+Measured: a press with the pointer on the button switches the layer, leaves the panel open, and
+switches back on the next press.
+
 ### The panel drew a scrollbar with nothing to scroll
 
 `.menu` is `overflow-y: auto`, so anything that leaks into its scroll height draws a scrollbar down a

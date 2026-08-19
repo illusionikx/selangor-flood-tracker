@@ -133,6 +133,23 @@ btn.click();
 await wait(200);
 is(menu.matches(':popover-open'), true, 'and the press path still works');
 
+// --- and with the panel already open under the pointer, the press switches the layer -----------
+/* Hover is what makes the press free on a pointer device. A tap and a keyboard press keep the
+   native toggle, because neither one has a way to open the panel without it. */
+const layer = () => (el('wxLayer').checked ? 'weather' : 'stations');
+ptr('pointerenter', btn, 'mouse');
+await wait(250);
+const was = layer();
+btn.click();
+await wait(2500);   // picking weather awaits a deferred module
+is(layer() !== was, true, 'a press with the pointer on the button switches the layer');
+is(menu.matches(':popover-open'), true, 'and never shuts the panel it switched in');
+btn.click();
+await wait(2500);
+is(layer(), was, 'so the next press switches back');
+ptr('pointerleave', btn, 'mouse');
+await wait(500);
+
 // --- the panel never scrolls with nothing to scroll --------------------------------------------
 /* `.menu` is `overflow-y: auto`, so anything that leaks into its scroll height draws a scrollbar
    down a box that fits. The collapsed branch did exactly that: 157px tall, 352px claimed. */

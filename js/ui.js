@@ -547,25 +547,40 @@ el('heat').onchange = el('rainHeat').onchange = el('risingOnly').onchange =
 {
   const canHover = matchMedia('(hover: hover) and (min-width: 601px)');
   const menu = el('paintmenu'), btn = el('paint');
-  let shut;
+  let shut, over = false;
   const enter = e => {
-    if (e.pointerType !== 'mouse') return;
+    if (e.pointerType !== 'mouse' || !canHover.matches) return;
     clearTimeout(shut);
+    over = e.currentTarget === btn;
     // showPopover() throws on an already-open popover, which is the ordinary case here: the pointer
     // crosses from the button to the panel and enters the second one while the first is still open.
-    if (canHover.matches && !menu.matches(':popover-open')) menu.showPopover();
+    if (!menu.matches(':popover-open')) menu.showPopover();
   };
   const leave = e => {
-    if (e.pointerType !== 'mouse') return;
+    if (e.pointerType !== 'mouse' || !canHover.matches) return;
     clearTimeout(shut);
+    over = false;
     shut = setTimeout(() => {
-      if (canHover.matches && menu.matches(':popover-open')) menu.hidePopover();
+      if (menu.matches(':popover-open')) menu.hidePopover();
     }, 180);
   };
   for (const box of [btn, menu]) {
     box.addEventListener('pointerenter', enter);
     box.addEventListener('pointerleave', leave);
   }
+  /* **With the panel already open under the pointer, the press is free, so it switches the layer.**
+     `over` is the whole gate. It is set only where hover opened the panel, so a tap and a keyboard
+     press both fall through to the native `popovertarget` toggle and keep the one way in they have.
+     `preventDefault()` is what stops that toggle here. A popover invoker runs as the click's
+     activation behavior, and a cancelled click has none. Without it the press cycles the layer and
+     shuts the panel it cycled in.
+     It presses the radio rather than writing the preference. Turning weather on awaits a deferred
+     module and rolls back when that import fails, and that lives on the radio's own handler. */
+  btn.addEventListener('click', e => {
+    if (!over) return;
+    e.preventDefault();
+    (PREFS.mapLayer === 'weather' ? el('stations') : el('wxLayer')).click();
+  });
 }
 
 /* The weather mode toggle. The pref is written first and the module reads it, so the box can never
