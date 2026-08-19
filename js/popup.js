@@ -736,7 +736,7 @@ export function sitePopup(members) {
    two ways to build one card. Built fresh on every open, so it reflects the latest poll rather than
    the fix's own timestamp. */
 export function herePopup(e, loaded) {
-  if (!loaded) return '<b>You are here</b><br><span class="muted">Stations still loading…</span>';
+  if (!loaded) return '<b>Your Location</b><br><span class="muted">Stations still loading…</span>';
   const at = e.latlng;
   const rows = ['river', 'rainfall', 'siren', 'gauge'].map(k => {
     const kind = KINDS[k];
@@ -772,8 +772,15 @@ export function herePopup(e, loaded) {
      else. */
   const wx = nearestWx(at);
 
+  /* The head is the one every station card draws: a `.popname` title, then a muted line under it.
+     A badge said it before, which is the slot a station card gives its sensor kind, and this card
+     names no kind. It also read `You are here`, where a title reads as a place. The glyph is the
+     one `#locate.on` carries, which is the state that button is in whenever this card can open. So
+     the title and the control that opened it agree.
+     It goes nowhere on a press: `.popname` without `data-go` is the shape the alert panel's own
+     head already uses. */
   return `<div class="pophead">
-      <span class="badge" style="--c:var(--me)"><i class="i i-home_pin"></i>You are here</span>
+      <div class="popname"><i class="i i-near_me" style="color:var(--me)"></i> Your Location</div>
       ${/* Not `Accurate to about N m`. The figure is already a radius the browser is unsure of,
             so `about` hedges a number that is itself the hedge. */''}
       <div class="muted">Accurate to ${Math.round(e.accuracy)} m</div>
