@@ -10375,6 +10375,20 @@ not get two looks.
 
 `.note` and `.hint` share one rule, so a chip carrying both lines them up in that order.
 
+**The label pushes, and nothing on the right pulls.** `margin-left: auto` on both of them was the
+first try, and it looks correct on a chip carrying one of them. A flex line distributes its free
+space between every auto margin on it.
+
+So the Weather chip, which carries a note and a hint, split its slack in two and left the note 41px
+short of the edge. Stations carries a note alone and was flush. One `margin-right: auto` on the
+label packs everything after it against the right edge instead, whatever the count.
+
+An empty `.hint` comes off the line through `:empty`, rather than sitting at zero width. It carries
+the flex `gap` either way, which held the note 8px off an edge the Stations chip met exactly.
+
+`paint-check.html` measures that edge now. It asserted containment before, and a containment test
+passes on a note sitting anywhere after the label.
+
 **No headings over the top level.** Stations and Weather are the two things this map draws, and one
 draws at a time. Every other control answers a question ABOUT the station layer, so it lives inside
 it.
@@ -10919,3 +10933,18 @@ accuracy circle and the ripple all still carry `--me`, and the title glyph carri
 
 The loading state reads `Your Location` as well. One name for one thing, so the card cannot introduce
 itself twice under two names.
+
+**Follow-up, same day: the sun became `partly_cloudy_day`, and the sun is gone.** The nowcast's
+rung 0 word is `Tiada Hujan`, which means no rain. It does not mean a clear sky. The sun was the
+wider claim of the two, and this file says so twice already, once for cloud and once for the bolt.
+A partly cloudy day is what the word actually states. Four surfaces move together: the pin, the
+card, the legend key and the weather layer chip in the paint chooser. `--i-sunny` had no caller
+left, so it went with them. The night form stays `clear_night`, because the reader asked for the
+day glyph and a moon still answers for the dark half.
+The word under the legend key still reads `Clear`. That is now a wider claim than the mark above
+it, and nobody has ruled on the wording.
+
+**And `past` never held the current issue.** The two previous cards come off `past`, which
+`wxRows()` filters with `$s[0] < $p['stamp']`. Measured on the 09:00 issue across all 50 points:
+0 rows sit at or after their own issue. So `slice(-2)` takes the two issues before now, and the
+`NOW` card is a third card that no slice can reach.

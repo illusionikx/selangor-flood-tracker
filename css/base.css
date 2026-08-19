@@ -285,8 +285,17 @@ td:last-child { text-align: right; padding-left: 16px; }
 .chip:has(input:disabled):hover { background: none; }
 /* The right edge of a chip, in two forms. `.note` is written in the markup and never moves: it
    names what the layer measures. `.hint` is written by JS and reports a state, such as how many
-   stations a filter holds. A chip can carry both, and the first one takes the space. */
-.chip .hint, .chip .note { margin-left: auto; font-size: 11px; opacity: .7; white-space: nowrap; }
+   stations a filter holds.
+   **The label pushes, and nothing on the right pulls.** `margin-left: auto` on both of these was
+   the first try, and free space is DISTRIBUTED between every auto margin on the line. So the
+   Weather chip, which carries a note and a hint, split its slack in two and left the note 41px
+   short of the edge. One `margin-right: auto` on the label packs everything after it against the
+   right edge instead, whatever the count.
+   An empty `.hint` is taken off the line rather than left at zero width. It still carries the
+   flex `gap`, which held the note 8px off an edge the Stations chip met exactly. */
+.chip .lab { margin-right: auto; }
+.chip .hint, .chip .note { font-size: 11px; opacity: .7; white-space: nowrap; }
+.chip .hint:empty { display: none; }
 #shown { margin: 10px 2px 0; font-size: 12px; }
 
 select, #goto, #dataFind, #camFind {

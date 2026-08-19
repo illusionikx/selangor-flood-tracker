@@ -2059,6 +2059,11 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   and off white on the light theme's card `#f1f3f4` is invisible. So `:root` holds `#7d8794`
   instead. Do not copy either value into the other block. The legend gains no moon key. That strip
   already wraps below 320px with five keys, and it states the ladder rather than the hour.
+- **Rung 0 draws `partly_cloudy_day`, and `--i-sunny` is gone.** The nowcast word is `Tiada
+  Hujan`, which means no rain and not a clear sky. So the sun claimed more than the feed states.
+  Four surfaces read the rung and all four moved: the pin, the card glyph, the legend key and the
+  weather chip in `#paintmenu`. The night form stays `clear_night`. The legend word still reads
+  `Clear`, which is now wider than the mark over it.
 - **Cloud is a refinement of rung 0, never a rung of its own.** The nowcast's whole vocabulary is
   `Tiada Hujan`, `Hujan` and `Hujan Lebat`. Measured 2026-08-18 over all 294 markers, those three
   are the only values it publishes. The page declares a fourth icon, `icon-na.svg`, and no marker
@@ -2187,6 +2192,11 @@ it. The weather section stretches nothing. It is five fixed keys measuring 231px
   **Every chip is one line.** The label names the control. `.note` at the right edge of a layer
   names the discipline it measures, `Hydrological Measurement` and `Nowcasting`. `.hint` at the same
   edge is the other thing: JS writes it, and it states a count and nothing else.
+  **The label pushes and nothing on the right pulls.** `.chip .lab` takes `margin-right: auto`, and
+  neither `.note` nor `.hint` takes `margin-left: auto`. A flex line distributes free space between
+  every auto margin on it. So two of them on the Weather chip split the slack and left the note 41px
+  short of an edge the Stations chip met exactly. An empty `.hint` also leaves the line through
+  `:empty`, because it carries the flex `gap` at zero width.
   **Four revisions carried a sentence under every label, and a reader cut all of them.** Do not put
   one back. The `.on` / `.off` pair on the two layers went with them, and so did the two empty-state
   sentences on the filters. A dead chip is already dimmed through `disabled`, and `#shown` states

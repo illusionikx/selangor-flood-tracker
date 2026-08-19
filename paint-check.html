@@ -273,18 +273,29 @@ is(note('stations'), 'Hydrological Measurement', 'stations names what it measure
 is(note('wxLayer'), 'Nowcasting', 'and weather names what it forecasts');
 for (const id of ['heat', 'rainHeat', 'favOnly', 'risingOnly'])
   is(note(id), null, id + ' carries none, because it is a choice about a layer and not a layer');
-/* The right edge is the slot, which is the one `.hint` already used. Measured with the panel OPEN:
-   a closed popover is `display: none`, so every rect inside it reads zero and an edge test then
-   compares 0 against 0. */
+/* **Flush with the right edge, and the edge is measured rather than assumed.** A containment test
+   passes on a note sitting anywhere after the label, and that is what shipped: `margin-left: auto`
+   on the note AND the hint split the chip's slack in two, leaving the Weather note 41px short.
+   Measured with the panel OPEN: a closed popover is `display: none`, so every rect inside it reads
+   zero and an edge test compares 0 against 0. */
 if (!menu.matches(':popover-open')) menu.showPopover();
 await wait(150);
-for (const id of ['stations', 'wxLayer']) {
-  const chip = el(id).closest('.chip'), n = chip.querySelector('.note');
-  is(n.getBoundingClientRect().right <= chip.getBoundingClientRect().right, true,
-     id + ': the note sits inside the right edge of its chip');
-  is(n.getBoundingClientRect().left >= chip.querySelector('.lab').getBoundingClientRect().right, true,
-     id + ': and clear of the label, not beside it');
+const rightEdge = chip => {
+  const cs = w.getComputedStyle(chip);
+  return chip.getBoundingClientRect().right
+       - parseFloat(cs.paddingRight) - parseFloat(cs.borderRightWidth);
+};
+for (const id of BOXES) {
+  const chip = el(id).closest('.chip');
+  const last = [...chip.querySelectorAll('.note, .hint')]
+    .filter(e => w.getComputedStyle(e).display !== 'none').pop();
+  if (!last) continue;
+  is(Math.abs(rightEdge(chip) - last.getBoundingClientRect().right) < 1, true,
+     id + ': the right slot is flush with the right edge of its chip');
 }
+/* An empty hint comes off the line rather than sitting at zero width. It carries the flex `gap`
+   either way, which held the note 8px off an edge the Stations chip met exactly. */
+is(w.getComputedStyle(el('wxHint')).display, 'none', 'an empty hint takes no room, not even its gap');
 
 /* The weather chip takes the hue its own clear-sky pin draws in, never a status hue. `--wx-clear`
    is muted away from `--s-alert` on purpose, so an amber chip here cannot read as an alert.
