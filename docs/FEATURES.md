@@ -62,8 +62,10 @@ reaching a danger mark within hours, and a bare direction arrow is no evidence f
 map filter, alert panel, drawer table and heat weighting can no longer disagree about what rising
 means — but changing the rule needs a server edit and a cache expiry, not a config constant.
 
-*The "Rising stations only" chip disables itself when nothing qualifies*, and says which kind of
-nothing: `none climbing`, or `needs an hour of history` when `rate` is null everywhere. A filter
+*The "On alert" chip disables itself when nothing qualifies.* It named which kind of nothing until
+2026-08-19 — `none climbing`, or `needs an hour of history` where `rate` was null everywhere. Both
+words are gone and the chip states its count alone. It is still dead and dimmed, and `#shown` still
+states what the map hides. A filter
 that can legitimately match zero stations is a trap — the map empties, and an empty flood map reads
 either as a broken app or, worse, as "nothing is happening". This surfaced the hard way: the
 history db was deleted during testing, every `rising` flag went false, and a persisted tick in
@@ -2954,8 +2956,8 @@ the traffic light, and the colour language reserves that ramp for status. What k
 reading as "an alert, here" is the shape and only the shape. If it ever does read that way, the fix
 is the hue, not the pin.
 
-One colour for all of "you": the pin, the accuracy circle, the arrival ripple and the badge on the
-card. The circle and the ripple reach it through classes (`.mecircle`, `.ping.me`) rather than
+One colour for all of "you": the pin, the accuracy circle, the arrival ripple and the title glyph on
+the card. The circle and the ripple reach it through classes (`.mecircle`, `.ping.me`) rather than
 Leaflet's path options, which are SVG presentation attributes and cannot resolve a token.
 
 **The light value spends the 3:1 floor, and it is the only one in the set that does** (`#e0a500`,
@@ -2973,9 +2975,11 @@ What pays for it is what always paid for it: the shape. A house in a pin resembl
 and it is drawn at 48px against every station's 29. `--s-alert` beside it holds 2.55 on white, so
 this is one step past an amber the map already carries rather than a new kind of value.
 
-*The cost, stated:* the "You are here" badge on the station card is 11px uppercase type in this
-colour, and 2.20 is under any text floor. It was under 4.5 at `#b87b00` too. If that badge ever has
-to be read rather than recognised, it takes its own token — the pin is what this value is for.
+*The cost, stated:* the card carries this colour on one 15px glyph, and 2.20 is under the 3:1 floor
+for a picture. It was under 4.5 at `#b87b00` too, when that surface was an 11px uppercase badge. The
+glyph stands beside the words `Your Location` in the card's own ink, so it is recognised and never
+read. Anything that has to be READ in this colour takes its own token. The pin is what this value is
+for.
 
 Its four predecessors, in order: a blue disc with a person in it (a station, as far as the map was
 concerned), a bare outlined person (clipart on a map), a filled `near_me` arrow (a heading we do not
@@ -10349,20 +10353,27 @@ Stations                      the station layer          ┐ radios: exactly
 Weather                       the MET nowcast layer      ┘
 ```
 
-Every chip carries a line under its label. The label names the control and the line says what the
-reader gets.
+Every chip is one line. The label names the control, and the right edge of a layer names the
+discipline that layer measures.
 
-**On the two layers that line has two forms.** The layer drawing says what it draws. The layer
-standing by says why it is quiet. Exactly one layer is on, so exactly one form of each shows, and
-the pair never both explains itself and excuses itself at once.
+| layer | note |
+|---|---|
+| Stations | `Hydrological Measurement` |
+| Weather | `Nowcasting` |
 
-| layer | drawing | standing by |
-|---|---|---|
-| Stations | `Live river, rain and camera sites` | `Off while weather is on` |
-| Weather | `Nowcast from MET` | `Off while stations are on` |
+**Four revisions carried a sentence under every label, and a reader cut all of them.** The two
+layers held that sentence in two forms, one saying what the layer draws and one saying why it is
+quiet. Six sentences said in about forty words what two nouns now say. The panel lost 45px of
+height and every chip came back to one row.
 
-**`.hint` beside a label is a third thing.** JS writes it and it reports a state, such as
-`none starred` on a filter with nothing to match. The line under the label is static.
+**`.hint` at the same edge is the other thing.** JS writes it and it reports a state. It carries a
+count, `· 12`, and nothing at all where the count is zero.
+
+It carried a sentence there too, and that sentence went the same way. The chip beside it is already
+dead and dimmed through `disabled`, and `#shown` under the map states what is hidden. One fact does
+not get two looks.
+
+`.note` and `.hint` share one rule, so a chip carrying both lines them up in that order.
 
 **No headings over the top level.** Stations and Weather are the two things this map draws, and one
 draws at a time. Every other control answers a question ABOUT the station layer, so it lives inside
@@ -10857,21 +10868,54 @@ states the ladder and not the hour, and the sun key stood for a clear sky after 
 work too.
 
 **The temperature is a card now, low left and high right.** It was two numbers stacked, high over
-low, with the word `Today` beside them and a `data-tip` naming both ends. Stacked, the order was
-the only thing that said which end was which, and a tip is a tap away. It takes the shape of the
+low, with the word `Today` beside them and a `data-tip` naming both ends. Stacked, only the order said which end was which. A tip is also a tap away. It takes the shape of the
 half-hour cards under it instead: one `.wxcol`, two equal halves, an arrow in `--muted` against each
 figure, and `Today` on the bottom edge. Low sits left because that is the direction a scale runs in.
-The arrows are `arrow_downward` and `arrow_upward`, which the icon set already holds. No
-thermometer glyph was added for a pair of numbers two arrows already answer.
+The arrows are `arrow_downward` and `arrow_upward`, which the icon set already holds. This work added no
+thermometer glyph. Two arrows already answer for a pair of numbers.
 The station card keeps the stacked pair. Its cell is a quarter of a 1:3 grid, and two halves do not
 fit there.
 
 **Two past steps, not the hour.** The panel drew every sample inside `WX_PAST`, which is one hour
 and two cards on a normal poll. The card is a forecast. What is behind it says which way the
-weather is going, and one hour of it pushed the steps that have not happened yet under the fold.
+weather moves. One hour of it pushed the steps ahead of now under the fold.
 
 **Checks.** A throwaway headless probe held eighteen facts. Eight cover `wxTone()` against
 `wxIcon()`, including cloud outranking the moon and night never touching a wet rung. Six confirm
-all six tokens resolve. Four measure the temperature card: two halves of 152.0px each, the card at
-the width of a step card, the title 12.0px in from the left edge, and the arrow at 12px against a
-16px figure. It is gone.
+all six tokens resolve. Four measure the temperature card. The two halves hold 152.0px each. The card matches the width of
+a step card. The title sits 12.0px in from the left edge. The arrow draws at 12px against a 16px
+figure. It is gone.
+
+## The location card takes a title, like every other card
+
+The `@here` card had no title. Its head held one badge, reading `You are here` under a `home_pin`
+glyph, then the accuracy line under that.
+
+**A badge is the slot a station card gives its sensor kind, and this card names no kind.** It lists
+the nearest river, rain gauge, siren and flood gauge, so a kind badge here can only name one of four
+things the card is not about. The head now draws what every station card draws. That is a `.popname`
+title, then one muted line under it.
+
+**The title reads `Your Location`.** `You are here` is a sentence about the reader. A title names a
+place, which is what the four sections under it measure the distance to. The words also stop the card
+speaking in a voice no other card uses.
+
+**The glyph is `near_me`, and it is the one `#locate.on` carries.** This card can only open once a fix
+has landed, so that button is in the `on` state whenever the card is on screen. The title and the
+control that opened it therefore show one shape. `my_location` is the resting crosshair of a button
+that has not found you yet, so it names the wrong state here.
+
+**The title goes nowhere on a press.** `.popname` takes its pointer only with a `data-go`, and this
+card has no station id to jump to. Two other heads already take that shape. The alert panel's head
+and the table's hover panel both reuse `.popname`, and both go nowhere.
+
+**Two rules paid for themselves with no new CSS.** `.pophead .popname` already reserves 34px for the
+panel's close button, which the badge never asked for. `.pophead .badge` already carries the top
+margin that separated the badge from a title, so removing the badge removed the spacing with it.
+
+*The trade, stated:* the card no longer states in a badge that it belongs to the reader. The pin, the
+accuracy circle and the ripple all still carry `--me`, and the title glyph carries it too. See
+*"You are here" is a pin, in hazard yellow* for what that colour can and cannot carry.
+
+The loading state reads `Your Location` as well. One name for one thing, so the card cannot introduce
+itself twice under two names.

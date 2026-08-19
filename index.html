@@ -70,7 +70,7 @@
 <link rel="stylesheet" href="vendor/markercluster.css">
 <link rel="stylesheet" href="vendor/fonts.css?v=51">
 <link rel="stylesheet" href="css/icons.css?v=93">
-<link rel="stylesheet" href="css/base.css?v=139">
+<link rel="stylesheet" href="css/base.css?v=140">
 <link rel="stylesheet" href="css/chrome.css?v=191">
 <link rel="stylesheet" href="css/map.css?v=154">
 
@@ -1026,17 +1026,16 @@
        member of a radio group cannot clear it, which is exactly the rule here. The pairs inside
        Stations stay checkboxes, because "no wash" and "no filter" are both states a reader wants.
        Everything else in here is a choice ABOUT the station layer, so it lives inside that branch.
-       Each chip carries a line under its label. On the two layers that line has two forms: what the
-       layer draws while it is the one drawing, and why it is quiet while the other one is.
-       `.hint` beside a label is a third thing. JS writes it and it reports a state, such as a
-       filter with nothing to match.
+       Every chip is one line. The right edge carries `.note` on the two layers, which names the
+       discipline each one measures, or `.hint` on the two filters, which JS writes and which
+       reports how many stations that filter holds. Each chip carried a sentence under its label for
+       four revisions, and a reader cut every one of them.
        No `checked` attribute on any box. `PREFS` is the source of truth, and syncPins(), syncHeat()
        and render() write the boxes from it. `autocomplete="off"` stops the other writer: a browser
        restores form state across a reload without firing `change`. -->
   <label class="chip layer"><input type="radio" name="maplayer" id="stations" autocomplete="off">
     <i class="glyph i i-place"></i><span class="lab">Stations</span>
-    <small><span class="on">Live river, rain and camera sites</span>
-      <span class="off">Off while weather is on</span></small></label>
+    <span class="note">Hydrological Measurement</span></label>
   <!-- Collapses with its parent. Every control in here is a choice about the station layer, so with
        that layer off there is nothing for any of them to act on. Nothing in here is ever unchecked
        by the collapse: switching Stations back on has to restore the view that was there before. -->
@@ -1049,32 +1048,26 @@
          that belongs to neither scale. -->
     <p class="mgroup">Heatmap</p>
     <label class="chip"><input type="checkbox" id="heat" autocomplete="off">
-      <i class="glyph i i-water_drop"></i><span class="lab">Water level</span>
-      <small>How near each reading is to its own mark</small></label>
+      <i class="glyph i i-water_drop"></i><span class="lab">Water level</span></label>
     <label class="chip"><input type="checkbox" id="rainHeat" autocomplete="off">
-      <i class="glyph i i-rainy"></i><span class="lab">Rainfall</span>
-      <small>Rain in the last hour</small></label>
+      <i class="glyph i i-rainy"></i><span class="lab">Rainfall</span></label>
     <!-- Which station pins draw. One at a time for the same reason as the pair above. Each one
          answers "show me only these", and two of those at once answers neither question. -->
     <p class="mgroup">Icon</p>
     <label class="chip"><input type="checkbox" id="favOnly" autocomplete="off">
-      <i class="glyph i i-favorite"></i><span class="lab">Favorites
-        <span id="favHint" class="hint"></span></span>
-      <small>Only the sites you starred</small></label>
+      <i class="glyph i i-favorite"></i><span class="lab">Favorites</span>
+      <span id="favHint" class="hint"></span></label>
     <label class="chip"><input type="checkbox" id="risingOnly" autocomplete="off">
-      <i class="glyph i i-warning"></i><span class="lab">On alert
-        <span id="risingHint" class="hint"></span></span>
-      <small>Only sites forecast to reach danger</small></label>
+      <i class="glyph i i-warning"></i><span class="lab">On alert</span>
+      <span id="risingHint" class="hint"></span></label>
   </div></div>
   <!-- `--c` is the weather layer's own hue, the one its clear-sky pin draws in. It is not a status
        hue and it must never become one: see the colour language in CLAUDE.md. `--wx-clear` is muted
        away from `--s-alert` on purpose, so an amber chip here cannot read as an alert on the water. -->
   <label class="chip layer" style="--c: var(--wx-clear)">
     <input type="radio" name="maplayer" id="wxLayer" autocomplete="off">
-    <i class="glyph i i-sunny"></i><span class="lab">Weather
-      <span id="wxHint" class="hint"></span></span>
-    <small><span class="on">Nowcast from MET</span>
-      <span class="off">Off while stations are on</span></small></label>
+    <i class="glyph i i-sunny"></i><span class="lab">Weather</span>
+    <span class="note">Nowcasting</span><span id="wxHint" class="hint"></span></label>
 </div>
 <!-- Standing indications that the map is showing less than it holds. One strip, because test mode
      and the rising filter can be on at the same time and two fixed pills would sit on each other.

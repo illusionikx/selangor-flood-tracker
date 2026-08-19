@@ -259,35 +259,33 @@ is(rows.indexOf(el('stations').closest('.chip')) < rows.indexOf(sub), true,
 is(rows.indexOf(sub) < rows.indexOf(el('wxLayer').closest('.chip')), true,
    'and Weather below it, so the branch cannot look like Weather\'s');
 
-// --- every chip says what the reader gets ---------------------------------------------------------
-/* The label names the control. The line under it says what the layer draws. `.hint` beside the
-   label is a different thing: JS writes it and it reports a state, such as a filter with nothing
-   to match, so it is not required here. */
-for (const id of BOXES) {
-  const chip = el(id).closest('.chip');
-  const small = chip.querySelector('small');
-  is(!!small && small.textContent.trim().length > 0, true, id + ' carries flavour text');
-  is(chip.querySelector('.lab') !== null, true, id + ' keeps its label in its own row');
+// --- every chip names itself, and the two layers name what they measure ------------------------
+/* The label names the control. On a layer, `.note` at the right edge names the discipline that
+   layer measures. `.hint` is the third thing: JS writes it and it reports a state, such as how many
+   stations a filter holds, so it is not required here.
+   Every chip carried a sentence under its label for four revisions. A reader cut all of them. */
+is(menu.querySelector('small'), null, 'no chip carries a line of flavour text any more');
+for (const id of BOXES)
+  is(el(id).closest('.chip').querySelector('.lab').textContent.trim().length > 0, true,
+     id + ' still names itself');
+const note = id => el(id).closest('.chip').querySelector('.note')?.textContent.trim() ?? null;
+is(note('stations'), 'Hydrological Measurement', 'stations names what it measures');
+is(note('wxLayer'), 'Nowcasting', 'and weather names what it forecasts');
+for (const id of ['heat', 'rainHeat', 'favOnly', 'risingOnly'])
+  is(note(id), null, id + ' carries none, because it is a choice about a layer and not a layer');
+/* The right edge is the slot, which is the one `.hint` already used. Measured with the panel OPEN:
+   a closed popover is `display: none`, so every rect inside it reads zero and an edge test then
+   compares 0 against 0. */
+if (!menu.matches(':popover-open')) menu.showPopover();
+await wait(150);
+for (const id of ['stations', 'wxLayer']) {
+  const chip = el(id).closest('.chip'), n = chip.querySelector('.note');
+  is(n.getBoundingClientRect().right <= chip.getBoundingClientRect().right, true,
+     id + ': the note sits inside the right edge of its chip');
+  is(n.getBoundingClientRect().left >= chip.querySelector('.lab').getBoundingClientRect().right, true,
+     id + ': and clear of the label, not beside it');
 }
-/* The two layer chips carry that line in two forms: what the layer draws while it is drawing, and
-   why it is quiet while the other one is. Exactly one layer is on, so exactly one form of each
-   shows, and the pair never both explains and excuses itself at once. */
-const shownLine = id => [...el(id).closest('.chip').querySelectorAll('small span')]
-  .filter(s => w.getComputedStyle(s).display !== 'none')
-  .map(s => s.textContent.trim()).join(' | ');
-el('stations').checked = true;
-el('stations').dispatchEvent(new w.Event('change'));
-await wait(1200);
-is(shownLine('stations'), 'Live river, rain and camera sites', 'the layer drawing says what it draws');
-is(shownLine('wxLayer'), 'Off while stations are on', 'and the quiet one says why');
-el('wxLayer').checked = true;
-el('wxLayer').dispatchEvent(new w.Event('change'));
-await wait(2500);
-is(shownLine('wxLayer'), 'Nowcast from MET', 'weather drawing names its source');
-is(shownLine('stations'), 'Off while weather is on', 'and stations says why it is quiet');
-el('stations').checked = true;
-el('stations').dispatchEvent(new w.Event('change'));
-await wait(1500);
+
 /* The weather chip takes the hue its own clear-sky pin draws in, never a status hue. `--wx-clear`
    is muted away from `--s-alert` on purpose, so an amber chip here cannot read as an alert.
    Compared against the RESOLVED token, because a custom property substitutes its `var()` at computed

@@ -2048,6 +2048,17 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   **Heavy differs from rain by saturation and never by lightness.** `.pin` uses one palette on both
   themes, because a pin has to win over the basemap. So a darker heavy pin disappears into the dark
   tile.
+  **`wxTone()` in `popup.js` is the one place a glyph gets a colour, and it reads the glyph.** It
+  maps one icon name to one `--wx-*` token, so a rung, a night form and a refinement all reach the
+  colour through `wxIcon()`. A ladder stated twice drifts. `js/wx.js` held a second one and it is
+  gone. Every weather glyph on a card reads it now: the half-hour cards, the `Now` and `Later`
+  cells, and the section head over each pair. `--k-weather` stays as the fallback in `.wxbig`.
+  **`--wx-moon` is the sixth token and the one the two themes do not share.** A clear night draws
+  `clear_night`, and `--wx-clear` is a gold that says daylight. The map keeps off white `#e6e3da`,
+  because a pin carries a dark drop shadow to stand against a pale tile. A card glyph carries none,
+  and off white on the light theme's card `#f1f3f4` is invisible. So `:root` holds `#7d8794`
+  instead. Do not copy either value into the other block. The legend gains no moon key. That strip
+  already wraps below 320px with five keys, and it states the ladder rather than the hour.
 - **Cloud is a refinement of rung 0, never a rung of its own.** The nowcast's whole vocabulary is
   `Tiada Hujan`, `Hujan` and `Hujan Lebat`. Measured 2026-08-18 over all 294 markers, those three
   are the only values it publishes. The page declares a fourth icon, `icon-na.svg`, and no marker
@@ -2173,10 +2184,13 @@ it. The weather section stretches nothing. It is five fixed keys measuring 231px
   answer on it. `PREFS.mapLayer` therefore has no empty value, `''` was reachable for one revision
   and is gone, and Stations is the landing default. **The pairs inside Stations stay checkboxes**,
   because "no wash" and "no filter" are both answers a reader wants.
-  **Every chip carries a line under its label**, which says what the reader gets. On the two layers
-  that line has two forms: what the layer draws, and why it is quiet while the other one draws. A
-  `.hint` beside the label is a third thing: JS writes it and it reports a state, such as
-  `none starred`.
+  **Every chip is one line.** The label names the control. `.note` at the right edge of a layer
+  names the discipline it measures, `Hydrological Measurement` and `Nowcasting`. `.hint` at the same
+  edge is the other thing: JS writes it, and it states a count and nothing else.
+  **Four revisions carried a sentence under every label, and a reader cut all of them.** Do not put
+  one back. The `.on` / `.off` pair on the two layers went with them, and so did the two empty-state
+  sentences on the filters. A dead chip is already dimmed through `disabled`, and `#shown` states
+  what the map hides. One fact does not get two looks.
   **The rule for what goes where: a control the reader reaches for WHILE LOOKING AT THE MAP goes on
   `#paint`. A control that shapes which stations exist at all stays in the drawer**, beside the
   district picker and the ignored list. `#layersect` and `#layerN` are gone.

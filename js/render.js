@@ -31,7 +31,6 @@ let wxSeen = false;
 function syncPins() {
   const rising = state.data.filter(s => s.rising).length;
   const starred = state.data.filter(isFav).length;
-  const measurable = state.data.some(s => s.rate != null);
 
   // Only on the way into the empty state. This runs on every poll for every reader who has starred
   // nothing — which is every new visitor — so an unguarded write puts a localStorage write on the
@@ -44,9 +43,11 @@ function syncPins() {
   el('favOnly').checked = PREFS.pinFilter === 'fav';
   el('risingOnly').disabled = !rising;
   el('favOnly').disabled = !starred;
-  el('risingHint').textContent = rising ? `· ${rising}`
-    : measurable ? '· none climbing' : '· needs an hour of history';
-  el('favHint').textContent = starred ? '' : 'none starred';
+  /* The count alone, and nothing where there is none to state. The empty case used to carry a
+     sentence, and the chip beside it is already dead and dimmed by `disabled`. One fact does not get
+     two looks, and `#shown` under the map carries the standing indication either way. */
+  el('risingHint').textContent = rising ? `· ${rising}` : '';
+  el('favHint').textContent = starred ? `· ${starred}` : '';
   return PREFS.pinFilter;
 }
 
