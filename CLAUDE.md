@@ -2068,11 +2068,24 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   and off white on the light theme's card `#f1f3f4` is invisible. So `:root` holds `#7d8794`
   instead. Do not copy either value into the other block. The legend gains no moon key. That strip
   already wraps below 320px with five keys, and it states the ladder rather than the hour.
-- **Rung 0 draws `partly_cloudy_day`, and `--i-sunny` is gone.** The nowcast word is `Tiada
-  Hujan`, which means no rain and not a clear sky. So the sun claimed more than the feed states.
-  Four surfaces read the rung and all four moved: the pin, the card glyph, the legend key and the
-  weather chip in `#paintmenu`. The night form stays `clear_night`. The legend word still reads
-  `Clear`, which is now wider than the mark over it.
+- **The Weather chip in `#paintmenu` draws `partly_cloudy_day`. The rung ladder draws `sunny`.**
+  The chip names a layer and reports no rung, so it takes the wider mark. Rung 0 is the rung the
+  legend calls `Clear`, so its glyph answers to that word. One revision moved the pin, the card
+  glyph and the legend key onto the new mark as well. The repository owner reverted it on
+  2026-08-19. Both icons ship, and each one has one job.
+- **The day's temperature shares the `NOW` card's bottom line with the clock, and `.wxfoot` is
+  that box.** It had a card of its own titled `Today`. One day-scale fact does not take the height
+  of a step beside nine half-hour ones, and on that line it costs no height at all. It takes the
+  clock's own 11px, because the two share a line and neither one outranks the other. `.wxfoot`
+  carries `margin-top: auto` for every step card. `.wxsub` keeps its own copy for the station card,
+  where it is still a direct child of `.wxcol`. `stepCard()` takes the pair as its last argument,
+  so only the step happening now can draw it.
+  **The arrows carry `--wx-cold` and `--wx-warm`, blue for the low and terracotta for the high.**
+  That pair argues past the status rule the same way the weather set does. The status set holds
+  full saturation and this pair sits well under it, so the two separate by vividness as well as by
+  hue. It also draws on an 11px arrow inside a card that reports no status. Do not reach for
+  `--wx-heavy` and `--wx-clear` instead. Those name heavy rain and a clear sky on this same card,
+  and one token cannot say `hot` and `clear` in one place.
 - **Cloud is a refinement of rung 0, never a rung of its own.** The nowcast's whole vocabulary is
   `Tiada Hujan`, `Hujan` and `Hujan Lebat`. Measured 2026-08-18 over all 294 markers, those three
   are the only values it publishes. The page declares a fourth icon, `icon-na.svg`, and no marker

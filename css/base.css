@@ -115,6 +115,17 @@
      See the note beside --wx-clear in the dark block for the full reasoning.
      Without this pair, the #lgWx legend swatches inherit one grey on this theme. They are plain
      `<i>` elements, not `.pin`, so these five names resolved to nothing there. */
+  /* The two ends of the day, on the arrow beside each figure. Blue for the low and terracotta for
+     the high is the one temperature idiom every reader already holds, and no word can say it as
+     fast.
+     **This does not breach the status rule above, on the same argument the weather set already
+     makes.** The status set holds full saturation, and this pair is muted well under it, so the two
+     separate by vividness as well as by hue. It also draws on an 11px arrow inside a weather card,
+     which is a surface that reports no status at all. `--s-warning` is #ff7e33 at 100% saturation
+     against this one at 68%.
+     Do not reach for `--wx-heavy` and `--wx-clear` instead. Those two name heavy rain and a clear
+     sky on the same card, and one token cannot say `hot` and `clear` in one place. */
+  --wx-cold: #3f7fb8; --wx-warm: #b06a3c;
   --wx-clear: #d8a93f; --wx-cloud: #b8ae9e; --wx-rain: #93a9bb; --wx-heavy: #2f7fc9;
   --wx-storm: #8a6dff;
   /* A clear night, and the ONE weather token that is not shared with the map set below. Off white is
@@ -192,6 +203,9 @@
      disappears into the dark tile. */
   --wx-clear: #d8a93f; --wx-cloud: #b8ae9e; --wx-rain: #93a9bb; --wx-heavy: #2f7fc9;
   --wx-storm: #8a6dff;
+  /* The two ends of the day. See the light block above for why this pair does not join the status
+     set. Lighter here than there, because it draws on a near-black card rather than on paper. */
+  --wx-cold: #7fb6e0; --wx-warm: #e0975f;
   /* Moonlight, and off white is the whole of the colour. `--wx-clear` is a gold that says daylight,
      so a clear night wearing it states the wrong half of the sky. Not `--on-surface`: this is a
      weather tone and it must read as one of the six, on a pin as well as on a card.

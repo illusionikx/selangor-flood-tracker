@@ -81,7 +81,7 @@ const dots = p => `<button class="icon dots" popovertarget="mnu-wx"
    longer one. Rung 0 has no `line`, so `word` answers there.
    `aria-hidden` on the glyph, because the word beside it already says the same thing. A screen
    reader must not say it twice. */
-const stepCard = (rung, clock, now, sky) => {
+const stepCard = (rung, clock, now, sky, temp = '') => {
   const w = wxSky(rung, sky) || WEATHER[rung] || WEATHER[0];
   return `<div class="wxcol${now ? ' now' : ''}">
       <div class="wxrow">
@@ -90,23 +90,24 @@ const stepCard = (rung, clock, now, sky) => {
         <span class="wxline">${w.line || w.word}</span>
         ${now ? '<b class="wxnow">NOW</b>' : ''}
       </div>
-      <span class="wxsub">${clock}</span>
+      <div class="wxfoot"><span class="wxsub">${clock}</span>${temp}</div>
     </div>`;
 };
 
 function card(p) {
-  /* The day's two ends, as a card of the same shape as the half-hour cards under it. Low on the
-     left and high on the right, because that is the order a scale runs in and the pair then needs
-     no words. The arrow is what says which is which, so `.wxsub` states the day rather than
-     repeating either end. `aria-label` carries the words for a reader who hears the card. */
-  const temp = p.tmax == null ? '' : `<div class="wxcol wxtoday">
-      <div class="wxtemps">
-        <span class="wxt" aria-label="Low ${p.tmin} degrees">
-          <i class="i i-arrow_downward" aria-hidden="true"></i>${p.tmin}°</span>
-        <span class="wxt" aria-label="High ${p.tmax} degrees">
-          <i class="i i-arrow_upward" aria-hidden="true"></i>${p.tmax}°</span>
-      </div>
-      <span class="wxsub">Today</span>
+  /* The day's two ends, low then high, under the NOW badge on the step happening now. They had a
+     card of their own above the stack, titled `Today`. That card carried one fact and took the
+     height of a step, and a reader scanning the stack met it first. It is one day-scale number
+     beside nine half-hour ones, so it rides the card a reader is already looking at instead.
+     The arrow says which end each figure is, and its colour says it a second time, so the pair
+     needs no word. `aria-label` carries the words for a reader who hears the card.
+     It shares the bottom line with the clock, at the clock's own size. The pair is a fact about the
+     day and the clock is a fact about the step, so neither one outranks the other. */
+  const temp = p.tmax == null ? '' : `<div class="wxtemps">
+      <span class="wxt lo" aria-label="Low ${p.tmin} degrees">
+        <i class="i i-arrow_downward" aria-hidden="true"></i>${p.tmin}°</span>
+      <span class="wxt hi" aria-label="High ${p.tmax} degrees">
+        <i class="i i-arrow_upward" aria-hidden="true"></i>${p.tmax}°</span>
     </div>`;
 
   const cards = [
@@ -114,7 +115,7 @@ function card(p) {
        there to say which way the weather is going. An hour of it pushed the steps that have not
        happened yet under the fold. */
     ...p.past.slice(-2).map(([ts, r]) => stepCard(r, hhmm(ts * 1000), false, p.sky)),
-    stepCard(p.rungs[0], hhmm(p.stamp * 1000), true, p.sky),
+    stepCard(p.rungs[0], hhmm(p.stamp * 1000), true, p.sky, temp),
     ...p.rungs.slice(1).map((r, i) => stepCard(r, p.clocks[i + 1], false, p.sky)),
   ].join('');
 
@@ -139,7 +140,6 @@ function card(p) {
            style="color:${wxTone(p.rungs[0], { sky: p.sky })}"></i>
         <b>Weather</b>
       </div>
-      ${temp}
       <div class="wxsteps">${cards}</div>
     </div>`;
 }

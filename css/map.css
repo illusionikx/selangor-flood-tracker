@@ -491,21 +491,28 @@
 .wxcol.now { outline: 2px solid var(--accent); outline-offset: -2px; }
 .wxnow { flex: none; font-size: 9px; letter-spacing: .06em; color: var(--accent);
   border: 1px solid var(--accent); border-radius: 4px; padding: 1px 5px; }
-/* The day's two ends, above the cards and shaped like them. Low left, high right: that is the
-   order a scale runs in, so the pair reads without a word on either half. The two halves are `1fr`
-   each and not `auto`, because the numbers are two or three characters and a shared centre line is
-   what makes them one control rather than two readings.
-   `.wxsub` is `width: var(--g)` (28px) for a title under a glyph. This one sits under a full row,
-   so it takes the width off, exactly as `.wxsteps .wxsub` does for the same reason. */
-.wxtoday { margin-bottom: 8px; }
-.wxtoday .wxsub { width: auto; text-align: left; }
-.wxtemps { display: grid; grid-template-columns: 1fr 1fr; }
-.wxt { display: flex; align-items: center; justify-content: center; gap: 4px;
-  font-size: 16px; line-height: 1.2; }
-/* The arrow names the end, so it must not outweigh the number it names. `.i` sizes in `em`, so this
-   is 12px against the 16px figure beside it. `--muted`, because the temperature is the reading and
-   the arrow is its label. */
-.wxt .i { font-size: .75em; color: var(--muted); }
+/* The bottom line of a step card: the clock on the left, and the day's two temperatures on the
+   right of the card happening now. The pair had a card of its own above the stack and it is gone.
+   One day-scale fact does not earn the height of a step beside nine half-hour ones.
+   `margin-top: auto` moves off `.wxsub` and onto this row, which is what parks every card's bottom
+   line on one level whatever stands above it. `.wxsub` keeps that declaration for the station
+   card, where it is still a direct child of `.wxcol`. */
+.wxfoot { display: flex; align-items: center; gap: 10px; margin-top: auto; }
+.wxfoot .wxsub { margin-top: 0; }
+/* Low then high, in the order a scale runs in. `margin-left: auto` puts the pair on the card's
+   right edge, opposite the clock.
+   The clock's own 11px, because the two share a line. A larger figure beside it reads as the
+   heading of a row whose heading is the clock. */
+.wxtemps { display: flex; gap: 10px; margin-left: auto; font-size: 11px; line-height: 1.35; }
+.wxt { display: flex; align-items: center; gap: 3px; }
+/* Blue for the low and terracotta for the high. It is the one temperature idiom a reader already
+   holds, and it says in a colour what the pair otherwise spends two words on. See the note on
+   `--wx-cold` in base.css for why this pair cannot read as a status.
+   `1em` and not less: at 11px an arrow shaved to `.8em` is 9px, and a direction is the whole of
+   what it has to carry. */
+.wxt .i { font-size: 1em; }
+.wxt.lo .i { color: var(--wx-cold); }
+.wxt.hi .i { color: var(--wx-warm); }
 /* The legend key. One row per rung, glyph then word. */
 /* The glyph carries the meaning here, so it leads and the word sits under it. `.i` sizes in `em`,
    so `2em` against this row's 11px is a 22px mark against an 11px label. Centred in a column

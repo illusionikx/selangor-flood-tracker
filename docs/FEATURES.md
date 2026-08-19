@@ -10974,17 +10974,44 @@ accuracy circle and the ripple all still carry `--me`, and the title glyph carri
 The loading state reads `Your Location` as well. One name for one thing, so the card cannot introduce
 itself twice under two names.
 
-**Follow-up, same day: the sun became `partly_cloudy_day`, and the sun is gone.** The nowcast's
-rung 0 word is `Tiada Hujan`, which means no rain. It does not mean a clear sky. The sun was the
-wider claim of the two, and this file says so twice already, once for cloud and once for the bolt.
-A partly cloudy day is what the word actually states. Four surfaces move together: the pin, the
-card, the legend key and the weather layer chip in the paint chooser. `--i-sunny` had no caller
-left, so it went with them. The night form stays `clear_night`, because the reader asked for the
-day glyph and a moon still answers for the dark half.
-The word under the legend key still reads `Clear`. That is now a wider claim than the mark above
-it, and nobody has ruled on the wording.
+**Follow-up, same day: the Weather layer chip draws `partly_cloudy_day`.** The chip names a
+layer. It does not report a rung, and a sun there said `clear` about a map that holds five kinds of
+weather. A partly cloudy day says weather without naming one of them.
+**The rung ladder keeps the sun, and one revision took it away.** That revision moved the pin, the
+card glyph and the legend key with the chip, on the reading that `Tiada Hujan` means no rain rather
+than a clear sky. The repository owner reverted it the same day. The rung ladder is five marks a
+reader learns off the legend, and rung 0 is the one the legend calls `Clear`. So the glyph there
+answers to the word beside it, and the wider claim belongs to the chip that names no rung at all.
+`--i-sunny` and `--i-partly_cloudy_day` both ship now, and each one has exactly one job.
 
 **And `past` never held the current issue.** The two previous cards come off `past`, which
 `wxRows()` filters with `$s[0] < $p['stamp']`. Measured on the 09:00 issue across all 50 points:
 0 rows sit at or after their own issue. So `slice(-2)` takes the two issues before now, and the
 `NOW` card is a third card that no slice can reach.
+
+**Second follow-up: the temperature moved into the `NOW` card, and the `Today` card is gone.** The
+day's two ends had a card of their own at the head of the stack. It carried one fact and took the
+height of a step, and a reader scanning nine half-hour cards met it first. One day-scale number
+does not outrank the weather happening now. It rides the bottom line of the `NOW` card instead, on
+the right, opposite the clock and at the clock's own 11px. Both are one fact about that card. The
+clock says which step it is and the pair says what kind of day holds it, so neither one outranks
+the other. A larger figure beside a clock reads as the heading of a row whose heading is the clock.
+`.wxfoot` is the new box, and it takes `margin-top: auto` off `.wxsub`. That is what parks every
+card's bottom line on one level. `.wxsub` keeps the declaration for the station card, where it is
+still a direct child of `.wxcol`.
+
+**The arrows carry the colour, blue for the low and terracotta for the high.** That is the one
+temperature idiom every reader already holds, and it says in a colour what the pair
+otherwise spends two words on. `--wx-cold` and `--wx-warm` are the tokens. They are the second pair in
+this app to argue past the status rule. The argument is the one the weather set already made. The
+status set holds full saturation and this pair is muted well under it, so the two separate by
+vividness as well as by hue. `--s-warning` is `#ff7e33` at full saturation against `--wx-warm` at
+68 percent. It also draws on an 11px arrow inside a card that reports no status at all.
+`--wx-heavy` and `--wx-clear` cost no token at all, and they are wrong. Those two name heavy rain
+and a clear sky on this same card, and one token cannot say `hot` and `clear` in one place.
+
+**Checks.** A throwaway headless probe held eleven facts on the rebuilt card. The pair measures
+11px against the clock's 11px and their centres sit 0.00px apart. It ends 12.0px inside the card,
+which is the card's own padding. Low draws left of high on one line. The two arrows resolve two
+different colours and each keeps an 11px box. The `NOW` card measures 64.8px against 64.8px for a
+card with no pair, so the day's temperature costs no height at all. It is gone.
