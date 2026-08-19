@@ -52,6 +52,12 @@ const el = id => d.getElementById(id);
   const t = w.getComputedStyle(d.querySelector('.subgrp')).transitionProperty;
   is(t.includes('grid-template-rows'), true, 'the branch animates its collapse');
   is(t.includes('visibility'), true, 'and carries visibility, which holds the tab order');
+  /* One press switches the whole map layer, and the glyph is the same at every state. So the press
+     answers for itself here, rather than leaving the map to answer somewhere else. */
+  is(w.getComputedStyle(el('paint')).transitionProperty.includes('transform'), true,
+     'the button answers a press, because what the press changes is somewhere else');
+  is(w.getComputedStyle(d.querySelector('.chip .glyph')).transitionProperty.includes('opacity'), true,
+     'and a chip glyph fades with the rest of its chip, rather than snapping beside it');
 }
 const noAnim = d.createElement('style');
 noAnim.textContent = '*{transition:none !important}';

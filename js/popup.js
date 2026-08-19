@@ -521,6 +521,15 @@ export const wxIcon = (r, { clock, pin, sky } = {}) => {
   return (pin && w.pin) || w.icon;
 };
 
+/* The `--wx-*` tone that belongs to a glyph, read off the glyph itself. So the mark and its colour
+   cannot drift: a refinement, a night form and a rung all answer here through `wxIcon()` alone, and
+   this holds no ladder of its own to keep in step with that one.
+   The moon is the one tone with no pin behind it. `--wx-clear` is a gold that says daylight, so an
+   overcast-free night wearing it states the wrong half of the sky. */
+const WX_TONE = { sunny: 'clear', clear_night: 'moon', cloud: 'cloud',
+  rainy_light: 'rain', rainy_heavy: 'heavy', flash_on: 'storm' };
+export const wxTone = (r, o) => `var(--wx-${WX_TONE[wxIcon(r, o)] || 'clear'})`;
+
 /* The weather section's ⋮, and it holds provenance alone. Every other ⋮ on a card carries actions
    under the same block — favorite, map link, ignore — and not one of them applies here. A favorite
    is a place, a map link is a coordinate, and `PREFS.ignored` silences a sensor. The weather is none
@@ -589,7 +598,7 @@ function metSection(s) {
   /* The glyph is the state, so the state is not also written under it. The word rides on `data-tip`,
      which `js/sparktip.js` opens on hover and on a tap — a `title` would say nothing to a thumb.
      `aria-label` carries the same word for a reader who hears the card instead. */
-  const big = r => `<i class="i wxbig i-${wxIcon(r)}" role="img"`
+  const big = r => `<i class="i wxbig i-${wxIcon(r)}" role="img" style="color:${wxTone(r)}"`
     + ` aria-label="${w(r).word}" data-tip="${w(r).word}"></i>`;
 
   /* Two columns, each one glyph and the words that belong to it. The two temperatures stack, high
@@ -617,7 +626,7 @@ function metSection(s) {
 
   return `<div class="sensor" data-sensor="@met">
       <div class="sensorhead">
-        <i class="glyph i i-${wxIcon(m.rung ?? m.now ?? 0)}" style="color:var(--k-weather)"></i>
+        <i class="glyph i i-${wxIcon(m.rung ?? m.now ?? 0)}" style="color:${wxTone(m.rung ?? m.now ?? 0)}"></i>
         <b>Weather</b>
         <span class="muted">${m.at}</span>
         ${wxDots(m)}

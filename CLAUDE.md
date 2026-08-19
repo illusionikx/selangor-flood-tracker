@@ -2209,6 +2209,12 @@ it. The weather section stretches nothing. It is five fixed keys measuring 231px
   because a popover invoker runs as the click's activation behavior. The handler presses the radio
   rather than writing `PREFS.mapLayer`, because the weather radio owns the deferred import and its
   rollback.
+  **The press answers for itself through `.mapbtn:active`, and never through a class.** The glyph is
+  the same at every state, so a press that switches the map leaves the button looking untouched.
+  `:active` covers the press that opens the panel and the press that switches the layer alike, with
+  no timer to clear. A chip's `.glyph` carries `transition: opacity` for the same family of reason.
+  It sat outside `.chip`'s own transition list, so it snapped to full while the rest of the chip
+  faded, and one press read as two events.
   **`Stations` gates the wash as well as the pins.** `render()` and `syncHeat()` share the test
   `PREFS.mapLayer === 'stations'`. Everything under that chip is a choice ABOUT the station layer, so
   with the layer off none of them has anything to act on and the branch collapses.

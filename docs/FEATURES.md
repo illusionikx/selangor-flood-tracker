@@ -10568,6 +10568,18 @@ nothing, because the chip in the open panel does the same thing.
 Measured: a press with the pointer on the button switches the layer, leaves the panel open, and
 switches back on the next press.
 
+**The press answers for itself, because what it changes is somewhere else.** `#paint` carries the
+same glyph at every state, so a press that switches the map leaves the button looking untouched.
+`.mapbtn:active` scales it to 0.92 while the press lasts.
+
+`:active` covers every way in with no class to add and no timer to clear. That is the press that
+opens the panel and the press that switches the layer alike. A reduced-motion query takes the
+transform away.
+
+**A chip glyph now fades with the rest of its chip.** `.chip` transitions its fill, its border and
+its ink over 0.15 s, and the glyph's own opacity was left out of that list. So it snapped to full
+while the rest of the chip faded, and one press read as two events.
+
 ### The panel drew a scrollbar with nothing to scroll
 
 `.menu` is `overflow-y: auto`, so anything that leaks into its scroll height draws a scrollbar down a
@@ -10814,3 +10826,52 @@ heat sections are hidden, so the two cases cannot overlap.
 keys. A squashed key breaks its own word before it drops a whole one. Measured at four widths: the
 heat legend holds 288px unchanged, the weather legend fits at 231.3px with 0.3px to spare, and in a
 210px box the keys take two rows with nothing outside it.
+
+## The weather glyph wears the weather, and the temperature became a card
+
+Four changes to the weather surfaces, on one instruction from the repository owner on 2026-08-19.
+
+**The glyph takes the colour of the weather it names.** Every weather glyph on a card drew
+`--k-weather`, one blue-grey, at every rung. The pin beside it drew `--wx-clear` through
+`--wx-storm`. So the map said which weather and the card did not. Three glyphs move: the half-hour
+cards in the weather panel, the `Now` and `Later` cells on a station card, and the section head over
+each pair. The legend already names those five colours, and it names them for the panel now as well
+as for the map.
+
+**`wxTone()` reads the tone off the glyph, and holds no ladder of its own.** It sits beside
+`wxIcon()` in `popup.js` and maps one icon name to one token. So a rung, a night form and a
+refinement all reach the colour through the function that already decides the mark. The old
+`tone()` in `js/wx.js` restated the rung ladder and the `wxSky()` rule, and it is gone. A ladder
+stated twice is a ladder that drifts.
+
+**`--wx-moon` is the sixth token, and it is the one the two themes do not share.** A clear night
+draws `clear_night`, and `--wx-clear` is a gold that says daylight. Off white says moonlight. The
+map keeps the off white, `#e6e3da`, because a pin carries a dark drop shadow to stand against a pale
+tile. A card glyph carries none, and off white on the light theme's card, `#f1f3f4`, is nothing at
+all. So the light theme takes `#7d8794`, at the lightness the rest of that set holds on paper. This
+is the `--k-*` pattern, not a break from the one-weather-palette rule: the map value lives in the
+`.pin` block and reaches every pin on both themes.
+
+**The legend gains no moon key.** The strip already wraps below 320px with five keys. The legend
+states the ladder and not the hour, and the sun key stood for a clear sky after dark before this
+work too.
+
+**The temperature is a card now, low left and high right.** It was two numbers stacked, high over
+low, with the word `Today` beside them and a `data-tip` naming both ends. Stacked, the order was
+the only thing that said which end was which, and a tip is a tap away. It takes the shape of the
+half-hour cards under it instead: one `.wxcol`, two equal halves, an arrow in `--muted` against each
+figure, and `Today` on the bottom edge. Low sits left because that is the direction a scale runs in.
+The arrows are `arrow_downward` and `arrow_upward`, which the icon set already holds. No
+thermometer glyph was added for a pair of numbers two arrows already answer.
+The station card keeps the stacked pair. Its cell is a quarter of a 1:3 grid, and two halves do not
+fit there.
+
+**Two past steps, not the hour.** The panel drew every sample inside `WX_PAST`, which is one hour
+and two cards on a normal poll. The card is a forecast. What is behind it says which way the
+weather is going, and one hour of it pushed the steps that have not happened yet under the fold.
+
+**Checks.** A throwaway headless probe held eighteen facts. Eight cover `wxTone()` against
+`wxIcon()`, including cloud outranking the moon and night never touching a wet rung. Six confirm
+all six tokens resolve. Four measure the temperature card: two halves of 152.0px each, the card at
+the width of a step card, the title 12.0px in from the left edge, and the arrow at 12px against a
+16px figure. It is gone.

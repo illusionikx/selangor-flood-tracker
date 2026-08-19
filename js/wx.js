@@ -6,7 +6,7 @@
 import { FEED_WX, WX_THIN_PX, WEATHER, wxSky, MET_NAME } from './config.js';
 import { PREFS } from './state.js';
 import { map, pinGlyph, openSide, side, focusOn } from './map.js';
-import { wxIcon, stamp } from './popup.js';
+import { wxIcon, wxTone, stamp } from './popup.js';
 import { askJson } from './ask.js';
 import { el, ago } from './util.js';
 
@@ -40,11 +40,6 @@ function thin(list) {
   return kept;
 }
 
-/* The `--wx-*` half of the pin colour. It reads `wxSky()` first, the same rule the glyph obeys, so
-   a pin can never take one kind's mark and another's colour. */
-const tone = (r, sky) => wxSky(r, sky)?.tone
-                      ?? (r >= 2 ? 'heavy' : r === 1 ? 'rain' : 'clear');
-
 function paint() {
   layer.clearLayers();
   if (PREFS.mapLayer !== 'weather') return;
@@ -55,7 +50,7 @@ function paint() {
         // Matches `.pin`'s box in map.css, the same way render.js does. Leaflet positions the
         // marker off this and not off the CSS.
         className: '', iconSize: [39, 39], iconAnchor: [19.5, 19.5],
-        html: `<span class="pin" style="--c:var(--wx-${tone(r, p.sky)})">${
+        html: `<span class="pin" style="--c:${wxTone(r, { pin: true, sky: p.sky })}">${
           pinGlyph(wxIcon(r, { pin: true, sky: p.sky }))}</span>`,
       }),
     })
@@ -90,7 +85,8 @@ const stepCard = (rung, clock, now, sky) => {
   const w = wxSky(rung, sky) || WEATHER[rung] || WEATHER[0];
   return `<div class="wxcol${now ? ' now' : ''}">
       <div class="wxrow">
-        <i class="i wxbig i-${wxIcon(rung, { clock, sky })}" aria-hidden="true"></i>
+        <i class="i wxbig i-${wxIcon(rung, { clock, sky })}"
+           style="color:${wxTone(rung, { clock, sky })}" aria-hidden="true"></i>
         <span class="wxline">${w.line || w.word}</span>
         ${now ? '<b class="wxnow">NOW</b>' : ''}
       </div>
@@ -99,14 +95,25 @@ const stepCard = (rung, clock, now, sky) => {
 };
 
 function card(p) {
-  const temp = p.tmax == null ? '' : `<div class="wxrow wxtoday">
-      <span class="wxtemp" data-tip="Max ${p.tmax}° · Min ${p.tmin}°">
-        <span>${p.tmax}°</span><span>${p.tmin}°</span></span>
-      <span class="wxline">Today</span>
+  /* The day's two ends, as a card of the same shape as the half-hour cards under it. Low on the
+     left and high on the right, because that is the order a scale runs in and the pair then needs
+     no words. The arrow is what says which is which, so `.wxsub` states the day rather than
+     repeating either end. `aria-label` carries the words for a reader who hears the card. */
+  const temp = p.tmax == null ? '' : `<div class="wxcol wxtoday">
+      <div class="wxtemps">
+        <span class="wxt" aria-label="Low ${p.tmin} degrees">
+          <i class="i i-arrow_downward" aria-hidden="true"></i>${p.tmin}°</span>
+        <span class="wxt" aria-label="High ${p.tmax} degrees">
+          <i class="i i-arrow_upward" aria-hidden="true"></i>${p.tmax}°</span>
+      </div>
+      <span class="wxsub">Today</span>
     </div>`;
 
   const cards = [
-    ...p.past.map(([ts, r]) => stepCard(r, hhmm(ts * 1000), false, p.sky)),
+    /* The last two readings and no more. The card is a forecast, and the half hour behind it is
+       there to say which way the weather is going. An hour of it pushed the steps that have not
+       happened yet under the fold. */
+    ...p.past.slice(-2).map(([ts, r]) => stepCard(r, hhmm(ts * 1000), false, p.sky)),
     stepCard(p.rungs[0], hhmm(p.stamp * 1000), true, p.sky),
     ...p.rungs.slice(1).map((r, i) => stepCard(r, p.clocks[i + 1], false, p.sky)),
   ].join('');
@@ -128,7 +135,8 @@ function card(p) {
     </div>
     <div class="sensor">
       <div class="sensorhead">
-        <i class="glyph i i-${wxIcon(p.rungs[0], { sky: p.sky })}" style="color:var(--k-weather)"></i>
+        <i class="glyph i i-${wxIcon(p.rungs[0], { sky: p.sky })}"
+           style="color:${wxTone(p.rungs[0], { sky: p.sky })}"></i>
         <b>Weather</b>
       </div>
       ${temp}

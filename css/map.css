@@ -152,6 +152,9 @@
    that state out again underneath it — the word is on `data-tip`, and `js/sparktip.js` opens it on
    hover and on a tap. There is no `.wxcol .i` rule any more. Two classes beat one, so that rule
    held this glyph at 14px and the large one never drew large. */
+/* The colour is written on the element, off `wxTone()` in popup.js, so the glyph and its hue are
+   one decision made in one place. `--k-weather` stays as the fallback: it is what this section
+   wore before, and a caller that states no tone still draws in the section's own colour. */
 .wxbig { font-size: var(--g); color: var(--k-weather); flex: none; cursor: help; }
 .wxline { color: var(--on-surface); font-size: 11px; }
 /* The weather section needs no seam of its own, and `.wxsec` is gone. It carried a bottom rule while
@@ -488,8 +491,21 @@
 .wxcol.now { outline: 2px solid var(--accent); outline-offset: -2px; }
 .wxnow { flex: none; font-size: 9px; letter-spacing: .06em; color: var(--accent);
   border: 1px solid var(--accent); border-radius: 4px; padding: 1px 5px; }
-/* The temperature, above the cards. `.wxtemp` already stacks high over low. */
+/* The day's two ends, above the cards and shaped like them. Low left, high right: that is the
+   order a scale runs in, so the pair reads without a word on either half. The two halves are `1fr`
+   each and not `auto`, because the numbers are two or three characters and a shared centre line is
+   what makes them one control rather than two readings.
+   `.wxsub` is `width: var(--g)` (28px) for a title under a glyph. This one sits under a full row,
+   so it takes the width off, exactly as `.wxsteps .wxsub` does for the same reason. */
 .wxtoday { margin-bottom: 8px; }
+.wxtoday .wxsub { width: auto; text-align: left; }
+.wxtemps { display: grid; grid-template-columns: 1fr 1fr; }
+.wxt { display: flex; align-items: center; justify-content: center; gap: 4px;
+  font-size: 16px; line-height: 1.2; }
+/* The arrow names the end, so it must not outweigh the number it names. `.i` sizes in `em`, so this
+   is 12px against the 16px figure beside it. `--muted`, because the temperature is the reading and
+   the arrow is its label. */
+.wxt .i { font-size: .75em; color: var(--muted); }
 /* The legend key. One row per rung, glyph then word. */
 /* The glyph carries the meaning here, so it leads and the word sits under it. `.i` sizes in `em`,
    so `2em` against this row's 11px is a 22px mark against an 11px label. Centred in a column
