@@ -608,6 +608,19 @@ el('wxLayer').onchange = async e => {
   render();
 };
 
+/* **Changing the layer closes the card, and that is a fifth way out of `#side`.** Every other one
+   is listed in CLAUDE.md, and the rule there is that nothing closes the card except the reader. This
+   obeys it. A layer switch is a press the reader made, and it takes the thing the card describes off
+   the map. A station card over a weather map names a pin that is not drawn, and a weather card over
+   the station map names a point that is not either. Neither can refresh: `render()` skips a site
+   that has left `sites`, and `tick()` in wx.js only runs while weather draws.
+   Both panels are the same panel. The weather card is a tenant of `#side` under a `@wx-` key, the
+   shape the alert list already uses, so one `closeSide()` covers the pair.
+   A listener of its own rather than a line inside either handler. The Stations radio shares a
+   handler with the four boxes under it, and Weather has a separate one that awaits a deferred
+   module. Adding the same line to both is two copies of one rule. */
+for (const id of ['stations', 'wxLayer']) el(id).addEventListener('change', closeSide);
+
 // --- district filter ------------------------------------------------------------------------------
 // render.js draws the list; this only interprets clicks on it. `hidden` holds the districts switched
 // off, so a district the feeds add later shows up by default rather than silently missing.

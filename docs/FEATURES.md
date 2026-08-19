@@ -10375,6 +10375,9 @@ not get two looks.
 
 `.note` and `.hint` share one rule, so a chip carrying both lines them up in that order.
 
+The panel is 300px wide for them. At the 236px it held before, the Stations note sat hard against
+its own label with no air between the two. 300 leaves every chip 54px of slack on that line.
+
 **The label pushes, and nothing on the right pulls.** `margin-left: auto` on both of them was the
 first try, and it looks correct on a chip carrying one of them. A flex line distributes its free
 space between every auto margin on it.
@@ -10430,8 +10433,25 @@ reader: it stands out too much.
 read as a control. Neither the whisper nor the shout answers that.
 
 **So it moved into the zoom cluster.** `.mapbtn` keeps the cluster's `--surface` fill, `--on-surface`
-ink and `var(--shadow)`, with no text and no accent. It takes M3's FAB size instead: 56px on a 16px
-radius, against the strip's 30px buttons on 8px.
+ink and `var(--shadow)`, with no text and no accent.
+
+**It takes the zoom box's own height, and it took M3's flat 56px first.** Two 30px zoom buttons make
+60, so the button stood 4px short of the box beside it. That is the same mismatch of a few pixels the
+fill and the shadow already answer for, and it reads as a mistake at that distance.
+
+**A phone keeps that 60 and does not follow the rule.** The desktop button matches the box because
+the two stand side by side. Here the button stands above it, so there is no edge to line up with.
+
+It followed the rule for one revision, at the 88px two 44px zoom buttons make. That is a quarter of a
+360px screen for a control that opens a panel. 60 clears the 44px touch target with room to spare.
+
+**One number carries it.** M3's FAB is a 16px radius on a 56px box under a 24px glyph, which is
+exactly 2/7 and 3/7 of the box. So `--fab` holds the height and two `calc()`s hold the ratios, and a
+breakpoint moves one number. The strip beside it is 30px buttons on an 8px radius, and the two
+deliberately do not match.
+
+`paint-check.html` asserts the height against the zoom box rather than against a number, and the two
+ratios against the height.
 
 **It stands out by size and never by colour.** It opens the map's own settings and it is the one
 control in that cluster that is not a zoom. Size says that. An accent fill said something louder,
@@ -10440,6 +10460,26 @@ and a status hue is not available to it at all.
 **The state left with the glyph, and nothing was lost.** `#legend` names the wash and draws its ramp.
 `#risebadge` states the filter. `#shown` counts what the drawer hides. Every one of those was already
 on screen. `#layerN`, the drawer summary that named the layer, is gone with its line in `syncHeat()`.
+
+### A layer switch closes the card
+
+`#side` is the station card, and it is the weather card too. The weather layer opens its point under
+a `@wx-` key, the tenant shape the alert list already uses. So one `closeSide()` covers both panels.
+
+**This is the fifth way out of that panel, and the rule is that nothing closes it except the
+reader.** The switch obeys the rule. It is a press the reader made, on a control beside the panel.
+
+**It also carries the strongest reason of the five.** The switch takes the thing the card describes
+off the map. A station card over a weather map names a pin that is not drawn, and a weather card over
+the station map names a point that is not either.
+
+Neither one can refresh. `render()` skips a site that has left `sites`, and `tick()` in `wx.js` runs
+only while weather draws. So the card freezes on a reading nothing can update, over a map that no
+longer holds it.
+
+**The listener sits on the two radios rather than inside either handler.** Stations shares a handler
+with the four boxes under it, and Weather has one of its own that awaits a deferred module. A line in
+each is two copies of one rule.
 
 ### Stations owns the wash as well as the pins
 

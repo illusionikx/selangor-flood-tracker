@@ -925,13 +925,22 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
   "you are here" card was hit hardest. The `js/locate.js` module draws an accuracy circle. `L.Path`
   bubbles its clicks to the map where `L.Marker` does not (`bubblingMouseEvents: false`). So at a
   coarse fix most of the viewport closed it. `render()` no longer closes it either when the site
-  leaves `sites`. The ways out are the ×, a dialog taking the screen, ⋮ → ignore, and two gestures
-  at phone width. About and the table are the dialogs, and both call `closeSide()` in ui.js. The two
+  leaves `sites`. The ways out are the ×, a dialog taking the screen, ⋮ → ignore, a switch of the
+  map layer, and two gestures at phone width. About and the table are the dialogs, and both call
+  `closeSide()` in ui.js. The two
   gestures are the ones a modal drawer owes a reader. They are a swipe toward the right edge, and a
   tap on `#scrim`. **Do not add another without a reason that survives
-  "it vanished while I was reading it".** The last two carry theirs. Both exist only below 600px,
+  "it vanished while I was reading it".** The last three carry theirs. The two gestures exist only
+  below 600px,
   where the panel takes 84vw and there is nothing behind it left to read. The scrim is a real box
   over the map, rather than a map click. So no pan, no marker and no accuracy circle can fire it.
+  **The layer switch carries the strongest reason of the five.** It takes the thing the card
+  describes off the map. A station card over a weather map names a pin that is not drawn, and a
+  weather card over the station map names a point that is not either. Neither can refresh: `render()`
+  skips a site that has left `sites`, and `tick()` in wx.js runs only while weather draws. It is a
+  press the reader made, on a control beside the panel. The listener sits on the two radios in
+  `ui.js` rather than inside either handler. Stations shares a handler with the four boxes under it,
+  and Weather has its own that awaits a deferred module. One rule does not get two copies.
 - **The alert list is a tenant of `#side`, under the key `@alerts`.** It is not a panel of its own
   any more. So there is nothing to place, slide past the drawer or collapse on a phone. A
   station picked out of the list *replaces* the list. That is why nothing binds the rows any more.
@@ -2261,9 +2270,16 @@ it. The weather section stretches nothing. It is five fixed keys measuring 231px
   no accent.** See `.mapbtn` in `base.css`. **Keep those in step** with
   `.leaflet-control-zoom`: the two stand against each other, and a mismatch of one shade reads as a
   mistake at that distance. `paint-check.html` compares them declaration by declaration.
-  **The size and the radius deliberately do NOT match.** It takes M3's FAB, 56px on a 16px radius,
-  against the strip's 30px on 8px. It opens the map's own settings and is the one control there that
-  is not a zoom, so it stands out by size. It must never stand out by colour.
+  **The size and the radius deliberately do NOT match the strip's 30px on 8px.** It opens the map's
+  own settings and is the one control there that is not a zoom, so it stands out by size. It must
+  never stand out by colour.
+  **Its height is the zoom BOX's height on a desktop, and `--fab` is the one number that carries
+  it.** 60, being two 30px zoom buttons stacked. M3's flat 56 stood here first and left the button
+  4px short of the box beside it. **A phone keeps that 60 and there is no override.** The rule is
+  about two boxes standing side by side, and on a phone this one stands above the zoom box instead.
+  It followed the rule there for one revision, at 88px, which is a quarter of a 360px screen. M3's FAB is a 16px radius under a 24px glyph on a 56px
+  box, which is exactly 2/7 and 3/7 of it, so two `calc()`s hold those ratios at any size.
+  `paint-check.html` asserts the height against the zoom box, never against a number.
   A second try made it an accent FAB with a label, still alone in that corner. A reader said it
   stood out too much. **Both failures came from putting a control on its own in the middle of a map.
   One had to whisper and the other had to shout. Neither is the answer.** See `docs/FEATURES.md`,

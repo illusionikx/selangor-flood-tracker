@@ -1131,7 +1131,9 @@ body.drawer #legend { transform: translateX(var(--drawer)); }
 
 /* `.menu` is a row list of `.mi` buttons and this one holds five `.chip` labels, which bring their
    own padding. So the 4px the shared rule pads with would sit inside the chips' own. */
-#paintmenu { min-width: 236px; padding: 6px; }
+/* The Stations chip is the widest thing in here, and at the old 236px its note sat hard against
+   its own label with no air between the two. 300 gives every chip slack on that line. */
+#paintmenu { min-width: 300px; padding: 6px; }
 
 /* --- heatmap legend ------------------------------------------------------------------------- */
 
@@ -2022,8 +2024,11 @@ body.finding #find { display: none; }
   #netstats { left: 8px; }
   /* ABOVE the zoom box here rather than beside it. `#legend` takes `left: 12px; right: 68px` at this
      width, so the strip left of the zoom buttons is the legend's and there is nowhere to stand.
-     No size override: `.mapbtn` is 56px at every width, which is M3's FAB and already clears the
-     44px touch target.
+     No size override. `--fab` follows the zoom control's height on a desktop because the two stand
+     side by side there, and a button 4px short of the box beside it reads as a mistake. Here it
+     stands ABOVE that box, so there is no edge to line up with and nothing to match. Two 44px zoom
+     buttons make 88, and an 88px square is a quarter of a 360px screen for a control that opens a
+     panel. 60 clears the 44px touch target with room to spare.
      Measured off the same two rules the desktop offset uses. `.leaflet-bottom.leaflet-right` carries
      `margin-bottom: 30px` here and Leaflet's gutter adds 10, so the zoom box sits 40px up. Two 44px
      buttons make it 88 tall. 40 + 88 + 8 = 136. paint-check.html asserts the adjacency, so a change

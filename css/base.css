@@ -504,14 +504,19 @@ dialog:focus, dialog:focus-visible { outline: none; }
    not. The glyph is the layers glyph and the panel it opens states everything in words. */
 .mapbtn {
   display: grid; place-items: center;
-  /* M3's FAB: 56px on a 16px radius. It opens the map's own settings and it is the one control in
-     that cluster that is not a zoom, so it is the one that gets the size. */
-  width: 56px; height: 56px; padding: 0; cursor: pointer;
+  /* **One number, and the shape follows it.** M3's FAB is 56px on a 16px radius carrying a 24px
+     glyph, which is exactly 2/7 and 3/7 of the box. So the two `calc()`s below hold those ratios at
+     any size, and a breakpoint moves `--fab` alone.
+     It is sized to the zoom control's own HEIGHT rather than to M3's 56. The two stand against each
+     other in one cluster, and a button 4px shorter than the box beside it reads as a mistake at
+     that distance. Two 30px zoom buttons make 60 here, and two 44px ones make 88 on a phone. */
+  --fab: 60px;
+  width: var(--fab); height: var(--fab); padding: 0; cursor: pointer;
   background: var(--surface); color: var(--on-surface);
-  border: 0; border-radius: 16px; box-shadow: var(--shadow);
+  border: 0; border-radius: calc(var(--fab) * 2 / 7); box-shadow: var(--shadow);
   transition: background .15s, transform .12s;
 }
-.mapbtn .i { font-size: 24px; }
+.mapbtn .i { font-size: calc(var(--fab) * 3 / 7); }
 .mapbtn:hover { background: var(--hover); }
 /* **The press has to answer for itself, because what it changes is somewhere else.** One press on
    `#paint` switches the whole map layer, and the button carries the same glyph at every state. So

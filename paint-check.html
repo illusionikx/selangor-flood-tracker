@@ -190,13 +190,21 @@ const zbtn = d.querySelector('.leaflet-control-zoom a').getBoundingClientRect();
 is(Math.round(r.bottom), Math.round(zoom.bottom), 'desktop: shares the zoom control baseline');
 is(r.right < zoom.left, true, 'desktop: sits to the LEFT of the zoom box');
 is(Math.round(zoom.left - r.right) <= 12, true, 'desktop: and up against it, not adrift');
-/* FAB-sized, not zoom-sized. It opens the map's own settings and is the one control in the cluster
-   that is not a zoom, so it is the one that gets M3's 56px. It stands out by size, never by colour
-   — a reader cut the accent fill that tried the other way. */
-is(Math.round(r.width), 56, 'desktop: M3 FAB width');
-is(Math.round(r.height), 56, 'desktop: and FAB height');
-is(parseFloat(w.getComputedStyle(btn).borderTopLeftRadius), 16, 'desktop: on the FAB radius');
-is(r.width > zbtn.width, true, 'desktop: and larger than a zoom button, which is the point');
+/* **As high as the zoom box, and asserted against that box rather than against a number.** It sat
+   at M3's 56 first, 4px shorter than the 60 beside it, and a mismatch of one shade or one pixel
+   reads as a mistake at that distance. It is still larger than a zoom BUTTON, which is the point:
+   it opens the map's own settings and is the one control in the cluster that is not a zoom. It
+   stands out by size, never by colour — a reader cut the accent fill that tried the other way. */
+is(Math.round(r.height), Math.round(zoom.height), 'desktop: as high as the zoom box beside it');
+is(Math.round(r.width), Math.round(r.height), 'desktop: and square');
+is(r.width > zbtn.width, true, 'desktop: larger than a zoom button, which is the point');
+/* M3's FAB is a 16px radius on a 56px box carrying a 24px glyph, which is 2/7 and 3/7 of it. One
+   `--fab` and two `calc()`s hold those ratios at any size, so a breakpoint moves one number. */
+const px = (node, prop) => parseFloat(w.getComputedStyle(node)[prop]);
+is(Math.abs(px(btn, 'borderTopLeftRadius') / r.height - 2 / 7) < 0.01, true,
+   'desktop: the radius holds the M3 FAB ratio, 2/7 of the box');
+is(Math.abs(px(btn.querySelector('.i'), 'fontSize') / r.height - 3 / 7) < 0.01, true,
+   'desktop: and the glyph holds its 3/7');
 // Nothing else floats here. An overlap is a control a reader cannot press.
 for (const id of ['legend', 'pills', 'toast', 'credit', 'bar']) {
   const o = el(id); if (!o) continue;
@@ -380,6 +388,16 @@ for (const id of ['favOnly', 'risingOnly', 'favOnly', 'rainHeat', 'heat', 'rainH
      with no answer on it. Radios are what enforce it, so this holds through every press above. */
   is(onCount(['stations', 'wxLayer']), 1, 'after ' + id + ': exactly one map layer on');
 }
+/* **A layer switch closes `#side`.** Both panels are that panel: the weather card is a tenant of
+   it under a `@wx-` key, the shape the alert list already uses. The card names something the map no
+   longer draws, and nothing can refresh it either. This is the fifth way out of that panel, and the
+   only one that is not a press on the panel itself. */
+el('alertBtn').click();
+await wait(400);
+is(d.body.classList.contains('side'), true, 'the panel opens, so there is something to close');
+await pick(el('stations').checked ? 'wxLayer' : 'stations');
+await wait(2500);
+is(d.body.classList.contains('side'), false, 'switching the layer closes the panel over it');
 /* Radios rather than checkboxes, and that is the difference from the two pairs above. The pairs
    inside Stations keep "neither" reachable, so they stay checkboxes. */
 for (const id of ['stations', 'wxLayer']) {
@@ -443,7 +461,12 @@ is(pd.body.classList.contains('drawer'), false, 'phone: lands with the drawer sh
 const pr = pbtn.getBoundingClientRect();
 const pz = pd.querySelector('.leaflet-control-zoom').getBoundingClientRect();
 const pza = pd.querySelector('.leaflet-control-zoom a').getBoundingClientRect();
-is(Math.round(pr.width), 56, 'phone: the same 56px FAB, no width override');
+/* No size override here. The desktop button matches the zoom BOX because the two stand side by
+   side, and this one stands above it, so there is no edge to line up with. It matched for one
+   revision, at 88px, which is a quarter of a 360px screen. */
+is(Math.round(pr.height), Math.round(r.height), 'phone: the same button as the desktop one');
+is(Math.round(pr.width), Math.round(pr.height), 'phone: and still square');
+is(pr.height >= 44, true, 'phone: which clears the touch target on its own');
 is(pr.width > pza.width, true, 'phone: still larger than a zoom button, which is 44 here');
 /* ABOVE the zoom box here, not beside it. #legend takes `left: 12px; right: 68px` at this width, so
    the strip left of the zoom buttons belongs to the legend and there is nowhere to stand. */
