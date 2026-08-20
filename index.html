@@ -71,7 +71,7 @@
 <link rel="stylesheet" href="vendor/fonts.css?v=51">
 <link rel="stylesheet" href="css/icons.css?v=94">
 <link rel="stylesheet" href="css/base.css?v=143">
-<link rel="stylesheet" href="css/chrome.css?v=193">
+<link rel="stylesheet" href="css/chrome.css?v=194">
 <link rel="stylesheet" href="css/map.css?v=156">
 
 <!-- Water tint for the dark basemap. CARTO's dark_all is greyscale — all 18 of its tones have zero
@@ -1068,6 +1068,11 @@
     <input type="radio" name="maplayer" id="wxLayer" autocomplete="off">
     <i class="glyph i i-partly_cloudy_day"></i><span class="lab">Weather</span>
     <span class="note">Nowcasting</span><span id="wxHint" class="hint"></span></label>
+  <!-- The shortcut, and it is drawn on a pointer device alone. Hover is what opens this panel there,
+       so the press on the button is free and it switches the layer. A tap and a keyboard press keep
+       the native toggle, which is the only way in either of them has, so the line would name an
+       action neither one can take. `css/chrome.css` holds the same media query the handler tests. -->
+  <p class="mfoot">Click the button to switch layers</p>
 </div>
 <!-- Standing indications that the map is showing less than it holds. One strip, because test mode
      and the rising filter can be on at the same time and two fixed pills would sit on each other.

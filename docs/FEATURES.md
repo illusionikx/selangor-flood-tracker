@@ -10627,8 +10627,13 @@ panel it switched in.
 module, and rolls back when that import fails. That rule lives on the radio's own handler, and a
 second writer here is a second copy of it.
 
-The trade-off is that the shortcut is not announced. A reader who never presses the button loses
-nothing, because the chip in the open panel does the same thing.
+**The panel names the shortcut, at its foot.** `Click the button to switch layers`, right-aligned,
+on the same edge as the notes above it. A reader who misses it loses nothing, because the chip in the
+open panel does the same thing.
+
+It draws on a pointer device alone, behind the same media query the handler tests. A tap and a
+keyboard press keep the native toggle, so on those the line would name an action that does not
+exist. `Click` rather than `press`, because the line is mouse-only by construction.
 
 Measured: a press with the pointer on the button switches the layer, leaves the panel open, and
 switches back on the next press.

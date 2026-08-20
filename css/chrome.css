@@ -1135,6 +1135,24 @@ body.drawer #legend { transform: translateX(var(--drawer)); }
    its own label with no air between the two. 300 gives every chip slack on that line. */
 #paintmenu { min-width: 300px; padding: 6px; }
 
+/* The press shortcut, named on the one class of device that can take it. Hover opens this panel on
+   a pointer device, which is what frees the press to switch the layer. A tap and a keyboard press
+   keep the native `popovertarget` toggle, so on those the line would name an action that does not
+   exist. Same media query as the handler in `js/ui.js`, and it is `PLAYER_OVERLAY`'s own.
+   Right, because it points at a control outside the panel rather than at the list above it.
+   It carries its own `font-size` rather than `.muted`, which is a colour AND a 12px size and would
+   draw this line larger than the notes it sits under. */
+#paintmenu .mfoot { display: none; }
+@media (hover: hover) and (min-width: 601px) {
+  #paintmenu .mfoot {
+    /* 15px on the right, which is a chip's own 14px padding plus its 1px border. Two right-aligned
+       texts that miss each other by 6px read as a mistake, and this line sits directly under the
+       Weather chip's note. */
+    display: block; margin: 8px 15px 2px 8px; text-align: right;
+    font-size: 11px; color: var(--muted); opacity: .8;
+  }
+}
+
 /* --- heatmap legend ------------------------------------------------------------------------- */
 
 #legend {

@@ -2255,6 +2255,10 @@ it. The weather section stretches nothing. It is five fixed keys measuring 231px
   because a popover invoker runs as the click's activation behavior. The handler presses the radio
   rather than writing `PREFS.mapLayer`, because the weather radio owns the deferred import and its
   rollback.
+  **The panel names that shortcut in `.mfoot`, at its foot and right-aligned**, on the same edge as
+  the notes above it. It draws behind the same media query the handler tests, because a tap and a
+  keyboard press keep the native toggle and cannot take it. It reads `Click` rather than `press`,
+  since the line is mouse-only by construction.
   **The press answers for itself through `.mapbtn:active`, and never through a class.** The glyph is
   the same at every state, so a press that switches the map leaves the button looking untouched.
   `:active` covers the press that opens the panel and the press that switches the layer alike, with

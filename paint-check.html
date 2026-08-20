@@ -305,6 +305,20 @@ for (const id of BOXES) {
    either way, which held the note 8px off an edge the Stations chip met exactly. */
 is(w.getComputedStyle(el('wxHint')).display, 'none', 'an empty hint takes no room, not even its gap');
 
+/* **The press shortcut is named, on the one class of device that can take it.** Hover opens this
+   panel on a pointer device, which is what frees the press to switch the layer. A tap and a keyboard
+   press keep the native toggle, so on those the line would name an action that does not exist. The
+   phone block at the foot of this file asserts the other half. */
+const foot = menu.querySelector('.mfoot');
+is(!!foot, true, 'the panel names the press shortcut');
+is(w.getComputedStyle(foot).display !== 'none', true, 'desktop: and draws it, because hover opens the panel here');
+is(w.getComputedStyle(foot).textAlign, 'right', 'desktop: right, because it points at a control outside the panel');
+/* Flush with the notes above it. Two right-aligned texts that miss each other by a few pixels read
+   as a mistake, and this line sits directly under the Weather chip's note. */
+is(Math.abs(foot.getBoundingClientRect().right
+   - menu.querySelector('.note').getBoundingClientRect().right) < 1, true,
+   'desktop: on the same right edge as the notes above it');
+
 /* The weather chip takes the hue its own clear-sky pin draws in, never a status hue. `--wx-clear`
    is muted away from `--s-alert` on purpose, so an amber chip here cannot read as an alert.
    Compared against the RESOLVED token, because a custom property substitutes its `var()` at computed
@@ -453,7 +467,7 @@ f.style.width = '360px';
 f.contentWindow.location.reload();
 await new Promise(r => f.addEventListener('load', r, { once: true }));
 await wait(4000);
-const pd = f.contentDocument, pbtn = pd.getElementById('paint');
+const pd = f.contentDocument, pw = f.contentWindow, pbtn = pd.getElementById('paint');
 pd.body.classList.add('rising');          // the state that puts #risebadge on screen
 await wait(300);
 
@@ -467,6 +481,10 @@ const pza = pd.querySelector('.leaflet-control-zoom a').getBoundingClientRect();
 is(Math.round(pr.height), Math.round(r.height), 'phone: the same button as the desktop one');
 is(Math.round(pr.width), Math.round(pr.height), 'phone: and still square');
 is(pr.height >= 44, true, 'phone: which clears the touch target on its own');
+/* The press shortcut is a pointer-device affordance, and a tap keeps the native toggle. So the line
+   naming it must not draw here, or it names an action a phone cannot take. */
+is(pw.getComputedStyle(pd.querySelector('#paintmenu .mfoot')).display, 'none',
+   'phone: the press shortcut is not named, because a tap cannot take it');
 is(pr.width > pza.width, true, 'phone: still larger than a zoom button, which is 44 here');
 /* ABOVE the zoom box here, not beside it. #legend takes `left: 12px; right: 68px` at this width, so
    the strip left of the zoom buttons belongs to the legend and there is nowhere to stand. */
