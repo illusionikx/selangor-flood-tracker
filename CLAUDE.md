@@ -19,14 +19,15 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `api.php` | server-side proxy + cache + source merge + poll history + camera image proxy + rate-limited `?force=1` + place lookup (`?place=`, proxies Nominatim) + weather layer lookup (`?wx=1`) |
 | `sources.php` | scrapers for the two HTML-only upstreams (national portal, JPS WP) and the three MET feeds (nowcast, forecast, warning). Also the national portal's rainfall table, gazetteer and 7-day history endpoints. Also the two JPS notice parsers: the MET mirror, the flood alert |
 | `shots.php` | camera archive: capture, retention tiers, lookup, and the on-request strip (`buildSheet()`) the wall and the clip play. Required by `api.php` |
-| `shots-test.php` | `php shots-test.php` — one of six runnable checks. Guards retention. Exercises `pruneShots()` |
+| `shots-test.php` | `php shots-test.php` — one of seven runnable checks. Guards retention. Exercises `pruneShots()` |
 | `log.php` | where a browser error lands. `js/oops.js` is the only caller. Appends one JSON line to `.client-errors.log` |
 | `watch.php` | reads a payload on stdin and complains when it is wrong. The poll cron pipes into it. Reports a change of state, never a state |
 | `.user.ini` | per-directory PHP settings. Holds one line, `session.auto_start=0`, and the reason it is there |
 | `index.html` | markup only — no inline CSS or JS |
-| `title-test.html` | `chrome --headless --dump-dom` — one of six runnable checks. Guards the app bar wordmark ladder, in rendered pixels |
-| `narrow-test.html` | `chrome --headless --dump-dom` — one of six runnable checks. Guards the narrow-window block: its threshold, its coverage, its refusal to be dismissed, and that it is modal |
-| `paint-check.html` | `chrome --headless --dump-dom` — one of six runnable checks. Guards the on-map paint chooser: that it reads as a control and not as a map pin, that its two layers and the four boxes nested under `Stations` sit where they belong, that each section holds one choice at a time, and that it clears the zoom cluster at both widths |
+| `title-test.html` | `chrome --headless --dump-dom` — one of seven runnable checks. Guards the app bar wordmark ladder, in rendered pixels |
+| `narrow-test.html` | `chrome --headless --dump-dom` — one of seven runnable checks. Guards the narrow-window block: its threshold, its coverage, its refusal to be dismissed, and that it is modal |
+| `paint-check.html` | `chrome --headless --dump-dom` — one of seven runnable checks. Guards the on-map paint chooser: that it reads as a control and not as a map pin, that its two layers and the four boxes nested under `Stations` sit where they belong, that each section holds one choice at a time, that it clears the zoom cluster at both widths, and that below 600px its panel is an M3 bottom sheet whose drag handle has a real swipe behind it |
+| `m3-check.html` | `chrome --headless --dump-dom` — one of seven runnable checks. Guards every M3 surface in rendered pixels: the eight dialogs against the roll call and the kind each is declared as, the four-band ladder, the supporting pane at M3's canonical ratios with the map giving up exactly that width, the pane as a side sheet above 600px and a full-screen dialog below it, and each station section as a filled card. Also that every enter carries M3's own duration and easing |
 | `css/icons.css` | every icon, as an SVG mask. Generated — see docs/FEATURES.md for the fetch |
 | `css/base.css` | tokens, reset, controls, blocks shared by popup + alert panel |
 | `css/chrome.css` | page furniture: app bar, status dot, drawer, legend, splash |
@@ -39,7 +40,7 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `js/stations.js` | queries over the station set (`nearestOf`, `nearestCam`, `byId`) |
 | `js/map.js` | map instance, basemap/theme, cluster, the station panel (`openSide`), `focusOn` / `flashTo` |
 | `js/heat.js` | both heat layers (water level, rainfall), ground-fixed sizing per layer, shared opacity. Also the field pass where a gauge reporting no rain denies the ground a wet one claims |
-| `heat-test.html` | `chrome --headless --dump-dom` — one of six runnable checks. Guards the rain layer's paint distance, its dry-gauge erase and its handover between neighbours, in canvas pixels |
+| `heat-test.html` | `chrome --headless --dump-dom` — one of seven runnable checks. Guards the rain layer's paint distance, its dry-gauge erase and its handover between neighbours, in canvas pixels |
 | `js/popup.js` | popup + meter + gauge + sparkline templates |
 | `js/sparktip.js` | the hover/tap readout on every graph, and the label on any `data-tip`. One delegated listener, no imports |
 | `js/render.js` | rebuilds markers and heat points, and the drawer summary table |
@@ -55,7 +56,7 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `js/net.js` | `load()` poll loop and the status dot on the logo |
 | `js/ui.js` | all DOM wiring: drawer, filters, chips, panels, lightbox, delegated jumps |
 | `js/wall.js` | the camera wall: every camera on one page, one timer for all of them |
-| `js/wx.js` | the MET weather layer: the map mode, the pins, and the half-hour panel. Deferred |
+| `js/wx.js` | the MET weather layer: the map mode, the pins, and the half-hour panel. `hereCard()` draws that panel over the reader's own fix, and `carry()` hands a card across a layer switch. Deferred |
 | `manifest.json` | PWA manifest. `.json`, not `.webmanifest` — see the gotcha below |
 | `sw.js` | service worker: network-first shell cache, and the reason Chrome offers "Install app" |
 | `icon.svg` | the app mark: bare glyph, no fill. Source for the PNGs *and* the `--i-flood` mask |
@@ -863,6 +864,99 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
   `[hidden] { display: none }`. So the Developer section's "Refresh now" button needed
   `.rowbtns .link[hidden] { display: none }` to actually disappear. That button is hidden on the
   GitHub Pages build, where the query it needs does nothing.
+- **Every `<dialog>` in this app is one of three kinds, and a bare `.modalhead` selector broke two
+  of them.** `#dataBox`, `#camBox` and the two `.docbox` panes are **full-screen** below 600px and
+  **basic** above it. `#lightbox` and `#warnBox` are **basic at every width**. `#eggBox` and
+  `#narrowBox` are **exempt**, and each names its reason where it is defined: one is a picture with
+  no chrome at all, and the other is a blocking state screen with no way out on purpose.
+  The full-screen header rules were written as bare `.modalhead` inside the phone media query. So
+  they also reached the two basic dialogs, and each one drew its close button on the leading edge of
+  a 56px bar while the box around it stayed a floating card with a 12px corner and a scrim. **A
+  full-screen header on a basic container reads as a fault in the header and is a fault in the
+  selector.** Those rules name `#dataBox .modalhead, #camBox .modalhead, .docbox .modalhead` now.
+  **The two basic ones must not become full-screen, and M3 is why.** That variant is for a task with
+  a series of steps, keyboard input, or a box that opens another dialog. A camera still and a
+  warning read are neither. The four that did convert each carry a filter field or a document.
+  **`m3-check.html` holds the roll call, and the roll call is the point.** It reads every `<dialog>`
+  out of the document and fails on any id the table does not name, and on any name the document no
+  longer holds. Nothing caught the fault above, because nothing knew those two dialogs existed. A
+  new dialog now needs a decision rather than a default.
+- **`#warnBox`'s icon sits ABOVE its headline, which is M3's basic dialog anatomy order.** Icon is
+  item 2 and headline is item 3, in a column. It was inline before the headline for a long time, and
+  the bare `.modalhead` rule then reversed the row and pushed it past the title to the trailing edge.
+  Left-aligned rather than centred: M3 marks centring a prop rather than the default, and every other
+  dialog here leads its header on the same edge. `js/ui.js` writes the glyph and its colour by id, so
+  moving the element in the markup needed nothing there.
+  **`headline-small` is 24px and only one of the two basic dialogs takes it.** `#warnBox` holds a
+  fixed short title. `#lightbox` holds a camera's name and its district on two lines, and it wraps
+  rather than truncating. M3's own rule about a long or variable headline applies: at 24px on a 360px
+  screen that name takes two 32px lines before the picture starts.
+- **A browser's own stylesheet caps every `<dialog>`, and it silently ate one breakpoint band.**
+  The UA sheet carries `dialog { max-width: calc(100% - 6px - 2em); max-height: calc(100% - 6px - 2em) }`.
+  `#dataBox` and `#camBox` set `width` and `height` rather than `max-*`, so that cap still applies
+  over the top of them. At a 14px font 2em is 28, so the cap is `100% - 34px`. It clamped a 668px
+  pane to 666 in a 700px window, and the medium band's 16px inset silently became 17. **It bites in
+  the medium band alone**, because the cap is wider than the pane at every band above it, which is
+  the worst shape for something to be wrong in: three of four bands look right. `max-width: none`
+  and `max-height: none` on those two clear it. `.docbox` never had the problem, because it sets
+  `max-width` itself and an author rule beats a UA one. It keeps the UA `max-height` on purpose,
+  and that is what makes long prose scroll inside the pane rather than off it.
+- **The four dialogs sit on a four-band ladder, and three variables carry it, not twelve rules.**
+  `--dlg-inset` is the gap to the window edge, `--dlg-wide` caps the table and `--dlg-prose` caps
+  the two prose panes. M3's window size classes name the bands: compact under 600, medium to 839,
+  expanded to 1199, large above. **The medium band exists to fix a jump.** Before it, a dialog
+  crossed out of the full-screen variant at 601px straight into its desktop shape, and that shape
+  measured 577px. The camera wall takes no cap at any width, which is a decision this file already
+  carries above: more room is strictly better for a wall of ninety pictures.
+  Two parts of M3's basic dialog are declined on purpose. `surface-container-high`, because this app
+  holds one surface tone in `css/base.css` and a second tone five percent off the first is invisible
+  over a scrim and is a colour invented outside that file. And elevation `level3`, because
+  `--shadow` is this app's one elevation and every dialog already carries it.
+- **A sticky header inside a padded scroller pins to the PADDING box, not to the top, so `top: 0`
+  is wrong there.** A sticky box is held inside its scrollport, and a scroller's scrollport is its
+  padding box. So a bar with `top: 0` in a scroller padded 20px stops 20px down, and the content
+  scrolls through the gap above it. It looks almost right, which is why it shipped twice in one
+  change. **`top` is the negative of that padding**: `-20px` in `#bar`, `-18px` in `.docbox`. The
+  negative margin beside it is a different job. That one takes the bar full bleed across the pane's
+  padding and puts its static position at the top of the border box. Neither one substitutes for the
+  other. `m3-check.html` scrolls each pane and reads the bar's `top` back, which is the only way to
+  tell a pinned bar from one pinned in the wrong place.
+  **`.docbox` pins its header at EVERY width, and `--pane` is what keeps the four offsets honest.**
+  That variable is the pane's own padding, 24px wide and 18px on a phone, and the sticky rule reads
+  it back rather than restating it. Help scrolled its own close button off the screen before this.
+  The table and the camera wall never needed it: each is a flex column whose `.dtop` is `flex: none`
+  and whose body scrolls under it, so their seam is structural. **Assert that the header does not
+  MOVE, never that it sits on a particular pixel.** A sticky box pins one border inside the pane,
+  and a `.dtop` carries its own padding. An assertion against the pane's own top fails on both.
+- **Below 600px FOUR surfaces are M3 full-screen dialogs, and none of them needs a `z-index`.**
+  `showModal()` puts a dialog in the top layer, which is not part of any stacking context. That is
+  also what makes M3's own rule work here — a full-screen dialog is the only dialog another dialog
+  can open over.
+  **The two panels are not among them.** They are M3 sheets: side sheets above 600px, modal bottom
+  sheets below it. A full-screen dialog is M3's answer for a TASK — a form with steps, keyboard
+  input, a box that opens another box. A panel that reports on the map behind it is a sheet, and a
+  sheet keeps that map in view. The four that stayed dialogs each carry a filter field or a
+  document.
+  **The two panels get an enter AND an exit, and the four dialogs get an enter alone.** A body class
+  leaves a closed state to transition from. `showModal()` flips `display`, so a keyframe on `[open]`
+  is all there is to start from, the same shape `#eggBox` uses, and a dialog still leaves instantly.
+  `@starting-style` with `allow-discrete` on `overlay` buys that exit. It also risks the dialog
+  leaving the top layer before the animation ends, which draws the exit behind the page.
+  **The motion comes from M3's own component spec, and two tokens in `css/base.css` hold it.**
+  **They are named for what a surface DOES, never for one component that does it.** `--m3-travel` is
+  a surface that moves in from an edge, at `duration-short2` (300ms) on `easing-emphasized`
+  (`cubic-bezier(.2, 0, 0, 1)`). The full-screen dialog takes it with `translateY(100%)`, and so does
+  the layer bottom sheet. `--m3-grow` is a surface that grows in place, which is the basic dialog:
+  `opacity: 0` with `scale(.95)`, at `duration-extra-short4` (200ms). M3 names three easings across
+  those components and its own table gives all three the same curve, so the duration is the whole of
+  the difference. The reference is the M3
+  Expressive component set's `dialog.css`, which cites `m3.material.io/components/dialogs/specs`.
+  **A clip-path collapse along the y axis stood here first and it was wrong.** The argument for it
+  was M3's transitions page, which files a dialog under enter and exit *within* screen bounds and
+  avoids anything implying an elevation change. That page describes the basic dialog. The component
+  spec for the full-screen variant says translate. **A component spec beats a generalisation about
+  its family.** The basic dialog still gets the within-bounds treatment, which is the half that
+  argument was right about.
 - **A popover inherits ten declarations from the UA sheet, and `height: fit-content` is the one that
   gets forgotten.** `.menu` restates `position`, `inset`, `margin`, `padding`, `overflow`, `border`
   and the colors, and left the height alone. WebKit reads `fit-content` on the block axis of an
@@ -887,16 +981,34 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
   is fixed to the right edge while the map moves under it. So the card's title carries `data-go`
   (`goName()` in `popup.js`) as the way back to the pin. A bare ring says "here" without saying
   what "here" is. Anything that wants a *persistent* label on the map is the thing this rule forbids.
-- **The card arrives as one string and is split into two boxes.** `openSide()` moves the card's
-  `.pophead` out of `#sideBody` and into `#sideHead`, which is not inside anything that scrolls.
+- **The card arrives as one string and THREE pieces of it move.** `#side` is an M3 side sheet, and
+  that component's header is a title with its trailing actions. So `openSide()` takes the `.popname`
+  into `#sideTitle`, the `.dots` and the popover it targets into `#sideActions`, and leaves the
+  region line and the sensor badges in `.pophead` at the top of the body. M3 puts supporting content
+  there, not in the header.
+  **The × is a flex item in that row now.** It used to float over the card's top-right corner, and
+  three numbers in `css/map.css` existed to work around it: the name was padded clear of it and the
+  ⋮ was placed against it. A header row places all three by itself and those numbers are gone.
+  The header is `min-height: 64px`, `align-items: center`, `padding: 8px 12px 8px 16px`, with the
+  title at `title-large` in `on-surface-variant`. The body is `padding: 12px 24px`. Every one of
+  those is `SideSheet/side-sheet.css`'s own.
+  **`.pophead` is still the seam and still the card's first element.** Only the slice taken from it
+  changed. Anything that reshapes `sitePopup()` has to keep `.popname` inside `.pophead`, or the
+  header empties and the name buries itself in the body — a fault nothing else in this app notices.
+  `m3-check.html` drives the real `openSide()` and asserts the distribution for that reason.
+  Its old shape, kept because it explains the constraint: `openSide()` moved the whole `.pophead`
+  into `#sideHead`, which is not inside anything that scrolls.
   `.pophead` is the place name, the region and one badge per sensor. `position: sticky` on it was
   tried first, and is one line rather than three. A header that stays put only while nothing defeats
   sticky is a header that can come loose. This one has no scroll to come loose from. **Anything that
   reshapes `sitePopup()` must keep `.pophead` as its first element** — that is the seam.
-- **Three numbers put the place name on the close button's line and move together.** `#sideClose`
-  takes `top: 8px`. `#sideHead .pophead` takes `padding-top: 18px`, which is 8 plus half the button's
-  40, less half a 15px/1.3 line. `.pophead > .dots` takes `top: 8px`, which is 18 plus half that
-  line, less half the button's 40, giving 7.75 — `#sideClose`'s own number.
+- **Three numbers used to put the place name on the close button's line, and all three are gone.**
+  `#sideClose` took `top: 8px`, `#sideHead .pophead` took `padding-top: 18px` and `.pophead > .dots`
+  took `top: 8px`, and each was derived from the others. They existed because the close button
+  floated over the card's corner. `#side` is an M3 side sheet now and its header is a flex row, so
+  the three controls place themselves. **The arithmetic survives in `css/map.css` for the surfaces
+  that still float a button**: the table's hover panel and every map card. `#sideBody .pophead`
+  cancels it, because nothing floats there any more.
   **That ⓘ takes the full `.icon` box, not `.dots`'s 28px one.** It stands beside the ×, and `.icon`
   paints a round `--hover` disc the width of its box. So the smaller shape drew two discs of two
   sizes, under two glyphs of two sizes. `.dots` stays 28px everywhere it
@@ -915,6 +1027,144 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
   name.** It is a line lower. But a 40px button reaches 48px down, and the region starts at 37.5.
   **A menu row's `[data-fav]` can hold a comma list.** So anything reading it back tests every id
   (see the still-open branch in ui.js). `ids.has('a,b,c')` is false forever.
+- **`#pane` is a `<dialog>` and the window class picks the METHOD, not the styling.** Below 600px it
+  opens with `showModal()`. That is the only way to get the top layer, a real focus trap, and a page
+  behind it that is inert. Above 600px it opens with `show()`, because a non-modal dialog is a plain
+  positioned box and that is what a standard side sheet beside a live map has to be. `syncPane()` in
+  `js/map.js` picks. **A `<div>` styled to look full-screen looks identical and is not the same
+  thing**, and this app drew it that way for one revision. Four dialogs open OVER this one, and only
+  the top layer lets them.
+- **`show()` runs the dialog focusing steps too, and on a desktop that is wrong.** Landing opens the
+  filters, and the pane then takes focus into the district filter box before a reader has touched
+  anything. `syncPane()` restores the previous `activeElement` in that branch alone. A modal
+  full-screen dialog MUST take focus, so the other branch leaves it. `#pane` carries `autofocus`
+  and `tabindex="-1"` for that case: without them the dialog focuses its first focusable descendant,
+  which drew a focus ring on the station card's ⋮ every time the pane opened.
+- **A dialog's `close` event is fired ASYNCHRONOUSLY, so a flag set around `close()` cannot guard
+  it.** The spec queues the event as an element task rather than firing it inside the call. A boolean
+  set before `close()` and cleared after is therefore already back to false when the handler runs.
+  Measured on the mode swap that crosses 600px: the event from one close landed AFTER the next open,
+  so the handler cleared a body class the pane was open for, and **the pane never opened again for
+  the rest of the session**. The listener in `js/map.js` tests `pane.open` instead. That cannot lie:
+  it is false only when the element is genuinely shut, and that is the one case that clears the
+  classes. **A headless check cannot wait for that event with a timer either.** Virtual time
+  fast-forwards a `setTimeout` past a queued task, and a 300ms wait resolved before the event was
+  delivered. `m3-check.html` awaits the `close` event itself.
+- **`syncPane()` runs from a `MutationObserver` on the body class, so the open is one microtask
+  behind the class that asks for it.** Four functions write those classes — `setDrawer()`,
+  `openSide()`, `closeSide()` and the breakpoint listener in ui.js. Watching the fact beats
+  remembering four calls. Anything that asserts on the pane has to wait a tick first.
+- **A module that wires an element at import time makes every test page carry that element.**
+  `js/map.js` reaches `#pane` and `#map` at module scope, and `heat-test.html` imports it for the
+  heat layer alone. A missing element is a `TypeError` at import time, and then nothing on that page
+  runs at all. That page already stubbed `#sideClose` for the same reason. Add the stub rather than
+  guard the wiring: a `if (pane)` in `map.js` hides a genuinely missing element in the app.
+- **The compact variant puts the close X on the LEADING edge, which is the opposite of the side
+  sheet it is at every other width.** M3's full-screen dialog anatomy is close, then headline, then
+  the trailing actions. `order: -1` on the button rather than `row-reverse` on the row: reversing
+  puts the trailing actions between the X and the title. **One number holds every full-screen app bar
+  in this app, and it is 8px to the close button.** `#barHead` needs `margin: 0 -6px 4px` to reach
+  it, because `#bar` carries 6px of its own — the same cancel `.docbox .modalhead .dclose` and
+  `.dtop .modalhead .dclose` already do.
+- **The bottom sheet is gone again, and the reversal is the entry.** The two panels were modal bottom
+  sheets for one revision, on the argument that a panel reporting on the map behind it has to keep
+  that map in view. **That argument describes a sheet somebody opens over content they are still
+  reading. It does not describe a pane.** A pane is a destination, and in a compact window it is the
+  only thing on screen. So `#scrim`, the `.grab` handle on both panels and `swipeSheet()` on the
+  pane are all deleted. `#paintmenu` is the last bottom sheet in this app and keeps its handle and
+  its swipe.
+- **The map is a pane, so Leaflet has to be told when its box changes.** `#map` is
+  `inset: var(--hdr) var(--pane-w) 0 0`, and `--pane-w` is the supporting pane's width while that
+  pane is open. So the map narrows rather than being covered. Leaflet listens to `window.resize` and
+  to nothing else. Without a second signal it keeps its old size: the tiles stop where the old edge
+  was, and every `latLngToContainerPoint` answers for a container that is no longer there. A
+  `ResizeObserver` on `#map` in `js/map.js` answers it, coalesced on a frame. **An observer and not a
+  call at each site.** The pane is one cause of a resize. The window, the breakpoint and a rotate are
+  others, and the observer catches every one with no call site to remember. `invalidateSize()` keeps
+  the CENTRE by default, which is what a narrowing map wants. Measured at 711 stations: one call
+  costs under a millisecond, so there is nothing to throttle beyond the frame.
+- **`--pane-w` does NOT transition, and that is a decision.** The map snaps to its new width in one
+  frame and the pane travels in beside it, which is what an adaptive layout does. Animating the width
+  makes Leaflet resize on every frame of the travel. It also leaves the strip revealed on the way out
+  empty for the whole 300ms. The strip the pane travels over is `--surface`, the same tone as the
+  pane, so an opening pane reads as its content sliding in. A closing one slides off a map that is
+  already full width.
+- **`--pane-w` is 0 at every state below 600px.** There the pane is a full-screen destination over
+  the map, which takes no width from it. `m3-check.html` asserts the map keeps its whole width at
+  that breakpoint. A `--pane-w` fed a phone value shortens the map for a surface that never sits
+  beside it.
+- **Three boxes step aside for the pane and the zoom control must not.** Leaflet's own controls live
+  INSIDE the map container, and that container now stops at the pane, so they follow it for
+  free. `#toast`, `#credit` and `#paint` are siblings of `#map` and position against the window, so
+  each adds `--pane-w` to its own `right`. `#pills` takes half of it off its centre line.
+  **`right`, not a transform**, which is what the old rule used: `#toast` already owns its
+  `transform` for the slide it opens with, and two rules writing one property is how a toast arrives
+  360px off the edge it belongs to.
+- **`focusOn()` carries no offset any more. Do not put one back.** It compensated for a
+  drawer covering the leading strip and a station panel covering the trailing one. The map's own box
+  ends at the pane now, so the container IS the visible strip. `setDrawer()`'s `map.panBy()` went the
+  same way, and the `map` import in `js/ui.js` went with it.
+- **One pane, one occupant, at EVERY width.** `#bar` and `#side` had a rail each on opposite edges
+  and stood side by side above 600px. They are two occupants of one box now, so a second one
+  opening replaces the first. `setDrawer(true)` calls `closeSide()`, and the `sideopen` event calls
+  `setDrawer(false)`. Both were phone-only tests before. Neither remembers the close, so a desktop
+  preference for an open drawer survives the station card that replaced it.
+- **The pane animates and its occupants do not.** One box moves, so switching the station card for
+  the filters swaps the content of a container already in place. Each panel carried its own travel
+  while each had its own box, and that switch drew two sheets sliding through each other.
+  **A keyframe on `[open]`, not a transition.** `show()` and `showModal()` both flip `display`, so
+  there is no closed state left to transition from. That is the shape the four other dialogs use. It
+  buys an enter and no exit. `m3-check.html` asserts an occupant's `animation-name` is `none`.
+- **`#pane` is not `class="surface"`.** That class pairs the background with `--shadow`, and a
+  standard side sheet has no elevation — the 1px line is what separates it. The full-screen variant
+  has none either, because it covers the screen and there is nothing to lift it off.
+  **A `<dialog>` also arrives with ten UA declarations to answer.** They are `position: absolute`,
+  `margin: auto`, a solid border, `1em` of padding, its own colours, and a cap of
+  `calc(100% - 6px - 2em)` on both axes. `#pane` states every one of them.
+- **A header written as a row in the flow needs a height before anything pins it. About and Help
+  shipped without one.** `.modalhead` sized to its own title and pulled its close button back onto that
+  line with `margin: -8px -10px -8px 0`. That is correct for a row the content flows past. Pinning
+  it made it a bar with a divider under it, and the vertical half of that pull then hung the 40px
+  button through the divider. Measured: About drew a **24px bar under a 38px button**, and Help a
+  35px one. **Both read as a browser artifact and are a number written for another layout.**
+  `.docbox .modalhead` takes `min-height: 56px` now, which is the number the phone block below it
+  already stated and is M3's top app bar. The pull survives on the inline edge alone, which is the
+  half that puts the button's hit area on the pane's own padding. `m3-check.html` opens each pane and
+  asserts the button stays inside the bar at both ends.
+- **`.pophead` is the station card's first element, so no rule can key on `#sideBody > .sensor:first-child`.**
+  That rule cancelled the first section's top rule against `.pophead`'s bottom rule, and its own
+  comment warned against a sibling selector for exactly this reason. It then keyed on position, which
+  is the same fault by another name. The moment `openSide()` began lifting three pieces out of
+  `.pophead` rather than the whole element, `.pophead` became the body's first child and the rule
+  stopped matching. Both rules drew, 8px apart, directly under the title. **A section is an M3 filled
+  card now, so neither rule exists.** Cards separate by surface and by an 8px gap. The rule is gone
+  rather than re-keyed: `#sideBody > .pophead + .sensor` would work today and break the next time the
+  head moves.
+- **`--hover` is this app's container tone, and an M3 filled card takes it.** M3's filled card wants
+  `surface-container-highest`. This app holds one surface tone in `css/base.css` and the palette rule
+  keeps M3's colour roles out of it, so the container is the one step off `--surface` that already
+  exists here — the same tone `.chip:hover` and `.wxcol` take. **A cell inside a filled card steps
+  back to `--surface`**, or the two containers read as one flat block. `.sensor .wxcol` does that,
+  and it reaches both surfaces that draw a `.wxcol`: the station card's weather section, and the
+  weather panel's half-hour stack. **`sflash` ends on `--hover`, never `transparent`.** The section
+  used to have no background, so fading to nothing was right. Fading to nothing now erases the card
+  the flash is drawn on.
+- **A place name is capitals from JPS and Title Case from the national portal, so a title has to pick
+  one.** `titleCase()` in `js/util.js` is the one place that picks. **CSS cannot do it**:
+  `text-transform: capitalize` raises a first letter and leaves the rest of the word alone, so
+  capitals stay capitals. Three tests find an acronym. The live payload supplied the evidence for each one.
+  A token holding a digit is a code (`F2`, `B27`, `FT29`, `BT.14`). A stop INSIDE a token marks an
+  acronym written with stops (`T.K.P.M`, `S.J.K.C`). A token with no vowel is an acronym written
+  without them (`SMK`, `KTM`, `LRT`, `TNB`, `PWTC`). **Eight Malay place words are the exception, and
+  the data is why.** They abbreviate a word rather than initial a name, the portal's own Title Case
+  rows already write them `Kg.` and `Sg.`, and `KG` and `SG` alone are **316 of the 380 vowel-less
+  tokens** in the payload. A first pass splits `SG.PELEK`, which JPS writes run together and
+  elsewhere writes apart. Left whole, the stop inside it reads as an acronym and the name stays in
+  capitals. **Three names of 630 come out wrong and no rule here can see them.** They are `USJ`,
+  `REM` and `PRAB` — acronyms that hold a vowel. A list of them is a list somebody maintains. It buys one word of one
+  station name. Three surfaces call it, and all three draw a name as a TITLE: the
+  station card (`goName()`), the weather card (`js/wx.js`) and the table's hover panel. **A row in a
+  list is not a title and does not call it.**
 - **`render()` refreshes the open card in place, so `openSide()` must stay idempotent.** It runs on
   every poll for the site currently on screen. It resets `scrollTop` **only** when the key changes.
   Otherwise a poll throws you back to the top of a card you read. Anything stateful
@@ -925,22 +1175,60 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
   "you are here" card was hit hardest. The `js/locate.js` module draws an accuracy circle. `L.Path`
   bubbles its clicks to the map where `L.Marker` does not (`bubblingMouseEvents: false`). So at a
   coarse fix most of the viewport closed it. `render()` no longer closes it either when the site
-  leaves `sites`. The ways out are the ×, a dialog taking the screen, ⋮ → ignore, a switch of the
-  map layer, and two gestures at phone width. About and the table are the dialogs, and both call
+  leaves `sites`. The ways out are the ×, a dialog taking the screen, ⋮ → ignore, and two gestures
+  at phone width. About and the table are the dialogs, and both call
   `closeSide()` in ui.js. The two
-  gestures are the ones a modal drawer owes a reader. They are a swipe toward the right edge, and a
-  tap on `#scrim`. **Do not add another without a reason that survives
-  "it vanished while I was reading it".** The last three carry theirs. The two gestures exist only
-  below 600px,
-  where the panel takes 84vw and there is nothing behind it left to read. The scrim is a real box
-  over the map, rather than a map click. So no pan, no marker and no accuracy circle can fire it.
-  **The layer switch carries the strongest reason of the five.** It takes the thing the card
-  describes off the map. A station card over a weather map names a pin that is not drawn, and a
-  weather card over the station map names a point that is not either. Neither can refresh: `render()`
-  skips a site that has left `sites`, and `tick()` in wx.js runs only while weather draws. It is a
-  press the reader made, on a control beside the panel. The listener sits on the two radios in
-  `ui.js` rather than inside either handler. Stations shares a handler with the four boxes under it,
-  and Weather has its own that awaits a deferred module. One rule does not get two copies.
+  gestures are the ones a modal sheet owes a reader. Below 600px the pane is an **M3 modal bottom
+  sheet**, so it has three ways out and all three are that component's own: a tap on `#scrim`, a
+  drag down on the handle, and Escape, which is also what the Android back gesture fires.
+  **The filters are a fourth way out and they are meant to be.** One pane holds one occupant, so
+  pressing the hamburger replaces the card rather than dismissing it. That is a swap and not a
+  dismissal, which is why it does not breach the rule above.
+  It spent one revision as a full-screen dialog, which has no scrim and no drag, and the scrim and
+  the swipe were deleted for it. Both are back.
+  **Do not add another without a reason that survives
+  "it vanished while I was reading it".** The last three carry theirs.
+  **The layer switch was a fifth way out and it is not one any more.** It closed the card, on the
+  argument that a switch takes the thing the card describes off the map. The premise is true and the
+  conclusion was wrong. Both layers answer about one place. So a reader on a station card who
+  presses Weather asks for the weather at that place. Closing takes the place away too.
+  **The card hands over instead**, and `carry()` in `js/ui.js` is the one door. A station card hands
+  to the nowcast point it already named, through `met.at`. `api.php` attaches a station to its
+  nearest point and publishes that point name. So the match is the point the reader already read,
+  and not a second guess at it. Measured 2026-08-20: all 675 stations carrying `met` name
+  one of the 50 points `?wx=1` publishes. A weather card hands back to the nearest station of any
+  kind. `flashTo()` does it, and that is the one door to a station card here.
+  **Both directions move the map, and the first version moved it on one.** `flashTo()` carries the
+  move and the ripple already. The weather side swapped the panel over a map standing still, which a
+  reader read as nothing having happened. So `carry()` makes the two moves a weather pin makes on a
+  click, `openSide()` then `focusOn()`, and adds the same ripple. The ripple carries the point name,
+  because the zoom can thin the pin under it away. **A headless probe cannot check this half.**
+  Leaflet pans with a transform and `requestAnimationFrame`, and virtual time does not run that
+  faithfully. Two runs reported the centre on the point and then short of it, with no code change
+  between. Record the `focusOn()` call, never the rendered position. **The hand-over is not
+  an inverse and nothing here makes it one.** KG. KUNDANG names the Banting point at 14.7 km, and the
+  nearest station to that point is SIREN PEKAN BANTING. Both steps are right.
+  **The alert list is the one occupant that still closes.** It is a directory of stations, and a
+  weather map has no answer to carry it to. A card with no answer at all closes too. That is the old
+  rule, kept for the case it was right about. That covers a station with no `met`, a point with no
+  station, and a failed import.
+  **`carry()` is one function with two call sites, and `pts` is the reason.** The weather direction
+  cannot answer until `?wx=1` has landed. So it runs at the tail of `wxLayer`'s own handler, after
+  the `tick()` that handler already awaits. The preference guards it, so a rolled-back import closes
+  nothing. The Stations direction starts in weather mode. The points are already in hand
+  there, so a listener on that radio is enough. `carry()` in `js/wx.js` holds both directions,
+  because it is the module that holds the points.
+  **The "Your Location" card answers on both layers, so it swaps rather than hands over.**
+  `showHere()` in `js/locate.js` owns both forms and `carry()` just calls it. On `weather` it is the
+  card a weather pin opens, over the MET point nearest the fix. `hereCard()` in `js/wx.js` builds
+  it, behind a dynamic import that costs no request. Weather mode is the only way to that branch,
+  and it is what loaded the module. **Do not put the two-cell `metSection()` back there.** A weather map opens the whole forecast on
+  every pin. A summary of that forecast beside it is one fact in two sizes. The
+  head keeps its title and its glyph and swaps its muted line for `<point> · <km>`. Which MET point
+  answered is the one fact that card cannot get anywhere else. `hereCard()` answers nothing past
+  `NEAR_MAX_KM`. `herePopup()` then draws the head and the line `No weather within 10 km`. That
+  is one message in one place, whichever half did not answer. `tick()` rebuilds the card on the poll under the
+  `@here` key. That is the way it already rebuilds an open `@wx-` one.
 - **The alert list is a tenant of `#side`, under the key `@alerts`.** It is not a panel of its own
   any more. So there is nothing to place, slide past the drawer or collapse on a phone. A
   station picked out of the list *replaces* the list. That is why nothing binds the rows any more.
@@ -2168,9 +2456,28 @@ it. The weather section stretches nothing. It is five fixed keys measuring 231px
   from that endpoint is the moment to check it by hand.
 - **Material Design 3 is the reference for every UI decision.** Where M3 names a component, take its
   behaviour from the spec instead of inventing one. A reader already knows the platform convention,
-  and a hand-made control costs them that knowledge. The modal drawer is the worked example. Both
-  panels dismiss on a tap on `#scrim`, or on a swipe toward the edge they are anchored to. The edge
-  tab that did the job before is gone. This does **not** override the two rules below it. The colour
+  and a hand-made control costs them that knowledge. **Transcribe the component rather than
+  approximate it.** The M3 Expressive component set is the reference this app reads:
+  https://github.com/bczak/m3you/tree/development/src/components — plain CSS files, each citing its
+  own page on m3.material.io. Every number this app takes from M3 comes out of one of them, so it
+  can be grepped against a real file rather than eyeballed. `css/base.css` carries M3's shape,
+  elevation and motion tokens under their own names for the same reason.
+  **Three components, six variants, and each surface declares which it is.** Dialogs are full-screen
+  or basic. Sheets are side or bottom. `m3-check.html` holds the roll call.
+  **The window is M3's supporting-pane canonical layout**, and the numbers come from that page:
+  https://m3.material.io/foundations/layout/canonical-examples/supporting-pane
+  `#map` is the main pane and `#pane` is the supporting one. `#pane` holds one of three occupants at
+  a time: the station card, the weather card and the filters.
+  **Medium splits the window equally. Expanded gives 70% to the main pane and 30% to the supporting
+  one**, and the two bands above expanded keep that ratio. `--pane` carries it.
+  **In a compact window the supporting pane is a full-screen destination.** That is what
+  `SupportingPaneScaffold` does in the Compose adaptive library, and it is why `#pane` is a
+  `<dialog>`: `showModal()` below 600px, `show()` above it.
+  The load-bearing half is that M3 answers questions this app would otherwise invent answers to.
+  A full-screen dialog covers the screen, carries 0dp corners and elevation 0, has no scrim, and
+  puts a close X on the leading edge of a 56dp app bar with the headline after it. So the swipe and
+  the scrim went, the drawer gained a header, and the station panel's × changed edges. The edge tab
+  that did the job before all this is gone too. This does **not** override the two rules below it. The colour
   language here is a status language. So M3's tonal palette never gets to paint a station kind.
   The writing standard still governs every word on screen. Where the spec and this file disagree,
   this file wins and the disagreement is written down.
@@ -2236,8 +2543,25 @@ it. The weather section stretches nothing. It is five fixed keys measuring 231px
   `'stations'`, in `flashTo()` and in the failed-import rollback. A reader leaving a weather map
   wants the map back. `syncWx()` no longer writes the weather box: `render()` writes both layer
   boxes, so the pair has one writer.
+  **Below 600px `#paintmenu` is an M3 modal bottom sheet, not a menu beside its button.** It is a
+  panel of settings a reader opens while looking at the map, so it belongs on the edge the thumb is
+  already at. The numbers come from the M3 Expressive component set's `BottomSheet/bottom-sheet.css`:
+  28dp on the two TOP corners, `min(640px, calc(100% - 32px))` centred, `calc(100dvh - 72px)` tall
+  at most, a 48dp handle row holding a 32 by 4px indicator, and a 32% scrim. It travels up from the
+  bottom edge on `--m3-travel`, the same 300ms a full-screen dialog takes.
+  **The sheet does not reach the side edges**, which is the reference's own shape and the reason
+  only the top corners are rounded.
+  **The handle is drawn AND the swipe is wired**, in `js/ui.js`. A handle over a gesture nobody
+  implemented is a promise the panel does not keep. The drag is refused while the sheet is scrolled
+  away from its top, because a downward drag shares its axis with the sheet's own scroll.
+  M3's 24px inline body padding is declined for the same reason the four dialogs decline their own:
+  every row here is a `.chip` carrying 14px of its own, and stacking the two puts a label 38px inside
+  its sheet. The 24px at the bottom is taken, where a phone's gesture bar sits.
+  **`js/ui.js` must CLEAR its placement at this width rather than skip it.** An inline `left` or
+  `bottom` beats the sheet's own rule, so a menu placed on a wide screen and then rotated to a narrow
+  one would stay pinned beside a button it no longer opens from.
   **A menu takes the edge it opens FROM as the edge that pins it**, `bottom` upward and `top`
-  downward — see the placement handler in `js/ui.js`. `#paintmenu` changes height on a press, and the
+  downward — see the placement handler in `js/ui.js`. That is the wide layout, and it is unchanged. `#paintmenu` changes height on a press, and the
   far edge pinned it off the button that opened it. The branch collapse is a grid row between `0fr`
   and `1fr`. `interpolate-size` with `height: auto` came first and does not come back.
   **A collapsed branch stays out of the panel's scroll height through `contain: layout`, not through
@@ -2650,7 +2974,7 @@ foreach($r as $s){$la=(float)$s["latitude"];$ln=(float)$s["longitude"];if(!$la)c
 $b=null;$bd=1e9;foreach($non as $n){$d=$km($la,$ln,$n["lat"],$n["lng"]);if($d<$bd){$bd=$d;$b=$n;}}
 printf("%-5d %-28s %6.0f m  %-30s %s\n",$s["stationId"],$s["stationName"],$bd*1000,$b["name"],$b["district"]);}'
 
-php shots-test.php            # one of six runnable checks. Guards camera retention. Must stay green.
+php shots-test.php            # one of seven runnable checks. Guards camera retention. Must stay green.
 php api.php --selftest       # another. Guards the force-refresh rate limit, cache choice, and the
                               # place-lookup validator/rate limit. Must stay green.
 curl -sk "https://flood-exp.test/api.php?shots=1"                          # frame timestamps
@@ -2792,6 +3116,16 @@ printf("rows: %d, points: %d, newest: %s\n",
   --ignore-certificate-errors --virtual-time-budget=40000 --window-size=1600,1000 --dump-dom \
   https://flood-exp.test/paint-check.html | perl -0777 -ne 'print $1 if /<pre id="out">(.*?)<\/pre>/s'
 
+# The six M3 full-screen dialogs below 600px: the drawer, the station panel, the table, the camera
+# wall, About and Help. Loads the app twice, at 360px and at 1200px. Four faults here put nothing
+# wrong on screen. A sticky header with `top: 0` pins at the scroller's PADDING edge and holds the
+# bar 18 or 20px down. A headline drifting off M3's 56dp is invisible on any one pane. A rule
+# written outside the media query moves the desktop, where nothing is meant to move. And a variant
+# with no scrim has to keep a way out, which is now the close X and Escape alone. Reads PASS.
+"/c/Program Files/Google/Chrome/Application/chrome.exe" --headless=new --disable-gpu \
+  --ignore-certificate-errors --virtual-time-budget=40000 --window-size=1600,1000 --dump-dom \
+  https://flood-exp.test/m3-check.html | perl -0777 -ne 'print $1 if /<pre id="out">(.*?)<\/pre>/s'
+
 # The app bar wordmark ladder, in rendered pixels. Loads the app in an iframe at fifteen widths and
 # asserts one spelling at a time, never wider than its rail, and never a longer spelling on a
 # narrower rail. Both faults here are invisible: an overflowing spelling hides under the ellipsis,
@@ -2918,6 +3252,32 @@ php -r '$p=json_decode(file_get_contents(".cache.json"),true);
 foreach($p["stations"] as $s) if($s["kind"]==="river"&&($s["status"]??0)>=3&&!empty($s["rising"]))
   printf("%-8s %-26s at danger AND rising\n",$s["id"],$s["name"]);'
 
+# titleCase() in js/util.js, the one rule that turns a JPS name into a title. It has three tests for
+# an acronym and one exception list, and every one of them was measured against the live payload. A
+# wrong branch here does not throw. It lowercases an acronym, or leaves a whole name in capitals.
+# The module is read as it ships, so no copy can drift from what runs.
+node --input-type=module -e "
+import fs from 'fs';
+const M = new Function(fs.readFileSync('js/util.js','utf8')
+  .match(/const ABBR[\s\S]*?cap\(w\)\);/)[0].replace(/export /g,'') + '; return titleCase;')();
+let bad = 0; const is=(g,w,n)=>{const ok=g===w; if(!ok)bad++;
+  console.log((ok?'ok  ':'FAIL')+'  '+n+'  -> '+JSON.stringify(g)+(ok?'':'  want '+JSON.stringify(w)));};
+is(M('BATU 9, HULU LANGAT'),'Batu 9, Hulu Langat','plain capitals');
+is(M('T.T.D.I JAYA, SHAH ALAM'),'T.T.D.I Jaya, Shah Alam','an acronym written with stops is kept');
+is(M('SMK SRI AMAN PURI (F2)'),'SMK Sri Aman Puri (F2)','a vowel-less acronym is kept');
+is(M('KG. SG. SELISIK'),'Kg. Sg. Selisik','the eight Malay abbreviations lower');
+is(M('Pintu Air SG.PELEK'),'Pintu Air Sg. Pelek','and split when JPS runs one together');
+is(M('Sg. Midah Di Lebuhraya KL-Seremban'),'Sg. Midah Di Lebuhraya KL-Seremban','a hyphen is a boundary');
+is(M('P/A KG. BARU HICOM (F2)'),'P/A Kg. Baru Hicom (F2)','a slash is one too');
+is(M('LN B27 RAWANG'),'LN B27 Rawang','a token holding a digit is a code');
+is(M(null),'','null is empty, never the word null');
+// No name may lose or gain a character. The one pass that inserts a space is the SG.PELEK split, so
+// the comparison ignores whitespace.
+const names = JSON.parse(fs.readFileSync('.cache.json','utf8')).stations.map(s=>s.name);
+is(names.filter(n => M(n).replace(/\s/g,'').length !== n.replace(/\s/g,'').length).length, 0,
+   'no name loses or gains a character');
+console.log(bad?'FAILURES: '+bad:'all pass'); process.exit(bad?1:0);"
+
 # Every module must carry a modulepreload link, except the six loaded on demand. There is no build
 # step to generate that list, so it goes stale silently when somebody adds a module.
 for f in js/*.js; do
@@ -2930,8 +3290,8 @@ There is otherwise no test suite. Changes are verified four ways. Lint the PHP. 
 the data shape being relied on. Then look at the page.
 
 `shots-test.php`, `php api.php --selftest`, `heat-test.html`, `title-test.html`,
-`narrow-test.html` and `paint-check.html` are the six runnable checks here, and each guards a
-different risk.
+`narrow-test.html`, `paint-check.html` and `m3-check.html` are the seven runnable checks here, and
+each guards a different risk.
 
 `shots-test.php` is deliberately narrow: retention is the only rule in this repo that can *quietly
 destroy* data. Everything else either works or visibly does not. A prune that buckets a frame
@@ -3047,7 +3407,42 @@ broken. That happened here.
 reports nothing at all when it hangs, and this one hung. The page sat on `running...` with no way to
 tell how far it got. The whole body is in a `try` for the same reason.
 
+**It drives the real touch path for the bottom sheet, both ways.** Below 600px `#paintmenu` draws a
+drag handle, and the check dispatches a real `TouchEvent` run past the threshold and a second one
+short of it. A handle over a gesture nobody wired up is a promise the panel does not keep, and a
+sheet that shuts on any downward twitch is unusable while somebody reads it. It also asserts that
+the release leaves no inline `translate` behind, or the sheet stays parked where the finger left it.
+
+**Motion is read before the override, and geometry after it.** The check switches transitions and
+animations off to measure a settled layout, and `getComputedStyle` then reports the override rather
+than the rule. `m3-check.html` states the same rule from its own experience.
+
 **It measures the corner rather than trusts an estimate of it.** A first revision pushed `#pills`
 down 48px to clear the button, on a guess at `#risebadge`'s width. Measured, that pill is 180px and
 clears on its own. The rule went and the measurement stayed, and it prints the clearance so a wider
 pill fails here rather than on somebody's phone.
+
+`m3-check.html` guards the six M3 full-screen dialogs below 600px. It is the same class of problem
+as `paint-check.html`: rendered pixels, and no query over the source can state one of them.
+
+Four faults here put nothing wrong on screen and three of them shipped during the work.
+
+**A sticky header pins to the scroller's PADDING box.** So `top: 0` holds the bar 18 or 20px down
+and the content scrolls through the gap above it. That reads as a browser artifact rather than as a
+wrong number, and it happened in two panes.
+
+**The headline starts on M3's 56dp across five panes built from four different paddings.** Drift
+there is invisible on any one pane. It only shows when two stand side by side, which is the one
+thing a reader never does.
+
+**A rule written outside the media query moves the desktop**, where nothing here is meant to move.
+So the check loads the app a second time at 1200px and reads the wide layout back: the 288px rail,
+the 360px panel, the trailing ×, the two slide transforms and the four floating dialogs.
+
+**A variant with no scrim has to keep a way out.** The scrim tap and the swipe both went with the
+drawer they belonged to. So the check asserts the drawer has a close button at all, and drives a
+real Escape through the document to reach the handler the app registered.
+
+It reuses two rules the checks above it already state. Transitions are switched off in the frame
+before anything is measured. And geometry is read with the pane OPEN, because a closed dialog is
+`display: none` and every rect inside it reads zero.

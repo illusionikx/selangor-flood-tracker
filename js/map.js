@@ -30,6 +30,73 @@ export const map = L.map('map', { maxZoom: 18, attributionControl: false, zoomCo
   .setView(PREFS.center || [3.2, 101.4], PREFS.zoom || 9);
 L.control.zoom({ position: 'bottomright' }).addTo(map);
 
+/* --- the supporting pane --------------------------------------------------------------------- */
+
+/* **One `<dialog>`, two variants, and the window class picks the method.** M3's canonical
+   supporting-pane layout hides the supporting pane in a compact window and navigates to it as a
+   full-screen destination. So below 600px this opens with `showModal()`, which is the only way to
+   get the top layer, a real focus trap and an inert page behind it. Above 600px it opens with
+   `show()`: a non-modal dialog is a plain positioned box, which is what a standard side sheet
+   beside a live map has to be.
+   **A `MutationObserver` on the body class rather than a call at each site.** The pane is open when
+   one of its occupants is, and four functions write those classes — `setDrawer()`, `openSide()`,
+   `closeSide()` and the breakpoint listener in ui.js. Watching the fact beats remembering four
+   calls, which is the same argument the size observer below makes.
+   Crossing 600px with the pane open closes and reopens it under the other method. See the `close`
+   listener below for the trap that hides in those two lines. */
+const pane = el('pane'), narrow = matchMedia('(max-width: 600px)');
+let paneModal = false;
+
+function syncPane() {
+  const cls = document.body.classList;
+  const want = cls.contains('drawer') || cls.contains('side');
+  if (!want) { pane.close(); return; }
+  if (pane.open && paneModal === narrow.matches) return;
+  pane.close();
+  paneModal = narrow.matches;
+  if (paneModal) { pane.showModal(); return; }
+  /* **`show()` runs the dialog focusing steps too, and on a desktop that is wrong.** Landing opens
+     the filters, and the pane would take focus into the district filter box before a reader has
+     touched anything. A modal full-screen dialog SHOULD take focus, so only this branch puts it
+     back. */
+  const had = document.activeElement;
+  pane.show();
+  if (had && had !== document.body) had.focus({ preventScroll: true });
+}
+
+/* Escape and the Android back gesture both reach a modal dialog as `cancel`. Either way the element
+   closes itself, so the body classes have to follow or the observer reopens the pane on the next
+   class write with nothing having changed.
+   **`close` is fired asynchronously, and that is why this tests the element and not a flag.** The
+   spec queues the event as a task rather than firing it inside `close()`. A boolean set around the
+   call is therefore already back to false when the handler runs. Measured: the event from one close
+   landed AFTER the next open, so the handler cleared a class the pane was open for, and the pane
+   never opened again for the rest of the session. `pane.open` cannot lie about that. It is false
+   only when the element is genuinely shut, which is the one case that should clear the classes. */
+pane.addEventListener('close', () => {
+  if (!pane.open) document.body.classList.remove('drawer', 'side');
+});
+new MutationObserver(syncPane)
+  .observe(document.body, { attributes: true, attributeFilter: ['class'] });
+narrow.addEventListener('change', syncPane);
+
+/* **The map's box changes without the window changing, so Leaflet has to be told.** Opening the
+   supporting pane takes `--side` off the map's own width. Leaflet listens to `window.resize` and
+   nothing else, so without this it keeps its old size: the tiles stop where the old edge was and
+   every `latLngToContainerPoint` answers for a container that is no longer there.
+   A `ResizeObserver` rather than a call at each site. The pane is one cause of a resize and the
+   window, the breakpoint and a rotate are others, and an observer on the box catches every one with
+   no call site to remember. Coalesced on a frame, because the observer can fire more than once for
+   one change. `invalidateSize()` keeps the CENTRE by default, which is what a narrowing map wants:
+   whatever the reader was looking at stays in the middle of the strip that is left.
+   Measured at 711 stations: one call costs under a millisecond, so there is nothing here to
+   throttle beyond the frame. */
+let sized;
+new ResizeObserver(() => {
+  cancelAnimationFrame(sized);
+  sized = requestAnimationFrame(() => map.invalidateSize());
+}).observe(el('map'));
+
 map.on('moveend zoomend', () => {
   const c = map.getCenter();
   Object.assign(PREFS, { center: [+c.lat.toFixed(5), +c.lng.toFixed(5)], zoom: map.getZoom() });
@@ -261,7 +328,16 @@ export function openSide(key, html, mastAt) {
      is being split — so the split happens here, on the one element that is always its first child.
      A column of readings whose station name has scrolled off is unreadable, and a five-sensor mast
      runs several screens. */
-  el('sideHead').replaceChildren(...[body.querySelector('.pophead')].filter(Boolean));
+  /* **The card arrives as one string and three pieces of it move.** M3's side sheet header is a
+     title and its trailing actions, so that is what goes up: the place name, and the ⋮ with the
+     popover it targets. The region line and the sensor badges stay in `.pophead` where they were,
+     which now leads the body — M3 puts supporting content there, not in the header.
+     `.pophead` is still the seam and still the card's first element. Only the slice taken from it
+     changed. A card with no `.pophead` (or no name inside one) empties both slots rather than
+     leaving the last station's name over the next one's readings. */
+  const head = body.querySelector('.pophead');
+  el('sideTitle').replaceChildren(...[head?.querySelector('.popname')].filter(Boolean));
+  el('sideActions').replaceChildren(...(head ? head.querySelectorAll(':scope > .dots, :scope > .menu') : []));
   if (moved) body.scrollTop = 0;   // a refresh of the same station keeps your place in it
   /* Clicking a second pin swaps text inside a panel that does not move, and one card of readings
      looks much like the next — so the swap is announced with a short wipe. Only on a real change of
@@ -319,12 +395,13 @@ el('sideClose').onclick = closeSide;
 
 // Centre on the strip of map you can actually see: the drawer covers the left, the station panel
 // the right. Not on a phone, where the panel covers the map outright and there is no strip to aim at.
+/* **Centre it. Nothing else.** This carried an offset for as long as the panels overlapped the map:
+   the drawer covered a strip on the leading edge and the station panel one on the trailing edge, so
+   a station centred in the container drew underneath one of them. The map is a pane now and its
+   container ends where the supporting pane begins. The container IS the visible strip, so there is
+   nothing left to compensate for and both terms are gone. */
 export function focusOn(latlng, minZoom = 0) {
-  const z = Math.max(map.getZoom(), minZoom);
-  const cls = document.body.classList;
-  const shift = (cls.contains('drawer') ? el('bar').offsetWidth / 2 : 0)
-    - (cls.contains('side') && innerWidth > 600 ? el('side').offsetWidth / 2 : 0);
-  map.setView(map.unproject(map.project(L.latLng(latlng), z).subtract([shift, 0]), z), z);
+  map.setView(latlng, Math.max(map.getZoom(), minZoom));
 }
 
 // Fly to a station and ripple over it. If its layer is switched off, show it for the flash only —

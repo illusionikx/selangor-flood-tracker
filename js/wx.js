@@ -3,12 +3,12 @@
 // Loaded on demand. A reader who never opens weather mode loads none of this and fetches none of
 // its data. That is why the points ride ?wx=1 and not the payload every poll already carries.
 
-import { FEED_WX, WX_THIN_PX, WEATHER, wxSky, MET_NAME } from './config.js';
-import { PREFS } from './state.js';
-import { map, pinGlyph, openSide, side, focusOn } from './map.js';
+import { FEED_WX, WX_THIN_PX, WEATHER, wxSky, MET_NAME, NEAR_MAX_KM } from './config.js';
+import { state, PREFS } from './state.js';
+import { map, pinGlyph, openSide, side, focusOn, flashTo, ping } from './map.js';
 import { wxIcon, wxTone, stamp } from './popup.js';
 import { askJson } from './ask.js';
-import { el } from './util.js';
+import { el, distKm, titleCase } from './util.js';
 
 const layer = L.layerGroup();
 let pts = [];    // the last answer from ?wx=1
@@ -89,7 +89,7 @@ const stepCard = (rung, clock, now, sky, temp = '') => {
     </div>`;
 };
 
-function card(p) {
+function card(p, name = p.n, sub = MET_NAME) {
   /* The day's two ends, low then high, under the NOW badge on the step happening now. They had a
      card of their own above the stack, titled `Today`. That card carried one fact and took the
      height of a step, and a reader scanning the stack met it first. It is one day-scale number
@@ -114,7 +114,8 @@ function card(p) {
     ...p.rungs.slice(1).map((r, i) => stepCard(r, p.clocks[i + 1], false, p.sky)),
   ].join('');
 
-  /* `.pophead` first, always. openSide() lifts it out into #sideHead, and that seam is what keeps
+  /* `.pophead` first, always. openSide() splits it — the name goes up into the sheet's title and
+     the rest leads the body — and that seam is what keeps
      the place name off the scrolling body.
 
      `dots(p)` comes first inside it too. css/map.css reserves the ⋮'s corner with a rule that only
@@ -126,8 +127,8 @@ function card(p) {
      every line above the last one. */
   return `<div class="pophead">
       ${dots(p)}
-      <div class="popname">${p.n}</div>
-      <div class="muted">${MET_NAME}</div>
+      <div class="popname">${titleCase(name)}</div>
+      <div class="muted">${sub}</div>
     </div>
     <div class="sensor">
       <div class="sensorhead">
@@ -137,6 +138,60 @@ function card(p) {
       </div>
       <div class="wxsteps">${cards}</div>
     </div>`;
+}
+
+/* The same card, over the reader's own fix rather than over a pin they pressed. Weather is a
+   field, so the nearest point answers for the ground under them, and the card names which point
+   that is and how far off it stands.
+   `NEAR_MAX_KM` is the cap every "near this point" surface in this app already states. Past it the
+   nearest point is a claim about somewhere else. This returns '' there, and locate.js falls back to
+   the station card, which prints the one sentence that says so.
+   The head is `#locate.on`'s own glyph, so the title and the button that opened it agree. That is
+   the rule `herePopup()` states for the station-mode card. */
+export function hereCard(at) {
+  const p = pts.reduce((best, x) =>
+    !best || distKm(at, x) < distKm(at, best) ? x : best, null);
+  const km = p && distKm(at, p);
+  if (!p || km > NEAR_MAX_KM) return '';
+  return card(p, '<i class="i i-near_me" style="color:var(--me)"></i> Your Location',
+    `${p.n} · ${km.toFixed(1)} km`);
+}
+
+/* Carry the open card across a layer switch, rather than close it. The two layers answer the same
+   question about one place, so the reader who switches wants the other answer about that place.
+
+   Going to weather, the point is the one the station card already named. `api.php` attaches a
+   station to its nearest nowcast point and publishes the point's name as `met.at`. So a name match
+   is the point the reader was already reading about, and not a second guess at it. Measured
+   2026-08-20: all 675 stations carrying `met` name one of the 50 points `?wx=1` publishes.
+
+   Going back, the nearest station of any kind. `flashTo()` is the one door to a station card in
+   this app. It pins the target past every filter, so the card cannot open on a pin that is not
+   there, and it pings the pin so the reader sees which station answered.
+
+   `pts` has to be full before either direction can answer, which is why the weather side is called
+   at the tail of `wxLayer`'s handler and not from a listener beside it. Returning false is the one
+   case with no answer at all, and ui.js closes the card there. */
+export function carry(key) {
+  if (PREFS.mapLayer === 'weather') {
+    const s = state.data.find(x => (x.site || x.id) === key && x.met?.at);
+    const p = s && pts.find(q => q.n === s.met.at);
+    if (!p) return false;
+    /* The same three moves the point's own pin makes on a click, plus the ripple `flashTo()` draws
+       on the way back. Without them the panel swapped its contents over a map that had not moved,
+       and a reader who pressed a layer chip read that as nothing having happened. The ripple names
+       the point, because the pin under it can be one the zoom thinned away. */
+    openSide('@wx-' + p.id, card(p));
+    focusOn([p.lat, p.lng], 12);
+    ping([p.lat, p.lng], '', p.n);
+    return true;
+  }
+  const p = pts.find(x => '@wx-' + x.id === key);
+  const s = p && state.data.reduce((best, x) =>
+    x.lat && (!best || distKm(p, x) < distKm(p, best)) ? x : best, null);
+  if (!s) return false;
+  flashTo(s);
+  return true;
 }
 
 /* Reads the preference and writes the control and the layer. syncHeat() writes the summary now,
@@ -180,6 +235,15 @@ export async function tick() {
   if (side.key?.startsWith('@wx-')) {
     const p = pts.find(x => '@wx-' + x.id === side.key);
     if (p) openSide(side.key, card(p));
+  } else if (side.key === '@here' && state.hereAt) {
+    /* The location card is the second tenant that draws this forecast, so it refreshes on the same
+       poll. A panel frozen on the issue it opened with, beside pins that moved, is the fault the
+       offline-gauge rule already names. `openSide()` is idempotent and resets no scroll on an
+       unchanged key, so a reader mid-card keeps their place. An empty answer leaves the card alone:
+       the reader may have walked out of range, and a card that empties itself says less than the
+       one already on screen. */
+    const h = hereCard(state.hereAt);
+    if (h) openSide('@here', h);
   }
 }
 

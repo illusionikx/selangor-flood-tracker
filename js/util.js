@@ -50,6 +50,34 @@ export const num = (v, u) => (v === null || v === undefined) ? '—' : v + u;
 export const esc = s => String(s ?? '').replace(/[&<>"']/g,
   c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
+/* A place name as a title. JPS publishes one in capitals, and the national portal publishes the
+   same place in Title Case, so the payload already spells one station two ways and a title has to
+   pick one. `text-transform` cannot do this: `capitalize` raises a first letter and leaves the rest
+   of the word as it found it, so capitals stay capitals.
+
+   **An acronym is kept, and three tests find one, each measured against the live payload.**
+   A token holding a digit is a code rather than a word: `F2`, `B27`, `FT29`, `KM11`, `BT.14`.
+   A stop INSIDE a token marks an acronym written with stops: `T.K.P.M`, `S.J.K.C`, `J.P.S`.
+   A token with no vowel is an acronym written without them: `SMK`, `KTM`, `LRT`, `TNB`, `PWTC`.
+
+   **The exception is eight Malay place words, and the data is why they are the exception.** They
+   are abbreviations of a word rather than initials of a name, and the portal's own Title Case rows
+   already write them `Kg.` and `Sg.`. They are also most of what the vowel test catches: `KG` and
+   `SG` alone are 316 of the 380 vowel-less tokens in the payload. Measured 2026-08-20.
+
+   The first pass splits `SG.PELEK`, which JPS writes run together and elsewhere writes apart. Left
+   whole, the stop inside it reads as an acronym and the name stays in capitals.
+
+   Three names of 630 come out wrong, all the same shape: an acronym that holds a vowel, so no test
+   here can see it. They are `USJ`, `REM` and `PRAB`. A list of them is a list somebody maintains,
+   and the cost of being wrong is one word of a station name in Title Case. */
+const ABBR = /^(KG|SG|JLN|BT|TMN|TG|BKT|KM)\.?$/i;
+const acronym = w => /\d/.test(w) || /\.\S/.test(w) || !/[AEIOU]/i.test(w);
+const cap = w => w[0].toUpperCase() + w.slice(1).toLowerCase();
+export const titleCase = s => String(s ?? '')
+  .replace(/\b(KG|SG|JLN|BT|TMN|TG|BKT|KM)\.(?=[A-Za-z])/gi, '$1. ')
+  .replace(/[^\s,\/()-]+/g, w => acronym(w) && !ABBR.test(w) ? w : cap(w));
+
 export const parseMY = t => {                // "21/07/2026 17:45:00" → Date
   const m = /^(\d\d)\/(\d\d)\/(\d{4}) (\d\d):(\d\d)/.exec(t || '');
   return m ? new Date(m[3], m[2] - 1, m[1], m[4], m[5]) : null;

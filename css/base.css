@@ -6,11 +6,67 @@
   --surface: #fff; --on-surface: #1f1f1f; --muted: #5f6368; --outline: #dadce0;
   --hover: #f1f3f4; --accent: #1a73e8;
   --shadow: 0 1px 2px rgba(60,64,67,.3), 0 2px 6px 2px rgba(60,64,67,.15);
-  --drawer: 288px; --slide: .25s cubic-bezier(.4, 0, .2, 1);
-  /* The station panel's width, in a token because three other pieces of map furniture step aside by
-     exactly this much when it opens. Wide enough for a camera still, which is what set the old
-     popup's 440px — the panel is a fixed column, so everything else has to live beside it. */
-  --side: 360px;
+  --slide: .25s cubic-bezier(.4, 0, .2, 1);
+
+  /* --- M3 system tokens ----------------------------------------------------------------------
+     **Copied verbatim from the M3 Expressive token set, names included.** Anything here can be
+     grepped straight against the reference, so a component written against these is checkable
+     rather than eyeballed. This app used to restate M3's numbers inline, and a number restated is a
+     number that drifts.
+       https://github.com/bczak/m3you/tree/development/src/styles/tokens
+
+     **Only shape, elevation and motion are taken.** Those three are pure spec constants with no
+     colour in them. M3's own colour roles are NOT adopted: the palette rule in CLAUDE.md reserves
+     this app's hues for station status, and a tonal role that paints a station kind breaks it. Any
+     component below that names `surface-container-low` or `outline-variant` resolves to this app's
+     own `--surface` and `--outline` instead, and says so where it does.
+
+     `--shadow` is left alone and is elevation 2 with a tinted black rather than a pure one. It
+     predates this block and every surface in the app already carries it. */
+  --md-sys-shape-corner-none: 0px;
+  --md-sys-shape-corner-extra-small: 4px;
+  --md-sys-shape-corner-small: 8px;
+  --md-sys-shape-corner-medium: 12px;
+  --md-sys-shape-corner-large: 16px;
+  --md-sys-shape-corner-large-increased: 20px;
+  --md-sys-shape-corner-extra-large: 28px;
+  --md-sys-shape-corner-extra-large-increased: 32px;
+  --md-sys-shape-corner-extra-extra-large: 48px;
+  --md-sys-shape-corner-full: 9999px;
+
+  --md-sys-elevation-0: none;
+  --md-sys-elevation-1: 0px 1px 2px 0px rgba(0, 0, 0, .3), 0px 1px 3px 1px rgba(0, 0, 0, .15);
+  --md-sys-elevation-2: 0px 1px 2px 0px rgba(0, 0, 0, .3), 0px 2px 6px 2px rgba(0, 0, 0, .15);
+  --md-sys-elevation-3: 0px 1px 3px 0px rgba(0, 0, 0, .3), 0px 4px 8px 3px rgba(0, 0, 0, .15);
+
+  --md-sys-motion-duration-extra-short2: 100ms;
+  --md-sys-motion-duration-extra-short4: 200ms;
+  --md-sys-motion-duration-short2: 300ms;
+  --md-sys-motion-duration-short4: 400ms;
+  --md-sys-motion-easing-standard: cubic-bezier(0.2, 0, 0, 1);
+  --md-sys-motion-easing-emphasized: cubic-bezier(0.2, 0, 0, 1);
+  --md-sys-motion-easing-emphasized-decelerate: cubic-bezier(0.05, 0.7, 0.1, 1);
+  --md-sys-motion-easing-emphasized-accelerate: cubic-bezier(0.3, 0, 0.8, 0.15);
+
+  /* The two pairs the components below actually reach for, built FROM the tokens above rather than
+     restating their values. **Named for what the surface DOES, not for one component that does it.**
+     `--m3-travel` moves in from an edge: the side sheet, the bottom sheet and the full-screen dialog
+     all take it. `--m3-grow` grows in place, which is the basic dialog. */
+  --m3-travel: var(--md-sys-motion-duration-short2) var(--md-sys-motion-easing-emphasized);
+  --m3-grow: var(--md-sys-motion-duration-extra-short4) var(--md-sys-motion-easing-standard);
+  /* **The supporting pane's width is a RATIO of the window, and M3's canonical layout sets it.**
+     https://m3.material.io/foundations/layout/canonical-examples/supporting-pane
+     Medium splits the space equally. Expanded gives 70% to the main pane and 30% to the supporting
+     one. The bands are M3's own window size classes and `css/chrome.css` carries the two overrides.
+     It is one ratio for all three occupants — the station card, the weather card and the filters.
+     A pane that resized as its content swapped would reflow the map beside it on every switch. The
+     filters were a 288px rail of their own before the pane held them.
+     `--pane-w` is how much of the window that pane is taking RIGHT NOW. It is 0 while the pane is
+     shut, and it stays 0 at every state below 600px, where the pane is a full-screen dialog over the
+     map and takes no width from it. The map's own box and the three boxes on that edge all read it,
+     so one variable places every one of them. */
+  --pane: 50vw;
+  --pane-w: 0px;
   /* Header height, and everything that hangs beneath it. One number because the header grows to two
      lines on a phone (the ticker wraps under the buttons) and the map, drawer, search box and alert
      panel all have to follow it down — they were six hard-coded 64/76/124/128s before. */

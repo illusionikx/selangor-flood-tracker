@@ -66,10 +66,13 @@
   position: relative;   /* the card's ⋮ hangs off the top-right corner */
   padding: 0 0 8px; margin-bottom: 8px; border-bottom: 1px solid var(--outline);
 }
-/* The name and the region line clear the panel's close button, which floats over this corner. Only
-   those two — the badge row runs the full width. 34px = the button's 48 from the panel edge, less
-   #sideBody's 16. */
+/* The name and the region line clear a close button floating over this corner. That is the shape
+   the table's hover panel and every map card still use. **The station sheet does not**: its header
+   is an M3 side sheet row that places the title, the ⋮ and the × as flex items, so nothing floats
+   and nothing needs padding out of the way. See `#sideHead` in css/chrome.css. */
 .pophead .popname, .pophead > .muted { padding-right: 34px; }
+#sideBody .pophead .popname, #sideBody .pophead > .muted,
+#sideBody .pophead > .dots ~ .popname, #sideBody .pophead > .dots ~ .muted { padding-right: 0; }
 /* The card's one control, sitting against the close button. It is the ⋮, and it is the only thing
    that goes here. A favorite heart held this slot, and then a webcam glyph beside the heart, and the
    pair owed the title 108px of a 328px line. Both are rows inside this menu now.
@@ -100,11 +103,32 @@
 
 /* One mast, several sensors: the place is named once in .pophead, then a section per sensor. */
 .pophead .badges { display: flex; flex-wrap: wrap; gap: 4px; }
-.sensor { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--outline); }
-/* The first sensor draws no rule of its own — the header above it ends in one, and the two together
-   were a double line. Keyed on `:first-child`, *not* `.pophead + .sensor`: map.js lifts the header
-   out of #sideBody into #sideHead, so a sibling selector silently stopped matching. */
-#sideBody > .sensor:first-child { margin-top: 0; padding-top: 0; border-top: 0; }
+/* **One M3 filled card per sensor.** Transcribed from `Card/card.css` in the M3 Expressive
+   component set: `background-color: surface-container-highest`, `border-radius: shape-corner-medium`
+   (12dp), no border, and no elevation at rest.
+   https://github.com/bczak/m3you/blob/development/src/components/Card/card.css
+   `--hover` stands in for the container tone. This app holds one surface tone in `css/base.css` and
+   the palette rule keeps M3's colour roles out of it, so the container is the one step off
+   `--surface` that already exists here — the same tone `.chip:hover` and `.wxcol` take.
+
+   **This is also what killed the double line under the title.** A section separated itself with a
+   top rule and `.pophead` ended in a bottom rule, and the two stacked as soon as the header stopped
+   being lifted whole out of the body. `#sideBody > .sensor:first-child` used to cancel the first
+   one; it stopped matching the moment `.pophead` became the body's first child, which is a
+   sibling-selector fault in a rule whose own comment warned about sibling selectors. A card
+   separates by surface, so neither rule is left to stack. */
+.sensor {
+  margin-top: 8px; padding: 12px;
+  border-radius: var(--md-sys-shape-corner-medium); background: var(--hover);
+}
+/* No `:first-child` cancel any more, and the rule that was here could no longer fire. `.pophead` is
+   the body's first element on every card this panel draws, so the first `.sensor` has a sibling
+   above it and wants the same 8px gap as the rest. That rule's own comment warned against a sibling
+   selector and then keyed on position, which is the same fault by another name. */
+/* A cell inside a filled card steps back to the page tone, or the two containers are one flat
+   block. Both surfaces that draw `.wxcol` sit inside a `.sensor`: the station card's weather
+   section, and the weather panel's half-hour stack. */
+.sensor .wxcol { background: var(--surface); }
 .sensorhead { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
 .sensorhead b { font-size: 12px; font-weight: 500; }
 .sensorhead .muted { flex: 1; min-width: 0; text-align: right; overflow: hidden;
@@ -421,7 +445,7 @@
   .pophead { padding-bottom: 6px; margin-bottom: 6px; }
   .popname { font-size: 14px; }
   .popbody { gap: 3px 10px; margin-bottom: 6px; }
-  .sensor { margin-top: 7px; padding-top: 7px; }
+  .sensor { margin-top: 6px; padding: 10px; }
 }
 
 /* The alert marker on a camera picture. Top left, because the bottom carries the timestamp JPS
@@ -469,9 +493,11 @@
 /* The sensor a search sub-row asked for. It fades rather than staying marked, because the card is
    rebuilt in place on every poll and a permanent mark would outlive the question that set it. */
 #sideBody .sensor.flash { animation: sflash 1.6s ease-out; }
+/* Back to the card's own tone, never `transparent`: the section is a filled card now, so fading to
+   nothing erases the container the flash was drawn on. */
 @keyframes sflash {
   from { background: color-mix(in srgb, var(--accent) 26%, transparent); }
-  to   { background: transparent; }
+  to   { background: var(--hover); }
 }
 
 /* One card per half hour MET publishes. It is built like the weather card's own `Later` cell.

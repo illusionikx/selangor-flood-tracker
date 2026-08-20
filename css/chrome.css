@@ -1,6 +1,16 @@
 /* Page furniture around the map: app bar, status chip, drawer, legend, alert panel, splash. */
 
-#map { position: absolute; inset: var(--hdr) 0 0; }
+/* **The map is a pane, not a backdrop.** Its box ends where the supporting pane begins, so the two
+   sit beside each other rather than one over the other. That is M3's supporting-pane layout, and it
+   is what deleted `focusOn()`'s offset arithmetic: the container IS the visible strip now, so
+   nothing has to work out which part of it a panel is covering.
+   `--pane-w` is 0 while the pane is shut, and 0 at every state below 600px. There the pane is a
+   modal bottom sheet over the map, which takes no width.
+   **It does not transition.** The map snaps to its new width in one frame and the pane travels in
+   beside it, which is what an adaptive layout does. Animating the width instead makes Leaflet
+   resize on every frame of the travel, and the strip revealed on the way out sits empty for the
+   whole 300ms. A `ResizeObserver` in `js/map.js` answers the snap with one `invalidateSize()`. */
+#map { position: absolute; inset: var(--hdr) var(--pane-w) 0 0; }
 
 /* --- top app bar ---------------------------------------------------------------------------- */
 
@@ -189,11 +199,44 @@ header .hactions {
 /* Wider than a plain dialog: this one carries the logo lockup, three source entries and a credits
    block, and at 440px the source descriptions ran to four lines each. */
 .docbox {
-  max-width: min(820px, calc(100vw - 32px)); padding: 24px;
+  /* `--pane` is this pane's own padding, and the pinned header below reads it back. It is 24px here
+     and 18px on a phone, and stating it once is what stops the header's four negative offsets
+     drifting from the padding they cancel. */
+  --pane: 24px;
+  max-width: min(820px, calc(100vw - 32px)); padding: var(--pane);
+  overflow: auto; overscroll-behavior: contain;
   border: 1px solid var(--outline); border-radius: 12px;
   background: var(--surface); color: var(--on-surface); box-shadow: var(--shadow);
 }
 .docbox::backdrop { background: #0009; }
+
+/* **The header is pinned at every width, because these two panes are their own scroller.** M3: even
+   when a dialog has to scroll, its title stays at the top. The table and the camera wall already
+   did it structurally — each is a flex column whose `.dtop` is `flex: none` and whose body scrolls
+   under it. These two had no such seam, so Help scrolled its own close button off the screen.
+   **`top` is the NEGATIVE of the pane's padding, never 0.** A sticky box is held inside its
+   scrollport, and a scroller's scrollport is its PADDING box. So `top: 0` pins the bar 24px down
+   and the content scrolls through the gap above it, which looks almost right. The negative margins
+   beside it are a different job: they take the bar full bleed across that padding, and the
+   `padding` puts its own contents back inside those edges. Neither substitutes for the other.
+   The divider is M3's anatomy item 6. M3's basic dialog specs no header border, and its token set
+   answers the same seam another way — `header-on-scroll-container-color` plus elevation level2,
+   which is a scroll state and needs script. A 1dp line is the same statement with no listener. */
+.docbox .modalhead {
+  position: sticky; top: calc(-1 * var(--pane)); z-index: 2;
+  min-height: 56px;
+  margin: calc(-1 * var(--pane)) calc(-1 * var(--pane)) 10px;
+  padding: 0 var(--pane);
+  background: var(--surface); border-bottom: 1px solid var(--outline);
+}
+/* **A pinned bar needs a height of its own, and these two shipped without one.** `.modalhead` was
+   written as a row in the flow, so it sized to its title and its close button was pulled back onto
+   that line with a negative margin on all four sides. Pinning it made it a bar with a divider under
+   it, and the pull then hung the 40px button through that divider: About measured a 24px bar under a
+   38px button, and Help a 35px one. 56px is the same number the phone block below already states,
+   and it is M3's top app bar. The pull survives on the inline edge alone, which is the half that
+   puts the button's hit area on the pane's own padding rather than 10px inside it. */
+.docbox .modalhead .dclose { margin: 0 -10px 0 0; }
 .docbox h2 { font-size: 18px; font-weight: 500; }
 
 /* Title and close on one line, both dialogs. In the header rather than a footer button: these
@@ -275,8 +318,11 @@ body.testmode header {
    rather than each badge fixing itself, because test mode and the rising filter can both be on and
    two independently-centred pills would land on each other. It does not take clicks; its children
    do — otherwise an invisible full-width strip would eat the map under it. */
+/* Centred on the MAP, not on the window: half the pane's width comes off the centre line, so the
+   badges stay over the strip they describe when the pane opens. */
 #pills {
-  position: fixed; z-index: 700; top: calc(var(--hdr) + 12px); left: 50%;
+  position: fixed; z-index: 700; top: calc(var(--hdr) + 12px);
+  left: calc(50% - var(--pane-w) / 2);
   transform: translateX(-50%); display: grid; gap: 8px; justify-items: center;
   pointer-events: none;
 }
@@ -752,7 +798,10 @@ table.data .dash { color: var(--outline); }
    above carries the full account of that bug. */
 #warnBox[open] { display: flex; flex-direction: column; }
 #warnBox::backdrop { background: #0009; }
-#warnBox .modalhead .i { font-size: 22px; }
+/* M3 sizes a basic dialog's icon at 24px. It is a block on its own line above the headline, so the
+   gap under it is the header's own — 8px here rather than M3's 16, because this app's dialogs run
+   tighter than the reference and a 16px gap over an 8px `.modalhead` margin reads as two headers. */
+#warnBox > .i { display: block; font-size: 24px; margin-bottom: 8px; }
 #warnBox h2 { font-size: 18px; font-weight: 500; }
 #warnBox #warnBody h3 { margin: 0 0 8px; font-size: 15px; font-weight: 500; }
 #warnBox #warnBody p { margin: 0 0 8px; line-height: 1.5; }
@@ -1035,31 +1084,34 @@ header:has(#net.open) #netstats { opacity: 1; visibility: visible; }
      than the strip actually on screen. Its content fitted inside that taller box, which meant no
      scrollbar and a bottom section parked behind the browser chrome, unreachable. `dvh` is the
      viewport as it stands right now, and it follows the bar in and out. */
-  position: fixed; z-index: 500; top: var(--hdr); left: 0; width: var(--drawer);
-  height: calc(100dvh - var(--hdr));
-  /* `overscroll-behavior: contain`, the same as #sideBody: without it, scrolling past the end of the
-     drawer chains to the document and takes the whole page with it. The station panel already had
-     the rule, which is why only this one did it. */
+  /* **The pane owns the box now.** This was a fixed 288px rail on the leading edge. It is one of
+     three occupants of `#pane`, so it fills that pane and states nothing about where the pane is or
+     how wide it is. `min-height: 0` is what lets it scroll inside a flex column.
+     `overscroll-behavior: contain`, the same as #sideBody: without it, scrolling past the end of the
+     drawer chains to the document and takes the whole page with it. */
+  flex: 1; min-height: 0;
   padding: 20px; overflow: auto; overscroll-behavior: contain;
-  background: var(--surface); box-shadow: var(--shadow);
   /* No gap between the two columns of the drawer: every section already carries its own 12px, and a
      24px seam on top of that made the one between Ignored sensors and Heatmap twice any other. */
-  display: flex; flex-direction: column;
-  transform: translateX(-100%); visibility: hidden;
+  display: none; flex-direction: column;
 }
+body.drawer #bar { display: flex; }
+/* The tie-break, for a state the JS already makes unreachable. `setDrawer(true)` closes the card and
+   the `sideopen` event closes the drawer, so one occupant draws. Two body classes can still both be
+   set by something that writes them directly, and two occupants stacked in one pane is the one shape
+   this container cannot draw. The card wins: it is the more specific answer of the two. */
+body.side #bar { display: none; }
 /* `flex-shrink: 0`, and it is what makes the drawer scroll at all. #bar is a column flex container
    with a fixed height, so a taller child does not overflow it — it *shrinks* to the container, its
    own content spills out of the shrunken box, and #bar's scrollHeight never exceeds its height. The
    result is a panel whose last sections are both clipped and unreachable. Only ever visible on a
    phone, where the sections are stacked in a narrow column and run past one screen. */
 #bar > div { min-width: 0; flex-shrink: 0; }
-/* Map furniture slides with the drawer instead of hiding under it. */
-/* `translate` too: a swipe writes the drag there rather than to `transform`, which is holding the
-   open/shut position — see swipeOff() in ui.js. This is what carries a half-swiped panel home. */
-#bar, #legend { transition: transform var(--slide), translate var(--slide), visibility var(--slide); }
-body:not(.ready) #bar, body:not(.ready) #legend { transition: none; }
-body.drawer #bar { transform: none; visibility: visible; }
-body.drawer #legend { transform: translateX(var(--drawer)); }
+/* **Nothing steps aside for the drawer any more, and the legend is why the rule is worth naming.**
+   It used to translate by `--drawer` because the drawer took the leading rail and the map ran
+   underneath it. Both halves of that are gone: the drawer is an occupant of the trailing pane, and
+   the map's own box stops at that pane. The legend sits on the leading edge of a map that never
+   moves. */
 
 /* --- the paint chooser ------------------------------------------------------------------------ */
 
@@ -1074,7 +1126,7 @@ body.drawer #legend { transform: translateX(var(--drawer)); }
    change to either margin fails a check rather than drifting apart on screen.
    401, not 400: it stands over the legend and the alert panel, one rung under #gotoBox's results
    list at 402 and well under the app bar at 600. */
-#paint { position: absolute; z-index: 401; right: 48px; bottom: 36px; }
+#paint { position: absolute; z-index: 401; right: calc(48px + var(--pane-w)); bottom: 36px; }
 
 /* It steps aside for the station panel exactly as the zoom buttons and the credit do — see the
    `body.side` block further down, which this joins. Nothing here rides the drawer any more: that
@@ -1134,6 +1186,9 @@ body.drawer #legend { transform: translateX(var(--drawer)); }
 /* The Stations chip is the widest thing in here, and at the old 236px its note sat hard against
    its own label with no air between the two. 300 gives every chip slack on that line. */
 #paintmenu { min-width: 300px; padding: 6px; }
+/* The bottom sheet's drag handle. It draws below 600px alone — see the sheet block at the foot of
+   this file. Above that width this panel is a menu beside its button, and a menu has no drag. */
+.grab { display: none; }
 
 /* The press shortcut, named on the one class of device that can take it. Hover opens this panel on
    a pointer device, which is what frees the press to switch the layer. A tap and a keyboard press
@@ -1212,69 +1267,124 @@ body.drawer #legend { transform: translateX(var(--drawer)); }
 .slider input[type=range] { flex: 1; min-width: 0; accent-color: var(--accent); height: 16px; }
 .slider span { width: 34px; text-align: right; font-variant-numeric: tabular-nums; }
 
+/* --- the supporting pane ---------------------------------------------------------------------- */
+
+/* **One box, three occupants.** M3's supporting-pane layout: the map is the main pane and this is
+   the pane beside it. The station card, the weather card and the filters take turns inside it, so
+   the container never moves when the content swaps and the map beside it never reflows for a swap.
+   Above 600px it is a STANDARD side sheet — `surface`, no radius, no elevation, and a 1px
+   `outline-variant` line on the edge facing the map. Standard rather than modal because the map
+   stays live beside it, which is the whole point of a pane.
+   `fixed`, not `absolute`: the header is the positioned ancestor and it is only `--hdr` tall.
+   `height: calc(100dvh - …)`, not `bottom: 0`. A phone's browser resolves a fixed box's `bottom`
+   against the LARGE viewport — the one with the address bar retracted — so the pane was taller than
+   the strip actually on screen. Its content fitted inside that taller box, so there was no scrollbar
+   and the last section sat behind the browser chrome, unreachable. `dvh` is the viewport as it
+   stands right now, and it follows the bar in and out. */
+/* **A `<dialog>`, so every UA default has to be answered.** The browser's own sheet gives a dialog
+   `position: absolute`, `margin: auto`, a solid border, `1em` of padding, its own colours, and a cap
+   of `calc(100% - 6px - 2em)` on both axes. Every one of those is wrong for a pane, and the cap is
+   the one that bites silently — see the medium-band gotcha in CLAUDE.md.
+   **`display` goes on `[open]`, never on the element.** The browser closes a dialog with
+   `dialog:not([open]) { display: none }` in its own sheet, and any author rule setting `display`
+   beats it. A `display: flex` here lays the pane out over the page while it is shut. */
+#pane {
+  position: fixed; z-index: 450; top: var(--hdr); right: 0; bottom: auto; left: auto;
+  width: var(--pane); height: calc(100dvh - var(--hdr));
+  max-width: none; max-height: none; margin: 0; padding: 0;
+  flex-direction: column;
+  /* Not `class="surface"`. That class pairs the background with `--shadow`, and a STANDARD side
+     sheet has no elevation — the 1px line is what separates it. The full-screen variant below 600px
+     has none either, because it covers the screen and there is nothing to lift it off. */
+  background: var(--surface); color: var(--on-surface);
+  border: 0; border-left: 1px solid var(--outline); border-radius: 0;
+}
+#pane[open] { display: flex; }
+/* No scrim at either width. Above 600px the pane is a standard side sheet, which is not modal.
+   Below it the pane is a full-screen dialog, which M3 gives no scrim because it covers the screen
+   and there is no outside to dim. */
+#pane::backdrop { background: none; }
+
+/* **The canonical ratios.** Medium splits the window equally between the two panes. Expanded gives
+   70% to the main pane and 30% to the supporting one, and the two bands above it keep that ratio.
+   `--pane-w` is the same number while the pane is open, and 0 while it is shut. Nothing keys on a
+   class of its own: the pane is open when one of its occupants is, and a third body class would be a
+   second source of truth for one fact. */
+@media (min-width: 601px) {
+  body:is(.drawer, .side) { --pane-w: var(--pane); }
+}
+@media (min-width: 840px) { :root { --pane: 30vw; } }
+
 /* --- station panel ---------------------------------------------------------------------------- */
 
 /* Fixed to the right edge, under the app bar. Above the map furniture (400) and below the header
    (600); the drawer (500) is on the opposite edge, so the two never meet. */
 #side {
-  /* `100dvh`, for the same reason as #bar — see the note there. */
-  position: fixed; z-index: 450; top: var(--hdr); right: 0; width: var(--side);
-  height: calc(100dvh - var(--hdr));
-  display: flex; flex-direction: column;
-  border-left: 1px solid var(--outline);
-  transform: translateX(100%); visibility: hidden;
-  transition: transform var(--slide), translate var(--slide), visibility var(--slide);
+  /* The pane owns the box — see `#pane` below. This fills it and states nothing about where it is. */
+  flex: 1; min-height: 0;
+  display: none; flex-direction: column;
 }
-body.side #side { transform: none; visibility: visible; }
-body:not(.ready) #side { transition: none; }
-
-/* --- scrim ------------------------------------------------------------------------------------ */
-
-/* One box for both panels. z-index 440 puts it over the map furniture (400) and under #side (450)
-   and #bar (500), so each panel stands clear of its own scrim. It starts below the app bar, because
-   the bar holds the hamburger that opens the drawer and the map's own controls sit under it.
-   No `visibility` here, and no transition on `pointer-events`. A transitioned `visibility` holds its
-   start value for the whole duration, so a fading-out scrim would go on eating taps for 250ms after
-   the panel left — the failure `#splash` had. `opacity` alone never stops a tap either, so the
-   `pointer-events` switch is what makes the scrim inert, and it must apply at once. */
-#scrim {
-  position: fixed; z-index: 440; inset: var(--hdr) 0 0 0;
-  background: #0009; opacity: 0; pointer-events: none;
-  transition: opacity var(--slide);
-}
-body:not(.ready) #scrim { transition: none; }
+body.side #side { display: flex; }
 
 /* The close button floats over the card's top-right corner rather than sitting on a row of its own:
    on its own row it was a whole line clear of the name it closes, above an empty strip the width of
    the panel.
    Header, then the scrolling remainder. Two boxes, not one box with a sticky child: the header is
    simply not inside anything that scrolls. */
-#sideHead { flex: none; padding: 0 16px 8px; }
-#sideHead:empty { display: none; }
-/* 18px = the close button's 8px top + half its 40px height − half the name's 15px/1.3 line, so the
-   place and the × sit on one line. The three numbers move together — see `.pophead > .dots` in
-   map.css, which centres the card's ⋮ on this same line. That corner holds one control, and the ⋮
-   is it: a favorite heart held the slot once, and then a webcam glyph beside the heart, and the pair
-   owed the title 108px of a 328px line. Both are rows inside the menu now. */
-#sideHead .pophead { padding-top: 18px; margin-bottom: 0; }
-#sideClose { position: absolute; z-index: 2; top: 8px; right: 8px; }
-#sideBody { flex: 1; overflow: auto; overscroll-behavior: contain; padding: 0 16px 16px; }
+/* M3's side sheet header, transcribed from `SideSheet/side-sheet.css`:
+
+       .md-side-sheet-header { display: flex; align-items: center; min-height: 64px; gap: 4px;
+                               padding: 8px 12px 8px 16px; }
+       .md-side-sheet-title  { flex: 1; color: on-surface-variant; font: title-large; }
+
+   **The × is a flex item in this row now, not a button floating over the card's corner.** That
+   floating button is what the three-number arithmetic in `css/map.css` existed to work around: the
+   name had to be padded clear of it, and the ⋮ had to be placed against it. A header row places all
+   three by itself, and those numbers are gone.
+   `#sideTitle` takes the slack and `#sideActions` holds the ⋮, so the row reads title, actions,
+   close — the order M3 draws. */
+#sideHead {
+  flex: none; display: flex; align-items: center; gap: 4px;
+  min-height: 64px; padding: 8px 12px 8px 16px;
+}
+#sideTitle { flex: 1; min-width: 0; }
+/* `title-large` at `on-surface-variant`, which is `--muted` here. It wraps rather than truncating:
+   M3 states no truncation for this title, and a station name cut in half names another station. */
+#sideTitle .popname {
+  font-size: 22px; font-weight: 400; line-height: 1.27; color: var(--muted);
+}
+#sideActions { flex: none; display: flex; align-items: center; }
+/* The menu is a popover and takes no space in the row; only the button does. */
+#sideActions .dots { position: static; width: 40px; height: 40px; margin: 0; font-size: 22px; }
+/* An empty header still draws its own height, and it must not: a card with no name would leave a
+   64px band of nothing over the readings. */
+#sideHead:has(#sideTitle:empty) { display: none; }
+#sideClose { flex: none; }
+/* M3's side sheet body: `flex: 1; overflow-y: auto; padding: 12px 24px`. The 24px is the
+   reference's own and replaces this app's 16, because the header above it now carries M3's
+   padding too and two different insets in one sheet is the thing this pass exists to remove. */
+#sideBody {
+  flex: 1; overflow: auto; overscroll-behavior: contain; padding: 12px 24px;
+}
+/* `.pophead` leads the body now and holds the region line and the sensor badges. Its name and its ⋮
+   went up into the header, so the padding that used to clear them goes with them. */
+/* No rule under it. The sections below are filled cards now and separate themselves by surface,
+   so a divider here and a card edge 8px under it were the double line a reader saw. */
+#sideBody > .pophead { padding: 0 0 8px; margin-bottom: 8px; border-bottom: 0; }
 /* Retriggered by openSide() (class `swap`) only when the station actually changes — see map.js.
    Both boxes animate, because the name is in one and the readings in the other and a wipe that
    moved half the card would read as a glitch. Under reduced motion the slide is dropped and the
    fade kept: something still has to say the content changed. */
 @keyframes sideSwap { from { opacity: 0; transform: translateX(14px); } }
-#side.swap #sideHead, #side.swap #sideBody { animation: sideSwap .22s cubic-bezier(.2, 0, 0, 1); }
+#side.swap #sideTitle, #side.swap #sideBody { animation: sideSwap .22s cubic-bezier(.2, 0, 0, 1); }
 @media (prefers-reduced-motion: reduce) { @keyframes sideSwap { from { opacity: 0; } } }
 
-/* The right-hand strip belongs to the panel while it is open, so what already lives there steps
-   aside rather than hiding under it — the attribution in particular has to stay readable, and the
-   zoom buttons have to stay usable. Same idea as the drawer pushing the legend and alert panel. */
-#toast, #credit, #paint, .leaflet-bottom.leaflet-right { transition: transform var(--slide); }
-body.side #toast, body.side #credit, body.side #paint,
-body.side .leaflet-bottom.leaflet-right {
-  transform: translateX(calc(-1 * var(--side)));
-}
+/* **Three boxes still step aside, and the zoom control no longer has to.** Leaflet's own controls
+   live INSIDE the map container, and that container now ends where the pane begins, so they follow
+   it for free. These three are siblings of `#map` and position against the window instead, so each
+   adds `--pane-w` to its own offset.
+   `right`, not a transform: `#toast` already owns its `transform` for the slide it opens with, and
+   two rules writing one property is how a toast arrives 360px off the edge it belongs to. */
 
 /* --- go to (in the app bar) -------------------------------------------------------------------- */
 
@@ -1311,7 +1421,7 @@ body.finding #find { display: none; }
 /* Top-right of the map, mirroring the alert panel on the left. Hidden rather than removed when
    closed: `visibility` keeps it out of the tab order and off screen readers, and still animates. */
 #toast {
-  position: absolute; z-index: 401; top: calc(var(--hdr) + 12px); right: 12px;
+  position: absolute; z-index: 401; top: calc(var(--hdr) + 12px); right: calc(12px + var(--pane-w));
   width: min(300px, calc(100vw - 24px));
   border-radius: 12px; padding: 12px 14px 6px; overflow: hidden;
   border-left: 3px solid #e8710a;
@@ -1466,7 +1576,7 @@ body.finding #find { display: none; }
 
 /* Leaflet's own attribution box is disabled; we render the credit ourselves, out of the way. */
 #credit {
-  position: absolute; z-index: 400; right: 10px; bottom: 8px;
+  position: absolute; z-index: 400; right: calc(10px + var(--pane-w)); bottom: 8px;
   text-shadow: 0 0 4px var(--surface), 0 0 4px var(--surface);
 }
 #credit a { color: var(--muted); }
@@ -2009,13 +2119,13 @@ body.finding #find { display: none; }
      was left after six controls — about 40px, which is not a ticker, it is a keyhole. */
   /* 6 (header pad) + 36 (controls) + 5 (gap) + 36 (ticker) = 83. Measured, not guessed: any slack
      here is dead white space between the ticker and the map. */
-  /* Both panels stop short of the far edge. A panel that covers the map completely reads as a new
-     page, and the strip it leaves is what says the map is still under there. 84vw is 58px of map at
-     360px, and that strip is the scrim you tap to dismiss the panel. */
-  :root { --drawer: 84vw; --side: 84vw; --hdr: 85px; }
-  /* Only here is either panel modal. On a wider screen the drawer and the station panel stand on
-     opposite edges with map between them, so there is nothing to dim and nothing to tap through. */
-  body.drawer #scrim, body.side #scrim { opacity: 1; pointer-events: auto; }
+  /* **`--side` is deliberately NOT overridden here.** The pane is a bottom sheet at this width and
+     takes `min(640px, calc(100% - 32px))` instead, so a width token for it would be a number
+     nothing reads. `--pane-w` stays 0 here for the same reason: a bottom sheet rises over the map
+     rather than beside it, so the map keeps its whole width. Every rule that still resolves `--side`
+     is a desktop rule, and each is cancelled by name below rather than by feeding it a phone
+     value. */
+  :root { --hdr: 85px; }
   header { gap: 4px; flex-wrap: wrap; align-content: flex-start; padding: 6px 8px 0 4px; }
   header > :not(#ticker) { order: 0; }
   /* Tighter controls so the mark, the chip and four buttons fit one line at 360px with room over. */
@@ -2101,4 +2211,448 @@ body.finding #find { display: none; }
      `display: none` rather than a JS guard so it follows a rotate without anything having to
      notice. */
   #toast { display: none; }
+}
+
+/* --- full-screen dialogs (phones) ------------------------------------------------------------- */
+
+/* Below 600px FOUR dialogs are M3 full-screen dialogs. The two panels are not: they are M3 side
+   sheets above 600px and M3 bottom sheets below it, and the sheet block further down owns them.
+   M3 puts this variant at the compact breakpoint alone, which is the same 600px this app already
+   turns on, and it names the case exactly — a task with a series of steps, keyboard input inside
+   the box, and a box that can open another dialog on top of itself. All four qualify: each carries
+   a filter field or a document. Above 600px they are basic dialogs instead.
+   https://m3.material.io/components/dialogs/guidelines
+
+   The spec numbers this block takes, from M3's own measurements table:
+     container shape       0dp corner radius
+     header height         56dp
+     divider height        1dp
+     headline alignment    start
+   and from the token set: container elevation `level0`, header container color `surface` at rest.
+
+   Two numbers this app keeps instead, and the reason. M3 asks for 24dp of top, left and right
+   padding on the container. Every one of these surfaces already sits on this app's own padding
+   scale: 16px in the station panel, 18px in the two prose dialogs, 20px in the drawer. One number
+   restated in the header alone gives each pane two left edges, so the header follows the pane it
+   heads. M3's headline token is `title-large` at 22px, and every headline here is already 18px over
+   a 15px body. A 22px headline at 360px takes width the close button needs. */
+@media (max-width: 600px) {
+
+  /* --- the container -------------------------------------------------------------------------- */
+
+  /* Full bleed, square, flat. M3 states that a full-screen dialog covers the screen and does not
+     appear as a floating modal window.
+     No z-index: `showModal()` puts a dialog in the top layer, which is above every stacking context
+     on the page. That is also what makes M3's own rule work — a full-screen dialog is the only
+     dialog another dialog can open over. */
+  #dataBox, #camBox, .docbox {
+    inset: 0; width: 100%; height: 100dvh; max-width: none; max-height: none;
+    margin: 0; border: 0; border-radius: 0; box-shadow: none;
+  }
+  /* No scrim. There is no outside to dim and nothing to tap through — M3 lists a scrim in the basic
+     dialog's anatomy and leaves it out of this one. The backdrop is still painted during the enter
+     transition, where the container is clipped and the page shows around it. */
+  #dataBox::backdrop, #camBox::backdrop, .docbox::backdrop { background: none; }
+
+  /* --- the header ----------------------------------------------------------------------------- */
+
+  /* M3's app bar: a close X on the leading edge, the headline after it, start-aligned. The X is the
+     only navigation in it, and never an up arrow — an arrow claims the view saves as it goes.
+     `row-reverse` rather than reordered markup. The close button is deliberately first in the
+     source of all four dialogs so a keyboard reaches it first, and this block moves only where it
+     draws. `#aboutBox .modalhead` needs no override: it carries no headline, and its existing
+     `justify-content: flex-end` now packs its lone button against the leading edge. M3 marks the
+     headline optional, and that pane's identity is the logo lockup in the content below. */
+  /* **Named one by one, never as bare `.modalhead`.** This is a full-screen dialog's app bar, and
+     only four dialogs are full-screen here. Written bare it also reached `#lightbox` and `#warnBox`,
+     which are basic dialogs at every width — so their close button jumped to the leading edge while
+     the box around it stayed a floating card with a 12px corner and a scrim. A full-screen header on
+     a basic container reads as a mistake in the header, and it is a mistake in the selector. */
+  #dataBox .modalhead, #camBox .modalhead, .docbox .modalhead {
+    flex-direction: row-reverse; justify-content: flex-end;
+    min-height: 56px; margin-bottom: 0; gap: 8px;
+  }
+  /* **One number holds every header here, and it is 56px: where the headline starts.** That is M3's
+     top app bar, and it is what makes five panes read as one component. It is 8 to the close
+     button, the button's own 40, then the 8px gap above.
+     The negative margin is what puts the button at 8 when the pane around it is padded further in.
+     One per pane padding: the two prose dialogs sit on 18, the table and the wall on 20. */
+  .docbox .modalhead .dclose { margin: 0 0 0 -10px; }
+  .dtop .modalhead .dclose { margin: 0 0 0 -12px; }
+
+  /* The pinned header is in the base rule now and reads `--pane` back, so this only has to move the
+     pane's padding. `margin-bottom: 0` because the 56dp bar above already carries the space, and
+     `.modalhead`'s own 10px would sit under a full-bleed divider as a second gap. */
+  .docbox { --pane: 18px; }
+  .docbox .modalhead { margin-bottom: 0; }
+
+  /* --- motion --------------------------------------------------------------------------------- */
+
+  /* **Up from the bottom edge, with a fade.** This is the M3 Expressive component set's own
+     full-screen dialog, which cites m3.material.io/components/dialogs/specs:
+
+         .md-fullscreen-dialog-content {
+           transition: all var(--md-sys-motion-duration-short2) var(--md-sys-motion-easing-emphasized);
+           &[data-ending-style], &[data-starting-style] { opacity: 0; transform: translateY(100%); }
+         }
+
+     https://github.com/bczak/m3you/blob/development/src/components/Dialog/dialog.css
+     `duration-short2` is 300ms and `easing-emphasized` is `cubic-bezier(.2, 0, 0, 1)`, both read
+     out of that project's own token file. `--m3-travel` in `css/base.css` holds the pair.
+
+     **A clip-path collapse along the y axis stood here first, and it is gone.** The argument for it
+     was M3's transitions page, which files a dialog under enter and exit *within* screen bounds and
+     avoids anything reading as an elevation change. That page describes the basic dialog. The
+     component spec for this variant says translate, and a component spec beats a generalisation
+     about the family. The basic dialog below still gets the within-bounds treatment, which is where
+     that argument was right.
+
+     **A keyframe rather than a transition.** `showModal()` flips `display`, so a keyframe on
+     `[open]` is all there is to start from. That is the shape `#eggBox` already uses. It buys an enter and no exit, and a dialog still
+     leaves instantly. `@starting-style` with `allow-discrete` on `overlay` buys that exit. It also
+     risks the dialog leaving the top layer before the animation ends, which draws the exit behind
+     the page. */
+  @keyframes fsOpen { from { opacity: 0; transform: translateY(100%); } }
+  #dataBox[open], #camBox[open], .docbox[open] { animation: fsOpen var(--m3-travel); }
+
+  @media (prefers-reduced-motion: reduce) {
+    @keyframes fsOpen { from { opacity: 0; } }
+  }
+}
+
+/* --- basic dialogs -------------------------------------------------------------------------- */
+
+/* M3's basic dialog: a 28dp corner, a `headline-small` headline, and an enter that grows in place
+   rather than travelling — `opacity: 0` with `scale(.95)` at `duration-extra-short4`, which is
+   `--m3-grow`. Growing in place is M3's within-screen-bounds pattern, and it is the half of that
+   argument the full-screen dialogs record as being right.
+   Reference: the M3 Expressive component set's `Dialog/dialog.css`, the same file the full-screen
+   motion came from. https://github.com/bczak/m3you/blob/development/src/components/Dialog/dialog.css
+
+   **Every dialog in this app is one of three things, and each states which.** `#lightbox` and
+   `#warnBox` are basic at EVERY width. `#dataBox`, `#camBox` and the two `.docbox` panes are
+   full-screen below 600px and basic above it, so their own block adds the corner and the headline
+   there. `#eggBox` and `#narrowBox` are the two deliberate exceptions and each names its reason
+   where it is defined: one is a picture with no chrome at all, and the other is a blocking state
+   screen with no way out on purpose.
+
+   **`#lightbox` and `#warnBox` do not become full-screen on a phone, and M3 is why.** That variant
+   is for a task with a series of steps, keyboard input, or a box that opens another dialog. A
+   camera still and a warning read are neither. The four that did convert each carry a filter field
+   or a document. */
+@keyframes dlgOpen { from { opacity: 0; transform: scale(.95); } }
+@media (prefers-reduced-motion: reduce) {
+  @keyframes dlgOpen { from { opacity: 0; } }
+}
+#lightbox, #warnBox { border-radius: 28px; }
+#lightbox[open], #warnBox[open] { animation: dlgOpen var(--m3-grow); }
+/* `headline-small` is 24px, and only one of the two takes it. `#warnBox` holds a fixed short title
+   — `Forecast Warning` or `Service Notice`. `#lightbox` holds a camera's name and its district, on
+   two lines, and it wraps rather than truncating. M3's own rule about a long or variable headline
+   applies: at 24px on a 360px screen that name takes two lines of 32px before the picture starts. */
+#warnBox h2 { font-size: 24px; }
+
+/* --- the four dialogs across M3's window size classes ------------------------------------------ */
+
+/* The block above turns four dialogs into full-screen ones below 600px. This one is the other half
+   of the same sentence: M3 says a dialog can swap variants as the breakpoint changes, and names a
+   full-screen dialog becoming a basic dialog at a larger one. So above 600px each of the four takes
+   the size its window class allows and its own content wants.
+   https://m3.material.io/foundations/layout/applying-layout/window-size-classes
+
+     compact    < 600     full-screen dialog, and nothing here applies
+     medium     601-839   near-full-bleed, because the window is still small
+     expanded   840-1199  each dialog settles at its own cap
+     large      1200+     the two scanning surfaces take the room, the prose does not
+
+   **Three variables carry it, not twelve rules.** `--dlg-inset` is the gap to the window edge.
+   `--dlg-wide` caps the table, and `--dlg-prose` caps the two prose panes. The camera wall takes no
+   cap at any width, which is a decision this file already carries: a wall of ninety pictures is the
+   one view here that gets better with more room, and two pixel caps once parked it in the middle of
+   a wide monitor at a size that ignored the screen.
+
+   **The jump at 601px is what the medium band exists to fix.** Before it, a dialog crossed out of
+   the full-screen variant and straight into its desktop shape. At 601px that shape measured 577px,
+   which is a phone-sized box already calling itself a desktop.
+
+   The chrome is M3's basic dialog, and two of its four parts are declined on purpose.
+   **Taken:** the 28dp corner, and `headline-small`'s 24px on the headline.
+   **Declined:** `surface-container-high`. This app holds one surface tone, in two theme sets, in
+   `css/base.css` and nowhere else. A second tone five percent off the first is invisible over a
+   scrim and is a colour invented outside that file, which is the one thing the palette rule
+   forbids. **Declined:** elevation `level3`. `--shadow` is this app's one elevation and every
+   dialog already carries it.
+   `headline-small`'s 400 weight goes with it. Every other heading in this app is 500, and a lone
+   400 among them reads as a mistake rather than as a spec.
+
+   `#lightbox` and `#warnBox` are deliberately not here. The lightbox is sized by the picture inside
+   it and carries its own ladder, and a warning is a short read that wants no more width. */
+@media (min-width: 601px) {
+  :root { --dlg-inset: 16px; --dlg-wide: 100vw; --dlg-prose: 560px; }
+}
+/* Expanded: the table stops growing at the width its widest row needs, and the prose pane opens up
+   to the 820px the `.key` grid was measured against. */
+@media (min-width: 840px) {
+  :root { --dlg-inset: 24px; --dlg-wide: 1060px; --dlg-prose: 820px; }
+}
+/* Large: more room goes to the two surfaces that scan, and none of it to the prose. 820px is
+   already about 110 characters of line, and a wider measure is a worse read, not a better one. */
+@media (min-width: 1200px) {
+  :root { --dlg-inset: 32px; --dlg-wide: 1200px; }
+}
+
+@media (min-width: 601px) {
+  /* One expression for the room left after the inset, so no dialog can drift from the others. */
+  #dataBox, #camBox, .docbox { border-radius: 28px; }
+  #dataBox h2, #camBox h2, .docbox h2 { font-size: 24px; }
+
+  /* These three are full-screen below 600px and basic above it, so their enter swaps with the
+     variant. `dlgOpen` itself is declared at the top level beside the basic-dialog block, because
+     two other dialogs are basic at every width and need it there. */
+  #dataBox[open], #camBox[open], .docbox[open] { animation: dlgOpen var(--m3-grow); }
+
+  /* **The UA stylesheet caps a dialog and it silently ate the medium band.** A browser's own sheet
+     carries `dialog { max-width: calc(100% - 6px - 2em); max-height: calc(100% - 6px - 2em) }`.
+     These two set `width` and `height` rather than `max-*`, so that cap still applies over the top.
+     At a 14px font 2em is 28, so the cap is `100% - 34px` and it clamped a 668px pane to 666 in a
+     700px window. The band's 16px inset silently became 17. It only bites in the medium band,
+     because the cap is wider than the pane at every band above it, which is the worst shape for
+     something to be wrong in. `.docbox` never had the problem: it sets `max-width` itself, and an
+     author rule beats a UA one. It keeps the UA `max-height` on purpose, which is what makes long
+     prose scroll inside the pane rather than off it. */
+  #dataBox, #camBox { max-width: none; max-height: none; }
+
+  #camBox {
+    width: calc(100vw - var(--dlg-inset) * 2);
+    height: calc(100dvh - var(--dlg-inset) * 2);
+  }
+  #dataBox {
+    width: min(var(--dlg-wide), calc(100vw - var(--dlg-inset) * 2));
+    height: min(88vh, 900px);
+  }
+  .docbox { max-width: min(var(--dlg-prose), calc(100vw - var(--dlg-inset) * 2)); }
+}
+
+/* --- the layer selector as a bottom sheet (phones) --------------------------------------------- */
+
+/* Below 600px `#paintmenu` is an M3 modal bottom sheet rather than a menu floating beside its
+   button. It is a panel of settings a reader opens while looking at the map, and the map is what
+   it reports on, so it belongs on the edge the thumb is already at rather than in a corner.
+
+   The numbers, from the M3 Expressive component set's `BottomSheet/bottom-sheet.css`, which cites
+   m3.material.io/components/bottom-sheets/specs:
+
+     container shape    28px on the two TOP corners only
+     container width    min(640px, calc(100% - 32px)), centred
+     max height         calc(100dvh - 72px)
+     drag handle        a 48px row holding a 32 x 4px indicator, radius 2
+     scrim              32% of the scrim colour
+
+   https://github.com/bczak/m3you/blob/development/src/components/BottomSheet/bottom-sheet.css
+
+   **The sheet does not reach the side edges, and that is the reference's own shape.** 16px of map
+   shows down each side at 360px while the sheet sits flush on the bottom. That is why only the top
+   corners are rounded.
+
+   One number this app keeps instead. M3 pads the sheet body 24px on the inline axis. Every row in
+   here is a `.chip`, and a chip brings 14px of its own padding — which is why this panel already
+   pads 6px where the shared `.menu` rule pads 4. Stacking 24 on top of 14 puts a label 38px inside
+   its own sheet. The header-follows-its-pane rule the four dialogs state applies here unchanged.
+   The 24px at the BOTTOM is taken: nothing sits under the last chip, and a phone's gesture bar does. */
+@media (max-width: 600px) {
+  #paintmenu {
+    /* `inset: auto 0 0 0` beats `.menu`'s `inset: auto`, and js/ui.js stops writing a placement
+       here at this width — see the guard at the top of its `toggle` handler. Inline styles win
+       over any of this, so the two halves have to agree. */
+    inset: auto 0 0 0;
+    width: min(640px, calc(100% - 32px)); margin-inline: auto;
+    min-width: 0; max-width: none;
+    max-height: calc(100dvh - 72px);
+    padding: 0 6px 24px;
+    border: 0; border-radius: 28px 28px 0 0;
+  }
+  /* M3's scrim, at the 32% its own file states. A popover's backdrop paints but never blocks: light
+     dismiss still closes the sheet on a tap outside, which is the modal bottom sheet's own way out.
+     So the scrim needs no `pointer-events` of its own and there is no second box to keep inert. */
+  #paintmenu::backdrop { background: color-mix(in srgb, #000 32%, transparent); }
+
+  /* The handle is the `.grab` rule at the foot of this file. */
+
+  /* Up from the bottom edge, the same travel and the same 300ms the full-screen dialogs take. A
+     popover flips `display` exactly as `showModal()` does, so a keyframe on `:popover-open` is the
+     only thing there is to start from. `.menu` already states that pair, so this only adds motion.
+     The scrim fades on its own keyframe: a `::backdrop` is a separate box and does not inherit the
+     element's animation. */
+  @keyframes sheetUp { from { transform: translateY(100%); } }
+  @keyframes sheetScrim { from { opacity: 0; } }
+  #paintmenu:popover-open { animation: sheetUp var(--m3-travel); }
+  #paintmenu:popover-open::backdrop { animation: sheetScrim var(--m3-travel); }
+  /* The drag is the shared `--drawer-swipe-movement-y` mechanism at the foot of this file. The
+     keyframe owns `transform` for its 300ms and hands it back to that rule when it ends. */
+
+  @media (prefers-reduced-motion: reduce) {
+    @keyframes sheetUp { from { opacity: 0; } }
+  }
+}
+
+/* --- the pane: side sheet on a desktop, full-screen dialog on a phone -------------------------- */
+
+/* `#pane` is one surface in two variants, and M3's canonical supporting-pane layout names both:
+   https://m3.material.io/foundations/layout/canonical-examples/supporting-pane
+
+     >= 601px   side sheet, standard variant    m3.material.io/components/side-sheets/specs
+     <= 600px   dialog, full-screen variant     m3.material.io/components/dialogs/specs
+
+   Both are transcribed from the M3 Expressive component set rather than eyeballed:
+     https://github.com/bczak/m3you/blob/development/src/components/SideSheet/side-sheet.css
+     https://github.com/bczak/m3you/blob/development/src/components/Dialog/dialog.css
+
+   **The compact variant is what M3 says it is, and this app has been round the houses on it.** The
+   canonical layout hides the supporting pane in a compact window and navigates to it as a
+   full-screen destination. `SupportingPaneScaffold` in the Compose adaptive library does exactly
+   that, and the layout page offers a bottom sheet as the other option. This app drew it as a modal
+   bottom sheet for one revision, on the argument that a panel reporting on the map behind it should
+   keep that map in view. **That argument belongs to a sheet somebody opens over content they are
+   still reading. It does not describe a pane.** A pane is a destination, and in a compact window it
+   is the only one on screen.
+   What the reversal cost: the scrim, the drag handle and the swipe-down are gone again. What it
+   bought is what a `<div>` could never have — the top layer, a real focus trap, and a page behind it
+   that is inert.
+
+   **What this app does not take from either file, and why.** Both name `surface-container-low` and
+   `outline-variant`. This app holds one surface tone and one outline tone, in `css/base.css`, and
+   the palette rule forbids inventing a second outside that file. So both resolve to `--surface` and
+   `--outline` here. The width is this app's own: the reference caps a side sheet at 320px and its
+   own header comment cites M3's 400px, and 360 sits inside M3's 256-400 band. 360 is what a camera
+   still needs, which is written down beside the token.
+   **One width for all three occupants.** The filters were a 288px rail of their own before the pane
+   held them. A pane that resized as its content swapped would reflow the map beside it on every
+   switch, so `--drawer` is not read by any rule here any more. */
+
+/* **There is no `#scrim` any more, and neither variant wants one.** A standard side sheet is not
+   modal, so above 600px there is nothing to dim. Below it the pane is a full-screen dialog, which
+   M3 lists a scrim for in the BASIC dialog's anatomy and leaves out of this one — the surface covers
+   the screen, so there is no outside. The box is gone from the markup rather than hidden here.
+   `#pane::backdrop` is what the modal variant paints instead, and it paints nothing. */
+
+/* --- side sheet, >= 601px --------------------------------------------------------------------- */
+
+/* The standard variant, which is the one that leaves the map live beside it. M3 gives it
+   `surface`, NO radius and NO elevation, and separates it from the content with a 1px
+   `outline-variant` line on the edge that faces that content. `#pane` states all four itself, so
+   there is nothing left for this block to correct. */
+@media (min-width: 601px) {
+  /* M3's side sheet header: 64px, centred, `title-large`, and the close on the trailing edge.
+     `#barHead` draws at this width now. The drawer had no header at all before, on the argument
+     that the hamburger which opened it stayed on screen — true, and it still left the panel
+     unnamed. M3's side sheet has a header, so it has one.
+     `#sideHead` is the same header, filled from the station card — see its own rules further up. */
+  #barHead {
+    display: flex; align-items: center; gap: 4px;
+    min-height: 64px; margin: -20px -20px 4px; padding: 8px 12px 8px 16px;
+  }
+  #barHead h2 { flex: 1; font-size: 22px; font-weight: 400; color: var(--muted); }
+}
+
+/* --- full-screen dialog, <= 600px ------------------------------------------------------------- */
+
+@media (max-width: 600px) {
+  /* Full bleed, square, flat, and the same four the other full-screen dialogs take. `inset: 0`
+     rather than an anchored `bottom`, which is what the bottom sheet used: `height: 100dvh` is the
+     viewport as it stands right now and follows a phone's address bar in and out, so the pane can
+     never be taller than the strip on screen.
+     It covers the app bar as well, which is what makes it a destination rather than a panel under
+     one. That is also why each occupant carries a close button of its own. */
+  #pane {
+    inset: 0; width: 100%; height: 100dvh;
+    border: 0; border-radius: 0; box-shadow: none;
+  }
+  /* The drawer is a scroller itself; the station panel scrolls in `#sideBody`. */
+  #bar { padding: 0 6px 24px; }
+
+  /* **M3's full-screen dialog app bar, and both occupants wear it.** 56dp, the close X on the
+     LEADING edge, the headline after it. That is the variant's anatomy and it is the opposite of the
+     side sheet's, where the close trails. `order: -1` rather than `row-reverse`: reversing the row
+     puts the trailing actions between the X and the title, and M3 keeps them at the far end.
+     M3's 64px is a side sheet number. 56 is the app bar height a compact window uses.
+     8px in on the leading edge, which is the same start the other four full-screen dialogs use. */
+  #barHead, #sideHead { min-height: 56px; padding: 0 16px 0 8px; }
+  #barClose, #sideClose { order: -1; }
+  /* Full bleed across `#bar`'s own 6px, so the X starts on the header's 8px and not on 6 plus 8.
+     One number holds every full-screen app bar in this app at 8px in, and `.dtop .modalhead .dclose`
+     and `.docbox .modalhead .dclose` are the other two doing the same cancel. */
+  #barHead {
+    display: flex; align-items: center; gap: 4px;
+    margin: 0 -6px 4px;
+  }
+  #barHead h2 { flex: 1; font-size: 16px; font-weight: 500; }
+  #sideTitle .popname { font-size: 18px; }
+  #sideBody { padding: 8px 16px 16px; }
+}
+
+/* --- the drag handle, shared by all three sheets ---------------------------------------------- */
+
+/* `#paintmenu`'s alone now. M3: a 48px row holding a 32 by 4px indicator with a 2px radius, painted
+   `outline`. The row is the touch target and the bar is the picture of it, so the bar is a
+   pseudo-element rather than a second box.
+   It draws below 600px alone, where that panel is a bottom sheet. The supporting pane had one while
+   it was a bottom sheet too. It is a full-screen dialog now and that variant has no swipe, so the
+   handle went with the gesture. A handle drawn over a gesture nobody wired up is a promise the panel
+   does not keep. */
+.grab { display: none; }
+@media (max-width: 600px) {
+  .grab {
+    display: flex; align-items: center; justify-content: center;
+    height: 48px; flex: none; touch-action: none;
+  }
+  .grab::before {
+    content: ''; width: 32px; height: 4px; border-radius: 2px; background: var(--outline);
+  }
+}
+
+/* --- sheet motion, and the drag ---------------------------------------------------------------- */
+
+/* **The finger writes a custom property and the transition is killed by an attribute.** That is the
+   reference's own mechanism, transcribed:
+
+       [data-slot="side-sheet-content"][data-swipe-direction="right"] {
+         transform: translateX(var(--drawer-swipe-movement-x, 0px));
+         transition: transform var(--md-sys-motion-duration-short2) var(--md-sys-motion-easing-emphasized);
+       }
+       [data-slot="side-sheet-content"][data-swiping] { transition: none; }
+
+   It replaces an inline `translate` plus an inline `style.transition = 'none'`, which is what stood
+   here first. Two reasons it is better, and both are real. The open and shut position lives in
+   `transform` and the finger lives in a variable INSIDE that same transform, so the two compose
+   without a second property. And `[data-swiping]` is a state the stylesheet can see, so the rule
+   that suppresses the transition sits beside the rule that declares it rather than in a script.
+
+   `--m3-travel` is `duration-short2` on `easing-emphasized`, which is what both reference files
+   use for a sheet. */
+/* **The pane travels, and its occupants do not.** One box moves, so switching the station card for
+   the filters swaps the content of a container that is already in place. Two sheets sliding through
+   each other is what that switch looked like while each panel carried its own travel. */
+/* **A keyframe on `[open]`, not a transition, and the element is why.** `show()` and `showModal()`
+   both flip `display`, so there is no closed state left to transition FROM — the same shape the four
+   other dialogs use. It buys an enter and no exit, and the pane leaves instantly. `@starting-style`
+   with `allow-discrete` on `overlay` buys that exit, and risks the dialog leaving the top layer
+   before the animation ends, which draws the exit behind the page.
+   Both variants travel in from the edge they are anchored to, on `--m3-travel`. That is
+   `duration-short2` on `easing-emphasized`, which is what the reference gives a side sheet AND a
+   full-screen dialog. */
+@keyframes paneIn  { from { opacity: 0; transform: translateX(100%); } }
+@keyframes paneUp  { from { opacity: 0; transform: translateY(100%); } }
+#pane[open] { animation: paneIn var(--m3-travel); }
+body:not(.ready) #pane[open] { animation: none; }
+@media (max-width: 600px) {
+  #pane[open] { animation: paneUp var(--m3-travel); }
+  #paintmenu { transition: transform var(--m3-travel); }
+  #paintmenu[data-swiping] { transition: none; }
+  #paintmenu:popover-open { transform: translateY(var(--drawer-swipe-movement-y, 0px)); }
+}
+
+/* Reduced motion keeps the fade and drops the travel. Something still has to say a pane arrived. */
+@media (prefers-reduced-motion: reduce) {
+  @keyframes paneIn { from { opacity: 0; } }
+  @keyframes paneUp { from { opacity: 0; } }
 }

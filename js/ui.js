@@ -5,7 +5,8 @@ import { KINDS, MAST, camSrc, FEED, STATIC, NEAR_MAX_KM, NOTICE, NOTICE_KIND, NA
 import { state, PREFS, PREFS_KEY, save } from './state.js';
 import { el, distKm, dkey, ignoredIds, leads, favIds, isFav, squash, termsOf, matches, esc
        } from './util.js';
-import { map, setTheme, applyTheme, flashTo, closeSide, showPlace } from './map.js';
+import { setTheme, applyTheme, flashTo, closeSide, showPlace, side } from './map.js';
+import { showHere } from './locate.js';
 import { heatOpacity, syncHeat } from './heat.js';
 import { byId } from './stations.js';
 import { camWarn } from './popup.js';
@@ -328,14 +329,19 @@ const phone = matchMedia('(max-width: 600px)');
 const menu = el('menu');
 // `remember: false` for opens and closes the layout forced rather than the user chose — otherwise a
 // phone-width auto-close would overwrite the preference and there'd be nothing to restore later.
+/* `pan` is dead and kept only so the four existing call sites still read. The drawer used to cover
+   a strip of map, so opening it panned the map half its width to keep the view centred on what was
+   left. The drawer is an occupant of the supporting pane now and the map's own box stops at that
+   pane, so the container narrows instead of being covered. `map.invalidateSize()` recentres it —
+   see the observer in map.js. */
 function setDrawer(open, pan = true, remember = true) {
-  // Phones only: see the `sideopen` listener below for the other half of this and the reasoning.
-  if (open && phone.matches) closeSide();
+  /* **One pane, one occupant, at every width.** The two panels shared a screen while each had a rail
+     of its own on opposite edges. They are the same box now, so a second one opening would land on
+     the first. See the `sideopen` listener below for the other half of this. */
+  if (open) closeSide();
   document.body.classList.toggle('drawer', open);
   menu.firstElementChild.className = `i i-${open ? 'menu_open' : 'menu'}`;
   menu.setAttribute('aria-expanded', open);
-  // Keep whatever you were looking at centred in the *visible* half of the map.
-  if (pan) map.panBy([(open ? -1 : 1) * el('bar').offsetWidth / 2, 0], { duration: .25 });
   if (remember) { PREFS.drawer = open; save(); }
 }
 menu.onclick = () => setDrawer(!document.body.classList.contains('drawer'));
@@ -357,69 +363,31 @@ setDrawer(wantDrawer(), false, false);
 // would leave nothing to restore.
 phone.addEventListener('change', () => setDrawer(wantDrawer(), false, false));
 
-/* One panel at a time, at phone width only. Both are 84vw there and the drawer is drawn over the
-   station panel, so a second one opening lands on top of the first — and above 600px there is room
-   for the two on opposite edges, which is the layout they were built for. Each closes the other.
+/* One panel at a time, at EVERY width. This was phone-only, back when the drawer had the leading
+   rail and the station panel the trailing one and the two could stand side by side. They are two
+   occupants of one supporting pane now, so a second one opening replaces the first.
    The station panel's half arrives as an event because map.js owns openSide() and this module
-   already imports map.js; a call back the other way would close the import cycle.
-   `remember: false` and `pan: false` — the layout is deciding here, not the user, so the desktop
-   preference survives, and there is no visible map to keep centred at this width. */
-document.addEventListener('sideopen', () => { if (phone.matches) setDrawer(false, false, false); });
+   already imports map.js. A call back the other way would close the import cycle.
+   `remember: false` — the layout is deciding here, not the reader, so a desktop preference for an
+   open drawer survives the station card that replaced it. */
+document.addEventListener('sideopen', () => setDrawer(false, false, false));
 
-// --- scrim and swipe (phones) --------------------------------------------------------------------
+// --- the ways out of the pane -------------------------------------------------------------------
 
-/* At phone width each panel takes 84vw and stands over the map, which makes it a modal drawer. A
-   modal drawer is dismissed by a tap on its scrim or by a swipe toward the edge it is anchored to,
-   and those are the two ways out here. An edge tab held the job first and drew a chevron plate on
-   the seam between the panel and the map — a second object on the map, for something the panel's own
-   scrim already says. Above 600px the scrim is inert: the × closes the card and the hamburger closes
-   the drawer, which is where each control belongs on a screen with room for both panels. */
-el('scrim').onclick = () => { setDrawer(false); closeSide(); };
+/* The drawer had no close button while the hamburger that opened it stayed on screen. Below 600px
+   the pane covers that hamburger, so `#barHead` carries an X of its own. The station panel's × was
+   always there. */
+el('barClose').onclick = () => setDrawer(false);
 
-/* Drag the panel off its own edge. `sign` is the direction that dismisses it: -1 for the drawer,
-   +1 for the station panel. Touch only — a drag with a mouse is a selection.
-   The first 8px decide the axis and nothing is moved before that: both panels scroll vertically, and
-   a swipe that stole a scroll would cost more than the swipe is worth. A range input keeps its own
-   drag (the drawer holds the heat opacity slider).
-   The drag is written to the `translate` property, not to `transform`. The box already carries a
-   `transform` that places it — the panel's open/shut slide — and an inline transform would throw
-   that away for the length of the drag. `translate` is a separate property that composes with it, so
-   the finger only ever adds to where the box already is. The stylesheet transitions it, which is
-   what carries a released panel home. */
-function swipeOff(box, sign, close) {
-  let x0 = 0, y0 = 0, dx = 0, axis = 0, on = false;
-  const move = v => { box.style.translate = v; };
-  box.addEventListener('touchstart', e => {
-    on = phone.matches && e.touches.length === 1 && !e.target.closest('input[type=range]');
-    axis = dx = 0;
-    x0 = e.touches[0].clientX; y0 = e.touches[0].clientY;
-  }, { passive: true });
-  box.addEventListener('touchmove', e => {
-    if (!on) return;
-    const mx = e.touches[0].clientX - x0, my = e.touches[0].clientY - y0;
-    if (!axis) {
-      if (Math.abs(mx) < 8 && Math.abs(my) < 8) return;
-      axis = Math.abs(mx) > Math.abs(my) ? 1 : -1;
-      if (axis > 0) box.style.transition = 'none';   // the finger is the animation now
-    }
-    if (axis < 0) return;
-    dx = Math.max(0, mx * sign);                     // travel toward the edge, never away from it
-    move(`${dx * sign}px`);
-  }, { passive: true });
-  // Let go under a third of the way and the stylesheet's transition carries it back; past that it
-  // closes, and the same transition carries it the rest of the way out.
-  const drop = () => {
-    if (!on) return;
-    on = false;
-    box.style.transition = '';
-    move('');
-    if (dx > box.offsetWidth * .3) close();
-  };
-  box.addEventListener('touchend', drop);
-  box.addEventListener('touchcancel', drop);
-}
-swipeOff(el('bar'), -1, () => setDrawer(false));
-swipeOff(el('side'), 1, closeSide);
+/* **Escape needs no handler here any more, and the element is the reason.** `#pane` is a `<dialog>`.
+   Below 600px it opens with `showModal()`, so Escape and the Android back gesture reach it natively
+   as `cancel` and the element closes itself. `syncPane()` in map.js clears the body classes from the
+   `close` event that follows.
+   Above 600px it opens with `show()`, and a non-modal dialog does not answer Escape at all. That is
+   the behaviour this app wants and used to enforce with a width test: a stray Escape must not take
+   a card somebody is reading beside a live map.
+   `#scrim` and the swipe went with the bottom sheet. A full-screen dialog has no outside to tap and
+   no drag, and its own backdrop paints nothing. */
 
 // --- layer chips -------------------------------------------------------------------------------
 
@@ -606,20 +574,38 @@ el('wxLayer').onchange = async e => {
   }
   syncHeat();
   render();
+  // The open card follows the layer. See carry() below for why it runs here and not in a listener.
+  // Guarded on the preference, because the catch above rolls it back and a card must not be closed
+  // by a switch that did not take.
+  if (PREFS.mapLayer === 'weather') await carry();
 };
 
-/* **Changing the layer closes the card, and that is a fifth way out of `#side`.** Every other one
-   is listed in CLAUDE.md, and the rule there is that nothing closes the card except the reader. This
-   obeys it. A layer switch is a press the reader made, and it takes the thing the card describes off
-   the map. A station card over a weather map names a pin that is not drawn, and a weather card over
-   the station map names a point that is not either. Neither can refresh: `render()` skips a site
-   that has left `sites`, and `tick()` in wx.js only runs while weather draws.
-   Both panels are the same panel. The weather card is a tenant of `#side` under a `@wx-` key, the
-   shape the alert list already uses, so one `closeSide()` covers the pair.
-   A listener of its own rather than a line inside either handler. The Stations radio shares a
-   handler with the four boxes under it, and Weather has a separate one that awaits a deferred
-   module. Adding the same line to both is two copies of one rule. */
-for (const id of ['stations', 'wxLayer']) el(id).addEventListener('change', closeSide);
+/* **Changing the layer carries the card across, and this reverses the rule that stood here.**
+   That rule closed the card, on the argument that a switch takes the thing the card describes off
+   the map. The premise held and the conclusion did not. Both layers answer about one place. So a
+   reader looking at Kajang who presses Weather is asking for the weather at Kajang, and closing the
+   card answers by taking the place away too.
+   Three occupants and three answers. A station card hands over to the nowcast point it already
+   named, and a weather card hands back to the nearest station. `carry()` in wx.js holds both
+   directions, because it is the module that holds the points. The location card is `showHere()`'s
+   own, which already builds one form per layer. The alert list is the one that still closes: it is
+   a directory of stations, and a weather map has no answer to carry it to.
+   With no answer at all the card closes, which is the old rule kept for the case it was right
+   about. That covers a station with no `met`, a point with no station in the payload, and a failed
+   import.
+   **One function, two call sites, and the reason is `pts`.** The weather direction cannot answer
+   until `?wx=1` has landed, so it runs at the tail of `wxLayer`'s own handler, after the `tick()`
+   that handler already awaits. The Stations direction is reached from weather mode, where the
+   points are already in hand, so a listener beside the radio is enough. */
+async function carry() {
+  const key = side.key;
+  if (!key) return;
+  if (key === '@here') return showHere();
+  if (key === '@alerts') return closeSide();
+  try { if (!(await import('./wx.js')).carry(key)) closeSide(); }
+  catch { closeSide(); }
+}
+el('stations').addEventListener('change', carry);
 
 // --- district filter ------------------------------------------------------------------------------
 // render.js draws the list; this only interprets clicks on it. `hidden` holds the districts switched
@@ -796,6 +782,14 @@ document.addEventListener('toggle', e => {
   if (e.newState !== 'open' || !box.classList?.contains('menu')) return;
   const btn = document.querySelector(`[popovertarget="${box.id}"]`);
   if (!btn) return;
+  /* Below 600px `#paintmenu` is a bottom sheet, and a sheet is placed by the stylesheet against the
+     bottom edge rather than against its button. The three properties are CLEARED rather than left
+     alone: an inline style beats the sheet's own rule, so a menu placed on a wide screen and then
+     rotated to a narrow one would stay pinned beside a button it no longer opens from. */
+  if (box.id === 'paintmenu' && phone.matches) {
+    box.style.left = box.style.top = box.style.bottom = '';
+    return;
+  }
   const r = btn.getBoundingClientRect();
   /* Away from the nearest edge, which is what every menu does. A button in the left half aligns its
      menu's LEFT edge to its own, and one in the right half aligns the right edges. Right was the
@@ -833,6 +827,90 @@ document.addEventListener('toggle', e => {
     box.style.top = `${Math.max(8, Math.min(r.bottom + 4, innerHeight - h - 8))}px`;
   }
 }, true);
+
+/* --- swipe to dismiss a sheet ------------------------------------------------------------------
+
+   One implementation for all three sheets: the filters, the station panel and the layer sheet.
+   Below 600px each is an M3 bottom sheet and each draws a drag handle, and a handle drawn over a
+   gesture nobody wired up is a promise the panel does not keep.
+
+   **The finger writes a custom property and the transition is killed by an attribute.** That is the
+   reference component's own mechanism rather than an approximation of it:
+
+       [data-slot="side-sheet-content"][data-swipe-direction="right"] {
+         transform: translateX(var(--drawer-swipe-movement-x, 0px));
+       }
+       [data-slot="side-sheet-content"][data-swiping] { transition: none; }
+
+   https://github.com/bczak/m3you/blob/development/src/components/SideSheet/side-sheet.css
+
+   It replaces an inline `translate` plus an inline `style.transition = 'none'`. Two things it buys.
+   The open and shut position lives in `transform` and the finger lives in a variable INSIDE that
+   same transform, so the two compose without needing a second property. And `[data-swiping]` is a
+   state the stylesheet can see, so the rule that suppresses the transition sits beside the rule
+   that declares it rather than in a script.
+
+   **A downward drag shares its axis with the sheet's own scroll.** So the drag is refused outright
+   while anything under the finger is scrolled away from its top. That gesture is the scroll coming
+   back. At the top there is nothing left to scroll to, and both sheets carry
+   `overscroll-behavior: contain`, so the browser does nothing while the finger drags. No
+   `preventDefault()` is needed, which is what lets both listeners stay passive.
+
+   **Distance OR velocity dismisses, and the velocity half is what a flick needs.** 90px is about a
+   third of a sheet and a distance a thumb covers without repositioning. A fast short flick travels
+   less than that and still means the same thing, so anything past 0.5px per millisecond over the
+   last move dismisses too. Distance alone made a sheet feel stuck to the screen, which is the half
+   this was missing. */
+const SWIPE_PX = 90, SWIPE_VEL = 0.5;
+
+function swipeSheet(box, close) {
+  let x0 = 0, y0 = 0, dy = 0, axis = 0, on = false, last = 0, lastY = 0, vel = 0;
+  const set = v => box.style.setProperty('--drawer-swipe-movement-y', `${v}px`);
+  const scrolled = t => {
+    for (; t && t !== box.parentNode; t = t.parentElement) if (t.scrollTop > 0) return true;
+    return false;
+  };
+  const end = () => {
+    if (!on) return;
+    on = false;
+    box.removeAttribute('data-swiping');
+    box.style.removeProperty('--drawer-swipe-movement-y');
+    if (dy > SWIPE_PX || (dy > 8 && vel > SWIPE_VEL)) close();
+  };
+  box.addEventListener('touchstart', e => {
+    on = phone.matches && e.touches.length === 1
+      && !e.target.closest('input[type=range]') && !scrolled(e.target);
+    axis = dy = vel = 0;
+    x0 = e.touches[0].clientX;
+    y0 = lastY = e.touches[0].clientY;
+    last = e.timeStamp;
+  }, { passive: true });
+  box.addEventListener('touchmove', e => {
+    if (!on) return;
+    const y = e.touches[0].clientY, my = y - y0, mx = e.touches[0].clientX - x0;
+    /* The first 8px decide the axis and nothing moves before that. A drag that is mostly sideways,
+       or that starts upward, belongs to the content: the drawer holds a horizontal chip row and an
+       opacity slider. */
+    if (!axis) {
+      if (Math.abs(my) < 8 && Math.abs(mx) < 8) return;
+      axis = Math.abs(my) > Math.abs(mx) && my > 0 ? 1 : -1;
+      if (axis > 0) box.setAttribute('data-swiping', '');
+    }
+    if (axis < 0) return;
+    const dt = e.timeStamp - last;
+    if (dt > 0) vel = (y - lastY) / dt;
+    last = e.timeStamp; lastY = y;
+    dy = my;
+    set(dy);
+  }, { passive: true });
+  box.addEventListener('touchend', end);
+  box.addEventListener('touchcancel', end);
+}
+
+swipeSheet(el('paintmenu'), () => el('paintmenu').hidePopover());
+/* `#paintmenu` is the last bottom sheet in this app, so it is the last drag. The supporting pane
+   had one while it was a bottom sheet. It is a full-screen dialog now, and that variant has no
+   swipe. */
 
 // --- alert list ------------------------------------------------------------------------------
 // Nothing more than a disclosure now — the list lives in #side and alerts.js owns both ends of it.

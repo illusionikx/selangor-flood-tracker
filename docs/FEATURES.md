@@ -11029,3 +11029,1003 @@ and a clear sky on this same card, and one token cannot say `hot` and `clear` in
 which is the card's own padding. Low draws left of high on one line. The two arrows resolve two
 different colours and each keeps an 11px box. The `NOW` card measures 64.8px against 64.8px for a
 card with no pair, so the day's temperature costs no height at all. It is gone.
+
+## The "Your Location" card shows the forecast on the weather map
+
+The card the locate button opens listed the nearest camera and the nearest station of each of the
+four sensor kinds. It listed them on both map layers.
+
+Weather mode draws no station pin. So on that layer the card named five places the map does not
+draw, and every `data-go` row on it pointed at a pin that is not there.
+
+That is the same disagreement the layer switch already answers for. A layer switch closes a station
+card, because it takes the thing the card describes off the map.
+
+This card is the one card that can answer on both layers. So it keeps the layer the reader is on,
+rather than closing.
+
+**It draws the full forecast, not a summary of one.** The first version kept the two-cell weather
+section a station card carries, which is `Now` and `Later`. Beside a weather map that opens a
+nine-step stack on every pin, that is the same fact in two sizes.
+
+`hereCard()` in `js/wx.js` builds
+the card a weather pin builds, over the point nearest the fix. So the reader gets the two issues
+behind, the step happening now with the day's two ends on it, and the six steps ahead.
+
+**The head names the point and the distance.** The station-mode card puts the accuracy of the fix
+on that line. A weather card has one fact the reader cannot get anywhere else, which is which MET
+point answered for them. So `Shah Alam · 0.3 km` takes the line there.
+
+The title and its glyph do not change, so the two cards still read as one card.
+
+**`js/locate.js` reaches it through a dynamic import, and that costs no request.** Weather mode is
+the only way to reach the branch, and reaching weather mode is what loaded `wx.js`. So the import
+resolves from the module map. That is the shape `place()` in the same file already uses for the
+table.
+
+**The empty answer stays with the station card.** `hereCard()` returns nothing where no MET point
+sits within `NEAR_MAX_KM` of the fix. `herePopup()` then draws the head and one line,
+`No weather within 10 km`. One message, in one place, whichever half did not answer.
+
+**It refreshes on the poll, like the pin card beside it.** `tick()` in `wx.js` already rebuilt an
+open `@wx-` card on every poll. It rebuilds `@here` the same way. A forecast frozen on the issue it
+opened with, beside pins that moved, is the fault the offline-gauge rule already names.
+
+An empty answer leaves the card alone. The reader can walk out of range, and a card that empties
+itself says less than the one on screen.
+
+**Trade-off accepted.** A reader on the weather map who wants the nearest river switches back to
+Stations first. The alternative is a card that answers about a map the reader is not looking at.
+The nearest point can also be one the pin layer thinned away at the current zoom. The card names
+it, so the reader reads which point answered even where no pin stands on it.
+
+**Checks.** A throwaway headless probe drove the real app at three fixes. A Shah Alam fix in
+weather mode drew 9 step cards, 1 `NOW` card, the day's two ends, 0 station rows and 0 cameras, under
+the head `Your Location | Shah Alam · 0.3 km`. A fix 11 km from every point drew
+`No weather within 10 km`.
+
+The same Shah Alam fix in station mode drew the four sensor rows and the camera as before. A poll
+left every card open and holding what it held. It is gone.
+
+
+## Changing the map layer hands the card over instead of closing it
+
+Switching between Stations and Weather closed the open card. The argument was that a switch takes
+the thing the card describes off the map. A station card over a weather map names a pin that is not
+drawn, and a weather card over the station map names a point that is not either.
+
+The premise held. The conclusion did not.
+
+Both layers answer about one place. A reader on the Kajang station card who presses Weather asks for
+the weather at Kajang. Closing the card answers by taking Kajang away as well.
+
+**A station card hands over to the point it already named.** `api.php` attaches every station to its
+nearest nowcast point. It publishes that point name as `met.at`.
+
+So the hand-over is a name match against the `?wx=1` points. It lands on the forecast the card
+already drew, which is the point the reader already read. It is not a second guess at that point.
+Measured 2026-08-20: all 675 stations carrying `met` name one of the 50 points `?wx=1` publishes.
+
+**A weather card hands back to the nearest station of any kind.** `flashTo()` does it, and that is
+the one door to a station card in this app. It pins the target past every filter, so the card cannot
+open on a pin that is not there. It pings the pin, so the reader sees which station answered.
+
+**The map goes to the target, and the first version left it standing still.** The station direction
+had the move already, because `flashTo()` carries it. The weather direction swapped the panel over a
+map that had not moved. A reader who pressed a layer chip read that as nothing having happened, even
+with the new place name at the top of the panel.
+
+So `carry()` makes the same two moves a weather pin makes on a click, `openSide()` and then
+`focusOn()`. It adds the ripple `flashTo()` draws on the way back, so both directions say the same
+thing. The ripple carries the point name, because the pin under it can be one the zoom thinned
+away.
+
+**The hand-over is not an inverse, and nothing here makes it one.** KG. KUNDANG names the
+Banting point at 14.7 km, because that is the point nearest the coordinates JPS gives it.
+
+The nearest station to the Banting point is SIREN PEKAN BANTING. Both steps are right, and a round
+trip lands somewhere else. A forced return needs the card the reader came from. The second switch
+then answers about a place the map no longer shows.
+
+**The "Your Location" card swaps rather than hands over.** It already holds one form per layer. So
+`carry()` calls `showHere()` in `js/locate.js`, and that function picks the form. See the section
+above for the weather form.
+
+**The alert list is the one occupant that still closes.** It is a directory of stations, and a
+weather map has no answer to carry it to. A card with no answer at all closes too, which is the old
+rule kept for the one case it was right about. That covers a station with no `met`, a point with no
+station in the payload, and a failed import of the deferred module.
+
+**One function, two call sites, and `pts` is the reason.** The weather direction cannot answer until
+`?wx=1` has landed. So it runs at the tail of the `wxLayer` handler, after the `tick()` that handler
+already awaits.
+
+The preference guards it. That handler rolls the preference back when the import fails, and a switch
+that did not take must close nothing. The Stations direction starts in weather mode, where the
+points are already in hand, so a listener on that radio is enough. `carry()` in `js/wx.js` holds
+both directions, because it is the module that holds the points.
+
+**Checks.** A throwaway headless probe drove the real app through every hand-over. A station card on
+KG. KUNDANG became the Banting weather card, and that became the SIREN PEKAN BANTING card. A weather
+card on Serdang became the SIREN SRI KEMBANGAN card.
+
+Both panels played the swap wipe.
+
+**The map move needed a temporary instrument, and the reason is worth keeping.** The probe recorded every `focusOn()` call.
+Station to weather aimed at 2.8139, 101.5041, which is the Banting point.
+Weather to stations aimed at 3.0105, 101.7071, which is SIREN SRI KEMBANGAN.
+
+Reading the settled map centre instead does not work here. Leaflet pans with a transform and
+`requestAnimationFrame` for any offset that fits the viewport. Headless virtual time does not run
+that animation faithfully.
+
+Two runs of one probe reported the centre on the point and then short of it, with no code change
+between. That is the trap `paint-check.html` already names for CSS transitions. Assert the call, not
+the rendered position.
+
+The location card kept its title across both switches. It drew 9 forecast steps and 0 station rows
+on weather, and drew its station rows again on the way back. The alert list closed. It is gone.
+
+## Below 600px, six surfaces became M3 full-screen dialogs
+
+The drawer arrived from the left edge and the station panel from the right. Each took 84vw and left
+a strip of map beside it. That strip was the scrim, and a swipe toward the panel's own edge
+dismissed it. The four dialogs floated in the middle of the screen with a dimmed page behind them.
+
+Material Design 3 names a component for this, and the app was not using it. A full-screen dialog is
+what M3 puts at the compact breakpoint, and compact is under 600dp, which is the same 600px this
+app already turns on.
+
+M3 also names the case, and all six surfaces answer it. A full-screen dialog is for a task with a
+series of steps. It is for a box that takes keyboard input. It is for a box that can open another
+dialog on top of itself. The drawer holds three filter lists and a district search. The station
+panel opens the lightbox. The table and the camera wall each hold a filter field and open a
+picture.
+
+**Six surfaces below 600px: the drawer, the station panel, the table, the camera wall, About and
+Help.** Above 600px nothing changed. The wide layout still draws two side panels on opposite edges
+and four floating dialogs.
+
+### What the shape is
+
+Quoted from M3's own measurements table:
+
+| Attribute | Value |
+|---|---|
+| Container shape | 0dp corner radius |
+| Header height | 56dp |
+| Divider height | 1dp |
+| Headline text alignment | Start-aligned |
+
+and from the token set, container elevation `level0` and a header container color of `surface` at
+rest.
+
+So each surface fills the screen, square and flat, over the app bar. M3 states that a full-screen
+dialog covers the screen and does not appear as a floating modal window.
+
+### The header is an app bar, and the X leads
+
+Every one of the six had its close button on the trailing edge. M3 puts it on the leading edge, and
+says it must be the only navigation in the bar. Never an up arrow: an arrow claims the view saves as
+it goes, and none of these do.
+
+`flex-direction: row-reverse` moves it, rather than reordered markup. The close button is
+deliberately first in the source of all four dialogs so a keyboard reaches it first. This block
+moves only where it draws.
+
+**One number holds all five headers, and it is 56px: where the headline starts.** That is 8px to the
+close button, the button's own 40, then an 8px gap. It is what makes five panes read as one
+component, and it is measured rather than assumed — see `fs-check.html`.
+
+Two M3 numbers this app declined, and why. M3 asks for 24dp of top, left and right padding on the
+container. Every one of these surfaces already sits on the app's own padding scale: 16px in the
+station panel, 18px in the two prose dialogs, 20px in the drawer. One number restated in the header
+alone gives each pane two left edges. The header follows the pane it heads. M3's headline token
+is `title-large` at 22px, and every headline here is already 18px over a 15px body. A 22px headline
+at 360px takes width the close button needs.
+
+### The drawer gained a header, because it had none
+
+It never needed one. The hamburger that opened it stayed on screen to close it again. A full-screen
+dialog covers that hamburger, so `#barHead` carries an X of its own and the headline `Layers and
+filters`. That is the word the hamburger's own `aria-label` and the Help page already use, so
+nothing here spells one thing two ways.
+
+`#barHead` draws nothing above 600px.
+
+### The station panel keeps its card head, and that is M3's own instruction
+
+M3 says a long or variable headline belongs in the content area rather than the app bar, because
+truncating it misleads. A station name is both long and variable. `SUNGAI DAMANSARA DI TTDI JAYA` is
+not a headline that fits a 360px bar beside a close button.
+
+So the name, the region and the sensor badges stay the card head they already are, and the bar
+around them is that card's first line. The X and the ⋮ swap edges, which is the desktop arithmetic
+in `css/map.css` mirrored: the X leads at 8px, the ⋮ trails at 8px, and each line clears the button
+beside it.
+
+8 + 40 + 8 is M3's 56dp header. Those desktop numbers already came to it.
+
+Those three rules are scoped to `#sideHead`, never to `.pophead` alone. That class also heads the
+alert list, the table's hover panel and every popup card, and none of those stands beside a close
+button.
+
+### The scrim is gone, and so is the swipe
+
+M3 lists a scrim in the basic dialog's anatomy and leaves it out of this one. A full-screen dialog
+has no outside. So `#scrim` is deleted rather than disabled, and `swipeOff()` with it. That is a
+`<div>`, a CSS block and about 45 lines of JavaScript removed.
+
+**The two ways out are M3's own.** The close X in each pane's app bar, and the Escape key, which is
+also what the Android back gesture fires in a browser. Escape is phone-width only. Above 600px
+neither panel is modal, the × closes the card and the hamburger closes the drawer, and a stray
+Escape must not take a card somebody is reading.
+
+M3 also asks for a confirm-before-discard dialog when a full-screen dialog closes with unsaved
+changes. **Nothing here has unsaved changes.** Every control in these panes writes `PREFS` the
+moment it is touched. So there is no confirming action in any header either, and the X is the whole
+of the dismissal.
+
+### The motion comes from M3's own component spec
+
+Up from the bottom edge, with a fade. Quoted from the M3 Expressive component set's `dialog.css`,
+which cites `m3.material.io/components/dialogs/specs`:
+
+```css
+.md-fullscreen-dialog-content {
+  transition: all var(--md-sys-motion-duration-short2) var(--md-sys-motion-easing-emphasized);
+  &[data-ending-style], &[data-starting-style] { opacity: 0; transform: translateY(100%); }
+}
+```
+
+`duration-short2` is 300ms and `easing-emphasized` is `cubic-bezier(0.2, 0, 0, 1)`, both read out of
+that project's own token file. `--m3-travel` in `css/base.css` holds the pair. Its basic dialog is
+`opacity: 0` with `scale(0.95)` at `duration-extra-short4`, 200ms, which is `--m3-grow`.
+
+`--slide` stays what it is. That token carries this app's own furniture, and furniture is not a
+dialog.
+
+**A clip-path collapse along the y axis stood here first, and it was wrong.** The argument for it
+was M3's transitions page, which files a dialog under enter and exit *within* screen bounds and
+avoids anything reading as an elevation change. That page describes the basic dialog. The component
+spec for the full-screen variant says translate.
+
+**A component spec beats a generalisation about its family.** The basic dialog still gets the
+within-bounds treatment on desktop, which is the half that argument was right about.
+
+**Two mechanisms, one for each kind of element.** The two panels are placed by a body class, so they
+hold a closed state to transition from and get an enter and an exit. The four dialogs are placed by
+`showModal()`, which flips `display`, so a keyframe on `[open]` is all there is to start from. That
+is the shape `#eggBox` already uses. It buys an enter and no exit, and a dialog still leaves
+instantly.
+
+`@starting-style` with `allow-discrete` on `overlay` buys that exit. It also risks the dialog
+leaving the top layer before the animation ends, which draws the exit behind the page.
+
+### `fs-check.html`, the seventh runnable check
+
+Four faults here put nothing wrong on screen and three of them shipped during the work.
+
+**A sticky header pins to the scroller's PADDING box, not to the top.** A sticky box is held inside
+its scrollport, and a scroller's scrollport is its padding box. So `top: 0` held the bar 20px down
+in the drawer and 18px down in the two prose dialogs, with the content scrolling through the gap
+above it. It looks almost right, which is why it shipped in two panes at once. `top` is the negative
+of that padding.
+
+**The 56dp headline start drifts invisibly.** Five panes, four different paddings. It only shows
+when two stand side by side, which is the one thing a reader never does. The first pass had it at
+50, 52 and 54 on three panes.
+
+**A rule written outside the media query moves the desktop.** So the check loads the app a second
+time at 1200px and reads the wide layout back: the 288px rail, the 360px panel, the trailing ×, the
+two slide transforms and the four floating dialogs, each with its scrim and its corner.
+
+**A variant with no scrim has to keep a way out.** The check asserts the drawer has a close button
+at all, and drives a real Escape through the document to reach the handler the app registered.
+
+### What was deliberately not built
+
+**No confirming action in any header.** M3's anatomy carries a trailing text button, and M3 is
+explicit about its label: `Save`, `Send`, `Create`, never `Done` or `OK`. It is for a task whose
+changes are not saved instantly. None of these six is that task.
+
+**No `@starting-style` exit for the four dialogs.** See the motion section for the risk.
+
+**The table dialog was not named in the request and is in the change.** It shares its whole shell
+with the camera wall and opens from the same menu. One of four dialogs floating while three fill the
+screen is the inconsistency this work exists to remove.
+
+**A bottom sheet was built first and thrown away.** Both panels rose from the bottom edge with M3's
+28px corner, and every dialog rose with them. The repository owner replaced it with this on
+2026-08-20. Two things it got wrong are worth not repeating. M3's dialogs page never mentions bottom
+sheets at all, so the sheet-versus-dialog rule it was built on came from nowhere. And a bottom sheet
+keeps a scrim and a peek strip, which meant the swipe and the scrim tap stayed, which meant a
+vertical dismiss gesture sharing its axis with the panel's own scroll.
+
+## The four dialogs adapt across M3's window size classes
+
+The full-screen shape above is one half of a sentence M3 states outright: a dialog can swap variants
+as the breakpoint changes, and a full-screen dialog can become a basic dialog at a larger one. This
+is the other half.
+
+Before it, the four dialogs had no breakpoint between 600px and infinity. The camera wall was
+`100vw - 24px` at every desktop width. The table capped at 1060 by 900. About and Help capped at
+820. So a dialog crossed out of the full-screen variant at 601px straight into its desktop shape,
+and at that width the shape measured 577px. A phone-sized box already calling itself a desktop.
+
+### The bands
+
+| band | width | inset | camera wall | table | About and Help |
+|---|---|---|---|---|---|
+| compact | < 600 | — | full screen | full screen | full screen |
+| medium | 601–839 | 16px | `100vw − 32` | `100vw − 32` | 560px |
+| expanded | 840–1199 | 24px | `100vw − 48` | 1060px | 820px |
+| large | 1200+ | 32px | `100vw − 64` | 1200px | 820px |
+
+**Three variables carry it, not twelve rules.** `--dlg-inset` is the gap to the window edge,
+`--dlg-wide` caps the table and `--dlg-prose` caps the two prose panes.
+
+**The camera wall takes no cap at any width.** That is a decision this file already carried: a wall
+of ninety pictures is the one view here that gets better with more room, and two pixel caps once
+parked it in the middle of a wide monitor at a size that ignored the screen.
+
+**The prose gets none of the extra room at large.** 820px is already about 110 characters of line. A
+wider measure is a worse read, not a better one.
+
+### The chrome, and the two parts of it declined
+
+**Taken:** M3's 28dp corner, and `headline-small`'s 24px on the four headlines.
+
+**Declined: `surface-container-high`.** This app holds one surface tone, in two theme sets, in
+`css/base.css` and nowhere else. A second tone five percent off the first is invisible over a scrim,
+and it is a colour invented outside that file, which is the one thing the palette rule forbids.
+
+**Declined: elevation `level3`.** `--shadow` is this app's one elevation and every dialog already
+carries it.
+
+`headline-small`'s 400 weight goes with them. Every other heading in this app is 500, and a lone 400
+among them reads as a mistake rather than as a spec.
+
+### The header is pinned at every width now
+
+M3: even when a dialog has to scroll, its title stays at the top. The table and the camera wall
+already did it structurally — each is a flex column whose `.dtop` is `flex: none` and whose body
+scrolls under it. About and Help had no such seam, so Help scrolled its own close button off the
+screen on a desktop.
+
+`.docbox` carries `--pane`, its own padding: 24px wide and 18px on a phone. The sticky rule reads
+that back rather than restating it, which is what stops the header's four negative offsets drifting
+from the padding they cancel.
+
+### The browser's own stylesheet ate one band
+
+The UA sheet carries `dialog { max-width: calc(100% - 6px - 2em); max-height: calc(100% - 6px - 2em) }`.
+
+`#dataBox` and `#camBox` set `width` and `height` rather than `max-*`, so that cap still applied over
+the top of them. At a 14px font 2em is 28, so the cap is `100% - 34px`. It clamped a 668px pane to
+666 in a 700px window, and the medium band's 16px inset silently became 17.
+
+**It bites in the medium band alone**, because the cap is wider than the pane at every band above
+it. Three of four bands looked right, which is the worst shape for something to be wrong in.
+`max-width: none` and `max-height: none` clear it.
+
+`.docbox` never had the problem: it sets `max-width` itself, and an author rule beats a UA one. It
+keeps the UA `max-height` on purpose, and that is what makes long prose scroll inside the pane
+rather than off it.
+
+### What `fs-check.html` gained
+
+**The bands, measured by resizing one frame through them.** `100vw` inside an iframe resolves to the
+iframe's own viewport, so a resize is a real breakpoint crossing. The expected numbers are the
+arithmetic of the three variables, not a copy of them: a check that restates the variables reports
+on the numbers it remembers.
+
+**Motion, asserted as a declaration before the override.** The check switches transitions and
+animations off in the frame, because headless virtual time does not run them faithfully. But the
+override is what `getComputedStyle` then reports, so an animation read after it comes back `none` on
+markup that is right. That happened. `settle()` is a separate call now: motion is read before it,
+geometry after it. `paint-check.html` states the same rule from its own experience.
+
+**The property, not the pixel.** The pinned header is asserted not to MOVE when the pane scrolls. A
+sticky box pins one border inside the pane, and a `.dtop` carries its own padding, so an assertion
+against the pane's own top fails on both of them while the markup is correct.
+
+## The layer selector became a bottom sheet on a phone
+
+`#paintmenu` opened as a menu beside its button at every width. The button sits in the map's bottom
+zoom cluster, so on a phone the panel grew upward from the bottom right corner, pinned to a 56px
+button, capped at 340px wide and floating over the map with a 10px corner.
+
+That is a menu. What the panel holds is a set of map settings a reader opens while looking at the
+map, on the edge their thumb is already at. Material Design 3 names the component for that, and it
+is a modal bottom sheet.
+
+**Below 600px `#paintmenu` is an M3 modal bottom sheet.** Above 600px nothing changed: it is still
+a menu beside its button, still opened by hover on a pointer device, still switched by a press.
+
+### The numbers
+
+From the M3 Expressive component set's `BottomSheet/bottom-sheet.css`, which cites
+`m3.material.io/components/bottom-sheets/specs` — the same project the four dialogs took their
+motion from:
+
+| Attribute | Value |
+|---|---|
+| Container shape | 28px, on the two top corners only |
+| Container width | `min(640px, calc(100% - 32px))`, centred |
+| Max height | `calc(100dvh - 72px)` |
+| Drag handle | a 48px row holding a 32 by 4px indicator, radius 2 |
+| Scrim | 32% of the scrim colour |
+
+**The sheet does not reach the side edges.** 16px of map shows down each side at 360px while the
+sheet sits flush on the bottom. That is the reference's own shape, and it is why only the top
+corners are rounded.
+
+One number this app keeps instead. M3 pads the sheet body 24px on the inline axis. Every row in
+here is a `.chip`, and a chip brings 14px of its own — which is why this panel already pads 6px
+where the shared `.menu` rule pads 4. Stacking 24 on top of 14 puts a label 38px inside its own
+sheet. That is the header-follows-its-pane rule the four dialogs already state. The 24px at the
+bottom is taken, because nothing sits under the last chip and a phone's gesture bar does.
+
+### It travels on the same token a full-screen dialog does
+
+`--m3-travel` is `duration-short2` on `easing-emphasized`, 300ms of `cubic-bezier(.2, 0, 0, 1)`.
+
+The token was called `--m3-fs` when only the full-screen dialog used it. It is renamed, because a
+bottom sheet reading a token named for a full-screen dialog is a name that misleads at its second
+call site. **The two tokens are named for what a surface DOES**, not for one component that does
+it. `--m3-travel` moves in from an edge. `--m3-grow` grows in place, which is the basic dialog.
+
+M3 names three easings across those components — emphasized on the dialog, standard on the sheet's
+scrim — and its own table gives all three the same curve. So the duration is the whole of the
+difference between the two tokens.
+
+The scrim fades on a keyframe of its own. A `::backdrop` is a separate box and does not inherit the
+element's animation.
+
+### The handle is drawn and the swipe is wired
+
+A handle drawn over a gesture nobody implemented is a promise the panel does not keep. So
+`js/ui.js` carries the drag: down past 90px dismisses, short of it the sheet comes back.
+
+**A downward drag shares its axis with the sheet's own scroll**, which `.menu`'s `overflow-y: auto`
+gives it whenever the Stations branch is open on a short screen. So the drag is refused outright
+while the sheet is scrolled away from its top. That gesture is the scroll coming back. At the top
+there is nothing left to scroll to, so the browser does nothing while the finger drags and no
+`preventDefault()` is needed, which is what lets both listeners stay passive. The handle itself
+carries `touch-action: none`, so a drag that starts on it never scrolls at all.
+
+The drag is written to `translate`, not to `transform`. The enter keyframe owns `transform`, and an
+inline one throws it away mid-animation. `translate` composes with it instead.
+
+90px is the threshold the two panels used before they became full-screen dialogs. It is about a
+third of this sheet's own height, and a distance a thumb covers without repositioning.
+
+### The scrim needed nothing
+
+A popover's `::backdrop` paints but never blocks. Light dismiss still closes the sheet on a tap
+outside, which is a modal bottom sheet's own way out. So there is no `pointer-events` to switch and
+no second box to keep inert — the trap `#splash` and the deleted `#scrim` both carried.
+
+### `js/ui.js` clears its placement rather than skipping it
+
+The `toggle` handler places every `.menu` by hand, writing inline `left` and `top` or `bottom`. An
+inline style beats the sheet's own rule. So a menu placed on a wide screen and then rotated to a
+narrow one stays pinned beside a button it no longer opens from.
+
+The guard clears all three properties and then returns. `paint-check.html` reads the three back and
+asserts they are empty.
+
+### What `paint-check.html` gained
+
+Fifteen assertions, and two of them drive a real `TouchEvent` run through the app's own listener:
+one past the threshold, one short of it. A sheet that shuts on any downward twitch is unusable
+while somebody reads it, and that failure is invisible to every other kind of check here.
+
+It also asserts that the release leaves no inline `translate` behind, or the sheet stays parked
+where the finger let go of it.
+
+Motion is read before the check switches transitions off, and geometry after. `getComputedStyle`
+reports the override rather than the rule, so a keyframe read after one comes back `none` on markup
+that is right. `fs-check.html` states the same rule from its own experience.
+
+## A bare selector gave two basic dialogs a full-screen header
+
+The full-screen dialog work wrote its header rules as bare `.modalhead` inside the phone media
+query. Four dialogs became full-screen. Six use that class.
+
+So `#lightbox` and `#warnBox` drew a close button on the leading edge of a 56px app bar while the
+box around them stayed a floating card with a 12px corner and a scrim behind it. `#warnBox`'s
+weather glyph, first in the source, was reversed past the title to the trailing edge.
+
+**A full-screen header on a basic container reads as a fault in the header. It is a fault in the
+selector.** Those rules name `#dataBox .modalhead, #camBox .modalhead, .docbox .modalhead` now.
+
+### Three kinds, and every dialog declares which
+
+| kind | dialogs | shape |
+|---|---|---|
+| full-screen | `#dataBox`, `#camBox`, `#aboutBox`, `#helpBox` | full-screen under 600px, basic above |
+| basic | `#lightbox`, `#warnBox` | basic at every width |
+| exempt | `#eggBox`, `#narrowBox` | neither, each for a stated reason |
+
+**The two basic ones do not become full-screen on a phone, and M3 is the reason.** That variant is
+for a task with a series of steps, for keyboard input, or for a box that opens another dialog. A
+camera still and a warning read are neither. The four that did convert each carry a filter field or
+a document.
+
+`#eggBox` is a picture with no chrome at all. `#narrowBox` is a blocking state screen with no way
+out on purpose. Neither has a header to get wrong.
+
+### The two basic dialogs gained the chrome they never had
+
+28dp corner, and the `dlgOpen` enter that grows in place at `--m3-grow`. Both were already basic
+dialogs and neither had been given M3's treatment, because the earlier work only touched the four it
+converted.
+
+`headline-small` is 24px, and only `#warnBox` takes it. `#lightbox` holds a camera's name and its
+district on two lines and wraps rather than truncating. M3's own rule about a long or variable
+headline applies: at 24px on a 360px screen that name takes two 32px lines before the picture
+starts.
+
+### `#warnBox`'s icon moved above its headline
+
+Icon is item 2 of M3's basic dialog anatomy and headline is item 3, in a column. It had been inline
+before the headline, which is what let a reversed row push it past the title.
+
+Left-aligned rather than centred. M3 marks centring a prop rather than the default, and every other
+dialog here leads its header on the same edge. `js/ui.js` writes the glyph and its colour by id, so
+moving the element in the markup needed nothing there.
+
+### The roll call is the part that matters
+
+`fs-check.html` now reads every `<dialog>` out of the document and fails on any id its table does
+not name, and on any name the document no longer holds.
+
+Nothing caught the original fault, because nothing knew those two dialogs existed. Every assertion
+was written against a list of four. A new dialog now needs a decision rather than a default.
+
+The motion half of that sweep has to run before the check switches animations off, because
+`getComputedStyle` reports the override rather than the rule. That trap has now caught this work
+three times: on the four full-screen dialogs, on the bottom sheet, and here. Both halves read the
+same table, which is the only copy of it.
+
+## The two panels became real M3 sheets, and the tokens came with them
+
+Two things were wrong, and the second one caused the first.
+
+`#bar` (the filters) and `#side` (the station card, and the weather card that shares it) had been
+side rails, then bottom sheets, then full-screen dialogs. **A full-screen dialog is M3's answer for
+a TASK** — a form with steps, keyboard input, a box that opens another box. A panel that reports on
+the map behind it is a sheet, and a sheet keeps that map in view.
+
+And every M3 number in this app was transcribed by hand into a bespoke rule. A number restated is a
+number that drifts, and half of them had.
+
+### The tokens are M3's own now, names included
+
+`css/base.css` carries M3's shape, elevation and motion token sets under their published names, so
+anything can be grepped straight against the reference:
+
+    https://github.com/bczak/m3you/tree/development/src/styles/tokens
+
+**Only those three are taken.** They are pure spec constants with no colour in them. M3's colour
+roles are not adopted: the palette rule reserves this app's hues for station status, and a tonal
+role that paints a station kind breaks it. Any component that names `surface-container-low` or
+`outline-variant` resolves to this app's own `--surface` and `--outline`, and says so where it does.
+
+`--m3-travel` and `--m3-grow` are built FROM those tokens rather than restating their values.
+
+### Side sheet above 600px, modal bottom sheet below it
+
+| | side sheet, standard | bottom sheet, modal |
+|---|---|---|
+| container | `surface`, square, no elevation | 28dp top corners, no elevation |
+| separation | 1px `outline-variant` on the content edge | a 32% scrim |
+| width | 288px and 360px, inside M3's 256–400 | `min(640px, 100% − 32px)`, centred |
+| height | full | `auto`, at most `100dvh − 72px` |
+| header | 64dp, `title-large` | 48dp handle, then the header |
+| travel | `translateX(±100%)` | `translateY(100%)` |
+
+Both transcribed from `SideSheet/side-sheet.css` and `BottomSheet/bottom-sheet.css`.
+
+**`#bar` carried a shadow and no line, so the two halves of one component did not match.** `#side`
+already drew M3's standard side sheet exactly. The drawer now does too.
+
+**The drawer gained a header it never had.** It went unnamed for years on the argument that the
+hamburger which opened it stays on screen. True, and it still left the panel with no title. M3's
+side sheet has a header, so it has one.
+
+### The drag is the reference's own mechanism
+
+    [data-slot="side-sheet-content"][data-swipe-direction="right"] {
+      transform: translateX(var(--drawer-swipe-movement-x, 0px));
+    }
+    [data-slot="side-sheet-content"][data-swiping] { transition: none; }
+
+The finger writes a custom property **inside** the transform that already holds the open position,
+so the two compose without a second property. And `[data-swiping]` is a state the stylesheet can
+see, so the rule that suppresses the transition sits beside the rule that declares it.
+
+It replaces an inline `translate` plus an inline `style.transition = 'none'`.
+
+**Velocity was the half that was missing.** Distance alone made a sheet feel stuck to the screen: a
+fast short flick travels less than 90px and means the same thing. Anything past 0.5px per
+millisecond dismisses too.
+
+One implementation serves all three sheets now — the filters, the station panel and the layer
+sheet — where there had been one bespoke copy for the layer sheet alone.
+
+### The fault that cost both sheets their bottom edge
+
+`body.drawer #legend` translates the legend by `--drawer`, because on a desktop the drawer takes the
+left rail and the legend steps aside.
+
+Nothing steps aside for a bottom sheet. Once the phone override for `--drawer` went, that rule fell
+back to the 288px base, pushed the legend's right edge past the viewport, and put a horizontal
+scrollbar on the document. A fixed box's `bottom: 0` resolves against an ICB the scrollbar has
+already shortened — so **both sheets sat 15px above the edge they were anchored to.**
+
+A layout fault two elements away, reading as a gap under the sheet. `m3-check.html` asserts the
+legend stays inside the viewport for exactly this reason.
+
+### `fs-check.html` became `m3-check.html`
+
+The file was named for one variant and now covers three components across six variants. A check
+named for a thing it no longer only covers is its own kind of half-measure.
+
+It also gained the sheet assertions, and the stale ones that called the two panels full-screen
+dialogs are gone.
+
+## The station sheet got M3's side sheet header
+
+The panel became an M3 side sheet, and its contents did not follow. It kept the card head it had
+carried since it was a map popup: a name, a region line and a badge row in one block, with the close
+button floating over the top-right corner and the ⋮ placed against that button.
+
+M3's side sheet is a header and a body, and it says what each holds.
+
+    .md-side-sheet-header { display: flex; align-items: center; min-height: 64px; gap: 4px;
+                            padding: 8px 12px 8px 16px; }
+    .md-side-sheet-title  { flex: 1; color: on-surface-variant; font: title-large; }
+    .md-side-sheet-body   { flex: 1; overflow-y: auto; padding: 12px 24px; }
+
+### The header is a row now, and the × is in it
+
+`#sideHead` holds three slots: `#sideTitle` takes the slack, `#sideActions` holds the ⋮, and
+`#sideClose` ends the row. Title, actions, close — the order M3 draws.
+
+**That deleted three numbers that had to move together.** `#sideClose` took `top: 8px`,
+`#sideHead .pophead` took `padding-top: 18px` and `.pophead > .dots` took `top: 8px`, each derived
+from the others, and all three existed only to work around a button floating over a corner. A flex
+row places all three by itself.
+
+The arithmetic survives in `css/map.css` for the surfaces that still float a button — the table's
+hover panel and every map card. `#sideBody .pophead` cancels it.
+
+### The content moved to where M3 puts it
+
+The place name is the sheet's title. The region line and the sensor badges are supporting content,
+so they stay in the body. The ⋮ is a trailing action.
+
+`openSide()` does the split. **The card is still built as one string whose first element is
+`.pophead`** — that seam has not moved. Only the slice taken out of it changed.
+
+The title is `title-large` at 22px in `on-surface-variant`, which is `--muted` here. It wraps rather
+than truncating: M3 states no truncation for this title, and a station name cut in half names
+another station.
+
+The body is `padding: 12px 24px`, which is the reference's own and replaces this app's 16px. Two
+different insets in one sheet is the thing this pass exists to remove.
+
+### On a phone the same header is 56px
+
+A bottom sheet sits under its drag handle, and 64dp is a side sheet number. 56 is the app bar height
+a compact window uses, and the title drops to 18px there for the same reason the full-screen dialogs
+declined `title-large`: at 22px a station name takes three lines of a 328px sheet.
+
+### The check drives the real split
+
+`m3-check.html` injects a module into the frame, so it shares that document's module map and reaches
+the live `openSide()`. It passes a fixed card in the shape `popup.js` emits and asserts where each
+piece lands.
+
+**That is the part that can break silently.** A template change that renames or reorders any of the
+three leaves the header empty and the name buried in the body. Nothing else in this app notices.
+
+
+## The station panel's sections became M3 filled cards
+
+Each sensor on a station card is now an M3 filled card. The card carries a container tone, a 12dp
+corner, no outline and no elevation. The numbers come from `Card/card.css` in the M3 Expressive
+component set, which cites `m3.material.io/components/cards/specs`.
+
+    &[data-variant="filled"] {
+      background-color: var(--md-sys-color-surface-container-highest);
+      color: var(--md-sys-color-on-surface);
+    }
+
+`--hover` stands in for the container tone. This app holds one surface tone in `css/base.css`, and
+the palette rule keeps M3's colour roles out of it. So the container is the one step off `--surface`
+that already exists here. It is the same tone `.chip:hover` and `.wxcol` take.
+
+A cell inside a filled card steps back to `--surface`. Without that, the two containers read as one
+flat block. `.sensor .wxcol` does it, and it reaches both surfaces that draw a `.wxcol`. Those are
+the station card's weather section and the weather panel's half-hour stack.
+
+### It also removed a double line under the title
+
+A section separated itself with a top rule. `.pophead` ended in a bottom rule. Nothing stacked the
+two while `openSide()` lifted the whole header out of the body, because `#sideBody > .sensor:first-child`
+cancelled the first one.
+
+That rule stopped matching the moment `openSide()` began lifting three pieces instead. `.pophead`
+became the body's first child, so the first `.sensor` was no longer `:first-child`. Both rules then
+drew, 8px apart, directly under the title.
+
+The rule's own comment warned against a sibling selector for exactly this reason, and then keyed on
+position. That is the same fault by another name. Neither rule exists now. Cards separate by surface
+and by an 8px gap, so there is nothing left to stack.
+
+`m3-check.html` asserts neither rule is there, and measures the gap. Do not re-key the cancel to
+`#sideBody > .pophead + .sensor`. It works today and breaks the next time the head moves.
+
+### Trade-offs
+
+The card costs 12px of padding on each side of every section. On a 360px phone that is 24px of the
+panel's width, and the phone rule takes it to 10px for the same reason.
+
+A card separates more strongly than a rule. A station with seven sensors now draws seven boxes
+rather than seven bands. That is the point of the component, and it is also more furniture on a
+screen the flood map has to share.
+
+## About and Help had a header with no height
+
+`.modalhead` was written as a row in the flow. It sized to its own title and pulled its close button
+back onto that line with `margin: -8px -10px -8px 0`. That is correct for a row the content flows
+past.
+
+Pinning it made it a bar with a divider under it. The vertical half of that pull then hung the 40px
+button through the divider. Measured at 1200px: About drew a 24px bar under a 38px button, and Help
+drew a 35px one.
+
+Both read as a browser artifact. Both are a number written for another layout.
+
+`.docbox .modalhead` takes `min-height: 56px` now. That is the number the phone block below it
+already stated, and it is M3's top app bar. The pull survives on the inline edge alone. That is the
+half which puts the button's hit area on the pane's own padding rather than 10px inside it.
+
+`m3-check.html` opens each pane and asserts the button stays inside the bar at both ends.
+
+## A station name became a title
+
+JPS publishes a place name in capitals. The national portal publishes the same place in Title Case.
+So the payload already spells one station two ways, and a title has to pick one. `titleCase()` in
+`js/util.js` is the one place that picks.
+
+CSS cannot do this. `text-transform: capitalize` raises a first letter and leaves the rest of the
+word as it found it. So capitals stay capitals.
+
+### Three tests find an acronym, and the payload supplied the evidence for each
+
+A token holding a digit is a code rather than a word. Examples are `F2`, `B27`, `FT29` and `BT.14`.
+
+A stop inside a token marks an acronym written with stops. Examples are `T.K.P.M` and `S.J.K.C`.
+
+A token with no vowel is an acronym written without them. Examples are `SMK`, `KTM`, `LRT`, `TNB`
+and `PWTC`.
+
+### Eight Malay place words are the exception, and the data is why
+
+They are `KG`, `SG`, `JLN`, `BT`, `TMN`, `TG`, `BKT` and `KM`. Each abbreviates a word. None of them initials a name. The portal's own Title Case rows already write them `Kg.` and `Sg.`.
+
+They are also most of what the vowel test catches. `KG` and `SG` alone are 316 of the 380 vowel-less
+tokens in the payload. Measured 2026-08-20.
+
+A first pass splits `SG.PELEK`, which JPS writes run together and elsewhere writes apart. Left
+whole, the stop inside it reads as an acronym and the name stays in capitals.
+
+### Three names of 630 come out wrong
+
+They are `USJ`, `REM` and `PRAB`. Each is an acronym that holds a vowel, so no test here can see it.
+
+A list of them is a list somebody maintains. It buys one word of one station name. The list was not
+built.
+
+`di` also comes out as `Di`. Malay title case lowers a connective, and this rule capitalises every
+word. The user asked for title caps, and that is what this does.
+
+### Three surfaces call it, and all three draw a name as a title
+
+They are the station card through `goName()`, the weather card in `js/wx.js`, and the table's hover
+panel. A row in a list is not a title, so no list calls it.
+
+The `title` attribute on the station card's own name calls it too. That attribute duplicates what is
+visible, which is the only use this repo allows. Two spellings of one name in one place break that
+rule.
+
+A runnable check in the Verify block of `CLAUDE.md` reads the module as it ships. It holds nine
+cases plus one sweep over every name in `.cache.json`. That sweep asserts no name loses or gains a
+character.
+
+
+## The map became a pane
+
+The window is now M3's supporting-pane layout. `#map` is the main pane. `#pane` is the supporting
+one, and it holds one of three occupants at a time. Those are the station card, the weather card and
+the filters.
+
+Before this the map filled the window and the panels floated over it. The filters took a 288px rail
+on the leading edge. The station card took a 360px rail on the trailing edge. Both covered the map
+they described.
+
+### The map gives up the width instead of hiding under it
+
+`#map` is `inset: var(--hdr) var(--pane-w) 0 0`. `--pane-w` is the pane's width while the pane is
+open, and 0 while it is shut.
+
+That one variable deleted the arithmetic three other places were carrying.
+
+`focusOn()` subtracted half the drawer's width and added half the panel's, so a station centred in
+the container did not draw underneath either. The container is the visible strip now, so the
+function is one `setView()` call.
+
+`setDrawer()` panned the map half the drawer's width on every open and close. The map narrows now,
+and `invalidateSize()` recentres it. The `map` import in `js/ui.js` went with that pan.
+
+The legend translated by the drawer's width to step out from under it. The drawer is on the other
+edge now and the map never moves, so the legend sits still.
+
+### Leaflet needs a second resize signal
+
+Leaflet listens to `window.resize` and to nothing else. The pane changes the map's box without
+changing the window. Leaflet then keeps its old size: the tiles stop where the old edge was,
+and every `latLngToContainerPoint` answers for a container that is no longer there.
+
+A `ResizeObserver` on `#map` answers it, coalesced on an animation frame. An observer rather than a
+call at each site. The pane is one cause of a resize, and the window, the breakpoint and a rotate are
+others. The observer catches every one with no call site to remember.
+
+`invalidateSize()` keeps the centre by default, which is what a narrowing map wants. Whatever the
+reader was looking at stays in the middle of the strip that is left.
+
+Measured at 711 stations: one call costs under a millisecond.
+
+### The width does not animate, and that is a decision
+
+The map snaps to its new width in one frame. The pane travels in beside it on `--m3-travel`.
+
+Animating the width instead makes Leaflet resize on every frame of the travel. It also leaves the
+strip revealed on the way out empty for the whole 300ms.
+
+The strip the pane travels over is `--surface`, the same tone as the pane. So an opening pane reads
+as its content sliding in. A closing pane slides off a map that is already full width.
+
+### One box, and the occupants are content
+
+`#bar` and `#side` state nothing about where they are or how wide they are. Each is `flex: 1` inside
+the pane and draws only while its own body class is on.
+
+The pane carries the travel. Each panel carried its own while each had its own box. A switch from
+the station card to the filters then drew two sheets sliding through each other.
+
+There is one drag handle in the markup and one `swipeSheet()` call, because there is one sheet.
+
+### One occupant at a time, at every width
+
+`setDrawer(true)` calls `closeSide()`. The `sideopen` event calls `setDrawer(false)`. Both tests were
+phone-only before, back when the two panels had a rail each and stood side by side above 600px.
+
+Neither remembers the close. A desktop preference for an open drawer survives the station card that
+replaced it.
+
+### Below 600px nothing changed
+
+The pane is a modal bottom sheet there, over a map that keeps its whole width. `--pane-w` stays 0 at
+every state. A bottom sheet rises over the map rather than beside it, so there is no width to give
+up.
+
+### Trade-offs
+
+The filters lost 72px of rail and gained 72px of pane. One width serves all three occupants, A pane that resized as its content
+swapped reflows the map on every switch. `--drawer` is read
+by nothing now and is deleted.
+
+A reader can no longer see the filters and a station card at once. That is what the user asked for,
+and it is also what makes the map a pane rather than a strip between two rails.
+
+The pane trigger is unchanged for now. The hamburger opens the filters, a pin opens the station card,
+and the weather card arrives through `carry()`. A button that selects the occupant directly is the
+next step, and the pane is the thing that makes one possible.
+
+
+## The pane took M3's canonical ratios, and the phone got a destination
+
+The supporting pane now follows M3's canonical supporting-pane layout rather than a width this app
+chose. The reference is the canonical examples page:
+https://m3.material.io/foundations/layout/canonical-examples/supporting-pane
+
+### The ratios
+
+A medium window splits the space equally between the two panes. An expanded window gives 70% to the
+main pane and 30% to the supporting one. The two bands above expanded keep that ratio.
+
+`--pane` carries it, and `css/chrome.css` holds the one override at 840px. Measured: 350px of pane at
+700, 300 at 1000, 420 at 1400. The map takes the rest in every case, and the two meet exactly.
+
+`--side: 360px` is gone. It was a fixed width picked for a camera still, and a ratio answers the same
+question at every window size.
+
+### The compact window gets a full-screen destination
+
+M3 hides the supporting pane in a compact window and navigates to it as a full-screen destination.
+`SupportingPaneScaffold` in the Compose adaptive library does exactly that. The canonical layouts
+page offers a bottom sheet as the other option.
+
+This app drew it as a modal bottom sheet for one revision. The argument was that a panel reporting on
+the map behind it has to keep that map in view.
+
+**That argument describes a sheet somebody opens over content they are still reading. It does not
+describe a pane.** A pane is a destination. In a compact window it is the only thing on screen.
+
+### `#pane` became a `<dialog>`
+
+The compact variant is what forced it. A `<div>` styled to fill the screen looks identical and is not
+the same thing. Only a real dialog gets the top layer, a focus trap, and a page behind it that is
+inert. Four other dialogs open over this one, and only the top layer lets them.
+
+`syncPane()` in `js/map.js` picks the method. `showModal()` below 600px. `show()` above it, because a
+non-modal dialog is a plain positioned box, which is what a standard side sheet beside a live map has
+to be.
+
+A `MutationObserver` on the body class drives it. The pane is open when one of its occupants is, and
+four functions write those classes. Watching the fact beats remembering four calls.
+
+### Three faults this turned up, all of them silent
+
+**`show()` runs the dialog focusing steps.** Landing opens the filters, and the pane then took focus
+into the district filter box before a reader had touched anything. `syncPane()` restores the previous
+`activeElement` in that branch alone. A modal full-screen dialog must take focus, so the other branch
+leaves it.
+
+**A dialog focuses its first focusable descendant.** That drew a focus ring on the station card's ⋮
+every time the pane opened. `#pane` carries `autofocus` and `tabindex="-1"`, so focus lands on the
+dialog itself.
+
+**A dialog's `close` event is fired asynchronously.** The spec queues it as an element task rather
+than firing it inside the call. So a boolean set before `close()` and cleared after is already back
+to false when the handler runs. Measured on the mode swap that crosses 600px: the event from one
+close landed after the next open, the handler cleared a body class the pane was open for, and the
+pane never opened again for the rest of the session. The listener tests `pane.open` instead.
+
+A headless check cannot wait for that event with a timer either. Virtual time fast-forwards a
+`setTimeout` past a queued task, and a 300ms wait resolved before the event arrived.
+`m3-check.html` awaits the `close` event itself.
+
+### What the reversal cost
+
+`#scrim` is deleted. The `.grab` handle on both panels is deleted. `swipeSheet()` on the pane is
+deleted. A full-screen dialog has no outside to tap and no drag.
+
+`#paintmenu` is the last bottom sheet in this app. It keeps its handle and its swipe.
+
+### The compact app bar
+
+M3's full-screen dialog anatomy puts the close X on the leading edge, the headline after it, and the
+trailing actions at the far end. That is the opposite of the side sheet header the same markup draws
+above 600px, where the close trails.
+
+`order: -1` on the button rather than `row-reverse` on the row. Reversing puts the trailing actions
+between the X and the title.
+
+All six full-screen surfaces now start on the same 8px. `#barHead` needs `margin: 0 -6px 4px` to
+reach it, because `#bar` carries 6px of its own.
+
+### Trade-offs
+
+A medium window gives the map 300 to 419 pixels. That is a narrow map, and it is what the canonical
+layout states. The ratio is the instruction, so this app takes it rather than capping the pane at
+M3's side sheet band of 256 to 400.
+
+An expanded window at 2560px gives the pane 768. Nothing caps it. At the reference viewport of 1536
+it is 461, which is wider than the 360 it replaced and better for a camera still.

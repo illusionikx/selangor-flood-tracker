@@ -4,8 +4,9 @@
 import { KINDS, SOURCES, SPARK_H, NO_INFO, ALERT_TITLE, RIVER_COLOR, RAIN_COLOR,
          GAUGE_COLOR, RAIN_STOPS, NEAR_MAX_KM, camSrc, WEATHER, wxSky, MET_NAME,
          ACC_ROWS } from './config.js';
+import { PREFS } from './state.js';
 import { noSec, distKm, hasInfo, hasWx, isStale, statusColor, scalePos,
-         levelStops, gaugeStops, gaugeColor, color, isFav } from './util.js';
+         levelStops, gaugeStops, gaugeColor, color, isFav, titleCase } from './util.js';
 import { nearestOf, nearestCam, nearestLevel, nearestWx, camAlert } from './stations.js';
 
 /* The warning that rides a camera picture, in the lightbox and nowhere else. Empty string when
@@ -490,7 +491,7 @@ const region = s => {
    attribute: it centres the pin and names it on the map for the length of the ripple.
    Emitted after the heart, because the CSS reserves that corner with an adjacent-sibling rule. */
 const goName = s =>
-  `<div class="popname" data-go="${s.id}" title="Show ${s.name} on the map">${s.name}</div>`;
+  `<div class="popname" data-go="${s.id}" title="Show ${titleCase(s.name)} on the map">${titleCase(s.name)}</div>`;
 
 /* This code reads the hour in Malaysia. It does not read the hour where the reader sits.
    Every time on this page is MYT, because JPS stamps its readings that way. A moon beside a
@@ -738,7 +739,16 @@ export function sitePopup(members) {
 export function herePopup(e, loaded) {
   if (!loaded) return '<b>Your Location</b><br><span class="muted">Stations still loading…</span>';
   const at = e.latlng;
-  const rows = ['river', 'rainfall', 'siren', 'gauge'].map(k => {
+  /* Weather mode draws no station pin, so a card naming the four nearest sensors and the nearest
+     camera points at five places the map does not draw. That is the same disagreement the layer
+     switch closes a station card for. This card keeps the layer the reader is on instead.
+     On that layer this function draws one line and nothing else. `hereCard()` in wx.js has already
+     answered, with the full forecast a weather pin opens, and locate.js reaches this only where
+     that answer was empty. So the line is the whole of what is left to say. The smaller weather
+     summary below it is the station card's, over a point read through a station, and one fact does
+     not get two looks. */
+  const wxOnly = PREFS.mapLayer === 'weather';
+  const rows = wxOnly ? '' : ['river', 'rainfall', 'siren', 'gauge'].map(k => {
     const kind = KINDS[k];
     let s = nearestOf(k, at);
     if (s && distKm(at, s) > NEAR_MAX_KM) s = null;
@@ -770,7 +780,7 @@ export function herePopup(e, loaded) {
      nothing about the weather: the section names the MET point it was read at, and a point borrowed
      through a station further away than any sensor this card will list is a claim about somewhere
      else. */
-  const wx = nearestWx(at);
+  const wx = wxOnly ? null : nearestWx(at);
 
   /* The head is the one every station card draws: a `.popname` title, then a muted line under it.
      A badge said it before, which is the slot a station card gives its sensor kind, and this card
@@ -784,8 +794,10 @@ export function herePopup(e, loaded) {
       ${/* Not `Accurate to about N m`. The figure is already a radius the browser is unsure of,
             so `about` hedges a number that is itself the hedge. */''}
       <div class="muted">Accurate to ${Math.round(e.accuracy)} m</div>
-    </div>${metSection(wx && distKm(at, wx) <= NEAR_MAX_KM ? wx : null)
-    }${camNear(at, nearestCam(at))}${rows}`;
+    </div>${wxOnly
+      ? `<div class="sensor"><div class="muted">No weather within ${NEAR_MAX_KM} km</div></div>`
+      : `${metSection(wx && distKm(at, wx) <= NEAR_MAX_KM ? wx : null)}${
+          camNear(at, nearestCam(at))}${rows}`}`;
 }
 
 

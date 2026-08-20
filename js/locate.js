@@ -45,9 +45,28 @@ export const failTip = (code, perm) =>
       ? 'Location is off for this site. Allow it in your browser.'
       : 'No location came back. Check that location is on for this site, and for this device.';
 
-// The one non-station card the panel shows. Built fresh on every open so it reflects the latest
-// poll; the `@` key keeps render()'s refresh pass off it, since it belongs to no site.
-const showHere = () => openSide('@here', herePopup({ latlng: at, accuracy: acc }, state.data.length > 0));
+/* The one non-station card the panel shows. Built fresh on every open so it reflects the latest
+   poll; the `@` key keeps render()'s refresh pass off it, since it belongs to no site.
+
+   Two cards under one key, one per map layer. Weather mode draws no station pin, so the four
+   nearest sensors and the nearest camera name five places the map does not draw. It gets the same
+   full forecast a weather pin opens instead, over the point nearest the fix — see `hereCard()` in
+   wx.js. A smaller summary of the same forecast was the first answer here, and one fact does not
+   get two looks.
+
+   `wx.js` is deferred, and weather mode is the only way to reach this branch, so the import
+   resolves from the module map with no request. That is the shape `place()` below already uses for
+   the table. An empty answer means no MET point within `NEAR_MAX_KM`, and the station card prints
+   the sentence that says so. A failed import falls through to the same place. */
+export const showHere = async () => {
+  if (PREFS.mapLayer === 'weather') {
+    try {
+      const html = (await import('./wx.js')).hereCard(at);
+      if (html) return openSide('@here', html);
+    } catch { /* fall through to the card below */ }
+  }
+  openSide('@here', herePopup({ latlng: at, accuracy: acc }, state.data.length > 0));
+};
 
 /* A fix is worth keeping for a quarter of an hour. Every reload was re-asking the Geolocation API,
    which on a phone means waking the GPS for a position that has not meaningfully changed — and the

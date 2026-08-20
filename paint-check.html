@@ -514,6 +514,57 @@ is(pb.width > 0, true, 'phone: the rising pill is on screen, so there is somethi
 is(pr.left < pb.right && pb.left < pr.right && pr.top < pb.bottom && pb.top < pr.bottom, false,
    'phone: the rising pill clears the button');
 
+/* --- the panel is an M3 bottom sheet at this width ------------------------------------------- */
+/* Motion is read FIRST, before anything switches it off. `getComputedStyle` reports the override,
+   not the rule, so a keyframe read after one comes back `none` on markup that is right. */
+pd.getElementById('paintmenu').showPopover();
+await wait(120);
+const pmCs = pw.getComputedStyle(pd.getElementById('paintmenu'));
+is(pmCs.animationName, 'sheetUp', 'phone: the sheet travels up from the bottom edge');
+is(pmCs.animationDuration, '0.3s', 'phone: on M3 duration-short2, the same travel a dialog takes');
+is(pw.getComputedStyle(pd.getElementById('paintmenu'), '::backdrop').animationName, 'sheetScrim',
+   'phone: and its scrim fades on a keyframe of its own, a backdrop inheriting none');
+
+pd.head.insertAdjacentHTML('beforeend',
+  '<style>*{transition:none !important;animation:none !important}</style>');
+await wait(120);
+const pm = pd.getElementById('paintmenu'), pmr = pm.getBoundingClientRect();
+/* Anchored to the bottom edge and centred, at the reference's own width. 16px of map shows down
+   each side at 360px, which is why only the top corners are rounded. */
+is(Math.round(pmr.bottom), pw.innerHeight, 'phone: the sheet sits on the bottom edge');
+is(Math.round(pmr.width), Math.min(640, pw.innerWidth - 32), 'phone: M3 min(640, 100% - 32)');
+is(Math.round(pmr.left), Math.round(pw.innerWidth - pmr.right), 'phone: and centred');
+is(pmCs.borderTopLeftRadius + ' ' + pmCs.borderBottomLeftRadius, '28px 0px',
+   'phone: M3 28dp on the TOP corners only, because the bottom one has no edge to round');
+/* The placement handler must not have written an inline anything. Inline beats the sheet's rule,
+   so a menu placed on a wide screen and rotated to a narrow one would stay pinned to its button. */
+is(pm.style.left + '|' + pm.style.top + '|' + pm.style.bottom, '||',
+   'phone: js/ui.js wrote no placement, which would beat the stylesheet');
+/* The handle, and the gesture it promises. A handle drawn over a swipe nobody wired up is a
+   promise the panel does not keep, so both halves are asserted together. */
+const pg = pd.querySelector('#paintmenu .grab');
+is(Math.round(pg.getBoundingClientRect().height), 48, 'phone: M3 48dp drag handle row');
+const ind = pw.getComputedStyle(pg, '::before');
+is(ind.width + ' ' + ind.height, '32px 4px', 'phone: holding M3 32 x 4 indicator');
+is(pw.getComputedStyle(pg).touchAction, 'none',
+   'phone: which never scrolls under the finger that grabs it');
+/* Drive the real touch path. Past 90px the sheet closes; the guard is that it was open first. */
+is(pm.matches(':popover-open'), true, 'phone: the sheet is open, so the drag has something to shut');
+const touch = (type, y) => pm.dispatchEvent(new pw.TouchEvent(type, {
+  bubbles: true, touches: type === 'touchend' ? [] : [new pw.Touch({ identifier: 1, target: pm, clientY: y, clientX: 180 })],
+}));
+touch('touchstart', 300); touch('touchmove', 320); touch('touchmove', 460); touch('touchend', 460);
+await wait(120);
+is(pm.matches(':popover-open'), false, 'phone: a drag down past the threshold dismisses it');
+/* And a short drag does NOT: a sheet that closes on any downward twitch is unusable while reading.
+   `translate` is cleared on release either way, or the sheet stays parked where the finger left it. */
+pm.showPopover(); await wait(120);
+touch('touchstart', 300); touch('touchmove', 320); touch('touchmove', 350); touch('touchend', 350);
+await wait(120);
+is(pm.matches(':popover-open'), true, 'phone: a short drag lets go and comes back');
+is(pm.style.translate, '', 'phone: and leaves no inline offset behind');
+pm.hidePopover();
+
 lines.push(bad ? `FAIL: ${bad}` : 'PASS');
 /* Without this the page stays on "running..." and says nothing about why. A check that can
    fail silently is not a check. */

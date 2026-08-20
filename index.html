@@ -70,9 +70,9 @@
 <link rel="stylesheet" href="vendor/markercluster.css">
 <link rel="stylesheet" href="vendor/fonts.css?v=51">
 <link rel="stylesheet" href="css/icons.css?v=94">
-<link rel="stylesheet" href="css/base.css?v=143">
-<link rel="stylesheet" href="css/chrome.css?v=195">
-<link rel="stylesheet" href="css/map.css?v=156">
+<link rel="stylesheet" href="css/base.css?v=148">
+<link rel="stylesheet" href="css/chrome.css?v=205">
+<link rel="stylesheet" href="css/map.css?v=158">
 
 <!-- Water tint for the dark basemap. CARTO's dark_all is greyscale — all 18 of its tones have zero
      chroma — so no saturate() or hue-rotate() can pull water out of it. What it does have is one
@@ -907,8 +907,15 @@
      and js/ticker.js. Same shell as the other dialogs: a form/dclose pair for the native close,
      and ui.js closes it on a backdrop click too. -->
 <dialog id="warnBox" aria-labelledby="warnBoxTitle">
+  <!-- The icon is item 2 of M3's basic dialog anatomy and the headline is item 3, in a column. So it
+       sits ABOVE the headline rather than inline with it. It was inline for one revision and the
+       phone header rule then pushed it past the title to the trailing edge, which is what a bare
+       `.modalhead` selector reaching a basic dialog looks like on screen.
+       Left-aligned, not centred. M3 marks centring a prop rather than the default, and every other
+       dialog in this app leads its header on the same edge. `js/ui.js` writes the glyph and its
+       colour by id, so moving the element needed nothing there. -->
+  <i id="warnBoxIcon" class="i i-rainy_heavy" style="color:var(--k-weather)"></i>
   <div class="modalhead">
-    <i id="warnBoxIcon" class="i i-rainy_heavy" style="color:var(--k-weather)"></i>
     <h2 id="warnBoxTitle">Forecast Warning</h2>
     <form method="dialog"><button class="icon dclose" title="Close" aria-label="Close"
       ><i class="i i-close"></i></button></form>
@@ -921,23 +928,56 @@
      own nudge and whether the target was already on screen — and markercluster rebuilds marker DOM
      on every zoom, so it was torn down mid-read. A panel in the page opens in the same place every
      time, survives a poll, and nothing on the map can move or destroy it. -->
-<aside id="side" class="surface" aria-label="Station details">
+<!-- **The supporting pane**, and M3's canonical supporting-pane layout is what shapes it:
+     https://m3.material.io/foundations/layout/canonical-examples/supporting-pane
+     `#map` is the main pane and this is the supporting one. It holds one of three occupants at a
+     time — the station card, the weather card and the filters — so a reader never has two rails
+     competing for the map, and the map's own box ends where this pane begins.
+     The pane owns the box. Its occupants own only what is inside it, so a swap changes the content
+     without moving the container.
+     **It is a `<dialog>` because of what the compact window needs.** M3 hides the supporting pane in
+     a compact window and navigates to it as a full-screen destination. That is this app's
+     full-screen dialog variant, and only a real `<dialog>` gets the top layer, the focus trap and
+     the inert page behind it. Above 600px it opens with `show()` instead: a non-modal dialog is a
+     plain positioned box, which is what a standard side sheet beside a live map has to be.
+     `js/map.js` picks the method — see `syncPane()`. -->
+<dialog id="pane" aria-label="Supporting pane" tabindex="-1" autofocus>
+<aside id="side" aria-label="Station details">
   <!-- The place: name, region, one badge per sensor. Its own box *above* the scrolling one, and
        openSide() moves the card's `.pophead` into it — so it cannot scroll, rather than being told
        not to. `position: sticky` inside the scroller did the same job in one CSS line, and is the
        obvious answer, but a header that only stays put if nothing in the box ever defeats sticky is
        a header that can come loose; this one has no scroll to come loose from. -->
-  <div id="sideHead"></div>
-  <button id="sideClose" class="icon" title="Close" aria-label="Close"
-    ><i class="i i-close"></i></button>
+  <!-- M3's side sheet header: a title that takes the slack, then the trailing actions, then the
+       close. `min-height: 64px` and `align-items: center`, which is what makes it a header row
+       rather than a card head floating a button over its own corner.
+       Three slots because `openSide()` fills two of them from one card. The card is still built as
+       one string whose first element is `.pophead` — that seam has not moved — and this splits it:
+       the name becomes the sheet's title, the ⋮ becomes its trailing action, and the region and the
+       sensor badges stay in the body where M3 puts supporting content. -->
+  <div id="sideHead">
+    <div id="sideTitle"></div>
+    <div id="sideActions"></div>
+    <button id="sideClose" class="icon" title="Close" aria-label="Close"
+      ><i class="i i-close"></i></button>
+  </div>
   <div id="sideBody" class="scroll"></div>
 </aside>
-<!-- The scrim behind a modal panel. Both panels take 84vw on a phone, which makes each one a modal
-     drawer, and a modal drawer is dismissed by a tap on its scrim or a swipe toward the edge it is
-     anchored to. Above 600px neither panel is modal and this box stays inert. It is a sibling of
-     both panels and sits under each one, so one box serves the two. -->
-<div id="scrim"></div>
+<!-- Below 600px this is an M3 full-screen dialog rather than a drawer, so it needs a header of its
+     own: a close X on the leading edge and the headline after it. `#barHead` draws nothing above
+     600px, where the hamburger that opened the drawer is still on screen to close it again.
+     The headline is the word the hamburger and the Help page already use for this panel. -->
 <div id="bar">
+  <!-- M3's side sheet carries a header, so this one does. It draws at both widths now: the drawer
+       went unnamed for a long time on the argument that the hamburger which opened it stays on
+       screen, which is true and still left the panel with no title.
+       The close button leads on a side sheet and trails on nothing — M3 puts a side sheet's close on
+       the trailing edge, and the CSS places it. -->
+  <div id="barHead">
+    <h2>Layers and filters</h2>
+    <button id="barClose" class="icon" title="Close" aria-label="Close"
+      ><i class="i i-close"></i></button>
+  </div>
   <div>
     <!-- Both filter lists are <details>: two scrolling lists stacked above the chips pushed the
          layer switches off a phone screen, and each is a thing you set once and then stop looking
@@ -995,6 +1035,7 @@
     <p id="shown" class="muted"></p>
   </div>
 </div>
+</dialog><!-- /#pane -->
 <!-- Top-right of the map. Polite: assertive would interrupt a screen reader mid-sentence, and
      the alert list behind the app bar's warning glyph carries the same information without a time
      limit. -->
@@ -1019,6 +1060,13 @@
 <button id="paint" class="mapbtn" popovertarget="paintmenu"
         title="Map layers" aria-label="Map layers"><i class="i i-layers"></i></button>
 <div id="paintmenu" class="menu surface" popover>
+  <!-- The drag handle, drawn below 600px alone, where this panel is an M3 bottom sheet. It is the
+       affordance for the swipe that dismisses the sheet, and js/ui.js implements that swipe — a
+       handle drawn over a gesture nobody wired up is a promise the panel does not keep.
+       `aria-hidden`, because it is a picture of a gesture. The panel already closes on Escape, on a
+       tap outside and on the button, and every one of those reaches a keyboard or a screen reader
+       where a drag does not. -->
+  <div class="grab" aria-hidden="true"></div>
   <!-- Two layers, and **exactly one of them at every moment**. `PREFS.mapLayer` holds `'stations'`
        or `'weather'` and nothing else. A map with neither is a basemap with no answer on it, which
        is not a view worth being able to reach by accident.

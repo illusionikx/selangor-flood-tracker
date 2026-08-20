@@ -292,7 +292,8 @@ export function alerts() {
   btn.title = what;
   btn.setAttribute('aria-label', what);
 
-  // The head, lifted into #sideHead by openSide() — which is why it must stay the first element.
+  /* The head. `openSide()` splits it: the `.popname` becomes the sheet's title and the rest stays
+     here at the top of the body. Which is why `.pophead` must stay the card's first element. */
   const head = `<div class="pophead"><div class="popname">On alert${
     hot.length && hereAt ? ' <span class="muted">· nearest first</span>' : ''
   }</div><div class="tally">${tally}</div></div>`;

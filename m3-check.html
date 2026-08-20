@@ -1,0 +1,585 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>M3 surface check</title>
+<!--
+  Every M3 surface in this app, in rendered pixels. There are three components and each has two
+  variants, and the whole point of this file is that a surface cannot quietly become the wrong one.
+
+    DIALOGS   #dataBox #camBox #aboutBox #helpBox   full-screen < 600px, basic above
+              #lightbox #warnBox                    basic at every width
+              #eggBox #narrowBox                    exempt, each for a stated reason
+    SHEETS    #bar #side                            side sheet >= 601px, bottom sheet <= 600px
+    BANDS     the four dialogs across M3's window size classes
+
+  Transcribed from the M3 Expressive component set, so every number here is greppable against a
+  real file rather than eyeballed:
+    https://github.com/bczak/m3you/tree/development/src/components
+
+  Six faults this guards, and five of them shipped during the work.
+
+  A bare `.modalhead` rule reached two basic dialogs and moved their close button to the leading
+  edge of a 56px bar while the box around them stayed a floating card. Hence the roll call.
+
+  A sticky header pins to the scroller's PADDING box, so `top: 0` holds it 18 or 20px down.
+
+  The 56dp headline start drifts invisibly across panes built from four different paddings.
+
+  The browser's own stylesheet caps every dialog at `calc(100% - 6px - 2em)`, which is wider than
+  the pane in three of four bands, so it bites in one and three look right.
+
+  `body.drawer #legend` translated by `--drawer` after the phone override for that token went, which
+  pushed the legend past the viewport, put a scrollbar on the document, shortened the ICB and left
+  BOTH bottom sheets 15px above the edge they are anchored to. A layout fault two elements away.
+
+  And a drag handle drawn over a gesture nobody wired up is a promise the panel does not keep.
+
+  Motion has to be read BEFORE this file switches transitions off, or `getComputedStyle` reports the
+  override rather than the rule. `settle()` is a separate call for that reason.
+
+  Run:
+    chrome --headless=new --disable-gpu --ignore-certificate-errors \
+      --virtual-time-budget=45000 --window-size=1600,1000 --dump-dom \
+      https://flood-exp.test/m3-check.html
+-->
+<style>
+  body { font: 13px/1.5 monospace; margin: 12px; }
+  iframe { border: 0; position: absolute; left: -4000px; }
+  pre { white-space: pre-wrap; }
+</style>
+<iframe id="phone" src="/index.html" style="width:360px;height:760px"></iframe>
+<iframe id="desk" src="/index.html" style="width:1200px;height:800px"></iframe>
+<pre id="out">running...</pre>
+<script>
+const out = document.getElementById('out');
+let bad = 0, done = 0;
+const say = s => { out.textContent += s + '\n'; };
+const is = (got, want, name) => {
+  const ok = got === want;
+  if (!ok) bad++;
+  say((ok ? 'ok   ' : 'FAIL ') + name + '  -> ' + JSON.stringify(got) + (ok ? '' : '  want ' + JSON.stringify(want)));
+};
+
+/* `settle()` is separate from `ready()`, and that is the whole reason this reads correctly.
+   Headless virtual time does not run a transition or a keyframe faithfully, so geometry has to be
+   measured with both switched off. But the override is what `getComputedStyle` then reports, so an
+   animation read after it comes back `none` on markup that is right. Motion is asserted as a
+   DECLARATION, before `settle()`. Geometry is measured after it. paint-check.html states the same
+   rule. */
+function ready(id) {
+  return new Promise(res => {
+    const f = document.getElementById(id);
+    const go = () => setTimeout(() => {
+      const d = f.contentDocument, w = f.contentWindow;
+      res({
+        d, w, cs: e => w.getComputedStyle(e), r: e => e.getBoundingClientRect(),
+        settle: () => d.head.insertAdjacentHTML('beforeend',
+          '<style>*{transition:none !important;animation:none !important}</style>'),
+      });
+    }, 3500);
+    if (f.contentDocument && f.contentDocument.readyState === 'complete') go(); else f.onload = go;
+  });
+}
+
+// M3's easing-emphasized and easing-standard are the same curve in M3's own token table.
+const M3_EASE = 'cubic-bezier(0.2, 0, 0, 1)';
+
+/* `#pane` opens from a MutationObserver on the body class, so the open is one microtask plus one
+   frame behind the class that asks for it. Every assertion about the pane waits on this. */
+const settled = () => new Promise(res => setTimeout(res, 120));
+
+const DIALOGS = ['dataBox', 'camBox', 'aboutBox', 'helpBox'];
+
+/* Run a module INSIDE the frame, so it shares that document's module map and reaches the live
+   `openSide()`. Importing from this page builds a second instance with an empty state and a map
+   that has no container to attach to. */
+function inFrame(d, code) {
+  return new Promise(res => {
+    const sc = d.createElement('script');
+    sc.type = 'module';
+    sc.textContent = code + '\ndocument.documentElement.dataset.probeDone = "1";';
+    delete d.documentElement.dataset.probeDone;
+    d.body.appendChild(sc);
+    const t = setInterval(() => {
+      if (d.documentElement.dataset.probeDone) { clearInterval(t); res(); }
+    }, 30);
+  });
+}
+
+/* A card in the shape `popup.js` emits: the ⋮ and its popover first, then the name, the region and
+   the badges. Fixed rather than taken from the live payload, so the assertions below cannot move
+   with the weather. */
+const CARD = `<div class="pophead">
+    <button class="icon dots" popovertarget="probemenu"></button>
+    <div class="menu" id="probemenu" popover></div>
+    <div class="popname" data-go="1">SUNGAI DAMANSARA DI TTDI JAYA</div>
+    <div class="muted">Shah Alam, Selangor</div>
+    <div class="badges"><span class="badge">Water level</span></div>
+  </div>
+  <div class="sensor"><b>Water level</b></div>
+  <div class="sensor"><b>Rainfall</b></div>`;
+/* `JSON.stringify` rather than a nested template literal: the card is HTML with quotes in it, and
+   the escaping of a template inside a template inside an injected module is the kind of thing that
+   fails at parse time and prints nothing at all. */
+const OPEN_CARD = "import { openSide } from '/js/map.js'; openSide('probe', " + JSON.stringify(CARD) + ");";
+
+/* **Every `<dialog>` in the app, and which of the three kinds it is.** The roll call is the point:
+   the check reads the document for dialogs and fails on any id that is not in this table, so a new
+   one cannot ship without somebody deciding what it is. A bare `.modalhead` rule once reached two
+   basic dialogs and moved their close button to the leading edge while the box around them stayed a
+   floating card. Nothing here caught it, because nothing here knew those two existed.
+     fullscreen  full-screen below 600px, basic above it
+     basic       a basic dialog at every width
+     exempt      deliberately neither, and each names its reason where it is defined */
+const KIND = {
+  dataBox: 'fullscreen', camBox: 'fullscreen', aboutBox: 'fullscreen', helpBox: 'fullscreen',
+  lightbox: 'basic', warnBox: 'basic',
+  // A picture with no chrome at all, and a blocking state screen with no way out on purpose.
+  eggBox: 'exempt', narrowBox: 'exempt',
+  /* The supporting pane. It is a `<dialog>` for the compact window, where M3's canonical layout
+     navigates to the supporting pane as a full-screen destination, and only a real dialog gets the
+     top layer, the focus trap and an inert page. It takes a block of its own below rather than a row
+     in the sweep: it is the one surface here whose kind CHANGES with the window, so the sweep's
+     one-kind-per-id shape cannot describe it. */
+  pane: 'pane',
+};
+
+async function phone() {
+  const { d, w, cs, r, settle } = await ready('phone');
+  const VW = w.innerWidth, VH = w.innerHeight;
+  say('--- phone, ' + VW + 'x' + VH + ' -------------------------------------------------');
+
+  /* --- motion, read BEFORE the override that switches it off ---
+     Every dialog at once, each against the kind it is declared as. A full-screen dialog travels:
+     opacity 0 with translateY(100%) at duration-short2. A basic one grows in place: opacity 0 with
+     scale(.95) at duration-extra-short4. Both curves are M3's one cubic-bezier.
+     **This loop is why the roll call exists.** Reading `animationName` off a settled frame returns
+     `none`, so these cannot move down to the sweep below — and the sweep is where a new dialog gets
+     noticed. The two halves have to agree on the table, which is the only copy of it. */
+  for (const [id, kind] of Object.entries(KIND)) {
+    // `pane` has its own motion assertion below: it is a full-screen dialog here and a side sheet
+    // above 600px, so one row in a per-id table cannot state its enter.
+    if (kind === 'exempt' || kind === 'pane') continue;
+    const b = d.getElementById(id);
+    b.showModal();
+    const fs = kind === 'fullscreen';
+    is(cs(b).animationName, fs ? 'fsOpen' : 'dlgOpen',
+       id + ': ' + (fs ? 'travels up from the bottom edge' : 'grows in place'));
+    is(cs(b).animationDuration, fs ? '0.3s' : '0.2s',
+       id + ': M3 ' + (fs ? 'duration-short2' : 'duration-extra-short4'));
+    is(cs(b).animationTimingFunction, M3_EASE, id + ': on M3 easing');
+    b.close();
+  }
+  /* The supporting pane transitions rather than animates, so it gets the exit as well as the enter.
+     **The motion is on the pane and never on an occupant.** One box travels, so switching the
+     station card for the filters swaps the content of a container already in place. Two sheets
+     sliding through each other is what that switch looked like while each carried its own travel. */
+  /* The pane animates on `[open]` like every other dialog here, because `show()` and `showModal()`
+     both flip `display` and leave no closed state to transition from. Both variants travel in from
+     the edge they are anchored to. */
+  const paneEl = d.getElementById('pane');
+  d.body.classList.add('drawer');
+  await settled();
+  is(paneEl.open, true, 'the observer opens the pane when an occupant asks for it');
+  is(cs(paneEl).animationName, 'paneUp', 'the pane travels up from the bottom edge here');
+  is(cs(paneEl).animationDuration, '0.3s', 'M3 duration-short2, a full-screen dialog\'s own');
+  is(cs(paneEl).animationTimingFunction, M3_EASE, 'on M3 easing-emphasized');
+  is(cs(d.getElementById('bar')).animationName, 'none',
+     'and an occupant carries none of its own, or a swap animates inside a settled container');
+  d.body.classList.remove('drawer');
+  await settled();
+  settle();
+  const box = e => [r(e).top, r(e).left, r(e).width, r(e).height].map(Math.round).join(',');
+  const FULL = '0,0,' + VW + ',' + VH;
+
+  /* --- the supporting pane is an M3 FULL-SCREEN DIALOG here ---
+     M3's canonical supporting-pane layout hides the supporting pane in a compact window and
+     navigates to it as a full-screen destination:
+       https://m3.material.io/foundations/layout/canonical-examples/supporting-pane
+     So this is the dialog component's full-screen variant, and it takes that variant's four:
+     covers the screen, 0dp corners, no elevation, no scrim.
+     **`showModal()` is the assertion that matters.** The pane drew as a `<div>` styled to look
+     full-screen for one revision. That looks identical on screen and is not the same thing: only a
+     modal dialog gets the top layer, a focus trap, and a page behind it that is inert. A styled div
+     also cannot be covered by another dialog, and four of them open over this one.
+     **One box, two occupants.** `#bar` and `#side` are content inside the pane, so each is asserted
+     against the same box. A destination that changed shape with its content is not one destination.
+
+     The scrim, the drag handle and the swipe are all gone, and that is the point rather than a
+     regression. They belonged to the bottom sheet this replaced. */
+  const pane = d.getElementById('pane');
+  /* Fill the station card through the real `openSide()` first. `#sideHead` hides itself while
+     `#sideTitle` is empty — a 56px band of nothing over the readings is worse than no band — so an
+     empty panel measures 0 and every header assertion below reads as broken. */
+  await inFrame(d, OPEN_CARD);
+  d.body.classList.remove('side');
+  await settled();
+  is(pane.tagName, 'DIALOG', 'the pane is a real <dialog>, not a div dressed as one');
+  is(!!d.getElementById('scrim'), false,
+     'and there is no scrim left: a full-screen dialog covers the screen, so it has no outside');
+  is(!!pane.querySelector(':scope > .grab'), false,
+     'and no drag handle: that variant has no swipe, and a handle over no gesture is a promise');
+  for (const [id, cls, name] of [['bar', 'drawer', 'filters'], ['side', 'side', 'station panel']]) {
+    d.body.classList.add(cls);
+    await settled();
+    const b = r(pane);
+    is(pane.open, true, name + ': asking for an occupant opens the pane');
+    is(pane.matches(':modal'), true, name + ': through showModal(), so the page behind is inert');
+    is(cs(d.getElementById(id)).display, 'flex', name + ': and its occupant draws');
+    is([b.top, b.left, b.width, b.height].map(Math.round).join(','), '0,0,' + VW + ',' + VH,
+       name + ': fills the screen, app bar included');
+    is(cs(pane).borderTopLeftRadius, '0px', name + ': M3 0dp corner');
+    /* M3's full-screen dialog anatomy: the close X leads and the headline follows it. That is the
+       OPPOSITE of the side sheet header this same markup draws above 600px, where the close trails.
+       `order`, not `row-reverse`: reversing the row puts the trailing actions between the X and the
+       title, and M3 keeps them at the far end. */
+    const hd = d.querySelector(id === 'bar' ? '#barHead' : '#sideHead');
+    const x = d.getElementById(id === 'bar' ? 'barClose' : 'sideClose');
+    is(Math.round(r(hd).height), 56, name + ': M3 56dp app bar');
+    is(Math.round(r(x).left), 8, name + ': its close X leads at 8px, as this variant states');
+    is(r(x).right < r(hd.querySelector(id === 'bar' ? 'h2' : '#sideTitle')).left, true,
+       name + ': and the headline follows it');
+    is(cs(pane).boxShadow, 'none', name + ': and no elevation');
+    is(w.getComputedStyle(pane, '::backdrop').backgroundColor, 'rgba(0, 0, 0, 0)',
+       name + ': no scrim, which M3 leaves out of this variant');
+    /* The map keeps its whole width. A full-screen destination covers the map rather than sitting
+       beside it, so `--pane-w` has to stay 0 at this width however the pane is drawn. */
+    is(Math.round(r(d.getElementById('map')).width), VW,
+       name + ': the map keeps its full width, because a destination takes none of it');
+    is(Math.round(r(d.getElementById('legend')).right) <= VW, true,
+       name + ': nothing steps aside, so nothing overflows the document');
+    d.body.classList.remove(cls);
+    await settled();
+    is(pane.open, false, name + ': and closing the occupant closes the pane');
+  }
+  /* Escape reaches a modal dialog natively as `cancel`. The body classes have to follow the element,
+     or the observer reopens the pane on the next class write with nothing having changed. */
+  d.body.classList.add('side');
+  await settled();
+  is(pane.open, true, 'the pane is open before the native close, or the next line proves nothing');
+  /* **Wait on the event, never on a timer.** `close` is fired as a queued element task, and headless
+     virtual time fast-forwards a `setTimeout` past it: measured, a 300ms wait resolved BEFORE the
+     event was delivered, so a correct handler read as a broken one. */
+  const shut = new Promise(res => pane.addEventListener('close', res, { once: true }));
+  pane.close();
+  await shut;
+  await settled();
+  is(d.body.className.includes('side'), false,
+     'a native close clears the body class, so the element and the state cannot drift');
+
+  // --- the four dialogs ---
+  for (const id of DIALOGS) {
+    const b = d.getElementById(id);
+    b.showModal();
+    is(box(b), FULL, id + ' fills the screen');
+    is(cs(b).borderTopLeftRadius, '0px', id + ': M3 0dp corner');
+    const mh = b.querySelector('.modalhead'), x = b.querySelector('.dclose'), h2 = mh.querySelector('h2');
+    is(cs(mh).flexDirection, 'row-reverse', id + ': X on the leading edge');
+    is(Math.round(r(mh).height) >= 56, true, id + ': header is M3 56dp or taller');
+    is(Math.round(r(x).left), 8, id + ': X leads at 8px');
+    // About carries no headline: M3 marks it optional and that pane's identity is its logo lockup.
+    if (h2) is(Math.round(r(h2).left), 56, id + ': headline starts at M3 56dp');
+    is(w.getComputedStyle(b, '::backdrop').backgroundColor, 'rgba(0, 0, 0, 0)',
+       id + ': no scrim, because there is no outside');
+    b.close();
+  }
+  // The prose dialogs are their own scroller, so their header is pinned rather than scrolled away.
+  for (const id of ['helpBox', 'aboutBox']) {
+    const b = d.getElementById(id);
+    b.showModal();
+    b.scrollTop = 600;
+    const mh = b.querySelector('.modalhead');
+    is(Math.round(r(mh).top), 0, id + ': header holds the top while content scrolls');
+    // Never == VW: a classic scrollbar takes width off the scrollport in headless and the bar
+    // correctly stops beside it. A phone's overlay scrollbar takes none.
+    is(Math.round(r(mh).width) >= VW - 20, true, id + ': header is full bleed');
+    b.close();
+  }
+
+  // --- every dialog is accounted for, and each obeys the kind it is declared as ---
+  const found = [...d.querySelectorAll('dialog')].map(x => x.id).sort();
+  is(found.filter(id => !KIND[id]).join(','), '',
+     'every <dialog> in the app is in the roll call — a new one needs a kind, not a default');
+  is(Object.keys(KIND).filter(id => !found.includes(id)).join(','), '',
+     'and every id in the roll call is still in the document');
+
+  for (const [id, kind] of Object.entries(KIND)) {
+    /* `pane` is skipped here and asserted in its own blocks. It is the one surface whose kind
+       CHANGES with the window — full-screen dialog below 600px, standard side sheet above — so the
+       one-kind-per-id shape this sweep is built on cannot describe it. It stays in the roll call so
+       the two completeness assertions above still account for it. */
+    if (kind === 'exempt' || kind === 'pane') continue;
+    const b = d.getElementById(id);
+    b.showModal();
+    const mh = b.querySelector('.modalhead'), x = b.querySelector('.dclose');
+    if (kind === 'basic') {
+      /* A basic dialog keeps its close on the TRAILING edge and never fills the screen, at any
+         width. M3 puts the full-screen variant behind a task with steps, keyboard input or a nested
+         dialog, and neither of these two is that. */
+      is(cs(mh).flexDirection, 'row', id + ' (basic): × stays on the trailing edge, even on a phone');
+      is(Math.round(r(x).right) < VW - 8, true, id + ' (basic): and inside the pane, not against it');
+      is(cs(b).borderTopLeftRadius, '28px', id + ' (basic): M3 28dp corner');
+      is(Math.round(r(b).width) < VW, true, id + ' (basic): does not fill the screen');
+    } else {
+      is(cs(mh).flexDirection, 'row-reverse', id + ' (full-screen): X leads');
+      is(Math.round(r(b).width), VW, id + ' (full-screen): fills the screen');
+      is(cs(b).borderTopLeftRadius, '0px', id + ' (full-screen): M3 0dp corner');
+    }
+    b.close();
+  }
+
+  /* --- the ways out ---
+     M3 leaves a full-screen dialog two, and this pane has exactly those two. The close X in each
+     occupant's own app bar, and the platform's own back or escape. **Neither is written in this
+     app any more.** Escape and the Android back gesture reach a modal `<dialog>` natively as
+     `cancel`, and `js/ui.js` used to carry a `keydown` handler gated on a width test for the same
+     job. The one line still needed is the `close` listener in map.js that clears the body class, and
+     the assertion above this covers it.
+     The scrim and the swipe are not here to assert. They went with the bottom sheet. */
+  is(!!d.getElementById('barClose'), true, 'the filters carry a close button');
+  is(!!d.getElementById('sideClose'), true, 'and so does the station card');
+  d.body.classList.add('side');
+  await settled();
+  is(pane.matches(':modal'), true, 'the pane is modal, which is what makes Escape reach it at all');
+  d.body.classList.remove('side');
+  await settled();
+}
+
+async function desktop() {
+  const { d, w, cs, r, settle } = await ready('desk');
+  say('--- desktop, ' + w.innerWidth + 'x' + w.innerHeight + ' ----------------------------------');
+
+  // --- motion, read BEFORE the override ---
+  // The M3 basic dialog: opacity 0 and scale(.95), duration-extra-short4 (200ms) on easing-standard.
+  // It grows in place rather than travelling, which is the within-screen-bounds pattern.
+  for (const id of DIALOGS) {
+    const b = d.getElementById(id);
+    b.showModal();
+    is(cs(b).animationName, 'dlgOpen', id + ': M3 basic-dialog enter, a scale in place');
+    is(cs(b).animationDuration, '0.2s', id + ': M3 duration-extra-short4');
+    b.close();
+  }
+  settle();
+  /* --- the supporting pane is an M3 STANDARD SIDE SHEET here, and the map is the main pane ---
+     Transcribed from SideSheet/side-sheet.css. The standard variant is the one that leaves the main
+     pane live beside it: `surface`, NO radius, NO elevation, and a 1px `outline-variant` line on the
+     edge facing the content.
+     **The map is a pane, so its box ends where this one begins.** That is the whole of the layout
+     change and the whole of what can silently go wrong. A map that keeps its full width under an
+     opaque pane looks identical until a reader tries to press something in the covered strip, and
+     `focusOn()` then centres a station under the panel that describes it. */
+  const bar = d.getElementById('bar'), side = d.getElementById('side');
+  const pane2 = d.getElementById('pane'), mapBox = d.getElementById('map'), VW = w.innerWidth;
+  d.body.classList.remove('drawer', 'side');
+  is(Math.round(r(mapBox).width), VW, 'shut, the map is the whole window');
+  d.body.classList.add('drawer');
+  is(cs(pane2).boxShadow, 'none', 'a standard side sheet has no elevation');
+  is(cs(pane2).borderLeftWidth, '1px', 'it is separated by a 1px line instead');
+  is(cs(pane2).borderTopLeftRadius, '0px', 'the standard variant is square');
+  is([r(pane2).top, r(pane2).width, Math.round(VW - r(pane2).right)].map(Math.round).join(','),
+     '64,360,0', 'a 360px pane on the trailing edge, under the app bar');
+  is(Math.round(r(mapBox).width), VW - 360, 'and the map gives up exactly that width');
+  is(Math.round(r(mapBox).right), Math.round(r(pane2).left),
+     'the two meet, so neither overlaps the other');
+  /* Leaflet's own controls live INSIDE the map container and follow it for free. These three are
+     siblings of the map and position against the window, so each adds `--pane-w` to its own offset.
+     A missed one sits under the pane, which is exactly where a reader cannot reach it. */
+  for (const [id, base] of [['credit', 10], ['paint', 48], ['toast', 12]]) {
+    is(Math.round(VW - r(d.getElementById(id)).right), base + 360,
+       id + ' steps aside by the pane width');
+  }
+  is(Math.round(VW - r(d.querySelector('.leaflet-control-zoom')).right), 370,
+     'and the zoom control follows the map, having never left it');
+  /* The occupants are content. Neither states a width, a position or an edge of its own. */
+  is(cs(bar).display, 'flex', 'the filters occupy the pane');
+  is(cs(side).display, 'none', 'and only one occupant draws at a time');
+  is(cs(bar).overflowY, 'auto', 'the filters are still their own scroller');
+  is(cs(bar).position + ' ' + cs(side).position, 'static static',
+     'and neither occupant positions itself, or the pane stops owning the box');
+  d.body.classList.remove('drawer');
+  is(Math.round(r(mapBox).width), VW, 'shut again, the map takes the width straight back');
+  d.body.classList.add('side');
+  /* --- the header is M3's side sheet header, filled by the real openSide() split ---
+     Transcribed from SideSheet/side-sheet.css: `min-height: 64px`, `align-items: center`,
+     `padding: 8px 12px 8px 16px`, a `flex: 1` title in `title-large`, and the body at
+     `padding: 12px 24px`.
+     **The split is the part that can break silently.** The card is built as one string whose first
+     element is `.pophead`, and `openSide()` takes three pieces out of it. A template change that
+     renames or reorders any of them leaves the header empty and the name buried in the body, and
+     nothing else in this app would notice. */
+  await inFrame(d, OPEN_CARD);
+  const sh = d.getElementById('sideHead'), st = d.getElementById('sideTitle');
+  const sa = d.getElementById('sideActions'), sc2 = d.getElementById('sideClose');
+  is(!!st.querySelector('.popname'), true, 'the split puts the place name in the title slot');
+  is(!!sa.querySelector('.dots'), true, 'and the ⋮ in the trailing actions');
+  is(!!sa.querySelector('.menu'), true, 'with the popover it targets, or the button opens nothing');
+  is(!!d.querySelector('#sideBody .pophead .popname'), false, 'the name is not left in the body too');
+  is(!!d.querySelector('#sideBody .pophead > .muted'), true, 'the region stays in the body');
+  is(!!d.querySelector('#sideBody .pophead .badges'), true, 'and so do the sensor badges');
+  is(Math.round(r(sh).height) >= 64, true, 'M3 64dp side sheet header');
+  is(cs(sh).alignItems, 'center', 'a header row, not a card head with a button over its corner');
+  is(cs(sh).padding, '8px 12px 8px 16px', 'M3 side sheet header padding');
+  is(cs(st.querySelector('.popname')).fontSize, '22px', 'title-large headline');
+  is(cs(st.querySelector('.popname')).color, cs(d.querySelector('#sideBody .muted')).color,
+     'in on-surface-variant, the same ink the supporting line takes');
+  is(cs(sc2).position, 'static', 'the × is a flex item, so nothing floats and nothing is padded');
+  is(Math.round(w.innerWidth - r(sc2).right), 12, 'and it sits on the header padding, 12px in');
+  is(cs(d.getElementById('sideBody')).padding, '12px 24px', 'M3 side sheet body padding');
+
+  /* --- each sensor section is an M3 FILLED CARD ---
+     Transcribed from Card/card.css: `surface-container-highest`, `shape-corner-medium` (12dp), no
+     border and no elevation at rest. `--hover` stands in for the container tone, because this app
+     holds one surface tone and the palette rule keeps M3's colour roles out of it.
+     **The double line is what this replaced, and it is the fault to guard.** A section separated
+     itself with a top rule while `.pophead` ended in a bottom rule. Nothing stacked them while
+     `openSide()` lifted the whole header out of the body. The moment it lifted three pieces instead,
+     `.pophead` became the body's first child, `#sideBody > .sensor:first-child` stopped matching,
+     and both rules drew 8px apart under the title. Neither rule exists now, and asserting that they
+     are gone is the only way to keep them gone. */
+  const secs = [...d.querySelectorAll('#sideBody > .sensor')];
+  const ph = d.querySelector('#sideBody > .pophead');
+  is(secs.length, 2, 'the body holds one section per sensor');
+  is(cs(ph).borderBottomWidth, '0px', 'no rule under the supporting line');
+  is(cs(secs[0]).borderTopWidth, '0px', 'and none over the first card, or the two are a double line');
+  is(cs(secs[0]).backgroundColor !== cs(d.getElementById('side')).backgroundColor, true,
+     'filled card: a container tone one step off the sheet, or the card is invisible');
+  is(cs(secs[0]).borderTopLeftRadius, '12px', 'M3 shape-corner-medium');
+  is(cs(secs[0]).borderTopWidth + cs(secs[0]).boxShadow, '0pxnone',
+     'no outline and no elevation: filled, not outlined and not elevated');
+  is(Math.round(r(secs[1]).top - r(secs[0]).bottom), 8, 'cards separate by a gap, not by a rule');
+  is(Math.round(r(secs[0]).top - r(ph).bottom), 8, 'and the first one clears the title the same way');
+  /* M3's side sheet has a header. The drawer went unnamed for a long time on the argument that the
+     hamburger which opened it stays on screen — true, and it still left the panel with no title. */
+  /* **A pinned header needs a height of its own.** `.modalhead` was written as a row in the flow, so
+     it sized to its title and pulled its close button back onto that line with a negative margin on
+     all four sides. Pinning it made it a bar with a divider, and the vertical pull then hung the
+     40px button through that divider — About drew a 24px bar under a 38px button, and Help a 35px
+     one. Both look like a browser artifact and are a number written for another layout. */
+  for (const id of ['aboutBox', 'helpBox']) {
+    const b = d.getElementById(id); b.showModal();
+    const hd = b.querySelector('.modalhead'), x = hd.querySelector('.dclose');
+    is(Math.round(r(hd).height) >= 56, true, id + ': its pinned bar measures M3 56dp');
+    is(Math.round(r(x).bottom) <= Math.round(r(hd).bottom), true,
+       id + ': and the close button stays inside it');
+    is(Math.round(r(x).top) >= Math.round(r(hd).top), true, id + ': at both ends');
+    b.close();
+  }
+
+  d.body.classList.remove('side'); d.body.classList.add('drawer');
+  const bh = d.getElementById('barHead');
+  is(cs(bh).display, 'flex', 'the side sheet carries a header, which M3 says it does');
+  is(Math.round(r(bh).height) >= 64, true, 'M3 64dp side sheet header');
+  is(cs(bh.querySelector('h2')).fontSize, '22px', 'with a title-large headline');
+  is(!!pane2.querySelector(':scope > .grab'), false, 'and no drag handle: a side sheet has none');
+  /* A standard side sheet is not modal, and `show()` is what makes that true. `showModal()` would
+     put the pane in the top layer and make the map behind it inert, which is the one thing a pane
+     beside live content must not do. There is no `#scrim` to assert against any more — the box went
+     with the bottom sheet, and this variant paints no backdrop of its own either. */
+  is(pane2.matches(':modal'), false, 'and it is NOT modal, so the map stays live beside it');
+  is(!!d.getElementById('scrim'), false, 'with no scrim box left in the document');
+  d.body.classList.remove('drawer'); d.body.classList.remove('side');
+  await settled();
+  /* Shut is `display: none`, not a box parked off screen. The pane is a `<dialog>`, so the browser's
+     own `dialog:not([open]) { display: none }` does it and the author rule sets `display` on `[open]`
+     alone. An author `display` on the element itself beats the UA rule and lays a shut pane out over
+     the page — that trap has bitten this repo before, on `#dataBox`. */
+  is(pane2.open, false, 'shut, the pane is closed as an element');
+  is(cs(pane2).display, 'none', 'and `display` is on [open], never on the element');
+  for (const id of DIALOGS) {
+    const b = d.getElementById(id);
+    b.showModal();
+    const mh = b.querySelector('.modalhead');
+    is(cs(mh).flexDirection, 'row', id + ': × stays at the trailing edge');
+    /* The pin has to hold here too, not only on a phone: this is the width where Help is longest.
+       The property is that the header does not MOVE, not that it sits on any particular pixel. A
+       sticky box pins to the padding box, one border inside the pane, and the two flex-column
+       dialogs hold their header inside a `.dtop` that carries its own padding. Comparing against
+       the pane's own top asserts neither of those and fails on both. */
+    const was = Math.round(r(mh).top);
+    b.scrollTop = 600;
+    is(Math.round(r(mh).top), was, id + ': its header does not move when the pane scrolls');
+    is(b.scrollTop > 0 || b.querySelector('.data, #camGrid, .skelrows, .skeltiles') !== null, true,
+       id + ': and there was something to scroll, so that assertion meant something');
+    b.scrollTop = 0;
+    is(cs(mh).position, id.startsWith('data') || id.startsWith('cam') ? 'static' : 'sticky',
+       id + ': the prose panes pin their header, the two flex-column ones do it structurally');
+    is(Math.round(r(b).width) <= w.innerWidth - 2 * parseFloat(cs(d.documentElement).getPropertyValue('--dlg-inset')) + 1,
+       true, id + ': sits inside the band inset');
+    is(cs(b).borderTopLeftRadius, '28px', id + ': M3 basic-dialog 28dp corner');
+    is(w.getComputedStyle(b, '::backdrop').backgroundColor !== 'rgba(0, 0, 0, 0)', true,
+       id + ': keeps its scrim');
+    b.close();
+  }
+}
+
+/* The four window size classes, read off one frame resized through them. `100vw` inside an iframe
+   resolves to the iframe's own viewport, so a resize is a real breakpoint crossing.
+   The numbers are the arithmetic of `--dlg-inset`, `--dlg-wide` and `--dlg-prose`, not a copy of
+   them: a check that restates the variables reports on the numbers it remembers. */
+async function bands() {
+  const f = document.getElementById('desk');
+  const { d, w, cs, r } = await ready('desk');
+  d.head.insertAdjacentHTML('beforeend',
+    '<style>*{transition:none !important;animation:none !important}</style>');
+  say('--- the four window size classes -------------------------------------------');
+  const wide = (id, expect, name) => {
+    const b = d.getElementById(id);
+    b.showModal();
+    is(Math.round(r(b).width), expect, name);
+    b.close();
+  };
+  const prose = (expect, name) => {
+    const b = d.getElementById('helpBox');
+    b.showModal();
+    is(Math.round(parseFloat(cs(b).maxWidth)), expect, name);
+    b.close();
+  };
+  for (const [px, label, inset, camW, tblW, proseW] of [
+    [700,  'medium',   16, 668,  668,  560],
+    [900,  'expanded', 24, 852,  852,  820],
+    [1400, 'large',    32, 1336, 1200, 820],
+  ]) {
+    f.style.width = px + 'px';
+    await new Promise(res => setTimeout(res, 150));
+    is(w.innerWidth, px, label + ' @' + px + ': the frame really resized');
+    is(cs(d.documentElement).getPropertyValue('--dlg-inset').trim(), inset + 'px',
+       label + ': inset is ' + inset + 'px');
+    wide('camBox', camW, label + ': the camera wall takes the room, uncapped');
+    wide('dataBox', tblW, label + ': the table caps at its widest row');
+    prose(proseW, label + ': the prose pane caps at a readable measure');
+
+    /* **M3's canonical supporting-pane ratios.** Medium splits the window equally between the two
+       panes. Expanded gives 70% to the main pane and 30% to the supporting one, and the bands above
+       it keep that ratio.
+       https://m3.material.io/foundations/layout/canonical-examples/supporting-pane
+       Asserted as a SHARE of the window, never as a pixel count, because that is what the spec
+       states and because the number moves with the frame. The map's own share is asserted from the
+       other end: the two have to add up, or one is drawing over the other. */
+    const share = label === 'medium' ? 0.5 : 0.3;
+    const pane = d.getElementById('pane');
+    d.body.classList.add('side');
+    await new Promise(res => setTimeout(res, 150));
+    const pw = r(pane).width, mw = r(d.getElementById('map')).width;
+    is(Math.abs(pw / px - share) < 0.01, true,
+       label + ': the supporting pane takes ' + Math.round(share * 100) + '% of the window');
+    is(Math.round(mw + pw), px, label + ': and the map takes the rest, with no overlap');
+    is(Math.round(r(d.getElementById('map')).right), Math.round(r(pane).left),
+       label + ': the two panes meet');
+    d.body.classList.remove('side');
+    await new Promise(res => setTimeout(res, 150));
+  }
+  f.style.width = '1200px';
+}
+
+(async () => {
+  out.textContent = '';
+  try {
+    await phone();
+    await desktop();
+    await bands();
+  } catch (e) {
+    bad++;
+    say('THREW  ' + e.message);
+  }
+  say(bad ? 'FAIL: ' + bad : 'PASS');
+})();
+</script>

@@ -8,7 +8,7 @@
 import { KINDS, KIND_RANK, NO_INFO, camSrc } from './config.js';
 import { state } from './state.js';
 import { el, dkey, distKm, hasInfo, color, statusColor, scalePos, levelStops, leads, gaugeTone,
-         gaugeColor, isStale } from './util.js';
+         gaugeColor, isStale, titleCase } from './util.js';
 import { nearestOf, nearestCam } from './stations.js';
 import { sparkline, rainBars, sirenBand, rateHtml, etaText, gaugeState, rainAcc } from './popup.js';
 import { flashTo } from './map.js';
@@ -183,7 +183,7 @@ export function dataTable() {
   const flat = sortCol !== 'nm';
   const row = ({ key, members, lead }) => `<tr${lead.lat && lead.lng ? ` data-mast="${key}"` : ''}>
     <td class="nm">
-      <div class="popname">${lead.name}</div>
+      <div class="popname">${titleCase(lead.name)}</div>
       <div class="muted">${flat ? `${lead.district}, ${lead.state} · ` : ''}${
         lead.basin || 'basin n/a'}</div>
       ${lead.lat && lead.lng ? '' : '<div class="muted nomap">not on the map · no coordinates</div>'}
