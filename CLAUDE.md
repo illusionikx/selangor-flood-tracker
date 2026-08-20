@@ -1044,12 +1044,17 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
   the gap does. Below 600px there is no second pane beside the map either — the supporting pane is a
   destination over it — so there is nothing for a card to separate from. **M3 states a 16dp margin
   for a compact window and this app declines it.** 32px off a 360px map is the reason.
-- **The card's edge is an inset `box-shadow` on `#map::after`, never a `border`.** A border sits
-  inside an absolutely positioned box, so it takes two pixels off the map rather than drawing around
-  it. That is invisible until somebody measures the container. The pseudo-element is
-  `pointer-events: none` and sits above every Leaflet pane, so it cannot eat a drag. The radius
-  alone is not enough on the light theme: a pale basemap against a white page has no boundary of
-  its own.
+- **Three surfaces lost their line, and none of them gets it back.** The map card carried an inset
+  1px outline, the app bar carried a rule under it, and the supporting pane carried M3's own
+  `outline-variant` on the edge facing the map. A reader cut all three on 2026-08-20.
+  **They separate by space now.** `--gap` is the seam on three sides of the card, between the two
+  panes, and under the app bar. A line inside that space states one seam twice. M3's own layout
+  guidance separates panes with space, so the pane's divergence is from the side sheet COMPONENT and
+  not from the layout.
+  If a boundary is ever wanted back on the map, it goes on a pseudo-element and never on a `border`.
+  A border sits inside an absolutely positioned box, so it takes two pixels off the map rather than
+  drawing around it. That is invisible until somebody measures the container. `m3-check.html` asserts
+  the border width and the pseudo-element separately, because those two fail differently.
 - **`#map`'s `right` transitions now, and that reverses an earlier decision.** It snapped, on the
   argument that animating the width makes Leaflet resize on every frame of the travel. It does, and
   that is exactly what keeps live tiles in the card as it grows. The alternative reveals a blank
@@ -2509,6 +2514,7 @@ it. The weather section stretches nothing. It is five fixed keys measuring 231px
   one**, and the two bands above expanded keep that ratio. `--pane` carries it.
   **The main pane is drawn as a card**, because M3 separates panes with space rather than with a
   line. `--gap` is the map's inset on three sides and the space between the two panes on the fourth.
+  **No surface in this layout carries a dividing line.** Not the card, not the app bar, not the pane.
   **In a compact window the supporting pane is a full-screen destination.** That is what
   `SupportingPaneScaffold` does in the Compose adaptive library, and it is why `#pane` is a
   `<dialog>`: `showModal()` below 600px, `show()` above it.

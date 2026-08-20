@@ -42,22 +42,26 @@ body:not(.ready) #map { transition: none; }
 @media (min-width: 601px) {
   :root { --gap: 16px; }
   #map { border-radius: var(--md-sys-shape-corner-large); }
-  /* The card's own edge, which the radius alone cannot supply: a pale basemap against a white page
-     has no boundary of its own. An inset `box-shadow` on a pseudo-element rather than a `border`,
-     because a border sits inside an absolutely positioned box and would take two pixels off the map
-     rather than draw around it. Above every Leaflet pane and inert, so it cannot eat a drag. */
-  #map::after {
-    content: ''; position: absolute; inset: 0; z-index: 500; pointer-events: none;
-    border-radius: inherit; box-shadow: inset 0 0 0 1px var(--outline);
-  }
 }
+/* **No outline on the card, and no `#map::after` to draw one.** It carried an inset 1px `--outline`
+   for one revision, on the argument that a pale basemap against a white page has no boundary of its
+   own. The corner is the boundary. A hairline round a map reads as a frame on the picture, and this
+   app already separates its surfaces by space rather than by lines — see the app bar above and the
+   pane below, which each lost the same rule for the same reason.
+   If a boundary is ever wanted back, it goes on a pseudo-element and never on a `border`. A border
+   sits inside an absolutely positioned box, so it takes two pixels off the map rather than drawing
+   around it, which is invisible until somebody measures the container. */
 
 /* --- top app bar ---------------------------------------------------------------------------- */
 
+/* **No rule under the bar.** The map is a card now, inset from the window on every side, so the gap
+   under the app bar already separates the two. A line inside that gap is the same seam stated twice.
+   This app separates surfaces by space wherever it can — see `--gap` on `#map` — and a divider is
+   what it reaches for only when two surfaces touch. */
 header {
   position: absolute; z-index: 600; top: 0; left: 0; right: 0; height: var(--hdr);
   display: flex; align-items: center; gap: 12px; padding: 0 16px 0 8px;
-  background: var(--surface); border-bottom: 1px solid var(--outline);
+  background: var(--surface);
 }
 /* The bar is a title, a strip and a cluster of controls, and the strip takes what the other two
    leave. It used to take a share of the viewport instead, first `min(58vw, 656px)` and then a flat
@@ -1339,7 +1343,12 @@ body.side #bar { display: none; }
      sheet has no elevation — the 1px line is what separates it. The full-screen variant below 600px
      has none either, because it covers the screen and there is nothing to lift it off. */
   background: var(--surface); color: var(--on-surface);
-  border: 0; border-left: 1px solid var(--outline); border-radius: 0;
+  /* **No line facing the map.** M3 gives a standard side sheet a 1px `outline-variant` on that edge,
+     and this app declines it: the map is a card inset by `--gap`, so the two panes are already
+     separated by space. A line inside that space is the same seam stated twice. M3's own layout
+     guidance separates panes with space, so the divergence is from the component and not from the
+     layout. Below 600px the pane covers the screen and has no edge facing anything. */
+  border: 0; border-radius: 0;
 }
 #pane[open] { display: flex; }
 /* No scrim at either width. Above 600px the pane is a standard side sheet, which is not modal.

@@ -12051,10 +12051,21 @@ on the map.
 on a full-bleed box notches the four screen corners and shows the page through them. So the radius
 and the edge live in the same query the gap does.
 
-**The edge is an inset `box-shadow` on `#map::after`, never a `border`.** A border sits inside an
-absolutely positioned box, so it takes two pixels off the map rather than drawing around it. That is
-invisible until somebody measures the container. The radius alone is not enough on the light theme,
-where a pale basemap against a white page has no boundary of its own.
+**The card takes no edge at all.** It carried an inset 1px outline for one revision, on the argument
+that a pale basemap against a white page has no boundary of its own. The corner is the boundary. A
+hairline round a map reads as a frame on the picture.
+
+The app bar's rule and the pane's own line went with it. All three surfaces separate by space now:
+`--gap` on three sides of the card, between the two panes, and under the app bar. A line inside that
+space states one seam twice.
+
+M3 gives a standard side sheet a 1px `outline-variant` on the edge facing the content. This app
+declines it. M3's own layout guidance separates panes with space, so the divergence is from the
+component and not from the layout.
+
+If a boundary is ever wanted back on the map, it goes on a pseudo-element and never on a `border`. A
+border sits inside an absolutely positioned box, so it takes two pixels off the map rather than
+drawing around it. That is invisible until somebody measures the container.
 
 ### The pane's arrival animates, which reverses an earlier decision
 

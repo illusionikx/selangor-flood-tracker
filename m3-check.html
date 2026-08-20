@@ -410,9 +410,17 @@ async function desktop() {
      [GAP, GAP, GAP, GAP].join(','), 'shut, the card sits one gap in on all four sides');
   is(cs(mapBox).borderTopLeftRadius, '16px', 'M3 shape-corner-large');
   is(cs(mapBox).overflow, 'hidden', 'and the tiles clip to that corner');
-  is(w.getComputedStyle(mapBox, '::after').boxShadow.includes('inset'), true,
-     'the edge is an inset shadow on a pseudo-element, not a border that eats two pixels of map');
-  is(cs(mapBox).borderWidth, '0px', 'so the container itself carries no border');
+  /* **The corner is the whole boundary, and no line may come back on any of these three surfaces.**
+     The card carried an inset 1px outline for one revision, the app bar carried a rule under it, and
+     the pane carried M3's own `outline-variant` on the edge facing the map. A reader cut all three.
+     They separate by space now — `--gap` on three sides of the card and between the two panes, and
+     the same gap under the app bar. A line inside that space states one seam twice.
+     A `border` is checked separately from a shadow because the two fail differently: a border on an
+     absolutely positioned box takes two pixels off the map rather than drawing around it, which is
+     invisible until somebody measures the container. */
+  is(cs(mapBox).borderWidth, '0px', 'no border on the card');
+  is(w.getComputedStyle(mapBox, '::after').content, 'none', 'and no pseudo-element drawing one');
+  is(cs(d.querySelector('header')).borderBottomWidth, '0px', 'no rule under the app bar');
   /* The furniture rides the card. Leaflet's own controls are inside the container and get it free;
      these four are siblings of `#map` and each has to add `--gap` to its own offset. */
   for (const [id, x, y] of [['legend', 12, 12], ['credit', 10, 8], ['paint', 48, 36]]) {
@@ -426,7 +434,11 @@ async function desktop() {
   d.body.classList.add('drawer');
   await settled();
   is(cs(pane2).boxShadow, 'none', 'a standard side sheet has no elevation');
-  is(cs(pane2).borderLeftWidth, '1px', 'it is separated by a 1px line instead');
+  /* M3 gives it a 1px `outline-variant` on the edge facing the content, and this app declines it.
+     The map is a card inset by `--gap`, so the two panes are already separated by space, which is
+     what M3's own layout guidance separates panes with. The divergence is from the component and
+     not from the layout. */
+  is(cs(pane2).borderWidth, '0px', 'and no line facing the map: the gap between them is the seam');
   is(cs(pane2).borderTopLeftRadius, '0px', 'the standard variant is square');
   is([r(pane2).top, r(pane2).width, Math.round(VW - r(pane2).right)].map(Math.round).join(','),
      '64,360,0', 'a 360px pane on the trailing edge, under the app bar');
