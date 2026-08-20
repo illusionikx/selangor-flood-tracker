@@ -70,8 +70,8 @@
 <link rel="stylesheet" href="vendor/markercluster.css">
 <link rel="stylesheet" href="vendor/fonts.css?v=51">
 <link rel="stylesheet" href="css/icons.css?v=94">
-<link rel="stylesheet" href="css/base.css?v=149">
-<link rel="stylesheet" href="css/chrome.css?v=207">
+<link rel="stylesheet" href="css/base.css?v=151">
+<link rel="stylesheet" href="css/chrome.css?v=209">
 <link rel="stylesheet" href="css/map.css?v=158">
 
 <!-- Water tint for the dark basemap. CARTO's dark_all is greyscale — all 18 of its tones have zero
@@ -942,7 +942,7 @@
      plain positioned box, which is what a standard side sheet beside a live map has to be.
      `js/map.js` picks the method — see `syncPane()`. -->
 <dialog id="pane" aria-label="Supporting pane" tabindex="-1" autofocus>
-<aside id="side" aria-label="Station details">
+<aside id="side" class="paneswap" aria-label="Station details">
   <!-- The place: name, region, one badge per sensor. Its own box *above* the scrolling one, and
        openSide() moves the card's `.pophead` into it — so it cannot scroll, rather than being told
        not to. `position: sticky` inside the scroller did the same job in one CSS line, and is the
@@ -967,7 +967,7 @@
      own: a close X on the leading edge and the headline after it. `#barHead` draws nothing above
      600px, where the hamburger that opened the drawer is still on screen to close it again.
      The headline is the word the hamburger and the Help page already use for this panel. -->
-<div id="bar">
+<div id="bar" class="paneswap">
   <!-- M3's side sheet carries a header, so this one does. It draws at both widths now: the drawer
        went unnamed for a long time on the argument that the hamburger which opened it stays on
        screen, which is true and still left the panel with no title.

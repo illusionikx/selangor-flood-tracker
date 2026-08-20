@@ -183,8 +183,35 @@ async function phone() {
   is(cs(paneEl).animationName, 'paneUp', 'the pane travels up from the bottom edge here');
   is(cs(paneEl).animationDuration, '0.3s', 'M3 duration-short2, a full-screen dialog\'s own');
   is(cs(paneEl).animationTimingFunction, M3_EASE, 'on M3 easing-emphasized');
+  /* **The occupant swap is M3's FADE THROUGH, and the numbers are the whole assertion.** M3 uses it
+     for peer destinations sharing one container, which is what the station card, the weather card
+     and the filters are. Shared axis — the slide — is for content with a navigational relationship,
+     and these three have none.
+     The outgoing surface fades over the first 30% of a 300ms gesture and does not move. The incoming
+     one waits that out, then fades and scales up from 92% over the remaining 70%. Read on the
+     OUTGOING rule and then the incoming one, because the two are different declarations on two
+     elements and only one of them applies at a time. */
+  const OUT_EASE = 'cubic-bezier(0.3, 0, 0.8, 0.15)';   // emphasized-accelerate
+  const IN_EASE = 'cubic-bezier(0.05, 0.7, 0.1, 1)';    // emphasized-decelerate
+  d.body.classList.remove('drawer', 'side');
+  await settled();
+  const outCs = cs(d.getElementById('bar'));
+  is(outCs.transitionDuration.split(',')[0].trim(), '0.09s', 'fade through: out over the first 30%');
+  is(outCs.transitionDelay.split(',')[0].trim(), '0s', 'starting at once');
+  is(outCs.transitionTimingFunction.split(/,\s*(?=cubic-bezier|ease|linear|steps)/)[0],
+     OUT_EASE, 'on M3 easing-emphasized-accelerate');
+  is(outCs.transitionProperty.includes('display'), true,
+     'and `display` rides it, so the outgoing surface survives its own fade');
+  d.body.classList.add('drawer');
+  await settled();
+  const inCs = cs(d.getElementById('bar'));
+  is(inCs.transitionDuration.split(',')[0].trim(), '0.21s', 'fade through: in over the other 70%');
+  is(inCs.transitionDelay.split(',')[0].trim(), '0.09s', 'after the outgoing one has finished');
+  is(inCs.transitionTimingFunction.split(/,\s*(?=cubic-bezier|ease|linear|steps)/)[0],
+     IN_EASE, 'on M3 easing-emphasized-decelerate');
+  is(inCs.transitionProperty.includes('scale'), true, 'and it scales as well as fades');
   is(cs(d.getElementById('bar')).animationName, 'none',
-     'and an occupant carries none of its own, or a swap animates inside a settled container');
+     'a transition and not a keyframe, so the container itself never moves');
   d.body.classList.remove('drawer');
   await settled();
   settle();
@@ -403,11 +430,16 @@ async function desktop() {
      corners. And an edge drawn as a `border` takes two pixels off the map instead of drawing round
      it, which is invisible until somebody measures the container. */
   const GAP = parseFloat(cs(d.documentElement).getPropertyValue('--gap'));
+  const SEAM = parseFloat(cs(d.documentElement).getPropertyValue('--seam'));
   const hdr = parseFloat(cs(d.documentElement).getPropertyValue('--hdr'));
   is(GAP > 0, true, 'the map card is inset from the window at this width');
+  /* Two numbers, and M3's layout names them separately: a margin holds content off the window edge
+     and a spacer separates one pane from the next. `--seam` is the trailing inset alone. */
+  is(SEAM > 0 && SEAM < GAP, true, 'and the space between the two panes is its own, smaller number');
   const mb = r(mapBox);
-  is([mb.left, mb.top - hdr, VW - mb.right, VH - mb.bottom].map(Math.round).join(','),
-     [GAP, GAP, GAP, GAP].join(','), 'shut, the card sits one gap in on all four sides');
+  is([mb.left, mb.top - hdr, VH - mb.bottom].map(Math.round).join(','),
+     [GAP, GAP, GAP].join(','), 'shut, the card sits one gap in on the three window edges');
+  is(Math.round(VW - mb.right), SEAM, 'and one seam in on the edge that faces the pane');
   is(cs(mapBox).borderTopLeftRadius, '16px', 'M3 shape-corner-large');
   is(cs(mapBox).overflow, 'hidden', 'and the tiles clip to that corner');
   /* **The corner is the whole boundary, and no line may come back on any of these three surfaces.**
@@ -422,14 +454,17 @@ async function desktop() {
   is(w.getComputedStyle(mapBox, '::after').content, 'none', 'and no pseudo-element drawing one');
   is(cs(d.querySelector('header')).borderBottomWidth, '0px', 'no rule under the app bar');
   /* The furniture rides the card. Leaflet's own controls are inside the container and get it free;
-     these four are siblings of `#map` and each has to add `--gap` to its own offset. */
+     these three are siblings of `#map` and each has to add the card's own inset to its offset.
+     **Which inset depends on the edge.** A box measuring from the trailing edge measures across the
+     space between the two panes and takes `--seam`. Every other edge takes `--gap`. */
   for (const [id, x, y] of [['legend', 12, 12], ['credit', 10, 8], ['paint', 48, 36]]) {
     const e = r(d.getElementById(id));
-    const off = id === 'legend' ? Math.round(e.left) : Math.round(VW - e.right);
-    is(off, x + GAP, id + ' rides the card inset, not the window edge');
+    const lead = id === 'legend';
+    const off = lead ? Math.round(e.left) : Math.round(VW - e.right);
+    is(off, x + (lead ? GAP : SEAM), id + ' rides the card inset, not the window edge');
     is(Math.round(VH - e.bottom), y + GAP, '  and on the other axis too');
   }
-  is(Math.round(VW - r(d.querySelector('.leaflet-control-zoom')).right), 10 + GAP,
+  is(Math.round(VW - r(d.querySelector('.leaflet-control-zoom')).right), 10 + SEAM,
      'the zoom control gets it free, having never left the map container');
   d.body.classList.add('drawer');
   await settled();
@@ -442,31 +477,38 @@ async function desktop() {
   is(cs(pane2).borderTopLeftRadius, '0px', 'the standard variant is square');
   is([r(pane2).top, r(pane2).width, Math.round(VW - r(pane2).right)].map(Math.round).join(','),
      '64,360,0', 'a 360px pane on the trailing edge, under the app bar');
-  is(Math.round(r(mapBox).width), VW - 360 - GAP * 2,
-     'and the map gives up that width, keeping its own two insets');
-  is(Math.round(r(pane2).left - r(mapBox).right), GAP,
-     'one gap between the two panes, the same number the card is inset by');
+  is(Math.round(r(mapBox).width), VW - 360 - GAP - SEAM,
+     'and the map gives up that width, keeping its leading gap and its trailing seam');
+  is(Math.round(r(pane2).left - r(mapBox).right), SEAM,
+     'one seam between the two panes, which is the smaller of the two numbers');
   /* Leaflet's own controls live INSIDE the map container and follow it for free. These three are
      siblings of the map and position against the window, so each adds `--pane-w` to its own offset.
      A missed one sits under the pane, which is exactly where a reader cannot reach it. */
   for (const [id, base] of [['credit', 10], ['paint', 48], ['toast', 12]]) {
-    is(Math.round(VW - r(d.getElementById(id)).right), base + 360 + GAP,
-       id + ' steps aside by the pane width, on top of the card inset it already had');
+    is(Math.round(VW - r(d.getElementById(id)).right), base + 360 + SEAM,
+       id + ' steps aside by the pane width, on top of the seam it already had');
   }
   /* 360 for the pane, `--gap` for the space between the panes, then the control's own 10 inside the
      card. It picks up ONE gap and not two: the map's trailing inset is the pane plus the gap, and
      the control measures from that edge. */
-  is(Math.round(VW - r(d.querySelector('.leaflet-control-zoom')).right), 360 + GAP + 10,
+  is(Math.round(VW - r(d.querySelector('.leaflet-control-zoom')).right), 360 + SEAM + 10,
      'and the zoom control follows the map, having never left it');
   /* The occupants are content. Neither states a width, a position or an edge of its own. */
   is(cs(bar).display, 'flex', 'the filters occupy the pane');
   is(cs(side).display, 'none', 'and only one occupant draws at a time');
   is(cs(bar).overflowY, 'auto', 'the filters are still their own scroller');
-  is(cs(bar).position + ' ' + cs(side).position, 'static static',
-     'and neither occupant positions itself, or the pane stops owning the box');
+  /* **Absolute, and the swap is why.** They were `flex: 1` children of a column, so two visible at
+     once would split the pane's height between them for the 90ms the fade through overlaps. Filling
+     the pane absolutely lets the outgoing one leave while the incoming one is already in place. The
+     pane still owns the box: the occupants state `inset: 0` and nothing else about it. */
+  is(cs(bar).position + ' ' + cs(side).position, 'absolute absolute',
+     'both occupants fill the pane absolutely, so a swap can overlap them');
+  const bi = r(bar), pi = r(pane2);
+  is([bi.left - pi.left, bi.top - pi.top, pi.right - bi.right, pi.bottom - bi.bottom]
+     .map(Math.round).join(','), '0,0,0,0', 'and each states inset: 0 and nothing more');
   d.body.classList.remove('drawer');
   await settled();
-  is(Math.round(r(mapBox).width), VW - GAP * 2,
+  is(Math.round(r(mapBox).width), VW - GAP - SEAM,
      'shut again, the map takes the width straight back, less its own two insets');
   d.body.classList.add('side');
   await settled();
@@ -629,6 +671,7 @@ async function bands() {
     const share = label === 'medium' ? 0.5 : 0.3;
     const pane = d.getElementById('pane');
     const gap = parseFloat(cs(d.documentElement).getPropertyValue('--gap'));
+    const seam = parseFloat(cs(d.documentElement).getPropertyValue('--seam'));
     d.body.classList.add('side');
     await new Promise(res => setTimeout(res, 200));
     const pw = r(pane).width, mw = r(d.getElementById('map')).width;
@@ -638,10 +681,10 @@ async function bands() {
        drawing over the other. */
     is(Math.abs(pw / px - share) < 0.01, true,
        label + ': the supporting pane takes ' + Math.round(share * 100) + '% of the window');
-    is(Math.round(mw + pw + gap * 2), px,
-       label + ': and the map takes the rest, less its own inset and the gap between them');
-    is(Math.round(r(pane).left - r(d.getElementById('map')).right), gap,
-       label + ': one gap between the two panes');
+    is(Math.round(mw + pw + gap + seam), px,
+       label + ': and the map takes the rest, less its leading gap and its trailing seam');
+    is(Math.round(r(pane).left - r(d.getElementById('map')).right), seam,
+       label + ': one seam between the two panes');
     d.body.classList.remove('side');
     await new Promise(res => setTimeout(res, 150));
   }

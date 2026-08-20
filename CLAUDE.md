@@ -27,7 +27,7 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `title-test.html` | `chrome --headless --dump-dom` — one of seven runnable checks. Guards the app bar wordmark ladder, in rendered pixels |
 | `narrow-test.html` | `chrome --headless --dump-dom` — one of seven runnable checks. Guards the narrow-window block: its threshold, its coverage, its refusal to be dismissed, and that it is modal |
 | `paint-check.html` | `chrome --headless --dump-dom` — one of seven runnable checks. Guards the on-map paint chooser: that it reads as a control and not as a map pin, that its two layers and the four boxes nested under `Stations` sit where they belong, that each section holds one choice at a time, that it clears the zoom cluster at both widths, and that below 600px its panel is an M3 bottom sheet whose drag handle has a real swipe behind it |
-| `m3-check.html` | `chrome --headless --dump-dom` — one of seven runnable checks. Guards every M3 surface in rendered pixels: the eight dialogs against the roll call and the kind each is declared as, the four-band ladder, the map as an inset card, the supporting pane at M3's canonical ratios with the map giving up exactly that width, the pane as a side sheet above 600px and a full-screen dialog below it, and each station section as a filled card. Also that every enter carries M3's own duration and easing |
+| `m3-check.html` | `chrome --headless --dump-dom` — one of seven runnable checks. Guards every M3 surface in rendered pixels: the eight dialogs against the roll call and the kind each is declared as, the four-band ladder, the map as an inset card, the fade through that swaps one occupant for another, the fade through that swaps one occupant for another, the supporting pane at M3's canonical ratios with the map giving up exactly that width, the pane as a side sheet above 600px and a full-screen dialog below it, and each station section as a filled card. Also that every enter carries M3's own duration and easing |
 | `css/icons.css` | every icon, as an SVG mask. Generated — see docs/FEATURES.md for the fetch |
 | `css/base.css` | tokens, reset, controls, blocks shared by popup + alert panel |
 | `css/chrome.css` | page furniture: app bar, status dot, drawer, legend, splash |
@@ -1027,17 +1027,43 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
   name.** It is a line lower. But a 40px button reaches 48px down, and the region starts at 37.5.
   **A menu row's `[data-fav]` can hold a comma list.** So anything reading it back tests every id
   (see the still-open branch in ui.js). `ids.has('a,b,c')` is false forever.
-- **The map is drawn as a card, and `--gap` is one number doing two jobs.** It is the map's inset
-  from the window on three sides, and the space between the map and the supporting pane on the
-  fourth. One number, because two read as two margins on one surface. The map's trailing inset
-  is therefore `--pane-w` PLUS `--gap`, and a box measuring from the map's own edge picks up ONE gap
-  and never two. `m3-check.html` got that wrong first: the zoom control sits 10px inside the card,
-  which is `360 + gap + 10` from the window and not `360 + gap + 10 + gap`.
-- **Every furniture box has to add `--gap` as well as `--pane-w`, and a missed one is not an error.**
-  Leaflet's own controls live inside the map container and get the inset free. `#legend`, `#credit`,
-  `#paint` and `#toast` are siblings of `#map` and position against the window, so each states both.
-  A box that misses `--gap` sits on the page beside the card rather than on the map, which reads as a
-  spacing mistake rather than as a missing term.
+- **The map card has TWO insets and they are not interchangeable.** `--gap` (16px) holds it off the
+  window on the leading, top and bottom edges. `--seam` (8px) is the space between it and the
+  supporting pane, on the trailing edge alone. That is M3's own pair: a margin holds content off the
+  window and a spacer separates one pane from the next. This app read them as one number for a
+  revision, and a reader cut the spacer alone. **M3 puts the spacer at 24dp, wider than the margin,
+  and this goes the other way.** The map is what this app draws, and the pane is the only thing
+  taking width from it.
+  The map's trailing inset is therefore `--pane-w` PLUS `--seam`, and a box measuring from the map's
+  own edge picks up ONE of them and never two. `m3-check.html` got that wrong first: the zoom control
+  sits 10px inside the card, which is `360 + seam + 10` from the window and not
+  `360 + seam + 10 + seam`.
+- **Every furniture box adds the card's inset as well as `--pane-w`, and WHICH inset depends on the
+  edge.** A box measuring from the trailing edge measures across the space between the two panes, so
+  it takes `--seam`. Every other edge takes `--gap`. `#toast` needs both, one per axis. Leaflet's own
+  controls live inside the map container and get it free. A box that misses the term sits on the page
+  beside the card rather than on the map, which reads as a spacing mistake rather than as a missing
+  term.
+- **Swapping one occupant for another is M3's FADE THROUGH, not a slide.** M3 has two answers here
+  and they are for different relationships. Shared axis — the slide with a fade — is for content with
+  a navigational or spatial relationship: steps in a sequence, tabs along one axis. Fade through is
+  for peer destinations that share a container and have no such relationship, and M3 gives bottom
+  navigation as its example. The station card, the weather card and the filters are that second case.
+  The gesture is 300ms. The outgoing surface fades out over the first 30% and does not move. The
+  incoming one waits that out, then fades in over the remaining 70% while it scales up from 92%. The
+  two never cross-fade. Out on `easing-emphasized-accelerate`, in on `easing-emphasized-decelerate`.
+- **The occupants are `position: absolute; inset: 0`, and the fade through is why.** They were
+  `flex: 1` children of a column, so two visible at once split the pane's height between them for the
+  90ms the swap overlaps. Filling the pane absolutely lets the outgoing one leave while the incoming
+  one is already in place. The pane still owns the box: the occupants state `inset: 0` and nothing
+  else about it. `m3-check.html` asserts both halves, because an occupant that positions itself and
+  one that states a size are different faults.
+- **`display` rides the transition with `allow-discrete`, and the direction matters.** Going to
+  `none` the flip lands at the END of the duration, so the outgoing surface survives its own 90ms
+  fade. Coming from `none` it lands at the START, so the incoming surface is in the box, invisible,
+  for the 90ms it waits. Without it the outgoing surface vanishes instantly and there is no fade to
+  see. A browser that does not support it loses the exit alone, which is the same graceful loss
+  `@starting-style` takes.
 - **The card treatment and the gap turn on together, and the radius is why.** With `--gap` at 0 the
   map fills the window, and a 16px radius on a full-bleed box notches the four screen corners and
   shows the page through them. So the radius and the edge live in the same `min-width: 601px` query
@@ -2513,7 +2539,10 @@ it. The weather section stretches nothing. It is five fixed keys measuring 231px
   **Medium splits the window equally. Expanded gives 70% to the main pane and 30% to the supporting
   one**, and the two bands above expanded keep that ratio. `--pane` carries it.
   **The main pane is drawn as a card**, because M3 separates panes with space rather than with a
-  line. `--gap` is the map's inset on three sides and the space between the two panes on the fourth.
+  line. `--gap` is the map's inset against the window and `--seam` is the space between the two
+  panes, which is M3's own margin-and-spacer pair.
+  **Swapping one occupant for another is M3's fade through**, which is its transition between peer
+  destinations sharing a container.
   **No surface in this layout carries a dividing line.** Not the card, not the app bar, not the pane.
   **In a compact window the supporting pane is a full-screen destination.** That is what
   `SupportingPaneScaffold` does in the Compose adaptive library, and it is why `#pane` is a

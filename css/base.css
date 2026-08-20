@@ -51,9 +51,22 @@
   /* The two pairs the components below actually reach for, built FROM the tokens above rather than
      restating their values. **Named for what the surface DOES, not for one component that does it.**
      `--m3-travel` moves in from an edge: the side sheet, the bottom sheet and the full-screen dialog
-     all take it. `--m3-grow` grows in place, which is the basic dialog. */
+     all take it. `--m3-grow` grows in place, which is the basic dialog. `--m3-fade-out` and
+     `--m3-fade-in` are the two halves of one surface replacing another in a container that does not
+     move. */
   --m3-travel: var(--md-sys-motion-duration-short2) var(--md-sys-motion-easing-emphasized);
   --m3-grow: var(--md-sys-motion-duration-extra-short4) var(--md-sys-motion-easing-standard);
+  /* **Fade through**, M3's transition between peer destinations sharing one container. The whole
+     gesture is `duration-short2`. The outgoing surface fades over the first 30% of it, and the
+     incoming one fades and scales over the remaining 70%, so the two are never on screen together.
+     Two halves because they are two declarations on two elements, and the delay on the second is the
+     duration of the first. */
+  --md-sys-motion-duration-fade-out: 90ms;
+  --md-sys-motion-duration-fade-in: 210ms;
+  --m3-fade-out: var(--md-sys-motion-duration-fade-out)
+                 var(--md-sys-motion-easing-emphasized-accelerate);
+  --m3-fade-in: var(--md-sys-motion-duration-fade-in) var(--md-sys-motion-duration-fade-out)
+                var(--md-sys-motion-easing-emphasized-decelerate);
   /* **The supporting pane's width is a RATIO of the window, and M3's canonical layout sets it.**
      https://m3.material.io/foundations/layout/canonical-examples/supporting-pane
      Medium splits the space equally. Expanded gives 70% to the main pane and 30% to the supporting
@@ -71,9 +84,19 @@
      both, because M3's layout separates panes with space rather than with a line and the space on
      every side of the main pane should read as one inset.
      It is 0 below 600px. There the map is the whole window and the pane is a full-screen
-     destination over it, so an inset would take 32px off a 360px map to draw a card nothing sits
-     beside. M3 states a 16dp margin for a compact window, and this is the divergence. */
+     destination over it, so an inset would take a bite out of a 360px map to draw a card nothing
+     sits beside. M3 states a 16dp margin for a compact window, and this is the divergence.
+
+     **`--seam` is the SPACE BETWEEN THE TWO PANES and it is the only inset that differs.** M3's
+     layout names the two separately: a margin holds content off the window edge, and a spacer
+     separates one pane from the next. This app read them as one number for a revision and a reader
+     cut the spacer alone, which is the distinction M3 already draws. The card keeps 16px against the
+     window on its other three sides, so the app bar and the left and bottom edges are unchanged.
+     M3 puts the spacer at 24dp, wider than the margin. This goes the other way for a reason a
+     reader can see: the map is what this app draws, and the pane is the only thing taking width
+     from it. */
   --gap: 0px;
+  --seam: 0px;
   /* Header height, and everything that hangs beneath it. One number because the header grows to two
      lines on a phone (the ticker wraps under the buttons) and the map, drawer, search box and alert
      panel all have to follow it down — they were six hard-coded 64/76/124/128s before. */

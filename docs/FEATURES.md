@@ -12110,3 +12110,73 @@ The supporting pane is NOT a card. It stays flush to the trailing edge and runs 
 the app bar, which is the standard side sheet it is declared as. So the pane starts 16px higher than
 the map card does. Making both panes cards is closer to the canonical layout drawings. It also
 changes what `m3-check.html` asserts about the side sheet.
+
+
+## Swapping the pane's occupant is a fade through
+
+The station card, the weather card and the filters share one container. Changing which one is on
+screen now animates.
+
+M3 has two answers here and they are for different relationships.
+
+**Shared axis** — a slide with a fade — is for content with a navigational or spatial relationship.
+Steps in a sequence. Tabs along one axis.
+
+**Fade through** is for peer destinations that share a container and have no such relationship. M3
+gives bottom navigation as its example.
+
+These three are the second case. A button selects which one the pane holds, and none of them is a
+step toward another. So this is a fade through.
+
+### The numbers
+
+The gesture is 300ms, which is `duration-short2`.
+
+The outgoing surface fades out over the first 30% of it and does not move. The incoming one waits
+that out, then fades in over the remaining 70% while it scales up from 92%.
+
+The two never cross-fade. The container is never showing two things at once, which is the whole point
+of the pattern.
+
+Out on `easing-emphasized-accelerate`. In on `easing-emphasized-decelerate`. Both curves were already
+in `css/base.css`.
+
+### Two structural changes it needed
+
+**The occupants became `position: absolute; inset: 0`.** They were `flex: 1` children of a column, so
+two visible at once split the pane's height between them for the 90ms the swap overlaps. Filling the
+pane absolutely lets the outgoing one leave while the incoming one is already in place.
+
+The pane still owns the box. The occupants state `inset: 0` and nothing else about it.
+
+**`display` rides the transition with `allow-discrete`.** The direction matters. Going to `none` the
+flip lands at the end of the duration, so the outgoing surface survives its own 90ms fade. Coming
+from `none` it lands at the start, so the incoming surface is in the box, invisible, for the 90ms it
+waits.
+
+Without it the outgoing surface vanishes instantly and there is no fade to see. A browser that does
+not support it loses the exit alone, which is the same graceful loss `@starting-style` takes.
+
+## The space between the two panes became its own number
+
+`--gap` holds the map card off the window on its leading, top and bottom edges. `--seam` is the space
+between the map and the supporting pane, on the trailing edge alone.
+
+That is M3's own pair. A margin holds content off the window edge. A spacer separates one pane from
+the next. This app read them as one number for a revision, and a reader cut the spacer alone.
+
+`--gap` is 16px and `--seam` is 8px above 600px. Both are 0 below it, where the map is the whole
+window.
+
+**M3 puts the spacer at 24dp, wider than the margin, and this goes the other way.** The map is what
+this app draws, and the pane is the only thing taking width from it.
+
+### Which inset a box takes depends on its edge
+
+A furniture box measuring from the trailing edge measures across the space between the two panes, so
+it takes `--seam`. Every other edge takes `--gap`. `#toast` needs both, one per axis.
+
+Leaflet's own controls live inside the map container and get it free.
+
+A box that misses the term sits on the page beside the card rather than on the map. That reads as a
+spacing mistake rather than as a missing term, which is why `m3-check.html` measures each one.
