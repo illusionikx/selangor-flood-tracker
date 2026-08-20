@@ -90,11 +90,22 @@ narrow.addEventListener('change', syncPane);
    one change. `invalidateSize()` keeps the CENTRE by default, which is what a narrowing map wants:
    whatever the reader was looking at stays in the middle of the strip that is left.
    Measured at 711 stations: one call costs under a millisecond, so there is nothing here to
-   throttle beyond the frame. */
+   throttle beyond the frame.
+
+   **`debounceMoveend` is not a nicety here, and the heat layer is why.** The map card transitions
+   its width, so this runs on every frame of a 300ms travel — about 18 of them. Leaflet fires
+   `moveend` from each call unless told otherwise. `SoftHeat` repaints its whole field on that event,
+   measured at 33 to 38ms for a full viewport, so eighteen of them is 630ms of main-thread work
+   inside a 300ms animation. This app's own `moveend` handler writes the centre to `localStorage`,
+   which would run eighteen times for one press.
+   With the debounce both happen once, 200ms after the travel. The tiles keep up regardless: a grid
+   layer redraws on `move`, which still fires per call. The heat canvas rides the overlay pane, so it
+   stays glued to the ground during the travel and only the newly revealed strip waits for the
+   repaint. */
 let sized;
 new ResizeObserver(() => {
   cancelAnimationFrame(sized);
-  sized = requestAnimationFrame(() => map.invalidateSize());
+  sized = requestAnimationFrame(() => map.invalidateSize({ debounceMoveend: true }));
 }).observe(el('map'));
 
 map.on('moveend zoomend', () => {

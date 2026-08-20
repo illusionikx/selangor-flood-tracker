@@ -213,6 +213,18 @@ async function phone() {
   await inFrame(d, OPEN_CARD);
   d.body.classList.remove('side');
   await settled();
+  /* **No card at this width, and the radius is why it has to be a query rather than a token.** With
+     `--gap` at 0 the map fills the window, and a 16px radius on a full-bleed box notches the four
+     screen corners and shows the page through them. There is no second pane beside it either: the
+     supporting pane is a destination over the map, so there is nothing for a card to separate from.
+     M3 states a 16dp margin for a compact window. This is the divergence, and 32px off a 360px map
+     is the reason. */
+  const mapEl = d.getElementById('map');
+  is(cs(d.documentElement).getPropertyValue('--gap').trim(), '0px', 'no card inset on a phone');
+  is(cs(mapEl).borderTopLeftRadius, '0px', 'and no corner, which would notch the screen');
+  is(w.getComputedStyle(mapEl, '::after').content, 'none', 'and no card edge');
+  is(Math.round(r(mapEl).width), VW, 'the map is the full width of the window');
+
   is(pane.tagName, 'DIALOG', 'the pane is a real <dialog>, not a div dressed as one');
   is(!!d.getElementById('scrim'), false,
      'and there is no scrim left: a full-screen dialog covers the screen, so it has no outside');
@@ -349,6 +361,15 @@ async function desktop() {
   say('--- desktop, ' + w.innerWidth + 'x' + w.innerHeight + ' ----------------------------------');
 
   // --- motion, read BEFORE the override ---
+  /* **The map card resizes on a transition, and that is the whole of the pane's arrival on screen.**
+     It snapped for one revision, on the argument that animating the width makes Leaflet resize on
+     every frame. It does, and that is what keeps live tiles in the card as it grows rather than
+     revealing a blank strip for 300ms. `right` alone: the other three sides never move. */
+  const mapCs = cs(d.getElementById('map'));
+  is(mapCs.transitionProperty, 'right', 'the map card transitions its trailing edge and nothing else');
+  is(mapCs.transitionDuration, '0.3s', 'on M3 duration-short2, the same travel the pane takes');
+  is(mapCs.transitionTimingFunction, M3_EASE, 'and M3 easing-emphasized, so the two move as one');
+
   // The M3 basic dialog: opacity 0 and scale(.95), duration-extra-short4 (200ms) on easing-standard.
   // It grows in place rather than travelling, which is the within-screen-bounds pattern.
   for (const id of DIALOGS) {
@@ -369,25 +390,61 @@ async function desktop() {
      `focusOn()` then centres a station under the panel that describes it. */
   const bar = d.getElementById('bar'), side = d.getElementById('side');
   const pane2 = d.getElementById('pane'), mapBox = d.getElementById('map'), VW = w.innerWidth;
+  const VH = w.innerHeight;
   d.body.classList.remove('drawer', 'side');
-  is(Math.round(r(mapBox).width), VW, 'shut, the map is the whole window');
+  await settled();
+
+  /* --- the main pane is drawn as a card ---
+     M3's canonical layout separates panes with space rather than with a line, so the map sits inside
+     its own inset surface. `--gap` is that inset on three sides AND the space between the two panes
+     on the fourth, because one number has to read as one margin.
+     **Every silent fault here is off by exactly `--gap`.** A furniture box that misses it sits on the
+     page beside the card rather than on the map. A radius without the gap notches the four screen
+     corners. And an edge drawn as a `border` takes two pixels off the map instead of drawing round
+     it, which is invisible until somebody measures the container. */
+  const GAP = parseFloat(cs(d.documentElement).getPropertyValue('--gap'));
+  const hdr = parseFloat(cs(d.documentElement).getPropertyValue('--hdr'));
+  is(GAP > 0, true, 'the map card is inset from the window at this width');
+  const mb = r(mapBox);
+  is([mb.left, mb.top - hdr, VW - mb.right, VH - mb.bottom].map(Math.round).join(','),
+     [GAP, GAP, GAP, GAP].join(','), 'shut, the card sits one gap in on all four sides');
+  is(cs(mapBox).borderTopLeftRadius, '16px', 'M3 shape-corner-large');
+  is(cs(mapBox).overflow, 'hidden', 'and the tiles clip to that corner');
+  is(w.getComputedStyle(mapBox, '::after').boxShadow.includes('inset'), true,
+     'the edge is an inset shadow on a pseudo-element, not a border that eats two pixels of map');
+  is(cs(mapBox).borderWidth, '0px', 'so the container itself carries no border');
+  /* The furniture rides the card. Leaflet's own controls are inside the container and get it free;
+     these four are siblings of `#map` and each has to add `--gap` to its own offset. */
+  for (const [id, x, y] of [['legend', 12, 12], ['credit', 10, 8], ['paint', 48, 36]]) {
+    const e = r(d.getElementById(id));
+    const off = id === 'legend' ? Math.round(e.left) : Math.round(VW - e.right);
+    is(off, x + GAP, id + ' rides the card inset, not the window edge');
+    is(Math.round(VH - e.bottom), y + GAP, '  and on the other axis too');
+  }
+  is(Math.round(VW - r(d.querySelector('.leaflet-control-zoom')).right), 10 + GAP,
+     'the zoom control gets it free, having never left the map container');
   d.body.classList.add('drawer');
+  await settled();
   is(cs(pane2).boxShadow, 'none', 'a standard side sheet has no elevation');
   is(cs(pane2).borderLeftWidth, '1px', 'it is separated by a 1px line instead');
   is(cs(pane2).borderTopLeftRadius, '0px', 'the standard variant is square');
   is([r(pane2).top, r(pane2).width, Math.round(VW - r(pane2).right)].map(Math.round).join(','),
      '64,360,0', 'a 360px pane on the trailing edge, under the app bar');
-  is(Math.round(r(mapBox).width), VW - 360, 'and the map gives up exactly that width');
-  is(Math.round(r(mapBox).right), Math.round(r(pane2).left),
-     'the two meet, so neither overlaps the other');
+  is(Math.round(r(mapBox).width), VW - 360 - GAP * 2,
+     'and the map gives up that width, keeping its own two insets');
+  is(Math.round(r(pane2).left - r(mapBox).right), GAP,
+     'one gap between the two panes, the same number the card is inset by');
   /* Leaflet's own controls live INSIDE the map container and follow it for free. These three are
      siblings of the map and position against the window, so each adds `--pane-w` to its own offset.
      A missed one sits under the pane, which is exactly where a reader cannot reach it. */
   for (const [id, base] of [['credit', 10], ['paint', 48], ['toast', 12]]) {
-    is(Math.round(VW - r(d.getElementById(id)).right), base + 360,
-       id + ' steps aside by the pane width');
+    is(Math.round(VW - r(d.getElementById(id)).right), base + 360 + GAP,
+       id + ' steps aside by the pane width, on top of the card inset it already had');
   }
-  is(Math.round(VW - r(d.querySelector('.leaflet-control-zoom')).right), 370,
+  /* 360 for the pane, `--gap` for the space between the panes, then the control's own 10 inside the
+     card. It picks up ONE gap and not two: the map's trailing inset is the pane plus the gap, and
+     the control measures from that edge. */
+  is(Math.round(VW - r(d.querySelector('.leaflet-control-zoom')).right), 360 + GAP + 10,
      'and the zoom control follows the map, having never left it');
   /* The occupants are content. Neither states a width, a position or an edge of its own. */
   is(cs(bar).display, 'flex', 'the filters occupy the pane');
@@ -396,8 +453,11 @@ async function desktop() {
   is(cs(bar).position + ' ' + cs(side).position, 'static static',
      'and neither occupant positions itself, or the pane stops owning the box');
   d.body.classList.remove('drawer');
-  is(Math.round(r(mapBox).width), VW, 'shut again, the map takes the width straight back');
+  await settled();
+  is(Math.round(r(mapBox).width), VW - GAP * 2,
+     'shut again, the map takes the width straight back, less its own two insets');
   d.body.classList.add('side');
+  await settled();
   /* --- the header is M3's side sheet header, filled by the real openSide() split ---
      Transcribed from SideSheet/side-sheet.css: `min-height: 64px`, `align-items: center`,
      `padding: 8px 12px 8px 16px`, a `flex: 1` title in `title-large`, and the body at
@@ -556,14 +616,20 @@ async function bands() {
        other end: the two have to add up, or one is drawing over the other. */
     const share = label === 'medium' ? 0.5 : 0.3;
     const pane = d.getElementById('pane');
+    const gap = parseFloat(cs(d.documentElement).getPropertyValue('--gap'));
     d.body.classList.add('side');
-    await new Promise(res => setTimeout(res, 150));
+    await new Promise(res => setTimeout(res, 200));
     const pw = r(pane).width, mw = r(d.getElementById('map')).width;
+    /* The RATIO is against the window, because that is what M3 states. The map is then measured
+       against what is left of the window after the pane and the card's own three insets. Add the
+       two and the gaps back, and the window has to come out whole: anything else means one pane is
+       drawing over the other. */
     is(Math.abs(pw / px - share) < 0.01, true,
        label + ': the supporting pane takes ' + Math.round(share * 100) + '% of the window');
-    is(Math.round(mw + pw), px, label + ': and the map takes the rest, with no overlap');
-    is(Math.round(r(d.getElementById('map')).right), Math.round(r(pane).left),
-       label + ': the two panes meet');
+    is(Math.round(mw + pw + gap * 2), px,
+       label + ': and the map takes the rest, less its own inset and the gap between them');
+    is(Math.round(r(pane).left - r(d.getElementById('map')).right), gap,
+       label + ': one gap between the two panes');
     d.body.classList.remove('side');
     await new Promise(res => setTimeout(res, 150));
   }

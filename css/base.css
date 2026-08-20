@@ -67,6 +67,13 @@
      so one variable places every one of them. */
   --pane: 50vw;
   --pane-w: 0px;
+  /* The margin around the map card, and the gap between it and the supporting pane. One number for
+     both, because M3's layout separates panes with space rather than with a line and the space on
+     every side of the main pane should read as one inset.
+     It is 0 below 600px. There the map is the whole window and the pane is a full-screen
+     destination over it, so an inset would take 32px off a 360px map to draw a card nothing sits
+     beside. M3 states a 16dp margin for a compact window, and this is the divergence. */
+  --gap: 0px;
   /* Header height, and everything that hangs beneath it. One number because the header grows to two
      lines on a phone (the ticker wraps under the buttons) and the map, drawer, search box and alert
      panel all have to follow it down — they were six hard-coded 64/76/124/128s before. */

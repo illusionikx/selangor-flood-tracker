@@ -12029,3 +12029,73 @@ M3's side sheet band of 256 to 400.
 
 An expanded window at 2560px gives the pane 768. Nothing caps it. At the reference viewport of 1536
 it is 461, which is wider than the 360 it replaced and better for a camera still.
+
+
+## The map pane became a card, and the pane's arrival animates
+
+M3 separates panes with space rather than with a line, so the main pane is now an inset surface with
+its own corner. `--gap` is 16px above 600px, and it does two jobs: the map's inset from the window on
+three sides, and the space between the map and the supporting pane on the fourth.
+
+One number, because two read as two margins on one surface. The map's trailing inset is therefore
+`--pane-w` plus `--gap`, and a box measuring from the map's own edge picks up one gap and never two.
+
+### Three things a card needs that are easy to miss
+
+**Every furniture box adds `--gap` as well as `--pane-w`.** Leaflet's own controls live inside the
+map container and get the inset free. `#legend`, `#credit`, `#paint` and `#toast` are siblings of
+`#map`, so each states both. A box that misses the gap sits on the page beside the card rather than
+on the map.
+
+**The radius turns on with the gap.** With `--gap` at 0 the map fills the window, and a 16px radius
+on a full-bleed box notches the four screen corners and shows the page through them. So the radius
+and the edge live in the same query the gap does.
+
+**The edge is an inset `box-shadow` on `#map::after`, never a `border`.** A border sits inside an
+absolutely positioned box, so it takes two pixels off the map rather than drawing around it. That is
+invisible until somebody measures the container. The radius alone is not enough on the light theme,
+where a pale basemap against a white page has no boundary of its own.
+
+### The pane's arrival animates, which reverses an earlier decision
+
+`#map`'s `right` transitions on `--m3-travel`, the same 300ms the pane itself takes. So the card
+narrows while the pane travels in beside it, and the two read as one movement.
+
+It snapped before, on the argument that animating the width makes Leaflet resize on every frame of
+the travel. Leaflet does, and that is exactly what keeps live tiles in the card as it grows. The
+alternative reveals a blank strip for 300ms.
+
+`right` alone, never the `inset` shorthand. The other three sides never move.
+
+The `ResizeObserver` already answered each of those frames and needed no change.
+
+### `invalidateSize()` needed one option, and the heat layer is why
+
+The observer now runs about 18 times across a 300ms travel. Leaflet fires `moveend` from each call
+unless told otherwise.
+
+`SoftHeat` repaints its whole field on that event, measured at 33 to 38ms for a full viewport. So
+eighteen of them is 630ms of main-thread work inside a 300ms animation. This app's own `moveend`
+handler writes the centre to `localStorage`, and that runs eighteen times for one press.
+
+`debounceMoveend: true` makes both happen once, 200ms after the travel.
+
+The tiles keep up regardless. A grid layer redraws on `move`, which still fires per call. The heat
+canvas rides the overlay pane, so it stays glued to the ground during the travel and only the newly
+revealed strip waits for the repaint.
+
+### Compact windows keep a full-bleed map
+
+There is no second pane beside the map below 600px. The supporting pane is a destination over it, so
+there is nothing for a card to separate from. M3 states a 16dp margin for a compact window, and this
+app declines it: 32px off a 360px map is the reason.
+
+### Trade-offs
+
+The card costs 32px of map width and 32px of height at every window above 600px. The map is the thing
+this app exists to draw, and that is real.
+
+The supporting pane is NOT a card. It stays flush to the trailing edge and runs the full height under
+the app bar, which is the standard side sheet it is declared as. So the pane starts 16px higher than
+the map card does. Making both panes cards is closer to the canonical layout drawings. It also
+changes what `m3-check.html` asserts about the side sheet.

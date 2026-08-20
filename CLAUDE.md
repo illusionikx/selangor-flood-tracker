@@ -27,7 +27,7 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `title-test.html` | `chrome --headless --dump-dom` — one of seven runnable checks. Guards the app bar wordmark ladder, in rendered pixels |
 | `narrow-test.html` | `chrome --headless --dump-dom` — one of seven runnable checks. Guards the narrow-window block: its threshold, its coverage, its refusal to be dismissed, and that it is modal |
 | `paint-check.html` | `chrome --headless --dump-dom` — one of seven runnable checks. Guards the on-map paint chooser: that it reads as a control and not as a map pin, that its two layers and the four boxes nested under `Stations` sit where they belong, that each section holds one choice at a time, that it clears the zoom cluster at both widths, and that below 600px its panel is an M3 bottom sheet whose drag handle has a real swipe behind it |
-| `m3-check.html` | `chrome --headless --dump-dom` — one of seven runnable checks. Guards every M3 surface in rendered pixels: the eight dialogs against the roll call and the kind each is declared as, the four-band ladder, the supporting pane at M3's canonical ratios with the map giving up exactly that width, the pane as a side sheet above 600px and a full-screen dialog below it, and each station section as a filled card. Also that every enter carries M3's own duration and easing |
+| `m3-check.html` | `chrome --headless --dump-dom` — one of seven runnable checks. Guards every M3 surface in rendered pixels: the eight dialogs against the roll call and the kind each is declared as, the four-band ladder, the map as an inset card, the supporting pane at M3's canonical ratios with the map giving up exactly that width, the pane as a side sheet above 600px and a full-screen dialog below it, and each station section as a filled card. Also that every enter carries M3's own duration and easing |
 | `css/icons.css` | every icon, as an SVG mask. Generated — see docs/FEATURES.md for the fetch |
 | `css/base.css` | tokens, reset, controls, blocks shared by popup + alert panel |
 | `css/chrome.css` | page furniture: app bar, status dot, drawer, legend, splash |
@@ -1027,6 +1027,43 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
   name.** It is a line lower. But a 40px button reaches 48px down, and the region starts at 37.5.
   **A menu row's `[data-fav]` can hold a comma list.** So anything reading it back tests every id
   (see the still-open branch in ui.js). `ids.has('a,b,c')` is false forever.
+- **The map is drawn as a card, and `--gap` is one number doing two jobs.** It is the map's inset
+  from the window on three sides, and the space between the map and the supporting pane on the
+  fourth. One number, because two read as two margins on one surface. The map's trailing inset
+  is therefore `--pane-w` PLUS `--gap`, and a box measuring from the map's own edge picks up ONE gap
+  and never two. `m3-check.html` got that wrong first: the zoom control sits 10px inside the card,
+  which is `360 + gap + 10` from the window and not `360 + gap + 10 + gap`.
+- **Every furniture box has to add `--gap` as well as `--pane-w`, and a missed one is not an error.**
+  Leaflet's own controls live inside the map container and get the inset free. `#legend`, `#credit`,
+  `#paint` and `#toast` are siblings of `#map` and position against the window, so each states both.
+  A box that misses `--gap` sits on the page beside the card rather than on the map, which reads as a
+  spacing mistake rather than as a missing term.
+- **The card treatment and the gap turn on together, and the radius is why.** With `--gap` at 0 the
+  map fills the window, and a 16px radius on a full-bleed box notches the four screen corners and
+  shows the page through them. So the radius and the edge live in the same `min-width: 601px` query
+  the gap does. Below 600px there is no second pane beside the map either — the supporting pane is a
+  destination over it — so there is nothing for a card to separate from. **M3 states a 16dp margin
+  for a compact window and this app declines it.** 32px off a 360px map is the reason.
+- **The card's edge is an inset `box-shadow` on `#map::after`, never a `border`.** A border sits
+  inside an absolutely positioned box, so it takes two pixels off the map rather than drawing around
+  it. That is invisible until somebody measures the container. The pseudo-element is
+  `pointer-events: none` and sits above every Leaflet pane, so it cannot eat a drag. The radius
+  alone is not enough on the light theme: a pale basemap against a white page has no boundary of
+  its own.
+- **`#map`'s `right` transitions now, and that reverses an earlier decision.** It snapped, on the
+  argument that animating the width makes Leaflet resize on every frame of the travel. It does, and
+  that is exactly what keeps live tiles in the card as it grows. The alternative reveals a blank
+  strip for 300ms. `right` alone, never the `inset` shorthand: the other three sides never move, and
+  naming them puts three properties on the transition list that can only animate a value to itself.
+  The `ResizeObserver` in `js/map.js` already answered each of those frames and needed no change.
+- **`invalidateSize()` needs `debounceMoveend: true` now, and the heat layer is why.** The observer
+  runs about 18 times across a 300ms travel. Leaflet fires `moveend` from each call unless told
+  otherwise. `SoftHeat` repaints its whole field on that event, measured at 33 to 38ms for a full
+  viewport, so eighteen of them is 630ms of main-thread work inside a 300ms animation. This app's own
+  `moveend` handler writes the centre to `localStorage`, and that runs eighteen times for one
+  press. With the debounce both happen once, 200ms after the travel. **The tiles keep up regardless**:
+  a grid layer redraws on `move`, which still fires per call. The heat canvas rides the overlay pane,
+  so it stays glued to the ground during the travel and only the newly revealed strip waits.
 - **`#pane` is a `<dialog>` and the window class picks the METHOD, not the styling.** Below 600px it
   opens with `showModal()`. That is the only way to get the top layer, a real focus trap, and a page
   behind it that is inert. Above 600px it opens with `show()`, because a non-modal dialog is a plain
@@ -2470,6 +2507,8 @@ it. The weather section stretches nothing. It is five fixed keys measuring 231px
   a time: the station card, the weather card and the filters.
   **Medium splits the window equally. Expanded gives 70% to the main pane and 30% to the supporting
   one**, and the two bands above expanded keep that ratio. `--pane` carries it.
+  **The main pane is drawn as a card**, because M3 separates panes with space rather than with a
+  line. `--gap` is the map's inset on three sides and the space between the two panes on the fourth.
   **In a compact window the supporting pane is a full-screen destination.** That is what
   `SupportingPaneScaffold` does in the Compose adaptive library, and it is why `#pane` is a
   `<dialog>`: `showModal()` below 600px, `show()` above it.

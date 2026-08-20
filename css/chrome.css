@@ -10,7 +10,47 @@
    beside it, which is what an adaptive layout does. Animating the width instead makes Leaflet
    resize on every frame of the travel, and the strip revealed on the way out sits empty for the
    whole 300ms. A `ResizeObserver` in `js/map.js` answers the snap with one `invalidateSize()`. */
-#map { position: absolute; inset: var(--hdr) var(--pane-w) 0 0; }
+/* **The map is the main pane, and it is drawn as a card.** M3's canonical layout separates panes
+   with space, so the map sits inside its own inset surface rather than running to the window edges.
+   `--gap` is that inset on three sides AND the space between the two panes on the fourth, because
+   one number reads as one margin.
+   `overflow: hidden` clips the tiles to the corner. `--outline` defines the edge, which the radius
+   alone cannot on the light theme: a pale basemap against a white page has no boundary of its own.
+
+   **`right` transitions, and that is a reversal.** It did not, on the argument that animating the
+   width makes Leaflet resize on every frame of the travel. Leaflet does, and that is what makes the
+   card grow with live tiles in it rather than reveal a blank strip for 300ms. The `ResizeObserver`
+   in `js/map.js` already answers each of those frames and needed no change. Measured on the live
+   map: `invalidateSize()` costs under a millisecond at 711 stations, so about 18 frames of travel
+   cost under 18ms in total.
+   `right` alone, never the `inset` shorthand. The other three sides never move, and naming them
+   puts three properties on the transition list that can only ever animate from a value to itself. */
+#map {
+  position: absolute;
+  inset: calc(var(--hdr) + var(--gap)) calc(var(--pane-w) + var(--gap)) var(--gap) var(--gap);
+  overflow: hidden;
+  transition: right var(--m3-travel);
+}
+body:not(.ready) #map { transition: none; }
+@media (prefers-reduced-motion: reduce) { #map { transition: none; } }
+
+/* **The card treatment and the gap turn on together, and they have to.** With `--gap` at 0 the map
+   fills the window, and a 16px radius on a full-bleed box notches the four screen corners and shows
+   the page through them. So the radius and the edge live in the same query the gap does.
+   Below 600px the map is the whole window and the supporting pane is a full-screen destination over
+   it. There is no second pane beside it, so there is nothing for a card to separate from. */
+@media (min-width: 601px) {
+  :root { --gap: 16px; }
+  #map { border-radius: var(--md-sys-shape-corner-large); }
+  /* The card's own edge, which the radius alone cannot supply: a pale basemap against a white page
+     has no boundary of its own. An inset `box-shadow` on a pseudo-element rather than a `border`,
+     because a border sits inside an absolutely positioned box and would take two pixels off the map
+     rather than draw around it. Above every Leaflet pane and inert, so it cannot eat a drag. */
+  #map::after {
+    content: ''; position: absolute; inset: 0; z-index: 500; pointer-events: none;
+    border-radius: inherit; box-shadow: inset 0 0 0 1px var(--outline);
+  }
+}
 
 /* --- top app bar ---------------------------------------------------------------------------- */
 
@@ -1126,7 +1166,8 @@ body.side #bar { display: none; }
    change to either margin fails a check rather than drifting apart on screen.
    401, not 400: it stands over the legend and the alert panel, one rung under #gotoBox's results
    list at 402 and well under the app bar at 600. */
-#paint { position: absolute; z-index: 401; right: calc(48px + var(--pane-w)); bottom: 36px; }
+#paint { position: absolute; z-index: 401;
+  right: calc(48px + var(--pane-w) + var(--gap)); bottom: calc(36px + var(--gap)); }
 
 /* It steps aside for the station panel exactly as the zoom buttons and the credit do — see the
    `body.side` block further down, which this joins. Nothing here rides the drawer any more: that
@@ -1217,7 +1258,8 @@ body.side #bar { display: none; }
 /* --- heatmap legend ------------------------------------------------------------------------- */
 
 #legend {
-  position: absolute; z-index: 400; left: 12px; bottom: 12px; width: 288px;
+  position: absolute; z-index: 400;
+  left: calc(12px + var(--gap)); bottom: calc(12px + var(--gap)); width: 288px;
   margin-top: 10px; padding: 12px 14px; border-radius: 12px;
 }
 /* The heat sections are sized by their ramp, and a ramp has no intrinsic width, so the box has to
@@ -1379,7 +1421,11 @@ body.side #side { display: flex; }
 #side.swap #sideTitle, #side.swap #sideBody { animation: sideSwap .22s cubic-bezier(.2, 0, 0, 1); }
 @media (prefers-reduced-motion: reduce) { @keyframes sideSwap { from { opacity: 0; } } }
 
-/* **Three boxes still step aside, and the zoom control no longer has to.** Leaflet's own controls
+/* **Three boxes still step aside, and each one also rides the map card's own inset.** Leaflet's
+   controls live INSIDE the map container, so the card carries them for free. These three are
+   siblings of `#map` and position against the window, so each adds `--gap` as well as `--pane-w`.
+   A missed `--gap` puts the box on the page beside the card rather than on the map.
+   **Three boxes still step aside, and the zoom control no longer has to.** Leaflet's own controls
    live INSIDE the map container, and that container now ends where the pane begins, so they follow
    it for free. These three are siblings of `#map` and position against the window instead, so each
    adds `--pane-w` to its own offset.
@@ -1421,7 +1467,8 @@ body.finding #find { display: none; }
 /* Top-right of the map, mirroring the alert panel on the left. Hidden rather than removed when
    closed: `visibility` keeps it out of the tab order and off screen readers, and still animates. */
 #toast {
-  position: absolute; z-index: 401; top: calc(var(--hdr) + 12px); right: calc(12px + var(--pane-w));
+  position: absolute; z-index: 401; top: calc(var(--hdr) + 12px + var(--gap));
+  right: calc(12px + var(--pane-w) + var(--gap));
   width: min(300px, calc(100vw - 24px));
   border-radius: 12px; padding: 12px 14px 6px; overflow: hidden;
   border-left: 3px solid #e8710a;
@@ -1576,7 +1623,8 @@ body.finding #find { display: none; }
 
 /* Leaflet's own attribution box is disabled; we render the credit ourselves, out of the way. */
 #credit {
-  position: absolute; z-index: 400; right: calc(10px + var(--pane-w)); bottom: 8px;
+  position: absolute; z-index: 400;
+  right: calc(10px + var(--pane-w) + var(--gap)); bottom: calc(8px + var(--gap));
   text-shadow: 0 0 4px var(--surface), 0 0 4px var(--surface);
 }
 #credit a { color: var(--muted); }
