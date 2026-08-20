@@ -8,12 +8,7 @@ import { PREFS } from './state.js';
 import { map, pinGlyph, openSide, side, focusOn } from './map.js';
 import { wxIcon, wxTone, stamp } from './popup.js';
 import { askJson } from './ask.js';
-import { el, ago } from './util.js';
-
-/* Mirrors MET_STALE in api.php. That constant stops a refresh from writing a row of stale
-   points. It cannot stop an already-written row from aging once every point in it turns
-   stale. tick() below reads this to warn a reader when that has happened. */
-const STALE_S = 7200;
+import { el } from './util.js';
 
 const layer = L.layerGroup();
 let pts = [];    // the last answer from ?wx=1
@@ -175,14 +170,12 @@ export async function tick() {
      also holds two heatmaps that work. `.hint` is the small slot the two filter chips below
      already use for the same job.
 
-     A non-empty answer can still be old. See STALE_S above for why a stored row can age with
-     nobody rewriting it. So the chip states the age instead of staying blank when that has
-     happened. Stating old weather with confidence is worse than stating nothing. An offline gauge
-     draws grey instead of a flat line, for the same reason. */
-  const now = Date.now() / 1000;
-  const newest = pts.reduce((m, p) => Math.max(m, p.stamp), 0);
-  el('wxHint').textContent = pts.length === 0 ? 'no data yet'
-    : now - newest > STALE_S ? `MET last issued ${ago(newest * 1000)}` : '';
+     **An age used to ride here too, and a reader cut it.** A stored row can go stale with nobody
+     rewriting it, so the chip printed `MET last issued 15.9h ago` on one. The words are ours rather
+     than the reader's, and a chip in a layer panel is not where somebody goes to ask how fresh a
+     forecast is. The card states MET's own issue time on every point, which is the surface that
+     question belongs on. Only the empty answer is left here, because no card can state that one. */
+  el('wxHint').textContent = pts.length === 0 ? 'no data yet' : '';
   paint();
   if (side.key?.startsWith('@wx-')) {
     const p = pts.find(x => '@wx-' + x.id === side.key);
