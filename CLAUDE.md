@@ -2259,6 +2259,11 @@ it. The weather section stretches nothing. It is five fixed keys measuring 231px
   the notes above it. It draws behind the same media query the handler tests, because a tap and a
   keyboard press keep the native toggle and cannot take it. It reads `Click` rather than `press`,
   since the line is mouse-only by construction.
+  **It points at the button by DRAWING the button's glyph**, a real `<i class="i i-layers">` inside
+  the sentence, at 1.35em of an 11px line. Naming it in words came first, and a panel floating beside
+  its own button holds more than one thing a reader can click. The glyph takes `role="img"` and a
+  name, because a mask carries no text of its own. `paint-check.html` compares its `mask-image`
+  against the button's rather than its `--i`.
   **The press answers for itself through `.mapbtn:active`, and never through a class.** The glyph is
   the same at every state, so a press that switches the map leaves the button looking untouched.
   `:active` covers the press that opens the panel and the press that switches the layer alike, with

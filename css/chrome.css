@@ -1151,6 +1151,12 @@ body.drawer #legend { transform: translateX(var(--drawer)); }
     display: block; margin: 8px 15px 2px 8px; text-align: right;
     font-size: 11px; color: var(--muted); opacity: .8;
   }
+  /* The glyph the sentence points at, drawn rather than named. `.i` is a 1em box already sitting on
+     the baseline through its own `vertical-align`, so this only has to grow it: at the line's 11px
+     the mark is smaller than the button it names and reads as punctuation.
+     It carries `role="img"` and a label, because a mask has no text of its own and a reader who
+     cannot see it is left with a sentence that points at nothing. */
+  #paintmenu .mfoot .i { font-size: 1.35em; }
 }
 
 /* --- heatmap legend ------------------------------------------------------------------------- */

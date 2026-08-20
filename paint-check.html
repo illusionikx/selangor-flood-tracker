@@ -318,6 +318,17 @@ is(w.getComputedStyle(foot).textAlign, 'right', 'desktop: right, because it poin
 is(Math.abs(foot.getBoundingClientRect().right
    - menu.querySelector('.note').getBoundingClientRect().right) < 1, true,
    'desktop: on the same right edge as the notes above it');
+/* **The line points at the button by drawing its glyph, not by naming it.** So the two marks have to
+   be the same one. Read `mask-image` rather than `--i`: a resolved token is not evidence that
+   anything painted, which is the fault `#paint::before` shipped with. */
+const fg = foot.querySelector('.i');
+is(w.getComputedStyle(fg).maskImage, w.getComputedStyle(btn.querySelector('.i')).maskImage,
+   'desktop: and the glyph in it is the button’s own');
+is(fg.getBoundingClientRect().height > 0, true, 'desktop: with a box to paint in');
+/* A mask has no text of its own, so a reader who cannot see it is left with a sentence pointing at
+   nothing. */
+is(!!fg.getAttribute('aria-label'), true, 'desktop: and an accessible name, because a mask has no text');
+is(foot.getBoundingClientRect().height < 24, true, 'desktop: the line does not wrap around it');
 
 /* The weather chip takes the hue its own clear-sky pin draws in, never a status hue. `--wx-clear`
    is muted away from `--s-alert` on purpose, so an amber chip here cannot read as an alert.

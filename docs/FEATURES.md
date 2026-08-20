@@ -10627,9 +10627,18 @@ panel it switched in.
 module, and rolls back when that import fails. That rule lives on the radio's own handler, and a
 second writer here is a second copy of it.
 
-**The panel names the shortcut, at its foot.** `Click the button to switch layers`, right-aligned,
-on the same edge as the notes above it. A reader who misses it loses nothing, because the chip in the
-open panel does the same thing.
+**The panel names the shortcut, at its foot.** `Click ⧉ to switch layer`, right-aligned, on the same
+edge as the notes above it. A reader who misses it loses nothing, because the chip in the open panel
+does the same thing.
+
+**It points at the button by drawing the button's glyph.** The line first read `Click the button to
+switch layers`. A panel floating beside its own button holds more than one thing a reader can click.
+The mark is the same `i-layers` the button carries, at 1.35em of an 11px line. So it stands beside
+the words rather than reading as punctuation. `paint-check.html` compares its `mask-image`
+against the button's, because a resolved token is not evidence that anything painted.
+
+A mask carries no text, so the glyph takes `role="img"` and a name. Without it a reader who cannot
+see the mark is left with a sentence pointing at nothing.
 
 It draws on a pointer device alone, behind the same media query the handler tests. A tap and a
 keyboard press keep the native toggle, so on those the line would name an action that does not
