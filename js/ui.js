@@ -337,8 +337,11 @@ const menu = el('menu');
 function setDrawer(open, pan = true, remember = true) {
   /* **One pane, one occupant, at every width.** The two panels shared a screen while each had a rail
      of its own on opposite edges. They are the same box now, so a second one opening would land on
-     the first. See the `sideopen` listener below for the other half of this. */
-  if (open) closeSide();
+     the first. See the `sideopen` listener below for the other half of this.
+     `find` clears the same way `drawer` does inside `setFind()`. Without it, opening the drawer
+     over an open search left `find` set. `syncPane()`'s `want` stayed true on that class alone, so
+     the pane never closed, and `#findpane` could reappear behind the drawer. */
+  if (open) { closeSide(); document.body.classList.remove('find'); }
   document.body.classList.toggle('drawer', open);
   menu.firstElementChild.className = `i i-${open ? 'menu_open' : 'menu'}`;
   menu.setAttribute('aria-expanded', open);

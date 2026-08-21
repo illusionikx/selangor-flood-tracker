@@ -1744,8 +1744,13 @@ body.side #side { display: flex; }
 /* The field fills the pane body. It was a 300px box that opened where its button stood, and both
    numbers belonged to a bar this control has left. */
 #gotoBox { position: relative; }
+/* The right side keeps 32px, not this field's own 12px. base.css still draws the `expand_more`
+   caret through `#gotoBox::after`, at `right: 8px; width: 20px`. That rule is still live here.
+   A `padding: 10px 12px` shorthand once set all four sides. It beat base.css's own
+   `padding-right: 32px` on specificity ties, because chrome.css loads after base.css. A long
+   query then ran under the glyph. This states the right side apart, to keep it clear. */
 #goto {
-  width: 100%; padding: 10px 12px; font: inherit;
+  width: 100%; padding: 10px 32px 10px 12px; font: inherit;
   color: var(--on-surface); background: var(--surface);
   border: 1px solid var(--outline); border-radius: var(--md-sys-shape-corner-full);
 }
