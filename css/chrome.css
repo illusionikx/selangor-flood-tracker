@@ -273,7 +273,7 @@ header .hactions {
   min-height: 56px;
   margin: calc(-1 * var(--pane)) calc(-1 * var(--pane)) 10px;
   padding: 0 var(--pane);
-  background: var(--surface); border-bottom: 1px solid var(--outline);
+  background: var(--surface);
 }
 /* **A pinned bar needs a height of its own, and these two shipped without one.** `.modalhead` was
    written as a row in the flow, so it sized to its title and its close button was pulled back onto
@@ -484,7 +484,7 @@ body.testmode #testbadge, body.rising #risebadge { display: flex; }
    back up to change it after seeing the result. */
 #dataBox .dtop {
   flex: none; padding: 16px 20px 12px;
-  border-bottom: 1px solid var(--outline); background: var(--surface);
+  background: var(--surface);
 }
 #dataBox h2 { font-size: 18px; font-weight: 500; }
 #dataBox #dataFind { margin-bottom: 6px; }
@@ -783,7 +783,7 @@ table.data .dash { color: var(--outline); }
 #camBox::backdrop { background: #0009; }
 #camBox .dtop {
   flex: none; padding: 16px 20px 12px;
-  border-bottom: 1px solid var(--outline); background: var(--surface);
+  background: var(--surface);
 }
 #camBox h2 { font-size: 18px; font-weight: 500; }
 
