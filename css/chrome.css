@@ -2513,7 +2513,14 @@ body.side #side { display: flex; }
      `margin-bottom: 30px` here and Leaflet's gutter adds 10, so the zoom box sits 40px up. Two 44px
      buttons make it 88 tall. 40 + 88 + 8 = 136. paint-check.html asserts the adjacency, so a change
      to either number fails a check rather than drifting apart on screen. */
-  #paint { right: 10px; bottom: 136px; }
+  /* `#locate` needs its own pair here too. The desktop rule above already stacks the two through
+     one shared `--fab` step. This phone block gives `#paint` a literal 136px bottom instead.
+     Without a pair here, `#locate` falls back to that desktop `calc()` and lands in a different
+     column. Same step, `--fab` plus 8px, added onto the 136 above rather than restated as a
+     second literal. */
+  #paint, #locate { right: 10px; }
+  #paint  { bottom: 136px; }
+  #locate { bottom: calc(136px + var(--fab, 60px) + 8px); }
   /* The legend earns its space: the heatmap is the one layer whose colours mean nothing without it,
      and it is the layer a phone shows most of. Compacted rather than dropped — full width beside the
      zoom buttons, and the sentence explaining the doubling goes, since the tip already says it. */

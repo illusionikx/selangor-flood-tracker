@@ -266,6 +266,14 @@ async function phone() {
   is(w.getComputedStyle(mapEl, '::after').content, 'none', 'and no card edge');
   is(Math.round(r(mapEl).width), VW, 'the map is the full width of the window');
 
+  /* **The same two assertions `bands()` makes at 700/900/1400px, run here too.** `#paint` carries
+     its own bottom rule inside the phone media query, and `#locate` needs one beside it — without
+     one, `bands()` cannot catch it, because that loop never runs a width under 700px. */
+  const lb = r(d.getElementById('locate')), pb = r(d.getElementById('paint'));
+  is(Math.round(lb.left), Math.round(pb.left),
+     'phone: locate and layers share one column in the zoom cluster');
+  is(lb.bottom <= pb.top + 0.5, true, 'phone: and locate sits above layers');
+
   is(pane.tagName, 'DIALOG', 'the pane is a real <dialog>, not a div dressed as one');
   is(!!d.getElementById('scrim'), false,
      'and there is no scrim left: a full-screen dialog covers the screen, so it has no outside');
