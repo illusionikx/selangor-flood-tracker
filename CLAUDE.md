@@ -1058,6 +1058,25 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
   one is already in place. The pane still owns the box: the occupants state `inset: 0` and nothing
   else about it. `m3-check.html` asserts both halves, because an occupant that positions itself and
   one that states a size are different faults.
+- **Both occupants of `#pane` are a fixed header over a scrolling body, and the drawer was not.**
+  `#side` has always been a flex column. `#sideHead` is `flex: none` and `#sideBody` takes the rest
+  and scrolls under it. `#bar` was one box doing both jobs. It carried `padding: 20px` and
+  `overflow: auto` itself. So its own title scrolled away with the sections below it, measured at
+  109px of travel on a 1400px window. The header then needed `margin: -20px -20px 4px` to bleed
+  across that padding. That is a number written for a layout that no longer exists. `#barBody` is
+  the scroller now. It takes `flex: 1`, `overflow: auto` and `padding: 12px 24px`, which are
+  `#sideBody`'s own three numbers.
+  **The motion is the second cost, and a reader named it first.** The fade through scales the
+  incoming occupant from 92%. So it ran on a scroll container in one occupant and on a static flex
+  column in the other. Two panels in one pane entered differently.
+  `m3-check.html` asserts the shape and then the behavior. An occupant that scrolls itself and one
+  whose header happens to fit are different faults. Only the second one is invisible.
+- **An `<h2>` keeps the UA block margin, and `css/base.css` resets `h1` alone.** `#barHead` asks for
+  `min-height: 64px` and drew 86. The UA margin is `0.83em`, which is 18px above and below at 22px.
+  `#sideHead` beside it drew 64, because its title is a `<div>`. The two headers stand in the same
+  pane, one at a time. So a reader meets the difference and no single pane shows it.
+  `m3-check.html` asserted `>= 64` and passed on the fault for a whole revision. It asserts 64 now.
+  Any heading placed in a header row in this app needs `margin: 0` stated.
 - **`display` rides the transition with `allow-discrete`, and the direction matters.** Going to
   `none` the flip lands at the END of the duration, so the outgoing surface survives its own 90ms
   fade. Coming from `none` it lands at the START, so the incoming surface is in the box, invisible,

@@ -1131,12 +1131,22 @@ header:has(#net.open) #netstats { opacity: 1; visibility: visible; }
   /* **The pane owns the box now.** This was a fixed 288px rail on the leading edge. It is one of
      three occupants of `#pane`, so it fills that pane and states nothing about where the pane is or
      how wide it is. See `.paneswap` below for why that is `position: absolute` and not `flex: 1`.
-     `overscroll-behavior: contain`, the same as #sideBody: without it, scrolling past the end of the
-     drawer chains to the document and takes the whole page with it. */
-  padding: 20px; overflow: auto; overscroll-behavior: contain;
+     **The header does not scroll, so this box is not the scroller.** `#barBody` is, which is the
+     shape `#side` has always had: a header that is a `flex: none` sibling, and a body that takes the
+     rest and scrolls under it. The drawer was one box doing both jobs, so its own title scrolled
+     away with the sections below it. Measured at 109px of travel on a 1400px window. It also put
+     the fade through's `scale` on a scroll container in one occupant and on a static flex column in
+     the other, which is why the two panels entered differently. */
   /* No gap between the two columns of the drawer: every section already carries its own 12px, and a
      24px seam on top of that made the one between Ignored sensors and Heatmap twice any other. */
   display: none; flex-direction: column;
+}
+/* M3's side sheet body, the same three numbers `#sideBody` takes: `flex: 1`, `overflow-y: auto` and
+   `padding: 12px 24px`. `overscroll-behavior: contain`, because without it a scroll past the end of
+   the drawer chains to the document and takes the whole page with it. */
+#barBody {
+  flex: 1; overflow: auto; overscroll-behavior: contain; padding: 12px 24px;
+  display: flex; flex-direction: column;
 }
 body.drawer #bar { display: flex; }
 /* The tie-break, for a state the JS already makes unreachable. `setDrawer(true)` closes the card and
@@ -1144,12 +1154,12 @@ body.drawer #bar { display: flex; }
    set by something that writes them directly, and two occupants stacked in one pane is the one shape
    this container cannot draw. The card wins: it is the more specific answer of the two. */
 body.side #bar { display: none; }
-/* `flex-shrink: 0`, and it is what makes the drawer scroll at all. #bar is a column flex container
-   with a fixed height, so a taller child does not overflow it — it *shrinks* to the container, its
-   own content spills out of the shrunken box, and #bar's scrollHeight never exceeds its height. The
-   result is a panel whose last sections are both clipped and unreachable. Only ever visible on a
-   phone, where the sections are stacked in a narrow column and run past one screen. */
-#bar > div { min-width: 0; flex-shrink: 0; }
+/* `flex-shrink: 0`, and it is what makes the drawer scroll at all. `#barBody` is a column flex
+   container with a fixed height, so a taller child does not overflow it — it *shrinks* to the
+   container, its own content spills out of the shrunken box, and the scrollHeight never exceeds the
+   height. The result is a panel whose last sections are both clipped and unreachable. Only ever
+   visible on a phone, where the sections are stacked in a narrow column and run past one screen. */
+#barBody > div { min-width: 0; flex-shrink: 0; }
 /* **Nothing steps aside for the drawer any more, and the legend is why the rule is worth naming.**
    It used to translate by `--drawer` because the drawer took the leading rail and the map ran
    underneath it. Both halves of that are gone: the drawer is an occupant of the trailing pane, and
@@ -1443,7 +1453,10 @@ body.side #side { display: flex; }
    three by itself, and those numbers are gone.
    `#sideTitle` takes the slack and `#sideActions` holds the ⋮, so the row reads title, actions,
    close — the order M3 draws. */
-#sideHead {
+/* **Both occupants wear it, so it is one rule.** They were two, and the drawer's copy carried a
+   negative margin to bleed across a padding only its own box had. That padding sits on `#barBody`
+   now, so there is nothing left to cancel and the two headers are the same box. */
+#barHead, #sideHead {
   flex: none; display: flex; align-items: center; gap: 4px;
   min-height: 64px; padding: 8px 12px 8px 16px;
 }
@@ -2656,11 +2669,10 @@ body.finding #find { display: none; }
      that the hamburger which opened it stayed on screen — true, and it still left the panel
      unnamed. M3's side sheet has a header, so it has one.
      `#sideHead` is the same header, filled from the station card — see its own rules further up. */
-  #barHead {
-    display: flex; align-items: center; gap: 4px;
-    min-height: 64px; margin: -20px -20px 4px; padding: 8px 12px 8px 16px;
-  }
-  #barHead h2 { flex: 1; font-size: 22px; font-weight: 400; color: var(--muted); }
+  /* `margin: 0`, and it is not tidiness. An `<h2>` keeps the UA's `0.83em` block margin, which at
+     22px is 18px above and below. So the header measured 86px against the 64 it asks for, and
+     against `#sideHead` beside it. `css/base.css` resets `h1` and no other heading. */
+  #barHead h2 { flex: 1; margin: 0; font-size: 22px; font-weight: 400; color: var(--muted); }
 }
 
 /* --- full-screen dialog, <= 600px ------------------------------------------------------------- */
@@ -2676,8 +2688,8 @@ body.finding #find { display: none; }
     inset: 0; width: 100%; height: 100dvh;
     border: 0; border-radius: 0; box-shadow: none;
   }
-  /* The drawer is a scroller itself; the station panel scrolls in `#sideBody`. */
-  #bar { padding: 0 6px 24px; }
+  /* Both occupants scroll in a body of their own, so both take the same compact inset. */
+  #barBody { padding: 8px 16px 16px; }
 
   /* **M3's full-screen dialog app bar, and both occupants wear it.** 56dp, the close X on the
      LEADING edge, the headline after it. That is the variant's anatomy and it is the opposite of the
@@ -2687,14 +2699,7 @@ body.finding #find { display: none; }
      8px in on the leading edge, which is the same start the other four full-screen dialogs use. */
   #barHead, #sideHead { min-height: 56px; padding: 0 16px 0 8px; }
   #barClose, #sideClose { order: -1; }
-  /* Full bleed across `#bar`'s own 6px, so the X starts on the header's 8px and not on 6 plus 8.
-     One number holds every full-screen app bar in this app at 8px in, and `.dtop .modalhead .dclose`
-     and `.docbox .modalhead .dclose` are the other two doing the same cancel. */
-  #barHead {
-    display: flex; align-items: center; gap: 4px;
-    margin: 0 -6px 4px;
-  }
-  #barHead h2 { flex: 1; font-size: 16px; font-weight: 500; }
+  #barHead h2 { flex: 1; margin: 0; font-size: 16px; font-weight: 500; }
   #sideTitle .popname { font-size: 18px; }
   #sideBody { padding: 8px 16px 16px; }
 }

@@ -496,7 +496,9 @@ async function desktop() {
   /* The occupants are content. Neither states a width, a position or an edge of its own. */
   is(cs(bar).display, 'flex', 'the filters occupy the pane');
   is(cs(side).display, 'none', 'and only one occupant draws at a time');
-  is(cs(bar).overflowY, 'auto', 'the filters are still their own scroller');
+  /* The occupant is not the scroller. Its body is, which is the shape `#side` already had. */
+  is(cs(bar).overflowY, 'visible', 'the filters occupant does not scroll itself');
+  is(cs(d.getElementById('barBody')).overflowY, 'auto', 'its body does');
   /* **Absolute, and the swap is why.** They were `flex: 1` children of a column, so two visible at
      once would split the pane's height between them for the 90ms the fade through overlaps. Filling
      the pane absolutely lets the outgoing one leave while the incoming one is already in place. The
@@ -581,8 +583,30 @@ async function desktop() {
   d.body.classList.remove('side'); d.body.classList.add('drawer');
   const bh = d.getElementById('barHead');
   is(cs(bh).display, 'flex', 'the side sheet carries a header, which M3 says it does');
-  is(Math.round(r(bh).height) >= 64, true, 'M3 64dp side sheet header');
+  /* **Exactly 64, not at least 64.** This read `>= 64` and a `<h2>` carrying the UA's own `0.83em`
+     block margin drew an 86px header under it for a whole revision. `#sideHead` beside it was 64,
+     and nothing here could see the difference because no check ever put the two side by side. */
+  is(Math.round(r(bh).height), 64, 'M3 64dp side sheet header');
   is(cs(bh.querySelector('h2')).fontSize, '22px', 'with a title-large headline');
+  is(cs(bh.querySelector('h2')).marginTop, '0px', 'and the heading keeps no UA margin of its own');
+  /* **Both occupants are a fixed header over a scrolling body, and the drawer was one box doing
+     both.** So its own title scrolled away with the sections under it, and the fade through's
+     `scale` ran on a scroll container in one occupant and a static flex column in the other. Assert
+     the SHAPE and then the BEHAVIOUR: an occupant that scrolls itself and one whose header happens
+     to fit are different faults, and only the second is invisible. */
+  for (const [box, body, head] of [['bar', 'barBody', 'barHead'], ['side', 'sideBody', 'sideHead']]) {
+    is(cs(d.getElementById(box)).overflowY, 'visible', box + ': the occupant is not the scroller');
+    is(cs(d.getElementById(body)).overflowY, 'auto', box + ': its body is');
+    is(cs(d.getElementById(head)).flexGrow + ' ' + cs(d.getElementById(head)).flexShrink, '0 0',
+       box + ': and its header is a flex: none sibling of that body');
+  }
+  const bb = d.getElementById('barBody');
+  bb.scrollTop = 200;
+  const moved = bb.scrollTop;
+  is(moved > 0, true, 'the filters body has something to scroll, or the next line proves nothing');
+  is(Math.round(r(bh).top), Math.round(r(d.getElementById('bar')).top),
+     'and its header stays on the occupant top edge while the body scrolls under it');
+  bb.scrollTop = 0;
   is(!!pane2.querySelector(':scope > .grab'), false, 'and no drag handle: a side sheet has none');
   /* A standard side sheet is not modal, and `show()` is what makes that true. `showModal()` would
      put the pane in the top layer and make the map behind it inert, which is the one thing a pane

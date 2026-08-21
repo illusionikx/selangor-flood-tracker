@@ -314,14 +314,14 @@ td:last-child { text-align: right; padding-left: 16px; }
 
 /* Slim scrollbars on the app's own scroll panes. Still `overflow: auto`, so they appear only when
    the content actually overflows — a permanent gutter on a list of four districts is noise. */
-.scroll, .picklist, #sideBody, #bar {
+.scroll, .picklist, #sideBody, #barBody {
   scrollbar-width: thin;
   scrollbar-color: color-mix(in srgb, var(--on-surface) 28%, transparent) transparent;
 }
 .scroll::-webkit-scrollbar, .picklist::-webkit-scrollbar,
-#sideBody::-webkit-scrollbar, #bar::-webkit-scrollbar { width: 8px; height: 8px; }
+#sideBody::-webkit-scrollbar, #barBody::-webkit-scrollbar { width: 8px; height: 8px; }
 .scroll::-webkit-scrollbar-thumb, .picklist::-webkit-scrollbar-thumb,
-#sideBody::-webkit-scrollbar-thumb, #bar::-webkit-scrollbar-thumb {
+#sideBody::-webkit-scrollbar-thumb, #barBody::-webkit-scrollbar-thumb {
   background: color-mix(in srgb, var(--on-surface) 28%, transparent);
   border: 2px solid transparent; background-clip: content-box; border-radius: 999px;
 }

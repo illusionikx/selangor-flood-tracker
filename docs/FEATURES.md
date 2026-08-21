@@ -12180,3 +12180,53 @@ Leaflet's own controls live inside the map container and get it free.
 
 A box that misses the term sits on the page beside the card rather than on the map. That reads as a
 spacing mistake rather than as a missing term, which is why `m3-check.html` measures each one.
+
+## The filters panel took the station panel's shape
+
+The supporting pane holds one occupant at a time. A reader found the filters panel inconsistent with
+the station panel beside it, and named two symptoms. The animation was wrong. The header was not
+fixed.
+
+Both symptoms came from one difference. `#side` is a flex column of two boxes. `#sideHead` is
+`flex: none` and `#sideBody` takes the rest and scrolls under it. `#bar` was one box doing both jobs.
+It carried `padding: 20px` and `overflow: auto` itself.
+
+### The header scrolled away
+
+Measured on a 1400px window. The filters panel held 945px of content in an 836px box. So the title
+`Layers and filters` traveled 109px up and off the panel. The station panel header traveled 0px,
+because it sits outside the box that scrolls.
+
+`#barBody` is the scroller now. It takes `flex: 1`, `overflow: auto` and `padding: 12px 24px`. Those
+are `#sideBody`'s own three numbers, and M3 states them for a side sheet body.
+
+The header also carried `margin: -20px -20px 4px` to bleed across the padding of the old box. That
+padding is gone, so the margin is gone too. The two headers are one rule now.
+
+### The motion followed from the same fault
+
+M3's fade through scales the incoming occupant from 92%. That scale ran on a scroll container in one
+occupant and on a static flex column in the other. So two panels in one pane entered differently,
+from one declaration that reads the same for both.
+
+Nothing in the motion changed. The two occupants now present the same kind of box to it.
+
+### The heading kept a margin nobody asked for
+
+`#barHead` asks for `min-height: 64px` and drew 86. An `<h2>` keeps the UA block margin of `0.83em`,
+which is 18px above and below at 22px. `css/base.css` resets `h1` and no other heading.
+
+`#sideHead` beside it drew 64, because its title is a `<div>`. The two headers stand in the same
+pane, one at a time. So a reader meets the difference and no single pane shows it.
+
+### What the check now holds
+
+`m3-check.html` asserted `>= 64` for that header and passed on an 86px box for a whole revision. It
+asserts 64 exactly now.
+
+It also asserts the shape and then the behavior. Each occupant must not scroll itself. Its body must.
+Its header must be a `flex: none` sibling of that body. Then the check scrolls the filters body and
+reads the header position back.
+
+An occupant that scrolls itself and one whose header happens to fit are different faults. Only the
+second one is invisible.

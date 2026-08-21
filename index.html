@@ -70,8 +70,8 @@
 <link rel="stylesheet" href="vendor/markercluster.css">
 <link rel="stylesheet" href="vendor/fonts.css?v=51">
 <link rel="stylesheet" href="css/icons.css?v=94">
-<link rel="stylesheet" href="css/base.css?v=151">
-<link rel="stylesheet" href="css/chrome.css?v=209">
+<link rel="stylesheet" href="css/base.css?v=152">
+<link rel="stylesheet" href="css/chrome.css?v=210">
 <link rel="stylesheet" href="css/map.css?v=158">
 
 <!-- Water tint for the dark basemap. CARTO's dark_all is greyscale — all 18 of its tones have zero
@@ -978,7 +978,12 @@
     <button id="barClose" class="icon" title="Close" aria-label="Close"
       ><i class="i i-close"></i></button>
   </div>
-  <div>
+  <!-- The scrolling box, and the header above it does not scroll. Two boxes rather than one, which
+       is the shape `#side` already uses: `#barHead` is `flex: none` and this takes the rest. The
+       drawer used to be the scroller itself, so its own header scrolled away with the sections
+       under it. -->
+  <div id="barBody" class="scroll">
+    <div>
     <!-- Both filter lists are <details>: two scrolling lists stacked above the chips pushed the
          layer switches off a phone screen, and each is a thing you set once and then stop looking
          at. Native, so the disclosure triangle, the keyboard behaviour and `open` come free — no
@@ -1019,8 +1024,8 @@
       <ul id="ignoredList" class="picklist"></ul>
       <div class="rowbtns"><button id="ignoredClear" class="link">Stop ignoring all</button></div>
     </details>
-  </div>
-  <div>
+    </div>
+    <div>
     <!-- Which sensor kinds draw, and nothing else. The paint choice and the two pin filters left
          this drawer for the map's own top-left corner. See #paint below.
          A kind is not a filter over stations. It is which of a station's sensors this map is
@@ -1033,6 +1038,7 @@
     <!-- Outside the section on purpose: the `· N ignored` count is one of the two always-visible
          indications that an alarm has been silenced, and a collapsed section would hide it. -->
     <p id="shown" class="muted"></p>
+    </div>
   </div>
 </div>
 </dialog><!-- /#pane -->
