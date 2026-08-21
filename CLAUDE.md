@@ -68,7 +68,9 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `icon-192.png`, `icon-512.png` | manifest icons (`any`) and the favicon — the glyph on transparency |
 | `icon-180.png` | `apple-touch-icon`. Opaque, because iOS flattens alpha onto a colour of its own |
 | `img/` | optional. Only `egg.webp` (the About easter egg). Absent is a supported state — see below |
-| `vendor/` | Leaflet, leaflet.heat (patched), markercluster, subsetted fonts — no CDN, hand-managed |
+| `m3-build.php` | `php m3-build.php` — bakes `vendor/m3/tokens.css` from the M3 Expressive token set. Run by hand, never in a request |
+| `vendor/m3/tokens.css` | M3's shape, typescale, elevation, motion and state scales, vendored. Generated — **colour is deliberately not in it** |
+| `vendor/` | Leaflet, leaflet.heat (patched), markercluster, subsetted fonts, the M3 token scales — no CDN, hand-managed |
 | `lib/` | Composer's vendor dir (`symfony/dom-crawler`), gitignored — **not** `vendor/` |
 | `composer.json` | the one server-side dependency. Run `composer install` before first run |
 | `.github/workflows/pages.yml` | bakes the static GitHub Pages build — runs the PHP on cron, publishes `api.json` |
@@ -2583,10 +2585,24 @@ it. The weather section stretches nothing. It is five fixed keys measuring 231px
   behaviour from the spec instead of inventing one. A reader already knows the platform convention,
   and a hand-made control costs them that knowledge. **Transcribe the component rather than
   approximate it.** The M3 Expressive component set is the reference this app reads:
-  https://github.com/bczak/m3you/tree/development/src/components — plain CSS files, each citing its
-  own page on m3.material.io. Every number this app takes from M3 comes out of one of them, so it
-  can be grepped against a real file rather than eyeballed. `css/base.css` carries M3's shape,
-  elevation and motion tokens under their own names for the same reason.
+  https://github.com/bczak/m3you (MIT) — plain CSS files, each citing its own page on
+  m3.material.io. Every number this app takes from M3 comes out of one of them, so it can be grepped
+  against a real file rather than eyeballed.
+  **The token SCALES are vendored and a component's CSS is transcribed, and the split is
+  deliberate.** `php m3-build.php` bakes that repo's `src/styles/tokens/` into
+  `vendor/m3/tokens.css`, so no shape, type, elevation, motion or state number is hand-copied again.
+  Every value this app had restated by hand matched the source exactly, and the swap moved no pixel.
+  A component's own CSS is still read and transcribed into `css/chrome.css` or `css/map.css` beside
+  the reasoning. Each one lands on markup this app already has, and each one diverges somewhere it
+  has to say why.
+  **That repo's components are React, so nothing here can import them.** Its CSS is plain and its
+  tokens are plain, and that is the half this app takes. There is no build step here at request
+  time, and there must not be one.
+  **Colour is the one scale this app does not vendor.** M3 ships a full tonal palette. The palette
+  rule below reserves this app's hues for station status and holds one surface tone. So
+  `css/base.css` bridges the `--md-sys-color-*` names a component asks for onto the tokens this app
+  already has. Add a line to that bridge when a component wants a role it is missing. Never add M3's
+  palette instead.
   **Four components, seven variants, and each surface declares which it is.** Dialogs are
   full-screen or basic. Sheets are side or bottom. The supporting pane's two headers are the top app
   bar's medium flexible variant, at both widths. `m3-check.html` holds the roll call.
@@ -3124,6 +3140,13 @@ foreach($p["stations"] as $s) if($s["kind"]!=="camera"&&$s["lat"]&&$s["lng"]) $n
 foreach($r as $s){$la=(float)$s["latitude"];$ln=(float)$s["longitude"];if(!$la)continue;
 $b=null;$bd=1e9;foreach($non as $n){$d=$km($la,$ln,$n["lat"],$n["lng"]);if($d<$bd){$bd=$d;$b=$n;}}
 printf("%-5d %-28s %6.0f m  %-30s %s\n",$s["stationId"],$s["stationName"],$bd*1000,$b["name"],$b["district"]);}'
+
+# The vendored M3 token scales must match their source. What this catches is somebody editing a
+# generated file by hand. What it cannot catch is upstream moving a number this app relies on, so
+# read the diff rather than the exit code. It reaches the network, so run it beside the other
+# by-hand bakes rather than on every change.
+php m3-build.php
+git diff --quiet vendor/m3/tokens.css && echo "OK: matches the source" || echo "MOVED: read the diff, then bump ?v="
 
 php shots-test.php            # one of seven runnable checks. Guards camera retention. Must stay green.
 php api.php --selftest       # another. Guards the force-refresh rate limit, cache choice, and the

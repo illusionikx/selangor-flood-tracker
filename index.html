@@ -70,7 +70,11 @@
 <link rel="stylesheet" href="vendor/markercluster.css">
 <link rel="stylesheet" href="vendor/fonts.css?v=51">
 <link rel="stylesheet" href="css/icons.css?v=95">
-<link rel="stylesheet" href="css/base.css?v=155">
+<!-- M3's own token scales, baked from the M3 Expressive component set by `php m3-build.php`.
+     Before `base.css`, which derives `--m3-travel`, `--m3-grow` and `--m3-swap` from them and
+     bridges M3's colour names onto this app's palette. Colour is not in this file on purpose. -->
+<link rel="stylesheet" href="vendor/m3/tokens.css?v=1">
+<link rel="stylesheet" href="css/base.css?v=156">
 <link rel="stylesheet" href="css/chrome.css?v=213">
 <link rel="stylesheet" href="css/map.css?v=158">
 

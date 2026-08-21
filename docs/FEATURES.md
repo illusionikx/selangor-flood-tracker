@@ -12433,3 +12433,70 @@ emits a menu row and no button.
 
 **Escape every double quote added to that harness.** It is one double-quoted shell string, and a
 bare backtick in a comment runs as a command substitution.
+
+## This app vendors the M3 token scales, and declines the colour
+
+This app takes more M3 components as time goes on. Every M3 number used to arrive the same way. A
+person opened a component file on GitHub, read a value, and typed it into `css/base.css`.
+
+That is a transcription, and a transcription drifts. So the scales come from the source now.
+
+### What the bake takes
+
+`php m3-build.php` fetches five token files from `bczak/m3you` and writes `vendor/m3/tokens.css`.
+That repo is MIT licensed, and it is the same one `css/chrome.css` already cites for the dialog, the
+side sheet, the bottom sheet and the app bar.
+
+| scale | what it holds |
+|---|---|
+| `sys.shape.css` | the 10-step corner scale |
+| `sys.typescale.css` | every type rung, and the two typeface references |
+| `sys.elevation.css` | levels 0 to 5 as box shadows |
+| `sys.motion.css` | durations and easing curves |
+| `sys.state.css` | state-layer opacities |
+
+**The swap moved no pixel.** Every value this app had restated by hand matched the source exactly.
+`m3-check.html` read 284 assertions before the change and the same 284 after it.
+
+### Colour is the one scale this app does not take
+
+M3 ships a full tonal palette: five surface containers, a primary, a secondary, an error. This app
+holds one surface tone, and it reserves its hues for station status.
+
+A vendored component that reaches for `surface-container-high` has to land on something this app
+already has, or a file nobody edited breaks the palette rule.
+
+So `css/base.css` bridges the names instead. `--md-sys-color-surface-container-high` resolves to
+`--hover`. `--md-sys-color-on-surface-variant` resolves to `--muted`. Add a line when a component
+asks for a role the bridge does not hold. Never add M3's palette.
+
+The bridge lives in `css/base.css` because the palette rule already says every colour value in this
+app lives there.
+
+### What is still transcribed, and why
+
+A component's own CSS stays hand-read into `css/chrome.css` or `css/map.css`, beside the reasoning
+for it.
+
+Each component lands on markup this app already has. Each one diverges somewhere, and the
+divergence needs a sentence. The app bar truncates its headline and this app wraps it, because a
+station name cut in half names another station. A vendored file cannot carry that.
+
+**The components in that repo are React, so nothing here can import them.** Its CSS is plain and its
+tokens are plain. That is the half this app takes. There is no build step at request time, and
+there must not be one.
+
+### The typescale names two typefaces this app does not vendor
+
+`--md-ref-typeface-brand` and `--md-ref-typeface-plain` both resolve to Roboto Flex, then Roboto,
+then `system-ui`.
+
+Nothing here sets `font-family` from a token, so both are inert today. A vendored component that
+does reach for one falls back to Roboto, which `vendor/fonts.css` carries.
+
+### How the bake fails, and how it says so
+
+A 404 from GitHub answers with a body. So `m3-build.php` checks the status code and exits non-zero.
+
+A silent miss writes a token file with one scale missing. Every rule that reads that scale then
+falls back to its initial value, which is usually nothing at all, and it errors nowhere.
