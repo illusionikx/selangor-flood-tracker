@@ -2428,27 +2428,55 @@ body.finding #find { display: none; }
 
   /* --- the header ----------------------------------------------------------------------------- */
 
-  /* M3's app bar: a close X on the leading edge, the headline after it, start-aligned. The X is the
-     only navigation in it, and never an up arrow — an arrow claims the view saves as it goes.
-     `row-reverse` rather than reordered markup. The close button is deliberately first in the
-     source of all four dialogs so a keyboard reaches it first, and this block moves only where it
-     draws. `#aboutBox .modalhead` needs no override: it carries no headline, and its existing
-     `justify-content: flex-end` now packs its lone button against the leading edge. M3 marks the
-     headline optional, and that pane's identity is the logo lockup in the content below. */
-  /* **Named one by one, never as bare `.modalhead`.** This is a full-screen dialog's app bar, and
-     only four dialogs are full-screen here. Written bare it also reached `#lightbox` and `#warnBox`,
-     which are basic dialogs at every width — so their close button jumped to the leading edge while
-     the box around it stayed a floating card with a 12px corner and a scrim. A full-screen header on
-     a basic container reads as a mistake in the header, and it is a mistake in the selector. */
+  /* **The four full-screen dialogs wear the same MEDIUM FLEXIBLE app bar the supporting pane does.**
+     They wore M3's small variant: one 56px row holding the close X and then the headline beside it.
+     A reader put the pane on the medium variant and then asked for these to follow, 2026-08-21. So
+     the numbers are `AppBar/app-bar.css`'s own, the same ones `#sideHead` states further up: a 56px
+     row of icons, then a bottom-aligned label block, 112px in all, headline at `headline-medium`.
+
+     **Two rows out of the markup that is already there.** The pane carries `.apptop` and `.apflex`
+     boxes for this. These four carry a `<form>` holding the close and an `<h2>` beside it, and a
+     column with the form ordered first is the same two rows with no markup to change. The close
+     button stays FIRST in the source of all four so a keyboard reaches it first, and only where it
+     draws moves.
+
+     **The X stays, and it is never a back arrow.** The pane took one, because a supporting pane is a
+     destination somebody navigates to. These four are dialogs. An arrow claims the view saves as it
+     goes, and a dialog dismisses.
+
+     **Named one by one, never as bare `.modalhead`.** Only four dialogs are full-screen here.
+     Written bare it also reached `#lightbox` and `#warnBox`, which are basic dialogs at every width,
+     so their close button jumped to the leading edge while the box around it stayed a floating card
+     with a 12px corner and a scrim. A full-screen header on a basic container reads as a mistake in
+     the header, and it is a mistake in the selector. */
   #dataBox .modalhead, #camBox .modalhead, .docbox .modalhead {
-    flex-direction: row-reverse; justify-content: flex-end;
-    min-height: 56px; margin-bottom: 0; gap: 8px;
+    flex-direction: column; align-items: stretch; justify-content: flex-end;
+    min-height: 112px; margin-bottom: 0; gap: 0; padding-bottom: 12px;
   }
-  /* **One number holds every header here, and it is 56px: where the headline starts.** That is M3's
-     top app bar, and it is what makes five panes read as one component. It is 8 to the close
-     button, the button's own 40, then the 8px gap above.
-     The negative margin is what puts the button at 8 when the pane around it is padded further in.
-     One per pane padding: the two prose dialogs sit on 18, the table and the wall on 20. */
+  /* The icon row. `order: -1` puts it above the headline without moving the button in the source.
+     `align-items: flex-start` and the 48px minimum are the reference's own `__top-row`. */
+  #dataBox .modalhead form, #camBox .modalhead form, .docbox .modalhead form {
+    order: -1; display: flex; align-items: flex-start; min-height: 48px;
+  }
+  /* `headline-medium`, the rung `#sideHead` takes. The token comes from `vendor/m3/tokens.css`, so
+     the two headers cannot drift on the one number that matters. */
+  #dataBox .modalhead h2, #camBox .modalhead h2, .docbox .modalhead h2 {
+    font-weight: 400;
+    font-size: var(--md-sys-typescale-headline-medium-size);
+    line-height: var(--md-sys-typescale-headline-medium-line-height);
+  }
+  /* **About keeps a bar of one row, because it has no headline to put on a second.** M3 marks the
+     headline optional, and that pane's identity is the logo lockup in the content below. A 112px
+     band over a lone close button is an empty label block. */
+  #aboutBox .modalhead { min-height: 56px; padding-bottom: 0; }
+  /* **The close glyph still lands 28px in, and the negative margin is what puts it there.** The pane
+     reaches 28 as 4px of top-row padding around a 48px target. These four reach it as 8px around a
+     40px one, and the margin cancels the pane padding that would otherwise push the button further
+     in. One per padding: the two prose dialogs sit on 18, the table and the wall on 20.
+     **The headline no longer starts at 56px, and that is the change.** It sat beside the X on one
+     row. It leads the label block now, so it starts on the pane's own padding, which is M3's 16 to
+     within the 2px these panes already use for their body text. The headline lining up with the
+     prose under it beats matching 16 exactly. */
   .docbox .modalhead .dclose { margin: 0 0 0 -10px; }
   .dtop .modalhead .dclose { margin: 0 0 0 -12px; }
 

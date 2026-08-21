@@ -325,11 +325,23 @@ async function phone() {
     is(box(b), FULL, id + ' fills the screen');
     is(cs(b).borderTopLeftRadius, '0px', id + ': M3 0dp corner');
     const mh = b.querySelector('.modalhead'), x = b.querySelector('.dclose'), h2 = mh.querySelector('h2');
-    is(cs(mh).flexDirection, 'row-reverse', id + ': X on the leading edge');
-    is(Math.round(r(mh).height) >= 56, true, id + ': header is M3 56dp or taller');
-    is(Math.round(r(x).left), 8, id + ': X leads at 8px');
+    /* **These four wear the same medium flexible app bar the pane does.** A column, so the icons take
+       a row of their own and the headline takes the row under them. They were M3's small variant, one
+       56px row with the X and the headline side by side, and a reader put them on the pane's. */
+    is(cs(mh).flexDirection, 'column', id + ': a column, so the icons and the headline are two rows');
+    is(Math.round(r(mh).height) >= (h2 ? 112 : 56), true,
+       id + ': M3 112dp with a headline, and the 56dp top row without one');
+    /* The glyph centre, never the box edge. These four reach 28px as 8px of padding around a 40px
+       target where the pane reaches it as 4px around a 48px one. */
+    is(Math.round((r(x).left + r(x).right) / 2), 28, id + ': its X leads with the glyph 28px in');
     // About carries no headline: M3 marks it optional and that pane's identity is its logo lockup.
-    if (h2) is(Math.round(r(h2).left), 56, id + ': headline starts at M3 56dp');
+    if (h2) {
+      is(Math.round(r(h2).top) >= Math.round(r(x).bottom), true,
+         id + ': the headline sits on the row under the icons');
+      is(cs(h2).fontSize, '28px', id + ': at headline-medium, the rung the pane takes');
+      is(Math.round(r(h2).left) <= 20, true,
+         id + ': starting on the pane padding rather than beside a button that is no longer there');
+    }
     is(w.getComputedStyle(b, '::backdrop').backgroundColor, 'rgba(0, 0, 0, 0)',
        id + ': no scrim, because there is no outside');
     b.close();
@@ -372,7 +384,7 @@ async function phone() {
       is(cs(b).borderTopLeftRadius, '28px', id + ' (basic): M3 28dp corner');
       is(Math.round(r(b).width) < VW, true, id + ' (basic): does not fill the screen');
     } else {
-      is(cs(mh).flexDirection, 'row-reverse', id + ' (full-screen): X leads');
+      is(cs(mh).flexDirection, 'column', id + ' (full-screen): a two-row app bar, X on the top row');
       is(Math.round(r(b).width), VW, id + ' (full-screen): fills the screen');
       is(cs(b).borderTopLeftRadius, '0px', id + ' (full-screen): M3 0dp corner');
     }

@@ -12500,3 +12500,63 @@ A 404 from GitHub answers with a body. So `m3-build.php` checks the status code 
 
 A silent miss writes a token file with one scale missing. Every rule that reads that scale then
 falls back to its initial value, which is usually nothing at all, and it errors nowhere.
+
+## The four full-screen dialogs took the pane's app bar
+
+Below 600px this app draws four full-screen dialogs: the all-stations table, the camera wall, About
+and Help. Each carried M3's small top app bar. That is one 56px row holding a close X, with the
+headline beside it.
+
+The supporting pane moved to M3's medium flexible variant. A reader then asked these four to follow.
+
+### What changed
+
+| part | before | after |
+|---|---|---|
+| container | 56px, one row | 112px, two rows |
+| icons | on the headline's own row | on a row of their own |
+| headline | 18px, starting 56px in | `headline-medium`, starting on the pane padding |
+
+The headline reads the same token the pane's does, out of `vendor/m3/tokens.css`. So the two cannot
+drift on the one number that matters.
+
+### No markup changed, and that is the point
+
+The pane carries an `.apptop` box and an `.apflex` box for its two rows. These four carry a `<form>`
+holding the close button and an `<h2>` beside it.
+
+A column with `order: -1` on the form gives the same two rows out of what is already there. So the
+close button stays first in the source of all four dialogs, which is what puts it first for a
+keyboard, and only where it draws moved.
+
+### The X stays, and it must never become a back arrow
+
+The pane took a back arrow. A supporting pane is a destination somebody navigates to.
+
+These four are dialogs. An arrow claims the view saves as it goes, and a dialog dismisses.
+
+### One number went, and one number stayed
+
+**The headline no longer starts at 56px.** It sat beside the X on one row, and 56 was what made
+every header in the app read as one component.
+
+It leads the label block now, so it starts on the pane's own padding. That is 18px for the two prose
+dialogs and 20px for the table and the wall. M3 states 16. The headline lining up with the prose
+under it beats matching 16 exactly.
+
+**The close glyph still lands 28px in.** These four reach that as 8px of padding around a 40px
+target. The pane reaches it as 4px around a 48px one. `m3-check.html` asserts the glyph centre on
+both, never a box edge.
+
+### About keeps a bar of one row
+
+About carries no headline. M3 marks the headline optional, and that pane's identity is the logo
+lockup in the content below.
+
+So it holds the 56px top row and no label block. A 112px band over a lone close button is an empty
+label block.
+
+### Only the compact block changed
+
+Above 600px these four are basic dialogs. A basic dialog takes `headline-small` on a floating card,
+not an app bar. So nothing above 600px moved.

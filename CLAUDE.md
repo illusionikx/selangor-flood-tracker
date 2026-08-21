@@ -27,7 +27,7 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `title-test.html` | `chrome --headless --dump-dom` — one of seven runnable checks. Guards the app bar wordmark ladder, in rendered pixels |
 | `narrow-test.html` | `chrome --headless --dump-dom` — one of seven runnable checks. Guards the narrow-window block: its threshold, its coverage, its refusal to be dismissed, and that it is modal |
 | `paint-check.html` | `chrome --headless --dump-dom` — one of seven runnable checks. Guards the on-map paint chooser: that it reads as a control and not as a map pin, that its two layers and the four boxes nested under `Stations` sit where they belong, that each section holds one choice at a time, that it clears the zoom cluster at both widths, and that below 600px its panel is an M3 bottom sheet whose drag handle has a real swipe behind it |
-| `m3-check.html` | `chrome --headless --dump-dom` — one of seven runnable checks. Guards every M3 surface in rendered pixels: the eight dialogs against the roll call and the kind each is declared as, the four-band ladder, the map as an inset card, the one motion that changes what the pane holds, both pane headers as M3's medium flexible top app bar, the supporting pane at M3's canonical ratios with the map giving up exactly that width, the pane as a side sheet above 600px and a full-screen dialog below it, and each station section as a filled card. Also that every enter carries M3's own duration and easing |
+| `m3-check.html` | `chrome --headless --dump-dom` — one of seven runnable checks. Guards every M3 surface in rendered pixels: the eight dialogs against the roll call and the kind each is declared as, the four-band ladder, the map as an inset card, the one motion that changes what the pane holds, every full-screen header as M3's medium flexible top app bar, the supporting pane at M3's canonical ratios with the map giving up exactly that width, the pane as a side sheet above 600px and a full-screen dialog below it, and each station section as a filled card. Also that every enter carries M3's own duration and easing |
 | `css/icons.css` | every icon, as an SVG mask. Generated — see docs/FEATURES.md for the fetch |
 | `css/base.css` | tokens, reset, controls, blocks shared by popup + alert panel |
 | `css/chrome.css` | page furniture: app bar, status dot, drawer, legend, splash |
@@ -1181,6 +1181,26 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
   heat layer alone. A missing element is a `TypeError` at import time, and then nothing on that page
   runs at all. That page already stubbed `#sideClose` for the same reason. Add the stub rather than
   guard the wiring: a `if (pane)` in `map.js` hides a genuinely missing element in the app.
+- **The four full-screen dialogs wear the pane's app bar, out of the markup they already had.**
+  `#dataBox`, `#camBox` and the two `.docbox` panes carried M3's small top app bar below 600px: one
+  56px row with the close X and the headline beside it. They take the medium flexible variant now,
+  112px, the icons on their own row and the headline at `headline-medium` under them.
+  **No markup changed.** The pane carries `.apptop` and `.apflex` boxes for those two rows. These
+  four carry a `<form>` holding the close and an `<h2>` beside it, and a column with `order: -1` on
+  the form is the same two rows. So the close button stays FIRST in the source of all four, which is
+  what puts it first for a keyboard, and only where it draws moved.
+  **The X stays, and it must never become a back arrow.** The pane took one, because a supporting
+  pane is a destination somebody navigates to. These four are dialogs. An arrow claims the view saves
+  as it goes, and a dialog dismisses.
+  **The headline no longer starts at 56px.** It sat beside the X on one row, and 56 was the one
+  number that made every header read as one component. It leads the label block now and starts on the
+  pane's own padding, 18px for the two prose dialogs and 20px for the table and the wall. M3 states
+  16. The headline lining up with the prose under it beats matching 16 exactly.
+  **About keeps a bar of ONE row.** It has no headline. M3 marks that optional, and that pane's
+  identity is the logo lockup in the content below. So it holds the 56px top row and no label block,
+  because a 112px band over a lone close button is an empty label block.
+  **Only the compact block changed.** Above 600px these four are basic dialogs, and a basic dialog
+  takes `headline-small` on a floating card rather than an app bar.
 - **The pane's leading button is a BACK ARROW at every width, and it is first in the DOM too.** It
   was a close X: trailing above 600px, leading below it, moved by `order: -1`. A reader asked for the
   arrow on 2026-08-21. M3 gives a top app bar a leading navigation icon, so the button moved rather
@@ -2625,8 +2645,12 @@ it. The weather section stretches nothing. It is five fixed keys measuring 231px
   `<dialog>`: `showModal()` below 600px, `show()` above it.
   The load-bearing half is that M3 answers questions this app would otherwise invent answers to.
   A full-screen dialog covers the screen, carries 0dp corners and elevation 0, has no scrim, and
-  puts a close X on the leading edge of a 56dp app bar with the headline after it. So the swipe and
-  the scrim went, the drawer gained a header, and the station panel's × changed edges. The edge tab
+  puts a close X on the leading edge of a top app bar. So the swipe and the scrim went, the drawer
+  gained a header, and the station panel's button changed edges.
+  **That bar is M3's MEDIUM FLEXIBLE variant on every full-screen surface here, and it was the small
+  one.** The small variant is 56dp with the headline beside the X. The medium is 112dp, with the
+  icons on their own row and the headline at `headline-medium` under them. A reader put the
+  supporting pane on the medium variant on 2026-08-21 and then asked the four dialogs to follow. The edge tab
   that did the job before all this is gone too. This does **not** override the two rules below it. The colour
   language here is a status language. So M3's tonal palette never gets to paint a station kind.
   The writing standard still governs every word on screen. Where the spec and this file disagree,
