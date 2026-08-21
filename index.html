@@ -75,8 +75,8 @@
      bridges M3's colour names onto this app's palette. Colour is not in this file on purpose. -->
 <link rel="stylesheet" href="vendor/m3/tokens.css?v=1">
 <link rel="stylesheet" href="css/base.css?v=156">
-<link rel="stylesheet" href="css/chrome.css?v=214">
-<link rel="stylesheet" href="css/map.css?v=158">
+<link rel="stylesheet" href="css/chrome.css?v=216">
+<link rel="stylesheet" href="css/map.css?v=159">
 
 <!-- Water tint for the dark basemap. CARTO's dark_all is greyscale — all 18 of its tones have zero
      chroma — so no saturate() or hue-rotate() can pull water out of it. What it does have is one
@@ -978,6 +978,11 @@
       <!-- The app bar's supporting text. `openSide()` fills it from the card's own region line,
            which used to stay in the body. A subtitle is what that line always was. -->
       <div id="sideSub"></div>
+      <!-- A second supporting line: one chip per sensor kind. It sat in the body under the region
+           line, which put the answer to "what is this place" below the fold on a long card. It
+           answers the same question the headline and the region line do, so it belongs in the same
+           block. M3's assist chip is the shape — see `#sideKinds` in css/chrome.css. -->
+      <div id="sideKinds"></div>
     </div>
   </div>
   <div id="sideBody" class="scroll"></div>

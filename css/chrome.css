@@ -265,7 +265,9 @@ header .hactions {
    `padding` puts its own contents back inside those edges. Neither substitutes for the other.
    The divider is M3's anatomy item 6. M3's basic dialog specs no header border, and its token set
    answers the same seam another way — `header-on-scroll-container-color` plus elevation level2,
-   which is a scroll state and needs script. A 1dp line is the same statement with no listener. */
+   which is a scroll state and needs script. A 1dp line is the same statement with no listener.
+   **Below 600px this line is cancelled and the compact block says why.** There the pane is a
+   full-screen dialog wearing a 112px app bar, and a reader cut it on 2026-08-21. */
 .docbox .modalhead {
   position: sticky; top: calc(-1 * var(--pane)); z-index: 2;
   min-height: 56px;
@@ -1509,6 +1511,29 @@ body.side #side { display: flex; }
   letter-spacing: var(--md-sys-typescale-body-medium-tracking);
 }
 #sideSub:empty { display: none; }
+/* **One M3 ASSIST CHIP per sensor kind, and it was a `.badge`.** Transcribed from `Chip/chip.css`
+   in the M3 Expressive component set: a 32dp container, `shape-corner-small` (8dp), a 1dp outline
+   in `outline-variant`, `label-large` for the text, and an 18dp leading icon with 8dp between it
+   and the label. https://github.com/bczak/m3you/blob/development/src/components/Chip/chip.css
+   The padding is M3's own asymmetry — 8dp on the leading edge where the icon sits, 16dp on the
+   trailing edge past the label.
+   **The colour splits the way M3 splits it.** The label takes `on-surface` and the leading icon
+   takes the accent role, which here is the station kind's own hue. That is what the app already
+   asks a badge to say, and the kind ladder stays out of the status ladder either way.
+   `.badge` is untouched everywhere else. The alert panel and the table both draw one, and this is
+   a chip in an app bar rather than a restyle of every badge in the app. */
+#sideKinds:empty { display: none; }
+#sideKinds .badges { display: flex; flex-wrap: wrap; gap: 8px; }
+#sideKinds .badge {
+  height: 32px; margin: 0; padding: 0 16px 0 8px; gap: 8px;
+  border: 1px solid var(--outline); border-radius: var(--md-sys-shape-corner-small);
+  background: none; color: var(--on-surface); text-transform: none;
+  font-size: var(--md-sys-typescale-label-large-size);
+  line-height: var(--md-sys-typescale-label-large-line-height);
+  font-weight: var(--md-sys-typescale-label-large-weight);
+  letter-spacing: var(--md-sys-typescale-label-large-tracking);
+}
+#sideKinds .badge .i { font-size: 18px; color: var(--c); }
 #sideActions { display: flex; align-items: center; }
 /* **The trailing slot holds two buttons: the favorite, then the ⋮.** The heart was a row inside
    that menu and a reader pulled it out on 2026-08-21. A menu row states its action in words, which
@@ -2479,6 +2504,21 @@ body.finding #find { display: none; }
      prose under it beats matching 16 exactly. */
   .docbox .modalhead .dclose { margin: 0 0 0 -10px; }
   .dtop .modalhead .dclose { margin: 0 0 0 -12px; }
+
+  /* **No line under a full-screen header, and that is the fourth surface to lose one.** The map
+     card, the app bar and the supporting pane each carried a rule and a reader cut all three on
+     2026-08-20. These three are the same cut, 2026-08-21, and the same reason: the surfaces separate
+     by space. A 112px bar with 12px under its headline states the seam already.
+     **Nothing is lost by taking it.** The line marked where content scrolls under a pinned header.
+     Every one of these headers paints `--surface`, so the content going under it is hidden either
+     way. The line was decoration on top of an opaque bar.
+     M3 agrees for the half of the day these are basic dialogs: its basic dialog specs no header
+     border, and its own answer to this seam is `header-on-scroll-container-color` with elevation
+     level2, which is a scroll state and needs script.
+     **`#dataBox` and `#camBox` carry theirs on `.dtop`, not on `.modalhead`.** That box holds the
+     header, the filter field and the count, so the line sat under all three rather than under the
+     headline. It is the same line to a reader. */
+  #dataBox .dtop, #camBox .dtop, .docbox .modalhead { border-bottom: 0; }
 
   /* The pinned header is in the base rule now and reads `--pane` back, so this only has to move the
      pane's padding. `margin-bottom: 0` because the 56dp bar above already carries the space, and

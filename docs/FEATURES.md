@@ -12329,24 +12329,74 @@ centre rather than either box edge.
 ### The region line became the subtitle
 
 `popup.js` builds the card as one string. Its first element is `.pophead`, and `openSide()`
-splits that element. It took three pieces before and takes four now.
+splits that element. It took three pieces before and takes five now.
 
 The fourth is the card's own muted line. Under a station name it reads `Shah Alam, Selangor`. Under
 "Your Location" it reads the accuracy radius. Under a weather place it names the MET point and its
 distance. That line was always a subtitle, and the app bar has a slot for one.
 
 It stayed in the body before, because M3 puts supporting content there. **That is the side sheet's
-rule, and the app bar states the opposite.** The sensor badges are what stay.
+rule, and the app bar states the opposite.**
 
 The selector is `:scope > .muted`. The alert list writes `· nearest first` inside its own
 `.popname`, and a descendant search lifts that fragment out of the title it belongs to.
 
-Three of the five cards then leave `.pophead` empty, so `openSide()` removes it. An empty seam still
-draws 16px of bottom margin over the first reading. `:empty` cannot see it, because the template
-leaves whitespace text nodes behind.
-
 The filters panel gets no subtitle. M3 makes it optional, and `#shown` already states at the foot
 of that body what a subtitle repeats at the top.
+
+### The kind chips became a second subtitle
+
+The fifth piece is one chip per sensor kind. A reader asked for it on 2026-08-21.
+
+Two arguments carry it. The chips answer `what is this place`, and that is the question the headline
+and the region line answer. So the three read as one block. And a five-sensor mast runs several
+screens, so the chips used to sit under a region line the reader scrolled away from. The place is
+now named once, in a header that cannot scroll.
+
+`#sideKinds` is the slot, under `#sideSub` in the label block. `.apflex` already carries M3's 4px
+row gap, so this needed no new spacing. The bar grows past 112px to hold the row, which is the same
+`min-height` the wrapping headline already relies on.
+
+A single-sensor card emits one bare `.badge` and a mast emits a `.badges` box. The selector names
+both.
+
+### The chips are M3 assist chips, and they were pills
+
+`.badge` is this app's own shape: a 999px pill, 11px uppercase text, and a 16% tint of the station
+kind behind it. That reads as a tag inside a card. In an app bar it had to read as a chip.
+
+The numbers come from `Chip/chip.css` in the M3 Expressive component set.
+
+| part | value |
+|---|---|
+| container | 32px |
+| shape | `shape-corner-small`, 8px |
+| outline | 1px, which is what makes it assist and not filled |
+| padding | 8px on the leading edge behind the icon, 16px past the label |
+| label | `label-large`, 14px on 20px at weight 500 |
+| leading icon | 18px, 8px clear of the label |
+
+**The colour splits the way M3 splits it.** The label takes `on-surface` and the leading icon takes
+the accent role, which here is the station kind's own hue. A chip that paints its text in the kind
+reads as a status, and this app reserves that reading for the traffic-light ladder.
+
+**`.badge` keeps its old shape everywhere else.** The alert panel and the table both draw one, and
+this is a chip in an app bar rather than a restyle of every badge in the app. The rule names
+`#sideKinds` alone.
+
+### `.pophead` is empty on every station card now, so it goes
+
+`openSide()` removed the seam already, whenever the split left nothing behind. It now leaves nothing
+behind on every card this panel draws. An empty seam still draws 16px of bottom margin over the
+first reading. `:empty` cannot see it, because the template leaves whitespace text nodes behind, so
+the test is `!head.firstElementChild`.
+
+So the first `.sensor` leads the body. Its own 8px margin is what clears the app bar, and that is
+the same 8px that separates one card from the next.
+
+`m3-check.html` asserted the first card against `.pophead`'s bottom edge. There is no sibling left
+to measure it against, so it asserts the sheet's 12px padding plus one measured card gap. A change
+to either number then fails where it was made, rather than against a 20 somebody has to derive.
 
 ### One divergence, and it is older than this change
 
@@ -12560,3 +12610,44 @@ label block.
 
 Above 600px these four are basic dialogs. A basic dialog takes `headline-small` on a floating card,
 not an app bar. So nothing above 600px moved.
+
+## The full-screen headers lost their line
+
+The four full-screen dialogs drew a 1px rule under the header. `#dataBox` and `#camBox` carried it
+on `.dtop`, the box that holds the header, the filter field and the count. About and Help carried it
+on `.modalhead` itself.
+
+A reader cut all three on 2026-08-21. This is the fourth surface in this app to lose a line. The map
+card, the app bar and the supporting pane each lost one on 2026-08-20, and none of them gets it back.
+
+### Nothing is lost by taking it
+
+The line marked where content scrolls under a pinned header.
+
+Every one of these headers paints `--surface`. So the content going under it is hidden either way,
+and the line was decoration on top of an opaque bar.
+
+The surfaces separate by space instead. A 112px app bar with 12px under its headline states the seam
+already.
+
+### M3 agrees for half the day
+
+Above 600px these four are basic dialogs, and M3's basic dialog specs no header border.
+
+Its own answer to this seam is `header-on-scroll-container-color` with elevation level2. That is a
+scroll state, and it needs script. A 1dp line was the same statement with no listener, which is why
+it stood.
+
+### The line above 600px still draws
+
+This cut is in the compact block alone, because the instruction named the full-screen variant.
+
+`.docbox .modalhead` still takes its border above 600px, where About and Help are basic dialogs with
+a pinned header.
+
+### The check holds it
+
+`m3-check.html` reads the bottom border of each full-screen header back and asserts 0.
+
+A line that returns is one declaration in one file. Nothing else in the app notices it, and a
+reader meets it before anybody else does.

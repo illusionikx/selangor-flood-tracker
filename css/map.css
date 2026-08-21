@@ -95,14 +95,14 @@
    starts at 37.5.
    `~`, not `+`: dots() emits the button and the popover it targets, so the menu sits between them. */
 .pophead > .dots ~ .popname, .pophead > .dots ~ .muted { padding-right: 78px; }
-/* The badge trails the location now, so its spacing has to flip with it. */
-.pophead .badge, .pophead .badges { margin: 6px 0 0; }
 .popname { font-size: 15px; font-weight: 500; line-height: 1.3; }
 .popbody { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin-bottom: 8px; }
 .popbody .v { text-align: right; }
 
-/* One mast, several sensors: the place is named once in .pophead, then a section per sensor. */
-.pophead .badges { display: flex; flex-wrap: wrap; gap: 4px; }
+/* One mast, several sensors: the place is named once in .pophead, then a section per sensor. The
+   kind chips are the app bar's second supporting line now, so their layout goes with them — see
+   `#sideKinds` in css/chrome.css. `.pophead` holds nothing at all on a station card, and
+   `openSide()` removes it. */
 /* **One M3 filled card per sensor.** Transcribed from `Card/card.css` in the M3 Expressive
    component set: `background-color: surface-container-highest`, `border-radius: shape-corner-medium`
    (12dp), no border, and no elevation at rest.
@@ -121,10 +121,11 @@
   margin-top: 8px; padding: 12px;
   border-radius: var(--md-sys-shape-corner-medium); background: var(--hover);
 }
-/* No `:first-child` cancel any more, and the rule that was here could no longer fire. `.pophead` is
-   the body's first element on every card this panel draws, so the first `.sensor` has a sibling
-   above it and wants the same 8px gap as the rest. That rule's own comment warned against a sibling
-   selector and then keyed on position, which is the same fault by another name. */
+/* No `:first-child` cancel any more, and the rule that was here could no longer fire. Every card
+   wants the same 8px whether or not it has a sibling above it: over a sibling it is the gap between
+   two cards, and at the top of the body it is the gap under the app bar. That rule's own comment
+   warned against a sibling selector and then keyed on position, which is the same fault by another
+   name — and position is exactly what moved when `.pophead` emptied and `openSide()` removed it. */
 /* A cell inside a filled card steps back to the page tone, or the two containers are one flat
    block. Both surfaces that draw `.wxcol` sit inside a `.sensor`: the station card's weather
    section, and the weather panel's half-hour stack. */

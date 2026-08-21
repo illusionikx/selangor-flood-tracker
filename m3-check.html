@@ -114,7 +114,8 @@ const CARD = `<div class="pophead">
     <div class="menu" id="probemenu" popover></div>
     <div class="popname" data-go="1">SUNGAI DAMANSARA DI TTDI JAYA</div>
     <div class="muted">Shah Alam, Selangor</div>
-    <div class="badges"><span class="badge">Water level</span></div>
+    <div class="badges"><span class="badge" style="--c:var(--k-river)"
+      ><i class="i i-water_drop"></i>Water level</span></div>
   </div>
   <div class="sensor"><b>Water level</b></div>
   <div class="sensor"><b>Rainfall</b></div>`;
@@ -344,6 +345,11 @@ async function phone() {
     }
     is(w.getComputedStyle(b, '::backdrop').backgroundColor, 'rgba(0, 0, 0, 0)',
        id + ': no scrim, because there is no outside');
+    /* **No line under a full-screen header.** The fourth surface in this app to lose one, after the
+       map card, the app bar and the supporting pane. `#dataBox` and `#camBox` carry theirs on
+       `.dtop` rather than on `.modalhead`, because that box holds the filter field too. */
+    const dtop = b.querySelector('.dtop');
+    is(cs(dtop || mh).borderBottomWidth, '0px', id + ': no line under the header');
     b.close();
   }
   // The prose dialogs are their own scroller, so their header is pinned rather than scrolled away.
@@ -555,14 +561,35 @@ async function desktop() {
   is(!!sa.querySelector('.dots'), true, 'and the ⋮ in the trailing actions');
   is(!!sa.querySelector('.menu'), true, 'with the popover it targets, or the button opens nothing');
   is(!!d.querySelector('#sideBody .pophead .popname'), false, 'the name is not left in the body too');
-  /* **The region line is the app bar's supporting text now, so it goes UP with the name.** It used
-     to stay in the body on the argument that M3 puts supporting content there. That is the side
-     sheet's rule. The app bar states a headline and an optional line under it, and this line always
-     was that. The badges are the ones that stay. */
+  /* **Both supporting lines are the app bar's now, so both go UP with the name.** They stayed in
+     the body on the argument that M3 puts supporting content there. That is the side SHEET's rule,
+     and this header stopped being one. The app bar states a headline and the lines under it, and
+     the region and the kind chips always were that. `.pophead` is left holding nothing, so
+     `openSide()` removes it — the fourth assertion is the one that catches a template still
+     leaving something behind in a box nothing styles any more. */
   is(!!d.getElementById('sideSub').querySelector('.muted'), true,
      'the region line becomes the app bar supporting text');
   is(!!d.querySelector('#sideBody .pophead > .muted'), false, 'and it is not left in the body too');
-  is(!!d.querySelector('#sideBody .pophead .badges'), true, 'the sensor badges do stay there');
+  const sk = d.getElementById('sideKinds');
+  is(!!sk.querySelector('.badges'), true, 'the kind chips become its second supporting line');
+  is(!!d.querySelector('#sideBody .pophead'), false, 'and the emptied seam is removed, not left');
+  /* --- each chip is an M3 ASSIST CHIP ---
+     Transcribed from Chip/chip.css: a 32dp container, `shape-corner-small` (8dp), a 1dp outline,
+     `label-large`, and an 18dp leading icon. The label takes `on-surface` and the icon takes the
+     accent role, which here is the station kind's own hue. **The kind hue on the label is the
+     fault to guard**: a chip whose text is painted by the station kind reads as a status, and this
+     app reserves that reading for the traffic-light ladder alone. */
+  const chip = sk.querySelector('.badge');
+  is(Math.round(r(chip).height), 32, 'M3 assist chip: a 32dp container');
+  is(cs(chip).borderTopLeftRadius, '8px', 'at shape-corner-small');
+  is(cs(chip).borderTopWidth, '1px', 'with a 1dp outline, which is what makes it assist and not filled');
+  is(cs(chip).padding, '0px 16px 0px 8px', 'at M3 padding: 8dp behind the icon, 16dp past the label');
+  is(cs(chip).fontSize, '14px', 'label-large');
+  is(cs(chip).fontWeight, '500', 'at its own weight');
+  is(cs(chip).textTransform, 'none', 'and not the badge uppercase it replaced');
+  is(cs(chip).color, cs(d.body).color, 'the label is on-surface, never the station kind');
+  is(cs(chip.querySelector('.i')).fontSize, '18px', 'an 18dp leading icon');
+  is(cs(chip.querySelector('.i')).color !== cs(chip).color, true, 'which is the one thing that takes the kind hue');
   const top = sh.querySelector('.apptop'), flex = sh.querySelector('.apflex');
   is(Math.round(r(sh).height) >= 112, true, 'M3 112dp medium flexible app bar');
   is(Math.round(r(top).height) >= 56, true, 'a 56px top row for the icons');
@@ -621,9 +648,7 @@ async function desktop() {
      and both rules drew 8px apart under the title. Neither rule exists now, and asserting that they
      are gone is the only way to keep them gone. */
   const secs = [...d.querySelectorAll('#sideBody > .sensor')];
-  const ph = d.querySelector('#sideBody > .pophead');
   is(secs.length, 2, 'the body holds one section per sensor');
-  is(cs(ph).borderBottomWidth, '0px', 'no rule under the supporting line');
   is(cs(secs[0]).borderTopWidth, '0px', 'and none over the first card, or the two are a double line');
   is(cs(secs[0]).backgroundColor !== cs(d.getElementById('side')).backgroundColor, true,
      'filled card: a container tone one step off the sheet, or the card is invisible');
@@ -631,7 +656,13 @@ async function desktop() {
   is(cs(secs[0]).borderTopWidth + cs(secs[0]).boxShadow, '0pxnone',
      'no outline and no elevation: filled, not outlined and not elevated');
   is(Math.round(r(secs[1]).top - r(secs[0]).bottom), 8, 'cards separate by a gap, not by a rule');
-  is(Math.round(r(secs[0]).top - r(ph).bottom), 8, 'and the first one clears the title the same way');
+  /* `.pophead` is gone, so the first card leads the body and there is no sibling left to measure
+     it against. The sheet's own 12px padding plus the 8px every card carries is what clears it, so
+     the assertion is that arithmetic rather than the 20 it comes to. A change to either number is
+     then caught where it was made. */
+  is(Math.round(r(secs[0]).top - r(d.getElementById('sideBody')).top),
+     12 + Math.round(r(secs[1]).top - r(secs[0]).bottom),
+     'and the first one clears the header on the sheet padding plus one card gap');
   /* M3's side sheet has a header. The drawer went unnamed for a long time on the argument that the
      hamburger which opened it stays on screen — true, and it still left the panel with no title. */
   /* **A pinned header needs a height of its own.** `.modalhead` was written as a row in the flow, so

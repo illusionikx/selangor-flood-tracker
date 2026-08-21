@@ -339,12 +339,12 @@ export function openSide(key, html, mastAt) {
      is being split — so the split happens here, on the one element that is always its first child.
      A column of readings whose station name has scrolled off is unreadable, and a five-sensor mast
      runs several screens. */
-  /* **The card arrives as one string and three pieces of it move.** M3's side sheet header is a
+  /* **The card arrives as one string and FIVE pieces of it move.** M3's side sheet header is a
      title and its trailing actions, so that is what goes up: the place name, and the ⋮ with the
-     popover it targets. The region line and the sensor badges stay in `.pophead` where they were,
-     which now leads the body — M3 puts supporting content there, not in the header.
+     popover it targets. The app bar's label block then takes the two supporting lines under it —
+     the region, and one chip per sensor kind.
      `.pophead` is still the seam and still the card's first element. Only the slice taken from it
-     changed. A card with no `.pophead` (or no name inside one) empties both slots rather than
+     changed. A card with no `.pophead` (or no name inside one) empties every slot rather than
      leaving the last station's name over the next one's readings. */
   const head = body.querySelector('.pophead');
   el('sideTitle').replaceChildren(...[head?.querySelector('.popname')].filter(Boolean));
@@ -359,7 +359,16 @@ export function openSide(key, html, mastAt) {
      `:scope > .muted` and not `.muted`, because the alert list writes `· nearest first` INSIDE its
      `.popname`. A descendant search lifts that fragment out of the title it belongs to. */
   el('sideSub').replaceChildren(...[head?.querySelector(':scope > .muted')].filter(Boolean));
-  /* Three of the five cards put nothing else in `.pophead`, so the split empties it. An empty seam
+  /* **The kind chips are the app bar's second supporting line.** They stayed in the body on the
+     argument that M3 puts supporting content there — which is the side SHEET's rule, and this
+     header stopped being one. What they answer is `what is this place`, the same question the
+     headline and the region line answer, so the three read as one block. On a five-sensor mast they
+     used to sit under a region line the reader scrolled away from.
+     A single-sensor card emits one bare `.badge` and a mast emits a `.badges` box, so both are
+     named. */
+  el('sideKinds').replaceChildren(
+    ...(head ? head.querySelectorAll(':scope > .badge, :scope > .badges') : []));
+  /* Every card now puts nothing else in `.pophead`, so the split empties it. An empty seam
      still draws its own bottom margin, which is 16px of nothing over the first reading. `:empty`
      cannot see this: the template leaves whitespace text nodes behind. */
   if (head && !head.firstElementChild) head.remove();

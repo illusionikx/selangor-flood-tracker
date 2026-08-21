@@ -1000,19 +1000,33 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
   **`min-height`, not `height`, because the headline wraps.** The reference truncates with an
   ellipsis. This app does not, and that rule is older: a station name cut in half names another
   station. M3 Expressive states a two-line form for this variant, so a grown bar stays in the family.
-- **The card arrives as one string and FOUR pieces of it move.** `openSide()` takes the `.popname`
+- **The card arrives as one string and FIVE pieces of it move.** `openSide()` takes the `.popname`
   into `#sideTitle`, the `.dots` and the popover it targets into `#sideActions`, the region line into
-  `#sideSub`, and leaves the sensor badges in `.pophead` at the top of the body.
+  `#sideSub`, and the sensor badges into `#sideKinds`.
   **The region line moved up on the same instruction, and that reverses an entry.** It stayed in the
   body because M3 puts supporting content there. That is the SIDE SHEET's rule. An app bar states a
   headline and an optional line under it, and this line always was that: `Shah Alam, Selangor` under
   a station name, the accuracy radius under "Your Location", the point and its distance under a
   weather place.
+  **The kind chips followed on 2026-08-21, for the same reason and one more.** They answer `what is
+  this place`, which is the question the headline and the region line answer. So the three read as
+  one block. On a five-sensor mast they used to sit under a region line the reader scrolled away
+  from. `#sideKinds` is the app bar's second supporting line.
+  **They are M3 assist chips there, and they were `.badge` pills.** A 32dp container,
+  `shape-corner-small`, a 1dp outline, `label-large` and an 18dp leading icon. **The colour splits
+  the way M3 splits it.** The label takes `on-surface` and the leading icon takes the accent role,
+  which here is the station kind's own hue. A chip whose TEXT is painted by the kind reads as a
+  status, and this app reserves that reading. **`.badge` is untouched everywhere else**, because
+  the alert panel and the table both draw one and this is a chip in an app bar. The rule names
+  `#sideKinds` alone.
   **It is `:scope > .muted`, never `.muted`.** The alert list writes `· nearest first` INSIDE its own
   `.popname`. A descendant search lifts that fragment out of the title it belongs to.
-  **Three of the five cards then leave `.pophead` empty, so `openSide()` removes it.** An empty seam
+  **Every card then leaves `.pophead` empty, so `openSide()` removes it.** An empty seam
   still draws its own 16px of bottom margin over the first reading. `:empty` cannot see it, because
   the template leaves whitespace text nodes behind. The test is `!head.firstElementChild`.
+  **So the first `.sensor` leads the body, and its own 8px is what clears the app bar.** That number
+  is the gap between two cards as well. `m3-check.html` asserts the arithmetic rather than the 20 it
+  comes to, since there is no sibling left to measure the first card against.
   **The × is a flex item in that row.** It used to float over the card's top-right corner, and
   three numbers in `css/map.css` existed to work around it: the name was padded clear of it and the
   ⋮ was placed against it. A header row places all three by itself and those numbers are gone.
@@ -1022,7 +1036,7 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
   `m3-check.html` drives the real `openSide()` and asserts the distribution for that reason.
   Its old shape, kept because it explains the constraint: `openSide()` moved the whole `.pophead`
   into `#sideHead`, which is not inside anything that scrolls.
-  `.pophead` is the place name, the region and one badge per sensor. `position: sticky` on it was
+  `.pophead` was the place name, the region and one badge per sensor. `position: sticky` on it was
   tried first, and is one line rather than three. A header that stays put only while nothing defeats
   sticky is a header that can come loose. This one has no scroll to come loose from. **Anything that
   reshapes `sitePopup()` must keep `.pophead` as its first element** — that is the seam.
