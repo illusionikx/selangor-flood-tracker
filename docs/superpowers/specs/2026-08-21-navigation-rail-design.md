@@ -92,8 +92,8 @@ The app bar keeps the wordmark, the status dot and the alert marquee at both wid
 
 ### Search
 
-`#gotoBox` leaves `.hactions` and becomes the fourth occupant of `#pane`. The three occupants today
-are `#bar`, `#side` and the weather card.
+`#gotoBox` leaves `.hactions` and becomes a third box inside `#pane`. The two boxes today are
+`#bar` and `#side`. The weather card draws inside `#side` under a `@wx-` key.
 
 A new body class `find` joins `drawer` and `side`. `syncPane()` in `js/map.js` tests it. The
 `--pane-w` rule in `css/chrome.css` reads it. The occupant inherits `--m3-swap`, the full-screen
@@ -148,7 +148,7 @@ Three of the seven runnable checks meet this change.
 `m3-check.html` reads every `<dialog>` into a roll call. The rail and the bar are each a `<nav>`,
 so neither joins that roll call. Each needs an assertion block of its own instead. `FURNITURE`
 gains `#navbar`. The leading edge gains an assertion, beside the trailing-edge one it already holds.
-The loop over the pane occupants grows from three to four.
+The loop over the pane occupants grows from two to three.
 
 `title-test.html` guards the wordmark ladder. Above 600px the title rail does not move, because
 `header h1` caps at 300px. Below 600px the freed row can move the wordmark up a rung. Read the
