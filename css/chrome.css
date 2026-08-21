@@ -1365,54 +1365,44 @@ body.side #bar { display: none; }
    and there is no outside to dim. */
 #pane::backdrop { background: none; }
 
-/* **Swapping one occupant for another is M3's FADE THROUGH, and the choice is the entry.** The
-   reader asked for a slide with a fade, which is M3's shared axis. Shared axis is for content with a
-   navigational or spatial relationship — steps in a sequence, tabs along one axis. These three have
-   none. The station card, the weather card and the filters are peer destinations that happen to
-   share a container, which is the case M3 names fade through for and gives its bottom navigation as
-   the example.
+/* **An occupant enters the way a station enters, and that motion is `--m3-swap`.** The pane holds
+   one occupant at a time, and `#side` holds one station at a time. Those are the same event at two
+   scales, so they take one motion: 14px in from the trailing edge with a fade, over 220ms on
+   `easing-emphasized`. `sideSwap` further down this file reads the same token.
 
-   Transcribed from Material's own motion spec. The whole gesture is 300ms, which is
-   `duration-short2`. The outgoing surface fades out over the first 30% of it and does not move. The
-   incoming surface then fades in over the remaining 70% while it scales up from 92%. The two never
-   cross-fade: the container is never showing two things at once, which is the whole point of the
-   pattern. Out on `easing-emphasized-accelerate`, in on `easing-emphasized-decelerate`, which are
-   the two curves this app already carries.
+   **This reverses M3's fade through, and the reversal is the entry.** That pattern stood here for
+   one revision. It fades the outgoing surface over the first 30% of 300ms. It then fades and scales
+   the incoming one from 92% over the rest. M3 names it for peer destinations that share a container,
+   which is what the station card, the weather card and the filters are. So the reading was right.
+   A reader met it beside the station swap and asked for the station swap.
+   **Two motions in one box read as two events.** The pane is one box.
 
-   **`position: absolute` on the occupants is what makes it possible.** They were `flex: 1` children
-   of a column, so two visible at once would split the pane's height between them for 90ms. Filling
-   the pane absolutely lets the outgoing one leave while the incoming one is already in place. The
-   pane still owns the box — the occupants state `inset: 0` and nothing else about it.
+   **The exit is instant, and that is what `sideSwap` does too.** A station swap replaces the card
+   with `innerHTML`, and the new card fades in from nothing. So the outgoing occupant simply stops
+   drawing. `display` then needs no transition and no `allow-discrete` to survive one. The fade
+   through needed both, because its outgoing half had a 90ms fade to live through.
 
-   **`display` rides the transition with `allow-discrete`, and the direction matters.** Going to
-   `none` the flip lands at the END of the duration, so the outgoing surface survives its own 90ms
-   fade. Coming from `none` it lands at the START, so the incoming surface is in the box, invisible,
-   for the 90ms it waits. A browser without `allow-discrete` flips `display` at once and loses the
-   exit alone, which is the same graceful loss `@starting-style` takes. */
+   **`position: absolute` on the occupants outlives that argument.** They were `flex: 1` children of
+   a column, so two visible at once would split the pane's height between them. The incoming occupant
+   still has to be in place before it slides. The pane still owns the box: the occupants state
+   `inset: 0` and nothing else about it. */
 .paneswap { position: absolute; inset: 0; }
-#bar, #side {
-  opacity: 0;
-  transition:
-    opacity var(--m3-fade-out),
-    display var(--md-sys-motion-duration-fade-out) allow-discrete;
-}
+#bar, #side { opacity: 0; }
 body.drawer #bar, body.side #side {
-  opacity: 1; scale: 1;
-  transition:
-    opacity var(--m3-fade-in),
-    scale var(--m3-fade-in),
-    display 0s allow-discrete;
+  opacity: 1; translate: 0;
+  transition: opacity var(--m3-swap), translate var(--m3-swap);
 }
 /* The entering surface's start values. A separate block rather than a nested one: this file uses no
    CSS nesting anywhere else, and one shape for one job beats two. */
 @starting-style {
-  body.drawer #bar, body.side #side { opacity: 0; scale: .92; }
+  body.drawer #bar, body.side #side { opacity: 0; translate: 14px; }
 }
 body:not(.ready) #bar, body:not(.ready) #side { transition: none; }
-/* Reduced motion keeps the fade and drops the scale. Something still has to say the pane changed. */
+/* Reduced motion keeps the fade and drops the slide, which is the trade `sideSwap` already takes.
+   Something still has to say the pane changed. */
 @media (prefers-reduced-motion: reduce) {
   @starting-style {
-    body.drawer #bar, body.side #side { opacity: 0; scale: 1; }
+    body.drawer #bar, body.side #side { opacity: 0; translate: 0; }
   }
 }
 
@@ -1488,8 +1478,11 @@ body.side #side { display: flex; }
    Both boxes animate, because the name is in one and the readings in the other and a wipe that
    moved half the card would read as a glitch. Under reduced motion the slide is dropped and the
    fade kept: something still has to say the content changed. */
+/* `--m3-swap`, and not `.22s cubic-bezier(...)` written out. The pane's own occupant enter reads the
+   same token. So a station replaced inside this panel and a panel replaced inside the pane move
+   alike. They were two motions, and a reader met both. */
 @keyframes sideSwap { from { opacity: 0; transform: translateX(14px); } }
-#side.swap #sideTitle, #side.swap #sideBody { animation: sideSwap .22s cubic-bezier(.2, 0, 0, 1); }
+#side.swap #sideTitle, #side.swap #sideBody { animation: sideSwap var(--m3-swap); }
 @media (prefers-reduced-motion: reduce) { @keyframes sideSwap { from { opacity: 0; } } }
 
 /* **Three boxes still step aside, and each one also rides the map card's own inset.** Leaflet's

@@ -12230,3 +12230,54 @@ reads the header position back.
 
 An occupant that scrolls itself and one whose header happens to fit are different faults. Only the
 second one is invisible.
+
+## The pane got one motion, and M3's fade through went
+
+The supporting pane changes what it holds in two ways. A station replaced by another station stays
+inside `#side`. An occupant replaced by another occupant stays inside `#pane`. Those are the same
+event at two scales.
+
+They ran two different motions. A reader met both and asked for one. They named the station swap.
+
+### What the two motions were
+
+`sideSwap` slides the arriving content 14px in from the trailing edge and fades it, over 220ms on
+`easing-emphasized`. It has run in this app since the station panel replaced the map popup.
+
+The occupant swap ran M3's fade through. That fades the outgoing surface over the first 30% of
+300ms. It then fades and scales the incoming one from 92% over the rest. The two never overlap.
+
+### The reading of the spec was right, and it lost anyway
+
+M3 names fade through for peer destinations that share a container. The station card, the weather
+card and the filters are exactly that. The station panel and the filters panel are peers, and the
+pane is the container.
+
+**Two motions in one box read as two events. The pane is one box.** A reader who opens the filters
+and then opens a station sees the box change twice. Two answers to one question cost more than the
+better answer buys.
+
+### One token now feeds both
+
+`--m3-swap` is 220ms on `easing-emphasized`. `sideSwap` reads it. The occupant enter reads it. So a
+change to either has to move both.
+
+The occupant enter is a transition rather than a keyframe, because `display` has to flip with it.
+The values are the keyframe's own: `opacity` 0 to 1, and `translate` 14px to 0.
+
+### The exit became instant
+
+A station swap replaces the card with `innerHTML`. The new card fades in from nothing, and there is
+no old card to fade out.
+
+So the outgoing occupant now stops drawing at once. `display` needs no transition and no
+`allow-discrete` to survive one. Both went with the fade through, which needed them for its own 90ms
+outgoing half.
+
+### What the check holds
+
+`m3-check.html` reads the numbers off each event. It then reads them against each other. The station
+swap must run for exactly as long as the occupant swap, on the same curve.
+
+It also asserts the incoming occupant does not scale. That is the first declaration a revert
+brings back.

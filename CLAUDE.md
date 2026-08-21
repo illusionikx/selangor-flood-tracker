@@ -27,7 +27,7 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `title-test.html` | `chrome --headless --dump-dom` — one of seven runnable checks. Guards the app bar wordmark ladder, in rendered pixels |
 | `narrow-test.html` | `chrome --headless --dump-dom` — one of seven runnable checks. Guards the narrow-window block: its threshold, its coverage, its refusal to be dismissed, and that it is modal |
 | `paint-check.html` | `chrome --headless --dump-dom` — one of seven runnable checks. Guards the on-map paint chooser: that it reads as a control and not as a map pin, that its two layers and the four boxes nested under `Stations` sit where they belong, that each section holds one choice at a time, that it clears the zoom cluster at both widths, and that below 600px its panel is an M3 bottom sheet whose drag handle has a real swipe behind it |
-| `m3-check.html` | `chrome --headless --dump-dom` — one of seven runnable checks. Guards every M3 surface in rendered pixels: the eight dialogs against the roll call and the kind each is declared as, the four-band ladder, the map as an inset card, the fade through that swaps one occupant for another, the fade through that swaps one occupant for another, the supporting pane at M3's canonical ratios with the map giving up exactly that width, the pane as a side sheet above 600px and a full-screen dialog below it, and each station section as a filled card. Also that every enter carries M3's own duration and easing |
+| `m3-check.html` | `chrome --headless --dump-dom` — one of seven runnable checks. Guards every M3 surface in rendered pixels: the eight dialogs against the roll call and the kind each is declared as, the four-band ladder, the map as an inset card, the one motion that changes what the pane holds, the supporting pane at M3's canonical ratios with the map giving up exactly that width, the pane as a side sheet above 600px and a full-screen dialog below it, and each station section as a filled card. Also that every enter carries M3's own duration and easing |
 | `css/icons.css` | every icon, as an SVG mask. Generated — see docs/FEATURES.md for the fetch |
 | `css/base.css` | tokens, reset, controls, blocks shared by popup + alert panel |
 | `css/chrome.css` | page furniture: app bar, status dot, drawer, legend, splash |
@@ -1044,20 +1044,27 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
   controls live inside the map container and get it free. A box that misses the term sits on the page
   beside the card rather than on the map, which reads as a spacing mistake rather than as a missing
   term.
-- **Swapping one occupant for another is M3's FADE THROUGH, not a slide.** M3 has two answers here
-  and they are for different relationships. Shared axis — the slide with a fade — is for content with
-  a navigational or spatial relationship: steps in a sequence, tabs along one axis. Fade through is
-  for peer destinations that share a container and have no such relationship, and M3 gives bottom
-  navigation as its example. The station card, the weather card and the filters are that second case.
-  The gesture is 300ms. The outgoing surface fades out over the first 30% and does not move. The
-  incoming one waits that out, then fades in over the remaining 70% while it scales up from 92%. The
-  two never cross-fade. Out on `easing-emphasized-accelerate`, in on `easing-emphasized-decelerate`.
-- **The occupants are `position: absolute; inset: 0`, and the fade through is why.** They were
-  `flex: 1` children of a column, so two visible at once split the pane's height between them for the
-  90ms the swap overlaps. Filling the pane absolutely lets the outgoing one leave while the incoming
-  one is already in place. The pane still owns the box: the occupants state `inset: 0` and nothing
-  else about it. `m3-check.html` asserts both halves, because an occupant that positions itself and
-  one that states a size are different faults.
+- **One motion changes what the supporting pane holds, and two events read it.** `--m3-swap` is
+  220ms on `easing-emphasized`. It slides the arriving surface 14px in from the trailing edge and
+  fades it. A station swapped for another inside `#side` takes it through `sideSwap`. An occupant
+  swapped for another inside `#pane` takes it through a transition on `#bar` and `#side`. One token
+  feeds both, so the two cannot drift.
+  **This reverses M3's fade through, on a reader's instruction, 2026-08-21.** That pattern fades the
+  outgoing surface over the first 30% of 300ms. It then fades and scales the incoming one from 92%
+  over the rest. M3 names it for peer destinations that share a container. The station card, the
+  weather card and the filters are exactly that, so the reading of the spec was right.
+  **Two motions in one box read as two events, and the pane is one box.** A reader met the occupant
+  swap beside the station swap and named the station swap. `m3-check.html` asserts the numbers on
+  each event, and then asserts the two events against each other.
+- **The occupant exit is instant, and that is the station swap's own behavior.** A station swap
+  replaces the card with `innerHTML`, and the new card fades in from nothing. So an outgoing occupant
+  simply stops drawing. `display` needs no transition and no `allow-discrete` to survive one. Both of
+  those went with the fade through, which needed them for its own 90ms outgoing half.
+- **The occupants are `position: absolute; inset: 0`, and the swap is why.** They were `flex: 1`
+  children of a column, so two visible at once split the pane's height between them. The arriving
+  occupant has to be in place before it slides. The pane still owns the box: the occupants state
+  `inset: 0` and nothing else about it. `m3-check.html` asserts both halves, because an occupant that
+  positions itself and one that states a size are different faults.
 - **Both occupants of `#pane` are a fixed header over a scrolling body, and the drawer was not.**
   `#side` has always been a flex column. `#sideHead` is `flex: none` and `#sideBody` takes the rest
   and scrolls under it. `#bar` was one box doing both jobs. It carried `padding: 20px` and
@@ -1066,9 +1073,10 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
   across that padding. That is a number written for a layout that no longer exists. `#barBody` is
   the scroller now. It takes `flex: 1`, `overflow: auto` and `padding: 12px 24px`, which are
   `#sideBody`'s own three numbers.
-  **The motion is the second cost, and a reader named it first.** The fade through scales the
+  **The motion was the second cost, and a reader named it first.** The enter then scaled the
   incoming occupant from 92%. So it ran on a scroll container in one occupant and on a static flex
-  column in the other. Two panels in one pane entered differently.
+  column in the other. Two panels in one pane entered differently. The scale is gone now for a
+  separate reason, and the shape still has to match.
   `m3-check.html` asserts the shape and then the behavior. An occupant that scrolls itself and one
   whose header happens to fit are different faults. Only the second one is invisible.
 - **An `<h2>` keeps the UA block margin, and `css/base.css` resets `h1` alone.** `#barHead` asks for
@@ -1077,12 +1085,6 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
   pane, one at a time. So a reader meets the difference and no single pane shows it.
   `m3-check.html` asserted `>= 64` and passed on the fault for a whole revision. It asserts 64 now.
   Any heading placed in a header row in this app needs `margin: 0` stated.
-- **`display` rides the transition with `allow-discrete`, and the direction matters.** Going to
-  `none` the flip lands at the END of the duration, so the outgoing surface survives its own 90ms
-  fade. Coming from `none` it lands at the START, so the incoming surface is in the box, invisible,
-  for the 90ms it waits. Without it the outgoing surface vanishes instantly and there is no fade to
-  see. A browser that does not support it loses the exit alone, which is the same graceful loss
-  `@starting-style` takes.
 - **The card treatment and the gap turn on together, and the radius is why.** With `--gap` at 0 the
   map fills the window, and a 16px radius on a full-bleed box notches the four screen corners and
   shows the page through them. So the radius and the edge live in the same `min-width: 601px` query
@@ -2560,8 +2562,10 @@ it. The weather section stretches nothing. It is five fixed keys measuring 231px
   **The main pane is drawn as a card**, because M3 separates panes with space rather than with a
   line. `--gap` is the map's inset against the window and `--seam` is the space between the two
   panes, which is M3's own margin-and-spacer pair.
-  **Swapping one occupant for another is M3's fade through**, which is its transition between peer
-  destinations sharing a container.
+  **One motion changes what the pane holds, and it is not M3's fade through.** M3 names fade through
+  for peer destinations that share a container, and these three are that. This app ran it for one
+  revision. A reader met it beside the station swap inside `#side` and asked for one motion.
+  `--m3-swap` is that motion, and both events read it.
   **No surface in this layout carries a dividing line.** Not the card, not the app bar, not the pane.
   **In a compact window the supporting pane is a full-screen destination.** That is what
   `SupportingPaneScaffold` does in the Compose adaptive library, and it is why `#pane` is a

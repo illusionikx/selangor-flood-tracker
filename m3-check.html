@@ -183,35 +183,41 @@ async function phone() {
   is(cs(paneEl).animationName, 'paneUp', 'the pane travels up from the bottom edge here');
   is(cs(paneEl).animationDuration, '0.3s', 'M3 duration-short2, a full-screen dialog\'s own');
   is(cs(paneEl).animationTimingFunction, M3_EASE, 'on M3 easing-emphasized');
-  /* **The occupant swap is M3's FADE THROUGH, and the numbers are the whole assertion.** M3 uses it
-     for peer destinations sharing one container, which is what the station card, the weather card
-     and the filters are. Shared axis — the slide — is for content with a navigational relationship,
-     and these three have none.
-     The outgoing surface fades over the first 30% of a 300ms gesture and does not move. The incoming
-     one waits that out, then fades and scales up from 92% over the remaining 70%. Read on the
-     OUTGOING rule and then the incoming one, because the two are different declarations on two
-     elements and only one of them applies at a time. */
-  const OUT_EASE = 'cubic-bezier(0.3, 0, 0.8, 0.15)';   // emphasized-accelerate
-  const IN_EASE = 'cubic-bezier(0.05, 0.7, 0.1, 1)';    // emphasized-decelerate
+  /* **One motion changes what the pane holds, and TWO events have to read it.** An occupant swapped
+     for another inside `#pane` is one. A station swapped for another inside `#side` is the other.
+     They were two motions for one revision, and a reader met both and asked for one. So the numbers
+     are asserted on each event and then against each other.
+     M3's fade through stood on the first of those two and is gone. It faded the outgoing surface
+     over the first 30% of 300ms, then faded and scaled the incoming one from 92%. The reading of the
+     spec was right and the result was two motions in one box. */
   d.body.classList.remove('drawer', 'side');
   await settled();
-  const outCs = cs(d.getElementById('bar'));
-  is(outCs.transitionDuration.split(',')[0].trim(), '0.09s', 'fade through: out over the first 30%');
-  is(outCs.transitionDelay.split(',')[0].trim(), '0s', 'starting at once');
-  is(outCs.transitionTimingFunction.split(/,\s*(?=cubic-bezier|ease|linear|steps)/)[0],
-     OUT_EASE, 'on M3 easing-emphasized-accelerate');
-  is(outCs.transitionProperty.includes('display'), true,
-     'and `display` rides it, so the outgoing surface survives its own fade');
+  /* **The exit is instant, which is what a station swap does.** That one replaces the card with
+     `innerHTML` and the new card fades in from nothing, so the outgoing occupant just stops drawing.
+     `display` therefore needs no transition and no `allow-discrete` to survive one. */
+  is(cs(d.getElementById('bar')).transitionDuration.split(',')[0].trim(), '0s',
+     'swap: the outgoing occupant leaves at once, the way a replaced station does');
   d.body.classList.add('drawer');
   await settled();
   const inCs = cs(d.getElementById('bar'));
-  is(inCs.transitionDuration.split(',')[0].trim(), '0.21s', 'fade through: in over the other 70%');
-  is(inCs.transitionDelay.split(',')[0].trim(), '0.09s', 'after the outgoing one has finished');
+  is(inCs.transitionDuration.split(',')[0].trim(), '0.22s', 'swap: the incoming one takes 220ms');
+  is(inCs.transitionDelay.split(',')[0].trim(), '0s', 'and it starts at once, waiting for nothing');
   is(inCs.transitionTimingFunction.split(/,\s*(?=cubic-bezier|ease|linear|steps)/)[0],
-     IN_EASE, 'on M3 easing-emphasized-decelerate');
-  is(inCs.transitionProperty.includes('scale'), true, 'and it scales as well as fades');
+     M3_EASE, 'on M3 easing-emphasized');
+  is(inCs.transitionProperty.includes('translate'), true, 'it slides in as well as fades');
+  is(inCs.transitionProperty.includes('scale'), false,
+     'and it does not scale: that was the fade through, and a reader cut it');
   is(cs(d.getElementById('bar')).animationName, 'none',
      'a transition and not a keyframe, so the container itself never moves');
+  /* The other event, read off the same element the app animates. Equal numbers are the assertion:
+     one token feeds both, so a change to either has to move both or fail here. */
+  const sideEl = d.getElementById('side');
+  sideEl.classList.add('swap');
+  const swapCs = cs(d.getElementById('sideTitle'));
+  is(swapCs.animationDuration, inCs.transitionDuration.split(',')[0].trim(),
+     'a station swap runs for exactly as long as an occupant swap');
+  is(swapCs.animationTimingFunction, M3_EASE, 'on the same curve');
+  sideEl.classList.remove('swap');
   d.body.classList.remove('drawer');
   await settled();
   settle();
