@@ -12826,3 +12826,53 @@ The sweep sets the frame to each width and reads `#pane` and `#map` back.
 **Switch transitions off in the frame first.** `#map` animates its trailing edge for 300ms, so a
 shorter wait reads a map that is still moving. The first run of this sweep reported sums that missed
 the window by up to 71px, at widths where nothing was wrong.
+
+## The map furniture stopped overlapping itself
+
+Five boxes float over the map: the legend, the layer button, the credit line, the zoom control and
+the pills. Each one adds `--pane-w` to its own offset, so none of them ever reaches the supporting
+pane.
+
+They still collided with each other as the map narrowed. A reader reported it past 840px.
+
+| window | overlap |
+|---|---|
+| 700 | legend and the layer button, 60px by 60. Legend and the zoom control |
+| 840 | legend and the credit line, 191px |
+| 900 | legend and the credit line, 131px |
+| 1024 | legend and the credit line, 7px |
+| 1200 and up | clear |
+
+### The credit line owns the bottom band
+
+`#credit` sits at `8px + --gap` and is one 14px line, so it owns the strip up to 22px.
+
+`#legend` started at 12px, inside that strip. The two only looked separate while the map was wide
+enough for the credit text to stay on its own side of it.
+
+The legend starts at 30px now. That clears the credit by 8px at every width.
+
+### The legend states 288px and the medium band has no room for it
+
+A heat ramp has no intrinsic width, so the legend box carries one for it.
+
+In M3's medium band the map is 289 to 408px wide. So 288px of legend leaves nothing for the layer
+button and the zoom control in the other corner.
+
+A `max-width` caps the legend against the window, less the pane, the seam, its own leading inset and
+the 116px that cluster reaches in from the trailing edge. It bites below about 950px and never
+above it. `.wxkey` already measures good in a 210px box, which is what 700px gives it.
+
+### Nothing else in this app sees this
+
+Each box was correct on its own. Correct against the pane, correct against the window, correct
+against the map card.
+
+`m3-check.html` reads every visible furniture box at each band and intersects them pairwise. That is
+the only assertion that catches a box landing on its neighbour.
+
+### One thing left, and it is older than this
+
+At 700px the credit text starts 9px left of the map card. It is a sibling of the map positioned
+against the window, and the string is long. It sits on the page beside the card rather than on the
+map. That was true before this change and it is not an overlap.

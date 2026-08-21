@@ -1295,6 +1295,22 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
   the map, which takes no width from it. `m3-check.html` asserts the map keeps its whole width at
   that breakpoint. A `--pane-w` fed a phone value shortens the map for a surface that never sits
   beside it.
+- **Stepping aside for the pane is only half of it. The furniture has to clear ITSELF.** Every box in
+  the bottom strip adds `--pane-w`, so none of them ever reaches the supporting pane. Each one was
+  correct on its own and they collided with each other as the map narrowed. Measured with the pane
+  open: at 700px the layer button sat on the legend, 60px by 60. At 840px the credit line ran 191px
+  in under it, at 900px 131px, at 1024px 7px.
+  **`#credit` owns the band up to 22px.** It sits at `8px + --gap` and is one 14px line. `#legend`
+  started at 12, inside that band, and the two only looked separate while the map was wide enough
+  for the credit to stay on its own side. The legend starts at 30 now.
+  **The legend's 288px is for the heat ramp, and the medium band has no room for it.** A ramp has no
+  intrinsic width, so the box states one. There the map is 289 to 408px wide, and 288 leaves nothing
+  for the cluster in the other corner. A `max-width` caps it against the window less the pane, the
+  seam, its own leading inset, and the 116px the layer button and the zoom control reach in from the
+  trailing edge. It bites below about 950px. `.wxkey` already measures good in a 210px box.
+  **`m3-check.html` intersects every visible furniture box pairwise at each band.** Nothing else in
+  this app could see this fault. A box that is correct against the pane, correct against the window
+  and correct against the card is still wrong if it lands on its neighbour.
 - **Three boxes step aside for the pane and the zoom control must not.** Leaflet's own controls live
   INSIDE the map container, and that container now stops at the pane, so they follow it for
   free. `#toast`, `#credit` and `#paint` are siblings of `#map` and position against the window, so
