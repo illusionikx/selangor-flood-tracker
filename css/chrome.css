@@ -230,16 +230,13 @@ header .hactions {
   #ticker { overflow-x: auto; scrollbar-width: none; }
 }
 
+/* Three states, and `setBtn()` in js/locate.js writes all three. The words ride `data-tip` and the
+   state rides the glyph. A broken control changes its glyph, never its hue: an amber glyph on a
+   flood map reads as an alert on the water. */
 #locate.busy { pointer-events: none; }
-#locate.busy::before { animation: pulse 1s infinite; }
-#locate::before { --i: var(--i-my_location); width: 22px; height: 22px; }
-#locate.on::before { --i: var(--i-near_me); color: var(--accent); }
-/* A failed fix changes the glyph and keeps the ink. Amber came first and a reader cut it. On a flood
-   map every other status hue means a station is in trouble. So an amber glyph in the app bar reads
-   as an alert on the water. `location_disabled` is the crosshair of the resting state with a line
-   through it, so the two read as one control in two states. The words behind it arrive through
-   `data-tip` rather than a `title`. */
-#locate.fail::before { --i: var(--i-location_disabled); }
+#locate.busy .i { animation: pulse 1s infinite; }
+#locate.on .i { --i: var(--i-near_me); color: var(--accent); }
+#locate.fail .i { --i: var(--i-location_disabled); }
 
 /* --- sources dialog -------------------------------------------------------------------------- */
 
@@ -1190,8 +1187,14 @@ body:is(.drawer, .side) #findpane { display: none; }
    change to either margin fails a check rather than drifting apart on screen.
    401, not 400: it stands over the legend and the alert panel, one rung under #gotoBox's results
    list at 402 and well under the app bar at 600. */
-#paint { position: absolute; z-index: 401;
-  right: calc(48px + var(--pane-w) + var(--seam)); bottom: calc(36px + var(--gap)); }
+/* One column with the zoom control. `#paint` keeps the bottom slot beside the zoom buttons and
+   `#locate` stacks above it. `--fab` plus 8px is the step between the two.
+   **State the `--fab` fallback.** That variable is declared on `.mapbtn` itself, so a rule written
+   here cannot inherit it and `var(--fab)` alone resolves to nothing. */
+#paint, #locate { position: absolute; z-index: 401;
+  right: calc(48px + var(--pane-w) + var(--seam)); }
+#paint  { bottom: calc(36px + var(--gap) + var(--navbar-h)); }
+#locate { bottom: calc(36px + var(--gap) + var(--navbar-h) + var(--fab, 60px) + 8px); }
 
 /* It steps aside for the station panel exactly as the zoom buttons and the credit do — see the
    `body.side` block further down, which this joins. Nothing here rides the drawer any more: that

@@ -19,8 +19,10 @@ let wantPopup = false;   // only pop up when the user asked; never on the landin
    and on tap alike, so this needs no listener of its own.
    The label is the accessible name. A colour and a hover are two things a screen reader cannot
    reach, so a failure has to arrive as text as well. */
+// `mapbtn` is the base class now. The button sits on the map, beside the layers button, not in
+// the app bar. `.mapbtn` sets the size and the shape, so a state change must keep the class.
 const setBtn = (cls, label, tip) => {
-  btn.className = cls ? `icon ${cls}` : 'icon';
+  btn.className = cls ? `mapbtn ${cls}` : 'mapbtn';
   btn.setAttribute('aria-label', tip || label);
   if (tip) { btn.dataset.tip = tip; btn.removeAttribute('title'); }
   else { delete btn.dataset.tip; btn.title = label; }

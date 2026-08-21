@@ -69,13 +69,13 @@
 <link rel="stylesheet" href="vendor/leaflet.css">
 <link rel="stylesheet" href="vendor/markercluster.css">
 <link rel="stylesheet" href="vendor/fonts.css?v=51">
-<link rel="stylesheet" href="css/icons.css?v=95">
+<link rel="stylesheet" href="css/icons.css?v=96">
 <!-- M3's own token scales, baked from the M3 Expressive component set by `php m3-build.php`.
      Before `base.css`, which derives `--m3-travel`, `--m3-grow` and `--m3-swap` from them and
      bridges M3's colour names onto this app's palette. Colour is not in this file on purpose. -->
 <link rel="stylesheet" href="vendor/m3/tokens.css?v=1">
-<link rel="stylesheet" href="css/base.css?v=161">
-<link rel="stylesheet" href="css/chrome.css?v=227">
+<link rel="stylesheet" href="css/base.css?v=162">
+<link rel="stylesheet" href="css/chrome.css?v=228">
 <link rel="stylesheet" href="css/map.css?v=159">
 
 <!-- Water tint for the dark basemap. CARTO's dark_all is greyscale — all 18 of its tones have zero
@@ -284,11 +284,6 @@
          the station panel (#side) — the same popout a pin opens, so a station picked out of the list
          replaces the list in place instead of a second card appearing beside it. -->
     <button id="alertBtn" class="icon" aria-expanded="false" aria-controls="side"></button>
-    <!-- The two dialogs used to be two buttons here, and the right group filled the bar at 360px.
-         `.menu` is the component the sensor menu uses, and the delegated handler in js/ui.js places
-         every popover carrying that class, so this needs no positioning code of its own.
-         `position: fixed` on `.menu` keeps the panel out of this flex row. -->
-    <button id="locate" class="icon" title="Show my location" aria-label="Show my location"></button>
     <!-- Last in the row on purpose: it is the only control here that opens a panel of its own, and a
          panel is placed against the button that opened it. Between two icon buttons the popover had
          controls on both sides of it. -->
@@ -1086,6 +1081,10 @@
      the alert list behind the app bar's warning glyph carries the same information without a time
      limit. -->
 <div id="toast" class="surface" role="status" aria-live="polite"></div>
+<!-- On the map, not in the app bar. It acts on the map, and the rail beside it holds destinations.
+     Stacked above `#paint` in one column, so the two read as one cluster with the zoom buttons. -->
+<button id="locate" class="mapbtn" title="Show my location" aria-label="Show my location"
+  ><i class="i i-my_location"></i></button>
 <!-- Bottom of the map, in the zoom control's own cluster: beside it on a desktop, above it on a
      phone where the legend takes the width. FAB-sized, because it opens the map's own settings and
      is the one control in that cluster that is not a zoom. It keeps the cluster's surface rather

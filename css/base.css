@@ -99,6 +99,8 @@
      lines on a phone (the ticker wraps under the buttons) and the map, drawer, search box and alert
      panel all have to follow it down — they were six hard-coded 64/76/124/128s before. */
   --hdr: 64px;
+  --rail-w: 0px;
+  --navbar-h: 0px;
 }
 /* --- the map palette -------------------------------------------------------------------------- */
 
