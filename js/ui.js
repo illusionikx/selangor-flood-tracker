@@ -971,13 +971,14 @@ let hits = [], sel = -1;
    at, where every other row already opens a station card with one press. */
 let nearPlace = null;
 
-/* The box lives in the app bar and is collapsed to its button until asked for — it is a control you
-   reach for deliberately, unlike the layer chips or the alert panel, and as 300px of permanent map
-   furniture it charged every visit for a search most of them never run. The button gives way to the
-   field rather than sitting beside it (see chrome.css), so there is nothing to press to close: it
-   closes on Escape, on picking a station, and on clicking away. The results list hangs below it. */
+/* The button opens the search as a pane occupant, not as a box beside it. `#findpane` is one of
+   `#pane`'s three occupants — see `syncPane()` in map.js. The back arrow, Escape, picking a
+   station, and a blur on the field all close it. */
 function setFind(open) {
-  document.body.classList.toggle('finding', open);
+  document.body.classList.toggle('find', open);
+  /* One pane holds one occupant, so opening the search replaces whatever was there. The other two
+     do the same to each other already — see `setDrawer()` and the `sideopen` listener. */
+  if (open) { closeSide(); document.body.classList.remove('drawer'); }
   findBtn.setAttribute('aria-expanded', open);
   /* The box is `visibility: hidden` while shut — that is what keeps it out of the tab order — and
      you cannot focus a hidden element. Reading offsetWidth forces the style flush that applies the
@@ -997,6 +998,7 @@ function setFind(open) {
   draw(false);
 }
 findBtn.onclick = () => setFind(true);
+el('findClose').onclick = () => setFind(false);
 
 const nearest = () => state.hereAt && state.data.reduce((best, s) =>
   s.lat && (!best || distKm(s, state.hereAt) < distKm(best, state.hereAt)) ? s : best, null);

@@ -75,7 +75,7 @@
      bridges M3's colour names onto this app's palette. Colour is not in this file on purpose. -->
 <link rel="stylesheet" href="vendor/m3/tokens.css?v=1">
 <link rel="stylesheet" href="css/base.css?v=161">
-<link rel="stylesheet" href="css/chrome.css?v=225">
+<link rel="stylesheet" href="css/chrome.css?v=226">
 <link rel="stylesheet" href="css/map.css?v=159">
 
 <!-- Water tint for the dark basemap. CARTO's dark_all is greyscale — all 18 of its tones have zero
@@ -279,18 +279,6 @@
   <div class="hactions">
     <button id="find" class="icon" title="Go to a station" aria-label="Go to a station"
             aria-expanded="false" aria-controls="gotoBox"><i class="i i-search"></i></button>
-    <!-- "Go to a station", collapsed to its button until asked for. It used to be a 300px box parked
-         over the top-right of the map, which spent that much map on every screen that never used it —
-         and it is the one control here you reach for deliberately rather than glance at.
-         Immediately after #find, so it opens *where the button was* — the button hides and the box
-         takes its place, pushing the remaining controls right. On the far side of .hactions it grew
-         out of the other end of the status chip, which is not where anything was clicked. -->
-    <div id="gotoBox">
-      <input id="goto" type="text" autocomplete="off" placeholder="Go to a station…"
-             role="combobox" aria-expanded="false" aria-controls="gotoHits" aria-autocomplete="list"
-             aria-label="Go to a station">
-      <ul id="gotoHits" class="surface picklist" role="listbox" hidden></ul>
-    </div>
     <!-- "On alert" lives here now rather than as a box parked over the top-left of the map. Filled by
          alerts.js: the glyph takes the status colour and the badge the count. The list it opens is
          the station panel (#side) — the same popout a pin opens, so a station picked out of the list
@@ -991,6 +979,29 @@
      own: a close X on the leading edge and the headline after it. `#barHead` draws nothing above
      600px, where the hamburger that opened the drawer is still on screen to close it again.
      The headline is the word the hamburger and the Help page already use for this panel. -->
+<!-- The search is a pane occupant and not a bar control. A 96px navigation rail cannot hold a 300px
+     field, and `#pane` is the search view M3 states at compact width and a side sheet above it.
+     Same three parts as `#bar`: a header that does not scroll, and a body that does. -->
+<div id="findpane" class="paneswap">
+  <div id="findHead">
+    <div class="apptop">
+      <button id="findClose" class="icon" title="Back" aria-label="Back"
+        ><i class="i i-arrow_back"></i></button>
+      <span class="apsp"></span>
+    </div>
+    <div class="apflex"><h2>Go to</h2></div>
+  </div>
+  <div id="findBody" class="scroll">
+    <div id="gotoBox">
+      <input id="goto" type="text" autocomplete="off" placeholder="Go to a station…"
+             role="combobox" aria-expanded="false" aria-controls="gotoHits" aria-autocomplete="list"
+             aria-label="Go to a station">
+      <!-- No `.surface` any more. The list floated over the map before. It sits inside the pane
+           now, so a second background and a second shadow draw a card inside a card. -->
+      <ul id="gotoHits" class="picklist" role="listbox" hidden></ul>
+    </div>
+  </div>
+</div>
 <div id="bar" class="paneswap">
   <!-- M3's side sheet carries a header, so this one does. It draws at both widths now: the drawer
        went unnamed for a long time on the argument that the hamburger which opened it stays on

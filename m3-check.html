@@ -271,7 +271,10 @@ async function phone() {
      'and there is no scrim left: a full-screen dialog covers the screen, so it has no outside');
   is(!!pane.querySelector(':scope > .grab'), false,
      'and no drag handle: that variant has no swipe, and a handle over no gesture is a promise');
-  for (const [id, cls, name] of [['bar', 'drawer', 'filters'], ['side', 'side', 'station panel']]) {
+  is(!!d.getElementById('findpane'), true,
+     'the search is a box inside the pane, because a 96px rail cannot hold a 300px field');
+  for (const [id, cls, name] of [['bar', 'drawer', 'filters'], ['side', 'side', 'station panel'],
+                                 ['findpane', 'find', 'search']]) {
     d.body.classList.add(cls);
     await settled();
     const b = r(pane);
@@ -288,8 +291,8 @@ async function phone() {
        **Assert the glyph CENTRE, never the box edge.** The app bar's top row is 4px of padding
        around a 48px target. The other four full-screen dialogs are 8px around a 40px one. Both land
        the glyph on 28px, so the centre is the fact that survives either convention. */
-    const hd = d.querySelector(id === 'bar' ? '#barHead' : '#sideHead');
-    const x = d.getElementById(id === 'bar' ? 'barClose' : 'sideClose');
+    const hd = d.querySelector(id === 'bar' ? '#barHead' : id === 'side' ? '#sideHead' : '#findHead');
+    const x = d.getElementById(id === 'bar' ? 'barClose' : id === 'side' ? 'sideClose' : 'findClose');
     const xr = r(x);
     is(Math.round(r(hd).height) >= 112, true, name + ': M3 112dp medium flexible app bar');
     is(Math.round((xr.left + xr.right) / 2), 28,

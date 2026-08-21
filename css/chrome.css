@@ -1149,7 +1149,7 @@ header:has(#net.open) #netstats { opacity: 1; visibility: visible; }
 /* M3's side sheet body, the same three numbers `#sideBody` takes: `flex: 1`, `overflow-y: auto` and
    `padding: 12px 24px`. `overscroll-behavior: contain`, because without it a scroll past the end of
    the drawer chains to the document and takes the whole page with it. */
-#barBody {
+#barBody, #findBody {
   flex: 1; overflow: auto; overscroll-behavior: contain; padding: 12px 24px;
   display: flex; flex-direction: column;
 }
@@ -1159,6 +1159,12 @@ body.drawer #bar { display: flex; }
    set by something that writes them directly, and two occupants stacked in one pane is the one shape
    this container cannot draw. The card wins: it is the more specific answer of the two. */
 body.side #bar { display: none; }
+/* The same shape, for the search. */
+#findpane { display: none; }
+body.find #findpane { display: flex; flex-direction: column; }
+/* The same tie-break, for the search against the other two. A body class can still set `find`
+   beside `drawer` or `side` directly, and this container draws one occupant only. */
+body:is(.drawer, .side) #findpane { display: none; }
 /* `flex-shrink: 0`, and it is what makes the drawer scroll at all. `#barBody` is a column flex
    container with a fixed height, so a taller child does not overflow it — it *shrinks* to the
    container, its own content spills out of the shrunken box, and the scrollHeight never exceeds the
@@ -1530,22 +1536,22 @@ body.side #bar { display: none; }
    still has to be in place before it slides. The pane still owns the box: the occupants state
    `inset: 0` and nothing else about it. */
 .paneswap { position: absolute; inset: 0; }
-#bar, #side { opacity: 0; }
-body.drawer #bar, body.side #side {
+#bar, #side, #findpane { opacity: 0; }
+body.drawer #bar, body.side #side, body.find #findpane {
   opacity: 1; translate: 0;
   transition: opacity var(--m3-swap), translate var(--m3-swap);
 }
 /* The entering surface's start values. A separate block rather than a nested one: this file uses no
    CSS nesting anywhere else, and one shape for one job beats two. */
 @starting-style {
-  body.drawer #bar, body.side #side { opacity: 0; translate: 14px; }
+  body.drawer #bar, body.side #side, body.find #findpane { opacity: 0; translate: 14px; }
 }
-body:not(.ready) #bar, body:not(.ready) #side { transition: none; }
+body:not(.ready) #bar, body:not(.ready) #side, body:not(.ready) #findpane { transition: none; }
 /* Reduced motion keeps the fade and drops the slide, which is the trade `sideSwap` already takes.
    Something still has to say the pane changed. */
 @media (prefers-reduced-motion: reduce) {
   @starting-style {
-    body.drawer #bar, body.side #side { opacity: 0; translate: 0; }
+    body.drawer #bar, body.side #side, body.find #findpane { opacity: 0; translate: 0; }
   }
 }
 
@@ -1555,7 +1561,7 @@ body:not(.ready) #bar, body:not(.ready) #side { transition: none; }
    class of its own: the pane is open when one of its occupants is, and a third body class would be a
    second source of truth for one fact. */
 @media (min-width: 601px) {
-  body:is(.drawer, .side) { --pane-w: var(--pane); }
+  body:is(.drawer, .side, .find) { --pane-w: var(--pane); }
 }
 /* **A floor under the ratio, because 30% of a small expanded window is not a pane.** M3 gives the
    supporting pane 30% from 840px up. At 840 that is 252px, which is under M3's own 256dp minimum for
@@ -1625,7 +1631,7 @@ body.side #side { display: flex; }
    ellipsis. This app does not, and the reason is older than this change: a station name cut in half
    names another station. So a long name takes a second 36px line and the bar grows. M3 Expressive
    states a two-line form for this variant, so a grown bar is inside the family. */
-#barHead, #sideHead {
+#barHead, #sideHead, #findHead {
   flex: none; display: flex; flex-direction: column;
   min-height: 112px;
   background: var(--surface); color: var(--on-surface);
@@ -1648,7 +1654,7 @@ body.side #side { display: flex; }
 #sideTitle { min-width: 0; }
 /* `headline-medium`, in `on-surface`. It was `title-large` in `--muted`: an app bar headline is the
    screen's own name and takes the full ink, where a side sheet title is a label over a panel. */
-#sideTitle .popname, #barHead h2 {
+#sideTitle .popname, #barHead h2, #findHead h2 {
   margin: 0; font-weight: 400; color: var(--on-surface);
   font-size: var(--md-sys-typescale-headline-medium-size);
   line-height: var(--md-sys-typescale-headline-medium-line-height);
@@ -1733,35 +1739,18 @@ body.side #side { display: flex; }
    `right`, not a transform: `#toast` already owns its `transform` for the slide it opens with, and
    two rules writing one property is how a toast arrives 360px off the edge it belongs to. */
 
-/* --- go to (in the app bar) -------------------------------------------------------------------- */
+/* --- go to (in the pane) ------------------------------------------------------------------------ */
 
-/* Collapsed to zero width until #find is pressed; see ui.js setFind(). `visibility` rather than
-   `display` so it can animate and so the input stays out of the tab order while it is shut. */
-#gotoBox {
-  position: relative; flex: none; width: 0; overflow: visible;
-  opacity: 0; visibility: hidden;
-  /* `visibility 0s .25s`, not `visibility var(--slide)`: a transitioned visibility interpolates, and
-     at t=0 of hidden→visible it still computes to `hidden` — so ui.js's focus() was refused on an
-     element the user could already see arriving. Flipped instantly on the way in (the open state
-     zeroes the delay), held to the end of the slide on the way out so the fade still plays. .25s is
-     --slide's duration, spelled out because the token bundles an easing with it. */
-  transition: width var(--slide), opacity var(--slide), visibility 0s .25s;
+/* The field fills the pane body. It was a 300px box that opened where its button stood, and both
+   numbers belonged to a bar this control has left. */
+#gotoBox { position: relative; }
+#goto {
+  width: 100%; padding: 10px 12px; font: inherit;
+  color: var(--on-surface); background: var(--surface);
+  border: 1px solid var(--outline); border-radius: var(--md-sys-shape-corner-full);
 }
-body.finding #gotoBox {
-  /* The 4px flex gap alone puts the field hard against the status chip: an icon button carries ~10px
-     of its own padding around the glyph, so the open field has to add that back to sit where the
-     magnifier sat. */
-  width: min(280px, 42vw); margin-left: 10px; opacity: 1; visibility: visible;
-  transition: width var(--slide), opacity var(--slide), visibility 0s;
-}
-/* The button *becomes* the box rather than sitting beside it — a magnifier next to an open search
-   field is a button with nothing left to do, and on a 360px bar it is 40px that the field wants.
-   Closing is clicking away or Escape, which is why nothing here has to stay pressable. */
-body.finding #find { display: none; }
-#goto { margin: 0; }                 /* the drawer's stacking margin doesn't apply in the bar */
-/* Out of the header's own box and over the map. The bar is z-index 600, so this needs nothing of
-   its own beyond clearing the input. */
-#gotoHits { right: 0; left: auto; width: min(320px, calc(100vw - 24px)); }
+#goto:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+#gotoHits { margin: 8px 0 0; padding: 0; list-style: none; }
 
 /* --- new-alert toast -------------------------------------------------------------------------- */
 
@@ -2540,21 +2529,6 @@ body.finding #find { display: none; }
      width; this only has to cancel the desktop shift. */
   body.side #toast, body.side #credit, body.side #paint,
   body.side .leaflet-bottom.leaflet-right { transform: none; }
-  /* The search takes the ticker's row rather than adding one: --hdr is a fixed two-line height, and
-     a third line would push the map down every time someone looked up a station. */
-  body.finding #ticker { display: none; }
-  /* Taken out of the flow rather than wrapped to a new flex line: the box lives inside .hactions
-     now (so that on a wide screen it opens where the button was), and a nested flex item cannot
-     claim a row of the bar above it. `header` is `position: absolute`, so this anchors to it.
-     47px = the header's 6px top padding + the 36px control row + the 5px gap the ticker used. */
-  body.finding #gotoBox {
-    position: absolute; left: 4px; right: 8px; top: 47px; width: auto; height: 34px; margin-left: 0;
-  }
-  /* 34px, so the row it borrowed is the height the ticker's was — --hdr is a fixed 85px here and a
-     taller input would push the map down. */
-  body.finding #goto { padding: 6px 10px; }
-  #gotoBox::after { top: 6px; }
-  #gotoHits { width: auto; left: 0; right: 0; }
   /* Desktop only. At this width the toast covers the top of the map — the band the user is already
      reading — for a list the app bar's warning glyph is already counting two rows above it.
      `display: none` rather than a JS guard so it follows a rotate without anything having to

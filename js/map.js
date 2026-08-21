@@ -49,7 +49,7 @@ let paneModal = false;
 
 function syncPane() {
   const cls = document.body.classList;
-  const want = cls.contains('drawer') || cls.contains('side');
+  const want = cls.contains('drawer') || cls.contains('side') || cls.contains('find');
   if (!want) { pane.close(); return; }
   if (pane.open && paneModal === narrow.matches) return;
   pane.close();
@@ -74,7 +74,7 @@ function syncPane() {
    never opened again for the rest of the session. `pane.open` cannot lie about that. It is false
    only when the element is genuinely shut, which is the one case that should clear the classes. */
 pane.addEventListener('close', () => {
-  if (!pane.open) document.body.classList.remove('drawer', 'side');
+  if (!pane.open) document.body.classList.remove('drawer', 'side', 'find');
 });
 new MutationObserver(syncPane)
   .observe(document.body, { attributes: true, attributeFilter: ['class'] });
