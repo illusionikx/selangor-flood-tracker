@@ -29,16 +29,19 @@
   position: absolute;
   inset: calc(var(--hdr) + var(--gap)) calc(var(--pane-w) + var(--seam)) var(--gap) var(--gap);
   overflow: hidden;
+  border-radius: var(--md-sys-shape-corner-large) var(--md-sys-shape-corner-large) 0 0;
   transition: right var(--m3-travel);
 }
 body:not(.ready) #map { transition: none; }
 @media (prefers-reduced-motion: reduce) { #map { transition: none; } }
 
-/* **The card treatment and the gap turn on together, and they have to.** With `--gap` at 0 the map
-   fills the window, and a 16px radius on a full-bleed box notches the four screen corners and shows
-   the page through them. So the radius and the edge live in the same query the gap does.
-   Below 600px the map is the whole window and the supporting pane is a full-screen destination over
-   it. There is no second pane beside it, so there is nothing for a card to separate from. */
+/* **Below 600px the two TOP corners keep the radius and the two bottom ones lose it.** That is
+   M3's canonical layout in a compact window: the pane meets the app bar with a rounded edge and
+   runs to the screen edge everywhere else. The top edge is not a screen edge. `--hdr` holds the map
+   under the app bar, so the corner is drawn against the page rather than notched out of it. The
+   bottom two ARE the screen edge, and a radius there shows the page through the two corners.
+   **The card treatment and the GAP still turn on together.** With `--gap` at 0 the map runs to the
+   window on three sides, and below 600px there is no second pane beside it to separate from. */
 @media (min-width: 601px) {
   :root { --gap: 16px; --seam: 8px; }
   #map { border-radius: var(--md-sys-shape-corner-large); }

@@ -256,7 +256,13 @@ async function phone() {
      is the reason. */
   const mapEl = d.getElementById('map');
   is(cs(d.documentElement).getPropertyValue('--gap').trim(), '0px', 'no card inset on a phone');
-  is(cs(mapEl).borderTopLeftRadius, '0px', 'and no corner, which would notch the screen');
+  /* **The two TOP corners keep the radius here and the two bottom ones lose it.** The top edge is
+     not a screen edge: `--hdr` holds the map under the app bar, so that corner is drawn against the
+     page rather than notched out of it. The bottom two ARE the screen edge, and a radius there
+     shows the page through them. Assert BOTH ends: a rule that rounds all four notches the screen,
+     and one that rounds none loses the seam under the app bar, and one assertion cannot see both. */
+  is(cs(mapEl).borderTopLeftRadius, '16px', 'the top corners keep shape-corner-large');
+  is(cs(mapEl).borderBottomLeftRadius, '0px', 'and the bottom two lose it, or they notch the screen');
   is(w.getComputedStyle(mapEl, '::after').content, 'none', 'and no card edge');
   is(Math.round(r(mapEl).width), VW, 'the map is the full width of the window');
 
