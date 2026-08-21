@@ -488,7 +488,10 @@ async function desktop() {
      these three are siblings of `#map` and each has to add the card's own inset to its offset.
      **Which inset depends on the edge.** A box measuring from the trailing edge measures across the
      space between the two panes and takes `--seam`. Every other edge takes `--gap`. */
-  for (const [id, x, y] of [['legend', 12, 12], ['credit', 10, 8], ['paint', 48, 36]]) {
+  /* The legend's 30 is not a spacing choice. `#credit` sits at 8 and is one 14px line, so it owns
+     the band up to 22, and the legend used to start at 12 — inside it. The two only looked separate
+     while the map was wide enough for the credit to stay on its own side of it. */
+  for (const [id, x, y] of [['legend', 12, 30], ['credit', 10, 8], ['paint', 48, 36]]) {
     const e = r(d.getElementById(id));
     const lead = id === 'legend';
     const off = lead ? Math.round(e.left) : Math.round(VW - e.right);
@@ -831,6 +834,28 @@ async function bands() {
        odd window is a half pixel. */
     is(Math.abs(mw + pw + gap + seam - px) <= 1, true,
        label + ': and the map takes the rest, less its leading gap and its trailing seam');
+
+    /* **The map furniture has to clear ITSELF, not just the pane.** Every box down there adds
+       `--pane-w`, so none of them ever reaches the supporting pane, and that is all this check used
+       to ask. They were still colliding with each other as the map narrowed: measured at 840px the
+       credit line ran 191px in under the legend, and at 700px the layer button sat on the legend,
+       60px by 60. Nothing else in this app could see it, because each box was correct on its own.
+       Read every visible box in the bottom strip and intersect them pairwise. A box with no size is
+       skipped rather than counted, since `#pills` and `#toast` are absent unless something puts
+       them there. */
+    const FURNITURE = ['#legend', '#paint', '#credit', '#pills', '#toast',
+                       '.leaflet-control-zoom', '.leaflet-control-scale'];
+    const boxes = FURNITURE.map(sel => [sel, d.querySelector(sel)])
+      .filter(([, e]) => e && r(e).width > 1 && r(e).height > 1)
+      .map(([sel, e]) => [sel, r(e)]);
+    const clashes = [];
+    for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) {
+      const [an, a] = boxes[i], [bn, b] = boxes[j];
+      const ox = Math.min(a.right, b.right) - Math.max(a.left, b.left);
+      const oy = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
+      if (ox > 0.5 && oy > 0.5) clashes.push(`${an} x ${bn} ${Math.round(ox)}x${Math.round(oy)}`);
+    }
+    is(clashes.join(', '), '', label + ': no two boxes on the map overlap each other');
     is(Math.round(r(pane).left - r(d.getElementById('map')).right), seam,
        label + ': one seam between the two panes');
     d.body.classList.remove('side');

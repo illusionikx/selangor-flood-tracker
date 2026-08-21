@@ -1272,9 +1272,27 @@ body.side #bar { display: none; }
 
 /* --- heatmap legend ------------------------------------------------------------------------- */
 
+/* **The bottom strip holds three things and they have to clear each other, not just the pane.**
+   Every box down here already adds `--pane-w`, so none of them ever reaches the supporting pane. They
+   were still colliding with EACH OTHER as the map narrowed, and a sweep across the range measured
+   it: at 840px the credit line ran 191px in under the legend, and at 700px the layer button sat on
+   top of it, 60px by 60.
+
+   **`bottom` clears the credit line rather than matching it.** `#credit` sits at `8px + --gap` and
+   is one 14px line, so it owns the band up to `22px + --gap`. The legend used to start at `12px`,
+   which is inside that band, and the two only looked separate while the map was wide enough for the
+   credit to stay on its own side. 30px puts the legend 8px above it at every width.
+
+   **`max-width` is what keeps it off the layer button.** The box states 288px for the heat ramp,
+   which has no intrinsic width. In M3's medium band the map is 289 to 408px wide, so 288 leaves
+   nothing for the cluster in the other corner. The cap is the window less the pane, the seam, this
+   box's own leading inset, and the 116px the layer button and the zoom control reach in from the
+   trailing edge. It only bites below about 950px. The legend already wraps: `.wxkey` is measured
+   good in a 210px box. */
 #legend {
   position: absolute; z-index: 400;
-  left: calc(12px + var(--gap)); bottom: calc(12px + var(--gap)); width: 288px;
+  left: calc(12px + var(--gap)); bottom: calc(30px + var(--gap)); width: 288px;
+  max-width: calc(100vw - var(--pane-w) - var(--seam) - var(--gap) - 128px);
   margin-top: 10px; padding: 12px 14px; border-radius: 12px;
 }
 /* The heat sections are sized by their ramp, and a ramp has no intrinsic width, so the box has to
