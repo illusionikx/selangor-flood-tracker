@@ -349,6 +349,17 @@ export function openSide(key, html, mastAt) {
   const head = body.querySelector('.pophead');
   el('sideTitle').replaceChildren(...[head?.querySelector('.popname')].filter(Boolean));
   el('sideActions').replaceChildren(...(head ? head.querySelectorAll(':scope > .dots, :scope > .menu') : []));
+  /* **The region line is the app bar's supporting text.** `#sideHead` is M3's medium flexible top
+     app bar now, and that component states a headline over an optional line under it. The card's
+     own muted line is what that has always been: `Shah Alam, Selangor` under a station name, the
+     accuracy radius under "Your Location", the point and its distance under a weather place.
+     `:scope > .muted` and not `.muted`, because the alert list writes `· nearest first` INSIDE its
+     `.popname`. A descendant search lifts that fragment out of the title it belongs to. */
+  el('sideSub').replaceChildren(...[head?.querySelector(':scope > .muted')].filter(Boolean));
+  /* Three of the five cards put nothing else in `.pophead`, so the split empties it. An empty seam
+     still draws its own bottom margin, which is 16px of nothing over the first reading. `:empty`
+     cannot see this: the template leaves whitespace text nodes behind. */
+  if (head && !head.firstElementChild) head.remove();
   if (moved) body.scrollTop = 0;   // a refresh of the same station keeps your place in it
   /* Clicking a second pin swaps text inside a panel that does not move, and one card of readings
      looks much like the next — so the swap is announced with a short wipe. Only on a real change of

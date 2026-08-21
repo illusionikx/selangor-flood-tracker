@@ -27,7 +27,7 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `title-test.html` | `chrome --headless --dump-dom` — one of seven runnable checks. Guards the app bar wordmark ladder, in rendered pixels |
 | `narrow-test.html` | `chrome --headless --dump-dom` — one of seven runnable checks. Guards the narrow-window block: its threshold, its coverage, its refusal to be dismissed, and that it is modal |
 | `paint-check.html` | `chrome --headless --dump-dom` — one of seven runnable checks. Guards the on-map paint chooser: that it reads as a control and not as a map pin, that its two layers and the four boxes nested under `Stations` sit where they belong, that each section holds one choice at a time, that it clears the zoom cluster at both widths, and that below 600px its panel is an M3 bottom sheet whose drag handle has a real swipe behind it |
-| `m3-check.html` | `chrome --headless --dump-dom` — one of seven runnable checks. Guards every M3 surface in rendered pixels: the eight dialogs against the roll call and the kind each is declared as, the four-band ladder, the map as an inset card, the one motion that changes what the pane holds, the supporting pane at M3's canonical ratios with the map giving up exactly that width, the pane as a side sheet above 600px and a full-screen dialog below it, and each station section as a filled card. Also that every enter carries M3's own duration and easing |
+| `m3-check.html` | `chrome --headless --dump-dom` — one of seven runnable checks. Guards every M3 surface in rendered pixels: the eight dialogs against the roll call and the kind each is declared as, the four-band ladder, the map as an inset card, the one motion that changes what the pane holds, both pane headers as M3's medium flexible top app bar, the supporting pane at M3's canonical ratios with the map giving up exactly that width, the pane as a side sheet above 600px and a full-screen dialog below it, and each station section as a filled card. Also that every enter carries M3's own duration and easing |
 | `css/icons.css` | every icon, as an SVG mask. Generated — see docs/FEATURES.md for the fetch |
 | `css/base.css` | tokens, reset, controls, blocks shared by popup + alert panel |
 | `css/chrome.css` | page furniture: app bar, status dot, drawer, legend, splash |
@@ -981,17 +981,39 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
   is fixed to the right edge while the map moves under it. So the card's title carries `data-go`
   (`goName()` in `popup.js`) as the way back to the pin. A bare ring says "here" without saying
   what "here" is. Anything that wants a *persistent* label on the map is the thing this rule forbids.
-- **The card arrives as one string and THREE pieces of it move.** `#side` is an M3 side sheet, and
-  that component's header is a title with its trailing actions. So `openSide()` takes the `.popname`
-  into `#sideTitle`, the `.dots` and the popover it targets into `#sideActions`, and leaves the
-  region line and the sensor badges in `.pophead` at the top of the body. M3 puts supporting content
-  there, not in the header.
-  **The × is a flex item in that row now.** It used to float over the card's top-right corner, and
+- **Both headers in the pane are M3's MEDIUM FLEXIBLE top app bar, and each was something else
+  before.** `#sideHead` was the side sheet header, 64px with a `title-large` title on the icons' own
+  row. `#barHead` was that above 600px and the full-screen dialog's 56px bar below it. A reader asked
+  for one headline across the pane, at `headline-medium`, on 2026-08-21. So both take one component
+  at both widths. The numbers are `AppBar/app-bar.css`'s own:
+
+      112px container, in two rows
+      top row     min-height 56px, padding 8px 4px 0, align-items flex-start, a flex: 1 spacer
+      label block min-height 56px, padding 0 16px 12px, bottom aligned, gap 4px
+      headline    headline-medium, 28px on 36px
+      supporting  body-medium, 14px on 20px at weight 500, in on-surface-variant
+
+  **`__flex-content` and `__label-block` are one box here.** The reference nests them and cancels the
+  inner one's inline padding. Nothing else sits in the outer box, so this states one set of numbers.
+  **`min-height`, not `height`, because the headline wraps.** The reference truncates with an
+  ellipsis. This app does not, and that rule is older: a station name cut in half names another
+  station. M3 Expressive states a two-line form for this variant, so a grown bar stays in the family.
+- **The card arrives as one string and FOUR pieces of it move.** `openSide()` takes the `.popname`
+  into `#sideTitle`, the `.dots` and the popover it targets into `#sideActions`, the region line into
+  `#sideSub`, and leaves the sensor badges in `.pophead` at the top of the body.
+  **The region line moved up on the same instruction, and that reverses an entry.** It stayed in the
+  body because M3 puts supporting content there. That is the SIDE SHEET's rule. An app bar states a
+  headline and an optional line under it, and this line always was that: `Shah Alam, Selangor` under
+  a station name, the accuracy radius under "Your Location", the point and its distance under a
+  weather place.
+  **It is `:scope > .muted`, never `.muted`.** The alert list writes `· nearest first` INSIDE its own
+  `.popname`. A descendant search lifts that fragment out of the title it belongs to.
+  **Three of the five cards then leave `.pophead` empty, so `openSide()` removes it.** An empty seam
+  still draws its own 16px of bottom margin over the first reading. `:empty` cannot see it, because
+  the template leaves whitespace text nodes behind. The test is `!head.firstElementChild`.
+  **The × is a flex item in that row.** It used to float over the card's top-right corner, and
   three numbers in `css/map.css` existed to work around it: the name was padded clear of it and the
   ⋮ was placed against it. A header row places all three by itself and those numbers are gone.
-  The header is `min-height: 64px`, `align-items: center`, `padding: 8px 12px 8px 16px`, with the
-  title at `title-large` in `on-surface-variant`. The body is `padding: 12px 24px`. Every one of
-  those is `SideSheet/side-sheet.css`'s own.
   **`.pophead` is still the seam and still the card's first element.** Only the slice taken from it
   changed. Anything that reshapes `sitePopup()` has to keep `.popname` inside `.pophead`, or the
   header empties and the name buries itself in the body — a fault nothing else in this app notices.
@@ -1151,10 +1173,14 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
 - **The compact variant puts the close X on the LEADING edge, which is the opposite of the side
   sheet it is at every other width.** M3's full-screen dialog anatomy is close, then headline, then
   the trailing actions. `order: -1` on the button rather than `row-reverse` on the row: reversing
-  puts the trailing actions between the X and the title. **One number holds every full-screen app bar
-  in this app, and it is 8px to the close button.** `#barHead` needs `margin: 0 -6px 4px` to reach
-  it, because `#bar` carries 6px of its own — the same cancel `.docbox .modalhead .dclose` and
-  `.dtop .modalhead .dclose` already do.
+  puts the trailing actions between the X and the title. `.apsp`, the app bar's own spacer, is what
+  the order moves the button past.
+  **One number holds every full-screen app bar in this app, and it is 28px to the close GLYPH.** It
+  used to read as 8px to the button box, and the two say the same thing about the four dialogs, which
+  put 8px of padding around a 40px target. The pane's app bar puts 4px around a 48px one. Both land
+  the glyph centre on 28. **So assert the centre, never the box edge**, or a correct bar reads as
+  broken the moment its target grows. `.docbox .modalhead .dclose` and `.dtop .modalhead .dclose` are
+  the two cancels still written against the 8px form.
 - **The bottom sheet is gone again, and the reversal is the entry.** The two panels were modal bottom
   sheets for one revision, on the argument that a panel reporting on the map behind it has to keep
   that map in view. **That argument describes a sheet somebody opens over content they are still
@@ -2551,8 +2577,9 @@ it. The weather section stretches nothing. It is five fixed keys measuring 231px
   own page on m3.material.io. Every number this app takes from M3 comes out of one of them, so it
   can be grepped against a real file rather than eyeballed. `css/base.css` carries M3's shape,
   elevation and motion tokens under their own names for the same reason.
-  **Three components, six variants, and each surface declares which it is.** Dialogs are full-screen
-  or basic. Sheets are side or bottom. `m3-check.html` holds the roll call.
+  **Four components, seven variants, and each surface declares which it is.** Dialogs are
+  full-screen or basic. Sheets are side or bottom. The supporting pane's two headers are the top app
+  bar's medium flexible variant, at both widths. `m3-check.html` holds the roll call.
   **The window is M3's supporting-pane canonical layout**, and the numbers come from that page:
   https://m3.material.io/foundations/layout/canonical-examples/supporting-pane
   `#map` is the main pane and `#pane` is the supporting one. `#pane` holds one of three occupants at
@@ -3220,8 +3247,11 @@ printf("rows: %d, points: %d, newest: %s\n",
 # written outside the media query moves the desktop, where nothing is meant to move. And a variant
 # with no scrim has to keep a way out, which is now the close X and Escape alone. Reads PASS.
 "/c/Program Files/Google/Chrome/Application/chrome.exe" --headless=new --disable-gpu \
-  --ignore-certificate-errors --virtual-time-budget=40000 --window-size=1600,1000 --dump-dom \
+  --ignore-certificate-errors --virtual-time-budget=180000 --window-size=1600,1000 --dump-dom \
   https://flood-exp.test/m3-check.html | perl -0777 -ne 'print $1 if /<pre id="out">(.*?)<\/pre>/s'
+# **A short budget TRUNCATES this check rather than failing it.** At 120000 it stopped as the desktop
+# pass started, after 122 of 274 assertions, with nothing failed and no verdict printed. Read the
+# last line: no `PASS` means the run did not finish, whatever the counts above it say.
 
 # The app bar wordmark ladder, in rendered pixels. Loads the app in an iframe at fifteen widths and
 # asserts one spelling at a time, never wider than its rail, and never a longer spelling on a

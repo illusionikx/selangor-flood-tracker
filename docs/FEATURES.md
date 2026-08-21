@@ -12281,3 +12281,85 @@ swap must run for exactly as long as the occupant swap, on the same curve.
 
 It also asserts the incoming occupant does not scale. That is the first declaration a revert
 brings back.
+
+## Both pane headers became M3 top app bars
+
+The supporting pane holds three occupants and each one carries a headline. The station card and the
+weather card share `#sideHead`. The filters carry `#barHead`.
+
+Those two headers came from two different components. `#sideHead` was the side sheet header, 64px
+with a `title-large` title on the icons' own row. `#barHead` was that above 600px, and the
+full-screen dialog's 56px bar below it. So one pane held three headline sizes: 22px, 16px and 18px.
+
+A reader asked for one headline across the pane, at `headline-medium`, from the app bar guideline.
+
+### The medium flexible variant
+
+The numbers come from `AppBar/app-bar.css` in the M3 Expressive component set, which cites
+`m3.material.io/components/app-bars`.
+
+| part | value |
+|---|---|
+| container | 112px, a column of two rows |
+| top row | `min-height: 56px`, `padding: 8px 4px 0`, `align-items: flex-start` |
+| spacer | one `flex: 1` child, which puts the actions on the trailing edge |
+| label block | `min-height: 56px`, `padding: 0 16px 12px`, bottom aligned, `gap: 4px` |
+| headline | `headline-medium`, 28px on 36px, in `on-surface` |
+| supporting text | `body-medium`, 14px on 20px at weight 500, in `on-surface-variant` |
+
+The reference nests a flex-content box and a label block, then cancels the inner one's inline
+padding. Nothing else sits in the outer box, so this app states one set of numbers.
+
+### Every button stayed, and the slots grew to hold them
+
+The station card keeps its ⋮ and its ×. The filters keep their ×. All three sit in the top row now,
+which is where the app bar puts its leading and trailing actions.
+
+M3 gives those slots a 48px minimum. This app draws a 40px `.icon` everywhere else, so the slot
+widened here and the button did not.
+
+### The close glyph did not move, and the arithmetic is why
+
+Below 600px the pane is a full-screen destination, so the close leads. It used to sit 8px in, inside
+a 40px target. The app bar puts 4px of padding around a 48px target.
+
+Both land the glyph centre on 28px. So nothing moved on screen, and `m3-check.html` asserts the
+centre rather than either box edge.
+
+### The region line became the subtitle
+
+`popup.js` builds the card as one string. Its first element is `.pophead`, and `openSide()`
+splits that element. It took three pieces before and takes four now.
+
+The fourth is the card's own muted line. Under a station name it reads `Shah Alam, Selangor`. Under
+"Your Location" it reads the accuracy radius. Under a weather place it names the MET point and its
+distance. That line was always a subtitle, and the app bar has a slot for one.
+
+It stayed in the body before, because M3 puts supporting content there. **That is the side sheet's
+rule, and the app bar states the opposite.** The sensor badges are what stay.
+
+The selector is `:scope > .muted`. The alert list writes `· nearest first` inside its own
+`.popname`, and a descendant search lifts that fragment out of the title it belongs to.
+
+Three of the five cards then leave `.pophead` empty, so `openSide()` removes it. An empty seam still
+draws 16px of bottom margin over the first reading. `:empty` cannot see it, because the template
+leaves whitespace text nodes behind.
+
+The filters panel gets no subtitle. M3 makes it optional, and `#shown` already states at the foot
+of that body what a subtitle repeats at the top.
+
+### One divergence, and it is older than this change
+
+The reference truncates its headline with an ellipsis. This app wraps instead. A station name cut in
+half names another station.
+
+So the container states `min-height` rather than `height`, and a long name takes a second 36px line.
+M3 Expressive states a two-line form for this variant, so a grown bar stays inside the family.
+
+### A short run truncates the check rather than failing it
+
+`m3-check.html` grew past its documented virtual-time budget during this work. At 120000 it stopped
+as the desktop pass started, after 122 of 274 assertions, with nothing failed.
+
+Read the last line of the output. No `PASS` means the run did not finish, whatever the counts above
+it say. The budget is 180000 now.

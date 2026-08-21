@@ -66,6 +66,16 @@
      for one motion. `sideSwap` is the one they named. A reader who meets two motions in one box
      counts two events. */
   --m3-swap: 220ms var(--md-sys-motion-easing-emphasized);
+
+  /* M3's type scale, the two rungs the supporting pane's app bar reads. The medium flexible top app
+     bar sets its headline to `headline-medium` and its supporting text to `body-medium` at weight
+     500. Those two names are the whole of what this app needs from that scale, so those two are what
+     it carries. https://m3.material.io/styles/typography/type-scale-tokens */
+  --md-sys-typescale-headline-medium-size: 28px;
+  --md-sys-typescale-headline-medium-line-height: 36px;
+  --md-sys-typescale-body-medium-size: 14px;
+  --md-sys-typescale-body-medium-line-height: 20px;
+  --md-sys-typescale-body-medium-tracking: .25px;
   /* **The supporting pane's width is a RATIO of the window, and M3's canonical layout sets it.**
      https://m3.material.io/foundations/layout/canonical-examples/supporting-pane
      Medium splits the space equally. Expanded gives 70% to the main pane and 30% to the supporting

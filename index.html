@@ -70,8 +70,8 @@
 <link rel="stylesheet" href="vendor/markercluster.css">
 <link rel="stylesheet" href="vendor/fonts.css?v=51">
 <link rel="stylesheet" href="css/icons.css?v=94">
-<link rel="stylesheet" href="css/base.css?v=153">
-<link rel="stylesheet" href="css/chrome.css?v=211">
+<link rel="stylesheet" href="css/base.css?v=154">
+<link rel="stylesheet" href="css/chrome.css?v=212">
 <link rel="stylesheet" href="css/map.css?v=158">
 
 <!-- Water tint for the dark basemap. CARTO's dark_all is greyscale — all 18 of its tones have zero
@@ -955,11 +955,22 @@
        one string whose first element is `.pophead` — that seam has not moved — and this splits it:
        the name becomes the sheet's title, the ⋮ becomes its trailing action, and the region and the
        sensor badges stay in the body where M3 puts supporting content. -->
+  <!-- M3's medium flexible top app bar: a 56px row of icons, then the label block bottom-aligned
+       under it. `.apsp` is the reference's own spacer, and it is what puts the actions on the
+       trailing edge here and lets the close lead below 600px with one `order`. -->
   <div id="sideHead">
-    <div id="sideTitle"></div>
-    <div id="sideActions"></div>
-    <button id="sideClose" class="icon" title="Close" aria-label="Close"
-      ><i class="i i-close"></i></button>
+    <div class="apptop">
+      <span class="apsp"></span>
+      <div id="sideActions"></div>
+      <button id="sideClose" class="icon" title="Close" aria-label="Close"
+        ><i class="i i-close"></i></button>
+    </div>
+    <div class="apflex">
+      <div id="sideTitle"></div>
+      <!-- The app bar's supporting text. `openSide()` fills it from the card's own region line,
+           which used to stay in the body. A subtitle is what that line always was. -->
+      <div id="sideSub"></div>
+    </div>
   </div>
   <div id="sideBody" class="scroll"></div>
 </aside>
@@ -974,9 +985,14 @@
        The close button leads on a side sheet and trails on nothing — M3 puts a side sheet's close on
        the trailing edge, and the CSS places it. -->
   <div id="barHead">
-    <h2>Layers and filters</h2>
-    <button id="barClose" class="icon" title="Close" aria-label="Close"
-      ><i class="i i-close"></i></button>
+    <div class="apptop">
+      <span class="apsp"></span>
+      <button id="barClose" class="icon" title="Close" aria-label="Close"
+        ><i class="i i-close"></i></button>
+    </div>
+    <!-- No supporting text. M3 makes it optional, and this panel has nothing to say under its own
+         name that `#shown` does not already say at the foot of the body. -->
+    <div class="apflex"><h2>Layers and filters</h2></div>
   </div>
   <!-- The scrolling box, and the header above it does not scroll. Two boxes rather than one, which
        is the shape `#side` already uses: `#barHead` is `flex: none` and this takes the rest. The

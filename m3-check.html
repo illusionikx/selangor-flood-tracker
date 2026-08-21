@@ -38,7 +38,7 @@
 
   Run:
     chrome --headless=new --disable-gpu --ignore-certificate-errors \
-      --virtual-time-budget=45000 --window-size=1600,1000 --dump-dom \
+      --virtual-time-budget=180000 --window-size=1600,1000 --dump-dom \
       https://flood-exp.test/m3-check.html
 -->
 <style>
@@ -273,16 +273,21 @@ async function phone() {
     is([b.top, b.left, b.width, b.height].map(Math.round).join(','), '0,0,' + VW + ',' + VH,
        name + ': fills the screen, app bar included');
     is(cs(pane).borderTopLeftRadius, '0px', name + ': M3 0dp corner');
-    /* M3's full-screen dialog anatomy: the close X leads and the headline follows it. That is the
-       OPPOSITE of the side sheet header this same markup draws above 600px, where the close trails.
-       `order`, not `row-reverse`: reversing the row puts the trailing actions between the X and the
-       title, and M3 keeps them at the far end. */
+    /* **The header is M3's medium flexible top app bar at BOTH widths, and only the close moves.**
+       A full-screen dialog puts its X on the leading edge, where the side sheet above 600px trails
+       it. `order`, not `row-reverse`: reversing the row puts the trailing actions between the X and
+       the title, and M3 keeps them at the far end.
+       **Assert the glyph CENTRE, never the box edge.** The app bar's top row is 4px of padding
+       around a 48px target. The other four full-screen dialogs are 8px around a 40px one. Both land
+       the glyph on 28px, so the centre is the fact that survives either convention. */
     const hd = d.querySelector(id === 'bar' ? '#barHead' : '#sideHead');
     const x = d.getElementById(id === 'bar' ? 'barClose' : 'sideClose');
-    is(Math.round(r(hd).height), 56, name + ': M3 56dp app bar');
-    is(Math.round(r(x).left), 8, name + ': its close X leads at 8px, as this variant states');
-    is(r(x).right < r(hd.querySelector(id === 'bar' ? 'h2' : '#sideTitle')).left, true,
-       name + ': and the headline follows it');
+    const xr = r(x);
+    is(Math.round(r(hd).height) >= 112, true, name + ': M3 112dp medium flexible app bar');
+    is(Math.round((xr.left + xr.right) / 2), 28,
+       name + ': its close X leads, with the glyph 28px in as every full-screen bar here has it');
+    is(Math.round(xr.bottom) <= Math.round(r(hd.querySelector('.apflex')).top), true,
+       name + ': and the headline sits on the row under it, which is what makes this the medium bar');
     is(cs(pane).boxShadow, 'none', name + ': and no elevation');
     is(w.getComputedStyle(pane, '::backdrop').backgroundColor, 'rgba(0, 0, 0, 0)',
        name + ': no scrim, which M3 leaves out of this variant');
@@ -520,12 +525,13 @@ async function desktop() {
      'shut again, the map takes the width straight back, less its own two insets');
   d.body.classList.add('side');
   await settled();
-  /* --- the header is M3's side sheet header, filled by the real openSide() split ---
-     Transcribed from SideSheet/side-sheet.css: `min-height: 64px`, `align-items: center`,
-     `padding: 8px 12px 8px 16px`, a `flex: 1` title in `title-large`, and the body at
-     `padding: 12px 24px`.
+  /* --- the header is M3's medium flexible top app bar, filled by the real openSide() split ---
+     Transcribed from AppBar/app-bar.css: a 112px container, a 56px `__top-row` at
+     `padding: 8px 4px 0`, and a `__flex-content` under it at `min-height: 56px`,
+     `padding-inline: 16px`, `padding-bottom: 12px`, bottom aligned, `gap: 4px`. The headline takes
+     `headline-medium` and the supporting text `body-medium` at weight 500.
      **The split is the part that can break silently.** The card is built as one string whose first
-     element is `.pophead`, and `openSide()` takes three pieces out of it. A template change that
+     element is `.pophead`, and `openSide()` takes FOUR pieces out of it now. A template change that
      renames or reorders any of them leaves the header empty and the name buried in the body, and
      nothing else in this app would notice. */
   await inFrame(d, OPEN_CARD);
@@ -535,16 +541,39 @@ async function desktop() {
   is(!!sa.querySelector('.dots'), true, 'and the ⋮ in the trailing actions');
   is(!!sa.querySelector('.menu'), true, 'with the popover it targets, or the button opens nothing');
   is(!!d.querySelector('#sideBody .pophead .popname'), false, 'the name is not left in the body too');
-  is(!!d.querySelector('#sideBody .pophead > .muted'), true, 'the region stays in the body');
-  is(!!d.querySelector('#sideBody .pophead .badges'), true, 'and so do the sensor badges');
-  is(Math.round(r(sh).height) >= 64, true, 'M3 64dp side sheet header');
-  is(cs(sh).alignItems, 'center', 'a header row, not a card head with a button over its corner');
-  is(cs(sh).padding, '8px 12px 8px 16px', 'M3 side sheet header padding');
-  is(cs(st.querySelector('.popname')).fontSize, '22px', 'title-large headline');
-  is(cs(st.querySelector('.popname')).color, cs(d.querySelector('#sideBody .muted')).color,
-     'in on-surface-variant, the same ink the supporting line takes');
+  /* **The region line is the app bar's supporting text now, so it goes UP with the name.** It used
+     to stay in the body on the argument that M3 puts supporting content there. That is the side
+     sheet's rule. The app bar states a headline and an optional line under it, and this line always
+     was that. The badges are the ones that stay. */
+  is(!!d.getElementById('sideSub').querySelector('.muted'), true,
+     'the region line becomes the app bar supporting text');
+  is(!!d.querySelector('#sideBody .pophead > .muted'), false, 'and it is not left in the body too');
+  is(!!d.querySelector('#sideBody .pophead .badges'), true, 'the sensor badges do stay there');
+  const top = sh.querySelector('.apptop'), flex = sh.querySelector('.apflex');
+  is(Math.round(r(sh).height) >= 112, true, 'M3 112dp medium flexible app bar');
+  is(Math.round(r(top).height) >= 56, true, 'a 56px top row for the icons');
+  is(cs(top).padding, '8px 4px 0px', 'at M3 __top-row padding');
+  is(cs(top).alignItems, 'flex-start', 'with the icons held at its own top edge');
+  is(Math.round(r(flex).height) >= 56, true, 'and a 56px label block under it');
+  is(cs(flex).padding, '0px 16px 12px', 'at M3 __flex-content padding');
+  is(cs(flex).justifyContent, 'flex-end', 'bottom aligned, which is what puts the name on the seam');
+  is(cs(flex).rowGap, '4px', 'and the medium variant gap between the two lines');
+  is(cs(st.querySelector('.popname')).fontSize, '28px', 'headline-medium');
+  is(cs(st.querySelector('.popname')).lineHeight, '36px', 'at its own line height');
+  is(cs(st.querySelector('.popname')).color, cs(d.body).color,
+     'in on-surface: an app bar headline names the screen, where a side sheet title labels a panel');
+  const sub2 = d.querySelector('#sideSub .muted');
+  is(cs(sub2).fontSize, '14px', 'the supporting text is body-medium');
+  is(cs(sub2).fontWeight, '500', 'at the weight M3 states for it');
+  /* Against `#shown`, not against a `.muted` in this card's body: the region line was the only one
+     there and it has moved up here. `getComputedStyle` resolves `color` on a `display: none`
+     element, so the drawer being the pane's other occupant costs nothing. */
+  is(cs(sub2).color, cs(d.getElementById('shown')).color, 'in on-surface-variant');
   is(cs(sc2).position, 'static', 'the × is a flex item, so nothing floats and nothing is padded');
-  is(Math.round(w.innerWidth - r(sc2).right), 12, 'and it sits on the header padding, 12px in');
+  /* Trailing, and read as a glyph centre for the reason the compact block states. 4px of top-row
+     padding around a 48px target puts it 28px in from the window edge. */
+  is(Math.round(w.innerWidth - (r(sc2).left + r(sc2).right) / 2), 28,
+     'and its glyph sits 28px in from the trailing edge');
   is(cs(d.getElementById('sideBody')).padding, '12px 24px', 'M3 side sheet body padding');
 
   /* --- each sensor section is an M3 FILLED CARD ---
@@ -589,12 +618,15 @@ async function desktop() {
   d.body.classList.remove('side'); d.body.classList.add('drawer');
   const bh = d.getElementById('barHead');
   is(cs(bh).display, 'flex', 'the side sheet carries a header, which M3 says it does');
-  /* **Exactly 64, not at least 64.** This read `>= 64` and a `<h2>` carrying the UA's own `0.83em`
-     block margin drew an 86px header under it for a whole revision. `#sideHead` beside it was 64,
-     and nothing here could see the difference because no check ever put the two side by side. */
-  is(Math.round(r(bh).height), 64, 'M3 64dp side sheet header');
-  is(cs(bh.querySelector('h2')).fontSize, '22px', 'with a title-large headline');
+  /* **112, and the `<h2>` keeps no margin.** This read `>= 64` while the header was a side sheet's,
+     and a `<h2>` carrying the UA's own `0.83em` block margin drew an 86px box under it for a whole
+     revision. `#sideHead` beside it was 64, and nothing here saw the difference because no check
+     ever put the two side by side. Both are the same app bar now, so both are asserted the same. */
+  is(Math.round(r(bh).height), 112, 'M3 112dp medium flexible app bar');
+  is(cs(bh.querySelector('h2')).fontSize, '28px', 'with a headline-medium headline');
   is(cs(bh.querySelector('h2')).marginTop, '0px', 'and the heading keeps no UA margin of its own');
+  is(cs(bh.querySelector('h2')).fontSize, cs(d.querySelector('#sideTitle .popname')).fontSize,
+     'which is the same headline the station panel takes, this pane having one');
   /* **Both occupants are a fixed header over a scrolling body, and the drawer was one box doing
      both.** So its own title scrolled away with the sections under it, and the fade through's
      `scale` ran on a scroll container in one occupant and a static flex column in the other. Assert

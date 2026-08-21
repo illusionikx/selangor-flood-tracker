@@ -1443,26 +1443,77 @@ body.side #side { display: flex; }
    three by itself, and those numbers are gone.
    `#sideTitle` takes the slack and `#sideActions` holds the ⋮, so the row reads title, actions,
    close — the order M3 draws. */
-/* **Both occupants wear it, so it is one rule.** They were two, and the drawer's copy carried a
-   negative margin to bleed across a padding only its own box had. That padding sits on `#barBody`
-   now, so there is nothing left to cancel and the two headers are the same box. */
+/* **Both headers are M3's MEDIUM FLEXIBLE top app bar, transcribed from `AppBar/app-bar.css`:**
+   https://github.com/bczak/m3you/blob/development/src/components/AppBar/app-bar.css
+   https://m3.material.io/components/app-bars/overview
+
+       .md-app-bar[data-variant="medium"] { height: 112px; }
+       .md-app-bar__top-row     { display: flex; min-height: 56px;
+                                  align-items: flex-start; padding: 8px 4px 0; }
+       .md-app-bar__spacer      { flex: 1; }
+       .md-app-bar__flex-content[data-variant="medium"] {
+                                  display: flex; flex-direction: column;
+                                  justify-content: flex-end; min-height: 56px;
+                                  padding-inline: 16px; padding-bottom: 12px; }
+       .md-app-bar__label-block[data-variant="medium"] { gap: 4px; }
+       headline        -> headline-medium
+       supporting text -> body-medium at weight 500, on-surface-variant
+
+   **`__flex-content` and `__label-block` are one box here.** The reference nests them and then
+   cancels the inner one's inline padding. Nothing else sits in the outer box, so the two resolve to
+   one set of numbers and this states them once.
+
+   **They were the SIDE SHEET header before, and a reader moved them.** That component gives 64px,
+   `title-large` and a title on the icons' own row. The app bar gives 112px in two rows, and it is
+   what M3 puts at the top of a full-screen destination. Both headers take it at both widths.
+
+   **`min-height`, not `height`, and the wrap is why.** The reference truncates its headline with an
+   ellipsis. This app does not, and the reason is older than this change: a station name cut in half
+   names another station. So a long name takes a second 36px line and the bar grows. M3 Expressive
+   states a two-line form for this variant, so a grown bar is inside the family. */
 #barHead, #sideHead {
-  flex: none; display: flex; align-items: center; gap: 4px;
-  min-height: 64px; padding: 8px 12px 8px 16px;
+  flex: none; display: flex; flex-direction: column;
+  min-height: 112px;
+  background: var(--surface); color: var(--on-surface);
 }
-#sideTitle { flex: 1; min-width: 0; }
-/* `title-large` at `on-surface-variant`, which is `--muted` here. It wraps rather than truncating:
-   M3 states no truncation for this title, and a station name cut in half names another station. */
-#sideTitle .popname {
-  font-size: 22px; font-weight: 400; line-height: 1.27; color: var(--muted);
+.apptop {
+  display: flex; align-items: flex-start; gap: 4px;
+  min-height: 56px; padding: 8px 4px 0;
 }
-#sideActions { flex: none; display: flex; align-items: center; }
+/* M3's own `__spacer`. One flex child holding the slack, so the actions trail above 600px and the
+   close leads below it on `order` alone. */
+.apsp { flex: 1; }
+/* M3 gives the leading and trailing slots a 48px minimum. This app's `.icon` is 40px everywhere
+   else, so the slot is widened here rather than the button. */
+.apptop > .icon, .apptop > * > .dots { width: 48px; height: 48px; }
+.apflex {
+  display: flex; flex-direction: column; justify-content: flex-end; gap: 4px;
+  min-width: 0; min-height: 56px; padding: 0 16px 12px;
+}
+#sideTitle { min-width: 0; }
+/* `headline-medium`, in `on-surface`. It was `title-large` in `--muted`: an app bar headline is the
+   screen's own name and takes the full ink, where a side sheet title is a label over a panel. */
+#sideTitle .popname, #barHead h2 {
+  margin: 0; font-weight: 400; color: var(--on-surface);
+  font-size: var(--md-sys-typescale-headline-medium-size);
+  line-height: var(--md-sys-typescale-headline-medium-line-height);
+}
+/* `body-medium` at weight 500, in `on-surface-variant`. **The size has to be restated.** `.muted`
+   carries `font-size: 12px` as well as the colour, and a declaration on the element beats anything
+   the context passes down — the same trap the rain chart's axis labels already document. */
+#sideSub, #sideSub .muted {
+  font-weight: 500; color: var(--muted);
+  font-size: var(--md-sys-typescale-body-medium-size);
+  line-height: var(--md-sys-typescale-body-medium-line-height);
+  letter-spacing: var(--md-sys-typescale-body-medium-tracking);
+}
+#sideSub:empty { display: none; }
+#sideActions { display: flex; align-items: center; }
 /* The menu is a popover and takes no space in the row; only the button does. */
 #sideActions .dots { position: static; width: 40px; height: 40px; margin: 0; font-size: 22px; }
 /* An empty header still draws its own height, and it must not: a card with no name would leave a
    64px band of nothing over the readings. */
 #sideHead:has(#sideTitle:empty) { display: none; }
-#sideClose { flex: none; }
 /* M3's side sheet body: `flex: 1; overflow-y: auto; padding: 12px 24px`. The 24px is the
    reference's own and replaces this app's 16, because the header above it now carries M3's
    padding too and two different insets in one sheet is the thing this pass exists to remove. */
@@ -2662,10 +2713,6 @@ body.finding #find { display: none; }
      that the hamburger which opened it stayed on screen — true, and it still left the panel
      unnamed. M3's side sheet has a header, so it has one.
      `#sideHead` is the same header, filled from the station card — see its own rules further up. */
-  /* `margin: 0`, and it is not tidiness. An `<h2>` keeps the UA's `0.83em` block margin, which at
-     22px is 18px above and below. So the header measured 86px against the 64 it asks for, and
-     against `#sideHead` beside it. `css/base.css` resets `h1` and no other heading. */
-  #barHead h2 { flex: 1; margin: 0; font-size: 22px; font-weight: 400; color: var(--muted); }
 }
 
 /* --- full-screen dialog, <= 600px ------------------------------------------------------------- */
@@ -2684,16 +2731,19 @@ body.finding #find { display: none; }
   /* Both occupants scroll in a body of their own, so both take the same compact inset. */
   #barBody { padding: 8px 16px 16px; }
 
-  /* **M3's full-screen dialog app bar, and both occupants wear it.** 56dp, the close X on the
-     LEADING edge, the headline after it. That is the variant's anatomy and it is the opposite of the
-     side sheet's, where the close trails. `order: -1` rather than `row-reverse`: reversing the row
-     puts the trailing actions between the X and the title, and M3 keeps them at the far end.
-     M3's 64px is a side sheet number. 56 is the app bar height a compact window uses.
-     8px in on the leading edge, which is the same start the other four full-screen dialogs use. */
-  #barHead, #sideHead { min-height: 56px; padding: 0 16px 0 8px; }
+  /* **The close leads here, and that is the only thing this width changes about the header.**
+     A full-screen dialog puts its X on the LEADING edge, which is the opposite of the side sheet the
+     same markup draws above 600px. `order: -1` and not `row-reverse`: reversing the row puts the
+     trailing actions between the X and the title, and M3 keeps them at the far end. `.apsp` is what
+     the order moves the button past.
+     **The bar keeps its 112px and its `headline-medium` at this width.** It used to drop to 56px and
+     16px, which is the full-screen dialog's own small app bar. A reader asked for one headline in
+     this pane, so there is one.
+     **The close glyph still lands 28px in, and it gets there a different way.** The app bar's top
+     row is 4px of padding around a 48px target. The other four full-screen dialogs are 8px around a
+     40px one. Both put the glyph's centre on 28. So nothing moved on screen, and `m3-check.html`
+     asserts the CENTRE rather than either box edge. */
   #barClose, #sideClose { order: -1; }
-  #barHead h2 { flex: 1; margin: 0; font-size: 16px; font-weight: 500; }
-  #sideTitle .popname { font-size: 18px; }
   #sideBody { padding: 8px 16px 16px; }
 }
 
