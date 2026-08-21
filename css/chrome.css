@@ -1592,8 +1592,12 @@ body:not(.ready) #bar, body:not(.ready) #side, body:not(.ready) #findpane { tran
    that. The step at 840 is 420 to 360 now rather than 420 to 252.
    **No cap at the top.** 30vw is 576px at 1920, which is past M3's 400dp side-sheet band. That band
    is written for a sheet over content. This is the supporting pane of a canonical layout, and the
-   ratio is what that page states. */
-@media (min-width: 840px) { :root { --pane: max(360px, 30vw); } }
+   ratio is what that page states.
+   **`--rail-w` comes off the window here too, for the reason `--pane`'s own comment in base.css
+   states: the rail is chrome, not a pane, so both panes split what is left after it.** The floor
+   still bites past 840px. The ratio still takes over once 30% of the remaining width passes it —
+   now at 1296px rather than 1200, since the rail is 96px of the width that 30% is measured against. */
+@media (min-width: 840px) { :root { --pane: max(360px, calc((100vw - var(--rail-w)) * 0.3)); } }
 
 /* --- station panel ---------------------------------------------------------------------------- */
 

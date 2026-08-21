@@ -256,6 +256,9 @@ async function phone() {
      is the reason. */
   const mapEl = d.getElementById('map');
   is(cs(d.documentElement).getPropertyValue('--gap').trim(), '0px', 'no card inset on a phone');
+  // The rail takes no width below 600px, and the element itself does not draw.
+  is(cs(d.documentElement).getPropertyValue('--rail-w').trim(), '0px', 'and the rail reads 0 too');
+  is(cs(d.getElementById('rail')).display, 'none', 'so the rail element does not draw here');
   /* **The two TOP corners keep the radius here and the two bottom ones lose it.** The top edge is
      not a screen edge: `--hdr` holds the map under the app bar, so that corner is drawn against the
      page rather than notched out of it. The bottom two ARE the screen edge, and a radius there
@@ -849,7 +852,10 @@ async function bands() {
        **Expanded carries a FLOOR under the ratio.** 30% of 840px is 252px, which is under M3's own
        256dp minimum for a side sheet, and it lands as a 168px collapse off the 420 the band below
        ends on. Every landscape tablet sits in that range. So 360px — the width a camera still needs
-       — is the floor, and the ratio takes over at 1200px where 30vw passes it. */
+       — is the floor.
+       **The rail comes off the window before the ratio applies, the same correction `--pane`'s own
+       comment in base.css states for the medium band.** So the ratio takes over at 1296px, where
+       30% of the window less the rail passes 360, rather than at 1200. */
     const pane = d.getElementById('pane');
     const gap = parseFloat(cs(d.documentElement).getPropertyValue('--gap'));
     const seam = parseFloat(cs(d.documentElement).getPropertyValue('--seam'));
@@ -857,16 +863,12 @@ async function bands() {
     d.body.classList.add('side');
     await new Promise(res => setTimeout(res, 200));
     const pw = r(pane).width, mw = r(d.getElementById('map')).width;
-    /* **The rail takes its width from the map alone.** `--pane` still reads `50vw - 12px`. It does
-       not know the rail exists, because this task does not touch it. So the supporting pane keeps
-       the width an equal split gave it before the rail existed. The map is now smaller by exactly
-       `--rail-w`. That is the map narrowing this task promises, not a drift between two formulas. */
     if (label === 'medium') {
-      is(Math.abs((pw - rail) - mw) <= 1, true,
-         label + ': the two panes split the window evenly, and the map also gives up the rail');
+      is(Math.abs(pw - mw) <= 1, true,
+         label + ': the two panes are equal, which is what an equal split means');
     } else {
-      is(Math.round(pw), Math.max(360, Math.round(px * 0.3)),
-         label + ': 30% of the window, or the 360px floor where 30% falls under it');
+      is(Math.round(pw), Math.max(360, Math.round((px - rail) * 0.3)),
+         label + ': 30% of the window less the rail, or the 360px floor where that falls under it');
     }
     is(pw >= 256, true, label + ": at or above M3's own 256dp minimum for this surface");
     /* Add the two panes, the card's insets and the rail back, and the window has to come out whole.
