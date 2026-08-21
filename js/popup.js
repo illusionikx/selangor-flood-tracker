@@ -707,6 +707,30 @@ export function popup(s) {
 const camFirst = members =>
   [...members].sort((a, b) => (b.kind === 'camera') - (a.kind === 'camera'));
 
+/* One chip per KIND, never one per sensor. A place carrying two sirens drew `Siren` twice, which
+   reads as a rendering fault rather than as two sirens — the chips answer `what is this place`, and
+   `Siren Siren` answers it twice instead of counting. So a repeated kind takes a multiplier and the
+   row states each kind once. A single sensor of its kind carries no `×1`: the count is only worth
+   printing where it is not the obvious one.
+   **A `Map` because it keeps insertion order**, which is the order `render.js` ranked the members
+   in. Sorting the kinds here would put the lead sensor's chip somewhere other than first.
+   **The colour folds with OR, not with the first member.** Grey is this app's "no reading", and a
+   chip covering two sirens where one reports is a chip over a place that reports. It goes grey only
+   where none of them does — a station with no reading must never look confident, and a station with
+   one must not look dead. */
+const kindChips = members => {
+  const by = new Map();
+  for (const m of members) {
+    const g = by.get(m.kind);
+    if (g) { g.n++; g.info ||= hasInfo(m); } else by.set(m.kind, { n: 1, info: hasInfo(m) });
+  }
+  return [...by].map(([kind, g]) => {
+    const k = KINDS[kind];
+    return `<span class="badge" style="--c:${g.info ? k.color : 'var(--muted)'}"
+            ><i class="i i-${k.icon}"></i>${k.one || k.label}${g.n > 1 ? ` ×${g.n}` : ''}</span>`;
+  }).join('');
+};
+
 export function sitePopup(members) {
   if (members.length === 1) return popup(members[0]);
   const lead = members[0];
@@ -725,11 +749,7 @@ export function sitePopup(members) {
       ${siteDots(lead, favIdList, favAll, hasCam ? '' : camLink(lead, nearestCam(lead)))}
       ${goName(lead)}
       ${region(lead)}
-      <div class="badges">${members.map(m => {
-        const k = KINDS[m.kind];
-        return `<span class="badge" style="--c:${hasInfo(m) ? k.color : 'var(--muted)'}"
-                ><i class="i i-${k.icon}"></i>${k.one || k.label}</span>`;
-      }).join('')}</div>
+      <div class="badges">${kindChips(members)}</div>
     </div>
     ${metSection(lead)}
     ${camFirst(members).map(m => `<div class="sensor" data-sensor="${m.id}">
