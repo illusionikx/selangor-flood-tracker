@@ -1416,7 +1416,18 @@ body:not(.ready) #bar, body:not(.ready) #side { transition: none; }
 @media (min-width: 601px) {
   body:is(.drawer, .side) { --pane-w: var(--pane); }
 }
-@media (min-width: 840px) { :root { --pane: 30vw; } }
+/* **A floor under the ratio, because 30% of a small expanded window is not a pane.** M3 gives the
+   supporting pane 30% from 840px up. At 840 that is 252px, which is under M3's own 256dp minimum for
+   a side sheet, and it arrives as a 168px COLLAPSE off the 420px the band below it ends on. The
+   whole 840 to 1199 range sits under 360, which is the width a camera still needs and the number
+   `--pane`'s own comment already carries. Every landscape tablet lands in it: 307px at 1024, 334 at
+   1112, 354 at 1180.
+   So the ratio holds from 1200px up, where 30vw passes 360 on its own, and 360 is the floor below
+   that. The step at 840 is 420 to 360 now rather than 420 to 252.
+   **No cap at the top.** 30vw is 576px at 1920, which is past M3's 400dp side-sheet band. That band
+   is written for a sheet over content. This is the supporting pane of a canonical layout, and the
+   ratio is what that page states. */
+@media (min-width: 840px) { :root { --pane: max(360px, 30vw); } }
 
 /* --- station panel ---------------------------------------------------------------------------- */
 

@@ -66,7 +66,13 @@
      shut, and it stays 0 at every state below 600px, where the pane is a full-screen dialog over the
      map and takes no width from it. The map's own box and the three boxes on that edge all read it,
      so one variable places every one of them. */
-  --pane: 50vw;
+  /* **`50vw - 12px`, not `50vw`, and the 12 is half of the map's own insets.** M3 splits a medium
+     window equally between the two panes. The map card is inset `--gap` (16) on its leading edge and
+     `--seam` (8) on the edge facing the pane, and both come out of the MAP. So a pane at a flat 50vw
+     left the map 24px short of half, and the "main" pane was the smaller of the two across the whole
+     band. Measured at 839px: a 420px pane against a 396px map. Taking half of those 24 puts the
+     seam back in the middle where an equal split says it goes. */
+  --pane: calc(50vw - 12px);
   --pane-w: 0px;
   /* The margin around the map card, and the gap between it and the supporting pane. One number for
      both, because M3's layout separates panes with space rather than with a line and the space on

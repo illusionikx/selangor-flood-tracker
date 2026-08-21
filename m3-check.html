@@ -800,23 +800,36 @@ async function bands() {
        panes. Expanded gives 70% to the main pane and 30% to the supporting one, and the bands above
        it keep that ratio.
        https://m3.material.io/foundations/layout/canonical-examples/supporting-pane
-       Asserted as a SHARE of the window, never as a pixel count, because that is what the spec
-       states and because the number moves with the frame. The map's own share is asserted from the
-       other end: the two have to add up, or one is drawing over the other. */
-    const share = label === 'medium' ? 0.5 : 0.3;
+
+       **Medium is asserted as EQUALITY, not as a 50% share, and that is the fault it caught.**
+       `--gap` (16) and `--seam` (8) both come out of the MAP, so a pane at a flat 50vw left the map
+       24px short of half and the main pane was the smaller of the two right across the band.
+       Measured at 839px: a 420px pane against a 396px map. `50vw - 12px` puts the seam back in the
+       middle. A share assertion cannot see this — 50% of the window is exactly what the pane was
+       taking while the split was wrong.
+
+       **Expanded carries a FLOOR under the ratio.** 30% of 840px is 252px, which is under M3's own
+       256dp minimum for a side sheet, and it lands as a 168px collapse off the 420 the band below
+       ends on. Every landscape tablet sits in that range. So 360px — the width a camera still needs
+       — is the floor, and the ratio takes over at 1200px where 30vw passes it. */
     const pane = d.getElementById('pane');
     const gap = parseFloat(cs(d.documentElement).getPropertyValue('--gap'));
     const seam = parseFloat(cs(d.documentElement).getPropertyValue('--seam'));
     d.body.classList.add('side');
     await new Promise(res => setTimeout(res, 200));
     const pw = r(pane).width, mw = r(d.getElementById('map')).width;
-    /* The RATIO is against the window, because that is what M3 states. The map is then measured
-       against what is left of the window after the pane and the card's own three insets. Add the
-       two and the gaps back, and the window has to come out whole: anything else means one pane is
-       drawing over the other. */
-    is(Math.abs(pw / px - share) < 0.01, true,
-       label + ': the supporting pane takes ' + Math.round(share * 100) + '% of the window');
-    is(Math.round(mw + pw + gap + seam), px,
+    if (label === 'medium') {
+      is(Math.abs(pw - mw) <= 1, true,
+         label + ': the two panes are equal, which is what an equal split means');
+    } else {
+      is(Math.round(pw), Math.max(360, Math.round(px * 0.3)),
+         label + ': 30% of the window, or the 360px floor where 30% falls under it');
+    }
+    is(pw >= 256, true, label + ": at or above M3's own 256dp minimum for this surface");
+    /* Add the two panes and the card's insets back, and the window has to come out whole. Anything
+       else means one pane is drawing over the other. One pixel of slack, because `50vw - 12px` on an
+       odd window is a half pixel. */
+    is(Math.abs(mw + pw + gap + seam - px) <= 1, true,
        label + ': and the map takes the rest, less its leading gap and its trailing seam');
     is(Math.round(r(pane).left - r(d.getElementById('map')).right), seam,
        label + ': one seam between the two panes');
