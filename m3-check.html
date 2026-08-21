@@ -573,6 +573,14 @@ async function desktop() {
   const sk = d.getElementById('sideKinds');
   is(!!sk.querySelector('.badges'), true, 'the kind chips become its second supporting line');
   is(!!d.querySelector('#sideBody .pophead'), false, 'and the emptied seam is removed, not left');
+  /* **A mast emits a `.badges` box and a single-sensor card emits one bare `.badge`.** The lift
+     names both, and only the box shape is in the fixture above. So the bare one is driven here.
+     A selector that lost it would leave every node card's kind in a box nothing styles any more. */
+  await inFrame(d, "import { openSide } from '/js/map.js'; openSide('probe-one', "
+    + JSON.stringify(CARD.replace(/<div class="badges">([^]*?)<\/div>/, '$1')) + ");");
+  is(!!d.getElementById('sideKinds').querySelector(':scope > .badge'), true,
+     'a single-sensor card lifts its bare chip too, not only a mast box');
+  await inFrame(d, OPEN_CARD);
   /* --- each chip is an M3 ASSIST CHIP ---
      Transcribed from Chip/chip.css: a 32dp container, `shape-corner-small` (8dp), a 1dp outline,
      `label-large`, and an 18dp leading icon. The label takes `on-surface` and the icon takes the

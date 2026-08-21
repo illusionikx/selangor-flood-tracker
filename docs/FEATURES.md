@@ -12651,3 +12651,77 @@ a pinned header.
 
 A line that returns is one declaration in one file. Nothing else in the app notices it, and a
 reader meets it before anybody else does.
+
+## A full-screen dialog's header is not a top app bar
+
+The four full-screen dialogs wore the supporting pane's medium flexible top app bar for one
+revision. Two rows, 112px, `headline-medium`.
+
+That is a different component. A top app bar heads a destination. M3 gives a full-screen dialog a
+header of its own, and `Dialog/dialog.css` states it:
+
+| part | value |
+|---|---|
+| header | `height: 56px`, `flex-shrink: 0`, `align-items: center`, `gap: 8px`, `padding-inline: 16px` |
+| title | `flex: 1`, `title-large` at 22px on 28px, in `on-surface` |
+| body | `flex: 1`, `overflow-y: auto`, `padding: 24px` |
+| container | `display: flex`, `flex-direction: column`, `background: surface` |
+
+A reader asked for the exact styles on 2026-08-21. These are them.
+
+### The pane keeps its app bar
+
+`#pane` is the supporting pane of M3's canonical layout, and a top app bar is what heads one. These
+four are dialogs. The two components legitimately differ, and the app draws both.
+
+### The headline starts at 56px, and both readings reach it
+
+The reference pads the header row 16px and puts a bare 24px icon in it. That is 16 plus 24 plus the
+8px gap.
+
+This app draws a 40px touch target rather than a bare icon, because 24px is not a touch target. The
+button starts at 8px, so the title lands at 8 plus 40 plus 8.
+
+Both put the close glyph on 28px too. That is now the one number every full-screen header in this
+app shares, the pane included.
+
+### `height`, not `min-height`
+
+The reference states a fixed 56px with `flex-shrink: 0` beside it.
+
+A headline long enough to wrap is one this component truncates. None of these four carries one: they
+read `All stations`, `All cameras` and `Help`. About carries no headline at all, which M3 marks
+optional, so its bar is a 56px row holding one button.
+
+### The body took M3's padding, and a second rule fought it
+
+`.md-fullscreen-dialog-body` states `padding: 24px`. The two prose panes are their own scroller, so
+the pane carries that number through `--pane`.
+
+**A phone-width rule held a literal `padding: 18px` beside a compact `--pane: 18px`.** The two agreed
+by luck. `--pane` went to 24 and the literal stayed at 18.
+
+The pinned header reads `--pane` back for the negative margin that takes it full bleed. So the header
+bled 6px past the pane on each side. Measured: `scrollWidth` 381 against `clientWidth` 375, and a
+horizontal scrollbar along the bottom of a dialog that never had one.
+
+Nothing else looked wrong. `m3-check.html` asserts `scrollWidth <= clientWidth` on every full-screen
+dialog now.
+
+### The table and the wall keep their full bleed
+
+M3 states that 24px body padding for prose and for forms. A data table on a 360px screen loses a
+column of readings to 24px of gutter down each side.
+
+So `.dtop` takes the header's own 16px inline padding, and the table and the grid under it stay full
+bleed. `.dtop` also takes no padding above the bar, because the reference puts that 56px row on the
+dialog's own top edge.
+
+### Every divider is gone now
+
+`.docbox .modalhead` kept its bottom border above 600px after the first cut. `#dataBox .dtop` and
+`#camBox .dtop` kept theirs at both widths.
+
+All three are gone, at every width. M3 specs no header border on the basic dialog these are above
+600px, and none on the full-screen dialog they are below it. Each box paints `--surface`, so content
+still passes under it unseen.
