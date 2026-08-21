@@ -484,10 +484,27 @@ async function desktop() {
   /* Two numbers, and M3's layout names them separately: a margin holds content off the window edge
      and a spacer separates one pane from the next. `--seam` is the trailing inset alone. */
   is(SEAM > 0 && SEAM < GAP, true, 'and the space between the two panes is its own, smaller number');
+  /* --- the navigation rail takes the leading edge, and the map gives up exactly that width ---
+     `--rail-w` is 96px above 600px and 0 below it, from NavigationRail/navigation-rail.css. The
+     rail is empty in this task. No button has left the app bar for it yet. So this block asserts
+     only the rail's own box and the map's leading edge. */
+  const RAIL = parseFloat(cs(d.documentElement).getPropertyValue('--rail-w'));
+  const railEl = d.getElementById('rail');
+  is(RAIL, VW > 600 ? 96 : 0, 'the rail is 96px above 600px and takes no width below it');
   const mb = r(mapBox);
-  is([mb.left, mb.top - hdr, VH - mb.bottom].map(Math.round).join(','),
-     [GAP, GAP, GAP].join(','), 'shut, the card sits one gap in on the three window edges');
+  is(Math.round(mb.left), Math.round(RAIL + GAP),
+     'the map card starts after the rail plus the window margin');
+  is([mb.top - hdr, VH - mb.bottom].map(Math.round).join(','),
+     [GAP, GAP].join(','), 'shut, the card still sits one gap in on the top and bottom window edges');
   is(Math.round(VW - mb.right), SEAM, 'and one seam in on the edge that faces the pane');
+  if (RAIL) {
+    const rb = r(railEl);
+    is([rb.left, rb.width].map(Math.round).join(','), '0,96',
+       'the rail is flush with the leading edge and 96px wide');
+    is(Math.round(rb.top), Math.round(hdr), 'and it starts under the app bar');
+    is(cs(railEl).paddingTop + ' ' + cs(railEl).paddingBottom, '44px 20px',
+       'M3 padding-block 44px 20px, from NavigationRail/navigation-rail.css');
+  }
   is(cs(mapBox).borderTopLeftRadius, '16px', 'M3 shape-corner-large');
   is(cs(mapBox).overflow, 'hidden', 'and the tiles clip to that corner');
   /* **The corner is the whole boundary, and no line may come back on any of these three surfaces.**
@@ -512,7 +529,8 @@ async function desktop() {
     const e = r(d.getElementById(id));
     const lead = id === 'legend';
     const off = lead ? Math.round(e.left) : Math.round(VW - e.right);
-    is(off, x + (lead ? GAP : SEAM), id + ' rides the card inset, not the window edge');
+    // The legend is the one box on the leading edge. It also rides the rail's width.
+    is(off, x + (lead ? GAP + RAIL : SEAM), id + ' rides the card inset, not the window edge');
     is(Math.round(VH - e.bottom), y + GAP, '  and on the other axis too');
   }
   is(Math.round(VW - r(d.querySelector('.leaflet-control-zoom')).right), 10 + SEAM,
@@ -528,8 +546,8 @@ async function desktop() {
   is(cs(pane2).borderTopLeftRadius, '0px', 'the standard variant is square');
   is([r(pane2).top, r(pane2).width, Math.round(VW - r(pane2).right)].map(Math.round).join(','),
      '64,360,0', 'a 360px pane on the trailing edge, under the app bar');
-  is(Math.round(r(mapBox).width), VW - 360 - GAP - SEAM,
-     'and the map gives up that width, keeping its leading gap and its trailing seam');
+  is(Math.round(r(mapBox).width), VW - 360 - GAP - SEAM - RAIL,
+     'and the map gives up that width, keeping its leading gap, its trailing seam and the rail');
   is(Math.round(r(pane2).left - r(mapBox).right), SEAM,
      'one seam between the two panes, which is the smaller of the two numbers');
   /* Leaflet's own controls live INSIDE the map container and follow it for free. These three are
@@ -561,8 +579,8 @@ async function desktop() {
      .map(Math.round).join(','), '0,0,0,0', 'and each states inset: 0 and nothing more');
   d.body.classList.remove('drawer');
   await settled();
-  is(Math.round(r(mapBox).width), VW - GAP - SEAM,
-     'shut again, the map takes the width straight back, less its own two insets');
+  is(Math.round(r(mapBox).width), VW - GAP - SEAM - RAIL,
+     'shut again, the map takes the width straight back, less its own two insets and the rail');
   d.body.classList.add('side');
   await settled();
   /* --- the header is M3's medium flexible top app bar, filled by the real openSide() split ---
@@ -835,22 +853,27 @@ async function bands() {
     const pane = d.getElementById('pane');
     const gap = parseFloat(cs(d.documentElement).getPropertyValue('--gap'));
     const seam = parseFloat(cs(d.documentElement).getPropertyValue('--seam'));
+    const rail = parseFloat(cs(d.documentElement).getPropertyValue('--rail-w'));
     d.body.classList.add('side');
     await new Promise(res => setTimeout(res, 200));
     const pw = r(pane).width, mw = r(d.getElementById('map')).width;
+    /* **The rail takes its width from the map alone.** `--pane` still reads `50vw - 12px`. It does
+       not know the rail exists, because this task does not touch it. So the supporting pane keeps
+       the width an equal split gave it before the rail existed. The map is now smaller by exactly
+       `--rail-w`. That is the map narrowing this task promises, not a drift between two formulas. */
     if (label === 'medium') {
-      is(Math.abs(pw - mw) <= 1, true,
-         label + ': the two panes are equal, which is what an equal split means');
+      is(Math.abs((pw - rail) - mw) <= 1, true,
+         label + ': the two panes split the window evenly, and the map also gives up the rail');
     } else {
       is(Math.round(pw), Math.max(360, Math.round(px * 0.3)),
          label + ': 30% of the window, or the 360px floor where 30% falls under it');
     }
     is(pw >= 256, true, label + ": at or above M3's own 256dp minimum for this surface");
-    /* Add the two panes and the card's insets back, and the window has to come out whole. Anything
-       else means one pane is drawing over the other. One pixel of slack, because `50vw - 12px` on an
-       odd window is a half pixel. */
-    is(Math.abs(mw + pw + gap + seam - px) <= 1, true,
-       label + ': and the map takes the rest, less its leading gap and its trailing seam');
+    /* Add the two panes, the card's insets and the rail back, and the window has to come out whole.
+       Anything else means one pane is drawing over the other. One pixel of slack, because
+       `50vw - 12px` on an odd window is a half pixel. */
+    is(Math.abs(mw + pw + gap + seam + rail - px) <= 1, true,
+       label + ': and the map takes the rest, less its leading gap, its trailing seam and the rail');
 
     /* **The map furniture has to clear ITSELF, not just the pane.** Every box down there adds
        `--pane-w`, so none of them ever reaches the supporting pane, and that is all this check used

@@ -27,7 +27,8 @@
    puts three properties on the transition list that can only ever animate from a value to itself. */
 #map {
   position: absolute;
-  inset: calc(var(--hdr) + var(--gap)) calc(var(--pane-w) + var(--seam)) var(--gap) var(--gap);
+  inset: calc(var(--hdr) + var(--gap)) calc(var(--pane-w) + var(--seam))
+         calc(var(--navbar-h) + var(--gap)) calc(var(--rail-w) + var(--gap));
   overflow: hidden;
   border-radius: var(--md-sys-shape-corner-large) var(--md-sys-shape-corner-large) 0 0;
   transition: right var(--m3-travel);
@@ -43,7 +44,7 @@ body:not(.ready) #map { transition: none; }
    **The card treatment and the GAP still turn on together.** With `--gap` at 0 the map runs to the
    window on three sides, and below 600px there is no second pane beside it to separate from. */
 @media (min-width: 601px) {
-  :root { --gap: 16px; --seam: 8px; }
+  :root { --gap: 16px; --seam: 8px; --rail-w: 96px; }
   #map { border-radius: var(--md-sys-shape-corner-large); }
 }
 /* **No outline on the card, and no `#map::after` to draw one.** It carried an inset 1px `--outline`
@@ -122,6 +123,20 @@ header h1 .mark { position: relative; display: flex; flex: none; cursor: help; }
 header .hactions {
   display: flex; align-items: center; justify-content: flex-end; gap: 4px; flex: 0 0 auto;
 }
+
+/* --- navigation rail ---------------------------------------------------------------------------
+   M3's collapsed rail: 96px wide, `padding-block: 44px 20px`, on the surface tone. It stands under
+   the app bar and beside the map card, so it takes the height that is left.
+   **No divider on the edge facing the map.** This app separates surfaces by space, and `--gap` is
+   already the seam between the two. The app bar and the pane each lost the same rule. */
+#rail {
+  position: absolute; z-index: 600; top: var(--hdr); bottom: 0; left: 0;
+  box-sizing: border-box; width: var(--rail-w);
+  display: flex; flex-direction: column; overflow-y: auto; scrollbar-width: none;
+  padding-block: 44px 20px;
+  background: var(--md-sys-color-surface);
+}
+@media (max-width: 600px) { #rail { display: none; } }
 
 /* --- alert ticker ----------------------------------------------------------------------------- */
 
@@ -368,7 +383,7 @@ body.testmode header {
    badges stay over the strip they describe when the pane opens. */
 #pills {
   position: fixed; z-index: 700; top: calc(var(--hdr) + 12px);
-  left: calc(50% - var(--pane-w) / 2);
+  left: calc(50% + var(--rail-w) / 2 - var(--pane-w) / 2);
   transform: translateX(-50%); display: grid; gap: 8px; justify-items: center;
   pointer-events: none;
 }
@@ -1423,8 +1438,9 @@ body:is(.drawer, .side) #findpane { display: none; }
    good in a 210px box. */
 #legend {
   position: absolute; z-index: 400;
-  left: calc(12px + var(--gap)); bottom: calc(30px + var(--gap)); width: 288px;
-  max-width: calc(100vw - var(--pane-w) - var(--seam) - var(--gap) - 128px);
+  left: calc(12px + var(--gap) + var(--rail-w));
+  bottom: calc(30px + var(--gap) + var(--navbar-h)); width: 288px;
+  max-width: calc(100vw - var(--rail-w) - var(--pane-w) - var(--seam) - var(--gap) - 128px);
   margin-top: 10px; padding: 12px 14px; border-radius: 12px;
 }
 /* The heat sections are sized by their ramp, and a ramp has no intrinsic width, so the box has to

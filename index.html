@@ -74,8 +74,8 @@
      Before `base.css`, which derives `--m3-travel`, `--m3-grow` and `--m3-swap` from them and
      bridges M3's colour names onto this app's palette. Colour is not in this file on purpose. -->
 <link rel="stylesheet" href="vendor/m3/tokens.css?v=1">
-<link rel="stylesheet" href="css/base.css?v=162">
-<link rel="stylesheet" href="css/chrome.css?v=229">
+<link rel="stylesheet" href="css/base.css?v=163">
+<link rel="stylesheet" href="css/chrome.css?v=230">
 <link rel="stylesheet" href="css/map.css?v=159">
 
 <!-- Water tint for the dark basemap. CARTO's dark_all is greyscale — all 18 of its tones have zero
@@ -315,6 +315,12 @@
     </div>
   </div>
 </header>
+<!-- M3's navigation rail, collapsed variant. Every number comes from
+     https://github.com/bczak/m3you/blob/development/src/components/NavigationRail/navigation-rail.css
+     It is a `<nav>` and never a dialog, so it does not join the roll call in m3-check.html and needs
+     an assertion block of its own there.
+     Empty in this commit. The items arrive with the buttons that leave the app bar. -->
+<nav id="rail" aria-label="Main"></nav>
 <!-- Native <dialog>: modal behaviour, backdrop, Esc-to-close and focus trapping come free. -->
 <!-- Two dialogs, one shape. `.docbox` carries the box and the prose rules both of them need; the
      id carries what belongs to one of them. The menu opens each entry directly, so a tab strip was
