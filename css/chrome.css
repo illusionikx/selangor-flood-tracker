@@ -1484,8 +1484,9 @@ body.side #side { display: flex; }
    close leads below it on `order` alone. */
 .apsp { flex: 1; }
 /* M3 gives the leading and trailing slots a 48px minimum. This app's `.icon` is 40px everywhere
-   else, so the slot is widened here rather than the button. */
-.apptop > .icon, .apptop > * > .dots { width: 48px; height: 48px; }
+   else, so the slot is widened here rather than the button. It reaches the leading back arrow and
+   both trailing buttons, the favorite and the ⋮. */
+.apptop .icon { width: 48px; height: 48px; }
 .apflex {
   display: flex; flex-direction: column; justify-content: flex-end; gap: 4px;
   min-width: 0; min-height: 56px; padding: 0 16px 12px;
@@ -1509,8 +1510,13 @@ body.side #side { display: flex; }
 }
 #sideSub:empty { display: none; }
 #sideActions { display: flex; align-items: center; }
-/* The menu is a popover and takes no space in the row; only the button does. */
-#sideActions .dots { position: static; width: 40px; height: 40px; margin: 0; font-size: 22px; }
+/* **The trailing slot holds two buttons: the favorite, then the ⋮.** The heart was a row inside
+   that menu and a reader pulled it out on 2026-08-21. A menu row states its action in words, which
+   a bare glyph cannot, so the button carries `data-tip` and `js/sparktip.js` answers it on tap as
+   well as on hover. The state was always visible either way, in the heart's own fill.
+   The menu is a popover and takes no space in the row. Only the two buttons do. `.dots` carries
+   `position: absolute` for the cards that still float it over a corner, and this cancels that. */
+#sideActions .icon { position: static; margin: 0; font-size: 22px; }
 /* An empty header still draws its own height, and it must not: a card with no name would leave a
    64px band of nothing over the readings. */
 #sideHead:has(#sideTitle:empty) { display: none; }
@@ -2731,19 +2737,16 @@ body.finding #find { display: none; }
   /* Both occupants scroll in a body of their own, so both take the same compact inset. */
   #barBody { padding: 8px 16px 16px; }
 
-  /* **The close leads here, and that is the only thing this width changes about the header.**
-     A full-screen dialog puts its X on the LEADING edge, which is the opposite of the side sheet the
-     same markup draws above 600px. `order: -1` and not `row-reverse`: reversing the row puts the
-     trailing actions between the X and the title, and M3 keeps them at the far end. `.apsp` is what
-     the order moves the button past.
-     **The bar keeps its 112px and its `headline-medium` at this width.** It used to drop to 56px and
-     16px, which is the full-screen dialog's own small app bar. A reader asked for one headline in
-     this pane, so there is one.
-     **The close glyph still lands 28px in, and it gets there a different way.** The app bar's top
-     row is 4px of padding around a 48px target. The other four full-screen dialogs are 8px around a
-     40px one. Both put the glyph's centre on 28. So nothing moved on screen, and `m3-check.html`
-     asserts the CENTRE rather than either box edge. */
-  #barClose, #sideClose { order: -1; }
+  /* **This width changes nothing about the header any more, and that is the entry.** The leading
+     button used to be a trailing close X above 600px and a leading one below it, moved by
+     `order: -1`. It is a back arrow on the leading edge at every width now, so there is no order to
+     flip and no rule to write here. M3 gives a top app bar a leading navigation icon, and one bar
+     that reads the same at both widths beats two that agree by arithmetic.
+     **The bar also keeps its 112px and its `headline-medium` at this width.** It used to drop to
+     56px and 16px, which is the full-screen dialog's own small app bar.
+     **The leading glyph lands 28px in either way.** The app bar's top row is 4px of padding around a
+     48px target. The other four full-screen dialogs are 8px around a 40px one. Both put the glyph's
+     centre on 28, so `m3-check.html` asserts the CENTRE rather than either box edge. */
   #sideBody { padding: 8px 16px 16px; }
 }
 

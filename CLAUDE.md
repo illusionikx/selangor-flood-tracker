@@ -1035,15 +1035,24 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
   paints a round `--hover` disc the width of its box. So the smaller shape drew two discs of two
   sizes, under two glyphs of two sizes. `.dots` stays 28px everywhere it
   is alone on a row. `right: 32px` puts the two boxes edge to edge, the way two toolbar icons meet.
-  **That corner holds exactly one control besides the ×, and it is the ⋮.** A sensor-count chip held
-  the slot first, then the favorite heart, then the heart and a nearest-webcam glyph together. The
-  pair reserved `padding-right: 108px` of a 328px line. It stood 4.5px into the district line
-  below, which is what a reader sees as a collision. **Every card control is a row inside that one
-  menu now.** `dots(s, extra)` takes the nearest webcam or water level as its optional row. A
-  mast gets `siteDots()`, which holds the favorite that acts on all its sensors. The rows state the
-  station name, the distance and the reading in visible text. A glyph can only put those in a
-  `title`. One control costs the title 68px instead of 108. The card loses a glance at the
-  favorite state. The map pin still draws a heart on a favorited site.
+  **The trailing actions hold two controls: the favorite, then the ⋮.** The heart has been round
+  this loop three times, and the last move is a reader's, 2026-08-21. A sensor-count chip held the
+  slot first. Then the heart. Then the heart and a nearest-webcam glyph together, and that pair
+  reserved `padding-right: 108px` of a 328px line and stood 4.5px into the district line below. So
+  every control became a row inside the one menu.
+  **The header is an M3 top app bar now, and that answers the objection rather than ignores it.** The
+  actions have a 56px row of their own. They take nothing from the headline under them, so the 108px
+  reservation that condemned the pair does not exist any more.
+  **The webcam offer stays a row, and the reason it lost is unchanged.** That row states a station
+  name, a distance and a reading in visible text. A glyph can only put those in a `title`, and a
+  `title` never opens on touch. The favorite has nothing of that kind to say: its whole state is the
+  heart's own fill, hollow or solid. `data-tip` carries the verb, and `js/sparktip.js` answers it on
+  tap as well as on hover.
+  **A sensor's inline ⋮ keeps the favorite as a row.** `dots(s, extra, lift)` takes `lift` only from
+  the card header. Six hearts down a six-sensor mast is six controls for what the header already
+  offers once, and the per-sensor favorite is what lets somebody star one gauge of six.
+  A mast's header gets `siteDots()`, whose heart acts on every sensor there.
+  The map pin still draws a heart on a favorited site.
   **The reservation is `~`, not `+`**: `dots()` emits the button *and* the popover it targets, so the
   menu div sits between the button and `.popname`. **The region line takes the same 78px as the
   name.** It is a line lower. But a 40px button reaches 48px down, and the region starts at 37.5.
@@ -1170,11 +1179,12 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
   heat layer alone. A missing element is a `TypeError` at import time, and then nothing on that page
   runs at all. That page already stubbed `#sideClose` for the same reason. Add the stub rather than
   guard the wiring: a `if (pane)` in `map.js` hides a genuinely missing element in the app.
-- **The compact variant puts the close X on the LEADING edge, which is the opposite of the side
-  sheet it is at every other width.** M3's full-screen dialog anatomy is close, then headline, then
-  the trailing actions. `order: -1` on the button rather than `row-reverse` on the row: reversing
-  puts the trailing actions between the X and the title. `.apsp`, the app bar's own spacer, is what
-  the order moves the button past.
+- **The pane's leading button is a BACK ARROW at every width, and it is first in the DOM too.** It
+  was a close X: trailing above 600px, leading below it, moved by `order: -1`. A reader asked for the
+  arrow on 2026-08-21. M3 gives a top app bar a leading navigation icon, so the button moved rather
+  than the order. One bar now reads the same at both widths, and the tab order follows the reading
+  order. `.apsp`, the app bar's own spacer, holds the slack between it and the trailing actions.
+  `--i-arrow_back` came into `css/icons.css` for it, by the refetch that file's own header states.
   **One number holds every full-screen app bar in this app, and it is 28px to the close GLYPH.** It
   used to read as 8px to the button box, and the two say the same thing about the four dialogs, which
   put 8px of padding around a 40px target. The pane's app bar puts 4px around a 48px one. Both land
@@ -3010,13 +3020,14 @@ const stubs = \`
 const SPARK_H=12, NO_INFO='', NEAR_MAX_KM=30, MET_NAME='', ACC_ROWS=[], WEATHER=[{}];
 const RIVER_COLOR={1:'r1',2:'r2',3:'r3'},RAIN_COLOR={1:'c1',2:'c2',3:'c3',4:'c4'};
 const GAUGE_COLOR={1:'g1',2:'g2',3:'g3'},RAIN_STOPS=[[0],[10],[30],[60]];
-const KINDS={river:{color:'B'},gauge:{color:'T'},rainfall:{color:'V'},siren:{color:'P'}};
-const SOURCES={},ALERT_TITLE={},camSrc=()=>'',distKm=()=>0;
+const KINDS={river:{color:'B',label:'Water level',one:'Water level',icon:'water_drop'},
+  gauge:{color:'T'},rainfall:{color:'V'},siren:{color:'P'}};
+const SOURCES={selangor:{label:'Selangor'}},ALERT_TITLE={},camSrc=()=>'',distKm=()=>0;
 const hasInfo=()=>true,isStale=()=>false,statusColor=n=>'S'+n,scalePos=()=>0;
 const levelStops=()=>null,gaugeStops=()=>null,gaugeColor=()=>'',color=()=>'',isFav=()=>false;
 const nearestOf=()=>null,nearestCam=()=>null,nearestLevel=()=>null,camAlert=()=>null;\`;
 const M = new Function(stubs+noSec+src+
-  '; return { stamp, spanText, sirenBand, sparkline, rainBars };')();
+  '; return { stamp, spanText, sirenBand, sparkline, rainBars, dots };')();
 const now=Math.floor(Date.now()/1000), H=3600;
 let bad=0; const is=(g,w,n)=>{const ok=g===w; if(!ok)bad++;
   console.log((ok?'ok  ':'FAIL')+'  '+n+'  -> '+JSON.stringify(g)+(ok?'':'  want '+JSON.stringify(w)));};
@@ -3030,6 +3041,22 @@ is(M.stamp(Date.parse('2025-09-19T12:15:00+08:00')),'19/09/2025','stamp: unix ms
 is(/^\d\d:\d\d\$/.test(M.stamp(Date.now())),true,'stamp: unix ms, today -> clock');
 is(M.spanText(3600*9.6),'9 h','spanText: floors, never rounds up');
 is(M.spanText(1800),'30 min','spanText: under an hour keeps minutes');
+
+// dots() emits the favorite two ways and must never emit both. The card HEADER gets a button beside
+// the kebab, and openSide() lifts it into the app bar. A sensor's inline menu keeps the row, which
+// is what lets somebody star one gauge of six. A lift flag that stops taking the row out puts the
+// same action on one card twice, and nothing on screen says which of the two is stale.
+// Escape every double quote in here. The whole harness is one double-quoted shell string, and a
+// bare backtick in a comment runs as a command substitution.
+const S={ id:'wl-1', name:'TEST', kind:'river', source:'selangor',
+          updated:'01/01/2026 00:00:00', lat:3, lng:101 };
+const head=M.dots(S,'',true), inline=M.dots(S);
+is(/class=\"icon fav\"/.test(head),true,'dots: the card header emits a favorite BUTTON');
+is((head.match(/data-fav/g)||[]).length,1,'dots: and exactly one favorite control, never two');
+is(/class=\"mi\" data-fav/.test(head),false,'dots: so its menu carries no favorite ROW');
+is(head.indexOf('icon fav')<head.indexOf('icon dots'),true,'dots: the heart comes before the kebab');
+is(/class=\"icon fav\"/.test(inline),false,'dots: a sensor row emits no button of its own');
+is(/class=\"mi\" data-fav/.test(inline),true,'dots: it keeps the favorite as a menu row');
 
 const rects=h=>[...h.matchAll(/<rect[\s\S]*?\/>/g)].map(m=>m[0]);
 const A=M.sirenBand(null), B=M.sirenBand([[now-9.3*H,0]]);

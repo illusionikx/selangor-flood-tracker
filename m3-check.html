@@ -109,6 +109,7 @@ function inFrame(d, code) {
    the badges. Fixed rather than taken from the live payload, so the assertions below cannot move
    with the weather. */
 const CARD = `<div class="pophead">
+    <button class="icon fav" data-fav="a,b" data-tip="Add to favorites"></button>
     <button class="icon dots" popovertarget="probemenu"></button>
     <div class="menu" id="probemenu" popover></div>
     <div class="popname" data-go="1">SUNGAI DAMANSARA DI TTDI JAYA</div>
@@ -285,7 +286,8 @@ async function phone() {
     const xr = r(x);
     is(Math.round(r(hd).height) >= 112, true, name + ': M3 112dp medium flexible app bar');
     is(Math.round((xr.left + xr.right) / 2), 28,
-       name + ': its close X leads, with the glyph 28px in as every full-screen bar here has it');
+       name + ': its back arrow leads, with the glyph 28px in as every full-screen bar here has it');
+    is(!!x.querySelector('.i-arrow_back'), true, name + ': and it is an arrow, not a close X');
     is(Math.round(xr.bottom) <= Math.round(r(hd.querySelector('.apflex')).top), true,
        name + ': and the headline sits on the row under it, which is what makes this the medium bar');
     is(cs(pane).boxShadow, 'none', name + ': and no elevation');
@@ -569,11 +571,31 @@ async function desktop() {
      there and it has moved up here. `getComputedStyle` resolves `color` on a `display: none`
      element, so the drawer being the pane's other occupant costs nothing. */
   is(cs(sub2).color, cs(d.getElementById('shown')).color, 'in on-surface-variant');
-  is(cs(sc2).position, 'static', 'the × is a flex item, so nothing floats and nothing is padded');
-  /* Trailing, and read as a glyph centre for the reason the compact block states. 4px of top-row
-     padding around a 48px target puts it 28px in from the window edge. */
-  is(Math.round(w.innerWidth - (r(sc2).left + r(sc2).right) / 2), 28,
-     'and its glyph sits 28px in from the trailing edge');
+  is(cs(sc2).position, 'static', 'the button is a flex item, so nothing floats and nothing is padded');
+  /* **Leading at THIS width too, and that is the change.** It was a trailing close X above 600px and
+     a leading one below it, moved by `order: -1`. M3 gives a top app bar a leading navigation icon,
+     so one bar reads the same at both widths and the tab order follows the reading order.
+     Read as a glyph centre for the reason the compact block states: 4px of top-row padding around a
+     48px target puts it 28px in. */
+  is(!!sc2.querySelector('.i-arrow_back'), true, 'the leading button is a back arrow');
+  is(cs(sc2.querySelector('.i')).maskImage !== 'none', true, 'and its mask actually resolves');
+  is(Math.round((r(sc2).left + r(sc2).right) / 2 - r(pane2).left), 28,
+     'sitting 28px in from the pane leading edge, the same place it takes on a phone');
+  is(r(sc2).right < r(d.getElementById('sideActions')).left, true,
+     'with the trailing actions on the far side of the spacer');
+  /* **The favorite is a button beside the ⋮, not a row inside it.** It was a corner glyph, then a
+     menu row, and a reader pulled it back out on 2026-08-21. The app bar gives the actions a row of
+     their own, which is what answers the objection that took it into the menu: the pair used to owe
+     the title 108px of a 328px line. */
+  const favB = d.querySelector('#sideActions .fav');
+  is(!!favB, true, 'the favorite is a button in the trailing actions');
+  is(favB && favB.compareDocumentPosition(d.querySelector('#sideActions .dots'))
+     & Node.DOCUMENT_POSITION_FOLLOWING ? true : false, true, 'and it sits before the ⋮');
+  is(!!favB.dataset.fav, true, 'carrying the id list the one delegated handler reads');
+  is(!!favB.dataset.tip, true,
+     'and `data-tip`, because a `title` never opens on touch and half these devices are phones');
+  is(!!d.querySelector('#sideActions .menu [data-fav]'), false,
+     'so the menu no longer carries the same action a second time');
   is(cs(d.getElementById('sideBody')).padding, '12px 24px', 'M3 side sheet body padding');
 
   /* --- each sensor section is an M3 FILLED CARD ---

@@ -102,6 +102,24 @@ const favItem = (ids, set) => `<button class="mi" data-fav="${ids}"
     <span>${set ? 'Remove from favorites' : 'Add to favorites'}</span>
   </button>`;
 
+/* The same favorite as a button, for the card HEADER alone. It stands beside the ⋮ in the app bar's
+   trailing actions, and `openSide()` lifts it there out of `.pophead`.
+   **This puts the heart back in a corner it was once taken out of, and the objection is answered
+   rather than ignored.** It lived there with a webcam glyph beside it, and the pair owed the title
+   108px of a 328px line — it stood 4.5px into the region line below. The header is an M3 top app bar
+   now, so the actions have a 56px row of their own and take nothing from the headline under them.
+   **`data-tip`, not `title` alone.** A `title` never opens on touch, and half the devices this runs
+   on are phones. `js/sparktip.js` names anything carrying that attribute on hover and on tap alike.
+   The heart still reports the state it is about to change: hollow and grey for no, solid and `--fav`
+   for yes. Never a `--s-*` colour, because a favorite is not a status.
+   `ids` is comma separated, and ui.js's one delegated handler reads a full list as "remove every
+   one". That is what lets a mast's heart act on all of its sensors. */
+const favBtn = (ids, set) => `<button class="icon fav" data-fav="${ids}"
+    data-tip="${set ? 'Remove from favorites' : 'Add to favorites'}" aria-pressed="${set}"
+    aria-label="${set ? 'Remove from favorites' : 'Add to favorites'}"
+    ><i class="i i-favorite${set ? '' : '_outline'}"
+       style="color:${set ? 'var(--fav)' : 'var(--muted)'}"></i></button>`;
+
 /* The ⋮ on every sensor: where this reading came from, when, and everything you can do to it.
    The glyph has been round the loop. It was a ⋮ holding a single "ignore" item, which promised
    actions and held one, so it became an ⓘ — and the provenance moved into it from a footer line
@@ -119,11 +137,17 @@ const favItem = (ids, set) => `<button class="mi" data-fav="${ids}"
 /* `extra` is the nearest webcam or water level, and only the card *header* passes one. A mast lists
    its sensors with a menu on each, and that offer belongs to the place rather than to the rainfall
    gauge whose row happens to hold it. */
-export const dots = (s, extra = '') => `<button class="icon dots" popovertarget="mnu-${s.id}"
+/* `lift` marks the CARD HEADER's own menu, the one `openSide()` takes up into the app bar. There the
+   favorite is a button beside the ⋮ rather than a row inside it, so the row would be the same action
+   twice. Every other caller is a sensor's inline ⋮ inside `.sensorhead`, which stays as it was: a
+   heart on each of a six-sensor mast's rows is six controls for what the header already offers, and
+   the per-sensor favorite is what lets somebody star one gauge of six. */
+export const dots = (s, extra = '', lift = false) => `${lift ? favBtn(s.id, isFav(s)) : ''}
+  <button class="icon dots" popovertarget="mnu-${s.id}"
     title="Details" aria-label="Details and actions for ${s.name}"><i class="i i-more_vert"></i></button>
   <div id="mnu-${s.id}" class="menu surface" popover>
     ${sourceInfo(s)}
-    ${favItem(s.id, isFav(s))}
+    ${lift ? '' : favItem(s.id, isFav(s))}
     ${extra}
     ${mapLink(s)}
     <button class="mi" data-ignore="${s.id}"><i class="i i-visibility_off"></i>
@@ -136,10 +160,10 @@ export const dots = (s, extra = '') => `<button class="icon dots" popovertarget=
    six answers. No ignore, because that is a request about one sensor and every sensor's own row
    already offers it. The favorite acts on all of them, which is the one thing this menu can say that
    none of the rows below it can. */
-const siteDots = (lead, ids, all, extra) => `<button class="icon dots" popovertarget="mnu-site-${lead.id}"
+const siteDots = (lead, ids, all, extra) => `${favBtn(ids, all)}
+  <button class="icon dots" popovertarget="mnu-site-${lead.id}"
     title="Details" aria-label="Details and actions for ${lead.name}"><i class="i i-more_vert"></i></button>
   <div id="mnu-site-${lead.id}" class="menu surface" popover>
-    ${favItem(ids, all)}
     ${extra}
     ${mapLink(lead)}
   </div>`;
@@ -656,7 +680,7 @@ export function popup(s) {
      Emitted first, because the CSS reserves the room with a sibling rule. */
   const near = s.kind === 'camera' ? levelLink(s, nearestLevel(s)) : camLink(s, nearestCam(s));
   return `<div class="pophead">
-      ${dots(s, near)}
+      ${dots(s, near, true)}
       ${goName(s)}
       ${region(s)}
       <span class="badge" style="--c:${tone}">

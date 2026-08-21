@@ -69,9 +69,9 @@
 <link rel="stylesheet" href="vendor/leaflet.css">
 <link rel="stylesheet" href="vendor/markercluster.css">
 <link rel="stylesheet" href="vendor/fonts.css?v=51">
-<link rel="stylesheet" href="css/icons.css?v=94">
-<link rel="stylesheet" href="css/base.css?v=154">
-<link rel="stylesheet" href="css/chrome.css?v=212">
+<link rel="stylesheet" href="css/icons.css?v=95">
+<link rel="stylesheet" href="css/base.css?v=155">
+<link rel="stylesheet" href="css/chrome.css?v=213">
 <link rel="stylesheet" href="css/map.css?v=158">
 
 <!-- Water tint for the dark basemap. CARTO's dark_all is greyscale — all 18 of its tones have zero
@@ -956,14 +956,18 @@
        the name becomes the sheet's title, the ⋮ becomes its trailing action, and the region and the
        sensor badges stay in the body where M3 puts supporting content. -->
   <!-- M3's medium flexible top app bar: a 56px row of icons, then the label block bottom-aligned
-       under it. `.apsp` is the reference's own spacer, and it is what puts the actions on the
-       trailing edge here and lets the close lead below 600px with one `order`. -->
+       under it. `.apsp` is the reference's own spacer, and it holds the slack between the leading
+       button and the trailing actions.
+       **The leading button is a back arrow, and it is first in the DOM as well as on screen.** It
+       was a close X on the trailing edge above 600px and a leading one below it, placed by `order`.
+       M3 gives a top app bar a leading navigation icon, so the button moved rather than the order,
+       and the tab order now follows the reading order at both widths. -->
   <div id="sideHead">
     <div class="apptop">
+      <button id="sideClose" class="icon" title="Back" aria-label="Back"
+        ><i class="i i-arrow_back"></i></button>
       <span class="apsp"></span>
       <div id="sideActions"></div>
-      <button id="sideClose" class="icon" title="Close" aria-label="Close"
-        ><i class="i i-close"></i></button>
     </div>
     <div class="apflex">
       <div id="sideTitle"></div>
@@ -986,9 +990,9 @@
        the trailing edge, and the CSS places it. -->
   <div id="barHead">
     <div class="apptop">
+      <button id="barClose" class="icon" title="Back" aria-label="Back"
+        ><i class="i i-arrow_back"></i></button>
       <span class="apsp"></span>
-      <button id="barClose" class="icon" title="Close" aria-label="Close"
-        ><i class="i i-close"></i></button>
     </div>
     <!-- No supporting text. M3 makes it optional, and this panel has nothing to say under its own
          name that `#shown` does not already say at the foot of the body. -->

@@ -12363,3 +12363,73 @@ as the desktop pass started, after 122 of 274 assertions, with nothing failed.
 
 Read the last line of the output. No `PASS` means the run did not finish, whatever the counts above
 it say. The budget is 180000 now.
+
+## The pane's app bar got a back arrow and its favorite back
+
+Three changes to the supporting pane's top app bar, all from one reader instruction on 2026-08-21.
+The close X became a back arrow on the leading edge. The kebab stayed on the trailing edge. The
+favorite came out of that kebab menu and stands beside it.
+
+### The leading button
+
+It was a close X. Above 600px it trailed, as a side sheet's close does. Below 600px it led, as a
+full-screen dialog's does, and `order: -1` moved it there.
+
+M3 gives a top app bar a leading navigation icon. So the button moved in the markup rather than in
+the `order`, and there is no width rule left. One bar reads the same at both widths, and the tab
+order follows the reading order.
+
+`--i-arrow_back` came into `css/icons.css` by the refetch that file's own header documents.
+
+### The favorite has been round this loop three times
+
+| revision | where the favorite lived | why it moved |
+|---|---|---|
+| 1 | a heart in the card's corner | a webcam glyph joined it |
+| 2 | heart and webcam glyph together | the pair owed the title 108px of a 328px line |
+| 3 | a row inside the kebab menu | a row can state a name, a distance and a reading |
+| 4 | a button beside the kebab | the app bar gives the actions a row of their own |
+
+**This answers the objection that took it into the menu. It does not ignore that objection.** The
+pair stood 4.5px into the district line below the title, because the corner and the headline shared
+one line. The app bar
+gives the actions a 56px row of their own, so they take nothing from the headline under them.
+
+**The webcam offer stays a menu row, and its reason holds.** That row states a
+station name, a distance and a reading in visible text. A glyph can only put those in a `title`, and
+a `title` never opens on touch.
+
+The favorite has nothing of that kind to say. Its whole state is the heart's own fill, hollow or
+solid, and that is on screen either way. `data-tip` carries the verb, and `js/sparktip.js` answers
+that attribute on tap as well as on hover.
+
+### A sensor row keeps its own favorite
+
+`dots(s, extra, lift)` takes `lift` from the card header alone. Every other caller is a sensor's
+inline kebab inside `.sensorhead`.
+
+Six hearts down a six-sensor mast is six controls for what the header already offers once. The
+per-sensor favorite is what lets somebody star one gauge of six, so it stays a row there.
+
+A mast's header takes `siteDots()`, whose heart acts on every sensor at that place.
+
+### Nothing in the handler changed
+
+`ui.js` already ran one delegated `[data-fav]` listener for two controls: a menu row, and a mast
+star that lived outside any menu. The button takes that second path. `ui.js` wrote it for a control
+with no popover ancestor.
+
+`openSide()` lifts `:scope > .fav` beside the kebab and the popover. Document order puts the heart
+first, which is where it draws.
+
+### What the checks now hold
+
+`m3-check.html` asserts the leading glyph is an arrow, that it sits 28px in from the pane edge at
+both widths, and that the trailing actions hold the favorite before the kebab.
+
+The `popup.js` harness in the Verify block asserts the other half, against the module as it ships.
+The card header emits exactly one favorite control. Its menu carries no second copy. A sensor row
+emits a menu row and no button.
+
+**Escape every double quote added to that harness.** It is one double-quoted shell string, and a
+bare backtick in a comment runs as a command substitution.
