@@ -12360,6 +12360,33 @@ row gap, so this needed no new spacing. The bar grows past 112px to hold the row
 A single-sensor card emits one bare `.badge` and a mast emits a `.badges` box. The selector names
 both.
 
+### One chip per kind, and a repeated kind counts
+
+The row drew one badge per sensor. A place carrying two sirens therefore drew the word `Siren`
+twice, side by side, in two identical chips. That reads as a rendering fault rather than as two
+sirens.
+
+The chips answer `what is this place`. `Siren Siren` answers it twice instead of counting.
+
+`kindChips()` in `popup.js` groups the members by kind and appends a multiplier where a kind repeats.
+So the row reads `Rainfall · Water level · Siren ×2 · Camera`, and each kind states itself once.
+
+Measured on the live payload: 188 sites hold more than one sensor, and 73 of them carried a repeated
+word. That is 39% of every mast this app draws.
+
+Three things fail silently here, so the `popup.js` harness in CLAUDE.md holds six assertions on them.
+
+A lone sensor of its kind carries no `×1`. The count is worth printing only where it is not the
+obvious one.
+
+The group is a `Map`, because a `Map` keeps insertion order. That order is the rank `render.js` gave
+the members. Sorting the kinds moves the lead sensor's chip off the front of the row.
+
+**The colour folds with OR, never off the first member.** Grey is this app's no-reading tone. A chip
+covering one reporting siren and one silent one sits over a place that reports, so it keeps the kind
+hue. It goes grey only where none of them reports. A station with no reading must never look
+confident, and a station with one must not look dead.
+
 ### The chips are M3 assist chips, and they were pills
 
 `.badge` is this app's own shape: a 999px pill, 11px uppercase text, and a 16% tint of the station
@@ -12725,3 +12752,77 @@ dialog's own top edge.
 All three are gone, at every width. M3 specs no header border on the basic dialog these are above
 600px, and none on the full-screen dialog they are below it. Each box paints `--surface`, so content
 still passes under it unseen.
+
+## The supporting pane got a floor, and an equal split that is equal
+
+The pane took a share of the window: half in M3's medium band, 30% from 840px up. A reader reported
+it too narrow at some sizes.
+
+A sweep across 18 widths found two faults, not one.
+
+| window | pane | map | fault |
+|---|---|---|---|
+| 601 | 300 | 277 | the pane is wider than the map |
+| 839 | 420 | 396 | the pane is wider than the map |
+| 840 | 252 | 564 | a 168px collapse, and under M3's 256dp minimum |
+| 1024 | 307 | 693 | under the 360 a camera still needs |
+| 1180 | 354 | 802 | under the 360 a camera still needs |
+
+### An equal split was not equal
+
+`--gap` is 16px and `--seam` is 8px, and both come out of the map. So a pane at a flat `50vw` left
+the map 24px short of half.
+
+The main pane was the smaller of the two right across the medium band. `calc(50vw - 12px)` puts half
+of those 24 back in the middle, where the seam of an equal split goes.
+
+**A share assertion cannot see this**, and `m3-check.html` held one. 50% of the window is exactly
+what the pane took while the split was wrong. It asserts `pane == map` now.
+
+### The ratio needed a floor
+
+30% of 840px is 252px. That is under M3's own 256dp minimum for this surface, and it arrives as a
+168px collapse off the 420 the band below ends on.
+
+The whole 840 to 1199 range sat under 360px, which is the width a camera still needs. Every
+landscape tablet lands in it.
+
+`max(360px, 30vw)` floors it. The ratio takes over at 1200px, where 30vw passes 360 on its own, so
+the two meet without a step.
+
+### What it measures now
+
+| window | pane | map |
+|---|---|---|
+| 601 | 289 | 289 |
+| 719 | 348 | 348 |
+| 839 | 408 | 408 |
+| 840 | 360 | 456 |
+| 1024 | 360 | 640 |
+| 1199 | 360 | 815 |
+| 1200 | 360 | 816 |
+| 1536 | 461 | 1051 |
+
+The step at 840 is 408 to 360 now, which is M3's own band change rather than a collapse.
+
+### No cap at the top
+
+30vw is 576px at 1920. That is past M3's 400dp band for a side sheet.
+
+M3 states that band for a sheet somebody opens over content. This is the supporting pane of a
+canonical layout, and the ratio is what that page gives it.
+
+### The pane stays under 360 in the medium band, and that is correct
+
+Half of a 601px window is 300px. A floor there makes the pane wider than the map again, which is the
+fault above.
+
+M3 states an equal split for a medium window. The window is small, so both panes are small.
+
+### Measure this by rendering, never by reading the rule
+
+The sweep sets the frame to each width and reads `#pane` and `#map` back.
+
+**Switch transitions off in the frame first.** `#map` animates its trailing edge for 300ms, so a
+shorter wait reads a map that is still moving. The first run of this sweep reported sums that missed
+the window by up to 71px, at widths where nothing was wrong.

@@ -1012,6 +1012,19 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
   this place`, which is the question the headline and the region line answer. So the three read as
   one block. On a five-sensor mast they used to sit under a region line the reader scrolled away
   from. `#sideKinds` is the app bar's second supporting line.
+  **One chip per KIND, never one per sensor, and `kindChips()` in `popup.js` is the one rule.** The
+  row drew one badge per member. So a place carrying two sirens drew the word `Siren` twice, which
+  reads as a rendering fault rather than as two sirens. A repeated kind takes a multiplier instead,
+  `Siren ×2`, and each kind states itself once. Measured on the live payload: 188 sites hold more
+  than one sensor, and **73 of them carried a repeated word**.
+  **A lone sensor of its kind carries no `×1`.** The count is worth printing only where it is not
+  the obvious one.
+  **A `Map`, because it keeps insertion order.** That order is the rank `render.js` gave the
+  members, so sorting the kinds here moves the lead sensor's chip off the front.
+  **The colour folds with OR, never off the first member.** Grey is this app's no-reading tone. A
+  chip covering one reporting siren and one silent one sits over a place that reports, so it keeps
+  the kind hue. It goes grey only where none of them reports. A station with no reading must never
+  look confident, and a station with one must not look dead.
   **They are M3 assist chips there, and they were `.badge` pills.** A 32dp container,
   `shape-corner-small`, a 1dp outline, `label-large` and an 18dp leading icon. **The colour splits
   the way M3 splits it.** The label takes `on-surface` and the leading icon takes the accent role,
@@ -1074,6 +1087,24 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
   name.** It is a line lower. But a 40px button reaches 48px down, and the region starts at 37.5.
   **A menu row's `[data-fav]` can hold a comma list.** So anything reading it back tests every id
   (see the still-open branch in ui.js). `ids.has('a,b,c')` is false forever.
+- **An equal split is EQUALITY, and a flat `50vw` is not it.** `--gap` (16) and `--seam` (8) both
+  come out of the MAP, so a pane at half the window left the map 24px short of half. The main pane
+  was the smaller of the two right across the medium band. Measured at 839px: a 420px pane against a
+  396px map. `--pane` is `calc(50vw - 12px)` there, which is half of those 24 put back in the middle.
+  **A share assertion cannot see this fault**, and `m3-check.html` held one for a while: 50% of the
+  window is exactly what the pane was taking while the split was wrong. It asserts `pane == map` now.
+- **The 30% ratio needs a floor, and 840px is where that shows.** M3 gives the supporting pane 30%
+  from 840 up. That is 252px there, under M3's own 256dp minimum for this surface, and it arrives as
+  a 168px COLLAPSE off the 420 the band below ends on. The whole 840 to 1199 range sits under 360,
+  which is the width a camera still needs and the number `--pane`'s own comment already carries.
+  Every landscape tablet lands in it: 307px at 1024, 334 at 1112, 354 at 1180.
+  `max(360px, 30vw)` floors it, and the ratio takes over at 1200 where 30vw passes 360 on its own.
+  **No cap at the top.** 30vw is 576px at 1920, past M3's 400dp side-sheet band. That band is written
+  for a sheet over content, and this is a canonical layout's supporting pane.
+  **Measure this by rendering the app across the range, never by reading the rule.** The sweep that
+  found both faults set the frame to 18 widths and read `#pane` and `#map` back. Switch transitions
+  off in the frame first: `#map`'s `right` animates for 300ms, so a shorter wait reads a map that is
+  still moving and the two widths do not add up to the window.
 - **The map card has TWO insets and they are not interchangeable.** `--gap` (16px) holds it off the
   window on the leading, top and bottom edges. `--seam` (8px) is the space between it and the
   supporting pane, on the trailing edge alone. That is M3's own pair: a margin holds content off the
@@ -2655,7 +2686,8 @@ it. The weather section stretches nothing. It is five fixed keys measuring 231px
   `#map` is the main pane and `#pane` is the supporting one. `#pane` holds one of three occupants at
   a time: the station card, the weather card and the filters.
   **Medium splits the window equally. Expanded gives 70% to the main pane and 30% to the supporting
-  one**, and the two bands above expanded keep that ratio. `--pane` carries it.
+  one**, and the two bands above expanded keep that ratio. `--pane` carries it, with two corrections
+  the ratio alone does not survive. See the entry on its floor below.
   **The main pane is drawn as a card**, because M3 separates panes with space rather than with a
   line. `--gap` is the map's inset against the window and `--seam` is the space between the two
   panes, which is M3's own margin-and-spacer pair.
@@ -3085,13 +3117,14 @@ const SPARK_H=12, NO_INFO='', NEAR_MAX_KM=30, MET_NAME='', ACC_ROWS=[], WEATHER=
 const RIVER_COLOR={1:'r1',2:'r2',3:'r3'},RAIN_COLOR={1:'c1',2:'c2',3:'c3',4:'c4'};
 const GAUGE_COLOR={1:'g1',2:'g2',3:'g3'},RAIN_STOPS=[[0],[10],[30],[60]];
 const KINDS={river:{color:'B',label:'Water level',one:'Water level',icon:'water_drop'},
-  gauge:{color:'T'},rainfall:{color:'V'},siren:{color:'P'}};
+  gauge:{color:'T',one:'Flood gauge',icon:'flood'},rainfall:{color:'V',one:'Rainfall',icon:'rainy'},
+  siren:{color:'P',one:'Siren',icon:'siren'},camera:{color:'C',one:'Camera',icon:'videocam'}};
 const SOURCES={selangor:{label:'Selangor'}},ALERT_TITLE={},camSrc=()=>'',distKm=()=>0;
-const hasInfo=()=>true,isStale=()=>false,statusColor=n=>'S'+n,scalePos=()=>0;
+const hasInfo=s=>s.info!==false,isStale=()=>false,statusColor=n=>'S'+n,scalePos=()=>0;
 const levelStops=()=>null,gaugeStops=()=>null,gaugeColor=()=>'',color=()=>'',isFav=()=>false;
 const nearestOf=()=>null,nearestCam=()=>null,nearestLevel=()=>null,camAlert=()=>null;\`;
 const M = new Function(stubs+noSec+src+
-  '; return { stamp, spanText, sirenBand, sparkline, rainBars, dots };')();
+  '; return { stamp, spanText, sirenBand, sparkline, rainBars, dots, kindChips };')();
 const now=Math.floor(Date.now()/1000), H=3600;
 let bad=0; const is=(g,w,n)=>{const ok=g===w; if(!ok)bad++;
   console.log((ok?'ok  ':'FAIL')+'  '+n+'  -> '+JSON.stringify(g)+(ok?'':'  want '+JSON.stringify(w)));};
@@ -3121,6 +3154,28 @@ is(/class=\"mi\" data-fav/.test(head),false,'dots: so its menu carries no favori
 is(head.indexOf('icon fav')<head.indexOf('icon dots'),true,'dots: the heart comes before the kebab');
 is(/class=\"icon fav\"/.test(inline),false,'dots: a sensor row emits no button of its own');
 is(/class=\"mi\" data-fav/.test(inline),true,'dots: it keeps the favorite as a menu row');
+
+// kindChips() draws the station panel's app bar row: one chip per KIND, never one per sensor. A
+// place with two sirens drew the word Siren twice, which reads as a rendering fault. Three things
+// fail silently here. A count printed as x1 on a lone sensor is noise. Sorting the kinds moves the
+// lead sensor's chip off the front. And the hue folds with OR, so a chip covering one reporting
+// siren and one silent one must keep the kind colour. Grey is this app's no-reading tone, and a
+// station with a reading must not look dead.
+// No backticks in this comment, and no bare double quotes: the whole harness is one double-quoted
+// shell string, so either one breaks the run before node sees it. The rule is stated above too.
+const labels=h=>[...h.matchAll(/<\/i>([^<]*)</g)].map(m=>m[1]).join('|');
+const hues=h=>[...h.matchAll(/--c:([^\"]*)\"/g)].map(m=>m[1]).join('|');
+const K=(kind,info=true)=>({kind,info});
+is(labels(M.kindChips([K('siren'),K('siren')])),'Siren ×2','chips: two sirens are one chip with the count');
+is(labels(M.kindChips([K('siren')])),'Siren','chips: and one siren carries no multiplier');
+is(labels(M.kindChips([K('river'),K('siren'),K('siren'),K('camera')])),
+   'Water level|Siren ×2|Camera','chips: each kind once, in the order render.js ranked them');
+is(labels(M.kindChips([K('rainfall'),K('river'),K('rainfall'),K('river'),K('river')])),
+   'Rainfall ×2|Water level ×3','chips: several repeated kinds each count separately');
+is(hues(M.kindChips([K('siren',false),K('siren')])),'P',
+   'chips: one reporting siren and one silent one keeps the kind hue');
+is(hues(M.kindChips([K('siren',false),K('siren',false)])),'var(--muted)',
+   'chips: and goes grey only where none of them reports');
 
 const rects=h=>[...h.matchAll(/<rect[\s\S]*?\/>/g)].map(m=>m[0]);
 const A=M.sirenBand(null), B=M.sirenBand([[now-9.3*H,0]]);
