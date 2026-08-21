@@ -1237,38 +1237,158 @@ body.side #bar { display: none; }
    is unreachable: `PREFS.mapLayer` holds one of the two, never both. A rule that cannot fire is a
    rule that goes. */
 
-/* `.menu` is a row list of `.mi` buttons and this one holds five `.chip` labels, which bring their
-   own padding. So the 4px the shared rule pads with would sit inside the chips' own. */
-/* The Stations chip is the widest thing in here, and at the old 236px its note sat hard against
-   its own label with no air between the two. 300 gives every chip slack on that line. */
-#paintmenu { min-width: 300px; padding: 6px; }
+/* **This panel takes M3's 24px inline body padding now, and the reason it declined it is gone.**
+   That reason was that every row was a `.chip` bringing 14px of its own, so 24 on top of 14 put a
+   label 38px inside the panel. The rows are button groups now. A group pads 2px and its buttons
+   paint to that edge, so 24 puts the fill 26px in and the panel reads as one column with air
+   around it. A reader called the old 6px too close to the border on 2026-08-21.
+   **`min-width` rises with it, and 320 is what the widest row needs.** The Icon group measures
+   251px at its own content width, and 300 less a 1px border either side less 48px of padding
+   leaves 250. One pixel of overflow. 320 leaves 270. `.menu`'s `max-width` caps this at 340. */
+#paintmenu { min-width: 320px; padding: 6px 24px 12px; }
+/* Everything in the panel lines up on the button fill, which sits 2px inside the group's own
+   padding. Stated once here rather than as four numbers that drift apart. */
+#paintmenu .mgroup, #paintmenu .mnote { margin-inline: 2px; }
+#paintmenu hr { margin-inline: 0; }
+/* **The sheet's heading, drawn below 600px alone** — see the block at the foot of this file for the
+   width, and index.html for why a menu needs none. `title-medium`, which outranks the 11px
+   uppercase `.mgroup` under it and stays under the 22px a full-screen dialog takes. `<h2>` keeps
+   the UA block margin, and this app resets `h1` alone, so `margin` is stated. */
+.sheettitle { display: none; }
+@media (max-width: 600px) {
+  .sheettitle {
+    display: block; margin: 0 2px 10px;
+    font-family: var(--md-sys-typescale-title-medium-font);
+    font-size: var(--md-sys-typescale-title-medium-size);
+    line-height: var(--md-sys-typescale-title-medium-line-height);
+    font-weight: var(--md-sys-typescale-title-medium-weight);
+    letter-spacing: var(--md-sys-typescale-title-medium-tracking);
+    color: var(--md-sys-color-on-surface);
+  }
+}
+/* --- M3 connected button group ------------------------------------------------------------------
+   **This is NOT `.seg`, and the difference is the whole entry.** `.seg` is this app's own sunken
+   track with a pill sliding along it, written for the app menu's theme picker and the lightbox's
+   range selector. It approximates a segmented button and matches no M3 component. M3 Expressive
+   retired the segmented button and replaced it with the **connected button group**, which is what
+   the three layer choices take.
+   Transcribed from the M3 Expressive component set's `ButtonGroup/button-group.css` and
+   `Button/button.css`, which cite `m3.material.io/components/button-groups/specs` and
+   `.../buttons/specs`. Size `xs`, shape `round`, variant `filled` with `data-selected`:
+
+       group      inline-flex, gap 2px, padding 2px          (connected, xs)
+       button     32px tall, padding-inline 12, gap 4, min-width 48
+       label      label-large — 14px on 20px at 500, 0.1px tracking
+       inner      corner-extra-small (4px) on every corner a neighbour touches
+       outer      height / 2, so the two ends of the group are a pill
+       selected   fully round at height / 2, on `primary` over `on-primary`
+       unselected `surface-container` over `on-surface-variant`
+
+   **The buttons size to their own content and are never stretched to share the width.** That is the
+   spec's own shape, and it is also what fits: the widest label decides an equal split, so three
+   equal segments of `Favorites · 12` measure 348px against the 262 this panel has. `min-width`
+   carries the short ones instead.
+   **The selected button changing shape is the component's signature**, and it is why the radius is
+   on the transition list with M3's own spring. A `.seg` moves a fill along a track. This grows one
+   button into a pill and lets its neighbours keep their square inner corners. */
+.btngrp {
+  --_h: 32px;                                          /* size xs */
+  --_r: var(--md-sys-shape-corner-extra-small);        /* 4px, the corner a neighbour touches */
+  display: inline-flex; max-width: 100%; gap: 2px; padding: 2px; margin: 0 0 2px;
+}
+.btngrp label {
+  box-sizing: border-box; position: relative;
+  display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+  flex-shrink: 0; min-width: 48px; height: var(--_h); padding-inline: 12px; margin: 0;
+  border: 0; border-radius: var(--_r); cursor: pointer; white-space: nowrap;
+  font-family: var(--md-sys-typescale-label-large-font);
+  font-size: var(--md-sys-typescale-label-large-size);
+  line-height: var(--md-sys-typescale-label-large-line-height);
+  font-weight: var(--md-sys-typescale-label-large-weight);
+  letter-spacing: var(--md-sys-typescale-label-large-tracking);
+  background: var(--md-sys-color-surface-container);
+  color: var(--md-sys-color-on-surface-variant);
+  -webkit-user-select: none; user-select: none;
+  transition:
+    color var(--md-sys-motion-duration-short2) var(--md-sys-motion-easing-standard),
+    background-color var(--md-sys-motion-duration-short2) var(--md-sys-motion-easing-standard),
+    border-radius var(--md-sys-motion-duration-spring-default-spatial)
+      var(--md-sys-motion-easing-spring-default-spatial);
+}
+/* A 32px button is under the 48px pointer minimum, so the spec grows the target rather than the
+   button. Vertical only: the inline edges belong to the neighbour 2px away. */
+.btngrp label::after { position: absolute; z-index: 2; inset: calc((var(--_h) - 48px) / 2) 0; content: ""; }
+/* The two ends of the group are a pill and everything a neighbour touches is the inner radius. */
+.btngrp label:first-of-type { border-start-start-radius: calc(var(--_h) / 2); border-end-start-radius: calc(var(--_h) / 2); }
+.btngrp label:last-of-type  { border-start-end-radius:   calc(var(--_h) / 2); border-end-end-radius:   calc(var(--_h) / 2); }
+/* Clipped to a pixel rather than hidden with `display: none`, which would take the control out of
+   the tab order and leave it mouse-only. The browser keeps the group exclusive, walks it with the
+   arrow keys and reads the label out — none of which a row of styled buttons gets for free. */
+.btngrp input { position: absolute; width: 1px; height: 1px; margin: -1px; border: 0; clip-path: inset(50%); }
+.btngrp label:has(:checked) {
+  border-radius: calc(var(--_h) / 2);
+  background: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary);
+}
+/* M3 paints hover as a state layer over the container, at `state-hover-opacity` of the label's own
+   colour. This app has no ripple to own it, so it is a `background-image` the way `button.css`
+   writes its focus layer. It lands on the selected button as well, which is the spec. */
+.btngrp label:hover {
+  background-image: linear-gradient(
+    color-mix(in srgb, currentColor calc(var(--md-sys-state-hover-opacity) * 100%), transparent),
+    color-mix(in srgb, currentColor calc(var(--md-sys-state-hover-opacity) * 100%), transparent));
+}
+.btngrp label:has(:focus-visible) { outline: 2px solid var(--md-sys-color-primary); outline-offset: 2px; }
+/* M3 draws a 20px icon in an xs button, at the 4px gap the base rule already states. `.i` is a 1em
+   box, and 1em here is `label-large`'s 14px, so the size has to be stated. The glyph takes the
+   button's own ink, `on-primary` on the chosen one, because a connected group paints in one fill. */
+.btngrp .i { font-size: 20px; }
+/* **The one divergence from the spec's own shape.** M3 sizes a connected group to its buttons.
+   Each group here is one row of the panel, and a row spans it.
+   **`flex: 1` fills them and is NOT an equal split, which is the whole reason it is safe.** A flex
+   item refuses to shrink under its own min-content, and a button here is `nowrap`, so its full
+   label is that floor. The free space spreads over whatever is left and no label is ever cut.
+   Three EQUAL buttons of `Favorites · 12` would measure 348px against the 270 this panel has. */
+#paintmenu .btngrp { display: flex; width: 100%; }
+/* **`flex-grow`, never the `flex: 1` shorthand, and the difference is a label spilling out of its
+   own fill.** That shorthand is `1 1 0`, and a zero basis makes every button start at nothing and
+   take an equal share of the whole row. A flex item is normally floored at its own min-content, but
+   the explicit `min-width: 48px` M3 states for a connected xs button REPLACES `min-width: auto` and
+   takes that floor away. Measured at a 320px window: three buttons of 77px each, with `Water level`
+   drawing about 100px of `nowrap` text straight over its neighbour. It did it at every width.
+   `flex-grow: 1` alone keeps the `auto` basis, so each button starts at its own label and only the
+   space left over is shared. `flex-shrink` stays 0 from the base rule, so a row that cannot fit
+   overflows the panel rather than cutting a word — and `paint-check.html` fails on that. */
+#paintmenu .btngrp label { flex-grow: 1; }
+/* A filter with nothing to match goes flat and unclickable rather than emptying the map in silence.
+   M3's own disabled pair for a filled button: the container is `on-surface` at 10% and the label is
+   `on-surface` at 38%. `.chip` states the same rule for the drawer's sensor kinds, in one opacity. */
+.btngrp label:has(:disabled) {
+  pointer-events: none;
+  background-color: color-mix(in srgb,
+    var(--md-sys-color-on-surface) calc(var(--md-sys-state-disabled-container-opacity) * 100%), transparent);
+  color: color-mix(in srgb,
+    var(--md-sys-color-on-surface) calc(var(--md-sys-state-disabled-opacity) * 100%), transparent);
+  background-image: none;
+}
+@media (prefers-reduced-motion: reduce) { .btngrp label { transition: none; } }
+/* **A failure line, and nothing else.** Each layer named the discipline it measures here, and a
+   reader cut both on 2026-08-21: the two buttons above already name the layers.
+   `#wxHint` is the one thing left in it, and every caller that writes it reports a failure. So this
+   line has no `min-height` and no margin of its own to reserve. An empty `.hint` leaves the line
+   through `:empty`, and `:has()` then takes the whole paragraph with it, or the panel keeps a blank
+   strip under its layer group on every healthy poll. */
+#paintmenu .mnote { display: flex; margin: 2px 8px 4px; color: var(--muted); }
+#paintmenu .mnote:not(:has(.hint:not(:empty))) { display: none; }
 /* The bottom sheet's drag handle. It draws below 600px alone — see the sheet block at the foot of
    this file. Above that width this panel is a menu beside its button, and a menu has no drag. */
 .grab { display: none; }
 
-/* The press shortcut, named on the one class of device that can take it. Hover opens this panel on
-   a pointer device, which is what frees the press to switch the layer. A tap and a keyboard press
-   keep the native `popovertarget` toggle, so on those the line would name an action that does not
-   exist. Same media query as the handler in `js/ui.js`, and it is `PLAYER_OVERLAY`'s own.
-   Right, because it points at a control outside the panel rather than at the list above it.
-   It carries its own `font-size` rather than `.muted`, which is a colour AND a 12px size and would
-   draw this line larger than the notes it sits under. */
-#paintmenu .mfoot { display: none; }
-@media (hover: hover) and (min-width: 601px) {
-  #paintmenu .mfoot {
-    /* 15px on the right, which is a chip's own 14px padding plus its 1px border. Two right-aligned
-       texts that miss each other by 6px read as a mistake, and this line sits directly under the
-       Weather chip's note. */
-    display: block; margin: 8px 15px 2px 8px; text-align: right;
-    font-size: 11px; color: var(--muted); opacity: .8;
-  }
-  /* The glyph the sentence points at, drawn rather than named. `.i` is a 1em box already sitting on
-     the baseline through its own `vertical-align`, so this only has to grow it: at the line's 11px
-     the mark is smaller than the button it names and reads as punctuation.
-     It carries `role="img"` and a label, because a mask has no text of its own and a reader who
-     cannot see it is left with a sentence that points at nothing. */
-  #paintmenu .mfoot .i { font-size: 1.35em; }
-}
+/* **The press shortcut is a tooltip now, and the line that named it is gone.** It sat at the foot
+   of the panel reading `Click <layers> to switch layer`, drawn behind a media query and pointing at
+   a button outside the box it sat in. A reader cut it on 2026-08-21.
+   `js/ui.js` writes the sentence onto `#paint` as `data-tip` instead, behind that same query, and
+   `js/sparktip.js` draws it. **It is not a `title`.** A `title` opens on no phone, and this app
+   accepts one only as a duplicate of something already visible. Nothing is visible here any more. */
 
 /* --- heatmap legend ------------------------------------------------------------------------- */
 
@@ -2723,11 +2843,12 @@ body.finding #find { display: none; }
    shows down each side at 360px while the sheet sits flush on the bottom. That is why only the top
    corners are rounded.
 
-   One number this app keeps instead. M3 pads the sheet body 24px on the inline axis. Every row in
-   here is a `.chip`, and a chip brings 14px of its own padding — which is why this panel already
-   pads 6px where the shared `.menu` rule pads 4. Stacking 24 on top of 14 puts a label 38px inside
-   its own sheet. The header-follows-its-pane rule the four dialogs state applies here unchanged.
-   The 24px at the BOTTOM is taken: nothing sits under the last chip, and a phone's gesture bar does. */
+   **M3's 24px inline body padding is taken now, and the reason this app declined it is gone.** That
+   reason was that every row was a `.chip` bringing 14px of its own, so 24 on top of 14 put a label
+   38px inside its own sheet. The rows are button groups now. A group pads 2px and its buttons paint
+   to that edge. `#paintmenu`'s own rule carries the number for both widths, so there is one place
+   that states it. The 24px at the BOTTOM was always taken: nothing sits under the last row, and a
+   phone's gesture bar does. */
 @media (max-width: 600px) {
   #paintmenu {
     /* `inset: auto 0 0 0` beats `.menu`'s `inset: auto`, and js/ui.js stops writing a placement
@@ -2737,7 +2858,7 @@ body.finding #find { display: none; }
     width: min(640px, calc(100% - 32px)); margin-inline: auto;
     min-width: 0; max-width: none;
     max-height: calc(100dvh - 72px);
-    padding: 0 6px 24px;
+    padding: 0 24px 24px;
     border: 0; border-radius: 28px 28px 0 0;
   }
   /* M3's scrim, at the 32% its own file states. A popover's backdrop paints but never blocks: light

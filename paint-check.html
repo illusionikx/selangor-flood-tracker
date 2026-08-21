@@ -56,8 +56,11 @@ const el = id => d.getElementById(id);
      answers for itself here, rather than leaving the map to answer somewhere else. */
   is(w.getComputedStyle(el('paint')).transitionProperty.includes('transform'), true,
      'the button answers a press, because what the press changes is somewhere else');
-  is(w.getComputedStyle(d.querySelector('.chip .glyph')).transitionProperty.includes('opacity'), true,
-     'and a chip glyph fades with the rest of its chip, rather than snapping beside it');
+  /* The selected button growing into a pill is the connected group's signature, so the radius is
+     on the transition list with M3's own spring. */
+  const bt = w.getComputedStyle(d.querySelector('#paintmenu .btngrp label')).transitionProperty;
+  is(bt.includes('background-color'), true, 'a button group fades its fill rather than snapping it');
+  is(bt.includes('border-radius'), true, 'and animates the shape change, which is the M3 signature');
 }
 const noAnim = d.createElement('style');
 noAnim.textContent = '*{transition:none !important}';
@@ -100,12 +103,12 @@ is(mb.left >= 8, true, 'and clamped onto the screen rather than off its left edg
    the handler decides from the button's own position, so neither placement is written down twice. */
 is(bb.left > w.innerWidth / 2, true, 'the button is in the right half of the viewport');
 is(Math.abs(mb.right - bb.right) < 2, true, 'so its menu aligns the right edges');
-is(mb.width > 0 && mb.height > 0, true, 'it has a size, so the three chips laid out');
+is(mb.width > 0 && mb.height > 0, true, 'it has a size, so the three segmented tracks laid out');
 // A press inside must not dismiss it: three mutually-exclusive choices means trying another one.
 el('favOnly').closest('label').click();
 await wait(120);
 is(menu.matches(':popover-open'), true, 'picking a layer leaves the panel open to pick another');
-el('favOnly').checked = false;
+el('pinAll').checked = true;
 menu.hidePopover();
 await wait(120);
 is(menu.matches(':popover-open'), false, 'and it closes again');
@@ -126,7 +129,7 @@ for (const kind of ['touch', 'pen']) {
 ptr('pointerenter', btn, 'mouse');
 await wait(250);
 is(menu.matches(':popover-open'), true, 'a mouse pointer does');
-/* The pointer crosses a 4px gap on the way to a chip. Leaving the button must not shut the panel
+/* The pointer crosses a 4px gap on the way to a segment. Leaving the button must not shut the panel
    the reader is reaching for. */
 ptr('pointerleave', btn, 'mouse');
 ptr('pointerenter', menu, 'mouse');
@@ -164,8 +167,10 @@ const gutter = () => menu.offsetWidth - menu.clientWidth;
 
 // --- the three choices moved, and none of them is in two places --------------------------------
 
-const BOXES = ['heat', 'rainHeat', 'stations', 'favOnly', 'wxLayer', 'risingOnly'];
-is(d.querySelectorAll(BOXES.map(i => '#' + i).join(', ')).length, 6, 'all six boxes exist once');
+const BOXES = ['heatOff', 'heat', 'rainHeat', 'stations', 'wxLayer',
+               'pinAll', 'favOnly', 'risingOnly'];
+is(d.querySelectorAll(BOXES.map(i => '#' + i).join(', ')).length, BOXES.length,
+   'every segment exists exactly once');
 for (const id of BOXES)
   is(el(id).closest('#paintmenu') !== null, true, id + ' is in the map panel');
 is(el('bar').contains(el('heat')), false, 'and no copy is left in the drawer');
@@ -244,7 +249,8 @@ is(me.borderTopLeftRadius !== zc.borderTopLeftRadius, true, 'but its own FAB rad
 /* The glyph holds whatever paints. That is the whole point of the change. */
 const seen = new Set();
 for (const [h, r, x] of [[1, 0, 0], [0, 1, 0], [0, 0, 1], [0, 0, 0]]) {
-  el('heat').checked = !!h; el('rainHeat').checked = !!r; el('wxLayer').checked = !!x;
+  el(h ? 'heat' : r ? 'rainHeat' : 'heatOff').checked = true;
+  el(x ? 'wxLayer' : 'stations').checked = true;
   await wait(50);
   seen.add(w.getComputedStyle(ico).maskImage);
 }
@@ -256,89 +262,236 @@ is(seen.size, 1, 'the glyph holds at all four states, so it can never name a lay
    lives inside it. */
 const sub = menu.querySelector('.subgrp');
 is(!!sub, true, 'Stations carries a branch');
-for (const id of ['heat', 'rainHeat', 'favOnly', 'risingOnly'])
+for (const id of ['heatOff', 'heat', 'rainHeat', 'pinAll', 'favOnly', 'risingOnly'])
   is(el(id).closest('.subgrp') === sub, true, id + ' is inside that branch');
 is(el('stations').closest('.subgrp'), null, 'Stations itself is not — it is the parent');
 is(el('wxLayer').closest('.subgrp'), null, 'and Weather is a layer of its own, not a child');
-// The parent has to come first, or the indent points at nothing above it.
-const rows = [...menu.querySelectorAll('.chip, .subgrp')];
-is(rows.indexOf(el('stations').closest('.chip')) < rows.indexOf(sub), true,
-   'Stations is drawn above its branch');
-is(rows.indexOf(sub) < rows.indexOf(el('wxLayer').closest('.chip')), true,
-   'and Weather below it, so the branch cannot look like Weather\'s');
+/* The two layers share ONE track, so the branch cannot sit between them any more. It follows the
+   track instead, and the track has to come first or the indent points at nothing above it. */
+const rows = [...menu.querySelectorAll('.btngrp, .subgrp')];
+is(el('wxLayer').closest('.btngrp'), el('stations').closest('.btngrp'),
+   'both layers are buttons of one group');
+is(rows.indexOf(el('stations').closest('.btngrp')), 0, 'that group is drawn first');
+is(rows.indexOf(sub) > 0, true, 'and the branch under it');
 
-// --- every chip names itself, and the two layers name what they measure ------------------------
-/* The label names the control. On a layer, `.note` at the right edge names the discipline that
-   layer measures. `.hint` is the third thing: JS writes it and it reports a state, such as how many
-   stations a filter holds, so it is not required here.
-   Every chip carried a sentence under its label for four revisions. A reader cut all of them. */
-is(menu.querySelector('small'), null, 'no chip carries a line of flavour text any more');
+// --- every segment names itself, and the layer track names what it measures --------------------
+/* The label names the control. A segment has no right edge of its own to spare, so the note moved
+   under the layer track and names whichever layer is on. The `:has()` pair in chrome.css does the
+   swap, so there is no JS to keep in step with the preference.
+   Every control here carried a sentence under its label for four revisions. A reader cut all of
+   them, and the segmented track has room for fewer words still. */
+is(menu.querySelector('small'), null, 'nothing carries a line of flavour text any more');
 for (const id of BOXES)
-  is(el(id).closest('.chip').querySelector('.lab').textContent.trim().length > 0, true,
-     id + ' still names itself');
-const note = id => el(id).closest('.chip').querySelector('.note')?.textContent.trim() ?? null;
-is(note('stations'), 'Hydrological Measurement', 'stations names what it measures');
-is(note('wxLayer'), 'Nowcasting', 'and weather names what it forecasts');
-for (const id of ['heat', 'rainHeat', 'favOnly', 'risingOnly'])
-  is(note(id), null, id + ' carries none, because it is a choice about a layer and not a layer');
-/* **Flush with the right edge, and the edge is measured rather than assumed.** A containment test
-   passes on a note sitting anywhere after the label, and that is what shipped: `margin-left: auto`
-   on the note AND the hint split the chip's slack in two, leaving the Weather note 41px short.
-   Measured with the panel OPEN: a closed popover is `display: none`, so every rect inside it reads
-   zero and an edge test compares 0 against 0. */
+  is(el(id).closest('label').textContent.trim().length > 0, true, id + ' still names itself');
+
+/* Measured with the panel OPEN: a closed popover is `display: none`, so every rect inside it reads
+   zero and a visibility test reads a working line as hidden. */
 if (!menu.matches(':popover-open')) menu.showPopover();
 await wait(150);
-const rightEdge = chip => {
-  const cs = w.getComputedStyle(chip);
-  return chip.getBoundingClientRect().right
-       - parseFloat(cs.paddingRight) - parseFloat(cs.borderRightWidth);
-};
-for (const id of BOXES) {
-  const chip = el(id).closest('.chip');
-  const last = [...chip.querySelectorAll('.note, .hint')]
-    .filter(e => w.getComputedStyle(e).display !== 'none').pop();
-  if (!last) continue;
-  is(Math.abs(rightEdge(chip) - last.getBoundingClientRect().right) < 1, true,
-     id + ': the right slot is flush with the right edge of its chip');
-}
-/* An empty hint comes off the line rather than sitting at zero width. It carries the flex `gap`
-   either way, which held the note 8px off an edge the Stations chip met exactly. */
+/* **Nothing names what a layer measures any more.** `Hydrological Measurement` and `Nowcasting` sat
+   under the group and a reader cut both on 2026-08-21: the two buttons above already name the
+   layers, and naming what each one measures is a second look at one fact. */
+is(menu.querySelector('.note'), null, 'no layer names the discipline it measures');
+/* **`#wxHint` is not that, and it stays.** Every caller that writes it reports a failure, so the
+   line it sits in must draw nothing at all on a healthy poll. An empty `.hint` leaves the line, and
+   `:has()` then takes the whole paragraph, or the panel keeps a blank strip under its layer group
+   for ever. */
+const hintLine = el('wxHint').closest('.mnote');
+el('wxHint').textContent = '';
+await wait(50);
 is(w.getComputedStyle(el('wxHint')).display, 'none', 'an empty hint takes no room, not even its gap');
+is(w.getComputedStyle(hintLine).display, 'none', 'and the line it sits in goes with it');
+el('wxHint').textContent = 'could not load';
+await wait(50);
+is(w.getComputedStyle(hintLine).display !== 'none', true, 'a failure brings that line back');
+is(hintLine.getBoundingClientRect().height > 0, true, 'with a box to read it in');
+el('wxHint').textContent = '';
+await wait(50);
 
-/* **The press shortcut is named, on the one class of device that can take it.** Hover opens this
-   panel on a pointer device, which is what frees the press to switch the layer. A tap and a keyboard
-   press keep the native toggle, so on those the line would name an action that does not exist. The
-   phone block at the foot of this file asserts the other half. */
-const foot = menu.querySelector('.mfoot');
-is(!!foot, true, 'the panel names the press shortcut');
-is(w.getComputedStyle(foot).display !== 'none', true, 'desktop: and draws it, because hover opens the panel here');
-is(w.getComputedStyle(foot).textAlign, 'right', 'desktop: right, because it points at a control outside the panel');
-/* Flush with the notes above it. Two right-aligned texts that miss each other by a few pixels read
-   as a mistake, and this line sits directly under the Weather chip's note. */
-is(Math.abs(foot.getBoundingClientRect().right
-   - menu.querySelector('.note').getBoundingClientRect().right) < 1, true,
-   'desktop: on the same right edge as the notes above it');
-/* **The line points at the button by drawing its glyph, not by naming it.** So the two marks have to
-   be the same one. Read `mask-image` rather than `--i`: a resolved token is not evidence that
-   anything painted, which is the fault `#paint::before` shipped with. */
-const fg = foot.querySelector('.i');
-is(w.getComputedStyle(fg).maskImage, w.getComputedStyle(btn.querySelector('.i')).maskImage,
-   'desktop: and the glyph in it is the button’s own');
-is(fg.getBoundingClientRect().height > 0, true, 'desktop: with a box to paint in');
-/* A mask has no text of its own, so a reader who cannot see it is left with a sentence pointing at
-   nothing. */
-is(!!fg.getAttribute('aria-label'), true, 'desktop: and an accessible name, because a mask has no text');
-is(foot.getBoundingClientRect().height < 24, true, 'desktop: the line does not wrap around it');
+/* The count a pin filter holds rides INSIDE its own button. A button has no right edge to spare. */
+is(el('favHint').closest('label').contains(el('favOnly')), true,
+   'the favorites count rides in the favorites button');
 
-/* The weather chip takes the hue its own clear-sky pin draws in, never a status hue. `--wx-clear`
-   is muted away from `--s-alert` on purpose, so an amber chip here cannot read as an alert.
-   Compared against the RESOLVED token, because a custom property substitutes its `var()` at computed
-   time. Reading the literal back is the same mistake the glyph assertion made once. */
-const wxc = w.getComputedStyle(el('wxLayer').closest('.chip')).getPropertyValue('--c').trim();
+// --- an M3 connected button group, transcribed rather than approximated ------------------------
+/* M3 Expressive retired the segmented button and replaced it with the connected button group. Real
+   radios under it, clipped rather than hidden, so the browser keeps the group exclusive, walks it
+   with the arrow keys and reads each label out. None of that comes free with a row of buttons. */
+/* Every number below is the component set's own, from `ButtonGroup/button-group.css` and
+   `Button/button.css`: size xs, shape round, variant filled with `data-selected`. Read them back
+   off the live element rather than trusting the rule applied — that is the `.leaflet-touch` lesson.
+   **`.seg` must never be what answers here.** That class is this app's own sunken track, written
+   for the theme picker and the lightbox ranges, and it matches no M3 component. */
+is(menu.querySelector('.seg'), null, 'no .seg is left in this panel, because it is not an M3 component');
+/* **M3's 24px inline body padding, taken at both widths.** This app declined it while every row was
+   a `.chip` bringing 14px of its own. The rows are button groups now, which pad 2px and paint their
+   fill to that edge, so the two no longer stack. A reader called the old 6px too close to the
+   border on 2026-08-21. */
+is(w.getComputedStyle(menu).paddingLeft, '24px', 'M3: the panel pads 24px inline');
+is(w.getComputedStyle(menu).paddingRight, '24px', 'M3: on both edges');
+for (const grp of menu.querySelectorAll('.btngrp')) {
+  const cs = w.getComputedStyle(grp);
+  is(cs.gap, '2px', 'M3: 2px between connected buttons, at every size');
+  is(cs.paddingLeft, '2px', 'M3: and 2px of group padding at xs');
+}
+
+const H = 32, R = 16;             // size xs, and its outer radius is height / 2
+for (const id of BOXES) {
+  const b = el(id).closest('label'), cs = w.getComputedStyle(b);
+  is(!!b.closest('.btngrp'), true, id + ' sits in a connected button group');
+  is(Math.round(b.getBoundingClientRect().height), H, id + ': M3 xs is 32px tall');
+  is(cs.paddingLeft, '12px', id + ': M3 xs pads 12px inline');
+  is(Math.round(parseFloat(cs.minWidth)), 48, id + ': M3 floors a connected xs button at 48px');
+  is(cs.fontSize + ' ' + cs.fontWeight, '14px 500', id + ': label-large, 14px at 500');
+  is(cs.letterSpacing, '0.1px', id + ': with label-large tracking');
+  /* The button is the hit area, not the radio inside it. A filter with nothing to match is
+     `disabled`, and M3 takes the pointer off it rather than changing the cursor. */
+  is(cs.pointerEvents, el(id).disabled ? 'none' : 'auto',
+     id + ': the button is the hit area, and a dead one takes no pointer at all');
+}
+/* **A 32px button is under the 48px pointer minimum, so the spec grows the TARGET.** Vertical only:
+   the inline edges belong to the neighbour 2px away. */
+{
+  const a = w.getComputedStyle(el('stations').closest('label'), '::after');
+  is(a.content !== 'none', true, 'M3: xs carries a pointer target of its own');
+  is(Math.round(parseFloat(a.top)), -8, 'M3: grown to 48px on the block axis, and no further');
+}
+/* **The two ends of a group are a pill and every corner a neighbour touches is 4px.** The selected
+   button then goes fully round, which is the whole signature of this component. */
+{
+  const first = el('heatOff').closest('label'), mid = el('heat').closest('label'),
+        last = el('rainHeat').closest('label');
+  const rad = (e, prop) => Math.round(parseFloat(w.getComputedStyle(e)[prop]));
+  el('rainHeat').checked = true;              // so the two probed below are both unselected
+  await wait(50);
+  is(rad(first, 'borderTopLeftRadius'), R, 'M3: the leading end of the group is a pill');
+  is(rad(first, 'borderTopRightRadius'), 4, 'M3: and its inner corner is corner-extra-small');
+  is(rad(mid, 'borderTopLeftRadius') + '|' + rad(mid, 'borderTopRightRadius'), '4|4',
+     'M3: a middle button is the inner radius on every corner');
+  is(rad(last, 'borderTopLeftRadius'), R, 'M3: and the selected button goes fully round');
+  is(rad(last, 'borderTopRightRadius'), R, 'M3: on both of its own corners');
+}
+/* Filled, with `data-selected`. Unselected is `surface-container` over `on-surface-variant`, and
+   selected is `primary` over `on-primary`. Compared against the RESOLVED bridge in css/base.css,
+   never against a literal: this app holds one surface tone and bridges M3's roles onto it. */
+{
+  const rgb = n => { const e = d.createElement('i'); e.style.color = 'var(' + n + ')';
+    menu.appendChild(e); const v = w.getComputedStyle(e).color; e.remove(); return v; };
+  el('heat').checked = true;
+  await wait(50);
+  const on = w.getComputedStyle(el('heat').closest('label'));
+  const off = w.getComputedStyle(el('heatOff').closest('label'));
+  is(on.backgroundColor, rgb('--md-sys-color-primary'), 'M3: the selected button is filled primary');
+  is(on.color, rgb('--md-sys-color-on-primary'), 'M3: with on-primary ink, never a literal white');
+  is(off.backgroundColor, rgb('--md-sys-color-surface-container'),
+     'M3: an unselected one is surface-container');
+  is(off.color, rgb('--md-sys-color-on-surface-variant'), 'M3: over on-surface-variant');
+}
+/* **Every group fills the panel between its own padding.** That is the one divergence from the
+   spec's shape, which sizes a group to its buttons. Each group is one row of this panel and a row
+   spans it. Asserted against the panel's own content box, never a constant: `.menu` carries a 1px
+   border as well as `#paintmenu`'s padding, so the content box is four pixels under the rect. */
+{
+  const mc = w.getComputedStyle(menu), mb = menu.getBoundingClientRect();
+  const inner = mb.width - parseFloat(mc.paddingLeft) - parseFloat(mc.paddingRight)
+                         - parseFloat(mc.borderLeftWidth) - parseFloat(mc.borderRightWidth);
+  for (const grp of menu.querySelectorAll('.btngrp'))
+    is(Math.round(grp.getBoundingClientRect().width), Math.round(inner),
+       (grp.getAttribute('aria-label') || '?') + ': the group fills the panel');
+}
+/* **`flex-grow`, never `flex: 1`, and a spilling label is what tells the two apart.** The shorthand
+   is `1 1 0`. A zero basis makes every button start at nothing and take an equal share, and the
+   explicit `min-width: 48px` M3 states for a connected xs button REPLACES `min-width: auto`, so the
+   content floor that would have saved it is gone. Measured at a 320px window: three buttons of 77px
+   each with `Water level` drawing about 100px of `nowrap` text over its neighbour. It did that at
+   every width, and it changed no `scrollWidth`, so only this assertion sees it. */
+{
+  const wid = id => el(id).closest('label').getBoundingClientRect().width;
+  is(wid('heat') > wid('heatOff'), true, 'a longer label takes a wider button');
+  is(wid('rainHeat') > wid('heatOff'), true, 'and a middling one lands between the two');
+  for (const id of BOXES) {
+    const b = el(id).closest('label'), lab = b.querySelector('span');
+    is(b.getBoundingClientRect().width >= lab.getBoundingClientRect().width, true,
+       id + ': its label fits inside its own fill');
+  }
+}
+/* Two of the layer buttons carry near-equal labels, so the equal share lands on both. Kept as its
+   own assertion: it is the one row where a reader meets the two halves side by side. */
+{
+  const a = el('stations').closest('label').getBoundingClientRect();
+  const b = el('wxLayer').closest('label').getBoundingClientRect();
+  is(Math.abs(a.width - b.width) < 1, true, 'the two layers come out the same width');
+}
+/* No button can sit outside its group, at either width. A row that cannot fit overflows the panel
+   rather than cutting a word, because `flex-shrink` stays 0, and this is what fails on it. */
+is(menu.scrollWidth <= menu.clientWidth, true, 'no group overflows the panel');
+
+/* **A leading icon on each layer, at M3's 20px for an xs button.** It is a real `<i>` taking the
+   mask from its class, which is the rule `#paint::before` shipped broken once: a pseudo-element
+   that sets `--i` and never joins the list in `css/icons.css` draws an empty box. Read `mask-image`
+   rather than the token, because a resolved `--i` is not evidence that anything painted. */
+const maskOf = cls => { const e = d.createElement('i'); e.className = 'i ' + cls;
+  menu.appendChild(e); const v = w.getComputedStyle(e).maskImage; e.remove(); return v; };
+for (const [id, name] of [['stations', 'i-place'], ['wxLayer', 'i-partly_cloudy_day']]) {
+  const g = el(id).closest('label').querySelector('.i');
+  is(!!g, true, id + ' carries a leading icon');
+  is(Math.round(g.getBoundingClientRect().width), 20, id + ': at M3 20px for an xs button');
+  /* A mask resolves to a data URI, so the icon's NAME is nowhere in the computed value. Compare
+     against a probe carrying the same class, the way the colour block compares against the bridge.
+     A resolved `--i` is not evidence that anything painted, which is the fault `#paint::before`
+     shipped with, so this reads `mask-image` on both sides. */
+  is(g && w.getComputedStyle(g).maskImage, maskOf(name), id + ': drawing the ' + name + ' mask');
+  is(w.getComputedStyle(g).maskImage !== 'none', true, id + ': which is a real mask, not an empty box');
+  is(g.compareDocumentPosition(el(id).closest('label').querySelector('span'))
+     & w.Node.DOCUMENT_POSITION_FOLLOWING, w.Node.DOCUMENT_POSITION_FOLLOWING,
+     id + ': leading, so the label follows it');
+}
+/* The two groups under it carry none. Three buttons of text and a glyph do not fit a 328px sheet,
+   and the legend under the map already draws what each wash means. */
+for (const id of ['heatOff', 'heat', 'rainHeat', 'pinAll', 'favOnly', 'risingOnly'])
+  is(el(id).closest('label').querySelector('.i'), null, id + ' carries none, and has no room for one');
+/* No button can sit outside its group, at either width. That is the fault a font change or one
+   extra word lands first, and it reads as a spacing mistake rather than as an overflow. */
+is(menu.scrollWidth <= menu.clientWidth, true, 'no group overflows the panel');
+
+/* **The press shortcut is a TOOLTIP now, and it is named on the one class of device that can take
+   it.** Hover opens this panel on a pointer device, which is what frees the press to switch the
+   layer. A tap and a keyboard press keep the native toggle, so on those the words would name an
+   action that does not exist. A line at the foot of the panel said it before, and a reader cut it
+   on 2026-08-21: it pointed at a button outside the box it sat in.
+   **It rides `data-tip`, never a `title`.** A `title` opens on no phone, and this app accepts one
+   only as a duplicate of something already visible. Nothing is visible here any more.
+   **One of the two, never both**, which is the shape `setBtn()` in js/locate.js already uses. */
+is(menu.querySelector('.mfoot'), null, 'desktop: the panel no longer names the shortcut in the panel');
+/* **The heading is the SHEET's, so it must not draw here.** Above 600px this panel is a menu
+   anchored to a button whose own tip names it, and the anchor is the label. */
+is(w.getComputedStyle(menu.querySelector('.sheettitle')).display, 'none',
+   'desktop: and carries no heading, because its button is the label');
+is(/switch/i.test(btn.dataset.tip || ''), true, 'desktop: the button names it on a tip instead');
+is(/layer/i.test(btn.dataset.tip || ''), true, 'desktop: and still says which control it is');
+is(btn.hasAttribute('title'), false, 'desktop: with no title beside it, which would name it twice');
+is(!!btn.getAttribute('aria-label'), true, 'desktop: and an accessible name, whichever tip is on it');
+/* The tip is what `js/sparktip.js` draws. Assert the wiring rather than the paint: a hover here
+   also opens the panel, and the two land at once. */
+{
+  btn.dispatchEvent(new w.PointerEvent('pointermove',
+    { bubbles: true, pointerType: 'mouse', clientX: r.left + 4, clientY: r.top + 4 }));
+  await wait(120);
+  const tip = d.querySelector('.sparktip');
+  is(!!tip && tip.textContent.includes('switch'), true, 'desktop: and sparktip draws those words');
+}
+
+/* **No segment carries a hue of its own, and the weather one used to.** A `.chip` painted its
+   border, its ink and its tint in `--c`, so weather took its own clear-sky hue to separate it from
+   the accent. A segmented track paints whichever segment is on in ONE fill, so a second colour
+   inside it reads as a rendering fault rather than as a layer's own mark. `--accent` is not a status
+   hue, so the colour language is unbroken — that rule reserves the traffic-light set, and this is
+   not one of them. */
 const tok = n => w.getComputedStyle(d.documentElement).getPropertyValue(n).trim();
-is(wxc, tok('--wx-clear'), 'the weather chip is painted its own weather hue');
-for (const s of ['--s-normal', '--s-alert', '--s-warning', '--s-danger'])
-  is(wxc === tok(s), false, 'and never ' + s + ', which is reserved for status');
+for (const id of BOXES) {
+  const c = w.getComputedStyle(el(id).closest('label')).getPropertyValue('--c').trim();
+  for (const t of ['--s-normal', '--s-alert', '--s-warning', '--s-danger'])
+    is(c !== '' && c === tok(t), false, id + ' takes no ' + t + ', which is reserved for status');
+}
 
 // --- the branch is two labelled sections ----------------------------------------------------------
 const groups = [...sub.querySelectorAll('.mgroup')].map(g => g.textContent.trim());
@@ -355,15 +508,27 @@ if (!menu.matches(':popover-open')) menu.showPopover();
 await wait(120);
 is(w.getComputedStyle(sub).display !== 'none', true, 'Stations on -> the children show');
 const subBox = sub.getBoundingClientRect();
-const parBox = el('stations').closest('.chip').getBoundingClientRect();
+const parBox = el('stations').closest('.btngrp').getBoundingClientRect();
 is(subBox.width > 0 && parBox.width > 0, true, 'the panel is open, so these rects are real');
-is(subBox.left > parBox.left, true, 'and the children are indented under Stations');
-is(el('favOnly').closest('.chip').getBoundingClientRect().left > subBox.left, true,
-   'the chips themselves clear the spine');
-is(w.getComputedStyle(sub).borderLeftStyle !== 'none', true, 'with a spine carrying the nesting');
+/* **No indent and no spine, and a divider says whose these are instead.** The branch sat 26px in
+   behind a 1px line, written for a time when its parent was a chip with a glyph to line up under.
+   A reader cut both on 2026-08-21. Assert the absence: an indent that creeps back takes width off
+   the two groups inside, and those are the ones that have no width to spare. */
+is(Math.round(subBox.left), Math.round(parBox.left), 'the branch lines up with the layer group');
+is(w.getComputedStyle(sub).borderLeftStyle, 'none', 'and carries no spine');
+is(Math.round(parseFloat(w.getComputedStyle(sub).paddingLeft)), 0, 'and no indent of its own');
+const rule = sub.querySelector('hr');
+is(!!rule, true, 'a divider separates the layer group from the choices about it');
+is(rule.getBoundingClientRect().width > 0, true, 'and it draws');
+/* **It sits INSIDE the collapsing branch, never above it.** Outside, it would stay on screen with
+   nothing under it the moment Weather takes the map, which is a rule under an empty panel. */
+is(rule.closest('.subgrp') === sub, true, 'inside the branch, so it collapses with it');
+is(rule.getBoundingClientRect().top < el('heat').getBoundingClientRect().top, true,
+   'above the first choice it introduces');
 
 /* Driven by picking the OTHER layer, because that is the only way a reader can put Stations away.
-   The chips are radios: clicking the checked one cannot clear it. */
+   Every group here is a single-select segmented button: clicking the chosen segment cannot clear
+   it. */
 const favWas = el('favOnly').checked, alertWas = el('risingOnly').checked;
 el('wxLayer').checked = true;
 el('wxLayer').dispatchEvent(new w.Event('change'));
@@ -393,7 +558,9 @@ await wait(60);
 /* **One at a time in each section**, and driven through the real `change` path rather than by
    assignment: the preference is what makes both-on unrepresentable, and only the handler writes it.
    A pair of booleans is the shape this must never go back to — see syncHeat()'s own comment for the
-   two repairs that failed before the pair became one string. */
+   two repairs that failed before the pair became one string. The three groups are single-select
+   segmented buttons now, so the browser refuses both-on as well. That is a second guard, not a
+   replacement: a control restored across a reload is form state this app does not own. */
 const pick = async id => {
   const box = el(id);
   box.checked = true;
@@ -404,13 +571,15 @@ const pick = async id => {
    payload usually has nothing starred, so Favorites is disabled and syncPins() clears any attempt
    to select it. That is correct behaviour, and a scenario test reads it as a failure. What must
    hold either way is that a pair can never both be checked. */
-const onCount = pair => pair.filter(id => el(id).checked).length;
-for (const id of ['favOnly', 'risingOnly', 'favOnly', 'rainHeat', 'heat', 'rainHeat']) {
+const onCount = grp => grp.filter(id => el(id).checked).length;
+for (const id of ['favOnly', 'risingOnly', 'pinAll', 'favOnly',
+                  'rainHeat', 'heat', 'heatOff', 'rainHeat']) {
   await pick(id);
-  is(onCount(['favOnly', 'risingOnly']) <= 1, true, 'after ' + id + ': at most one pin filter on');
-  is(onCount(['heat', 'rainHeat']) <= 1, true, 'after ' + id + ': at most one heatmap on');
-  /* **The layers are the stricter rule: EXACTLY one, never none.** A map with neither is a basemap
-     with no answer on it. Radios are what enforce it, so this holds through every press above. */
+  /* **EXACTLY one in every group, never none and never two.** "Neither" used to be the pair going
+     unchecked, and it is a segment of its own now — `All` and `Off`. So the same three states are
+     reachable and the empty control is not. */
+  is(onCount(['pinAll', 'favOnly', 'risingOnly']), 1, 'after ' + id + ': exactly one pin filter on');
+  is(onCount(['heatOff', 'heat', 'rainHeat']), 1, 'after ' + id + ': exactly one heatmap choice on');
   is(onCount(['stations', 'wxLayer']), 1, 'after ' + id + ': exactly one map layer on');
 }
 /* **A layer switch closes `#side`.** Both panels are that panel: the weather card is a tenant of
@@ -423,14 +592,21 @@ is(d.body.classList.contains('side'), true, 'the panel opens, so there is someth
 await pick(el('stations').checked ? 'wxLayer' : 'stations');
 await wait(2500);
 is(d.body.classList.contains('side'), false, 'switching the layer closes the panel over it');
-/* Radios rather than checkboxes, and that is the difference from the two pairs above. The pairs
-   inside Stations keep "neither" reachable, so they stay checkboxes. */
-for (const id of ['stations', 'wxLayer']) {
-  is(el(id).type, 'radio', id + ' is a radio, so a press cannot clear it');
-  is(el(id).name, el('stations').name, 'and both sit in one group');
+/* **Every group is single-select, and multi-select is applicable nowhere in this panel.** All three
+   choices are exclusive. The two pairs were checkboxes, because a radio group cannot be cleared and
+   "neither" had to stay reachable — a segmented button states that answer as a segment instead.
+   The multi-select variant is what the drawer's sensor-kind chips are, and they stay there.
+   Each radio carries its preference value in `value`, so the handler compares no ids. */
+for (const [name, want] of [['maplayer', ['stations', 'weather']],
+                            ['heatlayer', ['', 'water', 'rain']],
+                            ['pinfilter', ['', 'fav', 'alert']]]) {
+  const g = [...menu.querySelectorAll(`input[name="${name}"]`)];
+  is(g.length, want.length, name + ': every value in the preference has a segment');
+  is(g.every(i => i.type === 'radio'), true, name + ': single-select, so a press cannot clear it');
+  is(g.map(i => i.value).join('|'), want.join('|'), name + ': and each segment carries its value');
 }
-for (const id of ['heat', 'rainHeat', 'favOnly', 'risingOnly'])
-  is(el(id).type, 'checkbox', id + ' stays a checkbox, because "neither" is a real answer there');
+is(menu.querySelector('input[type="checkbox"]'), null,
+   'no checkbox is left in the panel, so both-on is unrepresentable in the markup');
 
 // Weather needs a longer wait: picking it awaits a deferred module.
 el('wxLayer').checked = true;
@@ -455,8 +631,8 @@ is(['stations', 'weather'].includes(prefs.mapLayer), true,
 is('wx' in prefs, false, 'the old wx boolean is migrated away');
 is('stations' in prefs, false, 'and the old stations boolean with it');
 // Leave the map unfiltered and the water wash on, or later assertions read a filtered payload.
-el('risingOnly').checked = false;
-el('risingOnly').dispatchEvent(new w.Event('change'));
+el('pinAll').checked = true;
+el('pinAll').dispatchEvent(new w.Event('change'));
 await wait(400);
 el('heat').checked = true;
 el('heat').dispatchEvent(new w.Event('change'));
@@ -492,10 +668,13 @@ const pza = pd.querySelector('.leaflet-control-zoom a').getBoundingClientRect();
 is(Math.round(pr.height), Math.round(r.height), 'phone: the same button as the desktop one');
 is(Math.round(pr.width), Math.round(pr.height), 'phone: and still square');
 is(pr.height >= 44, true, 'phone: which clears the touch target on its own');
-/* The press shortcut is a pointer-device affordance, and a tap keeps the native toggle. So the line
-   naming it must not draw here, or it names an action a phone cannot take. */
-is(pw.getComputedStyle(pd.querySelector('#paintmenu .mfoot')).display, 'none',
+/* The press shortcut is a pointer-device affordance, and a tap keeps the native toggle. So nothing
+   here may name it, or it names an action a phone cannot take. `data-tip` opens on a tap, which is
+   exactly why the sentence must not be sitting in it at this width. */
+is(/switch/i.test(pbtn.dataset.tip || ''), false,
    'phone: the press shortcut is not named, because a tap cannot take it');
+is(pbtn.getAttribute('title'), 'Map layers',
+   'phone: so the button falls back to a plain title naming the control');
 is(pr.width > pza.width, true, 'phone: still larger than a zoom button, which is 44 here');
 /* ABOVE the zoom box here, not beside it. #legend takes `left: 12px; right: 68px` at this width, so
    the strip left of the zoom buttons belongs to the legend and there is nowhere to stand. */
@@ -540,6 +719,45 @@ is(pmCs.borderTopLeftRadius + ' ' + pmCs.borderBottomLeftRadius, '28px 0px',
    so a menu placed on a wide screen and rotated to a narrow one would stay pinned to its button. */
 is(pm.style.left + '|' + pm.style.top + '|' + pm.style.bottom, '||',
    'phone: js/ui.js wrote no placement, which would beat the stylesheet');
+/* No group may sit wider than the sheet. Three buttons of text inside a 328px sheet, at M3's 24px
+   of body padding, is where one extra word or a font change lands first. It reads as a spacing
+   mistake rather than as an overflow. The desktop block asserts the same against the floating
+   panel. Measured across five widths from 1100 down to 320, with a two-digit count on the favorites
+   button: the tightest row is the Icon group at a 320px window, which lands on 240 of 240. */
+is(pm.scrollWidth <= pm.clientWidth, true, 'phone: no button group overflows the sheet');
+for (const id of ['stations', 'heat', 'rainHeat', 'favOnly', 'risingOnly']) {
+  const b = pd.getElementById(id).closest('label').getBoundingClientRect();
+  is(b.left >= pmr.left - 1 && b.right <= pmr.right + 1, true,
+     'phone: ' + id + ' stays inside the sheet');
+}
+/* The same 32px at both widths. The `::after` is what carries the 48px pointer target, so a phone
+   needs no size override. That is the reason M3 grows the target rather than the button. */
+is(Math.round(pd.getElementById('heat').closest('label').getBoundingClientRect().height), 32,
+   'phone: M3 xs is 32px here too, and the pointer target does the rest');
+/* **The sheet says what it is.** A menu is anchored to a button whose tip names it. A sheet arrives
+   from the bottom edge and covers the corner it came from, so the anchor is gone and the heading
+   has to stand in for it. `title-medium`, which outranks the 11px uppercase group headings under it
+   and stays under the 22px a full-screen dialog takes. An `<h2>` keeps the UA block margin and this
+   app resets `h1` alone, so the margin has to be stated or the sheet grows 16px of dead air. */
+{
+  const t = pd.querySelector('#paintmenu .sheettitle');
+  is(!!t, true, 'phone: the sheet carries a heading');
+  is(t.textContent.trim(), 'Layers', 'phone: which says what the sheet holds');
+  is(pw.getComputedStyle(t).display, 'block', 'phone: and it draws');
+  is(pw.getComputedStyle(t).fontSize, '16px', 'phone: at M3 title-medium');
+  is(Math.round(parseFloat(pw.getComputedStyle(t).marginTop)), 0, 'phone: with the UA margin reset');
+  is(pd.getElementById('paintmenu').getAttribute('aria-labelledby'), t.id,
+     'phone: and it names the sheet, so a reader is told what opened');
+  /* Under the drag handle and above the first control, or it is a title for nothing. */
+  const grab = pd.querySelector('#paintmenu .grab').getBoundingClientRect();
+  const tb = t.getBoundingClientRect();
+  is(tb.top >= grab.bottom - 1, true, 'phone: under the drag handle');
+  is(tb.bottom <= pd.getElementById('stations').closest('.btngrp').getBoundingClientRect().top + 1,
+     true, 'phone: and above the first control it introduces');
+}
+/* M3's 24px inline body padding, the same number the panel takes above 600px. */
+is(pw.getComputedStyle(pm).paddingLeft, '24px', 'phone: M3 pads the sheet body 24px inline');
+
 /* The handle, and the gesture it promises. A handle drawn over a swipe nobody wired up is a
    promise the panel does not keep, so both halves are asserted together. */
 const pg = pd.querySelector('#paintmenu .grab');

@@ -12876,3 +12876,225 @@ the only assertion that catches a box landing on its neighbour.
 At 700px the credit text starts 9px left of the map card. It is a sibling of the map positioned
 against the window, and the string is long. It sits on the page beside the card rather than on the
 map. That was true before this change and it is not an overlap.
+
+## The layer panel became three M3 connected button groups
+
+`#paintmenu` held five `.chip` rows: two layer radios, and two pairs of checkboxes under `Stations`.
+It is three M3 connected button groups now. `Stations | Weather`, then `Off | Water level |
+Rainfall`, then `All | Favorites | On alert`. Every group is single-select.
+
+### The first attempt named a component it was not
+
+The first pass reused `.seg`, this app's own sunken track with a pill sliding along it. It called
+that an M3 segmented button, in three comments and one doc. The repository owner refused it on
+2026-08-21.
+
+**M3 Expressive has no segmented button.** It retired that component and replaced it with the
+connected button group. The two are different objects. A segmented button slides one fill along a
+rail. A connected button group is a row of real buttons at a 2px gap, and the selected one changes
+SHAPE as well as colour.
+
+`.seg` matches neither. It is this app's own control. A name taken from a spec it does not follow is
+the exact failure `CLAUDE.md` already warns about. Transcribe the component, do not approximate it.
+
+### What the component actually says
+
+`.btngrp` in `css/chrome.css` is transcribed from the M3 Expressive component set's
+`ButtonGroup/button-group.css` and `Button/button.css`. Size `xs`, shape `round`, variant `filled`
+with `data-selected`:
+
+| part | value |
+|---|---|
+| group | `inline-flex`, 2px gap, 2px padding |
+| button | 32px tall, 12px inline padding, 4px gap, 48px minimum width |
+| label | `label-large` — 14px on 20px at 500, 0.1px tracking |
+| inner corner | `corner-extra-small`, 4px, on every corner a neighbour touches |
+| outer corner | height / 2, so the two ends of the group are a pill |
+| selected | fully round at height / 2, `primary` over `on-primary` |
+| unselected | `surface-container` over `on-surface-variant` |
+| disabled | container `on-surface` at 10%, label `on-surface` at 38% |
+
+Every number is a vendored token in `vendor/m3/tokens.css`. One colour role was missing from the
+bridge in `css/base.css`. `--md-sys-color-on-primary` is `--surface`, because the accent flips to a
+pale blue in the dark theme and white on it fails contrast.
+
+### Two details that are easy to skip
+
+**A 32px button is under the 48px pointer minimum, so the spec grows the TARGET.** `button.css` puts
+an `::after` at `inset: calc((height - 48px) / 2) 0` on the two dense sizes. Vertical only, because
+the inline edges belong to the neighbour 2px away. So a phone needs no size override at all.
+
+**M3 sizes a connected group to its own buttons, and this app fills the row instead.** See the
+divergence below. `min-width: 48px` still carries the short buttons, which is the spec's own floor.
+
+### Two divergences the repository owner asked for
+
+**Every group fills the panel**, on 2026-08-21. M3 sizes a connected group to its buttons. Each
+group here is one row of the panel, and a row spans it.
+
+**`flex-grow: 1`, never the `flex: 1` shorthand, and a spilling label is what tells the two apart.**
+The shorthand is `1 1 0`. A zero basis makes every button start at nothing and take an equal share
+of the row. A flex item is normally floored at its own min-content. The explicit `min-width: 48px` M3 states
+for a connected xs button replaces `min-width: auto` and takes that floor away.
+
+Measured at a 320px window: three buttons of 77px each, with `Water level` drawing about 100px of
+`nowrap` text straight over its neighbour. It did that at every width, and it moved no
+`scrollWidth`, so only an assertion against the label's own box sees it.
+
+`flex-grow` alone keeps the `auto` basis. Each button starts at its own label, and only the space
+left over is shared. `flex-shrink` stays 0, so a row that cannot fit overflows the panel rather than
+cutting a word, and `paint-check.html` fails on that.
+
+The icons are M3's own 20px for an xs button, at the 4px gap the base rule already states. They are
+real `<i>` elements taking the mask from a class, never a pseudo-element. A rule that sets `--i` and
+never joins the list in `css/icons.css` draws an empty box, which is what `#paint::before` shipped
+once. Nothing under the layer group carries one: three buttons of text and a glyph do not fit a
+328px sheet.
+
+**The branch lost its indent and its spine, and a divider does that job.** It sat 26px in behind a
+1px line. That was written for a time when its parent was a chip with a glyph to line up under.
+`.menu hr` is M3's own full-width divider and this app already draws it between menu sections.
+
+The divider lives inside `.subin`, never above the branch. Outside, it stays on screen with nothing
+under it the moment Weather takes the map, which is a rule under an empty panel.
+
+Removing the indent is also what gives the two groups inside their full 288px.
+
+### Why the two pairs stopped being checkboxes
+
+They were checkboxes because a radio group cannot be cleared, and "no wash" and "no filter" are real
+answers a reader wants.
+
+A button group states that answer as a button. `Off` and `All` are the empty value each preference
+always held. So the same three states are reachable, and the state this panel cannot draw is not.
+
+That state is both boxes on. `PREFS.heatLayer` and `PREFS.pinFilter` are each one string, which is
+what made both-on unrepresentable in the preference. The markup still reached it. A browser restores
+form state across a reload without firing `change`, and that is the path that got there.
+
+Two repairs inside the change handler failed at that. The browser refuses both-on now as well. So
+there are two guards, and neither one replaces the other.
+
+### The handler compares no ids any more
+
+Each radio carries its preference value in `value`. So the handler reads `e.target.value` and writes
+it. Three ternaries over element identity went with the checkboxes.
+
+`syncHeat()` and `syncPins()` each write one radio instead of two boxes. Checking a radio unchecks
+its siblings, so nothing is left holding a state the preference denies.
+
+### What the buttons gave up
+
+**Three of the five glyphs.** The two layers kept theirs as M3 leading icons. The three kinds under
+them went. Three buttons of text and a glyph do not fit a 328px bottom sheet. The legend under the map
+already draws what each wash means.
+
+**The weather hue.** The Weather chip took `--wx-clear`, because a `.chip` paints its border, its
+ink and its tint in `--c`. A connected group paints whichever button is on in one fill. A second
+colour inside it reads as a rendering fault rather than as a layer's own mark. `--accent` is not a
+status hue, so the colour language is unbroken.
+
+**The right edge.** A chip pushed its label and packed a note and a count against its own right
+edge. A button has no right edge to spare. A pin filter's count moved inside its own button.
+
+**Both layer notes, and the line that named the press shortcut.** The repository owner cut all three
+on 2026-08-21. See below.
+
+### The panel says less than it did, twice over
+
+`Hydrological Measurement` and `Nowcasting` sat under the layer group and named what each layer
+measures. The two buttons already name the layers. Naming what each one measures is a second look at one fact. This repo has now cut a sentence
+out of that panel five times.
+
+`#wxHint` stayed, because it is not that. Three callers write it and every one reports a failure:
+`could not load` from the rollback in `render.js` and in `ui.js`, and `no data yet` from `wx.js`.
+
+So `.mnote` is a failure line now. It draws nothing on a healthy poll, and that takes two rules. An
+empty `.hint` leaves the line through `:empty`, and a `:has()` on the paragraph takes the whole line
+with it. Without the second one the panel keeps a blank strip under its layer group for ever.
+
+### The press shortcut became a tooltip
+
+`.mfoot` sat at the foot of the panel reading `Click <layers> to switch layer`, drawn behind the same
+media query the handler tests. It pointed at a control outside the box it sat in. A panel floating beside its own button holds
+more than one thing a reader can click.
+
+`js/ui.js` writes the sentence onto `#paint` as `data-tip` instead, and `js/sparktip.js` draws it.
+One of a `data-tip` and a `title`, never both, which is the shape `setBtn()` in `js/locate.js`
+already uses.
+
+**Not a `title`.** A `title` opens on no phone, and this app accepts one only as a duplicate of
+something already visible. Nothing is visible here any more.
+
+**Written from the media query, not baked into the markup.** The query is live. A laptop docked to a
+mouse, and a tablet rotated past 600px, both cross it without a reload. Below it the button falls
+back to `title="Map layers"`, because `data-tip` opens on a tap and a tap cannot take the shortcut.
+
+The tip lands over the foot of the open panel, because hovering the button is what opened that
+panel. Moving one pixel into the panel clears it, which is what every tip in this app does.
+
+### The sheet says what it is
+
+A menu is anchored to a button whose tip names it, so the anchor is the label. A sheet arrives from
+the bottom edge and covers the corner it came from. The anchor is gone, so the sheet needs a heading
+of its own.
+
+`Layers`, under the drag handle and above the first control, below 600px alone. It labels the dialog
+through `aria-labelledby`, so a screen reader names the sheet on open rather than reading its first
+control.
+
+The reference `BottomSheet/bottom-sheet.css` carries no header slot, so the size is this app's own
+ladder rather than a transcribed number. `title-medium` at 16px outranks the 11px uppercase group
+headings under it and stays under the 22px `title-large` a full-screen dialog takes. A sheet is the
+lesser surface of the two.
+
+An `<h2>` keeps the UA block margin, and this app resets `h1` alone. Without `margin: 0` the sheet
+grows 16px of dead air above and below the word.
+
+### The panel takes M3's 24px inline padding
+
+A reader called the old 6px too close to the border. M3 pads a bottom sheet body 24px on the inline
+axis. This app declined that number while every row was a `.chip` bringing 14px of its own. Stacking
+24 on top of 14 put a label 38px inside its own sheet.
+
+The rows are button groups now. A group pads 2px and its buttons paint their fill to that edge, so
+the two no longer stack. `#paintmenu`'s own rule states the number once, for both widths.
+
+`min-width` rose to 320 with it. The Icon group measures 251px at its content width, and 300 less a
+1px border either side less 48px of padding leaves 250. One pixel of overflow.
+
+Measured across five viewport widths, from 1100 down to 320, with a two-digit count on the favorites
+button. Nothing overflows. The tightest row lands on 240 of 240 at 320px.
+
+### Multi-select is applicable nowhere here
+
+All three groups are exclusive. M3's multi-select group is what the drawer's sensor-kind chips
+already are, and those stay `.chip` in the drawer. That is the rule this app already carries. A
+control the reader reaches for while looking at the map goes on `#paint`. A control that shapes
+which stations exist at all stays in the drawer.
+
+### `.seg` stays, on two surfaces, and must not be merged into this
+
+The app menu's theme picker and the lightbox's range selector still draw `.seg`. Each one diverges
+for a reason of its own. The theme picker sits at the end of a menu row and sizes to its content.
+The range selector lies over a photograph in literal whites, and its chosen segment grows to hold a
+second label. Converting either one is a change of its own. Do not widen a `.btngrp` rule to `.seg`.
+
+### The check
+
+`paint-check.html` reads every one of the numbers above back off the live element, at both widths.
+It asserts the group shape, the button box and `label-large`. It asserts the pointer target, the
+three corner cases and the four colour roles against the resolved bridge. It asserts that a longer
+label takes a wider button, and that no group overflows the panel.
+
+It also asserts every divergence. Each group is flush with the panel's content box. Every label fits
+inside its own fill, which is the one assertion that sees a `flex: 1` spill. The two leading icons
+are 20px, compared against a probe carrying the same class. The branch is at zero indent with a
+divider inside it. The sheet carries its heading and the menu does not.
+
+It also asserts that no `.seg` is left in this panel. The first attempt fails that one line.
+
+Two of its older assertions had to move rather than be deleted. A disabled button takes M3's
+`pointer-events: none` rather than a cursor change. The layer note is one line under a group rather
+than two notes at two right edges. So the check reads which note is visible instead of measuring an
+edge.

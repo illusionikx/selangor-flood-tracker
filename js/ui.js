@@ -464,40 +464,34 @@ el('riseOff').onclick = () => {
   applyFilter(false);
 };
 
-el('heat').onchange = el('rainHeat').onchange = el('risingOnly').onchange =
-  el('favOnly').onchange = el('stations').onchange = e => {
-  /* One heatmap at a time. Stacked, they are two answers to two questions in one picture — and
-     worse, leaflet.heat accumulates alpha across layers, so overlapping blobs blend into a colour
-     that belongs to neither scale and reads as an intensity neither reading supports.
-     Checkboxes rather than radios because "neither" has to stay reachable, and a radio group cannot
-     be cleared by clicking. So the choice is one string, written here from the box the reader
-     actually moved, and syncHeat() puts both boxes back on it.
-     **Read the box that fired, never the pair.** Scoring the pref off both boxes let a pair that
-     was already both-on — the browser restoring form state across a reload — save `water` on any
-     toggle of the two filters below it, while the drawer went on showing both. Two repairs have now
-     been tried inside this handler and both failed, because the handler is not the only writer of a
-     checkbox and never was. */
-  if (e.target === el('heat') || e.target === el('rainHeat'))
-    PREFS.heatLayer = !e.target.checked ? '' : e.target === el('heat') ? 'water' : 'rain';
-
-  /* The two pin filters are the same shape as the two heatmaps above, and are read the same way:
-     off the box that fired, never off the pair. syncPins() in render.js puts both boxes back on the
-     preference. */
-  if (e.target === el('favOnly') || e.target === el('risingOnly'))
-    PREFS.pinFilter = !e.target.checked ? '' : e.target === el('favOnly') ? 'fav' : 'alert';
+el('heatOff').onchange = el('heat').onchange = el('rainHeat').onchange =
+  el('pinAll').onchange = el('favOnly').onchange = el('risingOnly').onchange =
+  el('stations').onchange = e => {
+  /* One heatmap at a time, and one pin filter at a time. Stacked, two heat layers are two answers
+     to two questions in one picture — and worse, leaflet.heat accumulates alpha across layers, so
+     overlapping blobs blend into a colour that belongs to neither scale.
+     **Each group is one M3 single-select segmented button now, so both-on is unrepresentable.** The
+     pairs were checkboxes, because a radio group cannot be cleared and "neither" had to stay
+     reachable. A segmented button states "neither" as a segment — `Off` and `All` — so the group
+     holds the same three values the preference always held, and the browser keeps it exclusive.
+     Two repairs were tried inside this handler before that and both failed, because the handler is
+     not the only writer of a control and never was. There is nothing left here to get wrong: the
+     radio carries its preference value in `value`, so this reads the string off the box that fired
+     and compares no ids. syncHeat() and syncPins() write the boxes back from the preference. */
+  if (e.target.name === 'heatlayer') PREFS.heatLayer = e.target.value;
+  if (e.target.name === 'pinfilter') PREFS.pinFilter = e.target.value;
 
   /* The station layer. A radio only fires `change` when it becomes the checked one, so there is no
      "unchecked" case to write here and no way for a reader to reach a map with no layer at all.
      Nothing inside Stations is cleared with it — the branch collapses in `#paintmenu` and every
      preference in it stands, so coming back to Stations restores the view that was there before.
-     Clearing them would make the parent a destructive control.
      Weather is NOT handled here. It has its own handler below, because turning it on has to await a
      deferred module and roll back when that import fails. */
   if (e.target === el('stations')) PREFS.mapLayer = 'stations';
   syncHeat();
   risePill();
   save();
-  /* Nothing on this handler closes the drawer any more. All five boxes moved to #paint on the map,
+  /* Nothing on this handler closes the drawer any more. Every control here moved to #paint on the map,
      where there is no drawer over the result of the press. The argument for closing it was that at
      phone width the drawer IS the screen, so a filter whose effect you cannot see is one you have
      to close the drawer to judge. These are not behind it now. */
@@ -536,6 +530,20 @@ el('heat').onchange = el('rainHeat').onchange = el('risingOnly').onchange =
     box.addEventListener('pointerenter', enter);
     box.addEventListener('pointerleave', leave);
   }
+  /* **The button names the shortcut, and only where the shortcut exists.** A line at the foot of the
+     panel said it before, and a reader cut it: it pointed at a button outside the box it sat in.
+     One of a `data-tip` and a `title`, never both, which is the shape `setBtn()` in js/locate.js
+     already uses. `js/sparktip.js` draws a `data-tip` on hover and on tap alike.
+     **Written from the query rather than the markup, because the query is live.** A laptop docked
+     to a mouse, and a tablet rotated past 600px, both cross this without a reload. A sentence baked
+     into `index.html` would promise a press that a touch device cannot make. */
+  const nameBtn = () => {
+    if (canHover.matches) { btn.dataset.tip = 'Map layers · click to switch layer';
+                            btn.removeAttribute('title'); }
+    else { delete btn.dataset.tip; btn.title = 'Map layers'; }
+  };
+  nameBtn();
+  canHover.addEventListener('change', nameBtn);
   /* **With the panel already open under the pointer, the press is free, so it switches the layer.**
      `over` is the whole gate. It is set only where hover opened the panel, so a tap and a keyboard
      press both fall through to the native `popovertarget` toggle and keep the one way in they have.

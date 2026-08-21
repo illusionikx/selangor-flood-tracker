@@ -39,13 +39,15 @@ function syncPins() {
     PREFS.pinFilter = '';
     save();
   }
-  el('risingOnly').checked = PREFS.pinFilter === 'alert';
-  el('favOnly').checked = PREFS.pinFilter === 'fav';
+  /* One write, because the three are one M3 single-select segmented button. Checking a radio
+     unchecks its siblings, so no other box is left holding a state this preference denies. */
+  el(PREFS.pinFilter === 'fav' ? 'favOnly'
+   : PREFS.pinFilter === 'alert' ? 'risingOnly' : 'pinAll').checked = true;
   el('risingOnly').disabled = !rising;
   el('favOnly').disabled = !starred;
   /* The count alone, and nothing where there is none to state. The empty case used to carry a
-     sentence, and the chip beside it is already dead and dimmed by `disabled`. One fact does not get
-     two looks, and `#shown` under the map carries the standing indication either way. */
+     sentence, and the segment beside it is already dead and dimmed by `disabled`. One fact does not
+     get two looks, and `#shown` under the map carries the standing indication either way. */
   el('risingHint').textContent = rising ? `· ${rising}` : '';
   el('favHint').textContent = starred ? `· ${starred}` : '';
   return PREFS.pinFilter;

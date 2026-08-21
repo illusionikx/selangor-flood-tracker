@@ -74,8 +74,8 @@
      Before `base.css`, which derives `--m3-travel`, `--m3-grow` and `--m3-swap` from them and
      bridges M3's colour names onto this app's palette. Colour is not in this file on purpose. -->
 <link rel="stylesheet" href="vendor/m3/tokens.css?v=1">
-<link rel="stylesheet" href="css/base.css?v=157">
-<link rel="stylesheet" href="css/chrome.css?v=219">
+<link rel="stylesheet" href="css/base.css?v=161">
+<link rel="stylesheet" href="css/chrome.css?v=225">
 <link rel="stylesheet" href="css/map.css?v=159">
 
 <!-- Water tint for the dark basemap. CARTO's dark_all is greyscale — all 18 of its tones have zero
@@ -1092,9 +1092,12 @@
      source that can only disagree. `autocomplete="off"` stops the other writer. A browser restores
      a checkbox across a reload without firing `change`. Every checkbox a preference owns carries
      it. -->
+<!-- No `title` here. `js/ui.js` writes one of a `title` and a `data-tip` and never both, which is
+     the shape `setBtn()` in js/locate.js already uses. Which one it writes depends on whether the
+     press shortcut applies, and that is a live media query. -->
 <button id="paint" class="mapbtn" popovertarget="paintmenu"
-        title="Map layers" aria-label="Map layers"><i class="i i-layers"></i></button>
-<div id="paintmenu" class="menu surface" popover>
+        aria-label="Map layers"><i class="i i-layers"></i></button>
+<div id="paintmenu" class="menu surface" popover aria-labelledby="paintTitle">
   <!-- The drag handle, drawn below 600px alone, where this panel is an M3 bottom sheet. It is the
        affordance for the swipe that dismisses the sheet, and js/ui.js implements that swipe — a
        handle drawn over a gesture nobody wired up is a promise the panel does not keep.
@@ -1102,61 +1105,101 @@
        tap outside and on the button, and every one of those reaches a keyboard or a screen reader
        where a drag does not. -->
   <div class="grab" aria-hidden="true"></div>
-  <!-- Two layers, and **exactly one of them at every moment**. `PREFS.mapLayer` holds `'stations'`
-       or `'weather'` and nothing else. A map with neither is a basemap with no answer on it, which
-       is not a view worth being able to reach by accident.
-       **Radios, not checkboxes, and that is the difference from the two pairs below.** Clicking a
-       member of a radio group cannot clear it, which is exactly the rule here. The pairs inside
-       Stations stay checkboxes, because "no wash" and "no filter" are both states a reader wants.
-       Everything else in here is a choice ABOUT the station layer, so it lives inside that branch.
-       Every chip is one line. The right edge carries `.note` on the two layers, which names the
-       discipline each one measures, or `.hint` on the two filters, which JS writes and which
-       reports how many stations that filter holds. Each chip carried a sentence under its label for
-       four revisions, and a reader cut every one of them.
-       No `checked` attribute on any box. `PREFS` is the source of truth, and syncPins(), syncHeat()
+  <!-- **The bottom sheet's heading, and it draws below 600px alone.** Above that width this panel is
+       a menu anchored to a button whose own tip names it, so the anchor is the label. A sheet
+       floats free of that button, arrives from the bottom edge and covers the corner it came from,
+       so it has to say what it is.
+       The reference `BottomSheet/bottom-sheet.css` carries no header slot, so the size is this
+       app's own ladder rather than a transcribed number: `title-medium` at 16px, which outranks the
+       11px uppercase `.mgroup` headings under it and stays under the 22px `title-large` this app's
+       full-screen dialogs take. A sheet is the lesser surface of the two.
+       It labels the dialog through `aria-labelledby`, so a screen reader names the sheet on open
+       rather than reading its first control. -->
+  <h2 id="paintTitle" class="sheettitle">Layers</h2>
+  <!-- **Three M3 CONNECTED BUTTON GROUPS, and every one of them is single-select.** That is the
+       component M3 Expressive replaced the segmented button with. `.btngrp` in `css/chrome.css` is
+       transcribed from the component set's own `button-group.css` and `button.css`, at size `xs`,
+       shape `round`, variant `filled`. It is deliberately NOT `.seg`, which is this app's own
+       sunken track and matches no M3 component — see the block that defines it.
+       **Multi-select is not applicable anywhere in this panel.** All three groups are exclusive.
+       The multi-select variant is what the drawer's sensor-kind chips are, and they stay there.
+       Two layers, and exactly one of them at every moment. `PREFS.mapLayer` holds `'stations'` or
+       `'weather'` and nothing else. A map with neither is a basemap with no answer on it.
+       **The two pairs below were checkboxes, because "no wash" and "no filter" are real answers a
+       radio group cannot clear.** A segmented button states that answer as a segment instead: `Off`
+       and `All`. So each group is one radio group holding the same three values the preference
+       already held, and both-on stops being representable in the markup at all. Two repairs inside
+       the change handler failed at that before — see syncHeat().
+       Each radio carries its preference value in `value`, so the handler in js/ui.js reads the
+       string off the box that fired and compares no ids.
+       No `checked` attribute on any box. `PREFS` is the source of truth, and syncHeat(), syncPins()
        and render() write the boxes from it. `autocomplete="off"` stops the other writer: a browser
-       restores form state across a reload without firing `change`. -->
-  <label class="chip layer"><input type="radio" name="maplayer" id="stations" autocomplete="off">
-    <i class="glyph i i-place"></i><span class="lab">Stations</span>
-    <span class="note">Hydrological Measurement</span></label>
+       restores form state across a reload without firing `change`.
+       **Every group fills the panel, and the two layers carry a LEADING ICON.** Filling is the one
+       divergence from the spec's own shape, which sizes a group to its buttons. Each group is one
+       row of this panel and a row spans it.
+       **`flex: 1` is what fills them, and it is not an equal split.** A flex item refuses to shrink
+       under its own min-content, and a button here is `nowrap`, so its whole label is that floor.
+       So the free space spreads and no label is ever cut. Three EQUAL buttons of `Favorites · 12`
+       would measure 348px against the 270 this panel has.
+       **No button carries a `--c`.** A connected group paints whichever button is on in one fill,
+       so a second hue inside it reads as a fault rather than as a layer's own colour. `--accent` is
+       not a status hue, so the colour language is unbroken. The icon takes the button's own ink for
+       the same reason, which is `on-primary` on the chosen one. -->
+  <div class="btngrp" role="group" aria-label="Map layer">
+    <label><input type="radio" name="maplayer" id="stations" value="stations" autocomplete="off">
+      <i class="i i-place"></i><span>Stations</span></label>
+    <label><input type="radio" name="maplayer" id="wxLayer" value="weather" autocomplete="off">
+      <i class="i i-partly_cloudy_day"></i><span>Weather</span></label>
+  </div>
+  <!-- **A failure line, and nothing else.** Each layer named the discipline it measures here,
+       `Hydrological Measurement` and `Nowcasting`. A reader cut both on 2026-08-21. The two buttons
+       above already name the layers, and naming what each one measures is a second look at one
+       fact.
+       `#wxHint` stays, because it is not that. Three callers write it and every one of them reports
+       a failure: `could not load` from the rollback in render.js and in ui.js, and `no data yet`
+       from wx.js. It is empty on a healthy poll, and an empty `.hint` leaves the line entirely. So
+       this draws nothing until something goes wrong. -->
+  <p class="mnote"><span id="wxHint" class="hint"></span></p>
   <!-- Collapses with its parent. Every control in here is a choice about the station layer, so with
-       that layer off there is nothing for any of them to act on. Nothing in here is ever unchecked
-       by the collapse: switching Stations back on has to restore the view that was there before. -->
+       that layer off there is nothing for any of them to act on. Nothing in here is ever cleared by
+       the collapse: switching Stations back on has to restore the view that was there before. -->
   <!-- `.subin` exists only so the branch can animate. A grid row goes from `0fr` to `1fr`
        and the wrapper inside it clips, which is the one collapse technique that needs no
        new CSS feature. See the rule in chrome.css for what was tried before it. -->
   <div class="subgrp"><div class="subin">
+    <!-- The divider says whose these are, and an indent used to. The branch sat 26px in behind a
+         1px spine. A reader cut both on 2026-08-21. It is M3's own full-width divider, the `.menu
+         hr` this app already draws between menu sections.
+         **It lives INSIDE the collapsing branch, never above it.** Outside, it stays on screen with
+         nothing under it the moment Weather takes the map, which is a rule under an empty panel. -->
+    <hr>
     <!-- How the station readings wash over the map. One at a time: stacked, two heat layers are two
          answers to two questions in one picture, and leaflet.heat adds their alpha into a colour
          that belongs to neither scale. -->
     <p class="mgroup">Heatmap</p>
-    <label class="chip"><input type="checkbox" id="heat" autocomplete="off">
-      <i class="glyph i i-water_drop"></i><span class="lab">Water level</span></label>
-    <label class="chip"><input type="checkbox" id="rainHeat" autocomplete="off">
-      <i class="glyph i i-rainy"></i><span class="lab">Rainfall</span></label>
-    <!-- Which station pins draw. One at a time for the same reason as the pair above. Each one
-         answers "show me only these", and two of those at once answers neither question. -->
+    <div class="btngrp" role="group" aria-label="Heatmap">
+      <label><input type="radio" name="heatlayer" id="heatOff" value="" autocomplete="off">
+        <span>Off</span></label>
+      <label><input type="radio" name="heatlayer" id="heat" value="water" autocomplete="off">
+        <span>Water level</span></label>
+      <label><input type="radio" name="heatlayer" id="rainHeat" value="rain" autocomplete="off">
+        <span>Rainfall</span></label>
+    </div>
+    <!-- Which station pins draw. One at a time for the same reason as the group above. Each one
+         answers "show me only these", and two of those at once answers neither question.
+         The hint is the count that filter holds, written by syncPins(). It rides inside its own
+         segment now: a segment has no right edge of its own to push it to. -->
     <p class="mgroup">Icon</p>
-    <label class="chip"><input type="checkbox" id="favOnly" autocomplete="off">
-      <i class="glyph i i-favorite"></i><span class="lab">Favorites</span>
-      <span id="favHint" class="hint"></span></label>
-    <label class="chip"><input type="checkbox" id="risingOnly" autocomplete="off">
-      <i class="glyph i i-warning"></i><span class="lab">On alert</span>
-      <span id="risingHint" class="hint"></span></label>
+    <div class="btngrp" role="group" aria-label="Station icons">
+      <label><input type="radio" name="pinfilter" id="pinAll" value="" autocomplete="off">
+        <span>All</span></label>
+      <label><input type="radio" name="pinfilter" id="favOnly" value="fav" autocomplete="off">
+        <span>Favorites</span><span id="favHint" class="hint"></span></label>
+      <label><input type="radio" name="pinfilter" id="risingOnly" value="alert" autocomplete="off">
+        <span>On alert</span><span id="risingHint" class="hint"></span></label>
+    </div>
   </div></div>
-  <!-- `--c` is the weather layer's own hue, the one its clear-sky pin draws in. It is not a status
-       hue and it must never become one: see the colour language in CLAUDE.md. `--wx-clear` is muted
-       away from `--s-alert` on purpose, so an amber chip here cannot read as an alert on the water. -->
-  <label class="chip layer" style="--c: var(--wx-clear)">
-    <input type="radio" name="maplayer" id="wxLayer" autocomplete="off">
-    <i class="glyph i i-partly_cloudy_day"></i><span class="lab">Weather</span>
-    <span class="note">Nowcasting</span><span id="wxHint" class="hint"></span></label>
-  <!-- The shortcut, and it is drawn on a pointer device alone. Hover is what opens this panel there,
-       so the press on the button is free and it switches the layer. A tap and a keyboard press keep
-       the native toggle, which is the only way in either of them has, so the line would name an
-       action neither one can take. `css/chrome.css` holds the same media query the handler tests. -->
-  <p class="mfoot">Click <i class="i i-layers" role="img" aria-label="the layers button"></i>
-    to switch layer</p>
 </div>
 <!-- Standing indications that the map is showing less than it holds. One strip, because test mode
      and the rising filter can be on at the same time and two fixed pills would sit on each other.

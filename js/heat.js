@@ -394,7 +394,7 @@ export function heatOpacity() {
   for (const l of LAYERS) if (l._canvas) l._canvas.style.opacity = pct / 100 * (l._fade ?? 1);
 }
 
-/* Puts the map, the legend, the two chips and the section summary on `PREFS.heatLayer`. One string
+/* Puts the map, the legend and the segmented button on `PREFS.heatLayer`. One string
    with three values, so exactly one scale is ever on screen — never a stack of two ramps to read
    against each other. The opacity slider sits below both and serves either.
    This runs at startup as well as on every render, and a render is a whole poll away — so a reader
@@ -407,11 +407,15 @@ export function heatOpacity() {
    composited into a colour neither scale defines, and the summary went on naming the one the reader
    had picked, because it alone was written from the handler. Deriving the pair from one string
    makes both-on unrepresentable whoever wrote the DOM. `syncPins()` in render.js is this same shape
-   at a second site, for the two pin filters, and it exists because of this entry. */
+   at a second site, for the pin filter, and it exists because of this entry.
+   The control is now a segmented button holding three radios, so the browser refuses both-on as
+   well. That is a second guard rather than a replacement: a radio restored across a reload is still
+   form state this app does not own. */
 export function syncHeat() {
   const wet = PREFS.heatLayer === 'water', rainy = PREFS.heatLayer === 'rain';
-  el('heat').checked = wet;
-  el('rainHeat').checked = rainy;
+  /* One write, because the three are one M3 single-select segmented button. Checking a radio
+     unchecks its siblings, so there is no second box left holding a state this preference denies. */
+  el(wet ? 'heat' : rainy ? 'rainHeat' : 'heatOff').checked = true;
   /* Two things take the wash off the map, and NEITHER writes PREFS.heatLayer. That is the whole of
      "turn the previous heatmap back on": the reader's choice never left, so restoring it needs no
      state remembered anywhere.
@@ -423,7 +427,7 @@ export function syncHeat() {
   /* No summary line here any more. This choice left the drawer for the map's own top-left corner,
      and the button there draws the active layer's own glyph. So what the map paints is on screen
      without opening anything, which is what the drawer summary was for. That glyph is CSS, off the
-     three checkboxes this function writes, so there is nothing to keep in step from here. */
+     radios this function writes, so there is nothing to keep in step from here. */
   wet && show   ? heat.addTo(map)     : heat.remove();
   rainy && show ? rainHeat.addTo(map) : rainHeat.remove();
   el('lgWater').style.display = wet && show ? '' : 'none';

@@ -2694,9 +2694,16 @@ it. The weather section stretches nothing. It is five fixed keys measuring 231px
   `css/base.css` bridges the `--md-sys-color-*` names a component asks for onto the tokens this app
   already has. Add a line to that bridge when a component wants a role it is missing. Never add M3's
   palette instead.
-  **Four components, seven variants, and each surface declares which it is.** Dialogs are
+  **Five components, eight variants, and each surface declares which it is.** Dialogs are
   full-screen or basic. Sheets are side or bottom. The supporting pane's two headers are the top app
-  bar's medium flexible variant, at both widths. `m3-check.html` holds the roll call.
+  bar's medium flexible variant, at both widths. The layer panel's three choices are connected
+  button groups. `m3-check.html` holds the dialog roll call and `paint-check.html` holds the button
+  group's numbers.
+  **A control that only LOOKS like an M3 component is the failure this section exists to stop.**
+  `.seg` is the worked example. It is this app's own sunken track, and for a while three surfaces
+  called it a segmented button. M3 Expressive has no segmented button. It has a connected button
+  group, whose selected member changes shape rather than sliding a fill along a rail. Name a
+  component only after reading its CSS in the reference set.
   **The window is M3's supporting-pane canonical layout**, and the numbers come from that page:
   https://m3.material.io/foundations/layout/canonical-examples/supporting-pane
   `#map` is the main pane and `#pane` is the supporting one. `#pane` holds one of three occupants at
@@ -2759,23 +2766,81 @@ it. The weather section stretches nothing. It is five fixed keys measuring 231px
   `#paint` is a `.mapbtn` in the map's bottom zoom cluster. Its popover holds two layers at the top
   level and no headings over them: `Stations` and `Weather`. Inside `Stations` sit two labelled
   sections, `Heatmap` (water level, rainfall) and `Icon` (favorites, on alert).
-  **Exactly one layer is on at every moment, so those two chips are RADIOS.** Clicking a member of a
-  radio group cannot clear it, which is the rule. A map with neither layer is a basemap with no
-  answer on it. `PREFS.mapLayer` therefore has no empty value, `''` was reachable for one revision
-  and is gone, and Stations is the landing default. **The pairs inside Stations stay checkboxes**,
-  because "no wash" and "no filter" are both answers a reader wants.
-  **Every chip is one line.** The label names the control. `.note` at the right edge of a layer
-  names the discipline it measures, `Hydrological Measurement` and `Nowcasting`. `.hint` at the same
-  edge is the other thing: JS writes it, and it states a count and nothing else.
-  **The label pushes and nothing on the right pulls.** `.chip .lab` takes `margin-right: auto`, and
-  neither `.note` nor `.hint` takes `margin-left: auto`. A flex line distributes free space between
-  every auto margin on it. So two of them on the Weather chip split the slack and left the note 41px
-  short of an edge the Stations chip met exactly. An empty `.hint` also leaves the line through
-  `:empty`, because it carries the flex `gap` at zero width.
+  **All three groups are M3 CONNECTED BUTTON GROUPS, single-select, and multi-select is applicable
+  nowhere in this panel.** That is the component M3 Expressive replaced the segmented button with.
+  `.btngrp` in `css/chrome.css` is transcribed from the component set's own `button-group.css` and
+  `button.css`, at size `xs`, shape `round`, variant `filled` with `data-selected`. Each group holds real radios, clipped to a pixel rather than hidden. So the browser keeps the
+  group exclusive and walks it with the arrow keys.
+  **`.btngrp` is NOT `.seg`, and the two must not be merged without a reason.** `.seg` is this app's
+  own sunken track with a pill sliding along it. It approximates a segmented button and matches no
+  M3 component. Two surfaces still draw it. The app menu's theme picker sits at the end of a menu
+  row and sizes to its content. The lightbox's range selector lies over a photograph in literal
+  whites, and its chosen segment grows to hold a second label. Converting either one is a change of
+  its own, and neither is in scope here. **Do not widen a `.btngrp` rule to `.seg`.**
+  M3's multi-select variant is what the drawer's sensor-kind chips are, and they stay `.chip` there.
+  **Every group fills the panel between its own padding, and that is the one divergence from the
+  spec's shape.** M3 sizes a connected group to its buttons. Each group here is one row of the
+  panel, and a row spans it.
+  **`flex-grow: 1`, never the `flex: 1` shorthand.** That shorthand is `1 1 0`, and a zero basis
+  makes every button start at nothing and take an equal share of the row. A flex item is normally floored at its own min-content. The explicit `min-width: 48px` M3
+  states for a connected xs button REPLACES `min-width: auto` and takes that floor away. Measured at a 320px window: three
+  buttons of 77px each, with `Water level` drawing about 100px of `nowrap` text straight over its
+  neighbour. It did that at every width and it moved no `scrollWidth`, so only an assertion against
+  the label's own box sees it. `flex-grow` alone keeps the `auto` basis, so each button starts at
+  its own label and only the space left over is shared. `flex-shrink` stays 0, so a row that cannot
+  fit overflows the panel rather than cutting a word.
+  **The selected button changes SHAPE as well as fill**, from the 4px inner corner to a full pill at
+  height / 2. That is the component's signature, so the radius rides M3's own spring on the
+  transition list beside the colour.
+  A map with neither layer is a basemap with no answer on it. `PREFS.mapLayer` therefore has no
+  empty value, `''` was reachable for one revision and is gone, and Stations is the landing default.
+  **The two pairs inside Stations were checkboxes and are not any more.** They were checkboxes
+  because a radio group cannot be cleared and "no wash" and "no filter" are real answers a reader
+  wants. A segmented button states that answer as a segment instead, `Off` and `All`. So each group holds the same three values its preference always held. The browser keeps it
+  exclusive, and both-on stops being representable in the markup at all. Two repairs inside the change handler
+  failed at that before. See `syncHeat()`'s own comment.
+  **Each radio carries its preference value in `value`.** So the handler in `js/ui.js` reads the
+  string off the box that fired and compares no ids. `syncHeat()` and `syncPins()` each write one
+  box back from the preference, and the browser clears the siblings.
+  **The two layers carry a LEADING ICON, at M3's 20px for an xs button, and nothing under them
+  does.** Three buttons of text and a glyph do not fit a 328px sheet. The legend under the map already
+  draws what each wash means. It is a real `<i>` taking the mask from its class, never a pseudo-element. A rule that sets
+  `--i` and never joins the list in `css/icons.css` draws an empty box. That is what
+  `#paint::before` shipped once.
+  **No button carries a `--c`.** A `.chip` painted its border, its ink and its tint
+  in `--c`, so the weather chip took its own clear-sky hue. A connected group paints whichever button is on in ONE fill. So a second colour inside it
+  reads as a rendering fault rather than as a layer's own mark. The filled variant's own pair is `primary` over `on-primary`, which bridges to
+  `--accent` over `--surface`. The leading icon takes the button's own ink for the same reason. `--accent` is not a status hue, so the colour language is unbroken.
+  **`--md-sys-color-on-primary` came into the bridge in `css/base.css` for it**, as `--surface`. The
+  accent flips to a pale blue in the dark theme, where white on it is a contrast failure.
+  **Nothing names what a layer measures, and `.mnote` is a failure line now.** `Hydrological
+  Measurement` and `Nowcasting` sat under the group and a reader cut both on 2026-08-21. The two
+  buttons already name the layers, and naming what each measures is a second look at one fact.
+  `#wxHint` is the one thing left in that paragraph, and every caller that writes it reports a
+  failure. They are `could not load` from the rollback in `render.js` and in `ui.js`, and `no data
+  yet` from `wx.js`. So the line draws nothing on a healthy poll. An empty `.hint` leaves through `:empty`, and a
+  `:has()` on the paragraph takes the whole line with it. Without that second rule
+  the panel keeps a blank strip under its layer group for ever.
+  **A pin filter's count rides INSIDE its own button**, for the same reason. It keeps 11px against
+  the button's own `label-large` 14px, because the count is what the label qualifies.
+  **The panel takes M3's 24px inline body padding, at both widths, and the reason it declined it is
+  gone.** That reason was that every row was a `.chip` bringing 14px of its own. Stacking 24 on top of
+  14 put a label 38px inside the panel. A group pads 2px and its buttons paint to that edge. A reader
+  called the old 6px too close to the border on 2026-08-21. **`min-width` rose to 320 with it**,
+  because the Icon group measures 251px and 300 less a border and 48px of padding leaves 250.
+  Measured across five widths, from 1100 down to 320, with a two-digit count on the favorites
+  button. The tightest row lands on 240 of 240 at a 320px window.
+  **The branch carries no indent and no spine, and a DIVIDER does that job.** It sat 26px in behind a 1px line. That was written for a time when its parent was a chip with
+  a glyph to line up under. A reader
+  cut both on 2026-08-21. `.menu hr` is M3's own full-width divider and this app already draws it
+  between menu sections. **It lives INSIDE `.subin`, never above the branch.** Outside, it stays on
+  screen with nothing under it the moment Weather takes the map, which is a rule under an empty
+  panel. Removing the indent is also what gives the two groups inside their full 288px. An empty `.hint`
+  leaves the line through `:empty`, because it carries the flex `gap` at zero width.
   **Four revisions carried a sentence under every label, and a reader cut all of them.** Do not put
   one back. The `.on` / `.off` pair on the two layers went with them, and so did the two empty-state
-  sentences on the filters. A dead chip is already dimmed through `disabled`, and `#shown` states
-  what the map hides. One fact does not get two looks.
+  sentences on the filters. A dead button already takes M3's own disabled pair through `disabled`,
+  and `#shown` states what the map hides. One fact does not get two looks.
   **The rule for what goes where: a control the reader reaches for WHILE LOOKING AT THE MAP goes on
   `#paint`. A control that shapes which stations exist at all stays in the drawer**, beside the
   district picker and the ignored list. `#layersect` and `#layerN` are gone.
@@ -2783,12 +2848,21 @@ it. The weather section stretches nothing. It is five fixed keys measuring 231px
   `PREFS.heatLayer` and `PREFS.pinFilter`. Never a pair of booleans: that shape holds both-on, which
   the panel cannot draw, and this repo already paid for it once — see `syncHeat()`'s own comment for
   the two repairs that failed. `syncPins()` and `render()` are the other two writers, and each one
-  writes its pair of boxes from its own string.
+  writes its own radio from its own string.
   **`PREFS.wx` and `PREFS.stations` are gone.** `PREFS.mapLayer === 'weather'` and `=== 'stations'`
   replace them everywhere, and those are the only two values. Leaving weather goes back to
   `'stations'`, in `flashTo()` and in the failed-import rollback. A reader leaving a weather map
   wants the map back. `syncWx()` no longer writes the weather box: `render()` writes both layer
   boxes, so the pair has one writer.
+  **The sheet carries a heading reading `Layers`, and the menu carries none.** Above 600px this
+  panel is anchored to a button whose own tip names it, so the anchor is the label. A sheet arrives
+  from the bottom edge and covers the corner it came from, so it has to say what it is. It labels
+  the dialog through `aria-labelledby`. The reference `BottomSheet/bottom-sheet.css` has no header
+  slot, so the size is this app's own ladder rather than a transcribed number: `title-medium` at
+  16px, which outranks the 11px uppercase `.mgroup` under it and stays under the 22px `title-large`
+  a full-screen dialog takes. A sheet is the lesser surface of the two. **An `<h2>` keeps the UA
+  block margin** and this app resets `h1` alone, so `margin: 0` is stated or the sheet grows 16px of
+  dead air above and below it.
   **Below 600px `#paintmenu` is an M3 modal bottom sheet, not a menu beside its button.** It is a
   panel of settings a reader opens while looking at the map, so it belongs on the edge the thumb is
   already at. The numbers come from the M3 Expressive component set's `BottomSheet/bottom-sheet.css`:
@@ -2800,9 +2874,9 @@ it. The weather section stretches nothing. It is five fixed keys measuring 231px
   **The handle is drawn AND the swipe is wired**, in `js/ui.js`. A handle over a gesture nobody
   implemented is a promise the panel does not keep. The drag is refused while the sheet is scrolled
   away from its top, because a downward drag shares its axis with the sheet's own scroll.
-  M3's 24px inline body padding is declined for the same reason the four dialogs decline their own:
-  every row here is a `.chip` carrying 14px of its own, and stacking the two puts a label 38px inside
-  its sheet. The 24px at the bottom is taken, where a phone's gesture bar sits.
+  M3's 24px inline body padding is taken now, and `#paintmenu`'s own rule states it for both widths.
+  This app declined it while every row was a `.chip` carrying 14px of its own. The 24px at the
+  bottom was always taken, where a phone's gesture bar sits.
   **`js/ui.js` must CLEAR its placement at this width rather than skip it.** An inline `left` or
   `bottom` beats the sheet's own rule, so a menu placed on a wide screen and then rotated to a narrow
   one would stay pinned beside a button it no longer opens from.
@@ -2825,15 +2899,19 @@ it. The weather section stretches nothing. It is five fixed keys measuring 231px
   because a popover invoker runs as the click's activation behavior. The handler presses the radio
   rather than writing `PREFS.mapLayer`, because the weather radio owns the deferred import and its
   rollback.
-  **The panel names that shortcut in `.mfoot`, at its foot and right-aligned**, on the same edge as
-  the notes above it. It draws behind the same media query the handler tests, because a tap and a
-  keyboard press keep the native toggle and cannot take it. It reads `Click` rather than `press`,
-  since the line is mouse-only by construction.
-  **It points at the button by DRAWING the button's glyph**, a real `<i class="i i-layers">` inside
-  the sentence, at 1.35em of an 11px line. Naming it in words came first, and a panel floating beside
-  its own button holds more than one thing a reader can click. The glyph takes `role="img"` and a
-  name, because a mask carries no text of its own. `paint-check.html` compares its `mask-image`
-  against the button's rather than its `--i`.
+  **The button names that shortcut on a TOOLTIP, and the panel does not name it at all.** A
+  `.mfoot` line sat at the foot of the panel reading `Click <layers> to switch layer`, drawn behind
+  the same media query the handler tests. A reader cut it on 2026-08-21. A panel floating beside its
+  own button holds more than one thing a reader can click, and the line pointed at a control outside
+  the box it sat in.
+  **`js/ui.js` writes the sentence onto `#paint` as `data-tip`, and `js/sparktip.js` draws it.** It
+  is one of a `data-tip` and a `title`, never both, which is the shape `setBtn()` in `js/locate.js`
+  already uses. **It is not a `title`.** A `title` opens on no phone, and this app accepts one only
+  as a duplicate of something already visible. Nothing is visible here any more.
+  **Written from the media query rather than baked into the markup, because the query is live.** A
+  laptop docked to a mouse, and a tablet rotated past 600px, both cross it without a reload. Below
+  it the button falls back to `title="Map layers"`, because `data-tip` opens on a tap and a tap
+  cannot take the shortcut.
   **The press answers for itself through `.mapbtn:active`, and never through a class.** The glyph is
   the same at every state, so a press that switches the map leaves the button looking untouched.
   `:active` covers the press that opens the panel and the press that switches the layer alike, with

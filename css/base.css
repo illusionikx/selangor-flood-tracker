@@ -36,6 +36,10 @@
   --md-sys-color-outline: var(--outline);
   --md-sys-color-outline-variant: var(--outline);
   --md-sys-color-primary: var(--accent);
+  /* Text on the accent is `--surface`, never `#fff`. The accent flips to a pale blue (#8ab4f8) in
+     the dark theme, where white on it is a contrast failure. The token is already near-black there
+     and already white in the light theme, so one declaration is correct in both. */
+  --md-sys-color-on-primary: var(--surface);
 
   /* The two pairs the components below actually reach for, built FROM the tokens above rather than
      restating their values. **Named for what the surface DOES, not for one component that does it.**
@@ -388,8 +392,13 @@ td:last-child { text-align: right; padding-left: 16px; }
    An empty `.hint` is taken off the line rather than left at zero width. It still carries the
    flex `gap`, which held the note 8px off an edge the Stations chip met exactly. */
 .chip .lab { margin-right: auto; }
-.chip .hint, .chip .note { font-size: 11px; opacity: .7; white-space: nowrap; }
-.chip .hint:empty { display: none; }
+/* `.btngrp .hint` is the same fact inside a connected button group: the count a pin filter holds,
+   riding in its own button because a button has no right edge to push it to. It keeps 11px against
+   the button's own `label-large` 14px, because the count is what the label qualifies and because
+   three of these have to fit one 262px row. `.mnote .note` is the layer note, which moved under its
+   group for the same reason. */
+.chip .hint, .chip .note, .btngrp .hint, .mnote .note { font-size: 11px; opacity: .7; white-space: nowrap; }
+.chip .hint:empty, .btngrp .hint:empty, .mnote .hint:empty { display: none; }
 #shown { margin: 10px 2px 0; font-size: 12px; }
 
 select, #goto, #dataFind, #camFind {
@@ -630,17 +639,16 @@ dialog:focus, dialog:focus-visible { outline: none; }
   font: 500 11px Roboto, sans-serif; letter-spacing: .06em; text-transform: uppercase;
   color: var(--muted);
 }
-/* Everything under the chip above it. The indent says whose they are and the spine carries it all
-   the way down, so the branch reads as one thing rather than as chips that happen to sit in.
-   The rule is inset to land under the parent chip's own glyph. */
-.subgrp {
-  margin: 2px 0 2px 14px; padding-left: 12px;
-  border-left: 1px solid var(--outline);
-}
+/* Everything under the layer group above it. **The indent and the spine are gone, and a divider
+   does that job now.** The branch sat 26px in behind a 1px line, which was written for a time when
+   its parent was a chip with a glyph to line up under. A reader cut both on 2026-08-21. A rule
+   across the panel separates the two the way M3 separates any two sections of a menu, and it costs
+   the branch none of its width — which is what lets the two groups inside it stay content-sized. */
+.subgrp { margin: 2px 0; }
 /* The headings inside that branch. `.mgroup`'s own top margin is written for a group that follows
-   another group; here the first one follows the parent chip and wants less. */
+   another group; the first one here follows the divider and wants less. */
 .subgrp .mgroup { margin: 8px 6px 4px; }
-.subgrp .mgroup:first-child { margin-top: 4px; }
+.subgrp hr + .mgroup { margin-top: 6px; }
 /* Every chip in this panel is one line, so the drawer's own flex `.chip` serves it with no
    override at all. It carried a sentence under each label for four revisions and was a two-row grid
    for them. A reader cut every one of those sentences. What is left says the same thing in fewer
