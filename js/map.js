@@ -125,6 +125,14 @@ pane.addEventListener('close', () => {
 new MutationObserver(syncPane)
   .observe(document.body, { attributes: true, attributeFilter: ['class'] });
 narrow.addEventListener('change', syncPane);
+/* **This has to run before js/ui.js's `wide` listener on the same crossing, and it does — by import
+   order, not by luck.** `app.js` imports `ui.js`, and `ui.js` imports this module before its own
+   top-level code runs. So this listener registers first and fires first on the same crossing.
+   Crossing OUT of 600px with `find` open, that order closes `#pane` here before `place()` in ui.js
+   moves `#findpane` out of it. Reversed, the move would pull the focused field out of a dialog
+   `showModal()` still holds open, and everything outside a modal dialog is inert while it stays
+   open. Nothing enforces the order beyond that import graph, so a reordered import would silently
+   strand it. */
 
 /* **The map's box changes without the window changing, so Leaflet has to be told.** Opening the
    supporting pane takes `--side` off the map's own width. Leaflet listens to `window.resize` and

@@ -342,13 +342,17 @@ const menu = el('railFilters');
    pane, so the container narrows instead of being covered. `map.invalidateSize()` recentres it —
    see the observer in map.js. */
 function setDrawer(open, pan = true, remember = true) {
-  /* **One pane, one occupant, at every width.** The two panels shared a screen while each had a rail
+  /* **One pane, one occupant, below 600px.** The two panels shared a screen while each had a rail
      of its own on opposite edges. They are the same box now, so a second one opening would land on
      the first. See the `sideopen` listener below for the other half of this.
-     `find` clears the same way `drawer` does inside `setFind()`. Without it, opening the drawer
-     over an open search left `find` set. `syncPane()`'s `want` stayed true on that class alone, so
-     the pane never closed, and `#findpane` could reappear behind the drawer. */
-  if (open) { closeSide(); document.body.classList.remove('find'); }
+     `find` clears the same way below 600px, where the search is a pane occupant too. Without it,
+     opening the drawer over an open search left `find` set. `syncPane()`'s `want` stayed true on
+     that class alone, so the pane never closed, and `#findpane` could reappear behind the drawer.
+     **Above 600px the search floats over the map and is not a pane occupant, so it stays put.**
+     A reader who opens the filters while reading the docked search wants both on screen at once —
+     that is what a floating box is for. Only `closeSide()` still runs at every width: the drawer
+     and the station card share `#pane` at both widths, and that rule has not changed. */
+  if (open) { closeSide(); if (phone.matches) document.body.classList.remove('find'); }
   document.body.classList.toggle('drawer', open);
   // The rail item wraps its glyph in a `.railpill` span. The icon to swap is `.i`, not the first
   // child. `menu.firstElementChild` was the `<i>` on the old bare button. It is the `.railpill`
@@ -968,18 +972,34 @@ document.addEventListener('click', () => {
 {
   const wide = matchMedia('(min-width: 601px)');
   const brand = el('brand'), slot = document.querySelector('#rail .railbrand'),
-        bar = document.querySelector('header'), find = el('findpane'), paneEl = el('pane');
+        bar = document.querySelector('header'), find = el('findpane'), paneEl = el('pane'),
+        railFindBtn = el('railFind');
   /* Before the ticker, or the brand lands after it in the bar. `prepend` states that rather than
      leaving it to whatever the last mover did.
      **The search moves the other way.** It is written outside the pane, because a closed `<dialog>`
      is `display: none` and the docked card above 600px cannot draw inside one. So the phone is the
-     case that needs the move, and `#pane` is where it goes. */
+     case that needs the move, and `#pane` is where it goes.
+     **Moving a node blurs its focused descendant, in every engine.** `#brand` holds nothing
+     focusable, so only `find`'s move needs the guard `syncPane()` already states for the pane
+     itself: capture `document.activeElement` before the move, and restore it after. Without this a
+     reader typing in `#goto`, or arrowing through `#gotoHits`, loses the field on a tablet rotate or
+     a window dragged across 600px.
+     **`aria-controls` follows the box too.** `#railFind` names `#pane` in the markup, which is right
+     below 600px: pressing it opens that dialog, and `#findpane` sits inside it. Above 600px the
+     search never opens `#pane` at all — it floats as its own card — so the button has to name
+     `#findpane` there instead, or a screen reader is told it expands a dialog that never moves. */
   const place = () => {
+    const focused = document.activeElement, keepFocus = focused && find.contains(focused);
     (wide.matches ? slot : bar).prepend(brand);
     (wide.matches ? document.body : paneEl).append(find);
+    if (keepFocus) focused.focus({ preventScroll: true });
+    railFindBtn.setAttribute('aria-controls', wide.matches ? 'findpane' : 'pane');
   };
   place();
   wide.addEventListener('change', place);
+  /* **This runs after js/map.js's `narrow` listener on the same crossing — see that file's own note
+     beside `narrow.addEventListener`.** Losing that order would move `#findpane` out of `#pane`
+     while `showModal()` still held the dialog open. */
 
   /* **The width is a preference, because it is a setting and not a state of the data.** It rides
      the same blob every other setting does, and `syncRail()` writes the control from it rather than
@@ -1056,9 +1076,13 @@ let nearPlace = null;
    station, and a blur on the field all close it. */
 function setFind(open) {
   document.body.classList.toggle('find', open);
-  /* One pane holds one occupant, so opening the search replaces whatever was there. The other two
-     do the same to each other already — see `setDrawer()` and the `sideopen` listener. */
-  if (open) { closeSide(); document.body.classList.remove('drawer'); }
+  /* **Below 600px the search is a pane occupant, so opening it replaces whatever was there.** The
+     other two do the same to each other already — see `setDrawer()` and the `sideopen` listener.
+     **Above 600px the search floats over the map instead**, on the leading edge under the app bar.
+     It is not a pane occupant there, so it clears nothing and nothing clears it. A station card or
+     an open drawer stays exactly where it was — sharing the screen with a floating box is the whole
+     point of drawing one. */
+  if (open && phone.matches) { closeSide(); document.body.classList.remove('drawer'); }
   findBtn.setAttribute('aria-expanded', open);
   /* The box is `visibility: hidden` while shut — that is what keeps it out of the tab order — and
      you cannot focus a hidden element. Reading offsetWidth forces the style flush that applies the

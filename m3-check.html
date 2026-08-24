@@ -282,8 +282,12 @@ async function phone() {
      'and there is no scrim left: a full-screen dialog covers the screen, so it has no outside');
   is(!!pane.querySelector(':scope > .grab'), false,
      'and no drag handle: that variant has no swipe, and a handle over no gesture is a promise');
-  is(!!d.getElementById('findpane'), true,
-     'the search is a box inside the pane, because a 96px rail cannot hold a 300px field');
+  /* `getElementById` finds `#findpane` wherever it sits in the document, so checking it merely
+     exists proves nothing about width: above 600px it lives outside the pane too, as a docked card.
+     `pane.contains(...)` is the phone-only claim, and it is marked as one — the desktop pass below
+     asserts the opposite shape. */
+  is(pane.contains(d.getElementById('findpane')), true,
+     'phone: the search sits inside the pane, because a 96px rail cannot hold a 300px field');
   for (const [id, cls, name] of [['bar', 'drawer', 'filters'], ['side', 'side', 'station panel'],
                                  ['findpane', 'find', 'search']]) {
     d.body.classList.add(cls);
@@ -923,6 +927,66 @@ async function desktop() {
   is(!!d.getElementById('scrim'), false, 'with no scrim box left in the document');
   d.body.classList.remove('drawer'); d.body.classList.remove('side');
   await settled();
+
+  /* --- the docked search, above 600px ---
+     Item 2 of the 2026-08-24 amendment moves `#gotoBox` out of the pane. Above 600px it floats over
+     the map's leading corner instead, collapsed to its rail item until a reader asks for it. Nothing
+     here checked that box at this width before now. Three faults survived a review of it: the
+     mutual clear still ran here though the search is no longer a pane occupant, a reparent with no
+     focus guard dropped whatever a reader was typing, and the rail button still named `#pane` in
+     `aria-controls` once the search left it. These three assertions guard all three. */
+  const findEl = d.getElementById('findpane'), findBtnEl = d.getElementById('railFind');
+
+  // 1. Collapsed until asked for — guards a desktop rule leaking past the button.
+  is(cs(findEl).display, 'none', 'the docked search stays collapsed until a reader asks for it');
+
+  // 2. Open geometry: under the app bar, past the rail, clear of the pane, no stray caret.
+  findBtnEl.click();
+  await settled();
+  is(cs(findEl).display, 'flex', 'pressing Search draws the docked card');
+  is(findBtnEl.getAttribute('aria-controls'), 'findpane',
+     'and the button now names the card it actually opens, not the shut pane behind it');
+  const fb = r(findEl);
+  is(Math.round(fb.top), Math.round(hdr + GAP + 12), 'it sits under the app bar, M3 docked search');
+  is(Math.round(fb.left), Math.round(12 + GAP + RAIL), 'and past the rail, on the leading edge');
+  const pr = r(pane2);
+  const overlaps = fb.left < pr.right && fb.right > pr.left && fb.top < pr.bottom && fb.bottom > pr.top;
+  is(overlaps, false, 'its box never intersects the pane, which stays shut behind it');
+  is(w.getComputedStyle(d.getElementById('gotoBox'), '::after').display, 'none',
+     'the results caret is the pane affordance, and this card IS the list');
+  is(cs(d.getElementById('goto')).paddingRight, cs(d.getElementById('goto')).paddingLeft,
+     'so the field reserves no room for a caret that never draws here');
+
+  /* **Close through the real control, then wait out `#goto`'s own blur-close timer, before
+     touching `find` again.** `gotoIn.onblur` in ui.js schedules `setFind(false)` 150ms after the
+     field loses focus, and closing here — through the field's own docked card going
+     `display: none` — is exactly what fires that blur. `settled()` (120ms) is short of that 150ms
+     window, so checking again too soon can race a still-pending timer. 200ms clears it. */
+  d.getElementById('findClose').click();
+  await new Promise(res => setTimeout(res, 200));
+  is(cs(findEl).display, 'none', 'closing collapses the card back to its rail item');
+
+  // 3. The mutual clear no longer runs at this width — a floating box shares the screen by design.
+  await inFrame(d, OPEN_CARD);
+  await settled();
+  is(d.body.classList.contains('side'), true, 'a station card is open before the search opens');
+  findBtnEl.click();
+  await settled();
+  is(d.body.classList.contains('side'), true,
+     'opening the search above 600px leaves an open station card in place');
+  is(cs(d.getElementById('side')).display, 'flex', 'and the card itself keeps drawing');
+
+  /* The mirror, with `find` left open from the click above rather than closed and reopened — a
+     second close-then-open here would race the same blur timer the comment above avoids. */
+  d.getElementById('railFilters').click();
+  is(d.body.classList.contains('find'), true,
+     'opening the drawer above 600px leaves the search open beside it');
+  is(cs(findEl).display, 'flex', 'and the docked card keeps drawing');
+
+  d.getElementById('findClose').click();
+  d.body.classList.remove('drawer', 'side');
+  await settled();
+
   /* Shut is `display: none`, not a box parked off screen. The pane is a `<dialog>`, so the browser's
      own `dialog:not([open]) { display: none }` does it and the author rule sets `display` on `[open]`
      alone. An author `display` on the element itself beats the UA rule and lays a shut pane out over

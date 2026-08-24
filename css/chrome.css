@@ -1392,18 +1392,30 @@ body.find #findpane { display: flex; flex-direction: column; }
   #findpane #gotoHits {
     position: static; margin: 0; border: 0; border-radius: 0; max-height: none;
   }
-  /* M3's search field: 56px, no border, transparent over the card's own tone, `body-large`. */
+  /* M3's search field: 56px, no border, transparent over the card's own tone, `body-large`.
+     **`margin-bottom: 0` cancels base.css's 10px, or it survives here too.** That rule sets
+     `margin-bottom` on `#goto` for the field's OWN pane context, and a higher-specificity rule that
+     never mentions a property does not cancel it — the lower one still wins that one declaration.
+     Left unset, a 10px gap opened between the field and the results, on a card whose own comment
+     above promises a flush M3 docked search field. */
   #findpane #goto {
     height: 56px; box-sizing: border-box; width: 100%;
-    padding-inline: 16px; border: 0; border-radius: 0; background: none;
+    padding-inline: 16px; margin-bottom: 0; border: 0; border-radius: 0; background: none;
     font-size: var(--md-sys-typescale-body-large-size);
     line-height: var(--md-sys-typescale-body-large-line-height);
   }
   #findpane #goto:focus { outline: none; }
 }
-/* The same tie-break, for the search against the other two. A body class can still set `find`
-   beside `drawer` or `side` directly, and this container draws one occupant only. */
-body:is(.drawer, .side) #findpane { display: none; }
+/* The same tie-break, below 600px only, where the search really is a pane occupant. A body class
+   can still set `find` beside `drawer` or `side` directly, and this container draws one occupant.
+   **Above 600px the search is not a pane occupant, so this must not reach there.** The search floats
+   over the map at that width and shares the screen with the drawer or a station card by design — see
+   `setFind()` and `setDrawer()` in ui.js. This rule used to run at every width and silently undid
+   that: whichever of the three classes landed last always won, and a station card left the docked
+   search hidden behind it for no reason a reader could see. */
+@media (max-width: 600px) {
+  body:is(.drawer, .side) #findpane { display: none; }
+}
 /* `flex-shrink: 0`, and it is what makes the drawer scroll at all. `#barBody` is a column flex
    container with a fixed height, so a taller child does not overflow it — it *shrinks* to the
    container, its own content spills out of the shrunken box, and the scrollHeight never exceeds the
@@ -1805,9 +1817,13 @@ body:not(.ready) #bar, body:not(.ready) #side, body:not(.ready) #findpane { tran
    70% to the main pane and 30% to the supporting one, and the two bands above it keep that ratio.
    `--pane-w` is the same number while the pane is open, and 0 while it is shut. Nothing keys on a
    class of its own: the pane is open when one of its occupants is, and a third body class would be a
-   second source of truth for one fact. */
+   second source of truth for one fact.
+   **`.find` is not in this list.** Above 600px the search is a docked card over the map and never a
+   pane occupant, so it must not reserve the pane's own width. `.find` alone used to reach here too,
+   and the map gave up 360-576px of its trailing edge for a search that drew 360px on the LEADING
+   one — a blank gutter with nothing in it, on every desktop search a reader opened alone. */
 @media (min-width: 601px) {
-  body:is(.drawer, .side, .find) { --pane-w: var(--pane); }
+  body:is(.drawer, .side) { --pane-w: var(--pane); }
 }
 /* **A floor under the ratio, because 30% of a small expanded window is not a pane.** M3 gives the
    supporting pane 30% from 840px up. At 840 that is 252px, which is under M3's own 256dp minimum for
