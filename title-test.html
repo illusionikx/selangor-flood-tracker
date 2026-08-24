@@ -11,14 +11,20 @@
      **Nothing is hard-coded about the drop.** The mark's own width and the heading's own `gap` are
      read back, so a change to either fails here rather than on somebody's screen.
 
+     **300 to 319px are probed on purpose, not rounded off to 320.** That is where the phone
+     ladder's own recalibrated crossing sits — see the comment on `#brand`'s phone `@container`
+     rules in css/chrome.css. `NARROW_PX` in js/config.js blocks the whole page under 300px, so
+     this is the narrowest real width the phone header ever has to answer for, and the check reads
+     that constant rather than a copy of it.
+
      chrome --headless=new --dump-dom title-test.html -->
 <title>Wordmark ladder</title>
 <style>body { font: 13px/1.5 monospace; margin: 16px } .f { color: #b00 }</style>
 <pre id="out">running…</pre>
 <script>
-const W = [1600, 1400, 1280, 1200, 1100, 1000, 900, 800, 700, 601, 600, 480, 414, 360, 320];
 const RUNG = { 'w-lg': 3, 'w-md': 2, 'w-sm': 1 };          // taller number, longer spelling
 const rows = [], fail = [];
+const phoneRungs = new Set();                              // reachability, not just fit — see below
 
 /* One reading of the lockup, wherever it is. `box` is the container the query measures, `need` is
    what the drawn spelling actually asks for: its own width, the mark beside it and the gap between
@@ -49,7 +55,23 @@ const check = (label, r) => {
 };
 
 (async () => {
+  /* NARROW_PX is read out of the source rather than copied here, the same rule narrow-test.html
+     already states: a check carrying its own copy of a constant reports on the number it
+     remembers, not on the one the app uses. This is the floor the phone probes below need — the
+     app blocks the whole page under it, so it is the narrowest real width the header ever answers
+     for, and the one this ladder's phone crossing is measured against. */
+  const NARROW_PX = +(await (await fetch('js/config.js')).text()).match(/NARROW_PX\s*=\s*(\d+)/)[1];
+  /* **`#railToggle` writes the REAL `localStorage` of `flood-exp.test`, because every iframe here
+     loads the same `index.html` a reader's own browser does.** Snapshot the stored `prefs` once,
+     before the first `railShut()` can touch it, and put it back in a `finally` around the whole
+     sweep — so a run of this file costs a reader nothing in their own stored rail preference,
+     pass or throw. The outer page shares the iframes' own origin, so `localStorage` here already
+     is their storage; there is no frame to reach into. */
+  const origPrefs = localStorage.getItem('prefs');
+  const W = [1600, 1400, 1280, 1200, 1100, 1000, 900, 800, 700, 601, 600, 480, 414, 360, 320,
+             ...Array.from({ length: 320 - NARROW_PX }, (_, i) => 319 - i)];
   let last = 4;                                            // nothing above the longest spelling
+  try {
   for (const w of W) {
     const f = document.createElement('iframe');
     f.style.cssText = `width:${w}px;height:800px;border:0;position:absolute;left:-9999px`;
@@ -89,7 +111,7 @@ const check = (label, r) => {
       /* Only the phone layout may widen its box as the viewport narrows, so it restarts the ladder.
          The 601/600 step changes the home as well, so it restarts there too. */
       if (!wide && w !== 600 && r.rung > last) fail.push(`${w}px: a narrower box drew a LONGER spelling`);
-      if (!wide) last = r.rung;
+      if (!wide) { last = r.rung; phoneRungs.add(r.rung); }
     }
 
     /* The open rail is the desktop's own ladder, and it is the half a reader actually reads. */
@@ -104,6 +126,23 @@ const check = (label, r) => {
     }
     f.remove();
   }
+  } finally {
+    // Whatever the reader's own browser held before this run touched the rail preference — put
+    // it back, pass or throw. `null` means the key was never set at all.
+    if (origPrefs === null) localStorage.removeItem('prefs');
+    else localStorage.setItem('prefs', origPrefs);
+  }
+  /* **Reachability, not just fit.** Every width above only ever checked that whatever drew fit its
+     own box, and a ladder frozen on one rung passes that forever. The phone box ranges 288 to 588px
+     across its whole band and only ever showed `.w-lg` before this fix: `.w-md`'s own threshold sat
+     under the 288px floor, so the mechanism never had anywhere lower to fall through to. This
+     asserts the SET of rungs the phone actually drew holds more than the one, which is the property
+     a frozen ladder cannot have. See the `#brand` phone `@container` rules in css/chrome.css for
+     the fix and the honest limit on it. `.w-sm` is not asserted here: it needs a box under 190px,
+     and nothing on this row can take the phone header that low any more. That is disclosed there,
+     not silently dropped here. */
+  if (phoneRungs.size < 2)
+    fail.push(`the phone ladder only ever drew rung ${[...phoneRungs]}, never stepping to another`);
   out.innerHTML = rows.join('\n') + '\n\n' +
     (fail.length ? `<b class="f">FAIL</b>\n` + fail.join('\n') : '<b>PASS</b>');
 })().catch(e => { out.innerHTML = `<b class="f">THREW</b>\n${(e && e.stack) || e}`; });

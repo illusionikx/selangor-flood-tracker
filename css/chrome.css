@@ -130,8 +130,9 @@ body:not(.ready) header { transition: none; }
 #brand .mark { position: relative; display: flex; flex: none; cursor: help; }
 
 /* --- navigation rail ---------------------------------------------------------------------------
-   M3's collapsed rail: 96px wide, `padding-block: 44px 20px`, on the surface tone. It stands under
-   the app bar and beside the map card, so it takes the height that is left.
+   M3's collapsed rail: 96px wide, `padding-block: 44px 20px`, on the surface tone. It runs the full
+   height of the window on the leading edge, beside the map card, with the app bar starting where it
+   ends rather than sitting under it — see the comment further down for the reversal.
    **No divider on the edge facing the map.** This app separates surfaces by space, and `--gap` is
    already the seam between the two. The app bar and the pane each lost the same rule. */
 #rail {
@@ -143,6 +144,7 @@ body:not(.ready) header { transition: none; }
   transition: width var(--m3-rail);
 }
 body:not(.ready) #rail { transition: none; }
+@media (prefers-reduced-motion: reduce) { #rail { transition: none; } }
 @media (max-width: 600px) { #rail { display: none; } }
 /* **The rail runs the FULL height now, so the bar starts beside it rather than over it.** It stood
    under the app bar before, which put the brand in the bar and the rail below it. M3's canonical
@@ -176,7 +178,7 @@ body:not(.ready) #rail { transition: none; }
    measurements, and `title-test.html` reads both back in rendered pixels. */
 /* **A definite `width`, never `flex: none`.** `container-type: inline-size` puts inline-size
    containment on this box, and a contained box cannot take its width from its own content. So
-   `flex: none` measured 0 and the whole lockup vanished. That is the trap `header h1`'s own comment
+   `flex: none` measured 0 and the whole lockup vanished. That is the trap `#brand`'s own comment
    already states from the other side, and it reads as a missing element rather than as a sizing
    rule. 56px is the width every indicator pill in this rail takes, so the drop stands in the same
    column as the glyphs under it. 180 is the 220px rail less its own 20px of inline padding. */
@@ -208,8 +210,10 @@ body.railopen #rail #brand { width: 180px; }
    nothing for JS to keep in step. */
 #rail #railToggle .i { transition: rotate var(--m3-rail); }
 body.railopen #rail #railToggle .i { rotate: 180deg; }
-/* M3's items box. `flex: 1` is what puts the theme button on the bottom edge, and `margin-block-start`
-   is the 40px the spec states between the brand slot and the first item. */
+/* M3's items box, from `NavigationRail/navigation-rail.css`. `flex: 1` is what puts the theme
+   button on the bottom edge. `margin-block-start: 40px` is that file's own gap between the brand
+   slot and the first item, and `gap: 4px` is its own spacing between one collapsed item and the
+   next. */
 #rail .railitems {
   display: flex; flex: 1; flex-direction: column; gap: 4px;
   margin-block-start: 40px; overflow-y: auto; scrollbar-width: none;
@@ -260,7 +264,9 @@ body.railopen #rail #railToggle .i { rotate: 180deg; }
 /* --- the rail, expanded ---
    Every number is NavigationRail/navigation-rail.css's own. The item goes from a 64px column to a
    56px row, the label moves inside the indicator, and the indicator goes from a 56 by 32 pill over
-   the glyph to the whole row at a 28px radius.
+   the glyph to the whole row at a 28px radius. That file's own numbers carry the rest too: no gap
+   between one expanded item and the next (the 28px corner is spacing enough), and an 8px gap
+   between an item's own icon and its label, in the row the collapsed variant stacked instead.
    **The indicator moves from `.railpill` to `.railitem`, and that is why the markup needs no
    change.** Collapsed, the pill is the indicator and the label sits under it, outside. Expanded,
    the row is the indicator and the label sits inside it. One DOM, two states, because the paint
@@ -284,7 +290,7 @@ body.railopen #rail #railApps { margin-inline: 0; }
    this width, so the old `right: 6px` put the count over the label. */
 body.railopen #rail .railbadge { top: -6px; right: -6px; }
 @media (prefers-reduced-motion: reduce) {
-  #rail .railitem, #rail .railpill { transition: none; }
+  #rail .railitem, #rail .railpill, #rail #railToggle .i { transition: none; }
 }
 /* The selected state. `railActive()` in js/map.js sets `aria-current="page"` on the one item that
    names the surface on screen, and clears it on every other item. */
@@ -297,7 +303,7 @@ body.railopen #rail .railbadge { top: -6px; right: -6px; }
 
 /* --- alert ticker ----------------------------------------------------------------------------- */
 
-/* Centred on the viewport, between two rails of equal width — see the `header h1` rule for the
+/* Centred on the viewport, between two rails of equal width — see the `#brand` rule for the
    mechanism. The strip stays a flex item and is never taken out of the flow: an absolutely centred
    one holds its width whatever else is on the bar, so at about 1024px it draws over the title.
 
@@ -1263,12 +1269,16 @@ table.data .dash { color: var(--outline); }
    js/net.js paints no colour at all now. The word it used to carry still leads the `status` row in
    the table below. */
 
-/* Anchored to the window rather than to the mark, because a `<table>` cannot live inside the `<h1>`
-   the mark is in, and because the heading has two homes now — the app bar on a phone and the rail
-   above 600px. One fixed box answers both, and js/ui.js moves only the heading.
-   The desktop numbers sum the rail's own three: 44px of block padding, a 56px menu slot and the 4px
-   above the brand slot. Stated here because the rail states them there, and `m3-check.html` reads
-   the popover against the mark rather than against this literal. */
+/* Anchored to `<header>`, its own nearest positioned ancestor — never to the window — because a
+   `<table>` cannot live inside the `<h1>` the mark is in. `header` itself carries `left:
+   var(--rail-w)` (see above), so `#netstats`'s own `left` is relative to a box that has ALREADY
+   stepped past the rail. Adding `--rail-w` again here counted it twice: 200px from the window
+   collapsed, 448px expanded, against a mark sitting at roughly 20 to 44px. `8px` alone is the
+   right number, at every rail width, because the rail term is never this rule's to add.
+   The desktop `top: 104px` sums the rail's own three: 44px of block padding, a 56px menu slot and
+   the 4px above the brand slot. Stated here because the rail states them there.
+   `m3-check.html` reads the popover's left edge back against `header`'s own, rather than against
+   either literal — that is the assertion the double-counted `--rail-w` term would have failed. */
 #netstats {
   position: absolute; z-index: 601; top: calc(var(--hdr) + 8px); left: 12px; width: 236px;
   padding: 14px 16px; border-radius: 12px; opacity: 0; visibility: hidden;
@@ -1284,8 +1294,11 @@ body:has(#brand .mark:hover) #netstats,
 body:has(#brand .mark:focus-within) #netstats,
 body:has(#brand .mark.open) #netstats { opacity: 1; visibility: visible; }
 @media (min-width: 601px) {
-  #netstats { top: 104px; left: calc(var(--rail-w) + 8px); transition: opacity .12s ease,
-              visibility .12s, left var(--m3-rail); }
+  /* `left: 8px`, not `calc(var(--rail-w) + 8px)` — see the comment above. Nothing here depends on
+     the rail's own width any more, so there is nothing to transition on `left`: as `header` itself
+     travels on its own `left var(--m3-rail)`, this box travels with it for free, being positioned
+     relative to `header`'s own box rather than to the window. */
+  #netstats { top: 104px; left: 8px; }
 }
 #netstats .note td { padding-top: 10px; line-height: 1.45; font-size: 11px; }
 
@@ -2702,6 +2715,29 @@ body.side #side { display: flex; }
      to share against, and it measured 4px — the lockup vanished and the bar looked empty.
      The rail states the same rule from its own side. */
   #brand { flex: none; width: 100%; max-width: none; }
+  /* **This box is `viewport − 12px` at every phone width, header padding aside, because nothing
+     else shares its row.** So it ranges 288 to 588px across the whole 300 to 600px phone band — a
+     RANGE, but one that never leaves the top rung's own territory. The desktop thresholds below
+     (190px, 282px) were measured for the bar this box used to share with a ticker and six controls,
+     where the ticker's own claim on the row could push it that low. None of that claims space here
+     any more, so the base 282px rule never sees a box under 288 and `.w-lg` draws at every legal
+     phone width, with only 9px of margin over the 279px it needs at the narrowest one.
+     **The rail carries its own thresholds, at its own two widths, rather than reusing these — see
+     `#rail #brand` below. This box needs the same**, recalibrated to what it actually ranges over.
+     A 295px threshold — 16px of margin over `.w-lg`'s own 279px, wider than the 2px the desktop
+     rule keeps, because this is now the narrowest box in the app and its margin should say so —
+     lands the crossing at a 307px window. `.w-md` therefore draws from 300 to 306px, and `.w-lg`
+     from 307px up. `title-test.html` probes across that crossing and asserts a real transition
+     happens inside it, not only that whatever drew still fits.
+     **`.w-sm` stays unreachable here, and that is disclosed rather than fixed.** Its own 190px
+     threshold sits under every box this rule ever measures — 288px is the floor a phone can reach,
+     set by `NARROW_PX` in js/config.js, and no margin choice moves that floor. Reaching it would
+     need something else back on this row to make the box vary the way `.w-lg`'s crossing does, and
+     nothing does. Two of the three word rungs are real here; the third needs the row-sharing this
+     box gave up, which is a larger change than this fix. */
+  @container (max-width: 294.98px) {
+    #brand .word > .w-md { display: inline; } #brand .word > .w-lg { display: none; }
+  }
   /* Tighter controls so the mark, the chip and four buttons fit one line at 360px with room over. */
   header .icon { width: 36px; height: 36px; font-size: 20px; }
   /* The ticker holds a row of its own here, so the two rails share line one between them. They keep
@@ -2726,7 +2762,7 @@ body.side #side { display: flex; }
     mask: linear-gradient(90deg, transparent, #000 18px, #000 calc(100% - 18px), transparent);
   }
   /* The title used to go here whole, on the argument that five buttons and the status chip all have
-     to fit. The container query on `header h1` measures that directly, so a phone with room draws
+     to fit. The container query on `#brand` measures that directly, so a phone with room draws
      `KVFW` and one without draws the drop alone. Nothing to state at this width any more. */
   /* The popover clears the two-row header rather than the one-row one; --hdr already carries the
      difference, so this only has to stop sitting under the ticker's rule. */

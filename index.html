@@ -74,8 +74,8 @@
      Before `base.css`, which derives `--m3-travel`, `--m3-grow` and `--m3-swap` from them and
      bridges M3's colour names onto this app's palette. Colour is not in this file on purpose. -->
 <link rel="stylesheet" href="vendor/m3/tokens.css?v=1">
-<link rel="stylesheet" href="css/base.css?v=169">
-<link rel="stylesheet" href="css/chrome.css?v=242">
+<link rel="stylesheet" href="css/base.css?v=170">
+<link rel="stylesheet" href="css/chrome.css?v=243">
 <link rel="stylesheet" href="css/map.css?v=159">
 
 <!-- Water tint for the dark basemap. CARTO's dark_all is greyscale — all 18 of its tones have zero
@@ -271,8 +271,11 @@
        corner. It was the one always-visible sign that the feed was alive. The rail above 600px left
        no room for it. `js/net.js` paints no colour there any more. `tabindex="0"` now sits on the
        mark itself. Hover or focus on the glyph still opens #netstats below. A tap still toggles
-       `.open` for touch. -->
-  <h1 id="brand"><span class="mark" tabindex="0" aria-label="Feed diagnostics"
+       `.open` for touch.
+       **`role="button"` is required, not decoration.** A `<span>` with no role maps to `generic`,
+       and ARIA forbids a naming attribute on that role — `aria-label` may not be exposed at all.
+       The mark is focusable and opens a popover, so it needs a role that admits a name. -->
+  <h1 id="brand"><span class="mark" role="button" tabindex="0" aria-label="Feed diagnostics"
         ><i class="glyph brand i i-flood"></i></span><span class="word"
       ><span class="w-lg">Klang Valley <b>Flood Watch</b></span
       ><span class="w-md">KV <b>Flood Watch</b></span
@@ -292,9 +295,11 @@
 <nav id="rail" aria-label="Main">
   <!-- **M3's menu slot**, 56px tall, leading-aligned when the rail is expanded and centred when it
        is collapsed. It holds the one control that changes the rail's own width.
-       `menu_open` is the glyph, and a `:has()` rule in chrome.css turns it 180 degrees when the rail
-       opens. The glyph names the direction the press moves the rail, so one mark answers both
-       states and there is nothing to keep in step from JS.
+       `menu_open` is the glyph, and `body.railopen #rail #railToggle .i` in chrome.css turns it
+       180 degrees when the rail opens — the same `body.railopen` class every other expanded-rail
+       rule reads, rather than a separate `:has()` for this one property. The glyph names the
+       direction the press moves the rail, so one mark answers both states and there is nothing to
+       keep in step from JS beyond that one class.
        `aria-expanded` rides this button and `aria-controls` names the rail, so the state is spoken
        rather than left to the arrow. js/ui.js writes both. -->
   <div class="railmenu">
@@ -541,14 +546,14 @@
        constant and this list is what goes stale. -->
   <h3>App bar</h3>
   <div class="key">
-    <span class="ctl"><i class="i i-menu"></i><b>Layers and filters</b></span>
+    <span class="ctl"><i class="i i-filter_alt"></i><b>Layers and filters</b></span>
     <span>Opens the drawer of filters. See Filters below.</span>
 
     <span class="ctl"><i class="i i-flood"></i><b>Feed status</b></span>
-    <span>The dot on the app mark reports the feed. Teal is live. Amber means every reading is over
-       two hours old. Red means the last fetch failed, or JPS did not answer and the map draws
-       a stored copy. Hover the mark, or tap the dot, for the figures behind it. The map refreshes
-       itself every 5 minutes.</span>
+    <span>Hover the app mark, or tap it on a phone, for the numbers behind the feed: when the data
+       last changed, how long ago this page last checked, and where the answer came from. The
+       status line reads live, stale, cached, offline, or test mode. The map refreshes itself
+       every 5 minutes.</span>
 
     <span><b>The moving strip</b></span>
     <span>Lists every station on alert, and any weather warning first. Select a station tile to jump

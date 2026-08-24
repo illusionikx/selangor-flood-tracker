@@ -67,10 +67,19 @@ const frame = async w => {
      which the app bar keeps at every phone width. */
   const g = await frame(px - 20), gd = g.contentDocument,
         behind = gd.querySelector('#brand .mark');
-  if (!behind) fail.push('modal: no focusable control behind the block to test inertness with');
-  behind?.focus();
-  ok(!!behind && gd.activeElement !== behind,
-     'modal: the page behind the block is inert, so it is in the top layer');
+  /* A missing target and a failed inertness check are two different faults, and a null `behind`
+     is only ever the first one. Running `ok()` on it too pushed a second, misleading failure for
+     the same root cause — "the page behind the block is inert" read as false when there was
+     nothing there to test it with. `L.push` alone keeps the found-a-target case (below) reporting
+     through the one shared log, without a second `ok()` call to fall out of step with it. */
+  if (!behind) {
+    fail.push('modal: no focusable control behind the block to test inertness with');
+    L.push('FAIL modal: the page behind the block is inert, so it is in the top layer');
+  } else {
+    behind.focus();
+    ok(gd.activeElement !== behind,
+       'modal: the page behind the block is inert, so it is in the top layer');
+  }
   g.remove();
 
   out.innerHTML = L.join('\n') + '\n\n' +

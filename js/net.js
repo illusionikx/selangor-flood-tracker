@@ -1,4 +1,4 @@
-// Polling the proxy, and the status chip that reports honestly on what came back.
+// Polling the proxy, and the diagnostics popover that reports honestly on what came back.
 
 import { FEED, POLL_MS } from './config.js';
 import { state, PREFS } from './state.js';
@@ -19,14 +19,14 @@ import { askJson } from './ask.js';
 
    Still measured, not assumed: 'live' needs a 200, a live upstream, and readings stamped within the
    last 2h (JPS publishes hourly). */
-let last;   // the payload the chip is currently describing, so the ages can tick between polls
+let last;   // the payload the popover is currently describing, so the ages can tick between polls
 /* The failure that goes with `last`, if any. The 30-second re-render below hands both back, so a
    refresh keeps the state it is refreshing and only the ages move. Without this the interval
-   re-rendered a failed poll as a healthy one, and a reader watching a real outage saw the dot go
-   back to green with no successful poll behind it. */
+   re-rendered a failed poll as a healthy one, and a reader watching a real outage saw the status
+   read live again with no successful poll behind it. */
 let lastErr;
 
-/* The four facts behind the status dot. Exported because the Developer section in the About dialog
+/* The four facts behind the diagnostics popover. Exported because the Developer section in the About dialog
    shows the same numbers, and two copies of this list would drift the first time one of them gained
    a row. */
 export const feedRows = j => [
@@ -36,7 +36,7 @@ export const feedRows = j => [
   ['from', j.cacheAge ? `cache, ${j.cacheAge}s old` : 'JPS'],
 ];
 
-/* What the dot has no room for. The scraped counters are the alarm for a scraper that broke —
+/* What the popover's status line has no room for. The scraped counters are the alarm for a scraper that broke —
    `parsed: 0` means a table moved upstream, not that the rivers went quiet — and until now they
    were in the payload and on no screen. */
 export const sourceRows = j => [
@@ -51,7 +51,7 @@ export const sourceRows = j => [
   ['offline stations', j.offline ?? '?'],
 ];
 
-/** The payload the chip is currently describing, so the About dialog reports the same poll. */
+/** The payload the popover is currently describing, so the About dialog reports the same poll. */
 export const lastPayload = () => last;
 
 /* Two messages, not a taxonomy of faults. Whatever broke, the reader's next move is the same:
@@ -92,12 +92,12 @@ function network(j, err) {
          POLL_MS / 60000} minutes. Nothing to reload.</td></tr>`;
 }
 
-/* The page updates itself every POLL_MS, but between polls the chip said "last checked 4 minutes
+/* The page updates itself every POLL_MS, but between polls the popover said "last checked 4 minutes
    ago" for four minutes without moving — which reads as a page that has stopped, not one that is
    waiting. Re-rendering the same payload every 30s costs nothing and makes the clock visibly run.
    `stale` also flips on its own this way, without needing a poll to notice the readings aged out.
-   The replay passes `lastErr` back in too, so a poll that failed keeps reading failed — the dot
-   and the problem row hold their state, and only the ages underneath keep ticking. */
+   The replay passes `lastErr` back in too, so a poll that failed keeps reading failed — the
+   status word and the problem row hold their state, and only the ages underneath keep ticking. */
 setInterval(() => last && network(last, lastErr), 30000);
 
 /* What the splash says while the first poll is in flight. Only stages we can actually observe get

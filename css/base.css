@@ -95,8 +95,16 @@
      **The rail is chrome, not a pane, so it comes off the window before the split — not off the
      map's own half.** The map already gives up half of `--gap` plus `--seam` under the argument
      above. `--rail-w` joins that same subtraction rather than landing on the map alone, or the two
-     panes stop splitting the window equally the moment the rail is wider than 0. */
-  --pane: calc((100vw - var(--rail-w)) / 2 - 12px);
+     panes stop splitting the window equally the moment the rail is wider than 0.
+     **`max(256px, ...)`, because the rail can now be 220px on its own.** An equal split was never
+     checked against a rail wider than the 96px it used to be fixed at, and 220px eats far enough
+     into the lower end of the medium band -- 700px, where `m3-check.html`'s own sweep now runs
+     with the rail open -- that the "half" a 700px window has left is 228px, under M3's own 256dp
+     minimum for this surface. This is the same floor the expanded band already keeps under its
+     30% ratio, for the same reason: a pane that cannot draw its own content is worse than a map
+     that gives up the difference. Equal is still the outcome whenever the window can afford it --
+     this only bites while the rail is open near the medium band's own narrow end. */
+  --pane: max(256px, calc((100vw - var(--rail-w)) / 2 - 12px));
   --pane-w: 0px;
   /* The margin around the map card, and the gap between it and the supporting pane. One number for
      both, because M3's layout separates panes with space rather than with a line and the space on

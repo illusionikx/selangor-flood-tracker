@@ -985,8 +985,9 @@ document.addEventListener('click', () => {
      the same blob every other setting does, and `syncRail()` writes the control from it rather than
      the reverse — the rule `syncHeat()` states for every preference-owned control in this app.
      The class goes on the BODY and the width is read off `:root:has(body.railopen)`. See the
-     comment on that rule for why the token cannot be declared on the body itself. */
-  PREFS.railOpen ??= false;
+     comment on that rule for why the token cannot be declared on the body itself.
+     No `??=` default here: `syncRail()` already reads it through `!!PREFS.railOpen`, so an unset
+     value already coerces to shut. A default assigned above that read changes nothing it sees. */
   const toggle = el('railToggle');
   const syncRail = () => {
     const open = !!PREFS.railOpen;
@@ -997,6 +998,30 @@ document.addEventListener('click', () => {
   };
   syncRail();
   toggle.onclick = () => { PREFS.railOpen = !PREFS.railOpen; save(); syncRail(); };
+
+  /* **The ticker has to re-measure once the bar it sits in changes width, and neither a poll nor a
+     `window.resize` covers this.** The rail toggle changes `header`'s own `left`, not the viewport,
+     so no resize event fires. `js/ticker.js` sizes its strip off `box.clientWidth` once, when
+     `ticker()` last ran, and otherwise waits for the next poll. Collapsing the rail widens the bar
+     by up to 124px between polls, past the copy count the strip was built for, and shows the seam
+     that module exists to hide.
+     A `ResizeObserver`, not a call at this one site — the rule `js/map.js` already states for
+     `#map`'s own observer. It catches every cause of the bar changing width: this toggle, and the
+     600px breakpoint crossing that moves `--rail-w` between 0 and its rail value, with reduced
+     motion honoured or not — a `prefers-reduced-motion` reader gets no `transitionend` to wait on
+     at all, since there is no transition, and the observer does not care either way.
+     **Debounced, because the observer fires roughly once a frame across the whole 300ms travel.**
+     Rebuilding the ticker eighteen times over one toggle is wasted work at best and a flickering
+     strip at worst. 80ms is short enough that a reader waiting on the toggle sees the strip settle
+     right after the rail does, and long enough that consecutive frames of one transition collapse
+     into the single call fired after the last of them.
+     Guarded on `state.data.length`, the same guard `js/app.js`'s own resize handler uses: nothing
+     has loaded to draw a strip from before the first poll lands. */
+  let tickResize;
+  new ResizeObserver(() => {
+    clearTimeout(tickResize);
+    tickResize = setTimeout(() => state.data.length && ticker(), 80);
+  }).observe(bar);
 }
 
 // --- go to -----------------------------------------------------------------------------------

@@ -554,13 +554,33 @@ async function desktop() {
     is(!!d.querySelector('.railbrand #brand'), true,
        'the brand moved into the rail above 600px, out of the app bar');
 
+    /* --- the diagnostics popover, against the header it is really anchored to ---
+       `#netstats` is a child of `<header>`, and `header` is its own nearest positioned ancestor.
+       `header` already carries `left: var(--rail-w)`, so `#netstats`'s own `left` has to be a
+       constant offset from HEADER, never from the rail again — adding `--rail-w` a second time
+       here is exactly the fault this reads against a real header box rather than against a
+       literal, at both rail widths, so a reintroduced `--rail-w` term fails here immediately. */
+    const netstatsGap = () =>
+      Math.round(r(d.getElementById('netstats')).left - r(d.querySelector('header')).left);
+    is(netstatsGap(), 8, 'the diagnostics popover sits 8px inside its own header, rail shut');
+
     /* --- the rail expands and collapses ---
        `NavigationRail/navigation-rail.css`: 220px open against 96px shut, `padding-inline: 20px`,
        a 56px leading-aligned item at `border-radius: 28px`, a 56 by 32 pill that gives up its own
        fill for the whole row. `PREFS.railOpen` holds the state, so the control is pressed here
        rather than the preference written directly — the rule `syncHeat()` states for every
-       preference-owned control in this app. */
+       preference-owned control in this app.
+       **The toggle writes to the REAL `localStorage` of the app's own origin**, because this
+       iframe loads the same `index.html` a reader's browser does. A press here can leave a
+       developer's own rail preference open the next time they visit the real app. The outer IIFE
+       captures the frame's stored `prefs` before this function runs and restores it in a
+       `finally`, so this block presses the control freely rather than writing the preference
+       directly — that is what keeps the assertions honest about the control a reader actually
+       has. It starts from a known shut state rather than assuming one, in case the reader's own
+       stored preference was already open when this ran. */
     const toggle = d.getElementById('railToggle');
+    if (d.body.classList.contains('railopen')) { toggle.click(); await settled(); }
+    is(d.body.classList.contains('railopen'), false, 'starting shut, whatever the stored preference was');
     toggle.click();
     await settled();
     is(d.body.classList.contains('railopen'), true, 'the toggle opens the rail');
@@ -574,6 +594,7 @@ async function desktop() {
     is(cs(items[0]).borderRadius, '28px', 'M3 surface corner 28px, the indicator is the whole row');
     is(cs(toggle.querySelector('.i')).rotate, '180deg',
        'the toggle names the direction the next press moves the rail');
+    is(netstatsGap(), 8, 'and the popover holds the same 8px against its header, rail open');
     toggle.click();
     await settled();
     is(d.body.classList.contains('railopen'), false, 'and the second press shuts it again');
@@ -944,7 +965,6 @@ async function bands() {
   const { d, w, cs, r } = await ready('desk');
   d.head.insertAdjacentHTML('beforeend',
     '<style>*{transition:none !important;animation:none !important}</style>');
-  say('--- the four window size classes -------------------------------------------');
   const wide = (id, expect, name) => {
     const b = d.getElementById(id);
     b.showModal();
@@ -957,11 +977,18 @@ async function bands() {
     is(Math.round(parseFloat(cs(b).maxWidth)), expect, name);
     b.close();
   };
-  for (const [px, label, inset, camW, tblW, proseW] of [
+  /* **Every one of these numbers reads `--rail-w` live, but nothing ran this sweep with the rail
+     OPEN until now.** `finding 1` — the diagnostics popover double-counting the rail's own width —
+     lived in exactly that gap: a fault that only a 220px rail exposes, in a check that only ever
+     ran collapsed. `sweep()` is the four-band loop, unchanged, run once at each rail width. */
+  const sweep = async railLabel => {
+  say(`--- the four window size classes, rail ${railLabel} -----------------------------`);
+  for (const [px, label0, inset, camW, tblW, proseW] of [
     [700,  'medium',   16, 668,  668,  560],
     [900,  'expanded', 24, 852,  852,  820],
     [1400, 'large',    32, 1336, 1200, 820],
   ]) {
+    const label = `${label0} (rail ${railLabel})`;
     f.style.width = px + 'px';
     await new Promise(res => setTimeout(res, 150));
     is(w.innerWidth, px, label + ' @' + px + ': the frame really resized');
@@ -997,9 +1024,18 @@ async function bands() {
     d.body.classList.add('side');
     await new Promise(res => setTimeout(res, 200));
     const pw = r(pane).width, mw = r(d.getElementById('map')).width;
-    if (label === 'medium') {
-      is(Math.abs(pw - mw) <= 1, true,
-         label + ': the two panes are equal, which is what an equal split means');
+    if (label0 === 'medium') {
+      /* **A floor lives under the equal split too, now that the rail can be 220px wide.** At
+         700px with the rail open, half the remaining window is 228px -- under M3's own 256dp
+         minimum -- so `--pane` floors there instead, and the map absorbs the difference rather
+         than staying equal. `want` is the same `max(256px, ...)` formula css/base.css states, so
+         this checks the real rule rather than a copy of it, in both the equal and the floored
+         case. */
+      const want = Math.max(256, Math.round((px - rail) / 2 - 12));
+      is(Math.round(pw), want,
+         label + ": half the window less the rail, floored at M3's 256dp minimum");
+      if (want === 256) is(mw <= pw + 1, true, label + ': floored, so the map is what shrinks rather than the two staying equal');
+      else is(Math.abs(pw - mw) <= 1, true, label + ': unfloored, the two panes are equal');
     } else {
       is(Math.round(pw), Math.max(360, Math.round((px - rail) * 0.3)),
          label + ': 30% of the window less the rail, or the 360px floor where that falls under it');
@@ -1041,6 +1077,19 @@ async function bands() {
     d.body.classList.remove('side');
     await new Promise(res => setTimeout(res, 150));
   }
+  };  // sweep()
+
+  const toggle = d.getElementById('railToggle');
+  /* Start from a known shut rail, whatever the reader's own stored preference happened to be —
+     the outer IIFE restores that stored value once this whole file is done, in a `finally`. */
+  if (d.body.classList.contains('railopen')) { toggle.click(); await new Promise(res => setTimeout(res, 120)); }
+  await sweep('shut');
+  toggle.click();
+  await new Promise(res => setTimeout(res, 120));
+  await sweep('open');
+  toggle.click();
+  await new Promise(res => setTimeout(res, 120));
+
   f.style.width = '1200px';
 }
 
@@ -1048,8 +1097,21 @@ async function bands() {
   out.textContent = '';
   try {
     await phone();
-    await desktop();
-    await bands();
+    /* **`#railToggle` writes the REAL `localStorage` of `flood-exp.test`, because `#desk` loads the
+       same `index.html` a reader's own browser does.** `desktop()` and `bands()` both press it now,
+       to reach a 220px rail for real rather than assert a number nobody's press ever produces.
+       Snapshot the frame's stored `prefs` once, before either function touches it, and put it back
+       in a `finally` — so a run of this file costs a reader nothing in their own stored
+       preferences, pass or throw. */
+    const deskWin = document.getElementById('desk').contentWindow;
+    const origPrefs = deskWin.localStorage.getItem('prefs');
+    try {
+      await desktop();
+      await bands();
+    } finally {
+      if (origPrefs === null) deskWin.localStorage.removeItem('prefs');
+      else deskWin.localStorage.setItem('prefs', origPrefs);
+    }
   } catch (e) {
     bad++;
     say('THREW  ' + e.message);
