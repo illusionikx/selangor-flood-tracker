@@ -13224,6 +13224,38 @@ the dot still carried the only `tabindex="0"` on that heading. The dot is delete
 moved onto `.mark` itself, so the check follows it there: `#brand .mark`. That control rides the
 heading, which the bar keeps at every phone width.
 
+## The supporting pane gets an exit
+
+The pane arrived over 300 ms and left in one frame. A reader named that on a phone on 2026-08-24. The
+enter was a keyframe on `[open]`, and a keyframe on an open state buys one direction only.
+
+The replacement is a transition on `#pane` itself, with three parts. `@starting-style` supplies the
+closed state that `show()` and `showModal()` leave nothing to transition from. `allow-discrete` on
+`display` holds the box on screen while it travels out. `allow-discrete` on `overlay` holds the top
+layer, and that part matters below 600 px alone. The modal variant otherwise drops out of the top
+layer in the first frame of the exit and draws the exit behind the page.
+
+Both variants leave by the edge they arrived from. That is `translateX(100%)` above 600 px and
+`translateY(100%)` below it, on `--m3-travel`.
+
+**The occupant on screen fades with the pane, and that is a second rule rather than a side effect.**
+`closeSide()` drops the body class, so the occupant's opacity goes to 0 in the same style recalc the
+pane starts its exit in. Without the second rule the pane slides off holding nothing. The selector is
+`#pane:not([open]) #bar, #pane:not([open]) #side, #pane:not([open]) #findpane`, so it names a closing
+pane and never a swap.
+
+An occupant replaced while the pane stays open still leaves at once. That is
+the rule this app already holds, and a cross fade there is the second motion a reader cut. Only the
+occupant that was on screen holds an opacity to fade from, so the other two cannot stack under it.
+
+`m3-check.html` asserts the transition rather than the keyframe: one duration and one curve across
+every property, `transform` on the list, `overlay` on the list, and `allow-discrete` in
+`transition-behavior`.
+
+Its swap assertion changed too. It removed every body class, which closes the
+pane rather than swaps its occupant, and that path now measures the new fade. It removes one class
+and adds another instead. A third assertion covers the close.
+
 ## The ticker fade is one fluid ramp, not two numbers
 
 The alert ticker fades both ends with a mask. The desktop ramp was 56px and the phone ramp was 18px.
@@ -13242,3 +13274,79 @@ steps aside for the rail and the supporting pane, so a narrow desktop strip fade
 instead. That is the same rule the phone follows, which is why one number can go.
 
 Not built. There is no per-width table of ramps. A second number is what this change removes.
+
+## The legend joined the credit line, and the opacity slider went
+
+A reader asked for two things on 2026-08-24. The map scales had to be small enough to sit on the
+credit's own line, at every layer. The heat opacity slider had to go, with the wash fixed at 75%.
+
+### One row, and it holds both
+
+`#mapfoot` is a new wrapper. It holds `#legend` and `#credit` in one wrapping flex row, anchored by
+its bottom edge to the map card's own inset.
+
+The legend and the credit were two absolutely positioned boxes on two bands. The credit sat at 8px
+and owned the band up to 22px. The legend started at 30px to clear it. That arithmetic exists in this
+repo because both boxes were once correct against the pane, correct against the window, and still
+landed on each other as the map narrowed.
+
+Two boxes in one flex line cannot overlap each other at any width. So the arithmetic is gone. A map
+too narrow to hold both wraps the credit onto its own line under the legend. The row grows upward,
+because it is anchored by its bottom edge.
+
+Two details are load-bearing. The wrapper takes no pointer events, and the two children take them
+back. Without that the row swallows every press along the bottom of the map. And each child states
+`min-width: 0`. A flex item floors at its own min-content, and the credit's is a 65px word. In the
+medium band with the rail open the map is under 300px wide, and the row overflowed its own
+reservation by 6px and landed back on the layer button.
+
+### The row reserves the trailing column
+
+The row stops 118px short of the map's trailing edge. The credit alone did not have to: one 14px line
+at 8px fits under the zoom cluster with room to spare. A wrapped row does not. Its second line rises
+to about 50px, which is inside the band `#paint` takes. So the row reserves the column those controls
+stand in rather than the band under them. 118 is `48 + --fab`, the button's own reach, and 10 more to
+stand off it. The phone block states 68 for the same reason, off that width's own numbers.
+
+### Every scale states itself on one line
+
+Each section was a title, a ramp under it, and the tick words under that. On the credit's line there
+is no second line to drop to, so the three run across instead. Only the ramp states a width, 72px on
+a desktop and 60 on a phone, because a ramp is the one thing here with no intrinsic width of its own.
+The weather key follows: a 14px glyph beside its word rather than a 22px glyph over it. `flex-wrap`
+is the floor. A phone too narrow for a whole scale breaks it rather than overflow the map.
+
+The 288px box width and the `:has()` rule that swapped it for `fit-content` on the weather section
+are both gone. All three sections size on their content now.
+
+Measured with the app rendered. At 1536px the row is one 23px line: a 308px legend on the leading
+edge, a 337px credit ending 10px short of the layer button. At 390px it is two lines, 42px in all,
+and the legend's 272px stays clear of the 44px zoom buttons.
+
+### The info panel changed edge
+
+`.info`'s 244px panel hung off `right: -8px`, so it ran leftward from its glyph. That was right while
+the legend was a 288px card with the glyph on its trailing edge. On the strip the glyph sits about
+100px from the map's leading edge, and the panel ran off the window and was cut. A reader named it in
+the same session. It leads on `left` now, and takes a `max-width` for a phone too narrow to hold 244.
+
+### The wash is 75%
+
+`HEAT_OPACITY` in `js/heat.js` holds the number. `heatOpacity()` keeps its name and its two callers,
+and reads no DOM at all. 75% is the figure the slider existed to reach: a pin, a river and a road all
+read through the wash, and the wash still states its own class.
+
+`_fade` is a separate term and it stays. That one is the layer telling a reader its blob has stopped
+covering the ground it names, and it multiplies this number rather than replaces it.
+
+`PREFS.heatOpacity` is dead in any preference blob written before this. Nothing reads it, so nothing
+has to migrate it. The `.slider` rules and the `heatOpacityRow` visibility line in `syncHeat()` went
+with the control.
+
+### What the checks caught
+
+`m3-check.html` reads the furniture offsets and intersects every visible box down there pairwise. It
+reported four collisions on the first attempt, which is the whole reason that pairwise pass exists.
+It names `#mapfoot` for the offsets now, at 12px leading and 8px on the other axis, with 118 on the
+trailing edge. It still reads `#legend` and `#credit` separately in the pairwise pass: a wrapper that
+clears the cluster is no proof that the row inside it does.

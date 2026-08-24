@@ -175,16 +175,27 @@ async function phone() {
      **The motion is on the pane and never on an occupant.** One box travels, so switching the
      station card for the filters swaps the content of a container already in place. Two sheets
      sliding through each other is what that switch looked like while each carried its own travel. */
-  /* The pane animates on `[open]` like every other dialog here, because `show()` and `showModal()`
-     both flip `display` and leave no closed state to transition from. Both variants travel in from
-     the edge they are anchored to. */
+  /* The pane transitions on `[open]` and gets an enter AND an exit. `@starting-style` supplies the
+     closed state `show()` and `showModal()` leave nothing to transition from. `allow-discrete` on
+     `display` and on `overlay` is what keeps the box, and the top layer, alive across that exit.
+     A keyframe bought the enter alone, so the pane arrived over 300ms and left in one frame. Both
+     variants travel in from the edge they are anchored to. */
   const paneEl = d.getElementById('pane');
   d.body.classList.add('drawer');
   await settled();
   is(paneEl.open, true, 'the observer opens the pane when an occupant asks for it');
-  is(cs(paneEl).animationName, 'paneUp', 'the pane travels up from the bottom edge here');
-  is(cs(paneEl).animationDuration, '0.3s', 'M3 duration-short2, a full-screen dialog\'s own');
-  is(cs(paneEl).animationTimingFunction, M3_EASE, 'on M3 easing-emphasized');
+  const paneCs = cs(paneEl);
+  is(paneCs.animationName, 'none', 'the pane transitions, so one declaration carries both directions');
+  is(paneCs.transitionDuration.split(',').every(v => v.trim() === '0.3s'), true,
+     'M3 duration-short2, a full-screen dialog\'s own, on every property');
+  is(paneCs.transitionTimingFunction.split(/,\s*(?=cubic-bezier|ease|linear|steps)/)
+       .every(v => v.trim() === M3_EASE), true, 'on M3 easing-emphasized');
+  is(paneCs.transitionProperty.includes('transform'), true,
+     'it travels from the edge it is anchored to');
+  is(paneCs.transitionProperty.includes('overlay'), true,
+     'and it holds the top layer across the exit, or the modal variant leaves behind the page');
+  is(paneCs.transitionBehavior.includes('allow-discrete'), true,
+     'both of those are discrete properties, so the exit is drawn at all');
   /* **One motion changes what the pane holds, and TWO events have to read it.** An occupant swapped
      for another inside `#pane` is one. A station swapped for another inside `#side` is the other.
      They were two motions for one revision, and a reader met both and asked for one. So the numbers
@@ -192,13 +203,21 @@ async function phone() {
      M3's fade through stood on the first of those two and is gone. It faded the outgoing surface
      over the first 30% of 300ms, then faded and scaled the incoming one from 92%. The reading of the
      spec was right and the result was two motions in one box. */
-  d.body.classList.remove('drawer', 'side');
+  /* **The exit is instant on a SWAP, and that is what a station swap does.** That one replaces the
+     card with `innerHTML` and the new card fades in from nothing, so the outgoing occupant just
+     stops drawing. So this has to be a real swap, with the pane open and one occupant replacing
+     another. Removing every class closes the pane instead, and a closing pane is the one case an
+     occupant DOES fade, or the pane slides off holding nothing. */
+  d.body.classList.remove('drawer');
+  d.body.classList.add('side');
   await settled();
-  /* **The exit is instant, which is what a station swap does.** That one replaces the card with
-     `innerHTML` and the new card fades in from nothing, so the outgoing occupant just stops drawing.
-     `display` therefore needs no transition and no `allow-discrete` to survive one. */
+  is(paneEl.open, true, 'swap: the pane stays open while its occupant is replaced');
   is(cs(d.getElementById('bar')).transitionDuration.split(',')[0].trim(), '0s',
      'swap: the outgoing occupant leaves at once, the way a replaced station does');
+  d.body.classList.remove('side');
+  await settled();
+  is(cs(d.getElementById('side')).transitionDuration.split(',')[0].trim(), '0.3s',
+     'close: the occupant on screen fades with the pane, so nothing slides off empty');
   d.body.classList.add('drawer');
   await settled();
   const inCs = cs(d.getElementById('bar'));
@@ -925,12 +944,17 @@ async function desktop() {
      these three are siblings of `#map` and each has to add the card's own inset to its offset.
      **Which inset depends on the edge.** A box measuring from the trailing edge measures across the
      space between the two panes and takes `--seam`. Every other edge takes `--gap`. */
-  /* The legend's 30 is not a spacing choice. `#credit` sits at 8 and is one 14px line, so it owns
-     the band up to 22, and the legend used to start at 12 — inside it. The two only looked separate
-     while the map was wide enough for the credit to stay on its own side of it. */
-  for (const [id, x, y] of [['legend', 12, 30], ['credit', 10, 8], ['paint', 48, 36]]) {
+  /* The legend and the credit are one box now, `#mapfoot`, and it spans the card. So it is read on
+     both edges rather than on one. It stood on two bands before, the legend at 30 to clear a 14px
+     credit line at 8, and a reader asked for them inline on 2026-08-24. */
+  const foot = r(d.getElementById('mapfoot'));
+  /* 118 on the trailing edge, not 10. The row wraps, and a wrapped line rises to about 50px, which
+     is inside the band `#paint` takes. So it reserves that button's own column, `48 + --fab`, and
+     10 more to stand off it. */
+  is(Math.round(VW - foot.right), 118 + GAP, 'the footer row clears the layer button on the trailing edge');
+  for (const [id, x, y] of [['mapfoot', 12, 8], ['paint', 48, 36]]) {
     const e = r(d.getElementById(id));
-    const lead = id === 'legend';
+    const lead = id === 'mapfoot';
     const off = lead ? Math.round(e.left) : Math.round(VW - e.right);
     // The legend is the one box on the leading edge. It also rides the rail's width.
     /* The pane is shut in this block, so the trailing inset is `--gap` like the other three. */
@@ -959,7 +983,7 @@ async function desktop() {
   /* Leaflet's own controls live INSIDE the map container and follow it for free. These three are
      siblings of the map and position against the window, so each adds `--pane-w` to its own offset.
      A missed one sits under the pane, which is exactly where a reader cannot reach it. */
-  for (const [id, base] of [['credit', 10], ['paint', 48], ['toast', 12]]) {
+  for (const [id, base] of [['mapfoot', 118], ['paint', 48], ['toast', 12]]) {
     is(Math.round(VW - r(d.getElementById(id)).right), base + 360 + SEAM,
        id + ' steps aside by the pane width, on top of the seam it already had');
   }
@@ -1453,6 +1477,9 @@ async function bands() {
        Read every visible box in the bottom strip and intersect them pairwise. A box with no size is
        skipped rather than counted, since `#pills` and `#toast` are absent unless something puts
        them there. */
+    /* `#legend` and `#credit` are flex items of `#mapfoot` now, so the browser keeps those two
+       apart. Both are still read here: a wrapper that clears the cluster does not prove that the
+       row inside it does. */
     const FURNITURE = ['#ticker', '#legend', '#paint', '#locate', '#credit', '#pills', '#toast',
                        '.leaflet-control-zoom', '.leaflet-control-scale'];
     const boxes = FURNITURE.map(sel => [sel, d.querySelector(sel)])

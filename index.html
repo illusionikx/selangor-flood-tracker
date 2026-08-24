@@ -75,8 +75,8 @@
      bridges M3's colour names onto this app's palette. Colour is not in this file on purpose. -->
 <link rel="stylesheet" href="vendor/m3/tokens.css?v=1">
 <link rel="stylesheet" href="css/base.css?v=175">
-<link rel="stylesheet" href="css/chrome.css?v=257">
-<link rel="stylesheet" href="css/map.css?v=159">
+<link rel="stylesheet" href="css/chrome.css?v=260">
+<link rel="stylesheet" href="css/map.css?v=160">
 
 <!-- Water tint for the dark basemap. CARTO's dark_all is greyscale — all 18 of its tones have zero
      chroma — so no saturate() or hue-rotate() can pull water out of it. What it does have is one
@@ -1289,6 +1289,12 @@
     <span>Every station not climbing is hidden</span>
     <button id="riseOff">Show all</button></div>
 </div>
+<!-- **The legend and the credit share one row.** A reader asked for that on 2026-08-24. They were
+     two absolutely positioned boxes on two bands, and the repo has already paid once for boxes down
+     here that clear the pane and not each other. In one wrapping flex row they cannot overlap at
+     all: a map too narrow to hold both wraps the credit onto its own line under the legend. The
+     wrapper takes no pointer events, so the map under it still answers a click. -->
+<div id="mapfoot">
 <div id="legend" class="surface">
   <div id="lgWater" class="lgsec">
     <div class="title">Water-level heat
@@ -1315,7 +1321,7 @@
     <div class="ticks muted"><span>alert</span><span>warning</span><span>danger</span></div>
   </div>
   <!-- Rainfall's own scale, drawn only while that layer is on. Separate section rather than a second
-       panel: the opacity slider below is shared, and two floating boxes on a phone is one too many. -->
+       panel: exactly one layer is ever on, and two floating boxes on a phone is one too many. -->
   <div id="lgRain" class="lgsec">
     <div class="title">Rainfall heat
       <span class="info" tabindex="0" aria-label="How the rainfall heatmap is calculated">
@@ -1347,13 +1353,9 @@
       <span><i class="i i-flash_on" style="color:var(--wx-storm)"></i>Storm</span>
     </div>
   </div>
-  <!-- Hidden by syncHeat() in js/heat.js whenever neither heat canvas is on the map. The slider
-       drives both of them through the LAYERS loop in heatOpacity(). A control left on screen with
-       nothing under it acts on nothing. -->
-  <label id="heatOpacityRow" class="slider muted">Opacity
-    <input type="range" id="heatOpacity" min="15" max="100" step="5" value="100">
-    <span id="heatOpacityVal">100%</span>
-  </label>
+  <!-- **No opacity slider.** It rode under both ramps and a reader cut it on 2026-08-24. The wash
+       is fixed at 75% in js/heat.js. One row cannot hold a control as well as a scale, and the one
+       number a reader ever wanted from it is the one that lets a pin read through the blob. -->
 </div>
 <div id="credit" class="muted">
   &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>,
@@ -1361,6 +1363,7 @@
   data: JPS <a href="https://publicinfobanjir.water.gov.my/">Malaysia</a>,
   <a href="https://infobanjirjps.selangor.gov.my/">Selangor</a>,
   <a href="https://infobanjirjpskl.water.gov.my/">WP</a>
+</div>
 </div>
 
 <!-- Vendored globals (L, L.heatLayer, L.markerClusterGroup) load first; the app is ES modules,

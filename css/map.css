@@ -547,6 +547,9 @@
    four phrases. `gap` grew with them: at 12px the 22px glyphs read as one strip. */
 /* Wraps rather than squashes. Below about 320px the strip beside the zoom buttons is narrower
    than the five keys, and a squashed key breaks its own word before it drops a whole one. */
-.wxkey { display: flex; flex-wrap: wrap; gap: 8px 16px; font-size: 11px; }
-.wxkey span { display: inline-flex; flex-direction: column; align-items: center; gap: 3px; }
-.wxkey .i { font-size: 2em; }
+/* One row, like every other scale in the legend. Each key was a column, a 22px glyph over its word,
+   which is a 40px block on a strip that is now one line high. The glyph sits beside its word at the
+   row's own size instead. */
+.wxkey { display: flex; flex-wrap: wrap; gap: 2px 8px; font-size: inherit; }
+.wxkey span { display: inline-flex; align-items: center; gap: 3px; }
+.wxkey .i { font-size: 14px; }

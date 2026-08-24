@@ -386,17 +386,20 @@ function heatScale() {
   heatOpacity();
 }
 
-// leaflet.heat has no opacity option, so we fade its canvas directly. It is recreated whenever the
-// layer is re-added, hence the re-apply after every render.
+/* leaflet.heat has no opacity option, so we fade its canvas directly. It is recreated whenever the
+   layer is re-added, hence the re-apply after every render.
+   **The number is fixed, and it was a slider under the legend until 2026-08-24.** A reader cut that
+   control. 75% is the figure it existed to reach: a pin, a river and a road all read through the
+   wash, and the wash still states its own class. `_fade` is a separate term and stays. That one is
+   the layer telling a reader its blob has stopped covering the ground it names. */
+const HEAT_OPACITY = 0.75;
 export function heatOpacity() {
-  const pct = +el('heatOpacity').value;
-  el('heatOpacityVal').textContent = pct + '%';
-  for (const l of LAYERS) if (l._canvas) l._canvas.style.opacity = pct / 100 * (l._fade ?? 1);
+  for (const l of LAYERS) if (l._canvas) l._canvas.style.opacity = HEAT_OPACITY * (l._fade ?? 1);
 }
 
 /* Puts the map, the legend and the segmented button on `PREFS.heatLayer`. One string
    with three values, so exactly one scale is ever on screen — never a stack of two ramps to read
-   against each other. The opacity slider sits below both and serves either.
+   against each other.
    This runs at startup as well as on every render, and a render is a whole poll away — so a reader
    whose pref is rainfall used to get the wrong legend, and the wrong layer, for as long as the first
    payload took.
@@ -434,10 +437,6 @@ export function syncHeat() {
   el('lgRain').style.display  = rainy && show ? '' : 'none';
   // The legend box holds three sections now, so one function decides whether the box itself shows.
   el('lgWx').style.display = PREFS.mapLayer === 'weather' ? '' : 'none';
-  /* The opacity slider drives whichever canvas is on the map, through the LAYERS loop in
-     heatOpacity() below. Weather mode and the "off" choice both leave neither canvas on the map.
-     A slider left on screen there acts on nothing. That is worse than no slider at all. */
-  el('heatOpacityRow').style.display = (wet || rainy) && show ? '' : 'none';
   /* **`show` once meant "not weather mode", and this line and the one above both used it that
      way.** Then Stations gained a switch, and `show` came to mean "the wash can draw" instead. With
      Stations off and weather off, the old test drew the box with all three of its sections hidden,

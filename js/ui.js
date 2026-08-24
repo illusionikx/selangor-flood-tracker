@@ -7,7 +7,7 @@ import { el, distKm, dkey, ignoredIds, leads, favIds, isFav, squash, termsOf, ma
        } from './util.js';
 import { setTheme, applyTheme, flashTo, closeSide, showPlace, side, railSync } from './map.js';
 import { showHere } from './locate.js';
-import { heatOpacity, syncHeat } from './heat.js';
+import { syncHeat } from './heat.js';
 import { byId } from './stations.js';
 import { camWarn } from './popup.js';
 import { render, districts } from './render.js';
@@ -430,13 +430,6 @@ document.querySelectorAll('#layers input').forEach(cb => cb.onchange = () => {
 });
 
 // --- filters & heatmap controls ------------------------------------------------------------------
-
-el('heatOpacity').value = PREFS.heatOpacity ?? 100;
-el('heatOpacity').oninput = () => {
-  heatOpacity();
-  PREFS.heatOpacity = +el('heatOpacity').value;
-  save();
-};
 
 /* The two heatmaps are **one** choice, so they are stored as one preference: `'water'`, `'rain'` or
    `''` for neither. A pair of booleans can hold a state the UI can no longer represent — both on —
@@ -920,8 +913,7 @@ function swipeSheet(box, close) {
     if (!on) return;
     const y = e.touches[0].clientY, my = y - y0, mx = e.touches[0].clientX - x0;
     /* The first 8px decide the axis and nothing moves before that. A drag that is mostly sideways,
-       or that starts upward, belongs to the content: the drawer holds a horizontal chip row and an
-       opacity slider. */
+       or that starts upward, belongs to the content: the drawer holds a horizontal chip row. */
     if (!axis) {
       if (Math.abs(my) < 8 && Math.abs(mx) < 8) return;
       axis = Math.abs(my) > Math.abs(mx) && my > 0 ? 1 : -1;

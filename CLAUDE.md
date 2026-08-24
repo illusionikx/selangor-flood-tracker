@@ -1300,20 +1300,39 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
   correct on its own and they collided with each other as the map narrowed. Measured with the pane
   open: at 700px the layer button sat on the legend, 60px by 60. At 840px the credit line ran 191px
   in under it, at 900px 131px, at 1024px 7px.
-  **`#credit` owns the band up to 22px.** It sits at `8px + --gap` and is one 14px line. `#legend`
-  started at 12, inside that band, and the two only looked separate while the map was wide enough
-  for the credit to stay on its own side. The legend starts at 30 now.
-  **The legend's 288px is for the heat ramp, and the medium band has no room for it.** A ramp has no
-  intrinsic width, so the box states one. There the map is 289 to 408px wide, and 288 leaves nothing
-  for the cluster in the other corner. A `max-width` caps it against the window less the pane, the
-  seam, its own leading inset, and the 116px the layer button and the zoom control reach in from the
-  trailing edge. It bites below about 950px. `.wxkey` already measures good in a 210px box.
+  **`#mapfoot` holds the legend and the credit in ONE wrapping flex row, and that replaces two
+  offsets.** A reader asked for them inline on 2026-08-24. Two boxes in one flex line cannot overlap
+  each other at any width, so the arithmetic that kept them apart is gone. `#credit` used to own the
+  band up to 22px, at `8px + --gap` and one 14px line, and `#legend` started at 30 to clear it. The
+  wrapper takes those offsets now and the browser keeps the two children apart. A map too narrow to
+  hold both wraps the credit onto its own line UNDER the legend. The row is anchored by its bottom
+  edge, so it grows upward rather than off the screen.
+  **The wrapper takes no pointer events and its children take them back.** The row spans the width
+  of the map. A wrapper that took clicks would swallow every press along the bottom of it.
+  **The row stops 118px short of the trailing edge, and the wrap is why.** The credit alone sat at
+  `--map-r + 10`, under the zoom cluster and clear of it, because one 14px line at 8px fits the band
+  that cluster leaves. A wrapped row does not. Its second line rises to about 50px and lands on
+  `#paint`. So the row reserves the column those controls take rather than the band under them.
+  118 is `48 + --fab` and 10 more to stand off it. The phone block states 68 for the same reason.
+  **Every child needs `min-width: 0`.** A flex item floors at its own min-content, and the credit's
+  is a 65px word. In the medium band with the rail open the map is under 300px wide. The row then
+  overflowed its own reservation by 6px and landed back on the layer button.
+  **The legend is one row, and every scale in it states itself on that row.** It was a stacked card:
+  a title, a ramp under it, and the tick words under that, at 288px with a `max-width` holding it off
+  the layer button. On the credit's own line there is no second line to drop to. So the title, the
+  ramp and the ticks run across, and only the ramp states a width, 72px on a desktop and 60 on a
+  phone. A ramp is the one thing here with no intrinsic width. `flex-wrap` is the floor: a phone too
+  narrow for the whole scale breaks it rather than overflow the map.
+  **`.info`'s panel opens toward the map now, on `left`.** It hung off `right: -8px`, which ran a
+  244px panel leftward from the glyph. That was right while the legend was a 288px card with the
+  glyph on its trailing edge. On the strip the glyph sits about 100px from the map's leading edge,
+  and the panel ran off it and was cut. A reader named that on 2026-08-24.
   **`m3-check.html` intersects every visible furniture box pairwise at each band.** Nothing else in
   this app could see this fault. A box that is correct against the pane, correct against the window
   and correct against the card is still wrong if it lands on its neighbour.
 - **Three boxes step aside for the pane and the zoom control must not.** Leaflet's own controls live
   INSIDE the map container, and that container now stops at the pane, so they follow it for
-  free. `#toast`, `#credit` and `#paint` are siblings of `#map` and position against the window, so
+  free. `#toast`, `#mapfoot` and `#paint` are siblings of `#map` and position against the window, so
   each adds `--pane-w` to its own `right`. `#pills` takes half of it off its centre line.
   **`right`, not a transform**, which is what the old rule used: `#toast` already owns its
   `transform` for the slide it opens with, and two rules writing one property is how a toast arrives
@@ -1330,9 +1349,19 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
 - **The pane animates and its occupants do not.** One box moves, so switching the station card for
   the filters swaps the content of a container already in place. Each panel carried its own travel
   while each had its own box, and that switch drew two sheets sliding through each other.
-  **A keyframe on `[open]`, not a transition.** `show()` and `showModal()` both flip `display`, so
-  there is no closed state left to transition from. That is the shape the four other dialogs use. It
-  buys an enter and no exit. `m3-check.html` asserts an occupant's `animation-name` is `none`.
+  **A transition on `[open]`, and it buys an enter AND an exit.** `show()` and `showModal()` both
+  flip `display`, so there is no closed state to transition from. `@starting-style` supplies one.
+  `allow-discrete` on `display` holds the box on screen while it travels out, and `allow-discrete` on
+  `overlay` holds the top layer, which matters below 600px alone. A keyframe stood here first and
+  bought the enter alone, so the pane arrived over 300ms and left in one frame. A reader named that
+  on 2026-08-24.
+  **The occupant on screen fades with the pane, and only there.** `closeSide()` drops the body class,
+  so the occupant's opacity goes to 0 in the same recalc the pane starts its exit in. Without a
+  second rule the pane slides off holding nothing. That rule names `#pane:not([open])`, so an
+  occupant replaced while the pane STAYS open still leaves at once. A cross fade there is the second
+  motion a reader already cut. `m3-check.html` asserts an occupant's `animation-name` is `none`, and
+  its swap assertion has to keep the pane open — removing every body class closes it and measures the
+  new fade instead.
 - **`#pane` is not `class="surface"`.** That class pairs the background with `--shadow`, and a
   standard side sheet has no elevation — the 1px line is what separates it. The full-screen variant
   has none either, because it covers the screen and there is nothing to lift it off.
@@ -2682,16 +2711,14 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   share a surface. Weather mode draws no station pin, and `syncHeat()` shows `#lgWx` only while
   every other legend section is hidden. It is lighter than `--wx-heavy` rather than darker, which
   is the rule the palette block below states for the whole set.
-- **The legend box states 288px for the heat sections and fits itself for the weather one.** A heat
-section is sized by its ramp. A ramp has no intrinsic width, so the box has to carry a number for
-it. The weather section stretches nothing. It is five fixed keys measuring 231px, so the other
-  57 were dead surface over the map.
-  `#legend:has(> #lgWx:not([style*="none"]))` in `chrome.css` is the selector. `syncHeat()` shows
-  `#lgWx` only while both heat sections are hidden, so the two cases cannot overlap. The box then
-  sizes on the section rather than on a class somebody has to remember to set.
-  `.wxkey` wraps. Below about 320px the strip beside the zoom buttons is narrower than five keys. A
-  squashed key breaks its own word before it drops a whole one. Measured in a 210px box: two
-  rows, no overflow, nothing outside the box.
+- **Every section of the legend fits its own content, and none of them states a box width.** The
+  heat sections carried 288px and the weather one carried `fit-content`, through a `:has()` on the
+  section that draws. All three are one row on the credit's line now, so all three size on their
+  content and that selector is gone. Only the ramp states a width, because a ramp has none of its
+  own.
+  `.wxkey` is one row too, a 14px glyph beside its word rather than a 22px glyph over it. It still
+  wraps. Below about 320px the strip beside the zoom buttons is narrower than five keys. A squashed
+  key breaks its own word before it drops a whole one.
 - **Weather mode never writes `PREFS.heatLayer`.** `syncHeat()` reads `PREFS.wx` as one more input
   and drops both canvases while the mode is on. So leaving the mode restores whatever heatmap the
   reader had, with nothing remembered and nothing to get wrong. Do not add a "previous layer" field.
@@ -3044,6 +3071,13 @@ it. The weather section stretches nothing. It is five fixed keys measuring 231px
   one its own layer paints at.** A thinning distance shorter than the paint leaves the stacking
   alive in the ring between the two. See the `radius + blur` gotcha above, which is how that
   happened.
+- **The heat wash is fixed at 75% and there is no opacity slider.** That control rode under both
+  ramps and a reader cut it on 2026-08-24. 75% is the figure it existed to reach. A pin, a river and
+  a road all read through the wash, and the wash still states its own class. `HEAT_OPACITY` in
+  `js/heat.js` holds it. **`_fade` is a separate term and it stays.** That one is the layer telling a
+  reader its blob has stopped covering the ground it names, and it multiplies this number rather than
+  replaces it. `PREFS.heatOpacity` is dead in any blob written before this. Nothing reads it and
+  nothing has to migrate it.
 - **A heat layer's weight is its alpha.** leaflet.heat draws each point at its weight. So a scale
   that starts at 0 draws real readings as nothing. The water layer never hit this, because its floor
   is the alert slot (0.38). The rain layer's first class therefore *starts at 0.25* (`RAIN_STOPS`)

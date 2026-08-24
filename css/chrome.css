@@ -1754,37 +1754,61 @@ body.find #findpane { display: flex; flex-direction: column; }
    it: at 840px the credit line ran 191px in under the legend, and at 700px the layer button sat on
    top of it, 60px by 60.
 
-   **`bottom` clears the credit line rather than matching it.** `#credit` sits at `8px + --gap` and
-   is one 14px line, so it owns the band up to `22px + --gap`. The legend used to start at `12px`,
-   which is inside that band, and the two only looked separate while the map was wide enough for the
-   credit to stay on its own side. 30px puts the legend 8px above it at every width.
+   **`#mapfoot` answers the first half of that, and it replaces an offset.** The legend and the
+   credit share one wrapping flex row now, on one band rather than two, because a reader asked for
+   them inline on 2026-08-24. Two boxes in one flex line cannot overlap each other at any width. A
+   map too narrow to hold both wraps the credit onto its own line UNDER the legend, and the row is
+   anchored by its bottom edge, so it grows upward off the credit rather than off the screen. The
+   old rule put the legend at `30px` to clear a 14px credit line sitting at `8px`. That arithmetic
+   is gone. They are siblings in a row and the browser keeps them apart.
 
-   **`max-width` is what keeps it off the layer button.** The box states 288px for the heat ramp,
-   which has no intrinsic width. In M3's medium band the map is 289 to 408px wide, so 288 leaves
-   nothing for the cluster in the other corner. The cap is the window less the pane, the seam, this
-   box's own leading inset, and the 116px the layer button and the zoom control reach in from the
-   trailing edge. It only bites below about 950px. The legend already wraps: `.wxkey` is measured
-   good in a 210px box. */
-#legend {
-  position: absolute; z-index: 400;
-  left: calc(12px + var(--gap) + var(--rail-w));
-  bottom: calc(30px + var(--gap) + var(--navbar-h)); width: 288px;
-  max-width: calc(100vw - var(--map-l) - var(--map-r) - 128px);
-  margin-top: 10px; padding: 12px 14px; border-radius: 12px;
+   **`pointer-events` still has to be handed back.** The row spans the width of the map, so a
+   wrapper that took clicks would swallow every press along the bottom of it. The two children take
+   them and the wrapper does not.
+
+   **The row stops 118px short of the trailing edge, and the wrap is why.** The credit alone sat at
+   `--map-r + 10`, under the zoom cluster and clear of it, because one 14px line at `8px` fits the
+   band the cluster leaves. A wrapped row does not: the second line rises to about 50px and lands on
+   `#paint`. So the row reserves the column those controls take rather than the band under them.
+   118 is the button's own reach, `48 + --fab`, and 10 more to stand off it. The phone block states
+   68 for the same reason, off that width's own numbers. m3-check.html intersects every box down here
+   pairwise, which is what reports it the day either number drifts. */
+#mapfoot {
+  position: absolute; z-index: 400; pointer-events: none;
+  left: calc(var(--map-l) + 12px); right: calc(var(--map-r) + 118px);
+  bottom: calc(8px + var(--gap) + var(--navbar-h));
+  display: flex; flex-wrap: wrap; align-items: flex-end;
+  justify-content: space-between; gap: 6px 12px;
 }
-/* The heat sections are sized by their ramp, and a ramp has no intrinsic width, so the box has to
-   state 288px for them. The weather section stretches nothing. It is five fixed keys that measure
-   231px, so the other 57 were dead surface over the map.
-   `syncHeat()` shows `#lgWx` only while both heat sections are hidden, so the two cases cannot
-   overlap and this can size on the section rather than on a class somebody has to remember to set.
-   `max-width` keeps it inside the strip the phone rule leaves beside the zoom buttons. */
-#legend:has(> #lgWx:not([style*="none"])) { width: fit-content; max-width: 100%; }
+/* `min-width: 0` because a flex item floors at its own min-content by default, and the credit's is
+   a 65px word. In the medium band with the rail open the map is under 300px wide, and the row then
+   overflowed its own reservation by 6px and landed back on the layer button. It wraps to four lines
+   there instead. */
+#mapfoot > * { pointer-events: auto; min-width: 0; }
+#credit { overflow-wrap: anywhere; }
+/* **The legend is one row now, and every scale in it states itself on that row.** It was a stacked
+   card: a title, a ramp under it, and the tick words under that, at 288px wide with a `max-width`
+   holding it off the layer button. On the credit's own line there is no second line to drop to, so
+   the title, the ramp and the ticks run across instead.
+   `flex-wrap` is the floor. A phone too narrow for the whole scale breaks it rather than overflow
+   the map.
+   The plate stays. A ramp is paint and needs something to sit on, and the credit beside it takes a
+   `text-shadow` for the same job. `fit-content` because a row of content states its own width, which
+   is the shape the weather section already had. */
+#legend {
+  width: fit-content; max-width: 100%;
+  padding: 3px 10px; border-radius: 999px; font-size: 11px;
+}
+#legend .lgsec { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
 #legend .title {
   display: flex; align-items: center; gap: 6px;
-  font-weight: 500; font-size: 12px; margin-bottom: 6px;
+  font-weight: 500; font-size: 11px; margin: 0;
 }
+/* The ramp has no intrinsic width, so it is the one thing on this row that has to state one. 72px
+   reads three bands against three words. */
 #legend .ramp {
-  height: 10px; border-radius: 999px; margin: 6px 0 4px;
+  width: 72px; flex: none;
+  height: 8px; border-radius: 999px; margin: 0;
   /* The visible slice of the heat gradient — HEAT_ALERT to danger — so the warning stop lands at
      (0.68 − 0.38) / (1 − 0.38). Change with heat.js's gradient and config.js's slots. */
   background: linear-gradient(90deg, #ffd166 0%, #ff9f1c 48%, #ff4d4d 100%);
@@ -1794,7 +1818,9 @@ body.find #findpane { display: flex; flex-direction: column; }
 #legend .ramp.rain {
   background: linear-gradient(90deg, #6f7bff 0%, #8f7bff 33.3%, #c77dff 66.7%, #ff4d4d 100%);
 }
-#legend .ticks { display: flex; justify-content: space-between; }
+/* Inline, so the words follow the ramp rather than sit under it. `space-between` was written for a
+   box the ramp's own width. On one row they are three labels in a run. */
+#legend .ticks { display: flex; gap: 6px; font-size: 10px; }
 /* No rule between the two scales any more: the layers are mutually exclusive, so exactly one section
    is ever on screen. (It was `#legend.both`, set from render.js — never `#lgWater + #lgRain`, since
    an adjacent-sibling selector still matches a hidden sibling and drew a divider under nothing.) */
@@ -1802,8 +1828,14 @@ body.find #findpane { display: flex; flex-direction: column; }
 /* Info bubble: the formula lives in here so the legend itself stays a legend. */
 .info { position: relative; margin-left: auto; color: var(--muted); cursor: help; }
 .info > .i { font-size: 16px; display: block; }
+/* **It opens toward the map, not toward the window edge.** It used to hang off `right: -8px`, so a
+   244px panel ran leftward from the glyph. That was right while the legend was a 288px card and the
+   glyph sat on its trailing edge. On the one-row strip the glyph sits about 100px from the map's
+   leading edge, and the panel ran off it and was cut. It leads on the same edge the legend does now,
+   and `max-width` is the floor for a phone too narrow to hold 244. */
 .info .tip {
-  position: absolute; z-index: 401; bottom: calc(100% + 8px); right: -8px; width: 244px;
+  position: absolute; z-index: 401; bottom: calc(100% + 8px); left: -8px; width: 244px;
+  max-width: calc(100vw - var(--map-l) - 24px);
   padding: 12px 14px; border-radius: 12px; font-size: 12px; font-weight: 400;
   background: var(--surface); color: var(--on-surface); box-shadow: var(--shadow);
   opacity: 0; visibility: hidden; transition: opacity .12s, visibility .12s;
@@ -1811,13 +1843,6 @@ body.find #findpane { display: flex; flex-direction: column; }
 .info:hover .tip, .info:focus-visible .tip, .info.open .tip { opacity: 1; visibility: visible; }
 .info .tip p { margin: 0 0 8px; }
 .info .tip p:last-child { margin: 0; }
-
-.slider {
-  display: flex; align-items: center; gap: 10px; margin: 10px 0 0;
-  padding-top: 10px; border-top: 1px solid var(--outline); font-size: 12px;
-}
-.slider input[type=range] { flex: 1; min-width: 0; accent-color: var(--accent); height: 16px; }
-.slider span { width: 34px; text-align: right; font-variant-numeric: tabular-nums; }
 
 /* --- the supporting pane ---------------------------------------------------------------------- */
 
@@ -2272,10 +2297,12 @@ body.side #side { display: flex; }
 
 /* --- credit --------------------------------------------------------------------------------- */
 
-/* Leaflet's own attribution box is disabled; we render the credit ourselves, out of the way. */
+/* Leaflet's own attribution box is disabled; we render the credit ourselves, out of the way. It is a
+   flex item of `#mapfoot` now rather than a box of its own, so its offsets and its `--pane-w` term
+   live on that wrapper. `margin-left: auto` holds it against the trailing edge on the line it wraps
+   onto, where `justify-content` has nothing to push it against. */
 #credit {
-  position: absolute; z-index: 400;
-  right: calc(var(--map-r) + 10px); bottom: calc(8px + var(--gap));
+  text-align: right; margin-left: auto;
   text-shadow: 0 0 4px var(--surface), 0 0 4px var(--surface);
 }
 #credit a { color: var(--muted); }
@@ -2877,22 +2904,21 @@ body.side #side { display: flex; }
   /* Bottom of a phone screen, in order: credit line, then the legend and the zoom buttons above it.
      The credit is the only one of the three that has to be readable rather than usable, so it takes
      the edge and the other two clear it by the same amount. */
-  #credit {
-    left: 12px; right: 12px; bottom: 6px; font-size: 10px; line-height: 1.4;
-  }
-  #legend {
-    left: 12px; right: 68px; width: auto; bottom: 40px; padding: 8px 12px 10px;
-  }
-  #legend .title { font-size: 11px; margin-bottom: 4px; }
-  #legend > .muted { display: none; }
-  #legend .ramp { height: 8px; margin: 4px 0 3px; }
-  #legend .slider { margin-top: 6px; padding-top: 6px; }
+  /* One row here too, which is what a reader asked for. The wrapper keeps the leading 12px and
+     stops short of the zoom buttons on the trailing edge, so the row wraps the credit under the
+     legend rather than running it into that cluster. */
+  #mapfoot { left: 12px; right: 68px; bottom: 6px; }
+  #credit { font-size: 10px; line-height: 1.4; }
+  #legend { font-size: 10px; padding: 3px 8px; }
+  #legend .title { font-size: 10px; }
+  #legend .ramp { width: 60px; }
+  #legend .ticks { font-size: 9px; gap: 4px; }
   /* The station panel takes the screen below the app bar, less the peek strip. Nothing steps aside
      for it here — it is over everything. */
   /* Nothing steps aside here — the panel covers most of the map, so there is nowhere to step to. The
      zoom buttons go *behind* it instead, which map.css now does for every Leaflet corner at every
      width; this only has to cancel the desktop shift. */
-  body.side #toast, body.side #credit, body.side #paint,
+  body.side #toast, body.side #mapfoot, body.side #paint,
   body.side .leaflet-bottom.leaflet-right { transform: none; }
   /* Desktop only. At this width the toast covers the top of the map — the band the user is already
      reading — for a list the app bar's warning glyph is already counting two rows above it.
@@ -3352,20 +3378,36 @@ body.side #side { display: flex; }
 /* **The pane travels, and its occupants do not.** One box moves, so switching the station card for
    the filters swaps the content of a container that is already in place. Two sheets sliding through
    each other is what that switch looked like while each panel carried its own travel. */
-/* **A keyframe on `[open]`, not a transition, and the element is why.** `show()` and `showModal()`
-   both flip `display`, so there is no closed state left to transition FROM — the same shape the four
-   other dialogs use. It buys an enter and no exit, and the pane leaves instantly. `@starting-style`
-   with `allow-discrete` on `overlay` buys that exit, and risks the dialog leaving the top layer
-   before the animation ends, which draws the exit behind the page.
+/* **The pane gets an enter AND an exit, and three things buy the exit.** `show()` and `showModal()`
+   both flip `display`, so there is no closed state to transition from. `@starting-style` supplies
+   one. `allow-discrete` on `display` holds the box on screen while it travels out. `allow-discrete`
+   on `overlay` is the half that matters below 600px: the modal variant otherwise leaves the top
+   layer in the first frame of the exit and draws it behind the page.
+   A keyframe on `[open]` stood here first and bought an enter alone, so the pane arrived over 300ms
+   and vanished in one frame. A reader named that on 2026-08-24.
    Both variants travel in from the edge they are anchored to, on `--m3-travel`. That is
    `duration-short2` on `easing-emphasized`, which is what the reference gives a side sheet AND a
    full-screen dialog. */
-@keyframes paneIn  { from { opacity: 0; transform: translateX(100%); } }
-@keyframes paneUp  { from { opacity: 0; transform: translateY(100%); } }
-#pane[open] { animation: paneIn var(--m3-travel); }
-body:not(.ready) #pane[open] { animation: none; }
+#pane {
+  opacity: 0; transform: translateX(100%);
+  transition: opacity var(--m3-travel), transform var(--m3-travel),
+              display var(--m3-travel) allow-discrete, overlay var(--m3-travel) allow-discrete;
+}
+#pane[open] { opacity: 1; transform: none; }
+@starting-style { #pane[open] { opacity: 0; transform: translateX(100%); } }
+body:not(.ready) #pane { transition: none; }
+/* **The leaving occupant fades with the pane, and it does NOT fade on a swap.** `closeSide()` drops
+   the body class, so the occupant's opacity goes to 0 in the same recalc the pane starts its exit
+   in. Without this the pane slides off holding nothing. The selector names the closed pane, so an
+   occupant replaced while the pane STAYS open still leaves at once — that is the rule the block
+   above states, and a cross fade there is the second motion a reader already cut. Only the occupant
+   that was on screen has an opacity to fade from, so the other two cannot stack under it. */
+#pane:not([open]) #bar, #pane:not([open]) #side, #pane:not([open]) #findpane {
+  transition: opacity var(--m3-travel);
+}
 @media (max-width: 600px) {
-  #pane[open] { animation: paneUp var(--m3-travel); }
+  #pane { transform: translateY(100%); }
+  @starting-style { #pane[open] { transform: translateY(100%); } }
   #paintmenu { transition: transform var(--m3-travel); }
   #paintmenu[data-swiping] { transition: none; }
   #paintmenu:popover-open { transform: translateY(var(--drawer-swipe-movement-y, 0px)); }
@@ -3373,6 +3415,6 @@ body:not(.ready) #pane[open] { animation: none; }
 
 /* Reduced motion keeps the fade and drops the travel. Something still has to say a pane arrived. */
 @media (prefers-reduced-motion: reduce) {
-  @keyframes paneIn { from { opacity: 0; } }
-  @keyframes paneUp { from { opacity: 0; } }
+  #pane, #pane[open] { transform: none; }
+  @starting-style { #pane[open] { transform: none; } }
 }
