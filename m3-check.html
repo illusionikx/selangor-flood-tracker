@@ -329,6 +329,26 @@ async function phone() {
      'phone: with the brand glyph on the centre line');
   is(d.getElementById('brand').closest('header') !== null, true,
      'phone: and the brand is in the bar, not the rail and not the news pill');
+  /* **The bar's one trailing action, asked for on 2026-08-24.** The rail is `display: none` here, so
+     the theme switch had no home and a phone carried no theme control at all. `js/ui.js` moves the
+     node, the way `#brand` already moves.
+     **Assert the glyph CENTRE, never the button's own edge.** 28px inside the trailing edge is the
+     number every app bar in this app lands a trailing glyph on, and a button that grew would fail a
+     box-edge literal while still being right.
+     **And assert that it did not move the brand.** A flex item on the trailing end pushes a centred
+     title off centre by half its width, which is the whole reason this one is out of flow. The
+     centre assertion above runs with the button already in the bar, so it covers that. This states
+     the mechanism, so a spacer-based repair fails here rather than silently passing. */
+  const phoneTheme = d.getElementById('railApps');
+  is(phoneTheme.closest('header') !== null, true,
+     'phone: the theme switch moved into the app bar');
+  const themeBox = r(phoneTheme);
+  is(Math.round(VW - (themeBox.left + themeBox.right) / 2), 28,
+     'phone: its glyph centre sits 28px inside the trailing edge');
+  is(cs(phoneTheme).position, 'absolute',
+     'phone: out of flow, so the centred brand never sees it');
+  is(Math.round(parseFloat(cs(phoneTheme.querySelector('.i')).fontSize)), 24,
+     'phone: and it keeps the 24px glyph the rail draws on it');
   is(Math.round(r(phoneMap).top), Math.round(r(phoneBar).bottom),
      'phone: the map starts where the bar ends');
   is(parseFloat(cs(phoneMap).borderTopLeftRadius) > 0, true,

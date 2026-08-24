@@ -971,7 +971,7 @@ document.addEventListener('click', () => {
   const wide = matchMedia('(min-width: 601px)');
   const brand = el('brand'), slot = document.querySelector('#rail .railbrand'),
         bar = document.querySelector('header'), find = el('findpane'), paneEl = el('pane'),
-        railFindBtn = el('railFind');
+        railFindBtn = el('railFind'), rail = el('rail'), themeSwitch = el('railApps');
   /* Before the ticker, or the brand lands after it in the bar. `prepend` states that rather than
      leaving it to whatever the last mover did.
      **The search moves the other way.** It is written outside the pane, because a closed `<dialog>`
@@ -990,6 +990,12 @@ document.addEventListener('click', () => {
     const focused = document.activeElement, keepFocus = focused && find.contains(focused);
     (wide.matches ? slot : bar).prepend(brand);
     (wide.matches ? document.body : paneEl).append(find);
+    /* **The theme switch moves too, and for the same reason the brand does.** The rail is
+       `display: none` below 600px, so a phone had no theme control at all. It is the app bar's one
+       trailing action there and the last item in the rail above it, and `append` states both.
+       Nothing here holds focus worth keeping: the press that flips the theme does not cross the
+       breakpoint. */
+    (wide.matches ? rail : bar).append(themeSwitch);
     if (keepFocus) focused.focus({ preventScroll: true });
     railFindBtn.setAttribute('aria-controls', wide.matches ? 'findpane' : 'pane');
   };

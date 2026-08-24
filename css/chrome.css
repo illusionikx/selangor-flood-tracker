@@ -87,6 +87,20 @@ header {
    there: `#brand` moves into the rail and the news is its own element on the map, so a drawn bar
    would be a 64px band of surface with nothing in it. */
 @media (min-width: 601px) { header { display: none; } }
+/* **The theme switch is the bar's one trailing action, and it is absolutely positioned.**
+   The rail is `display: none` below 600px, so the button has no home there and a phone carried no
+   theme control at all. `js/ui.js` moves the node on the breakpoint, the way `#brand` already
+   moves. The repository owner asked for it on 2026-08-24.
+   **`position: absolute`, so the brand stays centred on the WINDOW.** This is M3's center-aligned
+   small top app bar, whose title is centred in the container rather than in the space the actions
+   leave. A flex item on the trailing end pushes the mark off centre by half the button's width.
+   A matching spacer on the leading end holds it, and that is one more box to keep in step with a
+   control that can change size.
+   **8px puts the glyph centre 28px inside the trailing edge**, because `.icon` is a 40px box round
+   a 24px glyph. 28 is the number every app bar in this app already lands its trailing glyph on. */
+@media (max-width: 600px) {
+  header #railApps { position: absolute; right: 8px; }
+}
 /* The bar is a title, a strip and a cluster of controls, and the strip takes what the other two
    leave. It used to take a share of the viewport instead, first `min(58vw, 656px)` and then a flat
    `50vw`, with both rails on `flex: 1 1 0` so the strip landed on the middle of the bar. That
@@ -269,7 +283,11 @@ body.railopen #rail #brand { width: 164px; }
    The repository owner named it on 2026-08-24.
    A 40px button centres a 24px glyph, so 8px of the lead is the button's own box. The calc states
    that arithmetic rather than the 8 it comes to. */
-#rail #railToggle .i, #rail #railApps .i { font-size: 24px; }
+#rail #railToggle .i { font-size: 24px; }
+/* **No `#rail` on this one, because the button has two homes.** It sits at the foot of the
+   rail above 600px and at the trailing end of the app bar below it, and the glyph size belongs
+   to the button rather than to either home. Stated twice, the two drift the day one moves. */
+#railApps .i { font-size: 24px; }
 body.railopen #rail .railmenu { margin-inline-start: calc(16px - (40px - 24px) / 2); }
 body.railopen #rail .railbrand { padding-inline-start: 16px; }
 /* **The glyph swaps, it does not turn.** M3 draws `menu` on a collapsed rail and `menu_open` on an

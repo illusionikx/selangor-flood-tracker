@@ -595,3 +595,30 @@ square, because that edge IS the screen edge.
 **The checks moved with the element.** Every desktop assertion that named `header` names `#ticker`
 now, in `m3-check.html` and in `paint-check.html`'s overlap sweep alike. Ten new assertions cover the
 phone bar, the centred glyph and the card corner under it.
+
+## 19. The theme switch is the phone bar's one trailing action
+
+The repository owner asked for it on 2026-08-24.
+
+The rail is `display: none` below 600px. So `#railApps` had no home there, and a phone carried no
+theme control at all. The button moves into `<header>` on the breakpoint now, the way `#brand`
+already moves. `place()` in `js/ui.js` does both in one function.
+
+**One node, two homes.** A second copy in the markup is a second control for a screen reader to
+find, and `js/ui.js` writes the glyph and the label onto one element.
+
+**It is absolutely positioned, and that keeps the brand centred.** This is M3's center-aligned small
+top app bar, whose title centres in the container rather than in the space the actions leave. A flex
+item on the trailing end pushes the mark off centre by half the button's own width. A matching
+spacer on the leading end holds it, and that is one more box to keep in step with a control that can
+change size.
+
+**8px puts the glyph centre 28px inside the trailing edge.** `.icon` is a 40px box around a 24px
+glyph. 28 is the number every app bar in this app already lands a trailing glyph on.
+
+**The glyph size lost its `#rail` prefix.** It is a property of the button and not of either home.
+Stated twice, the two drift the day one moves.
+
+Four new assertions in `m3-check.html`: the button is in the bar, its glyph centre is 28px inside the
+trailing edge, it is out of flow, and it keeps its 24px glyph. The brand's own centre assertion runs
+with the button already in the bar, so a spacer-based repair fails there rather than passing.
