@@ -74,10 +74,15 @@ const DIALOG_ITEM = { dataBox: 'railTable', camBox: 'railCams' };
    Whichever writer runs last reads the same truth, so their order stops mattering. */
 export function railSync() {
   const cls = document.body.classList;
+  /* **The search is a FAB now, so it states `aria-expanded` and never `aria-current`.** A FAB is an
+     action and a rail item is a destination, and only a destination can be the current one. It is
+     derived here with everything else, rather than written inside `setFind()`. `setDrawer()` clears
+     the `find` class directly below 600px, so a write in `setFind()` alone goes stale on that path.
+     This runs above the dialog scan, because a dialog opening over the search does not close it. */
+  el('railFind').setAttribute('aria-expanded', String(cls.contains('find')));
   for (const d of document.querySelectorAll('dialog[open]'))
     if (DIALOG_ITEM[d.id]) return railActive(DIALOG_ITEM[d.id]);
   railActive(cls.contains('drawer') ? 'railFilters'
-           : cls.contains('find')   ? 'railFind'
            : cls.contains('side') && side.key === '@alerts' ? 'railAlerts' : null);
 }
 

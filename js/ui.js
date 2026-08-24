@@ -1083,7 +1083,9 @@ function setFind(open) {
      an open drawer stays exactly where it was — sharing the screen with a floating box is the whole
      point of drawing one. */
   if (open && phone.matches) { closeSide(); document.body.classList.remove('drawer'); }
-  findBtn.setAttribute('aria-expanded', open);
+  /* `railSync()` in map.js writes the FAB's `aria-expanded`, from the body class this line just
+     set. One writer: `setDrawer()` clears `find` directly below 600px, and a write here would go
+     stale on that path. */
   /* The box is `visibility: hidden` while shut — that is what keeps it out of the tab order — and
      you cannot focus a hidden element. Reading offsetWidth forces the style flush that applies the
      class, so by the next line the box is visible and the button that had focus is `display: none`

@@ -170,6 +170,39 @@ body:not(.ready) #rail { transition: none; }
   display: flex; flex-shrink: 0; align-items: center; justify-content: center;
   min-height: 56px; margin-block-start: 4px;
 }
+/* **M3's rail FAB, in the slot `NavigationRail/navigation-rail.css` puts between the brand and the
+   items.** The numbers are `Fab/fab.css`'s own medium FAB: a 56px box, `shape-corner-large`, a 24px
+   glyph, and the primary pair. Elevation is `--shadow`, this app's one elevation. Every other
+   floating surface here declines M3's own for the same reason.
+   **It states `min-width` and never `width`, so it can grow.** An expanded rail draws M3's extended
+   form: the same height, `padding-inline: 16px`, and the label beside the glyph. A box sized by its
+   own content travels between the two states, where a `56px` to `auto` pair cannot animate at all.
+   Collapsed the content is a 24px glyph, so `min-width` is what draws the 56px square. */
+#rail .railfab {
+  flex: none; align-self: center;
+  display: flex; align-items: center; justify-content: center;
+  box-sizing: border-box; min-width: 56px; height: 56px; margin-block-start: 12px;
+  padding: 0; border: 0; cursor: pointer;
+  border-radius: var(--md-sys-shape-corner-large);
+  background: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary);
+  box-shadow: var(--shadow);
+  transition: padding var(--m3-rail);
+}
+#rail .railfab .i { font-size: 24px; flex: none; }
+/* **The label is clipped to nothing collapsed, never `display: none`.** A box that grows needs
+   something to grow from. A label that leaves the flow makes the FAB jump between two widths.
+   The 12px start margin is the extended FAB's own gap, and it travels with the label so a collapsed
+   FAB keeps its glyph on centre. */
+#rail .railfab .fablab {
+  max-width: 0; margin-inline-start: 0; overflow: hidden; white-space: nowrap;
+  font-size: var(--md-sys-typescale-label-large-size);
+  line-height: var(--md-sys-typescale-label-large-line-height);
+  font-weight: var(--md-sys-typescale-label-large-weight);
+  transition: max-width var(--m3-rail), margin-inline-start var(--m3-rail);
+}
+#rail .railfab:focus-visible {
+  outline: 2px solid var(--md-sys-color-primary); outline-offset: 2px;
+}
 /* **The brand is smaller in the rail than in the bar, and the ladder is measured twice for it.**
    The app bar draws it at 22px across up to 300px of rail. This column has 180px between its own
    padding, and `KV Flood Watch` needs 156 of those at 22px against the 148 that are left once the
@@ -273,6 +306,11 @@ body.railopen #rail #railToggle .i { rotate: 180deg; }
    moves rather than the elements. */
 body.railopen #rail { padding-inline: 20px; }
 body.railopen #rail .railmenu, body.railopen #rail .railbrand { justify-content: flex-start; }
+/* M3's extended FAB: leading-aligned in the open rail, padded to 16px, with the label in place. */
+body.railopen #rail .railfab {
+  align-self: flex-start; justify-content: flex-start; padding-inline: 16px;
+}
+body.railopen #rail .railfab .fablab { max-width: 140px; margin-inline-start: 12px; }
 body.railopen #rail .railitems { gap: 0; }
 body.railopen #rail .railitem {
   flex-direction: row; justify-content: flex-start; gap: 8px;
@@ -290,7 +328,8 @@ body.railopen #rail #railApps { margin-inline: 0; }
    this width, so the old `right: 6px` put the count over the label. */
 body.railopen #rail .railbadge { top: -6px; right: -6px; }
 @media (prefers-reduced-motion: reduce) {
-  #rail .railitem, #rail .railpill, #rail #railToggle .i { transition: none; }
+  #rail .railitem, #rail .railpill, #rail #railToggle .i,
+  #rail .railfab, #rail .railfab .fablab { transition: none; }
 }
 /* The selected state. `railActive()` in js/map.js sets `aria-current="page"` on the one item that
    names the surface on screen, and clears it on every other item. */
@@ -1342,18 +1381,18 @@ body.side #bar { display: none; }
 #findpane { display: none; }
 body.find #findpane { display: flex; flex-direction: column; }
 /* --- the search, docked over the map -------------------------------------------------------------
-   **Above 600px this is M3's DOCKED search view and not a pane occupant.** Transcribed from the
-   component set's `Search/search.css`: `border-radius: 28px 28px 4px 4px`, a raised card on
-   `surface-container-high`, and a 56px header row above the results.
-   The full corner leads and the small one closes, which is the shape that says the results belong
-   to the field above them rather than to a card of their own.
-   **Elevation is `--shadow`, not M3's `elevation-5`.** This app holds one elevation and every
-   floating surface in it takes that one — the four dialogs each decline M3's own for the same
-   reason. A second shadow five percent off the first is a value invented outside `css/base.css`.
+   **Above 600px this is M3's DOCKED search and not a pane occupant.** It is TWO surfaces here, not
+   one card. `Search/search.css` draws the search bar as a pill of its own, and the results sit on a
+   separate raised surface under it. One card put the control and its answer on one tone, with one
+   outline around both, so a reader read one surface rather than two.
+   So `#findpane` paints nothing at this width. It is the frame that places the pair. `#gotoBox` is
+   the column inside it, and that column states the 8px between the two.
+   **Elevation is `--shadow`, not M3's own.** This app holds one elevation and every floating surface
+   takes that one. The four dialogs each decline M3's for the same reason.
    **It leads on the legend's own edge**, `12px + --gap + --rail-w`, so the two boxes over the map
-   share one leading line. `left` rides `--m3-rail`, so the card travels with the rail rather than
+   share one leading line. `left` rides `--m3-rail`, so the pair travels with the rail rather than
    jumping when the rail opens.
-   The pane's own header is gone here. A docked search view has no back arrow — that belongs to the
+   The pane's own header is gone here. A docked search has no back arrow. That belongs to the
    full-screen variant, which is what this surface still is below 600px. The ways out are Escape and
    a click away, and both were already wired. */
 @media (min-width: 601px) {
@@ -1364,47 +1403,54 @@ body.find #findpane { display: flex; flex-direction: column; }
     width: 360px;
     max-width: calc(100vw - var(--rail-w) - var(--pane-w) - var(--seam) - var(--gap) - 24px);
     max-height: calc(100dvh - var(--hdr) - var(--gap) - 36px);
-    border-radius: 28px 28px 4px 4px;
-    background: var(--md-sys-color-surface-container-high);
-    box-shadow: var(--shadow);
-    overflow: hidden;
+    background: none; box-shadow: none; border-radius: 0; overflow: visible;
     transition: opacity var(--m3-swap), translate var(--m3-swap), left var(--m3-rail);
   }
-  /* A docked view has no header row of its own: the field IS the header. */
+  /* A docked search has no header row of its own. The bar IS the header. */
   #findpane #findHead { display: none; }
-  /* **`flex: none`, so the card grows with its results.** The body is a pane occupant's scroller
-     everywhere else, and `flex: 1` in a card with no height of its own gave it a 20px box and a
-     scrollbar down the side of two rows. A docked view is sized by what it holds, capped so a long
-     list cannot run off the bottom of the window. */
+  /* **`flex: none`, so the column grows with its results.** The body is a pane occupant's scroller
+     everywhere else, and `flex: 1` in a box with no height of its own gave it a 20px frame and a
+     scrollbar down the side of two rows. The scroll belongs to the results box now, so nothing
+     scrolls here. */
   #findpane #findBody {
-    display: block; flex: none; padding: 0; max-height: 60vh; overflow-y: auto;
+    display: block; flex: none; padding: 0; overflow: visible;
   }
   /* base.css draws an `expand_more` caret through `#gotoBox::after`, which is the affordance for a
-     field that opens a list under itself inside a pane. This card IS that list, so the caret points
-     at nothing. */
+     field that opens a list under itself inside a pane. The list is its own box here, so the caret
+     points at nothing. */
   #findpane #gotoBox::after { display: none; }
-  /* **In flow, and that is the whole of why the card would not grow.** base.css floats this list
-     under the field with `position: absolute; top: 100%`, which is right for a field inside a pane
-     that has its own height. A docked view IS the list, so an out-of-flow one contributed nothing
-     to the card, the card stayed 66px tall, and `overflow: hidden` clipped 278px of results.
-     Nothing errored and the field looked right, so only a measurement finds it.
-     The border and the radius go with it: the card already draws both. */
-  #findpane #gotoHits {
-    position: static; margin: 0; border: 0; border-radius: 0; max-height: none;
+  /* The column. It holds the bar, then the results, and the gap between them is what separates the
+     two surfaces. A hidden results box contributes no gap, so a bar with nothing to say stands
+     alone. */
+  #findpane #gotoBox {
+    display: flex; flex-direction: column; gap: 8px; min-height: 0;
   }
-  /* M3's search field: 56px, no border, transparent over the card's own tone, `body-large`.
-     **`margin-bottom: 0` cancels base.css's 10px, or it survives here too.** That rule sets
-     `margin-bottom` on `#goto` for the field's OWN pane context, and a higher-specificity rule that
-     never mentions a property does not cancel it — the lower one still wins that one declaration.
-     Left unset, a 10px gap opened between the field and the results, on a card whose own comment
-     above promises a flush M3 docked search field. */
+  /* M3's search bar: a 56px pill on `surface-container-high`, `body-large`, no outline.
+     **`margin: 0` cancels base.css's 10px**, or a second gap opens under a box that already states
+     its own. A higher-specificity rule that never mentions a property does not cancel it. The lower
+     rule still wins that one declaration. */
   #findpane #goto {
-    height: 56px; box-sizing: border-box; width: 100%;
-    padding-inline: 16px; margin-bottom: 0; border: 0; border-radius: 0; background: none;
+    flex: none; box-sizing: border-box; width: 100%; height: 56px;
+    padding-inline: 16px; margin: 0; border: 0;
+    border-radius: var(--md-sys-shape-corner-extra-large);
+    background: var(--md-sys-color-surface-container-high);
+    box-shadow: var(--shadow);
     font-size: var(--md-sys-typescale-body-large-size);
     line-height: var(--md-sys-typescale-body-large-line-height);
   }
-  #findpane #goto:focus { outline: none; }
+  /* **In flow, and that is the whole of why the box would not grow.** base.css floats this list
+     under the field with `position: absolute; top: 100%`, which is right for a field inside a pane
+     that has its own height. Out of flow it contributed nothing to the column, the column stayed
+     66px tall, and the results were clipped. Nothing errored and the field looked right, so only a
+     measurement finds it.
+     It is its own surface now: its own tone, its own shadow, its own corner, and its own scroll. */
+  #findpane #gotoHits {
+    position: static; margin: 0; border: 0;
+    border-radius: var(--md-sys-shape-corner-medium);
+    background: var(--md-sys-color-surface-container-high);
+    box-shadow: var(--shadow);
+    max-height: 60vh; overflow-y: auto;
+  }
 }
 /* The same tie-break, below 600px only, where the search really is a pane occupant. A body class
    can still set `find` beside `drawer` or `side` directly, and this container draws one occupant.

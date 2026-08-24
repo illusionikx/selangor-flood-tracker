@@ -75,7 +75,7 @@
      bridges M3's colour names onto this app's palette. Colour is not in this file on purpose. -->
 <link rel="stylesheet" href="vendor/m3/tokens.css?v=1">
 <link rel="stylesheet" href="css/base.css?v=171">
-<link rel="stylesheet" href="css/chrome.css?v=245">
+<link rel="stylesheet" href="css/chrome.css?v=246">
 <link rel="stylesheet" href="css/map.css?v=159">
 
 <!-- Water tint for the dark basemap. CARTO's dark_all is greyscale — all 18 of its tones have zero
@@ -306,11 +306,19 @@
             aria-label="Expand the navigation rail"><i class="i i-menu_open"></i></button>
   </div>
   <!-- **The brand.** It sat in the app bar, and that bar is the ticker's strip now. M3 states no
-       brand slot for a rail, so this takes the geometry of the one slot it does state beside the
-       menu: the FAB slot, 56px tall with 4px above it, centred while collapsed.
+       brand slot for a rail, so this takes the same geometry as the FAB below it: 56px tall with
+       4px above, centred while collapsed.
        It is EMPTY in the markup. js/ui.js moves `#brand` in here above 600px and back to the header
        below it. -->
   <div class="railbrand"></div>
+  <!-- **M3's FAB slot, between the brand and the items.** `NavigationRail/navigation-rail.css`
+       places a FAB there, and the search is what takes it here. A FAB is an ACTION and never a
+       destination, so it carries no indicator pill and no `aria-current`. `aria-expanded` states
+       whether the search is on screen, and `railSync()` in js/map.js is its one writer.
+       It carries a `title` as well as its label, because a collapsed FAB shows no words at all. -->
+  <button id="railFind" class="railfab" aria-controls="pane" aria-expanded="false"
+          title="Search" aria-label="Search"
+    ><i class="i i-search"></i><span class="fablab">Search</span></button>
   <!-- M3's items box: `flex: 1`, so it takes the slack and the theme button below it sits on the
        bottom edge. The `.railsp` spacer that used to do that is gone with it. -->
   <div class="railitems">
@@ -326,9 +334,6 @@
   <button class="railitem" id="railAlerts" aria-controls="pane" aria-expanded="false"
     ><span class="railpill"><i class="i i-warning"></i><b class="railbadge"></b></span
     ><span class="raillabel">Alerts</span></button>
-  <button class="railitem" id="railFind" aria-controls="pane" aria-expanded="false"
-    ><span class="railpill"><i class="i i-search"></i></span
-    ><span class="raillabel">Search</span></button>
   <button class="railitem" id="railTable"
     ><span class="railpill"><i class="i i-list_alt"></i></span
     ><span class="raillabel">Table</span></button>

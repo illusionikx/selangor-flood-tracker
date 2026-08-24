@@ -271,3 +271,59 @@ under it.
 The five destinations, the divider, Help and About, and the theme button under the spacer. The
 locate button on the map. The selected state and what it tracks. The navigation bar below 600px.
 `#pane` keeping `showModal()` below 600px.
+
+# Amendment, 2026-08-24 (second)
+
+The repository owner asked for three more changes. Each one names a component the earlier design
+approximated.
+
+## 6. Search takes M3's FAB slot
+
+`NavigationRail/navigation-rail.css` places a FAB between the menu slot and the items. The search
+moves out of the item list and takes that slot, directly under the brand.
+
+**A FAB is an action. A rail item is a destination.** Only a destination can be the current one. So
+the search carries no indicator pill and no `aria-current` any more. `aria-expanded` states whether
+the search is on screen.
+
+**One writer, and it is `railSync()` in `js/map.js`.** `setFind()` wrote that attribute before.
+`setDrawer()` clears the `find` class directly below 600px, so a write inside `setFind()` alone goes
+stale on that path. This is the rule this repository already states for every derived fact.
+
+The numbers are `Fab/fab.css`'s own medium FAB. A 56px box, `shape-corner-large`, a 24px glyph, and
+the primary pair. Elevation is `--shadow`, this app's one elevation.
+
+**Collapsed it shows no label. Expanded it draws M3's extended form**: the same height,
+`padding-inline: 16px`, and the label beside the glyph.
+
+**It states `min-width` and never `width`.** A box sized by its own content travels between the two
+states. A `56px` to `auto` pair cannot animate at all. The label clips to zero rather than leaving
+the flow, so the box has something to grow from.
+
+**The 12px gap rides the label, not the FAB.** A flex `gap` applies between two items even when one
+of them measures nothing. So a gap on the container pushes the glyph off the centre of a collapsed
+FAB by 6px.
+
+## 7. The bar and the results are two surfaces
+
+Above 600px the docked search was one card holding the field and the list. It is two boxes now, each
+with its own tone, its own elevation and its own corner.
+
+`Search/search.css` draws the search bar as a pill of its own. The results sit on a separate raised
+surface under it. One card put the control and its answer on one tone, under one shadow, so a reader
+read one surface rather than two.
+
+`#findpane` paints nothing at this width. `#gotoBox` is the column inside it, and that column states
+the 8px between the two boxes.
+
+**A hidden results box contributes no gap**, so a bar with nothing to say stands alone.
+
+**The search bar keeps its focus ring.** The single-card rule carried `#goto:focus { outline: none }`,
+which beat the base stylesheet's own `:focus-visible` ring for a keyboard reader too. That rule is
+gone.
+
+## What this second amendment does not change
+
+The four remaining destinations, the divider, Help and About, and the theme button. The brand slot.
+The rail's own widths and its motion. The docked card's placement, its cap against the pane, or the
+ways out of it. The search below 600px, which is still M3's full-screen search view inside `#pane`.

@@ -532,8 +532,8 @@ async function desktop() {
        'M3 padding-block 44px 20px, from NavigationRail/navigation-rail.css');
     const items = [...railEl.querySelectorAll('.railitem')];
     is(items.map(b => b.id).join(','),
-       'railFilters,railAlerts,railFind,railTable,railCams,railHelp,railAbout',
-       'seven rail items, in the order the spec states');
+       'railFilters,railAlerts,railTable,railCams,railHelp,railAbout',
+       'six rail items, in the order the spec states');
     const first = items[0];
     is(Math.round(r(first).height), 64, 'M3 item min-height 64px');
     is(cs(first.querySelector('.i')).fontSize, '24px', 'M3 icon 24px');
@@ -543,8 +543,36 @@ async function desktop() {
     const pill = r(items[0].querySelector('.railpill'));
     is([pill.width, pill.height].map(Math.round).join(','), '56,32',
        'M3 active indicator 56 by 32');
+    /* --- the search FAB ---
+       Amendment of 2026-08-24: the search leaves the item list and takes M3's own FAB slot, between
+       the brand and the items. Three things fail silently here. A FAB left in the item list is a
+       destination that `railActive()` can light, and this app must never draw a selected action. A
+       label that leaves the flow rather than clipping makes the FAB jump between two widths instead
+       of growing. And a 56px box drawn with `width` cannot grow at all, so the extended form never
+       arrives. */
+    const fabEl = d.getElementById('railFind');
+    is(fabEl.classList.contains('railitem'), false,
+       'the search FAB is not a rail item, so nothing can mark it the current destination');
+    is(fabEl.previousElementSibling.className, 'railbrand',
+       'it sits in M3 FAB slot, directly under the brand');
+    is(fabEl.nextElementSibling.className, 'railitems',
+       'and directly above the items it is not one of');
+    is([r(fabEl).width, r(fabEl).height].map(Math.round).join(','), '56,56',
+       'M3 medium FAB, a 56px box, Fab/fab.css');
+    is(cs(fabEl).borderRadius,
+       cs(d.documentElement).getPropertyValue('--md-sys-shape-corner-large').trim(),
+       'M3 shape-corner-large');
+    is(Math.round(r(fabEl.querySelector('.fablab')).width), 0,
+       'a collapsed FAB shows no label');
+    is(cs(fabEl.querySelector('.fablab')).display !== 'none', true,
+       'but the label stays in the flow, or the box jumps between two widths instead of growing');
+    is(cs(fabEl.querySelector('.i')).fontSize, '24px', 'M3 FAB icon 24px');
+    is(Math.abs(Math.round(r(fabEl).left + r(fabEl).width / 2)
+              - Math.round(r(fabEl.querySelector('.i')).left
+                         + r(fabEl.querySelector('.i')).width / 2)) <= 1, true,
+       'and the glyph sits on the FAB centre, not pushed off it by a gap reserved for the label');
     is(!!railEl.querySelector('hr'), true,
-       'a divider separates the five destinations from Help and About');
+       'a divider separates the four destinations from Help and About');
     is(railEl.querySelector('hr').previousElementSibling.id, 'railCams',
        'and it sits after Cameras');
     is(railEl.lastElementChild.id, 'railApps', 'the theme button is the last thing in the rail');
@@ -598,6 +626,10 @@ async function desktop() {
     is(cs(items[0]).borderRadius, '28px', 'M3 surface corner 28px, the indicator is the whole row');
     is(cs(toggle.querySelector('.i')).rotate, '180deg',
        'the toggle names the direction the next press moves the rail');
+    is(Math.round(r(fabEl).height), 56, 'the open rail keeps the FAB 56px tall, M3 extended FAB');
+    is(r(fabEl).width > 56, true, 'and lets it grow along the rail');
+    is(r(fabEl.querySelector('.fablab')).width > 0, true, 'the label arrives with the width');
+    is(cs(fabEl).paddingLeft, '16px', 'M3 extended FAB padding-inline 16px');
     is(netstatsGap(), 8, 'and the popover holds the same 8px against its header, rail open');
     toggle.click();
     await settled();
@@ -956,6 +988,30 @@ async function desktop() {
      'the results caret is the pane affordance, and this card IS the list');
   is(cs(d.getElementById('goto')).paddingRight, cs(d.getElementById('goto')).paddingLeft,
      'so the field reserves no room for a caret that never draws here');
+
+  /* --- the bar and the results are two surfaces ---
+     Amendment of 2026-08-24. One card held the field and the list on one tone, under one shadow, so
+     a reader read one surface rather than two. Each paints itself now and `#findpane`
+     paints nothing. The fault is invisible either way: a single card looks like a design, and only
+     reading the three boxes apart tells them apart. `#gotoHits` is `hidden` until a query runs, and
+     `getComputedStyle` still reports its paint, so this needs no search to have happened. */
+  const barEl = d.getElementById('goto'), hitsEl = d.getElementById('gotoHits');
+  const clear = c => c === 'rgba(0, 0, 0, 0)' || c === 'transparent';
+  is(clear(cs(findEl).backgroundColor) && cs(findEl).boxShadow === 'none', true,
+     'the column that holds the two paints nothing of its own');
+  is(clear(cs(barEl).backgroundColor), false, 'the search bar carries its own surface');
+  is(cs(barEl).boxShadow !== 'none', true, 'and its own elevation');
+  is(clear(cs(hitsEl).backgroundColor), false, 'the results box carries its own surface');
+  is(cs(hitsEl).boxShadow !== 'none', true, 'and its own elevation');
+  is(cs(barEl).boxShadow, cs(hitsEl).boxShadow,
+     'both take this app one elevation, never two shadows five percent apart');
+  is(Math.round(r(barEl).height), 56, 'M3 search bar, 56px');
+  is(cs(barEl).borderRadius,
+     cs(d.documentElement).getPropertyValue('--md-sys-shape-corner-extra-large').trim(),
+     'a full pill, Search/search.css');
+  is(cs(barEl).borderRadius === cs(hitsEl).borderRadius, false,
+     'and the results take a smaller corner, so the two never read as one box');
+  is(cs(d.getElementById('gotoBox')).rowGap, '8px', 'with a real gap between them');
 
   /* **Close through the real control, then wait out `#goto`'s own blur-close timer, before
      touching `find` again.** `gotoIn.onblur` in ui.js schedules `setFind(false)` 150ms after the
