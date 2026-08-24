@@ -453,3 +453,23 @@ every other expanded-rail rule reads.
 **`m3-check.html` reads `mask-image` against a probe, never the token.** A computed `--i` is not
 evidence that anything painted. `paint-check.html` states that rule from its own experience, where a
 rule resolved the right token and drew a blank plate.
+
+## 14. The filters glyph never drew
+
+Item 1 of the first amendment moved `#railFilters` to `filter_alt`. It changed the markup and left
+the writer that overwrote it, so the new glyph never drew once.
+
+`setDrawer()` in `js/ui.js` rewrote that item's class to `menu` or `menu_open` on every call. That is
+right for the hamburger this control was in the app bar, and wrong for a rail item. It ran on the
+first `setDrawer()` of every landing, so a reader saw the old glyph and the markup said otherwise.
+
+**A rail item states its selection through M3's indicator pill, not through its glyph.** One glyph,
+one meaning. `railSync()` in `js/map.js` drives the pill.
+
+**`aria-expanded` moved to `railSync()` with it.** `setFind()` clears the `drawer` class directly
+below 600px, so a write inside `setDrawer()` goes stale on that path. That is the fault the search
+FAB already had.
+
+**`m3-check.html` now reads every rail item's glyph against a probe wearing the class its own markup
+names**, at both drawer states. Nothing here compared the two before, so reading the markup was the
+only evidence the item drew what it said.

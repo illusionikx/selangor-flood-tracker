@@ -637,6 +637,36 @@ async function desktop() {
     is(cs(toggleGlyph).maskImage, glyphMask('i-menu'), 'shut rail: the toggle draws `menu`');
     is(cs(toggleGlyph).rotate, 'none', 'and it is not a turned `menu_open` any more');
 
+    /* --- every rail item draws the glyph its own markup states ---
+       `setDrawer()` rewrote `#railFilters`'s glyph to `menu` and `menu_open`, which is right for the
+       hamburger this control used to be in the app bar. The markup went to `filter_alt` and that
+       writer kept winning, on the first `setDrawer()` of every landing. So the new glyph never drew
+       once, and reading the markup said it did.
+       **Assert the glyph against a probe wearing the class the MARKUP names**, at both drawer
+       states. A literal here would need a copy of the path data. */
+    const drewAsMarkup = label => {
+      for (const [id, cls] of [['railFilters', 'i-filter_alt'], ['railAlerts', 'i-warning'],
+                               ['railTable', 'i-list_alt'], ['railCams', 'i-photo_camera'],
+                               ['railFind', 'i-search']])
+        is(cs(d.querySelector('#' + id + ' .i')).maskImage, glyphMask(cls),
+           label + ': ' + id + ' draws ' + cls);
+    };
+    d.body.classList.remove('drawer');
+    await settled();
+    drewAsMarkup('drawer shut');
+    d.body.classList.add('drawer');
+    await settled();
+    drewAsMarkup('drawer open');
+    /* **`aria-expanded` is derived, and this path never calls `setDrawer()`.** Writing the class
+       directly is what `setFind()` does below 600px, and a write inside `setDrawer()` went stale on
+       exactly that. */
+    is(d.getElementById('railFilters').getAttribute('aria-expanded'), 'true',
+       'and the filters item states the pane is open, derived rather than written by the opener');
+    d.body.classList.remove('drawer');
+    await settled();
+    is(d.getElementById('railFilters').getAttribute('aria-expanded'), 'false',
+       'and states it shut again when something else clears the class');
+
     const shutHidden = ['.railbrand', 'hr', '#railHelp', '#railAbout'];
     for (const sel of shutHidden)
       is(cs(railEl.querySelector(sel)).display, 'none',

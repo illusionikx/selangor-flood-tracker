@@ -80,6 +80,9 @@ export function railSync() {
      the `find` class directly below 600px, so a write in `setFind()` alone goes stale on that path.
      This runs above the dialog scan, because a dialog opening over the search does not close it. */
   el('railFind').setAttribute('aria-expanded', String(cls.contains('find')));
+  /* The filters item states the same thing about the same pane, and `setDrawer()` wrote it. Both
+     `setFind()` and this module clear the `drawer` class without going through that function. */
+  el('railFilters').setAttribute('aria-expanded', String(cls.contains('drawer')));
   for (const d of document.querySelectorAll('dialog[open]'))
     if (DIALOG_ITEM[d.id]) return railActive(DIALOG_ITEM[d.id]);
   railActive(cls.contains('drawer') ? 'railFilters'

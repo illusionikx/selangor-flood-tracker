@@ -356,11 +356,15 @@ function setDrawer(open, pan = true, remember = true) {
      and the station card share `#pane` at both widths, and that rule has not changed. */
   if (open) { closeSide(); if (phone.matches) document.body.classList.remove('find'); }
   document.body.classList.toggle('drawer', open);
-  // The rail item wraps its glyph in a `.railpill` span. The icon to swap is `.i`, not the first
-  // child. `menu.firstElementChild` was the `<i>` on the old bare button. It is the `.railpill`
-  // span now. Setting its class there would strip the pill's own styling.
-  menu.querySelector('.i').className = `i i-${open ? 'menu_open' : 'menu'}`;
-  menu.setAttribute('aria-expanded', open);
+  /* **The glyph does not change, and a writer here overwrote the one the markup states.** This line
+     swapped `menu` for `menu_open`, which is right for the hamburger this control used to be in the
+     app bar. The markup went to `filter_alt` and this writer kept winning, on the first
+     `setDrawer()` of every landing. So the new glyph never drew once.
+     A rail item states its selection through M3's own indicator pill, which `railSync()` in
+     js/map.js drives. One glyph, one meaning: the button names a filter and draws one.
+     `aria-expanded` moved to `railSync()` with it. `setFind()` above clears the `drawer` class
+     directly below 600px, so a write here goes stale on that path — the fault the search FAB
+     already had. */
   if (remember) { PREFS.drawer = open; save(); }
 }
 menu.onclick = () => setDrawer(!document.body.classList.contains('drawer'));
