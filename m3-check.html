@@ -532,6 +532,29 @@ async function desktop() {
     // a leftover control. A live alert makes `header button` count the tiles too, so the check
     // would fail on the exact case it exists to prove safe: a real flood on screen.
     is([...d.querySelectorAll('header > button')].length, 0, 'and no button at all above 600px');
+
+    /* --- the selected state: the rail lights the item for whatever is on screen --- */
+    const active = () => [...railEl.querySelectorAll('[aria-current="page"]')].map(b => b.id);
+    d.body.classList.remove('drawer', 'side', 'find');
+    await settled();
+    is(active().join(','), '', 'a bare map selects no rail item');
+    d.body.classList.add('drawer');
+    await settled();
+    is(active().join(','), 'railFilters', 'the filters light their own item and nothing else');
+    /* **Compare against a probe, never against a hex.** `getComputedStyle` reports a background as
+       `rgb(...)` and a custom property as whatever the author wrote, so the two never match as
+       strings. A throwaway span painted with the same token settles both through the same engine.
+       This app moved its palette four times, so no check here may hold a copy of a colour. */
+    const probe = d.createElement('span');
+    probe.style.background = 'var(--md-sys-color-secondary-container)';
+    d.body.appendChild(probe);
+    is(cs(d.getElementById('railFilters').querySelector('.railpill')).backgroundColor,
+       cs(probe).backgroundColor,
+       'and the indicator takes the selected fill this app already uses');
+    probe.remove();
+    d.body.classList.remove('drawer');
+    await settled();
+    is(active().join(','), '', 'and closing it clears the item');
   }
   is(cs(mapBox).borderTopLeftRadius, '16px', 'M3 shape-corner-large');
   is(cs(mapBox).overflow, 'hidden', 'and the tiles clip to that corner');

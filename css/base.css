@@ -40,6 +40,13 @@
      the dark theme, where white on it is a contrast failure. The token is already near-black there
      and already white in the light theme, so one declaration is correct in both. */
   --md-sys-color-on-primary: var(--surface);
+  /* M3 paints a selected navigation indicator in `secondary-container`, which is a low-chroma tint
+     of its own tonal palette. This app holds one surface tone, and it already declines
+     `surface-container-high` for the same reason. So the indicator takes the selected language this
+     app already has: `.seg label:has(:checked)` fills with `--accent` and inks with `--surface`.
+     `--accent` is not a status hue, so the colour language is unbroken. */
+  --md-sys-color-secondary-container: var(--accent);
+  --md-sys-color-on-secondary-container: var(--surface);
 
   /* The two pairs the components below actually reach for, built FROM the tokens above rather than
      restating their values. **Named for what the surface DOES, not for one component that does it.**

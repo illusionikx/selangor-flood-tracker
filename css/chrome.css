@@ -181,6 +181,14 @@ header h1 .mark { position: relative; display: flex; flex: none; cursor: help; }
 @media (prefers-reduced-motion: reduce) {
   #rail .railitem, #rail .railpill { transition: none; }
 }
+/* The selected state. `railActive()` in js/map.js sets `aria-current="page"` on the one item that
+   names the surface on screen, and clears it on every other item. */
+#rail .railitem[aria-current="page"] { color: var(--md-sys-color-on-surface); }
+#rail .railitem[aria-current="page"] .railpill {
+  background: var(--md-sys-color-secondary-container);
+}
+#rail .railitem[aria-current="page"] .i { color: var(--md-sys-color-on-secondary-container); }
+#rail .railitem[aria-current="page"] .raillabel { font-weight: 700; }
 
 /* --- alert ticker ----------------------------------------------------------------------------- */
 

@@ -47,9 +47,23 @@ L.control.zoom({ position: 'bottomright' }).addTo(map);
 const pane = el('pane'), narrow = matchMedia('(max-width: 600px)');
 let paneModal = false;
 
+/* **One writer, and it is the one that already watches the fact.** `syncPane()` runs from a
+   MutationObserver on the body class, so it sees every open and every close whoever caused it. A
+   call at each button would have to be remembered at seven sites, which is the argument
+   `syncHeat()` already makes about a preference.
+   An item is active while the surface it opens is on screen. A bare map selects nothing, and so do
+   a station card and a weather card. The map is what this app draws, and it is always there. */
+export function railActive(id) {
+  for (const b of document.querySelectorAll('#rail .railitem'))
+    if (id === b.id) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
+}
+
 function syncPane() {
   const cls = document.body.classList;
   const want = cls.contains('drawer') || cls.contains('side') || cls.contains('find');
+  railActive(cls.contains('drawer') ? 'railFilters'
+           : cls.contains('find')   ? 'railFind'
+           : cls.contains('side') && side.key === '@alerts' ? 'railAlerts' : null);
   if (!want) { pane.close(); return; }
   if (pane.open && paneModal === narrow.matches) return;
   pane.close();
@@ -392,6 +406,13 @@ export function openSide(key, html, mastAt) {
   }
   mastAt ? showMast(mastAt) : hideMast();
   syncAlertBtn();
+  /* The rail's own MutationObserver misses a same-occupant swap.
+     Swapping from the alert list to a station card keeps the side class on.
+     No mutation then fires.
+     syncPane() never runs.
+     Without it, the alert item stays lit through the swap.
+     A direct call here catches it, both into and out of the alert list. */
+  railActive(side.key === '@alerts' ? 'railAlerts' : null);
 
   /* The card holds at most one camera, and `data-clip` carries its proxy id. `start()` is
      idempotent by that id, which is what makes this safe to call again on every poll — render()
