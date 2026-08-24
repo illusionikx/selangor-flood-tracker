@@ -75,7 +75,7 @@
      bridges M3's colour names onto this app's palette. Colour is not in this file on purpose. -->
 <link rel="stylesheet" href="vendor/m3/tokens.css?v=1">
 <link rel="stylesheet" href="css/base.css?v=172">
-<link rel="stylesheet" href="css/chrome.css?v=251">
+<link rel="stylesheet" href="css/chrome.css?v=252">
 <link rel="stylesheet" href="css/map.css?v=159">
 
 <!-- Water tint for the dark basemap. CARTO's dark_all is greyscale — all 18 of its tones have zero
@@ -294,16 +294,15 @@
 <nav id="rail" aria-label="Main">
   <!-- **M3's menu slot**, 56px tall, leading-aligned when the rail is expanded and centred when it
        is collapsed. It holds the one control that changes the rail's own width.
-       `menu_open` is the glyph, and `body.railopen #rail #railToggle .i` in chrome.css turns it
-       180 degrees when the rail opens — the same `body.railopen` class every other expanded-rail
-       rule reads, rather than a separate `:has()` for this one property. The glyph names the
-       direction the press moves the rail, so one mark answers both states and there is nothing to
-       keep in step from JS beyond that one class.
+       **`menu` collapsed and `menu_open` expanded**, which is M3's own pair. The mark names the
+       rail's own state. One `menu_open` turned 180 degrees stood here first, which is one mark
+       answering both states by pointing at the next press instead. `body.railopen` swaps the
+       custom property in chrome.css, so there is still nothing to keep in step from JS.
        `aria-expanded` rides this button and `aria-controls` names the rail, so the state is spoken
        rather than left to the arrow. js/ui.js writes both. -->
   <div class="railmenu">
     <button id="railToggle" class="icon" aria-controls="rail" aria-expanded="false"
-            aria-label="Expand the navigation rail"><i class="i i-menu_open"></i></button>
+            aria-label="Expand the navigation rail"><i class="i i-menu"></i></button>
   </div>
   <!-- **The brand.** It sat in the app bar, and that bar is the ticker's strip now. M3 states no
        brand slot for a rail, so this takes the same geometry as the FAB below it: 56px tall with

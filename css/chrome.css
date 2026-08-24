@@ -264,10 +264,16 @@ body.railopen #rail #brand { width: 164px; }
 #rail #railToggle .i, #rail #railApps .i { font-size: 24px; }
 body.railopen #rail .railmenu { margin-inline-start: calc(16px - (40px - 24px) / 2); }
 body.railopen #rail .railbrand { padding-inline-start: 16px; }
-/* M3 turns the menu glyph to name the direction the press moves the rail. One mark, two states, and
-   nothing for JS to keep in step. */
-#rail #railToggle .i { transition: rotate var(--m3-rail); }
-body.railopen #rail #railToggle .i { rotate: 180deg; }
+/* **The glyph swaps, it does not turn.** M3 draws `menu` on a collapsed rail and `menu_open` on an
+   expanded one, so the mark names the rail's own state. It was one `menu_open` turned 180 degrees,
+   which names the direction of the next press instead. The repository owner asked for M3's pair on
+   2026-08-24.
+   `.i` masks with `var(--i)` and `.i-menu` sets that from one class, so two ids and a class win the
+   override. That is why this needs no second element and no JS — the same `body.railopen` class
+   every other expanded-rail rule reads.
+   **A mask cannot tween**, so the swap is instant and carries no transition. The reduced-motion
+   block below lost its entry for this element with the rotation. */
+body.railopen #rail #railToggle .i { --i: var(--i-menu_open); }
 /* M3's items box, from `NavigationRail/navigation-rail.css`. `flex: 1` is what puts the theme
    button on the bottom edge. `margin-block-start: 40px` is that file's own gap between the brand
    slot and the first item, and `gap: 4px` is its own spacing between one collapsed item and the
@@ -364,7 +370,7 @@ body.railopen #rail #railApps { margin-inline: calc(16px - (40px - 24px) / 2) 0;
    this width, so the old `right: 6px` put the count over the label. */
 body.railopen #rail .railbadge { top: -6px; right: -6px; }
 @media (prefers-reduced-motion: reduce) {
-  #rail .railitem, #rail .railpill, #rail #railToggle .i,
+  #rail .railitem, #rail .railpill,
   #rail .railfab, #rail .railfab .fablab { transition: none; }
 }
 /* The selected state. `railActive()` in js/map.js sets `aria-current="page"` on the one item that

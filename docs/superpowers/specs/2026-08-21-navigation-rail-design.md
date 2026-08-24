@@ -433,3 +433,23 @@ never reaches 215.
 **`m3-check.html` asserts the property, never the 36 and the 24.** A rail at another padding, or an
 icon at another size, still has to draw one column. A pair of literals passes a rail that moved every
 glyph together and fails one that moved none.
+
+## 13. The menu glyph names the rail's own state
+
+M3 draws `menu` on a collapsed rail and `menu_open` on an expanded one. The repository owner asked
+for that pair on 2026-08-24.
+
+One `menu_open` turned 180 degrees stood here first. That names the direction of the next press
+rather than the state the rail is in.
+
+**This reverses section 4 of the first amendment**, which stated the rotation and the reason for it.
+
+`.i` masks with `var(--i)` and `.i-menu` sets that from one class, so two ids and a class win the
+override. The swap needs no second element and no JS, and it reads the same `body.railopen` class
+every other expanded-rail rule reads.
+
+**A mask cannot tween**, so the swap is instant and carries no transition.
+
+**`m3-check.html` reads `mask-image` against a probe, never the token.** A computed `--i` is not
+evidence that anything painted. `paint-check.html` states that rule from its own experience, where a
+rule resolved the right token and drew a blank plate.

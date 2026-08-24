@@ -615,6 +615,28 @@ async function desktop() {
     };
     oneColumn('shut rail');
 
+    /* --- the menu glyph names the rail's own state ---
+       M3 draws `menu` on a collapsed rail and `menu_open` on an expanded one. One `menu_open` turned
+       180 degrees stood here first, which names the direction of the next press instead.
+       **Read `mask-image`, and compare against a probe.** A computed `--i` is not evidence that
+       anything painted — `paint-check.html` states that rule from its own experience, where a rule
+       resolved the right token and drew a blank plate. And the token's own text and the resolved
+       `mask-image` are two different strings, so a probe wearing the icon class settles both through
+       the same engine. */
+    const glyphMask = cls => {
+      const probe = d.createElement('i');
+      probe.className = 'i ' + cls;
+      d.body.appendChild(probe);
+      const m = cs(probe).maskImage;
+      probe.remove();
+      return m;
+    };
+    const toggleGlyph = d.querySelector('#railToggle .i');
+    is(glyphMask('i-menu') !== glyphMask('i-menu_open'), true,
+       'the two menu glyphs are different pictures, or the two below prove nothing');
+    is(cs(toggleGlyph).maskImage, glyphMask('i-menu'), 'shut rail: the toggle draws `menu`');
+    is(cs(toggleGlyph).rotate, 'none', 'and it is not a turned `menu_open` any more');
+
     const shutHidden = ['.railbrand', 'hr', '#railHelp', '#railAbout'];
     for (const sel of shutHidden)
       is(cs(railEl.querySelector(sel)).display, 'none',
@@ -684,8 +706,8 @@ async function desktop() {
     is(cs(items[0]).flexDirection, 'row', 'an open item lays its icon and label out in a row');
     is(Math.round(r(items[0]).height), 56, 'M3 item height 56px, leading aligned');
     is(cs(items[0]).borderRadius, '28px', 'M3 surface corner 28px, the indicator is the whole row');
-    is(cs(toggle.querySelector('.i')).rotate, '180deg',
-       'the toggle names the direction the next press moves the rail');
+    is(cs(toggleGlyph).maskImage, glyphMask('i-menu_open'), 'open rail: the toggle draws `menu_open`');
+    is(cs(toggleGlyph).rotate, 'none', 'and still turns nothing');
     for (const sel of shutHidden)
       is(cs(railEl.querySelector(sel)).display !== 'none', true,
          'open rail: ' + sel + ' draws again');
