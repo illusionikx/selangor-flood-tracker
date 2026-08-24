@@ -13449,3 +13449,86 @@ that mark by half its own width.
 
 One box and not two buttons. Each button positioned for itself needs a literal offset that has to
 stay in step with the width of the one beside it.
+
+## The app bar controls moved into a navigation rail
+
+The app bar held five buttons, a status dot, a title and a moving strip on one row. Every control a
+reader reaches for was in it, and the strip took whatever width was left.
+
+`#rail` is M3's navigation rail. It runs the full window height on the leading edge above 600px.
+Every number comes from the M3 Expressive component set's `NavigationRail/navigation-rail.css`.
+
+### Five destinations, a divider, and one control that is not a destination
+
+Filters, Alerts, Table and Cameras are the items. A divider separates them from Help and About,
+which is M3's own grouping for a secondary destination.
+
+The theme switch sits under the items, on the bottom edge. It is a setting rather than a
+destination, so it takes no rail item and no indicator.
+
+The search is the rail's FAB, in the slot M3 places one. A FAB is an action, so it states
+`aria-expanded` and never `aria-current`.
+
+### Why the locate button went to the map
+
+It answers a question about the map, and a reader presses it while looking at one. So it joined the
+zoom cluster as a `.mapbtn`, beside the layers button.
+
+A rail item for it puts the map's own control on the far side of the window from the map.
+
+### Why the search became a pane occupant, and then a card
+
+A 300px field does not fit a 96px rail. So below 600px the search is a pane occupant, which is M3's
+full-screen search view.
+
+Above 600px it is M3's docked search view instead: a card floating over the map's top-left corner,
+with the field as its header and the results under it. That reverses the pane occupant at that
+width, and the reason is that a pane occupant took the whole supporting pane for one field.
+
+The card is written outside `#pane`. A closed `<dialog>` is `display: none`, and a card inside one
+cannot draw.
+
+### The colour bridge takes two lines and no tint
+
+M3 ships a full tonal palette. This app reserves its hues for station status and holds one surface
+tone, so `css/base.css` bridges the `--md-sys-color-*` names each component asks for onto the
+tokens this app already has.
+
+`secondary-container` and `on-secondary-container` are what the indicator needs. The tint M3 states
+for a rail surface is declined: this app has one surface tone, and a second tone five percent off
+the first is invisible.
+
+### What was not built
+
+- A modal rail. The pane already answers a compact window.
+- A `Map` item. The map is what the window is, not a place to go to.
+- A rail slot for `#locate`. See above.
+- A second copy of the bar inside `#pane`. The pane covers the bar below 600px, and a launcher
+  inside the thing it launched is a control with nothing left to do.
+
+### The rail expands, and the preference holds it
+
+96px against 220px. `PREFS.railOpen` holds the width and `syncRail()` writes the control from the
+preference, never the reverse.
+
+`--rail-w` is declared on `:root` and never on `body`. `--pane` is computed on `:root` and reads it
+there, so a value redefined further down the tree never reaches it.
+
+### Two presses on a phone, and one gap above 600px
+
+Below 600px `#pane` is a full-screen dialog and covers the navigation bar. So the bar is a launcher
+at that width and never a state display, and the active indicator reads above 600px alone.
+
+A collapsed rail draws no brand, so the feed diagnostics have no way in above 600px. One press of
+the rail toggle brings the mark back. That is an accepted cost, and it is the only place a state of
+the chrome puts something out of reach.
+
+### What the Help page had to say instead
+
+Help carried an `App bar` section over controls that are not in an app bar any more, and a whole
+`Menu` section for a popover that was deleted. Its Theme entry described a three-way pick with an
+Auto setting that no longer exists.
+
+Both sections are one `Getting around` list now, because the rail and the bar hold the same
+controls under the same names. The map's own two controls and the feed status moved to a second
+list, `On the map`.

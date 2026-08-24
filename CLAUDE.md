@@ -27,7 +27,7 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `title-test.html` | `chrome --headless --dump-dom` — one of seven runnable checks. Guards the wordmark ladder in both of the heading's homes, the app bar and the navigation rail, in rendered pixels |
 | `narrow-test.html` | `chrome --headless --dump-dom` — one of seven runnable checks. Guards the narrow-window block: its threshold, its coverage, its refusal to be dismissed, and that it is modal |
 | `paint-check.html` | `chrome --headless --dump-dom` — one of seven runnable checks. Guards the on-map paint chooser: that it reads as a control and not as a map pin, that its two layers and the four boxes nested under `Stations` sit where they belong, that each section holds one choice at a time, that it clears the zoom cluster at both widths, and that below 600px its panel is an M3 bottom sheet whose drag handle has a real swipe behind it |
-| `m3-check.html` | `chrome --headless --dump-dom` — one of seven runnable checks. Guards every M3 surface in rendered pixels: the eight dialogs against the roll call and the kind each is declared as, the four-band ladder, the map as an inset card, the one motion that changes what the pane holds, the supporting pane's headers as M3's medium flexible top app bar and the four full-screen dialogs as M3's own full-screen dialog header, the supporting pane at M3's canonical ratios with the map giving up exactly that width, the pane as a side sheet above 600px and a full-screen dialog below it, and each station section as a filled card. Also that every enter carries M3's own duration and easing |
+| `m3-check.html` | `chrome --headless --dump-dom` — one of seven runnable checks. Guards every M3 surface in rendered pixels: the eight dialogs against the roll call and the kind each is declared as, the four-band ladder, the map as an inset card, the one motion that changes what the pane holds, the supporting pane's headers as M3's medium flexible top app bar and the four full-screen dialogs as M3's own full-screen dialog header, the supporting pane at M3's canonical ratios with the map giving up exactly that width, the pane as a side sheet above 600px and a full-screen dialog below it, and each station section as a filled card. Also the navigation rail at both its widths, the navigation bar below 600px, and that every enter carries M3's own duration and easing |
 | `css/icons.css` | every icon, as an SVG mask. Generated — see docs/FEATURES.md for the fetch |
 | `css/base.css` | tokens, reset, controls, blocks shared by popup + alert panel |
 | `css/chrome.css` | page furniture: app bar, status dot, drawer, legend, splash |
@@ -747,8 +747,8 @@ frames only exist because we ran when they were taken. To re-test the capture pa
   thing that makes a new mark appear. The script prints the reminder when it finishes.
 - **A pseudo-element that sets `--i` paints nothing until its selector joins the list in
   `css/icons.css`.** An `.i` element gets the mask from the `.i` class. A pseudo-element cannot, so
-  the mask lives in one explicit selector list instead: `#locate::before, #gotoBox::after,
-  .spark::before, .sparktip.warn::before`. That list is the answer to "how do icons work", kept in
+  the mask lives in one explicit selector list instead: `#gotoBox::after, .spark::before,
+  .sparktip.warn::before`. `#locate::before` left it when that button took a real `<i>` child. That list is the answer to "how do icons work", kept in
   one file rather than repeated in three.
 
   A rule that sets `--i` and a size, and never joins that list, has no `content` and no `mask`. So
@@ -964,7 +964,7 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
   and the colors, and left the height alone. WebKit reads `fit-content` on the block axis of an
   out-of-flow box as the space available under `top`. It does not read it as the content height. So
   `#appMenu` measured one viewport tall on iOS Safari. A grid with a definite height stretches its
-  rows to fill. That drew the four tiles and the theme row spread down the whole screen. Chrome and
+  rows to fill. That drew its four tiles and its theme row spread down the whole screen. Chrome and
   Firefox drew the same markup at 157px. `.menu` carries `height: auto` now, which changes nothing on
   the engines that were already right. **Do not reach for `align-content: start`.** It closes the gaps
   and keeps the full-height box. So an invisible panel goes on swallowing taps over the map.
@@ -2283,6 +2283,52 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   `easing-standard` and `--m3-travel` cites `easing-emphasized`, and M3's token set gives both
   `cubic-bezier(0.2, 0, 0, 1)`. `m3-check.html` reads that back off the map card, which transitions
   `right` for the pane and `left` for the rail.
+  **A collapsed rail draws no brand, so `#netstats` has no way in above 600px.** The feed diagnostics
+  open from `#brand .mark`, and the collapsed rail hides the whole heading. One press of the rail
+  toggle brings it back. That is an accepted cost, and it is the one thing in this app that a state
+  of the chrome can put out of reach.
+- **The navigation bar is what a compact window gets, and the rail does not draw there at all.**
+  `#navbar` is M3's navigation bar, from `NavigationBar/navigation-bar.css`. 96px of a 360px screen
+  is 27% of it, and M3 states no rail under 600px.
+  **Five items, which is the cap M3 states.** The rail carries seven destinations. Help and About
+  are the two visited least, so they move to `#appMenu`, the app bar's overflow menu at that width.
+  The search is a rail FAB and a bar item, because a bar has no FAB slot.
+  **Every id in the bar is its rail twin with one prefix changed.** `railFilters` against
+  `navFilters`. `NAV` in `js/ui.js` binds both from one table and builds each id out of one string.
+  `railActive()` in `js/map.js` matches on that suffix. `js/alerts.js` writes both badges. Only one
+  of the two components is ever on screen, so a second copy of a handler is a second thing to
+  change — the shape `syncHeat()`'s own two repairs already record.
+  **`alerts.js` must write into `.railbadge` and never over the button.** A rail item and a bar item
+  each hold a pill, a glyph, a badge and a label. An `innerHTML` write on the button takes the label
+  and the pill with it, and the item then draws as a bare number under nothing.
+  **The indicator is shared, not copied.** `.railpill`, `.raillabel` and `.railbadge` name
+  `:is(#rail, #navbar)`. Only the label size differs: `title-small` at 14px in the rail,
+  `label-medium` at 12px in the bar, which is each component's own size.
+  **Below 600px `#pane` covers the bar**, because that pane is a full-screen dialog there. So the
+  bar is a launcher at that width and never a state display.
+  **`--navbar-h` holds `calc(64px + env(safe-area-inset-bottom, 0px))`**, and `viewport-fit=cover`
+  in the viewport meta tag is what makes that inset report a real number. Without the tag it reads 0
+  and the bar sits under the iOS home indicator.
+  **Three PHONE literals had to take the term as well as the desktop rules.** `#paint`, `#locate`
+  and `#mapfoot` state a bottom measured up from the map's own edge. That edge moved 64px and those
+  three did not, so the zoom box climbed past two of them. `paint-check.html` reported it. Nothing
+  else in this app reads that geometry.
+  **`.mapbtn` declares `--fab` on itself.** A rule that stacks `#locate` above `#paint` cannot
+  inherit it, so it states the fallback. Without one the whole `calc()` is invalid and the button
+  falls to the top of the page.
+- **The app bar below 600px carries one absolutely positioned action group, `.hactions`.** It holds
+  the theme switch and the overflow menu. `<header>` does not draw above 600px at all, so nothing
+  has to hide either one there.
+  **Out of flow, because the bar centres the brand on the WINDOW.** That is M3's center-aligned
+  small top app bar, whose title centres in the container rather than in the space the actions
+  leave. A flex item on the trailing end moves the mark by half its own width.
+  **One box and not two positioned buttons.** Each button placed for itself needs a literal offset
+  that has to stay in step with the width of the one beside it. 8px on the group puts the trailing
+  glyph centre 28px inside the window edge, which is the number every app bar in this app lands a
+  trailing glyph on.
+  **The theme switch is one node with two homes**, and `place()` in `js/ui.js` moves it beside
+  `#brand`. `append` into the rail and `prepend` into the group: the rail puts it under its items
+  and the bar puts it before the overflow, which M3 keeps furthest out.
 - **The search has two homes too, and above 600px it is M3's DOCKED search view.** A card floating
   over the map's top-left corner, on the legend's own leading edge, with the field as its header and
   the results under it. `Search/search.css`'s own `border-radius: 28px 28px 4px 4px` on
@@ -2771,11 +2817,16 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   `css/base.css` bridges the `--md-sys-color-*` names a component asks for onto the tokens this app
   already has. Add a line to that bridge when a component wants a role it is missing. Never add M3's
   palette instead.
-  **Five components, eight variants, and each surface declares which it is.** Dialogs are
+  **Seven components, ten variants, and each surface declares which it is.** Dialogs are
   full-screen or basic. Sheets are side or bottom. The supporting pane's two headers are the top app
   bar's medium flexible variant, at both widths. The layer panel's three choices are connected
   button groups. `m3-check.html` holds the dialog roll call and `paint-check.html` holds the button
   group's numbers.
+  **Navigation is two components and the window class picks which draws.** `#rail` is the navigation
+  rail, collapsed by default and expandable, on the leading edge above 600px. `#navbar` is the
+  navigation bar along the bottom below 600px, because M3 states no rail at a compact width and
+  96px of a 360px screen is 27% of it. Each id in the bar is its rail twin with one prefix changed,
+  and `m3-check.html` asserts both.
   **A control that only LOOKS like an M3 component is the failure this section exists to stop.**
   `.seg` is the worked example. It is this app's own sunken track, and for a while three surfaces
   called it a segmented button. M3 Expressive has no segmented button. It has a connected button
@@ -3109,45 +3160,47 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   writing them at all. The three text inputs already had it. **Any new control whose state a
   preference owns needs both halves.** Those are the attribute, and a reader that writes the control
   from the preference rather than the reverse.
-  **The theme control is the same rule at a second site.** It lives in `#appMenu` as `#themeRow`,
-  three `<input type="radio" name="theme">` in a segmented pill, none of them carrying `checked`.
-  **That pill is the lightbox range selector's shape, shared and not copied.** `.seg` and
-  `.seg label` are grouped into the `.tlranges` and `.tlr` rules. So a change there restyles the
-  theme picker too. The `PLAYER_OVERLAY` block is the safe half. It names `.tlranges` and `.tlr`
-  alone, in literal whites for a photograph. None of that must ever be widened to `.seg`.
+  **The theme control was the same rule at a second site, and it is not a control of that kind any
+  more.** It was three radios in a segmented pill inside `#appMenu`. Two themes and one press
+  replaced it on 2026-08-24, so there is no box for a browser to restore and nothing to write back.
+  `syncThemeBtn()` in `js/ui.js` still writes the glyph from the resolved theme rather than the
+  reverse, which is the half of this rule a button keeps.
   **`label` is a styled element in `css/base.css`, and it carries a margin.** `label { display: flex;
   align-items: center; gap: 8px; margin: 6px 0 }` is written for the drawer's stacked filter rows.
-  It lands on every `<label>` in the app. Measured on the theme picker, that margin made the track
-  37px tall around 21px pills. That is 6px of dead air above and below each one. The whole point of the shape
-  is that the fill hugs the segment. The lightbox's own pills are `<button>`s and never met it.
+  It lands on every `<label>` in the app. Measured on the old theme picker, that margin made the
+  track 37px tall around 21px pills. That is 6px of dead air above and below each one. The whole
+  point of that shape is that the fill hugs the segment.
   **Any `<label>` used as a compact control needs `margin: 0` stated.** The symptom is spacing
   around the control rather than in it, which reads as a padding mistake on the parent. Three other
   explanations were measured first and all three were wrong. They were the row's own padding
   (symmetric at 8px), `align-items` on the row (already `center`), and the flex item stretching.
-  `align-self: auto` on a centred row cannot stretch.
-  `applyTheme()` in `map.js` returns the stored pick. `ui.js` checks the matching radio from that
-  return value, which is also what corrects a browser that restored a different one.
-- **The theme has three states and two of them are the same colour.** `PREFS.theme` holds the
-  *pick* — `system`, `light` or `dark` — and `applyTheme()` resolves it to one of the two real
-  themes. Anything that is not `light` or `dark` means system, so an absent pref needs no special
-  case and `system` is the default. **`setTheme()` no longer applies anything.** It stores the pick
-  and calls `applyTheme()`. That is also the `change` listener on
-  `matchMedia('(prefers-color-scheme: dark)')`. The system can move the answer with nobody picking
-  anything. That listener needs no test of its own, because `applyTheme()` re-reads the pref every
-  time. Anything that wants to know the theme on screen reads `document.documentElement.dataset.theme`
-  as before. **Never read `PREFS.theme` as if it were a theme** — on the default it is not one.
-  A one-time clear in `map.js` guards `themePick`. The old two-state toggle wrote a *resolved*
-  `light`/`dark` back on every load. So every stored value predating this control was the system's
-  answer rather than a reader's. Honouring it leaves Auto reachable by new visitors
-  alone. Do not delete that line until nobody can still carry a pre-Auto `prefs` blob.
-- **`#appMenu` closes itself on any click inside it, in the capture phase, and a setting must opt
-  out.** The handler in `ui.js` exists so a menu item's `showModal()` never runs while its opener is
-  still in the top layer. That is right for the four tiles, which are destinations. It is wrong for the
-  theme row, which is a setting. Closing the menu takes the control off screen. That is the moment
-  you want to see what it did and try another one. The guard is `e.target.closest('.swrow')`. **Anything else
-  added to that menu that is not a destination needs `.swrow` or its own exemption.** Otherwise it
-  fires once and vanishes. `.swrow` also carries `grid-column: 1 / -1`, as does the `<hr>` above it:
-  `#appMenu` is a two-column grid and a row that does not span both lands in a tile slot.
+  `align-self: auto` on a centred row cannot stretch. `#paintmenu`'s button groups are the live
+  users of this rule now.
+- **The theme has two states, and the glyph names the NEXT press.** `PREFS.theme` holds `light` or
+  `dark` and nothing else. `applyTheme()` in `map.js` stamps it on `<html>`, and `setTheme()` stores
+  the pick and calls it. Anything that wants to know the theme on screen reads
+  `document.documentElement.dataset.theme`, as before.
+  **The device answers once, on the first visit, and never again.** `map.js` seeds `PREFS.theme`
+  from `matchMedia('(prefers-color-scheme: dark)')` when the stored value is neither theme. There is
+  no listener on that query any more. A reader who picked a shade keeps it when the phone crosses
+  sunset, which is what a two-state switch promises.
+  **A sun on a light page is the state a reader can already see.** So `syncThemeBtn()` in `js/ui.js`
+  draws the glyph and the label of the shade one press away, not of the shade on screen.
+  **This reverses a three-state control**, `system` / `light` / `dark` in a segmented pill inside a
+  popover. The repository owner cut Auto and the pill on 2026-08-24. The migration that guarded a
+  pre-Auto `themePick` blob went with it: every value that blob can hold is one of the two this
+  reads.
+- **The overflow menu is `#appMenu` again, and it is a different thing under one id.** It held four
+  destination tiles and a theme row, in a two-column grid, and it closed itself on any click inside
+  it through a capture-phase handler in `js/ui.js`. Every one of those is gone. It holds two rows,
+  Help and About, and it draws below 600px alone, because a navigation bar caps at five items and
+  the rail above 600px carries both as items of its own.
+  **So `.swrow` and the capture-phase close are deleted.** That handler existed so a menu item's
+  `showModal()` never ran while its opener was still in the top layer, and it needed an exemption
+  for the one row that was a setting rather than a destination. Both rows are destinations now.
+  **The two rows share one handler with their rail twins.** `openHelp` and `openAbout` in `js/ui.js`
+  are bound to `railHelp`/`menuHelp` and `railAbout`/`menuAbout` in one loop. Only one of each pair
+  is ever on screen, and two copies of a handler is two things to change.
 - **A river's sparkline draws every mark it publishes, and the axis grows to hold them.** This
   reverses the earlier rule. That rule drew a mark only within one *data span* of the readings. The
   readings then kept half the graph's height. It left 89 of 105 rivers with no mark at all on a
@@ -3578,11 +3631,12 @@ printf("rows: %d, points: %d, newest: %s\n",
 # written outside the media query moves the desktop, where nothing is meant to move. And a variant
 # with no scrim has to keep a way out, which is now the close X and Escape alone. Reads PASS.
 "/c/Program Files/Google/Chrome/Application/chrome.exe" --headless=new --disable-gpu \
-  --ignore-certificate-errors --virtual-time-budget=180000 --window-size=1600,1000 --dump-dom \
+  --ignore-certificate-errors --virtual-time-budget=300000 --window-size=1600,1000 --dump-dom \
   https://flood-exp.test/m3-check.html | perl -0777 -ne 'print $1 if /<pre id="out">(.*?)<\/pre>/s'
 # **A short budget TRUNCATES this check rather than failing it.** At 120000 it stopped as the desktop
-# pass started, after 122 of 274 assertions, with nothing failed and no verdict printed. Read the
-# last line: no `PASS` means the run did not finish, whatever the counts above it say.
+# pass started, after 122 of 274 assertions, with nothing failed and no verdict printed. At 240000
+# it printed the opening line alone, once the rail and the bar joined it. Read the last line: no
+# `PASS` means the run did not finish, whatever the counts above it say. It holds 573 assertions.
 
 # The app bar wordmark ladder, in rendered pixels. Loads the app in an iframe at fifteen widths and
 # asserts one spelling at a time, never wider than its rail, and never a longer spelling on a

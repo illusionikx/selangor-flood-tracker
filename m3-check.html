@@ -831,8 +831,16 @@ async function desktop() {
        `getComputedStyle` answers for a `display: none` subtree, so nothing here has to open it. */
     const helpGlyph = label => [...d.querySelectorAll('#helpBox .ctl')]
       .find(c => c.textContent.trim() === label)?.querySelector('.i');
-    for (const [id, label] of [['railFilters', 'Layers and filters'], ['railTable', 'Station table'],
-                               ['railCams', 'All cameras'], ['railAlerts', 'On alert'],
+    /* **Help names each control by the word the rail draws under it**, and it did not. It carried
+       `Layers and filters`, `Station table`, `All cameras` and `On alert` from the app bar that held
+       those controls before the rail. One name for one thing is this repo's own rule, and a reader
+       comparing the page to the page cannot follow two names.
+       `Show the labels`, `Help`, `About` and `Theme` are named in Help too and have no rail glyph to
+       compare against: two draw the same `flood` and `info` marks the About pane and the alert list
+       already use, and the rail toggle swaps its own glyph. So the pairs below are the five that a
+       drift in either file can put wrong. */
+    for (const [id, label] of [['railFilters', 'Filters'], ['railTable', 'Table'],
+                               ['railCams', 'Cameras'], ['railAlerts', 'Alerts'],
                                ['railFind', 'Go to a station']]) {
       const h = helpGlyph(label);
       is(!!h, true, 'Help names "' + label + '"');

@@ -657,3 +657,22 @@ literal offset that has to stay in step with the width of the one beside it.
 Seventeen new assertions in `m3-check.html`, and three rewritten. The desktop pass asserted that the
 app bar carried no control group. That group is the phone bar's own and `<header>` does not draw
 above 600px, so the claim is that nothing of it renders.
+
+## 21. The record
+
+Help carried an `App bar` section over controls that are not in an app bar any more, and a `Menu`
+section for a popover deleted in section 3. Its Theme entry described an Auto setting that no longer
+exists.
+
+Both are one `Getting around` list now, under the words the rail and the bar draw. The feed status,
+the moving strip, the layers button and the locate button moved to a second list, `On the map`.
+
+`m3-check.html` held the four old Help names and passed through all of it. It compared a glyph
+rather than a word, and the glyphs never moved. It names the rail's own words now.
+
+Three gotchas in `CLAUDE.md` described deleted code: the three-state theme, `#appMenu`'s
+capture-phase close with its `.swrow` exemption, and the `#themeRow` segmented pill. Each is
+rewritten to state what replaced it.
+
+The `m3-check.html` budget goes to 300000. At 240000 the check printed its opening line alone once
+the rail and the bar joined it.
