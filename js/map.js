@@ -58,12 +58,33 @@ export function railActive(id) {
     if (id === b.id) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
 }
 
-function syncPane() {
+/* A dialog is a rail destination too, and `syncPane()` cannot see one from a body class alone.
+   `railSync()` checks for one here, before it falls back to the drawer, the search and the alert
+   list. */
+const DIALOG_ITEM = { dataBox: 'railTable', camBox: 'railCams' };
+
+/* **One function reads every input. Every writer calls this function, never `railActive()`
+   directly.**
+   `narrow` is a `matchMedia` listener. A modal dialog does not block it.
+   `syncPane()` used to compute its own answer from the body class alone.
+   So crossing 600px with the wall open cleared `railCams` from under it.
+   The table and camera openers then tried to out-race that clear with a microtask yield.
+   That fixed one path and left this one open.
+   A derivation reads the live DOM instead, so it cannot go stale.
+   Whichever writer runs last reads the same truth, so their order stops mattering. */
+export function railSync() {
   const cls = document.body.classList;
-  const want = cls.contains('drawer') || cls.contains('side') || cls.contains('find');
+  for (const d of document.querySelectorAll('dialog[open]'))
+    if (DIALOG_ITEM[d.id]) return railActive(DIALOG_ITEM[d.id]);
   railActive(cls.contains('drawer') ? 'railFilters'
            : cls.contains('find')   ? 'railFind'
            : cls.contains('side') && side.key === '@alerts' ? 'railAlerts' : null);
+}
+
+function syncPane() {
+  const cls = document.body.classList;
+  const want = cls.contains('drawer') || cls.contains('side') || cls.contains('find');
+  railSync();
   if (!want) { pane.close(); return; }
   if (pane.open && paneModal === narrow.matches) return;
   pane.close();
@@ -408,11 +429,11 @@ export function openSide(key, html, mastAt) {
   syncAlertBtn();
   /* The rail's own MutationObserver misses a same-occupant swap.
      Swapping from the alert list to a station card keeps the side class on.
-     No mutation then fires.
-     syncPane() never runs.
+     No mutation then fires. syncPane() never runs.
      Without it, the alert item stays lit through the swap.
-     A direct call here catches it, both into and out of the alert list. */
-  railActive(side.key === '@alerts' ? 'railAlerts' : null);
+     A direct call here catches it, both into and out of the alert list.
+     It calls railSync(), so this reads side.key through the one derivation every writer shares. */
+  railSync();
 
   /* The card holds at most one camera, and `data-clip` carries its proxy id. `start()` is
      idempotent by that id, which is what makes this safe to call again on every poll — render()
@@ -426,7 +447,11 @@ export function openSide(key, html, mastAt) {
 export function closeSide() {
   withClip(m => m.stop());
   side.key = null;
-  document.body.classList.remove('side');
+  /* Guarded the same way `openSide()` already guards its own write, above.
+     A no-op `classList.remove()` still queues a mutation record and still wakes the observer for
+     nothing. It is not load-bearing once `railSync()` re-derives from the live DOM. It is the
+     honest repair of the thing that raced. */
+  if (document.body.classList.contains('side')) document.body.classList.remove('side');
   hideMast();
   syncAlertBtn();
 }

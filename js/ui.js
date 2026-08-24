@@ -5,7 +5,7 @@ import { KINDS, MAST, camSrc, FEED, STATIC, NEAR_MAX_KM, NOTICE, NOTICE_KIND, NA
 import { state, PREFS, PREFS_KEY, save } from './state.js';
 import { el, distKm, dkey, ignoredIds, leads, favIds, isFav, squash, termsOf, matches, esc
        } from './util.js';
-import { setTheme, applyTheme, flashTo, closeSide, showPlace, side, railActive } from './map.js';
+import { setTheme, applyTheme, flashTo, closeSide, showPlace, side, railSync } from './map.js';
 import { showHere } from './locate.js';
 import { heatOpacity, syncHeat } from './heat.js';
 import { byId } from './stations.js';
@@ -236,18 +236,12 @@ const dataBox = el('dataBox');
    once, and the skeleton stands in the box until the rows arrive. */
 el('railTable').onclick = async () => {
   closeSide();
-  /* closeSide() rewrites the body class even when nothing changes.
-     That still queues a mutation record for syncPane() to read.
-     syncPane() runs on the next microtask and sets the rail from the classes alone.
-     It does not know about this call.
-     One microtask yield here lets that run first.
-     This call then runs last.
-     So it wins. */
-  await Promise.resolve();
-  railActive('railTable');
   // A retry after a failed open must not still carry the last failure's banner over the fresh rows.
   dataBox.classList.remove('loadfail');
   dataBox.showModal();
+  /* railSync() reads which dialog is open, so it must run after showModal() opens this one.
+     Nothing else needs to race it any more. Whichever writer runs last reads the same live DOM. */
+  railSync();
   el('dataFind').focus();
   try {
     await lazy(() => withTable(m => m.dataTable()), dataBox);
@@ -256,7 +250,7 @@ el('railTable').onclick = async () => {
     dataBox.classList.add('loadfail');
   }
 };
-dataBox.addEventListener('close', () => railActive(null));
+dataBox.addEventListener('close', railSync);
 dataBox.onclick = e => { if (e.target === dataBox) dataBox.close(); };
 /* A wrapper, not the function itself. `dataTable` is no longer a static binding, so there is
    nothing to assign here. The dialog cannot be open unless its opener already imported the module,
@@ -271,22 +265,19 @@ const camBox = el('camBox');
 /* Same shape as the table opener above: the dialog opens first and js/wall.js follows. */
 el('railCams').onclick = async () => {
   closeSide();
-  // Same race as the table opener above.
-  // One microtask yield lets syncPane() run and settle first.
-  // This call then runs last. So it wins.
-  await Promise.resolve();
-  railActive('railCams');
   el('camFind').value = '';
   // Same reset as the table opener above: a retry must not carry the last failure's banner forward.
   camBox.classList.remove('loadfail');
   camBox.showModal();
+  // Same as the table opener above: railSync() must run after showModal() opens this dialog.
+  railSync();
   try {
     await lazy(() => withWall(m => m.open()), camBox);
   } catch {
     camBox.classList.add('loadfail');
   }
 };
-camBox.addEventListener('close', () => railActive(null));
+camBox.addEventListener('close', railSync);
 camBox.onclick = e => { if (e.target === camBox) camBox.close(); };
 /* Nothing ticks behind a closed dialog, and nothing holds 91 decoded frames after the reader has
    gone. `onclose` catches Esc, the ×, and the backdrop click above, which is every way out.

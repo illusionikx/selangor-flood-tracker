@@ -555,6 +555,45 @@ async function desktop() {
     d.body.classList.remove('drawer');
     await settled();
     is(active().join(','), '', 'and closing it clears the item');
+
+    /* --- the reported path: crossing 600px must not clear a dialog's own item ---
+       A `matchMedia` listener is not blocked by an open modal dialog. `narrow.addEventListener(
+       'change', syncPane)` still fires while a dialog holds the top layer, and `syncPane()`
+       re-derived from the body class alone had nothing to say the camera wall was open, and
+       cleared `railCams` out from under it.
+       `f.style.width` is a real resize of the frame's own viewport, the same mechanism `bands()`
+       below already uses to cross a breakpoint for real. **Headless Chrome under
+       `--virtual-time-budget` does not deliver the MediaQueryList `change` event on that resize
+       without an explicit reflow first** — measured directly against a throwaway page: `matches`
+       flipped at once, but `change` never fired even a full second later, until something read
+       back a layout property. `d.body.offsetHeight` is that read. A real browser, resized by a
+       reader's hand, needs none of this — it is a property of this harness, not of the app. */
+    const f = document.getElementById('desk');
+    d.getElementById('railCams').click();
+    await settled();
+    is(active().join(','), 'railCams', 'the camera wall lights its own item');
+    f.style.width = '500px';
+    d.body.offsetHeight;
+    await new Promise(res => setTimeout(res, 200));
+    is(w.innerWidth, 500, 'the frame really crossed 600px');
+    is(active().join(','), 'railCams', 'crossing 600px with the wall open must not clear it');
+    /* **Close it here, still narrow, and only then resize back.** `js/ui.js` runs its own
+       `phone.addEventListener('change', ...)` on the same breakpoint, and that listener reopens
+       the drawer on the way back to a wide window whenever `PREFS.drawer` has not been explicitly
+       closed. Resizing wide again BEFORE this close folds that unrelated, legitimate reopen into
+       what should be a bare check of the dialog's own item — the drawer really is back, and
+       `railSync()` is right to light it, which is not the fault this assertion exists to catch. */
+    d.getElementById('camBox').close();
+    await settled();
+    is(active().join(','), '', 'closing the wall while still narrow clears the item');
+    f.style.width = '1200px';
+    d.body.offsetHeight;
+    await new Promise(res => setTimeout(res, 200));
+    /* The resize back may have reopened the drawer through `js/ui.js`'s own breakpoint listener,
+       which is real, correct behavior and not this block's concern. Clear it, so the RAIL block
+       still ends bare for whatever runs after it, the same state it has ended in since Step 1. */
+    d.body.classList.remove('drawer');
+    await settled();
   }
   is(cs(mapBox).borderTopLeftRadius, '16px', 'M3 shape-corner-large');
   is(cs(mapBox).overflow, 'hidden', 'and the tiles clip to that corner');
