@@ -4,10 +4,10 @@
      looks exactly like the bottom rung.
 
      **The heading has TWO homes now, and it is measured in both.** Below 600px it sits in the app
-     bar, at 22px across up to 300px of rail. Above it the navigation rail holds it at
-     `title-medium` across 164px, and a SHUT rail draws no heading at all. Two boxes and two font
-     sizes, so the ladder is measured rather than assumed. See `#brand` and `#rail #brand` in
-     css/chrome.css.
+     bar. That bar is a 40px pill inside the map now, shared with the news, and the brand there is
+     32px of mark with no room for a word. Above 600px the navigation rail holds it at
+     `title-medium` across 164px, and a SHUT rail draws no heading at all. So ONE box draws a
+     spelling. See `#brand` and `#rail #brand` in css/chrome.css.
 
      **Nothing is hard-coded about the drop.** The mark's own width and the heading's own `gap` are
      read back, so a change to either fails here rather than on somebody's screen.
@@ -28,7 +28,7 @@
 <style>body { font: 13px/1.5 monospace; margin: 16px } .f { color: #b00 }</style>
 <pre id="out">running…</pre>
 <script>
-const RUNG = { 'w-lg': 2, 'w-md': 1 };                     // taller number, longer spelling. 0 is the drop.
+const RUNG = { 'w-md': 1 };                                // 1 is the one spelling. 0 is the drop.
 const rows = [], fail = [];
 /* Reachability, not just fit — see the block at the foot of the run. Three boxes, tracked apart,
    because each one is supposed to draw a DIFFERENT fixed answer or a different RANGE of answers,
@@ -88,7 +88,6 @@ const check = (label, r) => {
   const origPrefs = localStorage.getItem('prefs');
   const W = [1600, 1400, 1280, 1200, 1100, 1000, 900, 800, 700, 601, 600, 480, 414, 360, 320,
              ...Array.from({ length: 320 - NARROW_PX }, (_, i) => 319 - i)];
-  let last = 4;                                            // nothing above the longest spelling
   try {
   for (const w of W) {
     const f = document.createElement('iframe');
@@ -130,8 +129,8 @@ const check = (label, r) => {
       if (wide) railShutDrawn.add(r.drawn);
       /* Only the phone layout may widen its box as the viewport narrows, so it restarts the ladder.
          The 601/600 step changes the home as well, so it restarts there too. */
-      if (!wide && w !== 600 && r.rung > last) fail.push(`${w}px: a narrower box drew a LONGER spelling`);
-      if (!wide) { last = r.rung; phoneRungs.add(r.rung); }
+      if (!wide && r.rung) fail.push(`${w}px: the phone pill drew "${r.txt}" rather than the drop alone`);
+      if (!wide) phoneRungs.add(r.rung);
     }
 
     /* The open rail is the desktop's own ladder, and it is the half a reader actually reads. */
@@ -159,11 +158,11 @@ const check = (label, r) => {
      is gone rather than disclosed as unreachable. Three rungs are real, each tied to a fixed box:
 
        rail, shut       --   nothing at all: a collapsed rail carries destinations and no brand
-       rail, open    164px   always `.w-md` -- past 147px, short of the 215px `.w-lg` needs
-       phone bar   ~viewport steps `.w-md` to `.w-lg` across the 306/307px crossing
+       rail, open    164px   always `.w-md`, the one spelling left
+       phone pill     32px   always the drop alone: the news takes the rest of that pill
 
      The per-width checks above already fail the moment any one reading breaks its own row of that
-     table -- a shut rail drawing anything, an open rail drawing `.w-lg`, a phone width fitting nothing
+     table -- a shut rail drawing anything, a phone width drawing a word, anything fitting nothing
      it drew. What they cannot see on their own is a ladder that is individually correct at every
      width yet frozen on one answer throughout -- the exact shape a dead threshold left behind
      before this fix. So each box's own SET of drawn rungs is asserted here: the two fixed boxes for
@@ -172,8 +171,12 @@ const check = (label, r) => {
     fail.push(`rail, shut drew a heading at some width: ${[...railShutDrawn]}`);
   if (railOpenRungs.size !== 1 || !railOpenRungs.has(RUNG['w-md']))
     fail.push(`rail, open drew rung ${[...railOpenRungs]}, not only .w-md`);
-  if (phoneRungs.size !== 2 || !phoneRungs.has(RUNG['w-md']) || !phoneRungs.has(RUNG['w-lg']))
-    fail.push(`the phone bar drew rung ${[...phoneRungs]}, not both .w-md and .w-lg`);
+  /* **The phone ladder is gone, because its box is gone.** The brand shares a 40px pill with the
+     news and takes 32px of it. `KV Flood Watch` needs 156, and the strip would keep 148 of a 336px
+     pill with 112 of that its own fade ramp. So the drop carries the identity here and the tab
+     title says the rest, which is what this app already did under 93px of container. */
+  if (phoneRungs.size !== 1 || !phoneRungs.has(0))
+    fail.push(`the phone pill drew rung ${[...phoneRungs]}, not only the drop`);
   out.innerHTML = rows.join('\n') + '\n\n' +
     (fail.length ? `<b class="f">FAIL</b>\n` + fail.join('\n') : '<b>PASS</b>');
 })().catch(e => { out.innerHTML = `<b class="f">THREW</b>\n${(e && e.stack) || e}`; });

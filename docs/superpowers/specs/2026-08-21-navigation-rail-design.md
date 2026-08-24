@@ -527,3 +527,44 @@ the rail is what it stands beside.
 **The pill joins the pairwise furniture sweep** in `m3-check.html` and the overlap sweep in
 `paint-check.html`. It is a box floating over the map like every other one, and each box is correct
 on its own right up until it lands on a neighbour.
+
+## 17. The pill at both widths, and one gap all round
+
+The repository owner asked for two things on 2026-08-24: the phone follows the pill, and the space
+around the map card is equal on every edge.
+
+### The pill on a phone
+
+`--hdr` is `0px` at both widths now. The phone bar was 85px in two rows, the brand on one and the
+news on the other. Both ride one 40px pill inside the map, 12px in from a full-bleed map's own
+edges. Every token in the pill's offsets is 0 on a phone, so one rule answers both widths.
+
+**The brand there is 32px of mark, and the wordmark is what pays for the news.** A 336px pill at a
+360px window holds `KV Flood Watch` at 156px and leaves the strip 148, of which 112 is its own fade
+ramp. That is a news window nobody can read. Under 93px of container the shared ladder draws the drop
+alone, and 32 is well under it.
+
+**So `.w-lg` is deleted.** `Klang Valley Flood Watch` needs 279px in a bar and 215 in the rail. The
+bar is gone and the open rail is 164px, so no box in this app can draw it. A rung with no box is a
+span, a rule and a threshold that all state a fact about nothing. `KVFW` went the same way earlier,
+under the same rule. The full name still draws on the splash and in the About pane, which carry their
+own markup.
+
+**The phone ticker kept three rules written for the second row** and one of them overflowed the
+document. `flex: 1 0 100%` in a 336px pill drew a 328px strip starting 56px in, so the page ran to
+384px and a scrollbar drew along the bottom of the map. The strip takes what is left of the pill now.
+
+### One gap all round
+
+`--map-l` and `--map-r` are the map card's own two insets, as tokens. Every box that floats on the
+map measures from one of them, and each was stating the arithmetic itself.
+
+**The trailing one is a `max()`, and that is the repair.** It read `--pane-w + --seam` alone, so a
+shut pane left the card 8px from the window against 16px on the other three edges. `--seam` is the
+space between two panes. With no pane beside it, that edge owes the window a `--gap` like any other.
+
+**`--pane-w` moved to `:root`.** A custom property inherits its computed value, so a `--pane-w`
+written on the body never reaches `--map-r` declared above it: the trailing inset resolved against a
+permanent 0 and the card kept 16px with the pane open beside it. `:root:has(body…)` is what lets a
+body class move a root-level token. `--rail-w` states the same rule from its own side, and this is
+the second time this app has paid for it.

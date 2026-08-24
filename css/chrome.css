@@ -27,8 +27,8 @@
    puts three properties on the transition list that can only ever animate from a value to itself. */
 #map {
   position: absolute;
-  inset: calc(var(--hdr) + var(--gap)) calc(var(--pane-w) + var(--seam))
-         calc(var(--navbar-h) + var(--gap)) calc(var(--rail-w) + var(--gap));
+  inset: calc(var(--hdr) + var(--gap)) var(--map-r)
+         calc(var(--navbar-h) + var(--gap)) var(--map-l);
   overflow: hidden;
   border-radius: var(--md-sys-shape-corner-large) var(--md-sys-shape-corner-large) 0 0;
   transition: right var(--m3-travel), left var(--m3-rail);
@@ -85,36 +85,31 @@ header {
 }
 body:not(.ready) header { transition: none; }
 @media (prefers-reduced-motion: reduce) { header { transition: none; } }
-/* --- the news pill, above 600px ------------------------------------------------------------------
-   **The strip moved inside the map card.** It ran the width of the window above both panes, and the
-   repository owner asked for that space back on 2026-08-24. It is a long pill over the map now, on
-   the card's own 12px furniture inset, the same one `#legend` and `#credit` already take.
+/* --- the news pill --------------------------------------------------------------------------------
+   **The strip moved inside the map card, at both widths.** It ran the width of the window above both
+   panes, 64px on a desktop and 85 on a phone, and the repository owner asked for that space back on
+   2026-08-24. It is a long pill over the map now, on the card's own 12px furniture inset, the same
+   one `#legend` and `#credit` take. Every token in these offsets is 0 on a phone, so one rule
+   answers both widths and the pill lands 12px inside a full-bleed map there.
    **It is furniture, so it steps aside for the pane on the trailing edge and for the rail on the
    leading one**, and each edge rides the motion that edge already has. `right` takes the pane's own
-   `--m3-travel` so the pill grows with the map card rather than snapping. `left` takes `--m3-rail`.
-   Every other box at the top of the map clears it through `--top-free`.
-   `#ticker` masks both its own edges over 56px, so the pill needs no `overflow` of its own and the
+   `--m3-travel` and `left` takes `--m3-rail`. Every other box at the top of the map clears it
+   through `--top-free`.
+   `#ticker` masks both its own edges over 56px, so the pill needs no `overflow` of its own and its
    rounded ends never cut a word. That is also why the diagnostics popover can hang out of a 40px
-   box — see `#netstats`, which is a sibling of this element rather than a child now.
-   Below 600px none of this applies. The ticker is still a header row there, and a phone has no
-   second pane for the space above one to be worth taking. */
-@media (min-width: 601px) {
-  header {
-    top: calc(var(--gap) + 12px);
-    left: calc(var(--rail-w) + var(--gap) + 12px);
-    /* **`--seam` and never `--gap`** — the map card has two insets and a box measuring from its
-       trailing edge picks up one of them. This shipped with both for one measurement: the pill
-       stopped 28px short of the card's own edge against 12px on the leading side. */
-    right: calc(var(--pane-w) + var(--seam) + 12px);
-    height: var(--tick-h); padding-inline: 4px;
-    border-radius: var(--md-sys-shape-corner-full);
-    box-shadow: var(--shadow);
-    transition: left var(--m3-rail), right var(--m3-travel);
-  }
-  /* The strip filled a bar that ended in a row of 40px targets, and that margin held it off them.
-     There is nothing to its trailing side now but the pill's own end. */
-  #ticker { margin-right: 0; }
+   box — see `#netstats`, which is a sibling of this element rather than a child now. */
+header {
+  top: calc(var(--hdr) + var(--gap) + 12px);
+  left: calc(var(--map-l) + 12px);
+  right: calc(var(--map-r) + 12px);
+  height: var(--tick-h); padding-inline: 4px;
+  border-radius: var(--md-sys-shape-corner-full);
+  box-shadow: var(--shadow);
+  transition: left var(--m3-rail), right var(--m3-travel);
 }
+/* The strip filled a bar that ended in a row of 40px targets, and that margin held it off them.
+   There is nothing to its trailing side now but the pill's own end. */
+#ticker { margin-right: 0; }
 /* The bar is a title, a strip and a cluster of controls, and the strip takes what the other two
    leave. It used to take a share of the viewport instead, first `min(58vw, 656px)` and then a flat
    `50vw`, with both rails on `flex: 1 1 0` so the strip landed on the middle of the bar. That
@@ -152,11 +147,13 @@ body:not(.ready) header { transition: none; }
    spelling with no box to draw it in is a span, a rule and a threshold that all state a fact about
    nothing, so `title-test.html`'s own reachability check is what caught it — see that file's
    comment for the three rungs that do exist and where each one draws. */
+/* **One spelling left, and `.w-lg` is gone.** `Klang Valley Flood Watch` needed 279px in the phone
+   bar and 215 in the rail. The bar became a 40px pill shared with the news, so the brand there is
+   32px of mark, and the open rail is 164px. No box in this app can draw it any more. A rung with no
+   box is a span, a rule and a threshold that all state a fact about nothing — the rule this file
+   already acted on once, when `KVFW` went the same way. */
 #brand .word > span { display: none; }
 #brand .word > .w-md { display: inline; }
-@container (min-width: 282px) {
-  #brand .word > .w-md { display: none; } #brand .word > .w-lg { display: inline; }
-}
 /* Under the shorter spelling there is nothing left to shorten, so the drop carries the identity on
    its own. The tab title says the rest. */
 @container (max-width: 93px) { #brand .word { display: none; } }
@@ -274,15 +271,14 @@ body.railopen #rail #brand { width: 164px; }
    gap adds 32. So each rung is the width it needs plus 2px of slack. Remeasure both if the font,
    the size or the words change — `title-test.html` reads them back in rendered pixels.
    **The drop was 30 and is 32**, because the mark went to 24px to stand in the same column as the
-   six glyphs under it. Both thresholds moved 2px with it. Neither move changes what draws: the only
-   real box is 164px, which clears 147 and never reaches 215.
+   six glyphs under it. The threshold moved 2px with it.
+   **One threshold, because there is one spelling.** `.w-lg` needed 215px and no box in this app
+   reaches it any more, so it is deleted rather than left as a rule nothing can satisfy.
    The container is 164px expanded, and a shut rail draws no heading at all. */
 @container (min-width: 147px) {
   #rail #brand .word > .w-md { display: inline; }
 }
-@container (min-width: 215px) {
-  #rail #brand .word > .w-md { display: none; } #rail #brand .word > .w-lg { display: inline; }
-}
+
 /* **Every glyph in this rail stands on one column, and three of them did not.**
    Two faults, measured against the item glyphs at 24px and 36px from the window.
    The menu button and the theme button are `.icon`, which draws 22px. Every other glyph in this
@@ -662,7 +658,7 @@ body.testmode header {
    badges stay over the strip they describe when the pane opens. */
 #pills {
   position: fixed; z-index: 700; top: var(--top-free);
-  left: calc(50% + var(--rail-w) / 2 - var(--pane-w) / 2);
+  left: calc((var(--map-l) + 100% - var(--map-r)) / 2);
   transform: translateX(-50%); display: grid; gap: 8px; justify-items: center;
   pointer-events: none;
 }
@@ -1419,7 +1415,7 @@ body.find #findpane { display: flex; flex-direction: column; }
     top: var(--top-free);
     left: calc(12px + var(--gap) + var(--rail-w));
     width: 360px;
-    max-width: calc(100vw - var(--rail-w) - var(--pane-w) - var(--seam) - var(--gap) - 24px);
+    max-width: calc(100vw - var(--map-l) - var(--map-r) - 24px);
     max-height: calc(100dvh - var(--top-free) - var(--gap) - 12px);
     background: none; box-shadow: none; border-radius: 0; overflow: visible;
     transition: opacity var(--m3-swap), translate var(--m3-swap), left var(--m3-rail);
@@ -1567,7 +1563,7 @@ body.find #findpane { display: flex; flex-direction: column; }
    **State the `--fab` fallback.** That variable is declared on `.mapbtn` itself, so a rule written
    here cannot inherit it and `var(--fab)` alone resolves to nothing. */
 #paint, #locate { position: absolute; z-index: 401;
-  right: calc(48px + var(--pane-w) + var(--seam)); }
+  right: calc(var(--map-r) + 48px); }
 #paint  { bottom: calc(36px + var(--gap) + var(--navbar-h)); }
 #locate { bottom: calc(36px + var(--gap) + var(--navbar-h) + var(--fab, 60px) + 8px); }
 
@@ -1800,7 +1796,7 @@ body.find #findpane { display: flex; flex-direction: column; }
   position: absolute; z-index: 400;
   left: calc(12px + var(--gap) + var(--rail-w));
   bottom: calc(30px + var(--gap) + var(--navbar-h)); width: 288px;
-  max-width: calc(100vw - var(--rail-w) - var(--pane-w) - var(--seam) - var(--gap) - 128px);
+  max-width: calc(100vw - var(--map-l) - var(--map-r) - 128px);
   margin-top: 10px; padding: 12px 14px; border-radius: 12px;
 }
 /* The heat sections are sized by their ramp, and a ramp has no intrinsic width, so the box has to
@@ -1943,8 +1939,14 @@ body:not(.ready) #bar, body:not(.ready) #side, body:not(.ready) #findpane { tran
    pane occupant, so it must not reserve the pane's own width. `.find` alone used to reach here too,
    and the map gave up 360-576px of its trailing edge for a search that drew 360px on the LEADING
    one — a blank gutter with nothing in it, on every desktop search a reader opened alone. */
+/* **On `:root`, never on `body`, and that is a repair.** `--map-r` is computed on `:root` and reads
+   `--pane-w` there. A custom property inherits its COMPUTED value, so a `--pane-w` written on the
+   body never reaches a token declared above it: the map's trailing inset resolved against a
+   permanent 0 and the card stopped 16px from the window with the pane open beside it.
+   `:root:has(body…)` is what lets a body class move a root-level token. `--rail-w` states the same
+   rule from its own side, and this is the second time this app has paid for it. */
 @media (min-width: 601px) {
-  body:is(.drawer, .side) { --pane-w: var(--pane); }
+  :root:has(body.drawer), :root:has(body.side) { --pane-w: var(--pane); }
 }
 /* **A floor under the ratio, because 30% of a small expanded window is not a pane.** M3 gives the
    supporting pane 30% from 840px up. At 840 that is 252px, which is under M3's own 256dp minimum for
@@ -2157,7 +2159,7 @@ body.side #side { display: flex; }
    closed: `visibility` keeps it out of the tab order and off screen readers, and still animates. */
 #toast {
   position: absolute; z-index: 401; top: var(--top-free);
-  right: calc(12px + var(--pane-w) + var(--seam));
+  right: calc(var(--map-r) + 12px);
   width: min(300px, calc(100vw - 24px));
   border-radius: 12px; padding: 12px 14px 6px; overflow: hidden;
   border-left: 3px solid #e8710a;
@@ -2300,7 +2302,7 @@ body.side #side { display: flex; }
 /* Leaflet's own attribution box is disabled; we render the credit ourselves, out of the way. */
 #credit {
   position: absolute; z-index: 400;
-  right: calc(10px + var(--pane-w) + var(--seam)); bottom: calc(8px + var(--gap));
+  right: calc(var(--map-r) + 10px); bottom: calc(8px + var(--gap));
   text-shadow: 0 0 4px var(--surface), 0 0 4px var(--surface);
 }
 #credit a { color: var(--muted); }
@@ -2849,64 +2851,45 @@ body.side #side { display: flex; }
      rather than beside it, so the map keeps its whole width. Every rule that still resolves `--side`
      is a desktop rule, and each is cancelled by name below rather than by feeding it a phone
      value. */
-  :root { --hdr: 85px; }
-  header { gap: 4px; flex-wrap: wrap; align-content: flex-start; padding: 6px 8px 0 4px; }
-  header > :not(#ticker) { order: 0; }
-  /* **A definite width, never a zero basis with grow.** `container-type: inline-size` contains this
-     box, and a contained box cannot take its width from its own content. In the wide bar it shares
-     a line with the ticker and the flex algorithm hands it a share, which is a definite number and
-     works. Here the ticker takes a row of its own, so the heading is alone on line one with nothing
-     to share against, and it measured 4px — the lockup vanished and the bar looked empty.
-     The rail states the same rule from its own side. */
-  #brand { flex: none; width: 100%; max-width: none; }
-  /* **This box is `viewport − 12px` at every phone width, header padding aside, because nothing
-     else shares its row.** So it ranges 288 to 588px across the whole 300 to 600px phone band — a
-     RANGE, but one that never leaves the top rung's own territory. The base 282px rule below was
-     measured for the bar this box used to share with a ticker and six controls, where the ticker's
-     own claim on the row could push it that low. None of that claims space here any more, so that
-     rule never sees a box under 288 and `.w-lg` draws at every legal phone width, with only 9px of
-     margin over the 279px it needs at the narrowest one.
-     **The rail carries its own thresholds, at its own two widths, rather than reusing these — see
-     `#rail #brand` above. This box needs the same**, recalibrated to what it actually ranges over.
-     A 295px threshold — 16px of margin over `.w-lg`'s own 279px, wider than the 2px the base rule
-     keeps, because this is now the narrowest box in the app and its margin should say so — lands
-     the crossing at a 307px window. `.w-md` therefore draws from 300 to 306px, and `.w-lg` from
-     307px up. `title-test.html` probes across that crossing and asserts a real transition happens
-     inside it, not only that whatever drew still fits. */
-  @container (max-width: 294.98px) {
-    #brand .word > .w-md { display: inline; } #brand .word > .w-lg { display: none; }
-  }
-  /* Tighter controls so the mark, the chip and four buttons fit one line at 360px with room over. */
-  header .icon { width: 36px; height: 36px; font-size: 20px; }
-  /* The ticker holds a row of its own here, so the two rails share line one between them. They keep
-     the `flex` the wide layout gives them, and `justify-content: flex-end` still holds the controls
-     against the right edge — no auto margin, the same reason as up there.
-     `header .hactions { gap: 0 }` stood here and is gone with the group it styled. The app bar
-     carries no phone-width control of its own until Task 6 adds one. */
+  /* **`--hdr` is 0 here too, and the header is the same pill it is on a desktop.** It was 85px of
+     two-row bar: the brand on line one and the ticker on line two. The repository owner asked for
+     that space back on 2026-08-24. */
+  /* **The mark alone, and the wordmark is what pays for the news.** The brand shares one 40px pill
+     with the ticker here, and there is no rail to put it in. A 336px pill at a 360px window holds
+     `KV Flood Watch` at 156px and leaves the strip 148, of which 112 is its own fade ramp. That is
+     a news window nobody can read.
+     So this box is the mark's own width. `container-type: inline-size` still contains it, so the
+     width is stated rather than left to the content, which is the rule the rail states from its own
+     side. Under 93px the shared ladder below draws the drop alone, and 32 is well under it — the
+     wordmark needs no rule of its own here, and gets none. */
+  #brand { flex: none; width: 32px; max-width: none; }
+  /* **The phone wordmark ladder is gone, because its box is gone.** This block recalibrated the
+     crossing for a heading that had a whole row to itself, 288 to 588px wide. The brand is 32px of
+     mark in a shared pill now, so no phone width draws a spelling at all and there is nothing left
+     to calibrate. `.w-lg` went with it: the open rail is 164px and `.w-lg` needs 215, so no box in
+     this app can draw it any more. A rung with no box is dead weight in three files, which is the
+     rule `title-test.html` already states and already acted on once. */
+  /* **The strip shares the pill with the mark, so it takes what is left.** It had a row of its own
+     and `flex: 1 0 100%` with it, plus a rule dividing the two rows and margins bleeding through the
+     bar's own padding. Every one of those is written for a layout that is gone. Measured with the
+     100% basis still in place: the strip drew 328px starting 56px into a 336px pill, so the document
+     ran to 384 and a scrollbar drew along the bottom of the map.
+     **The ramp stays at 18px** rather than the wide layout's 56. Two 56px ramps take 31% of a 360px
+     strip, and 18 is the number somebody chose for this width.
+     `header .icon` sized four buttons that live in the rail now, and it is gone with them. */
   #ticker {
-    order: 1; flex: 1 0 100%; max-width: none; justify-content: flex-start;
-    /* Margin above the rule separates the strip from the buttons; inside it, no padding at all —
-       `align-items: center` splits the height evenly, which top padding was quietly stopping it
-       from doing (15px over the words, 8px under). */
-    height: 36px; margin: 5px -8px 0 -4px; padding: 0 8px;
-    border-top: 1px solid var(--outline);
-    /* Both edges, the same rule the wide layout states. This fell to the right edge alone from the
-       day the strip got a row of its own. The marquee translates -50% at every width, so a phone
-       guillotines a word on the left the way a desktop does with no mask.
-       The ramp stays at the 18px the right edge already used, rather than the wide layout's 56px.
-       Two 56px ramps take 31% of a 360px strip, and 18 is the number somebody chose for this
-       width. */
+    flex: 1 1 0; min-width: 0; height: 30px; margin: 0; padding: 0; border-top: 0;
     -webkit-mask: linear-gradient(90deg, transparent, #000 18px, #000 calc(100% - 18px), transparent);
     mask: linear-gradient(90deg, transparent, #000 18px, #000 calc(100% - 18px), transparent);
   }
   /* The title used to go here whole, on the argument that five buttons and the status chip all have
      to fit. Both are long gone — the controls moved into the rail and the status dot is deleted —
-     so the container query on `#brand` is what decides it now: `.w-md` to `.w-lg` across the
-     306/307px crossing above, or the drop alone under 93px. Nothing to state at this width any
-     more. */
+     so the container query on `#brand` is what decides it now, and a 32px box draws the drop alone.
+     Nothing to state at this width any more. */
   /* The popover clears the two-row header rather than the one-row one; --hdr already carries the
      difference, so this only has to stop sitting under the ticker's rule. */
-  #netstats { left: 8px; }
+  /* Under the pill rather than under a two-row bar. The mark it opens from rides that pill now. */
+  #netstats { top: var(--top-free); left: calc(var(--gap) + 12px); }
   /* ABOVE the zoom box here rather than beside it. `#legend` takes `left: 12px; right: 68px` at this
      width, so the strip left of the zoom buttons is the legend's and there is nowhere to stand.
      No size override. `--fab` follows the zoom control's height on a desktop because the two stand
