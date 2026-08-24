@@ -1090,6 +1090,35 @@ async function bands() {
   toggle.click();
   await new Promise(res => setTimeout(res, 120));
 
+  /* --- the medium band's own floor, at its bottom edge, rail SHUT ---
+     `sweep()` only ever probed 700px, so a floor that also bites a SHUT rail went unmeasured. It
+     does: `(window - 96) / 2 - 12` drops under M3's 256dp minimum for every window from 601 to
+     631px, an ordinary desktop width and not an edge case — the base.css comment on `--pane` states
+     the exact range. 620px sits inside it. This is the one probe that range needs: that `--pane`
+     really floors there, and that the map is what absorbs the difference, the same shape the
+     `sweep('open')` pass already asserts at 700px. */
+  f.style.width = '620px';
+  await new Promise(res => setTimeout(res, 200));
+  is(w.innerWidth, 620, 'medium (rail shut, band floor): the frame really resized');
+  {
+    const gap = parseFloat(cs(d.documentElement).getPropertyValue('--gap'));
+    const seam = parseFloat(cs(d.documentElement).getPropertyValue('--seam'));
+    const rail = parseFloat(cs(d.documentElement).getPropertyValue('--rail-w'));
+    is(rail, 96, 'medium (rail shut, band floor): the rail really is shut here');
+    const pane = d.getElementById('pane');
+    d.body.classList.add('side');
+    await new Promise(res => setTimeout(res, 200));
+    const pw = r(pane).width, mw = r(d.getElementById('map')).width;
+    is(Math.round(pw), 256,
+       "medium (rail shut, band floor): floors at M3's 256dp minimum, same as the open-rail case");
+    is(mw <= pw + 1, true,
+       'medium (rail shut, band floor): and the map is what shrinks, not the two staying equal');
+    is(Math.abs(mw + pw + gap + seam + rail - 620) <= 1, true,
+       'medium (rail shut, band floor): the window still comes out whole');
+    d.body.classList.remove('side');
+    await new Promise(res => setTimeout(res, 150));
+  }
+
   f.style.width = '1200px';
 }
 

@@ -104,23 +104,25 @@ body:not(.ready) header { transition: none; }
 }
 #brand .word { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-/* The wordmark shortens before it clips: Klang Valley Flood Watch -> KV Flood Watch -> KVFW -> the
-   drop alone. Measured at 22px Roboto, the three spellings are 247, 156 and 59px wide, and the drop
-   with its gap adds 32. So each step is the width it needs plus about 2px of slack. The ellipsis is
-   still there under all of it, for a rail between two steps. Remeasure the three if the font, the
-   size or the words change. */
-/* Every selector here goes through `.word >`, and that is specificity rather than tidiness: the
-   hide rule is one class and three elements, so `#brand .w-sm` loses to it and nothing draws at
-   all. Two classes beat one class and any number of elements. */
+/* The wordmark shortens before it clips: Klang Valley Flood Watch -> KV Flood Watch -> the drop
+   alone. Measured at 22px Roboto, the two spellings are 247 and 156px wide, and the drop with its
+   gap adds 32. So each step is the width it needs plus about 2px of slack. The ellipsis is still
+   there under both of them, for a rail between the two steps. Remeasure both if the font, the size
+   or the words change.
+   **There were three spellings, and `KVFW` is gone.** Every box `#brand` can ever occupy is fixed
+   now — 56px collapsed rail, 180px expanded rail, ~viewport phone bar — never a value that varies
+   continuously the way a shared header row once did. `KVFW`'s own thresholds sat at 75 to 145px in
+   the rail and 190 to 282px in the bar, and no real box ever lands there: the collapsed rail is
+   56px, under even the rail's own 75px floor, and the expanded rail is a fixed 180px, past it. A
+   spelling with no box to draw it in is a span, a rule and a threshold that all state a fact about
+   nothing, so `title-test.html`'s own reachability check is what caught it — see that file's
+   comment for the three rungs that do exist and where each one draws. */
 #brand .word > span { display: none; }
-#brand .word > .w-sm { display: inline; }
-@container (min-width: 190px) {
-  #brand .word > .w-sm { display: none; } #brand .word > .w-md { display: inline; }
-}
+#brand .word > .w-md { display: inline; }
 @container (min-width: 282px) {
   #brand .word > .w-md { display: none; } #brand .word > .w-lg { display: inline; }
 }
-/* Under the shortest spelling there is nothing left to shorten, so the drop carries the identity on
+/* Under the shorter spelling there is nothing left to shorten, so the drop carries the identity on
    its own. The tab title says the rest. */
 @container (max-width: 93px) { #brand .word { display: none; } }
 #brand b { font-weight: 500; color: var(--accent); }
@@ -192,16 +194,14 @@ body.railopen #rail #brand { width: 180px; }
 /* **The rail's own rungs, measured in this rail at this size.** Two ids, so they beat the bar's
    one-id rules above whichever way the cascade runs. The bar draws 22px text across up to 300px and
    these numbers are neither of those.
-   Measured at `title-medium` 16px: the three spellings are 181, 113 and 43px wide, and the drop
-   with its gap adds 30. So each rung is the width it needs plus 2px of slack. Remeasure all three
-   if the font, the size or the words change — `title-test.html` reads them back in rendered pixels.
+   Measured at `title-medium` 16px: the two spellings are 181 and 113px wide, and the drop with its
+   gap adds 30. So each rung is the width it needs plus 2px of slack. Remeasure both if the font,
+   the size or the words change — `title-test.html` reads them back in rendered pixels.
    The container is 56px collapsed and 180px expanded, so `KV Flood Watch` is what an open rail
-   draws and the shared hide rule below 93px is what a shut one draws. */
-@container (min-width: 75px) {
-  #rail #brand .word > .w-sm { display: inline; }
-}
+   always draws — 180 never reaches the 213px `.w-lg` needs — and the shared hide rule below 93px
+   is what a shut one draws. */
 @container (min-width: 145px) {
-  #rail #brand .word > .w-sm { display: none; } #rail #brand .word > .w-md { display: inline; }
+  #rail #brand .word > .w-md { display: inline; }
 }
 @container (min-width: 213px) {
   #rail #brand .word > .w-md { display: none; } #rail #brand .word > .w-lg { display: inline; }
@@ -2717,24 +2717,18 @@ body.side #side { display: flex; }
   #brand { flex: none; width: 100%; max-width: none; }
   /* **This box is `viewport − 12px` at every phone width, header padding aside, because nothing
      else shares its row.** So it ranges 288 to 588px across the whole 300 to 600px phone band — a
-     RANGE, but one that never leaves the top rung's own territory. The desktop thresholds below
-     (190px, 282px) were measured for the bar this box used to share with a ticker and six controls,
-     where the ticker's own claim on the row could push it that low. None of that claims space here
-     any more, so the base 282px rule never sees a box under 288 and `.w-lg` draws at every legal
-     phone width, with only 9px of margin over the 279px it needs at the narrowest one.
+     RANGE, but one that never leaves the top rung's own territory. The base 282px rule below was
+     measured for the bar this box used to share with a ticker and six controls, where the ticker's
+     own claim on the row could push it that low. None of that claims space here any more, so that
+     rule never sees a box under 288 and `.w-lg` draws at every legal phone width, with only 9px of
+     margin over the 279px it needs at the narrowest one.
      **The rail carries its own thresholds, at its own two widths, rather than reusing these — see
-     `#rail #brand` below. This box needs the same**, recalibrated to what it actually ranges over.
-     A 295px threshold — 16px of margin over `.w-lg`'s own 279px, wider than the 2px the desktop
-     rule keeps, because this is now the narrowest box in the app and its margin should say so —
-     lands the crossing at a 307px window. `.w-md` therefore draws from 300 to 306px, and `.w-lg`
-     from 307px up. `title-test.html` probes across that crossing and asserts a real transition
-     happens inside it, not only that whatever drew still fits.
-     **`.w-sm` stays unreachable here, and that is disclosed rather than fixed.** Its own 190px
-     threshold sits under every box this rule ever measures — 288px is the floor a phone can reach,
-     set by `NARROW_PX` in js/config.js, and no margin choice moves that floor. Reaching it would
-     need something else back on this row to make the box vary the way `.w-lg`'s crossing does, and
-     nothing does. Two of the three word rungs are real here; the third needs the row-sharing this
-     box gave up, which is a larger change than this fix. */
+     `#rail #brand` above. This box needs the same**, recalibrated to what it actually ranges over.
+     A 295px threshold — 16px of margin over `.w-lg`'s own 279px, wider than the 2px the base rule
+     keeps, because this is now the narrowest box in the app and its margin should say so — lands
+     the crossing at a 307px window. `.w-md` therefore draws from 300 to 306px, and `.w-lg` from
+     307px up. `title-test.html` probes across that crossing and asserts a real transition happens
+     inside it, not only that whatever drew still fits. */
   @container (max-width: 294.98px) {
     #brand .word > .w-md { display: inline; } #brand .word > .w-lg { display: none; }
   }
@@ -2762,8 +2756,10 @@ body.side #side { display: flex; }
     mask: linear-gradient(90deg, transparent, #000 18px, #000 calc(100% - 18px), transparent);
   }
   /* The title used to go here whole, on the argument that five buttons and the status chip all have
-     to fit. The container query on `#brand` measures that directly, so a phone with room draws
-     `KVFW` and one without draws the drop alone. Nothing to state at this width any more. */
+     to fit. Both are long gone — the controls moved into the rail and the status dot is deleted —
+     so the container query on `#brand` is what decides it now: `.w-md` to `.w-lg` across the
+     306/307px crossing above, or the drop alone under 93px. Nothing to state at this width any
+     more. */
   /* The popover clears the two-row header rather than the one-row one; --hdr already carries the
      difference, so this only has to stop sitting under the ticker's rule. */
   #netstats { left: 8px; }
