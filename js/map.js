@@ -83,7 +83,12 @@ export function railSync() {
 
 function syncPane() {
   const cls = document.body.classList;
-  const want = cls.contains('drawer') || cls.contains('side') || cls.contains('find');
+  /* **`find` opens this pane at compact width alone.** Above 600px the search is M3's docked search
+     view: a card that floats over the map's top-left corner, outside this dialog entirely. Below it
+     the search is M3's full-screen search view, which is what this pane is there. So the class means
+     two different surfaces, and only one of them is a pane occupant. */
+  const want = cls.contains('drawer') || cls.contains('side')
+            || (cls.contains('find') && narrow.matches);
   railSync();
   if (!want) { pane.close(); return; }
   if (pane.open && paneModal === narrow.matches) return;
@@ -109,7 +114,13 @@ function syncPane() {
    never opened again for the rest of the session. `pane.open` cannot lie about that. It is false
    only when the element is genuinely shut, which is the one case that should clear the classes. */
 pane.addEventListener('close', () => {
-  if (!pane.open) document.body.classList.remove('drawer', 'side', 'find');
+  if (!pane.open) document.body.classList.remove('drawer', 'side');
+  /* **`find` is only this pane's to clear at compact width.** Above 600px the search is a docked
+     card outside this dialog, and `syncPane()` closes the pane precisely BECAUSE the search opened.
+     Clearing the class here then took the card away in the same frame it arrived, and the press
+     read as a button that does nothing. Measured: `body` went to `find` and back to bare inside one
+     tick, with no error anywhere. */
+  if (!pane.open && narrow.matches) document.body.classList.remove('find');
 });
 new MutationObserver(syncPane)
   .observe(document.body, { attributes: true, attributeFilter: ['class'] });

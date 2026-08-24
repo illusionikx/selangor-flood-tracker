@@ -66,6 +66,15 @@
      for one motion. `sideSwap` is the one they named. A reader who meets two motions in one box
      counts two events. */
   --m3-swap: 220ms var(--md-sys-motion-easing-emphasized);
+  /* A surface that changes its own WIDTH, and every box that steps aside for it. The navigation
+     rail names it: `NavigationRail/navigation-rail.css` transitions its width on
+     `duration-short2` with `easing-standard`. **That resolves to the same curve `--m3-travel`
+     carries** — M3's own token set gives standard and emphasized `cubic-bezier(0.2, 0, 0, 1)`
+     alike, which `m3-check.html` reads back off the map card. So this is a second NAME for one
+     motion rather than a second motion, and it is worth having: the rail, the app bar's leading
+     edge, the map's leading inset and the diagnostics popover all cite the rail's own spec here.
+     If M3 ever splits the two curves, these four edges follow the rail and not the sheets. */
+  --m3-rail: var(--md-sys-motion-duration-short2) var(--md-sys-motion-easing-standard);
   /* **The supporting pane's width is a RATIO of the window, and M3's canonical layout sets it.**
      https://m3.material.io/foundations/layout/canonical-examples/supporting-pane
      Medium splits the space equally. Expanded gives 70% to the main pane and 30% to the supporting
@@ -1021,12 +1030,6 @@ dialog:focus, dialog:focus-visible { outline: none; }
 @keyframes halo {
   from { transform: scale(.85); opacity: .9; }
   to   { transform: scale(2);   opacity: 0; }
-}
-/* Same shape as `halo`, shorter reach — the status chip pulses, the danger pin pings. Kept separate
-   rather than parameterised: `halo` is the loud one and must stay loud on a station at danger. */
-@keyframes halo-soft {
-  from { transform: scale(.9); opacity: .7; }
-  to   { transform: scale(1.6); opacity: 0; }
 }
 @keyframes ripple { from { transform: scale(.4); opacity: 1; } to { transform: scale(3.4); opacity: 0; } }
 /* Marquee. The strip is rendered as two identical halves, so translating exactly -50% lands the

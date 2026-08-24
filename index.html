@@ -69,13 +69,13 @@
 <link rel="stylesheet" href="vendor/leaflet.css">
 <link rel="stylesheet" href="vendor/markercluster.css">
 <link rel="stylesheet" href="vendor/fonts.css?v=51">
-<link rel="stylesheet" href="css/icons.css?v=96">
+<link rel="stylesheet" href="css/icons.css?v=97">
 <!-- M3's own token scales, baked from the M3 Expressive component set by `php m3-build.php`.
      Before `base.css`, which derives `--m3-travel`, `--m3-grow` and `--m3-swap` from them and
      bridges M3's colour names onto this app's palette. Colour is not in this file on purpose. -->
 <link rel="stylesheet" href="vendor/m3/tokens.css?v=1">
-<link rel="stylesheet" href="css/base.css?v=166">
-<link rel="stylesheet" href="css/chrome.css?v=233">
+<link rel="stylesheet" href="css/base.css?v=169">
+<link rel="stylesheet" href="css/chrome.css?v=242">
 <link rel="stylesheet" href="css/map.css?v=159">
 
 <!-- Water tint for the dark basemap. CARTO's dark_all is greyscale — all 18 of its tones have zero
@@ -253,21 +253,33 @@
     <button class="link" id="splashRetry"><i class="i i-refresh"></i> Try again</button>
   </div>
 </div>
+<!-- **The strip over the two panes.** The rail runs the full height on the leading edge now, so
+     this bar starts where the rail ends and never draws over it. Below 600px `--rail-w` is 0 and the
+     supporting pane is a destination over the map, so it spans the map alone. That is one
+     declaration, `left: var(--rail-w)`, and it answers both widths.
+     **`#brand` lives here in the markup and moves into the rail above 600px.** One heading, two
+     homes, and js/ui.js moves it on the breakpoint. A phone has no rail to put it in, and a second
+     copy is a second `<h1>` for a screen reader to read.
+     **`#netstats` does not move.** It is a `<table>`. A `<table>` cannot live inside the `<h1>`
+     that holds the mark. It stays positioned against the window at both widths — see
+     css/chrome.css. -->
 <header>
-  <!-- The feed's state rides the mark as a dot on its corner, the way a presence dot rides an avatar:
-       it is a property of the thing it sits on, and it costs no bar width. Hovering the mark (or
-       tapping the dot) still brings up the full diagnostics — see #netstats below. -->
   <!-- The wordmark shortens rather than ellipsises. Three spellings, one shown at a time, chosen by
-       the width of the title rail itself — see `header h1` in css/chrome.css. Only one is ever in
+       the width of the title rail itself — see `#brand` in css/chrome.css. Only one is ever in
        the render tree, so a screen reader reads one heading. -->
-  <h1><span class="mark"><i class="glyph brand i i-flood"></i><span id="net" tabindex="0"
-        role="img"></span></span><span class="word"
+  <!-- **The status dot is gone. Only the glyph stays.** A coloured dot once sat on the mark's
+       corner. It was the one always-visible sign that the feed was alive. The rail above 600px left
+       no room for it. `js/net.js` paints no colour there any more. `tabindex="0"` now sits on the
+       mark itself. Hover or focus on the glyph still opens #netstats below. A tap still toggles
+       `.open` for touch. -->
+  <h1 id="brand"><span class="mark" tabindex="0" aria-label="Feed diagnostics"
+        ><i class="glyph brand i i-flood"></i></span><span class="word"
       ><span class="w-lg">Klang Valley <b>Flood Watch</b></span
       ><span class="w-md">KV <b>Flood Watch</b></span
       ><span class="w-sm">KV<b>FW</b></span
   ></span></h1>
   <!-- Outside the <h1>: a <table> is flow content and cannot legally live inside a heading, so the
-       popover is a sibling positioned under the mark rather than a child of the dot. -->
+       popover is a sibling positioned under the mark rather than a child of it. -->
   <table id="netstats" class="surface"></table>
   <!-- Live alert ticker. `aria-hidden`: the same stations are in the alert panel as a real list, so
        a screen reader gets them there rather than as an endlessly repeating strip. -->
@@ -278,8 +290,32 @@
      It is a `<nav>` and never a dialog, so it does not join the roll call in m3-check.html and needs
      an assertion block of its own there. -->
 <nav id="rail" aria-label="Main">
+  <!-- **M3's menu slot**, 56px tall, leading-aligned when the rail is expanded and centred when it
+       is collapsed. It holds the one control that changes the rail's own width.
+       `menu_open` is the glyph, and a `:has()` rule in chrome.css turns it 180 degrees when the rail
+       opens. The glyph names the direction the press moves the rail, so one mark answers both
+       states and there is nothing to keep in step from JS.
+       `aria-expanded` rides this button and `aria-controls` names the rail, so the state is spoken
+       rather than left to the arrow. js/ui.js writes both. -->
+  <div class="railmenu">
+    <button id="railToggle" class="icon" aria-controls="rail" aria-expanded="false"
+            aria-label="Expand the navigation rail"><i class="i i-menu_open"></i></button>
+  </div>
+  <!-- **The brand.** It sat in the app bar, and that bar is the ticker's strip now. M3 states no
+       brand slot for a rail, so this takes the geometry of the one slot it does state beside the
+       menu: the FAB slot, 56px tall with 4px above it, centred while collapsed.
+       It is EMPTY in the markup. js/ui.js moves `#brand` in here above 600px and back to the header
+       below it. -->
+  <div class="railbrand"></div>
+  <!-- M3's items box: `flex: 1`, so it takes the slack and the theme button below it sits on the
+       bottom edge. The `.railsp` spacer that used to do that is gone with it. -->
+  <div class="railitems">
+  <!-- **A funnel, not a hamburger.** This item opens the filters, and `i-menu` is the glyph for a
+       navigation drawer holding a list of destinations. That is what it was when the button sat in
+       the app bar and the pane held every control. The pane holds the district picker, the ignored
+       list and the favorites now, so the button names a filter and draws one. -->
   <button class="railitem" id="railFilters" aria-controls="pane" aria-expanded="false"
-    ><span class="railpill"><i class="i i-menu"></i></span
+    ><span class="railpill"><i class="i i-filter_alt"></i></span
     ><span class="raillabel">Filters</span></button>
   <!-- alerts.js writes the colour and the count. It writes into `.railbadge` alone, never over the
        whole button, or the label and the pill go with it. -->
@@ -302,7 +338,7 @@
   <button class="railitem" id="railAbout"
     ><span class="railpill"><i class="i i-flood"></i></span
     ><span class="raillabel">About</span></button>
-  <span class="railsp"></span>
+  </div>
   <!-- The theme picker keeps its own button. It is a setting rather than a destination, so it sits
        under the spacer and takes no rail item. The `.menu` class on the popover is what the
        delegated placement handler in js/ui.js keys on, so this needs no positioning code. That
@@ -985,29 +1021,6 @@
      own: a close X on the leading edge and the headline after it. `#barHead` draws nothing above
      600px, where the hamburger that opened the drawer is still on screen to close it again.
      The headline is the word the hamburger and the Help page already use for this panel. -->
-<!-- The search is a pane occupant and not a bar control. A 96px navigation rail cannot hold a 300px
-     field, and `#pane` is the search view M3 states at compact width and a side sheet above it.
-     Same three parts as `#bar`: a header that does not scroll, and a body that does. -->
-<div id="findpane" class="paneswap">
-  <div id="findHead">
-    <div class="apptop">
-      <button id="findClose" class="icon" title="Back" aria-label="Back"
-        ><i class="i i-arrow_back"></i></button>
-      <span class="apsp"></span>
-    </div>
-    <div class="apflex"><h2>Go to</h2></div>
-  </div>
-  <div id="findBody" class="scroll">
-    <div id="gotoBox">
-      <input id="goto" type="text" autocomplete="off" placeholder="Go to a station…"
-             role="combobox" aria-expanded="false" aria-controls="gotoHits" aria-autocomplete="list"
-             aria-label="Go to a station">
-      <!-- No `.surface` any more. The list floated over the map before. It sits inside the pane
-           now, so a second background and a second shadow draw a card inside a card. -->
-      <ul id="gotoHits" class="picklist" role="listbox" hidden></ul>
-    </div>
-  </div>
-</div>
 <div id="bar" class="paneswap">
   <!-- M3's side sheet carries a header, so this one does. It draws at both widths now: the drawer
        went unnamed for a long time on the argument that the hamburger which opened it stays on
@@ -1088,6 +1101,35 @@
   </div>
 </div>
 </dialog><!-- /#pane -->
+<!-- **The search has two homes, the same way `#brand` does.** Above 600px it is M3's DOCKED search
+     view: a card that floats over the map's top-left corner, on the same leading edge the legend
+     takes. Below 600px it is a pane occupant, which is M3's full-screen search view at compact
+     width, and js/ui.js moves it into `#pane` there.
+     It is written OUTSIDE the pane, because a closed `<dialog>` is `display: none` and a floating
+     card inside one cannot draw. The desktop case is the one with nothing to open it, so it is the
+     one the markup has to serve.
+     Same three parts either way: a header that does not scroll, and a body that does. -->
+<div id="findpane" class="paneswap">
+  <div id="findHead">
+    <div class="apptop">
+      <button id="findClose" class="icon" title="Back" aria-label="Back"
+        ><i class="i i-arrow_back"></i></button>
+      <span class="apsp"></span>
+    </div>
+    <div class="apflex"><h2>Go to</h2></div>
+  </div>
+  <div id="findBody" class="scroll">
+    <div id="gotoBox">
+      <input id="goto" type="text" autocomplete="off" placeholder="Go to a station…"
+             role="combobox" aria-expanded="false" aria-controls="gotoHits" aria-autocomplete="list"
+             aria-label="Go to a station">
+      <!-- No `.surface` any more. The list floated over the map before. It sits inside the pane
+           now, so a second background and a second shadow draw a card inside a card. -->
+      <ul id="gotoHits" class="picklist" role="listbox" hidden></ul>
+    </div>
+  </div>
+</div>
+
 <!-- Top-right of the map. Polite: assertive would interrupt a screen reader mid-sentence, and
      the alert list behind the app bar's warning glyph carries the same information without a time
      limit. -->

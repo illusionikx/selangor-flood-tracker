@@ -57,9 +57,20 @@ const frame = async w => {
      against an app put back to `show()`. Narrowing a live iframe to reach the app's own call needs
      a layout, and headless virtual time gives neither a reliable `setTimeout` nor an animation
      frame to wait on. */
-  const g = await frame(px - 20), gd = g.contentDocument, behind = gd.getElementById('menu');
-  behind.focus();
-  ok(gd.activeElement !== behind, 'modal: the page behind the block is inert, so it is in the top layer');
+  /* **`#brand .mark`, because it is focusable and it is on screen at this width.** The target was
+     `#menu`, the app bar's hamburger, and that button went into the navigation rail.
+     `getElementById` returned null, `focus()` threw inside the async body, and the page sat on
+     `running…` with nothing failed — which is the one way this check can lie.
+     The rail is `display: none` under 600px, so nothing in it would answer here either: an element
+     that cannot take focus at all passes this assertion for the wrong reason. `.mark` carries
+     `tabindex="0"` now that the status dot is gone (see index.html), and it rides the heading,
+     which the app bar keeps at every phone width. */
+  const g = await frame(px - 20), gd = g.contentDocument,
+        behind = gd.querySelector('#brand .mark');
+  if (!behind) fail.push('modal: no focusable control behind the block to test inertness with');
+  behind?.focus();
+  ok(!!behind && gd.activeElement !== behind,
+     'modal: the page behind the block is inert, so it is in the top layer');
   g.remove();
 
   out.innerHTML = L.join('\n') + '\n\n' +

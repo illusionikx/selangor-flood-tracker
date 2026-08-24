@@ -24,7 +24,7 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `watch.php` | reads a payload on stdin and complains when it is wrong. The poll cron pipes into it. Reports a change of state, never a state |
 | `.user.ini` | per-directory PHP settings. Holds one line, `session.auto_start=0`, and the reason it is there |
 | `index.html` | markup only — no inline CSS or JS |
-| `title-test.html` | `chrome --headless --dump-dom` — one of seven runnable checks. Guards the app bar wordmark ladder, in rendered pixels |
+| `title-test.html` | `chrome --headless --dump-dom` — one of seven runnable checks. Guards the wordmark ladder in both of the heading's homes, the app bar and the navigation rail, in rendered pixels |
 | `narrow-test.html` | `chrome --headless --dump-dom` — one of seven runnable checks. Guards the narrow-window block: its threshold, its coverage, its refusal to be dismissed, and that it is modal |
 | `paint-check.html` | `chrome --headless --dump-dom` — one of seven runnable checks. Guards the on-map paint chooser: that it reads as a control and not as a map pin, that its two layers and the four boxes nested under `Stations` sit where they belong, that each section holds one choice at a time, that it clears the zoom cluster at both widths, and that below 600px its panel is an M3 bottom sheet whose drag handle has a real swipe behind it |
 | `m3-check.html` | `chrome --headless --dump-dom` — one of seven runnable checks. Guards every M3 surface in rendered pixels: the eight dialogs against the roll call and the kind each is declared as, the four-band ladder, the map as an inset card, the one motion that changes what the pane holds, the supporting pane's headers as M3's medium flexible top app bar and the four full-screen dialogs as M3's own full-screen dialog header, the supporting pane at M3's canonical ratios with the map giving up exactly that width, the pane as a side sheet above 600px and a full-screen dialog below it, and each station section as a filled card. Also that every enter carries M3's own duration and easing |
@@ -53,7 +53,7 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `js/toast.js` | desktop-only "new alert since last poll" toast |
 | `js/test.js` | test mode: fakes a flood in the client's copy of the payload |
 | `js/lazy.js` | `lazy()` — loads a deferred module and drives `aria-busy` for its skeleton |
-| `js/net.js` | `load()` poll loop and the status dot on the logo |
+| `js/net.js` | `load()` poll loop and the diagnostics popover on the brand glyph |
 | `js/ui.js` | all DOM wiring: drawer, filters, chips, panels, lightbox, delegated jumps |
 | `js/wall.js` | the camera wall: every camera on one page, one timer for all of them |
 | `js/wx.js` | the MET weather layer: the map mode, the pins, and the half-hour panel. `hereCard()` draws that panel over the reader's own fix, and `carry()` hands a card across a layer switch. Deferred |
@@ -1459,10 +1459,12 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
 - **`#alertBtn`'s `aria-expanded` is synced from `openSide()`/`closeSide()` in map.js**, not from the
   click that opened it. The panel has half a dozen other ways to change what is in it. They are a
   pin, the table, "you are here" and the ×. Every one of them left the button lying.
-- **`#netstats` is a sibling of the `<h1>`, not a child of the dot that opens it.** A `<table>` is
-  flow content and cannot legally sit inside a heading. So the popover is anchored to `header` and
-  revealed by `header:has(h1 .mark:hover)`. There is no combinator that walks back out of the
-  heading to a sibling. The touch path toggles `.open` on `#net`. `#netstats` has to stop its own
+- **`#netstats` is a sibling of the `<h1>`, not a child of the mark that opens it.** A `<table>` is
+  flow content and cannot legally sit inside a heading. So the popover is anchored against the
+  window and revealed by `body:has(#brand .mark:hover)`. There is no combinator that walks back out
+  of the heading to a sibling. The `body` selector, not `header`, is what lets one popover answer
+  for both of the heading's homes — see the entry on that below. The touch path toggles `.open` on
+  `.mark` itself now: there is no separate status dot to carry it. `#netstats` has to stop its own
   clicks (ui.js), because it is no longer inside the element the document handler exempts.
 - **You cannot focus something you are still animating into view.** Two separate traps, both silent,
   and `#gotoBox` hit each in turn. A transitioned `visibility` *interpolates*: at t=0 of
@@ -2217,6 +2219,54 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   reader locked out of a flood map is a reader with no water levels. Weigh that against a map in a
   240px keyhole before moving the number, and move it in `js/config.js` only.
   `narrow-test.html` reads `NARROW_PX` out of the source and guards all three silent faults.
+- **The heading has TWO homes, and a wordmark ladder measured in each.** `#brand` is written into
+  `<header>`, which is where a phone keeps it. Above 600px the navigation rail runs the full height
+  on the leading edge and the app bar is the ticker's strip, so `js/ui.js` moves the node into the
+  rail's brand slot on the breakpoint. A second copy in the markup is a second `<h1>` for a screen
+  reader to read. CSS cannot move a node.
+  The bar draws it at 22px across up to 300px. The rail draws `title-medium` across 56px shut and
+  180px open, because `KV Flood Watch` needs 156px at 22px against the 148 the rail leaves. So the
+  rail carries rungs of its own, at two ids so they beat the bar's whichever way the cascade runs.
+  `title-test.html` reads both homes back in rendered pixels, and it opens the rail for the second
+  ladder.
+  **`container-type: inline-size` contains the box, so it can never take its width from its own
+  content.** `flex: none` in the rail measured 0 and the whole lockup vanished. The phone bar hit
+  the same trap from the other side: the ticker holds a row of its own there, so the heading is
+  alone on line one with nothing to share against, and `flex: 1 1 0` resolved to 4px. Both state a
+  definite `width`. It reads as a missing element rather than as a sizing rule.
+  **`#netstats` does not move.** It is positioned against the window at both widths, and a 236px
+  popover inside a 96px column that clips draws nothing. Its trigger is `body:has(#brand .mark:hover)`,
+  because body is the one ancestor that holds the mark and the popover at either width.
+- **The navigation rail runs the full height and expands.** 96px against 220, with
+  `padding-inline: 20px`, from `NavigationRail/navigation-rail.css`. It starts at `top: 0` and the
+  app bar starts where it ends, which is M3's canonical layout. That is one declaration,
+  `header { left: var(--rail-w) }`, and it answers both widths: below 600px the token is 0.
+  **The indicator moves from `.railpill` to `.railitem`, and that is why the markup needs no second
+  form.** Collapsed, the pill is the indicator and the label sits under it. Expanded, the row is the
+  indicator and the label sits inside it. One DOM, two states, because the paint moves.
+  **`--rail-w` is declared on `:root`, never on `body`.** `--pane` is computed on `:root` and reads
+  `--rail-w` there. A value redefined further down the tree never reaches it. The supporting pane
+  then sizes against a 96px rail while the rail draws 220. `:root:has(body.railopen)` is what lets a
+  body class move a root-level token.
+  `PREFS.railOpen` holds the width. `syncRail()` writes the control from the preference and never
+  the reverse, the rule `syncHeat()` states for every preference-owned control here.
+  **`--m3-rail` is a second NAME for one motion, not a second motion.** It cites the rail's own
+  `easing-standard` and `--m3-travel` cites `easing-emphasized`, and M3's token set gives both
+  `cubic-bezier(0.2, 0, 0, 1)`. `m3-check.html` reads that back off the map card, which transitions
+  `right` for the pane and `left` for the rail.
+- **The search has two homes too, and above 600px it is M3's DOCKED search view.** A card floating
+  over the map's top-left corner, on the legend's own leading edge, with the field as its header and
+  the results under it. `Search/search.css`'s own `border-radius: 28px 28px 4px 4px` on
+  `surface-container-high`. Elevation is `--shadow`, for the reason the four dialogs each decline
+  M3's own. Below 600px it stays a pane occupant, which is M3's full-screen search view.
+  **It is written OUTSIDE `#pane`.** A closed `<dialog>` is `display: none`, and a floating card
+  inside one cannot draw. So the phone is the case that needs the move.
+  Three things follow it. `syncPane()` stops opening the pane for `find` above 600px. The pane's
+  `close` listener stops clearing the `find` class there — it took the card away in the same frame
+  it arrived, and the press read as a button that does nothing. And `#gotoHits` goes in flow: it is
+  `position: absolute; top: 100%` in `css/base.css`, so it contributed nothing to a card that is
+  only as tall as its content. The card stayed 66px and clipped 278px of results, with nothing on
+  screen to say so.
 - **The app bar wordmark has four spellings and the title rail picks one.** So a specificity slip
   draws none of them. `Klang Valley Flood Watch` → `KV Flood Watch` → `KVFW` → the drop alone, at
   282px, 190px and 94px of `header h1`. That is a **container query and not a media query**. The

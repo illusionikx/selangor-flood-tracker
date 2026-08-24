@@ -442,11 +442,25 @@ async function desktop() {
   /* **The map card resizes on a transition, and that is the whole of the pane's arrival on screen.**
      It snapped for one revision, on the argument that animating the width makes Leaflet resize on
      every frame. It does, and that is what keeps live tiles in the card as it grows rather than
-     revealing a blank strip for 300ms. `right` alone: the other three sides never move. */
+     revealing a blank strip for 300ms. `right` for the pane's own arrival, `left` for the rail's:
+     the navigation rail now runs the full height on the leading edge, and the map's own leading
+     inset has to travel with it. `--m3-travel` (pane) and `--m3-rail` (rail) are two NAMES for one
+     motion — M3's own token table gives `easing-emphasized` and `easing-standard` the same curve —
+     so both edges carry the same duration and the same easing. Read as two equal values rather than
+     one, or a rail with its own timing would pass here unnoticed. */
   const mapCs = cs(d.getElementById('map'));
-  is(mapCs.transitionProperty, 'right', 'the map card transitions its trailing edge and nothing else');
-  is(mapCs.transitionDuration, '0.3s', 'on M3 duration-short2, the same travel the pane takes');
-  is(mapCs.transitionTimingFunction, M3_EASE, 'and M3 easing-emphasized, so the two move as one');
+  is(mapCs.transitionProperty, 'right, left',
+     'the map card transitions its trailing edge for the pane and its leading edge for the rail');
+  is(mapCs.transitionDuration, '0.3s, 0.3s', 'one duration on each edge, M3 duration-short2');
+  is(mapCs.transitionTimingFunction, `${M3_EASE}, ${M3_EASE}`,
+     'one easing on each edge — --m3-travel and --m3-rail cite the same M3 curve');
+
+  /* The app bar's own leading edge reads the same rail motion, so it never overlaps the rail as the
+     rail's width changes. Same rule, same file: read before `settle()` switches transitions off. */
+  const headerCsMotion = cs(d.querySelector('header'));
+  is(headerCsMotion.transitionProperty, 'left', 'the app bar itself travels with the rail');
+  is(headerCsMotion.transitionDuration, '0.3s', 'on the rail\'s own --m3-rail duration');
+  is(headerCsMotion.transitionTimingFunction, M3_EASE, 'and the same M3 curve');
 
   // The M3 basic dialog: opacity 0 and scale(.95), duration-extra-short4 (200ms) on easing-standard.
   // It grows in place rather than travelling, which is the within-screen-bounds pattern.
@@ -489,8 +503,9 @@ async function desktop() {
   is(SEAM > 0 && SEAM < GAP, true, 'and the space between the two panes is its own, smaller number');
   /* --- the navigation rail takes the leading edge, and the map gives up exactly that width ---
      `--rail-w` is 96px above 600px and 0 below it, from NavigationRail/navigation-rail.css. The
-     rail is empty in this task. No button has left the app bar for it yet. So this block asserts
-     only the rail's own box and the map's leading edge. */
+     rail runs the full window height now, and the app bar starts where the rail ends rather than
+     the rail starting under the app bar. So this block asserts the rail's own box, the app bar's
+     leading edge, and the map's leading edge. */
   const RAIL = parseFloat(cs(d.documentElement).getPropertyValue('--rail-w'));
   const railEl = d.getElementById('rail');
   is(RAIL, VW > 600 ? 96 : 0, 'the rail is 96px above 600px and takes no width below it');
@@ -500,11 +515,15 @@ async function desktop() {
   is([mb.top - hdr, VH - mb.bottom].map(Math.round).join(','),
      [GAP, GAP].join(','), 'shut, the card still sits one gap in on the top and bottom window edges');
   is(Math.round(VW - mb.right), SEAM, 'and one seam in on the edge that faces the pane');
+  /* `left: var(--rail-w)` is the whole of the app bar's own rule, and it answers both widths. */
+  is(Math.round(r(d.querySelector('header')).left), Math.round(RAIL),
+     'the app bar starts where the rail ends, so it never draws over it');
   if (RAIL) {
     const rb = r(railEl);
     is([rb.left, rb.width].map(Math.round).join(','), '0,96',
        'the rail is flush with the leading edge and 96px wide');
-    is(Math.round(rb.top), Math.round(hdr), 'and it starts under the app bar');
+    is(Math.round(rb.top), 0, 'and it runs the full height, starting at the top of the window');
+    is(Math.round(rb.bottom), Math.round(VH), 'reaching the bottom of the window');
     is(cs(railEl).paddingTop + ' ' + cs(railEl).paddingBottom, '44px 20px',
        'M3 padding-block 44px 20px, from NavigationRail/navigation-rail.css');
     const items = [...railEl.querySelectorAll('.railitem')];
@@ -532,6 +551,34 @@ async function desktop() {
     // a leftover control. A live alert makes `header button` count the tiles too, so the check
     // would fail on the exact case it exists to prove safe: a real flood on screen.
     is([...d.querySelectorAll('header > button')].length, 0, 'and no button at all above 600px');
+    is(!!d.querySelector('.railbrand #brand'), true,
+       'the brand moved into the rail above 600px, out of the app bar');
+
+    /* --- the rail expands and collapses ---
+       `NavigationRail/navigation-rail.css`: 220px open against 96px shut, `padding-inline: 20px`,
+       a 56px leading-aligned item at `border-radius: 28px`, a 56 by 32 pill that gives up its own
+       fill for the whole row. `PREFS.railOpen` holds the state, so the control is pressed here
+       rather than the preference written directly — the rule `syncHeat()` states for every
+       preference-owned control in this app. */
+    const toggle = d.getElementById('railToggle');
+    toggle.click();
+    await settled();
+    is(d.body.classList.contains('railopen'), true, 'the toggle opens the rail');
+    is(toggle.getAttribute('aria-expanded'), 'true', 'and states it for a screen reader');
+    is(parseFloat(cs(d.documentElement).getPropertyValue('--rail-w')), 220,
+       'the rail widens to 220px, NavigationRail/navigation-rail.css');
+    is(Math.round(r(railEl).width), 220, 'and the box itself measures it');
+    is(cs(railEl).paddingLeft, '20px', 'M3 padding-inline 20px on the open rail');
+    is(cs(items[0]).flexDirection, 'row', 'an open item lays its icon and label out in a row');
+    is(Math.round(r(items[0]).height), 56, 'M3 item height 56px, leading aligned');
+    is(cs(items[0]).borderRadius, '28px', 'M3 surface corner 28px, the indicator is the whole row');
+    is(cs(toggle.querySelector('.i')).rotate, '180deg',
+       'the toggle names the direction the next press moves the rail');
+    toggle.click();
+    await settled();
+    is(d.body.classList.contains('railopen'), false, 'and the second press shuts it again');
+    is(parseFloat(cs(d.documentElement).getPropertyValue('--rail-w')), 96,
+       'back to 96px, so nothing after this block inherits an open rail');
 
     /* --- the selected state: the rail lights the item for whatever is on screen --- */
     const active = () => [...railEl.querySelectorAll('[aria-current="page"]')].map(b => b.id);

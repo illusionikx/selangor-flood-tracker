@@ -945,17 +945,59 @@ document.querySelectorAll('.info').forEach(info => info.onclick = e => {
   e.stopPropagation();
   info.classList.toggle('open');
 });
-// The dot is 9px, so on touch it is the mark around it that opens the diagnostics — a 24px target
-// rather than a 9px one, and the dot is a decoration on the mark anyway.
-const netChip = el('net'), netMark = document.querySelector('header h1 .mark');
-netMark.onclick = e => { e.stopPropagation(); netChip.classList.toggle('open'); };
+// There is no separate dot any more — see index.html. The mark itself now carries `tabindex="0"`.
+// It is the same 24px target that opens the diagnostics on a tap, the same shape `.info` uses.
+const netMark = document.querySelector('#brand .mark');
+netMark.onclick = e => { e.stopPropagation(); netMark.classList.toggle('open'); };
 // The popover is no longer inside the thing that opens it (see index.html), so it has to keep its
 // own clicks off the close-everything handler below.
 el('netstats').onclick = e => e.stopPropagation();
 document.addEventListener('click', () => {
-  netChip.classList.remove('open');
+  netMark.classList.remove('open');
   document.querySelectorAll('.info.open').forEach(i => i.classList.remove('open'));
 });
+
+/* --- the navigation rail ------------------------------------------------------------------------
+   **One heading, two homes.** `#brand` is written into `<header>`, which is where a phone keeps it:
+   there is no rail under 600px to put it in. Above that width the rail runs the full height on the
+   leading edge and the bar is the ticker's strip, so the brand belongs in the rail.
+   A second copy in the markup is a second `<h1>` for a screen reader to read, and a CSS move is not
+   a thing CSS can do. So one node moves, on the breakpoint.
+   `#netstats` does NOT move. It is positioned against the window at both widths, and chrome.css
+   carries the two placements. Moving it would put a 236px popover inside a 96px box that clips. */
+{
+  const wide = matchMedia('(min-width: 601px)');
+  const brand = el('brand'), slot = document.querySelector('#rail .railbrand'),
+        bar = document.querySelector('header'), find = el('findpane'), paneEl = el('pane');
+  /* Before the ticker, or the brand lands after it in the bar. `prepend` states that rather than
+     leaving it to whatever the last mover did.
+     **The search moves the other way.** It is written outside the pane, because a closed `<dialog>`
+     is `display: none` and the docked card above 600px cannot draw inside one. So the phone is the
+     case that needs the move, and `#pane` is where it goes. */
+  const place = () => {
+    (wide.matches ? slot : bar).prepend(brand);
+    (wide.matches ? document.body : paneEl).append(find);
+  };
+  place();
+  wide.addEventListener('change', place);
+
+  /* **The width is a preference, because it is a setting and not a state of the data.** It rides
+     the same blob every other setting does, and `syncRail()` writes the control from it rather than
+     the reverse — the rule `syncHeat()` states for every preference-owned control in this app.
+     The class goes on the BODY and the width is read off `:root:has(body.railopen)`. See the
+     comment on that rule for why the token cannot be declared on the body itself. */
+  PREFS.railOpen ??= false;
+  const toggle = el('railToggle');
+  const syncRail = () => {
+    const open = !!PREFS.railOpen;
+    document.body.classList.toggle('railopen', open);
+    toggle.setAttribute('aria-expanded', String(open));
+    toggle.setAttribute('aria-label', open ? 'Collapse the navigation rail'
+                                           : 'Expand the navigation rail');
+  };
+  syncRail();
+  toggle.onclick = () => { PREFS.railOpen = !PREFS.railOpen; save(); syncRail(); };
+}
 
 // --- go to -----------------------------------------------------------------------------------
 // A searchable select (select2-shaped): closed it reads as a plain select; focused it filters a

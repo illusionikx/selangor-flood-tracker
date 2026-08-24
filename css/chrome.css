@@ -31,7 +31,7 @@
          calc(var(--navbar-h) + var(--gap)) calc(var(--rail-w) + var(--gap));
   overflow: hidden;
   border-radius: var(--md-sys-shape-corner-large) var(--md-sys-shape-corner-large) 0 0;
-  transition: right var(--m3-travel);
+  transition: right var(--m3-travel), left var(--m3-rail);
 }
 body:not(.ready) #map { transition: none; }
 @media (prefers-reduced-motion: reduce) { #map { transition: none; } }
@@ -45,6 +45,11 @@ body:not(.ready) #map { transition: none; }
    window on three sides, and below 600px there is no second pane beside it to separate from. */
 @media (min-width: 601px) {
   :root { --gap: 16px; --seam: 8px; --rail-w: 96px; }
+  /* **On `:root`, never on `body`.** `--pane` is computed on `:root` and reads `--rail-w` there. A
+     value redefined further down the tree never reaches it, so the supporting pane would keep
+     sizing itself against a 96px rail while the rail drew 220. `:has()` is what lets a body class
+     move a root-level token. */
+  :root:has(body.railopen) { --rail-w: 220px; }
   #map { border-radius: var(--md-sys-shape-corner-large); }
 }
 /* **No outline on the card, and no `#map::after` to draw one.** It carried an inset 1px `--outline`
@@ -68,10 +73,13 @@ body:not(.ready) #map { transition: none; }
    reason left. `--gap` lines the wordmark glyph up with the map card's own leading edge below it.
    That matches the alignment the trailing edge already kept with the map's right edge. */
 header {
-  position: absolute; z-index: 600; top: 0; left: 0; right: 0; height: var(--hdr);
+  position: absolute; z-index: 600; top: 0; left: var(--rail-w); right: 0; height: var(--hdr);
   display: flex; align-items: center; gap: 12px; padding: 0 var(--gap);
   background: var(--surface);
+  transition: left var(--m3-rail);
 }
+body:not(.ready) header { transition: none; }
+@media (prefers-reduced-motion: reduce) { header { transition: none; } }
 /* The bar is a title, a strip and a cluster of controls, and the strip takes what the other two
    leave. It used to take a share of the viewport instead, first `min(58vw, 656px)` and then a flat
    `50vw`, with both rails on `flex: 1 1 0` so the strip landed on the middle of the bar. That
@@ -89,12 +97,12 @@ header {
 
    `min-width: 0` still lets the rail be squeezed under its own content, which is what steps the
    wordmark down a rung. */
-header h1 {
+#brand {
   display: flex; align-items: center; gap: 8px; flex: 1 1 0; max-width: 300px;
   font-size: 22px; font-weight: 400; letter-spacing: 0; min-width: 0;
   container-type: inline-size;
 }
-header h1 .word { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#brand .word { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* The wordmark shortens before it clips: Klang Valley Flood Watch -> KV Flood Watch -> KVFW -> the
    drop alone. Measured at 22px Roboto, the three spellings are 247, 156 and 59px wide, and the drop
@@ -102,24 +110,24 @@ header h1 .word { overflow: hidden; text-overflow: ellipsis; white-space: nowrap
    still there under all of it, for a rail between two steps. Remeasure the three if the font, the
    size or the words change. */
 /* Every selector here goes through `.word >`, and that is specificity rather than tidiness: the
-   hide rule is one class and three elements, so `header h1 .w-sm` loses to it and nothing draws at
+   hide rule is one class and three elements, so `#brand .w-sm` loses to it and nothing draws at
    all. Two classes beat one class and any number of elements. */
-header h1 .word > span { display: none; }
-header h1 .word > .w-sm { display: inline; }
+#brand .word > span { display: none; }
+#brand .word > .w-sm { display: inline; }
 @container (min-width: 190px) {
-  header h1 .word > .w-sm { display: none; } header h1 .word > .w-md { display: inline; }
+  #brand .word > .w-sm { display: none; } #brand .word > .w-md { display: inline; }
 }
 @container (min-width: 282px) {
-  header h1 .word > .w-md { display: none; } header h1 .word > .w-lg { display: inline; }
+  #brand .word > .w-md { display: none; } #brand .word > .w-lg { display: inline; }
 }
 /* Under the shortest spelling there is nothing left to shorten, so the drop carries the identity on
    its own. The tab title says the rest. */
-@container (max-width: 93px) { header h1 .word { display: none; } }
-header h1 b { font-weight: 500; color: var(--accent); }
-header h1 .brand { font-size: 24px; color: var(--accent); flex: none; }
+@container (max-width: 93px) { #brand .word { display: none; } }
+#brand b { font-weight: 500; color: var(--accent); }
+#brand .brand { font-size: 24px; color: var(--accent); flex: none; }
 /* Just the glyph's own box, so the status dot has a corner to hang off. `cursor: help` and the hover
    target are on the mark rather than the whole h1: the wordmark is a title, not a control. */
-header h1 .mark { position: relative; display: flex; flex: none; cursor: help; }
+#brand .mark { position: relative; display: flex; flex: none; cursor: help; }
 
 /* --- navigation rail ---------------------------------------------------------------------------
    M3's collapsed rail: 96px wide, `padding-block: 44px 20px`, on the surface tone. It stands under
@@ -127,13 +135,85 @@ header h1 .mark { position: relative; display: flex; flex: none; cursor: help; }
    **No divider on the edge facing the map.** This app separates surfaces by space, and `--gap` is
    already the seam between the two. The app bar and the pane each lost the same rule. */
 #rail {
-  position: absolute; z-index: 600; top: var(--hdr); bottom: 0; left: 0;
+  position: absolute; z-index: 600; top: 0; bottom: 0; left: 0;
   box-sizing: border-box; width: var(--rail-w);
-  display: flex; flex-direction: column; overflow-y: auto; scrollbar-width: none;
+  display: flex; flex-direction: column; overflow: hidden;
   padding-block: 44px 20px;
   background: var(--md-sys-color-surface);
+  transition: width var(--m3-rail);
 }
+body:not(.ready) #rail { transition: none; }
 @media (max-width: 600px) { #rail { display: none; } }
+/* **The rail runs the FULL height now, so the bar starts beside it rather than over it.** It stood
+   under the app bar before, which put the brand in the bar and the rail below it. M3's canonical
+   layout puts the rail on the leading edge of the window and every other pane to its right.
+   **`overflow: hidden` is M3's own, and it replaced `overflow-y: auto`.** A collapsed rail clips a
+   label mid-word while the width travels, and a scrollbar down a 96px column is worse than the clip.
+   The items box scrolls instead, which is where M3 puts the scroll.
+
+   --- the expanded variant ---
+   220px against 96, with `padding-inline: 20px`, from the same file. `--rail-w` carries both, so
+   every box that steps aside for the rail follows with no rule of its own. The map's leading inset,
+   the app bar's leading edge and `--pane` all read it.
+   **The width is declared on `:root`, never on `body`.** `--pane` is computed on `:root` and reads
+   `--rail-w` there. A value redefined further down the tree never reaches it, so the supporting
+   pane would keep sizing against a 96px rail. `:root:has()` is what lets a body class move a
+   root-level token. */
+#rail .railmenu {
+  display: flex; flex-shrink: 0; align-items: center; justify-content: center; height: 56px;
+}
+#rail .railbrand {
+  display: flex; flex-shrink: 0; align-items: center; justify-content: center;
+  min-height: 56px; margin-block-start: 4px;
+}
+/* **The brand is smaller in the rail than in the bar, and the ladder is measured twice for it.**
+   The app bar draws it at 22px across up to 300px of rail. This column has 180px between its own
+   padding, and `KV Flood Watch` needs 156 of those at 22px against the 148 that are left once the
+   drop and its gap are out. So the rail draws `title-medium` instead, which is the size a brand
+   lockup takes in navigation, and the whole spelling fits.
+   The ladder still measures. It is the same three spellings chosen by the width of the box they sit
+   in, and the thresholds below are that box's numbers rather than the bar's. Two homes, two
+   measurements, and `title-test.html` reads both back in rendered pixels. */
+/* **A definite `width`, never `flex: none`.** `container-type: inline-size` puts inline-size
+   containment on this box, and a contained box cannot take its width from its own content. So
+   `flex: none` measured 0 and the whole lockup vanished. That is the trap `header h1`'s own comment
+   already states from the other side, and it reads as a missing element rather than as a sizing
+   rule. 56px is the width every indicator pill in this rail takes, so the drop stands in the same
+   column as the glyphs under it. 180 is the 220px rail less its own 20px of inline padding. */
+#rail #brand {
+  flex: none; width: 56px; max-width: none;
+  font-size: var(--md-sys-typescale-title-medium-size);
+  font-weight: var(--md-sys-typescale-title-medium-weight);
+}
+body.railopen #rail #brand { width: 180px; }
+#rail #brand .brand { font-size: 22px; }
+/* **The rail's own rungs, measured in this rail at this size.** Two ids, so they beat the bar's
+   one-id rules above whichever way the cascade runs. The bar draws 22px text across up to 300px and
+   these numbers are neither of those.
+   Measured at `title-medium` 16px: the three spellings are 181, 113 and 43px wide, and the drop
+   with its gap adds 30. So each rung is the width it needs plus 2px of slack. Remeasure all three
+   if the font, the size or the words change — `title-test.html` reads them back in rendered pixels.
+   The container is 56px collapsed and 180px expanded, so `KV Flood Watch` is what an open rail
+   draws and the shared hide rule below 93px is what a shut one draws. */
+@container (min-width: 75px) {
+  #rail #brand .word > .w-sm { display: inline; }
+}
+@container (min-width: 145px) {
+  #rail #brand .word > .w-sm { display: none; } #rail #brand .word > .w-md { display: inline; }
+}
+@container (min-width: 213px) {
+  #rail #brand .word > .w-md { display: none; } #rail #brand .word > .w-lg { display: inline; }
+}
+/* M3 turns the menu glyph to name the direction the press moves the rail. One mark, two states, and
+   nothing for JS to keep in step. */
+#rail #railToggle .i { transition: rotate var(--m3-rail); }
+body.railopen #rail #railToggle .i { rotate: 180deg; }
+/* M3's items box. `flex: 1` is what puts the theme button on the bottom edge, and `margin-block-start`
+   is the 40px the spec states between the brand slot and the first item. */
+#rail .railitems {
+  display: flex; flex: 1; flex-direction: column; gap: 4px;
+  margin-block-start: 40px; overflow-y: auto; scrollbar-width: none;
+}
 
 /* One item, from NavigationRail/navigation-rail.css: `min-height: 64px`, a 24px icon, a
    `title-small` label, and a 56 by 32 indicator pill. The pill is `.railpill` rather than a third
@@ -146,7 +226,7 @@ header h1 .mark { position: relative; display: flex; flex: none; cursor: help; }
   color: var(--md-sys-color-on-surface-variant);
   transition: color var(--md-sys-motion-duration-short2) var(--md-sys-motion-easing-standard);
 }
-#rail .railitem + .railitem { margin-top: 4px; }
+
 #rail .railpill {
   position: relative; display: grid; place-items: center;
   width: 56px; height: 32px; border-radius: 16px;
@@ -176,8 +256,33 @@ header h1 .mark { position: relative; display: flex; flex: none; cursor: help; }
   width: 56px; height: 1px; margin: 12px auto; border: 0;
   background: var(--md-sys-color-outline-variant);
 }
-#rail .railsp { flex: 1; }
 #rail #railApps { margin: 0 auto; flex: none; }
+/* --- the rail, expanded ---
+   Every number is NavigationRail/navigation-rail.css's own. The item goes from a 64px column to a
+   56px row, the label moves inside the indicator, and the indicator goes from a 56 by 32 pill over
+   the glyph to the whole row at a 28px radius.
+   **The indicator moves from `.railpill` to `.railitem`, and that is why the markup needs no
+   change.** Collapsed, the pill is the indicator and the label sits under it, outside. Expanded,
+   the row is the indicator and the label sits inside it. One DOM, two states, because the paint
+   moves rather than the elements. */
+body.railopen #rail { padding-inline: 20px; }
+body.railopen #rail .railmenu, body.railopen #rail .railbrand { justify-content: flex-start; }
+body.railopen #rail .railitems { gap: 0; }
+body.railopen #rail .railitem {
+  flex-direction: row; justify-content: flex-start; gap: 8px;
+  min-height: 56px; padding-inline: 16px; border-radius: 28px;
+}
+body.railopen #rail .railpill { width: 24px; height: 24px; background: none; }
+body.railopen #rail .railitem[aria-current="page"] {
+  background: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+}
+body.railopen #rail .railitem[aria-current="page"] .railpill { background: none; }
+body.railopen #rail hr { width: auto; }
+body.railopen #rail #railApps { margin-inline: 0; }
+/* The badge rides the glyph rather than the pill's corner here: the pill is the glyph's own box at
+   this width, so the old `right: 6px` put the count over the label. */
+body.railopen #rail .railbadge { top: -6px; right: -6px; }
 @media (prefers-reduced-motion: reduce) {
   #rail .railitem, #rail .railpill { transition: none; }
 }
@@ -1148,30 +1253,22 @@ table.data .dash { color: var(--outline); }
   #camBox #camCount { padding: 10px 12px; }   /* follows the grid's own inset in */
 }
 
-/* --- live status dot + its popover ---------------------------------------------------------- */
+/* --- the diagnostics popover ------------------------------------------------------------------ */
 
-/* On the mark's bottom-right corner, the way a presence dot rides an avatar. It was a pill with the
-   state written in it, parked in .hactions; the bar could not carry that, a ticker and six controls
-   at once, and of the three the state is the one that fits in a colour. The word is still in the
-   popover. The ring is the surface colour, so the dot reads as sitting *on* the glyph rather than
-   being part of it whichever theme is on. */
-#net {
-  position: absolute; right: -3px; bottom: -1px; width: 9px; height: 9px; border-radius: 50%;
-  background: var(--c, var(--muted)); box-shadow: 0 0 0 2px var(--surface);
-  transition: background .3s;
-}
-/* Broadcast halo pushing outwards — reads as "receiving". Deliberately restrained: this sits in a
-   64px bar next to a ticker that moves, and two competing motions in one bar is a bar you stop
-   reading. It ends at 1.6× rather than 2× and takes 2.6s over 1.8 — a slow pulse, not a ping. */
-#net::after {
-  content: ''; position: absolute; inset: -2.5px; border-radius: 50%;
-  border: 1.5px solid var(--c); opacity: .7; animation: halo-soft 2.6s ease-out infinite;
-}
-@media (prefers-reduced-motion: reduce) { #net::after { animation: none; opacity: .7; } }
+/* **There is no status dot any more. Only the glyph stays.** A coloured dot once sat on the mark's
+   bottom-right corner. It was the one always-visible sign that the feed was alive. The rail above
+   600px left no room for it. The repository owner accepted the cost: nothing on screen reports a
+   stale poll at a glance any more. The diagnostics stay one hover away, on the glyph itself.
+   `tabindex="0"` moved onto `.mark` in index.html, so a keyboard reader still reaches this popover.
+   js/net.js paints no colour at all now. The word it used to carry still leads the `status` row in
+   the table below. */
 
-/* Anchored to the header (which is the positioned ancestor) rather than to the dot, because a
-   <table> cannot live inside the <h1> the dot is in. Left edge of the bar rather than under the
-   glyph: one number that survives the phone layout changing the mark's position. */
+/* Anchored to the window rather than to the mark, because a `<table>` cannot live inside the `<h1>`
+   the mark is in, and because the heading has two homes now — the app bar on a phone and the rail
+   above 600px. One fixed box answers both, and js/ui.js moves only the heading.
+   The desktop numbers sum the rail's own three: 44px of block padding, a 56px menu slot and the 4px
+   above the brand slot. Stated here because the rail states them there, and `m3-check.html` reads
+   the popover against the mark rather than against this literal. */
 #netstats {
   position: absolute; z-index: 601; top: calc(var(--hdr) + 8px); left: 12px; width: 236px;
   padding: 14px 16px; border-radius: 12px; opacity: 0; visibility: hidden;
@@ -1180,11 +1277,16 @@ table.data .dash { color: var(--outline); }
   border-collapse: separate; border-spacing: 0;
   font-size: 12px; font-weight: 400; color: var(--on-surface);
 }
-/* `:has` because the trigger is inside the <h1> and the popover is its sibling — there is no
-   combinator that walks back out. `.open` is for touch, where there is no hover to reveal it. */
-header:has(h1 .mark:hover) #netstats,
-header:has(h1 .mark:focus-within) #netstats,
-header:has(#net.open) #netstats { opacity: 1; visibility: visible; }
+/* `:has` on the BODY, because the trigger and the popover are not in one box: the mark moves into
+   the rail above 600px and the popover stays where it is. Body is the one ancestor that holds both
+   at either width. `.open` is for touch, where there is no hover to reveal it. */
+body:has(#brand .mark:hover) #netstats,
+body:has(#brand .mark:focus-within) #netstats,
+body:has(#brand .mark.open) #netstats { opacity: 1; visibility: visible; }
+@media (min-width: 601px) {
+  #netstats { top: 104px; left: calc(var(--rail-w) + 8px); transition: opacity .12s ease,
+              visibility .12s, left var(--m3-rail); }
+}
 #netstats .note td { padding-top: 10px; line-height: 1.45; font-size: 11px; }
 
 /* --- drawer --------------------------------------------------------------------------------- */
@@ -1226,6 +1328,66 @@ body.side #bar { display: none; }
 /* The same shape, for the search. */
 #findpane { display: none; }
 body.find #findpane { display: flex; flex-direction: column; }
+/* --- the search, docked over the map -------------------------------------------------------------
+   **Above 600px this is M3's DOCKED search view and not a pane occupant.** Transcribed from the
+   component set's `Search/search.css`: `border-radius: 28px 28px 4px 4px`, a raised card on
+   `surface-container-high`, and a 56px header row above the results.
+   The full corner leads and the small one closes, which is the shape that says the results belong
+   to the field above them rather than to a card of their own.
+   **Elevation is `--shadow`, not M3's `elevation-5`.** This app holds one elevation and every
+   floating surface in it takes that one — the four dialogs each decline M3's own for the same
+   reason. A second shadow five percent off the first is a value invented outside `css/base.css`.
+   **It leads on the legend's own edge**, `12px + --gap + --rail-w`, so the two boxes over the map
+   share one leading line. `left` rides `--m3-rail`, so the card travels with the rail rather than
+   jumping when the rail opens.
+   The pane's own header is gone here. A docked search view has no back arrow — that belongs to the
+   full-screen variant, which is what this surface still is below 600px. The ways out are Escape and
+   a click away, and both were already wired. */
+@media (min-width: 601px) {
+  body.find #findpane {
+    position: fixed; z-index: 610; inset: auto;
+    top: calc(var(--hdr) + var(--gap) + 12px);
+    left: calc(12px + var(--gap) + var(--rail-w));
+    width: 360px;
+    max-width: calc(100vw - var(--rail-w) - var(--pane-w) - var(--seam) - var(--gap) - 24px);
+    max-height: calc(100dvh - var(--hdr) - var(--gap) - 36px);
+    border-radius: 28px 28px 4px 4px;
+    background: var(--md-sys-color-surface-container-high);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+    transition: opacity var(--m3-swap), translate var(--m3-swap), left var(--m3-rail);
+  }
+  /* A docked view has no header row of its own: the field IS the header. */
+  #findpane #findHead { display: none; }
+  /* **`flex: none`, so the card grows with its results.** The body is a pane occupant's scroller
+     everywhere else, and `flex: 1` in a card with no height of its own gave it a 20px box and a
+     scrollbar down the side of two rows. A docked view is sized by what it holds, capped so a long
+     list cannot run off the bottom of the window. */
+  #findpane #findBody {
+    display: block; flex: none; padding: 0; max-height: 60vh; overflow-y: auto;
+  }
+  /* base.css draws an `expand_more` caret through `#gotoBox::after`, which is the affordance for a
+     field that opens a list under itself inside a pane. This card IS that list, so the caret points
+     at nothing. */
+  #findpane #gotoBox::after { display: none; }
+  /* **In flow, and that is the whole of why the card would not grow.** base.css floats this list
+     under the field with `position: absolute; top: 100%`, which is right for a field inside a pane
+     that has its own height. A docked view IS the list, so an out-of-flow one contributed nothing
+     to the card, the card stayed 66px tall, and `overflow: hidden` clipped 278px of results.
+     Nothing errored and the field looked right, so only a measurement finds it.
+     The border and the radius go with it: the card already draws both. */
+  #findpane #gotoHits {
+    position: static; margin: 0; border: 0; border-radius: 0; max-height: none;
+  }
+  /* M3's search field: 56px, no border, transparent over the card's own tone, `body-large`. */
+  #findpane #goto {
+    height: 56px; box-sizing: border-box; width: 100%;
+    padding-inline: 16px; border: 0; border-radius: 0; background: none;
+    font-size: var(--md-sys-typescale-body-large-size);
+    line-height: var(--md-sys-typescale-body-large-line-height);
+  }
+  #findpane #goto:focus { outline: none; }
+}
 /* The same tie-break, for the search against the other two. A body class can still set `find`
    beside `drawer` or `side` directly, and this container draws one occupant only. */
 body:is(.drawer, .side) #findpane { display: none; }
@@ -2533,6 +2695,13 @@ body.side #side { display: flex; }
   :root { --hdr: 85px; }
   header { gap: 4px; flex-wrap: wrap; align-content: flex-start; padding: 6px 8px 0 4px; }
   header > :not(#ticker) { order: 0; }
+  /* **A definite width, never a zero basis with grow.** `container-type: inline-size` contains this
+     box, and a contained box cannot take its width from its own content. In the wide bar it shares
+     a line with the ticker and the flex algorithm hands it a share, which is a definite number and
+     works. Here the ticker takes a row of its own, so the heading is alone on line one with nothing
+     to share against, and it measured 4px — the lockup vanished and the bar looked empty.
+     The rail states the same rule from its own side. */
+  #brand { flex: none; width: 100%; max-width: none; }
   /* Tighter controls so the mark, the chip and four buttons fit one line at 360px with room over. */
   header .icon { width: 36px; height: 36px; font-size: 20px; }
   /* The ticker holds a row of its own here, so the two rails share line one between them. They keep

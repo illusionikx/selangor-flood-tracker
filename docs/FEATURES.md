@@ -13098,3 +13098,128 @@ Two of its older assertions had to move rather than be deleted. A disabled butto
 `pointer-events: none` rather than a cursor change. The layer note is one line under a group rather
 than two notes at two right edges. So the check reads which note is visible instead of measuring an
 edge.
+
+## The rail took the brand, learned to expand, and the bar became the ticker's strip
+
+Five changes the repository owner asked for on 2026-08-24, and four of them are one layout.
+
+### The filters item draws a funnel
+
+`#railFilters` drew `i-menu`, the hamburger. That glyph names a navigation drawer holding a list of
+destinations, which is what the button was when it sat in the app bar. The pane holds the district
+picker, the ignored list and the favorites now. So the button names a filter and draws one.
+
+`--i-filter_alt` came into `css/icons.css` by the refetch that file's own header states.
+
+### The rail runs the full height and holds the brand
+
+It stood under the app bar, which put the brand in the bar and the rail below it. M3's canonical
+layout puts the rail on the leading edge of the window and every other pane to its right.
+
+So the rail starts at `top: 0`, and the app bar starts where the rail ends. That is one declaration, `left: var(--rail-w)`, and it answers both widths. Below 600px the token is
+0 and the supporting pane is a destination over the map. So the bar spans the map alone.
+
+**One heading, two homes.** `#brand` is written into `<header>`, which is where a phone keeps it. A phone has no rail. Above 600px `js/ui.js` moves the node into the rail's brand slot. A second copy
+in the markup is a second `<h1>` for a screen reader to read. CSS cannot move a node.
+
+`#netstats` does not move. It is positioned against the window at both widths. A 236px popover inside a 96px column that clips draws nothing.
+
+### The status dot is gone
+
+A coloured dot once sat on the mark's corner. It was the one always-visible sign that the feed was
+alive. The rail above 600px left no room for it, so the repository owner accepted the cost: nothing
+on screen reports a stale poll at a glance any more.
+
+`#net` is deleted, from the markup, from `css/chrome.css`, and from `js/net.js`. `tabindex="0"`
+moved onto `.mark` itself, so a keyboard reader still reaches the diagnostics, and a tap still
+toggles `.open` for touch. `js/net.js` paints no colour any more. The word it used to carry — live,
+stale, cached, offline, test mode — still leads the `status` row in `#netstats`, one hover away on
+the glyph. `halo-soft`, the keyframe the dot's pulse used, is gone with it. `halo` stays: the danger
+pin still pings on it.
+
+### The rail expands
+
+96px against 220, with `padding-inline: 20px`, from `NavigationRail/navigation-rail.css`. The item goes from a 64px column to a 56px row. The label moves inside the indicator. The indicator
+goes from a 56 by 32 pill over the glyph to the whole row at a 28px radius.
+
+**The indicator moves from `.railpill` to `.railitem`, and that is why the markup needs no change.**
+Collapsed, the pill is the indicator and the label sits under it, outside. Expanded, the row is the
+indicator and the label sits inside it. One DOM, two states, because the paint moves.
+
+`PREFS.railOpen` holds the width, because it is a setting. `syncRail()` writes the control from the
+preference and never the reverse, which is the rule `syncHeat()` states for every preference-owned
+control here.
+
+**The token is declared on `:root`, never on `body`.** `--pane` is computed on `:root` and reads
+`--rail-w` there. A value redefined further down the tree never reaches it. The supporting pane then sizes against a
+96px rail while the rail draws 220. `:root:has(body.railopen)` is what
+lets a body class move a root-level token.
+
+### Two sizing traps, both the same one
+
+**`container-type: inline-size` contains a box, and a contained box cannot take its width from its
+own content.** `#rail #brand { flex: none }` measured 0 and the whole lockup vanished. The same trap took the phone bar. The ticker holds a row of its own there. So the heading is alone on line one with nothing to share
+against, and `flex: 1 1 0` resolved to 4px. Both take a definite
+`width` now.
+
+`header h1`'s own comment already stated this from the other side. It reads as a missing element
+rather than as a sizing rule, which is why it cost two rounds.
+
+### The wordmark ladder is measured twice
+
+The bar draws it at 22px across up to 300px. The rail has 180px between its own padding. `KV Flood Watch` needs 156 of those at 22px, against the
+148 that are left once the drop and its gap are out. So the rail draws `title-medium` and the whole spelling fits.
+
+Two homes, two sets of thresholds, each measured. The rail's rungs carry two ids so they beat the
+bar's whichever way the cascade runs.
+
+`title-test.html` reads both homes back in rendered pixels, and it opens the rail to read the second
+ladder. Two of its own faults were fixed on the way. It measured `header h1`, which returns null
+above 600px now, so it threw inside its async body and sat on `running…` with nothing failed. And every iframe shares one `localStorage`, so the rail preference leaked between widths. It presses
+the real control now rather than rewriting the blob. `PREFS` is read into memory once per frame.
+
+### The search is M3's docked search view
+
+Above 600px it is a card floating over the map's top-left corner, on the legend's own leading edge.
+`Search/search.css`'s own numbers: `border-radius: 28px 28px 4px 4px` on `surface-container-high`,
+with the field as the header and the results under it. Elevation is `--shadow`, this app's one
+elevation, for the reason the four dialogs each decline M3's own.
+
+Below 600px it stays a pane occupant, which is M3's full-screen search view at compact width.
+
+It is written outside `#pane`, because a closed `<dialog>` is `display: none` and a floating card
+inside one cannot draw. The phone is the case that needs the move.
+
+Three things had to follow it. `syncPane()` stops opening the pane for `find` above 600px. The pane's `close` listener stops clearing the `find` class there. It took the card away in the same
+frame it arrived, and the press read as a button that does nothing. And `#gotoHits` goes in flow. It is `position: absolute; top: 100%` in base.css, which is right for a
+field inside a pane that has its own height. It contributed nothing to a card that is only as tall as
+its content. The card stayed
+66px and clipped 278px of results, with nothing on screen to say so.
+
+### The ticker spans the two panes
+
+It always sat in the app bar, and the bar was full width. The bar starts after the rail now, so the
+strip spans the map and the supporting pane and never draws over the rail. Below 600px the rail is
+gone and the token is 0, so it spans the map.
+
+### What the checks caught
+
+`m3-check.html` held four stale assertions, all of them the rail change. The map card transitions two
+edges now rather than one. The rail starts at the top of the window rather than under the bar.
+Its easing assertion also proved a claim in `css/base.css` wrong. `--m3-rail` cites the rail's own
+`easing-standard` and `--m3-travel` cites `easing-emphasized`, and M3's token set gives both
+`cubic-bezier(0.2, 0, 0, 1)`. It is a second name for one motion, not a second motion.
+
+The four fixed assertions read two comma-joined values now, one per edge, rather than one. A rail
+with its own timing on `left` would have passed the old, single-value form unnoticed. The app bar's
+own `left` motion gets the same two-part check, and the rail block gains four new assertions: the
+brand landed in `.railbrand`, the app bar starts exactly where the rail ends, and a real press of
+`#railToggle` widens the rail to 220px, lays its items out in a row at 56px, and rotates the toggle
+glyph — then shuts it again, so nothing later in the file inherits an open rail.
+
+`narrow-test.html` was already broken at `HEAD`, before any of this. It focuses a control behind the
+block to prove the page is inert. It named `#menu`, the app bar hamburger the rail replaced. It threw
+on null and sat on `running…`. It named `#net` next, the status dot — correct at the time, because
+the dot still carried the only `tabindex="0"` on that heading. The dot is deleted now. `tabindex="0"`
+moved onto `.mark` itself, so the check follows it there: `#brand .mark`. That control rides the
+heading, which the bar keeps at every phone width.

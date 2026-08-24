@@ -1,8 +1,15 @@
-<!-- The app bar wordmark shortens rather than ellipsises, and the rungs are container queries against
+<!-- The wordmark shortens rather than ellipsises, and the rungs are container queries against
      measured font widths. Two ways that fails silently. A threshold that is too low draws a spelling
-     wider than its rail, which clips. A selector that loses on specificity draws nothing, which
-     looks exactly like the bottom rung. This loads the app at fifteen widths and reads the rungs
-     back. See `header h1` in css/chrome.css.
+     wider than its box, which clips. A selector that loses on specificity draws nothing, which
+     looks exactly like the bottom rung.
+
+     **The heading has TWO homes now, and it is measured in both.** Below 600px it sits in the app
+     bar, at 22px across up to 300px of rail. Above it the navigation rail holds it, at
+     `title-medium` across 56px shut and 180px open. Three different boxes and two font sizes, so
+     the ladder is measured rather than assumed. See `#brand` and `#rail #brand` in css/chrome.css.
+
+     **Nothing is hard-coded about the drop.** The mark's own width and the heading's own `gap` are
+     read back, so a change to either fails here rather than on somebody's screen.
 
      chrome --headless=new --dump-dom title-test.html -->
 <title>Wordmark ladder</title>
@@ -12,9 +19,37 @@
 const W = [1600, 1400, 1280, 1200, 1100, 1000, 900, 800, 700, 601, 600, 480, 414, 360, 320];
 const RUNG = { 'w-lg': 3, 'w-md': 2, 'w-sm': 1 };          // taller number, longer spelling
 const rows = [], fail = [];
-let last = 4;                                              // nothing above the longest spelling
+
+/* One reading of the lockup, wherever it is. `box` is the container the query measures, `need` is
+   what the drawn spelling actually asks for: its own width, the mark beside it and the gap between
+   the two, all read back rather than stated here. */
+function read(d, win) {
+  const h = d.getElementById('brand');
+  if (!h) return { err: 'no #brand in the document' };
+  const shown = s => win.getComputedStyle(s).display !== 'none';
+  const word = h.querySelector('.word'), mark = h.querySelector('.mark');
+  const on = [...word.children].filter(shown);
+  const rung = shown(word) && on.length === 1 ? RUNG[on[0].className] : 0;
+  const gap = parseFloat(win.getComputedStyle(h).gap) || 0;
+  return {
+    home: h.closest('#rail') ? 'rail' : h.closest('header') ? 'bar' : '???',
+    box: h.clientWidth, rung, count: shown(word) ? on.length : 0,
+    txt: rung ? on[0].textContent : '(logo)',
+    need: rung ? on[0].getBoundingClientRect().width + mark.getBoundingClientRect().width + gap : 0,
+  };
+}
+
+const check = (label, r) => {
+  if (r.err) return fail.push(`${label}: ${r.err}`);
+  rows.push(`${label.padEnd(20)} ${r.home.padEnd(5)} box ${String(r.box).padStart(4)}px  ${r.txt}`);
+  if (r.count > 1) fail.push(`${label}: ${r.count} spellings drawn at once`);
+  if (r.rung && r.need > r.box + 1)
+    fail.push(`${label}: "${r.txt}" wants ${r.need.toFixed(0)}px of a ${r.box}px box`);
+  return r;
+};
 
 (async () => {
+  let last = 4;                                            // nothing above the longest spelling
   for (const w of W) {
     const f = document.createElement('iframe');
     f.style.cssText = `width:${w}px;height:800px;border:0;position:absolute;left:-9999px`;
@@ -22,24 +57,54 @@ let last = 4;                                              // nothing above the 
     document.body.append(f);
     await new Promise(r => f.addEventListener('load', r, { once: true }));
     await new Promise(r => setTimeout(r, 700));            // the map settles, the bar reflows
+    const d = f.contentDocument, win = f.contentWindow;
+    /* **Every iframe shares one `localStorage`, so the rail's preference leaks between widths.** The
+       second frame LANDS with whatever the first left, and a shut-rail assertion then reads an open
+       one. It failed on every other width, which reads as a flapping check rather than as shared
+       state.
+       **Press the control, never rewrite the blob.** `PREFS` is read into memory once per frame, so
+       a later write to storage leaves the module holding the old value and the next press flips
+       away from the state the check just set. Driving the real control is the only thing that keeps
+       the two in step, and it is the path a reader takes. */
+    const railShut = () => {
+      if (d.body.classList.contains('railopen')) d.getElementById('railToggle').click();
+    };
+    railShut();
+    await new Promise(r2 => setTimeout(r2, 60));
+    /* Motion off before anything is measured. The rail transitions its own width, and headless
+       virtual time does not run a transition faithfully — it freezes it at the start value, which
+       reads as a rail that never opened. Every check in this repo states the same rule. */
+    d.head.insertAdjacentHTML('beforeend', '<style>*{transition:none !important}</style>');
 
-    const d = f.contentDocument, win = f.contentWindow, shown = s => win.getComputedStyle(s).display !== 'none';
-    const rail = d.querySelector('header h1').clientWidth;
-    const word = d.querySelector('header h1 .word');
-    const on = [...word.children].filter(shown);
-    const rung = shown(word) && on.length === 1 ? RUNG[on[0].className] : 0;
-    const txt = rung ? on[0].textContent : '(logo)';
-    const need = rung ? on[0].getBoundingClientRect().width + 32 : 0;   // the drop and its gap
-    rows.push(`${String(w).padStart(4)}px  rail ${String(rail).padStart(4)}px  ${txt}`);
+    const wide = w > 600;
+    const r = check(`${w}px${wide ? ' shut' : ''}`, read(d, win));
+    if (r && !r.err) {
+      /* The heading belongs to the layout that has room for it. A phone has no rail to put it in,
+         and above 600px the app bar is the ticker's strip. */
+      const want = wide ? 'rail' : 'bar';
+      if (r.home !== want) fail.push(`${w}px: the heading is in the ${r.home}, not the ${want}`);
+      /* A shut rail is 96px of column and the lockup is the drop alone. A word there sits beside a
+         24px glyph in a box narrower than either item under it. */
+      if (wide && r.rung) fail.push(`${w}px: a shut rail drew "${r.txt}" rather than the drop alone`);
+      /* Only the phone layout may widen its box as the viewport narrows, so it restarts the ladder.
+         The 601/600 step changes the home as well, so it restarts there too. */
+      if (!wide && w !== 600 && r.rung > last) fail.push(`${w}px: a narrower box drew a LONGER spelling`);
+      if (!wide) last = r.rung;
+    }
 
-    if (shown(word) && on.length !== 1) fail.push(`${w}px: ${on.length} spellings drawn at once`);
-    if (rung && need > rail + 1) fail.push(`${w}px: "${txt}" wants ${need.toFixed(0)}px of a ${rail}px rail`);
-    // Only the phone layout may widen the rail as the viewport narrows, so it restarts the ladder.
-    if (w !== 600 && rung > last) fail.push(`${w}px: a narrower rail drew a LONGER spelling`);
-    last = rung;
+    /* The open rail is the desktop's own ladder, and it is the half a reader actually reads. */
+    if (wide) {
+      d.getElementById('railToggle').click();
+      await new Promise(r2 => setTimeout(r2, 120));
+      const o = check(`${w}px open`, read(d, win));
+      if (o && !o.err) {
+        if (!o.rung) fail.push(`${w}px: an open rail drew no spelling at all`);
+        if (o.box <= r.box) fail.push(`${w}px: opening the rail did not widen the heading's box`);
+      }
+    }
     f.remove();
   }
   out.innerHTML = rows.join('\n') + '\n\n' +
     (fail.length ? `<b class="f">FAIL</b>\n` + fail.join('\n') : '<b>PASS</b>');
-})();
+})().catch(e => { out.innerHTML = `<b class="f">THREW</b>\n${(e && e.stack) || e}`; });
 </script>
