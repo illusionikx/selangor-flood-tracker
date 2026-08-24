@@ -74,8 +74,8 @@
      Before `base.css`, which derives `--m3-travel`, `--m3-grow` and `--m3-swap` from them and
      bridges M3's colour names onto this app's palette. Colour is not in this file on purpose. -->
 <link rel="stylesheet" href="vendor/m3/tokens.css?v=1">
-<link rel="stylesheet" href="css/base.css?v=174">
-<link rel="stylesheet" href="css/chrome.css?v=254">
+<link rel="stylesheet" href="css/base.css?v=175">
+<link rel="stylesheet" href="css/chrome.css?v=256">
 <link rel="stylesheet" href="css/map.css?v=159">
 
 <!-- Water tint for the dark basemap. CARTO's dark_all is greyscale — all 18 of its tones have zero
@@ -253,16 +253,14 @@
     <button class="link" id="splashRetry"><i class="i i-refresh"></i> Try again</button>
   </div>
 </div>
-<!-- **The strip over the two panes.** The rail runs the full height on the leading edge now, so
-     this bar starts where the rail ends and never draws over it. Below 600px `--rail-w` is 0 and the
-     supporting pane is a destination over the map, so it spans the map alone. That is one
-     declaration, `left: var(--rail-w)`, and it answers both widths.
+<!-- **The app bar, below 600px only.** Above that the rail runs the full height and nothing stands
+     above the two panes, so this element does not draw at all there.
+     **It holds the brand glyph, centred, and nothing else yet.** The repository owner asked for that
+     on 2026-08-24 as the start of a new phone design. The news left this element for a pill inside
+     the map, so there is nothing here to share the row with.
      **`#brand` lives here in the markup and moves into the rail above 600px.** One heading, two
-     homes, and js/ui.js moves it on the breakpoint. A phone has no rail to put it in, and a second
-     copy is a second `<h1>` for a screen reader to read.
-     **`#netstats` does not move.** It is a `<table>`. A `<table>` cannot live inside the `<h1>`
-     that holds the mark. It stays positioned against the window at both widths — see
-     css/chrome.css. -->
+     homes, and js/ui.js moves it on the breakpoint. A second copy is a second `<h1>` for a screen
+     reader to read. -->
 <header>
   <!-- The wordmark shortens rather than ellipsises. Three spellings, one shown at a time, chosen by
        the width of the title rail itself — see `#brand` in css/chrome.css. Only one is ever in
@@ -279,15 +277,18 @@
         ><i class="glyph brand i i-flood"></i></span><span class="word"
       ><span class="w-md">KV <b>Flood Watch</b></span
   ></span></h1>
-  <!-- Live alert ticker. `aria-hidden`: the same stations are in the alert panel as a real list, so
-       a screen reader gets them there rather than as an endlessly repeating strip. -->
-  <div id="ticker" aria-hidden="true"><div class="tk-run"></div></div>
-</header>
+  </header>
+<!-- **The news, as a long pill inside the map card.** It was a strip inside `<header>`, across the
+     whole window above both panes. It is furniture on the map now, at both widths, and it is its own
+     element rather than a child of the bar: above 600px there is no bar at all, and below it the bar
+     holds the brand instead.
+     `aria-hidden`: the same stations are in the alert panel as a real list, so a screen reader gets
+     them there rather than as an endlessly repeating strip. -->
+<div id="ticker" aria-hidden="true"><div class="tk-run"></div></div>
 <!-- Outside the <h1>, because a <table> is flow content and cannot legally live inside a heading.
-     Outside <header> too, since 2026-08-24: that element is a 40px pill inside the map card above
-     600px, and a 236px popover cannot be positioned from one. It is fixed against the window now
-     and adds `--rail-w` itself. The mark that opens it lives in the rail at that width, so the
-     popover stands beside the rail rather than beside the news. -->
+     Outside <header> too: it is fixed against the window and adds `--rail-w` itself. The mark that
+     opens it lives in the rail above 600px, so the popover stands beside the rail there, and under
+     the app bar below it. -->
 <table id="netstats" class="surface"></table>
 <!-- M3's navigation rail, collapsed variant. Every number comes from
      https://github.com/bczak/m3you/blob/development/src/components/NavigationRail/navigation-rail.css

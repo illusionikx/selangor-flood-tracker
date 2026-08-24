@@ -128,11 +128,14 @@
   /* Header height, and everything that hangs beneath it. One number because the header grows to two
      lines on a phone (the ticker wraps under the buttons) and the map, drawer, search box and alert
      panel all have to follow it down — they were six hard-coded 64/76/124/128s before. */
-  /* **Nothing stands above the panes, at either width.** This was 64px of app bar, and 85 on a
-     phone. The ticker is a pill inside the map now and the brand rides it, so there is no strip
-     left. The token stays because four rules read it and each is correct with a zero.
-     `0px` and never `0`: every reader is a `calc()`, where a unitless zero is a parse error. */
-  --hdr: 0px;
+  /* **The app bar's height, and it exists on a phone alone.** Above 600px the rail runs the full
+     height and nothing stands above the two panes, so `--hdr` is `0px` there. Below it the bar is
+     back, holding the brand glyph and nothing else yet. It was 85px in two rows once, the brand on
+     one and the news on the other, and the news lives in a pill on the map now.
+     64px is M3's own small top app bar.
+     `0px` and never `0` in the override: every reader is a `calc()`, where a unitless zero is a
+     parse error. */
+  --hdr: 64px;
   /* The news pill's own height. */
   --tick-h: 40px;
   /* **The top of the map's free furniture area**: inside the card, and clear of the pill. Four

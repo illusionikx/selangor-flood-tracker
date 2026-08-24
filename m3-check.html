@@ -288,6 +288,39 @@ async function phone() {
      asserts the opposite shape. */
   is(pane.contains(d.getElementById('findpane')), true,
      'phone: the search sits inside the pane, because a 96px rail cannot hold a 300px field');
+
+  /* --- the phone app bar, and the card corner under it ---
+     Asked for on 2026-08-24 as the start of a new phone design. The bar came back above the map,
+     holding the brand glyph centred and nothing else yet. The news stayed on the map as a pill.
+     **The map keeps its own corner here, and that only works because the bar is above it.** A 16px
+     radius on a full-bleed box notches the two screen corners and shows the page through them. With
+     a bar over the top edge, those corners sit against the bar's own surface instead.
+     **Assert the brand's CENTRE against the window's**, never a left edge. The bar centres one item
+     with `justify-content`, so a box that grew would still be centred and a left-edge literal would
+     read that as a fault. */
+  const phoneBar = d.querySelector('header'), phoneMap = d.getElementById('map');
+  is(cs(phoneBar).display !== 'none', true, 'phone: the app bar draws above the map');
+  is(Math.round(r(phoneBar).height),
+     parseFloat(cs(d.documentElement).getPropertyValue('--hdr')), 'phone: --hdr tall');
+  is([Math.round(r(phoneBar).top), Math.round(r(phoneBar).left),
+      Math.round(VW - r(phoneBar).right)].join(','), '0,0,0',
+     'phone: spanning the window from its very top');
+  const phoneBrand = r(d.getElementById('brand'));
+  is(Math.abs((phoneBrand.left + phoneBrand.right) / 2 - VW / 2) <= 1, true,
+     'phone: with the brand glyph on the centre line');
+  is(d.getElementById('brand').closest('header') !== null, true,
+     'phone: and the brand is in the bar, not the rail and not the news pill');
+  is(Math.round(r(phoneMap).top), Math.round(r(phoneBar).bottom),
+     'phone: the map starts where the bar ends');
+  is(parseFloat(cs(phoneMap).borderTopLeftRadius) > 0, true,
+     'phone: and keeps its own top corner, which only reads against a bar above it');
+  is(cs(phoneMap).borderBottomLeftRadius, '0px',
+     'phone: the bottom corner stays square, because that edge IS the screen edge');
+  const phonePill = r(d.getElementById('ticker'));
+  is(phonePill.top >= r(phoneMap).top, true, 'phone: the news pill sits inside the map, not above it');
+  is([Math.round(phonePill.left - r(phoneMap).left),
+      Math.round(r(phoneMap).right - phonePill.right)].join(','), '12,12',
+     'phone: on the same 12px furniture inset the desktop card uses');
   for (const [id, cls, name] of [['bar', 'drawer', 'filters'], ['side', 'side', 'station panel'],
                                  ['findpane', 'find', 'search']]) {
     d.body.classList.add(cls);
@@ -466,7 +499,7 @@ async function desktop() {
 
   /* The app bar's own leading edge reads the same rail motion, so it never overlaps the rail as the
      rail's width changes. Same rule, same file: read before `settle()` switches transitions off. */
-  const headerCsMotion = cs(d.querySelector('header'));
+  const headerCsMotion = cs(d.getElementById('ticker'));
   is(headerCsMotion.transitionProperty, 'left, right',
      'the news pill travels with the rail on one edge and with the pane on the other');
   is(headerCsMotion.transitionDuration, '0.3s, 0.3s',
@@ -543,7 +576,7 @@ async function desktop() {
      **The trailing inset is `--seam` and never `--gap`.** A box measuring from the card's trailing
      edge measures across the space between the two panes. This shipped with both terms for one
      measurement, and the pill stopped 28px short of the card against 12px on the leading side. */
-  const pill = r(d.querySelector('header')), card = r(d.getElementById('map'));
+  const pill = r(d.getElementById('ticker')), card = r(d.getElementById('map'));
   is(Math.round(hdr), 0, 'no strip stands above the panes');
   is(Math.round(card.top), GAP, 'so the map card starts one gap from the top of the window');
   /* The pane is SHUT here, so its box measures nothing. `getComputedStyle` still answers for a
@@ -554,9 +587,9 @@ async function desktop() {
   is(pill.top > card.top && pill.bottom < card.bottom, true, 'and inside it top to bottom');
   is(Math.round(pill.height),
      parseFloat(cs(d.documentElement).getPropertyValue('--tick-h')), '--tick-h tall');
-  is(parseFloat(cs(d.querySelector('header')).borderTopLeftRadius) >= pill.height / 2, true,
+  is(parseFloat(cs(d.getElementById('ticker')).borderTopLeftRadius) >= pill.height / 2, true,
      'drawn as a pill, not a card');
-  is(cs(d.querySelector('header')).boxShadow !== 'none', true,
+  is(cs(d.getElementById('ticker')).boxShadow !== 'none', true,
      'and lifted off the map it floats on');
   /* Everything else at the top of the map clears it, through `--top-free`. Two of these are hidden
      until something puts them there, so each is measured only when it draws. */
@@ -885,7 +918,9 @@ async function desktop() {
      invisible until somebody measures the container. */
   is(cs(mapBox).borderWidth, '0px', 'no border on the card');
   is(w.getComputedStyle(mapBox, '::after').content, 'none', 'and no pseudo-element drawing one');
-  is(cs(d.querySelector('header')).borderBottomWidth, '0px', 'no rule under the app bar');
+  /* Above 600px there is no app bar at all: the rail runs the full height and nothing stands over
+     the two panes. A drawn one would be a 64px band of surface holding nothing. */
+  is(cs(d.querySelector('header')).display, 'none', 'and no app bar above the panes at this width');
   /* The furniture rides the card. Leaflet's own controls are inside the container and get it free;
      these three are siblings of `#map` and each has to add the card's own inset to its offset.
      **Which inset depends on the edge.** A box measuring from the trailing edge measures across the
@@ -1161,7 +1196,7 @@ async function desktop() {
   is(Math.round(fb.top),
      Math.round(parseFloat(cs(d.documentElement).getPropertyValue('--tick-h')) + GAP + 12 + 8),
      'it clears the news pill, M3 docked search');
-  is(fb.top >= r(d.querySelector('header')).bottom - 0.5, true, 'measured against the pill itself');
+  is(fb.top >= r(d.getElementById('ticker')).bottom - 0.5, true, 'measured against the pill itself');
   is(Math.round(fb.left), Math.round(12 + GAP + RAIL), 'and past the rail, on the leading edge');
   const pr = r(pane2);
   const overlaps = fb.left < pr.right && fb.right > pr.left && fb.top < pr.bottom && fb.bottom > pr.top;
@@ -1418,7 +1453,7 @@ async function bands() {
        Read every visible box in the bottom strip and intersect them pairwise. A box with no size is
        skipped rather than counted, since `#pills` and `#toast` are absent unless something puts
        them there. */
-    const FURNITURE = ['header', '#legend', '#paint', '#locate', '#credit', '#pills', '#toast',
+    const FURNITURE = ['#ticker', '#legend', '#paint', '#locate', '#credit', '#pills', '#toast',
                        '.leaflet-control-zoom', '.leaflet-control-scale'];
     const boxes = FURNITURE.map(sel => [sel, d.querySelector(sel)])
       .filter(([, e]) => e && r(e).width > 1 && r(e).height > 1)

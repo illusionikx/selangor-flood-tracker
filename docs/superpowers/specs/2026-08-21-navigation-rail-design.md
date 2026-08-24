@@ -568,3 +568,30 @@ written on the body never reaches `--map-r` declared above it: the trailing inse
 permanent 0 and the card kept 16px with the pane open beside it. `:root:has(body…)` is what lets a
 body class move a root-level token. `--rail-w` states the same rule from its own side, and this is
 the second time this app has paid for it.
+
+## 18. The phone app bar comes back, holding the glyph alone
+
+The repository owner asked for this on 2026-08-24, as the start of a new phone design. It reverses
+the phone half of section 17 and keeps the rest.
+
+**`--hdr` is 64px below 600px and `0px` above it.** 64 is M3's own small top app bar. Above 600px the
+rail runs the full height and nothing stands over the two panes, so `<header>` does not draw there at
+all. A drawn one is a 64px band of surface holding nothing.
+
+**The bar holds the brand glyph, centred, and nothing else yet.** `justify-content: center` on
+`header` is what centres it. The brand is 32px of mark, which is under the 93px where the shared
+ladder draws the drop alone, so the wordmark needs no rule of its own here.
+
+**The news stayed on the map.** `#ticker` is the pill itself now, and it left `<header>` in the
+markup. Above 600px there is no bar to be a child of, and below it the bar holds the brand instead.
+Every rule that made it a flex item is gone with the row it shared: `flex: 1 1 0`, `min-width: 0`, a
+16px trailing margin off a row of buttons, and a 30px height inside a taller bar.
+
+**The map keeps its own top corner on a phone, and that only reads because the bar is above it.** A
+16px radius on a full-bleed box notches the two screen corners and shows the page through them. With
+a bar over the top edge, those corners sit against the bar's own surface. The bottom corner stays
+square, because that edge IS the screen edge.
+
+**The checks moved with the element.** Every desktop assertion that named `header` names `#ticker`
+now, in `m3-check.html` and in `paint-check.html`'s overlap sweep alike. Ten new assertions cover the
+phone bar, the centred glyph and the card corner under it.
