@@ -405,3 +405,31 @@ toggle reading as a deliberate pick. A resolved value IS the pick again.
 **Task 6 loses its stated plan for Help and About.** The plan put those two rows back into
 `#appMenu` below 600px. That element no longer exists, so the navigation bar needs a home of its own
 for them.
+
+## 12. One column, one size
+
+Every glyph in the rail stands on one leading edge and draws at one size, at both rail widths.
+Three did not, and the repository owner named it on 2026-08-24.
+
+**Two faults.** The menu button and the theme button take `.icon`, which draws 22px against M3's
+24px for a rail glyph. And an open rail leads an item with `padding-inline: 16px`, while those two
+buttons and the brand mark each started on the rail's own 20px padding edge. Measured: items at
+left 36, and 29, 20 and 29 for the three.
+
+**M3's own reference leaves that offset.** `NavigationRail/navigation-rail.css` starts the menu
+button on the padding edge and pads an item 16px inside it, so that file draws two columns. A reader
+sees one column with three glyphs out of it, and reads it as a fault.
+
+A 40px button centres a 24px glyph, so 8px of the 16px lead is the button's own box. The rule states
+that arithmetic as a `calc()` rather than the 8 it comes to.
+
+**The brand's own box gives up the lead it now carries.** It was 180px, the 220px rail less its own
+20px of inline padding. It is 164px, because `.railbrand` leads with 16px more and the rail clips.
+
+**The mark went to 24px and both wordmark thresholds moved 2px with it.** The drop and its gap add
+32 rather than 30. Neither move changes what draws: the only real box is 164px, which clears 147 and
+never reaches 215.
+
+**`m3-check.html` asserts the property, never the 36 and the 24.** A rail at another padding, or an
+icon at another size, still has to draw one column. A pair of literals passes a rail that moved every
+glyph together and fails one that moved none.

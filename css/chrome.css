@@ -110,10 +110,10 @@ body:not(.ready) header { transition: none; }
    there under both of them, for a rail between the two steps. Remeasure both if the font, the size
    or the words change.
    **There were three spellings, and `KVFW` is gone.** Every box `#brand` can ever occupy is fixed
-   now — 56px collapsed rail, 180px expanded rail, ~viewport phone bar — never a value that varies
-   continuously the way a shared header row once did. `KVFW`'s own thresholds sat at 75 to 145px in
-   the rail and 190 to 282px in the bar, and no real box ever lands there: the collapsed rail is
-   56px, under even the rail's own 75px floor, and the expanded rail is a fixed 180px, past it. A
+   now — a 164px expanded rail and a ~viewport phone bar, and a collapsed rail draws no heading at
+   all — never a value that varies continuously the way a shared header row once did. `KVFW`'s own
+   thresholds sat at 75 to 147px in the rail and 190 to 282px in the bar, and no real box ever lands
+   there: the expanded rail is a fixed 164px, past the top of that range. A
    spelling with no box to draw it in is a span, a rule and a threshold that all state a fact about
    nothing, so `title-test.html`'s own reachability check is what caught it — see that file's
    comment for the three rungs that do exist and where each one draws. */
@@ -222,23 +222,48 @@ body:not(.ready) #rail { transition: none; }
   font-size: var(--md-sys-typescale-title-medium-size);
   font-weight: var(--md-sys-typescale-title-medium-weight);
 }
-body.railopen #rail #brand { width: 180px; }
-#rail #brand .brand { font-size: 22px; }
+/* **164, not 180.** It was the 220px rail less its own 20px of inline padding. `.railbrand` now
+   leads with 16px more, to put the mark on the item glyph column, and this box gives that up rather
+   than overflow a rail that clips. The rungs below are unchanged by it: `.w-md` needs 145 and
+   `.w-lg` needs 213, so 164 draws the same spelling 180 did. */
+body.railopen #rail #brand { width: 164px; }
+/* **24px, the same as every other glyph in this column.** `.brand` is the MARK, not the wordmark:
+   the word takes `title-medium` from `#rail #brand` above. The mark was 22px, sized to pair with a
+   16px word, and it then stood one size under the six glyphs beneath it on the same column. A
+   lockup that pairs internally and disagrees with its neighbours is the fault a reader sees. */
+#rail #brand .brand { font-size: 24px; }
 /* **The rail's own rungs, measured in this rail at this size.** Two ids, so they beat the bar's
    one-id rules above whichever way the cascade runs. The bar draws 22px text across up to 300px and
    these numbers are neither of those.
    Measured at `title-medium` 16px: the two spellings are 181 and 113px wide, and the drop with its
-   gap adds 30. So each rung is the width it needs plus 2px of slack. Remeasure both if the font,
+   gap adds 32. So each rung is the width it needs plus 2px of slack. Remeasure both if the font,
    the size or the words change — `title-test.html` reads them back in rendered pixels.
-   The container is 56px collapsed and 180px expanded, so `KV Flood Watch` is what an open rail
-   always draws — 180 never reaches the 213px `.w-lg` needs — and the shared hide rule below 93px
-   is what a shut one draws. */
-@container (min-width: 145px) {
+   **The drop was 30 and is 32**, because the mark went to 24px to stand in the same column as the
+   six glyphs under it. Both thresholds moved 2px with it. Neither move changes what draws: the only
+   real box is 164px, which clears 147 and never reaches 215.
+   The container is 164px expanded, and a shut rail draws no heading at all. */
+@container (min-width: 147px) {
   #rail #brand .word > .w-md { display: inline; }
 }
-@container (min-width: 213px) {
+@container (min-width: 215px) {
   #rail #brand .word > .w-md { display: none; } #rail #brand .word > .w-lg { display: inline; }
 }
+/* **Every glyph in this rail stands on one column, and three of them did not.**
+   Two faults, measured against the item glyphs at 24px and 36px from the window.
+   The menu button and the theme button are `.icon`, which draws 22px. Every other glyph in this
+   rail is M3's 24px. So the top and the bottom of the column read a size smaller than the middle.
+   And an open rail leads an item with `padding-inline: 16px`. Those two buttons and the brand mark
+   each started at the rail's own 20px padding edge instead, 16px short of that. Measured: items at
+   left 36, and 29, 20 and 29 for the three.
+   **M3's own reference leaves that offset.** `NavigationRail/navigation-rail.css` starts the menu
+   button on the padding edge and pads an item 16px inside it, so that file draws two columns. A
+   reader sees one column with three glyphs out of it, which reads as a fault rather than as a spec.
+   The repository owner named it on 2026-08-24.
+   A 40px button centres a 24px glyph, so 8px of the lead is the button's own box. The calc states
+   that arithmetic rather than the 8 it comes to. */
+#rail #railToggle .i, #rail #railApps .i { font-size: 24px; }
+body.railopen #rail .railmenu { margin-inline-start: calc(16px - (40px - 24px) / 2); }
+body.railopen #rail .railbrand { padding-inline-start: 16px; }
 /* M3 turns the menu glyph to name the direction the press moves the rail. One mark, two states, and
    nothing for JS to keep in step. */
 #rail #railToggle .i { transition: rotate var(--m3-rail); }
@@ -334,7 +359,7 @@ body.railopen #rail .railitem[aria-current="page"] {
 }
 body.railopen #rail .railitem[aria-current="page"] .railpill { background: none; }
 body.railopen #rail hr { width: auto; }
-body.railopen #rail #railApps { margin-inline: 0; }
+body.railopen #rail #railApps { margin-inline: calc(16px - (40px - 24px) / 2) 0; }
 /* The badge rides the glyph rather than the pill's corner here: the pill is the glyph's own box at
    this width, so the old `right: 6px` put the count over the label. */
 body.railopen #rail .railbadge { top: -6px; right: -6px; }

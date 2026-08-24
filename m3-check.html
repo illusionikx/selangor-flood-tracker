@@ -595,6 +595,26 @@ async function desktop() {
        Asked for on 2026-08-24. The brand, the divider, Help and About draw at 220px alone. Every
        one of these is a `display: none` on a node that stays in the document, so `querySelector`
        still finds all four and only a computed style tells them apart. */
+    /* --- one column, one size ---
+       Every glyph in this rail stands on one leading edge and draws at one size, at both widths.
+       Three did not. The menu button and the theme button take `.icon`, which draws 22px against
+       M3's 24px for a rail glyph. And an open rail leads an item with `padding-inline: 16px`, while
+       those two buttons and the brand mark each started on the rail's own 20px padding edge.
+       Measured before the fix: items at left 36, and 29, 20 and 29 for the three.
+       **Assert the property, never the 36 and the 24.** A rail at another padding, or an icon at
+       another size, still has to draw one column. A pair of literals here passes a rail that moved
+       every glyph together and fails one that moved none. */
+    const oneColumn = label => {
+      const g = [...railEl.querySelectorAll('.i')]
+        .filter(i => i.getClientRects().length).map(i => i.getBoundingClientRect());
+      is(g.length >= 5, true, label + ': there are glyphs to measure, or the two below prove nothing');
+      is(new Set(g.map(b => Math.round(b.left))).size, 1,
+         label + ': every glyph stands on one leading edge');
+      is(new Set(g.map(b => Math.round(b.width) + 'x' + Math.round(b.height))).size, 1,
+         label + ': and every one of them draws at one size');
+    };
+    oneColumn('shut rail');
+
     const shutHidden = ['.railbrand', 'hr', '#railHelp', '#railAbout'];
     for (const sel of shutHidden)
       is(cs(railEl.querySelector(sel)).display, 'none',
@@ -669,6 +689,7 @@ async function desktop() {
     for (const sel of shutHidden)
       is(cs(railEl.querySelector(sel)).display !== 'none', true,
          'open rail: ' + sel + ' draws again');
+    oneColumn('open rail');
     is(Math.round(r(fabEl).height), 56, 'the open rail keeps the FAB 56px tall, M3 extended FAB');
     is(r(fabEl).width > 56, true, 'and lets it grow along the rail');
     is(r(fabEl.querySelector('.fablab')).width > 0, true, 'the label arrives with the width');

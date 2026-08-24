@@ -5,7 +5,7 @@
 
      **The heading has TWO homes now, and it is measured in both.** Below 600px it sits in the app
      bar, at 22px across up to 300px of rail. Above it the navigation rail holds it at
-     `title-medium` across 180px, and a SHUT rail draws no heading at all. Two boxes and two font
+     `title-medium` across 164px, and a SHUT rail draws no heading at all. Two boxes and two font
      sizes, so the ladder is measured rather than assumed. See `#brand` and `#rail #brand` in
      css/chrome.css.
 
@@ -159,7 +159,7 @@ const check = (label, r) => {
      is gone rather than disclosed as unreachable. Three rungs are real, each tied to a fixed box:
 
        rail, shut       --   nothing at all: a collapsed rail carries destinations and no brand
-       rail, open    180px   always `.w-md` -- past 145px, short of the 213px `.w-lg` needs
+       rail, open    164px   always `.w-md` -- past 147px, short of the 215px `.w-lg` needs
        phone bar   ~viewport steps `.w-md` to `.w-lg` across the 306/307px crossing
 
      The per-width checks above already fail the moment any one reading breaks its own row of that
