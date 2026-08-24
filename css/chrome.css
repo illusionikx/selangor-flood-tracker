@@ -62,9 +62,14 @@ body:not(.ready) #map { transition: none; }
    under the app bar already separates the two. A line inside that gap is the same seam stated twice.
    This app separates surfaces by space wherever it can — see `--gap` on `#map` — and a divider is
    what it reaches for only when two surfaces touch. */
+/* **Both edges take `--gap` now.** The leading edge took 8px before this task. That was the
+   hamburger button's own inset. A button needs a touch target, and the bare glyph beside it does
+   not. The `<h1>` leads the bar now, with no button in front of it. So the asymmetry has no
+   reason left. `--gap` lines the wordmark glyph up with the map card's own leading edge below it.
+   That matches the alignment the trailing edge already kept with the map's right edge. */
 header {
   position: absolute; z-index: 600; top: 0; left: 0; right: 0; height: var(--hdr);
-  display: flex; align-items: center; gap: 12px; padding: 0 16px 0 8px;
+  display: flex; align-items: center; gap: 12px; padding: 0 var(--gap);
   background: var(--surface);
 }
 /* The bar is a title, a strip and a cluster of controls, and the strip takes what the other two
@@ -115,14 +120,6 @@ header h1 .brand { font-size: 24px; color: var(--accent); flex: none; }
 /* Just the glyph's own box, so the status dot has a corner to hang off. `cursor: help` and the hover
    target are on the mark rather than the whole h1: the wordmark is a title, not a control. */
 header h1 .mark { position: relative; display: flex; flex: none; cursor: help; }
-/* Everything that is not the menu or the mark, kept together. `flex: 0 0 auto` — the controls are
-   worth exactly what they measure, and the strip beside them takes the rest. This was `flex: 1 1 0`
-   while the bar centred the strip on the viewport, which gave the controls a rail far wider than
-   they needed and put a void beside them. `justify-content: flex-end` no longer has slack to act on
-   and stays as the guard for a rail that somehow gets one. */
-header .hactions {
-  display: flex; align-items: center; justify-content: flex-end; gap: 4px; flex: 0 0 auto;
-}
 
 /* --- navigation rail ---------------------------------------------------------------------------
    M3's collapsed rail: 96px wide, `padding-block: 44px 20px`, on the surface tone. It stands under
@@ -137,6 +134,53 @@ header .hactions {
   background: var(--md-sys-color-surface);
 }
 @media (max-width: 600px) { #rail { display: none; } }
+
+/* One item, from NavigationRail/navigation-rail.css: `min-height: 64px`, a 24px icon, a
+   `title-small` label, and a 56 by 32 indicator pill. The pill is `.railpill` rather than a third
+   absolutely positioned element, because this app has one glyph per item and no state layer to
+   stack under it. */
+#rail .railitem {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 4px; width: 100%; min-height: 64px; padding: 0;
+  border: 0; background: none; cursor: pointer;
+  color: var(--md-sys-color-on-surface-variant);
+  transition: color var(--md-sys-motion-duration-short2) var(--md-sys-motion-easing-standard);
+}
+#rail .railitem + .railitem { margin-top: 4px; }
+#rail .railpill {
+  position: relative; display: grid; place-items: center;
+  width: 56px; height: 32px; border-radius: 16px;
+  transition: background-color var(--md-sys-motion-duration-short2)
+              var(--md-sys-motion-easing-standard);
+}
+#rail .railitem .i { font-size: 24px; }
+#rail .raillabel {
+  font-size: var(--md-sys-typescale-title-small-size);
+  line-height: var(--md-sys-typescale-title-small-line-height);
+  font-weight: var(--md-sys-typescale-title-small-weight);
+}
+#rail .railitem:hover { color: var(--md-sys-color-on-surface); }
+#rail .railitem:focus-visible {
+  outline: 2px solid var(--md-sys-color-primary); outline-offset: 2px;
+  border-radius: var(--md-sys-shape-corner-medium);
+}
+/* The count rides the corner of the pill, the way the app bar badge rode the button. `:empty`
+   removes it, because a zero-width pill still draws its own background. */
+#rail .railbadge {
+  position: absolute; top: -2px; right: 6px; min-width: 16px; padding: 0 4px;
+  font-size: 10px; font-weight: 500; line-height: 16px; text-align: center;
+  color: var(--surface); background: var(--c, var(--muted)); border-radius: 999px;
+}
+#rail .railbadge:empty { display: none; }
+#rail hr {
+  width: 56px; height: 1px; margin: 12px auto; border: 0;
+  background: var(--md-sys-color-outline-variant);
+}
+#rail .railsp { flex: 1; }
+#rail #railApps { margin: 0 auto; flex: none; }
+@media (prefers-reduced-motion: reduce) {
+  #rail .railitem, #rail .railpill { transition: none; }
+}
 
 /* --- alert ticker ----------------------------------------------------------------------------- */
 
@@ -1820,23 +1864,10 @@ body.side #side { display: flex; }
 #toast .tmore { margin: 6px 0 6px 2px; font-size: 11px; }
 #toast .trow:last-child { margin-bottom: 6px; }
 
-/* --- alert list (its button in the app bar; the list itself is in #side) ---------------------- */
+/* --- alert list (its button is the rail's Alerts item; the list itself is in #side) ------------ */
 
-/* The glyph takes the status ramp, so the button is the signal whether or not the list is open —
-   grey when nothing, then amber / orange / red as it gets worse (see alerts.js for the steps). */
-#alertBtn { position: relative; color: var(--c, var(--muted)); }
-/* Count on the corner, as a badge rather than beside the glyph: it has to fit a 40px control, and a
-   two-digit number next to a 22px icon is a control the bar has no room for. `:empty` covers the
-   all-clear — the grey glyph already says it, and a "0" is a number worth reading that isn't. */
-#alertBtn .abadge {
-  position: absolute; top: 1px; right: 0; min-width: 16px; height: 16px; padding: 0 4px;
-  /* Ink is the surface, not white: the status ramp is lighter on the dark theme (see the palette in
-     base.css), and white on a pale amber is the one combination this badge can't survive. */
-  border-radius: 999px; background: var(--c); color: var(--surface);
-  font: 500 10px/16px Roboto, sans-serif; font-style: normal;
-  box-shadow: 0 0 0 2px var(--surface);
-}
-#alertBtn .abadge:empty { display: none; }
+/* The button's own color and count moved to the rail item — see `#rail .railbadge` above, and
+   `alerts.js` for the steps. This section keeps only what the list itself still needs. */
 /* The four counts — at danger, sounding, rising, not current — under the list's title. Icons rather
    than words: all four at once is exactly when the list matters most, and that is when words wrap. */
 .tally { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
@@ -2498,8 +2529,9 @@ body.side #side { display: flex; }
   header .icon { width: 36px; height: 36px; font-size: 20px; }
   /* The ticker holds a row of its own here, so the two rails share line one between them. They keep
      the `flex` the wide layout gives them, and `justify-content: flex-end` still holds the controls
-     against the right edge — no auto margin, the same reason as up there. */
-  header .hactions { gap: 0; }
+     against the right edge — no auto margin, the same reason as up there.
+     `header .hactions { gap: 0 }` stood here and is gone with the group it styled. The app bar
+     carries no phone-width control of its own until Task 6 adds one. */
   #ticker {
     order: 1; flex: 1 0 100%; max-width: none; justify-content: flex-start;
     /* Margin above the rule separates the strip from the buttons; inside it, no padding at all —

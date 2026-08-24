@@ -413,7 +413,7 @@ export function closeSide() {
 /* The app bar's warning glyph is a disclosure for one particular occupant of this panel, and the
    panel has half a dozen other ways to change what is in it — a pin, the table, "you are here", the
    × — so the button's state is synced from here rather than from the click that opened it. */
-const syncAlertBtn = () => el('alertBtn').setAttribute('aria-expanded', side.key === '@alerts');
+const syncAlertBtn = () => el('railAlerts').setAttribute('aria-expanded', side.key === '@alerts');
 
 el('sideClose').onclick = closeSide;
 /* Deliberately **no** `map.on('click', closeSide)`. A popup had to close that way because it was

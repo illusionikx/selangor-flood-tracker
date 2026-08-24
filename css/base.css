@@ -600,7 +600,7 @@ dialog:focus, dialog:focus-visible { outline: none; }
   background: none; border: 0; border-radius: 50%; color: var(--muted);
   font-size: 22px;
 }
-.icon:hover, body.drawer #menu { background: var(--hover); }
+.icon:hover { background: var(--hover); }
 
 /* --- a map control ------------------------------------------------------------------------------
    The layers button, and the shape for anything else that joins the map's own furniture. It is the

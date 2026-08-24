@@ -284,9 +284,12 @@ export function alerts() {
      reason: it is a demand for attention, and stations we can no longer read are not one. The
      breakdown that used to sit under the tab is in the panel head instead, where there is width for
      it; the button carries the colour and the number, which is all a 40px control can say. */
-  const btn = el('alertBtn');
+  /* The rail item holds a pill, a glyph, a badge and a label. So this writes the count into the
+     badge alone. Writing `innerHTML` on the button takes the label and the pill with it, and the
+     item then draws as a bare number under nothing. */
+  const btn = el('railAlerts');
   btn.style.setProperty('--c', c);
-  btn.innerHTML = `<i class="i i-warning"></i><b class="abadge">${live.length || ''}</b>`;
+  btn.querySelector('.railbadge').textContent = live.length || '';
   const what = live.length ? `${live.length} station${live.length > 1 ? 's' : ''} on alert`
                            : 'On alert — all clear';
   btn.title = what;

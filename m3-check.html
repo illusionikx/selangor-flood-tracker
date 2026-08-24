@@ -507,6 +507,31 @@ async function desktop() {
     is(Math.round(rb.top), Math.round(hdr), 'and it starts under the app bar');
     is(cs(railEl).paddingTop + ' ' + cs(railEl).paddingBottom, '44px 20px',
        'M3 padding-block 44px 20px, from NavigationRail/navigation-rail.css');
+    const items = [...railEl.querySelectorAll('.railitem')];
+    is(items.map(b => b.id).join(','),
+       'railFilters,railAlerts,railFind,railTable,railCams,railHelp,railAbout',
+       'seven rail items, in the order the spec states');
+    const first = items[0];
+    is(Math.round(r(first).height), 64, 'M3 item min-height 64px');
+    is(cs(first.querySelector('.i')).fontSize, '24px', 'M3 icon 24px');
+    is(cs(first.querySelector('.raillabel')).fontSize,
+       cs(d.documentElement).getPropertyValue('--md-sys-typescale-title-small-size').trim(),
+       'M3 label title-small');
+    const pill = r(items[0].querySelector('.railpill'));
+    is([pill.width, pill.height].map(Math.round).join(','), '56,32',
+       'M3 active indicator 56 by 32');
+    is(!!railEl.querySelector('hr'), true,
+       'a divider separates the five destinations from Help and About');
+    is(railEl.querySelector('hr').previousElementSibling.id, 'railCams',
+       'and it sits after Cameras');
+    is(railEl.lastElementChild.id, 'railApps', 'the theme button is the last thing in the rail');
+    is(!!d.querySelector('header .hactions'), false,
+       'the app bar carries no control group any more');
+    // `header > button` counts only a direct child of the bar, never a descendant.
+    // The ticker holds its own buttons, one per tile in the marquee. Those are real content, not
+    // a leftover control. A live alert makes `header button` count the tiles too, so the check
+    // would fail on the exact case it exists to prove safe: a real flood on screen.
+    is([...d.querySelectorAll('header > button')].length, 0, 'and no button at all above 600px');
   }
   is(cs(mapBox).borderTopLeftRadius, '16px', 'M3 shape-corner-large');
   is(cs(mapBox).overflow, 'hidden', 'and the tiles clip to that corner');

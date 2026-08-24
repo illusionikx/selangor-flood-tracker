@@ -77,8 +77,8 @@ appMenu.addEventListener('click', e => {
 // shuts: nothing on the map dismisses it, and a poll never does. See map.js.
 // Each menu entry opens its own dialog. Both scroll, so both are parked at the top on open: a
 // reopened dialog that keeps the last reader's scroll position starts mid-sentence.
-el('about').onclick = () => { closeSide(); aboutBox.scrollTop = 0; aboutBox.showModal(); paintDev(); };
-el('help').onclick  = () => { closeSide(); helpBox.scrollTop  = 0; helpBox.showModal(); };
+el('railAbout').onclick = () => { closeSide(); aboutBox.scrollTop = 0; aboutBox.showModal(); paintDev(); };
+el('railHelp').onclick  = () => { closeSide(); helpBox.scrollTop  = 0; helpBox.showModal(); };
 aboutBox.onclick = e => { if (e.target === aboutBox) aboutBox.close(); };
 helpBox.onclick  = e => { if (e.target === helpBox)  helpBox.close(); };
 
@@ -234,7 +234,7 @@ el('pills').addEventListener('click', e => {
 const dataBox = el('dataBox');
 /* The dialog opens first and the module follows. A reader who pressed a button gets a response at
    once, and the skeleton stands in the box until the rows arrive. */
-el('data').onclick = async () => {
+el('railTable').onclick = async () => {
   closeSide();
   // A retry after a failed open must not still carry the last failure's banner over the fresh rows.
   dataBox.classList.remove('loadfail');
@@ -259,7 +259,7 @@ el('dataFind').oninput = () => withTable(m => m.dataTable()).catch(ignoreImportF
 
 const camBox = el('camBox');
 /* Same shape as the table opener above: the dialog opens first and js/wall.js follows. */
-el('cams').onclick = async () => {
+el('railCams').onclick = async () => {
   closeSide();
   el('camFind').value = '';
   // Same reset as the table opener above: a retry must not carry the last failure's banner forward.
@@ -326,7 +326,7 @@ el('camFind').oninput = camFilter;
 // --- drawer ------------------------------------------------------------------------------------
 
 const phone = matchMedia('(max-width: 600px)');
-const menu = el('menu');
+const menu = el('railFilters');
 // `remember: false` for opens and closes the layout forced rather than the user chose — otherwise a
 // phone-width auto-close would overwrite the preference and there'd be nothing to restore later.
 /* `pan` is dead and kept only so the four existing call sites still read. The drawer used to cover
@@ -343,7 +343,10 @@ function setDrawer(open, pan = true, remember = true) {
      the pane never closed, and `#findpane` could reappear behind the drawer. */
   if (open) { closeSide(); document.body.classList.remove('find'); }
   document.body.classList.toggle('drawer', open);
-  menu.firstElementChild.className = `i i-${open ? 'menu_open' : 'menu'}`;
+  // The rail item wraps its glyph in a `.railpill` span. The icon to swap is `.i`, not the first
+  // child. `menu.firstElementChild` was the `<i>` on the old bare button. It is the `.railpill`
+  // span now. Setting its class there would strip the pill's own styling.
+  menu.querySelector('.i').className = `i i-${open ? 'menu_open' : 'menu'}`;
   menu.setAttribute('aria-expanded', open);
   if (remember) { PREFS.drawer = open; save(); }
 }
@@ -927,7 +930,7 @@ swipeSheet(el('paintmenu'), () => el('paintmenu').hidePopover());
 // Nothing more than a disclosure now — the list lives in #side and alerts.js owns both ends of it.
 // No open/closed preference either: the panel is not permanent furniture any more, so there is no
 // state to remember between visits, and nothing covers a third of a phone screen until asked.
-el('alertBtn').onclick = toggleAlerts;
+el('railAlerts').onclick = toggleAlerts;
 
 // --- tap-to-open popovers (touch has no hover) -----------------------------------------------------
 
@@ -957,7 +960,7 @@ document.addEventListener('click', () => {
 // One spelling, read twice: the row's own label, and the haystack the query is matched against
 // below. `squash()` lowercases, so the matcher needs no second copy in lower case.
 const NEAREST = 'Nearest station to me';
-const gotoIn = el('goto'), gotoHits = el('gotoHits'), findBtn = el('find');
+const gotoIn = el('goto'), gotoHits = el('gotoHits'), findBtn = el('railFind');
 let hits = [], sel = -1;
 
 /* The place the list is currently answering about, once the reader has picked one. Set by `pick()`,

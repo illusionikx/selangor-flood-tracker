@@ -586,7 +586,7 @@ for (const id of ['favOnly', 'risingOnly', 'pinAll', 'favOnly',
    it under a `@wx-` key, the shape the alert list already uses. The card names something the map no
    longer draws, and nothing can refresh it either. This is the fifth way out of that panel, and the
    only one that is not a press on the panel itself. */
-el('alertBtn').click();
+el('railAlerts').click();
 await wait(400);
 is(d.body.classList.contains('side'), true, 'the panel opens, so there is something to close');
 await pick(el('stations').checked ? 'wxLayer' : 'stations');
