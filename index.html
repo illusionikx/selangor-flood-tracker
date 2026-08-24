@@ -69,13 +69,13 @@
 <link rel="stylesheet" href="vendor/leaflet.css">
 <link rel="stylesheet" href="vendor/markercluster.css">
 <link rel="stylesheet" href="vendor/fonts.css?v=51">
-<link rel="stylesheet" href="css/icons.css?v=97">
+<link rel="stylesheet" href="css/icons.css?v=98">
 <!-- M3's own token scales, baked from the M3 Expressive component set by `php m3-build.php`.
      Before `base.css`, which derives `--m3-travel`, `--m3-grow` and `--m3-swap` from them and
      bridges M3's colour names onto this app's palette. Colour is not in this file on purpose. -->
 <link rel="stylesheet" href="vendor/m3/tokens.css?v=1">
-<link rel="stylesheet" href="css/base.css?v=171">
-<link rel="stylesheet" href="css/chrome.css?v=248">
+<link rel="stylesheet" href="css/base.css?v=172">
+<link rel="stylesheet" href="css/chrome.css?v=249">
 <link rel="stylesheet" href="css/map.css?v=159">
 
 <!-- Water tint for the dark basemap. CARTO's dark_all is greyscale — all 18 of its tones have zero
@@ -353,24 +353,15 @@
        delegated placement handler in js/ui.js keys on, so this needs no positioning code. That
        handler places a menu by the edge it opens FROM, and this button is in the left half and the
        bottom half — which is `#paint`'s own case. -->
-  <button id="railApps" class="icon" title="Theme" aria-label="Theme"
-          popovertarget="appMenu"><i class="i i-dark_mode"></i></button>
+  <!-- **Two themes, and this button IS the switch.** It held a popover carrying a three-way pill,
+       Auto, Light and Dark. The repository owner cut Auto and the pill on 2026-08-24, so one press
+       flips the theme and there is no box to open.
+       **The glyph names what the press DOES, never the theme on screen.** A sun on a light page is
+       the state a reader can already see. A moon on it is the state one press away. `js/ui.js`
+       writes the glyph and the label from the resolved theme. -->
+  <button id="railApps" class="icon" title="Dark theme" aria-label="Dark theme"
+    ><i class="i i-dark_mode"></i></button>
 </nav>
-<!-- Still `.menu`, so the delegated popover-placement handler in js/ui.js — which keys off that
-     class alone and measures the box itself — needs no change. -->
-<div id="appMenu" class="menu surface" popover>
-  <!-- The row itself answers to nothing, the three labels inside it do. No `checked` here; js/ui.js
-       writes it. "Follow the system" is a third choice, not a shade of the other two, so it is a
-       radio group rather than a switch. -->
-  <div class="mi info swrow" id="themeRow" role="radiogroup" aria-label="Theme">
-    <i class="i i-dark_mode"></i>Theme
-    <span class="seg">
-      <label><input type="radio" name="theme" value="system">Auto</label>
-      <label><input type="radio" name="theme" value="light">Light</label>
-      <label><input type="radio" name="theme" value="dark">Dark</label>
-    </span>
-  </div>
-</div>
 <!-- Native <dialog>: modal behaviour, backdrop, Esc-to-close and focus trapping come free. -->
 <!-- Two dialogs, one shape. `.docbox` carries the box and the prose rules both of them need; the
      id carries what belongs to one of them. The menu opens each entry directly, so a tab strip was
@@ -1203,8 +1194,8 @@
   <!-- **Three M3 CONNECTED BUTTON GROUPS, and every one of them is single-select.** That is the
        component M3 Expressive replaced the segmented button with. `.btngrp` in `css/chrome.css` is
        transcribed from the component set's own `button-group.css` and `button.css`, at size `xs`,
-       shape `round`, variant `filled`. It is deliberately NOT `.seg`, which is this app's own
-       sunken track and matches no M3 component — see the block that defines it.
+       shape `round`, variant `filled`. It is deliberately NOT the lightbox's range selector, which
+       is this app's own sunken track and matches no M3 component.
        **Multi-select is not applicable anywhere in this panel.** All three groups are exclusive.
        The multi-select variant is what the drawer's sensor-kind chips are, and they stay there.
        Two layers, and exactly one of them at every moment. `PREFS.mapLayer` holds `'stations'` or

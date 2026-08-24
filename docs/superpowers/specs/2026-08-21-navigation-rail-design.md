@@ -359,3 +359,49 @@ same tint before, so moving a mouse across the list erased the one mark that say
 **The supporting line states its own size.** `.muted` carries a 12px declaration, and a declaration
 on the element beats anything a row inherits. So `body-medium` is written on `#gotoHits .nm small`
 or the line draws at 12.
+
+# Amendment, 2026-08-24 (third)
+
+## 10. A collapsed rail carries the destinations and nothing else
+
+The brand, the divider, Help and About draw at 220px alone. The four destinations, the search FAB
+and the theme button draw at both widths.
+
+The divider goes with them. It separates the four destinations from Help and About, and with both
+of those gone it separates nothing.
+
+**This costs the diagnostics popover while the rail is shut.** `#netstats` opens on
+`body:has(#brand .mark:hover)`, and a hidden brand has no hover to give. One press of the rail
+toggle brings it back. The About dialog's Developer section still holds the source counters.
+
+**`title-test.html` needed a new question.** It read which wordmark rung drew by asking each span
+for its computed `display`. A `display: none` on an ANCESTOR does not change that value, so a shut
+rail reported a spelling on a heading that generates no box. The test is `getClientRects().length`
+now, which is empty whichever ancestor decided it.
+
+## 11. The theme is two states and the button is the switch
+
+`#railApps` held a popover carrying a three-way pill: Auto, Light and Dark. One press flips the
+theme now, and there is no box to open.
+
+**A first visit still opens the way the reader's desktop looks.** The system's answer seeds
+`PREFS.theme` once and is then stored. Nothing follows the system after that. A stored theme is a
+theme the reader owns, and a page that restyles itself at sunset is what "no auto" refuses.
+
+**The glyph and the words name the next press, never the theme on screen.** A reader can already see
+the shade they are looking at.
+
+**`#appMenu` and `.seg` are deleted.** That popover held four destination tiles, which are rail items
+now, and the theme row. `.seg` was this app's own sunken track and the theme pill was its only
+markup. The lightbox range selector shared those rules and keeps its own numbers under `.tlranges`
+and `.tlr`.
+
+The `themePick` migration went too. It existed to stop a resolved value from the old two-state
+toggle reading as a deliberate pick. A resolved value IS the pick again.
+
+**This reverses the three-state theme control described in `CLAUDE.md`.** That section, and the
+`#appMenu` entries beside it, are now wrong. Task 7 corrects them.
+
+**Task 6 loses its stated plan for Help and About.** The plan put those two rows back into
+`#appMenu` below 600px. That element no longer exists, so the navigation bar needs a home of its own
+for them.

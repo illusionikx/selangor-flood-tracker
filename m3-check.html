@@ -591,6 +591,41 @@ async function desktop() {
     is(!!d.querySelector('.railbrand #brand'), true,
        'the brand moved into the rail above 600px, out of the app bar');
 
+    /* --- a collapsed rail carries the destinations and nothing else ---
+       Asked for on 2026-08-24. The brand, the divider, Help and About draw at 220px alone. Every
+       one of these is a `display: none` on a node that stays in the document, so `querySelector`
+       still finds all four and only a computed style tells them apart. */
+    const shutHidden = ['.railbrand', 'hr', '#railHelp', '#railAbout'];
+    for (const sel of shutHidden)
+      is(cs(railEl.querySelector(sel)).display, 'none',
+         'shut rail: ' + sel + ' does not draw');
+    for (const id of ['railFilters', 'railAlerts', 'railTable', 'railCams'])
+      is(cs(d.getElementById(id)).display !== 'none', true,
+         'shut rail: ' + id + ' still draws, because a destination is what the rail is for');
+    is(cs(d.getElementById('railFind')).display !== 'none', true,
+       'shut rail: and so does the search FAB');
+
+    /* --- the theme button is the switch ---
+       It held a popover carrying a three-way pill, Auto, Light and Dark. Two states now, and one
+       press flips them. The glyph names the NEXT press: a reader can already see the shade they
+       are looking at. `prefs` is captured and restored by the block around this one, so pressing
+       a preference-owned control here costs a reader nothing. */
+    const themeBtn = d.getElementById('railApps'), root = d.documentElement;
+    const themeWas = root.dataset.theme;
+    is(!!d.getElementById('appMenu'), false, 'the theme popover is gone from the document');
+    is(themeBtn.hasAttribute('popovertarget'), false, 'and the button opens no box');
+    for (let i = 0; i < 2; i++) {
+      const before = root.dataset.theme, want = before === 'dark' ? 'light' : 'dark';
+      is(!!themeBtn.querySelector('.i-' + want + '_mode'), true,
+         'the glyph names the next press, not the theme on screen');
+      is(themeBtn.getAttribute('aria-label'), want === 'dark' ? 'Dark theme' : 'Light theme',
+         'and so do its words');
+      themeBtn.click();
+      await settled();
+      is(root.dataset.theme, want, 'one press flips the theme, with no box in between');
+    }
+    is(root.dataset.theme, themeWas, 'and two presses land back where this block started');
+
     /* --- the diagnostics popover, against the header it is really anchored to ---
        `#netstats` is a child of `<header>`, and `header` is its own nearest positioned ancestor.
        `header` already carries `left: var(--rail-w)`, so `#netstats`'s own `left` has to be a
@@ -631,6 +666,9 @@ async function desktop() {
     is(cs(items[0]).borderRadius, '28px', 'M3 surface corner 28px, the indicator is the whole row');
     is(cs(toggle.querySelector('.i')).rotate, '180deg',
        'the toggle names the direction the next press moves the rail');
+    for (const sel of shutHidden)
+      is(cs(railEl.querySelector(sel)).display !== 'none', true,
+         'open rail: ' + sel + ' draws again');
     is(Math.round(r(fabEl).height), 56, 'the open rail keeps the FAB 56px tall, M3 extended FAB');
     is(r(fabEl).width > 56, true, 'and lets it grow along the rail');
     is(r(fabEl.querySelector('.fablab')).width > 0, true, 'the label arrives with the width');

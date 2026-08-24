@@ -43,7 +43,7 @@
   /* M3 paints a selected navigation indicator in `secondary-container`, which is a low-chroma tint
      of its own tonal palette. This app holds one surface tone, and it already declines
      `surface-container-high` for the same reason. So the indicator takes the selected language this
-     app already has: `.seg label:has(:checked)` fills with `--accent` and inks with `--surface`.
+     app already has: a selected surface fills with `--accent` and inks with `--surface`.
      `--accent` is not a status hue, so the colour language is unbroken. */
   --md-sys-color-secondary-container: var(--accent);
   --md-sys-color-on-secondary-container: var(--surface);

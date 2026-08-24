@@ -304,6 +304,17 @@ body.railopen #rail #railToggle .i { rotate: 180deg; }
    change.** Collapsed, the pill is the indicator and the label sits under it, outside. Expanded,
    the row is the indicator and the label sits inside it. One DOM, two states, because the paint
    moves rather than the elements. */
+/* **A collapsed rail carries the destinations and nothing else.** The repository owner asked for
+   this on 2026-08-24. The brand, the divider, Help and About draw at 220px alone.
+   The divider goes with them. It separates the four destinations from Help and About, and with both
+   of those gone it separates nothing.
+   **This costs the diagnostics popover while the rail is shut.** `#netstats` opens on
+   `body:has(#brand .mark:hover)`, and a hidden brand has no hover to give. One press of the rail
+   toggle brings it back, and the About dialog's Developer section still holds the source counters. */
+body:not(.railopen) #rail .railbrand,
+body:not(.railopen) #rail hr,
+body:not(.railopen) #rail #railHelp,
+body:not(.railopen) #rail #railAbout { display: none; }
 body.railopen #rail { padding-inline: 20px; }
 body.railopen #rail .railmenu, body.railopen #rail .railbrand { justify-content: flex-start; }
 /* M3's extended FAB: leading-aligned in the open rail, padded to 16px, with the label in place. */
@@ -852,7 +863,7 @@ table.data button[data-pop] { cursor: pointer; }
   max-height: calc(100dvh - 16px); overflow-y: auto;
   /* The popover UA sheet says `height: fit-content`, and WebKit reads that on an out-of-flow box as
      the space left under `top` rather than as the content height. iOS Safari therefore gave this box
-     a definite full-screen height, and `#appMenu`'s grid stretched its four rows down the page. Every
+     a definite full-screen height, and the app menu's grid stretched its four rows down the page. Every
      other UA declaration on `:popover-open` is already restated above; this is the one that was left. */
   height: auto;
   padding: 4px; border: 1px solid var(--outline); border-radius: 10px; color: var(--on-surface);
@@ -880,71 +891,11 @@ table.data button[data-pop] { cursor: pointer; }
    the same function the pin and the card use — 1.74 m is a quiet river or a flood, and the mark it
    is measured against is not on this row. */
 .mi .mv { flex: none; font-size: 13px; font-weight: 500; }
-/* The app menu is the one `.menu` user shaped as a 2x2 grid of tiles rather than a row list — four
-   short destinations scan faster as a grid. It does not save height: measured, the old four-row list
-   came to about 148px including the menu's own padding, and this 2x2 grid comes to about 157px, a
-   little more rather than less. The grid earns its place on scan speed, not on size. Scoped to the
-   id, not a second class: the sensor ⋮ menu shares `.menu` for its popover mechanics (see js/ui.js's
-   delegated placement handler, which keys off that class alone) and keeps the row shape, which is
-   right for its longer, two-line items.
-   The width is stated here rather than left to `.menu`'s own `min-width: 210px`: a 2x2 grid divides
-   its box across two columns, and "Station table" — the longest label — needs a column wide enough
-   to hold it on one line at this padding, which 210px halved is not. 260px was sized to that label
-   with a little slack either side. `.menu`'s own `max-width: calc(100vw - 16px)` is a shared safety
-   net for every popover this class draws, not a cap that ever binds on this one: it only shrinks a
-   box narrower than its declared width below a 276px viewport, well under anything this app targets.
-   `display: grid` is on `#appMenu:popover-open`, not on the bare selector, for the same reason a
-   dialog's own `display` has to be on `[open]` — see the gotcha list in CLAUDE.md. An ID beats two
-   classes on specificity, so `#appMenu { display: grid }` would have outranked *both*
-   `.menu { display: none }` and `.menu:popover-open { display: block }` and left the popover always
-   on screen, open or shut. Gating it on `:popover-open` keeps the closed state entirely to `.menu`'s
-   own rule, exactly as the fallback for a browser without Popover API support needs. */
-#appMenu { width: 260px; grid-template-columns: 1fr 1fr; }
-#appMenu:popover-open { display: grid; }
-/* Column, not row: a grid tile reads glyph-over-label, centred, rather than the row list's
-   glyph-beside-label. `white-space: nowrap` is what earns the width set above instead of wrapping
-   and losing the point of it — the sensor menu's own items wrap to two lines and hold a `<small>`,
-   which is a different shape for a different length of label. */
-#appMenu .mi {
-  flex-direction: column; align-items: center; justify-content: center; gap: 6px;
-  padding: 16px 8px; text-align: center; white-space: nowrap;
-}
-/* The one row in this grid that is not a tile. It spans both columns and goes back to the shared
-   `.mi` shape — glyph, label, control on one line — because a setting reads as a line of text with
-   its state at the end, and the column layout above has nowhere to put a state. `grid-column` is on
-   the rule below rather than on `.mi` itself, so the four tiles keep the auto placement they had. */
-#appMenu hr, #appMenu .swrow { grid-column: 1 / -1; }
-#appMenu .swrow {
-  flex-direction: row; align-items: center; justify-content: flex-start;
-  padding: 8px 10px; text-align: left;
-}
-/* Three positions, because the theme has three answers and one of them is "ask the system". A
-   two-state switch was here first and could not hold the third.
-   **The shape is the lightbox range selector's**, and it is shared rather than copied: `.seg` and
-   `.seg label` are grouped into `.tlranges` and `.tlr` at those rules, further down. A sunken track
-   with the chosen segment filled — no outer border, no dividers. Written as a bordered box first,
-   and it read as three buttons in a frame rather than as one control with a selection inside it.
-   The PLAYER_OVERLAY block near the bottom restyles `.tlranges` and `.tlr` in literal whites for a
-   photograph, and names those two selectors only, so none of that reaches this menu.
-   What stays here is only what makes it a form control instead of a row of buttons. Real radios,
-   hidden rather than replaced: the browser keeps the group exclusive, walks it with the arrow keys
-   and reads the label out, none of which a set of styled buttons gets for free. The CSS clips each
-   input to a pixel rather than hiding it with `display: none`, which would take it out of the tab
-   order and leave the control mouse-only. Each input sits in its own `<label>`, so the segment is
-   the hit area and `:has(:checked)` can paint it. */
-.seg { flex: none; margin-left: auto; position: relative; }
-/* `.mi .i` nudges a tile's glyph down 1px to sit with a label under it. This one sits beside its
-   label instead, and the crescent's mass is low in its own box, so centring the box leaves the shape
-   reading low. 2px up from the tile value. */
-#themeRow .i { margin-top: -1px; }
-/* `label { margin: 6px 0 }` in base.css is written for the drawer's stacked filter rows, and it lands
-   on these three as well. Measured, it made the track 37px around 21px pills — 6px of dead air above
-   and below each one, inside a shape whose whole point is that the fill hugs the segment. The pills
-   in the lightbox are `<button>`s and never met it. Zero it here, not in the shared rule: `.tlr` has
-   no margin to clear. */
-.seg label { margin: 0; }
-.seg input { position: absolute; width: 1px; height: 1px; margin: -1px; border: 0; clip-path: inset(50%); }
-.seg label:has(:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* **The app menu is gone, and `.seg` with it.** That popover held four destination tiles and one
+   row: a three-way theme pill. The tiles are rail items now, and the repository owner cut Auto and
+   the pill on 2026-08-24, so `#railApps` is the switch itself and there is no box to open.
+   `.seg` was this app's own sunken track and that pill was its only markup. The lightbox range
+   selector shared those rules, so `.tlranges` and `.tlr` name one selector each again. */
 /* Where the reading came from, above the one action. It reads like the item under it and answers
    to nothing — no pointer, no hover fill — because a block that lit up under the mouse in a list of
    one button would promise a second one. */
@@ -1636,9 +1587,9 @@ body.find #findpane { display: flex; flex-direction: column; }
   }
 }
 /* --- M3 connected button group ------------------------------------------------------------------
-   **This is NOT `.seg`, and the difference is the whole entry.** `.seg` is this app's own sunken
-   track with a pill sliding along it, written for the app menu's theme picker and the lightbox's
-   range selector. It approximates a segmented button and matches no M3 component. M3 Expressive
+   **This is NOT the lightbox's range selector, and the difference is the whole entry.** That control
+   is this app's own sunken track with a pill sliding along it, under `.tlranges` and `.tlr`. It
+   approximates a segmented button and matches no M3 component. M3 Expressive
    retired the segmented button and replaced it with the **connected button group**, which is what
    the three layer choices take.
    Transcribed from the M3 Expressive component set's `ButtonGroup/button-group.css` and
@@ -1658,8 +1609,8 @@ body.find #findpane { display: flex; flex-direction: column; }
    equal segments of `Favorites · 12` measure 348px against the 262 this panel has. `min-width`
    carries the short ones instead.
    **The selected button changing shape is the component's signature**, and it is why the radius is
-   on the transition list with M3's own spring. A `.seg` moves a fill along a track. This grows one
-   button into a pill and lets its neighbours keep their square inner corners. */
+   on the transition list with M3's own spring. A sunken track moves a fill along itself. This grows
+   one button into a pill and lets its neighbours keep their square inner corners. */
 .btngrp {
   --_h: 32px;                                          /* size xs */
   --_r: var(--md-sys-shape-corner-extra-small);        /* 4px, the corner a neighbour touches */
@@ -2621,13 +2572,13 @@ body.side #side { display: flex; }
    dialog. The chosen segment grows to hold its pace — `24 hours, 30 minutes per frame` — so the
    control changes width as it is used, which is also what says the selection is inside it.
    The app menu's theme picker is the same control with the same argument — three exclusive choices,
-   one of which is on — so `.seg` and `.seg label` are grouped in here rather than given a second set
-   of numbers to drift from. See the `.seg` block up in the app-menu section for what it adds. */
-.tlranges, .seg {
+   one of which is on. `.seg` and `.seg label` were grouped in here while the app menu drew a theme
+   pill. Both are gone, so these rules name one selector each again. */
+.tlranges {
   display: flex; align-items: center; width: auto; max-width: 100%; gap: 2px; padding: 2px;
   background: var(--hover); border-radius: 999px;
 }
-.tlr, .seg label {
+.tlr {
   padding: 4px 11px; cursor: pointer; font: 500 11px Roboto, sans-serif; white-space: nowrap;
   color: var(--muted); background: none; border: 0; border-radius: 999px;
   -webkit-user-select: none; user-select: none;   /* clicked repeatedly while hunting a range */
@@ -2643,12 +2594,12 @@ body.side #side { display: flex; }
 }
 .tls, .tlr.on .tll { width: auto; opacity: 1; }
 .tll, .tlr.on .tls { width: 0;    opacity: 0; }
-.tlr:hover:not(.on), .seg label:hover:not(:has(:checked)) { color: var(--on-surface); }
+.tlr:hover:not(.on) { color: var(--on-surface); }
 /* Text on the accent is `--surface`, never `#fff`. The accent flips to a pale blue (#8ab4f8) in the
    dark theme, where white on it is a contrast failure — the token is already near-black there and
    already white in the light theme, so one declaration is correct in both. */
-.tlr.on, .seg label:has(:checked) { color: var(--surface); background: var(--accent); }
-@media (prefers-reduced-motion: reduce) { .tlr, .tls, .tll, .seg label { transition: none; } }
+.tlr.on { color: var(--surface); background: var(--accent); }
+@media (prefers-reduced-motion: reduce) { .tlr, .tls, .tll { transition: none; } }
 
 /* --- PLAYER_OVERLAY: the same controls, laid over the picture -----------------------------------
    Both halves of the query are required, and each rules out a different failure.

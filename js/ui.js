@@ -51,27 +51,29 @@ const withTimeline = fn => (tlMod ??= import('./timeline.js')).then(fn, err => {
 
 // --- theme ---------------------------------------------------------------------------------------
 
-// applyTheme() returns the stored pick, which is what checks the matching radio. The markup carries
-// no `checked` attribute — the pref is the state, and see the gotcha list in CLAUDE.md.
-const themeRow = el('themeRow');
-themeRow.querySelector(`input[value="${applyTheme()}"]`).checked = true;
-themeRow.onchange = e => setTheme(e.target.value);
+/* **One button, two themes.** It was a popover holding a three-way pill. The repository owner cut
+   Auto and the pill on 2026-08-24.
+   **The glyph and the words name the NEXT press, never the theme on screen.** A reader can already
+   see which shade they are looking at. What a control has to say is what it does.
+   `applyTheme()` runs here, once, at module evaluation. It paints the stored theme before the map
+   draws, and `js/map.js` states why the call lives on this side. The theme on screen is read back
+   from the root element, which is the one place this app keeps it. */
+const themeBtn = el('railApps'), themeNow = () => document.documentElement.dataset.theme;
+function syncThemeBtn() {
+  const next = themeNow() === 'dark' ? 'light' : 'dark';
+  themeBtn.querySelector('.i').className = 'i i-' + next + '_mode';
+  themeBtn.title = themeBtn.ariaLabel = next === 'dark' ? 'Dark theme' : 'Light theme';
+}
+applyTheme();
+syncThemeBtn();
+themeBtn.onclick = () => { setTheme(themeNow() === 'dark' ? 'light' : 'dark'); syncThemeBtn(); };
 
 // --- about and help dialogs ----------------------------------------------------------------------
 // <dialog> handles the backdrop, Esc and focus; the only wiring needed is opening it and treating a
 // click on the backdrop as a close, which the element does not do on its own.
 
 const aboutBox = el('aboutBox'), helpBox = el('helpBox');
-/* One handler closes the menu, whichever item was hit. Capture, not bubble: an item's own handler
-   calls showModal(), and a dialog that opens while its opener is still in the top layer is a
-   sequence worth not testing. Capture runs the parent first, so the menu is gone before the dialog
-   arrives.
-   The theme switch is the exception: it is a setting, not a destination, and closing the menu on it
-   would take the control off screen at the moment you want to see what it did — and put it back. */
-const appMenu = el('appMenu');
-appMenu.addEventListener('click', e => {
-  if (!e.target.closest('.swrow')) appMenu.hidePopover();
-}, true);
+
 // The station card closes when a dialog takes the screen — you have gone somewhere else, and coming
 // back to a card you had forgotten was open is a surprise. That, and its own ×, are the only ways it
 // shuts: nothing on the map dismisses it, and a poll never does. See map.js.

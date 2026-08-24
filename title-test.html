@@ -4,9 +4,10 @@
      looks exactly like the bottom rung.
 
      **The heading has TWO homes now, and it is measured in both.** Below 600px it sits in the app
-     bar, at 22px across up to 300px of rail. Above it the navigation rail holds it, at
-     `title-medium` across 56px shut and 180px open. Three different boxes and two font sizes, so
-     the ladder is measured rather than assumed. See `#brand` and `#rail #brand` in css/chrome.css.
+     bar, at 22px across up to 300px of rail. Above it the navigation rail holds it at
+     `title-medium` across 180px, and a SHUT rail draws no heading at all. Two boxes and two font
+     sizes, so the ladder is measured rather than assumed. See `#brand` and `#rail #brand` in
+     css/chrome.css.
 
      **Nothing is hard-coded about the drop.** The mark's own width and the heading's own `gap` are
      read back, so a change to either fails here rather than on somebody's screen.
@@ -32,7 +33,7 @@ const rows = [], fail = [];
 /* Reachability, not just fit — see the block at the foot of the run. Three boxes, tracked apart,
    because each one is supposed to draw a DIFFERENT fixed answer or a different RANGE of answers,
    and a combined tally could not tell "always right" from "right somewhere". */
-const railShutRungs = new Set(), railOpenRungs = new Set(), phoneRungs = new Set();
+const railShutDrawn = new Set(), railOpenRungs = new Set(), phoneRungs = new Set();
 
 /* One reading of the lockup, wherever it is. `box` is the container the query measures, `need` is
    what the drawn spelling actually asks for: its own width, the mark beside it and the gap between
@@ -45,8 +46,17 @@ function read(d, win) {
   const on = [...word.children].filter(shown);
   const rung = shown(word) && on.length === 1 ? RUNG[on[0].className] : 0;
   const gap = parseFloat(win.getComputedStyle(h).gap) || 0;
+  const home = h.closest('#rail') ? 'rail' : h.closest('header') ? 'bar' : '???';
+  /* **`display: none` on an ANCESTOR is invisible to `getComputedStyle` on the child.** A shut rail
+     hides `.railbrand`, and every `.w-*` span inside it still computes the display its own rule
+     states. So the rung test above reported a spelling on a heading that generates no box at all.
+     `getClientRects()` is the question that survives that: it is empty when nothing draws, whichever
+     ancestor decided it. */
+  if (!h.getClientRects().length)
+    return { home, box: 0, rung: 0, count: 0, txt: '(not drawn)', need: 0, drawn: false };
   return {
-    home: h.closest('#rail') ? 'rail' : h.closest('header') ? 'bar' : '???',
+    drawn: true,
+    home,
     box: h.clientWidth, rung, count: shown(word) ? on.length : 0,
     txt: rung ? on[0].textContent : '(logo)',
     need: rung ? on[0].getBoundingClientRect().width + mark.getBoundingClientRect().width + gap : 0,
@@ -113,10 +123,11 @@ const check = (label, r) => {
          and above 600px the app bar is the ticker's strip. */
       const want = wide ? 'rail' : 'bar';
       if (r.home !== want) fail.push(`${w}px: the heading is in the ${r.home}, not the ${want}`);
-      /* A shut rail is 96px of column and the lockup is the drop alone. A word there sits beside a
-         24px glyph in a box narrower than either item under it. */
-      if (wide && r.rung) fail.push(`${w}px: a shut rail drew "${r.txt}" rather than the drop alone`);
-      if (wide) railShutRungs.add(r.rung);
+      /* **A shut rail draws no heading at all.** The repository owner asked for that on 2026-08-24:
+         a collapsed rail carries the destinations and nothing else. It drew the drop alone before,
+         in 96px of column. */
+      if (wide && r.drawn) fail.push(`${w}px: a shut rail drew "${r.txt}" rather than nothing`);
+      if (wide) railShutDrawn.add(r.drawn);
       /* Only the phone layout may widen its box as the viewport narrows, so it restarts the ladder.
          The 601/600 step changes the home as well, so it restarts there too. */
       if (!wide && w !== 600 && r.rung > last) fail.push(`${w}px: a narrower box drew a LONGER spelling`);
@@ -147,18 +158,18 @@ const check = (label, r) => {
      that way any more -- see the comment on `#brand .word > span` in css/chrome.css for why `KVFW`
      is gone rather than disclosed as unreachable. Three rungs are real, each tied to a fixed box:
 
-       rail, shut     56px   always the drop alone -- under even the rail's own 145px floor
+       rail, shut       --   nothing at all: a collapsed rail carries destinations and no brand
        rail, open    180px   always `.w-md` -- past 145px, short of the 213px `.w-lg` needs
        phone bar   ~viewport steps `.w-md` to `.w-lg` across the 306/307px crossing
 
      The per-width checks above already fail the moment any one reading breaks its own row of that
-     table -- a shut rail drawing a word, an open rail drawing `.w-lg`, a phone width fitting nothing
+     table -- a shut rail drawing anything, an open rail drawing `.w-lg`, a phone width fitting nothing
      it drew. What they cannot see on their own is a ladder that is individually correct at every
      width yet frozen on one answer throughout -- the exact shape a dead threshold left behind
      before this fix. So each box's own SET of drawn rungs is asserted here: the two fixed boxes for
      holding to their one answer, and the phone bar for visiting both of its own. */
-  if (railShutRungs.size !== 1 || !railShutRungs.has(0))
-    fail.push(`rail, shut drew rung ${[...railShutRungs]}, not only the drop`);
+  if (railShutDrawn.size !== 1 || !railShutDrawn.has(false))
+    fail.push(`rail, shut drew a heading at some width: ${[...railShutDrawn]}`);
   if (railOpenRungs.size !== 1 || !railOpenRungs.has(RUNG['w-md']))
     fail.push(`rail, open drew rung ${[...railOpenRungs]}, not only .w-md`);
   if (phoneRungs.size !== 2 || !phoneRungs.has(RUNG['w-md']) || !phoneRungs.has(RUNG['w-lg']))

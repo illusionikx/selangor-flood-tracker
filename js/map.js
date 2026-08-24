@@ -257,19 +257,20 @@ function setBasemap() {
   setWater(key === 'dark');
 }
 
-// Three choices, two themes. PREFS.theme holds what the reader picked — 'system', 'light' or 'dark'
-// — and applyTheme() resolves it to one of the two. Anything that is not 'light' or 'dark' means
-// system, so an absent pref is the default and a stored one from before this control existed still
-// works.
+// **Two themes, and the button flips between them.** `PREFS.theme` holds `light` or `dark` and
+// nothing else. The repository owner cut the third choice on 2026-08-24, so the three-way control
+// and the `system` value are gone.
+// **A first visit still opens the way the reader's desktop looks.** The system's answer seeds the
+// preference once and is then stored, so the app never starts on the wrong shade for somebody who
+// has never pressed anything. Nothing follows the system after that: a stored theme is a theme the
+// reader owns, and a page that restyles itself at sunset is what "no auto" refuses.
+// The `themePick` migration went with the third choice. It existed to stop a resolved value from
+// the old two-state toggle reading as a deliberate pick. A resolved value IS the pick again.
 const sysDark = matchMedia('(prefers-color-scheme: dark)');
-
-// One-time clear, and the only thing that makes 'system' the default for a reader who has been here
-// before. The old two-state toggle wrote a resolved 'light' or 'dark' back on every single load, so
-// every stored value predating this control was copied from the system rather than chosen — and
-// honouring it would leave Auto reachable by new visitors alone. `themePick` marks the pref as one
-// somebody actually picked. A reader who had deliberately set dark under the old build loses that
-// once, which is one tap in a control that is now on screen.
-if (!PREFS.themePick) { delete PREFS.theme; PREFS.themePick = 1; save(); }
+if (PREFS.theme !== 'light' && PREFS.theme !== 'dark') {
+  PREFS.theme = sysDark.matches ? 'dark' : 'light';
+  save();
+}
 
 export function setTheme(t) {
   PREFS.theme = t;
@@ -277,22 +278,18 @@ export function setTheme(t) {
   applyTheme();
 }
 
-// Separate from setTheme(), because the system can change the answer without the reader picking
-// anything. It reads the pref every time, so the listener below is a no-op on 'light' or 'dark' and
-// needs no test of its own. Returns the pick rather than the resolved theme: the control shows what
-// was chosen, not what that resolved to today.
+// Kept apart from `setTheme()`, because `js/ui.js` calls it once at module evaluation to paint the
+// stored theme before anything draws. It returns the theme on screen, which is what the button reads
+// to name its own next press.
 export function applyTheme() {
-  const pick = PREFS.theme === 'light' || PREFS.theme === 'dark' ? PREFS.theme : 'system';
-  const t = pick === 'system' ? (sysDark.matches ? 'dark' : 'light') : pick;
+  const t = PREFS.theme === 'dark' ? 'dark' : 'light';
   document.documentElement.dataset.theme = t;
   // The standalone window's title bar. Same value the header paints itself, so an installed app
   // has no seam above its own header — see the --surface tokens in css/base.css.
   document.querySelector('meta[name=theme-color]').content = t === 'dark' ? '#202124' : '#ffffff';
   setBasemap();
-  return pick;
+  return t;
 }
-
-sysDark.addEventListener('change', applyTheme);
 
 // --- clustering --------------------------------------------------------------------------------
 
