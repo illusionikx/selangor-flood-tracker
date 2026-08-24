@@ -87,19 +87,24 @@ header {
    there: `#brand` moves into the rail and the news is its own element on the map, so a drawn bar
    would be a 64px band of surface with nothing in it. */
 @media (min-width: 601px) { header { display: none; } }
-/* **The theme switch is the bar's one trailing action, and it is absolutely positioned.**
-   The rail is `display: none` below 600px, so the button has no home there and a phone carried no
-   theme control at all. `js/ui.js` moves the node on the breakpoint, the way `#brand` already
-   moves. The repository owner asked for it on 2026-08-24.
-   **`position: absolute`, so the brand stays centred on the WINDOW.** This is M3's center-aligned
-   small top app bar, whose title is centred in the container rather than in the space the actions
-   leave. A flex item on the trailing end pushes the mark off centre by half the button's width.
-   A matching spacer on the leading end holds it, and that is one more box to keep in step with a
-   control that can change size.
-   **8px puts the glyph centre 28px inside the trailing edge**, because `.icon` is a 40px box round
+/* **The bar's trailing actions, as one absolutely positioned group.** The theme switch moved here
+   on 2026-08-24: the rail is `display: none` below 600px, so it had no home and a phone carried no
+   theme control at all. The overflow menu joined it with the navigation bar, which caps at five
+   items and leaves Help and About with nowhere else to go. `js/ui.js` moves the theme node on the
+   breakpoint, the way `#brand` already moves.
+   **Out of flow, so the brand stays centred on the WINDOW.** This is M3's center-aligned small top
+   app bar, whose title centres in the container rather than in the space the actions leave. A flex
+   item on the trailing end pushes the mark off centre by half its own width. A matching spacer on
+   the leading end holds it, and that is one more box to keep in step with a group that can change
+   size.
+   **One box and not two buttons.** Each button positioned for itself needs a literal offset that
+   has to stay in step with the width of the one beside it. A flex row needs none.
+   **8px puts the trailing glyph centre 28px inside the edge**, because `.icon` is a 40px box round
    a 24px glyph. 28 is the number every app bar in this app already lands its trailing glyph on. */
 @media (max-width: 600px) {
-  header #railApps { position: absolute; right: 8px; }
+  header .hactions {
+    position: absolute; right: 8px; display: flex; align-items: center;
+  }
 }
 /* The bar is a title, a strip and a cluster of controls, and the strip takes what the other two
    leave. It used to take a share of the viewport instead, first `min(58vw, 656px)` and then a flat
@@ -309,6 +314,10 @@ body.railopen #rail #railToggle .i { --i: var(--i-menu_open); }
   margin-block-start: 40px; overflow-y: auto; scrollbar-width: none;
 }
 
+/* **The pill, the label and the badge are shared with the navigation bar below 600px.** Those three
+   are the M3 indicator, and both components draw the same one. Only one of the two is ever on
+   screen, so a second copy is a second thing to change and nothing to check it against. The rail's
+   own geometry stays on `#rail` alone. */
 /* One item, from NavigationRail/navigation-rail.css: `min-height: 64px`, a 24px icon, a
    `title-small` label, and a 56 by 32 indicator pill. The pill is `.railpill` rather than a third
    absolutely positioned element, because this app has one glyph per item and no state layer to
@@ -321,14 +330,14 @@ body.railopen #rail #railToggle .i { --i: var(--i-menu_open); }
   transition: color var(--md-sys-motion-duration-short2) var(--md-sys-motion-easing-standard);
 }
 
-#rail .railpill {
+:is(#rail, #navbar) .railpill {
   position: relative; display: grid; place-items: center;
   width: 56px; height: 32px; border-radius: 16px;
   transition: background-color var(--md-sys-motion-duration-short2)
               var(--md-sys-motion-easing-standard);
 }
-#rail .railitem .i { font-size: 24px; }
-#rail .raillabel {
+:is(#rail, #navbar) :is(.railitem, .navitem) .i { font-size: 24px; }
+:is(#rail, #navbar) .raillabel {
   font-size: var(--md-sys-typescale-title-small-size);
   line-height: var(--md-sys-typescale-title-small-line-height);
   font-weight: var(--md-sys-typescale-title-small-weight);
@@ -340,12 +349,12 @@ body.railopen #rail #railToggle .i { --i: var(--i-menu_open); }
 }
 /* The count rides the corner of the pill, the way the app bar badge rode the button. `:empty`
    removes it, because a zero-width pill still draws its own background. */
-#rail .railbadge {
+:is(#rail, #navbar) .railbadge {
   position: absolute; top: -2px; right: 6px; min-width: 16px; padding: 0 4px;
   font-size: 10px; font-weight: 500; line-height: 16px; text-align: center;
   color: var(--surface); background: var(--c, var(--muted)); border-radius: 999px;
 }
-#rail .railbadge:empty { display: none; }
+:is(#rail, #navbar) .railbadge:empty { display: none; }
 #rail hr {
   width: 56px; height: 1px; margin: 12px auto; border: 0;
   background: var(--md-sys-color-outline-variant);
@@ -407,6 +416,56 @@ body.railopen #rail .railbadge { top: -6px; right: -6px; }
 }
 #rail .railitem[aria-current="page"] .i { color: var(--md-sys-color-on-secondary-container); }
 #rail .railitem[aria-current="page"] .raillabel { font-weight: 700; }
+
+/* --- navigation bar ---------------------------------------------------------------------------
+   M3's navigation bar, from NavigationBar/navigation-bar.css. It draws below 600px alone, where the
+   rail does not draw at all: 96px of a 360px screen is 27% of it, and M3 states no rail there.
+   **`min-height` and not `height`.** The safe area extends the bar downward that way. Under
+   `box-sizing: border-box` a fixed height absorbs the inset into the content box instead, and the
+   labels clip.
+   **`--navbar-h` carries the same expression**, so the map card and every box in the bottom strip
+   clear the whole bar, gesture inset included. One expression, stated once. */
+#navbar { display: none; }
+@media (max-width: 600px) {
+  :root { --navbar-h: calc(64px + env(safe-area-inset-bottom, 0px)); }
+  #navbar {
+    position: absolute; z-index: 600; right: 0; bottom: 0; left: 0;
+    box-sizing: border-box; display: flex; align-items: stretch;
+    min-height: 64px; padding-block: 4px;
+    padding-bottom: calc(4px + env(safe-area-inset-bottom, 0px));
+    background: var(--md-sys-color-surface-container);
+  }
+  /* `flex: 1 1 0` with `min-width: 0`, so five items split the window evenly and the widest label
+     cannot claim more than its fifth. A basis of `auto` sizes each item to its own word. */
+  #navbar .navitem {
+    display: flex; flex: 1 1 0; min-width: 0;
+    flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+    padding: 0; border: 0; background: none; cursor: pointer;
+    color: var(--md-sys-color-on-surface-variant);
+    transition: color var(--md-sys-motion-duration-short2) var(--md-sys-motion-easing-standard);
+  }
+  /* **`label-medium`, which is this component's own size.** The rail draws `title-small` at 14px.
+     A bar splits one window five ways, so it states 12px instead. */
+  #navbar .raillabel {
+    font-size: var(--md-sys-typescale-label-medium-size);
+    line-height: var(--md-sys-typescale-label-medium-line-height);
+    font-weight: var(--md-sys-typescale-label-medium-weight);
+  }
+  #navbar .navitem:focus-visible {
+    outline: 2px solid var(--md-sys-color-primary); outline-offset: -2px;
+    border-radius: var(--md-sys-shape-corner-medium);
+  }
+  /* The selected state, written by the same `railActive()` that writes the rail's. */
+  #navbar .navitem[aria-current="page"] { color: var(--md-sys-color-on-surface); }
+  #navbar .navitem[aria-current="page"] .railpill {
+    background: var(--md-sys-color-secondary-container);
+  }
+  #navbar .navitem[aria-current="page"] .i { color: var(--md-sys-color-on-secondary-container); }
+  #navbar .navitem[aria-current="page"] .raillabel { font-weight: 700; }
+}
+@media (max-width: 600px) and (prefers-reduced-motion: reduce) {
+  #navbar .navitem, #navbar .railpill { transition: none; }
+}
 
 /* --- alert ticker ----------------------------------------------------------------------------- */
 
@@ -2921,9 +2980,12 @@ body.side #side { display: flex; }
      Without a pair here, `#locate` falls back to that desktop `calc()` and lands in a different
      column. Same step, `--fab` plus 8px, added onto the 136 above rather than restated as a
      second literal. */
+  /* **`--navbar-h` rides these literals too.** The 136 is measured up from the MAP's bottom edge,
+     and below 600px that edge sits a navigation bar above the window. Without the term the two
+     buttons stay where the window puts them and the zoom box climbs past them. */
   #paint, #locate { right: 10px; }
-  #paint  { bottom: 136px; }
-  #locate { bottom: calc(136px + var(--fab, 60px) + 8px); }
+  #paint  { bottom: calc(136px + var(--navbar-h)); }
+  #locate { bottom: calc(136px + var(--navbar-h) + var(--fab, 60px) + 8px); }
   /* The legend earns its space: the heatmap is the one layer whose colours mean nothing without it,
      and it is the layer a phone shows most of. Compacted rather than dropped — full width beside the
      zoom buttons, and the sentence explaining the doubling goes, since the tip already says it. */
@@ -2933,7 +2995,7 @@ body.side #side { display: flex; }
   /* One row here too, which is what a reader asked for. The wrapper keeps the leading 12px and
      stops short of the zoom buttons on the trailing edge, so the row wraps the credit under the
      legend rather than running it into that cluster. */
-  #mapfoot { left: 12px; right: 68px; bottom: 6px; }
+  #mapfoot { left: 12px; right: 68px; bottom: calc(6px + var(--navbar-h)); }
   #credit { font-size: 10px; line-height: 1.4; }
   #legend { font-size: 10px; padding: 3px 8px; }
   #legend .title { font-size: 10px; }

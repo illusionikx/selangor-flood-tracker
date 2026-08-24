@@ -13388,3 +13388,64 @@ says so.
 
 The fit rule is the rail's alone now. That rule fails a spelling wider than its own box, and this
 bar truncates on purpose. It reported a fault at 320px and at each of the twenty widths under it.
+
+## The navigation bar below 600px
+
+The rail is `display: none` under 600px. So a phone reached no filter, no alert list, no search, no
+table and no camera wall. M3 states no rail at that width either: 96px of a 360px screen is 27% of
+it.
+
+`#navbar` is M3's navigation bar. Every number comes from the M3 Expressive component set's
+`NavigationBar/navigation-bar.css`.
+
+### Five items, because that is the cap
+
+M3 caps this component at five. The rail carries seven destinations and one action. So two have to
+go somewhere else, and Help and About are the two a reader visits least.
+
+They move to an overflow menu on the app bar, which is M3's own answer for a secondary destination
+in a compact window. `#appMenu` came back for that job. It holds no theme control any more.
+
+The search is a rail FAB and a bar item. A navigation bar has no FAB slot.
+
+### One handler, two controls
+
+Every id is its rail twin with one prefix changed. `railFilters` against `navFilters`.
+
+`js/ui.js` binds both from one table, and `el(prefix + name)` builds each id out of one string.
+`railActive()` in `js/map.js` matches on the same suffix. `js/alerts.js` writes both badges.
+
+Only one of the two components is ever on screen. Two copies of a handler is two things to change,
+and this app already paid for that shape twice. See the two repairs `syncHeat()` records.
+
+### The indicator is shared, not copied
+
+`.railpill`, `.raillabel` and `.railbadge` name `:is(#rail, #navbar)` now. Those three are the M3
+indicator and both components draw the same one. The rail's own geometry stays on `#rail`.
+
+Only the label size differs. A rail draws `title-small` at 14px. A bar splits one window five ways,
+so it takes `label-medium` at 12px, which is this component's own size.
+
+### `--navbar-h` is one expression
+
+The token holds `calc(64px + env(safe-area-inset-bottom, 0px))`. The map card and every box in the
+bottom strip read it, so each clears the whole bar, gesture inset included.
+
+`viewport-fit=cover` joined the viewport meta tag. Without it the inset reports 0 and the bar sits
+under the iOS home indicator.
+
+**Three phone literals had to take the term.** `#paint`, `#locate` and `#mapfoot` state a bottom
+measured up from the map's own edge. That edge moved 64px and those three did not, so the zoom box
+climbed past two of them. `paint-check.html` is what reported it.
+
+### The theme switch is the bar's other trailing action
+
+The repository owner asked for it on 2026-08-24. `js/ui.js` moves the node on the breakpoint, the
+way `#brand` already moves. One node, two homes.
+
+`.hactions` is one absolutely positioned group holding both. Out of flow, so the bar keeps centring
+the brand on the window, which is M3's center-aligned variant. A flex item on the trailing end moves
+that mark by half its own width.
+
+One box and not two buttons. Each button positioned for itself needs a literal offset that has to
+stay in step with the width of the one beside it.

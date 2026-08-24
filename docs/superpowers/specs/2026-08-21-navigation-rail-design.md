@@ -622,3 +622,38 @@ Stated twice, the two drift the day one moves.
 Four new assertions in `m3-check.html`: the button is in the bar, its glyph centre is 28px inside the
 trailing edge, it is out of flow, and it keeps its 24px glyph. The brand's own centre assertion runs
 with the button already in the bar, so a spacer-based repair fails there rather than passing.
+
+## 20. The navigation bar below 600px
+
+The rail does not draw under 600px, and M3 states none there. So a phone reached no filter, no alert
+list, no search, no table and no camera wall at all.
+
+`#navbar` is M3's navigation bar, from the component set's `NavigationBar/navigation-bar.css`.
+
+**Five items, which is the cap M3 states.** The rail carries seven destinations. Help and About are
+the two visited least, so they move to an overflow menu on the app bar. That is M3's own answer for
+a secondary destination in a compact window. `#appMenu` came back to hold them, and it carries no
+theme control any more.
+
+**Every id is its rail twin with one prefix changed.** `js/ui.js` binds both from one table.
+`railActive()` in `js/map.js` matches on the suffix. `js/alerts.js` writes both badges. Only one of
+the two components is ever on screen, so a second copy of a handler is a second thing to change.
+
+**The indicator is shared.** `.railpill`, `.raillabel` and `.railbadge` name `:is(#rail, #navbar)`.
+Only the label size differs: `title-small` in the rail, `label-medium` in the bar, which is each
+component's own size.
+
+**`--navbar-h` holds `calc(64px + env(safe-area-inset-bottom, 0px))`.** The map card and every box
+in the bottom strip read it. `viewport-fit=cover` joined the viewport meta tag, or that inset reads
+0 on iOS.
+
+Three phone literals had to take the term. `#paint`, `#locate` and `#mapfoot` measure up from the
+map's own bottom edge, and that edge moved 64px. `paint-check.html` reported it.
+
+**The theme switch gained a neighbour.** `.hactions` is one absolutely positioned group holding the
+switch and the overflow. One box and not two buttons: each button positioned for itself needs a
+literal offset that has to stay in step with the width of the one beside it.
+
+Seventeen new assertions in `m3-check.html`, and three rewritten. The desktop pass asserted that the
+app bar carried no control group. That group is the phone bar's own and `<header>` does not draw
+above 600px, so the claim is that nothing of it renders.

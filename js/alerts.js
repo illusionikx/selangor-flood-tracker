@@ -4,7 +4,7 @@
 
 import { KINDS, STATUS_COLOR, NO_INFO, ALERT_TITLE, NOTICE, NOTICE_KIND } from './config.js';
 import { state, PREFS } from './state.js';
-import { el, distKm, dkey, isHot, tier, TIER_RANK, isIgnored, noSec, isFav, esc } from './util.js';
+import { distKm, dkey, isHot, tier, TIER_RANK, isIgnored, noSec, isFav, esc } from './util.js';
 import { side, openSide, closeSide } from './map.js';
 import { etaText } from './popup.js';
 
@@ -287,13 +287,17 @@ export function alerts() {
   /* The rail item holds a pill, a glyph, a badge and a label. So this writes the count into the
      badge alone. Writing `innerHTML` on the button takes the label and the pill with it, and the
      item then draws as a bare number under nothing. */
-  const btn = el('railAlerts');
-  btn.style.setProperty('--c', c);
-  btn.querySelector('.railbadge').textContent = live.length || '';
+  /* **Both controls, because the rail draws above 600px and the navigation bar below it.** Only one
+     of the two is ever on screen, and this module has no width test. Writing one leaves the other
+     holding the count from whichever side the reader landed on. */
   const what = live.length ? `${live.length} station${live.length > 1 ? 's' : ''} on alert`
                            : 'On alert — all clear';
-  btn.title = what;
-  btn.setAttribute('aria-label', what);
+  for (const btn of document.querySelectorAll('#railAlerts, #navAlerts')) {
+    btn.style.setProperty('--c', c);
+    btn.querySelector('.railbadge').textContent = live.length || '';
+    btn.title = what;
+    btn.setAttribute('aria-label', what);
+  }
 
   /* The head. `openSide()` splits it: the `.popname` becomes the sheet's title and the rest stays
      here at the top of the body. Which is why `.pophead` must stay the card's first element. */

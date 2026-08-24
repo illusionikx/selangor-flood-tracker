@@ -53,10 +53,19 @@ let paneModal = false;
    `syncHeat()` already makes about a preference.
    An item is active while the surface it opens is on screen. A bare map selects nothing, and so do
    a station card and a weather card. The map is what this app draws, and it is always there. */
+/* **One call writes both components, and it matches on the SUFFIX.** The rail draws above 600px and
+   the navigation bar below it. Their ids differ by one prefix, `railFilters` against `navFilters`,
+   so stripping it names the destination rather than the control. Writing only the component on
+   screen needs a width test here, and this function is called from four writers that have none. */
 export function railActive(id) {
-  for (const b of document.querySelectorAll('#rail .railitem'))
-    if (id === b.id) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
+  const want = id && id.replace(/^rail/, '');
+  for (const b of document.querySelectorAll('#rail .railitem, #navbar .navitem'))
+    if (want && b.id.endsWith(want)) b.setAttribute('aria-current', 'page');
+    else b.removeAttribute('aria-current');
 }
+/* `aria-expanded` rides both controls too, for the same reason. `el()` answers one id, so this takes
+   the pair by suffix the way `railActive()` does. */
+const navPair = name => document.querySelectorAll(`#rail${name}, #nav${name}`);
 
 /* A dialog is a rail destination too, and `syncPane()` cannot see one from a body class alone.
    `railSync()` checks for one here, before it falls back to the drawer, the search and the alert
@@ -79,10 +88,11 @@ export function railSync() {
      derived here with everything else, rather than written inside `setFind()`. `setDrawer()` clears
      the `find` class directly below 600px, so a write in `setFind()` alone goes stale on that path.
      This runs above the dialog scan, because a dialog opening over the search does not close it. */
-  el('railFind').setAttribute('aria-expanded', String(cls.contains('find')));
+  for (const b of navPair('Find')) b.setAttribute('aria-expanded', String(cls.contains('find')));
   /* The filters item states the same thing about the same pane, and `setDrawer()` wrote it. Both
      `setFind()` and this module clear the `drawer` class without going through that function. */
-  el('railFilters').setAttribute('aria-expanded', String(cls.contains('drawer')));
+  for (const b of navPair('Filters'))
+    b.setAttribute('aria-expanded', String(cls.contains('drawer')));
   for (const d of document.querySelectorAll('dialog[open]'))
     if (DIALOG_ITEM[d.id]) return railActive(DIALOG_ITEM[d.id]);
   railActive(cls.contains('drawer') ? 'railFilters'
@@ -483,7 +493,9 @@ export function closeSide() {
 /* The app bar's warning glyph is a disclosure for one particular occupant of this panel, and the
    panel has half a dozen other ways to change what is in it — a pin, the table, "you are here", the
    × — so the button's state is synced from here rather than from the click that opened it. */
-const syncAlertBtn = () => el('railAlerts').setAttribute('aria-expanded', side.key === '@alerts');
+const syncAlertBtn = () => {
+  for (const b of navPair('Alerts')) b.setAttribute('aria-expanded', side.key === '@alerts');
+};
 
 el('sideClose').onclick = closeSide;
 /* Deliberately **no** `map.on('click', closeSide)`. A popup had to close that way because it was

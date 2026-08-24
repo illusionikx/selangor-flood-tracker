@@ -329,26 +329,67 @@ async function phone() {
      'phone: with the brand glyph on the centre line');
   is(d.getElementById('brand').closest('header') !== null, true,
      'phone: and the brand is in the bar, not the rail and not the news pill');
-  /* **The bar's one trailing action, asked for on 2026-08-24.** The rail is `display: none` here, so
-     the theme switch had no home and a phone carried no theme control at all. `js/ui.js` moves the
-     node, the way `#brand` already moves.
-     **Assert the glyph CENTRE, never the button's own edge.** 28px inside the trailing edge is the
-     number every app bar in this app lands a trailing glyph on, and a button that grew would fail a
-     box-edge literal while still being right.
-     **And assert that it did not move the brand.** A flex item on the trailing end pushes a centred
-     title off centre by half its width, which is the whole reason this one is out of flow. The
-     centre assertion above runs with the button already in the bar, so it covers that. This states
+  /* **The bar's trailing actions, asked for on 2026-08-24.** The rail is `display: none` here, so
+     the theme switch had no home and a phone carried no theme control at all. The overflow menu
+     joined it, because a navigation bar caps at five items and this app has seven destinations.
+     `js/ui.js` moves the theme node, the way `#brand` already moves.
+     **Assert the trailing GLYPH centre, never a button's own edge.** 28px inside the trailing edge
+     is the number every app bar in this app lands a trailing glyph on, and a control that grew
+     would fail a box-edge literal while still being right.
+     **And assert that the group is out of flow.** A flex item on the trailing end pushes a centred
+     title off centre by half its width, which is the whole reason this is positioned. The centre
+     assertion above runs with the group already in the bar, so it covers the outcome. This states
      the mechanism, so a spacer-based repair fails here rather than silently passing. */
-  const phoneTheme = d.getElementById('railApps');
-  is(phoneTheme.closest('header') !== null, true,
-     'phone: the theme switch moved into the app bar');
-  const themeBox = r(phoneTheme);
-  is(Math.round(VW - (themeBox.left + themeBox.right) / 2), 28,
-     'phone: its glyph centre sits 28px inside the trailing edge');
-  is(cs(phoneTheme).position, 'absolute',
+  const hact = d.querySelector('header .hactions');
+  is(!!hact, true, 'phone: the app bar carries a trailing action group');
+  is(cs(hact).position, 'absolute',
      'phone: out of flow, so the centred brand never sees it');
+  const phoneTheme = d.getElementById('railApps');
+  is(phoneTheme.parentElement === hact, true,
+     'phone: the theme switch moved into that group');
+  is([...hact.children].map(c => c.id).filter(Boolean).join(','), 'railApps,apps',
+     'phone: theme first, overflow furthest out, which is where M3 keeps it');
+  const lastGlyph = r(hact.lastElementChild.querySelector('.i'));
+  is(Math.round(VW - (lastGlyph.left + lastGlyph.right) / 2), 28,
+     'phone: the trailing glyph centre sits 28px inside the window edge');
   is(Math.round(parseFloat(cs(phoneTheme.querySelector('.i')).fontSize)), 24,
-     'phone: and it keeps the 24px glyph the rail draws on it');
+     'phone: and the switch keeps the 24px glyph the rail draws on it');
+
+  /* --- the navigation bar ---
+     M3 states no rail below 600px, and 96px of a 360px screen is 27% of it. The bar holds the same
+     destinations, capped at the five M3 allows. Help and About go to the app bar's overflow menu.
+     **Assert the ids as an ORDERED list.** Each one is its rail twin with one prefix changed, and
+     `railActive()` matches on that suffix. A renamed id breaks the pairing and nothing on screen
+     says so: the item still draws, and only the indicator stops following it.
+     **`--navbar-h` must equal what the bar really measures**, or the map card and every box in the
+     bottom strip clear the wrong distance. Read it back rather than compare two literals. */
+  const nav = d.getElementById('navbar');
+  is(!!nav, true, 'phone: a navigation bar draws below 600px');
+  is(cs(nav).display !== 'none', true, 'phone: and it is not merely in the markup');
+  is(Math.round(r(nav).height), 64, 'phone: M3 navigation bar, 64dp with no safe-area inset');
+  is([...nav.querySelectorAll('.navitem')].map(b => b.id).join(','),
+     'navFilters,navAlerts,navFind,navTable,navCams',
+     'phone: five items, which is what M3 caps this component at');
+  is([Math.round(r(nav).bottom), Math.round(r(nav).left), Math.round(VW - r(nav).right)].join(','),
+     [VH, 0, 0].join(','), 'phone: spanning the window along its bottom edge');
+  is(cs(d.getElementById('rail')).display, 'none',
+     'phone: and the rail does not draw at this width');
+  /* **Read the map card against the bar, never `--navbar-h` against a literal.** That token holds
+     `calc(64px + env(...))`, and a custom property computes to its own token stream rather than to a
+     pixel. So `parseFloat` on it answers `NaN` and an assertion against it can only ever be wrong.
+     The fact worth holding is what the token is FOR: the card clears the whole bar by one gap. */
+  is(Math.round(r(nav).top - r(phoneMap).bottom),
+     parseFloat(cs(d.documentElement).getPropertyValue('--gap')),
+     'phone: the map card stops one gap above the bar');
+  /* Every item splits the window evenly. A basis of `auto` sizes each to its own word, so `Cameras`
+     takes more room than `Table` and the five stop reading as one row. */
+  const navW = [...nav.querySelectorAll('.navitem')].map(b => Math.round(r(b).width));
+  is(new Set(navW).size, 1, 'phone: five equal columns, whatever each label says');
+  /* The indicator is the rail's own, drawn once and shared. A second copy drifts. */
+  is(!!nav.querySelector('#navAlerts .railbadge'), true,
+     'phone: the alert item carries the rail badge, not a copy of it');
+  is(Math.round(r(nav.querySelector('#navFilters .railpill')).width), 56,
+     'phone: and the shared 56dp indicator pill reaches this component');
   is(Math.round(r(phoneMap).top), Math.round(r(phoneBar).bottom),
      'phone: the map starts where the bar ends');
   is(parseFloat(cs(phoneMap).borderTopLeftRadius) > 0, true,
@@ -691,8 +732,15 @@ async function desktop() {
     is(railEl.querySelector('hr').previousElementSibling.id, 'railCams',
        'and it sits after Cameras');
     is(railEl.lastElementChild.id, 'railApps', 'the theme button is the last thing in the rail');
-    is(!!d.querySelector('header .hactions'), false,
-       'the app bar carries no control group any more');
+    /* The group is still in the markup — it is the phone bar's own, and `<header>` does not draw at
+       this width at all. So the claim to hold here is that nothing of it renders, never that the
+       element is absent. */
+    is(cs(d.querySelector('header')).display, 'none',
+       'the app bar does not draw, so its trailing group cannot either');
+    is(d.getElementById('railApps').closest('#rail') !== null, true,
+       'and the theme switch went back to the foot of the rail');
+    is(cs(d.getElementById('navbar')).display, 'none',
+       'the navigation bar does not draw above 600px');
     // `header > button` counts only a direct child of the bar, never a descendant.
     // The ticker holds its own buttons, one per tile in the marquee. Those are real content, not
     // a leftover control. A live alert makes `header button` count the tiles too, so the check
@@ -809,7 +857,13 @@ async function desktop() {
        a preference-owned control here costs a reader nothing. */
     const themeBtn = d.getElementById('railApps'), root = d.documentElement;
     const themeWas = root.dataset.theme;
-    is(!!d.getElementById('appMenu'), false, 'the theme popover is gone from the document');
+    /* The three-way pill is gone. `#appMenu` is back for a different job: it is the phone app bar's
+       overflow menu, holding Help and About, which are rail items at THIS width. So the claim is
+       that it carries no theme control, never that the element is absent. */
+    is(!!d.querySelector('#appMenu #themeRow'), false,
+       'the theme popover is gone: one press flips the shade now');
+    is([...d.querySelectorAll('#appMenu .mi')].map(b2 => b2.id).join(','), 'menuHelp,menuAbout',
+       'and the menu that kept the id holds the two destinations the navigation bar cannot');
     is(themeBtn.hasAttribute('popovertarget'), false, 'and the button opens no box');
     for (let i = 0; i < 2; i++) {
       const before = root.dataset.theme, want = before === 'dark' ? 'light' : 'dark';

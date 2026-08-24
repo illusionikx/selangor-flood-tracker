@@ -79,8 +79,14 @@ const aboutBox = el('aboutBox'), helpBox = el('helpBox');
 // shuts: nothing on the map dismisses it, and a poll never does. See map.js.
 // Each menu entry opens its own dialog. Both scroll, so both are parked at the top on open: a
 // reopened dialog that keeps the last reader's scroll position starts mid-sentence.
-el('railAbout').onclick = () => { closeSide(); aboutBox.scrollTop = 0; aboutBox.showModal(); paintDev(); };
-el('railHelp').onclick  = () => { closeSide(); helpBox.scrollTop  = 0; helpBox.showModal(); };
+/* **Two controls per entry, one handler.** Help and About are rail items above 600px and rows in
+   the app bar's overflow menu below it, because a navigation bar caps at five items. Only one of
+   the two ever draws. Two copies of a handler is two things to change, and this app has paid for
+   that shape before — see the two repairs `syncHeat()` records. */
+const openAbout = () => { closeSide(); aboutBox.scrollTop = 0; aboutBox.showModal(); paintDev(); };
+const openHelp  = () => { closeSide(); helpBox.scrollTop  = 0; helpBox.showModal(); };
+for (const [fn, ids] of [[openAbout, ['railAbout', 'menuAbout']], [openHelp, ['railHelp', 'menuHelp']]])
+  for (const id of ids) el(id).onclick = fn;
 aboutBox.onclick = e => { if (e.target === aboutBox) aboutBox.close(); };
 helpBox.onclick  = e => { if (e.target === helpBox)  helpBox.close(); };
 
@@ -236,7 +242,7 @@ el('pills').addEventListener('click', e => {
 const dataBox = el('dataBox');
 /* The dialog opens first and the module follows. A reader who pressed a button gets a response at
    once, and the skeleton stands in the box until the rows arrive. */
-el('railTable').onclick = async () => {
+const openTable = async () => {
   closeSide();
   // A retry after a failed open must not still carry the last failure's banner over the fresh rows.
   dataBox.classList.remove('loadfail');
@@ -265,7 +271,7 @@ el('dataFind').oninput = () => withTable(m => m.dataTable()).catch(ignoreImportF
 
 const camBox = el('camBox');
 /* Same shape as the table opener above: the dialog opens first and js/wall.js follows. */
-el('railCams').onclick = async () => {
+const openWall = async () => {
   closeSide();
   el('camFind').value = '';
   // Same reset as the table opener above: a retry must not carry the last failure's banner forward.
@@ -367,7 +373,7 @@ function setDrawer(open, pan = true, remember = true) {
      already had. */
   if (remember) { PREFS.drawer = open; save(); }
 }
-menu.onclick = () => setDrawer(!document.body.classList.contains('drawer'));
+const openFilters = () => setDrawer(!document.body.classList.contains('drawer'));
 /* Open on desktop unless the user has closed it — `!== false`, not `!!`, so an unset preference
    counts as open. The drawer holds every filter and the layer chips, and a first visit used to land
    on a bare map with all of that behind an unlabelled hamburger; there is room for it beside the map
@@ -939,7 +945,6 @@ swipeSheet(el('paintmenu'), () => el('paintmenu').hidePopover());
 // Nothing more than a disclosure now — the list lives in #side and alerts.js owns both ends of it.
 // No open/closed preference either: the panel is not permanent furniture any more, so there is no
 // state to remember between visits, and nothing covers a third of a phone screen until asked.
-el('railAlerts').onclick = toggleAlerts;
 
 // --- tap-to-open popovers (touch has no hover) -----------------------------------------------------
 
@@ -975,7 +980,8 @@ document.addEventListener('click', () => {
   const wide = matchMedia('(min-width: 601px)');
   const brand = el('brand'), slot = document.querySelector('#rail .railbrand'),
         bar = document.querySelector('header'), find = el('findpane'), paneEl = el('pane'),
-        railFindBtn = el('railFind'), rail = el('rail'), themeSwitch = el('railApps');
+        railFindBtn = el('railFind'), rail = el('rail'), themeSwitch = el('railApps'),
+        hactions = document.querySelector('header .hactions');
   /* Before the ticker, or the brand lands after it in the bar. `prepend` states that rather than
      leaving it to whatever the last mover did.
      **The search moves the other way.** It is written outside the pane, because a closed `<dialog>`
@@ -995,11 +1001,13 @@ document.addEventListener('click', () => {
     (wide.matches ? slot : bar).prepend(brand);
     (wide.matches ? document.body : paneEl).append(find);
     /* **The theme switch moves too, and for the same reason the brand does.** The rail is
-       `display: none` below 600px, so a phone had no theme control at all. It is the app bar's one
-       trailing action there and the last item in the rail above it, and `append` states both.
+       `display: none` below 600px, so a phone had no theme control at all.
+       **`append` into the rail and `prepend` into the group**, because the trailing edge belongs to
+       different things at the two widths. The rail puts the switch under its items. The app bar
+       puts it before the overflow menu, which M3 keeps furthest out.
        Nothing here holds focus worth keeping: the press that flips the theme does not cross the
        breakpoint. */
-    (wide.matches ? rail : bar).append(themeSwitch);
+    if (wide.matches) rail.append(themeSwitch); else hactions.prepend(themeSwitch);
     if (keepFocus) focused.focus({ preventScroll: true });
     railFindBtn.setAttribute('aria-controls', wide.matches ? 'findpane' : 'pane');
   };
@@ -1111,8 +1119,32 @@ function setFind(open) {
   nearPlace = null;
   draw(false);
 }
-findBtn.onclick = () => setFind(true);
 el('findClose').onclick = el('findBack').onclick = () => setFind(false);
+
+/* --- one handler, two components -----------------------------------------------------------------
+   The rail draws above 600px and the navigation bar below it, and only one of the two is ever on
+   screen. So every destination binds one function to both controls.
+   **`el(p + name)` builds `railFilters` and `navFilters` out of one string**, which is why the ids
+   share a suffix. `railActive()` in js/map.js matches on that same suffix, so the two components
+   cannot drift apart.
+   **The guard is what lets one loop serve a document holding one component or both.** The rail is
+   always in the markup and the bar is too, but a test page carrying neither still evaluates this
+   module.
+   **Search opens rather than toggles**, at both widths. It closes on blur, on Escape and on its own
+   back arrow, which is three ways out already. A fourth on the control that opened it dismisses the
+   field the moment a reader reaches back for it. */
+const NAV = {
+  Filters: openFilters,
+  Alerts:  toggleAlerts,
+  Find:    () => setFind(true),
+  Table:   openTable,
+  Cams:    openWall,
+};
+for (const [name, fn] of Object.entries(NAV))
+  for (const prefix of ['rail', 'nav']) {
+    const b = el(prefix + name);
+    if (b) b.onclick = fn;
+  }
 
 const nearest = () => state.hereAt && state.data.reduce((best, s) =>
   s.lat && (!best || distKm(s, state.hereAt) < distKm(best, state.hereAt)) ? s : best, null);

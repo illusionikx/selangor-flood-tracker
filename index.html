@@ -1,6 +1,9 @@
 <!doctype html>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<!-- `viewport-fit=cover` is what makes `env(safe-area-inset-bottom)` report a real number.
+     The navigation bar below 600px reserves that inset under its items. Without this tag the
+     inset reads 0 and the bar sits under the iOS home indicator. -->
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Klang Valley Flood Watch</title>
 <!-- Installable: Chrome's "Install app", and standalone from the iOS home screen. All paths here are
      relative, because this ships to both the root of a Herd host and a GitHub Pages sub-path.
@@ -278,7 +281,33 @@
         ><i class="glyph brand i i-flood"></i></span><span class="word"
       ><span class="w-md">KV <b>Flood Watch</b></span
   ></span></h1>
+  <!-- **The bar's trailing actions, as one group.** M3 allows a small top app bar up to three of
+       them. Two draw here: the theme switch, and the overflow menu holding what the navigation bar
+       has no room for.
+       **It is one absolutely positioned box, never two.** The bar centres the brand on the WINDOW,
+       which is M3's center-aligned variant. A flex item on the trailing end moves that mark by half
+       its own width. Two separately positioned buttons need two literals that have to stay in step,
+       and a group needs one.
+       `#railApps` is NOT written here. It has two homes and js/ui.js moves the node, the way
+       `#brand` already moves. It lands first in this group, so the overflow keeps the trailing
+       edge. -->
+  <div class="hactions">
+    <!-- **M3's overflow menu.** A navigation bar caps at five items, and this app has seven
+         destinations. Help and About are the two a reader visits least, so they go here.
+         Above 600px they are rail items and `<header>` does not draw at all, so nothing has to hide
+         this. -->
+    <button id="apps" class="icon" title="More" aria-label="More"
+            popovertarget="appMenu"><i class="i i-more_vert"></i></button>
+  </div>
   </header>
+<!-- Outside the group it opens from, and outside `<header>` with it. A popover is in the top layer
+     and the placement handler in js/ui.js finds its button by `popovertarget`, so nothing here has
+     to be a descendant of anything. Inside the group it counted as one more trailing action, and
+     the group's last child is what the app bar measures its 28px against. -->
+<div id="appMenu" class="menu" popover>
+  <button class="mi" id="menuHelp"><i class="i i-info"></i>Help</button>
+  <button class="mi" id="menuAbout"><i class="i i-flood"></i>About</button>
+</div>
 <!-- **The news, as a long pill inside the map card.** It was a strip inside `<header>`, across the
      whole window above both panes. It is furniture on the map now, at both widths, and it is its own
      element rather than a child of the bar: above 600px there is no bar at all, and below it the bar
@@ -364,6 +393,31 @@
        writes the glyph and the label from the resolved theme. -->
   <button id="railApps" class="icon" title="Dark theme" aria-label="Dark theme"
     ><i class="i i-dark_mode"></i></button>
+</nav>
+<!-- M3's navigation bar, below 600px alone. Every number comes from
+     https://github.com/bczak/m3you/blob/development/src/components/NavigationBar/navigation-bar.css
+     **Five items, which is what M3 caps this component at.** The rail carries seven destinations and
+     an action. Help and About are the two visited least, so they move to the app bar's overflow menu
+     at this width. The search is a rail FAB and a bar item, because a bar has no FAB slot.
+     **Every id is its rail twin with one prefix changed.** `js/ui.js` binds both from one table and
+     `railActive()` in js/map.js matches on the suffix, so the two components cannot drift apart.
+     It reuses `.railpill`, `.raillabel` and `.railbadge`. One indicator, defined once. -->
+<nav id="navbar" aria-label="Main">
+  <button class="navitem" id="navFilters" aria-controls="pane" aria-expanded="false"
+    ><span class="railpill"><i class="i i-filter_alt"></i></span
+    ><span class="raillabel">Filters</span></button>
+  <button class="navitem" id="navAlerts" aria-controls="pane" aria-expanded="false"
+    ><span class="railpill"><i class="i i-warning"></i><b class="railbadge"></b></span
+    ><span class="raillabel">Alerts</span></button>
+  <button class="navitem" id="navFind" aria-controls="pane" aria-expanded="false"
+    ><span class="railpill"><i class="i i-search"></i></span
+    ><span class="raillabel">Search</span></button>
+  <button class="navitem" id="navTable"
+    ><span class="railpill"><i class="i i-table"></i></span
+    ><span class="raillabel">Table</span></button>
+  <button class="navitem" id="navCams"
+    ><span class="railpill"><i class="i i-photo_camera"></i></span
+    ><span class="raillabel">Cameras</span></button>
 </nav>
 <!-- Native <dialog>: modal behaviour, backdrop, Esc-to-close and focus trapping come free. -->
 <!-- Two dialogs, one shape. `.docbox` carries the box and the prose rules both of them need; the
