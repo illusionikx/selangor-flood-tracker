@@ -1104,7 +1104,7 @@ function setFind(open) {
   draw(false);
 }
 findBtn.onclick = () => setFind(true);
-el('findClose').onclick = () => setFind(false);
+el('findClose').onclick = el('findBack').onclick = () => setFind(false);
 
 const nearest = () => state.hereAt && state.data.reduce((best, s) =>
   s.lat && (!best || distKm(s, state.hereAt) < distKm(best, state.hereAt)) ? s : best, null);

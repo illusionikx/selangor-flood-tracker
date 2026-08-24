@@ -1425,16 +1425,31 @@ body.find #findpane { display: flex; flex-direction: column; }
   #findpane #gotoBox {
     display: flex; flex-direction: column; gap: 8px; min-height: 0;
   }
-  /* M3's search bar: a 56px pill on `surface-container-high`, `body-large`, no outline.
-     **`margin: 0` cancels base.css's 10px**, or a second gap opens under a box that already states
-     its own. A higher-specificity rule that never mentions a property does not cancel it. The lower
-     rule still wins that one declaration. */
-  #findpane #goto {
-    flex: none; box-sizing: border-box; width: 100%; height: 56px;
-    padding-inline: 16px; margin: 0; border: 0;
+  /* **M3's search bar is the ROW, not the field.** `Search/search.css` states a 56px pill holding a
+     leading icon and then the input. So the surface, the corner and the elevation sit on `#gotobar`,
+     and the field inside it paints nothing at all.
+     `padding-inline: 4px 8px` is that file's own, around a 48px icon button. So the arrow's glyph
+     centre lands 28px in, which is where every full-screen bar in this app already puts it. */
+  #findpane #gotobar {
+    display: flex; align-items: center; gap: 4px; flex: none;
+    box-sizing: border-box; width: 100%; height: 56px; padding-inline: 4px 8px;
     border-radius: var(--md-sys-shape-corner-extra-large);
     background: var(--md-sys-color-surface-container-high);
     box-shadow: var(--shadow);
+  }
+  /* The leading icon. 48px is M3's own target for this bar, against the 40px `.icon` draws
+     everywhere else in this app, and the bar is 56px tall so it has the room. */
+  #findpane #findBack {
+    display: grid; width: 48px; height: 48px; font-size: 24px;
+    color: var(--md-sys-color-on-surface-variant);
+  }
+  /* **`margin: 0` cancels base.css's 10px**, or a second gap opens inside a bar that already states
+     its own. A higher-specificity rule that never mentions a property does not cancel it. The lower
+     rule still wins that one declaration. */
+  #findpane #goto {
+    flex: 1; min-width: 0; box-sizing: border-box; height: 100%;
+    padding-inline: 4px; margin: 0; border: 0; border-radius: 0;
+    background: none; box-shadow: none;
     font-size: var(--md-sys-typescale-body-large-size);
     line-height: var(--md-sys-typescale-body-large-line-height);
   }
@@ -1451,6 +1466,48 @@ body.find #findpane { display: flex; flex-direction: column; }
     box-shadow: var(--shadow);
     max-height: 60vh; overflow-y: auto;
   }
+}
+/* --- the results, as M3's own list ---------------------------------------------------------------
+   **Scoped to `#gotoHits`, never to `.picklist`.** That class has three other users: the district
+   filter, the ignored list and the favorites list. Each is a filter row inside a pane, and none of
+   them is a search result. Widening these rules restyles all four.
+   The numbers are M3's one-line list item: a 56dp row, `padding-inline: 16px`, a 16dp gap, a 24dp
+   leading icon, and `body-large` for the name. A row in a list carries no corner of its own, so the
+   6px pill is gone and the box's own corner is the only one.
+   **Hover and keyboard selection stop being one look, and M3 is why.** A hover is a state layer,
+   which M3 draws as `on-surface` at 8%. A selected row is where the keyboard stands. The two used
+   to paint the same accent tint, so moving a mouse across the list erased the one mark that says
+   what Enter will open. */
+#gotoHits { padding: 8px 0; }
+#gotoHits li {
+  min-height: 56px; padding: 8px 16px; gap: 16px; border-radius: 0;
+  font-size: var(--md-sys-typescale-body-large-size);
+  line-height: var(--md-sys-typescale-body-large-line-height);
+}
+#gotoHits .glyph { font-size: 24px; }
+/* **The size is stated, because `.muted` carries one of its own.** That class is a colour and a
+   12px pair, and a declaration on the element beats anything the row inherits. So the supporting
+   line needs M3's `body-medium` written here or it draws at 12. */
+#gotoHits .nm small, #gotoHits b {
+  font-size: var(--md-sys-typescale-body-medium-size);
+  line-height: var(--md-sys-typescale-body-medium-line-height);
+}
+/* A group heading is M3's list overline: `label-small`, on the same 16px column as the names. */
+#gotoHits li.head, #gotoHits li.none {
+  min-height: 0; padding: 16px 16px 8px;
+  font-size: var(--md-sys-typescale-label-small-size);
+  line-height: var(--md-sys-typescale-label-small-line-height);
+}
+#gotoHits li.head:first-child { padding-top: 8px; }
+#gotoHits li.head:not(:first-child) { margin-top: 0; padding-top: 20px; }
+/* A sub-row lines up under the name above it, which is 16px of padding plus a 24px glyph plus the
+   16px gap. */
+#gotoHits li.sub { padding-inline-start: 56px; }
+#gotoHits li:not(.head, .none):hover {
+  background: color-mix(in srgb, var(--on-surface) 8%, transparent);
+}
+#gotoHits li.sel {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
 }
 /* The same tie-break, below 600px only, where the search really is a pane occupant. A body class
    can still set `find` beside `drawer` or `side` directly, and this container draws one occupant.
@@ -2067,7 +2124,14 @@ body.side #side { display: flex; }
   border: 1px solid var(--outline); border-radius: var(--md-sys-shape-corner-full);
 }
 #goto:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-#gotoHits { margin: 8px 0 0; padding: 0; list-style: none; }
+/* **The back arrow draws above 600px alone**, where the field is M3's docked search BAR and carries
+   its own leading icon. Below 600px the search is the full-screen search view inside `#pane`, and
+   `#findHead` leads with the same arrow one row up. */
+#findBack { display: none; }
+/* **No `padding` here.** The M3 list block above states `padding: 8px 0`, and this rule is later in
+   the file at the same specificity. A `padding: 0` here silently beat it, and nothing on screen or
+   in the check said so. `m3-check.html` asserts the list's own padding now. */
+#gotoHits { margin: 8px 0 0; list-style: none; }
 
 /* --- new-alert toast -------------------------------------------------------------------------- */
 

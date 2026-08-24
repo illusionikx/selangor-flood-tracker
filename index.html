@@ -75,7 +75,7 @@
      bridges M3's colour names onto this app's palette. Colour is not in this file on purpose. -->
 <link rel="stylesheet" href="vendor/m3/tokens.css?v=1">
 <link rel="stylesheet" href="css/base.css?v=171">
-<link rel="stylesheet" href="css/chrome.css?v=246">
+<link rel="stylesheet" href="css/chrome.css?v=248">
 <link rel="stylesheet" href="css/map.css?v=159">
 
 <!-- Water tint for the dark basemap. CARTO's dark_all is greyscale — all 18 of its tones have zero
@@ -1129,11 +1129,23 @@
   </div>
   <div id="findBody" class="scroll">
     <div id="gotoBox">
-      <input id="goto" type="text" autocomplete="off" placeholder="Go to a station…"
-             role="combobox" aria-expanded="false" aria-controls="gotoHits" aria-autocomplete="list"
-             aria-label="Go to a station">
-      <!-- No `.surface` any more. The list floated over the map before. It sits inside the pane
-           now, so a second background and a second shadow draw a card inside a card. -->
+      <!-- **The bar, and it is a bar only above 600px.** M3's docked search bar is a row: a leading
+           icon, then the field. The leading icon of an ACTIVE search view is a back arrow, and this
+           is the one that dismisses the card.
+           Below 600px this row draws no button. The search is M3's full-screen search VIEW there,
+           it sits inside `#pane`, and `#findHead` above it already leads with the same arrow. Two
+           arrows on one surface is one control drawn twice. -->
+      <div id="gotobar">
+        <button id="findBack" class="icon" title="Back" aria-label="Back"
+          ><i class="i i-arrow_back"></i></button>
+        <input id="goto" type="text" autocomplete="off" placeholder="Go to a station…"
+               role="combobox" aria-expanded="false" aria-controls="gotoHits"
+               aria-autocomplete="list" aria-label="Go to a station">
+      </div>
+      <!-- **The results, and they are a surface of their own above 600px.** M3 draws the docked
+           search bar and its results as two boxes. Below 600px this list floats under the field
+           inside the pane, and it paints nothing there: the pane is already a surface, so a second
+           background draws a card inside a card. -->
       <ul id="gotoHits" class="picklist" role="listbox" hidden></ul>
     </div>
   </div>

@@ -327,3 +327,35 @@ gone.
 The four remaining destinations, the divider, Help and About, and the theme button. The brand slot.
 The rail's own widths and its motion. The docked card's placement, its cap against the pane, or the
 ways out of it. The search below 600px, which is still M3's full-screen search view inside `#pane`.
+
+## 8. The search bar leads with a back arrow
+
+`Search/search.css` draws the docked search bar as a row: a leading icon, then the field. The
+leading icon of an active search view is a back arrow, and it dismisses the view.
+
+**So the bar is the surface, not the field.** `#gotobar` holds the corner, the tone and the
+elevation. `#goto` inside it paints nothing.
+
+`padding-inline: 4px 8px` around a 48px target puts the arrow's glyph centre 28px in. That is where
+every full-screen bar in this app already lands one.
+
+**The arrow draws above 600px alone.** Below 600px the search is M3's full-screen search view inside
+`#pane`, and `#findHead` already leads with the same arrow. Two arrows on one surface is one control
+drawn twice, and each looks right on its own.
+
+## 9. The results take M3's own list
+
+M3's one-line list item: a 56dp row, `padding-inline: 16px`, a 16dp gap, a 24dp leading icon, and
+`body-large` for the name. A row in a list carries no corner, so the 6px pill is gone.
+
+**Scoped to `#gotoHits`, never to `.picklist`.** Three other lists wear that class: the district
+filter, the ignored list and the favorites list. Each is a filter row inside a pane, and none of
+them is a search result.
+
+**Hover and keyboard selection stop being one look.** M3 draws a hover as a state layer, `on-surface`
+at 8%. A selected row is where the keyboard stands, and it keeps the accent tint. Both painted the
+same tint before, so moving a mouse across the list erased the one mark that says what Enter opens.
+
+**The supporting line states its own size.** `.muted` carries a 12px declaration, and a declaration
+on the element beats anything a row inherits. So `body-medium` is written on `#gotoHits .nm small`
+or the line draws at 12.

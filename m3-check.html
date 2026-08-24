@@ -328,6 +328,11 @@ async function phone() {
     await settled();
     is(pane.open, false, name + ': and closing the occupant closes the pane');
   }
+  /* **The search bar's own back arrow must not draw at this width.** The search is M3's full-screen
+     search view here, and `#findHead` above it already leads with an arrow. Two arrows on one
+     surface is one control drawn twice, and each one looks right on its own. */
+  is(cs(d.getElementById('findBack')).display, 'none',
+     'phone: the bar draws no second back arrow, because the pane header already leads with one');
   /* Escape reaches a modal dialog natively as `cancel`. The body classes have to follow the element,
      or the observer reopens the pane on the next class write with nothing having changed. */
   d.body.classList.add('side');
@@ -995,7 +1000,7 @@ async function desktop() {
      paints nothing. The fault is invisible either way: a single card looks like a design, and only
      reading the three boxes apart tells them apart. `#gotoHits` is `hidden` until a query runs, and
      `getComputedStyle` still reports its paint, so this needs no search to have happened. */
-  const barEl = d.getElementById('goto'), hitsEl = d.getElementById('gotoHits');
+  const barEl = d.getElementById('gotobar'), hitsEl = d.getElementById('gotoHits');
   const clear = c => c === 'rgba(0, 0, 0, 0)' || c === 'transparent';
   is(clear(cs(findEl).backgroundColor) && cs(findEl).boxShadow === 'none', true,
      'the column that holds the two paints nothing of its own');
@@ -1005,13 +1010,74 @@ async function desktop() {
   is(cs(hitsEl).boxShadow !== 'none', true, 'and its own elevation');
   is(cs(barEl).boxShadow, cs(hitsEl).boxShadow,
      'both take this app one elevation, never two shadows five percent apart');
+  is(clear(cs(d.getElementById('goto')).backgroundColor)
+     && cs(d.getElementById('goto')).boxShadow === 'none', true,
+     'and the field inside the bar paints nothing, or two surfaces stack on one row');
   is(Math.round(r(barEl).height), 56, 'M3 search bar, 56px');
+
+  /* --- the bar's leading back arrow ---
+     M3 leads an active search view with a back arrow. Below 600px the search is the full-screen
+     view inside `#pane`, and `#findHead` already leads with one, so this arrow must not draw there
+     too. The phone pass asserts that half. */
+  const backEl = d.getElementById('findBack');
+  is(cs(backEl).display !== 'none', true, 'the docked search bar leads with a back arrow');
+  is(!!backEl.querySelector('.i-arrow_back'), true, 'and it is an arrow, not a close X');
+  is([r(backEl).width, r(backEl).height].map(Math.round).join(','), '48,48',
+     'M3 48px leading target in a search bar, wider than the 40px this app draws elsewhere');
+  const bg = r(backEl.querySelector('.i'));
+  is(Math.round(bg.left + bg.width / 2 - r(barEl).left), 28,
+     'so its glyph lands 28px in, where every full-screen bar in this app already puts one');
+  is(r(backEl).right <= r(d.getElementById('goto')).left, true, 'and it leads the field, never overlaps it');
   is(cs(barEl).borderRadius,
      cs(d.documentElement).getPropertyValue('--md-sys-shape-corner-extra-large').trim(),
      'a full pill, Search/search.css');
   is(cs(barEl).borderRadius === cs(hitsEl).borderRadius, false,
      'and the results take a smaller corner, so the two never read as one box');
   is(cs(d.getElementById('gotoBox')).rowGap, '8px', 'with a real gap between them');
+
+  /* --- the results list, as M3's own list ---
+     Scoped to `#gotoHits`, never to `.picklist`: the district filter, the ignored list and the
+     favorites list all wear that class and none of them is a search result. A widened rule restyles
+     all four, and only one of them is on screen here, so nothing would say so.
+     `#gotoHits` is `hidden` until a query runs, so this drives the real field and waits. */
+  d.getElementById('goto').value = 'a';
+  d.getElementById('goto').dispatchEvent(new w.Event('input', { bubbles: true }));
+  await settled();
+  const rows = [...hitsEl.querySelectorAll('li:not(.head):not(.none)')];
+  is(rows.length > 0, true, 'a query fills the list, or the rules below are measured on nothing');
+  if (rows.length) {
+    /* The list's own padding. A later same-specificity `#gotoHits` rule set `padding: 0` and beat
+       the M3 block, with nothing on screen to say so. */
+    is(cs(hitsEl).paddingTop, '8px', 'M3 list padding-block 8px, and no later rule beats it');
+    is(Math.round(r(rows[0]).height) >= 56, true, 'M3 one-line list item, 56dp');
+    is(cs(rows[0]).paddingLeft, '16px', 'M3 list padding-inline 16px');
+    is(cs(rows[0]).columnGap, '16px', 'M3 list gap 16dp');
+    is(cs(rows[0]).borderRadius, '0px', 'and no corner: a row in a list is not a pill');
+    is(cs(rows[0]).fontSize,
+       cs(d.documentElement).getPropertyValue('--md-sys-typescale-body-large-size').trim(),
+       'M3 list headline body-large');
+    const gl = rows[0].querySelector('.glyph');
+    if (gl) is(cs(gl).fontSize, '24px', 'M3 leading icon 24dp');
+    /* Hover and keyboard selection must not paint the same thing. They both drew the accent tint,
+       so a mouse crossing the list erased the one mark that says what Enter opens. */
+    const dl = d.createElement('div');
+    dl.style.background = 'color-mix(in srgb, var(--accent) 14%, transparent)';
+    d.body.appendChild(dl);
+    /* Nothing is selected until an arrow key moves onto a row: `sel` starts at -1, and a keystroke
+       in the field rebuilds the list without moving it. So this drives the real key handler. */
+    d.getElementById('goto').dispatchEvent(
+      new w.KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    await settled();
+    const selRow = hitsEl.querySelector('li.sel');
+    is(!!selRow, true, 'the down arrow stands the keyboard on a row');
+    if (selRow) is(cs(selRow).backgroundColor, cs(dl).backgroundColor,
+       'and it keeps the accent tint, which is where Enter goes');
+    dl.remove();
+  }
+  /* Leave the field as this block found it, or every assertion after this one reads an open list. */
+  d.getElementById('goto').value = '';
+  d.getElementById('goto').dispatchEvent(new w.Event('input', { bubbles: true }));
+  await settled();
 
   /* **Close through the real control, then wait out `#goto`'s own blur-close timer, before
      touching `find` again.** `gotoIn.onblur` in ui.js schedules `setFind(false)` 150ms after the
