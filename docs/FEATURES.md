@@ -13223,3 +13223,22 @@ on null and sat on `running…`. It named `#net` next, the status dot — correc
 the dot still carried the only `tabindex="0"` on that heading. The dot is deleted now. `tabindex="0"`
 moved onto `.mark` itself, so the check follows it there: `#brand .mark`. That control rides the
 heading, which the bar keeps at every phone width.
+
+## The ticker fade is one fluid ramp, not two numbers
+
+The alert ticker fades both ends with a mask. The desktop ramp was 56px and the phone ramp was 18px.
+The repository owner reported that the phone fade was too weak.
+
+18px is 10% of a 360px strip. 56px is a larger share of the wide pill it sits in. So the phone met
+the weakest fade in the app, on the box with the least room to dissolve a word.
+
+A flat 56px is the opposite failure. Two of them take 31% of a 360px strip.
+
+The base rule states `min(56px, 9%)` now, and this change deletes the phone rule. The ramp holds 56px above a
+622px strip and scales under it. A 360px phone gets 32px, which is 78% more fade than before.
+
+Trade-off accepted. The wide layout keeps 56px only while the strip is wider than 622px. The pill
+steps aside for the rail and the supporting pane, so a narrow desktop strip fades on the percentage
+instead. That is the same rule the phone follows, which is why one number can go.
+
+Not built. There is no per-width table of ramps. A second number is what this change removes.

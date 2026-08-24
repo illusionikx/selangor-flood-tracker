@@ -426,10 +426,16 @@ body.railopen #rail .railbadge { top: -6px; right: -6px; }
      `overflow: hidden` stays: the marquee is wider than its window by design. */
   overflow: hidden; display: flex; align-items: center;
   /* Both edges fade, so an item entering or leaving dissolves instead of appearing at a hard cut.
-     Long ramps (56px) because a marquee is *always* half-way through an item at both edges — a
-     short ramp there reads as a clipped word rather than one still coming into view. */
-  -webkit-mask: linear-gradient(90deg, transparent, #000 56px, #000 calc(100% - 56px), transparent);
-  mask: linear-gradient(90deg, transparent, #000 56px, #000 calc(100% - 56px), transparent);
+     Long ramps because a marquee is *always* half-way through an item at both edges — a short ramp
+     there reads as a clipped word rather than one still coming into view.
+     **One fluid ramp answers both widths, and a phone override is what it replaces.** That override
+     held 18px, which is 10% of a 360px strip against the 56px wide ramp's own share. So the fade a
+     reader met on a phone was the weakest one on any screen, on the box with the least room to
+     dissolve a word in. A flat 56 is the other failure: two of them take 31% of that strip.
+     `min(56px, 9%)` holds the wide ramp above 622px and scales it under that, which is 32px on a
+     phone. */
+  -webkit-mask: linear-gradient(90deg, transparent, #000 min(56px, 9%), #000 calc(100% - min(56px, 9%)), transparent);
+  mask: linear-gradient(90deg, transparent, #000 min(56px, 9%), #000 calc(100% - min(56px, 9%)), transparent);
 }
 /* `flex: none` so the strip keeps its natural width instead of being squeezed to the box — a
    shrunk strip would translate by a percentage of the wrong number and the loop would jump. */
@@ -2835,14 +2841,9 @@ body.side #side { display: flex; }
      to calibrate. `.w-lg` went with it: the open rail is 164px and `.w-lg` needs 215, so no box in
      this app can draw it any more. A rung with no box is dead weight in three files, which is the
      rule `title-test.html` already states and already acted on once. */
-  /* **The ramp stays at 18px here** rather than the wide layout's 56. Two 56px ramps take 31% of a
-     360px strip, and 18 is the number somebody chose for this width. Nothing else about the pill
-     changes: every token in its offsets is 0 on a phone, so the base rule already lands it 12px
-     inside a full-bleed map. */
-  #ticker {
-    -webkit-mask: linear-gradient(90deg, transparent, #000 18px, #000 calc(100% - 18px), transparent);
-    mask: linear-gradient(90deg, transparent, #000 18px, #000 calc(100% - 18px), transparent);
-  }
+  /* **The ramp has no phone rule any more.** It stated 18px, and the base rule states
+     `min(56px, 9%)`, which is 32px here. Nothing else about the pill changes: every token in its
+     offsets is 0 on a phone, so the base rule already lands it 12px inside a full-bleed map. */
   /* The title used to go here whole, on the argument that five buttons and the status chip all have
      to fit. Both are long gone — the controls moved into the rail and the status dot is deleted —
      so the container query on `#brand` is what decides it now, and a 32px box draws the drop alone.
