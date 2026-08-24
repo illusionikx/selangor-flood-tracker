@@ -180,3 +180,94 @@ compact width, and a side sheet above it.
 
 **Help and About are rail items.** The repository owner asked for them on 2026-08-21. A divider
 separates them from the five destinations, which is the secondary rail section M3 states.
+
+---
+
+# Amendment, 2026-08-24
+
+The repository owner asked for five changes. Three of them were already in flight in the working
+tree when the request arrived. Each entry states what ships, what it reverses, and what it costs.
+
+## 1. Filters draws `filter_alt`
+
+The rail item for the filters carried `menu`, which names a navigation drawer holding a list of
+destinations. The pane holds a district picker, an ignored list and a favorites list. So the
+item names a filter and now draws one.
+
+`--i-filter_alt` joins `css/icons.css` by the refetch the header of that file states.
+
+## 2. The search floats over the leading top corner, above 600px
+
+`#gotoBox` leaves `#pane` on a desktop. It becomes a floating box over the map, on the leading
+edge under the app bar. Below 600px it stays a pane occupant.
+
+**This reverses Task 1 on one width, and the cost is on record.** The search moved into the pane
+because a 96px rail cannot hold a 300px field. That reason still holds — the box floats over the map
+rather than sitting in the rail. The second cost is older. `CLAUDE.md` records the search as a 300px box parked over the
+top-right of the map. It spent that much map on every screen that never used it. This is the same trade at the other corner. The repository owner accepted it on 2026-08-24.
+
+The box stays collapsed to its rail item until a reader asks for it. So the map pays for it only
+while a search stands open.
+
+Below 600px nothing changes. A 300px floating box on a 360px screen is the whole screen.
+
+## 3. The brand moves into the rail, and the status dot goes
+
+The `<h1>` moves from the app bar into the rail above 600px, and back to the app bar below it. One
+heading, two homes. `js/ui.js` moves it on the breakpoint. A second copy is a second `<h1>` for
+a screen reader to read.
+
+M3 states no brand slot for a navigation rail. So the brand takes the geometry of the one slot M3 states
+beside the menu, which is the FAB slot: 56px tall with 4px above it, centered while the
+rail collapses.
+
+**The status dot goes, and only the glyph stays.** Delete `#net`.
+
+**The cost is real and the repository owner accepted it.** That dot was the only always-visible
+signal that the feed is alive. `#netstats` carries `tookMs`, `cacheAge`, the per-source counters and
+`sources.stale`, and a hover over the mark is what opened it. So the popover re-anchors to the brand glyph
+in the rail. A hover over that glyph opens it. The diagnostics stay reachable. Nothing on
+screen reports a stale poll at a glance any more.
+
+## 4. The rail expands and collapses
+
+M3 states both variants and this app now ships both. The numbers come from
+`NavigationRail/navigation-rail.css` in bczak/m3you.
+
+    collapsed   96px, items centered, label under the icon
+    expanded    220px, `padding-inline: 20px`, items box 180px wide at `gap: 0`
+    item        56px tall when expanded, leading aligned, surface `border-radius: 28px`
+    indicator   `inset: 0` when expanded, rather than the 56 by 32 pill
+    menu slot   56px tall, leading aligned when expanded and centered when collapsed
+    motion      `duration-short2` on `easing-standard`, which is NOT `--m3-travel`
+
+**This reverses the "Not built" line above.** That line refused an expanded rail and a control
+to expand one. The repository owner asked for both on 2026-08-24.
+
+`--m3-rail` carries the motion. Four edges read it: the rail, the leading edge of the app bar, the
+leading inset of the map, and the diagnostics popover. So the four cannot drift apart.
+
+`PREFS` holds the state, the way it holds every other reader setting.
+
+`#railToggle` is the control. It draws `menu_open`. A `:has()` rule turns it 180 degrees when the
+rail opens. So one glyph names the direction the press moves the rail. Nothing keeps two marks in
+step.
+
+## 5. The ticker spans both panes
+
+The app bar starts where the rail ends and runs to the trailing edge, so it covers the map card and
+the supporting pane together. `left: var(--rail-w)` is the whole of it, and it answers both widths:
+below 600px `--rail-w` is 0 and the supporting pane is a destination over the map, so the bar spans
+the map alone.
+
+**So the rail runs the full height of the window on the leading edge**, from the top rather than
+from under the app bar. `m3-check.html` asserted the old shape and now asserts this one.
+
+**This reverses the layout section above.** The app bar spanned the window and the rail started
+under it.
+
+## What this amendment does not change
+
+The five destinations, the divider, Help and About, and the theme button under the spacer. The
+locate button on the map. The selected state and what it tracks. The navigation bar below 600px.
+`#pane` keeping `showModal()` below 600px.
