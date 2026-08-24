@@ -473,3 +473,23 @@ FAB already had.
 **`m3-check.html` now reads every rail item's glyph against a probe wearing the class its own markup
 names**, at both drawer states. Nothing here compared the two before, so reading the markup was the
 only evidence the item drew what it said.
+
+## 15. The table item draws `table`
+
+`list_alt` is a list, and the destination is a table. `table_view` was fitted first and the
+repository owner rejected it on sight, so `table` is what ships.
+
+**Two markup sites moved together.** The rail item, and the Help glossary entry that names the same
+control. Help draws a picture of each control, and a glyph changed on the rail alone leaves Help
+stating a control that does not exist.
+
+`list_alt` had no other user, so it is deleted from `css/icons.css` rather than left as a token
+nothing names.
+
+**`m3-check.html` reads the Help glossary against the rail**, for five controls. Nothing compared
+those two before, which is the same gap that let `filter_alt` sit unread in the markup for a whole
+wave.
+
+**Help is stale in ways this section does not fix.** It still carries an `App bar` heading over
+controls that live in the rail, a whole `Menu` section for a popover that is deleted, and a Theme
+entry describing an Auto setting that is gone. Task 7 corrects them.

@@ -646,7 +646,7 @@ async function desktop() {
        states. A literal here would need a copy of the path data. */
     const drewAsMarkup = label => {
       for (const [id, cls] of [['railFilters', 'i-filter_alt'], ['railAlerts', 'i-warning'],
-                               ['railTable', 'i-list_alt'], ['railCams', 'i-photo_camera'],
+                               ['railTable', 'i-table'], ['railCams', 'i-photo_camera'],
                                ['railFind', 'i-search']])
         is(cs(d.querySelector('#' + id + ' .i')).maskImage, glyphMask(cls),
            label + ': ' + id + ' draws ' + cls);
@@ -666,6 +666,21 @@ async function desktop() {
     await settled();
     is(d.getElementById('railFilters').getAttribute('aria-expanded'), 'false',
        'and states it shut again when something else clears the class');
+
+    /* --- Help draws a picture of each control, and that picture has to be the control's own ---
+       A glyph changed on the rail and left behind in Help states a control that does not exist.
+       Read the pair through the same engine, never the two class names. `#helpBox` is shut, and
+       `getComputedStyle` answers for a `display: none` subtree, so nothing here has to open it. */
+    const helpGlyph = label => [...d.querySelectorAll('#helpBox .ctl')]
+      .find(c => c.textContent.trim() === label)?.querySelector('.i');
+    for (const [id, label] of [['railFilters', 'Layers and filters'], ['railTable', 'Station table'],
+                               ['railCams', 'All cameras'], ['railAlerts', 'On alert'],
+                               ['railFind', 'Go to a station']]) {
+      const h = helpGlyph(label);
+      is(!!h, true, 'Help names "' + label + '"');
+      if (h) is(cs(h).maskImage, cs(d.querySelector('#' + id + ' .i')).maskImage,
+                'and draws ' + id + "'s own glyph");
+    }
 
     const shutHidden = ['.railbrand', 'hr', '#railHelp', '#railAbout'];
     for (const sel of shutHidden)
