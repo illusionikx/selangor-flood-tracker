@@ -13350,3 +13350,41 @@ reported four collisions on the first attempt, which is the whole reason that pa
 It names `#mapfoot` for the offsets now, at 12px leading and 8px on the other axis, with 118 on the
 trailing edge. It still reads `#legend` and `#credit` separately in the pairwise pass: a wrapper that
 clears the cluster is no proof that the row inside it does.
+
+## The phone app bar states the name
+
+The bar drew the flood glyph alone, centred, with the two trailing buttons beside it. The repository
+owner asked for the words in its place on 2026-08-24.
+
+`#brand` now draws `KV Flood Watch` at that width and hides `.mark`. Nothing about the styling is new
+here. `#brand b` paints `Flood Watch` in `--accent` at 500, and the heading is 22px at both widths.
+So the phone reads the same lockup the open rail reads.
+
+### The cap keeps the words off the buttons
+
+The trailing group is 80px wide at `right: 8px`, and the bar centres the brand on the WINDOW. So the
+words reach the buttons below 332px. `min(156px, calc(100vw - 176px))` reserves the same 88px on each
+side of centre. 156 is the measured width of the spelling at 22px Roboto, which the ladder above it
+already carries.
+
+Below 332px the words ellipsise. A reader on a 320px screen sees `KV Flood Watc…`. That is what M3
+states for a title too long for its bar, and it is the trade this accepts. The alternative is a
+second rung that puts the glyph back under 332px, which is one more spelling, one more rule and one
+more threshold to keep measured.
+
+### The diagnostics keep a way in
+
+`#brand .mark` is the target that opens `#netstats`, and this bar hides it. So `js/ui.js` binds the
+tap to the heading rather than to the mark. The class still goes on the mark, because the popover
+reads `#brand .mark.open` and `:has()` matches a hidden element.
+
+A handler left on the mark takes the feed diagnostics away from every phone, and nothing on screen
+says so.
+
+### What the check caught
+
+`title-test.html` held the phone expectation as rung 0, the drop alone, at every width down to
+`NARROW_PX`. It states `.w-md` now.
+
+The fit rule is the rail's alone now. That rule fails a spelling wider than its own box, and this
+bar truncates on purpose. It reported a fault at 320px and at each of the twenty widths under it.

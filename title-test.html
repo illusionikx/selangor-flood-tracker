@@ -67,7 +67,10 @@ const check = (label, r) => {
   if (r.err) return fail.push(`${label}: ${r.err}`);
   rows.push(`${label.padEnd(20)} ${r.home.padEnd(5)} box ${String(r.box).padStart(4)}px  ${r.txt}`);
   if (r.count > 1) fail.push(`${label}: ${r.count} spellings drawn at once`);
-  if (r.rung && r.need > r.box + 1)
+  /* **The fit rule is the rail's alone.** The phone bar caps the heading at `100vw - 176px`, so the
+     two trailing buttons keep their column, and `.word` ellipsises under 332px on purpose. A rule
+     that reads a deliberate truncation as a fault fails at every width a 320px phone answers for. */
+  if (r.rung && r.home === 'rail' && r.need > r.box + 1)
     fail.push(`${label}: "${r.txt}" wants ${r.need.toFixed(0)}px of a ${r.box}px box`);
   return r;
 };
@@ -129,7 +132,8 @@ const check = (label, r) => {
       if (wide) railShutDrawn.add(r.drawn);
       /* Only the phone layout may widen its box as the viewport narrows, so it restarts the ladder.
          The 601/600 step changes the home as well, so it restarts there too. */
-      if (!wide && r.rung) fail.push(`${w}px: the phone pill drew "${r.txt}" rather than the drop alone`);
+      if (!wide && r.rung !== RUNG['w-md'])
+        fail.push(`${w}px: the phone bar drew "${r.txt}" rather than the wordmark`);
       if (!wide) phoneRungs.add(r.rung);
     }
 
@@ -159,7 +163,7 @@ const check = (label, r) => {
 
        rail, shut       --   nothing at all: a collapsed rail carries destinations and no brand
        rail, open    164px   always `.w-md`, the one spelling left
-       phone pill     32px   always the drop alone: the news takes the rest of that pill
+       phone bar     156px   always `.w-md` too, and the mark is hidden under it
 
      The per-width checks above already fail the moment any one reading breaks its own row of that
      table -- a shut rail drawing anything, a phone width drawing a word, anything fitting nothing
@@ -171,12 +175,13 @@ const check = (label, r) => {
     fail.push(`rail, shut drew a heading at some width: ${[...railShutDrawn]}`);
   if (railOpenRungs.size !== 1 || !railOpenRungs.has(RUNG['w-md']))
     fail.push(`rail, open drew rung ${[...railOpenRungs]}, not only .w-md`);
-  /* **The phone ladder is gone, because its box is gone.** The brand shares a 40px pill with the
-     news and takes 32px of it. `KV Flood Watch` needs 156, and the strip would keep 148 of a 336px
-     pill with 112 of that its own fade ramp. So the drop carries the identity here and the tab
-     title says the rest, which is what this app already did under 93px of container. */
-  if (phoneRungs.size !== 1 || !phoneRungs.has(0))
-    fail.push(`the phone pill drew rung ${[...phoneRungs]}, not only the drop`);
+  /* **The phone bar has no ladder either, and it draws the words rather than the drop.** The
+     repository owner asked for the wordmark on 2026-08-24. `KV Flood Watch` needs 156px and the bar
+     states that width, so there is one answer at every phone width and the mark is hidden under it.
+     A rung of 0 here means the mark came back or the word went, and each of those is the bar drawing
+     something nobody asked for. */
+  if (phoneRungs.size !== 1 || !phoneRungs.has(RUNG['w-md']))
+    fail.push(`the phone bar drew rung ${[...phoneRungs]}, not only .w-md`);
   out.innerHTML = rows.join('\n') + '\n\n' +
     (fail.length ? `<b class="f">FAIL</b>\n` + fail.join('\n') : '<b>PASS</b>');
 })().catch(e => { out.innerHTML = `<b class="f">THREW</b>\n${(e && e.stack) || e}`; });

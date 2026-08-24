@@ -75,7 +75,7 @@
      bridges M3's colour names onto this app's palette. Colour is not in this file on purpose. -->
 <link rel="stylesheet" href="vendor/m3/tokens.css?v=1">
 <link rel="stylesheet" href="css/base.css?v=175">
-<link rel="stylesheet" href="css/chrome.css?v=261">
+<link rel="stylesheet" href="css/chrome.css?v=263">
 <link rel="stylesheet" href="css/map.css?v=160">
 
 <!-- Water tint for the dark basemap. CARTO's dark_all is greyscale — all 18 of its tones have zero
@@ -255,9 +255,10 @@
 </div>
 <!-- **The app bar, below 600px only.** Above that the rail runs the full height and nothing stands
      above the two panes, so this element does not draw at all there.
-     **It holds the brand glyph, centred, and nothing else yet.** The repository owner asked for that
-     on 2026-08-24 as the start of a new phone design. The news left this element for a pill inside
-     the map, so there is nothing here to share the row with.
+     **It holds the wordmark, centred, and one trailing group.** The repository owner asked for the
+     glyph on 2026-08-24 and for the words in its place the same day. The news left this element for
+     a pill inside the map, so there is nothing here to share the row with. The mark is hidden at
+     this width — see `#brand` in css/chrome.css — so the words carry the identity alone.
      **`#brand` lives here in the markup and moves into the rail above 600px.** One heading, two
      homes, and js/ui.js moves it on the breakpoint. A second copy is a second `<h1>` for a screen
      reader to read. -->

@@ -949,8 +949,12 @@ document.querySelectorAll('.info').forEach(info => info.onclick = e => {
 });
 // There is no separate dot any more — see index.html. The mark itself now carries `tabindex="0"`.
 // It is the same 24px target that opens the diagnostics on a tap, the same shape `.info` uses.
+// **The tap is bound to the heading, not to the mark.** Below 600px the bar draws the wordmark and
+// hides the mark, so a handler on the mark leaves a phone with no way to the diagnostics at all.
+// The class still goes on the mark, because `#netstats` reads `#brand .mark.open` and `:has()`
+// matches a hidden element.
 const netMark = document.querySelector('#brand .mark');
-netMark.onclick = e => { e.stopPropagation(); netMark.classList.toggle('open'); };
+el('brand').onclick = e => { e.stopPropagation(); netMark.classList.toggle('open'); };
 // The popover is no longer inside the thing that opens it (see index.html), so it has to keep its
 // own clicks off the close-everything handler below.
 el('netstats').onclick = e => e.stopPropagation();
