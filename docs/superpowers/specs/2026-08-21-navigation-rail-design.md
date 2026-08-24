@@ -493,3 +493,37 @@ wave.
 **Help is stale in ways this section does not fix.** It still carries an `App bar` heading over
 controls that live in the rail, a whole `Menu` section for a popover that is deleted, and a Theme
 entry describing an Auto setting that is gone. Task 7 corrects them.
+
+## 16. The news moves inside the map card
+
+Above 600px the ticker was a strip across the whole window, above both panes. It took 64px off the
+top of everything. The repository owner asked for that space back on 2026-08-24.
+
+`<header>` is a long pill inside the map card now, on the card's own 12px furniture inset, the same
+one `#legend` and `#credit` take. `--hdr` is `0px` at that width, so the map card starts at `--gap`
+and the supporting pane starts at the very top of the window.
+
+**Below 600px nothing changes.** The ticker is still a header row there, beside the brand. A phone
+has no second pane, so there is no space above one to take back, and the brand has nowhere else to
+live until the navigation bar lands.
+
+**The pill steps aside on both edges, and each edge rides the motion that edge already has.**
+`right` takes the pane's own `--m3-travel` and `left` takes `--m3-rail`.
+
+**The trailing inset is `--seam` and never `--gap`.** A box measuring from the card's trailing edge
+measures across the space between the two panes. This shipped with both terms for one measurement,
+and the pill stopped 28px short of the card against 12px on the leading side.
+
+**`--top-free` is the one token for the top of the map's free area.** Four boxes read it: the badges,
+the toast, the docked search's top and that card's own height cap. Above 600px it clears the pill.
+Below 600px it comes to the same `--hdr + 12px` those boxes always read, so the two widths cannot
+drift.
+
+**`#netstats` left `<header>` for the document.** A 236px popover cannot be positioned from a 40px
+pill. It is fixed against the window now and states the rail term itself, which reverses the note
+that said the rail term was never that rule's to add. The mark that opens it lives in the rail, so
+the rail is what it stands beside.
+
+**The pill joins the pairwise furniture sweep** in `m3-check.html` and the overlap sweep in
+`paint-check.html`. It is a box floating over the map like every other one, and each box is correct
+on its own right up until it lands on a neighbour.

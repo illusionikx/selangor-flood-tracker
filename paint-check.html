@@ -211,8 +211,8 @@ is(Math.abs(px(btn, 'borderTopLeftRadius') / r.height - 2 / 7) < 0.01, true,
 is(Math.abs(px(btn.querySelector('.i'), 'fontSize') / r.height - 3 / 7) < 0.01, true,
    'desktop: and the glyph holds its 3/7');
 // Nothing else floats here. An overlap is a control a reader cannot press.
-for (const id of ['legend', 'pills', 'toast', 'credit', 'bar']) {
-  const o = el(id); if (!o) continue;
+for (const id of ['legend', 'pills', 'toast', 'credit', 'bar', 'header']) {
+  const o = id === 'header' ? d.querySelector('header') : el(id); if (!o) continue;
   const b = o.getBoundingClientRect();
   if (!b.width || !b.height || w.getComputedStyle(o).visibility === 'hidden') continue;
   is(r.left < b.right && b.left < r.right && r.top < b.bottom && b.top < r.bottom, false,

@@ -129,6 +129,13 @@
      lines on a phone (the ticker wraps under the buttons) and the map, drawer, search box and alert
      panel all have to follow it down — they were six hard-coded 64/76/124/128s before. */
   --hdr: 64px;
+  /* **The news pill's own height, and the top of the map's free furniture area.** Above 600px the
+     ticker is a pill inside the map card rather than a strip above both panes, so `--hdr` is 0
+     there and anything else at the top of the map has to clear the pill instead. Below 600px the
+     ticker is still a header row, `--gap` is 0, and `--top-free` comes to the same
+     `--hdr + 12px` those boxes always read. One token, so the two widths cannot drift. */
+  --tick-h: 40px;
+  --top-free: calc(var(--hdr) + 12px);
   /* The rail takes width from the map above 600px. The bar takes height from it below. Each is 0 at
      the width the other one draws, so one expression on `#map` covers both. */
   --rail-w: 0px;

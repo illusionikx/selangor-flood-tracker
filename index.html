@@ -74,8 +74,8 @@
      Before `base.css`, which derives `--m3-travel`, `--m3-grow` and `--m3-swap` from them and
      bridges M3's colour names onto this app's palette. Colour is not in this file on purpose. -->
 <link rel="stylesheet" href="vendor/m3/tokens.css?v=1">
-<link rel="stylesheet" href="css/base.css?v=172">
-<link rel="stylesheet" href="css/chrome.css?v=252">
+<link rel="stylesheet" href="css/base.css?v=173">
+<link rel="stylesheet" href="css/chrome.css?v=253">
 <link rel="stylesheet" href="css/map.css?v=159">
 
 <!-- Water tint for the dark basemap. CARTO's dark_all is greyscale — all 18 of its tones have zero
@@ -280,13 +280,16 @@
       ><span class="w-lg">Klang Valley <b>Flood Watch</b></span
       ><span class="w-md">KV <b>Flood Watch</b></span
   ></span></h1>
-  <!-- Outside the <h1>: a <table> is flow content and cannot legally live inside a heading, so the
-       popover is a sibling positioned under the mark rather than a child of it. -->
-  <table id="netstats" class="surface"></table>
   <!-- Live alert ticker. `aria-hidden`: the same stations are in the alert panel as a real list, so
        a screen reader gets them there rather than as an endlessly repeating strip. -->
   <div id="ticker" aria-hidden="true"><div class="tk-run"></div></div>
 </header>
+<!-- Outside the <h1>, because a <table> is flow content and cannot legally live inside a heading.
+     Outside <header> too, since 2026-08-24: that element is a 40px pill inside the map card above
+     600px, and a 236px popover cannot be positioned from one. It is fixed against the window now
+     and adds `--rail-w` itself. The mark that opens it lives in the rail at that width, so the
+     popover stands beside the rail rather than beside the news. -->
+<table id="netstats" class="surface"></table>
 <!-- M3's navigation rail, collapsed variant. Every number comes from
      https://github.com/bczak/m3you/blob/development/src/components/NavigationRail/navigation-rail.css
      It is a `<nav>` and never a dialog, so it does not join the roll call in m3-check.html and needs

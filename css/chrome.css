@@ -44,7 +44,12 @@ body:not(.ready) #map { transition: none; }
    **The card treatment and the GAP still turn on together.** With `--gap` at 0 the map runs to the
    window on three sides, and below 600px there is no second pane beside it to separate from. */
 @media (min-width: 601px) {
-  :root { --gap: 16px; --seam: 8px; --rail-w: 96px; }
+  /* **Nothing stands above the two panes.** `--hdr` was 64px of app bar across the whole window,
+     and the repository owner asked for that space back on 2026-08-24. The ticker moved inside the
+     map card as a pill, so the map starts at `--gap` and the supporting pane starts at 0.
+     `0px` and never `0`: every reader is a `calc()`, and a unitless zero is a parse error there. */
+  :root { --gap: 16px; --seam: 8px; --rail-w: 96px; --hdr: 0px;
+          --top-free: calc(var(--gap) + 12px + var(--tick-h) + 8px); }
   /* **On `:root`, never on `body`.** `--pane` is computed on `:root` and reads `--rail-w` there. A
      value redefined further down the tree never reaches it, so the supporting pane would keep
      sizing itself against a 96px rail while the rail drew 220. `:has()` is what lets a body class
@@ -80,6 +85,36 @@ header {
 }
 body:not(.ready) header { transition: none; }
 @media (prefers-reduced-motion: reduce) { header { transition: none; } }
+/* --- the news pill, above 600px ------------------------------------------------------------------
+   **The strip moved inside the map card.** It ran the width of the window above both panes, and the
+   repository owner asked for that space back on 2026-08-24. It is a long pill over the map now, on
+   the card's own 12px furniture inset, the same one `#legend` and `#credit` already take.
+   **It is furniture, so it steps aside for the pane on the trailing edge and for the rail on the
+   leading one**, and each edge rides the motion that edge already has. `right` takes the pane's own
+   `--m3-travel` so the pill grows with the map card rather than snapping. `left` takes `--m3-rail`.
+   Every other box at the top of the map clears it through `--top-free`.
+   `#ticker` masks both its own edges over 56px, so the pill needs no `overflow` of its own and the
+   rounded ends never cut a word. That is also why the diagnostics popover can hang out of a 40px
+   box — see `#netstats`, which is a sibling of this element rather than a child now.
+   Below 600px none of this applies. The ticker is still a header row there, and a phone has no
+   second pane for the space above one to be worth taking. */
+@media (min-width: 601px) {
+  header {
+    top: calc(var(--gap) + 12px);
+    left: calc(var(--rail-w) + var(--gap) + 12px);
+    /* **`--seam` and never `--gap`** — the map card has two insets and a box measuring from its
+       trailing edge picks up one of them. This shipped with both for one measurement: the pill
+       stopped 28px short of the card's own edge against 12px on the leading side. */
+    right: calc(var(--pane-w) + var(--seam) + 12px);
+    height: var(--tick-h); padding-inline: 4px;
+    border-radius: var(--md-sys-shape-corner-full);
+    box-shadow: var(--shadow);
+    transition: left var(--m3-rail), right var(--m3-travel);
+  }
+  /* The strip filled a bar that ended in a row of 40px targets, and that margin held it off them.
+     There is nothing to its trailing side now but the pill's own end. */
+  #ticker { margin-right: 0; }
+}
 /* The bar is a title, a strip and a cluster of controls, and the strip takes what the other two
    leave. It used to take a share of the viewport instead, first `min(58vw, 656px)` and then a flat
    `50vw`, with both rails on `flex: 1 1 0` so the strip landed on the middle of the bar. That
@@ -626,7 +661,7 @@ body.testmode header {
 /* Centred on the MAP, not on the window: half the pane's width comes off the centre line, so the
    badges stay over the strip they describe when the pane opens. */
 #pills {
-  position: fixed; z-index: 700; top: calc(var(--hdr) + 12px);
+  position: fixed; z-index: 700; top: var(--top-free);
   left: calc(50% + var(--rail-w) / 2 - var(--pane-w) / 2);
   transform: translateX(-50%); display: grid; gap: 8px; justify-items: center;
   pointer-events: none;
@@ -1290,18 +1325,20 @@ table.data .dash { color: var(--outline); }
    js/net.js paints no colour at all now. The word it used to carry still leads the `status` row in
    the table below. */
 
-/* Anchored to `<header>`, its own nearest positioned ancestor — never to the window — because a
-   `<table>` cannot live inside the `<h1>` the mark is in. `header` itself carries `left:
-   var(--rail-w)` (see above), so `#netstats`'s own `left` is relative to a box that has ALREADY
-   stepped past the rail. Adding `--rail-w` again here counted it twice: 200px from the window
-   collapsed, 448px expanded, against a mark sitting at roughly 20 to 44px. `8px` alone is the
-   right number, at every rail width, because the rail term is never this rule's to add.
+/* **Fixed against the window, and it adds `--rail-w` itself.** It was absolute inside `<header>`,
+   which carried `left: var(--rail-w)` of its own, so adding the rail term here counted it twice:
+   200px from the window collapsed, 448px expanded, against a mark sitting at roughly 20 to 44px.
+   That reasoning ended on 2026-08-24. `header` is a 40px pill inside the map card above 600px, and
+   a 236px popover cannot be positioned from one. So the popover left that element, and the rail
+   term IS this rule's to add now.
    The desktop `top: 104px` sums the rail's own three: 44px of block padding, a 56px menu slot and
-   the 4px above the brand slot. Stated here because the rail states them there.
-   `m3-check.html` reads the popover's left edge back against `header`'s own, rather than against
-   either literal — that is the assertion the double-counted `--rail-w` term would have failed. */
+   the 4px above the brand slot. Stated here because the rail states them there. The mark that opens
+   this lives in the rail at that width, so the popover stands beside the rail.
+   `m3-check.html` reads the popover's left edge back against the RAIL's own right edge, rather than
+   against either literal — that is the assertion a double-counted `--rail-w` term fails. */
 #netstats {
-  position: absolute; z-index: 601; top: calc(var(--hdr) + 8px); left: 12px; width: 236px;
+  position: fixed; z-index: 601; top: calc(var(--hdr) + 8px);
+  left: calc(var(--rail-w) + 12px); width: 236px;
   padding: 14px 16px; border-radius: 12px; opacity: 0; visibility: hidden;
   transition: opacity .12s ease, visibility .12s;
   /* collapsed borders make the browser drop padding on the table box */
@@ -1315,11 +1352,10 @@ body:has(#brand .mark:hover) #netstats,
 body:has(#brand .mark:focus-within) #netstats,
 body:has(#brand .mark.open) #netstats { opacity: 1; visibility: visible; }
 @media (min-width: 601px) {
-  /* `left: 8px`, not `calc(var(--rail-w) + 8px)` — see the comment above. Nothing here depends on
-     the rail's own width any more, so there is nothing to transition on `left`: as `header` itself
-     travels on its own `left var(--m3-rail)`, this box travels with it for free, being positioned
-     relative to `header`'s own box rather than to the window. */
-  #netstats { top: 104px; left: 8px; }
+  /* It is fixed against the window now, so the rail term is its own to state and its own to
+     travel on. `left` rides `--m3-rail`, the same motion the rail's own width takes. */
+  #netstats { top: 104px; left: calc(var(--rail-w) + 8px); transition: opacity .12s ease,
+              visibility .12s, left var(--m3-rail); }
 }
 #netstats .note td { padding-top: 10px; line-height: 1.45; font-size: 11px; }
 
@@ -1380,11 +1416,11 @@ body.find #findpane { display: flex; flex-direction: column; }
 @media (min-width: 601px) {
   body.find #findpane {
     position: fixed; z-index: 610; inset: auto;
-    top: calc(var(--hdr) + var(--gap) + 12px);
+    top: var(--top-free);
     left: calc(12px + var(--gap) + var(--rail-w));
     width: 360px;
     max-width: calc(100vw - var(--rail-w) - var(--pane-w) - var(--seam) - var(--gap) - 24px);
-    max-height: calc(100dvh - var(--hdr) - var(--gap) - 36px);
+    max-height: calc(100dvh - var(--top-free) - var(--gap) - 12px);
     background: none; box-shadow: none; border-radius: 0; overflow: visible;
     transition: opacity var(--m3-swap), translate var(--m3-swap), left var(--m3-rail);
   }
@@ -2120,7 +2156,7 @@ body.side #side { display: flex; }
 /* Top-right of the map, mirroring the alert panel on the left. Hidden rather than removed when
    closed: `visibility` keeps it out of the tab order and off screen readers, and still animates. */
 #toast {
-  position: absolute; z-index: 401; top: calc(var(--hdr) + 12px + var(--gap));
+  position: absolute; z-index: 401; top: var(--top-free);
   right: calc(12px + var(--pane-w) + var(--seam));
   width: min(300px, calc(100vw - 24px));
   border-radius: 12px; padding: 12px 14px 6px; overflow: hidden;
