@@ -47,6 +47,12 @@
      `--accent` is not a status hue, so the colour language is unbroken. */
   --md-sys-color-secondary-container: var(--accent);
   --md-sys-color-on-secondary-container: var(--surface);
+  /* M3's outlined button fills its SELECTED state with `inverse-surface`. That is the one M3 role
+     this app can bridge without inventing a colour or reaching for a tonal tint: the page's own ink
+     as a fill, and the page's own fill as the ink. Both tokens already exist, both already flip with
+     the theme, and the contrast is the contrast every line of text on this page already has. */
+  --md-sys-color-inverse-surface: var(--on-surface);
+  --md-sys-color-inverse-on-surface: var(--surface);
 
   /* The two pairs the components below actually reach for, built FROM the tokens above rather than
      restating their values. **Named for what the surface DOES, not for one component that does it.**
@@ -142,6 +148,10 @@
      boxes read it — the badges, the toast, the docked search and that card's own height cap. One
      token, so no two of them can drift apart. */
   --top-free: calc(var(--hdr) + var(--gap) + 12px + var(--tick-h) + 8px);
+  /* The layer chip row sits on `--top-free`, so everything else that docks there starts under it.
+     One chip is 32px and the gap under the row is 8. It is one row at every width the toast and the
+     docked search draw at — below 600px the row wraps and neither of those two exists. */
+  --top-chips: calc(var(--top-free) + 40px);
   /* **The map card's own two insets, as tokens.** Every box that floats on the map measures from
      one of them, and each was stating the arithmetic itself.
      **The trailing one is a `max()`, and that is the repair.** It read `--pane-w + --seam` alone, so
@@ -413,47 +423,105 @@ td:last-child { text-align: right; padding-left: 16px; }
 
 /* --- controls ------------------------------------------------------------------------------ */
 
-/* Toggle buttons (Material filter chips). Still a real checkbox underneath, just hidden, so every
-   handler, the prefs persistence and keyboard access stay as they were. */
+/* Every filter chip in this app, and they are M3 FILTER CHIPS. Two surfaces call `.chip`: the
+   drawer's sensor kinds through `#layers`, and the layer chips over the map through `#mapchips`. Transcribed from `Chip/chip.css` in the
+   M3 Expressive component set, at `data-variant="filter"`:
+   https://github.com/bczak/m3you/blob/development/src/components/Chip/chip.css
+   A 32dp container, `shape-corner-small` (8dp), `label-large`, an 18dp leading icon, 8dp behind
+   that icon and 16dp past the label. Unselected carries a 1dp outline over no fill. Selected drops
+   the outline and takes a container fill. That is the same set of numbers `#sideKinds .badge`
+   already takes for M3's assist chip, one variant over.
+
+   **The drawer's kinds were full-width rows, one per line, and a chip is not a row.** `.chip` was
+   `display: flex` with a vertical margin, so five kinds took five lines of the drawer and each one
+   stretched to the pane. M3 draws a filter chip SET: content-sized chips in a wrapping row.
+   `#layers` is that row, and `#mapchips` in `css/chrome.css` is the map's.
+
+   **The container is the kind's own hue, not `secondary-container`.** This app holds one surface
+   tone in `css/base.css` and the palette rule keeps M3's colour roles out of it, so the fill is the
+   tint this control already used. The same divergence `.sensor` states for `surface-container-highest`.
+
+   **The label never takes the kind hue, and the leading icon is the one thing that does.** A chip
+   whose text is painted by the station kind reads as a status, and this app reserves that reading.
+   Still a real checkbox underneath, just clipped, so every handler, the prefs persistence and
+   keyboard access stay as they were. */
+/* The sensor kinds, and they were a wrapping row of chips in the drawer. A reader moved them onto
+   the map on 2026-08-25, where they are the rows of a menu chip. So this box only stacks them. */
+#layers { display: flex; flex-direction: column; }
 .chip {
-  display: flex; align-items: center; gap: 8px; margin: 6px 0; padding: 7px 14px 7px 10px;
-  border: 1px solid var(--outline); border-radius: 999px; cursor: pointer;
-  font-size: 13px; color: var(--muted); transition: background .15s, border-color .15s, color .15s;
+  box-sizing: border-box; position: relative;
+  display: inline-flex; align-items: center; gap: 8px; margin: 0; padding: 0 16px;
+  height: 32px; border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: var(--md-sys-shape-corner-small); cursor: pointer;
+  color: var(--md-sys-color-on-surface-variant); background: none;
+  font-size: var(--md-sys-typescale-label-large-size);
+  line-height: var(--md-sys-typescale-label-large-line-height);
+  font-weight: var(--md-sys-typescale-label-large-weight);
+  letter-spacing: var(--md-sys-typescale-label-large-tracking);
+  -webkit-user-select: none; user-select: none;
+  transition:
+    background var(--md-sys-motion-duration-short2) var(--md-sys-motion-easing-standard),
+    border-color var(--md-sys-motion-duration-short2) var(--md-sys-motion-easing-standard),
+    color var(--md-sys-motion-duration-short2) var(--md-sys-motion-easing-standard),
+    padding-left var(--md-sys-motion-duration-short2) var(--md-sys-motion-easing-standard);
 }
+/* **M3 pads a chip 16px, and 8px on the edge a leading icon sits on.** So the padding follows what
+   is actually in the chip rather than being one number: a permanent glyph takes it to 8 for good,
+   and a checkmark takes it to 8 only while the chip is on. Left at a flat 8, a chip with neither
+   draws its label off-centre inside its own outline. */
+.chip:has(.glyph), .chip:has(input:checked), .chip.on { padding-left: 8px; }
+/* A 32px chip is under the 48px pointer minimum, so the target grows rather than the chip. Vertical
+   only: the inline edges belong to the chip 8px away. This is the same shape M3 states for a small
+   button, and `.chip` had none at all. */
+.chip::after { position: absolute; z-index: 1; inset: -8px 0; content: ""; }
+/* **The selected checkmark, which is what makes this a FILTER chip and not an assist one.** M3
+   animates a container from 0 to 18px wide with its glyph scaling in behind it. `.chip`'s own 8px
+   `gap` is the margin the reference states, so a zero-width check has to cancel that gap with a
+   negative margin or every unselected chip carries 8px of nothing at its leading edge. */
+.chip .chipcheck {
+  width: 0; margin-right: -8px; transform: scale(0); overflow: hidden;
+  font-size: 18px; color: inherit; opacity: 1;
+  transition:
+    width var(--md-sys-motion-duration-short2) var(--md-sys-motion-easing-standard),
+    margin var(--md-sys-motion-duration-short2) var(--md-sys-motion-easing-standard),
+    transform var(--md-sys-motion-duration-short2) var(--md-sys-motion-easing-standard);
+}
+.chip:has(input:checked) .chipcheck, .chip.on .chipcheck { width: 18px; margin-right: 0; transform: scale(1); }
 .chip input { position: absolute; width: 1px; height: 1px; opacity: 0; margin: 0; }
 .chip:hover { background: var(--hover); }
-.chip:has(input:checked) {
-  color: var(--c, var(--accent)); border-color: var(--c, var(--accent));
-  background: color-mix(in srgb, var(--c, var(--accent)) 14%, transparent);
+/* Selected drops the outline, which is what separates M3's filter chip from its assist chip beside
+   it. Without that, a filled chip and an outlined one differ by a fill alone and the set reads as
+   one control in two tints. */
+/* **`.chip.on` sits beside every `:has(input:checked)` here, and it is not belt and braces.**
+   Chromium does not restyle a `:has()` subject when a SCRIPT changes the checkedness inside it. Every
+   box in this app is written by script, because `PREFS` is the source of truth and no control carries
+   a `checked` attribute. So a page landing with a filter on drew the chip looking off. `setBox()` in
+   js/util.js writes the class from the same preference the box is written from. The `:has()` half
+   stays, because it is what answers a real pointer press with no script involved. */
+.chip:has(input:checked), .chip.on {
+  color: var(--on-surface); border-color: transparent;
+  background: color-mix(in srgb, var(--c, var(--accent)) 16%, transparent);
 }
 .chip:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
 /* The glyph rides the same .15s as the fill, the border and the ink above it. Left out of that
    list it snapped to full while the rest of the chip faded, so one press read as two events. */
-.chip .glyph { color: var(--c, var(--accent)); opacity: .55; transition: opacity .15s; }
+.chip .glyph { font-size: 18px; color: var(--c, var(--accent)); opacity: .55; transition: opacity .15s; }
 .chip:has(input:checked) .glyph { opacity: 1; }
-/* How many pins this layer holds under the current filters — pushed to the far edge of the chip. */
-.chip b { margin-left: auto; font-weight: 500; font-variant-numeric: tabular-nums; opacity: .7; }
+/* How many pins this kind holds under the current filters. It sat on `margin-left: auto` against a
+   full-width row. A chip sizes to its content, so the count simply follows the label across the
+   chip's own gap. */
+.chip b { font-weight: 500; font-variant-numeric: tabular-nums; opacity: .7; }
 /* A filter with nothing to match goes flat and unclickable rather than emptying the map in silence. */
-.chip:has(input:disabled) { cursor: not-allowed; opacity: .55; }
+.chip:has(input:disabled) { pointer-events: none; cursor: not-allowed; opacity: .55; }
 .chip:has(input:disabled):hover { background: none; }
-/* The right edge of a chip, in two forms. `.note` is written in the markup and never moves: it
-   names what the layer measures. `.hint` is written by JS and reports a state, such as how many
-   stations a filter holds.
-   **The label pushes, and nothing on the right pulls.** `margin-left: auto` on both of these was
-   the first try, and free space is DISTRIBUTED between every auto margin on the line. So the
-   Weather chip, which carries a note and a hint, split its slack in two and left the note 41px
-   short of the edge. One `margin-right: auto` on the label packs everything after it against the
-   right edge instead, whatever the count.
-   An empty `.hint` is taken off the line rather than left at zero width. It still carries the
-   flex `gap`, which held the note 8px off an edge the Stations chip met exactly. */
-.chip .lab { margin-right: auto; }
-/* `.btngrp .hint` is the same fact inside a connected button group: the count a pin filter holds,
-   riding in its own button because a button has no right edge to push it to. It keeps 11px against
-   the button's own `label-large` 14px, because the count is what the label qualifies and because
-   three of these have to fit one 262px row. `.mnote .note` is the layer note, which moved under its
-   group for the same reason. */
-.chip .hint, .chip .note, .btngrp .hint, .mnote .note { font-size: 11px; opacity: .7; white-space: nowrap; }
-.chip .hint:empty, .btngrp .hint:empty, .mnote .hint:empty { display: none; }
+/* `.chip .hint` is the count a pin filter holds, riding inside its own chip because a chip has no
+   right edge to push it to. It keeps 11px against the button's own `label-large` 14px, because the
+   count is what the label qualifies and because three of these have to fit one 262px row.
+   `.mnote .note` is the layer note, which moved under its group for the same reason.
+   `.chip .lab` is gone with the full-width rows that needed it. A chip sizes to its content, so
+   there is no free space for an auto margin to push into. */
+.chip .hint, .mnote .note { font-size: 11px; opacity: .7; white-space: nowrap; }
+.chip .hint:empty, .mnote .hint:empty { display: none; }
 #shown { margin: 10px 2px 0; font-size: 12px; }
 
 select, #goto, #dataFind, #camFind {
@@ -603,10 +671,20 @@ dialog:focus, dialog:focus-visible { outline: none; }
 /* Collapsible filter sections. The stock marker is replaced by a chevron on the right, because the
    count sits there too and a triangle on the left with a number on the right reads as two controls.
    `list-style: none` plus the ::-webkit-details-marker rule: Safari still needs the second. */
+/* **`title-small`, in sentence case, which is M3's own list subheader.** It drew at 11px, 500,
+   uppercase and tracked. `.mgroup` in `#paintmenu` carried the identical language and moved to this
+   token on 2026-08-25, so the drawer was the last surface here writing a heading in a size this app
+   picked rather than transcribed. `on-surface-variant` bridges to `--muted`, so the colour did not
+   move. `text-transform` is gone rather than overridden: M3 writes a subheader in sentence case,
+   this app's writing standard already does, and an uppercase transform breaks a screen reader on
+   anything acronym-shaped. */
 .sect > summary {
-  display: flex; align-items: center; gap: 6px; padding: 6px 0; cursor: pointer;
-  font: 500 11px Roboto, sans-serif; letter-spacing: .06em; text-transform: uppercase;
-  color: var(--muted); list-style: none;
+  display: flex; align-items: center; gap: 8px; padding: 6px 0; cursor: pointer;
+  color: var(--md-sys-color-on-surface-variant); list-style: none;
+  font-size: var(--md-sys-typescale-title-small-size);
+  line-height: var(--md-sys-typescale-title-small-line-height);
+  font-weight: var(--md-sys-typescale-title-small-weight);
+  letter-spacing: var(--md-sys-typescale-title-small-tracking);
 }
 .sect > summary::-webkit-details-marker { display: none; }
 .sect > summary::after {
@@ -619,7 +697,7 @@ dialog:focus, dialog:focus-visible { outline: none; }
 .sect > summary:hover { color: var(--on-surface); }
 /* The count is the whole point of a collapsed section — it must not be pushed off by a long title. */
 .sect > summary b { margin-left: auto; font-weight: 500; font-variant-numeric: tabular-nums; }
-.sect > summary .i { font-size: 15px; }
+.sect > summary .i { font-size: 18px; }
 .sect > summary + * { margin-top: 4px; }
 
 /* Ignored sensors: the same picklist again, so it reads as a sibling of the district filter rather
@@ -684,41 +762,6 @@ dialog:focus, dialog:focus-visible { outline: none; }
 .mapbtn:active { transform: scale(.92); }
 @media (prefers-reduced-motion: reduce) { .mapbtn { transition: none; } .mapbtn:active { transform: none; } }
 .mapbtn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-
-/* --- a labelled group inside a menu ------------------------------------------------------------
-   **M3's list subheader, and it was this app's own drawer heading.** That was 11px, 500, uppercase,
-   tracked and muted, on the argument that the two panels should speak one language. A reader asked
-   for M3 on every title in this panel on 2026-08-25, and the panel is the only user of this class.
-   M3 states a subheader as `title-small` — 14px on 20 at 500 — in `on-surface-variant`, which this
-   app bridges onto `--muted`. So the colour is unchanged and the type is transcribed.
-   **`text-transform` is gone rather than overridden.** M3 writes a subheader in sentence case, and
-   this app's writing standard already writes every rendered string that way. An uppercase transform
-   also breaks a screen reader's pronunciation of anything acronym-shaped.
-   `.sect > summary` in the drawer keeps the old language. It carries a chevron, a flex row and a
-   pointer for a `<details>` that is not here, so the two were never one rule. */
-.mgroup {
-  display: flex; align-items: center; gap: 6px; margin: 6px 6px 4px;
-  font-family: var(--md-sys-typescale-title-small-font);
-  font-size: var(--md-sys-typescale-title-small-size);
-  line-height: var(--md-sys-typescale-title-small-line-height);
-  font-weight: var(--md-sys-typescale-title-small-weight);
-  letter-spacing: var(--md-sys-typescale-title-small-tracking);
-  color: var(--md-sys-color-on-surface-variant);
-}
-/* Everything under the layer group above it. **The indent and the spine are gone, and a divider
-   does that job now.** The branch sat 26px in behind a 1px line, which was written for a time when
-   its parent was a chip with a glyph to line up under. A reader cut both on 2026-08-21. A rule
-   across the panel separates the two the way M3 separates any two sections of a menu, and it costs
-   the branch none of its width — which is what lets the two groups inside it stay content-sized. */
-.subgrp { margin: 2px 0; }
-/* The headings inside that branch. `.mgroup`'s own top margin is written for a group that follows
-   another group; the first one here follows the divider and wants less. */
-.subgrp .mgroup { margin: 8px 6px 4px; }
-.subgrp hr + .mgroup { margin-top: 6px; }
-/* Every chip in this panel is one line, so the drawer's own flex `.chip` serves it with no
-   override at all. It carried a sentence under each label for four revisions and was a two-row grid
-   for them. A reader cut every one of those sentences. What is left says the same thing in fewer
-   words: the label names the layer, and `.note` on the right names the discipline it measures. */
 
 .link {
   display: flex; align-items: center; gap: 6px; width: 100%; padding: 8px 10px;

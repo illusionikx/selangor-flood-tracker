@@ -288,13 +288,12 @@ async function phone() {
   is(w.getComputedStyle(mapEl, '::after').content, 'none', 'and no card edge');
   is(Math.round(r(mapEl).width), VW, 'the map is the full width of the window');
 
-  /* **`#locate` is the one button left on the map here, and it needs its own phone rule.** The
-     layers moved to the navigation bar on 2026-08-25, so `#paint` draws nothing at this width and
-     `#locate` takes the slot it held above the zoom box. Without a rule of its own it falls back to
-     the desktop `calc()`, which adds a `--fab` step for a button that is no longer under it.
+  /* **`#locate` is the one button left on the map, and it needs its own phone rule.** The layer
+     controls are a chip row over the map since 2026-08-25, so the button that opened their panel is
+     gone and `#locate` takes the slot it held above the zoom box. Without a rule of its own it falls
+     back to the desktop `calc()`, which adds a `--fab` step for a button that is no longer under it.
      `bands()` cannot catch that, because that loop never runs a width under 700px. */
-  is(cs(d.getElementById('paint')).display, 'none',
-     'phone: the map draws no layers button, because the navigation bar carries them');
+  is(d.getElementById('paint'), null, 'phone: the layers button is gone at every width');
   const lb = r(d.getElementById('locate')),
         zb = r(d.querySelector('.leaflet-control-zoom'));
   is(Math.round(lb.right), Math.round(zb.right),
@@ -307,7 +306,7 @@ async function phone() {
      own offsets for all four of these boxes, so a number that drifts there is invisible to every
      other probe in this file. */
   const cr = r(d.getElementById('credit'));
-  const low = [['#legend', d.getElementById('legend')], ['#paint', d.getElementById('paint')],
+  const low = [['#legend', d.getElementById('legend')],
                ['#locate', d.getElementById('locate')],
                ['.leaflet-control-zoom', d.querySelector('.leaflet-control-zoom')]]
     .filter(([, e]) => e && r(e).width > 1 && r(e).height > 1)
@@ -418,16 +417,14 @@ async function phone() {
   is(cs(nav).display !== 'none', true, 'phone: and it is not merely in the markup');
   is(Math.round(r(nav).height), 64, 'phone: M3 navigation bar, 64dp with no safe-area inset');
   is([...nav.querySelectorAll('.navitem')].map(b => b.id).join(','),
-     'navFilters,navAlerts,navLayers,navTable,navCams',
-     'phone: five items, which is what M3 caps this component at');
-  /* **The middle slot holds the map layers, and it opens the panel natively.** `#paint` is a FAB on
-     the map above 600px and it draws nothing below it, so this item is the only way in at this
-     width. It carries no handler: `popovertarget` names the same panel, so there is nothing in
-     `js/ui.js` to keep in step with it. */
-  is(d.getElementById('navLayers').getAttribute('popovertarget'), 'paintmenu',
-     'phone: the middle item opens the layers panel, through the browser and not a handler');
-  is(cs(d.getElementById('paint')).display, 'none',
-     'phone: so the map draws no layers button of its own');
+     'navFilters,navAlerts,navTable,navCams',
+     'phone: four items, under the five M3 caps this component at');
+  /* **The layers item is gone, and so is the panel it opened.** The layer controls are a chip row
+     over the map since 2026-08-25. A bar item pointing at a panel that no longer exists opens
+     nothing and errors nowhere, which is the fault this asserts against. */
+  is(d.getElementById('navLayers'), null, 'phone: no layers item, because there is no panel');
+  is(d.getElementById('paintmenu'), null, 'phone: and no panel for one to open');
+  is(!!d.getElementById('mapchips'), true, 'phone: the chip row over the map is the control instead');
   is([Math.round(r(nav).bottom), Math.round(r(nav).left), Math.round(VW - r(nav).right)].join(','),
      [VH, 0, 0].join(','), 'phone: spanning the window along its bottom edge');
   is(cs(d.getElementById('rail')).display, 'none',
@@ -773,7 +770,7 @@ async function desktop() {
      'and lifted off the map it floats on');
   /* Everything else at the top of the map clears it, through `--top-free`. Two of these are hidden
      until something puts them there, so each is measured only when it draws. */
-  for (const sel of ['#pills', '#toast', '#findpane']) {
+  for (const sel of ['#pills', '#toast', '#findpane', '#mapchips']) {
     const e = d.querySelector(sel);
     if (e && r(e).height > 1 && cs(e).visibility !== 'hidden' && cs(e).display !== 'none')
       is(r(e).top >= pill.bottom - 0.5, true, sel + ' clears the news pill');
@@ -1135,7 +1132,7 @@ async function desktop() {
      query, on the one map width where that line wraps. It stopped 118px short for a revision, and
      a reader called the result floating. */
   is(Math.round(VW - foot.right), 12 + GAP, 'the footer column is flush with the map on both edges');
-  for (const [id, x, y] of [['mapfoot', 12, 8], ['paint', 48, 36]]) {
+  for (const [id, x, y] of [['mapfoot', 12, 8], ['locate', 48, 36]]) {
     const e = r(d.getElementById(id));
     const lead = id === 'mapfoot';
     const off = lead ? Math.round(e.left) : Math.round(VW - e.right);
@@ -1166,7 +1163,7 @@ async function desktop() {
   /* Leaflet's own controls live INSIDE the map container and follow it for free. These three are
      siblings of the map and position against the window, so each adds `--pane-w` to its own offset.
      A missed one sits under the pane, which is exactly where a reader cannot reach it. */
-  for (const [id, base] of [['mapfoot', 12], ['paint', 48], ['toast', 12]]) {
+  for (const [id, base] of [['mapfoot', 12], ['locate', 48], ['toast', 12], ['mapchips', 12]]) {
     is(Math.round(VW - r(d.getElementById(id)).right), base + 360 + SEAM,
        id + ' steps aside by the pane width, on top of the seam it already had');
   }
@@ -1363,12 +1360,20 @@ async function desktop() {
        box + ': and its header is a flex: none sibling of that body');
   }
   const bb = d.getElementById('barBody');
+  /* **The body is capped for the probe, because the drawer no longer overfills a tall pane.** It
+     lost its sensor-kind section on 2026-08-25 and what is left fits a 1000px window, so there is
+     nothing to scroll and the line under this one proves nothing. What is asserted is that the
+     header stays put WHILE the body scrolls, and a cap is the smallest thing that creates a scroll
+     without inventing content. */
+  bb.style.maxHeight = '80px';
+  await settled();
   bb.scrollTop = 200;
   const moved = bb.scrollTop;
   is(moved > 0, true, 'the filters body has something to scroll, or the next line proves nothing');
   is(Math.round(r(bh).top), Math.round(r(d.getElementById('bar')).top),
      'and its header stays on the occupant top edge while the body scrolls under it');
   bb.scrollTop = 0;
+  bb.style.maxHeight = '';
   is(!!pane2.querySelector(':scope > .grab'), false, 'and no drag handle: a side sheet has none');
   /* A standard side sheet is not modal, and `show()` is what makes that true. `showModal()` would
      put the pane in the top layer and make the map behind it inert, which is the one thing a pane
@@ -1398,12 +1403,14 @@ async function desktop() {
   is(findBtnEl.getAttribute('aria-controls'), 'findpane',
      'and the button now names the card it actually opens, not the shut pane behind it');
   const fb = r(findEl);
-  /* `--top-free`, the one token every box at the top of the map reads. It cleared an app bar before
-     and it clears the news pill now, and the docked card must not be the one that forgot. */
-  is(Math.round(fb.top),
-     Math.round(parseFloat(cs(d.documentElement).getPropertyValue('--tick-h')) + GAP + 12 + 8),
-     'it clears the news pill, M3 docked search');
-  is(fb.top >= r(d.getElementById('ticker')).bottom - 0.5, true, 'measured against the pill itself');
+  /* **`--top-chips`, not `--top-free`.** That first token is the top of the map, and the layer chip
+     row took it on 2026-08-25. Everything that used to dock there starts under the row instead, and
+     the docked card must not be the one that forgot. Read it against the chip row's own bottom edge
+     rather than against a number: a token that drifts from the row's height is invisible until the
+     two boxes touch. */
+  const chipRow = r(d.getElementById('mapchips'));
+  is(fb.top >= chipRow.bottom - 0.5, true, 'the docked search starts under the layer chip row');
+  is(fb.top >= r(d.getElementById('ticker')).bottom - 0.5, true, 'and under the news pill above it');
   is(Math.round(fb.left), Math.round(12 + GAP + RAIL), 'and past the rail, on the leading edge');
   const pr = r(pane2);
   const overlaps = fb.left < pr.right && fb.right > pr.left && fb.top < pr.bottom && fb.bottom > pr.top;
@@ -1714,10 +1721,14 @@ async function bands() {
     is(Math.round(shared ? foot2.right - credit.right : credit.left - foot2.left), 0,
        label + (shared ? ': the credit is flush right while it shares the scale line'
                        : ': the credit leads on the left once it takes a line of its own'));
-    const lb = r(d.getElementById('locate')), pb = r(d.getElementById('paint'));
-    is(Math.round(lb.left), Math.round(pb.left),
-       label + ': locate and layers share one column in the zoom cluster');
-    is(lb.bottom <= pb.top + 0.5, true, label + ': and locate sits above layers');
+    /* **One button beside the zoom cluster, and there were two.** The layer controls are a chip row
+       over the map since 2026-08-25, so `#locate` took the slot that button held. */
+    const lb = r(d.getElementById('locate')), zb2 = r(d.querySelector('.leaflet-control-zoom'));
+    is(lb.right < zb2.left + 0.5, true, label + ': locate sits beside the zoom cluster');
+    is(Math.abs(lb.bottom - zb2.bottom) < 1.5, true, label + ': on its own baseline');
+    /* The chip row runs along the TOP of the map, so nothing in the bottom strip can reach it. */
+    const ch = r(d.getElementById('mapchips'));
+    is(ch.bottom < foot2.top, true, label + ': and the chip row clears the whole bottom strip');
     is(Math.round(r(pane).left - r(d.getElementById('map')).right), seam,
        label + ': one seam between the two panes');
     d.body.classList.remove('side');

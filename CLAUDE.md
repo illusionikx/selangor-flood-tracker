@@ -26,7 +26,7 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `index.html` | markup only — no inline CSS or JS |
 | `title-test.html` | `chrome --headless --dump-dom` — one of seven runnable checks. Guards the wordmark ladder in both of the heading's homes, the app bar and the navigation rail, in rendered pixels |
 | `narrow-test.html` | `chrome --headless --dump-dom` — one of seven runnable checks. Guards the narrow-window block: its threshold, its coverage, its refusal to be dismissed, and that it is modal |
-| `paint-check.html` | `chrome --headless --dump-dom` — one of seven runnable checks. Guards the on-map paint chooser: that it reads as a control and not as a map pin, that its two layers and the four boxes nested under `Stations` sit where they belong, that each section holds one choice at a time, that it clears the zoom cluster at both widths, and that below 600px its panel is an M3 bottom sheet: full window width, a drag handle with a real swipe behind it, and a press behind it that dismisses the sheet without reaching the map |
+| `paint-check.html` | `chrome --headless --dump-dom` — one of seven runnable checks. Guards the layer chips over the map: that the panel and its two openers are gone, that a menu chip states its own value and a filter chip carries a checkmark, that the heatmap and the two filters leave with the station layer, that a filter chip clears itself on a second press, that nothing else on the map lands on the row, and that below 600px the row wraps rather than scrolling |
 | `m3-check.html` | `chrome --headless --dump-dom` — one of seven runnable checks. Guards every M3 surface in rendered pixels: the eight dialogs against the roll call and the kind each is declared as, the four-band ladder, the map as an inset card, the one motion that changes what the pane holds, the supporting pane's headers as M3's medium flexible top app bar and the four full-screen dialogs as M3's own full-screen dialog header, the supporting pane at M3's canonical ratios with the map giving up exactly that width, the pane as a side sheet above 600px and a full-screen dialog below it, and each station section as a filled card. Also the navigation rail at both its widths, the navigation bar below 600px, and that every enter carries M3's own duration and easing |
 | `css/icons.css` | every icon, as an SVG mask. Generated — see docs/FEATURES.md for the fetch |
 | `css/base.css` | tokens, reset, controls, blocks shared by popup + alert panel |
@@ -752,12 +752,12 @@ frames only exist because we ran when they were taken. To re-test the capture pa
   one file rather than repeated in three.
 
   A rule that sets `--i` and a size, and never joins that list, has no `content` and no `mask`. So
-  it draws an empty box. `#paint::before` shipped that way for one run. It resolved the right `--i`
+  it draws an empty box. The old `#paint::before` shipped that way for one run. It resolved the right `--i`
   at every state and drew a blank white plate on the map.
   **A computed `--i` is not evidence that anything painted.** `paint-check.html` reads `mask-image`
-  for that reason, not just the token. **The fix was to stop using a pseudo-element.** `#paint`
-  carries a real `<i class="i i-layers">` child now, which takes the mask from the class like every
-  other icon in the app. Reach for the child element first. The list exists for the cases that
+  for that reason, not just the token. **The fix was to stop using a pseudo-element.** That button
+  took a real `<i class="i i-layers">` child, which takes the mask from the class like every other
+  icon in the app. The button is gone now and the rule is not: reach for the child element first. The list exists for the cases that
   cannot have one, which is a box whose content is already spoken for.
 - **`filter` runs before `mask`, so a filter on an `.i` is discarded.** The spec order is: paint the
   element, apply the filter, *then* clip with the mask. An `.i` is a box of `currentColor` with the
@@ -1273,8 +1273,9 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
   that map in view. **That argument describes a sheet somebody opens over content they are still
   reading. It does not describe a pane.** A pane is a destination, and in a compact window it is the
   only thing on screen. So `#scrim`, the `.grab` handle on both panels and `swipeSheet()` on the
-  pane are all deleted. `#paintmenu` is the last bottom sheet in this app and keeps its handle and
-  its swipe.
+  pane are all deleted. **There is no bottom sheet left in this app.** `#paintmenu` was the last
+  one, and the layer controls became a chip row over the map on 2026-08-25. `.grab` and
+  `swipeSheet()` went with it.
 - **The map is a pane, so Leaflet has to be told when its box changes.** `#map` is
   `inset: var(--hdr) var(--pane-w) 0 0`, and `--pane-w` is the supporting pane's width while that
   pane is open. So the map narrows rather than being covered. Leaflet listens to `window.resize` and
@@ -1321,14 +1322,14 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
   the scale rather than run it under the buttons. `m3-check.html` asserts one line wherever the map
   leaves room, and asserts the clearance at every width.
   **THE CREDIT IS THE LOWEST THING ON THE MAP, AT EVERY WIDTH.** That is a rule a reader stated with
-  the stack, and it covers the legend, the zoom control, `#paint` and `#locate` alike. The
+  the stack, and it covers the legend, the zoom control and `#locate` alike. The
   arithmetic was already correct and nobody stated it as a rule. The credit sits 8px above the map's
   bottom edge and the zoom cluster sits 36px up. On a phone that is 6px against 40px. **Anything new
   that floats over the map takes a `bottom` at or above the zoom box's, never under it.**
   **The wrapper takes no pointer events and its children take them back.** The column spans the
   width of the map. A wrapper that took clicks would swallow every press along the bottom of it.
   **THE COLUMN IS FLUSH WITH THE MAP ON BOTH EDGES, AND THE RESERVATION MOVED ONTO THE WRAP.** It
-  stopped 118px short of the trailing edge for a revision, to keep a wrapped credit out of `#paint`
+  stopped 118px short of the trailing edge for a revision, to keep a wrapped credit out of the button
   and the zoom box. A reader called that floating on 2026-08-25, and it was: one line of credit,
   ending in the middle of the map. The credit needs 337px for one line, measured across eight window
   widths at both rail states. So it wraps on a map narrower than that and nowhere else, which is the
@@ -1378,7 +1379,7 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
   and correct against the card is still wrong if it lands on its neighbour.
 - **Three boxes step aside for the pane and the zoom control must not.** Leaflet's own controls live
   INSIDE the map container, and that container now stops at the pane, so they follow it for
-  free. `#toast`, `#mapfoot` and `#paint` are siblings of `#map` and position against the window, so
+  free. `#toast`, `#mapfoot`, `#mapchips` and `#locate` are siblings of `#map` and position against the window, so
   each adds `--pane-w` to its own `right`. `#pills` takes half of it off its centre line.
   **`right`, not a transform**, which is what the old rule used: `#toast` already owns its
   `transform` for the slide it opens with, and two rules writing one property is how a toast arrives
@@ -2340,40 +2341,21 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   are the two visited least, so they move to `#appMenu`, the app bar's overflow menu at that width.
   **The middle slot holds the map layers, and the search left this bar for the app bar.** A reader
   asked for both on 2026-08-25. The search was the middle item and it is `.hlead` now, the app bar's
-  leading action. `#navLayers` took the slot it vacated.
-  **`#navLayers` is a second element, never `#paint` moved.** A bar item is a pill over a label and
-  `#paint` is a 60px FAB, so one node cannot be both. That is the same shape every rail item already
-  uses against its bar twin. It carries `popovertarget="paintmenu"`, so the browser opens the panel
-  and there is nothing in `js/ui.js` to keep in step.
-  **So two buttons name `#paintmenu` and only one of them draws.** The placement handler in
-  `js/ui.js` used `querySelector`, which answers the first in document order. That is `#navLayers`,
-  and it is `display: none` above 600px, so the menu measured a rectangle of zeros and placed itself
-  in the top-left corner. It takes the button with a box now. Any second invoker for one popover
-  needs that rule.
-  **Every id in the bar is its rail twin with one prefix changed.** `railFilters` against
-  `navFilters`. `NAV` in `js/ui.js` binds both from one table and builds each id out of one string.
-  `railActive()` in `js/map.js` matches on that suffix. `js/alerts.js` writes both badges. Only one
-  of the two components is ever on screen, so a second copy of a handler is a second thing to
-  change — the shape `syncHeat()`'s own two repairs already record.
-  **`alerts.js` must write into `.railbadge` and never over the button.** A rail item and a bar item
-  each hold a pill, a glyph, a badge and a label. An `innerHTML` write on the button takes the label
-  and the pill with it, and the item then draws as a bare number under nothing.
-  **The indicator is shared, not copied.** `.railpill`, `.raillabel` and `.railbadge` name
-  `:is(#rail, #navbar)`. Only the label size differs: `title-small` at 14px in the rail,
-  `label-medium` at 12px in the bar, which is each component's own size.
+  leading action, and the search took the slot it vacated.
+  **Four items now, and there were five.** The layers item pointed at a panel, and the layer controls
+  are a chip row over the map since 2026-08-25. A bar item that opens a panel which no longer exists
+  opens nothing and errors nowhere.
   **Below 600px `#pane` covers the bar**, because that pane is a full-screen dialog there. So the
   bar is a launcher at that width and never a state display.
   **`--navbar-h` holds `calc(64px + env(safe-area-inset-bottom, 0px))`**, and `viewport-fit=cover`
   in the viewport meta tag is what makes that inset report a real number. Without the tag it reads 0
   and the bar sits under the iOS home indicator.
-  **Three PHONE literals had to take the term as well as the desktop rules.** `#paint`, `#locate`
-  and `#mapfoot` state a bottom measured up from the map's own edge. That edge moved 64px and those
-  three did not, so the zoom box climbed past two of them. `paint-check.html` reported it. Nothing
-  else in this app reads that geometry.
-  **`#paint` is `display: none` below 600px now, so `#locate` holds that slot alone.** It takes the
-  same 136 without the `--fab` step that used to stack it above a second button. The button stays in
-  the document rather than leaving it, because `#paintmenu` names it through `popovertarget` and a
-  rotate past 600px then needs nothing to notice.
+  **Two PHONE literals had to take the term as well as the desktop rules.** `#locate` and `#mapfoot`
+  state a bottom measured up from the map's own edge. That edge moved 64px and they did not, so the
+  zoom box climbed past them. `paint-check.html` reported it. Nothing else in this app reads that
+  geometry.
+  **`#locate` is the one button left on the map**, and it takes the slot beside the zoom box that the
+  layers button held.
   **`.mapbtn` declares `--fab` on itself.** A rule that stacks one map button above another cannot
   inherit it, so it states the fallback. Without one the whole `calc()` is invalid and the button
   falls to the top of the page. It is the desktop pair that still stacks.
@@ -2781,7 +2763,7 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   and off white on the light theme's card `#f1f3f4` is invisible. So `:root` holds `#7d8794`
   instead. Do not copy either value into the other block. The legend gains no moon key. That strip
   already wraps below 320px with five keys, and it states the ladder rather than the hour.
-- **The Weather chip in `#paintmenu` draws `partly_cloudy_day`. The rung ladder draws `sunny`.**
+- **The Weather row in the layer menu draws `partly_cloudy_day`. The rung ladder draws `sunny`.**
   The chip names a layer and reports no rung, so it takes the wider mark. Rung 0 is the rung the
   legend calls `Clear`, so its glyph answers to that word. One revision moved the pin, the card
   glyph and the legend key onto the new mark as well. The repository owner reverted it on
@@ -2972,252 +2954,71 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   `HEAVY RAIN`, `HAPPENING NOW`) are a deliberate visual language and are **not** messages — leave
   them.
 - All user settings live in one `prefs` blob in `localStorage` (`PREFS` + `save()`).
-- **The layer controls live on the map, in two groups, and the drawer keeps the sensor kinds.**
-  `#paint` is a `.mapbtn` in the map's bottom zoom cluster, **above 600px alone**. Below it the
-  navigation bar's middle item opens the same panel and the map draws no button at all — see the
-  navigation bar entry in the gotcha list. Its popover holds two layers at the top
-  level and no headings over them: `Stations` and `Weather`. Inside `Stations` sit two labelled
-  sections, `Heatmap` (water level, rainfall) and `Icon` (favorites, on alert).
-  **All three groups are M3 CONNECTED BUTTON GROUPS, single-select, and multi-select is applicable
-  nowhere in this panel.** That is the component M3 Expressive replaced the segmented button with.
-  `.btngrp` in `css/chrome.css` is transcribed from the component set's own `button-group.css` and
-  `button.css`, at size `xs`, shape `round`, variant `filled` with `data-selected`. Each group holds real radios, clipped to a pixel rather than hidden. So the browser keeps the
-  group exclusive and walks it with the arrow keys.
-  **`.btngrp` is NOT `.seg`, and the two must not be merged without a reason.** `.seg` is this app's
-  own sunken track with a pill sliding along it. It approximates a segmented button and matches no
-  M3 component. Two surfaces still draw it. The app menu's theme picker sits at the end of a menu
-  row and sizes to its content. The lightbox's range selector lies over a photograph in literal
-  whites, and its chosen segment grows to hold a second label. Converting either one is a change of
-  its own, and neither is in scope here. **Do not widen a `.btngrp` rule to `.seg`.**
-  M3's multi-select variant is what the drawer's sensor-kind chips are, and they stay `.chip` there.
-  **Every group fills the panel between its own padding, and that is the one divergence from the
-  spec's shape.** M3 sizes a connected group to its buttons. Each group here is one row of the
-  panel, and a row spans it.
-  **`flex-grow: 1`, never the `flex: 1` shorthand.** That shorthand is `1 1 0`, and a zero basis
-  makes every button start at nothing and take an equal share of the row. A flex item is normally floored at its own min-content. The explicit `min-width: 48px` M3
-  states for a connected xs button REPLACES `min-width: auto` and takes that floor away. Measured at a 320px window: three
-  buttons of 77px each, with `Water level` drawing about 100px of `nowrap` text straight over its
-  neighbour. It did that at every width and it moved no `scrollWidth`, so only an assertion against
-  the label's own box sees it. `flex-grow` alone keeps the `auto` basis, so each button starts at
-  its own label and only the space left over is shared. `flex-shrink` stays 0, so a row that cannot
-  fit overflows the panel rather than cutting a word.
-  **The selected button changes SHAPE as well as fill**, from the 4px inner corner to a full pill at
-  height / 2. That is the component's signature, so the radius rides M3's own spring on the
-  transition list beside the colour.
-  A map with neither layer is a basemap with no answer on it. `PREFS.mapLayer` therefore has no
-  empty value, `''` was reachable for one revision and is gone, and Stations is the landing default.
-  **The two pairs inside Stations were checkboxes and are not any more.** They were checkboxes
-  because a radio group cannot be cleared and "no wash" and "no filter" are real answers a reader
-  wants. A segmented button states that answer as a segment instead, `Off` and `All`. So each group holds the same three values its preference always held. The browser keeps it
-  exclusive, and both-on stops being representable in the markup at all. Two repairs inside the change handler
-  failed at that before. See `syncHeat()`'s own comment.
-  **Each radio carries its preference value in `value`.** So the handler in `js/ui.js` reads the
-  string off the box that fired and compares no ids. `syncHeat()` and `syncPins()` each write one
-  box back from the preference, and the browser clears the siblings.
-  **The MAP LAYER group is size MD in the SQUARE shape, and the two groups under it stay at xs.** A
-  reader asked for the large square form on 2026-08-25, and then for a size that reads beside the
-  navigation bar. **That bar is what picks md.** Its items draw a 24px glyph over a label, and md is
-  the one button size whose icon is 24px. Size lg stood here first at 96px, with a 32px icon and a
-  24px label, and it towered over the bar it sits beside.
-  `Button/button.css` at `data-size="md"` and `ButtonGroup/button-group.css` at the same size: 56px
-  tall, 24px of inline padding, a 24px icon, `title-medium` at 16px on 24, an 8px inner corner, a
-  16px outer corner for the square shape, no group padding and no 48px floor. **The last two are xs
-  and sm alone**, so a group at md takes neither.
-  **The selected button still goes fully round at `height / 2`**, which is the connected group's own
-  rule at every size and in both shapes. That is the component's signature.
-  **`--_out` is the whole of the square override, and restating the two corner rules broke it.** The
-  base `:first-of-type` and `:last-of-type` rules read that variable already. A copy of them under
-  `#paintmenu` carries an id, so it beats `.btngrp label:has(:checked)` and holds the chosen button
-  at its square corner rather than letting it go round. Set the variable, never the corners.
-  **The scope is `#paintmenu > .btngrp`, and the child combinator is the whole of it.** That group is
-  a direct child of the panel. The Heatmap and Icon groups sit inside `.subgrp > .subin`. A bare
-  descendant selector reaches all three, which shipped for one run and looks deliberate on screen.
-  **One divergence, and it is this panel's existing one.** The glyph sits OVER the label rather than
-  before it, on the same reader's instruction. 56 is 24 + 2 + 24 with 3 of padding at each end, so
-  the stacked form lands on the spec's own height with nothing to adjust. **`padding-inline` is the
-  spec's 24.** At size lg it had to be 12, because the pair floored at 372px of min-content against
-  the 272 this panel has and a flex item never shrinks under that floor. At md the two labels measure
-  about 230px with the full padding, so the number comes across whole.
-  **The six nested buttons still carry no glyph, and the reason is unchanged.** Three buttons of
-  text and a glyph do not fit a 328px sheet on one row, and the legend under the map already draws
-  what each wash means.
-  **Every title in the panel is an M3 token.** The two group headings, `Heatmap` and `Icon`, drew at
-  11px, 500, uppercase and tracked, which is the drawer's own section-heading language. A reader
-  asked for M3 on all of them on 2026-08-25. `.mgroup` is `title-small` now — 14px on 20 at 500 — in
-  `on-surface-variant`, which is M3's list subheader and which this app bridges onto `--muted`. So
-  the colour did not move and the type is transcribed. **`text-transform` is gone rather than
-  overridden**: M3 writes a subheader in sentence case, this app's writing standard already does, and
-  an uppercase transform breaks a screen reader on anything acronym-shaped. `.sect > summary` in the
-  drawer keeps the old language, and the two were never one rule.
-  **The panel carries a heading at BOTH widths, reading `Layers`.** It drew on the sheet alone and at
-  `title-medium`, a size this app picked rather than transcribed. A reader cut it on 2026-08-25 and
-  asked for it back the same day at M3's own numbers. It is `title-large` now, 22px on 28, which is
-  the token this app's full-screen dialogs take for their own headline. **An `<h2>` keeps the UA
-  block margin** and this app resets `h1` alone, so `margin` is stated.
-  **Nothing names what a layer measures, and `.mnote` is a failure line now.** `Hydrological
-  Measurement` and `Nowcasting` sat under the group and a reader cut both on 2026-08-21. The two
-  buttons already name the layers, and naming what each measures is a second look at one fact.
-  `#wxHint` is the one thing left in that paragraph, and every caller that writes it reports a
-  failure. They are `could not load` from the rollback in `render.js` and in `ui.js`, and `no data
-  yet` from `wx.js`. So the line draws nothing on a healthy poll. An empty `.hint` leaves through `:empty`, and a
-  `:has()` on the paragraph takes the whole line with it. Without that second rule
-  the panel keeps a blank strip under its layer group for ever.
-  **A pin filter's count rides INSIDE its own button**, for the same reason. It keeps 11px against
-  the button's own `label-large` 14px, because the count is what the label qualifies.
-  **The panel takes M3's 24px inline body padding, at both widths, and the reason it declined it is
-  gone.** That reason was that every row was a `.chip` bringing 14px of its own. Stacking 24 on top of
-  14 put a label 38px inside the panel. A group pads 2px and its buttons paint to that edge. A reader
-  called the old 6px too close to the border on 2026-08-21. **`min-width` rose to 320 with it**,
-  because the Icon group measures 251px and 300 less a border and 48px of padding leaves 250.
-  Measured across five widths, from 1100 down to 320, with a two-digit count on the favorites
-  button. The tightest row lands on 240 of 240 at a 320px window.
-  **The branch carries no indent and no spine, and a DIVIDER does that job.** It sat 26px in behind a 1px line. That was written for a time when its parent was a chip with
-  a glyph to line up under. A reader
-  cut both on 2026-08-21. `.menu hr` is M3's own full-width divider and this app already draws it
-  between menu sections. **It lives INSIDE `.subin`, never above the branch.** Outside, it stays on
-  screen with nothing under it the moment Weather takes the map, which is a rule under an empty
-  panel. Removing the indent is also what gives the two groups inside their full 288px. An empty `.hint`
-  leaves the line through `:empty`, because it carries the flex `gap` at zero width.
-  **Four revisions carried a sentence under every label, and a reader cut all of them.** Do not put
-  one back. The `.on` / `.off` pair on the two layers went with them, and so did the two empty-state
-  sentences on the filters. A dead button already takes M3's own disabled pair through `disabled`,
-  and `#shown` states what the map hides. One fact does not get two looks.
-  **The rule for what goes where: a control the reader reaches for WHILE LOOKING AT THE MAP goes on
-  `#paint`. A control that shapes which stations exist at all stays in the drawer**, beside the
-  district picker and the ignored list. `#layersect` and `#layerN` are gone.
-  **Every mutually-exclusive group here is ONE choice held in ONE string**: `PREFS.mapLayer`,
-  `PREFS.heatLayer` and `PREFS.pinFilter`. Never a pair of booleans: that shape holds both-on, which
-  the panel cannot draw, and this repo already paid for it once — see `syncHeat()`'s own comment for
-  the two repairs that failed. `syncPins()` and `render()` are the other two writers, and each one
-  writes its own radio from its own string.
-  **`PREFS.wx` and `PREFS.stations` are gone.** `PREFS.mapLayer === 'weather'` and `=== 'stations'`
-  replace them everywhere, and those are the only two values. Leaving weather goes back to
-  `'stations'`, in `flashTo()` and in the failed-import rollback. A reader leaving a weather map
-  wants the map back. `syncWx()` no longer writes the weather box: `render()` writes both layer
-  boxes, so the pair has one writer.
-  **The panel carries no heading at either width.** It read `Layers` on the sheet alone, and a reader
-  cut it on 2026-08-25. `aria-label` on `#paintmenu` names the panel now. **Never `aria-labelledby`
-  here again**: it pointed at the `<h2>`, and an `aria-labelledby` aimed at a deleted node names
-  nothing and errors nowhere. `paint-check.html` asserts the attribute is absent for that reason.
-  **Below 600px `#paintmenu` is an M3 modal bottom sheet, not a menu beside its button.** It is a
-  panel of settings a reader opens while looking at the map, so it belongs on the edge the thumb is
-  already at. The numbers come from the M3 Expressive component set's `BottomSheet/bottom-sheet.css`:
-  28dp on the two TOP corners, `min(640px, 100%)` centred, `calc(100dvh - 72px)` tall
-  at most, a 48dp handle row holding a 32 by 4px indicator, and a 32% scrim. It travels up from the
-  bottom edge on `--m3-travel`, the same 300ms a full-screen dialog takes.
-  **The sheet reaches both side edges, and the reference file it is transcribed from does not.**
-  That file writes `calc(100% - 32px)`. M3's own spec table states `Full width, up to max-width
-  640dp`, and states a 56dp start and end margin for a window WIDER than 640dp alone. So the inset is
-  the leftover after centring, never a literal. Below 640dp there is nothing left over. The 32px
-  version left 16px of map down each side at 360px, and a reader named it on 2026-08-25. Only the top
-  corners are rounded, because the other three sit on an edge. **The three margins above 640dp are
-  not written**: the block sits inside `@media (max-width: 600px)`, so no window can reach them.
-  **The 48dp handle row is the spec's 22 + 4 + 22**, stated from the other end.
-  **A tap that dismisses the sheet must do nothing else, and light dismiss alone does not give
-  that.** A popover closes itself on a press outside it, and the same press still reaches what sits
-  under it. So a tap on a pin behind the sheet shut the sheet AND opened that station's card.
-  `js/ui.js` swallows that press with two capture-phase listeners on `#map`. **Two, because the
-  popover is already shut by the time `click` fires.** Light dismiss runs on the pointer down and up,
-  so `:popover-open` reads false in a click handler. The down pass records the answer and the click
-  pass spends it. **Capture on `#map`** is what puts them ahead of the `click` listener Leaflet binds
-  on the marker itself. **The scrim is the rule, not the width.** A press on a scrim means dismiss.
-  Above 600px the panel is a menu beside its button, with no scrim and a live map behind it, so a
-  press there is a press on the map and is left alone. Only a `click` is swallowed, so a pan still
-  works, and nothing here closes the sheet: light dismiss already did.
-  **The sheet gets an enter AND an exit, and a keyframe buys the enter alone.** It shipped as
-  `@keyframes sheetUp` on `:popover-open` for a run, so the sheet arrived over 300ms and left in one
-  frame. A reader named it on 2026-08-25. That is the identical fault `#pane` had, and the repair is
-  the one that entry already states: `transform: translateY(100%)` as a closed state to travel from,
-  `@starting-style` so the enter starts there, and `allow-discrete` on `display` AND on `overlay`.
-  Without the second one the sheet leaves the top layer in the first frame of the exit and draws
-  behind the page. **The scrim states its own**, because a `::backdrop` is a separate box and
-  inherits nothing from its element.
-  **The travel lives in the swipe block at the foot of `css/chrome.css`, not in the sheet block**,
-  because the drag writes into the same `transform`.
-  **The handle is drawn AND the swipe is wired**, in `js/ui.js`. A handle over a gesture nobody
-  implemented is a promise the panel does not keep. The drag is refused while the sheet is scrolled
-  away from its top, because a downward drag shares its axis with the sheet's own scroll.
-  M3's 24px inline body padding is taken now, and `#paintmenu`'s own rule states it for both widths.
-  This app declined it while every row was a `.chip` carrying 14px of its own. The 24px at the
-  bottom was always taken, where a phone's gesture bar sits.
-  **`js/ui.js` must CLEAR its placement at this width rather than skip it.** An inline `left` or
-  `bottom` beats the sheet's own rule, so a menu placed on a wide screen and then rotated to a narrow
-  one would stay pinned beside a button it no longer opens from.
-  **A menu takes the edge it opens FROM as the edge that pins it**, `bottom` upward and `top`
-  downward — see the placement handler in `js/ui.js`. That is the wide layout, and it is unchanged. `#paintmenu` changes height on a press, and the
-  far edge pinned it off the button that opened it. The branch collapse is a grid row between `0fr`
-  and `1fr`. `interpolate-size` with `height: auto` came first and does not come back.
-  **A collapsed branch stays out of the panel's scroll height through `contain: layout`, not through
-  `overflow: hidden`.** The second clips the paint and makes no claim about layout, so `.menu`'s
-  `overflow-y: auto` drew a 17px scrollbar down a 157px box reporting 352. `contain: size` also
-  clears it, and nothing here uses it: it sizes the item as if empty, so the open branch draws
-  nothing.
-  **Hover opens the panel on a pointer device**, behind
-  `(hover: hover) and (min-width: 601px)` AND a `pointerType === 'mouse'` test. A tap fires
-  `pointerenter` too, and a tap already has the press. Leaving schedules the close so the pointer can
-  cross the 4px gap to the panel.
-  **Hover then frees the press, so one press switches the layer.** The gate is the pointer being on
-  the button, never the media query: a tap and a keyboard press keep the native `popovertarget`
-  toggle, which is the only way in either of them has. `preventDefault()` is what stops that toggle,
-  because a popover invoker runs as the click's activation behavior. The handler presses the radio
-  rather than writing `PREFS.mapLayer`, because the weather radio owns the deferred import and its
-  rollback.
-  **The button names that shortcut on a TOOLTIP, and the panel does not name it at all.** A
-  `.mfoot` line sat at the foot of the panel reading `Click <layers> to switch layer`, drawn behind
-  the same media query the handler tests. A reader cut it on 2026-08-21. A panel floating beside its
-  own button holds more than one thing a reader can click, and the line pointed at a control outside
-  the box it sat in.
-  **`js/ui.js` writes the sentence onto `#paint` as `data-tip`, and `js/sparktip.js` draws it.** It
-  is one of a `data-tip` and a `title`, never both, which is the shape `setBtn()` in `js/locate.js`
-  already uses. **It is not a `title`.** A `title` opens on no phone, and this app accepts one only
-  as a duplicate of something already visible. Nothing is visible here any more.
-  **Written from the media query rather than baked into the markup, because the query is live.** A
-  laptop docked to a mouse, and a tablet rotated past 600px, both cross it without a reload. Below
-  it the button falls back to `title="Map layers"`, because `data-tip` opens on a tap and a tap
-  cannot take the shortcut.
-  **The press answers for itself through `.mapbtn:active`, and never through a class.** The glyph is
-  the same at every state, so a press that switches the map leaves the button looking untouched.
-  `:active` covers the press that opens the panel and the press that switches the layer alike, with
-  no timer to clear. A chip's `.glyph` carries `transition: opacity` for the same family of reason.
-  It sat outside `.chip`'s own transition list, so it snapped to full while the rest of the chip
-  faded, and one press read as two events.
-  **`Stations` gates the wash as well as the pins.** `render()` and `syncHeat()` share the test
-  `PREFS.mapLayer === 'stations'`. Everything under that chip is a choice ABOUT the station layer, so
-  with the layer off none of them has anything to act on and the branch collapses.
-  **The weather chip takes `--c: var(--wx-clear)`, its own layer's hue, and never a status hue.**
-  This app reserves that ladder. An amber chip in a layer panel on a flood map reads as an alert on
-  the water.
-  **A parent collapses its children and never unchecks them.** The check is the preference, and
-  switching `Stations` back on has to restore the view that was there before. Both the collapse and
-  the weather dim are `:has()` rules in `chrome.css`, so no JS can get either wrong. `#shown` names
-  whichever of the two emptied the map.
-  **Its glyph is `layers` at every state and must never name the active layer.** It carried the
-  water drop and the rain cloud first, which are the glyphs the river and rainfall PINS draw. A
-  reader called it indistinguishable from a map icon, and they were right.
-
-  The state is already on screen three times over. `#legend` names the wash and draws its ramp,
-  `#risebadge` states the filter, and `#shown` counts what the drawer hides. A control states which
-  control it is.
-
-  **It sits in the zoom control's cluster and wears that cluster's fill, ink and shadow — no text,
-  no accent.** See `.mapbtn` in `base.css`. **Keep those in step** with
-  `.leaflet-control-zoom`: the two stand against each other, and a mismatch of one shade reads as a
-  mistake at that distance. `paint-check.html` compares them declaration by declaration.
-  **The size and the radius deliberately do NOT match the strip's 30px on 8px.** It opens the map's
-  own settings and is the one control there that is not a zoom, so it stands out by size. It must
-  never stand out by colour.
-  **Its height is the zoom BOX's height on a desktop, and `--fab` is the one number that carries
-  it.** 60, being two 30px zoom buttons stacked. M3's flat 56 stood here first and left the button
-  4px short of the box beside it. **`#locate` keeps that 60 on a phone and there is no override.**
-  The rule is about two boxes standing side by side, and on a phone the one map button left stands
-  above the zoom box instead. It followed the rule there for one revision, at 88px, which is a
-  quarter of a 360px screen. M3's FAB is a 16px radius under a 24px glyph on a 56px
-  box, which is exactly 2/7 and 3/7 of it, so two `calc()`s hold those ratios at any size.
-  `paint-check.html` asserts the height against the zoom box, never against a number.
-  A second try made it an accent FAB with a label, still alone in that corner. A reader said it
-  stood out too much. **Both failures came from putting a control on its own in the middle of a map.
-  One had to whisper and the other had to shout. Neither is the answer.** See `docs/FEATURES.md`,
-  *The paint chooser moved onto the map*.
+- **The layer controls are a bare CHIP ROW over the map, and the drawer keeps the sensor kinds.**
+  `#mapchips` sits on the map's leading edge, under the ticker, on the legend's own 12px line. A
+  reader asked for that on 2026-08-25.
+  **Four chips, in two M3 kinds.** A chip that opens a menu states its VALUE as its label and carries
+  a trailing `expand_more`. A chip that is on or off states a NAME and answers with a leading
+  checkmark. `Chip/chip.css` is the reference, and `.chip` in `css/base.css` is the component — the
+  same class the drawer's sensor kinds draw.
+  `layerChip` picks Stations or Weather. `heatChip` picks Off, Water level or Rainfall. `kindChip`
+  holds the five sensor kinds. `alertChip` and `favChip` are filter chips.
+  **The sensor kinds moved off the drawer on 2026-08-25 and they are a MENU chip, not five chips.**
+  Five more chips on that row is nine chips over a map. They are the one MULTI-select group here, so
+  their rows are checkboxes and `PREFS.layers` stays a map of booleans. Every other group in the row
+  is one string holding one answer. **The chip states how much of the set is off** — `Sensors` alone
+  means every kind draws — which is what the drawer section's own `<summary>` count used to say.
+  **A kind is not a filter over stations.** It is which of a station's sensors this map draws at all.
+  That is why it stayed in the drawer while Favorites and On alert left, and why it sits under the
+  station layer here rather than beside the two filters.
+  **`checked` in the markup is safe on these and on nothing else.** `js/ui.js` generates the rows
+  from `PREFS.layers` on every load, so a browser has no form state left to restore. A radio written
+  once in `index.html` is the case that rule forbids.
+  **The heatmap, the kinds and the two filters answer about the STATION layer, so they leave with
+  it.** Weather takes the map and there is nothing for any of them to act on. A `:has()` rule in `css/chrome.css`
+  does it, so no script can get it wrong and nothing is written on the poll.
+  **There is no `All` chip on the filter, because a filter chip clears itself.** M3 states that
+  pressing a selected filter chip turns it off, so "every pin" is the state with neither on. They are
+  still radios and still one string, so both-on stays unrepresentable.
+  **The clear handler must NOT call `preventDefault()`.** A browser sets a radio's checkedness as
+  pre-click activation and restores the PRE-click value on a cancelled click. That value is checked,
+  so cancelling put the chip straight back on and undid the line under it. The test also reads
+  `PREFS.pinFilter`, never `e.target.checked`: activation runs before dispatch, so the box reads
+  `true` on a first press as well as a second.
+  **The drawer holds the district picker and the ignored list, and nothing about the map's paint.**
+  The sensor kinds were the last section to leave it.
+  **`#paintmenu`, `#paint` and `#navLayers` are all gone.** The chips ARE the control, so a panel, a
+  round button that opened it, and a navigation bar item pointing at the same panel are three things
+  with no job. The bar carries four items now. `#locate` took the slot beside the zoom box.
+  **`--top-chips` is the row's height plus its gap**, and `#toast`, `#pills` and the docked search
+  all start under it. Above 600px the row is one chip tall. Below it the row WRAPS to two, so the
+  phone block states its own value. A row that scrolled sideways would hide chips with nothing on
+  screen to say they exist.
+  **The row takes no pointer events and its chips take them back.** It spans the map so its chips can
+  wrap across it, and a row that took clicks would swallow every press along the top of the map. That
+  is the pair `#mapfoot` already states at the other end.
+  **Every chip up here carries `--surface` and `--shadow`.** `.chip` alone is transparent, which is
+  right inside a panel and invisible on a map.
+  **Chromium does not restyle a `:has(input:checked)` subject when a SCRIPT changes that
+  checkedness.** `matches()` answers true and `getComputedStyle` hands back the unchecked value.
+  Measured on this build. Every box in this app is written by script, because `PREFS` is the source
+  of truth and no control carries a `checked` attribute. So a page landing with a filter on drew the
+  chip looking off. **`setBox()` in `js/util.js` is the repair**: it sets the box and mirrors the
+  answer onto `.chip.on`, from the same preference. Every `:has(input:checked)` rule on a chip names
+  `.chip.on` beside it. The `:has()` half stays, because it answers a real pointer press with no
+  script involved. Anything new that writes one of these boxes goes through `setBox()`.
+  **The rule for what goes where: a control the reader reaches for WHILE LOOKING AT THE MAP is a chip
+  on the map. A control that shapes which stations exist at all stays in the drawer**, beside the
+  district picker and the ignored list.
+  **Every mutually-exclusive group is ONE choice held in ONE string**: `PREFS.mapLayer`,
+  `PREFS.heatLayer` and `PREFS.pinFilter`. Never a pair of booleans: that shape holds both-on, and
+  this repo already paid for it once — see `syncHeat()`.
+  **The menu chip's label is written from the preference, never read back.** `render()` writes
+  `#layerChipLabel` and `#layerChipIcon`. `syncHeat()` writes `#heatChipLabel`.
+  **Five shapes came before this one and every one failed on the same axis.** A glyph plate in the
+  map's corner read as a map pin. An accent FAB with a label shouted. Then a panel behind a `layers`
+  button, then a bottom sheet on a phone, then connected button groups inside that panel, then size-lg
+  square outlined buttons. Each one put a settings dialog between a reader and a setting.
 - **`#risebadge` reads `ON ALERT` and the chip that raises it filters on `s.rising`.** That is
   narrower than `isHot()`, which is what the app bar counts, the badge shows and the panel lists. So
   the map chip hides stations the app bar counts, and the pill's own sentence carries the real
@@ -3310,8 +3111,8 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   around the control rather than in it, which reads as a padding mistake on the parent. Three other
   explanations were measured first and all three were wrong. They were the row's own padding
   (symmetric at 8px), `align-items` on the row (already `center`), and the flex item stretching.
-  `align-self: auto` on a centred row cannot stretch. `#paintmenu`'s button groups are the live
-  users of this rule now.
+  `align-self: auto` on a centred row cannot stretch. The map's own layer chips are the live users
+  of this rule now.
 - **The theme has two states, and the glyph names the NEXT press.** `PREFS.theme` holds `light` or
   `dark` and nothing else. `applyTheme()` in `map.js` stamps it on `<html>`, and `setTheme()` stores
   the pick and calls it. Anything that wants to know the theme on screen reads
@@ -4010,65 +3811,62 @@ time supplies no reliable clock to wait on.
 Focus is the property. A modal dialog makes the page behind it inert, and a modal dialog is in the
 top layer by definition.
 
-`paint-check.html` guards the on-map paint chooser, which is a control drawn over a map full of
-controls-shaped things. What it asserts is rendered pixels, and none of it reaches `php -l`,
-`node --check` or any query over `.cache.json`.
+`paint-check.html` guards the layer chips over the map. What it asserts is rendered pixels, and none
+of it reaches `php -l`, `node --check` or any query over `.cache.json`.
 
-**The button must not read as a map pin, and the first one did.** Its glyph followed the active
-layer, so it drew `water_drop` or `rainy` beside real pins carrying those exact shapes. So the check
-asserts the layers glyph and that the glyph HOLDS across all four layer states.
+**Five shapes came before this one and every one of them failed on the same axis.** A glyph plate in
+the map's corner read as a map pin. An accent FAB with a label shouted. Then a panel behind a
+`layers` button, a bottom sheet on a phone, connected button groups inside that panel, and size-lg
+square outlined buttons. Each one put a settings dialog between a reader and a setting. The chips ARE
+the control now.
 
-**It also must not shout, and the second one did.** It is map furniture now, so the check compares
-its fill, ink, radius and shadow against the zoom control's, and its box against a zoom button's.
-That comparison found a fault in the zoom control rather than in the button — see the
-`.leaflet-touch` gotcha above.
+**The deletions are asserted, and that is the assertion nothing else can make.** `#paintmenu`,
+`#paint` and `#navLayers` are gone. Markup left behind by a half-finished revert draws a dead button
+on the map and errors nowhere.
 
-**Placement is asserted against the zoom box, never against a constant.** Beside it on a desktop,
-above it on a phone, hard up against it either way. The offsets in `chrome.css` come off Leaflet's
-own margins, so a change to either drifts the two apart on screen and nowhere else.
+**Two chip kinds, told apart by shape.** A menu chip states its VALUE as its label and carries a
+trailing arrow. A filter chip states a NAME and answers with a leading checkmark. The check reads
+both halves on all four chips, because a chip carrying neither mark looks deliberate.
 
-**One-at-a-time is asserted as a property, never as a scenario.** A pick only takes when its set has
-members, and the live payload usually has nothing starred. So Favorites is disabled, `syncPins()`
-clears any attempt to select it, and a scenario test reads that correct behaviour as a failure. What
-holds either way is that a pair can never both be checked. The check drives six picks through the
-real `change` path and asserts that after each one, and it reads the stored blob to confirm the
-preference is one string rather than a pair of booleans.
+**Chromium does not restyle a `:has(input:checked)` subject when a SCRIPT changes that
+checkedness.** `matches()` answers true and `getComputedStyle` hands back the unchecked value.
+Measured on this build. So the selected chip's own pixels are read from a page that LANDS with the
+filter on, never after a scripted click.
+
+**A filter with no members is disabled, and `syncPins()` clears the preference when one empties.**
+That is correct behaviour, and a scenario test reads it as a failure. So the check writes a real
+station id into `PREFS.favs` first, taken out of the live payload. A made-up id leaves the filter
+with nothing to match, and the app clears it again.
+
+**A reload replaces the document, so every helper bound to the old one goes stale.** The favorite
+block is last in the desktop pass for that reason, and it rebinds.
 
 **A resolved token is not a painted pixel.** An early version asserted `--i` alone and passed on a
-button drawing an empty plate, because `#paint::before` had never joined the mask list in
-`css/icons.css`. It reads `mask-image` and the box size too now.
+button drawing an empty plate, because a rule had never joined the mask list in `css/icons.css`. It
+reads `mask-image` and the box size too.
 
 **Headless virtual time does not run CSS transitions faithfully, so no check here can measure one
-mid-flight.** Reading the animated branch 120ms into its collapse returned a value that then stuck at
-0 for the rest of the run, on markup that works in a real browser. Two runs agreed, and a probe that
-did not read mid-flight reported the correct 309px from the same code.
+mid-flight.** Reading an animated collapse 120ms in returned a value that then stuck at 0 for the
+rest of the run, on markup that works in a real browser.
 
 So an animation is asserted as a DECLARATION, once, and then `paint-check.html` injects
 `* { transition: none !important }` into the frame and measures every state settled. Assert the
 declaration BEFORE that override, or the override is what gets read.
 
-**Geometry is measured with the panel OPEN.** A closed popover is `display: none`, so every rect
-inside it reads zero. An indent assertion then compares 0 against 0 and reports a working indent as
-broken. That happened here.
+**Geometry is measured with a menu OPEN.** A closed popover is `display: none`, so every rect inside
+it reads zero and an assertion compares 0 against 0.
 
 **It paints after every assertion, not once at the end.** A check that reports only on completion
-reports nothing at all when it hangs, and this one hung. The page sat on `running...` with no way to
-tell how far it got. The whole body is in a `try` for the same reason.
+reports nothing at all when it hangs, and this one hung. The whole body is in a `try` for the same
+reason.
 
-**It drives the real touch path for the bottom sheet, both ways.** Below 600px `#paintmenu` draws a
-drag handle, and the check dispatches a real `TouchEvent` run past the threshold and a second one
-short of it. A handle over a gesture nobody wired up is a promise the panel does not keep, and a
-sheet that shuts on any downward twitch is unusable while somebody reads it. It also asserts that
-the release leaves no inline `translate` behind, or the sheet stays parked where the finger left it.
+**Nothing else in this app could see a box landing on its neighbour.** A box correct against the
+pane, correct against the window and correct against the card is still wrong if it lands on the one
+beside it. So the check intersects the chip row against every other box on the map, at both widths.
 
-**Motion is read before the override, and geometry after it.** The check switches transitions and
-animations off to measure a settled layout, and `getComputedStyle` then reports the override rather
-than the rule. `m3-check.html` states the same rule from its own experience.
-
-**It measures the corner rather than trusts an estimate of it.** A first revision pushed `#pills`
-down 48px to clear the button, on a guess at `#risebadge`'s width. Measured, that pill is 180px and
-clears on its own. The rule went and the measurement stayed, and it prints the clearance so a wider
-pill fails here rather than on somebody's phone.
+**Below 600px the row wraps, and that is asserted as two rows.** Four chips need about 440px and a
+compact map is 360. A row that scrolled sideways would hide the chips past its edge with nothing on
+screen to say they exist.
 
 `m3-check.html` guards the six M3 full-screen dialogs below 600px. It is the same class of problem
 as `paint-check.html`: rendered pixels, and no query over the source can state one of them.

@@ -420,17 +420,27 @@ el('barClose').onclick = () => setDrawer(false);
 
 // --- layer chips -------------------------------------------------------------------------------
 
+/* **Menu ROWS now, and they were chips in the drawer.** A reader moved the sensor kinds onto the map
+   on 2026-08-25, and five more chips on that row would be nine chips over a map. So they are the
+   rows of a menu chip, in the shape `.mi` already draws for the layer and heatmap menus.
+   **A checkbox, because kinds are the one MULTI-select group here.** Every other group in the row is
+   one string holding one answer. This one is a set, so `PREFS.layers` stays a map of booleans and
+   the `checked` attribute is written from it at build time. That is safe where a radio's is not: the
+   markup is generated from the preference on every load, so a browser has no form state to restore.
+   The kind's own hue rides `--c`, which is what paints the row's leading glyph. */
 for (const [k, v] of Object.entries(KINDS)) {
   el('layers').insertAdjacentHTML('beforeend',
-    `<label class="chip" style="--c:${v.color}">
+    `<label class="mi kindrow" style="--c:${v.color}">
        <input type="checkbox" data-kind="${k}"${PREFS.layers[k] !== false ? ' checked' : ''}>
-       <i class="glyph i i-${v.icon}"></i>${v.label}<b data-n="${k}"></b></label>`);
+       <i class="i i-check mcheck" aria-hidden="true"></i>
+       <i class="glyph i i-${v.icon}"></i><span>${v.label}</span><b data-n="${k}"></b></label>`);
 }
 // A full re-render, not just syncCluster: pins are built per *site* from the sensors currently
 // showing on it, so switching a layer changes which sensor leads a shared mast and what its popup
 // holds. Rebuilding ~430 markers is the same work the poll does every five minutes.
 document.querySelectorAll('#layers input').forEach(cb => cb.onchange = () => {
   PREFS.layers[cb.dataset.kind] = cb.checked;
+  cb.closest('.mi').classList.toggle('on', cb.checked);
   save();
   render();
 });
@@ -486,8 +496,35 @@ el('riseOff').onclick = () => {
   applyFilter(false);
 };
 
+/* **A selected filter chip clears itself on a second press, which is M3's own behaviour.** The pin
+   filter has two chips and no `All`, so `''` is the state with neither on. A radio cannot be
+   unchecked by pressing it, and it fires no `change` when it is already the checked one. So the
+   press is caught before the browser acts on it: a `click` on a chip already holding the preference
+   clears the pair, writes the preference and repaints.
+   **The test reads the PREFERENCE, never `e.target.checked`.** A browser sets `checked` as part of
+   the click's own activation behaviour, BEFORE the event is dispatched. So a radio reads `true`
+   inside this handler on a first press as well as a second, and a `checked` test cleared the filter
+   the moment a reader turned it on. `PREFS.pinFilter` still holds the old value here, because
+   `change` runs after this, so the two presses are told apart with no flag and no second listener.
+   **`click` and not `change`.** The event the browser sends for an already-checked radio is a click
+   and nothing else. A `change` handler never runs, which is why this cannot live in the one below.
+   The heatmap group keeps its `Off` chip, so nothing there needs this. */
+for (const id of ['favOnly', 'risingOnly']) el(id).addEventListener('click', e => {
+  if (PREFS.pinFilter !== e.target.value) return;
+  /* **No `preventDefault()` here, and that is the whole of the repair.** A browser sets the radio's
+     checkedness as PRE-click activation, dispatches the click, and on a cancelled click restores the
+     value it had BEFORE. That value is checked, so cancelling the event put the chip straight back
+     on and undid the line under it. Nothing needs cancelling: the radio was already the checked one,
+     so the browser's own activation changes nothing and fires no `change`. */
+  e.target.checked = false;
+  PREFS.pinFilter = '';
+  save();
+  risePill();
+  applyFilter(false);
+});
+
 el('heatOff').onchange = el('heat').onchange = el('rainHeat').onchange =
-  el('pinAll').onchange = el('favOnly').onchange = el('risingOnly').onchange =
+  el('favOnly').onchange = el('risingOnly').onchange =
   el('stations').onchange = e => {
   /* One heatmap at a time, and one pin filter at a time. Stacked, two heat layers are two answers
      to two questions in one picture — and worse, leaflet.heat accumulates alpha across layers, so
@@ -505,7 +542,7 @@ el('heatOff').onchange = el('heat').onchange = el('rainHeat').onchange =
 
   /* The station layer. A radio only fires `change` when it becomes the checked one, so there is no
      "unchecked" case to write here and no way for a reader to reach a map with no layer at all.
-     Nothing inside Stations is cleared with it — the branch collapses in `#paintmenu` and every
+     Nothing under Stations is cleared with it — those chips leave the map with the layer and every
      preference in it stands, so coming back to Stations restores the view that was there before.
      Weather is NOT handled here. It has its own handler below, because turning it on has to await a
      deferred module and roll back when that import fails. */
@@ -513,73 +550,12 @@ el('heatOff').onchange = el('heat').onchange = el('rainHeat').onchange =
   syncHeat();
   risePill();
   save();
-  /* Nothing on this handler closes the drawer any more. Every control here moved to #paint on the map,
+  /* Nothing on this handler closes the drawer any more. Every control here is a chip on the map,
      where there is no drawer over the result of the press. The argument for closing it was that at
      phone width the drawer IS the screen, so a filter whose effect you cannot see is one you have
      to close the drawer to judge. These are not behind it now. */
   applyFilter(false);
 };
-
-/* **Hover opens the paint panel, on a pointer device and nowhere else.** `popovertarget` keeps the
-   press path for touch and for the keyboard, so this only adds a way in, never the only way.
-   Two guards, and both earn their place. The media query is `PLAYER_OVERLAY`'s own, because a phone
-   can report `hover: hover` and a bar that hides itself needs something to bring it back. The
-   `pointerType` test is because a tap fires `pointerenter` too, and a tap already has the press.
-   The pointer crosses a 4px gap between the button and the panel, so leaving either one schedules
-   the close rather than doing it, and entering either one cancels that. Without the delay the panel
-   shuts in the gap on the way to the chip the reader is reaching for. */
-{
-  const canHover = matchMedia('(hover: hover) and (min-width: 601px)');
-  const menu = el('paintmenu'), btn = el('paint');
-  let shut, over = false;
-  const enter = e => {
-    if (e.pointerType !== 'mouse' || !canHover.matches) return;
-    clearTimeout(shut);
-    over = e.currentTarget === btn;
-    // showPopover() throws on an already-open popover, which is the ordinary case here: the pointer
-    // crosses from the button to the panel and enters the second one while the first is still open.
-    if (!menu.matches(':popover-open')) menu.showPopover();
-  };
-  const leave = e => {
-    if (e.pointerType !== 'mouse' || !canHover.matches) return;
-    clearTimeout(shut);
-    over = false;
-    shut = setTimeout(() => {
-      if (menu.matches(':popover-open')) menu.hidePopover();
-    }, 180);
-  };
-  for (const box of [btn, menu]) {
-    box.addEventListener('pointerenter', enter);
-    box.addEventListener('pointerleave', leave);
-  }
-  /* **The button names the shortcut, and only where the shortcut exists.** A line at the foot of the
-     panel said it before, and a reader cut it: it pointed at a button outside the box it sat in.
-     One of a `data-tip` and a `title`, never both, which is the shape `setBtn()` in js/locate.js
-     already uses. `js/sparktip.js` draws a `data-tip` on hover and on tap alike.
-     **Written from the query rather than the markup, because the query is live.** A laptop docked
-     to a mouse, and a tablet rotated past 600px, both cross this without a reload. A sentence baked
-     into `index.html` would promise a press that a touch device cannot make. */
-  const nameBtn = () => {
-    if (canHover.matches) { btn.dataset.tip = 'Map layers · click to switch layer';
-                            btn.removeAttribute('title'); }
-    else { delete btn.dataset.tip; btn.title = 'Map layers'; }
-  };
-  nameBtn();
-  canHover.addEventListener('change', nameBtn);
-  /* **With the panel already open under the pointer, the press is free, so it switches the layer.**
-     `over` is the whole gate. It is set only where hover opened the panel, so a tap and a keyboard
-     press both fall through to the native `popovertarget` toggle and keep the one way in they have.
-     `preventDefault()` is what stops that toggle here. A popover invoker runs as the click's
-     activation behavior, and a cancelled click has none. Without it the press cycles the layer and
-     shuts the panel it cycled in.
-     It presses the radio rather than writing the preference. Turning weather on awaits a deferred
-     module and rolls back when that import fails, and that lives on the radio's own handler. */
-  btn.addEventListener('click', e => {
-    if (!over) return;
-    e.preventDefault();
-    (PREFS.mapLayer === 'weather' ? el('stations') : el('wxLayer')).click();
-  });
-}
 
 /* The weather mode toggle. The pref is written first and the module reads it, so the box can never
    be the source of truth. This is the rule syncHeat() and syncWx() both state.
@@ -810,31 +786,19 @@ el('favClear').onclick = () => setFavs(new Set());
 document.addEventListener('toggle', e => {
   const box = e.target;
   if (e.newState !== 'open' || !box.classList?.contains('menu')) return;
-  /* **Two buttons open `#paintmenu` and only one of them ever draws.** The layers control is map
-     furniture above 600px and a navigation bar item below it, so the document holds both and the
-     stylesheet hides one. A bare `querySelector` answers the first in document order. That is the
-     bar item, which is `display: none` above 600px, and a hidden box measures zero. So the menu
-     placed itself against a rectangle of zeros in the top-left corner. Take the button that has a
-     box instead. Every other menu here has one invoker, so this answers the same element it always
-     did for them. */
+  /* **Take the invoker that has a BOX, never the first in document order.** A hidden box measures
+     zero, and a menu placed against a rectangle of zeros lands in the top-left corner of the window.
+     That happened while the layers control had two invokers, one per breakpoint. Every menu here has
+     one invoker today, so this answers the same element it always did. */
   const btn = [...document.querySelectorAll(`[popovertarget="${box.id}"]`)]
     .find(b => b.getClientRects().length);
   if (!btn) return;
-  /* Below 600px `#paintmenu` is a bottom sheet, and a sheet is placed by the stylesheet against the
-     bottom edge rather than against its button. The three properties are CLEARED rather than left
-     alone: an inline style beats the sheet's own rule, so a menu placed on a wide screen and then
-     rotated to a narrow one would stay pinned beside a button it no longer opens from. */
-  if (box.id === 'paintmenu' && phone.matches) {
-    box.style.left = box.style.top = box.style.bottom = '';
-    return;
-  }
   const r = btn.getBoundingClientRect();
   /* Away from the nearest edge, which is what every menu does. A button in the left half aligns its
      menu's LEFT edge to its own, and one in the right half aligns the right edges. Right was the
      only rule here, because every caller was the ⋮ on a station card and `#side` is on the right.
-     `#paint` is a FAB on the map's left edge, and a right-aligned menu grew leftward across the
-     drawer from a button 64px wide. It read as the drawer's menu rather than the button's. The
-     clamps below still keep the whole box on screen either way. */
+     The layer chips sit on the map's leading edge, and a right-aligned menu there grows leftward
+     off the map. The clamps below still keep the whole box on screen either way. */
   const wantLeft = r.left < innerWidth / 2 ? r.left : r.right - box.offsetWidth;
   box.style.left = `${Math.max(8,
     Math.min(wantLeft, innerWidth - box.offsetWidth - 8))}px`;
@@ -845,14 +809,13 @@ document.addEventListener('toggle', e => {
      almost everywhere. The ⋮ on a station card sits near the top of `#side`, so that flip put the
      menu above the top edge of the screen, where a reader could not reach it. A button in the
      bottom half always has more than half a viewport above it, so this rule cannot repeat that.
-     `#paint` is what needs it: the button sits 36px off the bottom edge beside the zoom control, and
-     a menu opened downward from there is clamped up over the button it came from.
+     `#locate` is what needs it: it sits 36px off the bottom edge beside the zoom control, and a
+     menu opened downward from there is clamped up over the button it came from.
 
      **The edge it opens FROM is the edge it is anchored BY, and that is not tidiness.** A menu whose
      contents can change height while it is open drifts away from its button if the far edge is the
-     fixed one. `#paintmenu` collapses and expands a whole branch on a press, so an upward menu
-     pinned by `top` would leave its bottom edge sliding up the screen, away from the button that
-     opened it. Pinned by `bottom` it grows and shrinks upward instead, and the two stay together
+     fixed one. A menu that changes height on a press, pinned by `top`, leaves its bottom edge
+     sliding up the screen away from the button that opened it. Pinned by `bottom` it grows and shrinks upward instead, and the two stay together
      with no observer and no second placement pass.
      Both are cleared each time, because the same box can be placed either way over its life. */
   const up = r.top > innerHeight / 2;
@@ -865,114 +828,6 @@ document.addEventListener('toggle', e => {
     box.style.top = `${Math.max(8, Math.min(r.bottom + 4, innerHeight - h - 8))}px`;
   }
 }, true);
-
-/* --- swipe to dismiss a sheet ------------------------------------------------------------------
-
-   One implementation for all three sheets: the filters, the station panel and the layer sheet.
-   Below 600px each is an M3 bottom sheet and each draws a drag handle, and a handle drawn over a
-   gesture nobody wired up is a promise the panel does not keep.
-
-   **The finger writes a custom property and the transition is killed by an attribute.** That is the
-   reference component's own mechanism rather than an approximation of it:
-
-       [data-slot="side-sheet-content"][data-swipe-direction="right"] {
-         transform: translateX(var(--drawer-swipe-movement-x, 0px));
-       }
-       [data-slot="side-sheet-content"][data-swiping] { transition: none; }
-
-   https://github.com/bczak/m3you/blob/development/src/components/SideSheet/side-sheet.css
-
-   It replaces an inline `translate` plus an inline `style.transition = 'none'`. Two things it buys.
-   The open and shut position lives in `transform` and the finger lives in a variable INSIDE that
-   same transform, so the two compose without needing a second property. And `[data-swiping]` is a
-   state the stylesheet can see, so the rule that suppresses the transition sits beside the rule
-   that declares it rather than in a script.
-
-   **A downward drag shares its axis with the sheet's own scroll.** So the drag is refused outright
-   while anything under the finger is scrolled away from its top. That gesture is the scroll coming
-   back. At the top there is nothing left to scroll to, and both sheets carry
-   `overscroll-behavior: contain`, so the browser does nothing while the finger drags. No
-   `preventDefault()` is needed, which is what lets both listeners stay passive.
-
-   **Distance OR velocity dismisses, and the velocity half is what a flick needs.** 90px is about a
-   third of a sheet and a distance a thumb covers without repositioning. A fast short flick travels
-   less than that and still means the same thing, so anything past 0.5px per millisecond over the
-   last move dismisses too. Distance alone made a sheet feel stuck to the screen, which is the half
-   this was missing. */
-const SWIPE_PX = 90, SWIPE_VEL = 0.5;
-
-function swipeSheet(box, close) {
-  let x0 = 0, y0 = 0, dy = 0, axis = 0, on = false, last = 0, lastY = 0, vel = 0;
-  const set = v => box.style.setProperty('--drawer-swipe-movement-y', `${v}px`);
-  const scrolled = t => {
-    for (; t && t !== box.parentNode; t = t.parentElement) if (t.scrollTop > 0) return true;
-    return false;
-  };
-  const end = () => {
-    if (!on) return;
-    on = false;
-    box.removeAttribute('data-swiping');
-    box.style.removeProperty('--drawer-swipe-movement-y');
-    if (dy > SWIPE_PX || (dy > 8 && vel > SWIPE_VEL)) close();
-  };
-  box.addEventListener('touchstart', e => {
-    on = phone.matches && e.touches.length === 1
-      && !e.target.closest('input[type=range]') && !scrolled(e.target);
-    axis = dy = vel = 0;
-    x0 = e.touches[0].clientX;
-    y0 = lastY = e.touches[0].clientY;
-    last = e.timeStamp;
-  }, { passive: true });
-  box.addEventListener('touchmove', e => {
-    if (!on) return;
-    const y = e.touches[0].clientY, my = y - y0, mx = e.touches[0].clientX - x0;
-    /* The first 8px decide the axis and nothing moves before that. A drag that is mostly sideways,
-       or that starts upward, belongs to the content: the drawer holds a horizontal chip row. */
-    if (!axis) {
-      if (Math.abs(my) < 8 && Math.abs(mx) < 8) return;
-      axis = Math.abs(my) > Math.abs(mx) && my > 0 ? 1 : -1;
-      if (axis > 0) box.setAttribute('data-swiping', '');
-    }
-    if (axis < 0) return;
-    const dt = e.timeStamp - last;
-    if (dt > 0) vel = (y - lastY) / dt;
-    last = e.timeStamp; lastY = y;
-    dy = my;
-    set(dy);
-  }, { passive: true });
-  box.addEventListener('touchend', end);
-  box.addEventListener('touchcancel', end);
-}
-
-swipeSheet(el('paintmenu'), () => el('paintmenu').hidePopover());
-/* `#paintmenu` is the last bottom sheet in this app, so it is the last drag. The supporting pane
-   had one while it was a bottom sheet. It is a full-screen dialog now, and that variant has no
-   swipe. */
-
-/* **A tap that dismisses the sheet does nothing else, and light dismiss alone does not give that.**
-   A popover closes itself on a press outside it, and the same press still reaches whatever sits
-   under it. So a tap on a pin behind the sheet shut the sheet AND opened that station's card. The
-   reader asked for the sheet and got a card they never pressed for.
-   **The scrim is the rule, not the width.** Below 600px the sheet paints a 32% scrim, and a press on
-   a scrim means dismiss. Above it the panel is a menu beside its button, with no scrim and a live
-   map behind it, so a press there is a press on the map and is left alone.
-   **Two listeners, because the popover is already shut by the time the click lands.** Light dismiss
-   runs on the pointer down and up, so `:popover-open` reads false at `click`. The down pass records
-   the answer and the click pass spends it. Both are capture-phase on `#map`, which is what puts
-   them ahead of the listener Leaflet binds on the marker itself. */
-{
-  const menu = el('paintmenu'), box = el('map');
-  let eat = false;
-  box.addEventListener('pointerdown', () => {
-    eat = phone.matches && menu.matches(':popover-open');
-  }, true);
-  box.addEventListener('click', e => {
-    if (!eat) return;
-    eat = false;
-    e.stopPropagation();
-    e.preventDefault();
-  }, true);
-}
 
 // --- alert list ------------------------------------------------------------------------------
 // Nothing more than a disclosure now — the list lives in #side and alerts.js owns both ends of it.

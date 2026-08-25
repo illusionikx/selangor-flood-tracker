@@ -13990,3 +13990,218 @@ the layer panel and nowhere else.
 
 `paint-check.html` asserts the panel heading sits above the group headings on that ladder. Two
 headings at one size is a panel with no levels, and it reads as a spacing problem.
+
+## The filter drawer takes the M3 components the layer panel already took
+
+Date: 2026-08-25.
+
+The layer panel moved onto M3's own components across several changes. The filter drawer beside it
+did not. So one pane spoke M3 and the pane that replaces it in the same box spoke this app's older
+language. A reader meets both, one after the other.
+
+### The title said `Layers and filters` and holds no layer
+
+The two map layers and the two pin filters left this drawer for `#paintmenu` on the map. The title
+kept their name after them. So the pane promised a control that is not in it.
+
+It reads `Filters` now. The navigation rail item, the navigation bar item and the Help entry all read
+`Filters` already. One name for one thing is this repo's own rule.
+
+### The sensor kinds are M3 filter chips, and they were full-width rows
+
+`.chip` was a flex row with a vertical margin. Each kind took one line of the drawer and stretched to
+the width of the pane. Five kinds took five lines.
+
+M3 draws a filter chip SET: content-sized chips in a wrapping row. The numbers come from
+`Chip/chip.css` in the M3 Expressive component set, at `data-variant="filter"`:
+
+    container       32dp, shape-corner-small (8dp)
+    label           label-large, 14px on 20 at 500
+    leading icon    18dp
+    padding         8dp behind the icon, 16dp past the label
+    unselected      a 1dp outline over no fill
+    selected        no outline, a container fill
+
+Measured in a 360px pane: five chips over three rows, with no horizontal overflow.
+
+These are the same numbers `#sideKinds .badge` takes for M3's assist chip, one variant over. Two chip
+variants in one app now state one set of numbers.
+
+#### The container is the kind's own hue, not `secondary-container`
+
+This app holds one surface tone in `css/base.css`. The palette rule keeps M3's colour roles out of
+it. So the fill is the tint this control already used. It is the same divergence `.sensor` states for
+`surface-container-highest`.
+
+#### The label never takes the kind hue
+
+A chip whose text is painted by the station kind reads as a status. This app reserves that reading.
+The leading icon is the one thing that carries the kind hue, which is the rule `#sideKinds` already
+obeys.
+
+#### Selected drops the outline
+
+That is what separates M3's filter chip from the assist chip beside it. Without it, a filled chip and
+an outlined one differ by a fill alone. The set then reads as one control in two tints.
+
+### The section headings are `title-small`, in sentence case
+
+`.sect > summary` drew at 11px, 500, uppercase and tracked. `.mgroup` in the layer panel carried the
+identical language and moved to `title-small` on the same day. So the drawer was the last surface
+here writing a heading in a size this app picked rather than transcribed.
+
+M3 bridges `on-surface-variant` onto `--muted`, so the colour did not move. Only the type did. The
+uppercase transform is gone rather than overridden, for the reason the layer panel already states: M3
+writes a subheader in sentence case, this app's writing standard already does, and an uppercase
+transform breaks a screen reader on anything acronym-shaped.
+
+The section glyph moved from 15px to 18px, which is M3's own leading-icon size and the size the chips
+under it now take.
+
+### What this did not change
+
+The chevron, the count on each summary and the `<details>` behind it all stay. M3 has no component
+for a collapsible filter section, so there is nothing to transcribe there.
+
+`.link`, `.pickbox` and `.picklist` stay too. Each one has callers outside this drawer, so a change
+to any of them is a change of its own.
+
+### The trade-off accepted
+
+A chip set wraps, so the number of rows moves with the pane width and with the counts written into
+each chip. A row of full-width chips never moved. The set is shorter at every width this app draws,
+and it is the component M3 states for a multi-select filter.
+
+## The layer controls left their panel for a chip row on the map
+
+The repository owner asked for this on 2026-08-25, after reading M3's chips guidance. `#paintmenu`
+is gone. So is `#paint`, the round button in the zoom cluster that opened it, and `#navLayers`, its
+twin in the phone navigation bar.
+
+`#mapchips` is the control now: four chips on the map's leading edge, under the ticker, on the
+legend's own 12px line.
+
+### Two chip kinds, and the shape tells them apart
+
+| Chip | Kind | States |
+|---|---|---|
+| Layer | menu | Stations, Weather |
+| Heatmap | menu | Off, Water level, Rainfall |
+| Sensors | menu | the five kinds, multi-select |
+| On alert | filter | on, off |
+| Favorites | filter | on, off |
+
+A menu chip states its VALUE as its label and carries a trailing `expand_more`. So the map says what
+it draws with nothing opened. A filter chip states a NAME and answers with a leading checkmark.
+
+The two menus are the app's own `.menu` popovers, so they reuse the placement handler, the scroll cap
+and the width cap that every other menu here already has.
+
+### The four station chips leave with the station layer
+
+Heatmap, Sensors, On alert and Favorites answer about the station layer. Weather takes the map and there is
+nothing left for any of them to act on.
+
+A `:has()` rule in `css/chrome.css` does it. No script can get it wrong, and nothing is written on
+the poll.
+
+### There is no All chip, because a filter chip clears itself
+
+M3 states that pressing a selected filter chip turns it off. So "every pin" is the state with neither
+chip on, and the third chip that used to hold it is gone.
+
+They are still radios and `PREFS.pinFilter` is still one string. The browser keeps the pair exclusive
+and `js/ui.js` clears the pressed one, so both-on stays unrepresentable in the markup.
+
+### The clear handler must not cancel the click
+
+A browser sets a radio's checkedness as pre-click activation, dispatches the click, and on a
+cancelled click restores the value the radio had BEFORE. On a second press that value is checked, so
+`preventDefault()` put the chip straight back on and undid the line under it.
+
+The handler also reads `PREFS.pinFilter`, never `e.target.checked`. Activation runs before dispatch,
+so the box reads `true` on a first press as well as a second.
+
+### What the deletions cost, and what they bought
+
+`.grab`, `swipeSheet()`, the bottom sheet block, the sheet's own travel, the hover-open handler and
+the light-dismiss guard are all deleted. There is no bottom sheet left in this app.
+
+`#locate` took the slot beside the zoom box. The navigation bar carries four items.
+
+`--top-chips` is the row's height plus its gap. `#toast`, `#pills` and the docked search all start
+under it. Above 600px the row is one chip tall. Below it the row wraps to two, so the phone block
+states its own value.
+
+### The row wraps below 600px
+
+Four chips need about 440px and a compact map is 360. A row that scrolls sideways hides the chips past
+its edge, and nothing on screen says they exist. The wrap costs about 40px of map and hides
+nothing.
+
+### Chromium will not restyle a scripted check
+
+`.chip:has(input:checked)` does not restyle when a script changes that checkedness. `matches()`
+answers true and `getComputedStyle` hands back the unchecked value. Measured on this build.
+
+Every box in this app is written by script: `PREFS` is the source of truth and no control carries a
+`checked` attribute. So a page landing with a filter on drew the chip looking off.
+
+`setBox()` in `js/util.js` is the repair. It sets the box and mirrors the answer onto `.chip.on`,
+from the same preference the box is written from. So this adds no second source of truth. Every
+`:has(input:checked)` rule on a chip names `.chip.on` beside it, and the `:has()` half stays because
+it answers a real pointer press with no script involved.
+
+Anything new that writes one of these boxes goes through `setBox()`.
+
+### A fixed wait races the payload
+
+`paint-check.html` waited 4000ms after each load. Headless virtual time runs the page's own timers
+far ahead of real network I/O, so at a 120s budget the file passed and at 300s it read a chip the app
+had not written yet.
+
+The check waits for the map to hold a pin now. Wait for the state, never for a clock.
+
+## The sensor kinds moved onto the chip row
+
+They were a `<details>` section in the drawer holding five chips. The repository owner moved them
+onto the map on 2026-08-25, so the drawer now holds the district picker and the ignored list and
+nothing about the map's paint.
+
+### One menu chip, not five chips
+
+Five more chips on that row is nine chips over a map. So the kinds are the rows of a menu chip, in
+the same `.mi` shape the layer and heatmap menus already draw.
+
+The chip states how much of the set is off. `Sensors` alone means every kind draws, and
+`Sensors · 1 off` is what the drawer section's own `<summary>` count used to say.
+
+### The one multi-select group in the row
+
+Every other group here is one string holding one answer: `PREFS.mapLayer`, `PREFS.heatLayer`,
+`PREFS.pinFilter`. Kinds are a set, so `PREFS.layers` stays a map of booleans and the rows are
+checkboxes.
+
+A `checked` attribute in the markup is safe on these and on nothing else. `js/ui.js` builds the rows
+from `PREFS.layers` on every load. So a browser has no form state left to restore. A radio written
+once into `index.html` is the case that rule forbids.
+
+Each row carries the kind's own glyph in the kind's own hue, and its own pin count. That is what the
+drawer chips drew before they moved.
+
+### A kind is not a filter over stations
+
+It is which of a station's sensors this map draws at all. That is why it stayed in the drawer while
+Favorites and On alert left, and why it sits under the station layer here rather than beside the two
+filters.
+
+### Two things the check had to learn
+
+`m3-check.html` scrolls the drawer body to prove its header stays pinned. The drawer no longer
+overfills a 1000px window, so there was nothing to scroll and the line under it proved nothing. The
+check caps the body for that probe instead.
+
+`paint-check.html` measured a reloaded page mid-transition, one run in four. The `noAnim` style at
+the top of the file belongs to the document that reloaded away, and the start values of a chip's
+transition are exactly the unchecked ones: 16px of padding and a checkmark 0 wide. Every reload
+re-injects it now.

@@ -5,6 +5,20 @@ import { KINDS, KIND_RANK, RIVER_COLOR, RAIN_COLOR, STATUS_COLOR, GAUGE_COLOR, N
 import { PREFS } from './state.js';
 
 export const el  = id => document.getElementById(id);
+/* **Set a radio and mirror the answer onto the chip around it, because `:has()` will not.** Chromium
+   does not restyle a `:has(input:checked)` subject when a SCRIPT changes that checkedness. Measured:
+   `matches()` answers true and `getComputedStyle` still hands back the unchecked value. Every box in
+   this app is written by script — `PREFS` is the source of truth and no control carries a `checked`
+   attribute — so a page that lands with a filter on drew the chip looking off.
+   The class is written FROM the preference, the same direction the box is, so this adds no second
+   source of truth. `.chip.on` sits beside `.chip:has(input:checked)` in css/base.css, and the second
+   half is what still answers a real pointer press with no script involved. */
+export const setBox = (id, on) => {
+  const b = el(id);
+  if (!b) return;
+  b.checked = on;
+  b.closest('.chip')?.classList.toggle('on', on);
+};
 
 /* Sensors the user has switched off one at a time, by station id.
  *

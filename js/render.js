@@ -3,7 +3,7 @@
 import { KINDS, MAST, HEAT_FLOOR, HEAT_KM, RAIN_KM, RAIN_STOPS } from './config.js';
 import { state, PREFS, save } from './state.js';
 import { el, color, dkey, atDanger, statusColor, leads, hasInfo, isIgnored, ignoredIds,
-         favIds, isFav, scalePos, levelStops, gaugeStops } from './util.js';
+         favIds, isFav, scalePos, levelStops, gaugeStops, setBox } from './util.js';
 import { marks, siteMark, shown, syncCluster, focusOn, side, openSide,
          showMast, hideMast, pinGlyph } from './map.js';
 import { heat, rainHeat, syncHeat, thinHeat } from './heat.js';
@@ -39,10 +39,12 @@ function syncPins() {
     PREFS.pinFilter = '';
     save();
   }
-  /* One write, because the three are one M3 single-select segmented button. Checking a radio
-     unchecks its siblings, so no other box is left holding a state this preference denies. */
-  el(PREFS.pinFilter === 'fav' ? 'favOnly'
-   : PREFS.pinFilter === 'alert' ? 'risingOnly' : 'pinAll').checked = true;
+  /* **`''` is no chip on, and there is no chip for it.** M3's filter chip clears itself on a second
+     press, so "every pin" is the state with neither chip on. The `All` chip that used to hold it was
+     cut on 2026-08-25. Checking one radio unchecks its sibling, so the only case left to write by
+     hand is the empty one, and a radio group is cleared by clearing every member. */
+  const on = PREFS.pinFilter === 'fav' ? 'favOnly' : PREFS.pinFilter === 'alert' ? 'risingOnly' : '';
+  for (const id of ['favOnly', 'risingOnly']) setBox(id, id === on);
   el('risingOnly').disabled = !rising;
   el('favOnly').disabled = !starred;
   /* The count alone, and nothing where there is none to state. The empty case used to carry a
@@ -64,8 +66,15 @@ export function render() {
      They are radios, so the browser already refuses both-on and refuses neither. This still writes
      both, because a radio restored across a reload is form state this app does not own, and because
      the rollback in the weather handler moves the preference without touching a box. */
-  el('stations').checked = PREFS.mapLayer === 'stations';
-  el('wxLayer').checked = PREFS.mapLayer === 'weather';
+  setBox('stations', PREFS.mapLayer === 'stations');
+  setBox('wxLayer', PREFS.mapLayer === 'weather');
+  /* **The chip states its own value, and its glyph names the layer.** That is what an M3 menu chip
+     does: the label is the answer and the trailing arrow is the promise of a menu. So the map says
+     which layer it draws with nothing opened. Written from the preference, never read back off the
+     chip, which is the rule every control in this function obeys. */
+  const wx = PREFS.mapLayer === 'weather';
+  el('layerChipLabel').textContent = wx ? 'Weather' : 'Stations';
+  el('layerChipIcon').className = `i glyph i-${wx ? 'partly_cloudy_day' : 'place'}`;
   const pinFilter = syncPins();
   Object.keys(marks).forEach(k => marks[k] = []);
   siteMark.clear();
@@ -384,10 +393,16 @@ function counts() {
     document.querySelector(`#layers [data-n="${k}"]`).textContent = perKind[k] ?? 0;
     if (shown(k)) total += perKind[k] ?? 0;
   }
-  // On the section's summary, the same as the district filter's: collapsed, it still says what it
-  // is holding back.
+  /* **On the chip itself, which is where the drawer's `<summary>` count used to be.** A menu chip
+     states its own value, and the value of a multi-select group is how much of it is off. `Sensors`
+     alone is the whole set drawing, which needs no number. */
   const off = Object.keys(marks).filter(k => !shown(k)).length;
-  el('kindN').textContent = off ? `${off} hidden` : '';
+  el('kindChipLabel').textContent = off ? `Sensors · ${off} off` : 'Sensors';
+  /* The class the row's own fill reads. Chromium does not restyle a `:has(input:checked)` subject
+     when a script changes the checkedness, and these boxes are written from `PREFS.layers` at build
+     time — see `setBox()` in js/util.js for the same repair on the chips. */
+  for (const cb of document.querySelectorAll('#layers input'))
+    cb.closest('.mi').classList.toggle('on', cb.checked);
   const pins = Object.values(marks).reduce((n, l) => n + l.length, 0);
   // The ignored count rides here rather than only in its own panel: this line is the one the eye
   // lands on to ask "why is the map this empty", and a sensor you silenced last week is exactly the

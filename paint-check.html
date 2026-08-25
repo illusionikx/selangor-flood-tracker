@@ -1,23 +1,22 @@
 <!doctype html>
 <meta charset="utf-8">
-<title>paint chooser check</title>
+<title>layer chips check</title>
 <!--
-  The paint chooser is a map control holding six boxes in two groups. What it guards is rendered
-  pixels, which `php -l`, `node --check` and any query over .cache.json all miss.
+  The layer controls are a bare chip row over the map. What this guards is rendered pixels, which
+  `php -l`, `node --check` and any query over .cache.json all miss.
 
-  **It took three tries to sit right, and both failures were about the same thing.** First it drew
-  the active layer's glyph — the water drop, the rain cloud — on a `--surface` plate, alone in the
-  top-left corner among pins carrying those exact shapes. A reader called it indistinguishable from
-  a map icon. Then it became an accent-filled FAB with a label, still alone in that corner, and it
-  stood out too much. A control on its own in the middle of a map has to shout to read as a control.
+  **The control took five shapes to get here, and every one of them failed on the same axis.** It
+  drew the active layer's own glyph on a plate in the map's corner, and read as a map pin. It became
+  an accent FAB with a label, and shouted. It became a panel behind a `layers` button in the zoom
+  cluster, then a bottom sheet on a phone, then connected button groups inside that panel. Each one
+  put a settings dialog between a reader and a setting.
 
-  It sits in the zoom control's cluster now and wears the zoom control's look, so it needs to do
-  neither. The check asserts the layers glyph, the shared look, and the adjacency in rendered pixels
-  at both widths — beside the zoom box on a desktop, above it on a phone.
+  The chips ARE the control now. There is no panel, no button that opens one, and no navigation bar
+  item pointing at one. So this file asserts a row of chips over a map rather than a dialog.
 
   Run:
   "/c/Program Files/Google/Chrome/Application/chrome.exe" --headless=new --disable-gpu \
-    --ignore-certificate-errors --virtual-time-budget=30000 --window-size=1600,1000 --dump-dom \
+    --ignore-certificate-errors --virtual-time-budget=60000 --window-size=1600,1000 --dump-dom \
     https://flood-exp.test/paint-check.html | perl -0777 -ne 'print $1 if /<pre id="out">(.*?)<\/pre>/s'
 -->
 <style>html, body { margin: 0 } iframe { width: 1536px; height: 900px; border: 0 }</style>
@@ -35,903 +34,429 @@ const is = (got, want, name) => {
   out.textContent = lines.join('\n');
 };
 const wait = ms => new Promise(r => setTimeout(r, ms));
+/* **A fixed wait races the payload, and a bigger virtual-time budget is what exposes it.** Headless
+   virtual time runs the page's own timers far ahead of real network I/O, so `await wait(4000)` can
+   land before the first `render()`. At a 120s budget this file passed and at 300s it read a chip the
+   app had not written yet. Wait for the STATE, never for a clock. */
+const until = async (fn, tries = 60) => {
+  for (let i = 0; i < tries; i++) { if (fn()) return true; await wait(200); }
+  return false;
+};
 
 try {
 const f = document.getElementById('f');
 await new Promise(r => f.addEventListener('load', r, { once: true }));
-await wait(4000);
+await until(() => f.contentDocument.querySelectorAll('#map .pin').length > 0);
+await wait(600);
 const w = f.contentWindow, d = f.contentDocument;
 const el = id => d.getElementById(id);
+const box = id => el(id).getBoundingClientRect();
+const cs = id => w.getComputedStyle(el(id));
 
 /* **Headless virtual time does not run CSS transitions faithfully**, so nothing here can measure one
-   mid-flight. Reading the branch at 120ms returned a value that then stuck at 0 for the rest of the
-   run, on markup that works in a real browser. So the animation is asserted as a DECLARATION, once,
-   and then transitions come out of the way and every state below is measured settled.
+   mid-flight. So motion is asserted as a DECLARATION, once, and then transitions come out of the way
+   and every state below is measured settled.
    Assert the declaration BEFORE the override, or the override is what gets read. */
 {
-  const t = w.getComputedStyle(d.querySelector('.subgrp')).transitionProperty;
-  is(t.includes('grid-template-rows'), true, 'the branch animates its collapse');
-  is(t.includes('visibility'), true, 'and carries visibility, which holds the tab order');
-  /* One press switches the whole map layer, and the glyph is the same at every state. So the press
-     answers for itself here, rather than leaving the map to answer somewhere else. */
-  is(w.getComputedStyle(el('paint')).transitionProperty.includes('transform'), true,
-     'the button answers a press, because what the press changes is somewhere else');
-  /* The selected button growing into a pill is the connected group's signature, so the radius is
-     on the transition list with M3's own spring. */
-  const bt = w.getComputedStyle(d.querySelector('#paintmenu .btngrp label')).transitionProperty;
-  is(bt.includes('background-color'), true, 'a button group fades its fill rather than snapping it');
-  is(bt.includes('border-radius'), true, 'and animates the shape change, which is the M3 signature');
+  const bt = w.getComputedStyle(d.querySelector('#mapchips .chip')).transitionProperty;
+  is(bt.includes('background'), true, 'a chip fades its fill rather than snapping it');
+  is(bt.includes('border-color'), true, 'and its outline, which the selected state takes away');
+  is(bt.includes('padding-left'), true, 'and its leading padding, which the checkmark changes');
+  /* The checkmark is what makes a filter chip, so it has to arrive rather than appear. M3 animates
+     a container from 0 to 18px with its glyph scaling in behind it. */
+  const ct = w.getComputedStyle(d.querySelector('#mapchips .chipcheck')).transitionProperty;
+  is(ct.includes('width'), true, 'the checkmark grows in rather than appearing');
+  is(ct.includes('transform'), true, 'with its glyph scaling behind it, which is M3 own pair');
 }
 const noAnim = d.createElement('style');
 noAnim.textContent = '*{transition:none !important}';
 d.head.appendChild(noAnim);
 
-const btn = el('paint'), menu = el('paintmenu');
-if (!btn || !menu) {
-  out.textContent = 'FAIL  the paint chooser did not render at all';
-  throw new Error('no control');
+// --- the panel and its two openers are gone ----------------------------------------------------
+/* All three went on 2026-08-25. A control that opens nothing is worse than no control, and two ways
+   to one setting is two things to keep in step. This is the assertion that catches a half-finished
+   revert: markup left behind draws a dead button on the map and nothing errors. */
+is(el('paintmenu'), null, 'the layer panel is gone');
+is(el('paint'), null, 'and the button that opened it');
+is(el('navLayers'), null, 'and its twin in the navigation bar');
+is(d.querySelectorAll('#navbar .navitem').length, 4, 'so the bar carries four items, not five');
+
+// --- the row itself ----------------------------------------------------------------------------
+const row = el('mapchips');
+if (!row) { out.textContent = 'FAIL  the chip row did not render at all'; throw new Error('no row'); }
+const rb = box('mapchips'), map = d.getElementById('map').getBoundingClientRect();
+/* On the map, under the ticker, on the legend's own leading line. `--map-l` and `--map-r` already
+   carry the rail and the supporting pane, which is the rule every floating box here obeys: a box
+   that misses that term sits on the page beside the card rather than on it. */
+is(rb.left >= map.left && rb.right <= map.right, true, 'the row sits inside the map card');
+is(rb.top >= map.top, true, 'and under its top edge, which is under the ticker');
+is(Math.round(rb.left - map.left), 12, 'on the legend own 12px leading line');
+is(cs('mapchips').flexWrap, 'wrap', 'the row wraps rather than scrolling sideways');
+is(cs('mapchips').gap, '8px', 'at M3 8px between chips');
+/* The row spans the map so its chips can wrap across it, and a row that took clicks would swallow
+   every press along the top of the map. Each chip takes them back. */
+is(cs('mapchips').pointerEvents, 'none', 'the row itself takes no clicks');
+is(w.getComputedStyle(el('layerChip')).pointerEvents, 'auto', 'and each chip takes them back');
+
+// --- four chips, two kinds ---------------------------------------------------------------------
+/* **A chip that opens a menu states its VALUE and carries a trailing arrow. A filter chip states a
+   NAME and answers with a leading check.** That is M3's own split, and it is what tells the two
+   kinds apart before their position does. */
+const MENUS = ['layerChip', 'heatChip', 'kindChip'], FILTERS = ['alertChip', 'favChip'];
+for (const id of [...MENUS, ...FILTERS]) {
+  const e = el(id);
+  is(!!e, true, id + ' is on the map');
+  is(e.classList.contains('chip'), true, id + ' is a chip');
+  is(Math.round(box(id).height), 32, id + ': M3 states a chip at 32px');
+  is(cs(id).fontSize, '14px', id + ': label-large');
+  is(Math.round(parseFloat(cs(id).borderTopLeftRadius)), 8, id + ': on shape-corner-small');
+  /* Every chip here floats over a basemap, so it carries the panel tone and this app's one
+     elevation. `.chip` alone is transparent, which is right inside a panel and invisible on a map. */
+  is(cs(id).backgroundColor !== 'rgba(0, 0, 0, 0)', true, id + ': paints a fill, over a basemap');
+  is(cs(id).boxShadow !== 'none', true, id + ': and lifts off the map on this app one elevation');
 }
-/* `getPropertyValue` hands back the substituted value, never the `var(...)` that was written. So
-   the expected side has to be the same token resolved off :root, or every rung reports a mismatch
-   between two spellings of one correct answer. */
-const glyph = () => w.getComputedStyle(btn, '::before').getPropertyValue('--i').trim();
-const token = n => w.getComputedStyle(d.documentElement).getPropertyValue('--i-' + n).trim();
-const ink = () => w.getComputedStyle(btn).color;
-
-// --- the control -------------------------------------------------------------------------------
-
-is(menu.hasAttribute('popover'), true, 'the panel is a popover, so Escape and light dismiss are free');
-is(btn.getAttribute('popovertarget'), 'paintmenu', 'the button is the popover invoker');
-is(menu.classList.contains('menu'), true, 'it carries .menu, which is what places it under the button');
-
-// --- it opens, and the shared placement handler catches it -------------------------------------
-/* The handler in js/ui.js keys on `.menu` and on a `[popovertarget]` pointing back at the box. Miss
-   either and the popover still opens, at the UA's own centred position, over the middle of the map. */
-btn.click();
-await wait(200);
-is(menu.matches(':popover-open'), true, 'the button opens the panel');
-const mb = menu.getBoundingClientRect(), bb = btn.getBoundingClientRect();
-/* The button sits 36px off the bottom edge, so a menu opened downward is clamped up over the button
-   it came from. A button in the bottom half opens UPWARD. It is a position test and never a space
-   test — see the handler's own comment for the fault that distinction avoids. */
-is(bb.top > w.innerHeight / 2, true, 'the button is in the bottom half of the viewport');
-is(mb.bottom <= bb.top && bb.top - mb.bottom < 16, true, 'so the panel opens upward from it');
-is(mb.bottom < bb.top, true, 'and never over the button it came from');
-is(mb.left >= 8, true, 'and clamped onto the screen rather than off its left edge');
-/* Away from the nearest edge. This button sits in the bottom-RIGHT cluster now, so the menu aligns
-   the right edges. It spent one revision on the left, where the same rule aligned the left edges —
-   the handler decides from the button's own position, so neither placement is written down twice. */
-is(bb.left > w.innerWidth / 2, true, 'the button is in the right half of the viewport');
-is(Math.abs(mb.right - bb.right) < 2, true, 'so its menu aligns the right edges');
-is(mb.width > 0 && mb.height > 0, true, 'it has a size, so the three segmented tracks laid out');
-// A press inside must not dismiss it: three mutually-exclusive choices means trying another one.
-el('favOnly').closest('label').click();
-await wait(120);
-is(menu.matches(':popover-open'), true, 'picking a layer leaves the panel open to pick another');
-el('pinAll').checked = true;
-menu.hidePopover();
-await wait(120);
-is(menu.matches(':popover-open'), false, 'and it closes again');
-
-// --- hover opens it on a pointer device, and only a mouse does -------------------------------
-/* `popovertarget` keeps the press path for touch and the keyboard. Hover only adds a way in. A tap
-   fires `pointerenter` too, so the handler tests `pointerType` as well as the media query — without
-   that test a phone reporting `hover: hover` opens the panel under the finger before the press. */
-const ptr = (type, node, kind) =>
-  node.dispatchEvent(new w.PointerEvent(type, { pointerType: kind }));
-if (menu.matches(':popover-open')) menu.hidePopover();
-await wait(200);
-for (const kind of ['touch', 'pen']) {
-  ptr('pointerenter', btn, kind);
-  await wait(250);
-  is(menu.matches(':popover-open'), false, `a ${kind} pointer does not open it`);
+for (const id of MENUS) {
+  const e = el(id);
+  is(e.tagName, 'BUTTON', id + ': a menu chip is a button');
+  is(!!e.getAttribute('popovertarget'), true, id + ': which opens a menu through the browser');
+  is(!!e.querySelector('.tail'), true, id + ': and carries a trailing arrow, the promise of one');
+  is(e.querySelector('.chipcheck'), null, id + ': and no checkmark, because it states a value');
 }
-ptr('pointerenter', btn, 'mouse');
-await wait(250);
-is(menu.matches(':popover-open'), true, 'a mouse pointer does');
-/* The pointer crosses a 4px gap on the way to a segment. Leaving the button must not shut the panel
-   the reader is reaching for. */
-ptr('pointerleave', btn, 'mouse');
-ptr('pointerenter', menu, 'mouse');
-await wait(400);
-is(menu.matches(':popover-open'), true, 'and it survives the gap between button and panel');
-ptr('pointerleave', menu, 'mouse');
-await wait(500);
-is(menu.matches(':popover-open'), false, 'leaving both closes it');
-btn.click();
-await wait(200);
-is(menu.matches(':popover-open'), true, 'and the press path still works');
+for (const id of FILTERS) {
+  const e = el(id);
+  is(e.tagName, 'LABEL', id + ': a filter chip wraps its own radio');
+  is(!!e.querySelector('.chipcheck'), true, id + ': and carries a leading checkmark');
+  is(e.querySelector('.tail'), null, id + ': and no arrow, because it opens nothing');
+}
 
-// --- and with the panel already open under the pointer, the press switches the layer -----------
-/* Hover is what makes the press free on a pointer device. A tap and a keyboard press keep the
-   native toggle, because neither one has a way to open the panel without it. */
-const layer = () => (el('wxLayer').checked ? 'weather' : 'stations');
-ptr('pointerenter', btn, 'mouse');
-await wait(250);
-const was = layer();
-btn.click();
-await wait(2500);   // picking weather awaits a deferred module
-is(layer() !== was, true, 'a press with the pointer on the button switches the layer');
-is(menu.matches(':popover-open'), true, 'and never shuts the panel it switched in');
-btn.click();
-await wait(2500);
-is(layer(), was, 'so the next press switches back');
-ptr('pointerleave', btn, 'mouse');
-await wait(500);
+// --- a menu chip states its own value -----------------------------------------------------------
+/* The label IS the answer, so the map says what it draws with nothing opened. Written from the
+   preference by render() and syncHeat(), never read back off the chip. */
+is(el('layerChipLabel').textContent.trim(), 'Stations', 'the layer chip states the layer on screen');
+{
+  const want = [['heatOff', '', 'Heatmap'], ['heat', 'water', 'Water level'],
+                ['rainHeat', 'rain', 'Rainfall']];
+  for (const [id, val, label] of want) {
+    el(id).closest('label').click();
+    await wait(300);
+    is(el('heatChipLabel').textContent.trim(), label, id + ' writes its own value on the chip');
+    is(JSON.parse(w.localStorage.getItem('prefs')).heatLayer, val, id + ': and into the preference');
+  }
+  el('heat').closest('label').click();
+  await wait(300);
+}
 
-// --- the panel never scrolls with nothing to scroll --------------------------------------------
-/* `.menu` is `overflow-y: auto`, so anything that leaks into its scroll height draws a scrollbar
-   down a box that fits. The collapsed branch did exactly that: 157px tall, 352px claimed. */
-const fits = () => menu.scrollHeight <= menu.clientHeight + 1;
-const gutter = () => menu.offsetWidth - menu.clientWidth;
+// --- the menus ----------------------------------------------------------------------------------
+/* The shared placement handler in js/ui.js opens a menu away from the nearest edge and clamps it on
+   screen. These chips lead on the map's own leading edge, so the menu opens rightward and downward.
+   **A menu placed against a box that measures zero lands in the top-left corner of the window.**
+   That is the fault the handler's own comment records, so this reads the placement rather than
+   trusting it. */
+for (const pair of [['layerChip', 'layerMenu', 2], ['heatChip', 'heatMenu', 3],
+                    ['kindChip', 'kindMenu', 5]]) {
+  const chip = pair[0], menuId = pair[1], rows = pair[2];
+  el(chip).click();
+  await wait(300);
+  const m = el(menuId);
+  is(m.matches(':popover-open'), true, menuId + ' opens from its chip');
+  const mb = m.getBoundingClientRect(), cb = box(chip);
+  is(mb.width > 0 && mb.height > 0, true, menuId + ': and has a size, so it laid out');
+  is(Math.abs(mb.left - cb.left) <= 1, true, menuId + ': aligned to its chip leading edge');
+  is(mb.top >= cb.bottom - 1, true, menuId + ': opening downward, away from the nearest edge');
+  is(m.querySelectorAll('.mi').length, rows, menuId + ': holding all of its rows');
+  /* **The kinds are the one MULTI-select group here, so their rows are checkboxes.** Every other
+     menu holds one answer in one string. This one holds a set, and `PREFS.layers` is a map of
+     booleans. A radio group there could not draw two kinds at once. */
+  const kinds = menuId === 'kindMenu';
+  is(m.querySelectorAll(kinds ? 'input[type="checkbox"]' : 'input[type="radio"]').length, rows,
+     menuId + (kinds ? ': every row is a checkbox, because kinds are a set'
+                     : ': every row is a radio, so the browser keeps the group exclusive'));
+  if (kinds) { m.hidePopover(); await wait(200); continue; }
+  /* The selected row's check holds its box whether or not it draws. A check that took the row's own
+     space only while it was on would shift every label sideways on a press. */
+  const on = [...m.querySelectorAll('.mi')].find(r => r.querySelector('input').checked);
+  is(!!on, true, menuId + ': one row is selected');
+  is(w.getComputedStyle(on.querySelector('.mcheck')).visibility, 'visible',
+     menuId + ': and its check draws');
+  const off = [...m.querySelectorAll('.mi')].find(r => !r.querySelector('input').checked);
+  is(w.getComputedStyle(off.querySelector('.mcheck')).visibility, 'hidden',
+     menuId + ': while an unselected row hides its own');
+  is(Math.round(off.querySelector('.mcheck').getBoundingClientRect().width), 18,
+     menuId + ': keeping its 18px box, so no label shifts on a press');
+  m.hidePopover();
+  await wait(200);
+}
 
-// --- the three choices moved, and none of them is in two places --------------------------------
+// --- the three station chips leave with the station layer ---------------------------------------
+/* The heatmap and the two filters answer about the station layer. Weather takes the map and there
+   is nothing left for any of them to act on. A `:has()` rule does it, so no script can get it wrong
+   and nothing has to be written on the poll. */
+{
+  el('wxLayer').closest('label').click();
+  await wait(600);
+  is(el('layerChipLabel').textContent.trim(), 'Weather', 'picking Weather writes the layer chip');
+  for (const id of ['heatChip', 'kindChip', 'alertChip', 'favChip'])
+    is(cs(id).display, 'none', id + ' leaves the map with the station layer');
+  is(cs('layerChip').display !== 'none', true, 'and the layer chip stays, or there is no way back');
+  el('stations').closest('label').click();
+  await wait(600);
+  for (const id of ['heatChip', 'kindChip', 'alertChip', 'favChip'])
+    is(cs(id).display !== 'none', true, id + ' comes back with it');
+}
 
-const BOXES = ['heatOff', 'heat', 'rainHeat', 'stations', 'wxLayer',
-               'pinAll', 'favOnly', 'risingOnly'];
-is(d.querySelectorAll(BOXES.map(i => '#' + i).join(', ')).length, BOXES.length,
-   'every segment exists exactly once');
-for (const id of BOXES)
-  is(el(id).closest('#paintmenu') !== null, true, id + ' is in the map panel');
-is(el('bar').contains(el('heat')), false, 'and no copy is left in the drawer');
-is(!!el('layersect'), false, '#layersect is gone');
-is(!!el('layerN'), false, '#layerN is gone with the summary it fed');
+/* **The sensor kinds are MULTI-select, and the chip states how much of the set is off.** That count
+   was the drawer section's own `<summary>` before 2026-08-25. `Sensors` alone means every kind
+   draws, which needs no number.
+   **`.on` sits beside `:has(input:checked)` on these rows too.** Chromium does not restyle a
+   `:has()` subject when a script changes the checkedness, and these boxes come from `PREFS.layers`.
+   Without the class a kind switched off still drew its row lit. */
+{
+  const rows = [...el('kindMenu').querySelectorAll('.kindrow')];
+  is(rows.length, 5, 'five sensor kinds');
+  is(rows.every(r => r.querySelector('.glyph') && r.querySelector('b')), true,
+     'each carrying its own glyph and its own count');
+  is(el('kindChipLabel').textContent.trim(), 'Sensors', 'with every kind on, the chip states no count');
+  rows[0].click();
+  await wait(500);
+  is(rows[0].querySelector('input').checked, false, 'a press turns one kind off');
+  is(rows[0].classList.contains('on'), false, 'and the row stops reading as selected');
+  is(el('kindChipLabel').textContent.trim(), 'Sensors · 1 off', 'and the chip states the count');
+  rows[0].click();
+  await wait(500);
+  is(el('kindChipLabel').textContent.trim(), 'Sensors', 'a second press puts it back');
+  is(rows[0].classList.contains('on'), true, 'and the row with it');
+}
+/* Two radios and no empty value, so both-on is unrepresentable in the markup. A pair of checkboxes
+   holds it, and this repo has already paid for that shape once — see syncHeat(). */
+{
+  const g = [...d.querySelectorAll('input[name="pinfilter"]')];
+  is(g.length, 2, 'the filter is two chips');
+  is(g.every(i => i.type === 'radio'), true, 'both radios, so two can never be on at once');
+  is(g.map(i => i.value).sort().join('|'), 'alert|fav', 'each carrying its own preference value');
+  /* **A checkbox in a filter group is what this refuses, not a checkbox on the row.** The sensor
+     kinds ARE a set and their menu holds five. Every OTHER group here holds one answer in one
+     string, and a pair of checkboxes can hold both-on — the shape this repo already paid for once,
+     see syncHeat(). So the test names the three single-answer groups. */
+  for (const name of ['maplayer', 'heatlayer', 'pinfilter'])
+    is(d.querySelector(`#mapchips input[name="${name}"][type="checkbox"]`), null,
+       name + ': no checkbox, so both-on is unrepresentable in the markup');
+  is(d.querySelectorAll('#kindMenu input[type="checkbox"]').length, 5,
+     'while the sensor kinds are five checkboxes, because a kind set is not one answer');
+}
+/* Every group is one string, never a pair of booleans. */
+{
+  const prefs = JSON.parse(w.localStorage.getItem('prefs') || '{}');
+  is(typeof prefs.mapLayer, 'string', 'mapLayer is one string');
+  is(['stations', 'weather'].includes(prefs.mapLayer), true, 'holding one of the two layers');
+  is('wx' in prefs, false, 'the old wx boolean is migrated away');
+  is('stations' in prefs, false, 'and the old stations boolean with it');
+}
 
-// --- the drawer keeps the kinds and nothing else -----------------------------------------------
-
-is(el('bar').contains(el('risingOnly')), false, 'on alert left the drawer');
-is(el('bar').contains(el('favOnly')), false, 'favorites left the drawer');
-is(d.querySelector('#kinds input[data-kind]') !== null, true, 'the sensor kinds stayed');
-is(d.querySelector('#kinds hr'), null, 'and the rule that split them went with them');
-
-// --- placement, in rendered pixels -------------------------------------------------------------
-
-const r = btn.getBoundingClientRect();
-const zoom = d.querySelector('.leaflet-control-zoom').getBoundingClientRect();
-const zbtn = d.querySelector('.leaflet-control-zoom a').getBoundingClientRect();
-/* Beside the zoom box, on its baseline, at the same size. The offsets in chrome.css are derived
-   from Leaflet's own margins, so a change to either drifts the two apart on screen and nowhere
-   else. These assert the result rather than the arithmetic. */
-is(Math.round(r.bottom), Math.round(zoom.bottom), 'desktop: shares the zoom control baseline');
-is(r.right < zoom.left, true, 'desktop: sits to the LEFT of the zoom box');
-is(Math.round(zoom.left - r.right) <= 12, true, 'desktop: and up against it, not adrift');
-/* **As high as the zoom box, and asserted against that box rather than against a number.** It sat
-   at M3's 56 first, 4px shorter than the 60 beside it, and a mismatch of one shade or one pixel
-   reads as a mistake at that distance. It is still larger than a zoom BUTTON, which is the point:
-   it opens the map's own settings and is the one control in the cluster that is not a zoom. It
-   stands out by size, never by colour — a reader cut the accent fill that tried the other way. */
-is(Math.round(r.height), Math.round(zoom.height), 'desktop: as high as the zoom box beside it');
-is(Math.round(r.width), Math.round(r.height), 'desktop: and square');
-is(r.width > zbtn.width, true, 'desktop: larger than a zoom button, which is the point');
-/* M3's FAB is a 16px radius on a 56px box carrying a 24px glyph, which is 2/7 and 3/7 of it. One
-   `--fab` and two `calc()`s hold those ratios at any size, so a breakpoint moves one number. */
-const px = (node, prop) => parseFloat(w.getComputedStyle(node)[prop]);
-is(Math.abs(px(btn, 'borderTopLeftRadius') / r.height - 2 / 7) < 0.01, true,
-   'desktop: the radius holds the M3 FAB ratio, 2/7 of the box');
-is(Math.abs(px(btn.querySelector('.i'), 'fontSize') / r.height - 3 / 7) < 0.01, true,
-   'desktop: and the glyph holds its 3/7');
-// Nothing else floats here. An overlap is a control a reader cannot press.
-for (const id of ['legend', 'pills', 'toast', 'credit', 'bar', 'ticker']) {
+// --- the row does not land on anything else -----------------------------------------------------
+/* **Nothing else in this app could see this fault.** A box that is correct against the pane, correct
+   against the window and correct against the card is still wrong if it lands on its neighbour. */
+for (const id of ['legend', 'pills', 'credit', 'locate', 'mapfoot']) {
   const o = el(id); if (!o) continue;
   const b = o.getBoundingClientRect();
   if (!b.width || !b.height || w.getComputedStyle(o).visibility === 'hidden') continue;
-  is(r.left < b.right && b.left < r.right && r.top < b.bottom && b.top < r.bottom, false,
-     `does not overlap #${id}`);
+  is(rb.left < b.right && b.left < rb.right && rb.top < b.bottom && b.top < rb.bottom, false,
+     'the chip row does not overlap #' + id);
 }
-is(r.left < zoom.left && r.top < zoom.bottom && r.bottom > zoom.top
-   && r.right > zoom.left, false, 'and it does not overlap the zoom control itself');
-
-// --- the button is a control, not a pin ------------------------------------------------------
-/* The fault this replaced: the glyph followed the active layer, so it drew `water_drop` or `rainy`
-   - the river and rainfall PIN glyphs - beside real pins carrying the same shape. And the plate was
-   `--surface`, which on the dark theme is the tone of the basemap under it. */
-const ico = btn.querySelector('.i');
-is(!!ico, true, 'the button carries a glyph element');
-is(ico.classList.contains('i-layers'), true, 'and it is the layers glyph');
-is(/water_drop|rainy|sunny/.test(ico.className), false, 'never a station-pin glyph');
-is(w.getComputedStyle(ico).maskImage !== 'none', true, 'the glyph is masked, so it paints');
-
-const me = w.getComputedStyle(btn);
-const zc = w.getComputedStyle(d.querySelector('.leaflet-control-zoom'));
-const za = w.getComputedStyle(d.querySelector('.leaflet-control-zoom a'));
-is(btn.textContent.trim(), '', 'it carries no text — the glyph and the panel do the talking');
-is(me.backgroundColor !== 'rgba(0, 0, 0, 0)' && me.backgroundColor !== 'transparent', true,
-   'the plate is opaque');
-/* It stands against the zoom box, so a mismatch of one shade or one pixel reads as a mistake. Two
-   rules in two files paint them, because Leaflet's sheet needs beating and this does not. */
-is(me.backgroundColor, za.backgroundColor, 'it wears the zoom control fill');
-is(me.color, za.color, 'and its ink');
-is(me.boxShadow, zc.boxShadow, 'and its elevation');
-/* NOT its radius. This one is a FAB, so it takes M3's 16px against the control strip's 8px. That
-   difference is deliberate and the assertion above pins the number. */
-is(me.borderTopLeftRadius !== zc.borderTopLeftRadius, true, 'but its own FAB radius');
-
-/* The glyph holds whatever paints. That is the whole point of the change. */
-const seen = new Set();
-for (const [h, r, x] of [[1, 0, 0], [0, 1, 0], [0, 0, 1], [0, 0, 0]]) {
-  el(h ? 'heat' : r ? 'rainHeat' : 'heatOff').checked = true;
-  el(x ? 'wxLayer' : 'stations').checked = true;
-  await wait(50);
-  seen.add(w.getComputedStyle(ico).maskImage);
-}
-is(seen.size, 1, 'the glyph holds at all four states, so it can never name a layer');
-
-// --- two layers at the top, and everything else is a choice about one of them --------------------
-/* There are no headings over the top level. Stations and Weather are the two things this map can
-   draw, and every other control in the panel answers a question ABOUT the station layer, so it
-   lives inside it. */
-const sub = menu.querySelector('.subgrp');
-is(!!sub, true, 'Stations carries a branch');
-for (const id of ['heatOff', 'heat', 'rainHeat', 'pinAll', 'favOnly', 'risingOnly'])
-  is(el(id).closest('.subgrp') === sub, true, id + ' is inside that branch');
-is(el('stations').closest('.subgrp'), null, 'Stations itself is not — it is the parent');
-is(el('wxLayer').closest('.subgrp'), null, 'and Weather is a layer of its own, not a child');
-/* The two layers share ONE track, so the branch cannot sit between them any more. It follows the
-   track instead, and the track has to come first or the indent points at nothing above it. */
-const rows = [...menu.querySelectorAll('.btngrp, .subgrp')];
-is(el('wxLayer').closest('.btngrp'), el('stations').closest('.btngrp'),
-   'both layers are buttons of one group');
-is(rows.indexOf(el('stations').closest('.btngrp')), 0, 'that group is drawn first');
-is(rows.indexOf(sub) > 0, true, 'and the branch under it');
-
-// --- every segment names itself, and the layer track names what it measures --------------------
-/* The label names the control. A segment has no right edge of its own to spare, so the note moved
-   under the layer track and names whichever layer is on. The `:has()` pair in chrome.css does the
-   swap, so there is no JS to keep in step with the preference.
-   Every control here carried a sentence under its label for four revisions. A reader cut all of
-   them, and the segmented track has room for fewer words still. */
-is(menu.querySelector('small'), null, 'nothing carries a line of flavour text any more');
-for (const id of BOXES)
-  is(el(id).closest('label').textContent.trim().length > 0, true, id + ' still names itself');
-
-/* Measured with the panel OPEN: a closed popover is `display: none`, so every rect inside it reads
-   zero and a visibility test reads a working line as hidden. */
-if (!menu.matches(':popover-open')) menu.showPopover();
-await wait(150);
-/* **Nothing names what a layer measures any more.** `Hydrological Measurement` and `Nowcasting` sat
-   under the group and a reader cut both on 2026-08-21: the two buttons above already name the
-   layers, and naming what each one measures is a second look at one fact. */
-is(menu.querySelector('.note'), null, 'no layer names the discipline it measures');
-/* **`#wxHint` is not that, and it stays.** Every caller that writes it reports a failure, so the
-   line it sits in must draw nothing at all on a healthy poll. An empty `.hint` leaves the line, and
-   `:has()` then takes the whole paragraph, or the panel keeps a blank strip under its layer group
-   for ever. */
-const hintLine = el('wxHint').closest('.mnote');
-el('wxHint').textContent = '';
-await wait(50);
-is(w.getComputedStyle(el('wxHint')).display, 'none', 'an empty hint takes no room, not even its gap');
-is(w.getComputedStyle(hintLine).display, 'none', 'and the line it sits in goes with it');
-el('wxHint').textContent = 'could not load';
-await wait(50);
-is(w.getComputedStyle(hintLine).display !== 'none', true, 'a failure brings that line back');
-is(hintLine.getBoundingClientRect().height > 0, true, 'with a box to read it in');
-el('wxHint').textContent = '';
-await wait(50);
-
-/* The count a pin filter holds rides INSIDE its own button. A button has no right edge to spare. */
-is(el('favHint').closest('label').contains(el('favOnly')), true,
-   'the favorites count rides in the favorites button');
-
-// --- an M3 connected button group, transcribed rather than approximated ------------------------
-/* M3 Expressive retired the segmented button and replaced it with the connected button group. Real
-   radios under it, clipped rather than hidden, so the browser keeps the group exclusive, walks it
-   with the arrow keys and reads each label out. None of that comes free with a row of buttons. */
-/* Every number below is the component set's own, from `ButtonGroup/button-group.css` and
-   `Button/button.css`: size xs, shape round, variant filled with `data-selected`. Read them back
-   off the live element rather than trusting the rule applied — that is the `.leaflet-touch` lesson.
-   **`.seg` must never be what answers here.** That class is this app's own sunken track, written
-   for the theme picker and the lightbox ranges, and it matches no M3 component. */
-is(menu.querySelector('.seg'), null, 'no .seg is left in this panel, because it is not an M3 component');
-/* **M3's 24px inline body padding, taken at both widths.** This app declined it while every row was
-   a `.chip` bringing 14px of its own. The rows are button groups now, which pad 2px and paint their
-   fill to that edge, so the two no longer stack. A reader called the old 6px too close to the
-   border on 2026-08-21. */
-is(w.getComputedStyle(menu).paddingLeft, '24px', 'M3: the panel pads 24px inline');
-is(w.getComputedStyle(menu).paddingRight, '24px', 'M3: on both edges');
-/* 2px between connected buttons at every size. The 2px of GROUP padding is xs and sm alone, so the
-   map layer group at size lg takes none. */
-for (const grp of menu.querySelectorAll('.btngrp')) {
-  const cs = w.getComputedStyle(grp);
-  const lg = grp.parentElement === menu;
-  is(cs.gap, '2px', 'M3: 2px between connected buttons, at every size');
-  is(cs.paddingLeft, lg ? '0px' : '2px',
-     lg ? 'M3: and no group padding at lg' : 'M3: and 2px of group padding at xs');
-}
-
-/* **Two shapes in one panel, and each is asserted as its own.** The Stations and Weather pair takes
-   the stacked form a reader asked for on 2026-08-25: 56px, glyph over label. The Heatmap and Icon
-   groups keep M3's transcribed xs row at 32px. The scope is a `>` in `css/chrome.css`, so a bare
-   descendant selector takes all three, which is what shipped for one run. Read the two apart, or
-   nothing here can see that. The outer radius follows the height either way, because the component
-   states the end of a group as `height / 2` and nothing restates the number. */
-const LAYERS = ['stations', 'wxLayer'];
-const big = id => LAYERS.includes(id);
-for (const id of BOXES) {
-  const b = el(id).closest('label'), cs = w.getComputedStyle(b);
-  is(!!b.closest('.btngrp'), true, id + ' sits in a connected button group');
-  is(Math.round(b.getBoundingClientRect().height), big(id) ? 56 : 32,
-     id + (big(id) ? ': M3 size md is 56px tall' : ': M3 size xs is 32px tall'));
-  is(cs.fontSize, big(id) ? '16px' : '14px',
-     id + (big(id) ? ': title-medium, which is size md' : ': label-large, which is size xs'));
-  is(cs.paddingLeft, big(id) ? '24px' : '12px',
-     id + (big(id) ? ': and M3 pads a md button 24px inline' : ': M3 xs pads 12px inline'));
-  is(cs.flexDirection, big(id) ? 'column' : 'row',
-     id + (big(id) ? ': glyph over label' : ': label on one row, the transcribed shape'));
-  is(Math.round(parseFloat(cs.minWidth)), big(id) ? 0 : 48,
-     id + (big(id) ? ': and takes no 48px floor, which M3 states for xs and sm alone'
-                   : ': M3 floors a connected xs button at 48px'));
-  is(Math.round(parseFloat(cs.minWidth)) >= 0, true, id + ': sizes to its own label');
-  /* The button is the hit area, not the radio inside it. A filter with nothing to match is
-     `disabled`, and M3 takes the pointer off it rather than changing the cursor. */
-  is(cs.pointerEvents, el(id).disabled ? 'none' : 'auto',
-     id + ': the button is the hit area, and a dead one takes no pointer at all');
-}
-/* **M3 grows the TARGET where a 32px button is under the 48px pointer minimum.** The stacked button
-   is 56px and clears it on its own, so the rule must give back nothing. `min(0px, ...)` is what
-   holds both cases: the bare expression is +4 here, which is 4px of dead edge top and bottom on a
-   button that was already big enough. */
 {
-  const a = w.getComputedStyle(el('stations').closest('label'), '::after');
-  is(a.content !== 'none', true, 'M3: the button carries a pointer target of its own');
-  is(Math.round(parseFloat(a.top)), 0, 'M3: and a 56px button keeps its whole height, never less');
-  const x = w.getComputedStyle(el('heat').closest('label'), '::after');
-  is(Math.round(parseFloat(x.top)), -8, 'M3: while a 32px one is still grown to 48, and no further');
+  const z = d.querySelector('.leaflet-control-zoom').getBoundingClientRect();
+  is(rb.left < z.right && z.left < rb.right && rb.top < z.bottom && z.top < rb.bottom, false,
+     'nor the zoom control');
 }
-/* **The two ends of a group are a pill and every corner a neighbour touches is 4px.** The selected
-   button then goes fully round, which is the whole signature of this component. */
+/* **The toast and the docked search both dock where this row now is, so both start under it.**
+   `--top-chips` is one constant, because the row is exactly one chip tall at every width those two
+   draw at. Asserted as a relation, never as a number: a token that drifts from the row height is
+   invisible until the two boxes touch. */
 {
-  const R = 16;                    // the Heatmap group is the transcribed 32px row
-  const first = el('heatOff').closest('label'), mid = el('heat').closest('label'),
-        last = el('rainHeat').closest('label');
-  const rad = (e, prop) => Math.round(parseFloat(w.getComputedStyle(e)[prop]));
-  el('rainHeat').checked = true;              // so the two probed below are both unselected
-  await wait(50);
-  is(rad(first, 'borderTopLeftRadius'), R, 'M3: the leading end of the group is a pill');
-  is(rad(first, 'borderTopRightRadius'), 4, 'M3: and its inner corner is corner-extra-small');
-  is(rad(mid, 'borderTopLeftRadius') + '|' + rad(mid, 'borderTopRightRadius'), '4|4',
-     'M3: a middle button is the inner radius on every corner');
-  is(rad(last, 'borderTopLeftRadius'), R, 'M3: and the selected button goes fully round');
-  is(rad(last, 'borderTopRightRadius'), R, 'M3: on both of its own corners');
-}
-/* **Every title in this panel is an M3 token, and the two group headings were this app's own.** They
-   drew at 11px, 500, uppercase and tracked, which is the drawer's section-heading language. A reader
-   asked for M3 on all of them on 2026-08-25. M3 states a list subheader as `title-small`, 14px on 20
-   at 500, in `on-surface-variant`.
-   **The uppercase transform is the half that fails silently.** A heading at the right size and still
-   transformed reads as a deliberate style rather than as a rule that was missed. Compare the colour
-   against the RESOLVED bridge in `css/base.css`, never against a literal: this app holds one surface
-   tone and bridges M3's roles onto it. */
-{
-  const heads = [...menu.querySelectorAll('.mgroup')];
-  is(heads.length, 2, 'M3: two group headings, Heatmap and Icon');
-  const probe = d.createElement('span');
-  probe.style.color = 'var(--md-sys-color-on-surface-variant)';
-  menu.appendChild(probe);
-  const want = w.getComputedStyle(probe).color;
-  for (const h of heads) {
-    const cs = w.getComputedStyle(h);
-    const nm = h.textContent.trim();
-    is(cs.fontSize, '14px', nm + ': M3 title-small, which is the list subheader');
-    is(cs.fontWeight, '500', nm + ': at 500');
-    is(cs.lineHeight, '20px', nm + ': on a 20px line');
-    is(cs.textTransform, 'none', nm + ': in sentence case, never an uppercase transform');
-    is(cs.color, want, nm + ': in on-surface-variant, off the bridge');
-  }
-  probe.remove();
-}
-/* The panel heading outranks them, or the two read as one level. */
-is(parseFloat(w.getComputedStyle(menu.querySelector('.sheettitle')).fontSize) >
-   parseFloat(w.getComputedStyle(menu.querySelector('.mgroup')).fontSize), true,
-   'M3: and the panel heading sits above them on the ladder');
-/* **The map layer group is the SQUARE shape, and its corners are the whole of what says so.** At
-   size md the connected group states an 8px inner corner and a 16px outer one, against the round
-   shape's `height / 2`. The selected button still goes fully round at 48, which is that group's own
-   rule at every size and in both shapes. So the shape shows on the two buttons that are OFF, and a
-   square group reverting to round is invisible on whichever one is on. */
-{
-  const rad = (e, prop) => Math.round(parseFloat(w.getComputedStyle(e)[prop]));
-  const st = el('stations').closest('label'), wx = el('wxLayer').closest('label');
-  el('stations').checked = true;
-  await wait(50);
-  is(rad(wx, 'borderTopRightRadius'), 16, 'M3: square md, so the unselected outer corner is 16');
-  is(rad(wx, 'borderTopLeftRadius'), 8, 'M3: and its inner corner is 8, against the 4 the xs groups take');
-  is(rad(st, 'borderTopLeftRadius'), 28, 'M3: the selected button still goes fully round at height / 2');
-  is(rad(st, 'borderTopRightRadius'), 28, 'M3: on both of its own corners');
-}
-/* Filled, with `data-selected`. Unselected is `surface-container` over `on-surface-variant`, and
-   selected is `primary` over `on-primary`. Compared against the RESOLVED bridge in css/base.css,
-   never against a literal: this app holds one surface tone and bridges M3's roles onto it. */
-{
-  const rgb = n => { const e = d.createElement('i'); e.style.color = 'var(' + n + ')';
-    menu.appendChild(e); const v = w.getComputedStyle(e).color; e.remove(); return v; };
-  el('heat').checked = true;
-  await wait(50);
-  const on = w.getComputedStyle(el('heat').closest('label'));
-  const off = w.getComputedStyle(el('heatOff').closest('label'));
-  is(on.backgroundColor, rgb('--md-sys-color-primary'), 'M3: the selected button is filled primary');
-  is(on.color, rgb('--md-sys-color-on-primary'), 'M3: with on-primary ink, never a literal white');
-  is(off.backgroundColor, rgb('--md-sys-color-surface-container'),
-     'M3: an unselected one is surface-container');
-  is(off.color, rgb('--md-sys-color-on-surface-variant'), 'M3: over on-surface-variant');
-}
-/* **Every group fills the panel between its own padding.** That is the one divergence from the
-   spec's shape, which sizes a group to its buttons. Each group is one row of this panel and a row
-   spans it. Asserted against the panel's own content box, never a constant: `.menu` carries a 1px
-   border as well as `#paintmenu`'s padding, so the content box is four pixels under the rect. */
-{
-  const mc = w.getComputedStyle(menu), mb = menu.getBoundingClientRect();
-  const inner = mb.width - parseFloat(mc.paddingLeft) - parseFloat(mc.paddingRight)
-                         - parseFloat(mc.borderLeftWidth) - parseFloat(mc.borderRightWidth);
-  for (const grp of menu.querySelectorAll('.btngrp'))
-    is(Math.round(grp.getBoundingClientRect().width), Math.round(inner),
-       (grp.getAttribute('aria-label') || '?') + ': the group fills the panel');
-}
-/* **`flex-grow`, never `flex: 1`, and a spilling label is what tells the two apart.** The shorthand
-   is `1 1 0`. A zero basis makes every button start at nothing and take an equal share, and the
-   explicit `min-width: 48px` M3 states for a connected xs button REPLACES `min-width: auto`, so the
-   content floor that would have saved it is gone. Measured at a 320px window: three buttons of 77px
-   each with `Water level` drawing about 100px of `nowrap` text over its neighbour. It did that at
-   every width, and it changed no `scrollWidth`, so only this assertion sees it. */
-{
-  const wid = id => el(id).closest('label').getBoundingClientRect().width;
-  is(wid('heat') > wid('heatOff'), true, 'a longer label takes a wider button');
-  is(wid('rainHeat') > wid('heatOff'), true, 'and a middling one lands between the two');
-  for (const id of BOXES) {
-    const b = el(id).closest('label'), lab = b.querySelector('span');
-    is(b.getBoundingClientRect().width >= lab.getBoundingClientRect().width, true,
-       id + ': its label fits inside its own fill');
+  const t = el('toast');
+  is(Math.round(parseFloat(w.getComputedStyle(t).top)) >= Math.round(rb.bottom - map.top), true,
+     'the toast starts under the chip row');
+  const fb = el('railFind');
+  if (fb) {
+    fb.click();
+    await wait(700);
+    const fp = el('findpane').getBoundingClientRect();
+    is(fp.top >= rb.bottom - 1, true, 'and so does the docked search card');
+    is(rb.left < fp.right && fp.left < rb.right && rb.top < fp.bottom && fp.top < rb.bottom, false,
+       'so the two never overlap');
+    el('findBack').click();
+    await wait(500);
   }
 }
-/* Two of the layer buttons carry near-equal labels, so the equal share lands on both. Kept as its
-   own assertion: it is the one row where a reader meets the two halves side by side. */
+
+// --- the drawer keeps the kinds and nothing else --------------------------------------------------
+/* **The drawer holds the districts and the ignored list, and nothing about the map's paint.** The
+   sensor kinds were the last section to leave, on 2026-08-25. */
+is(el('layersect'), null, 'the drawer has no layers section');
+is(el('kinds'), null, 'nor a sensor-kinds section');
+is(el('layers').closest('#kindMenu')?.id, 'kindMenu', 'the kinds live in the map chip menu instead');
+is(!!el('districts'), true, 'and the drawer keeps the district picker');
+
+// --- a filter chip clears itself on a second press -----------------------------------------------
+/* **There is no `All` chip, and that is M3's own filter-chip behaviour.** Pressing a selected chip
+   clears it, so "every pin" is the state with neither on. A radio fires no `change` when it is
+   already checked, so js/ui.js catches the `click` — and that is exactly what this drives. Without
+   it a reader can filter the map and never get back.
+   **`preventDefault()` is what broke this once.** A cancelled click restores the checkedness the
+   radio had BEFORE the click, which on a second press is checked. So the chip went straight back on
+   and undid the line above it. Nothing needs cancelling, and this asserts the state after both
+   presses rather than the handler's own shape.
+   **The live payload usually has nothing starred, so this stars a station first.** `syncPins()`
+   disables a filter with no members AND clears the preference when one empties, so enabling the box
+   by hand is not enough: the press turns the filter on and the render behind it turns it straight
+   back off. That is correct behaviour, and a scenario test reads it as a failure.
+   **The chip is also asserted in RENDERED pixels from a fresh load, never after a scripted click.**
+   Chromium does not restyle a `:has(input:checked)` subject when a script changes that checkedness.
+   `matches()` answers true and `getComputedStyle` still hands back the unchecked value, measured on
+   this build. A page that LANDS with the filter on has the state at first paint, so the checkmark
+   and the M3 leading padding can be read there and nowhere else. */
 {
-  const a = el('stations').closest('label').getBoundingClientRect();
-  const b = el('wxLayer').closest('label').getBoundingClientRect();
-  is(Math.abs(a.width - b.width) < 1, true, 'the two layers come out the same width');
-}
-/* No button can sit outside its group, at either width. A row that cannot fit overflows the panel
-   rather than cutting a word, because `flex-shrink` stays 0, and this is what fails on it. */
-is(menu.scrollWidth <= menu.clientWidth, true, 'no group overflows the panel');
-
-/* **A leading icon on each layer, at M3's 20px for an xs button.** It is a real `<i>` taking the
-   mask from its class, which is the rule `#paint::before` shipped broken once: a pseudo-element
-   that sets `--i` and never joins the list in `css/icons.css` draws an empty box. Read `mask-image`
-   rather than the token, because a resolved `--i` is not evidence that anything painted. */
-const maskOf = cls => { const e = d.createElement('i'); e.className = 'i ' + cls;
-  menu.appendChild(e); const v = w.getComputedStyle(e).maskImage; e.remove(); return v; };
-for (const [id, name] of [['stations', 'i-place'], ['wxLayer', 'i-partly_cloudy_day']]) {
-  const g = el(id).closest('label').querySelector('.i');
-  is(!!g, true, id + ' carries a leading icon');
-  is(Math.round(g.getBoundingClientRect().width), 24, id + ': at M3 24px, the navigation bar own glyph size');
-  /* A mask resolves to a data URI, so the icon's NAME is nowhere in the computed value. Compare
-     against a probe carrying the same class, the way the colour block compares against the bridge.
-     A resolved `--i` is not evidence that anything painted, which is the fault `#paint::before`
-     shipped with, so this reads `mask-image` on both sides. */
-  is(g && w.getComputedStyle(g).maskImage, maskOf(name), id + ': drawing the ' + name + ' mask');
-  is(w.getComputedStyle(g).maskImage !== 'none', true, id + ': which is a real mask, not an empty box');
-  is(g.compareDocumentPosition(el(id).closest('label').querySelector('span'))
-     & w.Node.DOCUMENT_POSITION_FOLLOWING, w.Node.DOCUMENT_POSITION_FOLLOWING,
-     id + ': leading, so the label follows it');
-}
-/* **The two groups under it carry none, and the stacked form did not change that.** Three buttons
-   of text and a glyph do not fit a 328px sheet, and the legend under the map already draws what each
-   wash means. Only the Stations and Weather pair stacks. */
-for (const id of ['heatOff', 'heat', 'rainHeat', 'pinAll', 'favOnly', 'risingOnly'])
-  is(el(id).closest('label').querySelector('.i'), null, id + ' carries none, and has no room for one');/* No button can sit outside its group, at either width. That is the fault a font change or one
-   extra word lands first, and it reads as a spacing mistake rather than as an overflow. */
-is(menu.scrollWidth <= menu.clientWidth, true, 'no group overflows the panel');
-
-/* **The press shortcut is a TOOLTIP now, and it is named on the one class of device that can take
-   it.** Hover opens this panel on a pointer device, which is what frees the press to switch the
-   layer. A tap and a keyboard press keep the native toggle, so on those the words would name an
-   action that does not exist. A line at the foot of the panel said it before, and a reader cut it
-   on 2026-08-21: it pointed at a button outside the box it sat in.
-   **It rides `data-tip`, never a `title`.** A `title` opens on no phone, and this app accepts one
-   only as a duplicate of something already visible. Nothing is visible here any more.
-   **One of the two, never both**, which is the shape `setBtn()` in js/locate.js already uses. */
-is(menu.querySelector('.mfoot'), null, 'desktop: the panel no longer names the shortcut in the panel');
-/* **The panel carries a heading at BOTH widths, and it drew on the sheet alone before.** A reader
-   cut it on 2026-08-25 and asked for it back the same day, at M3's own numbers. `title-large`, 22px
-   on 28px, which is the token this app's full-screen dialogs take for their own headline.
-   Two things fail silently. An `<h2>` keeps the UA block margin, and this app resets `h1` alone, so
-   an unstated margin is 18px of dead air that reads as panel padding. And an `aria-labelledby`
-   pointing at a node that is gone names nothing and errors nowhere. */
-{
-  const t = menu.querySelector('.sheettitle');
-  is(!!t, true, 'desktop: the panel carries a heading here too');
-  is(t.textContent.trim(), 'Layers', 'desktop: which says what the panel holds');
-  is(w.getComputedStyle(t).display !== 'none', true, 'desktop: and it draws at this width');
-  is(w.getComputedStyle(t).fontSize, '22px', 'desktop: at M3 title-large');
-  is(Math.round(parseFloat(w.getComputedStyle(t).marginTop)), 0, 'desktop: with the UA margin reset');
-  is(menu.getAttribute('aria-labelledby'), t.id, 'desktop: and it names the panel');
-}
-is(/switch/i.test(btn.dataset.tip || ''), true, 'desktop: the button names it on a tip instead');
-is(/layer/i.test(btn.dataset.tip || ''), true, 'desktop: and still says which control it is');
-is(btn.hasAttribute('title'), false, 'desktop: with no title beside it, which would name it twice');
-is(!!btn.getAttribute('aria-label'), true, 'desktop: and an accessible name, whichever tip is on it');
-/* The tip is what `js/sparktip.js` draws. Assert the wiring rather than the paint: a hover here
-   also opens the panel, and the two land at once. */
-{
-  btn.dispatchEvent(new w.PointerEvent('pointermove',
-    { bubbles: true, pointerType: 'mouse', clientX: r.left + 4, clientY: r.top + 4 }));
-  await wait(120);
-  const tip = d.querySelector('.sparktip');
-  is(!!tip && tip.textContent.includes('switch'), true, 'desktop: and sparktip draws those words');
-}
-
-/* **No segment carries a hue of its own, and the weather one used to.** A `.chip` painted its
-   border, its ink and its tint in `--c`, so weather took its own clear-sky hue to separate it from
-   the accent. A segmented track paints whichever segment is on in ONE fill, so a second colour
-   inside it reads as a rendering fault rather than as a layer's own mark. `--accent` is not a status
-   hue, so the colour language is unbroken — that rule reserves the traffic-light set, and this is
-   not one of them. */
-const tok = n => w.getComputedStyle(d.documentElement).getPropertyValue(n).trim();
-for (const id of BOXES) {
-  const c = w.getComputedStyle(el(id).closest('label')).getPropertyValue('--c').trim();
-  for (const t of ['--s-normal', '--s-alert', '--s-warning', '--s-danger'])
-    is(c !== '' && c === tok(t), false, id + ' takes no ' + t + ', which is reserved for status');
-}
-
-// --- the branch is two labelled sections ----------------------------------------------------------
-const groups = [...sub.querySelectorAll('.mgroup')].map(g => g.textContent.trim());
-is(groups.length, 2, 'the branch is two labelled sections');
-is(groups[0], 'Heatmap', 'the wash comes first');
-is(groups[1], 'Icon', 'then which pins draw');
-is(menu.querySelectorAll(':scope > .mgroup').length, 0, 'and nothing is labelled at the top level');
-
-el('stations').checked = true; el('wxLayer').checked = false;
-/* Geometry has to be measured with the panel OPEN. A closed popover is `display: none`, so every
-   rect inside it is zero and an indent assertion compares 0 against 0. That passed as a failure
-   here once, on an indent that was working. */
-if (!menu.matches(':popover-open')) menu.showPopover();
-await wait(120);
-is(w.getComputedStyle(sub).display !== 'none', true, 'Stations on -> the children show');
-const subBox = sub.getBoundingClientRect();
-const parBox = el('stations').closest('.btngrp').getBoundingClientRect();
-is(subBox.width > 0 && parBox.width > 0, true, 'the panel is open, so these rects are real');
-/* **No indent and no spine, and a divider says whose these are instead.** The branch sat 26px in
-   behind a 1px line, written for a time when its parent was a chip with a glyph to line up under.
-   A reader cut both on 2026-08-21. Assert the absence: an indent that creeps back takes width off
-   the two groups inside, and those are the ones that have no width to spare. */
-is(Math.round(subBox.left), Math.round(parBox.left), 'the branch lines up with the layer group');
-is(w.getComputedStyle(sub).borderLeftStyle, 'none', 'and carries no spine');
-is(Math.round(parseFloat(w.getComputedStyle(sub).paddingLeft)), 0, 'and no indent of its own');
-const rule = sub.querySelector('hr');
-is(!!rule, true, 'a divider separates the layer group from the choices about it');
-is(rule.getBoundingClientRect().width > 0, true, 'and it draws');
-/* **It sits INSIDE the collapsing branch, never above it.** Outside, it would stay on screen with
-   nothing under it the moment Weather takes the map, which is a rule under an empty panel. */
-is(rule.closest('.subgrp') === sub, true, 'inside the branch, so it collapses with it');
-is(rule.getBoundingClientRect().top < el('heat').getBoundingClientRect().top, true,
-   'above the first choice it introduces');
-
-/* Driven by picking the OTHER layer, because that is the only way a reader can put Stations away.
-   Every group here is a single-select segmented button: clicking the chosen segment cannot clear
-   it. */
-const favWas = el('favOnly').checked, alertWas = el('risingOnly').checked;
-el('wxLayer').checked = true;
-el('wxLayer').dispatchEvent(new w.Event('change'));
-await wait(2500);
-is(sub.offsetHeight, 0, 'weather picked -> the whole branch collapses');
-is(fits(), true, 'collapsed: the clipped rows stay out of the scroll height');
-is(gutter() < 10, true, 'so no scrollbar is drawn down a box that fits');
-is(w.getComputedStyle(sub).visibility, 'hidden', 'and leaves the tab order with it');
-is(el('favOnly').checked === favWas && el('risingOnly').checked === alertWas, true,
-   'collapsing changes nothing inside it');
-/* The panel is anchored by its bottom edge, so a branch that grows or shrinks moves away from the
-   button rather than dragging the box off it. */
-const glued = () => Math.round(el('paint').getBoundingClientRect().top
-                             - menu.getBoundingClientRect().bottom);
-const gapCollapsed = glued();
-el('stations').checked = true;
-el('stations').dispatchEvent(new w.Event('change'));
-await wait(1500);
-is(sub.offsetHeight > 0, true, 'stations picked -> the branch comes back');
-is(glued(), gapCollapsed, 'and the panel stays the same distance off the button either way');
-is(glued() >= 0 && glued() <= 12, true, 'which is hard against it');
-is(fits(), true, 'expanded: the panel does not claim more than it holds');
-is(gutter() < 10, true, 'so no scrollbar is drawn');
-menu.hidePopover();
-await wait(60);
-
-/* **One at a time in each section**, and driven through the real `change` path rather than by
-   assignment: the preference is what makes both-on unrepresentable, and only the handler writes it.
-   A pair of booleans is the shape this must never go back to — see syncHeat()'s own comment for the
-   two repairs that failed before the pair became one string. The three groups are single-select
-   segmented buttons now, so the browser refuses both-on as well. That is a second guard, not a
-   replacement: a control restored across a reload is form state this app does not own. */
-const pick = async id => {
-  const box = el(id);
-  box.checked = true;
-  box.dispatchEvent(new w.Event('change'));
+  /* One real station id out of the payload. It has to be an id this app actually holds: syncPins()
+     counts `state.data.filter(isFav)`, so a made-up one leaves the filter with nothing to match. */
+  const payload = await (await fetch('/api.php')).json();
+  const seed = extra => {
+    const p0 = JSON.parse(w.localStorage.getItem('prefs') || '{}');
+    Object.assign(p0, { favs: [payload.stations[0].id] }, extra);
+    w.localStorage.setItem('prefs', JSON.stringify(p0));
+  };
+  /* Wait for the app to have DRAWN, not for a clock. `render()` is what writes every box and every
+     chip label in this panel, and it cannot run before the first payload lands. */
+  /* **Switch transitions off again after every reload.** The `noAnim` style at the top of this file
+     belongs to the document that reloaded away. Without it the chip's padding and its checkmark are
+     measured MID-TRANSITION, and the start values are exactly the unchecked ones: 16px and a width
+     of 0. That read as a styling fault, one run in four, on markup that is right. */
+  const reload = async () => {
+    f.contentWindow.location.reload();
+    await new Promise(r => f.addEventListener('load', r, { once: true }));
+    await until(() => f.contentDocument.querySelectorAll('#map .pin').length > 0);
+    const s2 = f.contentDocument.createElement('style');
+    s2.textContent = '*{transition:none !important;animation:none !important}';
+    f.contentDocument.head.appendChild(s2);
+    await wait(400);
+  };
+  /* Landing with the filter ON. This is the only place the selected chip can be measured. */
+  seed({ pinFilter: 'fav' });
+  await reload();
+  let df = f.contentDocument, wf = f.contentWindow;
+  let ef = id => df.getElementById(id), cf = id => wf.getComputedStyle(ef(id));
+  /* **Read every value in ONE pass, then assert.** A poll lands between two `getComputedStyle` calls
+     and `render()` rewrites these boxes, so three separate reads can describe three different
+     moments. That is what made this block flake. */
+  {
+    const lab = ef('favChip'), st = cf('favChip');
+    const snap = {
+      checked: ef('favOnly').checked,
+      cls: lab.className,
+      pref: JSON.parse(wf.localStorage.getItem('prefs')).pinFilter,
+      chk: Math.round(lab.querySelector('.chipcheck').getBoundingClientRect().width),
+      pad: st.paddingLeft,
+      edge: st.borderTopColor,
+    };
+    is(snap.checked + '|' + snap.cls + '|' + snap.pref, 'true|chip on|fav',
+       'landing with the filter on draws the chip selected');
+    is(snap.chk, 18, 'M3: its checkmark draws at 18px');
+    is(snap.pad, '8px', 'M3: and the chip pads 8px on the edge that check sits on');
+    is(snap.edge, 'rgba(0, 0, 0, 0)',
+       'M3: a selected filter chip drops its outline, which separates it from an assist chip');
+  }
+  /* And landing with it off, which is the other half of the same measurement. */
+  seed({ pinFilter: '' });
+  await reload();
+  df = f.contentDocument; wf = f.contentWindow;
+  ef = id => df.getElementById(id); cf = id => wf.getComputedStyle(ef(id));
+  is(ef('favOnly').checked, false, 'landing with it off draws the chip unselected');
+  is(Math.round(ef('favChip').querySelector('.chipcheck').getBoundingClientRect().width), 0,
+     'M3: with no checkmark taking any width');
+  is(cf('favChip').paddingLeft, '16px', 'M3: and the chip back to 16px with no leading icon');
+  is(cf('favChip').borderTopWidth, '1px', 'M3: keeping its 1px outline');
+  /* Now the behaviour. Two presses, and the state after each. */
+  is(ef('favOnly').disabled, false, 'with a station starred, the favorites chip is live');
+  ef('favChip').click();
   await wait(400);
-};
-/* **Assert the property, not the scenario.** A pick only takes when its set has members: the live
-   payload usually has nothing starred, so Favorites is disabled and syncPins() clears any attempt
-   to select it. That is correct behaviour, and a scenario test reads it as a failure. What must
-   hold either way is that a pair can never both be checked. */
-const onCount = grp => grp.filter(id => el(id).checked).length;
-for (const id of ['favOnly', 'risingOnly', 'pinAll', 'favOnly',
-                  'rainHeat', 'heat', 'heatOff', 'rainHeat']) {
-  await pick(id);
-  /* **EXACTLY one in every group, never none and never two.** "Neither" used to be the pair going
-     unchecked, and it is a segment of its own now — `All` and `Off`. So the same three states are
-     reachable and the empty control is not. */
-  is(onCount(['pinAll', 'favOnly', 'risingOnly']), 1, 'after ' + id + ': exactly one pin filter on');
-  is(onCount(['heatOff', 'heat', 'rainHeat']), 1, 'after ' + id + ': exactly one heatmap choice on');
-  is(onCount(['stations', 'wxLayer']), 1, 'after ' + id + ': exactly one map layer on');
+  is(ef('favOnly').checked, true, 'a first press turns the filter on');
+  is(JSON.parse(wf.localStorage.getItem('prefs')).pinFilter, 'fav', 'and writes the preference');
+  ef('favChip').click();
+  await wait(400);
+  is(ef('favOnly').checked, false, 'a second press clears it, rather than doing nothing');
+  is(ef('risingOnly').checked, false, 'leaving neither chip on, which is every pin');
+  is(JSON.parse(wf.localStorage.getItem('prefs')).pinFilter, '',
+     'and the preference holds the empty string, never a stale filter');
 }
-/* **A layer switch closes `#side`.** Both panels are that panel: the weather card is a tenant of
-   it under a `@wx-` key, the shape the alert list already uses. The card names something the map no
-   longer draws, and nothing can refresh it either. This is the fifth way out of that panel, and the
-   only one that is not a press on the panel itself. */
-el('railAlerts').click();
-await wait(400);
-is(d.body.classList.contains('side'), true, 'the panel opens, so there is something to close');
-await pick(el('stations').checked ? 'wxLayer' : 'stations');
-await wait(2500);
-is(d.body.classList.contains('side'), false, 'switching the layer closes the panel over it');
-/* **Every group is single-select, and multi-select is applicable nowhere in this panel.** All three
-   choices are exclusive. The two pairs were checkboxes, because a radio group cannot be cleared and
-   "neither" had to stay reachable — a segmented button states that answer as a segment instead.
-   The multi-select variant is what the drawer's sensor-kind chips are, and they stay there.
-   Each radio carries its preference value in `value`, so the handler compares no ids. */
-for (const [name, want] of [['maplayer', ['stations', 'weather']],
-                            ['heatlayer', ['', 'water', 'rain']],
-                            ['pinfilter', ['', 'fav', 'alert']]]) {
-  const g = [...menu.querySelectorAll(`input[name="${name}"]`)];
-  is(g.length, want.length, name + ': every value in the preference has a segment');
-  is(g.every(i => i.type === 'radio'), true, name + ': single-select, so a press cannot clear it');
-  is(g.map(i => i.value).join('|'), want.join('|'), name + ': and each segment carries its value');
-}
-is(menu.querySelector('input[type="checkbox"]'), null,
-   'no checkbox is left in the panel, so both-on is unrepresentable in the markup');
 
-// Weather needs a longer wait: picking it awaits a deferred module.
-el('wxLayer').checked = true;
-el('wxLayer').dispatchEvent(new w.Event('change'));
-await wait(2500);
-is(onCount(['stations', 'wxLayer']), 1, 'weather picked -> exactly one map layer on');
-is(sub.offsetHeight, 0, 'and the station branch collapses with its parent');
-el('stations').checked = true;
-el('stations').dispatchEvent(new w.Event('change'));
-await wait(1500);
-is(el('stations').checked, true, 'picking stations returns to them');
-/* And the mechanism behind it: one preference holding one string. A pair of booleans can hold
-   both-on, which is the state this panel cannot draw. */
-const prefs = JSON.parse(w.localStorage.getItem('prefs') || '{}');
-is(typeof prefs.pinFilter, 'string', 'the pin filters are one preference holding one string');
-is('favOnly' in prefs, false, 'and the old favOnly boolean is migrated away');
-is('risingOnly' in prefs, false, 'and the old risingOnly boolean with it');
-is(typeof prefs.heatLayer, 'string', 'the heatmaps are the same shape, which this copies');
-is(typeof prefs.mapLayer, 'string', 'and the two map layers are one string too');
-is(['stations', 'weather'].includes(prefs.mapLayer), true,
-   'which is only ever one of the two — there is no empty map layer');
-is('wx' in prefs, false, 'the old wx boolean is migrated away');
-is('stations' in prefs, false, 'and the old stations boolean with it');
-// Leave the map unfiltered and the water wash on, or later assertions read a filtered payload.
-el('pinAll').checked = true;
-el('pinAll').dispatchEvent(new w.Event('change'));
-await wait(400);
-el('heat').checked = true;
-el('heat').dispatchEvent(new w.Event('change'));
-await wait(400);
-
-/* **No dim and no caption any more.** Weather and Stations are one choice, so weather unchecks
-   Stations rather than overruling it, and the collapse above is the whole of what a reader sees.
-   The dim existed for a state that is now unrepresentable: a checked Stations box beside a weather
-   map. The exclusivity assertions further up are what guard it. */
-is(menu.querySelector('.mhint'), null, 'the weather caption is gone, because the state it named is');
-
-// --- phone width -------------------------------------------------------------------------------
-/* 360px, the width the app bar is measured against. **The layers button does not draw here at
-   all.** The navigation bar carries the layers in its middle slot, so `#locate` is the one button
-   left on the map and it takes the slot above the zoom box. `#legend` takes the width left of those
-   buttons, so there is nowhere beside them to stand. */
-/* Reloaded at this width rather than resized to it. A phone LANDS here, and landing is the path
-   that leaves the drawer shut — resizing an open one only exercises the breakpoint listener. */
+// --- phone width ---------------------------------------------------------------------------------
+/* Reloaded at this width rather than resized to it. A phone LANDS here, and landing is the path that
+   leaves the drawer shut. */
 f.style.width = '360px';
 f.contentWindow.location.reload();
 await new Promise(r => f.addEventListener('load', r, { once: true }));
-await wait(4000);
-const pd = f.contentDocument, pw = f.contentWindow, pbtn = pd.getElementById('paint');
+await until(() => f.contentDocument.querySelectorAll('#map .pin').length > 0);
+{
+  const s3 = f.contentDocument.createElement('style');
+  s3.textContent = '*{transition:none !important;animation:none !important}';
+  f.contentDocument.head.appendChild(s3);
+}
+await wait(600);
+const pd = f.contentDocument, pw = f.contentWindow;
+const pel = id => pd.getElementById(id);
+const pbox = id => pel(id).getBoundingClientRect();
 pd.body.classList.add('rising');          // the state that puts #risebadge on screen
 await wait(300);
-
 is(pd.body.classList.contains('drawer'), false, 'phone: lands with the drawer shut');
-/* **The map draws no layers button at this width, and that is the change of 2026-08-25.** The
-   navigation bar carries the layers in its middle slot instead, so a phone reaches the panel from
-   the bar rather than from the map.
-   **`#paint` stays in the document.** `#paintmenu` names it through `popovertarget`, and the
-   stylesheet hides it. So a rotate past 600px brings it back with nothing to notice. */
-is(pw.getComputedStyle(pbtn).display, 'none', 'phone: the map draws no layers button');
-const pnav = pd.getElementById('navLayers');
-is(!!pnav, true, 'phone: the navigation bar carries the layers instead');
-is(pnav.getAttribute('popovertarget'), 'paintmenu',
-   'phone: and it opens the same panel, through the browser and not a handler');
-is(pnav.closest('#navbar')?.id, 'navbar', 'phone: from inside the bar itself');
-/* The press shortcut is a pointer-device affordance, and a tap keeps the native toggle. So nothing
-   here may name it, or it names an action a phone cannot take. `data-tip` opens on a tap, which is
-   exactly why the sentence must not be sitting in it at this width. */
-is(/switch/i.test(pbtn.dataset.tip || ''), false,
-   'phone: the press shortcut is not named, because a tap cannot take it');
-is(pbtn.getAttribute('title'), 'Map layers',
-   'phone: so the button falls back to a plain title naming the control');
 
-/* **`#locate` took the slot the layers button held**, beside the zoom box and above it. That button
-   used to stack one `--fab` step higher. With one button left on the map there is one slot, and
-   nothing else in this app reads that geometry. */
-const pr = pd.getElementById('locate').getBoundingClientRect();
+/* **Four chips need about 440px and a compact map is 360, so the row WRAPS.** A row that scrolled
+   sideways would hide the chips past its edge with nothing on screen to say they exist. */
+const prow = pel('mapchips'), prb = pbox('mapchips');
+const pmap = pd.getElementById('map').getBoundingClientRect();
+is(prb.left >= pmap.left && prb.right <= pmap.right, true, 'phone: the row stays inside the map');
+is(prow.scrollWidth <= prow.clientWidth, true, 'phone: and never scrolls sideways');
+is(Math.round(prb.height) > 32, true, 'phone: it wrapped, rather than cutting a chip off the edge');
+{
+  const tops = [...pd.querySelectorAll('#mapchips .chip')]
+    .map(c => Math.round(c.getBoundingClientRect().top));
+  is(new Set(tops).size, 2, 'phone: onto exactly two rows');
+  for (const c of pd.querySelectorAll('#mapchips .chip')) {
+    const b = c.getBoundingClientRect();
+    is(b.left >= pmap.left - 1 && b.right <= pmap.right + 1, true,
+       'phone: ' + (c.id || '?') + ' stays inside the map');
+    is(Math.round(b.height), 32, 'phone: ' + (c.id || '?') + ' is still the 32px M3 chip');
+  }
+}
+/* **`#locate` took the slot the layers button held**, above the zoom box. With one button left on
+   the map there is one slot, and nothing else in this app reads that geometry. */
+const pr = pbox('locate');
 const pz = pd.querySelector('.leaflet-control-zoom').getBoundingClientRect();
-const pza = pd.querySelector('.leaflet-control-zoom a').getBoundingClientRect();
-is(Math.round(pr.height), Math.round(r.height), 'phone: the same box the desktop button takes');
-is(Math.round(pr.width), Math.round(pr.height), 'phone: and still square');
-is(pr.height >= 44, true, 'phone: which clears the touch target on its own');
-is(pr.width > pza.width, true, 'phone: still larger than a zoom button, which is 44 here');
-/* ABOVE the zoom box here, not beside it. #legend takes `left: 12px; right: 68px` at this width, so
-   the strip left of the zoom buttons belongs to the legend and there is nowhere to stand. */
-is(pr.bottom <= pz.top, true, 'phone: sits ABOVE the zoom box');
+is(pr.bottom <= pz.top, true, 'phone: the locate button sits ABOVE the zoom box');
 is(Math.round(pz.top - pr.bottom) <= 12, true, 'phone: and up against it, not adrift');
 is(Math.round(pr.right), Math.round(pz.right), 'phone: sharing its right edge');
-const plg = pd.getElementById('legend').getBoundingClientRect();
+const plg = pbox('legend');
 is(pr.left < plg.right && plg.left < pr.right && pr.top < plg.bottom && plg.top < pr.bottom, false,
    'phone: and clear of the legend, which takes the width beside the zoom buttons');
-
-const pb = pd.getElementById('pills').getBoundingClientRect();
-is(pb.width > 0, true, 'phone: the rising pill is on screen, so there is something to clear');
-is(pr.left < pb.right && pb.left < pr.right && pr.top < pb.bottom && pb.top < pr.bottom, false,
-   'phone: the rising pill clears that button');
-
-/* --- the panel is an M3 bottom sheet at this width ------------------------------------------- */
-/* Motion is read FIRST, before anything switches it off. `getComputedStyle` reports the override,
-   not the rule, so a keyframe read after one comes back `none` on markup that is right. */
-/* **The sheet gets an enter AND an exit, and a keyframe buys the enter alone.** It shipped as one
-   for a run: the sheet arrived over 300ms and vanished in one frame, which a reader named on
-   2026-08-25. A transition needs three things a keyframe does not, and every one of them fails
-   silently. A closed state to travel from. `@starting-style`, or the enter starts from the open
-   state and never moves. And `allow-discrete` on `display` AND on `overlay`, or the box leaves the
-   top layer in the first frame of the exit and draws behind the page.
-   The scrim states its own, because a `::backdrop` is a separate box and inherits nothing. */
-pd.getElementById('paintmenu').showPopover();
-await wait(120);
-const pmCs = pw.getComputedStyle(pd.getElementById('paintmenu'));
-const tp = pmCs.transitionProperty, td = pmCs.transitionDuration;
-is(tp.includes('transform'), true, 'phone: the sheet travels on transform, never on a keyframe');
-is(tp.includes('display'), true, 'phone: with display on the list, which is what holds the exit');
-is(tp.includes('overlay'), true, 'phone: and overlay, which holds the top layer through it');
-is(td.split(',')[0].trim(), '0.3s', 'phone: on M3 duration-short2, the travel a dialog takes');
-is(pmCs.animationName, 'none', 'phone: and no keyframe, which would buy the enter alone');
-{
-  const bd = pw.getComputedStyle(pd.getElementById('paintmenu'), '::backdrop');
-  is(bd.transitionProperty.includes('opacity'), true, 'phone: the scrim fades on a transition of its own');
-  is(bd.transitionProperty.includes('display'), true, 'phone: which it also has to hold through the exit');
+/* The chip row is at the top and the button cluster is at the bottom, so these two can only meet on
+   a very short screen. Asserted anyway: that is exactly the screen a reader has. */
+for (const id of ['locate', 'legend', 'credit', 'pills']) {
+  const o = pel(id); if (!o) continue;
+  const b = o.getBoundingClientRect();
+  if (!b.width || !b.height) continue;
+  is(prb.left < b.right && b.left < prb.right && prb.top < b.bottom && b.top < prb.bottom, false,
+     'phone: the chip row does not overlap #' + id);
 }
-/* The exit is the half that shipped broken, so drive it. `hidePopover()` leaves the box on screen
-   for the whole travel, and only `allow-discrete` on `display` can do that. */
+/* The menu opens at this width too, and the placement handler clamps it on screen. */
 {
-  const pmx = pd.getElementById('paintmenu');
-  pmx.hidePopover();
-  await wait(60);
-  is(pw.getComputedStyle(pmx).display !== 'none', true,
-     'phone: the sheet is still on screen mid-exit, rather than gone in one frame');
+  pel('layerChip').click();
   await wait(400);
-  is(pw.getComputedStyle(pmx).display, 'none', 'phone: and gone once the travel ends');
-  pmx.showPopover(); await wait(400);
+  const m = pel('layerMenu'), mb = m.getBoundingClientRect();
+  is(m.matches(':popover-open'), true, 'phone: the layer menu opens');
+  is(mb.left >= 0 && mb.right <= pw.innerWidth, true, 'phone: clamped inside the window');
+  m.hidePopover();
 }
 
-pd.head.insertAdjacentHTML('beforeend',
-  '<style>*{transition:none !important;animation:none !important}</style>');
-await wait(120);
-const pm = pd.getElementById('paintmenu'), pmr = pm.getBoundingClientRect();
-/* Anchored to the bottom edge and centred, at M3's own width. Under 640dp there is no window left
-   over to inset, so the sheet spans it. That is why only the top corners are rounded. */
-is(Math.round(pmr.bottom), pw.innerHeight, 'phone: the sheet sits on the bottom edge');
-is(Math.round(pmr.width), Math.min(640, pw.innerWidth), 'phone: M3 min(640, 100%), no side inset');
-is(Math.round(pmr.left), Math.round(pw.innerWidth - pmr.right), 'phone: and centred');
-is(pmCs.borderTopLeftRadius + ' ' + pmCs.borderBottomLeftRadius, '28px 0px',
-   'phone: M3 28dp on the TOP corners only, because the bottom one has no edge to round');
-/* The placement handler must not have written an inline anything. Inline beats the sheet's rule,
-   so a menu placed on a wide screen and rotated to a narrow one would stay pinned to its button. */
-is(pm.style.left + '|' + pm.style.top + '|' + pm.style.bottom, '||',
-   'phone: js/ui.js wrote no placement, which would beat the stylesheet');
-/* No group may sit wider than the sheet. Three buttons of text inside a 328px sheet, at M3's 24px
-   of body padding, is where one extra word or a font change lands first. It reads as a spacing
-   mistake rather than as an overflow. The desktop block asserts the same against the floating
-   panel. Measured across five widths from 1100 down to 320, with a two-digit count on the favorites
-   button: the tightest row is the Icon group at a 320px window, which lands on 240 of 240. */
-is(pm.scrollWidth <= pm.clientWidth, true, 'phone: no button group overflows the sheet');
-for (const id of ['stations', 'heat', 'rainHeat', 'favOnly', 'risingOnly']) {
-  const b = pd.getElementById(id).closest('label').getBoundingClientRect();
-  is(b.left >= pmr.left - 1 && b.right <= pmr.right + 1, true,
-     'phone: ' + id + ' stays inside the sheet');
-}
-/* **The stacked form is the MAP LAYER pair's, and the two groups under it keep M3's 32px row.** A
-   reader asked for the glyph over the label on 2026-08-25, for Stations and Weather alone. The scope
-   is a `>` in `css/chrome.css`. A bare descendant selector takes all three groups and looks
-   deliberate on screen, so both shapes are read here. There is no size override at either width:
-   the same two rules answer, and the `::after` carries the 48px pointer target for the short one. */
-for (const id of ['stations', 'wxLayer']) {
-  const lab = pd.getElementById(id).closest('label');
-  const gl = lab.querySelector('.i');
-  is(Math.round(lab.getBoundingClientRect().height), 56, 'phone: ' + id + ' is the 56px size-md box');
-  is(!!gl, true, 'phone: ' + id + ' carries a glyph');
-  is(/url\(/.test(pw.getComputedStyle(gl).maskImage || ''), true,
-     'phone: ' + id + ' paints that glyph, rather than an empty box at the right size');
-  is(Math.round(gl.getBoundingClientRect().bottom) <= Math.round(
-       lab.querySelector('span').getBoundingClientRect().top) + 1, true,
-     'phone: ' + id + ' puts the glyph over the label, never beside it');
-}
-/* The two groups under it keep the transcribed row, and carry no glyph at all. */
-for (const id of ['heatOff', 'heat', 'rainHeat', 'pinAll', 'favOnly', 'risingOnly']) {
-  const lab = pd.getElementById(id).closest('label');
-  is(Math.round(lab.getBoundingClientRect().height), 32, 'phone: ' + id + ' is M3 xs at 32px');
-  is(lab.querySelector('.i'), null, 'phone: ' + id + ' carries no glyph');
-}
-/* A 56px button is already past the 48px pointer minimum, so the `::after` must give nothing back.
-   A 32px one is still grown. `min(0px, ...)` is what holds both, and the bare expression is +4 on
-   the tall one, which is 4px of dead edge top and bottom. */
-{
-  const t = id => pw.getComputedStyle(pd.getElementById(id).closest('label'), '::after').top;
-  is(t('stations'), '0px', 'phone: a 56px button keeps its whole height as the target');
-  is(Math.round(parseFloat(t('heat'))), -8, 'phone: and a 32px one is still grown to 48');
-}
-/* No group may overflow. The tightest row is the Icon group with a two-digit count on Favorites. */
-is(pm.scrollWidth <= pm.clientWidth, true, 'phone: no group overflows the sheet');
-/* M3's 24px inline body padding, the same number the panel takes above 600px. */
-is(pw.getComputedStyle(pm).paddingLeft, '24px', 'phone: M3 pads the sheet body 24px inline');
-
-/* **A tap that dismisses the sheet must not also act on the map under it.** Light dismiss closes the
-   popover and lets the same press through, so a pin behind the sheet opened its card. Drive the real
-   pointer path against a listener standing where Leaflet's marker listener stands, on a child of
-   `#map` in the bubble phase. Two states, because the guard is worth nothing if it eats every press:
-   the click is swallowed while the sheet is open and delivered once it is shut. */
-{
-  const mapEl = pd.getElementById('map');
-  const probe = mapEl.querySelector('.leaflet-marker-pane') || mapEl.firstElementChild;
-  let hits = 0;
-  probe.addEventListener('click', () => hits++);
-  const press = () => {
-    probe.dispatchEvent(new pw.PointerEvent('pointerdown', { bubbles: true }));
-    probe.dispatchEvent(new pw.MouseEvent('click', { bubbles: true, cancelable: true }));
-  };
-  is(!!probe, true, 'phone: there is a box inside the map to press');
-  is(pm.matches(':popover-open'), true, 'phone: the sheet is open, so a press has something to shut');
-  press();
-  is(hits, 0, 'phone: a press behind the open sheet never reaches the map');
-  pm.hidePopover(); await wait(60);
-  press();
-  is(hits, 1, 'phone: and reaches it again once the sheet is shut');
-  pm.showPopover(); await wait(120);
-}
-
-/* The handle, and the gesture it promises. A handle drawn over a swipe nobody wired up is a
-   promise the panel does not keep, so both halves are asserted together. */
-const pg = pd.querySelector('#paintmenu .grab');
-is(Math.round(pg.getBoundingClientRect().height), 48, 'phone: M3 48dp drag handle row');
-const ind = pw.getComputedStyle(pg, '::before');
-is(ind.width + ' ' + ind.height, '32px 4px', 'phone: holding M3 32 x 4 indicator');
-is(pw.getComputedStyle(pg).touchAction, 'none',
-   'phone: which never scrolls under the finger that grabs it');
-/* Drive the real touch path. Past 90px the sheet closes; the guard is that it was open first. */
-is(pm.matches(':popover-open'), true, 'phone: the sheet is open, so the drag has something to shut');
-const touch = (type, y) => pm.dispatchEvent(new pw.TouchEvent(type, {
-  bubbles: true, touches: type === 'touchend' ? [] : [new pw.Touch({ identifier: 1, target: pm, clientY: y, clientX: 180 })],
-}));
-touch('touchstart', 300); touch('touchmove', 320); touch('touchmove', 460); touch('touchend', 460);
-await wait(120);
-is(pm.matches(':popover-open'), false, 'phone: a drag down past the threshold dismisses it');
-/* And a short drag does NOT: a sheet that closes on any downward twitch is unusable while reading.
-   `translate` is cleared on release either way, or the sheet stays parked where the finger left it. */
-pm.showPopover(); await wait(120);
-touch('touchstart', 300); touch('touchmove', 320); touch('touchmove', 350); touch('touchend', 350);
-await wait(120);
-is(pm.matches(':popover-open'), true, 'phone: a short drag lets go and comes back');
-is(pm.style.translate, '', 'phone: and leaves no inline offset behind');
-pm.hidePopover();
-
-lines.push(bad ? `FAIL: ${bad}` : 'PASS');
-/* Without this the page stays on "running..." and says nothing about why. A check that can
-   fail silently is not a check. */
+lines.push(bad ? 'FAIL: ' + bad : 'PASS');
+/* Without this the page stays on "running..." and says nothing about why. A check that can fail
+   silently is not a check. */
 } catch (e) { bad++; lines.push('THREW: ' + ((e && e.stack) || e)); lines.push('FAIL: ' + bad); }
 out.textContent = lines.join('\n');
 </script>

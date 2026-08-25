@@ -18,7 +18,7 @@
 import { HEAT_KM, RAIN_KM, HEAT_MAX_PX, HEAT_ALERT, HEAT_WARNING, RAIN_HEAT } from './config.js';
 import { PREFS } from './state.js';
 import { map } from './map.js';
-import { el } from './util.js';
+import { el, setBox } from './util.js';
 
 /* `radius` and `blur` size simpleheat's sprite, which `SoftHeat._redraw()` does not use — it paints
    the blobs itself. They stay because `_updateOptions()` runs on add and builds `_grad` out of
@@ -418,19 +418,24 @@ export function syncHeat() {
   const wet = PREFS.heatLayer === 'water', rainy = PREFS.heatLayer === 'rain';
   /* One write, because the three are one M3 single-select segmented button. Checking a radio
      unchecks its siblings, so there is no second box left holding a state this preference denies. */
-  el(wet ? 'heat' : rainy ? 'rainHeat' : 'heatOff').checked = true;
+  for (const id of ['heatOff', 'heat', 'rainHeat'])
+    setBox(id, id === (wet ? 'heat' : rainy ? 'rainHeat' : 'heatOff'));
+  /* **The chip states its own value, because that is what an M3 menu chip does.** A chip that opens
+     a menu carries the answer as its label and a trailing arrow as the promise. So the map says what
+     it paints with nothing opened. Written from the preference, never read back from it, which is
+     the rule every control this function owns already obeys. */
+  el('heatChipLabel').textContent = wet ? 'Water level' : rainy ? 'Rainfall' : 'Heatmap';
   /* Two things take the wash off the map, and NEITHER writes PREFS.heatLayer. That is the whole of
      "turn the previous heatmap back on": the reader's choice never left, so restoring it needs no
      state remembered anywhere.
      Weather mode takes the map outright. `Stations` is the reader switching the station layer off,
-     and the heatmap is a choice about that layer — it sits inside it in `#paintmenu` — so it goes
-     with it. A wash still drawn under a switched-off Stations is a layer with its control hidden,
+     and the heatmap is a choice about that layer, so its chip leaves the map with it and the wash
+     goes with them. A wash still drawn under a switched-off Stations is a layer with its control hidden,
      which is worse than a control with nothing under it. */
   const show = PREFS.mapLayer === 'stations';
-  /* No summary line here any more. This choice left the drawer for the map's own top-left corner,
-     and the button there draws the active layer's own glyph. So what the map paints is on screen
-     without opening anything, which is what the drawer summary was for. That glyph is CSS, off the
-     radios this function writes, so there is nothing to keep in step from here. */
+  /* No summary line here any more. This choice left the drawer for a chip on the map, and that chip
+     states the answer in its own label. So what the map paints is on screen without opening
+     anything, which is what the drawer summary was for. */
   wet && show   ? heat.addTo(map)     : heat.remove();
   rainy && show ? rainHeat.addTo(map) : rainHeat.remove();
   el('lgWater').style.display = wet && show ? '' : 'none';

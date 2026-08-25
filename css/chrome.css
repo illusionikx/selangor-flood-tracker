@@ -722,8 +722,10 @@ body.testmode header {
    do — otherwise an invisible full-width strip would eat the map under it. */
 /* Centred on the MAP, not on the window: half the pane's width comes off the centre line, so the
    badges stay over the strip they describe when the pane opens. */
+/* Under the chip row, which took `--top-free` on 2026-08-25. These pills are centred on the map and
+   the row spans it, so at a compact width the two land on each other. */
 #pills {
-  position: fixed; z-index: 700; top: var(--top-free);
+  position: fixed; z-index: 700; top: var(--top-chips);
   left: calc((var(--map-l) + 100% - var(--map-r)) / 2);
   transform: translateX(-50%); display: grid; gap: 8px; justify-items: center;
   pointer-events: none;
@@ -1516,11 +1518,11 @@ body.find #findpane { display: flex; flex-direction: column; }
 @media (min-width: 601px) {
   body.find #findpane {
     position: fixed; z-index: 610; inset: auto;
-    top: var(--top-free);
+    top: var(--top-chips);
     left: calc(12px + var(--gap) + var(--rail-w));
     width: 360px;
     max-width: calc(100vw - var(--map-l) - var(--map-r) - 24px);
-    max-height: calc(100dvh - var(--top-free) - var(--gap) - 12px);
+    max-height: calc(100dvh - var(--top-chips) - var(--gap) - 12px);
     background: none; box-shadow: none; border-radius: 0; overflow: visible;
     transition: opacity var(--m3-swap), translate var(--m3-swap), left var(--m3-rail);
   }
@@ -1646,275 +1648,98 @@ body.find #findpane { display: flex; flex-direction: column; }
    change to either margin fails a check rather than drifting apart on screen.
    401, not 400: it stands over the legend and the alert panel, one rung under #gotoBox's results
    list at 402 and well under the app bar at 600. */
-/* One column with the zoom control. `#paint` keeps the bottom slot beside the zoom buttons and
-   `#locate` stacks above it. `--fab` plus 8px is the step between the two.
-   **State the `--fab` fallback.** That variable is declared on `.mapbtn` itself, so a rule written
-   here cannot inherit it and `var(--fab)` alone resolves to nothing. */
-#paint, #locate { position: absolute; z-index: 401;
-  right: calc(var(--map-r) + 48px); }
-#paint  { bottom: calc(36px + var(--gap) + var(--navbar-h)); }
-#locate { bottom: calc(36px + var(--gap) + var(--navbar-h) + var(--fab, 60px) + 8px); }
+/* **One button beside the zoom control, and there were two.** `#paint` held the bottom slot and
+   `#locate` stacked above it. The layer controls are a chip row over the map now, so that button is
+   gone and `#locate` takes the slot it held. */
+#locate { position: absolute; z-index: 401;
+  right: calc(var(--map-r) + 48px); bottom: calc(36px + var(--gap) + var(--navbar-h)); }
 
 /* It steps aside for the station panel exactly as the zoom buttons and the credit do — see the
    `body.side` block further down, which this joins. Nothing here rides the drawer any more: that
    panel is on the left and this button is not. */
 
-/* The station branch collapses with its parent rather than greying with it. Every control in it is
-   a choice about the station layer — how it washes, which pins draw — so with that layer off there
-   is nothing for any of them to act on. A column of dead rows under a switched-off parent is
-   furniture for the state the reader just left.
-   Nothing in there is unchecked by this. The check is the preference, and turning Stations back on
-   has to restore the view that was there before it went off.
-   **It animates, and `display: none` cannot.** The branch is a one-row grid whose row runs between
-   `0fr` and `1fr`, with `.subin` clipping inside it. That is the collapse technique that needs no
-   new CSS feature, and it is the one that works here.
-   **`interpolate-size: allow-keywords` with `height: auto` was tried first and does not come back.**
-   Measured in headless Chrome, which reports the property as supported: the branch collapsed to 0
-   and then stayed at 0 for good, with the collapse rule no longer matching and `scrollHeight` still
-   reporting its full 309px. Going out worked and coming back did not. Do not reach for it again
-   here without measuring both directions.
-   The panel is anchored by its BOTTOM edge while it opens upward, so the branch grows and shrinks
-   away from the button and the box stays put against it. See the placement handler in js/ui.js.
-   `visibility` carries the tab order, and it is spelled with explicit timings on both sides. A
-   transitioned `visibility` holds its start value for the whole duration, so a bare transition
-   would leave the collapsed rows focusable for the length of the slide. That is the trap `#splash`
-   and `#gotoBox` both hit. */
-#paintmenu .subgrp {
-  display: grid; grid-template-rows: 1fr;
-  transition: grid-template-rows .22s ease, opacity .16s, visibility 0s;
-}
-/* `min-height: 0` because a grid item refuses to shrink below its content without it, which is the
-   whole mechanism here.
-   **`contain: layout` is what keeps the collapsed branch out of the panel's scroll height.** Without
-   it the clipped rows still counted: with the branch collapsed the panel measured 157px tall and
-   reported a 352px `scrollHeight`, so `.menu`'s `overflow-y: auto` drew a 17px scrollbar down a box
-   with nothing to scroll. `overflow: hidden` clips the paint and does not make that claim on its
-   own. Measured: 352 against 157 before, 157 against 157 after, with the expanded branch unchanged
-   at 309px. `contain: size` also clears it and must NOT be used — it sizes the item as if it were
-   empty, so the open branch collapses to nothing. */
-#paintmenu .subin { overflow: hidden; min-height: 0; contain: layout; }
-#paintmenu:not(:has(#stations:checked)) .subgrp {
-  grid-template-rows: 0fr; opacity: 0; visibility: hidden;
-  margin-top: 0; margin-bottom: 0; border-left-color: transparent;
-  transition: grid-template-rows .22s ease, opacity .12s, visibility 0s .22s;
-}
-@media (prefers-reduced-motion: reduce) {
-  #paintmenu .subgrp { transition: none; }
-}
+/* --- the layer chips, over the map ---------------------------------------------------------------
+   **The layer controls are a bare chip row now, and they were a panel behind a round button.** A
+   reader asked for that on 2026-08-25. `#paintmenu`, `#paint` and `#navLayers` are all gone with it.
 
-/* **No weather dim here any more, and no caption.** Stations and Weather are one choice now, so
-   weather unchecks Stations rather than overruling it, and the collapse rule above does the rest.
-   The dim existed because a checked Stations box could claim a layer weather had taken. That state
-   is unreachable: `PREFS.mapLayer` holds one of the two, never both. A rule that cannot fire is a
-   rule that goes. */
+   It sits on the legend's own leading line and under the ticker, so the three boxes over the map
+   share one edge. `--map-l` and `--map-r` already carry the rail and the supporting pane, which is
+   the rule every floating box here obeys: a box that misses that term sits on the page beside the
+   card rather than on it.
 
-/* **This panel takes M3's 24px inline body padding now, and the reason it declined it is gone.**
-   That reason was that every row was a `.chip` bringing 14px of its own, so 24 on top of 14 put a
-   label 38px inside the panel. The rows are button groups now. A group pads 2px and its buttons
-   paint to that edge, so 24 puts the fill 26px in and the panel reads as one column with air
-   around it. A reader called the old 6px too close to the border on 2026-08-21.
-   **`min-width` rises with it, and 320 is what the widest row needs.** The Icon group measures
-   251px at its own content width, and 300 less a 1px border either side less 48px of padding
-   leaves 250. One pixel of overflow. 320 leaves 270. `.menu`'s `max-width` caps this at 340. */
-#paintmenu { min-width: 320px; padding: 6px 24px 12px; }
-/* Everything in the panel lines up on the button fill, which sits 2px inside the group's own
-   padding. Stated once here rather than as four numbers that drift apart. */
-#paintmenu .mgroup, #paintmenu .mnote { margin-inline: 2px; }
-#paintmenu hr { margin-inline: 0; }
-/* **The panel's heading, at both widths.** `title-large` — 22px on 28px — which is the token this
-   app's full-screen dialogs take for their own headline. The buttons under it are 96px tall with
-   24px labels, and a 16px heading over those reads as a caption. It drew at `title-medium` on the
-   sheet alone before, and a reader asked for M3's own numbers on 2026-08-25.
-   **An `<h2>` keeps the UA block margin**, and this app resets `h1` alone. So `margin` is stated or
-   the panel grows 18px of dead air above and below it. */
-.sheettitle {
-  margin: 0 2px 10px;
-  font-family: var(--md-sys-typescale-title-large-font);
-  font-size: var(--md-sys-typescale-title-large-size);
-  line-height: var(--md-sys-typescale-title-large-line-height);
-  font-weight: var(--md-sys-typescale-title-large-weight);
-  letter-spacing: var(--md-sys-typescale-title-large-tracking);
-  color: var(--md-sys-color-on-surface);
-}
-/* --- M3 connected button group ------------------------------------------------------------------
-   **This is NOT the lightbox's range selector, and the difference is the whole entry.** That control
-   is this app's own sunken track with a pill sliding along it, under `.tlranges` and `.tlr`. It
-   approximates a segmented button and matches no M3 component. M3 Expressive
-   retired the segmented button and replaced it with the **connected button group**, which is what
-   the three layer choices take.
-   Transcribed from the M3 Expressive component set's `ButtonGroup/button-group.css` and
-   `Button/button.css`, which cite `m3.material.io/components/button-groups/specs` and
-   `.../buttons/specs`. Size `xs`, shape `round`, variant `filled` with `data-selected`:
+   **The row WRAPS, and that is what makes a phone work.** Four chips need about 440px and a compact
+   map is 360. A row that scrolls sideways hides the chips past its edge with nothing on screen to
+   say they exist. Wrapping costs about 40px of map and hides nothing.
 
-       group      inline-flex, gap 2px, padding 2px          (connected, xs)
-       button     32px tall, padding-inline 12, gap 4, min-width 48
-       label      label-large — 14px on 20px at 500, 0.1px tracking
-       inner      corner-extra-small (4px) on every corner a neighbour touches
-       outer      height / 2, so the two ends of the group are a pill
-       selected   fully round at height / 2, on `primary` over `on-primary`
-       unselected `surface-container` over `on-surface-variant`
-
-   **The buttons size to their own content and are never stretched to share the width.** That is the
-   spec's own shape, and it is also what fits: the widest label decides an equal split, so three
-   equal segments of `Favorites · 12` measure 348px against the 262 this panel has. `min-width`
-   carries the short ones instead.
-   **The selected button changing shape is the component's signature**, and it is why the radius is
-   on the transition list with M3's own spring. A sunken track moves a fill along itself. This grows
-   one button into a pill and lets its neighbours keep their square inner corners. */
-.btngrp {
-  --_h: 32px;                                          /* size xs */
-  --_r: var(--md-sys-shape-corner-extra-small);        /* 4px, the corner a neighbour touches */
-  display: inline-flex; max-width: 100%; gap: 2px; padding: 2px; margin: 0 0 2px;
-}
-.btngrp label {
-  box-sizing: border-box; position: relative;
-  display: inline-flex; align-items: center; justify-content: center; gap: 4px;
-  flex-shrink: 0; min-width: 48px; height: var(--_h); padding-inline: 12px; margin: 0;
-  border: 0; border-radius: var(--_r); cursor: pointer; white-space: nowrap;
-  font-family: var(--md-sys-typescale-label-large-font);
-  font-size: var(--md-sys-typescale-label-large-size);
-  line-height: var(--md-sys-typescale-label-large-line-height);
-  font-weight: var(--md-sys-typescale-label-large-weight);
-  letter-spacing: var(--md-sys-typescale-label-large-tracking);
-  background: var(--md-sys-color-surface-container);
-  color: var(--md-sys-color-on-surface-variant);
-  -webkit-user-select: none; user-select: none;
-  transition:
-    color var(--md-sys-motion-duration-short2) var(--md-sys-motion-easing-standard),
-    background-color var(--md-sys-motion-duration-short2) var(--md-sys-motion-easing-standard),
-    border-radius var(--md-sys-motion-duration-spring-default-spatial)
-      var(--md-sys-motion-easing-spring-default-spatial);
-}
-/* A 32px button is under the 48px pointer minimum, so the spec grows the target rather than the
-   button. Vertical only: the inline edges belong to the neighbour 2px away.
-   **`min(0px, ...)`, because a taller button must never shrink its own target.** The stacked
-   variant in `#paintmenu` is 56px, and the bare expression is +4 there. That reads as a button
-   with 4px of dead edge top and bottom, which is the opposite of what this rule is for. */
-.btngrp label::after {
-  position: absolute; z-index: 2; content: "";
-  inset: min(0px, calc((var(--_h) - 48px) / 2)) 0;
-}
-/* The two ends of the group are a pill and everything a neighbour touches is the inner radius. */
-.btngrp {
-  --_out: calc(var(--_h) / 2);   /* the ROUND shape's outer corner. A square group overrides it. */
-}
-.btngrp label:first-of-type { border-start-start-radius: var(--_out); border-end-start-radius: var(--_out); }
-.btngrp label:last-of-type  { border-start-end-radius:   var(--_out); border-end-end-radius:   var(--_out); }
-/* Clipped to a pixel rather than hidden with `display: none`, which would take the control out of
-   the tab order and leave it mouse-only. The browser keeps the group exclusive, walks it with the
-   arrow keys and reads the label out — none of which a row of styled buttons gets for free. */
-.btngrp input { position: absolute; width: 1px; height: 1px; margin: -1px; border: 0; clip-path: inset(50%); }
-.btngrp label:has(:checked) {
-  border-radius: calc(var(--_h) / 2);
-  background: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary);
-}
-/* M3 paints hover as a state layer over the container, at `state-hover-opacity` of the label's own
-   colour. This app has no ripple to own it, so it is a `background-image` the way `button.css`
-   writes its focus layer. It lands on the selected button as well, which is the spec. */
-.btngrp label:hover {
-  background-image: linear-gradient(
-    color-mix(in srgb, currentColor calc(var(--md-sys-state-hover-opacity) * 100%), transparent),
-    color-mix(in srgb, currentColor calc(var(--md-sys-state-hover-opacity) * 100%), transparent));
-}
-.btngrp label:has(:focus-visible) { outline: 2px solid var(--md-sys-color-primary); outline-offset: 2px; }
-/* M3 draws a 20px icon in an xs button, at the 4px gap the base rule already states. `.i` is a 1em
-   box, and 1em here is `label-large`'s 14px, so the size has to be stated. The glyph takes the
-   button's own ink, `on-primary` on the chosen one, because a connected group paints in one fill. */
-.btngrp .i { font-size: 20px; }
-/* **The one divergence from the spec's own shape.** M3 sizes a connected group to its buttons.
-   Each group here is one row of the panel, and a row spans it.
-   **`flex: 1` fills them and is NOT an equal split, which is the whole reason it is safe.** A flex
-   item refuses to shrink under its own min-content, and a button here is `nowrap`, so its full
-   label is that floor. The free space spreads over whatever is left and no label is ever cut.
-   Three EQUAL buttons of `Favorites · 12` would measure 348px against the 270 this panel has. */
-#paintmenu .btngrp { display: flex; width: 100%; }
-/* **The MAP LAYER group is size MD in the SQUARE shape, and the two groups under it stay at xs.**
-   A reader asked for the large square form on 2026-08-25, and then for a size that reads beside the
-   navigation bar. **That bar is what picks md.** Its items draw a 24px glyph over a label, and md is
-   the one button size whose icon is 24px. Size lg stood here first at 96px with a 32px icon and a
-   24px label, and it towered over the bar it sits beside.
-   **`>` is the whole of the scope.** That group is a direct child of the panel. The Heatmap and Icon
-   groups sit inside `.subgrp > .subin`, so a bare `#paintmenu .btngrp` reaches all three. That is
-   what shipped for one run, and a large Heatmap row looks deliberate on screen.
-
-   `Button/button.css` at `data-size="md"`, and `ButtonGroup/button-group.css` at the same size:
-
-       height          56px
-       padding-inline  24px
-       icon            24px, the navigation bar's own glyph size
-       label           title-medium — 16px on 24px
-       inner corner    shape-corner-small (8px), the corner a neighbour touches
-       outer corner    shape-corner-large (16px), because the shape is SQUARE
-       selected        height / 2, fully round, which is the group's own rule at every size
-       group           gap 2px and NO padding — the 2px group padding is xs and sm only
-       min-width       none — the 48px floor is xs and sm only
-
-   **One divergence, and it is the one this panel already carries.** The glyph sits OVER the label
-   rather than before it, on the same reader's instruction. 56 is 24 + 2 + 24 with 3 of padding at
-   each end, so the stacked form lands on the spec's own height with nothing to adjust.
-   **`padding-inline` is the spec's 24 now.** At size lg it had to be 12: the pair floored at 372px
-   of min-content against the 272 this panel has, and a flex item never shrinks under that floor. At
-   md the two labels measure about 230px with the full padding, so the number comes across whole.
-   **`nowrap` still holds, and it is what stops a label being cut.** A flex item floors at its own
-   min-content, which for a `nowrap` button is its whole label. Wrapping hands that floor back and
-   puts a label on two lines inside a box measured for one. */
-#paintmenu > .btngrp {
-  --_h: 56px;                                          /* size md */
-  --_r: var(--md-sys-shape-corner-small);              /* 8px, the corner a neighbour touches */
-  --_out: var(--md-sys-shape-corner-large);            /* 16px, the square shape's own outer corner */
-  padding: 0;
-}
-#paintmenu > .btngrp label {
-  flex-direction: column; gap: 2px; min-width: 0; padding-inline: 24px;
-  font-family: var(--md-sys-typescale-title-medium-font);
-  font-size: var(--md-sys-typescale-title-medium-size);
-  line-height: var(--md-sys-typescale-title-medium-line-height);
-  font-weight: var(--md-sys-typescale-title-medium-weight);
-  letter-spacing: var(--md-sys-typescale-title-medium-tracking);
-}
-#paintmenu > .btngrp .i { font-size: 24px; }
-/* The SQUARE shape's outer corner rides `--_out` on the group above, and the base rules read it.
-   **Restating those two rules here is what broke the selected state.** They carry an id, so they
-   beat `.btngrp label:has(:checked)` and held the chosen button at its square corner rather than
-   letting it go fully round. The connected group makes a selected button `height / 2` at every size
-   and in both shapes, and that is the component's signature. So the variable is the whole override. */
-/* **`flex-grow`, never the `flex: 1` shorthand, and the difference is a label spilling out of its
-   own fill.** That shorthand is `1 1 0`, and a zero basis makes every button start at nothing and
-   take an equal share of the whole row. A flex item is normally floored at its own min-content, but
-   the explicit `min-width: 48px` M3 states for a connected xs button REPLACES `min-width: auto` and
-   takes that floor away. Measured at a 320px window: three buttons of 77px each, with `Water level`
-   drawing about 100px of `nowrap` text straight over its neighbour. It did it at every width.
-   `flex-grow: 1` alone keeps the `auto` basis, so each button starts at its own label and only the
-   space left over is shared. `flex-shrink` stays 0 from the base rule, so a row that cannot fit
-   overflows the panel rather than cutting a word — and `paint-check.html` fails on that. */
-#paintmenu .btngrp label { flex-grow: 1; }
-/* A filter with nothing to match goes flat and unclickable rather than emptying the map in silence.
-   M3's own disabled pair for a filled button: the container is `on-surface` at 10% and the label is
-   `on-surface` at 38%. `.chip` states the same rule for the drawer's sensor kinds, in one opacity. */
-.btngrp label:has(:disabled) {
+   **`--top-chips` is the row's own height plus its gap, and two boxes read it.** The toast and the
+   docked search both dock at `--top-free`, which is now this row's line. Each starts under it
+   instead. One constant, because the row is exactly one chip tall at every width the two of them
+   draw at. */
+#mapchips {
+  position: absolute; z-index: 401;
+  top: var(--top-free); left: calc(var(--map-l) + 12px); right: calc(var(--map-r) + 12px);
+  display: flex; flex-wrap: wrap; align-items: flex-start; gap: 8px;
   pointer-events: none;
-  background-color: color-mix(in srgb,
-    var(--md-sys-color-on-surface) calc(var(--md-sys-state-disabled-container-opacity) * 100%), transparent);
-  color: color-mix(in srgb,
-    var(--md-sys-color-on-surface) calc(var(--md-sys-state-disabled-opacity) * 100%), transparent);
-  background-image: none;
+  transition: left var(--m3-rail), right var(--m3-travel);
 }
-@media (prefers-reduced-motion: reduce) { .btngrp label { transition: none; } }
-/* **A failure line, and nothing else.** Each layer named the discipline it measures here, and a
-   reader cut both on 2026-08-21: the two buttons above already name the layers.
-   `#wxHint` is the one thing left in it, and every caller that writes it reports a failure. So this
-   line has no `min-height` and no margin of its own to reserve. An empty `.hint` leaves the line
-   through `:empty`, and `:has()` then takes the whole paragraph with it, or the panel keeps a blank
-   strip under its layer group on every healthy poll. */
-#paintmenu .mnote { display: flex; margin: 2px 8px 4px; color: var(--muted); }
-#paintmenu .mnote:not(:has(.hint:not(:empty))) { display: none; }
-/* **The press shortcut is a tooltip now, and the line that named it is gone.** It sat at the foot
-   of the panel reading `Click <layers> to switch layer`, drawn behind a media query and pointing at
-   a button outside the box it sat in. A reader cut it on 2026-08-21.
-   `js/ui.js` writes the sentence onto `#paint` as `data-tip` instead, behind that same query, and
-   `js/sparktip.js` draws it. **It is not a `title`.** A `title` opens on no phone, and this app
-   accepts one only as a duplicate of something already visible. Nothing is visible here any more. */
-
+/* The row spans the map so its chips can wrap across it, and a row that took clicks would swallow
+   every press along the top of the map. Each chip takes them back. This is the same pair `#mapfoot`
+   states at the other end of the map. */
+#mapchips > * { pointer-events: auto; }
+/* Every chip up here floats over a basemap, so it carries the panel's tone and this app's one
+   elevation. `.chip` alone is transparent, which is right inside a panel and invisible on a map. */
+#mapchips .chip {
+  background: var(--surface); box-shadow: var(--shadow);
+}
+#mapchips .chip:has(input:checked), #mapchips .chip.on {
+  background: color-mix(in srgb, var(--c, var(--accent)) 16%, var(--surface));
+}
+/* **A chip that opens a menu states its VALUE and carries a trailing `expand_more`.** That is M3's
+   own reading of the pattern: the label is the answer and the arrow is the promise of a menu. A
+   filter chip states a NAME and answers with a leading check instead, which is what the two below
+   it do. So the two kinds are told apart by shape before they are told apart by position. */
+#mapchips .mchip { padding-left: 8px; padding-right: 8px; }
+#mapchips .mchip .tail { font-size: 18px; margin-left: -2px; }
+#mapchips .mchip .glyph { opacity: 1; }
+/* The menu a chip opens. `.menu` already places itself, scrolls and caps its own width — this only
+   states that a row here is a radio and not a button. */
+.chipmenu .mi { align-items: center; }
+.chipmenu .mi .i { margin-top: 0; }
+.chipmenu input { position: absolute; width: 1px; height: 1px; opacity: 0; margin: 0; }
+/* The selected row's check, and it holds its 18px box whether or not it draws. A check that took
+   the row's own space only while it was on would shift every label sideways on a press. */
+.chipmenu .mcheck { visibility: hidden; color: var(--accent); }
+.chipmenu .mi:has(input:checked) .mcheck { visibility: visible; }
+.chipmenu .mi:has(input:checked) { color: var(--on-surface); font-weight: 500; }
+/* **The sensor-kind rows, and they are the one MULTI-select group in this row of chips.** Every other
+   menu here is radios, so a row states its choice with the check alone. These carry the kind's own
+   glyph beside it, in the kind's own hue, which is what the drawer chips did before they moved.
+   `.on` sits beside `:has(input:checked)` for the reason `setBox()` in js/util.js states: Chromium
+   does not restyle a `:has()` subject when a script changes the checkedness, and these boxes are
+   written from `PREFS.layers`. */
+.chipmenu .kindrow .glyph { color: var(--c, var(--accent)); opacity: .45; }
+.chipmenu .kindrow:has(input:checked) .glyph,
+.chipmenu .kindrow.on .glyph { opacity: 1; }
+.chipmenu .kindrow.on { color: var(--on-surface); font-weight: 500; }
+.chipmenu .kindrow.on .mcheck { visibility: visible; }
+/* How many pins this kind holds under the current filters. It sits on the trailing edge of its own
+   row, which is the slack a menu row already gives its label. */
+.chipmenu .kindrow b {
+  margin-left: auto; font-weight: 500; font-variant-numeric: tabular-nums; opacity: .7;
+}
+/* **The heatmap, the sensor kinds and the two filters answer about the STATION layer, so they leave
+   with it.** Weather takes the map and there is nothing left for any of them to act on. A `:has()` rule rather than a
+   body class, so no script can get it wrong and nothing has to be written on the poll. */
+body:has(#wxLayer:checked) :is(#heatChip, #kindChip, #alertChip, #favChip) { display: none; }
+/* The failure line, on a row of its own under the chips. It is empty on a healthy poll, and an empty
+   `.hint` takes the whole line with it — without that second rule the map keeps a blank strip under
+   its chips for ever. */
+#mapchips .mnote {
+  flex-basis: 100%; margin: 0; padding: 4px 10px; width: fit-content;
+  border-radius: var(--md-sys-shape-corner-small);
+  background: var(--surface); box-shadow: var(--shadow); color: var(--muted); font-size: 12px;
+}
+#mapchips .mnote:not(:has(.hint:not(:empty))) { display: none; }
 /* --- heatmap legend ------------------------------------------------------------------------- */
 
 /* **The bottom strip holds three things and they have to clear each other, not just the pane.**
@@ -2358,7 +2183,7 @@ body.side #side { display: flex; }
 /* Top-right of the map, mirroring the alert panel on the left. Hidden rather than removed when
    closed: `visibility` keeps it out of the tab order and off screen readers, and still animates. */
 #toast {
-  position: absolute; z-index: 401; top: var(--top-free);
+  position: absolute; z-index: 401; top: var(--top-chips);
   right: calc(var(--map-r) + 12px);
   width: min(300px, calc(100vw - 24px));
   border-radius: 12px; padding: 12px 14px 6px; overflow: hidden;
@@ -3104,6 +2929,12 @@ body.side #side { display: flex; }
      difference, so this only has to stop sitting under the ticker's rule. */
   /* Under the pill rather than under a two-row bar. The mark it opens from rides that pill now. */
   #netstats { top: var(--top-free); left: calc(var(--gap) + 12px); }
+  /* **The chip row wraps to two rows at this width, so everything under it clears both.** Four chips
+     need about 440px and a compact map is 360. `--top-chips` is one chip plus its gap above 600px,
+     where the row never wraps. Here it is two chips plus two gaps. With Weather on, only the layer
+     chip draws and this leaves 40px of air over a pill centred on a map, which nothing reads as a
+     fault. A token that follows the real height needs a measurement, and CSS has none to give. */
+  :root { --top-chips: calc(var(--top-free) + 80px); }
   /* ABOVE the zoom box here rather than beside it. `#legend` takes `left: 12px; right: 68px` at this
      width, so the strip left of the zoom buttons is the legend's and there is nowhere to stand.
      No size override. `--fab` follows the zoom control's height on a desktop because the two stand
@@ -3123,14 +2954,6 @@ body.side #side { display: flex; }
   /* **`--navbar-h` rides these literals too.** The 136 is measured up from the MAP's bottom edge,
      and below 600px that edge sits a navigation bar above the window. Without the term the two
      buttons stay where the window puts them and the zoom box climbs past them. */
-  /* **`#paint` draws nothing at this width, because the navigation bar carries the layers.** A
-     reader asked for that on 2026-08-25. So the map holds one button here rather than two, and
-     `#locate` takes the slot beside the zoom box that `#paint` held. It is the same 136, without
-     the `--fab` step that used to stack it above a second button.
-     **`display: none` rather than a JS guard**, so a rotate past 600px needs nothing to notice. The
-     button stays in the document, and `#paintmenu` still names it through `popovertarget`. The
-     placement handler in `js/ui.js` takes whichever of the two buttons has a box. */
-  #paint { display: none; }
   #locate { right: 10px; bottom: calc(136px + var(--navbar-h)); }
   /* The legend earns its space: the heatmap is the one layer whose colours mean nothing without it,
      and it is the layer a phone shows most of. Compacted rather than dropped — full width beside the
@@ -3156,7 +2979,7 @@ body.side #side { display: flex; }
   /* Nothing steps aside here — the panel covers most of the map, so there is nowhere to step to. The
      zoom buttons go *behind* it instead, which map.css now does for every Leaflet corner at every
      width; this only has to cancel the desktop shift. */
-  body.side #toast, body.side #mapfoot, body.side #paint,
+  body.side #toast, body.side #mapfoot,
   body.side .leaflet-bottom.leaflet-right { transform: none; }
   /* Desktop only. At this width the toast covers the top of the map — the band the user is already
      reading — for a list the app bar's warning glyph is already counting two rows above it.
@@ -3428,72 +3251,6 @@ body.side #side { display: flex; }
   .docbox { max-width: min(var(--dlg-prose), calc(100vw - var(--dlg-inset) * 2)); }
 }
 
-/* --- the layer selector as a bottom sheet (phones) --------------------------------------------- */
-
-/* Below 600px `#paintmenu` is an M3 modal bottom sheet rather than a menu floating beside its
-   button. It is a panel of settings a reader opens while looking at the map, and the map is what
-   it reports on, so it belongs on the edge the thumb is already at rather than in a corner.
-
-   The numbers, from the M3 Expressive component set's `BottomSheet/bottom-sheet.css`, which cites
-   m3.material.io/components/bottom-sheets/specs:
-
-     container shape    28px on the two TOP corners only
-     container width    min(640px, 100%), centred
-     max height         calc(100dvh - 72px)
-     drag handle        a 48px row holding a 32 x 4px indicator, radius 2
-     scrim              32% of the scrim colour
-
-   https://github.com/bczak/m3you/blob/development/src/components/BottomSheet/bottom-sheet.css
-
-   **The sheet reaches both side edges, and the reference's own file does not.** That file writes
-   `calc(100% - 32px)`, which leaves 16px of map down each side at 360px. M3 states the inset for a
-   window WIDER than the sheet, so the sheet centres at 640px and the margin is what is left over.
-   Below 640dp there is nothing left over, and the sheet spans the window. `min()` states both cases
-   in one expression. Only the top corners are rounded, because the other three sit on an edge.
-
-   **M3's 24px inline body padding is taken now, and the reason this app declined it is gone.** That
-   reason was that every row was a `.chip` bringing 14px of its own, so 24 on top of 14 put a label
-   38px inside its own sheet. The rows are button groups now. A group pads 2px and its buttons paint
-   to that edge. `#paintmenu`'s own rule carries the number for both widths, so there is one place
-   that states it. The 24px at the BOTTOM was always taken: nothing sits under the last row, and a
-   phone's gesture bar does. */
-@media (max-width: 600px) {
-  #paintmenu {
-    /* `inset: auto 0 0 0` beats `.menu`'s `inset: auto`, and js/ui.js stops writing a placement
-       here at this width — see the guard at the top of its `toggle` handler. Inline styles win
-       over any of this, so the two halves have to agree. */
-    inset: auto 0 0 0;
-    width: min(640px, 100%); margin-inline: auto;
-    min-width: 0; max-width: none;
-    max-height: calc(100dvh - 72px);
-    padding: 0 24px 24px;
-    border: 0; border-radius: 28px 28px 0 0;
-  }
-  /* M3's scrim, at the 32% its own file states. A popover's backdrop paints but never blocks: light
-     dismiss still closes the sheet on a tap outside, which is the modal bottom sheet's own way out.
-     So the scrim needs no `pointer-events` of its own and there is no second box to keep inert. */
-  #paintmenu::backdrop { background: color-mix(in srgb, #000 32%, transparent); }
-
-  /* The handle is the `.grab` rule at the foot of this file. */
-
-  /* Up from the bottom edge and back down it, the same travel and the same 300ms a full-screen
-     dialog takes. The transform, the closed state and the transition all live in the swipe block at
-     the foot of this file, because the drag writes into that same transform. Only the scrim is
-     stated here, because a `::backdrop` is a separate box and inherits nothing from its element.
-     **A keyframe on `:popover-open` stood here first and bought an ENTER alone.** So the sheet
-     arrived over 300ms and vanished in one frame, which a reader named on 2026-08-25. That is the
-     identical fault `#pane` had, and the repair is the one that file already carries: a closed state
-     to transition from, `@starting-style` to supply it on the way in, and `allow-discrete` to hold
-     the box on screen while it leaves. */
-  #paintmenu::backdrop {
-    opacity: 0;
-    transition: opacity var(--m3-travel), display var(--m3-travel) allow-discrete,
-                overlay var(--m3-travel) allow-discrete;
-  }
-  #paintmenu:popover-open::backdrop { opacity: 1; }
-  @starting-style { #paintmenu:popover-open::backdrop { opacity: 0; } }
-}
-
 /* --- the pane: side sheet on a desktop, full-screen dialog on a phone -------------------------- */
 
 /* `#pane` is one surface in two variants, and M3's canonical supporting-pane layout names both:
@@ -3577,27 +3334,6 @@ body.side #side { display: flex; }
   #sideBody { padding: 8px 16px 16px; }
 }
 
-/* --- the drag handle, shared by all three sheets ---------------------------------------------- */
-
-/* `#paintmenu`'s alone now. M3: a 48px row holding a 32 by 4px indicator with a 2px radius, painted
-   `outline`. The spec states the row as 22dp of padding above and below the bar, so 22 + 4 + 22 is
-   where the 48 comes from. The row is the touch target and the bar is the picture of it, so the bar is a
-   pseudo-element rather than a second box.
-   It draws below 600px alone, where that panel is a bottom sheet. The supporting pane had one while
-   it was a bottom sheet too. It is a full-screen dialog now and that variant has no swipe, so the
-   handle went with the gesture. A handle drawn over a gesture nobody wired up is a promise the panel
-   does not keep. */
-.grab { display: none; }
-@media (max-width: 600px) {
-  .grab {
-    display: flex; align-items: center; justify-content: center;
-    height: 48px; flex: none; touch-action: none;
-  }
-  .grab::before {
-    content: ''; width: 32px; height: 4px; border-radius: 2px; background: var(--outline);
-  }
-}
-
 /* --- sheet motion, and the drag ---------------------------------------------------------------- */
 
 /* **The finger writes a custom property and the transition is killed by an attribute.** That is the
@@ -3656,20 +3392,10 @@ body:not(.ready) #pane { transition: none; }
      `allow-discrete` terms are what keep the box and its top layer alive through the exit.
      `[data-swiping]` kills the transition while a finger is on it, which is the reference's own
      mechanism, transcribed at the head of this block. */
-  #paintmenu {
-    transform: translateY(100%);
-    transition: transform var(--m3-travel), display var(--m3-travel) allow-discrete,
-                overlay var(--m3-travel) allow-discrete;
-  }
-  #paintmenu[data-swiping] { transition: none; }
-  #paintmenu:popover-open { transform: translateY(var(--drawer-swipe-movement-y, 0px)); }
-  @starting-style { #paintmenu:popover-open { transform: translateY(100%); } }
 }
 
 /* Reduced motion keeps the fade and drops the travel. Something still has to say a pane arrived. */
 @media (prefers-reduced-motion: reduce) {
   #pane, #pane[open] { transform: none; }
   @starting-style { #pane[open] { transform: none; } }
-  #paintmenu, #paintmenu:popover-open { transform: none; }
-  @starting-style { #paintmenu:popover-open { transform: none; } }
 }

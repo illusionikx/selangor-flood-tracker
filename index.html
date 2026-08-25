@@ -72,13 +72,13 @@
 <link rel="stylesheet" href="vendor/leaflet.css">
 <link rel="stylesheet" href="vendor/markercluster.css">
 <link rel="stylesheet" href="vendor/fonts.css?v=51">
-<link rel="stylesheet" href="css/icons.css?v=99">
+<link rel="stylesheet" href="css/icons.css?v=100">
 <!-- M3's own token scales, baked from the M3 Expressive component set by `php m3-build.php`.
      Before `base.css`, which derives `--m3-travel`, `--m3-grow` and `--m3-swap` from them and
      bridges M3's colour names onto this app's palette. Colour is not in this file on purpose. -->
 <link rel="stylesheet" href="vendor/m3/tokens.css?v=1">
-<link rel="stylesheet" href="css/base.css?v=176">
-<link rel="stylesheet" href="css/chrome.css?v=274">
+<link rel="stylesheet" href="css/base.css?v=182">
+<link rel="stylesheet" href="css/chrome.css?v=284">
 <link rel="stylesheet" href="css/map.css?v=160">
 
 <!-- Water tint for the dark basemap. CARTO's dark_all is greyscale — all 18 of its tones have zero
@@ -433,9 +433,6 @@
        rail item already uses against its bar twin.
        **It needs no handler.** `popovertarget` opens the same panel `#paint` opens, so the browser
        does the work and there is nothing in `js/ui.js` to keep in step. -->
-  <button class="navitem" id="navLayers" popovertarget="paintmenu"
-    ><span class="railpill"><i class="i i-layers"></i></span
-    ><span class="raillabel">Layers</span></button>
   <button class="navitem" id="navTable"
     ><span class="railpill"><i class="i i-table"></i></span
     ><span class="raillabel">Table</span></button>
@@ -1122,8 +1119,13 @@
       <span class="apsp"></span>
     </div>
     <!-- No supporting text. M3 makes it optional, and this panel has nothing to say under its own
-         name that `#shown` does not already say at the foot of the body. -->
-    <div class="apflex"><h2>Layers and filters</h2></div>
+         name that `#shown` does not already say at the foot of the body.
+         **`Filters`, and it read `Layers and filters`.** The two layer choices and the two pin
+         filters left this drawer for `#paintmenu` on the map. The title kept their name after
+         them, so the pane promised a control it does not hold. The rail item, the navigation bar
+         item and the Help entry all read `Filters` already, and one name for one thing is this
+         repo's own rule. -->
+    <div class="apflex"><h2>Filters</h2></div>
   </div>
   <!-- The scrolling box, and the header above it does not scroll. Two boxes rather than one, which
        is the shape `#side` already uses: `#barHead` is `flex: none` and this takes the rest. The
@@ -1173,15 +1175,6 @@
     </details>
     </div>
     <div>
-    <!-- Which sensor kinds draw, and nothing else. The paint choice and the two pin filters left
-         this drawer for the map's own top-left corner. See #paint below.
-         A kind is not a filter over stations. It is which of a station's sensors this map is
-         willing to draw at all, which is why it stayed here beside the district picker while
-         Favorites and On alert went to the map. -->
-    <details id="kinds" class="sect" open>
-      <summary><i class="i i-apps"></i>Sensor kinds<b id="kindN"></b></summary>
-      <div id="layers"></div>
-    </details>
     <!-- Outside the section on purpose: the `· N ignored` count is one of the two always-visible
          indications that an alarm has been silenced, and a collapsed section would hide it. -->
     <p id="shown" class="muted"></p>
@@ -1251,116 +1244,83 @@
      source that can only disagree. `autocomplete="off"` stops the other writer. A browser restores
      a checkbox across a reload without firing `change`. Every checkbox a preference owns carries
      it. -->
-<!-- No `title` here. `js/ui.js` writes one of a `title` and a `data-tip` and never both, which is
-     the shape `setBtn()` in js/locate.js already uses. Which one it writes depends on whether the
-     press shortcut applies, and that is a live media query. -->
-<button id="paint" class="mapbtn" popovertarget="paintmenu"
-        aria-label="Map layers"><i class="i i-layers"></i></button>
-<div id="paintmenu" class="menu surface" popover aria-labelledby="paintTitle">
-  <!-- The drag handle, drawn below 600px alone, where this panel is an M3 bottom sheet. It is the
-       affordance for the swipe that dismisses the sheet, and js/ui.js implements that swipe — a
-       handle drawn over a gesture nobody wired up is a promise the panel does not keep.
-       `aria-hidden`, because it is a picture of a gesture. The panel already closes on Escape, on a
-       tap outside and on the button, and every one of those reaches a keyboard or a screen reader
-       where a drag does not. -->
-  <div class="grab" aria-hidden="true"></div>
-  <!-- **The panel's heading, at both widths.** It was the sheet's alone and it read at
-       `title-medium`, a size this app picked rather than transcribed. A reader cut it on 2026-08-25
-       and asked for it back on the same day, at M3's own numbers.
-       `title-large` is the token: 22px on 28px at 400. It is what this app's full-screen dialogs
-       take for their own headline, and the buttons under it are now 96px tall with 24px labels. A
-       16px heading over those reads as a caption rather than as a title.
-       **Both widths, because the panel is one panel.** It drew on the sheet alone before, on the
-       argument that the desktop menu is anchored to a button whose own tip names it. A heading that
-       appears at one width and not the other is one surface with two identities.
-       It labels the panel through `aria-labelledby`, so a screen reader names it on open rather
-       than reading its first control. -->
-  <h2 id="paintTitle" class="sheettitle">Layers</h2>
-  <!-- **Three M3 CONNECTED BUTTON GROUPS, and every one of them is single-select.** That is the
-       component M3 Expressive replaced the segmented button with. `.btngrp` in `css/chrome.css` is
-       transcribed from the component set's own `button-group.css` and `button.css`, at size `xs`,
-       shape `round`, variant `filled`. It is deliberately NOT the lightbox's range selector, which
-       is this app's own sunken track and matches no M3 component.
-       **Multi-select is not applicable anywhere in this panel.** All three groups are exclusive.
-       The multi-select variant is what the drawer's sensor-kind chips are, and they stay there.
-       Two layers, and exactly one of them at every moment. `PREFS.mapLayer` holds `'stations'` or
-       `'weather'` and nothing else. A map with neither is a basemap with no answer on it.
-       **The two pairs below were checkboxes, because "no wash" and "no filter" are real answers a
-       radio group cannot clear.** A segmented button states that answer as a segment instead: `Off`
-       and `All`. So each group is one radio group holding the same three values the preference
-       already held, and both-on stops being representable in the markup at all. Two repairs inside
-       the change handler failed at that before — see syncHeat().
-       Each radio carries its preference value in `value`, so the handler in js/ui.js reads the
-       string off the box that fired and compares no ids.
-       No `checked` attribute on any box. `PREFS` is the source of truth, and syncHeat(), syncPins()
-       and render() write the boxes from it. `autocomplete="off"` stops the other writer: a browser
-       restores form state across a reload without firing `change`.
-       **Every group fills the panel, and the two layers carry a LEADING ICON.** Filling is the one
-       divergence from the spec's own shape, which sizes a group to its buttons. Each group is one
-       row of this panel and a row spans it.
-       **`flex: 1` is what fills them, and it is not an equal split.** A flex item refuses to shrink
-       under its own min-content, and a button here is `nowrap`, so its whole label is that floor.
-       So the free space spreads and no label is ever cut. Three EQUAL buttons of `Favorites · 12`
-       would measure 348px against the 270 this panel has.
-       **No button carries a `--c`.** A connected group paints whichever button is on in one fill,
-       so a second hue inside it reads as a fault rather than as a layer's own colour. `--accent` is
-       not a status hue, so the colour language is unbroken. The icon takes the button's own ink for
-       the same reason, which is `on-primary` on the chosen one. -->
-  <div class="btngrp" role="group" aria-label="Map layer">
-    <label><input type="radio" name="maplayer" id="stations" value="stations" autocomplete="off">
-      <i class="i i-place"></i><span>Stations</span></label>
-    <label><input type="radio" name="maplayer" id="wxLayer" value="weather" autocomplete="off">
-      <i class="i i-partly_cloudy_day"></i><span>Weather</span></label>
+<!-- **The layer controls are a bare chip row over the map, and they were a panel behind a button.**
+     A reader asked for that on 2026-08-25. The panel was `#paintmenu`, opened by a round `#paint`
+     button in the zoom cluster and by `#navLayers` in the phone navigation bar. All three are gone:
+     a control that opens nothing is worse than no control, and there is no second way to one
+     setting.
+     **Two menu chips and two filter chips**, which is M3's own split. A chip that states a value and
+     opens a menu carries that value as its label and a trailing `expand_more`. A chip that is on or
+     off carries a leading checkmark instead. See `Chip/chip.css`, cited at `.chip` in css/base.css.
+     **The heatmap and the two filters answer about the STATION layer**, so they draw only while that
+     layer is on. Weather takes the map and there is nothing for them to act on. A `:has()` rule in
+     css/chrome.css does it, so no script can get it wrong.
+     The radios are unchanged: `PREFS.mapLayer`, `PREFS.heatLayer` and `PREFS.pinFilter` are still
+     one string each, still written from the box that fired, and still read back by syncHeat(),
+     syncPins() and render(). `autocomplete="off"` stops a browser restoring a box across a reload
+     without firing `change`. -->
+<div id="mapchips">
+  <button type="button" class="chip mchip" id="layerChip" popovertarget="layerMenu"
+          aria-haspopup="menu" aria-label="Map layer">
+    <i class="i glyph" id="layerChipIcon" aria-hidden="true"></i>
+    <span id="layerChipLabel">Stations</span>
+    <i class="i i-expand_more tail" aria-hidden="true"></i>
+  </button>
+  <div class="menu chipmenu" id="layerMenu" popover role="menu" aria-label="Map layer">
+    <label class="mi"><input type="radio" name="maplayer" id="stations" value="stations" autocomplete="off"
+      ><i class="i i-check mcheck" aria-hidden="true"></i><i class="i i-place"></i><span>Stations</span></label>
+    <label class="mi"><input type="radio" name="maplayer" id="wxLayer" value="weather" autocomplete="off"
+      ><i class="i i-check mcheck" aria-hidden="true"></i><i class="i i-partly_cloudy_day"></i><span>Weather</span></label>
   </div>
-  <!-- **A failure line, and nothing else.** Each layer named the discipline it measures here,
-       `Hydrological Measurement` and `Nowcasting`. A reader cut both on 2026-08-21. The two buttons
-       above already name the layers, and naming what each one measures is a second look at one
-       fact.
-       `#wxHint` stays, because it is not that. Three callers write it and every one of them reports
-       a failure: `could not load` from the rollback in render.js and in ui.js, and `no data yet`
-       from wx.js. It is empty on a healthy poll, and an empty `.hint` leaves the line entirely. So
-       this draws nothing until something goes wrong. -->
+
+  <button type="button" class="chip mchip" id="heatChip" popovertarget="heatMenu"
+          aria-haspopup="menu" aria-label="Heatmap">
+    <i class="i i-gradient glyph" aria-hidden="true"></i>
+    <span id="heatChipLabel">Heatmap</span>
+    <i class="i i-expand_more tail" aria-hidden="true"></i>
+  </button>
+  <div class="menu chipmenu" id="heatMenu" popover role="menu" aria-label="Heatmap">
+    <label class="mi"><input type="radio" name="heatlayer" id="heatOff" value="" autocomplete="off"
+      ><i class="i i-check mcheck" aria-hidden="true"></i><span>Off</span></label>
+    <label class="mi"><input type="radio" name="heatlayer" id="heat" value="water" autocomplete="off"
+      ><i class="i i-check mcheck" aria-hidden="true"></i><span>Water level</span></label>
+    <label class="mi"><input type="radio" name="heatlayer" id="rainHeat" value="rain" autocomplete="off"
+      ><i class="i i-check mcheck" aria-hidden="true"></i><span>Rainfall</span></label>
+  </div>
+
+  <!-- **The sensor kinds, and they were a drawer section.** A reader moved them here on 2026-08-25.
+       They are MULTI-select, so this is a menu chip rather than five chips of their own: five on the
+       row would be nine chips over a map. The chip states how many kinds are hidden, which is what
+       the drawer's `<summary>` count used to say, and `js/ui.js` fills the menu from `KINDS`.
+       **A kind is not a filter over stations.** It is which of a station's sensors this map draws at
+       all. That is why it stayed in the drawer while Favorites and On alert left, and why it sits
+       under the station layer here rather than beside the two filters. -->
+  <button type="button" class="chip mchip" id="kindChip" popovertarget="kindMenu"
+          aria-haspopup="menu" aria-label="Sensor kinds">
+    <i class="i i-apps glyph" aria-hidden="true"></i>
+    <span id="kindChipLabel">Sensors</span>
+    <i class="i i-expand_more tail" aria-hidden="true"></i>
+  </button>
+  <div class="menu chipmenu" id="kindMenu" popover role="menu" aria-label="Sensor kinds">
+    <div id="layers"></div>
+  </div>
+
+  <!-- **Two filter chips and no `All`, and that is the filter chip's own behaviour.** M3 states that
+       pressing a selected filter chip clears it, so "every pin" is the state with neither chip on.
+       They are radios, so the browser keeps the pair exclusive, and js/ui.js clears the pressed one.
+       A pair of checkboxes holds both-on, which is the shape this repo already paid for — see
+       syncHeat(). -->
+  <label class="chip" id="alertChip"><input type="radio" name="pinfilter" id="risingOnly" value="alert" autocomplete="off"
+    ><i class="i i-check chipcheck" aria-hidden="true"></i><span>On alert</span><span id="risingHint" class="hint"></span></label>
+  <label class="chip" id="favChip"><input type="radio" name="pinfilter" id="favOnly" value="fav" autocomplete="off"
+    ><i class="i i-check chipcheck" aria-hidden="true"></i><span>Favorites</span><span id="favHint" class="hint"></span></label>
+
+  <!-- The one line left of the panel's own prose. Every caller that writes it reports a failure:
+       `could not load` from the rollback in render.js and in ui.js, and `no data yet` from wx.js.
+       It is empty on a healthy poll, and an empty `.hint` leaves the row entirely. -->
   <p class="mnote"><span id="wxHint" class="hint"></span></p>
-  <!-- Collapses with its parent. Every control in here is a choice about the station layer, so with
-       that layer off there is nothing for any of them to act on. Nothing in here is ever cleared by
-       the collapse: switching Stations back on has to restore the view that was there before. -->
-  <!-- `.subin` exists only so the branch can animate. A grid row goes from `0fr` to `1fr`
-       and the wrapper inside it clips, which is the one collapse technique that needs no
-       new CSS feature. See the rule in chrome.css for what was tried before it. -->
-  <div class="subgrp"><div class="subin">
-    <!-- The divider says whose these are, and an indent used to. The branch sat 26px in behind a
-         1px spine. A reader cut both on 2026-08-21. It is M3's own full-width divider, the `.menu
-         hr` this app already draws between menu sections.
-         **It lives INSIDE the collapsing branch, never above it.** Outside, it stays on screen with
-         nothing under it the moment Weather takes the map, which is a rule under an empty panel. -->
-    <hr>
-    <!-- How the station readings wash over the map. One at a time: stacked, two heat layers are two
-         answers to two questions in one picture, and leaflet.heat adds their alpha into a colour
-         that belongs to neither scale. -->
-    <p class="mgroup">Heatmap</p>
-    <div class="btngrp" role="group" aria-label="Heatmap">
-      <label><input type="radio" name="heatlayer" id="heatOff" value="" autocomplete="off">
-        <span>Off</span></label>
-      <label><input type="radio" name="heatlayer" id="heat" value="water" autocomplete="off">
-        <span>Water level</span></label>
-      <label><input type="radio" name="heatlayer" id="rainHeat" value="rain" autocomplete="off">
-        <span>Rainfall</span></label>
-    </div>
-    <!-- Which station pins draw. One at a time for the same reason as the group above. Each one
-         answers "show me only these", and two of those at once answers neither question.
-         The hint is the count that filter holds, written by syncPins(). It rides inside its own
-         segment now: a segment has no right edge of its own to push it to. -->
-    <p class="mgroup">Icon</p>
-    <div class="btngrp" role="group" aria-label="Station icons">
-      <label><input type="radio" name="pinfilter" id="pinAll" value="" autocomplete="off">
-        <span>All</span></label>
-      <label><input type="radio" name="pinfilter" id="favOnly" value="fav" autocomplete="off">
-        <span>Favorites</span><span id="favHint" class="hint"></span></label>
-      <label><input type="radio" name="pinfilter" id="risingOnly" value="alert" autocomplete="off">
-        <span>On alert</span><span id="risingHint" class="hint"></span></label>
-    </div>
-  </div></div>
 </div>
+
 <!-- Standing indications that the map is showing less than it holds. One strip, because test mode
      and the rising filter can be on at the same time and two fixed pills would sit on each other.
      The test badge appends itself here from test.js. -->
