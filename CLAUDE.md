@@ -26,7 +26,7 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `index.html` | markup only — no inline CSS or JS |
 | `title-test.html` | `chrome --headless --dump-dom` — one of seven runnable checks. Guards the wordmark ladder in both of the heading's homes, the app bar and the navigation rail, in rendered pixels |
 | `narrow-test.html` | `chrome --headless --dump-dom` — one of seven runnable checks. Guards the narrow-window block: its threshold, its coverage, its refusal to be dismissed, and that it is modal |
-| `paint-check.html` | `chrome --headless --dump-dom` — one of seven runnable checks. Guards the on-map paint chooser: that it reads as a control and not as a map pin, that its two layers and the four boxes nested under `Stations` sit where they belong, that each section holds one choice at a time, that it clears the zoom cluster at both widths, and that below 600px its panel is an M3 bottom sheet whose drag handle has a real swipe behind it |
+| `paint-check.html` | `chrome --headless --dump-dom` — one of seven runnable checks. Guards the on-map paint chooser: that it reads as a control and not as a map pin, that its two layers and the four boxes nested under `Stations` sit where they belong, that each section holds one choice at a time, that it clears the zoom cluster at both widths, and that below 600px its panel is an M3 bottom sheet: full window width, a drag handle with a real swipe behind it, and a press behind it that dismisses the sheet without reaching the map |
 | `m3-check.html` | `chrome --headless --dump-dom` — one of seven runnable checks. Guards every M3 surface in rendered pixels: the eight dialogs against the roll call and the kind each is declared as, the four-band ladder, the map as an inset card, the one motion that changes what the pane holds, the supporting pane's headers as M3's medium flexible top app bar and the four full-screen dialogs as M3's own full-screen dialog header, the supporting pane at M3's canonical ratios with the map giving up exactly that width, the pane as a side sheet above 600px and a full-screen dialog below it, and each station section as a filled card. Also the navigation rail at both its widths, the navigation bar below 600px, and that every enter carries M3's own duration and easing |
 | `css/icons.css` | every icon, as an SVG mask. Generated — see docs/FEATURES.md for the fetch |
 | `css/base.css` | tokens, reset, controls, blocks shared by popup + alert panel |
@@ -2399,7 +2399,23 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   over the map's top-left corner, on the legend's own leading edge, with the field as its header and
   the results under it. `Search/search.css`'s own `border-radius: 28px 28px 4px 4px` on
   `surface-container-high`. Elevation is `--shadow`, for the reason the four dialogs each decline
-  M3's own. Below 600px it stays a pane occupant, which is M3's full-screen search view.
+  M3's own. Below 600px it is a pane occupant, which is M3's FULL-SCREEN search view.
+  **Both variants are search views, so both are the same two parts: the bar, then the results.**
+  `css/chrome.css` states that shape once and each width states only its own numbers. The bar is a
+  row holding a leading back arrow and then the field, and `Search/search.css` puts the surface on
+  the row rather than on the field. The desktop bar is a 56px pill with its results on a second
+  raised surface. The phone bar is 72px on the screen's own surface, with a divider under it and the
+  results filling the rest.
+  **The phone variant was a dropdown, and four things made it one.** `css/base.css` floats
+  `#gotoHits` under the field with `position: absolute; top: 100%`, outlines it, caps it at 46vh and
+  draws an `expand_more` caret in the field. Those four say that a field opens a list under itself.
+  A search view is a destination. So `css/chrome.css` cancels all four, at both widths.
+  **`#findHead` is gone, and that is the fifth.** The pane carried a 112px app bar reading `Go to`
+  over the field. M3 gives a search view no title bar: the search bar IS the header, and it carries
+  the arrow. A title bar above a field made the field read as a form control on a page.
+  So `#findBack` draws at every width now, and `#findClose` went with the bar it sat in.
+  **The body stops scrolling and the list starts.** `#findBody` is a pane occupant's scroller, and
+  with the bar inside it the bar scrolled away with the results. A search view holds its bar still.
   **It is written OUTSIDE `#pane`.** A closed `<dialog>` is `display: none`, and a floating card
   inside one cannot draw. So the phone is the case that needs the move.
   Three things follow it. `syncPane()` stops opening the pane for `find` above 600px. The pane's
@@ -2998,17 +3014,46 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   **Each radio carries its preference value in `value`.** So the handler in `js/ui.js` reads the
   string off the box that fired and compares no ids. `syncHeat()` and `syncPins()` each write one
   box back from the preference, and the browser clears the siblings.
-  **The two layers carry a LEADING ICON, at M3's 20px for an xs button, and nothing under them
-  does.** Three buttons of text and a glyph do not fit a 328px sheet. The legend under the map already
-  draws what each wash means. It is a real `<i>` taking the mask from its class, never a pseudo-element. A rule that sets
-  `--i` and never joins the list in `css/icons.css` draws an empty box. That is what
-  `#paint::before` shipped once.
-  **No button carries a `--c`.** A `.chip` painted its border, its ink and its tint
-  in `--c`, so the weather chip took its own clear-sky hue. A connected group paints whichever button is on in ONE fill. So a second colour inside it
-  reads as a rendering fault rather than as a layer's own mark. The filled variant's own pair is `primary` over `on-primary`, which bridges to
-  `--accent` over `--surface`. The leading icon takes the button's own ink for the same reason. `--accent` is not a status hue, so the colour language is unbroken.
-  **`--md-sys-color-on-primary` came into the bridge in `css/base.css` for it**, as `--surface`. The
-  accent flips to a pale blue in the dark theme, where white on it is a contrast failure.
+  **The MAP LAYER group is size MD in the SQUARE shape, and the two groups under it stay at xs.** A
+  reader asked for the large square form on 2026-08-25, and then for a size that reads beside the
+  navigation bar. **That bar is what picks md.** Its items draw a 24px glyph over a label, and md is
+  the one button size whose icon is 24px. Size lg stood here first at 96px, with a 32px icon and a
+  24px label, and it towered over the bar it sits beside.
+  `Button/button.css` at `data-size="md"` and `ButtonGroup/button-group.css` at the same size: 56px
+  tall, 24px of inline padding, a 24px icon, `title-medium` at 16px on 24, an 8px inner corner, a
+  16px outer corner for the square shape, no group padding and no 48px floor. **The last two are xs
+  and sm alone**, so a group at md takes neither.
+  **The selected button still goes fully round at `height / 2`**, which is the connected group's own
+  rule at every size and in both shapes. That is the component's signature.
+  **`--_out` is the whole of the square override, and restating the two corner rules broke it.** The
+  base `:first-of-type` and `:last-of-type` rules read that variable already. A copy of them under
+  `#paintmenu` carries an id, so it beats `.btngrp label:has(:checked)` and holds the chosen button
+  at its square corner rather than letting it go round. Set the variable, never the corners.
+  **The scope is `#paintmenu > .btngrp`, and the child combinator is the whole of it.** That group is
+  a direct child of the panel. The Heatmap and Icon groups sit inside `.subgrp > .subin`. A bare
+  descendant selector reaches all three, which shipped for one run and looks deliberate on screen.
+  **One divergence, and it is this panel's existing one.** The glyph sits OVER the label rather than
+  before it, on the same reader's instruction. 56 is 24 + 2 + 24 with 3 of padding at each end, so
+  the stacked form lands on the spec's own height with nothing to adjust. **`padding-inline` is the
+  spec's 24.** At size lg it had to be 12, because the pair floored at 372px of min-content against
+  the 272 this panel has and a flex item never shrinks under that floor. At md the two labels measure
+  about 230px with the full padding, so the number comes across whole.
+  **The six nested buttons still carry no glyph, and the reason is unchanged.** Three buttons of
+  text and a glyph do not fit a 328px sheet on one row, and the legend under the map already draws
+  what each wash means.
+  **Every title in the panel is an M3 token.** The two group headings, `Heatmap` and `Icon`, drew at
+  11px, 500, uppercase and tracked, which is the drawer's own section-heading language. A reader
+  asked for M3 on all of them on 2026-08-25. `.mgroup` is `title-small` now — 14px on 20 at 500 — in
+  `on-surface-variant`, which is M3's list subheader and which this app bridges onto `--muted`. So
+  the colour did not move and the type is transcribed. **`text-transform` is gone rather than
+  overridden**: M3 writes a subheader in sentence case, this app's writing standard already does, and
+  an uppercase transform breaks a screen reader on anything acronym-shaped. `.sect > summary` in the
+  drawer keeps the old language, and the two were never one rule.
+  **The panel carries a heading at BOTH widths, reading `Layers`.** It drew on the sheet alone and at
+  `title-medium`, a size this app picked rather than transcribed. A reader cut it on 2026-08-25 and
+  asked for it back the same day at M3's own numbers. It is `title-large` now, 22px on 28, which is
+  the token this app's full-screen dialogs take for their own headline. **An `<h2>` keeps the UA
+  block margin** and this app resets `h1` alone, so `margin` is stated.
   **Nothing names what a layer measures, and `.mnote` is a failure line now.** `Hydrological
   Measurement` and `Nowcasting` sat under the group and a reader cut both on 2026-08-21. The two
   buttons already name the layers, and naming what each measures is a second look at one fact.
@@ -3050,23 +3095,45 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   `'stations'`, in `flashTo()` and in the failed-import rollback. A reader leaving a weather map
   wants the map back. `syncWx()` no longer writes the weather box: `render()` writes both layer
   boxes, so the pair has one writer.
-  **The sheet carries a heading reading `Layers`, and the menu carries none.** Above 600px this
-  panel is anchored to a button whose own tip names it, so the anchor is the label. A sheet arrives
-  from the bottom edge and covers the corner it came from, so it has to say what it is. It labels
-  the dialog through `aria-labelledby`. The reference `BottomSheet/bottom-sheet.css` has no header
-  slot, so the size is this app's own ladder rather than a transcribed number: `title-medium` at
-  16px, which outranks the 11px uppercase `.mgroup` under it and stays under the 22px `title-large`
-  a full-screen dialog takes. A sheet is the lesser surface of the two. **An `<h2>` keeps the UA
-  block margin** and this app resets `h1` alone, so `margin: 0` is stated or the sheet grows 16px of
-  dead air above and below it.
+  **The panel carries no heading at either width.** It read `Layers` on the sheet alone, and a reader
+  cut it on 2026-08-25. `aria-label` on `#paintmenu` names the panel now. **Never `aria-labelledby`
+  here again**: it pointed at the `<h2>`, and an `aria-labelledby` aimed at a deleted node names
+  nothing and errors nowhere. `paint-check.html` asserts the attribute is absent for that reason.
   **Below 600px `#paintmenu` is an M3 modal bottom sheet, not a menu beside its button.** It is a
   panel of settings a reader opens while looking at the map, so it belongs on the edge the thumb is
   already at. The numbers come from the M3 Expressive component set's `BottomSheet/bottom-sheet.css`:
-  28dp on the two TOP corners, `min(640px, calc(100% - 32px))` centred, `calc(100dvh - 72px)` tall
+  28dp on the two TOP corners, `min(640px, 100%)` centred, `calc(100dvh - 72px)` tall
   at most, a 48dp handle row holding a 32 by 4px indicator, and a 32% scrim. It travels up from the
   bottom edge on `--m3-travel`, the same 300ms a full-screen dialog takes.
-  **The sheet does not reach the side edges**, which is the reference's own shape and the reason
-  only the top corners are rounded.
+  **The sheet reaches both side edges, and the reference file it is transcribed from does not.**
+  That file writes `calc(100% - 32px)`. M3's own spec table states `Full width, up to max-width
+  640dp`, and states a 56dp start and end margin for a window WIDER than 640dp alone. So the inset is
+  the leftover after centring, never a literal. Below 640dp there is nothing left over. The 32px
+  version left 16px of map down each side at 360px, and a reader named it on 2026-08-25. Only the top
+  corners are rounded, because the other three sit on an edge. **The three margins above 640dp are
+  not written**: the block sits inside `@media (max-width: 600px)`, so no window can reach them.
+  **The 48dp handle row is the spec's 22 + 4 + 22**, stated from the other end.
+  **A tap that dismisses the sheet must do nothing else, and light dismiss alone does not give
+  that.** A popover closes itself on a press outside it, and the same press still reaches what sits
+  under it. So a tap on a pin behind the sheet shut the sheet AND opened that station's card.
+  `js/ui.js` swallows that press with two capture-phase listeners on `#map`. **Two, because the
+  popover is already shut by the time `click` fires.** Light dismiss runs on the pointer down and up,
+  so `:popover-open` reads false in a click handler. The down pass records the answer and the click
+  pass spends it. **Capture on `#map`** is what puts them ahead of the `click` listener Leaflet binds
+  on the marker itself. **The scrim is the rule, not the width.** A press on a scrim means dismiss.
+  Above 600px the panel is a menu beside its button, with no scrim and a live map behind it, so a
+  press there is a press on the map and is left alone. Only a `click` is swallowed, so a pan still
+  works, and nothing here closes the sheet: light dismiss already did.
+  **The sheet gets an enter AND an exit, and a keyframe buys the enter alone.** It shipped as
+  `@keyframes sheetUp` on `:popover-open` for a run, so the sheet arrived over 300ms and left in one
+  frame. A reader named it on 2026-08-25. That is the identical fault `#pane` had, and the repair is
+  the one that entry already states: `transform: translateY(100%)` as a closed state to travel from,
+  `@starting-style` so the enter starts there, and `allow-discrete` on `display` AND on `overlay`.
+  Without the second one the sheet leaves the top layer in the first frame of the exit and draws
+  behind the page. **The scrim states its own**, because a `::backdrop` is a separate box and
+  inherits nothing from its element.
+  **The travel lives in the swipe block at the foot of `css/chrome.css`, not in the sheet block**,
+  because the drag writes into the same `transform`.
   **The handle is drawn AND the swipe is wired**, in `js/ui.js`. A handle over a gesture nobody
   implemented is a promise the panel does not keep. The drag is refused while the sheet is scrolled
   away from its top, because a downward drag shares its axis with the sheet's own scroll.

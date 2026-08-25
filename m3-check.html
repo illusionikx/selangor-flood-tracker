@@ -459,6 +459,9 @@ async function phone() {
   is([Math.round(phonePill.left - r(phoneMap).left),
       Math.round(r(phoneMap).right - phonePill.right)].join(','), '12,12',
      'phone: on the same 12px furniture inset the desktop card uses');
+  /* **The search is in this loop for the pane assertions and NOT for the header ones.** M3 gives a
+     search view no title bar: its own search bar is the header, and it carries the back arrow. So
+     the pane's `#findHead` is gone, and the block guarded below is the block that measured it. */
   for (const [id, cls, name] of [['bar', 'drawer', 'filters'], ['side', 'side', 'station panel'],
                                  ['findpane', 'find', 'search']]) {
     d.body.classList.add(cls);
@@ -477,15 +480,17 @@ async function phone() {
        **Assert the glyph CENTRE, never the box edge.** The app bar's top row is 4px of padding
        around a 48px target. The other four full-screen dialogs are 8px around a 40px one. Both land
        the glyph on 28px, so the centre is the fact that survives either convention. */
-    const hd = d.querySelector(id === 'bar' ? '#barHead' : id === 'side' ? '#sideHead' : '#findHead');
-    const x = d.getElementById(id === 'bar' ? 'barClose' : id === 'side' ? 'sideClose' : 'findClose');
-    const xr = r(x);
-    is(Math.round(r(hd).height) >= 112, true, name + ': M3 112dp medium flexible app bar');
-    is(Math.round((xr.left + xr.right) / 2), 28,
-       name + ': its back arrow leads, with the glyph 28px in as every full-screen bar here has it');
-    is(!!x.querySelector('.i-arrow_back'), true, name + ': and it is an arrow, not a close X');
-    is(Math.round(xr.bottom) <= Math.round(r(hd.querySelector('.apflex')).top), true,
-       name + ': and the headline sits on the row under it, which is what makes this the medium bar');
+    if (id !== 'findpane') {
+      const hd = d.querySelector(id === 'bar' ? '#barHead' : '#sideHead');
+      const x = d.getElementById(id === 'bar' ? 'barClose' : 'sideClose');
+      const xr = r(x);
+      is(Math.round(r(hd).height) >= 112, true, name + ': M3 112dp medium flexible app bar');
+      is(Math.round((xr.left + xr.right) / 2), 28,
+         name + ': its back arrow leads, with the glyph 28px in as every full-screen bar here has it');
+      is(!!x.querySelector('.i-arrow_back'), true, name + ': and it is an arrow, not a close X');
+      is(Math.round(xr.bottom) <= Math.round(r(hd.querySelector('.apflex')).top), true,
+         name + ': and the headline sits on the row under it, which is what makes this the medium bar');
+    }
     is(cs(pane).boxShadow, 'none', name + ': and no elevation');
     is(w.getComputedStyle(pane, '::backdrop').backgroundColor, 'rgba(0, 0, 0, 0)',
        name + ': no scrim, which M3 leaves out of this variant');
@@ -499,11 +504,48 @@ async function phone() {
     await settled();
     is(pane.open, false, name + ': and closing the occupant closes the pane');
   }
-  /* **The search bar's own back arrow must not draw at this width.** The search is M3's full-screen
-     search view here, and `#findHead` above it already leads with an arrow. Two arrows on one
-     surface is one control drawn twice, and each one looks right on its own. */
-  is(cs(d.getElementById('findBack')).display, 'none',
-     'phone: the bar draws no second back arrow, because the pane header already leads with one');
+  /* --- the full-screen search view, below 600px ---
+     **It was a dropdown here and M3 says it is a screen.** base.css floats `#gotoHits` under the
+     field with `position: absolute; top: 100%`, outlines it, caps it at 46vh and puts an
+     `expand_more` caret in the field. Under a 112px `Go to` title bar, that read as a form control
+     on a page. `Search/search.css` gives this variant a 72px bar carrying the back arrow, a divider
+     under it, and the results filling the rest of the screen.
+     **Every one of those five faults is invisible on its own.** A floating list inside a full-screen
+     surface looks like a design, and only reading the boxes apart tells them apart. */
+  d.body.classList.add('find');
+  await settled();
+  const fBar = d.getElementById('gotobar'), fHits = d.getElementById('gotoHits'),
+        fBack = d.getElementById('findBack'), fBody = d.getElementById('findBody');
+  is(d.getElementById('findHead'), null,
+     'phone: a search view carries no title bar, so the pane header is gone');
+  is(cs(fBack).display !== 'none', true, 'phone: the search bar leads with the back arrow instead');
+  is(!!fBack.querySelector('.i-arrow_back'), true, 'phone: and it is an arrow, not a close X');
+  const fbg = r(fBack.querySelector('.i'));
+  is(Math.round(fbg.left + fbg.width / 2 - r(fBar).left), 28,
+     'phone: with its glyph 28px in, as every full-screen bar in this app has it');
+  is(Math.round(r(fBar).height), 72, 'phone: M3 full-screen search bar, 72px');
+  is(Math.round(r(fBar).top), Math.round(r(d.getElementById('pane')).top),
+     'phone: and the bar IS the top of the screen, with nothing above it');
+  is(cs(fBar).borderBottomWidth, '1px', 'phone: a divider under it, not a card around it');
+  is(cs(fBar).boxShadow, 'none', 'phone: and no elevation, because the surface is the screen');
+  is(w.getComputedStyle(d.getElementById('gotoBox'), '::after').display, 'none',
+     'phone: no caret, which is the affordance of a field that opens a list under itself');
+  /* The list is `hidden` until a query runs, so this drives the real field and waits. */
+  d.getElementById('goto').value = 'a';
+  d.getElementById('goto').dispatchEvent(new w.Event('input', { bubbles: true }));
+  await settled();
+  is(cs(fHits).position, 'static', 'phone: the results are in flow, never floated under the field');
+  is(Math.round(r(fHits).top), Math.round(r(fBar).bottom),
+     'phone: they start where the bar ends');
+  is(Math.round(r(fHits).bottom), Math.round(r(fBody).bottom),
+     'phone: and run to the foot of the screen, rather than stopping at a 46vh cap');
+  is(cs(fHits).borderRadius, '0px', 'phone: no corner, because it is the screen and not a card');
+  is(cs(fHits).borderTopWidth, '0px', 'phone: and no outline around it either');
+  is(Math.round(r(fBody).bottom) <= VH, true, 'phone: the whole view stays inside the screen');
+  d.getElementById('goto').value = '';
+  d.getElementById('goto').dispatchEvent(new w.Event('input', { bubbles: true }));
+  d.body.classList.remove('find');
+  await new Promise(res => setTimeout(res, 200));
   /* Escape reaches a modal dialog natively as `cancel`. The body classes have to follow the element,
      or the observer reopens the pane on the next class write with nothing having changed. */
   d.body.classList.add('side');
@@ -1393,9 +1435,9 @@ async function desktop() {
   is(Math.round(r(barEl).height), 56, 'M3 search bar, 56px');
 
   /* --- the bar's leading back arrow ---
-     M3 leads an active search view with a back arrow. Below 600px the search is the full-screen
-     view inside `#pane`, and `#findHead` already leads with one, so this arrow must not draw there
-     too. The phone pass asserts that half. */
+     M3 leads an active search view with a back arrow, and both variants are search views. So this
+     is one control at both widths, at 56px here and 72px on a phone. The phone pass asserts that
+     half. */
   const backEl = d.getElementById('findBack');
   is(cs(backEl).display !== 'none', true, 'the docked search bar leads with a back arrow');
   is(!!backEl.querySelector('.i-arrow_back'), true, 'and it is an arrow, not a close X');
@@ -1461,7 +1503,7 @@ async function desktop() {
      field loses focus, and closing here — through the field's own docked card going
      `display: none` — is exactly what fires that blur. `settled()` (120ms) is short of that 150ms
      window, so checking again too soon can race a still-pending timer. 200ms clears it. */
-  d.getElementById('findClose').click();
+  d.getElementById('findBack').click();
   await new Promise(res => setTimeout(res, 200));
   is(cs(findEl).display, 'none', 'closing collapses the card back to its rail item');
 
@@ -1482,7 +1524,7 @@ async function desktop() {
      'opening the drawer above 600px leaves the search open beside it');
   is(cs(findEl).display, 'flex', 'and the docked card keeps drawing');
 
-  d.getElementById('findClose').click();
+  d.getElementById('findBack').click();
   d.body.classList.remove('drawer', 'side');
   await settled();
 

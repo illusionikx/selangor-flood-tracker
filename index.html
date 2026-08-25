@@ -77,7 +77,7 @@
      Before `base.css`, which derives `--m3-travel`, `--m3-grow` and `--m3-swap` from them and
      bridges M3's colour names onto this app's palette. Colour is not in this file on purpose. -->
 <link rel="stylesheet" href="vendor/m3/tokens.css?v=1">
-<link rel="stylesheet" href="css/base.css?v=175">
+<link rel="stylesheet" href="css/base.css?v=176">
 <link rel="stylesheet" href="css/chrome.css?v=274">
 <link rel="stylesheet" href="css/map.css?v=160">
 
@@ -330,7 +330,7 @@
      holds the brand instead.
      `aria-hidden`: the same stations are in the alert panel as a real list, so a screen reader gets
      them there rather than as an endlessly repeating strip. -->
-<div id="ticker" aria-hidden="true"><div class="tk-run"></div></div>
+<div id="ticker" aria-hidden="true"><div class="tk-win"><div class="tk-run"></div></div></div>
 <!-- Outside the <h1>, because a <table> is flow content and cannot legally live inside a heading.
      Outside <header> too: it is fixed against the window and adds `--rail-w` itself. The mark that
      opens it lives in the rail above 600px, so the popover stands beside the rail there, and under
@@ -1196,24 +1196,19 @@
      It is written OUTSIDE the pane, because a closed `<dialog>` is `display: none` and a floating
      card inside one cannot draw. The desktop case is the one with nothing to open it, so it is the
      one the markup has to serve.
-     Same three parts either way: a header that does not scroll, and a body that does. -->
+     **Both variants are the same two parts: the bar, then the results.** The pane's own
+     `#findHead`, a 112px app bar reading `Go to` over the field, is gone. M3 gives a search view no
+     title bar. The search bar IS its header, and it carries the back arrow. A title bar above the
+     field made the field read as a form control on a page, which is the dropdown this is not. -->
 <div id="findpane" class="paneswap">
-  <div id="findHead">
-    <div class="apptop">
-      <button id="findClose" class="icon" title="Back" aria-label="Back"
-        ><i class="i i-arrow_back"></i></button>
-      <span class="apsp"></span>
-    </div>
-    <div class="apflex"><h2>Go to</h2></div>
-  </div>
   <div id="findBody" class="scroll">
     <div id="gotoBox">
       <!-- **The bar, and it is a bar only above 600px.** M3's docked search bar is a row: a leading
            icon, then the field. The leading icon of an ACTIVE search view is a back arrow, and this
            is the one that dismisses the card.
-           Below 600px this row draws no button. The search is M3's full-screen search VIEW there,
-           it sits inside `#pane`, and `#findHead` above it already leads with the same arrow. Two
-           arrows on one surface is one control drawn twice. -->
+           Below 600px the same row is the full-screen search VIEW's header, at 72px against 56.
+           So the arrow draws at every width. It used to draw above 600px alone, because the pane
+           carried a title bar with an arrow of its own. That bar is gone. -->
       <div id="gotobar">
         <button id="findBack" class="icon" title="Back" aria-label="Back"
           ><i class="i i-arrow_back"></i></button>
@@ -1222,9 +1217,10 @@
                aria-autocomplete="list" aria-label="Go to a station">
       </div>
       <!-- **The results, and they are a surface of their own above 600px.** M3 draws the docked
-           search bar and its results as two boxes. Below 600px this list floats under the field
-           inside the pane, and it paints nothing there: the pane is already a surface, so a second
-           background draws a card inside a card. -->
+           search bar and its results as two boxes. Below 600px the list fills the rest of the
+           screen and paints nothing: the search view is already a surface, so a second background
+           draws a card inside a card. It floated under the field there, clipped to 46vh, which is
+           a dropdown and not a search view. -->
       <ul id="gotoHits" class="picklist" role="listbox" hidden></ul>
     </div>
   </div>
@@ -1268,16 +1264,17 @@
        tap outside and on the button, and every one of those reaches a keyboard or a screen reader
        where a drag does not. -->
   <div class="grab" aria-hidden="true"></div>
-  <!-- **The bottom sheet's heading, and it draws below 600px alone.** Above that width this panel is
-       a menu anchored to a button whose own tip names it, so the anchor is the label. A sheet
-       floats free of that button, arrives from the bottom edge and covers the corner it came from,
-       so it has to say what it is.
-       The reference `BottomSheet/bottom-sheet.css` carries no header slot, so the size is this
-       app's own ladder rather than a transcribed number: `title-medium` at 16px, which outranks the
-       11px uppercase `.mgroup` headings under it and stays under the 22px `title-large` this app's
-       full-screen dialogs take. A sheet is the lesser surface of the two.
-       It labels the dialog through `aria-labelledby`, so a screen reader names the sheet on open
-       rather than reading its first control. -->
+  <!-- **The panel's heading, at both widths.** It was the sheet's alone and it read at
+       `title-medium`, a size this app picked rather than transcribed. A reader cut it on 2026-08-25
+       and asked for it back on the same day, at M3's own numbers.
+       `title-large` is the token: 22px on 28px at 400. It is what this app's full-screen dialogs
+       take for their own headline, and the buttons under it are now 96px tall with 24px labels. A
+       16px heading over those reads as a caption rather than as a title.
+       **Both widths, because the panel is one panel.** It drew on the sheet alone before, on the
+       argument that the desktop menu is anchored to a button whose own tip names it. A heading that
+       appears at one width and not the other is one surface with two identities.
+       It labels the panel through `aria-labelledby`, so a screen reader names it on open rather
+       than reading its first control. -->
   <h2 id="paintTitle" class="sheettitle">Layers</h2>
   <!-- **Three M3 CONNECTED BUTTON GROUPS, and every one of them is single-select.** That is the
        component M3 Expressive replaced the segmented button with. `.btngrp` in `css/chrome.css` is

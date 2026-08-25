@@ -949,6 +949,31 @@ swipeSheet(el('paintmenu'), () => el('paintmenu').hidePopover());
    had one while it was a bottom sheet. It is a full-screen dialog now, and that variant has no
    swipe. */
 
+/* **A tap that dismisses the sheet does nothing else, and light dismiss alone does not give that.**
+   A popover closes itself on a press outside it, and the same press still reaches whatever sits
+   under it. So a tap on a pin behind the sheet shut the sheet AND opened that station's card. The
+   reader asked for the sheet and got a card they never pressed for.
+   **The scrim is the rule, not the width.** Below 600px the sheet paints a 32% scrim, and a press on
+   a scrim means dismiss. Above it the panel is a menu beside its button, with no scrim and a live
+   map behind it, so a press there is a press on the map and is left alone.
+   **Two listeners, because the popover is already shut by the time the click lands.** Light dismiss
+   runs on the pointer down and up, so `:popover-open` reads false at `click`. The down pass records
+   the answer and the click pass spends it. Both are capture-phase on `#map`, which is what puts
+   them ahead of the listener Leaflet binds on the marker itself. */
+{
+  const menu = el('paintmenu'), box = el('map');
+  let eat = false;
+  box.addEventListener('pointerdown', () => {
+    eat = phone.matches && menu.matches(':popover-open');
+  }, true);
+  box.addEventListener('click', e => {
+    if (!eat) return;
+    eat = false;
+    e.stopPropagation();
+    e.preventDefault();
+  }, true);
+}
+
 // --- alert list ------------------------------------------------------------------------------
 // Nothing more than a disclosure now — the list lives in #side and alerts.js owns both ends of it.
 // No open/closed preference either: the panel is not permanent furniture any more, so there is no
@@ -1123,7 +1148,9 @@ function setFind(open) {
   nearPlace = null;
   draw(false);
 }
-el('findClose').onclick = el('findBack').onclick = () => setFind(false);
+/* One back arrow, because there is one bar. The pane's own `#findHead` and its `#findClose` are
+   gone: M3 gives a search view no title bar, and the search bar is its header at both widths. */
+el('findBack').onclick = () => setFind(false);
 
 /* --- one handler, two components -----------------------------------------------------------------
    The rail draws above 600px and the navigation bar below it, and only one of the two is ever on

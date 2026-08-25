@@ -686,13 +686,24 @@ dialog:focus, dialog:focus-visible { outline: none; }
 .mapbtn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* --- a labelled group inside a menu ------------------------------------------------------------
-   The same words as a drawer section heading, so the two panels speak one language: 11px, 500,
-   uppercase, tracked, muted. `.sect > summary` is the original and this cannot reuse it, because
-   that selector carries a chevron, a flex row and a pointer for a <details> that is not here. */
+   **M3's list subheader, and it was this app's own drawer heading.** That was 11px, 500, uppercase,
+   tracked and muted, on the argument that the two panels should speak one language. A reader asked
+   for M3 on every title in this panel on 2026-08-25, and the panel is the only user of this class.
+   M3 states a subheader as `title-small` — 14px on 20 at 500 — in `on-surface-variant`, which this
+   app bridges onto `--muted`. So the colour is unchanged and the type is transcribed.
+   **`text-transform` is gone rather than overridden.** M3 writes a subheader in sentence case, and
+   this app's writing standard already writes every rendered string that way. An uppercase transform
+   also breaks a screen reader's pronunciation of anything acronym-shaped.
+   `.sect > summary` in the drawer keeps the old language. It carries a chevron, a flex row and a
+   pointer for a `<details>` that is not here, so the two were never one rule. */
 .mgroup {
   display: flex; align-items: center; gap: 6px; margin: 6px 6px 4px;
-  font: 500 11px Roboto, sans-serif; letter-spacing: .06em; text-transform: uppercase;
-  color: var(--muted);
+  font-family: var(--md-sys-typescale-title-small-font);
+  font-size: var(--md-sys-typescale-title-small-size);
+  line-height: var(--md-sys-typescale-title-small-line-height);
+  font-weight: var(--md-sys-typescale-title-small-weight);
+  letter-spacing: var(--md-sys-typescale-title-small-tracking);
+  color: var(--md-sys-color-on-surface-variant);
 }
 /* Everything under the layer group above it. **The indent and the spine are gone, and a divider
    does that job now.** The branch sat 26px in behind a 1px line, which was written for a time when

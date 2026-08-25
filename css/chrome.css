@@ -493,8 +493,10 @@ body.railopen #rail .railbadge { top: -6px; right: -6px; }
    **It steps aside for the pane on the trailing edge and for the rail on the leading one**, and each
    edge rides the motion that edge already has. Every other box at the top of the map clears it
    through `--top-free`.
-   Its own mask fades both ends over 56px, so the rounded ends never cut a word and the box needs no
-   `overflow` beyond the one the marquee already wants. */
+   **The mask is on `.tk-win` and never on the pill.** A mask on `#ticker` fades the surface and the
+   shadow with the words, so the pill's own rounded ends dissolve into the map. The reader then sees
+   a strip with no edges. The wrapper holds the text alone, so only a word entering or leaving
+   fades. The pill keeps its full edge at every width. */
 #ticker {
   position: absolute; z-index: 600;
   top: calc(var(--hdr) + var(--gap) + 12px);
@@ -508,7 +510,13 @@ body.railopen #rail .railbadge { top: -6px; right: -6px; }
   /* **Every rule that made this a flex item is gone.** It was `flex: 1 1 0` with `min-width: 0`, a
      16px trailing margin off a row of buttons, and a 30px height inside a taller bar. All four were
      written for a strip sharing a header row, and none of them describes a positioned pill.
-     `overflow: hidden` stays: the marquee is wider than its window by design. */
+     `overflow` moved to `.tk-win` with the mask: the marquee is wider than its window by design. */
+  display: flex; align-items: center;
+}
+/* The window the marquee runs in, and the one box the fade acts on. It clips, so `#ticker` does not
+   have to. */
+#ticker .tk-win {
+  flex: 1; min-width: 0; height: 100%;
   overflow: hidden; display: flex; align-items: center;
   /* Both edges fade, so an item entering or leaving dissolves instead of appearing at a hard cut.
      Long ramps because a marquee is *always* half-way through an item at both edges — a short ramp
@@ -567,7 +575,7 @@ body.railopen #rail .railbadge { top: -6px; right: -6px; }
 #ticker .tk-dot { color: var(--outline); margin: 0 16px; }
 /* All-clear: centred, grey, still. It is the one card that is not a link and not news, so it reads
    as a label rather than an item that happens to be showing — and stillness is the message. */
-#ticker.quiet { justify-content: center; -webkit-mask: none; mask: none; }
+#ticker.quiet .tk-win { justify-content: center; -webkit-mask: none; mask: none; }
 #ticker.quiet .tk-run { flex: 1; justify-content: center; animation: none; }
 #ticker .tk-none { color: var(--muted); cursor: default; letter-spacing: .2px; }
 #ticker .tk-none .i { color: var(--muted); opacity: .8; }
@@ -575,7 +583,7 @@ body.railopen #rail .railbadge { top: -6px; right: -6px; }
    and can be swiped through; the alert panel has all of it as a list. */
 @media (prefers-reduced-motion: reduce) {
   #ticker .tk-run { animation: none; }
-  #ticker { overflow-x: auto; scrollbar-width: none; }
+  #ticker .tk-win { overflow-x: auto; scrollbar-width: none; }
 }
 
 /* Three states, and `setBtn()` in js/locate.js writes all three. The words ride `data-tip` and the
@@ -1452,21 +1460,59 @@ body.side #bar { display: none; }
 /* The same shape, for the search. */
 #findpane { display: none; }
 body.find #findpane { display: flex; flex-direction: column; }
-/* --- the search, docked over the map -------------------------------------------------------------
-   **Above 600px this is M3's DOCKED search and not a pane occupant.** It is TWO surfaces here, not
-   one card. `Search/search.css` draws the search bar as a pill of its own, and the results sit on a
-   separate raised surface under it. One card put the control and its answer on one tone, with one
-   outline around both, so a reader read one surface rather than two.
-   So `#findpane` paints nothing at this width. It is the frame that places the pair. `#gotoBox` is
-   the column inside it, and that column states the 8px between the two.
+/* --- the search, as M3's search view ------------------------------------------------------------
+   **One component, two variants, and both are search VIEWS.** Above 600px it is M3's DOCKED search:
+   a bar over the map's leading corner with its results on a second surface under it. Below 600px it
+   is the FULL-SCREEN search view: the same bar as the header of a screen, with the results filling
+   the rest of it.
+   **The shape is shared and only the numbers differ**, so the block below states the shape once.
+   A bar is a row holding a leading back arrow and then the field, and `Search/search.css` puts the
+   surface on that row rather than on the field. The results are a list under it. `#findpane` is the
+   frame that places the pair and paints nothing itself.
+   **Neither variant is a dropdown, and the phone one was.** base.css floats `#gotoHits` under the
+   field with `position: absolute; top: 100%`, draws an outline around it, caps it at 46vh, and puts
+   an `expand_more` caret in the field. Those four say "this field opens a list". A search view is a
+   destination. So all four are cancelled here, at both widths. */
+#findpane #gotoBox {
+  display: flex; flex-direction: column; min-height: 0;
+}
+#findpane #gotoBox::after { display: none; }
+#findpane #gotobar {
+  display: flex; align-items: center; gap: 4px; flex: none;
+  box-sizing: border-box; width: 100%; padding-inline: 4px 8px;
+}
+/* The leading icon. 48px is M3's own target for this bar, against the 40px `.icon` draws everywhere
+   else in this app, and the bar is tall enough to hold it at either width. Its glyph centre lands
+   28px in, which is where every full-screen bar in this app already puts one. */
+#findpane #findBack {
+  display: grid; width: 48px; height: 48px; font-size: 24px;
+  color: var(--md-sys-color-on-surface-variant);
+}
+/* **`margin: 0` cancels base.css's 10px**, or a second gap opens inside a bar that already states
+   its own. A higher-specificity rule that never mentions a property does not cancel it. The lower
+   rule still wins that one declaration. */
+#findpane #goto {
+  flex: 1; min-width: 0; box-sizing: border-box; height: 100%;
+  padding-inline: 4px; margin: 0; border: 0; border-radius: 0;
+  background: none; box-shadow: none;
+  font-size: var(--md-sys-typescale-body-large-size);
+  line-height: var(--md-sys-typescale-body-large-line-height);
+}
+/* **In flow, and that is the whole of why the box would not grow.** Out of flow the list
+   contributed nothing to the column, the column stayed 66px tall, and the results were clipped.
+   Nothing errored and the field looked right, so only a measurement finds it. */
+#findpane #gotoHits {
+  position: static; margin: 0; border: 0; overflow-y: auto;
+}
+
+/* --- above 600px: the docked search ---
+   It is TWO surfaces here, not one card. One card put the control and its answer on one tone, with
+   one outline around both, so a reader read one surface rather than two.
    **Elevation is `--shadow`, not M3's own.** This app holds one elevation and every floating surface
    takes that one. The four dialogs each decline M3's for the same reason.
    **It leads on the legend's own edge**, `12px + --gap + --rail-w`, so the two boxes over the map
    share one leading line. `left` rides `--m3-rail`, so the pair travels with the rail rather than
-   jumping when the rail opens.
-   The pane's own header is gone here. A docked search has no back arrow. That belongs to the
-   full-screen variant, which is what this surface still is below 600px. The ways out are Escape and
-   a click away, and both were already wired. */
+   jumping when the rail opens. */
 @media (min-width: 601px) {
   body.find #findpane {
     position: fixed; z-index: 610; inset: auto;
@@ -1478,65 +1524,49 @@ body.find #findpane { display: flex; flex-direction: column; }
     background: none; box-shadow: none; border-radius: 0; overflow: visible;
     transition: opacity var(--m3-swap), translate var(--m3-swap), left var(--m3-rail);
   }
-  /* A docked search has no header row of its own. The bar IS the header. */
-  #findpane #findHead { display: none; }
   /* **`flex: none`, so the column grows with its results.** The body is a pane occupant's scroller
      everywhere else, and `flex: 1` in a box with no height of its own gave it a 20px frame and a
-     scrollbar down the side of two rows. The scroll belongs to the results box now, so nothing
-     scrolls here. */
+     scrollbar down the side of two rows. The scroll belongs to the results box here, so nothing
+     scrolls in the frame. */
   #findpane #findBody {
     display: block; flex: none; padding: 0; overflow: visible;
   }
-  /* base.css draws an `expand_more` caret through `#gotoBox::after`, which is the affordance for a
-     field that opens a list under itself inside a pane. The list is its own box here, so the caret
-     points at nothing. */
-  #findpane #gotoBox::after { display: none; }
-  /* The column. It holds the bar, then the results, and the gap between them is what separates the
-     two surfaces. A hidden results box contributes no gap, so a bar with nothing to say stands
-     alone. */
-  #findpane #gotoBox {
-    display: flex; flex-direction: column; gap: 8px; min-height: 0;
-  }
-  /* **M3's search bar is the ROW, not the field.** `Search/search.css` states a 56px pill holding a
-     leading icon and then the input. So the surface, the corner and the elevation sit on `#gotobar`,
-     and the field inside it paints nothing at all.
-     `padding-inline: 4px 8px` is that file's own, around a 48px icon button. So the arrow's glyph
-     centre lands 28px in, which is where every full-screen bar in this app already puts it. */
+  /* The gap between the two surfaces. A hidden results box contributes no gap, so a bar with
+     nothing to say stands alone. */
+  #findpane #gotoBox { gap: 8px; }
+  /* `Search/search.css`'s own 56px pill, and `padding-inline: 4px 8px` around a 48px icon button. */
   #findpane #gotobar {
-    display: flex; align-items: center; gap: 4px; flex: none;
-    box-sizing: border-box; width: 100%; height: 56px; padding-inline: 4px 8px;
+    height: 56px;
     border-radius: var(--md-sys-shape-corner-extra-large);
     background: var(--md-sys-color-surface-container-high);
     box-shadow: var(--shadow);
   }
-  /* The leading icon. 48px is M3's own target for this bar, against the 40px `.icon` draws
-     everywhere else in this app, and the bar is 56px tall so it has the room. */
-  #findpane #findBack {
-    display: grid; width: 48px; height: 48px; font-size: 24px;
-    color: var(--md-sys-color-on-surface-variant);
-  }
-  /* **`margin: 0` cancels base.css's 10px**, or a second gap opens inside a bar that already states
-     its own. A higher-specificity rule that never mentions a property does not cancel it. The lower
-     rule still wins that one declaration. */
-  #findpane #goto {
-    flex: 1; min-width: 0; box-sizing: border-box; height: 100%;
-    padding-inline: 4px; margin: 0; border: 0; border-radius: 0;
-    background: none; box-shadow: none;
-    font-size: var(--md-sys-typescale-body-large-size);
-    line-height: var(--md-sys-typescale-body-large-line-height);
-  }
-  /* **In flow, and that is the whole of why the box would not grow.** base.css floats this list
-     under the field with `position: absolute; top: 100%`, which is right for a field inside a pane
-     that has its own height. Out of flow it contributed nothing to the column, the column stayed
-     66px tall, and the results were clipped. Nothing errored and the field looked right, so only a
-     measurement finds it.
-     It is its own surface now: its own tone, its own shadow, its own corner, and its own scroll. */
+  /* Its own tone, its own shadow, its own corner and its own scroll. */
   #findpane #gotoHits {
-    position: static; margin: 0; border: 0;
     border-radius: var(--md-sys-shape-corner-medium);
     background: var(--md-sys-color-surface-container-high);
     box-shadow: var(--shadow);
-    max-height: 60vh; overflow-y: auto;
+    max-height: 60vh;
+  }
+}
+
+/* --- below 600px: the full-screen search view ---
+   `Search/search.css` gives this variant a 72px bar on the screen's own surface, a divider under it,
+   and the results below. There is no card, no corner and no elevation: the surface IS the screen.
+   **The body stops scrolling and the list starts.** `#findBody` is a pane occupant's scroller, and
+   with the bar inside it the bar scrolled away with the results. A search view holds its bar still.
+   So the body holds the column at the screen's height, the bar takes what it needs, and the list
+   takes the rest. */
+@media (max-width: 600px) {
+  #findpane #findBody { padding: 0; overflow: hidden; }
+  #findpane #gotoBox { flex: 1; }
+  #findpane #gotobar {
+    height: 72px;
+    border-bottom: 1px solid var(--md-sys-color-outline-variant);
+  }
+  #findpane #gotoHits {
+    flex: 1; max-height: none; border-radius: 0;
+    background: none; box-shadow: none;
   }
 }
 /* --- the results, as M3's own list ---------------------------------------------------------------
@@ -1691,21 +1721,20 @@ body.find #findpane { display: flex; flex-direction: column; }
    padding. Stated once here rather than as four numbers that drift apart. */
 #paintmenu .mgroup, #paintmenu .mnote { margin-inline: 2px; }
 #paintmenu hr { margin-inline: 0; }
-/* **The sheet's heading, drawn below 600px alone** — see the block at the foot of this file for the
-   width, and index.html for why a menu needs none. `title-medium`, which outranks the 11px
-   uppercase `.mgroup` under it and stays under the 22px a full-screen dialog takes. `<h2>` keeps
-   the UA block margin, and this app resets `h1` alone, so `margin` is stated. */
-.sheettitle { display: none; }
-@media (max-width: 600px) {
-  .sheettitle {
-    display: block; margin: 0 2px 10px;
-    font-family: var(--md-sys-typescale-title-medium-font);
-    font-size: var(--md-sys-typescale-title-medium-size);
-    line-height: var(--md-sys-typescale-title-medium-line-height);
-    font-weight: var(--md-sys-typescale-title-medium-weight);
-    letter-spacing: var(--md-sys-typescale-title-medium-tracking);
-    color: var(--md-sys-color-on-surface);
-  }
+/* **The panel's heading, at both widths.** `title-large` — 22px on 28px — which is the token this
+   app's full-screen dialogs take for their own headline. The buttons under it are 96px tall with
+   24px labels, and a 16px heading over those reads as a caption. It drew at `title-medium` on the
+   sheet alone before, and a reader asked for M3's own numbers on 2026-08-25.
+   **An `<h2>` keeps the UA block margin**, and this app resets `h1` alone. So `margin` is stated or
+   the panel grows 18px of dead air above and below it. */
+.sheettitle {
+  margin: 0 2px 10px;
+  font-family: var(--md-sys-typescale-title-large-font);
+  font-size: var(--md-sys-typescale-title-large-size);
+  line-height: var(--md-sys-typescale-title-large-line-height);
+  font-weight: var(--md-sys-typescale-title-large-weight);
+  letter-spacing: var(--md-sys-typescale-title-large-tracking);
+  color: var(--md-sys-color-on-surface);
 }
 /* --- M3 connected button group ------------------------------------------------------------------
    **This is NOT the lightbox's range selector, and the difference is the whole entry.** That control
@@ -1757,11 +1786,20 @@ body.find #findpane { display: flex; flex-direction: column; }
       var(--md-sys-motion-easing-spring-default-spatial);
 }
 /* A 32px button is under the 48px pointer minimum, so the spec grows the target rather than the
-   button. Vertical only: the inline edges belong to the neighbour 2px away. */
-.btngrp label::after { position: absolute; z-index: 2; inset: calc((var(--_h) - 48px) / 2) 0; content: ""; }
+   button. Vertical only: the inline edges belong to the neighbour 2px away.
+   **`min(0px, ...)`, because a taller button must never shrink its own target.** The stacked
+   variant in `#paintmenu` is 56px, and the bare expression is +4 there. That reads as a button
+   with 4px of dead edge top and bottom, which is the opposite of what this rule is for. */
+.btngrp label::after {
+  position: absolute; z-index: 2; content: "";
+  inset: min(0px, calc((var(--_h) - 48px) / 2)) 0;
+}
 /* The two ends of the group are a pill and everything a neighbour touches is the inner radius. */
-.btngrp label:first-of-type { border-start-start-radius: calc(var(--_h) / 2); border-end-start-radius: calc(var(--_h) / 2); }
-.btngrp label:last-of-type  { border-start-end-radius:   calc(var(--_h) / 2); border-end-end-radius:   calc(var(--_h) / 2); }
+.btngrp {
+  --_out: calc(var(--_h) / 2);   /* the ROUND shape's outer corner. A square group overrides it. */
+}
+.btngrp label:first-of-type { border-start-start-radius: var(--_out); border-end-start-radius: var(--_out); }
+.btngrp label:last-of-type  { border-start-end-radius:   var(--_out); border-end-end-radius:   var(--_out); }
 /* Clipped to a pixel rather than hidden with `display: none`, which would take the control out of
    the tab order and leave it mouse-only. The browser keeps the group exclusive, walks it with the
    arrow keys and reads the label out — none of which a row of styled buttons gets for free. */
@@ -1790,6 +1828,56 @@ body.find #findpane { display: flex; flex-direction: column; }
    label is that floor. The free space spreads over whatever is left and no label is ever cut.
    Three EQUAL buttons of `Favorites · 12` would measure 348px against the 270 this panel has. */
 #paintmenu .btngrp { display: flex; width: 100%; }
+/* **The MAP LAYER group is size MD in the SQUARE shape, and the two groups under it stay at xs.**
+   A reader asked for the large square form on 2026-08-25, and then for a size that reads beside the
+   navigation bar. **That bar is what picks md.** Its items draw a 24px glyph over a label, and md is
+   the one button size whose icon is 24px. Size lg stood here first at 96px with a 32px icon and a
+   24px label, and it towered over the bar it sits beside.
+   **`>` is the whole of the scope.** That group is a direct child of the panel. The Heatmap and Icon
+   groups sit inside `.subgrp > .subin`, so a bare `#paintmenu .btngrp` reaches all three. That is
+   what shipped for one run, and a large Heatmap row looks deliberate on screen.
+
+   `Button/button.css` at `data-size="md"`, and `ButtonGroup/button-group.css` at the same size:
+
+       height          56px
+       padding-inline  24px
+       icon            24px, the navigation bar's own glyph size
+       label           title-medium — 16px on 24px
+       inner corner    shape-corner-small (8px), the corner a neighbour touches
+       outer corner    shape-corner-large (16px), because the shape is SQUARE
+       selected        height / 2, fully round, which is the group's own rule at every size
+       group           gap 2px and NO padding — the 2px group padding is xs and sm only
+       min-width       none — the 48px floor is xs and sm only
+
+   **One divergence, and it is the one this panel already carries.** The glyph sits OVER the label
+   rather than before it, on the same reader's instruction. 56 is 24 + 2 + 24 with 3 of padding at
+   each end, so the stacked form lands on the spec's own height with nothing to adjust.
+   **`padding-inline` is the spec's 24 now.** At size lg it had to be 12: the pair floored at 372px
+   of min-content against the 272 this panel has, and a flex item never shrinks under that floor. At
+   md the two labels measure about 230px with the full padding, so the number comes across whole.
+   **`nowrap` still holds, and it is what stops a label being cut.** A flex item floors at its own
+   min-content, which for a `nowrap` button is its whole label. Wrapping hands that floor back and
+   puts a label on two lines inside a box measured for one. */
+#paintmenu > .btngrp {
+  --_h: 56px;                                          /* size md */
+  --_r: var(--md-sys-shape-corner-small);              /* 8px, the corner a neighbour touches */
+  --_out: var(--md-sys-shape-corner-large);            /* 16px, the square shape's own outer corner */
+  padding: 0;
+}
+#paintmenu > .btngrp label {
+  flex-direction: column; gap: 2px; min-width: 0; padding-inline: 24px;
+  font-family: var(--md-sys-typescale-title-medium-font);
+  font-size: var(--md-sys-typescale-title-medium-size);
+  line-height: var(--md-sys-typescale-title-medium-line-height);
+  font-weight: var(--md-sys-typescale-title-medium-weight);
+  letter-spacing: var(--md-sys-typescale-title-medium-tracking);
+}
+#paintmenu > .btngrp .i { font-size: 24px; }
+/* The SQUARE shape's outer corner rides `--_out` on the group above, and the base rules read it.
+   **Restating those two rules here is what broke the selected state.** They carry an id, so they
+   beat `.btngrp label:has(:checked)` and held the chosen button at its square corner rather than
+   letting it go fully round. The connected group makes a selected button `height / 2` at every size
+   and in both shapes, and that is the component's signature. So the variable is the whole override. */
 /* **`flex-grow`, never the `flex: 1` shorthand, and the difference is a label spilling out of its
    own fill.** That shorthand is `1 1 0`, and a zero basis makes every button start at nothing and
    take an equal share of the whole row. A flex item is normally floored at its own min-content, but
@@ -1820,10 +1908,6 @@ body.find #findpane { display: flex; flex-direction: column; }
    strip under its layer group on every healthy poll. */
 #paintmenu .mnote { display: flex; margin: 2px 8px 4px; color: var(--muted); }
 #paintmenu .mnote:not(:has(.hint:not(:empty))) { display: none; }
-/* The bottom sheet's drag handle. It draws below 600px alone — see the sheet block at the foot of
-   this file. Above that width this panel is a menu beside its button, and a menu has no drag. */
-.grab { display: none; }
-
 /* **The press shortcut is a tooltip now, and the line that named it is gone.** It sat at the foot
    of the panel reading `Click <layers> to switch layer`, drawn behind a media query and pointing at
    a button outside the box it sat in. A reader cut it on 2026-08-21.
@@ -2140,7 +2224,7 @@ body.side #side { display: flex; }
    ellipsis. This app does not, and the reason is older than this change: a station name cut in half
    names another station. So a long name takes a second 36px line and the bar grows. M3 Expressive
    states a two-line form for this variant, so a grown bar is inside the family. */
-#barHead, #sideHead, #findHead {
+#barHead, #sideHead {
   flex: none; display: flex; flex-direction: column;
   min-height: 112px;
   background: var(--surface); color: var(--on-surface);
@@ -2163,7 +2247,7 @@ body.side #side { display: flex; }
 #sideTitle { min-width: 0; }
 /* `headline-medium`, in `on-surface`. It was `title-large` in `--muted`: an app bar headline is the
    screen's own name and takes the full ink, where a side sheet title is a label over a panel. */
-#sideTitle .popname, #barHead h2, #findHead h2 {
+#sideTitle .popname, #barHead h2 {
   margin: 0; font-weight: 400; color: var(--on-surface);
   font-size: var(--md-sys-typescale-headline-medium-size);
   line-height: var(--md-sys-typescale-headline-medium-line-height);
@@ -2264,10 +2348,6 @@ body.side #side { display: flex; }
   border: 1px solid var(--outline); border-radius: var(--md-sys-shape-corner-full);
 }
 #goto:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-/* **The back arrow draws above 600px alone**, where the field is M3's docked search BAR and carries
-   its own leading icon. Below 600px the search is the full-screen search view inside `#pane`, and
-   `#findHead` leads with the same arrow one row up. */
-#findBack { display: none; }
 /* **No `padding` here.** The M3 list block above states `padding: 8px 0`, and this rule is later in
    the file at the same specificity. A `padding: 0` here silently beat it, and nothing on screen or
    in the check said so. `m3-check.html` asserts the list's own padding now. */
@@ -2438,7 +2518,7 @@ body.side #side { display: flex; }
    that floating. The container query on `#mapfoot` hands the button column back on the one map
    width where this line wraps. */
 #credit {
-  text-align: right; margin-left: auto;
+  text-align: left;
   text-shadow: 0 0 4px var(--surface), 0 0 4px var(--surface);
 }
 #credit a { color: var(--muted); }
@@ -2982,7 +3062,7 @@ body.side #side { display: flex; }
   /* 6 (header pad) + 36 (controls) + 5 (gap) + 36 (ticker) = 83. Measured, not guessed: any slack
      here is dead white space between the ticker and the map. */
   /* **`--side` is deliberately NOT overridden here.** The pane is a bottom sheet at this width and
-     takes `min(640px, calc(100% - 32px))` instead, so a width token for it would be a number
+     takes the whole window instead, so a width token for it would be a number
      nothing reads. `--pane-w` stays 0 here for the same reason: a bottom sheet rises over the map
      rather than beside it, so the map keeps its whole width. Every rule that still resolves `--side`
      is a desktop rule, and each is cancelled by name below rather than by feeding it a phone
@@ -3358,16 +3438,18 @@ body.side #side { display: flex; }
    m3.material.io/components/bottom-sheets/specs:
 
      container shape    28px on the two TOP corners only
-     container width    min(640px, calc(100% - 32px)), centred
+     container width    min(640px, 100%), centred
      max height         calc(100dvh - 72px)
      drag handle        a 48px row holding a 32 x 4px indicator, radius 2
      scrim              32% of the scrim colour
 
    https://github.com/bczak/m3you/blob/development/src/components/BottomSheet/bottom-sheet.css
 
-   **The sheet does not reach the side edges, and that is the reference's own shape.** 16px of map
-   shows down each side at 360px while the sheet sits flush on the bottom. That is why only the top
-   corners are rounded.
+   **The sheet reaches both side edges, and the reference's own file does not.** That file writes
+   `calc(100% - 32px)`, which leaves 16px of map down each side at 360px. M3 states the inset for a
+   window WIDER than the sheet, so the sheet centres at 640px and the margin is what is left over.
+   Below 640dp there is nothing left over, and the sheet spans the window. `min()` states both cases
+   in one expression. Only the top corners are rounded, because the other three sit on an edge.
 
    **M3's 24px inline body padding is taken now, and the reason this app declined it is gone.** That
    reason was that every row was a `.chip` bringing 14px of its own, so 24 on top of 14 put a label
@@ -3381,7 +3463,7 @@ body.side #side { display: flex; }
        here at this width — see the guard at the top of its `toggle` handler. Inline styles win
        over any of this, so the two halves have to agree. */
     inset: auto 0 0 0;
-    width: min(640px, calc(100% - 32px)); margin-inline: auto;
+    width: min(640px, 100%); margin-inline: auto;
     min-width: 0; max-width: none;
     max-height: calc(100dvh - 72px);
     padding: 0 24px 24px;
@@ -3394,21 +3476,22 @@ body.side #side { display: flex; }
 
   /* The handle is the `.grab` rule at the foot of this file. */
 
-  /* Up from the bottom edge, the same travel and the same 300ms the full-screen dialogs take. A
-     popover flips `display` exactly as `showModal()` does, so a keyframe on `:popover-open` is the
-     only thing there is to start from. `.menu` already states that pair, so this only adds motion.
-     The scrim fades on its own keyframe: a `::backdrop` is a separate box and does not inherit the
-     element's animation. */
-  @keyframes sheetUp { from { transform: translateY(100%); } }
-  @keyframes sheetScrim { from { opacity: 0; } }
-  #paintmenu:popover-open { animation: sheetUp var(--m3-travel); }
-  #paintmenu:popover-open::backdrop { animation: sheetScrim var(--m3-travel); }
-  /* The drag is the shared `--drawer-swipe-movement-y` mechanism at the foot of this file. The
-     keyframe owns `transform` for its 300ms and hands it back to that rule when it ends. */
-
-  @media (prefers-reduced-motion: reduce) {
-    @keyframes sheetUp { from { opacity: 0; } }
+  /* Up from the bottom edge and back down it, the same travel and the same 300ms a full-screen
+     dialog takes. The transform, the closed state and the transition all live in the swipe block at
+     the foot of this file, because the drag writes into that same transform. Only the scrim is
+     stated here, because a `::backdrop` is a separate box and inherits nothing from its element.
+     **A keyframe on `:popover-open` stood here first and bought an ENTER alone.** So the sheet
+     arrived over 300ms and vanished in one frame, which a reader named on 2026-08-25. That is the
+     identical fault `#pane` had, and the repair is the one that file already carries: a closed state
+     to transition from, `@starting-style` to supply it on the way in, and `allow-discrete` to hold
+     the box on screen while it leaves. */
+  #paintmenu::backdrop {
+    opacity: 0;
+    transition: opacity var(--m3-travel), display var(--m3-travel) allow-discrete,
+                overlay var(--m3-travel) allow-discrete;
   }
+  #paintmenu:popover-open::backdrop { opacity: 1; }
+  @starting-style { #paintmenu:popover-open::backdrop { opacity: 0; } }
 }
 
 /* --- the pane: side sheet on a desktop, full-screen dialog on a phone -------------------------- */
@@ -3497,7 +3580,8 @@ body.side #side { display: flex; }
 /* --- the drag handle, shared by all three sheets ---------------------------------------------- */
 
 /* `#paintmenu`'s alone now. M3: a 48px row holding a 32 by 4px indicator with a 2px radius, painted
-   `outline`. The row is the touch target and the bar is the picture of it, so the bar is a
+   `outline`. The spec states the row as 22dp of padding above and below the bar, so 22 + 4 + 22 is
+   where the 48 comes from. The row is the touch target and the bar is the picture of it, so the bar is a
    pseudo-element rather than a second box.
    It draws below 600px alone, where that panel is a bottom sheet. The supporting pane had one while
    it was a bottom sheet too. It is a full-screen dialog now and that variant has no swipe, so the
@@ -3566,13 +3650,26 @@ body:not(.ready) #pane { transition: none; }
 @media (max-width: 600px) {
   #pane { transform: translateY(100%); }
   @starting-style { #pane[open] { transform: translateY(100%); } }
-  #paintmenu { transition: transform var(--m3-travel); }
+  /* **The sheet's own enter and exit, and the drag writes into the same `transform`.** That is why
+     both live here rather than in the sheet block above. `translateY(100%)` is the closed state,
+     `@starting-style` is what makes the browser use it as the start of the enter, and the two
+     `allow-discrete` terms are what keep the box and its top layer alive through the exit.
+     `[data-swiping]` kills the transition while a finger is on it, which is the reference's own
+     mechanism, transcribed at the head of this block. */
+  #paintmenu {
+    transform: translateY(100%);
+    transition: transform var(--m3-travel), display var(--m3-travel) allow-discrete,
+                overlay var(--m3-travel) allow-discrete;
+  }
   #paintmenu[data-swiping] { transition: none; }
   #paintmenu:popover-open { transform: translateY(var(--drawer-swipe-movement-y, 0px)); }
+  @starting-style { #paintmenu:popover-open { transform: translateY(100%); } }
 }
 
 /* Reduced motion keeps the fade and drops the travel. Something still has to say a pane arrived. */
 @media (prefers-reduced-motion: reduce) {
   #pane, #pane[open] { transform: none; }
   @starting-style { #pane[open] { transform: none; } }
+  #paintmenu, #paintmenu:popover-open { transform: none; }
+  @starting-style { #paintmenu:popover-open { transform: none; } }
 }

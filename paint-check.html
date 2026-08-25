@@ -328,36 +328,59 @@ is(menu.querySelector('.seg'), null, 'no .seg is left in this panel, because it 
    border on 2026-08-21. */
 is(w.getComputedStyle(menu).paddingLeft, '24px', 'M3: the panel pads 24px inline');
 is(w.getComputedStyle(menu).paddingRight, '24px', 'M3: on both edges');
+/* 2px between connected buttons at every size. The 2px of GROUP padding is xs and sm alone, so the
+   map layer group at size lg takes none. */
 for (const grp of menu.querySelectorAll('.btngrp')) {
   const cs = w.getComputedStyle(grp);
+  const lg = grp.parentElement === menu;
   is(cs.gap, '2px', 'M3: 2px between connected buttons, at every size');
-  is(cs.paddingLeft, '2px', 'M3: and 2px of group padding at xs');
+  is(cs.paddingLeft, lg ? '0px' : '2px',
+     lg ? 'M3: and no group padding at lg' : 'M3: and 2px of group padding at xs');
 }
 
-const H = 32, R = 16;             // size xs, and its outer radius is height / 2
+/* **Two shapes in one panel, and each is asserted as its own.** The Stations and Weather pair takes
+   the stacked form a reader asked for on 2026-08-25: 56px, glyph over label. The Heatmap and Icon
+   groups keep M3's transcribed xs row at 32px. The scope is a `>` in `css/chrome.css`, so a bare
+   descendant selector takes all three, which is what shipped for one run. Read the two apart, or
+   nothing here can see that. The outer radius follows the height either way, because the component
+   states the end of a group as `height / 2` and nothing restates the number. */
+const LAYERS = ['stations', 'wxLayer'];
+const big = id => LAYERS.includes(id);
 for (const id of BOXES) {
   const b = el(id).closest('label'), cs = w.getComputedStyle(b);
   is(!!b.closest('.btngrp'), true, id + ' sits in a connected button group');
-  is(Math.round(b.getBoundingClientRect().height), H, id + ': M3 xs is 32px tall');
-  is(cs.paddingLeft, '12px', id + ': M3 xs pads 12px inline');
-  is(Math.round(parseFloat(cs.minWidth)), 48, id + ': M3 floors a connected xs button at 48px');
-  is(cs.fontSize + ' ' + cs.fontWeight, '14px 500', id + ': label-large, 14px at 500');
-  is(cs.letterSpacing, '0.1px', id + ': with label-large tracking');
+  is(Math.round(b.getBoundingClientRect().height), big(id) ? 56 : 32,
+     id + (big(id) ? ': M3 size md is 56px tall' : ': M3 size xs is 32px tall'));
+  is(cs.fontSize, big(id) ? '16px' : '14px',
+     id + (big(id) ? ': title-medium, which is size md' : ': label-large, which is size xs'));
+  is(cs.paddingLeft, big(id) ? '24px' : '12px',
+     id + (big(id) ? ': and M3 pads a md button 24px inline' : ': M3 xs pads 12px inline'));
+  is(cs.flexDirection, big(id) ? 'column' : 'row',
+     id + (big(id) ? ': glyph over label' : ': label on one row, the transcribed shape'));
+  is(Math.round(parseFloat(cs.minWidth)), big(id) ? 0 : 48,
+     id + (big(id) ? ': and takes no 48px floor, which M3 states for xs and sm alone'
+                   : ': M3 floors a connected xs button at 48px'));
+  is(Math.round(parseFloat(cs.minWidth)) >= 0, true, id + ': sizes to its own label');
   /* The button is the hit area, not the radio inside it. A filter with nothing to match is
      `disabled`, and M3 takes the pointer off it rather than changing the cursor. */
   is(cs.pointerEvents, el(id).disabled ? 'none' : 'auto',
      id + ': the button is the hit area, and a dead one takes no pointer at all');
 }
-/* **A 32px button is under the 48px pointer minimum, so the spec grows the TARGET.** Vertical only:
-   the inline edges belong to the neighbour 2px away. */
+/* **M3 grows the TARGET where a 32px button is under the 48px pointer minimum.** The stacked button
+   is 56px and clears it on its own, so the rule must give back nothing. `min(0px, ...)` is what
+   holds both cases: the bare expression is +4 here, which is 4px of dead edge top and bottom on a
+   button that was already big enough. */
 {
   const a = w.getComputedStyle(el('stations').closest('label'), '::after');
-  is(a.content !== 'none', true, 'M3: xs carries a pointer target of its own');
-  is(Math.round(parseFloat(a.top)), -8, 'M3: grown to 48px on the block axis, and no further');
+  is(a.content !== 'none', true, 'M3: the button carries a pointer target of its own');
+  is(Math.round(parseFloat(a.top)), 0, 'M3: and a 56px button keeps its whole height, never less');
+  const x = w.getComputedStyle(el('heat').closest('label'), '::after');
+  is(Math.round(parseFloat(x.top)), -8, 'M3: while a 32px one is still grown to 48, and no further');
 }
 /* **The two ends of a group are a pill and every corner a neighbour touches is 4px.** The selected
    button then goes fully round, which is the whole signature of this component. */
 {
+  const R = 16;                    // the Heatmap group is the transcribed 32px row
   const first = el('heatOff').closest('label'), mid = el('heat').closest('label'),
         last = el('rainHeat').closest('label');
   const rad = (e, prop) => Math.round(parseFloat(w.getComputedStyle(e)[prop]));
@@ -369,6 +392,51 @@ for (const id of BOXES) {
      'M3: a middle button is the inner radius on every corner');
   is(rad(last, 'borderTopLeftRadius'), R, 'M3: and the selected button goes fully round');
   is(rad(last, 'borderTopRightRadius'), R, 'M3: on both of its own corners');
+}
+/* **Every title in this panel is an M3 token, and the two group headings were this app's own.** They
+   drew at 11px, 500, uppercase and tracked, which is the drawer's section-heading language. A reader
+   asked for M3 on all of them on 2026-08-25. M3 states a list subheader as `title-small`, 14px on 20
+   at 500, in `on-surface-variant`.
+   **The uppercase transform is the half that fails silently.** A heading at the right size and still
+   transformed reads as a deliberate style rather than as a rule that was missed. Compare the colour
+   against the RESOLVED bridge in `css/base.css`, never against a literal: this app holds one surface
+   tone and bridges M3's roles onto it. */
+{
+  const heads = [...menu.querySelectorAll('.mgroup')];
+  is(heads.length, 2, 'M3: two group headings, Heatmap and Icon');
+  const probe = d.createElement('span');
+  probe.style.color = 'var(--md-sys-color-on-surface-variant)';
+  menu.appendChild(probe);
+  const want = w.getComputedStyle(probe).color;
+  for (const h of heads) {
+    const cs = w.getComputedStyle(h);
+    const nm = h.textContent.trim();
+    is(cs.fontSize, '14px', nm + ': M3 title-small, which is the list subheader');
+    is(cs.fontWeight, '500', nm + ': at 500');
+    is(cs.lineHeight, '20px', nm + ': on a 20px line');
+    is(cs.textTransform, 'none', nm + ': in sentence case, never an uppercase transform');
+    is(cs.color, want, nm + ': in on-surface-variant, off the bridge');
+  }
+  probe.remove();
+}
+/* The panel heading outranks them, or the two read as one level. */
+is(parseFloat(w.getComputedStyle(menu.querySelector('.sheettitle')).fontSize) >
+   parseFloat(w.getComputedStyle(menu.querySelector('.mgroup')).fontSize), true,
+   'M3: and the panel heading sits above them on the ladder');
+/* **The map layer group is the SQUARE shape, and its corners are the whole of what says so.** At
+   size md the connected group states an 8px inner corner and a 16px outer one, against the round
+   shape's `height / 2`. The selected button still goes fully round at 48, which is that group's own
+   rule at every size and in both shapes. So the shape shows on the two buttons that are OFF, and a
+   square group reverting to round is invisible on whichever one is on. */
+{
+  const rad = (e, prop) => Math.round(parseFloat(w.getComputedStyle(e)[prop]));
+  const st = el('stations').closest('label'), wx = el('wxLayer').closest('label');
+  el('stations').checked = true;
+  await wait(50);
+  is(rad(wx, 'borderTopRightRadius'), 16, 'M3: square md, so the unselected outer corner is 16');
+  is(rad(wx, 'borderTopLeftRadius'), 8, 'M3: and its inner corner is 8, against the 4 the xs groups take');
+  is(rad(st, 'borderTopLeftRadius'), 28, 'M3: the selected button still goes fully round at height / 2');
+  is(rad(st, 'borderTopRightRadius'), 28, 'M3: on both of its own corners');
 }
 /* Filled, with `data-selected`. Unselected is `surface-container` over `on-surface-variant`, and
    selected is `primary` over `on-primary`. Compared against the RESOLVED bridge in css/base.css,
@@ -434,7 +502,7 @@ const maskOf = cls => { const e = d.createElement('i'); e.className = 'i ' + cls
 for (const [id, name] of [['stations', 'i-place'], ['wxLayer', 'i-partly_cloudy_day']]) {
   const g = el(id).closest('label').querySelector('.i');
   is(!!g, true, id + ' carries a leading icon');
-  is(Math.round(g.getBoundingClientRect().width), 20, id + ': at M3 20px for an xs button');
+  is(Math.round(g.getBoundingClientRect().width), 24, id + ': at M3 24px, the navigation bar own glyph size');
   /* A mask resolves to a data URI, so the icon's NAME is nowhere in the computed value. Compare
      against a probe carrying the same class, the way the colour block compares against the bridge.
      A resolved `--i` is not evidence that anything painted, which is the fault `#paint::before`
@@ -445,11 +513,11 @@ for (const [id, name] of [['stations', 'i-place'], ['wxLayer', 'i-partly_cloudy_
      & w.Node.DOCUMENT_POSITION_FOLLOWING, w.Node.DOCUMENT_POSITION_FOLLOWING,
      id + ': leading, so the label follows it');
 }
-/* The two groups under it carry none. Three buttons of text and a glyph do not fit a 328px sheet,
-   and the legend under the map already draws what each wash means. */
+/* **The two groups under it carry none, and the stacked form did not change that.** Three buttons
+   of text and a glyph do not fit a 328px sheet, and the legend under the map already draws what each
+   wash means. Only the Stations and Weather pair stacks. */
 for (const id of ['heatOff', 'heat', 'rainHeat', 'pinAll', 'favOnly', 'risingOnly'])
-  is(el(id).closest('label').querySelector('.i'), null, id + ' carries none, and has no room for one');
-/* No button can sit outside its group, at either width. That is the fault a font change or one
+  is(el(id).closest('label').querySelector('.i'), null, id + ' carries none, and has no room for one');/* No button can sit outside its group, at either width. That is the fault a font change or one
    extra word lands first, and it reads as a spacing mistake rather than as an overflow. */
 is(menu.scrollWidth <= menu.clientWidth, true, 'no group overflows the panel');
 
@@ -462,10 +530,21 @@ is(menu.scrollWidth <= menu.clientWidth, true, 'no group overflows the panel');
    only as a duplicate of something already visible. Nothing is visible here any more.
    **One of the two, never both**, which is the shape `setBtn()` in js/locate.js already uses. */
 is(menu.querySelector('.mfoot'), null, 'desktop: the panel no longer names the shortcut in the panel');
-/* **The heading is the SHEET's, so it must not draw here.** Above 600px this panel is a menu
-   anchored to a button whose own tip names it, and the anchor is the label. */
-is(w.getComputedStyle(menu.querySelector('.sheettitle')).display, 'none',
-   'desktop: and carries no heading, because its button is the label');
+/* **The panel carries a heading at BOTH widths, and it drew on the sheet alone before.** A reader
+   cut it on 2026-08-25 and asked for it back the same day, at M3's own numbers. `title-large`, 22px
+   on 28px, which is the token this app's full-screen dialogs take for their own headline.
+   Two things fail silently. An `<h2>` keeps the UA block margin, and this app resets `h1` alone, so
+   an unstated margin is 18px of dead air that reads as panel padding. And an `aria-labelledby`
+   pointing at a node that is gone names nothing and errors nowhere. */
+{
+  const t = menu.querySelector('.sheettitle');
+  is(!!t, true, 'desktop: the panel carries a heading here too');
+  is(t.textContent.trim(), 'Layers', 'desktop: which says what the panel holds');
+  is(w.getComputedStyle(t).display !== 'none', true, 'desktop: and it draws at this width');
+  is(w.getComputedStyle(t).fontSize, '22px', 'desktop: at M3 title-large');
+  is(Math.round(parseFloat(w.getComputedStyle(t).marginTop)), 0, 'desktop: with the UA margin reset');
+  is(menu.getAttribute('aria-labelledby'), t.id, 'desktop: and it names the panel');
+}
 is(/switch/i.test(btn.dataset.tip || ''), true, 'desktop: the button names it on a tip instead');
 is(/layer/i.test(btn.dataset.tip || ''), true, 'desktop: and still says which control it is');
 is(btn.hasAttribute('title'), false, 'desktop: with no title beside it, which would name it twice');
@@ -706,13 +785,39 @@ is(pr.left < pb.right && pb.left < pr.right && pr.top < pb.bottom && pb.top < pr
 /* --- the panel is an M3 bottom sheet at this width ------------------------------------------- */
 /* Motion is read FIRST, before anything switches it off. `getComputedStyle` reports the override,
    not the rule, so a keyframe read after one comes back `none` on markup that is right. */
+/* **The sheet gets an enter AND an exit, and a keyframe buys the enter alone.** It shipped as one
+   for a run: the sheet arrived over 300ms and vanished in one frame, which a reader named on
+   2026-08-25. A transition needs three things a keyframe does not, and every one of them fails
+   silently. A closed state to travel from. `@starting-style`, or the enter starts from the open
+   state and never moves. And `allow-discrete` on `display` AND on `overlay`, or the box leaves the
+   top layer in the first frame of the exit and draws behind the page.
+   The scrim states its own, because a `::backdrop` is a separate box and inherits nothing. */
 pd.getElementById('paintmenu').showPopover();
 await wait(120);
 const pmCs = pw.getComputedStyle(pd.getElementById('paintmenu'));
-is(pmCs.animationName, 'sheetUp', 'phone: the sheet travels up from the bottom edge');
-is(pmCs.animationDuration, '0.3s', 'phone: on M3 duration-short2, the same travel a dialog takes');
-is(pw.getComputedStyle(pd.getElementById('paintmenu'), '::backdrop').animationName, 'sheetScrim',
-   'phone: and its scrim fades on a keyframe of its own, a backdrop inheriting none');
+const tp = pmCs.transitionProperty, td = pmCs.transitionDuration;
+is(tp.includes('transform'), true, 'phone: the sheet travels on transform, never on a keyframe');
+is(tp.includes('display'), true, 'phone: with display on the list, which is what holds the exit');
+is(tp.includes('overlay'), true, 'phone: and overlay, which holds the top layer through it');
+is(td.split(',')[0].trim(), '0.3s', 'phone: on M3 duration-short2, the travel a dialog takes');
+is(pmCs.animationName, 'none', 'phone: and no keyframe, which would buy the enter alone');
+{
+  const bd = pw.getComputedStyle(pd.getElementById('paintmenu'), '::backdrop');
+  is(bd.transitionProperty.includes('opacity'), true, 'phone: the scrim fades on a transition of its own');
+  is(bd.transitionProperty.includes('display'), true, 'phone: which it also has to hold through the exit');
+}
+/* The exit is the half that shipped broken, so drive it. `hidePopover()` leaves the box on screen
+   for the whole travel, and only `allow-discrete` on `display` can do that. */
+{
+  const pmx = pd.getElementById('paintmenu');
+  pmx.hidePopover();
+  await wait(60);
+  is(pw.getComputedStyle(pmx).display !== 'none', true,
+     'phone: the sheet is still on screen mid-exit, rather than gone in one frame');
+  await wait(400);
+  is(pw.getComputedStyle(pmx).display, 'none', 'phone: and gone once the travel ends');
+  pmx.showPopover(); await wait(400);
+}
 
 pd.head.insertAdjacentHTML('beforeend',
   '<style>*{transition:none !important;animation:none !important}</style>');
@@ -740,33 +845,64 @@ for (const id of ['stations', 'heat', 'rainHeat', 'favOnly', 'risingOnly']) {
   is(b.left >= pmr.left - 1 && b.right <= pmr.right + 1, true,
      'phone: ' + id + ' stays inside the sheet');
 }
-/* The same 32px at both widths. The `::after` is what carries the 48px pointer target, so a phone
-   needs no size override. That is the reason M3 grows the target rather than the button. */
-is(Math.round(pd.getElementById('heat').closest('label').getBoundingClientRect().height), 32,
-   'phone: M3 xs is 32px here too, and the pointer target does the rest');
-/* **The sheet says what it is.** A menu is anchored to a button whose tip names it. A sheet arrives
-   from the bottom edge and covers the corner it came from, so the anchor is gone and the heading
-   has to stand in for it. `title-medium`, which outranks the 11px uppercase group headings under it
-   and stays under the 22px a full-screen dialog takes. An `<h2>` keeps the UA block margin and this
-   app resets `h1` alone, so the margin has to be stated or the sheet grows 16px of dead air. */
-{
-  const t = pd.querySelector('#paintmenu .sheettitle');
-  is(!!t, true, 'phone: the sheet carries a heading');
-  is(t.textContent.trim(), 'Layers', 'phone: which says what the sheet holds');
-  is(pw.getComputedStyle(t).display, 'block', 'phone: and it draws');
-  is(pw.getComputedStyle(t).fontSize, '16px', 'phone: at M3 title-medium');
-  is(Math.round(parseFloat(pw.getComputedStyle(t).marginTop)), 0, 'phone: with the UA margin reset');
-  is(pd.getElementById('paintmenu').getAttribute('aria-labelledby'), t.id,
-     'phone: and it names the sheet, so a reader is told what opened');
-  /* Under the drag handle and above the first control, or it is a title for nothing. */
-  const grab = pd.querySelector('#paintmenu .grab').getBoundingClientRect();
-  const tb = t.getBoundingClientRect();
-  is(tb.top >= grab.bottom - 1, true, 'phone: under the drag handle');
-  is(tb.bottom <= pd.getElementById('stations').closest('.btngrp').getBoundingClientRect().top + 1,
-     true, 'phone: and above the first control it introduces');
+/* **The stacked form is the MAP LAYER pair's, and the two groups under it keep M3's 32px row.** A
+   reader asked for the glyph over the label on 2026-08-25, for Stations and Weather alone. The scope
+   is a `>` in `css/chrome.css`. A bare descendant selector takes all three groups and looks
+   deliberate on screen, so both shapes are read here. There is no size override at either width:
+   the same two rules answer, and the `::after` carries the 48px pointer target for the short one. */
+for (const id of ['stations', 'wxLayer']) {
+  const lab = pd.getElementById(id).closest('label');
+  const gl = lab.querySelector('.i');
+  is(Math.round(lab.getBoundingClientRect().height), 56, 'phone: ' + id + ' is the 56px size-md box');
+  is(!!gl, true, 'phone: ' + id + ' carries a glyph');
+  is(/url\(/.test(pw.getComputedStyle(gl).maskImage || ''), true,
+     'phone: ' + id + ' paints that glyph, rather than an empty box at the right size');
+  is(Math.round(gl.getBoundingClientRect().bottom) <= Math.round(
+       lab.querySelector('span').getBoundingClientRect().top) + 1, true,
+     'phone: ' + id + ' puts the glyph over the label, never beside it');
 }
+/* The two groups under it keep the transcribed row, and carry no glyph at all. */
+for (const id of ['heatOff', 'heat', 'rainHeat', 'pinAll', 'favOnly', 'risingOnly']) {
+  const lab = pd.getElementById(id).closest('label');
+  is(Math.round(lab.getBoundingClientRect().height), 32, 'phone: ' + id + ' is M3 xs at 32px');
+  is(lab.querySelector('.i'), null, 'phone: ' + id + ' carries no glyph');
+}
+/* A 56px button is already past the 48px pointer minimum, so the `::after` must give nothing back.
+   A 32px one is still grown. `min(0px, ...)` is what holds both, and the bare expression is +4 on
+   the tall one, which is 4px of dead edge top and bottom. */
+{
+  const t = id => pw.getComputedStyle(pd.getElementById(id).closest('label'), '::after').top;
+  is(t('stations'), '0px', 'phone: a 56px button keeps its whole height as the target');
+  is(Math.round(parseFloat(t('heat'))), -8, 'phone: and a 32px one is still grown to 48');
+}
+/* No group may overflow. The tightest row is the Icon group with a two-digit count on Favorites. */
+is(pm.scrollWidth <= pm.clientWidth, true, 'phone: no group overflows the sheet');
 /* M3's 24px inline body padding, the same number the panel takes above 600px. */
 is(pw.getComputedStyle(pm).paddingLeft, '24px', 'phone: M3 pads the sheet body 24px inline');
+
+/* **A tap that dismisses the sheet must not also act on the map under it.** Light dismiss closes the
+   popover and lets the same press through, so a pin behind the sheet opened its card. Drive the real
+   pointer path against a listener standing where Leaflet's marker listener stands, on a child of
+   `#map` in the bubble phase. Two states, because the guard is worth nothing if it eats every press:
+   the click is swallowed while the sheet is open and delivered once it is shut. */
+{
+  const mapEl = pd.getElementById('map');
+  const probe = mapEl.querySelector('.leaflet-marker-pane') || mapEl.firstElementChild;
+  let hits = 0;
+  probe.addEventListener('click', () => hits++);
+  const press = () => {
+    probe.dispatchEvent(new pw.PointerEvent('pointerdown', { bubbles: true }));
+    probe.dispatchEvent(new pw.MouseEvent('click', { bubbles: true, cancelable: true }));
+  };
+  is(!!probe, true, 'phone: there is a box inside the map to press');
+  is(pm.matches(':popover-open'), true, 'phone: the sheet is open, so a press has something to shut');
+  press();
+  is(hits, 0, 'phone: a press behind the open sheet never reaches the map');
+  pm.hidePopover(); await wait(60);
+  press();
+  is(hits, 1, 'phone: and reaches it again once the sheet is shut');
+  pm.showPopover(); await wait(120);
+}
 
 /* The handle, and the gesture it promises. A handle drawn over a swipe nobody wired up is a
    promise the panel does not keep, so both halves are asserted together. */
