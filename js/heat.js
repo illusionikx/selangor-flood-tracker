@@ -425,6 +425,9 @@ export function syncHeat() {
      it paints with nothing opened. Written from the preference, never read back from it, which is
      the rule every control this function owns already obeys. */
   el('heatChipLabel').textContent = wet ? 'Water level' : rainy ? 'Rainfall' : 'Heatmap';
+  /* The glyph names the same value, off the two kinds' own icons — the rule the layer chip already
+     obeys. `gradient` is the layer with nothing chosen, so it stands for the whole menu. */
+  el('heatChipIcon').className = `i glyph i-${wet ? 'water_drop' : rainy ? 'rainy' : 'gradient'}`;
   /* Two things take the wash off the map, and NEITHER writes PREFS.heatLayer. That is the whole of
      "turn the previous heatmap back on": the reader's choice never left, so restoring it needs no
      state remembered anywhere.

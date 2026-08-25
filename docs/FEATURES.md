@@ -14097,6 +14097,26 @@ it draws with nothing opened. A filter chip states a NAME and answers with a lea
 The two menus are the app's own `.menu` popovers, so they reuse the placement handler, the scroll cap
 and the width cap that every other menu here already has.
 
+### A menu chip's glyph names its value too, and the heatmap chip did not
+
+The layer chip swapped `place` for `partly_cloudy_day` with its label. The heatmap chip held a fixed
+`gradient` at all three values. So one chip named its value twice and the chip beside it named it
+once.
+
+Two of the three values are station kinds this app already draws a glyph for. Water level takes
+`water_drop` and Rainfall takes `rainy`, off `KINDS` in `js/config.js`. `gradient` stays for Off,
+because it names the layer rather than a value inside it.
+
+The three menu rows take the same three glyphs, which is what the layer menu's own rows already do.
+Off takes `visibility_off`. A row with no glyph beside two rows with one starts its label 18px
+further in.
+
+`syncHeat()` writes the class from the preference, never back off the chip. That is the rule every
+control it owns obeys.
+
+`paint-check.html` reads `mask-image` back rather than the token. A rule that never joined the mask
+list in `css/icons.css` resolves its `--i` and paints an empty box, and this app shipped that once.
+
 ### The four station chips leave with the station layer
 
 Heatmap, Sensors, On alert and Favorites answer about the station layer. Weather takes the map and there is

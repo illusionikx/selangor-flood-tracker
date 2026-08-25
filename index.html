@@ -1275,17 +1275,17 @@
 
   <button type="button" class="chip mchip" id="heatChip" popovertarget="heatMenu"
           aria-haspopup="menu" aria-label="Heatmap">
-    <i class="i i-gradient glyph" aria-hidden="true"></i>
+    <i class="i i-gradient glyph" id="heatChipIcon" aria-hidden="true"></i>
     <span id="heatChipLabel">Heatmap</span>
     <i class="i i-expand_more tail" aria-hidden="true"></i>
   </button>
   <div class="menu chipmenu" id="heatMenu" popover role="menu" aria-label="Heatmap">
     <label class="mi"><input type="radio" name="heatlayer" id="heatOff" value="" autocomplete="off"
-      ><i class="i i-check mcheck" aria-hidden="true"></i><span>Off</span></label>
+      ><i class="i i-check mcheck" aria-hidden="true"></i><i class="i i-visibility_off"></i><span>Off</span></label>
     <label class="mi"><input type="radio" name="heatlayer" id="heat" value="water" autocomplete="off"
-      ><i class="i i-check mcheck" aria-hidden="true"></i><span>Water level</span></label>
+      ><i class="i i-check mcheck" aria-hidden="true"></i><i class="i i-water_drop"></i><span>Water level</span></label>
     <label class="mi"><input type="radio" name="heatlayer" id="rainHeat" value="rain" autocomplete="off"
-      ><i class="i i-check mcheck" aria-hidden="true"></i><span>Rainfall</span></label>
+      ><i class="i i-check mcheck" aria-hidden="true"></i><i class="i i-rainy"></i><span>Rainfall</span></label>
   </div>
 
   <!-- **The sensor kinds, and they were a drawer section.** A reader moved them here on 2026-08-25.

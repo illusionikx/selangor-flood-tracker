@@ -134,13 +134,17 @@ for (const id of FILTERS) {
    preference by render() and syncHeat(), never read back off the chip. */
 is(el('layerChipLabel').textContent.trim(), 'Stations', 'the layer chip states the layer on screen');
 {
-  const want = [['heatOff', '', 'Heatmap'], ['heat', 'water', 'Water level'],
-                ['rainHeat', 'rain', 'Rainfall']];
-  for (const [id, val, label] of want) {
+  const want = [['heatOff', '', 'Heatmap', 'gradient'], ['heat', 'water', 'Water level', 'water_drop'],
+                ['rainHeat', 'rain', 'Rainfall', 'rainy']];
+  for (const [id, val, label, icon] of want) {
     el(id).closest('label').click();
     await wait(300);
     is(el('heatChipLabel').textContent.trim(), label, id + ' writes its own value on the chip');
     is(JSON.parse(w.localStorage.getItem('prefs')).heatLayer, val, id + ': and into the preference');
+    /* And the glyph names the same value. A mask that never painted resolves its token all the
+       same, so this reads `mask-image` — the fault css/icons.css already shipped once. */
+    is(el('heatChipIcon').classList.contains('i-' + icon), true, id + ': and the glyph names it');
+    is(/url|image/.test(getComputedStyle(el('heatChipIcon')).maskImage), true, id + ': and it paints');
   }
   el('heat').closest('label').click();
   await wait(300);
