@@ -1300,26 +1300,48 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
   correct on its own and they collided with each other as the map narrowed. Measured with the pane
   open: at 700px the layer button sat on the legend, 60px by 60. At 840px the credit line ran 191px
   in under it, at 900px 131px, at 1024px 7px.
-  **`#mapfoot` holds the legend and the credit in ONE wrapping flex row, and that replaces two
-  offsets.** A reader asked for them inline on 2026-08-24. Two boxes in one flex line cannot overlap
-  each other at any width, so the arithmetic that kept them apart is gone. `#credit` used to own the
-  band up to 22px, at `8px + --gap` and one 14px line, and `#legend` started at 30 to clear it. The
-  wrapper takes those offsets now and the browser keeps the two children apart. A map too narrow to
-  hold both wraps the credit onto its own line UNDER the legend. The row is anchored by its bottom
-  edge, so it grows upward rather than off the screen.
-  **The wrapper takes no pointer events and its children take them back.** The row spans the width
-  of the map. A wrapper that took clicks would swallow every press along the bottom of it.
-  **The row stops 118px short of the trailing edge, and the wrap is why.** The credit alone sat at
-  `--map-r + 10`, under the zoom cluster and clear of it, because one 14px line at 8px fits the band
-  that cluster leaves. A wrapped row does not. Its second line rises to about 50px and lands on
-  `#paint`. So the row reserves the column those controls take rather than the band under them.
-  118 is `48 + --fab` and 10 more to stand off it. The phone block states 68 for the same reason.
+  **`#mapfoot` holds the legend over the credit in ONE flex COLUMN, and that replaces two offsets.**
+  A reader asked for the credit under the scale on 2026-08-25. It was a wrapping row from
+  2026-08-24, where the credit dropped under the legend only on a map too narrow to hold both. Two
+  boxes stacked in one column cannot overlap each other at any width, so the arithmetic that kept
+  them apart is gone. `#credit` used to own the band up to 22px, at `8px + --gap` and one 14px line,
+  and `#legend` started at 30 to clear it. The wrapper takes those offsets now. The column is
+  anchored by its bottom edge, so it grows upward rather than off the screen.
+  **THE CREDIT IS THE LOWEST THING ON THE MAP, AT EVERY WIDTH.** That is a rule a reader stated with
+  the stack, and it covers the legend, the zoom control, `#paint` and `#locate` alike. The
+  arithmetic was already correct and nobody stated it as a rule. The credit sits 8px above the map's
+  bottom edge and the zoom cluster sits 36px up. On a phone that is 6px against 40px. **Anything new
+  that floats over the map takes a `bottom` at or above the zoom box's, never under it.**
+  **The wrapper takes no pointer events and its children take them back.** The column spans the
+  width of the map. A wrapper that took clicks would swallow every press along the bottom of it.
+  **THE COLUMN IS FLUSH WITH THE MAP ON BOTH EDGES, AND THE RESERVATION MOVED ONTO THE WRAP.** It
+  stopped 118px short of the trailing edge for a revision, to keep a wrapped credit out of `#paint`
+  and the zoom box. A reader called that floating on 2026-08-25, and it was: one line of credit,
+  ending in the middle of the map. The credit needs 337px for one line, measured across eight window
+  widths at both rail states. So it wraps on a map narrower than that and nowhere else, which is the
+  medium band alone. A wrapped line rises to 44px above the map's bottom edge and 80px at four
+  lines, against a zoom cluster 36px up. So the wrap is the whole of the fault and the width where it
+  wraps is the whole of the answer. `#mapfoot` is a container now, and
+  `@container (max-width: 360px)` hands the credit `--btncol` (106px) back. 106 is 118 less the
+  column's own 12px inset, and 118 is the button's reach, `48 + --fab`, and 10 more to stand off it.
+  **`#mapfoot` can be a container because its width is definite.** It is absolutely positioned on
+  both edges, so containment has nothing to collapse. A box that takes its width from its own
+  content and then contains it measures 0 — the trap `#brand` already carries.
+  **The legend keeps the reservation at every width, through `max-width`.** It stands 56px above the
+  map's bottom edge, which is inside the band the cluster takes, and it never wraps out of it. The
+  phone column states 68 on the trailing edge for the same reason, off that width's own numbers.
+  **The pairwise check cannot see the ordering rule, so `m3-check.html` states it in two halves.** A
+  button beside the credit on one band never intersects it, and that is the arrangement the rule
+  refuses. One assertion reads the credit's own bottom edge and fails on any box that reaches under
+  it. A second asserts the legend sits over the credit rather than beside it. Both run at every band
+  the sweep covers, and again at 360px. The phone block writes its own offsets for all four boxes,
+  and no other probe in that file runs a width under 700px.
   **Every child needs `min-width: 0`.** A flex item floors at its own min-content, and the credit's
   is a 65px word. In the medium band with the rail open the map is under 300px wide. The row then
   overflowed its own reservation by 6px and landed back on the layer button.
   **The legend is one row, and every scale in it states itself on that row.** It was a stacked card:
   a title, a ramp under it, and the tick words under that, at 288px with a `max-width` holding it off
-  the layer button. On the credit's own line there is no second line to drop to. So the title, the
+  the layer button. On one row there is no second line to drop to. So the title, the
   ramp and the ticks run across, and only the ramp states a width, 72px on a desktop and 60 on a
   phone. A ramp is the one thing here with no intrinsic width. `flex-wrap` is the floor: a phone too
   narrow for the whole scale breaks it rather than overflow the map.

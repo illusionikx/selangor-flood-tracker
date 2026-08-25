@@ -1840,35 +1840,58 @@ body.find #findpane { display: flex; flex-direction: column; }
    top of it, 60px by 60.
 
    **`#mapfoot` answers the first half of that, and it replaces an offset.** The legend and the
-   credit share one wrapping flex row now, on one band rather than two, because a reader asked for
-   them inline on 2026-08-24. Two boxes in one flex line cannot overlap each other at any width. A
-   map too narrow to hold both wraps the credit onto its own line UNDER the legend, and the row is
-   anchored by its bottom edge, so it grows upward off the credit rather than off the screen. The
-   old rule put the legend at `30px` to clear a 14px credit line sitting at `8px`. That arithmetic
-   is gone. They are siblings in a row and the browser keeps them apart.
+   credit are one flex COLUMN, legend over credit, because a reader asked for the credit under the
+   scale on 2026-08-25. Two boxes stacked in one column cannot overlap each other at any width. The
+   column is anchored by its bottom edge, so it grows upward off the credit rather than off the
+   screen. The old rule put the legend at `30px` to clear a 14px credit line sitting at `8px`. That
+   arithmetic is gone.
 
-   **`pointer-events` still has to be handed back.** The row spans the width of the map, so a
+   **THE CREDIT IS THE LOWEST THING ON THE MAP, AT EVERY WIDTH.** That is the rule a reader stated
+   with the stack, and it covers the zoom control, `#paint`, `#locate` and the legend alike. The
+   credit sits 8px above the map's bottom edge and the zoom cluster sits 36px up. On a phone that is
+   6px against 40px. **Anything new that floats over the map takes a `bottom` at or above the zoom
+   box's, never under it.** m3-check.html reads every visible box against the credit's own bottom
+   edge, so a new box that undercuts it fails a check.
+
+   **THE COLUMN IS FLUSH WITH THE MAP ON BOTH EDGES, AND THE RESERVATION MOVED ONTO THE WRAP.** It
+   stopped 118px short of the trailing edge for a revision, so that a wrapped credit could not climb
+   into `#paint` and the zoom box. A reader called the result floating on 2026-08-25, and it was:
+   one line of credit, ending in the middle of the map.
+   The credit needs 337px for one line, measured. So it wraps only on a map narrower than that,
+   which is the medium band and nothing else. Above 360px of column it is flush with the map's own
+   edge. Under it, `@container` gives it the button column back, at `margin-right: 106px`. That is
+   `118` less the column's own 12px inset, and 118 is the button's own reach, `48 + --fab`, and 10
+   more to stand off it.
+   **`#mapfoot` is the container, and it can be one because its width is definite.** It is absolutely
+   positioned on both edges, so containment has nothing to collapse. A box that takes its width from
+   its own content and then contains it measures 0 — the trap `#brand` already carries.
+   **The legend keeps the reservation at every width, through `max-width`.** It sits 56px above the
+   map's bottom edge, which is inside the band that cluster takes, and it never wraps out of it.
+
+   **`pointer-events` still has to be handed back.** The column spans the width of the map, so a
    wrapper that took clicks would swallow every press along the bottom of it. The two children take
    them and the wrapper does not.
 
-   **The row stops 118px short of the trailing edge, and the wrap is why.** The credit alone sat at
-   `--map-r + 10`, under the zoom cluster and clear of it, because one 14px line at `8px` fits the
-   band the cluster leaves. A wrapped row does not: the second line rises to about 50px and lands on
-   `#paint`. So the row reserves the column those controls take rather than the band under them.
-   118 is the button's own reach, `48 + --fab`, and 10 more to stand off it. The phone block states
-   68 for the same reason, off that width's own numbers. m3-check.html intersects every box down here
-   pairwise, which is what reports it the day either number drifts. */
+   m3-check.html intersects every box down here pairwise, which is what reports it the day either
+   number drifts. */
 #mapfoot {
   position: absolute; z-index: 400; pointer-events: none;
-  left: calc(var(--map-l) + 12px); right: calc(var(--map-r) + 118px);
+  --btncol: 106px;
+  left: calc(var(--map-l) + 12px); right: calc(var(--map-r) + 12px);
   bottom: calc(8px + var(--gap) + var(--navbar-h));
-  display: flex; flex-wrap: wrap; align-items: flex-end;
-  justify-content: space-between; gap: 6px 12px;
+  display: flex; flex-direction: column; align-items: flex-start; gap: 6px;
+  container-type: inline-size;
+}
+/* One line of credit is 337px wide, measured. So a column narrower than that wraps it, and a
+   wrapped line rises to about 44px, which is inside the band the zoom cluster takes. 360 is that
+   width with room to spare. Remeasure it if the words, the font or the size change. */
+@container (max-width: 360px) {
+  #credit { margin-right: var(--btncol); }
 }
 /* `min-width: 0` because a flex item floors at its own min-content by default, and the credit's is
-   a 65px word. In the medium band with the rail open the map is under 300px wide, and the row then
-   overflowed its own reservation by 6px and landed back on the layer button. It wraps to four lines
-   there instead. */
+   a 65px word. In the medium band with the rail open the map is under 300px wide, and the credit
+   then overflowed its own reservation by 6px and landed back on the layer button. It wraps to three
+   lines there instead. */
 #mapfoot > * { pointer-events: auto; min-width: 0; }
 #credit { overflow-wrap: anywhere; }
 /* **The legend is one row now, and every scale in it states itself on that row.** It was a stacked
@@ -1877,11 +1900,14 @@ body.find #findpane { display: flex; flex-direction: column; }
    the title, the ramp and the ticks run across instead.
    `flex-wrap` is the floor. A phone too narrow for the whole scale breaks it rather than overflow
    the map.
-   The plate stays. A ramp is paint and needs something to sit on, and the credit beside it takes a
+   The plate stays. A ramp is paint and needs something to sit on, and the credit under it takes a
    `text-shadow` for the same job. `fit-content` because a row of content states its own width, which
-   is the shape the weather section already had. */
+   is the shape the weather section already had. `--btncol` is the trailing reservation. The legend
+   stands 56px above the map's bottom edge, which is inside the band the zoom cluster takes, so it
+   holds that column clear at every width. The credit under it only needs the same reservation when
+   it wraps. */
 #legend {
-  width: fit-content; max-width: 100%;
+  width: fit-content; max-width: calc(100% - var(--btncol));
   padding: 3px 10px; border-radius: 999px; font-size: 11px;
 }
 #legend .lgsec { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
@@ -2384,8 +2410,15 @@ body.side #side { display: flex; }
 
 /* Leaflet's own attribution box is disabled; we render the credit ourselves, out of the way. It is a
    flex item of `#mapfoot` now rather than a box of its own, so its offsets and its `--pane-w` term
-   live on that wrapper. `margin-left: auto` holds it against the trailing edge on the line it wraps
-   onto, where `justify-content` has nothing to push it against. */
+   live on that wrapper.
+   **It is flush right on a desktop and flush left on a phone, and a reader asked for that pair on
+   2026-08-25.** The column aligns its items to the leading edge, so `margin-left: auto` is what
+   moves this one. That is a CROSS-axis auto margin, and it beats `align-items` rather than reads
+   it. The phone block cancels it and the `text-align` beside it together. Cancel one alone and the
+   box goes to one edge with its text against the other.
+   **Flush means the map's own edge.** It stopped 118px short for a revision, and a reader called
+   that floating. The container query on `#mapfoot` hands the button column back on the one map
+   width where this line wraps. */
 #credit {
   text-align: right; margin-left: auto;
   text-shadow: 0 0 4px var(--surface), 0 0 4px var(--surface);
@@ -3007,11 +3040,12 @@ body.side #side { display: flex; }
   /* Bottom of a phone screen, in order: credit line, then the legend and the zoom buttons above it.
      The credit is the only one of the three that has to be readable rather than usable, so it takes
      the edge and the other two clear it by the same amount. */
-  /* One row here too, which is what a reader asked for. The wrapper keeps the leading 12px and
-     stops short of the zoom buttons on the trailing edge, so the row wraps the credit under the
-     legend rather than running it into that cluster. */
+  /* One column here too. The wrapper keeps the leading 12px and stops short of the zoom buttons on
+     the trailing edge, so neither the legend nor the credit under it runs into that cluster. */
   #mapfoot { left: 12px; right: 68px; bottom: calc(6px + var(--navbar-h)); }
-  #credit { font-size: 10px; line-height: 1.4; }
+  /* Flush LEFT here, under the legend's own leading edge. On a phone the map is the whole window
+     and the credit is the one thing down here a reader reads rather than presses. */
+  #credit { font-size: 10px; line-height: 1.4; margin-left: 0; text-align: left; }
   #legend { font-size: 10px; padding: 3px 8px; }
   #legend .title { font-size: 10px; }
   #legend .ramp { width: 60px; }

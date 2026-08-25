@@ -302,6 +302,24 @@ async function phone() {
   is(lb.bottom <= zb.top + 0.5, true, 'phone: and sits above the zoom box');
   is(Math.round(zb.top - lb.bottom) <= 12, true, 'phone: up against it, not one step adrift');
 
+  /* **The credit is the lowest thing on the map here as well.** A reader stated that rule for every
+     width on 2026-08-25, and `bands()` never runs a width under 700px. The phone block writes its
+     own offsets for all four of these boxes, so a number that drifts there is invisible to every
+     other probe in this file. */
+  const cr = r(d.getElementById('credit'));
+  const low = [['#legend', d.getElementById('legend')], ['#paint', d.getElementById('paint')],
+               ['#locate', d.getElementById('locate')],
+               ['.leaflet-control-zoom', d.querySelector('.leaflet-control-zoom')]]
+    .filter(([, e]) => e && r(e).width > 1 && r(e).height > 1)
+    .filter(([, e]) => r(e).bottom > cr.bottom + 0.5)
+    .map(([sel, e]) => `${sel} ${Math.round(r(e).bottom - cr.bottom)}px under it`);
+  is(low.join(', '), '', 'phone: the credit is the lowest thing on the map');
+  is(r(d.getElementById('legend')).bottom <= cr.top + 0.5, true,
+     'phone: and the scale sits over the credit, not beside it');
+  /* Flush LEFT at this width, against flush right on a desktop. The phone block has to cancel the
+     auto margin AND the `text-align`, and the box is what reports whether it cancelled both. */
+  is(Math.round(cr.left - r(d.getElementById('mapfoot')).left), 0, 'phone: the credit is flush left');
+
   is(pane.tagName, 'DIALOG', 'the pane is a real <dialog>, not a div dressed as one');
   is(!!d.getElementById('scrim'), false,
      'and there is no scrim left: a full-screen dialog covers the screen, so it has no outside');
@@ -1063,12 +1081,13 @@ async function desktop() {
      space between the two panes and takes `--seam`. Every other edge takes `--gap`. */
   /* The legend and the credit are one box now, `#mapfoot`, and it spans the card. So it is read on
      both edges rather than on one. It stood on two bands before, the legend at 30 to clear a 14px
-     credit line at 8, and a reader asked for them inline on 2026-08-24. */
+     credit line at 8, and a reader asked for the credit under the scale on 2026-08-25. */
   const foot = r(d.getElementById('mapfoot'));
-  /* 118 on the trailing edge, not 10. The row wraps, and a wrapped line rises to about 50px, which
-     is inside the band `#paint` takes. So it reserves that button's own column, `48 + --fab`, and
-     10 more to stand off it. */
-  is(Math.round(VW - foot.right), 118 + GAP, 'the footer row clears the layer button on the trailing edge');
+  /* 12 on the trailing edge, the same furniture inset as the leading one. The column is flush with
+     the map on both edges, and the button column is handed back to the CREDIT alone, by a container
+     query, on the one map width where that line wraps. It stopped 118px short for a revision, and
+     a reader called the result floating. */
+  is(Math.round(VW - foot.right), 12 + GAP, 'the footer column is flush with the map on both edges');
   for (const [id, x, y] of [['mapfoot', 12, 8], ['paint', 48, 36]]) {
     const e = r(d.getElementById(id));
     const lead = id === 'mapfoot';
@@ -1100,7 +1119,7 @@ async function desktop() {
   /* Leaflet's own controls live INSIDE the map container and follow it for free. These three are
      siblings of the map and position against the window, so each adds `--pane-w` to its own offset.
      A missed one sits under the pane, which is exactly where a reader cannot reach it. */
-  for (const [id, base] of [['mapfoot', 118], ['paint', 48], ['toast', 12]]) {
+  for (const [id, base] of [['mapfoot', 12], ['paint', 48], ['toast', 12]]) {
     is(Math.round(VW - r(d.getElementById(id)).right), base + 360 + SEAM,
        id + ' steps aside by the pane width, on top of the seam it already had');
   }
@@ -1610,6 +1629,32 @@ async function bands() {
       if (ox > 0.5 && oy > 0.5) clashes.push(`${an} x ${bn} ${Math.round(ox)}x${Math.round(oy)}`);
     }
     is(clashes.join(', '), '', label + ': no two boxes on the map overlap each other');
+    /* **THE CREDIT IS THE LOWEST THING ON THE MAP, AND EVERY OTHER ELEMENT STANDS ABOVE IT.** A
+       reader stated that rule on 2026-08-25, for every width. The pairwise check above cannot
+       answer it: a button beside the credit on one band never intersects it, and that is the
+       arrangement this rule refuses. So read the credit's own bottom edge and assert that nothing
+       else reaches under it. The two checks state the rule together. This one gives the credit the
+       bottom band, and the one above keeps every other box out of it. */
+    const credit = r(d.getElementById('credit'));
+    const under = boxes.filter(([sel]) => sel !== '#credit')
+      .filter(([, b]) => b.bottom > credit.bottom + 0.5)
+      .map(([sel, b]) => `${sel} ${Math.round(b.bottom - credit.bottom)}px under it`);
+    is(under.join(', '), '', label + ': the credit is the lowest thing on the map');
+    is(r(d.getElementById('legend')).bottom <= credit.top + 0.5, true,
+       label + ': and the scale sits over the credit, not beside it');
+    /* **Flush with the map's own edge, and flush left on a phone.** A reader asked for the pair on
+       2026-08-25, after a revision that stopped this line 118px short and read as floating.
+       Read the BOX and not the `text-align`: cancelling one of the two leaves the box on one edge
+       with its text against the other, and only the box says which edge it sits on.
+       **One line is flush and a wrapped one gives the button column back.** The credit needs 337px
+       for one line, so it wraps in the medium band alone, and a wrapped line rises into the band
+       the zoom cluster takes. A container query hands it `--btncol` there. Assert both cases off
+       the box's own height, or the check states one width's answer at every width. */
+    const foot2 = r(d.getElementById('mapfoot'));
+    const oneLine = credit.height < 24;
+    is(Math.round(foot2.right - credit.right), oneLine ? 0 : 106,
+       label + (oneLine ? ': the credit is flush with the map edge'
+                        : ': the credit wraps, so it takes the button column back'));
     const lb = r(d.getElementById('locate')), pb = r(d.getElementById('paint'));
     is(Math.round(lb.left), Math.round(pb.left),
        label + ': locate and layers share one column in the zoom cluster');

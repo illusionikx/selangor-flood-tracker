@@ -13537,6 +13537,73 @@ Both sections are one `Getting around` list now, because the rail and the bar ho
 controls under the same names. The map's own two controls and the feed status moved to a second
 list, `On the map`.
 
+## The credit moved under the scale, and it took the bottom band
+
+A reader asked for two things on 2026-08-25. The credit must sit under the scale. And every map
+element must stand above the credit, at every width.
+
+### One column, in place of one row
+
+`#mapfoot` was a wrapping flex row. The legend and the credit sat side by side, and the credit
+dropped under the legend only on a map too narrow to hold both. It is a flex column now. The legend
+is over the credit at every width, which is the first half of what was asked.
+
+The column is still anchored by its bottom edge, so it grows upward off the credit. Nothing else
+about the wrapper changed. It still takes no pointer events, and its two children still take them
+back.
+
+### The bottom band belongs to the credit
+
+The second half is an ordering rule over every box on the map. The credit is the lowest one. The
+legend, the zoom control, the layer button and the locate button all stand above it.
+
+The arithmetic was already correct and nobody stated it as a rule. The credit sits 8px above the map's
+bottom edge, and the zoom cluster sits 36px up. On a phone that is 6px against 40px. So the rule
+cost no pixel of map. It is a rule about anything added next.
+
+### The credit is flush with the map, and the reservation moved onto the wrap
+
+The column stopped 118px short of the trailing edge for a revision. That kept a wrapped credit out
+of the layer button and the zoom box. A reader called the result floating on 2026-08-25, and it was:
+one line of credit, ending in the middle of the map.
+
+The credit needs 337px for one line. That is measured, across eight window widths at both rail
+states. So it wraps on a map narrower than that, and nowhere else. Only the medium band is that
+narrow: 260px of map at a 640px window, and 140px with the rail open.
+
+A wrapped line rises to 44px above the map's bottom edge, and 80px at four lines. The zoom cluster
+sits 36px up. So the wrap is the whole of the problem, and the width where it happens is the whole
+of the answer.
+
+`#mapfoot` is a container now, and one query hands the button column back:
+
+    @container (max-width: 360px) { #credit { margin-right: 106px } }
+
+Above 360px the credit is flush with the map's own edge. 106 is `118` less the column's own 12px
+inset, and 118 is the layer button's reach, `48 + --fab`, and 10 more to stand off it.
+
+`#mapfoot` can be a container because its width is definite. It is absolutely positioned on both
+edges, so containment has nothing to collapse. A box that takes its width from its own content and
+then contains it measures 0, which is a trap the app bar wordmark already carries.
+
+The legend keeps the reservation at every width, through `max-width`. It stands 56px above the map's
+bottom edge, which is inside the band the cluster takes, and it never wraps out of that band.
+
+### The check states the rule in two halves
+
+`m3-check.html` intersects every furniture box pairwise already. That check cannot see this rule. A
+button beside the credit on one band never intersects it, and that is the arrangement the rule
+refuses.
+
+So a second assertion reads the credit's own bottom edge and fails on any box that reaches under
+it. A third asserts that the legend sits over the credit rather than beside it. The two run at
+every band the sweep covers, and again at 360px, because the phone block writes its own offsets for
+all four boxes and no other probe in that file runs a width under 700px.
+
+A fourth reads the credit's own height and asserts the two cases apart. One line must be flush with
+the map. A wrapped one must give the 106px back. A check that asserts one of the two states one
+width's answer at every width.
+
 ## The search took the app bar and the layers took the navigation bar
 
 A reader asked for two moves on 2026-08-25. Put the search on the leading edge of the phone app

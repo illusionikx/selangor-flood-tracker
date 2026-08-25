@@ -78,7 +78,7 @@
      bridges M3's colour names onto this app's palette. Colour is not in this file on purpose. -->
 <link rel="stylesheet" href="vendor/m3/tokens.css?v=1">
 <link rel="stylesheet" href="css/base.css?v=175">
-<link rel="stylesheet" href="css/chrome.css?v=266">
+<link rel="stylesheet" href="css/chrome.css?v=270">
 <link rel="stylesheet" href="css/map.css?v=160">
 
 <!-- Water tint for the dark basemap. CARTO's dark_all is greyscale — all 18 of its tones have zero
@@ -1375,11 +1375,11 @@
     <span>Every station not climbing is hidden</span>
     <button id="riseOff">Show all</button></div>
 </div>
-<!-- **The legend and the credit share one row.** A reader asked for that on 2026-08-24. They were
-     two absolutely positioned boxes on two bands, and the repo has already paid once for boxes down
-     here that clear the pane and not each other. In one wrapping flex row they cannot overlap at
-     all: a map too narrow to hold both wraps the credit onto its own line under the legend. The
-     wrapper takes no pointer events, so the map under it still answers a click. -->
+<!-- **The legend sits over the credit in one column.** A reader asked for that on 2026-08-25, with
+     the rule that every other map element stands above the credit at every width. They were two
+     absolutely positioned boxes on two bands, and the repo has already paid once for boxes down
+     here that clear the pane and not each other. Stacked in one column they cannot overlap at all.
+     The wrapper takes no pointer events, so the map under it still answers a click. -->
 <div id="mapfoot">
 <div id="legend" class="surface">
   <div id="lgWater" class="lgsec">
