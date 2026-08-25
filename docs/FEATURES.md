@@ -13542,6 +13542,100 @@ list, `On the map`.
 A reader asked for two things on 2026-08-25. The credit must sit under the scale. And every map
 element must stand above the credit, at every width.
 
+### One wrapping row, and the wrap is what puts the credit under the scale
+
+`#mapfoot` holds the legend and the credit in one wrapping flex row. Two boxes in one flex row
+cannot overlap at any width. A row too narrow for both puts the credit on a line of its own under
+the legend.
+
+So the two asks are one shape. They read as one line where the map is wide enough. The credit sits
+under the scale where it is not.
+
+It was a flex column for one revision. A column states two lines on a 1536px map with room for one,
+and a reader asked for the pair inline on 2026-08-25.
+
+The legend is first and the credit second, so the flex lines stack in that order.
+
+### The scale states itself on one line
+
+The scale broke onto a second line on a phone. It drew the ramp on one line and its four tick words
+under it.
+
+The titles paid for the repair. `Water-level heat` and `Rainfall heat` are `Water level` and
+`Rainfall` now. Those are the paint panel's own two names for the same two layers, and one thing
+takes one name. The ramp beside a title is what says heat.
+
+That is 35px on a 360px screen, and it is the difference between one line and two. Measured after
+the change: 249px for water and 265px for rainfall, against a 280px row.
+
+The medium band is the floor, and no shorter word repairs it. One line needs about 273px. The row
+hands 106px of its trailing edge to the zoom cluster. That band leaves the map 236 to 300px, so no
+width there is both one line and clear of the buttons. `flex-wrap` breaks the scale instead of
+running it under them.
+
+### The bottom band belongs to the credit
+
+The second half is an ordering rule over every box on the map. The credit is the lowest one. The
+legend, the zoom control, the layer button and the locate button all stand above it.
+
+The arithmetic was already correct and nobody stated it as a rule. The credit sits 8px above the map's
+bottom edge, and the zoom cluster sits 36px up. On a phone that is 6px against 40px. So the rule
+cost no pixel of map. It is a rule about anything added next.
+
+### The credit is flush with the map, and the reservation moved onto the wrap
+
+The row stopped 118px short of the trailing edge for a revision. That kept a wrapped credit out of
+the layer button and the zoom box. A reader called the result floating on 2026-08-25, and it was:
+one line of credit, ending in the middle of the map.
+
+The credit needs 337px for one line. That is measured, across eight window widths at both rail
+states. So it wraps on a map narrower than that, and nowhere else. Only the medium band is that
+narrow: 260px of map at a 640px window, and 140px with the rail open.
+
+A wrapped line rises to 44px above the map's bottom edge, and 80px at four lines. The zoom cluster
+sits 36px up. So the wrap is the whole of the problem, and the width where it happens is the whole
+of the answer.
+
+`#mapfoot` is a container now, and one query hands the button column back:
+
+    @container (max-width: 360px) { #credit { margin-right: 106px } }
+
+Above 360px the credit is flush with the map's own edge. 106 is `118` less the row's own 12px
+inset, and 118 is the layer button's reach, `48 + --fab`, and 10 more to stand off it.
+
+A phone sets `--btncol` to 0 and this query then does nothing there. That width reserves the zoom
+column on the wrapper instead, at `right: 68px`, so both children are already clear of it. Left in
+place, the reservation costs the scale the 56px it needs for one line.
+
+`#mapfoot` can be a container because its width is definite. It is absolutely positioned on both
+edges, so containment has nothing to collapse. A box that takes its width from its own content and
+then contains it measures 0, which is a trap the app bar wordmark already carries.
+
+The legend keeps the reservation at every width, through `max-width`. It stands 56px above the map's
+bottom edge, which is inside the band the cluster takes, and it never wraps out of that band.
+
+### The check states the rule in two halves
+
+`m3-check.html` intersects every furniture box pairwise already. That check cannot see this rule. A
+button beside the credit on one band never intersects it, and that is the arrangement the rule
+refuses.
+
+So a second assertion reads the credit's own bottom edge and fails on any box that reaches under
+it. A third asserts that the credit never sits above the scale, which is the claim that holds
+whether the two share a line or not. A fourth asserts the scale is one line wherever the map leaves
+room, and that it never reaches under the zoom cluster. They run at every band the sweep covers,
+and again at 360px, because the phone block writes its own offsets for all four boxes and no other
+probe in that file runs a width under 700px.
+
+A fifth reads the credit's own height and asserts the two cases apart. One line must be flush with
+the map. A wrapped one must give the 106px back. A check that asserts one of the two states one
+width's answer at every width.
+
+## The credit moved under the scale, and it took the bottom band
+
+A reader asked for two things on 2026-08-25. The credit must sit under the scale. And every map
+element must stand above the credit, at every width.
+
 ### One column, in place of one row
 
 `#mapfoot` was a wrapping flex row. The legend and the credit sat side by side, and the credit

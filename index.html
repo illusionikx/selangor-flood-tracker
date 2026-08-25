@@ -78,7 +78,7 @@
      bridges M3's colour names onto this app's palette. Colour is not in this file on purpose. -->
 <link rel="stylesheet" href="vendor/m3/tokens.css?v=1">
 <link rel="stylesheet" href="css/base.css?v=175">
-<link rel="stylesheet" href="css/chrome.css?v=270">
+<link rel="stylesheet" href="css/chrome.css?v=272">
 <link rel="stylesheet" href="css/map.css?v=160">
 
 <!-- Water tint for the dark basemap. CARTO's dark_all is greyscale — all 18 of its tones have zero
@@ -1375,15 +1375,20 @@
     <span>Every station not climbing is hidden</span>
     <button id="riseOff">Show all</button></div>
 </div>
-<!-- **The legend sits over the credit in one column.** A reader asked for that on 2026-08-25, with
-     the rule that every other map element stands above the credit at every width. They were two
+<!-- **The legend and the credit share one row, and the credit drops under it when they do not fit.**
+     A reader asked for that on 2026-08-25, with the rule that every other map element stands above
+     the credit at every width. They were two
      absolutely positioned boxes on two bands, and the repo has already paid once for boxes down
-     here that clear the pane and not each other. Stacked in one column they cannot overlap at all.
+     here that clear the pane and not each other. As two items of one flex row they cannot overlap
+     at all, and a row too narrow for both puts the credit on a line of its own under the legend.
      The wrapper takes no pointer events, so the map under it still answers a click. -->
 <div id="mapfoot">
 <div id="legend" class="surface">
   <div id="lgWater" class="lgsec">
-    <div class="title">Water-level heat
+    <!-- **`Water level`, not `Water-level heat`.** The paint panel's own button carries that name,
+         and one thing takes one name. The ramp beside it is what says heat. It is also 35px of a
+         360px screen, which is the difference between one line and two. -->
+    <div class="title">Water level
       <span class="info" tabindex="0" aria-label="How the heatmap is calculated">
         <i class="i i-info"></i>
         <span class="tip">
@@ -1409,7 +1414,7 @@
   <!-- Rainfall's own scale, drawn only while that layer is on. Separate section rather than a second
        panel: exactly one layer is ever on, and two floating boxes on a phone is one too many. -->
   <div id="lgRain" class="lgsec">
-    <div class="title">Rainfall heat
+    <div class="title">Rainfall
       <span class="info" tabindex="0" aria-label="How the rainfall heatmap is calculated">
         <i class="i i-info"></i>
         <span class="tip">

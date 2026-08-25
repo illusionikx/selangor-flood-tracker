@@ -1300,13 +1300,26 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
   correct on its own and they collided with each other as the map narrowed. Measured with the pane
   open: at 700px the layer button sat on the legend, 60px by 60. At 840px the credit line ran 191px
   in under it, at 900px 131px, at 1024px 7px.
-  **`#mapfoot` holds the legend over the credit in ONE flex COLUMN, and that replaces two offsets.**
-  A reader asked for the credit under the scale on 2026-08-25. It was a wrapping row from
-  2026-08-24, where the credit dropped under the legend only on a map too narrow to hold both. Two
-  boxes stacked in one column cannot overlap each other at any width, so the arithmetic that kept
-  them apart is gone. `#credit` used to own the band up to 22px, at `8px + --gap` and one 14px line,
-  and `#legend` started at 30 to clear it. The wrapper takes those offsets now. The column is
-  anchored by its bottom edge, so it grows upward rather than off the screen.
+  **`#mapfoot` holds the legend and the credit in ONE WRAPPING flex row, and that replaces two
+  offsets.** Two boxes in one flex row cannot overlap at any width, and a row too narrow for both
+  puts the credit on a line of its own UNDER the legend. So a reader's two asks of 2026-08-25 are
+  one shape: they read as one line where the map is wide enough, and the credit sits under the scale
+  where it is not. `#credit` used to own the band up to 22px, at `8px + --gap` and one 14px line, and
+  `#legend` started at 30 to clear it. The wrapper takes those offsets now, and it is anchored by its
+  bottom edge, so it grows upward rather than off the screen.
+  **It was a flex COLUMN for one revision, and that is the reversal to remember.** A column states
+  two lines on a 1536px map with room for one. The legend is first and the credit second, so the
+  wrap puts them in the order this entry is about.
+  **The scale states itself on ONE line, and the titles paid for it.** `Water-level heat` and
+  `Rainfall heat` are `Water level` and `Rainfall` now, which are the paint panel's own two names
+  for the same two layers. The ramp beside a title is what says heat. That is 35px on a 360px
+  screen, and it is the difference between one line and two. Measured after: 249px and 265px against
+  a 280px row.
+  **The medium band is the floor, and it cannot be repaired by shortening a word.** One line needs
+  about 273px and the row hands 106px to the zoom cluster, against a map of 236 to 300px there. So
+  no width in that band is both one line and clear of the cluster. `flex-wrap` on `.lgsec` breaks
+  the scale rather than run it under the buttons. `m3-check.html` asserts one line wherever the map
+  leaves room, and asserts the clearance at every width.
   **THE CREDIT IS THE LOWEST THING ON THE MAP, AT EVERY WIDTH.** That is a rule a reader stated with
   the stack, and it covers the legend, the zoom control, `#paint` and `#locate` alike. The
   arithmetic was already correct and nobody stated it as a rule. The credit sits 8px above the map's
@@ -1327,9 +1340,12 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
   **`#mapfoot` can be a container because its width is definite.** It is absolutely positioned on
   both edges, so containment has nothing to collapse. A box that takes its width from its own
   content and then contains it measures 0 — the trap `#brand` already carries.
-  **The legend keeps the reservation at every width, through `max-width`.** It stands 56px above the
-  map's bottom edge, which is inside the band the cluster takes, and it never wraps out of it. The
-  phone column states 68 on the trailing edge for the same reason, off that width's own numbers.
+  **The legend keeps the reservation at every width, through `max-width`.** It stands inside the band
+  the cluster takes, and it never wraps out of it.
+  **The phone reserves that column on the WRAPPER instead, at `right: 68px`, and sets `--btncol` to
+  0.** Both children are clear of the cluster there, so a second reservation on the legend is 56px
+  the scale needs for its one line. One token carries it, so the container query on the credit goes
+  quiet at that width too.
   **The pairwise check cannot see the ordering rule, so `m3-check.html` states it in two halves.** A
   button beside the credit on one band never intersects it, and that is the arrangement the rule
   refuses. One assertion reads the credit's own bottom edge and fails on any box that reaches under

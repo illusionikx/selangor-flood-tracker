@@ -314,8 +314,12 @@ async function phone() {
     .filter(([, e]) => r(e).bottom > cr.bottom + 0.5)
     .map(([sel, e]) => `${sel} ${Math.round(r(e).bottom - cr.bottom)}px under it`);
   is(low.join(', '), '', 'phone: the credit is the lowest thing on the map');
-  is(r(d.getElementById('legend')).bottom <= cr.top + 0.5, true,
-     'phone: and the scale sits over the credit, not beside it');
+  const lgp = r(d.getElementById('legend'));
+  is(lgp.bottom <= cr.bottom + 0.5, true, 'phone: the credit never sits above the scale');
+  /* At this width the row cannot hold both, so the credit takes a line of its own under the scale.
+     The scale itself still states one line, which is what a reader asked for on 2026-08-25. */
+  is(lgp.bottom <= cr.top + 0.5, true, 'phone: so here it sits under it');
+  is(lgp.height < 30, true, 'phone: and the scale is one line');
   /* Flush LEFT at this width, against flush right on a desktop. The phone block has to cancel the
      auto margin AND the `text-align`, and the box is what reports whether it cancelled both. */
   is(Math.round(cr.left - r(d.getElementById('mapfoot')).left), 0, 'phone: the credit is flush left');
@@ -1640,8 +1644,21 @@ async function bands() {
       .filter(([, b]) => b.bottom > credit.bottom + 0.5)
       .map(([sel, b]) => `${sel} ${Math.round(b.bottom - credit.bottom)}px under it`);
     is(under.join(', '), '', label + ': the credit is the lowest thing on the map');
-    is(r(d.getElementById('legend')).bottom <= credit.top + 0.5, true,
-       label + ': and the scale sits over the credit, not beside it');
+    /* **They share one row where it fits, and the credit drops under the scale where it does not.**
+       So the assertion is that the credit never sits ABOVE the scale, never that it sits under it.
+       On a shared line the two bottoms are equal, which the tolerance covers. */
+    const lg = r(d.getElementById('legend')), foot2 = r(d.getElementById('mapfoot'));
+    is(lg.bottom <= credit.bottom + 0.5, true, label + ': the credit never sits above the scale');
+    /* **The scale states itself on one line wherever the map leaves room, and wraps rather than
+       run under the zoom cluster where it does not.** It broke onto two lines on a phone and a
+       reader asked for one on 2026-08-25. One line needs about 273px, measured, and the row hands
+       106px of its trailing edge to that cluster. The medium band leaves the map 236 to 300px, so
+       there is no width there that is both one line and clear. 30 is one 23px line with room. */
+    const room = r(d.getElementById('mapfoot')).width - 106;
+    is(room < 320 || lg.height < 30, true,
+       label + ': the scale is one line wherever the map leaves room for one');
+    is(lg.right <= foot2.right - 106 + 0.5, true,
+       label + ': and it never reaches under the zoom cluster');
     /* **Flush with the map's own edge, and flush left on a phone.** A reader asked for the pair on
        2026-08-25, after a revision that stopped this line 118px short and read as floating.
        Read the BOX and not the `text-align`: cancelling one of the two leaves the box on one edge

@@ -1840,11 +1840,14 @@ body.find #findpane { display: flex; flex-direction: column; }
    top of it, 60px by 60.
 
    **`#mapfoot` answers the first half of that, and it replaces an offset.** The legend and the
-   credit are one flex COLUMN, legend over credit, because a reader asked for the credit under the
-   scale on 2026-08-25. Two boxes stacked in one column cannot overlap each other at any width. The
-   column is anchored by its bottom edge, so it grows upward off the credit rather than off the
-   screen. The old rule put the legend at `30px` to clear a 14px credit line sitting at `8px`. That
-   arithmetic is gone.
+   credit are one WRAPPING flex row. Two boxes in one flex row cannot overlap each other at any
+   width, and a row too narrow for both puts the credit on a line of its own UNDER the legend. So
+   the reader's two asks are one shape: they read as one line where the map is wide enough, and the
+   credit is under the scale where it is not. It was a column for one revision, and a column states
+   two lines on a 1536px map that has room for one. The old rule put the legend at `30px` to clear
+   a 14px credit line sitting at `8px`. That arithmetic is gone.
+   **The legend is first and the credit second, so the flex lines stack the right way.** Line one
+   holds the legend and line two the credit, which is the order this rule is about.
 
    **THE CREDIT IS THE LOWEST THING ON THE MAP, AT EVERY WIDTH.** That is the rule a reader stated
    with the stack, and it covers the zoom control, `#paint`, `#locate` and the legend alike. The
@@ -1879,12 +1882,14 @@ body.find #findpane { display: flex; flex-direction: column; }
   --btncol: 106px;
   left: calc(var(--map-l) + 12px); right: calc(var(--map-r) + 12px);
   bottom: calc(8px + var(--gap) + var(--navbar-h));
-  display: flex; flex-direction: column; align-items: flex-start; gap: 6px;
+  display: flex; flex-wrap: wrap; align-items: flex-end; gap: 6px 12px;
   container-type: inline-size;
 }
-/* One line of credit is 337px wide, measured. So a column narrower than that wraps it, and a
-   wrapped line rises to about 44px, which is inside the band the zoom cluster takes. 360 is that
-   width with room to spare. Remeasure it if the words, the font or the size change. */
+/* One line of credit is 337px wide, measured. So a row narrower than that wraps it, and a wrapped
+   line rises to about 44px, which is inside the band the zoom cluster takes. 360 is that width with
+   room to spare. Remeasure it if the words, the font or the size change.
+   **The phone sets `--btncol` to 0 and this rule then does nothing there.** That width reserves the
+   zoom column on the wrapper instead, so the credit is already clear of it. */
 @container (max-width: 360px) {
   #credit { margin-right: var(--btncol); }
 }
@@ -1898,8 +1903,13 @@ body.find #findpane { display: flex; flex-direction: column; }
    card: a title, a ramp under it, and the tick words under that, at 288px wide with a `max-width`
    holding it off the layer button. On the credit's own line there is no second line to drop to, so
    the title, the ramp and the ticks run across instead.
-   `flex-wrap` is the floor. A phone too narrow for the whole scale breaks it rather than overflow
-   the map.
+   **The scale states itself on ONE line, at every width, and a reader asked for that on
+   2026-08-25.** It broke onto a second line on a phone, which drew the ramp over one word and its
+   four tick words under it. The titles lost the word `heat` for it: `Water level` and `Rainfall`
+   are the paint panel's own two names, and the ramp beside them is what says heat. That is 35px on
+   a 360px screen, and it is the difference between one line and two.
+   `flex-wrap` stays as the floor. A phone under about 320px still breaks the scale rather than
+   overflow the map, and a broken scale beats a cut one.
    The plate stays. A ramp is paint and needs something to sit on, and the credit under it takes a
    `text-shadow` for the same job. `fit-content` because a row of content states its own width, which
    is the shape the weather section already had. `--btncol` is the trailing reservation. The legend
@@ -3042,7 +3052,10 @@ body.side #side { display: flex; }
      the edge and the other two clear it by the same amount. */
   /* One column here too. The wrapper keeps the leading 12px and stops short of the zoom buttons on
      the trailing edge, so neither the legend nor the credit under it runs into that cluster. */
-  #mapfoot { left: 12px; right: 68px; bottom: calc(6px + var(--navbar-h)); }
+  /* **`--btncol` is 0 here, because the wrapper reserves that column itself.** The 68px on the
+     trailing edge holds the whole row clear of the zoom cluster, so neither child needs a
+     reservation of its own. Left in place, the legend loses 56px it needs for its one line. */
+  #mapfoot { left: 12px; right: 68px; --btncol: 0px; bottom: calc(6px + var(--navbar-h)); }
   /* Flush LEFT here, under the legend's own leading edge. On a phone the map is the whole window
      and the credit is the one thing down here a reader reads rather than presses. */
   #credit { font-size: 10px; line-height: 1.4; margin-left: 0; text-align: left; }
