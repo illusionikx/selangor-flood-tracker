@@ -4,9 +4,10 @@
 
 import { KINDS, STATUS_COLOR, NO_INFO, ALERT_TITLE, NOTICE, NOTICE_KIND } from './config.js';
 import { state, PREFS } from './state.js';
-import { distKm, dkey, isHot, tier, TIER_RANK, isIgnored, noSec, isFav, esc } from './util.js';
+import { distKm, dkey, isHot, tier, TIER_RANK, isIgnored, noSec, isFav, esc,
+         warnWhen } from './util.js';
 import { side, openSide, closeSide } from './map.js';
-import { etaText } from './popup.js';
+import { etaText, stamp } from './popup.js';
 
 /* The list shares #side with the station cards. `@`-prefixed, so render()'s per-poll refresh leaves
    it alone (see the tail of render.js) — this module refreshes it instead, on the same poll.
@@ -16,6 +17,37 @@ import { etaText } from './popup.js';
 const KEY = '@alerts';
 let card = '';        // last built list, so the button can open it without waiting for a poll
 const TITLE = document.title;   // the base, read once — alerts() prefixes a count onto it
+
+/* Two panes, M3 primary tabs, sensors first. The station alerts and the regional notices answer two
+   different questions, and a night that trips twenty sirens used to bury a flood forecast under
+   them. The choice lives here rather than in the DOM, because `alerts()` rebuilds the whole card on
+   every poll and a reader on the Notices tab must not be thrown back to the Sensors one.
+   The count rides in each tab label. So a notice is still announced while the other pane is on
+   screen — the tab reads `Notices 1`. That is the whole of what says a source is down while the
+   sensor list says all clear, and it is weaker than the banner that used to sit above everything. */
+let tab = 'sensors';
+let parts = { head: '', sensors: '', notices: '', ns: 0, nn: 0 };
+
+const tabBtn = (id, label, n) => `<button class="atab${tab === id ? ' on' : ''}" data-tab="${id}"
+    role="tab" aria-selected="${tab === id}">${label}<span class="atabn">${n}</span></button>`;
+
+const build = () => `${parts.head}<div class="atabs" role="tablist">${
+    tabBtn('sensors', 'Sensors', parts.ns)}${tabBtn('notices', 'Notices', parts.nn)
+  }</div><div class="apane" role="tabpanel">${
+    tab === 'sensors' ? parts.sensors
+      : parts.notices || '<p class="empty muted">No notices.</p>'}</div>`;
+
+export function setAlertTab(t) {
+  if (t === tab) return;
+  tab = t;
+  card = build();
+  if (side.key !== KEY) return;
+  openSide(KEY, card);
+  // openSide() keeps the scroll position while the key is unchanged, which is what a poll wants and
+  // not what a tab swap wants: forty rows deep in Sensors leaves Notices showing a blank pane.
+  const b = document.getElementById('sideBody');
+  if (b) b.scrollTop = 0;
+}
 
 export function toggleAlerts() {
   side.key === KEY ? closeSide() : openSide(KEY, card);
@@ -56,6 +88,9 @@ const favSites = () => {
    picture states the same phrase for the one station it names. The two must not drift. */
 const TIER_TAG = {
   now:   '<span class="tg tg-now">HAPPENING NOW</span>',
+  // Observed, and under the top of its own scale. The words are the app's own, the ones rainState()
+  // already prints on a station card, so the panel and the card name one thing one way.
+  heavy: '<span class="tg tg-heavy">HEAVY RAIN</span>',
   soon:  '<span class="tg tg-soon">FORECAST</span>',
   stale: '<span class="tg tg-stale">NOT CURRENT</span>',
 };
@@ -64,6 +99,15 @@ const TIER_TAG = {
    read. A siren has neither — it is sounding, which the card title already said. */
 function reading(s, t) {
   if (s.kind === 'siren') return '';
+  /* Rain before the `level` test, because a rain gauge has no level and would leave the column
+     empty. The rate is the whole claim, so nothing goes under it. A stale row keeps the stamp, the
+     one thing that column says for every other kind. */
+  if (s.kind === 'rainfall') {
+    if (s.hourly == null) return '';
+    const when = t === 'stale' ? noSec(s.updated) || '' : '';
+    return `<b class="rd">${s.hourly} mm/h${
+      when ? `<br><small class="muted">${when}</small>` : ''}</b>`;
+  }
   if (s.level == null) return '';
   const max = s.danger || s.warning || s.alert;
   const under = t === 'stale' ? noSec(s.updated) || ''
@@ -95,11 +139,16 @@ function groupCard(items, kind, t, hereAt) {
       : (b.lead.ratio || 0) - (a.lead.ratio || 0)));
 
   const [one, many] = ALERT_TITLE[`${kind}|${t}`] || [k.label, k.label];
+  /* The kind chip and the tier tag share a flex row now. They were two inline-level boxes, and the
+     chip is an M3 assist chip at 32dp against the tag's 18. See `.alerttop` in css/chrome.css.
+     The rows are an M3 SEGMENTED list, which is `.mseg` in that same file. */
   return `<div class="alert t-${t} grouped">
-    <span class="badge" style="--c:${k.color}"><i class="i i-${k.icon}"></i>${k.one || k.label}</span
-      >${TIER_TAG[t]}
+    <div class="alerttop">
+      <span class="badge" style="--c:${k.color}"><i class="i i-${k.icon}"></i>${k.one || k.label}</span>
+      ${TIER_TAG[t]}
+    </div>
     <div class="popname">${rows.length > 1 ? many : one}</div>
-    <ul class="slist">${rows.map(({ lead: s, n }) => `<li data-go="${s.id}"
+    <ul class="slist mseg">${rows.map(({ lead: s, n }) => `<li data-go="${s.id}"
         title="Show ${s.name} on the map">
         <i class="i i-${(size.get(s.site || s.id) || 1) > 1 ? 'layers' : k.icon}"></i>
         ${fav.has(s.site || s.id)
@@ -175,23 +224,56 @@ const BANNER = {
   notice: { icon: 'public_off', c: 'var(--k-source)', head: 'Service Notice' },
 };
 
-/* One card for both kinds. An outage publishes an id rather than prose, so its words come from
+/* Each category is an M3 list SUBHEADER over M3 three-line list items, drawn as an EMAIL LIST. The
+   repository owner asked for that shape on 2026-08-25.
+
+   An email list is the right analogy and not a decoration. Every row here is a bulletin somebody
+   published, with a sender, a subject, a preview and a time. It is read down the column and opened
+   one at a time. The card shell this replaced put a coloured left rule and a heading block around
+   each category, which is the shape of an alert and not of a message.
+
+   The category colour lives in the avatar alone now. It said the same thing three times before: a
+   left rule, a heading glyph and a heading word. `--c` is on the row, so the avatar reads it.
+
+   The preview clips to two lines with CSS, not by cutting the string. The full sentence stays in
+   the DOM for a screen reader, and for anyone who copies it. That was already the rule at one line.
+
+   The time is the start of the validity window, at the precision its age needs — a clock today, a
+   date on any other day. `stamp()` is that rule and `popup.js` owns it. An outage publishes no
+   window, so its row carries no time. An empty trailing slot is the honest answer.
+
+   Neither kind adds anything to the counts on the Sensors pane. The badge, the tab title, the tally
+   glyphs and the warning glyph still read the station list alone. */
+
+// One category: a subheader carrying its own count, then its rows.
+const nsec = (b, rows, n) => rows ? `<h3 class="nsub" style="--c:${b.c}">
+      <i class="i i-${b.icon}"></i>${b.head}<b>${n}</b>
+    </h3><div class="nlist">${rows}</div>` : '';
+
+/* One row. `time` is empty for an outage. The avatar repeats the category glyph, which is what
+   carries the colour once the shell is gone and what makes a scrolled list readable past its own
+   subheader. */
+const nrow = (b, tag, title, text, time) => `<button class="nrow" data-banner="${tag}"
+      style="--c:${b.c}">
+      <span class="avat"><i class="i i-${b.icon}"></i></span>
+      <span class="nbody"><b>${esc(title)}</b><span class="nprev">${esc(text)}</span></span>
+      ${time ? `<time class="ntime">${esc(time)}</time>` : ''}
+    </button>`;
+
+/* One list for both kinds. An outage publishes an id rather than prose, so its words come from
    NOTICE in config.js. A warning carries its own.
  *
- * A warning card is split by `kind`, so a JPS flood forecast and a MET thunderstorm never share a
- * heading. They are different claims, and one heading over both makes the app state something
+ * A warning list is split by `kind`, so a JPS flood forecast and a MET thunderstorm never share a
+ * subheader. They are different claims, and one heading over both makes the app state something
  * neither source said. */
 function bannerCard(list, kind) {
   if (!list || !list.length) return '';
   if (kind === 'notice') {
-    const rows = list.map((w, i) => {
-      const t = NOTICE[w.id];
-      if (!t) return '';                  // an id this build has no words for says nothing
-      return `<button class="warnrow" data-banner="notice:${i}">
-          <b>${esc(t.title)}</b><span class="warntext">${esc(t.line)}</span>
-        </button>`;
-    }).join('');
-    return rows ? shell(BANNER.notice, 'noticegrp', rows) : '';
+    const keep = list.map((w, i) => [w, i]).filter(([w]) => NOTICE[w.id]);
+    // An id this build has no words for says nothing, so it draws no row and joins no count.
+    return nsec(BANNER.notice, keep.map(([w, i]) =>
+      nrow(BANNER.notice, `notice:${i}`, NOTICE[w.id].title, NOTICE[w.id].line, '')).join(''),
+      keep.length);
   }
 
   /* `data-banner` indexes state.warnings, so the index is taken BEFORE the split. Renumbering
@@ -200,26 +282,13 @@ function bannerCard(list, kind) {
      ticker and the modal already use — one rule stated three ways must not drift, and a dropped
      warning is worse than a mislabeled one. */
   return Object.entries(NOTICE_KIND).map(([k, b]) => {
-    const rows = list.map((w, i) => [w, i])
-      .filter(([w]) => (NOTICE_KIND[w.kind] ? w.kind : 'weather') === k)
-      .map(([w, i]) => `<button class="warnrow" data-banner="warn:${i}">
-          <b>${esc(w.title)}</b><span class="warntext">${esc(w.text)}</span>
-        </button>`).join('');
-    return rows ? shell(b, 'warngrp', rows) : '';
+    const mine = list.map((w, i) => [w, i])
+      .filter(([w]) => (NOTICE_KIND[w.kind] ? w.kind : 'weather') === k);
+    return nsec(b, mine.map(([w, i]) =>
+      nrow(b, `warn:${i}`, w.title, w.text, w.from ? stamp(warnWhen(w.from)) : '')).join(''),
+      mine.length);
   }).join('');
 }
-
-// The shared card shell. Split out because bannerCard() now builds up to three of them.
-// `--c` on the outer div, not only the inner <i>: .warngrp's left rule reads it too, now that
-// the class serves two kinds instead of one. The inner <i>'s own --c is redundant and harmless —
-// removing it would touch the notice path for no gain.
-const shell = (b, cls, rows) => `<div class="alertgrp ${cls}" style="--c:${b.c}">
-      <div class="alerthead">
-        <i class="i i-${b.icon}" style="--c:${b.c}"></i>
-        <b>${b.head}</b>
-      </div>
-      ${rows}
-    </div>`;
 
 export function alerts() {
   const hidden = new Set(PREFS.hidden || []);
@@ -234,6 +303,14 @@ export function alerts() {
   const rising = live.filter(s => s.rising && tier(s) === 'soon').length;
   const danger = live.filter(s => s.kind === 'river' && s.status >= 3).length;
   const sirens = live.filter(s => s.kind === 'siren').length;
+  /* Rain needs a chip of its own, or the chips stop partitioning the list under them. No other chip
+     counts it, so a heavy-rain alert used to raise the head count with nothing beside it to say what
+     the alert was. It counts the KIND and not one tier, so class 3 and class 4 land in one chip.
+     `--s-warning`, not the danger red the two chips above it take. That is the tier colour the
+     `heavy` cards under it carry, and a red chip over amber cards is the mismatch this rung exists
+     to remove. A class 4 gauge is red in its own card and counted here all the same: the chip says
+     how much rain is on the list, and the cards say how bad each one is. */
+  const rain   = live.filter(s => s.kind === 'rainfall').length;
   const stale  = hot.length - live.length;
   const hereAt = state.hereAt;
 
@@ -252,17 +329,26 @@ export function alerts() {
   // readable while the page is in a background tab.
   document.title = (live.length ? `(${live.length}) ` : '') + TITLE;
 
-  // Icons rather than "(2 rising / 1 danger)": the head is one panel-width and the words wrapped as
-  // soon as all three counts were non-zero — which is exactly when the list matters most. Each count
-  // keeps its title/aria text, so nothing is conveyed by the glyph alone.
+  /* **Every kind of alert in this head is an M3 assist chip, on a reader's instruction of
+     2026-08-25.** They were `.tally b`, a 12px pill on a 16% tint of its own status colour. The
+     chip is the same one the group heads below draw and the same one a station card's kinds draw,
+     so the pane states a kind one way wherever it states one.
+     **The colour splits M3's way**: the label takes `on-surface` and only the leading icon takes
+     the status hue. A chip whose NUMBER is painted by the status reads as a reading, and a count of
+     stations is not one.
+     **Glyph and number, not "2 at danger".** That decision is older than the chip: the head is one
+     panel-width and the words wrapped as soon as three counts were non-zero, which is exactly when
+     the list matters most. Each count keeps its `title` and its `aria-label`, so nothing is
+     conveyed by the glyph alone. */
   const tally = [
     [danger, 'warning',     'at danger', STATUS_COLOR[3]],
     [sirens, 'campaign',    'sounding', STATUS_COLOR[3]],
+    [rain,   'rainy',       'in heavy rain', STATUS_COLOR[2]],
     [rising, 'expand_less', 'rising', STATUS_COLOR[2]],
     [stale,  'wifi_off',    'not current', 'var(--muted)'],
   ].filter(([n]) => n)
-   .map(([n, icon, what, c]) => `<b style="--c:${c}" title="${n} ${what}" aria-label="${n} ${what}"
-        ><i class="i i-${icon}"></i>${n}</b>`).join('');
+   .map(([n, icon, what, c]) => `<span class="badge" style="--c:${c}" title="${n} ${what}"
+        aria-label="${n} ${what}"><i class="i i-${icon}"></i>${n}</span>`).join('');
 
   /* The warning glyph carries **severity, not headcount**: red the moment one station is at its
      danger mark or one siren is sounding, amber while the worst of it is still a forecast, grey when
@@ -301,18 +387,37 @@ export function alerts() {
 
   /* The head. `openSide()` splits it: the `.popname` becomes the sheet's title and the rest stays
      here at the top of the body. Which is why `.pophead` must stay the card's first element. */
-  const head = `<div class="pophead"><div class="popname">On alert${
-    hot.length && hereAt ? ' <span class="muted">· nearest first</span>' : ''
-  }</div><div class="tally">${tally}</div></div>`;
+  /* **`Nearest first` is a chip too, and it had to leave the title to become one.** It was
+     `· nearest first`, a muted fragment INSIDE `.popname`, which `openSide()` lifts whole into the
+     app bar's headline. A 32dp chip inside a headline is not a chip.
+     It states how the rows are ordered rather than what is in them, so it takes `--muted` on its
+     glyph and no status hue. It comes LAST: the counts are what a reader scans for.
+     **The row is `.badges`, which is what makes `openSide()` lift it.** That function moves
+     `:scope > .badge, :scope > .badges` into `#sideKinds`, the app bar's own chip line, so the
+     alert head now reads exactly as a station card does — a headline over a row of chips. `.tally`
+     stayed in the body and left `.pophead` behind it, so the seam never emptied and never got
+     removed.
+     Emitted only when there is something in it. An empty `.badges` is a child, so `#sideKinds:empty`
+     would not match it and the app bar would keep a line for nothing. */
+  const near = hot.length && hereAt
+    ? `<span class="badge" style="--c:var(--muted)"><i class="i i-near_me"></i>Nearest first</span>`
+    : '';
+  const chips = tally + near;
+  const head = `<div class="pophead"><div class="popname">On alert</div>${
+    chips ? `<div class="badges">${chips}</div>` : ''}</div>`;
 
-  // Placed by the caller, not by write() — it sits after the `now` groups, and only the group list
-  // below knows where those end. See the comment on bannerCard().
+  /* The Notices pane, in category order: the outage caveat, then the flood alert, then the weather
+     warning. `bannerCard()` already draws one headed card per category, so the two calls are the
+     whole of the split. The outage leads because it is a caveat on the sensor pane rather than an
+     item beside the other two. */
   const warnHtml = bannerCard(state.warnings, 'warn');
-  /* The outage notice is not placed by the group list. It goes above everything, so it rides inside
-     write() and covers the all-clear path and the grouped path with one line rather than two. */
   const noticeHtml = bannerCard(state.notices, 'notice');
+  // The count in each tab label. A notice with no words in this build draws no row, so it is not
+  // counted either — the tab must name what the pane holds.
+  const nn = (state.notices || []).filter(w => NOTICE[w.id]).length + (state.warnings || []).length;
   const write = body => {
-    card = head + noticeHtml + body;
+    parts = { head, sensors: body, notices: noticeHtml + warnHtml, ns: hot.length, nn };
+    card = build();
     if (side.key === KEY) openSide(KEY, card);
   };
 
@@ -327,8 +432,7 @@ export function alerts() {
        but counted, so the all-clear is one the reader can weigh. The number they need is the ignored
        sensors that are hot right now, not how many are ignored in total. */
     const muted = state.data.filter(s => isIgnored(s) && isHot(s)).length;
-    // Nothing is happening, so there is nothing for a warning to sit under. It leads.
-    write(warnHtml + `<p class="empty muted">All clear${where}. Nothing rising or in danger.</p>${
+    write(`<p class="empty muted">All clear${where}. Nothing rising or in danger.</p>${
       muted ? `<p class="empty muted"><i class="i i-visibility_off"></i> ${muted} ignored sensor${
         muted > 1 ? 's are' : ' is'} on alert — restore ${
         muted > 1 ? 'them' : 'it'} under Ignored sensors in the filters.</p>` : ''}`);
@@ -359,15 +463,11 @@ export function alerts() {
       return [t, groupCard(items, kind, t, hereAt)];
     });
 
-  /* The warning section takes its place in the tier order: after the last `now` group, before the
-     first `soon` one. `findIndex` on the sorted list is the whole rule — the groups are already in
-     tier order, so the first entry that is not `now` is the seam. No `now` group at all and the
-     index is 0, which puts the warning first, under the head. Every group is `now` and there is no
-     seam, so it goes last. */
-  const seam = cards.findIndex(([t]) => t !== 'now');
-  const body = cards.map(([, html]) => html);
-  body.splice(seam < 0 ? body.length : seam, 0, warnHtml);
-  write(body.join(''));
+  /* The warning section used to be spliced into this list, after the last `now` group and before the
+     first `soon` one, so a forecast about a region never sat above a river already over its mark.
+     The tabs answer that ordering question instead: the two claims are in two panes now, and neither
+     one can outrank the other. */
+  write(cards.map(([, html]) => html).join(''));
   // No advisory here. It lives on the ticker, which is the strip that stays visible while this list
   // is closed or covered — and repeating it in both would make it furniture.
   // Nor is anything bound to the rows: the list is in #side now, so ui.js's delegated [data-go]

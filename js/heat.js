@@ -388,13 +388,17 @@ function heatScale() {
 
 /* leaflet.heat has no opacity option, so we fade its canvas directly. It is recreated whenever the
    layer is re-added, hence the re-apply after every render.
-   **The number is fixed, and it was a slider under the legend until 2026-08-24.** A reader cut that
-   control. 75% is the figure it existed to reach: a pin, a river and a road all read through the
-   wash, and the wash still states its own class. `_fade` is a separate term and stays. That one is
-   the layer telling a reader its blob has stopped covering the ground it names. */
-const HEAT_OPACITY = 0.75;
+   **75% is the DEFAULT and a reader can move it, from Settings.** The control rode under both ramps
+   on the legend until 2026-08-24, and a reader cut it there. 75% is the figure it existed to reach:
+   a pin, a river and a road all read through the wash, and the wash still states its own class. It
+   is back as a row in Settings on 2026-08-25, on a reader's instruction. The map is where a reader
+   judges the wash, so the legend was the wrong home for a control they set once.
+   `_fade` is a separate term and stays. That one is the layer telling a reader its blob has stopped
+   covering the ground it names, and it multiplies this number rather than replaces it. */
+export const HEAT_OPACITY = 0.75;
 export function heatOpacity() {
-  for (const l of LAYERS) if (l._canvas) l._canvas.style.opacity = HEAT_OPACITY * (l._fade ?? 1);
+  const o = PREFS.heatOpacity ?? HEAT_OPACITY;
+  for (const l of LAYERS) if (l._canvas) l._canvas.style.opacity = o * (l._fade ?? 1);
 }
 
 /* Puts the map, the legend and the segmented button on `PREFS.heatLayer`. One string

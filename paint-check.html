@@ -79,7 +79,30 @@ d.head.appendChild(noAnim);
 is(el('paintmenu'), null, 'the layer panel is gone');
 is(el('paint'), null, 'and the button that opened it');
 is(el('navLayers'), null, 'and its twin in the navigation bar');
-is(d.querySelectorAll('#navbar .navitem').length, 4, 'so the bar carries four items, not five');
+/* The slot the layers item vacated holds the overflow menu since 2026-08-25, so the bar is back at
+   the five M3 caps it at. `m3-check.html` asserts the ids and their order. */
+is(el('navMore')?.getAttribute('popovertarget'), 'appMenu',
+   'the freed slot holds the overflow menu, not a second layers control');
+
+/* --- test mode is a chip on this row, and it draws only while the mode is on ---------------------
+   A reader asked for that on 2026-08-25. It replaced `#testbadge`, a fat amber pill in `#pills`.
+   **`body.testmode` is the whole switch**, so this reads the class rather than driving the toggle:
+   turning the mode on for real loads a deferred module and rewrites the payload.
+   **It is the only thing that says the map is lying above 600px.** `<header>` does not draw there,
+   so the striped bar is a compact-width signal alone. An absence check on the chip is therefore an
+   alert-surface check, not a styling one. */
+is(!!el('testChip'), true, 'the test chip is on the map chip row');
+is(el('testChip').closest('#mapchips')?.id, 'mapchips', 'and inside the row, not beside it');
+is(el('testbadge'), null, 'the old #pills badge is gone');
+is(cs('testChip').display, 'none', 'it does not draw while test mode is off');
+d.body.classList.add('testmode');
+is(cs('testChip').display !== 'none', true, 'and it draws as soon as body.testmode is set');
+/* The amber, not a chip surface. Every other chip here reports a choice the reader made about the
+   map. This one reports that the map is lying, and the colour is what says so at a glance. */
+is(cs('testChip').backgroundColor, 'rgb(232, 113, 10)', 'in the amber the striped app bar uses');
+is(!!el('testChip').querySelector('.i-close'), true,
+   'carrying the × that turns the mode off, which is M3 input-chip behaviour');
+d.body.classList.remove('testmode');
 
 // --- the row itself ----------------------------------------------------------------------------
 const row = el('mapchips');
@@ -292,13 +315,26 @@ for (const id of ['legend', 'pills', 'credit', 'locate', 'mapfoot']) {
   }
 }
 
-// --- the drawer keeps the kinds and nothing else --------------------------------------------------
-/* **The drawer holds the districts and the ignored list, and nothing about the map's paint.** The
-   sensor kinds were the last section to leave, on 2026-08-25. */
+// --- the drawer keeps the districts and nothing else ----------------------------------------------
+/* **The drawer holds the district picker, and nothing else.** The sensor kinds left for the map chip
+   menu on 2026-08-25, and the two saved lists left for Settings the same day.
+   **A saved list is not a filter.** Each one is a list a reader reviews and edits. The district
+   picker stays because it IS a filter, which is the rule this pane is named for. */
 is(el('layersect'), null, 'the drawer has no layers section');
 is(el('kinds'), null, 'nor a sensor-kinds section');
 is(el('layers').closest('#kindMenu')?.id, 'kindMenu', 'the kinds live in the map chip menu instead');
 is(!!el('districts'), true, 'and the drawer keeps the district picker');
+/* **Assert the new PARENT, never that the id is gone.** The lists moved, so an absence check passes
+   on markup somebody deleted by mistake, and `render.js` writes into both by id on every poll. A
+   missing `#favList` is a throw halfway through `render()`, which stops the markers and the alert
+   panel with it. */
+for (const id of ['favList', 'favClear', 'favN', 'ignoredList', 'ignoredClear', 'ignoredN'])
+  is(el(id)?.closest('#settingsBox')?.id, 'settingsBox', id + ' lives in Settings now');
+is(el('favList').closest('#bar'), null, 'and the favorites left the filters panel');
+is(el('ignoredList').closest('#bar'), null, 'and so did the ignored list');
+/* **The `· N ignored` count did NOT follow the list.** It is the one always-visible sign that a
+   sensor is silenced, and every alarm standard this app reads says a muted alarm needs one. */
+is(el('shown').closest('#bar')?.id, 'bar', 'the ignored count stays in the filters panel');
 
 // --- a filter chip clears itself on a second press -----------------------------------------------
 /* **There is no `All` chip, and that is M3's own filter-chip behaviour.** Pressing a selected chip
@@ -419,10 +455,24 @@ is(prb.left >= pmap.left && prb.right <= pmap.right, true, 'phone: the row stays
 is(prow.scrollWidth <= prow.clientWidth, true, 'phone: and never scrolls sideways');
 is(Math.round(prb.height) > 32, true, 'phone: it wrapped, rather than cutting a chip off the edge');
 {
-  const tops = [...pd.querySelectorAll('#mapchips .chip')]
-    .map(c => Math.round(c.getBoundingClientRect().top));
-  is(new Set(tops).size, 2, 'phone: onto exactly two rows');
-  for (const c of pd.querySelectorAll('#mapchips .chip')) {
+  /* **Only the chips that DRAW.** `#testChip` is `display: none` until test mode is on, and a box
+     that does not draw measures all zeros. Left in, it adds a phantom row at top 0 and reports a
+     height of 0 against the 32px every chip here holds. */
+  const drawn = [...pd.querySelectorAll('#mapchips .chip')].filter(c => c.getClientRects().length);
+  const tops = drawn.map(c => Math.round(c.getBoundingClientRect().top));
+  /* **Assert that it wrapped, never how many lines it took.** The line count follows the LIVE
+     payload: `On alert · 63` is three digits wider than `On alert · 1`, and at 360px that alone
+     moves the chips onto a third line. This read `exactly two rows` and went red on upstream
+     churn, which is the equality-against-live-data trap this repo already records.
+     **What has to hold is that the strip below clears the row**, and `--top-chips` is measured from
+     the row rather than stated as one or two lines. The overlap assertions under this one are what
+     prove it. */
+  is(new Set(tops).size > 1, true, 'phone: onto more than one row, so it wrapped');
+  /* **Read the outcome, never `--top-chips` itself.** That token holds
+     `calc(var(--top-free) + Npx)`, and a custom property computes to its own token stream rather
+     than to a pixel, so `parseFloat` on it can only ever be wrong. It is the trap `--navbar-h`
+     already carries. The overlap assertions below are what prove the strip clears the row. */
+  for (const c of drawn) {
     const b = c.getBoundingClientRect();
     is(b.left >= pmap.left - 1 && b.right <= pmap.right + 1, true,
        'phone: ' + (c.id || '?') + ' stays inside the map');

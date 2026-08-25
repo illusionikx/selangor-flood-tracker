@@ -326,9 +326,11 @@ export function districts() {
 
 /* The sensors switched off from a station card's Details button, listed so they can be switched back on.
    Always drawn, never hidden when empty. An ignored sensor is a muted alarm. A muted alarm you
-   cannot find is the failure ISA-18.2 spends a chapter on. This list and the count below the layer
-   chips are the only two places that name a silenced sensor. So neither of them gets to
-   disappear. Row order is the order they were ignored in. It is a short list, and "the one I just
+   cannot find is the failure ISA-18.2 spends a chapter on. This list and the `· N ignored` count in
+   the filters panel are the only two places that name a silenced sensor. So neither of them gets to
+   disappear. **The list moved to Settings on 2026-08-25 and the count stayed in the filters.** So
+   the two indications now sit behind two different presses, and the count is the one a reader meets
+   without asking for it. Row order is the order they were ignored in. It is a short list, and "the one I just
    switched off" is at the bottom where you left it.
    That promise means walking `ids` — a `Set` built by insertion order — rather than filtering
    `state.data`, the shape this had before: `state.data` is the merged payload's own order, which is
@@ -345,8 +347,8 @@ function ignoredPanel() {
       <i class="glyph i i-${KINDS[s.kind].icon}" style="color:${KINDS[s.kind].color}"></i>
       <span class="nm">${s.name}<br><span class="muted">${
         [s.district, s.state].filter(Boolean).join(', ') || 'district n/a'}</span></span>
-      <button class="solo" data-unignore="${s.id}" title="Stop ignoring ${s.name}"
-              aria-label="Stop ignoring ${s.name}">restore</button>
+      <button class="mtrail" data-unignore="${s.id}" data-tip="Stop ignoring ${s.name}"
+              aria-label="Stop ignoring ${s.name}"><i class="i i-visibility"></i></button>
     </li>`).join('')
     || '<li class="none">Nothing ignored. Use the Details button on any sensor in a station’s '
      + 'card.</li>';
@@ -371,8 +373,8 @@ function favPanel() {
       <span class="nm">${s.name}<br><span class="muted">${
         [s.district, s.state].filter(Boolean).join(', ')} · ${
         KINDS[s.kind].one || KINDS[s.kind].label}</span></span>
-      <button class="solo" data-unfav="${s.id}"
-              aria-label="Remove ${s.name} from favorites">remove</button>
+      <button class="mtrail" data-unfav="${s.id}" data-tip="Remove ${s.name} from favorites"
+              aria-label="Remove ${s.name} from favorites"><i class="i i-heart_minus"></i></button>
     </li>`).join('')
     /* One control, named once. There is no star on a card any more. The favorite is a row in the
     Details menu. It sits in the card's own corner and on every sensor listed under it. A message naming
@@ -406,7 +408,7 @@ function counts() {
   const pins = Object.values(marks).reduce((n, l) => n + l.length, 0);
   // The ignored count rides here rather than only in its own panel: this line is the one the eye
   // lands on to ask "why is the map this empty", and a sensor you silenced last week is exactly the
-  // answer it should give.
+  // answer it should give. That carries more weight since the list itself moved to Settings.
   const ign = ignoredIds();
   const nIgn = state.data.filter(s => ign.has(s.id)).length;
   /* Weather hides every station, so the tally would read "0 of 729" and explain nothing. This line

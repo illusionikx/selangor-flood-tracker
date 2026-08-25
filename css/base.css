@@ -81,6 +81,19 @@
      edge, the map's leading inset and the diagnostics popover all cite the rail's own spec here.
      If M3 ever splits the two curves, these four edges follow the rail and not the sheets. */
   --m3-rail: var(--md-sys-motion-duration-short2) var(--md-sys-motion-easing-standard);
+  /* **M3's state layer, as a `color-mix()` percentage rather than an opacity.** M3 paints a hover
+     or a pressed state as a translucent sheet of the surface's own CONTENT colour, over that
+     surface's own shape. `vendor/m3/tokens.css` carries the scale, 0.08 and 0.10, so no number is
+     hand-copied here. The scale is a fraction and `color-mix()` takes a percentage, so the multiply
+     lives here once rather than at every call site.
+     **A pseudo-element carrying an `opacity` is M3's own mechanism, and this is not it.** That needs
+     a positioned box, an `inset: 0` and a `pointer-events: none` on every control that wants one.
+     A mix reaches the same pixels with one property. The one thing it costs: the mix has to name the
+     container underneath, where a real layer sits on whatever is already there. **A mix ending in
+     `transparent` over a filled shape ERASES that fill.** So a selected surface names its own
+     container as the second colour, and only a transparent one names `transparent`. */
+  --m3-state-hover: calc(var(--md-sys-state-hover-opacity) * 100%);
+  --m3-state-press: calc(var(--md-sys-state-pressed-opacity) * 100%);
   /* **The supporting pane's width is a RATIO of the window, and M3's canonical layout sets it.**
      https://m3.material.io/foundations/layout/canonical-examples/supporting-pane
      Medium splits the space equally. Expanded gives 70% to the main pane and 30% to the supporting
@@ -104,7 +117,7 @@
      panes stop splitting the window equally the moment the rail is wider than 0.
      **`max(256px, ...)`, because an equal split of the medium band (601 to 839px) can undershoot
      M3's own 256dp minimum at either rail width, not only while the rail is open.** With the rail
-     SHUT, `(window - 96) / 2 - 12` drops under 256 for every window from 601 to 631px -- an
+     SHUT, `(window - 80) / 2 - 12` drops under 256 for every window from 601 to 615px -- an
      ordinary desktop width, not an edge case, and `m3-check.html`'s own sweep never sampled it
      before this fix; it only ever probed 700px. With the rail OPEN, the same arithmetic drops under
      256 for every window up to 755px, which is most of the band: 700px, where the sweep already
@@ -651,7 +664,10 @@ dialog:focus, dialog:focus-visible { outline: none; }
    all. Pinned visible it was permanent, and permanent beside the count made every row in the list
    carry a number and a control at once. The count is what the row is for, so the count is what stays.
    Solo is a shortcut, not the only way through: the checkboxes hide districts on any device.
-   `#ignoredList` keeps its own `.solo` — restoring a silenced sensor is that panel's whole job. */
+   **The district list is the only user of this class now.** The ignored list and the favorites both
+   drew a `.solo` pill, pinned visible, because restoring a saved sensor is what those lists are for.
+   Each carries an M3 icon button in its trailing slot since 2026-08-25 — see `.mtrail` in
+   `css/chrome.css`. */
 @media (hover: none) { #districtList .solo { display: none; } }
 /* Where there is a hover, the count is the resting state and the button is what hovering swaps in. */
 @media (hover: hover) {
@@ -700,20 +716,11 @@ dialog:focus, dialog:focus-visible { outline: none; }
 .sect > summary .i { font-size: 18px; }
 .sect > summary + * { margin-top: 4px; }
 
-/* Ignored sensors: the same picklist again, so it reads as a sibling of the district filter rather
-   than a new kind of control. Two lines a row, because a station name alone is not enough to know
-   which of the four "Sungai Klang" gauges you silenced. */
-#ignoredList, #favList { max-height: 26vh; border: 1px solid var(--outline); border-radius: 8px; }
-#ignoredList .nm, #favList .nm { flex: 1; min-width: 0; line-height: 1.35; }
-#ignoredList .nm .muted, #favList .nm .muted { font-size: 11px; }
-/* Always visible, unlike the district list's "only" — reviewing and undoing the list is the whole
-   reason both panels exist, so the control must not be something you hover a row to discover. */
-#ignoredList .solo, #favList .solo { visibility: visible; position: relative; }
-/* The pill stays small so a two-line row does not grow around it, and the hit area grows past it
-   instead. Both panels, not just the favorites one: the two selectors were merged above precisely
-   so they cannot drift, and a 19px control that a phone genuinely shows is the same defect on
-   either list. `#districtList`'s copy needs none of this — that one is `display: none` on touch. */
-#ignoredList .solo::after, #favList .solo::after { content: ''; position: absolute; inset: -10px -6px; }
+/* **The favorites and the ignored sensors are M3 lists, and their rules live in `css/chrome.css`
+   beside `#settingsBox`.** They were two `<details>` sections in this drawer, styled here as another
+   `.picklist` so they read as siblings of the district filter. They left the drawer on 2026-08-25,
+   and they are the only two lists in this app that are a settings surface rather than a filter.
+   `.picklist` still supplies the row's own shape. Only the M3 numbers sit in the other file. */
 
 .rowbtns { display: flex; gap: 8px; margin-top: 8px; }
 .rowbtns .link { justify-content: center; }
@@ -798,7 +805,11 @@ dialog:focus, dialog:focus-visible { outline: none; }
    One expression serves both themes: `--on-surface` is near-ink on the light theme and near-paper on
    the dark one, so the mix always moves *away* from the surface behind it. The chip keeps the hue at
    full strength — it is the background that carries the signal here, and the word that carries the
-   meaning. Same reason on `.tally b` in chrome.css. */
+   meaning.
+   **`.tally b` in chrome.css used to carry the same expression and is gone.** Those counts are M3
+   assist chips now, and a chip puts its label in `on-surface` over the page rather than in its own
+   hue on a tint. So the contrast problem this expression answers does not arise there. It still
+   arises here, because `.state` is exactly that shape. */
 .state.off { color: color-mix(in srgb, var(--s-normal) 70%, var(--on-surface)); background: color-mix(in srgb, var(--s-normal) 12%, transparent); }
 .state.on  { color: color-mix(in srgb, var(--s-danger) 70%, var(--on-surface)); background: color-mix(in srgb, var(--s-danger) 14%, transparent); }
 .state.mid { color: color-mix(in srgb, var(--s-alert)  70%, var(--on-surface)); background: color-mix(in srgb, var(--s-alert) 18%, transparent); }
@@ -816,10 +827,13 @@ dialog:focus, dialog:focus-visible { outline: none; }
 /* One line naming each part of a sensor's body. Rainfall is the only kind with three of them —
    a state block, a 12 hour graph and five window totals — and they measure three different spans of
    time with nothing but their shapes to say so.
-   Quieter than `.sensorhead b` at 12px/500, because that names the sensor and this names a part of
-   it. `.sensorhead` already carries `margin-bottom: 6px`, so the first one sits tight under it. */
+   Quieter than `.sensorhead b`, because that names the sensor and this names a part of it.
+   **It leads its own segment now, so it cancels its top margin there.** Each part of a sensor's body
+   is one `<li>` of `.sbody`, and that item states its own 12px of padding. A margin over the first
+   line inside it stands the line 22px down instead. The old rule cancelled against `.sensorhead`,
+   which is not a sibling of anything in the body any more. */
 .subhead { font-size: 11px; font-weight: 500; color: var(--muted); margin: 10px 0 3px; }
-.sensorhead + .subhead { margin-top: 0; }
+.sbody > li > .subhead:first-child { margin-top: 0; }
 
 .spark { position: relative; margin: 6px 0 4px; }
 /* The peak, marked on the plot. A rule down the column it happened in, with the glyph sitting on

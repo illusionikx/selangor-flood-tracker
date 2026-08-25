@@ -40,9 +40,13 @@ const rows = list => list.slice(0, LIST).map(s => {
   const t = tier(s);
   // `null` only reaches here from the all-clear list: off the alert set entirely. A cleared station
   // that is still climbing keeps its forecast line, because that is still true of it.
-  const why = t === null   ? 'Back below its danger mark'
+  // A rain gauge stands at no danger mark, so the all-clear line for it names the rain instead.
+  const why = t === null   ? (s.kind === 'rainfall' ? 'Rain has eased' : 'Back below its danger mark')
     : t === 'stale'        ? 'Stopped reporting'
     : s.kind === 'siren'   ? 'Siren sounding'
+    // Rain before the shared rung, the same split js/ticker.js makes. A rain gauge stands at no
+    // danger mark, so `At danger` is the wrong sentence about it.
+    : s.kind === 'rainfall' ? `${s.status >= 4 ? 'Very heavy' : 'Heavy'} rain · ${s.hourly} mm/h`
     : s.status >= 3        ? 'At danger'
     : `Reaches danger ${s.eta != null && s.eta < 1 ? 'within the hour' : `in ~${s.eta} h`}`;
   return `<button class="trow" data-go="${s.id}">
@@ -97,16 +101,29 @@ export function alertToast() {
   /* Bad news outranks good news. Both in one poll means the situation is moving, and "2 back below
      danger" over the top of "1 at danger" is the wrong headline for that. */
   if (fresh.length) {
-    const nowN = fresh.filter(s => tier(s) === 'now').length;
-    const soonN = fresh.length - nowN;
-    // Says which kind of alert, because "3 stations have gone on alert" covered a river already over
-    // its mark and a forecast that may never happen, in the same six words.
-    const head = nowN && soonN ? `${nowN} at danger, ${soonN} forecast to reach it`
-      : nowN                   ? `${nowN} station${nowN > 1 ? 's' : ''} at danger now`
-                               : `${soonN} station${soonN > 1 ? 's' : ''} forecast to reach danger`;
-    show(fresh.some(s => tier(s) === 'now') ? 'now' : 'soon', head, fresh);
+    /* Says which kind of alert, because "3 stations have gone on alert" covered a river already over
+       its mark and a forecast that may never happen, in the same six words.
+       Three counts now, one per tier this list can hold. Rain used to fall into `soonN` by
+       subtraction, and the head then called an observed downpour a forecast. */
+    const nowN  = fresh.filter(s => tier(s) === 'now').length;
+    const rainN = fresh.filter(s => tier(s) === 'heavy').length;
+    const soonN = fresh.length - nowN - rainN;
+    const bits = [
+      nowN  && `${nowN} at danger now`,
+      rainN && `${rainN} in heavy rain`,
+      soonN && `${soonN} forecast to reach danger`,
+    ].filter(Boolean);
+    // One kind of news gets the noun. Two or three would repeat it down a line the toast draws once.
+    const head = bits.length === 1
+      ? `${fresh.length} station${fresh.length > 1 ? 's' : ''} ${bits[0].replace(/^\d+ /, '')}`
+      : bits.join(', ');
+    // Red only for the top rung. A toast carrying heavy rain alone is amber, which is the colour its
+    // rows and its panel cards already take.
+    show(nowN ? 'now' : 'soon', head, fresh);
   } else if (cleared.length) {
-    show('clear', `${cleared.length} station${cleared.length > 1 ? 's' : ''} back below danger`, cleared);
+    // `no longer on alert`, not `back below danger`: this list can hold a rain gauge, and a gauge
+    // stands at no danger mark. Each row under the head still names what eased.
+    show('clear', `${cleared.length} station${cleared.length > 1 ? 's' : ''} no longer on alert`, cleared);
   }
 }
 

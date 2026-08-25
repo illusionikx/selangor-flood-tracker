@@ -72,14 +72,14 @@
 <link rel="stylesheet" href="vendor/leaflet.css">
 <link rel="stylesheet" href="vendor/markercluster.css">
 <link rel="stylesheet" href="vendor/fonts.css?v=51">
-<link rel="stylesheet" href="css/icons.css?v=100">
+<link rel="stylesheet" href="css/icons.css?v=101">
 <!-- M3's own token scales, baked from the M3 Expressive component set by `php m3-build.php`.
      Before `base.css`, which derives `--m3-travel`, `--m3-grow` and `--m3-swap` from them and
      bridges M3's colour names onto this app's palette. Colour is not in this file on purpose. -->
 <link rel="stylesheet" href="vendor/m3/tokens.css?v=1">
-<link rel="stylesheet" href="css/base.css?v=182">
-<link rel="stylesheet" href="css/chrome.css?v=284">
-<link rel="stylesheet" href="css/map.css?v=160">
+<link rel="stylesheet" href="css/base.css?v=185">
+<link rel="stylesheet" href="css/chrome.css?v=299">
+<link rel="stylesheet" href="css/map.css?v=161">
 
 <!-- Water tint for the dark basemap. CARTO's dark_all is greyscale — all 18 of its tones have zero
      chroma — so no saturate() or hue-rotate() can pull water out of it. What it does have is one
@@ -282,16 +282,6 @@
       ><span class="w-md">KV <b>Flood Watch</b></span
       ><span class="w-sm">KV<b>FW</b></span
   ></span></h1>
-  <!-- **The bar's trailing actions, as one group.** M3 allows a small top app bar up to three of
-       them. Two draw here: the theme switch, and the overflow menu holding what the navigation bar
-       has no room for.
-       **It is one absolutely positioned box, never two.** The bar centres the brand on the WINDOW,
-       which is M3's center-aligned variant. A flex item on the trailing end moves that mark by half
-       its own width. Two separately positioned buttons need two literals that have to stay in step,
-       and a group needs one.
-       `#railApps` is NOT written here. It has two homes and js/ui.js moves the node, the way
-       `#brand` already moves. It lands first in this group, so the overflow keeps the trailing
-       edge. -->
   <!-- **The bar's one leading action, and it is the search.** M3 gives a small top app bar a
        leading slot, and a reader asked for the search there on 2026-08-25. It used to be the middle
        item of the navigation bar. That freed the middle slot for the map layers.
@@ -307,20 +297,27 @@
             title="Go to a station" aria-label="Go to a station"
       ><i class="i i-search"></i></button>
   </div>
-  <div class="hactions">
-    <!-- **M3's overflow menu.** A navigation bar caps at five items, and this app has seven
-         destinations. Help and About are the two a reader visits least, so they go here.
-         Above 600px they are rail items and `<header>` does not draw at all, so nothing has to hide
-         this. -->
-    <button id="apps" class="icon" title="More" aria-label="More"
-            popovertarget="appMenu"><i class="i i-more_vert"></i></button>
-  </div>
+  <!-- **The bar's trailing actions, as one group. The theme switch is the only one left.** The
+       overflow menu stood here too. It moved to the navigation bar's fifth slot on 2026-08-25, on a
+       reader's instruction. Two More buttons at one width is one control in two places.
+       **It is one absolutely positioned box, never two.** The bar centres the brand on the WINDOW,
+       which is M3's center-aligned variant. A flex item on the trailing end moves that mark by half
+       its own width. Two separately positioned buttons need two literals that have to stay in step,
+       and a group needs one. The box stays for that reason, and because `place()` in js/ui.js
+       prepends into it.
+       `#railApps` is NOT written here. It has two homes and js/ui.js moves the node, the way
+       `#brand` already moves. -->
+  <div class="hactions"></div>
   </header>
-<!-- Outside the group it opens from, and outside `<header>` with it. A popover is in the top layer
-     and the placement handler in js/ui.js finds its button by `popovertarget`, so nothing here has
-     to be a descendant of anything. Inside the group it counted as one more trailing action, and
-     the group's last child is what the app bar measures its 28px against. -->
+<!-- **M3's overflow menu.** A navigation bar caps at five items, and this app has more destinations
+     than that. Settings, Help and About are the three a reader visits least, so they go here.
+     Above 600px each one is a rail item and `<header>` and `#navbar` do not draw at all, so nothing
+     has to hide this.
+     Outside the bar it opens from. A popover is in the top layer and the placement handler in
+     js/ui.js finds its button by `popovertarget`, so nothing here has to be a descendant of
+     anything. -->
 <div id="appMenu" class="menu" popover>
+  <button class="mi" id="menuSettings"><i class="i i-settings"></i>Settings</button>
   <button class="mi" id="menuHelp"><i class="i i-info"></i>Help</button>
   <button class="mi" id="menuAbout"><i class="i i-flood"></i>About</button>
 </div>
@@ -372,8 +369,9 @@
   <div class="railitems">
   <!-- **A funnel, not a hamburger.** This item opens the filters, and `i-menu` is the glyph for a
        navigation drawer holding a list of destinations. That is what it was when the button sat in
-       the app bar and the pane held every control. The pane holds the district picker, the ignored
-       list and the favorites now, so the button names a filter and draws one. -->
+       the app bar and the pane held every control. The pane holds the district picker alone now, so
+       the button names a filter and draws one. The two saved lists left it for Settings on
+       2026-08-25. -->
   <button class="railitem" id="railFilters" aria-controls="pane" aria-expanded="false"
     ><span class="railpill"><i class="i i-filter_alt"></i></span
     ><span class="raillabel">Filters</span></button>
@@ -389,6 +387,11 @@
     ><span class="railpill"><i class="i i-photo_camera"></i></span
     ><span class="raillabel">Cameras</span></button>
   <hr>
+  <!-- **Settings is a rail item and never an overflow.** The rail has room, and a destination the
+       navigation bar hides behind a menu still needs one way in at this width. -->
+  <button class="railitem" id="railSettings"
+    ><span class="railpill"><i class="i i-settings"></i></span
+    ><span class="raillabel">Settings</span></button>
   <button class="railitem" id="railHelp"
     ><span class="railpill"><i class="i i-info"></i></span
     ><span class="raillabel">Help</span></button>
@@ -412,11 +415,13 @@
 </nav>
 <!-- M3's navigation bar, below 600px alone. Every number comes from
      https://github.com/bczak/m3you/blob/development/src/components/NavigationBar/navigation-bar.css
-     **Five items, which is what M3 caps this component at.** The rail carries seven destinations and
-     an action. Help and About are the two visited least, so they move to the app bar's overflow menu
-     at this width. The search is a rail FAB and a bar item, because a bar has no FAB slot.
+     **Five items, which is what M3 caps this component at.** The rail carries eight destinations.
+     Settings, Help and About are the three visited least, so the fifth slot holds an overflow menu
+     rather than a destination. The search is a rail FAB and an app bar action, because a bar has no
+     FAB slot.
      **Every id is its rail twin with one prefix changed.** `js/ui.js` binds both from one table and
      `railActive()` in js/map.js matches on the suffix, so the two components cannot drift apart.
+     `#navMore` is the one exception, and it states its reason where it is written.
      It reuses `.railpill`, `.raillabel` and `.railbadge`. One indicator, defined once. -->
 <nav id="navbar" aria-label="Main">
   <button class="navitem" id="navFilters" aria-controls="pane" aria-expanded="false"
@@ -439,18 +444,31 @@
   <button class="navitem" id="navCams"
     ><span class="railpill"><i class="i i-photo_camera"></i></span
     ><span class="raillabel">Cameras</span></button>
+  <!-- **The overflow, in the fifth and last slot.** A reader asked for it there on 2026-08-25. It
+       stood in the app bar's trailing group, and one More button is all this width gets.
+       **It has no rail twin, and it must not grow one.** The rail carries Settings, Help and About
+       as items of its own, so there is nothing above 600px for an overflow to hold. That is why the
+       id breaks the `rail`/`nav` pairing every other item here keeps.
+       **It needs no handler.** `popovertarget` opens the menu, so the browser does the work and
+       there is nothing in js/ui.js to keep in step.
+       **It states `aria-expanded` and never `aria-current`.** The menu is an action, the same rule
+       the search already obeys, so `railActive()` never reaches it. The browser writes the value. -->
+  <button class="navitem" id="navMore" popovertarget="appMenu" aria-label="More"
+    ><span class="railpill"><i class="i i-more_vert"></i></span
+    ><span class="raillabel">More</span></button>
 </nav>
 <!-- Native <dialog>: modal behaviour, backdrop, Esc-to-close and focus trapping come free. -->
 <!-- Two dialogs, one shape. `.docbox` carries the box and the prose rules both of them need; the
      id carries what belongs to one of them. The menu opens each entry directly, so a tab strip was
      one control between the reader and the page they had already named. -->
 <dialog id="aboutBox" class="docbox">
-  <!-- Controls first in the source, so the close button is the first thing reachable by keyboard,
-       but they read as a corner strip rather than a header row. -->
+  <!-- Controls first in the source, so the back arrow is the first thing reachable by keyboard.
+       It leads the row, the way the pane's own arrow does and the way the other four panes do. -->
   <div class="modalhead">
-    <form method="dialog"><button class="icon dclose" title="Close" aria-label="Close"
-      ><i class="i i-close"></i></button></form>
+    <form method="dialog"><button class="icon dclose" title="Back" aria-label="Back"
+      ><i class="i i-arrow_back"></i></button></form>
   </div>
+  <div class="docbody">
   <!-- The mark doubles as the dialog's heading: the mark and the two-line wordmark are the logo,
        and "About" over the top of them would be a title for a title. -->
   <h2 class="logo"><i class="i i-flood"></i><span>Klang Valley<br><b>Flood Watch</b></span></h2>
@@ -575,33 +593,134 @@
      Flood data remains the property of JPS Malaysia, and weather data of
      <a href="https://www.met.gov.my/" target="_blank" rel="noopener">MET Malaysia</a>.</p>
 
-  <!-- The toggle moved here out of the close-button row. Its old spot had a reason — a mode and its
-       exit within reach of each other — and the amber test-mode strip across the top of the page is
-       what actually gets you out anyway. Here it sits under a heading that names what it is. -->
-  <h3>Developer</h3>
-  <label class="testtog" title="Fill the map with fake alerts to see how it behaves in a flood">
-    <input type="checkbox" id="testMode"><span>Test mode</span>
-  </label>
-  <p class="muted">Fills the map with fake alerts, in this browser only. Nothing reaches JPS, and
-     the site stores nothing.</p>
-
-  <table id="devstats"></table>
-
-  <div class="rowbtns">
-    <button id="devForce" class="link"><i class="i i-refresh"></i> Refresh now</button>
-    <a id="devRaw" class="link" href="api.php" target="_blank" rel="noopener">Raw payload</a>
-    <button id="devReset" class="link">Reset settings</button>
-  </div>
-  <p id="devMsg" class="muted" role="status"></p>
+  <!-- **The Developer section left this pane on 2026-08-25**, on a reader's instruction. It sits at
+       the foot of Settings now. About states what this site is and where the data comes from. The
+       developer controls change what the app does, which is the other pane's job. -->
+  </div><!-- /.docbody -->
 </dialog>
+<!-- **Settings.** `.docbox` makes it a full-screen dialog below 600px and a basic one above, which
+     is what every prose pane here already is. It carries a title for the same reason Help does.
+     There is no logo lockup to stand in for one.
+     **It holds the two saved lists and the developer controls, and both arrived on 2026-08-25 on a
+     reader's instruction.** Neither list is a filter over the map. Each is a list a reader reviews
+     and edits, and the drawer beside them is for filters. The developer controls came the other
+     way, out of About, which states what this site is rather than what it does.
+     **The order is the reader's own, and it is not alphabetical.** The two lists are what somebody
+     comes here for. Developer is last, under a heading that names it. -->
+<dialog id="settingsBox" class="docbox">
+  <div class="modalhead">
+    <h2>Settings</h2>
+    <form method="dialog"><button class="icon dclose" title="Back" aria-label="Back"
+      ><i class="i i-arrow_back"></i></button></form>
+  </div>
+  <div class="docbody">
+
+  <!-- Sensors starred from a station card. Listed one row per sensor, not one row per site: the
+       search box groups by site because it matches the map, and this panel manages the saved list
+       itself, so it has to show every id the list holds. A reader who starred one gauge of six
+       needs to see which one.
+       **Open, never a `<details>`.** In the drawer it was collapsed, because two scrolling lists
+       stacked over the layer switches pushed those off a phone screen. Nothing sits under these two
+       but Developer, and a reader who opened Settings to review a list should not press again to see
+       it. The count keeps the same `<b>` and the same id, so `render.js` needed no change. -->
+  <h3><i class="i i-favorite"></i>Favorite sensors<b id="favN"></b></h3>
+  <ul id="favList" class="picklist mseg"></ul>
+  <!-- **The clear action is the group's LAST ROW, not a button under it.** A reader asked for that
+       on 2026-08-25. It was a full-width link in a `.rowbtns` box, which read as a control the list
+       had nothing to do with. `.mfoot` joins the two: the list above it drops its bottom outer
+       corner and this row takes it. -->
+  <ul class="picklist mseg mfoot"><li><button class="mrow" id="favClear"
+    ><i class="glyph i i-heart_minus"></i><span class="nm">Remove all favorites</span></button></li></ul>
+
+  <!-- Sensors switched off one at a time from a station card's Details button. Drawn even when
+       empty: this list and the `· N ignored` count in the drawer are the only two places that say a
+       sensor has been silenced, and a muted alarm nobody can find is the thing every alarm standard
+       warns about. -->
+  <h3><i class="i i-visibility_off"></i>Ignored sensors<b id="ignoredN"></b></h3>
+  <ul id="ignoredList" class="picklist mseg"></ul>
+  <ul class="picklist mseg mfoot"><li><button class="mrow" id="ignoredClear"
+    ><i class="glyph i i-visibility"></i><span class="nm">Stop ignoring all</span></button></li></ul>
+
+  <!-- **The wash opacity, as one row of its own group.** It rode under both ramps on the legend
+       until 2026-08-24, and a reader cut it there. It is a setting somebody picks once, and the
+       legend is a scale somebody reads on every glance. So it sits here and the legend states the
+       scale alone.
+       **It is not a filter and it is not a Developer control.** It changes how the map draws, which
+       is what this section is named for. The two lists above it are lists a reader edits.
+       **The glyph is the heat chip's own.** One name and one mark for one thing: `gradient` is what
+       the chip draws with no layer chosen, so it stands for the heatmap as a whole. -->
+  <h3>Map</h3>
+  <ul id="mapList" class="picklist mseg">
+    <li><i class="glyph i i-gradient"></i><span class="nm">Heatmap opacity<br
+        ><span class="muted">How strongly the wash paints over the map.</span></span
+      ><span class="mslide"><b id="washPct"></b><input type="range" id="washOpacity"
+          min="20" max="100" step="5" autocomplete="off" aria-label="Heatmap opacity"></span></li>
+  </ul>
+
+  <!-- **The developer controls, as one segmented list.** The order is a reader's own, 2026-08-25:
+       the switch, then the readings, then the three actions.
+       **The readings are a row of the same list and take no press.** `.readout` carries the table
+       rather than a headline, so the group reads as one block and nothing about it invites a tap.
+       **`#devForce` hides on the Pages build**, and `js/ui.js` hides its `<li>`. Hiding the button
+       alone leaves an empty container in a segmented group, which draws as a gap in the middle of
+       the block. -->
+  <h3>Developer</h3>
+  <ul id="devList" class="picklist mseg">
+    <!-- M3's switch, in the list's trailing slot. The row's own label is the headline and the
+         warning sits on the supporting line, so the pill that used to carry both is gone. -->
+    <li><i class="glyph i i-science"></i><span class="nm">Test mode<br
+        ><span class="muted">Fake alerts, in this browser only. Nothing reaches JPS.</span></span
+      ><label class="msw"><input type="checkbox" id="testMode" autocomplete="off"
+          ><span class="mswtrack"><span class="mswthumb"></span></span></label></li>
+    <li class="readout"><table id="devstats"></table></li>
+    <li><button class="mrow" id="devForce"><i class="glyph i i-refresh"></i
+      ><span class="nm">Refresh now</span></button></li>
+    <li><a class="mrow" id="devRaw" href="api.php" target="_blank" rel="noopener"
+      ><i class="glyph i i-open_in_new"></i><span class="nm">Raw payload</span></a></li>
+    <li><button class="mrow" id="devReset"><i class="glyph i i-restart_alt"></i
+      ><span class="nm">Reset settings</span></button></li>
+  </ul>
+  </div><!-- /.docbody -->
+</dialog>
+<!-- **The reset confirmation, as M3's basic dialog.** It replaced a native `confirm()`, which takes
+     the browser's own chrome and cannot be read in this app's voice. The numbers are
+     `Dialog/dialog.css`'s own: a 28dp corner, 24px of padding, `headline-small` over `body-medium`,
+     and a footer that puts its actions on the trailing edge with an 8px gap.
+     **It carries no close X, and the roll call in `m3-check.html` allows that.** A confirmation
+     answers with its two buttons. A third way out states a third answer this dialog does not have.
+     **It opens OVER `#settingsBox`.** Below 600px that pane is a full-screen dialog, which is the
+     one variant M3 lets another dialog open over. Both sit in the top layer, so neither needs a
+     `z-index`. -->
+<dialog id="confirmBox" aria-labelledby="confirmTitle">
+  <!-- **One dialog answers all three destructive presses**, and `ask()` in `js/ui.js` writes the
+       three strings. Reset settings, Remove all favorites and Stop ignoring all each destroy a list
+       a reader built by hand. Three dialogs is three copies of one component, and the day M3 moves a
+       number two of them stay behind.
+       **The verb on the confirming button names the ACT, never "OK".** M3 states that, and it is
+       also the only word left to read for a reader who mis-tapped. -->
+  <h2 class="mdlgtitle" id="confirmTitle"></h2>
+  <p class="mdlgbody" id="confirmBody"></p>
+  <div class="mdlgfoot">
+    <button class="mtext" id="confirmNo">Cancel</button>
+    <button class="mtext" id="confirmYes"></button>
+  </div>
+</dialog>
+<!-- **M3's snackbar, and it is a `popover` for one reason.** It reports on a control inside a modal
+     dialog, and a modal dialog is in the top layer. No `z-index` reaches over that, which is the
+     rule `js/sparktip.js` already obeys from the other side. `manual`, so a press anywhere does not
+     light-dismiss it and `js/ui.js` owns its clock.
+     It replaced `#devMsg`, a muted line under the buttons. A line inside a scrolling pane can sit
+     below the fold, and the reader who pressed Refresh is looking at the button. -->
+<div id="snack" class="msnack" popover="manual" role="status" aria-live="polite"></div>
 <!-- Help's own dialog. It carries a title in .modalhead where About carries none, because About's
      logo lockup is its heading and this page has no lockup to stand in for one. -->
 <dialog id="helpBox" class="docbox">
   <div class="modalhead">
     <h2>Help</h2>
-    <form method="dialog"><button class="icon dclose" title="Close" aria-label="Close"
-      ><i class="i i-close"></i></button></form>
+    <form method="dialog"><button class="icon dclose" title="Back" aria-label="Back"
+      ><i class="i i-arrow_back"></i></button></form>
   </div>
+  <div class="docbody">
   <!-- A manual, in the order a reader meets the app: the bar, the menu, the drawer, the search box,
        the panel, the two camera views, then the reference sections. One heading per surface, and
        every heading names the surface rather than asking a question about it. A question heading
@@ -641,8 +760,12 @@
     <span class="ctl"><i class="i i-photo_camera"></i><b>Cameras</b></span>
     <span>Every camera in one grid. See All cameras below.</span>
 
+    <span class="ctl"><i class="i i-settings"></i><b>Settings</b></span>
+    <span>Your favorite sensors, your ignored sensors, and the developer controls. On a phone it
+       sits under the <b>More</b> button at the end of the bottom bar.</span>
+
     <span class="ctl"><i class="i i-info"></i><b>Help</b></span>
-    <span>This page. On a phone it sits under the <b>More</b> button at the top right.</span>
+    <span>This page. On a phone it sits under the same <b>More</b> button.</span>
 
     <span class="ctl"><i class="i i-flood"></i><b>About</b></span>
     <span>What this site is, where the data comes from, and the credits. On a phone it sits under
@@ -675,21 +798,12 @@
   </div>
 
   <h3>Filters</h3>
-  <p class="muted">Every control here changes what the map draws. Only the ignored list changes
-     what raises an alarm.</p>
+  <p class="muted">Every control here changes what the map draws. The two saved lists moved to
+     Settings.</p>
   <div class="key">
     <span class="ctl"><i class="i i-near_me"></i><b>Districts</b></span>
     <span>Turn a district on or off. On a mouse, hover a row and press <b>only</b> to show that
        district alone. Show all and Hide all act on the whole list.</span>
-
-    <span class="ctl"><i class="i i-favorite"></i><b>Favorite sensors</b></span>
-    <span>Lists every sensor you starred, one row per sensor. Press <b>remove</b> on a row to
-       unstar it. The count stays on the heading while the panel is shut.</span>
-
-    <span class="ctl"><i class="i i-visibility_off"></i><b>Ignored sensors</b></span>
-    <span>Lists every sensor you silenced. An ignored sensor leaves the map, the alert list, the
-       strip and the badge. Press <b>restore</b> on a row to hear it again. This panel stays on
-       screen even when it is empty.</span>
 
     <span class="ctl"><i class="i i-water_drop"></i><b>Heatmap</b></span>
     <span>Water level or rainfall, never both. Water level scores each river and flood gauge
@@ -703,6 +817,27 @@
 
     <span class="ctl"><i class="i i-apps"></i><b>Sensor kinds</b></span>
     <span>One chip per kind. Turn a chip off to take that kind off the map.</span>
+  </div>
+
+  <h3>Settings</h3>
+  <p class="muted">Two saved lists, and the developer controls under them. Only the ignored list
+     changes what raises an alarm.</p>
+  <div class="key">
+    <span class="ctl"><i class="i i-favorite"></i><b>Favorite sensors</b></span>
+    <span>Lists every sensor you starred, one row per sensor. Press <b>remove</b> on a row to
+       unstar it.</span>
+
+    <span class="ctl"><i class="i i-visibility_off"></i><b>Ignored sensors</b></span>
+    <span>Lists every sensor you silenced. An ignored sensor leaves the map, the alert list, the
+       strip and the badge. Press <b>restore</b> on a row to hear it again. The list stays on
+       screen even when it is empty, and the filters panel states the count.</span>
+
+    <span class="ctl"><i class="i i-settings"></i><b>Developer</b></span>
+    <span>Test mode fills the map with fake alerts, in this browser only. Switching it on closes
+       this pane and puts an amber <b>Test mode</b> chip over the map. That chip is the way out. The
+       table under it states
+       what each feed returned on the last poll. <b>Refresh now</b> asks the server to refetch, and
+       the server holds its own limit of one refresh a minute.</span>
   </div>
 
   <h3>Go to a station</h3>
@@ -971,6 +1106,7 @@
     <span><b>A station JPS does not publish</b></span>
     <span>It is not here. This site adds no station of its own.</span>
   </div>
+  </div><!-- /.docbody -->
 </dialog>
 <!-- Tap the About logo seven times inside five seconds. No header, no close button: the picture is
      the entire content, so the whole surface dismisses it — the one case where tap-anywhere is right,
@@ -981,8 +1117,8 @@
   <div class="dtop">
     <div class="modalhead">
       <h2>All stations</h2>
-      <form method="dialog"><button class="icon dclose" title="Close" aria-label="Close"
-      ><i class="i i-close"></i></button></form>
+      <form method="dialog"><button class="icon dclose" title="Back" aria-label="Back"
+      ><i class="i i-arrow_back"></i></button></form>
     </div>
     <input id="dataFind" type="text" autocomplete="off" placeholder="Filter by name, district or basin…"
            aria-label="Filter stations">
@@ -1000,8 +1136,8 @@
   <div class="dtop">
     <div class="modalhead">
       <h2>All cameras</h2>
-      <form method="dialog"><button class="icon dclose" title="Close" aria-label="Close"
-      ><i class="i i-close"></i></button></form>
+      <form method="dialog"><button class="icon dclose" title="Back" aria-label="Back"
+      ><i class="i i-arrow_back"></i></button></form>
     </div>
     <input id="camFind" type="text" autocomplete="off" placeholder="Filter by name or district…"
            aria-label="Filter cameras">
@@ -1154,29 +1290,15 @@
         <button id="districtNone" class="link">Hide all</button>
       </div>
     </details>
-    <!-- Sensors starred from a station card. Listed one row per sensor, not one row per site: the
-         search box groups by site because it matches the map, and this panel manages the saved list
-         itself, so it has to show every id the list holds. A reader who starred one gauge of six
-         needs to see which one. Collapsed by default — the count on the summary is the indication. -->
-    <details id="favs" class="sect">
-      <summary><i class="i i-favorite"></i>Favorite sensors<b id="favN"></b></summary>
-      <ul id="favList" class="picklist"></ul>
-      <div class="rowbtns"><button id="favClear" class="link">Remove all favorites</button></div>
-    </details>
-    <!-- Sensors switched off one at a time from a station card's Details button. Always here, even
-         empty: this summary and the count under the layer chips are the only two places that say a
-         sensor has been silenced, and a muted alarm nobody can find is the thing every alarm
-         standard warns about. Collapsed by default — the count on the summary is the indication,
-         not the open list. -->
-    <details id="ignored" class="sect">
-      <summary><i class="i i-visibility_off"></i>Ignored sensors<b id="ignoredN"></b></summary>
-      <ul id="ignoredList" class="picklist"></ul>
-      <div class="rowbtns"><button id="ignoredClear" class="link">Stop ignoring all</button></div>
-    </details>
+    <!-- **The favorites and the ignored list left this drawer on 2026-08-25**, on a reader's
+         instruction. They are open sections in Settings now. Neither one is a filter over the map:
+         each is a saved list a reader reviews and edits, which is what a settings pane is for.
+         The district picker stays, because it IS a filter. -->
     </div>
     <div>
-    <!-- Outside the section on purpose: the `· N ignored` count is one of the two always-visible
-         indications that an alarm has been silenced, and a collapsed section would hide it. -->
+    <!-- **The `· N ignored` count stays here, and it is now the one always-visible sign that a
+         sensor is silenced.** The list itself moved to Settings, one press further away. This line
+         is what still says a sensor has been muted, and it must not follow the list. -->
     <p id="shown" class="muted"></p>
     </div>
   </div>
@@ -1315,15 +1437,31 @@
   <label class="chip" id="favChip"><input type="radio" name="pinfilter" id="favOnly" value="fav" autocomplete="off"
     ><i class="i i-check chipcheck" aria-hidden="true"></i><span>Favorites</span><span id="favHint" class="hint"></span></label>
 
+  <!-- **Test mode, and it draws only while the mode is on.** A reader asked for it here on
+       2026-08-25. It replaced `#testbadge`, a fat amber pill in `#pills` carrying three lines and a
+       Turn off button.
+       **`body.testmode` shows it, so no script writes this.** `js/test.js` already toggles that
+       class, and the chip is the one thing on the map that says the alerts are fake.
+       **It keeps the amber and never the chip's own surface.** This is not a filter a reader chose.
+       It is the map claiming something that is not true, and the colour is what says so at a glance.
+       **The trailing × turns the mode off**, which is M3's input chip: a thing that is on, and can
+       be dismissed from the place it is stated. -->
+  <button type="button" class="chip mchip" id="testChip"
+          aria-label="Test mode is on. Turn it off">
+    <i class="i i-warning glyph" aria-hidden="true"></i>
+    <span>Test mode</span>
+    <i class="i i-close tail" aria-hidden="true"></i>
+  </button>
+
   <!-- The one line left of the panel's own prose. Every caller that writes it reports a failure:
        `could not load` from the rollback in render.js and in ui.js, and `no data yet` from wx.js.
        It is empty on a healthy poll, and an empty `.hint` leaves the row entirely. -->
   <p class="mnote"><span id="wxHint" class="hint"></span></p>
 </div>
 
-<!-- Standing indications that the map is showing less than it holds. One strip, because test mode
-     and the rising filter can be on at the same time and two fixed pills would sit on each other.
-     The test badge appends itself here from test.js. -->
+<!-- A standing indication that the map is showing less than it holds. **One pill left.** The test
+     badge stood here too, and it is a chip on the map chip row since 2026-08-25. The strip stays a
+     strip: it centres on the map and it is where a second standing state would go. -->
 <div id="pills">
   <!-- ON ALERT, matching the chip in #paint that raises it. One name for one thing. The sentence
        under it states what the filter actually does, which is narrower than the app bar's own

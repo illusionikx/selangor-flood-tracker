@@ -48,11 +48,11 @@ body:not(.ready) #map { transition: none; }
      and the repository owner asked for that space back on 2026-08-24. The ticker moved inside the
      map card as a pill, so the map starts at `--gap` and the supporting pane starts at 0.
      `0px` and never `0`: every reader is a `calc()`, and a unitless zero is a parse error there. */
-  :root { --gap: 16px; --seam: 8px; --rail-w: 96px; --hdr: 0px;
+  :root { --gap: 16px; --seam: 8px; --rail-w: 80px; --hdr: 0px;
           --top-free: calc(var(--gap) + 12px + var(--tick-h) + 8px); }
   /* **On `:root`, never on `body`.** `--pane` is computed on `:root` and reads `--rail-w` there. A
      value redefined further down the tree never reaches it, so the supporting pane would keep
-     sizing itself against a 96px rail while the rail drew 220. `:has()` is what lets a body class
+     sizing itself against an 80px rail while the rail drew 220. `:has()` is what lets a body class
      move a root-level token. */
   :root:has(body.railopen) { --rail-w: 220px; }
   #map { border-radius: var(--md-sys-shape-corner-large); }
@@ -168,16 +168,25 @@ header {
 #brand .mark { position: relative; display: flex; flex: none; cursor: help; }
 
 /* --- navigation rail ---------------------------------------------------------------------------
-   M3's collapsed rail: 96px wide, `padding-block: 44px 20px`, on the surface tone. It runs the full
+   M3's collapsed rail: 80px wide, on the surface tone. It runs the full
    height of the window on the leading edge, beside the map card, with the app bar starting where it
    ends rather than sitting under it — see the comment further down for the reversal.
+   **80 and not 96, and M3 publishes both.** 96 is the Expressive rail in
+   `NavigationRail/navigation-rail.css`, which is the file the rest of this block transcribes. 80 is
+   the container width on m3.material.io's own navigation rail specs page, beside a 56dp item and a
+   32dp indicator. This rail already draws both of those numbers, so 96 left the 56px pill 20px of
+   clear space on each side against the 12 the classic page states. The repository owner picked 80 on
+   2026-08-25, off that page. It hands 16px back to the map at every width above 600px.
    **No divider on the edge facing the map.** This app separates surfaces by space, and `--gap` is
-   already the seam between the two. The app bar and the pane each lost the same rule. */
+   already the seam between the two. The app bar and the pane each lost the same rule.
+   **The top pad is 0, and M3 states 44px.** That number reserves a status bar this app does not
+   draw. The toggle is the first item, so 44px of empty surface put it below the app bar's own
+   glyphs on the row beside it. The repository owner cut it on 2026-08-25. */
 #rail {
   position: absolute; z-index: 600; top: 0; bottom: 0; left: 0;
   box-sizing: border-box; width: var(--rail-w);
   display: flex; flex-direction: column; overflow: hidden;
-  padding-block: 44px 20px;
+  padding-block: 0 20px;
   background: var(--md-sys-color-surface);
   transition: width var(--m3-rail);
 }
@@ -188,16 +197,16 @@ body:not(.ready) #rail { transition: none; }
    under the app bar before, which put the brand in the bar and the rail below it. M3's canonical
    layout puts the rail on the leading edge of the window and every other pane to its right.
    **`overflow: hidden` is M3's own, and it replaced `overflow-y: auto`.** A collapsed rail clips a
-   label mid-word while the width travels, and a scrollbar down a 96px column is worse than the clip.
+   label mid-word while the width travels, and a scrollbar down an 80px column is worse than the clip.
    The items box scrolls instead, which is where M3 puts the scroll.
 
    --- the expanded variant ---
-   220px against 96, with `padding-inline: 20px`, from the same file. `--rail-w` carries both, so
+   220px against 80, with `padding-inline: 20px`, from the same file. `--rail-w` carries both, so
    every box that steps aside for the rail follows with no rule of its own. The map's leading inset,
    the app bar's leading edge and `--pane` all read it.
    **The width is declared on `:root`, never on `body`.** `--pane` is computed on `:root` and reads
    `--rail-w` there. A value redefined further down the tree never reaches it, so the supporting
-   pane would keep sizing against a 96px rail. `:root:has()` is what lets a body class move a
+   pane would keep sizing against an 80px rail. `:root:has()` is what lets a body class move a
    root-level token. */
 #rail .railmenu {
   display: flex; flex-shrink: 0; align-items: center; justify-content: center; height: 56px;
@@ -210,6 +219,8 @@ body:not(.ready) #rail { transition: none; }
    items.** The numbers are `Fab/fab.css`'s own medium FAB: a 56px box, `shape-corner-large`, a 24px
    glyph, and the primary pair. Elevation is `--shadow`, this app's one elevation. Every other
    floating surface here declines M3's own for the same reason.
+   **The start margin is 8px, down from 12**, one of the three gaps trimmed on 2026-08-25. It is the
+   gap INSIDE the header block, against the 24 that separates that block from the destinations.
    **It states `min-width` and never `width`, so it can grow.** An expanded rail draws M3's extended
    form: the same height, `padding-inline: 16px`, and the label beside the glyph. A box sized by its
    own content travels between the two states, where a `56px` to `auto` pair cannot animate at all.
@@ -217,7 +228,7 @@ body:not(.ready) #rail { transition: none; }
 #rail .railfab {
   flex: none; align-self: center;
   display: flex; align-items: center; justify-content: center;
-  box-sizing: border-box; min-width: 56px; height: 56px; margin-block-start: 12px;
+  box-sizing: border-box; min-width: 56px; height: 56px; margin-block-start: 8px;
   padding: 0; border: 0; cursor: pointer;
   border-radius: var(--md-sys-shape-corner-large);
   background: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary);
@@ -314,12 +325,19 @@ body.railopen #rail .railbrand { padding-inline-start: 16px; }
    block below lost its entry for this element with the rotation. */
 body.railopen #rail #railToggle .i { --i: var(--i-menu_open); }
 /* M3's items box, from `NavigationRail/navigation-rail.css`. `flex: 1` is what puts the theme
-   button on the bottom edge. `margin-block-start: 40px` is that file's own gap between the brand
-   slot and the first item, and `gap: 4px` is its own spacing between one collapsed item and the
-   next. */
+   button on the bottom edge, and `gap: 4px` is that file's own spacing between one collapsed item
+   and the next.
+   **The gap over the first item is 24px, and M3 states 40.** That number separates the header block
+   — the menu row, the brand and the FAB — from the destinations under it. It is one of three gaps
+   the repository owner asked back on 2026-08-25, with the `hr` at 8 and the FAB at 8. Together they
+   hand about 40px back down the column.
+   **The gap is not deleted, and it must not be.** It is the one thing saying the search is part of
+   the header rather than the first destination. 24 is still three times the 8 inside that block, so
+   the grouping reads the same. This is the same reduction the rail's own width took: M3's number,
+   cut where this app's own content leaves slack, with the ratio kept. */
 #rail .railitems {
   display: flex; flex: 1; flex-direction: column; gap: 4px;
-  margin-block-start: 40px; overflow-y: auto; scrollbar-width: none;
+  margin-block-start: 24px; overflow-y: auto; scrollbar-width: none;
 }
 
 /* **The pill, the label and the badge are shared with the navigation bar below 600px.** Those three
@@ -335,7 +353,9 @@ body.railopen #rail #railToggle .i { --i: var(--i-menu_open); }
   gap: 4px; width: 100%; min-height: 64px; padding: 0;
   border: 0; background: none; cursor: pointer;
   color: var(--md-sys-color-on-surface-variant);
-  transition: color var(--md-sys-motion-duration-short2) var(--md-sys-motion-easing-standard);
+  transition: color var(--md-sys-motion-duration-short2) var(--md-sys-motion-easing-standard),
+              background-color var(--md-sys-motion-duration-short2)
+              var(--md-sys-motion-easing-standard);
 }
 
 :is(#rail, #navbar) .railpill {
@@ -355,6 +375,73 @@ body.railopen #rail #railToggle .i { --i: var(--i-menu_open); }
   outline: 2px solid var(--md-sys-color-primary); outline-offset: 2px;
   border-radius: var(--md-sys-shape-corner-medium);
 }
+/* --- the state layers ---------------------------------------------------------------------------
+   Every button in this rail answers a pointer the way M3 states it: a state layer of the surface's
+   own content colour, at `--m3-state-hover` (8%) or `--m3-state-press` (10%). `css/base.css` derives
+   both from the vendored scale, so no opacity is written here.
+   **The layer goes on the INDICATOR, never on the whole item.** A collapsed item is a 64px column
+   holding a 56 by 32 pill with a label under it, and M3 lights the pill alone. A layer over the
+   column paints the label's own box too, which reads as a row in a list rather than as an indicator
+   lighting up. Expanded, the ROW is the indicator, so the layer moves onto the row. That is the same
+   move the selected fill already makes, and it is why these are two blocks rather than one.
+   **A selected surface takes its own content colour AND its own container.** The selected pill is
+   `--accent` here. `on-surface` at 8% over it is invisible on the light theme and a grey wash on the
+   dark one, and a mix ending in `transparent` erases the fill outright.
+   **`:active` and not `:focus`.** A focus ring already answers the keyboard on all four controls,
+   and M3 gives focus and pressed the same 10%. Two marks for one state is one too many. */
+body:not(.railopen) #rail .railitem:hover .railpill {
+  background: color-mix(in srgb,
+    var(--md-sys-color-on-surface) var(--m3-state-hover), transparent);
+}
+body:not(.railopen) #rail .railitem:active .railpill {
+  background: color-mix(in srgb,
+    var(--md-sys-color-on-surface) var(--m3-state-press), transparent);
+}
+body:not(.railopen) #rail .railitem[aria-current="page"]:hover .railpill {
+  background: color-mix(in srgb, var(--md-sys-color-on-secondary-container)
+    var(--m3-state-hover), var(--md-sys-color-secondary-container));
+}
+body:not(.railopen) #rail .railitem[aria-current="page"]:active .railpill {
+  background: color-mix(in srgb, var(--md-sys-color-on-secondary-container)
+    var(--m3-state-press), var(--md-sys-color-secondary-container));
+}
+body.railopen #rail .railitem:hover {
+  background: color-mix(in srgb,
+    var(--md-sys-color-on-surface) var(--m3-state-hover), transparent);
+}
+body.railopen #rail .railitem:active {
+  background: color-mix(in srgb,
+    var(--md-sys-color-on-surface) var(--m3-state-press), transparent);
+}
+body.railopen #rail .railitem[aria-current="page"]:hover {
+  background: color-mix(in srgb, var(--md-sys-color-on-secondary-container)
+    var(--m3-state-hover), var(--md-sys-color-secondary-container));
+}
+body.railopen #rail .railitem[aria-current="page"]:active {
+  background: color-mix(in srgb, var(--md-sys-color-on-secondary-container)
+    var(--m3-state-press), var(--md-sys-color-secondary-container));
+}
+/* The FAB's own pair: `on-primary` over `primary`, the same shape the selected item takes. */
+#rail .railfab:hover {
+  background: color-mix(in srgb,
+    var(--md-sys-color-on-primary) var(--m3-state-hover), var(--md-sys-color-primary));
+}
+#rail .railfab:active {
+  background: color-mix(in srgb,
+    var(--md-sys-color-on-primary) var(--m3-state-press), var(--md-sys-color-primary));
+}
+/* The rail toggle. `.icon:hover` in `css/base.css` fills a 40px disc with `--hover`, this app's
+   container TONE. That is a surface rather than a state layer, and the theme button below now wears
+   that same tone as its resting disc. So one of the two would answer a pointer with a fill it
+   already has. Both take the layer instead, and the rail answers a pointer one way. */
+#rail #railToggle:hover {
+  background: color-mix(in srgb,
+    var(--md-sys-color-on-surface-variant) var(--m3-state-hover), transparent);
+}
+#rail #railToggle:active {
+  background: color-mix(in srgb,
+    var(--md-sys-color-on-surface-variant) var(--m3-state-press), transparent);
+}
 /* The count rides the corner of the pill, the way the app bar badge rode the button. `:empty`
    removes it, because a zero-width pill still draws its own background. */
 :is(#rail, #navbar) .railbadge {
@@ -363,11 +450,38 @@ body.railopen #rail #railToggle .i { --i: var(--i-menu_open); }
   color: var(--surface); background: var(--c, var(--muted)); border-radius: 999px;
 }
 :is(#rail, #navbar) .railbadge:empty { display: none; }
+/* 8px each side, down from 12. A divider needs enough air to read as one, and the two groups it
+   separates are already four rows and three rows. */
 #rail hr {
-  width: 56px; height: 1px; margin: 12px auto; border: 0;
+  width: 56px; height: 1px; margin: 8px auto; border: 0;
   background: var(--md-sys-color-outline-variant);
 }
-#rail #railApps { margin: 0 auto; flex: none; }
+/* **The theme button wears a resting DISC in the rail, and nowhere else.** The repository owner
+   asked for it on 2026-08-25. It is M3's filled icon button in its unselected state: a
+   `surface-container-highest` container under an `on-surface-variant` glyph, which this app's bridge
+   in `css/base.css` resolves to `--hover` under `--muted`.
+   **Not the tonal variant.** M3 fills that one with `secondary-container`, and this app bridges that
+   role to `--accent` — the selected rail indicator's own fill. An accent disc at the foot of this
+   column reads as a seventh destination, and a selected one.
+   **The rail alone, because the button has two homes.** Below 600px it is the app bar's trailing
+   action, and an app bar action is a standard icon button with no container. `#railApps .i` beside
+   it is deliberately unscoped for the opposite reason: a glyph size belongs to the button, and a
+   container belongs to the surface the button stands on.
+   Its hover is the state layer over that disc, not a second tone. */
+#rail #railApps {
+  margin: 0 auto; flex: none;
+  background: var(--md-sys-color-surface-container-highest);
+  transition: background-color var(--md-sys-motion-duration-short2)
+              var(--md-sys-motion-easing-standard);
+}
+#rail #railApps:hover {
+  background: color-mix(in srgb, var(--md-sys-color-on-surface-variant)
+    var(--m3-state-hover), var(--md-sys-color-surface-container-highest));
+}
+#rail #railApps:active {
+  background: color-mix(in srgb, var(--md-sys-color-on-surface-variant)
+    var(--m3-state-press), var(--md-sys-color-surface-container-highest));
+}
 /* --- the rail, expanded ---
    Every number is NavigationRail/navigation-rail.css's own. The item goes from a 64px column to a
    56px row, the label moves inside the indicator, and the indicator goes from a 56 by 32 pill over
@@ -379,14 +493,15 @@ body.railopen #rail #railToggle .i { --i: var(--i-menu_open); }
    the row is the indicator and the label sits inside it. One DOM, two states, because the paint
    moves rather than the elements. */
 /* **A collapsed rail carries the destinations and nothing else.** The repository owner asked for
-   this on 2026-08-24. The brand, the divider, Help and About draw at 220px alone.
-   The divider goes with them. It separates the four destinations from Help and About, and with both
-   of those gone it separates nothing.
+   this on 2026-08-24. The brand, the divider, Settings, Help and About draw at 220px alone.
+   The divider goes with them. It separates the four destinations from the other three, and with all
+   three gone it separates nothing.
    **This costs the diagnostics popover while the rail is shut.** `#netstats` opens on
    `body:has(#brand .mark:hover)`, and a hidden brand has no hover to give. One press of the rail
    toggle brings it back, and the About dialog's Developer section still holds the source counters. */
 body:not(.railopen) #rail .railbrand,
 body:not(.railopen) #rail hr,
+body:not(.railopen) #rail #railSettings,
 body:not(.railopen) #rail #railHelp,
 body:not(.railopen) #rail #railAbout { display: none; }
 body.railopen #rail { padding-inline: 20px; }
@@ -427,7 +542,7 @@ body.railopen #rail .railbadge { top: -6px; right: -6px; }
 
 /* --- navigation bar ---------------------------------------------------------------------------
    M3's navigation bar, from NavigationBar/navigation-bar.css. It draws below 600px alone, where the
-   rail does not draw at all: 96px of a 360px screen is 27% of it, and M3 states no rail there.
+   rail does not draw at all: 80px of a 360px screen is 22% of it, and M3 states no rail there.
    **`min-height` and not `height`.** The safe area extends the bar downward that way. Under
    `box-sizing: border-box` a fixed height absorbs the inset into the content box instead, and the
    labels clip.
@@ -550,8 +665,11 @@ body.railopen #rail .railbadge { top: -6px; right: -6px; }
    and the colour language keeps the traffic-light ramp for status. Grey stays the default, so a
    stale alert needs no rule of its own — it simply never gets one of the two below. */
 #ticker .tk-why { color: var(--muted); }
-#ticker .tk-why.t-now  { color: var(--s-danger); }
-#ticker .tk-why.t-soon { color: var(--s-warning); }
+#ticker .tk-why.t-now   { color: var(--s-danger); }
+/* The panel's fourth rung reaches the strip too. `.camtile` and `.camwarn` deliberately have no
+   `t-heavy` rule: camAlert() in js/stations.js drops that rung before a camera ever sees it. */
+#ticker .tk-why.t-heavy { color: var(--s-warning); }
+#ticker .tk-why.t-soon  { color: var(--s-warning); }
 /* The advisory. Not a link and not a station — the accent colour marks it as the app talking rather
    than another row of telemetry, and it is the only tile with no `data-go`. */
 #ticker .tk-say { cursor: default; }
@@ -599,37 +717,55 @@ body.railopen #rail .railbadge { top: -6px; right: -6px; }
 /* Wider than a plain dialog: this one carries the logo lockup, three source entries and a credits
    block, and at 440px the source descriptions ran to four lines each. */
 .docbox {
-  /* `--pane` is this pane's own padding, and the pinned header below reads it back. It is 24px here
-     and 18px on a phone, and stating it once is what stops the header's four negative offsets
-     drifting from the padding they cancel. */
+  /* `--pane` is this pane's own padding, and both the header and the body read it back. It is 24px
+     here and 18px on a phone, and stating it once is what stops the two drifting apart. */
   --pane: 24px;
-  max-width: min(820px, calc(100vw - 32px)); padding: var(--pane);
-  overflow: auto; overscroll-behavior: contain;
+  max-width: min(820px, calc(100vw - 32px)); padding: 0;
+  /* **The dialog does not scroll. Its body does.** So the bar cannot scroll away, and the scrollbar
+     runs beside the prose rather than up the whole pane and past the header. See `.docbody`. */
+  overflow: hidden;
   border: 1px solid var(--outline); border-radius: 12px;
   background: var(--surface); color: var(--on-surface); box-shadow: var(--shadow);
 }
+/* On `[open]`, never on the element. `#dataBox` carries the full account: a browser closes a dialog
+   with `dialog:not([open]) { display: none }` in its own stylesheet, and any author `display` on the
+   element beats it, which lays a closed dialog out on the page. */
+.docbox[open] { display: flex; flex-direction: column; }
 .docbox::backdrop { background: #0009; }
 
-/* **The header is pinned at every width, because these two panes are their own scroller.** M3: even
-   when a dialog has to scroll, its title stays at the top. The table and the camera wall already
-   did it structurally — each is a flex column whose `.dtop` is `flex: none` and whose body scrolls
-   under it. These two had no such seam, so Help scrolled its own close button off the screen.
-   **`top` is the NEGATIVE of the pane's padding, never 0.** A sticky box is held inside its
-   scrollport, and a scroller's scrollport is its PADDING box. So `top: 0` pins the bar 24px down
-   and the content scrolls through the gap above it, which looks almost right. The negative margins
-   beside it are a different job: they take the bar full bleed across that padding, and the
-   `padding` puts its own contents back inside those edges. Neither substitutes for the other.
-   The divider is M3's anatomy item 6. M3's basic dialog specs no header border, and its token set
-   answers the same seam another way — `header-on-scroll-container-color` plus elevation level2,
-   which is a scroll state and needs script. A 1dp line is the same statement with no listener.
-   **Below 600px this line is cancelled and the compact block says why.** There the pane is a
-   full-screen dialog wearing a 112px app bar, and a reader cut it on 2026-08-21. */
+/* **The header is a fixed row and the body scrolls under it, which is the shape the table and the
+   camera wall already had.** Each of those is a flex column whose `.dtop` is `flex: none` and whose
+   body scrolls. These three prose panes were their own scroller instead, so Help scrolled its own
+   close button off the screen.
+   **`position: sticky` stood here for one revision and it is gone.** It pinned the bar and left two
+   faults a reader can see. The scrollbar still belonged to the dialog, so it ran the full height of
+   the pane and past the bar. And a sticky box is held inside its scrollport, and a scroller's
+   scrollport is its PADDING box — so `top: 0` pinned the bar 24px down, and the fix was a negative
+   `top` and four negative margins that each had to stay in step with the padding they cancelled.
+   A structural seam needs none of that. One box holds the bar, the next one scrolls, and there is
+   no offset left to drift.
+   **The divider is M3's anatomy item 6, and this app draws none.** M3's basic dialog specs no header
+   border, and its own answer to the seam is `header-on-scroll-container-color` with elevation
+   level2, which is a scroll state and needs script. These surfaces separate by space, which is the
+   cut a reader already made on the map card, the app bar and the supporting pane. */
 .docbox .modalhead {
-  position: sticky; top: calc(-1 * var(--pane)); z-index: 2;
+  flex: none;
   min-height: 56px;
-  margin: calc(-1 * var(--pane)) calc(-1 * var(--pane)) 10px;
+  margin: 0 0 10px;
   padding: 0 var(--pane);
   background: var(--surface);
+}
+/* **The scroller, and the only box in this pane that scrolls.** `flex: 1` with `overflow: auto`, the
+   three numbers `#sideBody` and `table.data` already take.
+   **`overflow: auto` is what lets it shrink.** A flex item's automatic minimum size is its content,
+   so a body left at `overflow: visible` refuses to shrink and pushes the header off the top instead.
+   The rule only applies to an item whose overflow IS visible, so stating the scroll states both.
+   **No padding on top.** The header carries its own 10px below it, and that space sits outside the
+   scroller — so prose stops under the bar rather than running up to it. */
+.docbody {
+  flex: 1; min-width: 0;
+  overflow: auto; overscroll-behavior: contain;
+  padding: 0 var(--pane) var(--pane);
 }
 /* **A pinned bar needs a height of its own, and these two shipped without one.** `.modalhead` was
    written as a row in the flow, so it sized to its title and its close button was pulled back onto
@@ -665,14 +801,35 @@ body.railopen #rail .railbadge { top: -6px; right: -6px; }
 .modalhead h2 { flex: 1; min-width: 0; margin: 0; }
 .modalhead .dclose { margin: -8px -10px -8px 0; font-size: 20px; }
 .modalhead form { margin: 0; }
+
+/* **The five full-screen-capable panes lead with a BACK ARROW, at every width.** The repository
+   owner asked for one glyph across every panel on 2026-08-25, and named the arrow. So About, Help,
+   Settings, the table and the camera wall each read the way `#pane` already reads: a leading
+   navigation icon, first in the source, first on the row.
+   **This reverses "the X stays, and it must never become a back arrow".** That rule argued from M3:
+   a supporting pane is a destination somebody navigates to, and a dialog dismisses. It is still the
+   spec's own answer. What it cost a reader is the thing it lost on: a phone shows one full-screen
+   surface at a time, and two glyphs in one position for one action reads as a fault rather than as
+   a component boundary.
+   **`order` rather than a source move.** The close button already sits first in three of the five,
+   and the phone block already ordered the row above the headline. One property states the position
+   at both widths instead.
+   **Named one by one, never as bare `.modalhead`.** `#lightbox` and `#warnBox` are basic dialogs at
+   every width — floating cards that never fill the screen — so both keep the ×. The lightbox has a
+   second reason: a back arrow beside a scrubber and a step-back button reads as "previous frame". */
+#dataBox .modalhead form, #camBox .modalhead form, .docbox .modalhead form { order: -1; }
+#dataBox .modalhead .dclose, #camBox .modalhead .dclose, .docbox .modalhead .dclose {
+  margin: -8px 0 -8px -10px;
+}
 /* No `max-width` on the paragraph. A 70ch cap was tried when the dialog went to 820px, to keep a
    line under about 100 characters. It gave the pane two right edges: the prose stopped short while
    the `.key` grid next to it ran the full width, and the ragged gutter read as a layout fault. One
    edge for everything beats a comfortable measure here. Anything that wants a narrower line has to
    narrow the whole pane, grid included. */
 .docbox p { margin: 10px 0; line-height: 1.5; }
-/* Nothing left in this row but the close button, pushed to the corner. */
-#aboutBox .modalhead { justify-content: flex-end; margin-bottom: 0; }
+/* Nothing left in this row but the back arrow. It LEADS, the way it does in the other four and in
+   the pane: this row read flex-end while the button was an X on the trailing edge. */
+#aboutBox .modalhead { justify-content: flex-start; margin-bottom: 0; }
 
 /* The disclaimer, lifted out of the run of grey paragraphs. It is the one line on this page with
    legal and safety weight, and as a third muted paragraph it was the easiest thing to skip.
@@ -697,17 +854,10 @@ body.railopen #rail .railbadge { top: -6px; right: -6px; }
 
 /* --- test mode --------------------------------------------------------------------------------- */
 
-/* A switch, not a checkbox: it changes what the whole map means, and should not look like the
-   district filters. Amber rather than the accent — this is a warning state, not a preference. */
-.testtog {
-  display: flex; align-items: center; gap: 6px; flex: none; cursor: pointer;
-  font-size: 11px; font-weight: 500; letter-spacing: .04em; text-transform: uppercase;
-  color: var(--muted); padding: 4px 10px 4px 8px; border-radius: 999px;
-  border: 1px solid var(--outline);
-}
-.testtog:hover { background: var(--hover); }
-.testtog:has(:checked) { color: #e8710a; border-color: #e8710a; background: #e8710a1a; }
-.testtog input { margin: 0; accent-color: #e8710a; }
+/* **The amber pill is gone, and the control is an M3 switch on a list row.** `.testtog` carried a
+   checkbox and the words TEST MODE, in amber, on the argument that the mode is a warning state
+   rather than a preference. The three signals below are what carry that warning, and they stayed.
+   A reader asked for the switch on 2026-08-25. See `.msw` further down this file. */
 
 /* Three signals, because one badge is a thing you stop seeing after ten minutes, and mistaking a
    drill for a flood is the worst failure this app could have. Striped bar, badge, and the chip. */
@@ -731,30 +881,33 @@ body.testmode header {
   pointer-events: none;
 }
 #pills > * { pointer-events: auto; }
-#testbadge, #risebadge {
+/* **`#testbadge` is gone, and `#testChip` on the map chip row replaced it on 2026-08-25.** The
+   badge was a fat amber pill carrying a label, a sentence and a Turn off button. A reader asked for
+   a chip. See `#testChip` further down this file for what it keeps and why it stays amber. */
+#risebadge {
   display: none; align-items: center; gap: 10px;
   padding: 8px 10px 8px 14px; border-radius: 999px;
   box-shadow: var(--shadow); font-size: 12px; line-height: 1;
 }
-#testbadge { background: #e8710a; color: #fff; }
 /* The accent, not the amber: a filter you switched on yourself is a state to be reminded of, not a
    hazard — amber here would be the third thing on this page claiming something is wrong. Ink is
    `--surface` and never `#fff`, because the accent is a pale blue on the dark theme. */
 #risebadge { background: var(--accent); color: var(--surface); }
-body.testmode #testbadge, body.rising #risebadge { display: flex; }
-#testbadge b, #risebadge b { font-weight: 500; letter-spacing: .06em; }
-#testbadge span, #risebadge span { opacity: .9; }
-#testbadge .i, #risebadge .i { font-size: 18px; }
-#testbadge button, #risebadge button {
+body.rising #risebadge { display: flex; }
+#risebadge b { font-weight: 500; letter-spacing: .06em; }
+#risebadge span { opacity: .9; }
+#risebadge .i { font-size: 18px; }
+#risebadge button {
   padding: 5px 12px; border: 0; border-radius: 999px; cursor: pointer;
   background: #fff3; color: inherit; font: 500 11px Roboto, sans-serif;
 }
-#testbadge button:hover, #risebadge button:hover { background: #ffffff4d; }
+#risebadge button:hover { background: #ffffff4d; }
 @media (max-width: 600px) {
   /* The sentence is the first thing to lose: the label and the way out are what matter. */
-  #testbadge span, #risebadge span { display: none; }
-  /* The logo already has its own line, so nothing needs to wrap here — just less of everything. */
-  .docbox { padding: 18px; }
+  #risebadge span { display: none; }
+  /* **The pane's padding is `--pane` and this block used to state a second copy of it, at 18px.**
+     The two agreed by luck until `--pane` moved to 24, and then the header's own offsets bled 6px
+     past the pane on each side. `--pane: 18px` is set once, in the compact block further down. */
   #aboutBox .logo { margin-bottom: 12px; padding: 30px 0 8px; }
   #aboutBox .logo .i { font-size: 34px; }
   #aboutBox .logo span { font-size: 18px; }
@@ -811,13 +964,314 @@ body.testmode #testbadge, body.rising #risebadge { display: flex; }
    attribute alone does not hide this button. The Pages build has no api.php to force. */
 .rowbtns .link[hidden] { display: none; }
 
-/* .testtog was a flex item in .modalhead, where `flex: none` sized it to its content. Here it is a
-   block-level flex container and would stretch the full pane, so the pill has to claim its width. */
-#aboutBox .testtog { width: fit-content; }
+/* **No `.rowbtns` left in Settings.** The three developer controls became list rows on 2026-08-25,
+   and the two clear actions became the last row of their own list the same day. See `.mfoot`. */
 
-/* Three controls, not the drawer's two. They wrap rather than shrink past their own text. */
-#aboutBox .rowbtns { flex-wrap: wrap; }
-#aboutBox .rowbtns .link { width: auto; flex: 1 1 auto; }
+/* --- Settings, as M3 lists -----------------------------------------------------------------------
+   Transcribed from `List/list.css` in the M3 Expressive component set, which cites
+   m3.material.io/components/lists:
+   https://github.com/bczak/m3you/blob/development/src/components/List/list.css
+
+     list        a flex column, no padding, no list marker
+     item        min-block-size 56px, 72px at two lines, 88px at three
+     layout      a flex row, centred, gap 16px, padding 8px 16px
+     leading     min 24px wide and 48px tall, in `on-surface-variant`
+     content     `flex: 1` with `min-inline-size: 0`, a column
+     headline    body-large
+     supporting  body-medium, in `on-surface-variant`
+     trailing    min 48px on both axes
+     segmented   rows on `surface-container`, a 4dp inner corner, and a 16dp outer corner on the
+                 group's own first and last row
+
+   **The SEGMENTED appearance, on a reader's instruction of 2026-08-25.** The standard appearance
+   stood here for one revision. Segmented is what M3 gives a settings group: every row is a filled
+   container and the group is one shape.
+   **The gap is 8px and the reference states 2px.** `--md-list-item-gap` is written for rows that
+   read as one block. These three groups each hold a different kind of row, and 2px between a
+   two-line station and the next reads as one long block with hairlines cut into it.
+   **The markup already carried the three slots.** `.picklist li` is the item and its own layout in
+   one box. `.glyph` is the leading slot, `.nm` is the content, and `.mtrail` or `.msw` is the
+   trailing one. `js/render.js` emits the rows it always did.
+   **A saved row is STATIC and its trailing button is the action.** So no pointer cursor on the row
+   and no hover tint. `.picklist` gives those to a row that opens something. A Developer action row
+   IS pressable, and `.mrow` is that row's own button. */
+
+/* The bordered, inner-scrolling box is gone. `max-height: 26vh` put a second scroller inside a pane
+   that already scrolls. The cost is a long pane for a reader holding forty favorites, and this pane
+   is where that list belongs. */
+/* --- M3 segmented list, shared -------------------------------------------------------------------
+
+   `.mseg` is M3's list at `appearance: segmented`. TWO surfaces draw one: the two saved lists in
+   Settings, and every alert group in the "On alert" pane. The numbers are stated once here so the
+   two cannot drift, and each surface states only what it diverges on below.
+
+   Segmented gives every row a filled container and gives the GROUP one shape. So the rows carry a
+   4dp inner corner and the group's own first and last row take the 16dp outer one.
+
+   `surface-container` is `--hover` through the bridge in `css/base.css`. That is this app's one
+   container tone, and the palette rule keeps M3's tonal ladder out of it. */
+.mseg {
+  display: flex; flex-direction: column; gap: 8px; list-style: none; margin: 0; padding: 0;
+}
+.mseg > li {
+  display: flex; align-items: center; gap: 16px; padding: 8px 16px; min-height: 72px;
+  background: var(--md-sys-color-surface-container);
+  border-radius: var(--md-sys-shape-corner-extra-small);
+  font-size: var(--md-sys-typescale-body-large-size);
+  line-height: var(--md-sys-typescale-body-large-line-height);
+  letter-spacing: var(--md-sys-typescale-body-large-tracking);
+}
+.mseg > li:first-child {
+  border-start-start-radius: var(--md-sys-shape-corner-large);
+  border-start-end-radius: var(--md-sys-shape-corner-large);
+}
+.mseg > li:last-child {
+  border-end-start-radius: var(--md-sys-shape-corner-large);
+  border-end-end-radius: var(--md-sys-shape-corner-large);
+}
+/* 72px is M3's TWO-LINE item. Every row on both surfaces carries a headline and a supporting line,
+   so neither surface ever draws the 56px one. A group of one row takes the 16dp corner all round,
+   which `:first-child` and `:last-child` both matching already does. */
+
+#settingsBox .picklist { padding: 0; overflow: visible; }
+/* A saved row is STATIC and its trailing button is the action, so it takes no pointer and no state
+   layer. `.picklist li` hands both to a row that opens something. */
+#settingsBox .mseg > li { cursor: default; }
+#settingsBox .mseg > li:hover { background: var(--md-sys-color-surface-container); }
+/* M3's leading slot is 24px wide and 48px tall, which is what holds a one-line row at 56px. */
+#settingsBox .picklist .glyph { font-size: 24px; min-width: 24px; min-height: 48px; }
+#settingsBox .picklist .nm { flex: 1; min-width: 0; line-height: inherit; }
+/* **`.muted` carries a `font-size` of its own, so this needs three classes to beat it.** That trap
+   is written up in CLAUDE.md: a declaration on the element wins against an inherited value. */
+#settingsBox .picklist .nm .muted {
+  font-size: var(--md-sys-typescale-body-medium-size);
+  line-height: var(--md-sys-typescale-body-medium-line-height);
+  letter-spacing: var(--md-sys-typescale-body-medium-tracking);
+}
+/* The empty state is a one-line item, at M3's 56px and the supporting type. It is the group's only
+   row, so it takes the 16dp corner all round. */
+#settingsBox .mseg > li.none {
+  min-height: 56px; display: flex; align-items: center; letter-spacing: normal;
+  font-size: var(--md-sys-typescale-body-medium-size);
+  line-height: var(--md-sys-typescale-body-medium-line-height);
+  border-radius: var(--md-sys-shape-corner-large);
+}
+
+/* **The trailing action is an M3 ICON BUTTON, and it was a text pill reading `remove`.** A reader
+   asked for the glyph on 2026-08-25. `heart_minus` removes a favorite and `visibility` restores an
+   ignored sensor, which pairs with the `visibility_off` on that section's own heading.
+   **48px on both axes, which is M3's trailing slot.** The pill needed an `::after` to reach a touch
+   target. A real icon button carries one.
+   **The words ride `data-tip`, never `title`.** A `title` never opens on touch, which is a rule
+   this app already states. `js/sparktip.js` answers that attribute on hover and on tap alike. */
+#settingsBox .mtrail {
+  flex: none; display: grid; place-items: center;
+  width: 48px; height: 48px; padding: 0; margin-right: -8px;
+  background: none; border: 0; border-radius: 50%; cursor: pointer;
+  color: var(--md-sys-color-on-surface-variant);
+}
+#settingsBox .mtrail:hover { background: var(--hover); color: var(--md-sys-color-on-surface); }
+#settingsBox .mtrail:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+#settingsBox .mtrail .i { font-size: 24px; }
+
+/* **A pressable row, which is M3's list ACTION mode.** The reference wraps the row's own content in
+   a button that fills the item, so the whole row is the target rather than the words inside it.
+   The `<li>` states the container and this states the layout, which is why the item's own padding
+   moves onto the button on these three rows. */
+#settingsBox .mseg > li:has(.mrow) { padding: 0; }
+#settingsBox .mrow {
+  display: flex; align-items: center; gap: 16px;
+  width: 100%; min-height: inherit; padding: 8px 16px; box-sizing: border-box;
+  background: none; border: 0; border-radius: inherit; cursor: pointer; text-align: start;
+  color: var(--md-sys-color-on-surface); font: inherit; text-decoration: none;
+}
+#settingsBox .mrow:hover { background: var(--m3-hover); }
+#settingsBox .mrow:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+#settingsBox .mrow:disabled {
+  color: color-mix(in srgb, var(--on-surface) 38%, transparent); cursor: default;
+}
+#settingsBox .mrow:disabled:hover { background: none; }
+/* The readings, as a row of the same group that takes no press. It carries a table rather than a
+   headline, so `align-items: center` and the 72px floor both have to go. */
+#settingsBox .mseg > li.readout { display: block; min-height: 0; padding: 4px 16px; }
+#settingsBox .mseg > li.readout #devstats { margin: 0; }
+
+/* **The wash opacity, on the browser's own range control.** `accent-color` paints the filled track
+   and the handle in this app's primary, which is the anatomy M3's own slider states: an active track
+   over an inactive one, under a round handle.
+   ponytail: a native input, not a transcribed M3 slider. Go to M3's own the day this needs a value
+   label on the handle or a stepped track. The value sits beside it instead, because a wash a reader
+   just set to 45% has to be a number they can go back to. */
+#settingsBox .mslide { flex: none; display: flex; align-items: center; gap: 8px; }
+#settingsBox .mslide input { width: 120px; accent-color: var(--accent); }
+#settingsBox .mslide b {
+  min-width: 4ch; text-align: right; font-weight: 500;
+  font-variant-numeric: tabular-nums; color: var(--muted);
+}
+
+/* **Every heading in this pane is M3's list SUBHEADER**, including Developer, which heads no list.
+   One pane states one heading style. `title-small` in `on-surface-variant`, 48dp tall, on the rows'
+   own 16dp line.
+   **`List/list.css` carries no subheader, so these numbers come from the spec page** rather than
+   from a file this repo can grep. That is the one divergence in this block.
+   It overrides `.docbox h3`, the 11px uppercase label About and Help use. Those two are prose panes
+   and this one is a list. */
+#settingsBox h3 {
+  display: flex; align-items: center; gap: 16px;
+  min-height: 48px; margin: 8px 0 0; padding: 0 16px;
+  text-transform: none; color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--md-sys-typescale-title-small-size);
+  line-height: var(--md-sys-typescale-title-small-line-height);
+  font-weight: var(--md-sys-typescale-title-small-weight);
+  letter-spacing: var(--md-sys-typescale-title-small-tracking);
+}
+/* The glyph takes the leading slot's own 24px, so a heading and the rows under it share one line. */
+#settingsBox h3 .i { font-size: 24px; }
+/* The count must never be pushed off the row by a long title, which is its rule in the drawer too. */
+#settingsBox h3 b { margin-left: auto; font-weight: 500; font-variant-numeric: tabular-nums; }
+/* **A group's action is its LAST ROW, and `.mfoot` is what joins the two boxes.** A reader asked
+   for that on 2026-08-25: the action was a full-width link in a `.rowbtns` box, which read as a
+   control the list had nothing to do with.
+   **Two elements and one group, because `render.js` owns the list's `innerHTML`.** A row written
+   inside the `<ul>` is wiped on the next poll. So the action is a one-row list of its own, and the
+   corners are what say the two are one thing: the list above drops its bottom outer corner and this
+   row takes it.
+   **The gap is the group's own 8px**, so nothing about the seam says the action is separate. */
+#settingsBox .mseg + .mseg { margin-top: 8px; }
+#settingsBox .mseg:has(+ .mfoot) > li:last-child {
+  border-end-start-radius: var(--md-sys-shape-corner-extra-small);
+  border-end-end-radius: var(--md-sys-shape-corner-extra-small);
+}
+#settingsBox .mfoot > li:first-child {
+  border-start-start-radius: var(--md-sys-shape-corner-extra-small);
+  border-start-end-radius: var(--md-sys-shape-corner-extra-small);
+}
+/* A one-line action row, at M3's 56px rather than the two-line 72. */
+#settingsBox .mfoot > li { min-height: 56px; }
+
+/* --- M3 switch -----------------------------------------------------------------------------------
+   Transcribed from `Switch/switch.css`, which cites m3.material.io/components/switch/specs:
+   https://github.com/bczak/m3you/blob/development/src/components/Switch/switch.css
+
+     target      48px tall, 68px wide
+     track       52x32px, corner-full, a 2px border
+     thumb off   16px, in `outline`, translated 8px
+     thumb on    24px, in `on-primary`, translated 24px, on a `primary` track
+     pressed     28px, translated 2px off and 22px on
+
+   **`:has(:checked)`, never a data attribute.** The reference is React and writes `data-checked`.
+   This app has no build step and no framework, so the input's own state is the source and CSS reads
+   it. The box carries `autocomplete="off"`, the rule every preference-owned control here obeys.
+   **The variant is `primary`, not `error`.** Test mode is a mode rather than a fault, and the amber
+   strip across the top of the page is what says the map is lying. That strip stays.
+   **`.testtog` is gone.** It was an amber pill carrying a checkbox and the words `TEST MODE`. A row
+   states the name and a switch states the state, which is what M3 gives a setting. */
+.msw {
+  position: relative; flex: none; display: inline-flex; align-items: center; justify-content: center;
+  width: 68px; height: 48px; margin-right: -10px; cursor: pointer;
+}
+.msw input { position: absolute; opacity: 0; width: 0; height: 0; margin: 0; }
+.mswtrack {
+  box-sizing: border-box; position: relative; display: inline-flex; align-items: center;
+  width: 52px; height: 32px; flex: none; border-radius: 16px;
+  border: 2px solid var(--md-sys-color-outline);
+  background: var(--md-sys-color-surface-container-highest);
+  transition: background-color var(--m3-rail), border-color var(--m3-rail);
+}
+.mswthumb {
+  position: absolute; left: 0; width: 16px; height: 16px; border-radius: 50%;
+  background: var(--md-sys-color-outline); transform: translateX(8px);
+  transition: width var(--m3-rail), height var(--m3-rail), background-color var(--m3-rail),
+              transform var(--m3-travel);
+}
+.msw:has(:checked) .mswtrack {
+  border-color: var(--md-sys-color-primary); background: var(--md-sys-color-primary);
+}
+.msw:has(:checked) .mswthumb {
+  width: 24px; height: 24px; background: var(--md-sys-color-on-primary); transform: translateX(24px);
+}
+.msw:active .mswthumb { width: 28px; height: 28px; transform: translateX(2px); }
+.msw:has(:checked):active .mswthumb { transform: translateX(22px); }
+.msw:has(:focus-visible) { outline: 2px solid var(--accent); outline-offset: -6px; border-radius: 16px; }
+.msw:has(:disabled) { pointer-events: none; opacity: .38; }
+@media (prefers-reduced-motion: reduce) { .mswtrack, .mswthumb { transition: none; } }
+
+/* --- M3 snackbar ---------------------------------------------------------------------------------
+   Transcribed from `Snackbar/snackbar.css`, which cites m3.material.io/components/snackbar/specs:
+   https://github.com/bczak/m3you/blob/development/src/components/Snackbar/snackbar.css
+
+     container   min(344px, 100vw - 32px), a 4dp corner, `inverse-surface`, elevation level3
+     single line 48px, centred
+     message     `body-medium` in `inverse-on-surface`, padding 14px 16px
+
+   **It is a `popover`, and that is the only way it can be seen.** It reports on a control inside a
+   modal dialog, and a modal dialog is in the top layer. No `z-index` reaches over that, which is a
+   rule `js/sparktip.js` already obeys from the other side.
+   **Elevation is `--shadow`.** This app holds one elevation, which is why every dialog here
+   declines M3's own level3 as well.
+   **Bottom centre, clear of the navigation bar.** `--navbar-h` is 0 above 600px, so one expression
+   answers both widths.
+   **It replaced `#devMsg`**, a muted line under the buttons. A line inside a scrolling pane can sit
+   below the fold, and the reader who pressed Refresh is looking at the button. */
+.msnack {
+  position: fixed; inset: auto 0 calc(16px + var(--navbar-h, 0px)) 0; margin: 0 auto;
+  width: min(344px, calc(100vw - 32px)); min-height: 48px; box-sizing: border-box;
+  display: flex; align-items: center; padding: 14px 16px;
+  border: 0; border-radius: var(--md-sys-shape-corner-extra-small);
+  background: var(--md-sys-color-inverse-surface); color: var(--md-sys-color-inverse-on-surface);
+  box-shadow: var(--shadow);
+  font-size: var(--md-sys-typescale-body-medium-size);
+  line-height: var(--md-sys-typescale-body-medium-line-height);
+  letter-spacing: var(--md-sys-typescale-body-medium-tracking);
+}
+.msnack:popover-open { animation: snackUp var(--m3-travel); }
+@keyframes snackUp { from { opacity: 0; transform: translateY(16px); } }
+@media (prefers-reduced-motion: reduce) { .msnack:popover-open { animation: none; } }
+
+/* --- M3 basic dialog, for a confirmation ---------------------------------------------------------
+   Transcribed from `Dialog/dialog.css`, which cites m3.material.io/components/dialogs/specs:
+   https://github.com/bczak/m3you/blob/development/src/components/Dialog/dialog.css
+
+     content     min(560px, 100vw - 48px), a 28dp corner, 24px of padding
+     title       `headline-small`, in `on-surface`
+     body        `body-medium`, in `on-surface-variant`, 16px under the title
+     footer      a flex row on the trailing edge, gap 8px, 24px under the body
+
+   **It replaced a native `confirm()`.** That dialog takes the browser's own chrome, cannot be read
+   in this app's voice, and on a phone it draws over the pane with no relation to it.
+   **It declines `surface-container-high` and level3**, the two parts of this component every dialog
+   here declines: this app holds one surface tone and one elevation. */
+#confirmBox {
+  width: min(560px, calc(100vw - 48px)); max-width: none; max-height: none; padding: 24px;
+  border: 0; border-radius: var(--md-sys-shape-corner-extra-large);
+  background: var(--surface); color: var(--on-surface); box-shadow: var(--shadow);
+}
+#confirmBox[open] { display: block; animation: dlgOpen var(--m3-grow); }
+#confirmBox::backdrop { background: #0006; }
+.mdlgtitle {
+  margin: 0; color: var(--md-sys-color-on-surface);
+  font-size: var(--md-sys-typescale-headline-small-size);
+  line-height: var(--md-sys-typescale-headline-small-line-height);
+  font-weight: var(--md-sys-typescale-headline-small-weight);
+}
+.mdlgbody {
+  margin: 16px 0 0; color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--md-sys-typescale-body-medium-size);
+  line-height: var(--md-sys-typescale-body-medium-line-height);
+  letter-spacing: var(--md-sys-typescale-body-medium-tracking);
+}
+.mdlgfoot { display: flex; justify-content: flex-end; gap: 8px; margin-top: 24px; }
+/* M3's text button: 40px tall, corner-full, a `primary` label, 12px of inline padding. */
+.mtext {
+  min-height: 40px; padding: 0 12px; border: 0; border-radius: 20px; cursor: pointer;
+  background: none; color: var(--md-sys-color-primary);
+  font-size: var(--md-sys-typescale-label-large-size);
+  line-height: var(--md-sys-typescale-label-large-line-height);
+  font-weight: var(--md-sys-typescale-label-large-weight);
+  letter-spacing: var(--md-sys-typescale-label-large-tracking);
+}
+.mtext:hover { background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.mtext:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* --- all-stations table ----------------------------------------------------------------------- */
 
@@ -1142,6 +1596,13 @@ table.data .dash { color: var(--outline); }
    above carries the full account of that bug. */
 #warnBox[open] { display: flex; flex-direction: column; }
 #warnBox::backdrop { background: #0009; }
+/* **The text scrolls, the icon and the headline do not.** A MET bulletin runs to about 1,800
+   characters, and this box takes the browser's own `max-height` cap. With nothing scrolling, that
+   text simply ran out of the bottom of the dialog and no reader could reach the end of it.
+   `flex: none` on the two rows above it, or a long body shrinks the headline instead of scrolling.
+   `overflow: auto` is also what lets the body shrink at all — see `.docbody`. */
+#warnBox > .i, #warnBox .modalhead { flex: none; }
+#warnBox #warnBody { flex: 1; overflow: auto; overscroll-behavior: contain; }
 /* M3 sizes a basic dialog's icon at 24px. It is a block on its own line above the headline, so the
    gap under it is the header's own — 8px here rather than M3's 16, because this app's dialogs run
    tighter than the reference and a 16px gap over an 8px `.modalhead` margin reads as two headers. */
@@ -1701,6 +2162,28 @@ body.find #findpane { display: flex; flex-direction: column; }
 #mapchips .mchip { padding-left: 8px; padding-right: 8px; }
 #mapchips .mchip .tail { font-size: 18px; margin-left: -2px; }
 #mapchips .mchip .glyph { opacity: 1; }
+
+/* **Test mode, and it draws only while the mode is on.** It replaced `#testbadge` on 2026-08-25, a
+   fat amber pill in `#pills` carrying a label, a sentence and a Turn off button. A reader asked for
+   a chip.
+   **`body.testmode` is the switch, so no script writes this.** `js/test.js` already toggles that
+   class for the striped app bar.
+   **It keeps the amber and takes no chip surface.** Every other chip on this row reports a choice
+   the reader made about the map. This one reports that the map is lying, and the colour is what says
+   so at a glance. The amber is `#e8710a` in both themes, the same literal the striped app bar uses:
+   it stands on a basemap the theme does not flip.
+   **It is the ONLY thing that says so above 600px.** `<header>` does not draw there, so the striped
+   bar is a compact-width signal alone. That is a narrower guard than the pill it replaced, and it is
+   the accepted cost of the reader's own instruction. Anything that weakens it further goes through
+   the alert design standard first.
+   **The trailing × turns the mode off**, which is M3's input chip: a thing that is on, dismissed
+   from the place that states it. */
+#testChip { display: none; }
+body.testmode #testChip {
+  display: inline-flex; background: #e8710a; color: #fff; border-color: #e8710a;
+}
+body.testmode #testChip:hover { background: #d0650a; }
+#testChip .tail { font-size: 18px; margin-left: -2px; }
 /* The menu a chip opens. `.menu` already places itself, scrolls and caps its own width — this only
    states that a row here is a radio and not a button. */
 .chipmenu .mi { align-items: center; }
@@ -1991,7 +2474,7 @@ body:not(.ready) #bar, body:not(.ready) #side, body:not(.ready) #findpane { tran
    **`--rail-w` comes off the window here too, for the reason `--pane`'s own comment in base.css
    states: the rail is chrome, not a pane, so both panes split what is left after it.** The floor
    still bites past 840px. The ratio still takes over once 30% of the remaining width passes it —
-   now at 1296px rather than 1200, since the rail is 96px of the width that 30% is measured against. */
+   now at 1280px rather than 1200, since the rail is 80px of the width that 30% is measured against. */
 @media (min-width: 840px) { :root { --pane: max(360px, calc((100vw - var(--rail-w)) * 0.3)); } }
 
 /* --- station panel ---------------------------------------------------------------------------- */
@@ -2096,11 +2579,13 @@ body.side #side { display: flex; }
    **The colour splits the way M3 splits it.** The label takes `on-surface` and the leading icon
    takes the accent role, which here is the station kind's own hue. That is what the app already
    asks a badge to say, and the kind ladder stays out of the status ladder either way.
-   `.badge` is untouched everywhere else. The alert panel and the table both draw one, and this is
-   a chip in an app bar rather than a restyle of every badge in the app. */
+   **THE ALERT PANEL JOINED THIS RULE ON 2026-08-25, on a reader's instruction.** Every alert group
+   heads itself with the kind it holds, and that is the same claim `#sideKinds` makes about a place.
+   One kind, one shape. `.badge` is still untouched in the all-stations table, which is a dense grid
+   rather than a pane, and a 32dp chip in a table cell is a row height. */
 #sideKinds:empty { display: none; }
 #sideKinds .badges { display: flex; flex-wrap: wrap; gap: 8px; }
-#sideKinds .badge {
+#sideKinds .badge, .alert .badge {
   height: 32px; margin: 0; padding: 0 16px 0 8px; gap: 8px;
   border: 1px solid var(--outline); border-radius: var(--md-sys-shape-corner-small);
   background: none; color: var(--on-surface); text-transform: none;
@@ -2109,7 +2594,7 @@ body.side #side { display: flex; }
   font-weight: var(--md-sys-typescale-label-large-weight);
   letter-spacing: var(--md-sys-typescale-label-large-tracking);
 }
-#sideKinds .badge .i { font-size: 18px; color: var(--c); }
+#sideKinds .badge .i, .alert .badge .i { font-size: 18px; color: var(--c); }
 #sideActions { display: flex; align-items: center; }
 /* **The trailing slot holds two buttons: the favorite, then the ⋮.** The heart was a row inside
    that menu and a reader pulled it out on 2026-08-21. A menu row states its action in words, which
@@ -2224,18 +2709,53 @@ body.side #side { display: flex; }
    `alerts.js` for the steps. This section keeps only what the list itself still needs. */
 /* The four counts — at danger, sounding, rising, not current — under the list's title. Icons rather
    than words: all four at once is exactly when the list matters most, and that is when words wrap. */
-.tally { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
-.tally:empty { display: none; }
-.tally b {
-  display: inline-flex; align-items: center; gap: 2px;
-  padding: 2px 7px 2px 4px; border-radius: 999px; font-size: 12px;
-  /* Ink pulled off the surface, the same 30% as `.state` in base.css and for the same reason: a
-     status token is held to 3:1 as a mark, and this is a 12px number set on a tint of itself. */
-  color: color-mix(in srgb, var(--c) 70%, var(--on-surface));
-  background: color-mix(in srgb, var(--c) 16%, transparent);
+/* The list's two panes — station alerts, then regional notices. M3 PRIMARY tabs, from
+   Tabs/tabs.css: a 48dp row, `title-small` labels, an active label in the primary role and an
+   inactive one in on-surface-variant, and a 3dp indicator with rounded top corners under the active
+   label alone. Primary rather than secondary, because these two panes are the top-level split of
+   this destination and not a division inside one of its sections.
+   The divider under the row is the component's own. The layout's "no dividing line" rule names the
+   map card, the app bar and the pane, and a tab bar with no line under it does not read as one.
+   It scrolls with the body. A sticky bar here pins to the scroller's PADDING box, so it needs the
+   negative of `#sideBody`'s own padding rather than `top: 0`, and the list is short enough at every
+   size of flood that nobody has asked for it. */
+.atabs {
+  display: flex; margin: 0 0 4px; border-bottom: 1px solid var(--md-sys-color-outline-variant);
 }
-.tally .i { font-size: 15px; }
-.tally i { font-style: normal; letter-spacing: normal; }
+.atab {
+  flex: 1; position: relative;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  min-height: 48px; padding: 0 16px; border: 0; background: none; cursor: pointer;
+  color: var(--md-sys-color-on-surface-variant);
+  font: var(--md-sys-typescale-title-small-weight) var(--md-sys-typescale-title-small-size)/var(--md-sys-typescale-title-small-line-height) Roboto, sans-serif;
+  letter-spacing: var(--md-sys-typescale-title-small-tracking);
+}
+.atab:hover { background: var(--hover); }
+.atab.on { color: var(--md-sys-color-primary); }
+/* The indicator. A pseudo-element, so it needs no second box in the markup and cannot be measured
+   into the label's own line. It sits ON the divider, hence `bottom: -1px`. */
+.atab.on::after {
+  content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 3px;
+  border-radius: 3px 3px 0 0; background: var(--md-sys-color-primary);
+}
+/* The count. It is what says a notice arrived while the other pane is on screen, so it keeps its
+   own ink rather than fading with the inactive label. */
+.atabn {
+  min-width: 18px; padding: 0 5px; border-radius: 999px; font-size: 11px; font-weight: 500;
+  color: var(--on-surface); background: var(--hover);
+}
+.atab.on .atabn {
+  color: var(--md-sys-color-primary);
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
+/* `.tally` is gone. Every count in the alert head is an M3 assist chip now, in a `.badges` row that
+   `openSide()` lifts into `#sideKinds` — the app bar's own chip line. So the numbers take
+   `#sideKinds .badge` with everything else, and this file states the chip once.
+   The pill it replaced set its own ink with `color-mix(in srgb, var(--c) 70%, var(--on-surface))`,
+   because a 12px number in its own colour on a tint of itself starts under 4.5:1. `.state` in
+   `css/base.css` still needs that expression and still carries it. A chip does not: the label is
+   `on-surface` over the page and only the 18dp leading icon takes the status hue. */
 .empty { padding: 12px 0 0; margin: 0; }
 /* Tier, twice over: a coloured left rule for the glance and a word for the meaning. Colour alone
    would be a code nobody was taught, and a word alone does not survive a scroll past forty of them.
@@ -2243,84 +2763,163 @@ body.side #side { display: flex; }
 .alert { padding: 14px 0 14px 10px; border-top: 1px solid var(--outline); border-left: 3px solid transparent; }
 /* Same rule as .sensor's: the head is lifted out of #sideBody into #sideHead and already ends in a
    line, so the first row must not draw a second one under it. */
-#sideBody > .alert:first-child { border-top: 0; padding-top: 4px; }
+.apane > .alert:first-child { border-top: 0; padding-top: 4px; }
 .alert.t-now   { border-left-color: var(--s-danger); }
+/* `heavy` and `soon` share one amber, and the tag word is what tells them apart. That is the shape
+   `now` already has: one red over a river at its mark and over a sounding siren. A fourth hue would
+   put four traffic-light steps on a panel that has three things to say about severity. */
+.alert.t-heavy { border-left-color: var(--s-warning); }
 .alert.t-soon  { border-left-color: var(--s-warning); }
 .alert.t-stale { border-left-color: var(--outline); opacity: .82; }
 .tg {
   display: inline-block; margin-left: 6px; padding: 2px 7px; border-radius: 999px;
   font-size: 10px; font-weight: 500; letter-spacing: .5px; vertical-align: 1px;
 }
-/* The tier tag sits next to the sensor-kind badge, which is a taller inline-flex with its own
-   bottom margin — baseline alignment put the two pills on different lines. Match the margin and
-   centre both boxes instead. */
-.alert .badge, .alert .tg { vertical-align: middle; }
-.alert .tg { margin-bottom: 6px; }
+/* The kind chip and the tier tag on one row, in a flex box. They were two inline-level boxes held
+   together by `vertical-align: middle` and a matched bottom margin. The chip is an M3 assist chip
+   now, at 32dp against the tag's 18, and `#sideKinds .badge` zeroes the margin those two hacks were
+   written against. A row places both by itself and neither number has to stay in step.
+   `margin-left: 0` cancels `.tg`'s own 6px: that offset was written for an inline tag following an
+   inline badge, and a flex gap states the same space once. */
+.alerttop { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 6px; }
+.alerttop .tg { margin-left: 0; }
 .tg-now   { background: color-mix(in srgb, var(--s-danger) 16%, transparent); color: var(--s-danger); }
+.tg-heavy { background: color-mix(in srgb, var(--s-warning) 16%, transparent); color: var(--s-warning); }
 .tg-soon  { background: color-mix(in srgb, var(--s-warning) 16%, transparent); color: var(--s-warning); }
 .tg-stale { background: var(--hover); color: var(--muted); }
-/* One card per kind per tier, and every row in it is a place — see alerts.js for why. The rows are
-   laid out as a list rather than as more alert blocks: a rule down the left of each one would claim
-   each place is its own alert, which is the shape this replaced. */
-.alert.grouped .popname { margin-bottom: 2px; }
-.slist { list-style: none; margin: 0; padding: 0; }
-.slist li {
-  display: flex; align-items: flex-start; gap: 8px;
-  padding: 7px 8px 7px 6px; border-radius: 6px; cursor: pointer; line-height: 1.35;
-}
-.slist li:hover { background: color-mix(in srgb, var(--accent) 14%, transparent); }
-.slist .i { font-size: 18px; flex: none; margin-top: 1px; }
+/* One card per kind per tier, and every row in it is a place — see alerts.js for why.
+
+   **The rows are an M3 SEGMENTED list, on a reader's instruction of 2026-08-25.** `.mseg` above
+   holds the container, the two corners and the typescale. Only the slots and this app's own two
+   divergences live here.
+   They were a bare list with a 6dp radius and an accent tint on hover. A segmented row states the
+   whole group as one shape, which is what "these four places" is.
+   **The old comment's worry does not apply.** It argued against giving each place its own block,
+   because a rule down the left of each row would claim each place is its own alert. A segmented row
+   carries a fill and no rule, and the group's own outer corner is what says the four are one set. */
+.alert.grouped .popname { margin-bottom: 8px; }
+/* M3's leading slot is a 24px glyph. This app paints it with the TIER colour rather than
+   `on-surface-variant`, which is the divergence the block at the foot of this section states. */
+.slist .i { font-size: 24px; min-width: 24px; flex: none; }
 .slist .nm { flex: 1; min-width: 0; }
-.slist small { font-size: 11px; }
-/* The reading, right-aligned so a column of them lines up down the list and can be scanned as one. */
+/* The supporting line, at M3's `body-medium`. **`.muted` carries a `font-size` of its own**, so
+   this needs two classes and an element to beat it — the trap CLAUDE.md already records. */
+.slist .nm small {
+  font-size: var(--md-sys-typescale-body-medium-size);
+  line-height: var(--md-sys-typescale-body-medium-line-height);
+  letter-spacing: var(--md-sys-typescale-body-medium-tracking);
+}
+/* The trailing slot. M3 gives it 48px, and this app right-aligns it so a column of readings lines
+   up down the group and can be scanned as one. */
 .slist .rd {
-  flex: none; text-align: right; font-weight: 500;
+  flex: none; min-width: 48px; text-align: right; font-weight: 500;
   font-variant-numeric: tabular-nums; white-space: nowrap;
 }
 .slist .rd small { font-weight: 400; }
+/* A row opens a station card, so it keeps a pointer and a state layer. M3 draws that layer OVER the
+   container rather than instead of it, which is why this mixes into `surface-container` and does
+   not replace it. The accent tint it had was written for a row with no fill under it. */
+.slist > li { cursor: pointer; }
+.slist > li:hover {
+  background: color-mix(in srgb, var(--on-surface) 8%, var(--md-sys-color-surface-container));
+}
 /* The glyph takes the tier's own colour, the same one the card's left rule carries. */
 .alert.t-now   .slist .i { color: var(--s-danger); }
+.alert.t-heavy .slist .i { color: var(--s-warning); }
 .alert.t-soon  .slist .i { color: var(--s-warning); }
 .alert.t-stale .slist .i { color: var(--muted); }
 .alert.grouped p { margin: 8px 0 0; }
 
-/* --- MET warnings (panel section) --------------------------------------------------------------- */
+/* --- notices, as an email list -------------------------------------------------------------------
 
-/* A regional notice, not a station reading — see the comment on bannerCard() in js/alerts.js.
-   Same box shape as an .alert card, so the two read as one list. The left rule takes --c, which
-   shell() sets on the outer div, instead of a status colour: nothing here stands at a published
-   threshold. This class now serves two kinds — weather and flood — so the colour has to come from
-   the row's own kind rather than be fixed to one of them. */
-.warngrp {
-  padding: 14px 0 14px 10px; border-top: 1px solid var(--outline);
-  border-left: 3px solid var(--c);
-}
-#sideBody > .warngrp:first-child { border-top: 0; padding-top: 4px; }
-.warngrp .alerthead { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
-.warngrp .alerthead .i { color: var(--c); font-size: 18px; }
-.warngrp .alerthead b { font-weight: 500; }
-.warnrow {
-  display: block; width: 100%; margin-top: 6px; padding: 7px 8px; text-align: left;
-  background: none; border: 0; border-radius: 6px; cursor: pointer; color: var(--on-surface);
-  font: inherit; line-height: 1.35;
-}
-.warnrow:hover { background: color-mix(in srgb, var(--accent) 14%, transparent); }
-.warnrow b { display: block; font-weight: 500; font-size: 13px; }
-/* The one-line clip. CSS trims the row here. The full sentence still reaches a screen reader.
-   It stays whole in the modal this row opens. */
-.warnrow .warntext { display: block; overflow: hidden; text-overflow: ellipsis;
-  white-space: nowrap; font-size: 12px; color: var(--muted); }
+   The Notices pane of the alert list. Each category is an M3 list SUBHEADER over M3 THREE-LINE list
+   items, laid out as an email list. The repository owner asked for that shape on 2026-08-25.
 
-/* Same box as .warngrp, one rung above it in the panel, and its own left rule. A source that is down
-   is not a status, so this colour is a kind colour and never a traffic light. */
-.noticegrp {
-  padding: 14px 0 14px 10px; border-top: 1px solid var(--outline);
-  border-left: 3px solid var(--k-source);
+   The numbers are `List/list.css`'s own, at the three-line height:
+
+     item        88px min-height, padding 12px 16px, gap 16px, align-items flex-start
+     leading     a 40px avatar, corner-full, the category glyph at 24px inside it
+     headline    body-large
+     supporting  body-medium in on-surface-variant, clipped to TWO lines
+     trailing    label-small in on-surface-variant, top aligned
+
+   The subheader is the one this app already draws in Settings: `title-small` in
+   `on-surface-variant`, 48dp, its count pushed to the trailing end. `List/list.css` carries no
+   subheader, so those numbers come from the spec page rather than from a file this repo can grep.
+   That is the same divergence the Settings block already names.
+
+   **The coloured left rule is gone and the avatar carries the colour instead.** A card shell stated
+   the category three times: a rule, a heading glyph and a heading word. An email row states its
+   sender once, in the avatar, and that is what stays readable when the subheader has scrolled away.
+
+   **No divider between rows.** M3 offers one and this app separates by space, which is the rule the
+   pane already obeys. The tab bar above keeps its divider because that is a tab bar. */
+.nsub {
+  display: flex; align-items: center; gap: 16px;
+  min-height: 48px; margin: 8px 0 0; padding: 0 4px;
+  text-transform: none; color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--md-sys-typescale-title-small-size);
+  line-height: var(--md-sys-typescale-title-small-line-height);
+  font-weight: var(--md-sys-typescale-title-small-weight);
+  letter-spacing: var(--md-sys-typescale-title-small-tracking);
 }
-#sideBody > .noticegrp:first-child { border-top: 0; padding-top: 4px; }
-.noticegrp .alerthead { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
-.noticegrp .alerthead .i { color: var(--c); font-size: 18px; }
-.noticegrp .alerthead b { font-weight: 500; }
+/* The glyph takes the leading slot's own 24px, so a subheader and the rows under it share one line. */
+.nsub .i { font-size: 24px; color: var(--c); }
+/* The count must never be pushed off the row by a long heading — its rule in Settings and in the
+   drawer alike. */
+.nsub b { margin-left: auto; font-weight: 500; font-variant-numeric: tabular-nums; }
+/* The first subheader sits under the tab row, which already ends in a line. */
+.apane > .nsub:first-child { margin-top: 0; }
+
+.nlist { display: flex; flex-direction: column; }
+.nrow {
+  display: flex; align-items: flex-start; gap: 16px; width: 100%;
+  min-height: 88px; padding: 12px 4px; text-align: left;
+  background: none; border: 0; border-radius: 12px; cursor: pointer;
+  color: var(--on-surface); font: inherit;
+}
+.nrow:hover { background: var(--hover); }
+/* The avatar. A tinted disc rather than a filled one: this colour names a source or a station kind,
+   never a status, and a saturated 40px disc down a list reads as a severity ramp.
+   **TWO panes draw one, so the numbers live here and nowhere else.** The Notices pane puts it over a
+   bulletin. The station panel puts it over a sensor, through `avat()` in `js/popup.js`. The class
+   was `.navat` while the Notices pane was the only caller. One name for one thing, and this thing is
+   an avatar rather than a notice.
+   `--c` is written on the element, so a caller states the colour and this rule states the shape. */
+.avat {
+  flex: none; display: grid; place-items: center;
+  width: 40px; height: 40px; border-radius: 50%;
+  color: var(--c); background: color-mix(in srgb, var(--c) 16%, transparent);
+}
+.avat .i { font-size: 24px; }
+.nbody { flex: 1; min-width: 0; }
+/* The headline. One line, clipped — a bulletin title names its own kind and its region, and a
+   wrapped one pushes the preview off the row. */
+.nrow b {
+  display: block; font-weight: 400; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: var(--md-sys-typescale-body-large-size);
+  line-height: var(--md-sys-typescale-body-large-line-height);
+  letter-spacing: var(--md-sys-typescale-body-large-tracking);
+}
+/* The preview, at TWO lines. That is the email shape, and it is one line more than the card row
+   this replaced gave. CSS trims it. The whole sentence still reaches a screen reader, and the modal
+   this row opens holds it whole. */
+.nprev {
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+  overflow: hidden; color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--md-sys-typescale-body-medium-size);
+  line-height: var(--md-sys-typescale-body-medium-line-height);
+  letter-spacing: var(--md-sys-typescale-body-medium-tracking);
+}
+/* The time. Top aligned with the headline, the way a mail client stamps a thread. It states the
+   start of the validity window. An outage publishes none, so its row draws no time at all. */
+.ntime {
+  flex: none; color: var(--md-sys-color-on-surface-variant);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--md-sys-typescale-label-small-size);
+  line-height: var(--md-sys-typescale-body-large-line-height);
+  letter-spacing: var(--md-sys-typescale-label-small-tracking);
+}
 
 /* --- credit --------------------------------------------------------------------------------- */
 
@@ -3043,9 +3642,12 @@ body.side #side { display: flex; }
      button stays FIRST in the source of all four so a keyboard reaches it first, and only where it
      draws moves.
 
-     **The X stays, and it is never a back arrow.** The pane took one, because a supporting pane is a
-     destination somebody navigates to. These four are dialogs. An arrow claims the view saves as it
-     goes, and a dialog dismisses.
+     **These four take the BACK ARROW now, at every width.** That reverses the rule this block used
+     to state, which was that the X stays and must never become an arrow. The argument was M3's: a
+     supporting pane is a destination somebody navigates to, and a dialog dismisses. The repository
+     owner asked for one glyph across every panel on 2026-08-25. A phone shows one full-screen
+     surface at a time, so two glyphs in one position for one action reads as a fault rather than as
+     a component boundary. See the base rule beside `.modalhead` for the position.
 
      **Named one by one, never as bare `.modalhead`.** Only four dialogs are full-screen here.
      Written bare it also reached `#lightbox` and `#warnBox`, which are basic dialogs at every width,
@@ -3081,7 +3683,11 @@ body.side #side { display: flex; }
      within the 2px these panes already use for their body text. The headline lining up with the
      prose under it beats matching 16 exactly. */
   .docbox .modalhead .dclose { margin: 0 0 0 -10px; }
-  .dtop .modalhead .dclose { margin: 0 0 0 -12px; }
+  /* **These two name their ids, and the base rule above is why.** That rule states the leading
+     margin as `#dataBox .modalhead .dclose`, which is one id and beats three classes wherever it
+     lands. A bare `.dtop .modalhead .dclose` therefore lost, and both panes drew their glyph 30px
+     in against the 28 every other full-screen bar here holds. */
+  #dataBox .dtop .modalhead .dclose, #camBox .dtop .modalhead .dclose { margin: 0 0 0 -12px; }
 
   /* **No line under a full-screen header, and that is the fourth surface to lose one.** The map
      card, the app bar and the supporting pane each carried a rule and a reader cut all three on

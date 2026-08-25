@@ -193,7 +193,11 @@ const CAM_FIX = [
 const CAM_ALERT_KM = 2;
 /* The lowest rainfall reading that is JPS's top class. `rainStatus()` in sources.php scores
    `> 60` as class 4, and frameTiers() compares with `>=`, so the two agree only at a value the
-   feed cannot publish between. JPS reports rainfall to one decimal, so 60.1 is that value. */
+   feed cannot publish between. JPS reports rainfall to one decimal, so 60.1 is that value.
+   IT STAYS AT THE TOP CLASS, AND `isCritical()` MOVING DOWN TO CLASS 3 DOES NOT MOVE IT. The panel
+   gained a `heavy` rung on 2026-08-25 and the camera pill did not. `camAlert()` in js/stations.js
+   drops that rung before it ranks anything, so this scorer and the live pill still ask one
+   question. Move this to 30.1 and the archive answers a question no live frame asks. */
 const RAIN_DANGER = 60.1;
 const CACHE = __DIR__ . '/.cache.json';
 /* The camera still cache. Every ?cam= request used to reach JPS, so N readers on the camera wall
@@ -3331,10 +3335,18 @@ foreach ($rainfallList as $s) {
         'basin'    => $s['mainRiverBasin'],
         'lat'      => (float)$s['latitude'],
         'lng'      => (float)$s['longitude'],
-        // -1 none .. 4 very heavy. The list publishes -1 on 144 of 233 gauges that are reporting a
-        // real number, so where there is a reading the class comes from rainStatus(), the same one
-        // the scraped feeds use. One definition of a status, and it is this file's.
-        'status'   => (int)$s['status'] < 0 && isset($d['hourlyRainfall'])
+        /* -1 none .. 4 very heavy. Wherever there is a reading, the class comes from rainStatus() —
+           the same scorer the two scraped feeds use. One definition of a status, and it is this
+           file's. The list publishes -1 on 144 of 233 gauges that report a real number, which is
+           why this started as a fallback.
+           IT IS NO LONGER A FALLBACK, AND THE FEED'S OWN CLASS TABLE IS WHY. Measured 2026-08-25:
+           TAMAN FRIM KEPONG reported 51.5 mm an hour against its own published `spHeavy` of 31, and
+           JPS still published `status: 2`. So the field contradicts the table beside it in the same
+           response. 4 of 281 gauges disagreed with rainStatus() on that poll, every one of them a
+           class low. Trusting the field listed a gauge at 38.5 mm/h and skipped the one at 51.5.
+           This moves a pin colour and a heat weight on those 4, always upward, and only where the
+           feed understates a reading it publishes itself. */
+        'status'   => isset($d['hourlyRainfall'])
                         ? rainStatus((float)$d['hourlyRainfall']) : (int)$s['status'],
         'online'   => (int)$s['stationStatus'] === 1,
         'code'     => $s['station_Id'] ?? null,   // national JPS code — the key the other feeds share

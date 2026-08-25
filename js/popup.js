@@ -9,6 +9,16 @@ import { noSec, distKm, hasInfo, hasWx, isStale, statusColor, scalePos,
          levelStops, gaugeStops, gaugeColor, color, isFav, titleCase } from './util.js';
 import { nearestOf, nearestCam, nearestLevel, nearestWx, camAlert } from './stations.js';
 
+/* The leading slot of every sensor row: the kind's glyph inside a tinted disc.
+   It is the same avatar the Notices pane draws over a bulletin, and `.avat` in `css/chrome.css` is
+   the one place its numbers live. So the two panes cannot drift.
+   **The disc cannot be the `<i>` itself.** An `.i` is a box of `currentColor` with the glyph masked
+   out of it, so a background on that box is clipped away with everything else outside the glyph.
+   The wrapper is the only place a disc can go. That is the same rule the favorite heart already
+   obeys for its drop shadow. */
+export const avat = (icon, tone) =>
+  `<span class="avat" style="--c:${tone}"><i class="i i-${icon}"></i></span>`;
+
 /* The warning that rides a camera picture, in the lightbox and nowhere else. Empty string when
    nothing near the lens is on alert, so it costs nothing to interpolate unconditionally.
  *
@@ -218,12 +228,17 @@ export function camNear(from, cam) {
   const k = KINDS.camera;
   return `<div class="sensor cam">
     <div class="sensorhead">
-      <i class="glyph i i-${k.icon}" style="color:${k.color}"></i>
+      ${avat(k.icon, k.color)}
       <b>Nearest camera</b>
       <span class="muted">${distKm(from, cam).toFixed(1)} km</span>
     </div>
-    <div class="place" data-cam="${cam.id}" title="Show ${cam.name} on the map">${cam.name}</div>
-    ${camImg(cam, `Latest still from ${cam.name}`)}
+    ${/* The name and the picture are two segments of one `.sbody`, the shape every sensor on a
+          station card draws. The name is pressable and the picture is not, so they are two items
+          rather than one. */''}
+    <ul class="sbody">
+      <li><div class="place" data-cam="${cam.id}" title="Show ${cam.name} on the map">${cam.name}</div></li>
+      <li>${camImg(cam, `Latest still from ${cam.name}`)}</li>
+    </ul>
   </div>`;
 }
 
@@ -446,10 +461,18 @@ function sensorBody(s) {
   const still = s.kind !== 'camera' ? ''
     : s.image ? camImg(s, `Latest still from ${s.name}`) : camNone;
 
-  return `${still}${siren}${gauge}${wet}
-    ${s.kind === 'river' ? meter(s) : ''}
-    ${body.length ? `<div class="popbody">${body.join('')}</div>` : ''}
-    ${spark}${rain}${acc}`;
+  /* One segment per block, as an M3 list at `appearance: segmented`. The blocks were a loose run
+     inside one filled card, so a meter, a metric row and a graph all read as one wall. Each answers
+     a different question, and a segment is what says so.
+     **A block this kind does not draw makes no `<li>`.** The filter runs before the wrap, so
+     `:first-child` and `:last-child` reach the blocks a reader can see and the group takes its
+     outer corner on the real ends. A river draws three segments, a siren one, a camera one.
+     Every block keeps its own markup. This wraps them and changes none of them. */
+  return `<ul class="sbody">${[still, siren, gauge, wet,
+    s.kind === 'river' ? meter(s) : '',
+    body.length ? `<div class="popbody">${body.join('')}</div>` : '',
+    spark, rain, acc]
+    .filter(h => h && h.trim()).map(h => `<li>${h}</li>`).join('')}</ul>`;
 }
 
 /* One clock, at the precision the fact needs.
@@ -651,12 +674,12 @@ function metSection(s) {
 
   return `<div class="sensor" data-sensor="@met">
       <div class="sensorhead">
-        <i class="glyph i i-${wxIcon(m.rung ?? m.now ?? 0)}" style="color:${wxTone(m.rung ?? m.now ?? 0)}"></i>
+        ${avat(wxIcon(m.rung ?? m.now ?? 0), wxTone(m.rung ?? m.now ?? 0))}
         <b>Weather</b>
         <span class="muted">${m.at}</span>
         ${wxDots(m)}
       </div>
-      <div class="wx">${now}${out}</div>
+      <ul class="sbody"><li><div class="wx">${now}${out}</div></li></ul>
     </div>`;
 }
 
@@ -690,7 +713,7 @@ export function popup(s) {
     ${metSection(s)}
     <div class="sensor" data-sensor="${s.id}">
       <div class="sensorhead">
-        <i class="glyph i i-${kind.icon}" style="color:${tone}"></i>
+        ${avat(kind.icon, tone)}
         <b>${kind.one || kind.label}</b>
       </div>
       ${sensorBody(s)}
@@ -754,8 +777,7 @@ export function sitePopup(members) {
     ${metSection(lead)}
     ${camFirst(members).map(m => `<div class="sensor" data-sensor="${m.id}">
       <div class="sensorhead">
-        <i class="glyph i i-${KINDS[m.kind].icon}" style="color:${hasInfo(m) ? KINDS[m.kind].color : 'var(--muted)'}"
-          ></i>
+        ${avat(KINDS[m.kind].icon, hasInfo(m) ? KINDS[m.kind].color : 'var(--muted)')}
         <b>${KINDS[m.kind].one || KINDS[m.kind].label}</b>
         ${m.name !== lead.name ? `<span class="muted">${m.name}</span>` : ''}
         ${dots(m)}
@@ -798,8 +820,8 @@ export function herePopup(e, loaded) {
     if (s && distKm(at, s) > NEAR_MAX_KM) s = null;
     /* `title`, not `head`: the card's own head is written below, and shadowing that name inside the
        callback would put a sensor's glyph where the card's badge belongs. */
-    const title = `<i class="glyph i i-${kind.icon}"
-        style="color:${s ? kind.color : 'var(--muted)'}"></i><b>${kind.one || kind.label}</b>`;
+    const title = `${avat(kind.icon, s ? kind.color : 'var(--muted)')
+      }<b>${kind.one || kind.label}</b>`;
     // nearestOf() only ever returns a station that is reporting, so there is no "no reading" case
     // here — either the nearest one inside the cap has something to say or nothing does.
     if (!s) return `<div class="sensor">

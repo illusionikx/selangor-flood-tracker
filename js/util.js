@@ -225,8 +225,14 @@ export const sounding = s => s.kind === 'siren' && s.status > 0 && s.backed !== 
    own total denied. One had held 4.5 mm for twelve hours against an odometer that never moved. */
 export const raining = s => s.kind === 'rainfall' && s.hourly > 0 && s.backed !== false;
 
-// Is this station the reason someone opens the map at all: a river at danger, or a siren sounding.
-export const isCritical = s => (s.kind === 'river' && s.status >= 3) || sounding(s);
+/* Is this station the reason someone opens the map at all: a river at danger, a siren sounding, or
+   rain in JPS's heavy class and above.
+   Rain joined on the repository owner's instruction, 2026-08-25. It is class 3 (> 30 mm an hour) and
+   not class 4, because class 4 is > 60 and this network reaches it a handful of times a year.
+   `raining()` and not `status` alone, the same guard `sounding()` carries: a gauge stuck on an old
+   number must not raise five surfaces. */
+export const isCritical = s => (s.kind === 'river' && s.status >= 3) || sounding(s)
+  || (raining(s) && s.status >= 3);
 
 /* Has this sensor reached the top of its own scale — whatever its own scale is? A river over its
    danger mark, a siren sounding, a flood gauge past 0.3 m of standing water, rainfall in JPS's top
@@ -271,15 +277,29 @@ export const isStale = s => {
  * is the last thing that should quietly vanish from the list — silence rendered as safety. So it
  * stays visible, drops out of the counts and the heat, and says why.
  */
+/* `heavy` is the fourth rung, added 2026-08-25 with heavy rain. It is the SEVERITY axis, which the
+   other three do not carry: they split certainty and urgency alone. Four gauges at 38 mm an hour and
+   a river over its danger mark are both observed and both immediate. They are not the same claim,
+   and one red said they were.
+   It sits above `soon` because it is observed and a forecast is not. It sits under `now` because
+   class 3 is not the top of the rain scale — `atDanger()` still reads class 4, and a class 3 gauge
+   keeps its violet pin. So the rung and the map agree.
+   The test comes BEFORE `isCritical()`, which already answers true for a class 3 gauge.
+   Rain is its only occupant and the tag names it. Do not widen it to another kind without a rung
+   name that covers both, and without the alert design standard. */
 export const tier = s => !isHot(s) ? null
   : isStale(s)   ? 'stale'
+  : s.kind === 'rainfall' && s.status === 3 ? 'heavy'
   : isCritical(s) ? 'now'
                   : 'soon';
 
-// Worst first. Stale sorts last everywhere: it is the one tier you cannot act on.
-// The tier *colours* live in CSS, keyed off `.t-now` / `.t-soon` / `.t-stale`, so light and dark
-// can differ without a second palette in here.
-export const TIER_RANK = { now: 0, soon: 1, stale: 2 };
+/* Worst first. Stale sorts last everywhere: it is the one tier you cannot act on.
+   The tier *colours* live in CSS, keyed off `.t-now` / `.t-heavy` / `.t-soon` / `.t-stale`, so light
+   and dark can differ without a second palette in here.
+   `heavy` outranks `soon` because it is observed. `heavy` and `soon` share `--s-warning`, and the
+   tag word is what tells them apart. That is the same shape `now` already has, where one red covers
+   a river at its mark and a sounding siren. */
+export const TIER_RANK = { now: 0, heavy: 1, soon: 2, stale: 3 };
 
 /* Which sensor speaks for a mast when several share one — trouble first, then the standing rank in
    config.js. Lives here rather than in render.js because the table needs the same order and a view
@@ -297,3 +317,17 @@ export const squash = t => t.toLowerCase().replace(/[^a-z0-9]/g, '');
    punctuation instead turned `I.K.B.N` into four single-letter terms and matched 294 stations. */
 export const termsOf = q => q.trim().split(/\s+/).map(squash).filter(Boolean);
 export const matches = (text, terms) => terms.every(t => text.includes(t));
+
+/* MET and JPS stamp a validity window "2026-08-10T09:00:00", Malaysian wall clock with no offset —
+   the same shape JPS uses on a reading, and the same trap. `new Date()` on a string with no offset
+   reads it as the reader's own zone, so a viewer outside Malaysia sees the window slide by their
+   offset. This rearranges the characters and does no time arithmetic at all, which is what `noSec()`
+   does to a JPS stamp for the same reason. 24-hour, because every clock in this app is.
+   It lives here rather than in ui.js because the notice list reads it too, and ui.js imports
+   alerts.js — so the other direction is a cycle. */
+export const warnWhen = s => {
+  const m = /^(\d{4})-(\d\d)-(\d\d)T(\d\d:\d\d)/.exec(String(s || ''));
+  // The fallback hands back whatever arrived. That is upstream text, so the caller escapes it. Only
+  // strtotime() in sources.php keeps a hostile stamp out today, and that guard lives in another file.
+  return m ? `${m[3]}/${m[2]}/${m[1]} ${m[4]}` : String(s || '');
+};

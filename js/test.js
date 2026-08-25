@@ -356,10 +356,9 @@ export function paintTestChrome() {
   document.body.classList.toggle('testmode', state.test);
 }
 
-// Rendered once and left in the DOM; CSS shows it only while `body.testmode`. Into #pills, not the
-// body: the rising-only filter has a pill of its own and the two can be on together.
-document.getElementById('pills').insertAdjacentHTML('beforeend',
-  `<div id="testbadge"><i class="i i-warning"></i><b>TEST MODE</b>
-     <span>Every alert on this map is fake</span>
-     <button id="testOff">Turn off</button></div>`);
+/* **Nothing is injected here any more.** This module used to write `#testbadge` into `#pills`, a
+   fat amber pill with a label, a sentence and a Turn off button. A reader asked for a chip on
+   2026-08-25, so `#testChip` sits in `index.html` on the map chip row and `css/chrome.css` draws it
+   from `body.testmode`. One class, and no markup written from a deferred module.
+   That also let `js/ui.js` bind the way out directly rather than delegate from `#pills`. */
 

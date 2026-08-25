@@ -61,6 +61,15 @@ export const camAlert = cam => state.data.reduce((best, s) => {
   const hot = isHot(s);
   if ((!hot && !atDanger(s)) || isIgnored(s) || isStale(s)) return best;
   const t = hot ? tier(s) : 'now';
+  /* The pill carries TWO rungs and the panel carries four. `heavy` is rain under JPS's top class,
+     added 2026-08-25, and it stops here. Three reasons, and any one of them is enough.
+     A glyph on a photograph has no room for a third severity, which is the same argument that put
+     the stale exclusion two lines above.
+     The pill answers the MAP's question, which this function's own header states, and the map still
+     reads `atDanger()` at class 4.
+     And `?shots=` scores an archived frame at `RAIN_DANGER`, one mark and not two. Let `heavy`
+     through and the live pill draws where the whole archive behind it does not. */
+  if (t === 'heavy') return best;
   const km = distKm(cam, s);
   if (km > CAM_ALERT_KM) return best;
   return !best || TIER_RANK[t] < TIER_RANK[best.tier] || (t === best.tier && km < best.km)

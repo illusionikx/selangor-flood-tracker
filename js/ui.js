@@ -3,15 +3,15 @@
 import { KINDS, MAST, camSrc, FEED, STATIC, NEAR_MAX_KM, NOTICE, NOTICE_KIND, NARROW_PX
        } from './config.js';
 import { state, PREFS, PREFS_KEY, save } from './state.js';
-import { el, distKm, dkey, ignoredIds, leads, favIds, isFav, squash, termsOf, matches, esc
-       } from './util.js';
+import { el, distKm, dkey, ignoredIds, leads, favIds, isFav, squash, termsOf, matches, esc,
+         warnWhen } from './util.js';
 import { setTheme, applyTheme, flashTo, closeSide, showPlace, side, railSync } from './map.js';
 import { showHere } from './locate.js';
-import { syncHeat } from './heat.js';
+import { syncHeat, heatOpacity, HEAT_OPACITY } from './heat.js';
 import { byId } from './stations.js';
 import { camWarn } from './popup.js';
 import { render, districts } from './render.js';
-import { alerts, toggleAlerts } from './alerts.js';
+import { alerts, toggleAlerts, setAlertTab } from './alerts.js';
 import { ticker } from './ticker.js';
 import { load, feedRows, sourceRows, lastPayload } from './net.js';
 import { askJson } from './ask.js';
@@ -79,21 +79,63 @@ const aboutBox = el('aboutBox'), helpBox = el('helpBox');
 // shuts: nothing on the map dismisses it, and a poll never does. See map.js.
 // Each menu entry opens its own dialog. Both scroll, so both are parked at the top on open: a
 // reopened dialog that keeps the last reader's scroll position starts mid-sentence.
-/* **Two controls per entry, one handler.** Help and About are rail items above 600px and rows in
-   the app bar's overflow menu below it, because a navigation bar caps at five items. Only one of
-   the two ever draws. Two copies of a handler is two things to change, and this app has paid for
-   that shape before — see the two repairs `syncHeat()` records. */
-const openAbout = () => { closeSide(); aboutBox.scrollTop = 0; aboutBox.showModal(); paintDev(); };
+/* **Two controls per entry, one handler.** Settings, Help and About are rail items above 600px and
+   rows in the navigation bar's overflow menu below it, because a navigation bar caps at five items.
+   Only one of the two ever draws. Two copies of a handler is two things to change, and this app has
+   paid for that shape before — see the two repairs `syncHeat()` records.
+   **Nothing here closes the menu.** `showModal()` closes every open popover itself, which is what
+   the HTML spec states, so the row that opened a dialog leaves nothing behind it. */
+const openAbout = () => { closeSide(); aboutBox.scrollTop = 0; aboutBox.showModal(); };
 const openHelp  = () => { closeSide(); helpBox.scrollTop  = 0; helpBox.showModal(); };
-for (const [fn, ids] of [[openAbout, ['railAbout', 'menuAbout']], [openHelp, ['railHelp', 'menuHelp']]])
+const openSettings = () => {
+  closeSide(); settingsBox.scrollTop = 0; settingsBox.showModal(); paintDev();
+};
+for (const [fn, ids] of [[openAbout, ['railAbout', 'menuAbout']], [openHelp, ['railHelp', 'menuHelp']],
+                         [openSettings, ['railSettings', 'menuSettings']]])
   for (const id of ids) el(id).onclick = fn;
 aboutBox.onclick = e => { if (e.target === aboutBox) aboutBox.close(); };
 helpBox.onclick  = e => { if (e.target === helpBox)  helpBox.close(); };
+settingsBox.onclick = e => { if (e.target === settingsBox) settingsBox.close(); };
 
-// The message a force leaves in #devMsg belongs to the dialog session that produced it, not to any
-// one repaint — clearing it here, not in paintDev(), is what stops a poll landing mid-read from
-// wiping a result nobody has seen yet. Close the dialog and it is gone; reopen and force a fresh one.
-aboutBox.onclose = () => { el('devMsg').textContent = ''; };
+/* **M3's snackbar, and it replaced `#devMsg`.** That was a muted line under the buttons, inside a
+   pane that scrolls. So the answer to a press could sit below the fold while the reader watched the
+   button. A snackbar reports at the foot of the screen, whatever the pane is showing.
+   **It is a `popover`.** The dialog it reports on is modal, so it is in the top layer, and no
+   `z-index` reaches over that. `manual`, so a press anywhere else does not dismiss it.
+   **One timer, cleared on every call.** Two messages in a row otherwise share the first one's clock,
+   and the second vanishes early. `SNACK_MS` is M3's own short duration for a message with no
+   action to take. */
+const SNACK_MS = 4000;
+/* Half a second, so the switch's own travel finishes before the pane leaves. Shorter reads as the
+   pane closing INSTEAD of the control answering. Longer reads as a pane that closed by itself. */
+const TEST_CLOSE_MS = 500;
+let snackAt = 0;
+/* **`togglePopover()`, never `showPopover()`/`hidePopover()`.** Both of those THROW rather than do
+   nothing when the popover is already in the state they ask for: `hidePopover()` on a closed one
+   raises `InvalidStateError`, and `showPopover()` on an open one does the same. The first version
+   called `hidePopover()` first, to restart the enter animation, and every single call threw on the
+   first line. So the snackbar never drew once, and nothing said so — the throw landed inside a
+   handler with no surface. `togglePopover(force)` is the idempotent pair.
+   The restart went with it. A second message replaces the text and resets the clock, and the
+   messages this app raises are seconds apart. */
+function snack(msg) {
+  const b = el('snack');
+  b.textContent = msg;
+  clearTimeout(snackAt);
+  b.togglePopover(true);
+  snackAt = setTimeout(() => b.togglePopover(false), SNACK_MS);
+}
+// A message belongs to the dialog session that produced it. Closing the pane takes it with it, so a
+// result nobody has seen cannot outlive the control that asked for it.
+/* **Closing the pane does NOT take the snackbar down, and this line used to.** The rule came across
+   from `#devMsg`, which was a line INSIDE the pane: a message belongs to the session that produced
+   it. A snackbar is not inside the pane. It has its own four-second clock, and M3 ties its life to
+   that clock rather than to the surface that raised it.
+   **It also made one thing impossible.** Switching test mode on closes this pane and then says so,
+   and a snackbar that died with the pane could never carry that message. Measured: the text was
+   written, the popover opened, and the queued `close` event hid it in the same task.
+   The two in-flight guards on the force button still stop a late result speaking after the reader
+   has gone. */
 
 /* The same numbers the status dot shows, plus the ones it has no room for. Painted when the dialog
    opens, and again on every poll while it stays open. There is nothing to tear down, so re-painting
@@ -115,11 +157,13 @@ function paintDev() {
 // only fires once a payload actually exists, and only from a real fetch, never from a re-render the
 // filters trigger — see the dispatch in net.js. Repainting only while the dialog is open matches
 // openSide()'s own rule for the station panel: nothing redraws what nobody can see.
-document.addEventListener('poll', () => { if (aboutBox.open) paintDev(); });
+document.addEventListener('poll', () => { if (settingsBox.open) paintDev(); });
 
 /* Refresh now exists only where there is something to refresh. The Pages build serves a baked
-   api.json written by a cron job, so a force there is a 404 against a file that has no opinion. */
-if (STATIC) el('devForce').hidden = true;
+   api.json written by a cron job, so a force there is a 404 against a file that has no opinion.
+   **The row hides, never the button.** These are segmented list items, so a hidden button leaves an
+   empty container in the middle of the group, which draws as a gap rather than as nothing. */
+if (STATIC) el('devForce').closest('li').hidden = true;
 
 el('devRaw').href = FEED;
 
@@ -129,7 +173,7 @@ el('devRaw').href = FEED;
 el('devForce').onclick = async () => {
   const b = el('devForce');
   b.disabled = true;
-  el('devMsg').textContent = 'Refreshing…';
+  snack('Refreshing…');
   try {
     /* `no-store` stays here. This button exists to defeat the cache, and that is the one place
        where doing so is right. One try: a reader who pressed a button watches the result, and the
@@ -139,14 +183,14 @@ el('devForce').onclick = async () => {
        refresh that had already succeeded. */
     const j = await askJson(FEED + (FEED.includes('?') ? '&' : '?') + 'force=1',
                             { cache: 'no-store', tries: 1, ms: 45000 });
-    // The dialog can close while the fetch is in flight. onclose already cleared #devMsg for the
-    // next session, and a result landing after that must not write into it.
-    if (aboutBox.open) el('devMsg').textContent = j.forced
-      ? `refreshed in ${j.tookMs} ms`
-      : `not refreshed — ${j.forceWhy || 'served from cache'}`;
+    // The pane can close while the fetch is in flight. The snackbar outlives the pane now, so this
+    // guard is the only thing that stops a result speaking to a reader who has gone back to the map.
+    if (settingsBox.open) snack(j.forced
+      ? `Refreshed in ${j.tookMs} ms`
+      : `Not refreshed. ${j.forceWhy || 'Served from cache'}`);
     await load();
   } catch (e) {
-    if (aboutBox.open) el('devMsg').textContent = 'Failed — ' + e.message;
+    if (settingsBox.open) snack('Failed. ' + e.message);
   }
   b.disabled = false;
   // Not redundant with the `poll` listener above: on the catch path load() never ran, so no `poll`
@@ -154,16 +198,70 @@ el('devForce').onclick = async () => {
   paintDev();
 };
 
-/* Native confirm(), because this drops the ignored list and that is the one setting somebody chose
-   deliberately. It fails in the safe direction — clearing it un-silences sensors, so it can only
-   add alerts, never hide one — but "safe" is not "expected". */
-el('devReset').onclick = () => {
-  if (!confirm('Reset every setting to its default? This clears the theme, the district filter, '
-      + 'the layer chips, the heatmap, the favorites and the ignored sensors.\n\n'
-      + 'This cannot be undone.')) return;
-  localStorage.removeItem(PREFS_KEY);
-  location.reload();
+/* **The wash opacity.** It reads the preference and writes the control, never the reverse. That is
+   the rule every preference-owned control here obeys, and the reason each one carries
+   `autocomplete="off"`: a browser restores form state across a reload and fires no `change`, so a
+   control this app never wrote holds a state the preference denies.
+   `oninput` rather than `onchange`, because the wash is what a reader is watching while they drag.
+   `heatOpacity()` is one style write per layer, so there is nothing here to throttle. */
+const wash = el('washOpacity'), washPct = el('washPct');
+const sayWash = () => { washPct.textContent = `${wash.value}%`; };
+wash.value = Math.round((PREFS.heatOpacity ?? HEAT_OPACITY) * 100);
+sayWash();
+wash.oninput = () => {
+  PREFS.heatOpacity = +wash.value / 100;
+  save();
+  sayWash();
+  heatOpacity();
 };
+
+/* **Three presses in Settings destroy a list a reader built by hand, and one dialog asks about all
+   three.** They are Reset settings, Remove all favorites and Stop ignoring all. A reader asked for
+   the two list controls to confirm on 2026-08-25.
+   **Every one of the three is undoable only by doing the work again.** The favorites are a list
+   somebody starred one sensor at a time. The ignored sensors are the same, and that one fails in the
+   safe direction — clearing it un-silences sensors, so it can only add alerts, never hide one — but
+   "safe" is not "expected".
+   **It is an M3 basic dialog, and it was a native `confirm()`.** A reader asked for the M3 dialog on
+   2026-08-25. The native one takes the browser's own chrome and cannot be written in this app's
+   voice. It also blocks the main thread, which a poll landing under it does not enjoy.
+   **It opens over `#settingsBox`, which is allowed here.** Below 600px that pane is a full-screen
+   dialog, and M3 states that as the one variant another dialog may open over. Both are in the top
+   layer, so neither needs a `z-index`.
+   **Cancel is the default answer.** Escape and the backdrop both reach `close()` with nothing done,
+   which is what a destructive confirmation owes a reader.
+   **The confirming button names the ACT and never "OK".** That is M3's own rule for a dialog action,
+   and here it is the last word a reader who mis-tapped has left to read. */
+const confirmBox = el('confirmBox');
+let confirmDo = null;
+function ask(title, body, verb, done) {
+  el('confirmTitle').textContent = title;
+  el('confirmBody').textContent = body;
+  el('confirmYes').textContent = verb;
+  confirmDo = done;
+  confirmBox.showModal();
+}
+el('confirmNo').onclick = () => confirmBox.close();
+confirmBox.onclick = e => { if (e.target === confirmBox) confirmBox.close(); };
+/* **The action is taken in hand BEFORE the close, never read back after it.** A dialog fires `close`
+   asynchronously, so a handler that clears the armed action runs after this one returns. Reading it
+   back would work today and break the day anything else clears it. Clearing it here also means one
+   press does one thing: a second click on a closing dialog finds nothing armed.
+   `onclose` covers the two answers that never reach this button, Escape and the backdrop. */
+el('confirmYes').onclick = () => {
+  const go = confirmDo;
+  confirmDo = null;
+  confirmBox.close();
+  go?.();
+};
+confirmBox.onclose = () => { confirmDo = null; };
+
+el('devReset').onclick = () => ask(
+  'Reset every setting?',
+  'This clears the theme, the district filter, the map layers, the heatmap, the favorites and the '
+  + 'ignored sensors. It cannot be undone.',
+  'Reset',
+  () => { localStorage.removeItem(PREFS_KEY); location.reload(); });
 
 /* Seven taps on the About logo inside five seconds. A rolling window of the last seven timestamps
    rather than a counter and a timer: there is no interval to arm, clear or leak, and the gesture
@@ -224,18 +322,50 @@ el('testMode').onchange = async () => {
     b.disabled = false;
   }
   load();
+  /* **Switching the mode ON leaves this pane, and a snackbar says what happened.** A reader asked
+     for that on 2026-08-25. The whole point of the mode is the map, and a settings pane over it is
+     the one thing that cannot show a fake flood.
+     **The delay is what makes the switch readable.** Half a second is long enough for the thumb to
+     finish its travel, so the pane leaves after the control answers rather than instead of it.
+     **The snackbar follows the close, never precedes it.** A `<dialog>` fires `close`
+     asynchronously, so a message shown first would be on screen while the pane is still open, and
+     the reader would watch it slide out of the way. `settingsBox.close()` is a no-op when the mode
+     was switched off from the map chip, so one path serves both.
+     **A failed import lands in the `catch` above with `state.test` back to false**, so this branch
+     reports what is on screen rather than what was pressed. */
+  if (state.test) setTimeout(() => {
+    settingsBox.close();
+    snack('Test mode on. Every alert on this map is fake.');
+  }, TEST_CLOSE_MS);
+  else snack('Test mode off.');
 };
-// The badge's own escape hatch: whoever is looking at a fake flood may not be whoever switched it
-// on, and hunting through a dialog to stop it is a poor way to find that out.
-/* Delegated, because `#testOff` does not exist on landing. js/test.js inserts the badge that holds
-   it, and that module now loads only when a reader turns test mode on. Binding the button directly
-   at module scope threw on `null` and stopped js/ui.js, which js/app.js imports statically, so the
-   whole app failed to start. `#pills` is static markup and is always there. */
-el('pills').addEventListener('click', e => {
-  if (e.target.id !== 'testOff') return;
+/* **`--top-chips` is MEASURED, never assumed.** Two literals held it, one row on a desktop and two
+   on a phone, and every box in the top strip clears the row by reading it. The row wraps, and how
+   many lines it takes depends on the LIVE payload: `On alert · 63` is three digits wider than
+   `On alert · 1`, and at 360px that alone pushes the chips onto a third line. The strip below then
+   sat on the chips, which is the exact fault `#mapfoot` already fixed at the other end of the map.
+   **The literals stay as the pre-script value.** This module runs before the first paint but not
+   before the stylesheet, and a failed import must not leave every box docked at 0.
+   `+ 8` is the row's own gap to whatever docks under it. The row's height already carries the gaps
+   between its lines, so one term answers any number of them. */
+{
+  const row = el('mapchips'), root = document.documentElement;
+  const syncChipRow = () => root.style.setProperty('--top-chips',
+    `calc(var(--top-free) + ${Math.round(row.getBoundingClientRect().height) + 8}px)`);
+  new ResizeObserver(syncChipRow).observe(row);
+  syncChipRow();
+}
+
+/* The chip's own escape hatch: whoever is looking at a fake flood may not be whoever switched it on,
+   and hunting through a pane to stop it is a poor way to find that out.
+   **Bound directly, because `#testChip` is static markup now.** It was `#testOff` inside a badge
+   `js/test.js` inserted, so the handler had to be delegated from `#pills`: binding a button that
+   does not exist on landing threw at module scope and stopped `js/ui.js`, which `js/app.js` imports
+   statically, so the whole app failed to start. The chip is in `index.html`, so that trap is gone. */
+el('testChip').onclick = () => {
   el('testMode').checked = false;
   el('testMode').onchange();
-});
+};
 
 // --- all-stations table ------------------------------------------------------------------------
 
@@ -770,7 +900,15 @@ el('ignoredList').onclick = e => {
   ids.delete(id);
   setIgnored(ids);
 };
-el('ignoredClear').onclick = () => setIgnored(new Set());
+/* **Clearing the whole list confirms. Removing one row does not.** A row states one sensor's name
+   and its own control sits beside it, so a mis-tap costs one star and the row says which. This
+   button empties a list a reader built one sensor at a time, and nothing on screen names what it
+   took. See `ask()` further up this file. */
+el('ignoredClear').onclick = () => ask(
+  'Stop ignoring every sensor?',
+  'Every sensor on this list will alert again. The list cannot be restored.',
+  'Stop ignoring',
+  () => setIgnored(new Set()));
 
 el('favList').onclick = e => {
   const id = e.target.closest('[data-unfav]')?.dataset.unfav;
@@ -779,7 +917,12 @@ el('favList').onclick = e => {
   ids.delete(id);
   setFavs(ids);
 };
-el('favClear').onclick = () => setFavs(new Set());
+// The same rule the ignored list states above: the whole list confirms, one row does not.
+el('favClear').onclick = () => ask(
+  'Remove every favorite?',
+  'This empties the list. The starred sensors stay on the map as ordinary pins.',
+  'Remove',
+  () => setFavs(new Set()));
 
 /* Placement for the Details menu, by hand — CSS anchor positioning is Chromium-only, exactly as in the
    table's hover panels. `toggle` does not bubble, hence the capture phase. */
@@ -1444,21 +1587,16 @@ document.addEventListener('click', e => {
   if (t) flashTo(t);
 });
 
+// The alert list's two tabs. Delegated, because that list is rebuilt on every poll. The pane it
+// switches is rebuilt by alerts.js, which owns the choice — see setAlertTab().
+document.addEventListener('click', e => {
+  const t = e.target.closest('.atab[data-tab]');
+  if (t) setAlertTab(t.dataset.tab);
+});
+
 // --- MET warnings ------------------------------------------------------------------------------
 
 const warnBox = el('warnBox');
-
-/* MET stamps a validity window "2026-08-10T09:00:00", Malaysian wall clock with no offset — the
-   same shape JPS uses, and the same trap. `new Date()` on a string with no offset reads it as the
-   reader's own zone, so a viewer outside Malaysia would see the window slide by their offset. This
-   rearranges the characters and does no time arithmetic at all, which is what `noSec()` does to a
-   JPS stamp for the same reason. 24-hour, because every clock in this app is. */
-const warnWhen = s => {
-  const m = /^(\d{4})-(\d\d)-(\d\d)T(\d\d:\d\d)/.exec(String(s || ''));
-  // The fallback hands back whatever arrived. That is upstream text, so the caller escapes it. Only
-  // strtotime() in sources.php keeps a hostile stamp out today, and that guard lives in another file.
-  return m ? `${m[3]}/${m[2]}/${m[1]} ${m[4]}` : String(s || '');
-};
 
 // "Kuala Lumpur and Putrajaya", not "Kuala Lumpur, Putrajaya". One region reads as one region.
 // Not called `list`: this file already binds that name at lines 507 and 702.

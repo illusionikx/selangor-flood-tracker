@@ -103,37 +103,77 @@
    kind chips are the app bar's second supporting line now, so their layout goes with them — see
    `#sideKinds` in css/chrome.css. `.pophead` holds nothing at all on a station card, and
    `openSide()` removes it. */
-/* **One M3 filled card per sensor.** Transcribed from `Card/card.css` in the M3 Expressive
-   component set: `background-color: surface-container-highest`, `border-radius: shape-corner-medium`
-   (12dp), no border, and no elevation at rest.
-   https://github.com/bczak/m3you/blob/development/src/components/Card/card.css
-   `--hover` stands in for the container tone. This app holds one surface tone in `css/base.css` and
-   the palette rule keeps M3's colour roles out of it, so the container is the one step off
-   `--surface` that already exists here — the same tone `.chip:hover` and `.wxcol` take.
+/* **The station panel is an M3 LIST, and one item names each sensor.** A reader asked for that on
+   2026-08-25, beside the avatar disc the Notices pane already draws.
+   `.sensor` is the group and it paints nothing. `.sensorhead` is the item: the leading avatar, the
+   headline, and a trailing supporting line. `.sbody` under it is that sensor's readings, as M3's
+   list at `appearance: segmented`.
 
-   **This is also what killed the double line under the title.** A section separated itself with a
-   top rule and `.pophead` ended in a bottom rule, and the two stacked as soon as the header stopped
-   being lifted whole out of the body. `#sideBody > .sensor:first-child` used to cancel the first
-   one; it stopped matching the moment `.pophead` became the body's first child, which is a
-   sibling-selector fault in a rule whose own comment warned about sibling selectors. A card
-   separates by surface, so neither rule is left to stack. */
-.sensor {
-  margin-top: 8px; padding: 12px;
-  border-radius: var(--md-sys-shape-corner-medium); background: var(--hover);
-}
-/* No `:first-child` cancel any more, and the rule that was here could no longer fire. Every card
-   wants the same 8px whether or not it has a sibling above it: over a sibling it is the gap between
-   two cards, and at the top of the body it is the gap under the app bar. That rule's own comment
-   warned against a sibling selector and then keyed on position, which is the same fault by another
-   name — and position is exactly what moved when `.pophead` emptied and `openSide()` removed it. */
-/* A cell inside a filled card steps back to the page tone, or the two containers are one flat
-   block. Both surfaces that draw `.wxcol` sit inside a `.sensor`: the station card's weather
-   section, and the weather panel's half-hour stack. */
+   **This replaces one filled card per sensor.** That card held a meter, a metric row, a graph and a
+   totals chart on one flat surface. Each answers a different question and the card said so nowhere.
+   A segment per block is what says it, and the group still reads as one sensor because the
+   segments carry the 4dp inner corner and only the ends take the 16dp outer one.
+
+   **The double line stays killed, and by the same mechanism.** A section separated itself with a top
+   rule while `.pophead` ended in a bottom rule, and the two stacked once `openSide()` began lifting
+   three pieces rather than the whole header. Neither rule exists here. Surfaces and space separate
+   everything, so there is nothing left to stack. Do not reach for a border. */
+.sensor { margin-top: 8px; }
+/* One 8px gap whether or not there is a sibling above. Over a sibling it separates two sensors, and
+   at the top of the body it clears the app bar. A `:first-child` cancel stood here and keyed on
+   position, which is what moved the day `.pophead` emptied and `openSide()` removed it. */
+/* A cell inside a segment steps back to the page tone, or the two containers are one flat block.
+   Both surfaces that draw `.wxcol` sit inside a `.sensor`: the station card's weather section, and
+   the weather panel's half-hour stack. */
 .sensor .wxcol { background: var(--surface); }
-.sensorhead { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
-.sensorhead b { font-size: 12px; font-weight: 500; }
+/* M3's list item: a 16px gap, a 40px leading avatar, and a headline at `body-large` in the regular
+   weight. That is the `.nrow` headline's own rule, so a sensor and a bulletin read the same.
+   `min-height` and not `height`: a headline this app never truncates can wrap, which is the rule a
+   station name already earns everywhere else.
+   The radius is here for the flash alone. A list item takes its state layer on its own shape. */
+.sensorhead {
+  display: flex; align-items: center; gap: 16px;
+  min-height: 56px; padding: 4px; border-radius: var(--md-sys-shape-corner-large);
+}
+.sensorhead b {
+  font-weight: 400;
+  font-size: var(--md-sys-typescale-body-large-size);
+  line-height: var(--md-sys-typescale-body-large-line-height);
+  letter-spacing: var(--md-sys-typescale-body-large-tracking);
+}
+/* The trailing supporting text: a distance, a MET point, or a member's own name where it differs
+   from the place. One line, clipped, so it can never push the kebab off the row. */
 .sensorhead .muted { flex: 1; min-width: 0; text-align: right; overflow: hidden;
   text-overflow: ellipsis; white-space: nowrap; }
+
+/* The readings, as M3's list at `appearance: segmented`. `.mseg` in `css/chrome.css` states the same
+   shape for the Settings groups and the alert groups. This is not that class, and the divergence is
+   the item: those two draw a row of text and this one draws a meter, a graph or a picture. So there
+   is no 72px floor, no centred flex row, and no 16px inline padding to stand a graph in.
+   **The gap is 2px, which is `--md-list-item-gap`'s own number.** `.mseg` takes 8px because its
+   groups hold different kinds of row. Every segment here belongs to one sensor and has to read as
+   one block. */
+.sbody {
+  display: flex; flex-direction: column; gap: 2px; list-style: none; margin: 0; padding: 0;
+}
+.sbody > li {
+  padding: 12px;
+  background: var(--md-sys-color-surface-container);
+  border-radius: var(--md-sys-shape-corner-extra-small);
+}
+.sbody > li:first-child {
+  border-start-start-radius: var(--md-sys-shape-corner-large);
+  border-start-end-radius: var(--md-sys-shape-corner-large);
+}
+.sbody > li:last-child {
+  border-end-start-radius: var(--md-sys-shape-corner-large);
+  border-end-end-radius: var(--md-sys-shape-corner-large);
+}
+/* A line the "You are here" card puts between the head and the readings: the station name it found,
+   its region, or `No river within 30 km` where it found none. It is supporting content of the item
+   rather than a reading, so it takes no container. It takes the head's own 4px inset, or it stands
+   left of the headline above it. */
+.sensor > .place, .sensor > .muted { padding-inline: 4px; }
 
 /* The MET section. Two cells, each one a glyph, the words that belong to it, and its own title on
    the bottom edge. The split is 1:3, because `Now` holds two short numbers and `Later` holds a
@@ -446,7 +486,8 @@
   .pophead { padding-bottom: 6px; margin-bottom: 6px; }
   .popname { font-size: 14px; }
   .popbody { gap: 3px 10px; margin-bottom: 6px; }
-  .sensor { margin-top: 6px; padding: 10px; }
+  .sensor { margin-top: 6px; }
+  .sbody > li { padding: 10px; }
 }
 
 /* The alert marker on a camera picture. Top left, because the bottom carries the timestamp JPS
@@ -493,12 +534,17 @@
 
 /* The sensor a search sub-row asked for. It fades rather than staying marked, because the card is
    rebuilt in place on every poll and a permanent mark would outlive the question that set it. */
-#sideBody .sensor.flash { animation: sflash 1.6s ease-out; }
-/* Back to the card's own tone, never `transparent`: the section is a filled card now, so fading to
-   nothing erases the container the flash was drawn on. */
+/* **The flash lands on the HEAD, not on the group.** `.sensor` paints nothing now, and every segment
+   under it carries its own opaque container. So a tint on the group would show in the 2px gaps
+   between the segments and nowhere else. The head is the list item, and a list item is what takes a
+   state layer. It carries the shape for one too.
+   **Back to `transparent`, and the rule here ended on `--hover`.** That was right while the section
+   was a filled card, because fading to nothing erased the container the flash was drawn on. The head
+   has no container to erase. */
+#sideBody .sensor.flash .sensorhead { animation: sflash 1.6s ease-out; }
 @keyframes sflash {
   from { background: color-mix(in srgb, var(--accent) 26%, transparent); }
-  to   { background: var(--hover); }
+  to   { background: transparent; }
 }
 
 /* One card per half hour MET publishes. It is built like the weather card's own `Later` cell.

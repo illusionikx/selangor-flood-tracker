@@ -2111,7 +2111,7 @@ All four gaps found in the audit are now closed. The change that carries most of
 
 | tier | what it is | CAP | rendered |
 |---|---|---|---|
-| `now` | river at danger, siren sounding | Observed / Immediate | red rule, `HAPPENING NOW` |
+| `now` | river at danger, siren sounding, rain in JPS's heavy class | Observed / Immediate | red rule, `HAPPENING NOW` |
 | `soon` | rising, forecast to reach danger ≤3h | Likely / Expected | amber rule, `FORECAST` |
 | `stale` | on alert, but offline or a reading over 24h old | — | grey rule, `NOT CURRENT`, dimmed |
 
@@ -13122,7 +13122,7 @@ So the rail starts at `top: 0`, and the app bar starts where the rail ends. That
 **One heading, two homes.** `#brand` is written into `<header>`, which is where a phone keeps it. A phone has no rail. Above 600px `js/ui.js` moves the node into the rail's brand slot. A second copy
 in the markup is a second `<h1>` for a screen reader to read. CSS cannot move a node.
 
-`#netstats` does not move. It is positioned against the window at both widths. A 236px popover inside a 96px column that clips draws nothing.
+`#netstats` does not move. It is positioned against the window at both widths. A 236px popover inside an 80px column that clips draws nothing.
 
 ### The status dot is gone
 
@@ -13139,12 +13139,162 @@ pin still pings on it.
 
 ### The rail expands
 
-96px against 220, with `padding-inline: 20px`, from `NavigationRail/navigation-rail.css`. The item goes from a 64px column to a 56px row. The label moves inside the indicator. The indicator
-goes from a 56 by 32 pill over the glyph to the whole row at a 28px radius.
+80px against 220, with `padding-inline: 20px`. The item goes from a 64px column to a 56px row. The label moves inside the indicator. The indicator
+goes from a 56 by 32 pill over the glyph to the whole row at a 28px radius. Every number except the
+collapsed width is `NavigationRail/navigation-rail.css`'s own.
+
+**The collapsed width is 80px, and M3 publishes two answers.** That file states 96, which is the
+Expressive rail, and this app drew it for the whole M3 transformation. m3.material.io's own
+navigation rail specs page states an 80dp container, a 56dp item and a 32dp indicator. This rail
+already draws that item and that indicator. So 96 left the 56px pill 20px of clear space on each
+side against the 12 the classic page states. The repository owner picked 80 on 2026-08-25, off that
+page. It hands 16px back to the map at every width above 600px.
+
+**Two derived numbers moved with it.** The medium band's floor now bites from 601 to 615px rather
+than to 631. The expanded band's ratio takes over at 1280px rather than 1296. Both come out of
+`(window - rail)`, so both are arithmetic rather than decisions.
 
 **The indicator moves from `.railpill` to `.railitem`, and that is why the markup needs no change.**
 Collapsed, the pill is the indicator and the label sits under it, outside. Expanded, the row is the
 indicator and the label sits inside it. One DOM, two states, because the paint moves.
+
+### The expanded rail gives back vertical space, never width
+
+The repository owner asked for space back on 2026-08-25. **220px cannot go.**
+`body.railopen #rail #brand` gets `220 - 40 - 16 = 164px`, and the rail's wordmark ladder has one
+rung at `@container (min-width: 147px)`. At 200px the brand falls to 144px and the rail draws no
+heading at all. `title-test.html` guards exactly that. 220 is also M3's own floor for this variant.
+The classic spec publishes no expanded rail at all, only a 360dp navigation drawer, which is wider.
+
+So the slack is vertical. Three gaps move, for about 40px back down the column:
+
+| gap | was | now |
+|---|---|---|
+| `.railitems` over the first destination | 40px | 24px |
+| `#rail hr` each side | 12px | 8px |
+| `.railfab` over the FAB | 12px | 8px |
+
+**The 24 is not deleted, and it must not be.** It is the one thing saying the search FAB belongs to
+the header block rather than being the first destination. It is still three times the 8px inside
+that block, so the grouping reads the same. This is the reduction the rail's width already took:
+M3's number, cut where this app's own content leaves slack, with the ratio kept.
+
+### What a rail toggle costs
+
+Measured 2026-08-25 with a throwaway probe page: an iframe holding the real app at 1536×900, four
+presses per condition, Leaflet patched before `app.js` built the map. **Real frame timing, never
+virtual time** — a headless run with `--virtual-time-budget` fast-forwards timers and reports
+nothing about frames.
+
+| per press | calls | cost |
+|---|---|---|
+| `SoftHeat._reset` → `_redraw` → `_field` | 1 | 30ms |
+| `Map.invalidateSize` | 16 | 19ms, 1.2ms each |
+| `GridLayer._update` | 4 | 0.5ms |
+
+Three readings this rules out. Leaflet's `invalidateSize` is not the cost, at 1.2ms a call. Tile
+work is nothing. And no task passed 50ms, so nothing blocks the thread outright.
+
+**The first reading of this was wrong, and the correction is the entry.** The one `SoftHeat` repaint
+lands 200ms after the travel, so it cannot stutter the travel. The heat layer IS the cost, but it is
+per frame and not per press. Frame counts say so. Over one 460ms window the toggle rendered 124
+frames with the heat layer on and 157 with it off, against 157 for a page with no animation at all.
+
+| condition | median frame | p90 |
+|---|---|---|
+| heat on | 22.4ms | 32.9ms |
+| heat off | 17.1ms | 25.7ms |
+| nothing animates at all | 16.6ms | 18.3ms |
+
+**The cost is the canvas's composited AREA.** `_pad()` in `vendor/leaflet-heat.js` returns
+`map.getSize() × 0.2`, so the canvas is 1.4 on each axis and **1.96 times the map's own area** —
+1393×1216 against a 995×868 map. Scaling the canvas's CSS box to 71% (half the area) recovered the
+whole cost: 17.7ms median against 17.6 for a page with the canvas deleted. Quartering it gained
+nothing more.
+
+That pad is deliberate and its own comment states the trade: without it a drag pulls blank canvas in
+from the edge, because `SoftHeat` repaints on `moveend` alone. The comment reasons about REPAINT
+cost, `(1 + 2 × PAD)²`, and not about compositing a large canvas every frame while its container
+animates its width.
+
+**No CSS fix exists, and one of them lied.** `will-change: left` on the map looked like a large win
+in a blocked run and vanished under interleaving — it was an order effect. `contain: layout paint`
+and `contain: paint` on the canvas do nothing. `contain: strict` looked best of all and **collapsed
+the canvas to a 0×0 box**: it includes size containment, and a canvas takes its box from its
+`width`/`height` attributes. It was fast because it was invisible.
+
+**A pixel count would have called that a pass.** `getImageData` still reports a full backing store on
+a canvas whose box is 0×0, so the wash reads as painted while nothing draws. Read
+`getBoundingClientRect()` as well as the pixels, on anything that claims a canvas survived.
+
+**Nothing was changed on the strength of these numbers.** Every one comes from headless software
+rasterization, where composite area is expensive and on a GPU it is nearly free. The response is also
+not linear — a 7% cut off the canvas's edge recovered most of the median and the next 21% recovered
+little, which is the shape of a raster-tile threshold rather than of a real cost curve. The one datum
+this cannot supply is whether the machine in front of the reader behaves the same way. Turn the
+heatmap off, press the rail, and compare. That answers it in ten seconds, and only then is lowering
+`_pad()` worth its own trade.
+
+**The probe is deleted and the method is the part to keep.** Patch Leaflet from the parent window
+before the module graph runs, and wrap `L.Map.prototype.addLayer` to reach the app's own layer
+classes. Inject `#map { transition: none }` into the frame to isolate the map's travel from the
+rail's. **Interleave the conditions and rotate their order every round.** Run in blocks and drift
+across the run is read as a difference between conditions, which is exactly how `will-change` scored
+a win it does not have. Count frames as well as timing them: a dropped frame is the symptom, and a
+median hides it.
+
+**The probes press real controls on the app's own origin**, so a run can leave the developer's saved
+heatmap or rail preference changed. That is the hazard `m3-check.html` already carries for its own
+rail toggle.
+
+### Every rail button answers a pointer
+
+M3 paints a hover or a pressed state as a state layer: the surface's own content colour, at the
+state scale's own opacity, over that surface's own shape. `--m3-state-hover` is 8% and
+`--m3-state-press` is 10%. `css/base.css` derives both from `vendor/m3/tokens.css`, so no opacity is
+hand-copied. Four controls take one: the item, the search FAB, the rail toggle and the theme button.
+
+**The layer goes on the indicator, never on the whole item.** A collapsed item is a 64px column
+holding a 56 by 32 pill with a label under it. M3 lights the pill alone. A layer over the column
+paints the label's own box too, which reads as a row in a list rather than as an indicator lighting
+up. Expanded, the row is the indicator, so the layer moves onto the row. That is the same move the
+selected fill already makes, and it is why the rules are two blocks rather than one.
+
+**The mechanism is `color-mix()` and not a pseudo-element.** M3 uses a positioned child carrying an
+`opacity`. That needs an `inset: 0` and a `pointer-events: none` on every control that wants one. A
+mix reaches the same pixels with one property and no extra child. What it costs is that the mix has
+to name what sits underneath, where a real layer sits on whatever is already there. **A mix ending
+in `transparent` over a filled shape erases that fill.** So a selected pill mixes
+`on-secondary-container` into `secondary-container`, and only a transparent control mixes into
+`transparent`.
+
+`:active` and not `:focus`. A focus ring already answers the keyboard on all four, and M3 gives
+focus and pressed the same 10%.
+
+**A `:hover` cannot be driven from a script**, so `m3-check.html` asserts the two halves that fail
+silently. A probe element carrying the same expression reads back whether `color-mix()` resolved it
+at all. A declaration that cannot read its token is dropped whole, and the button then answers
+nothing. A CSSOM walk then asserts that all four controls still declare a rule, because a control
+left out of the sweep draws correctly.
+
+### The theme button wears a disc
+
+The repository owner asked for it on 2026-08-25. It is M3's filled icon button in its unselected
+state: a `surface-container-highest` container under an `on-surface-variant` glyph. This app's bridge
+resolves that to `--hover` under `--muted`.
+
+**Not the tonal variant.** M3 fills that one with `secondary-container`, which this app bridges to
+`--accent` — the selected rail indicator's own fill. An accent disc at the foot of this column reads
+as a seventh destination, and a selected one.
+
+**The rail alone, because the button has two homes.** Below 600px it is the app bar's trailing
+action, and an app bar action is a standard icon button with no container. `#railApps .i` beside it
+is deliberately unscoped for the opposite reason: a glyph size belongs to the button, and a container
+belongs to the surface the button stands on.
+
+`.icon:hover` in `css/base.css` fills a 40px disc with `--hover`, this app's container tone. That is
+a surface rather than a state layer, and it is the same tone this disc rests on. So the theme
+button's hover would have shown nothing. Both icon buttons in the rail take the layer instead.
 
 `PREFS.railOpen` holds the width, because it is a setting. `syncRail()` writes the control from the
 preference and never the reverse, which is the rule `syncHeat()` states for every preference-owned
@@ -13152,7 +13302,7 @@ control here.
 
 **The token is declared on `:root`, never on `body`.** `--pane` is computed on `:root` and reads
 `--rail-w` there. A value redefined further down the tree never reaches it. The supporting pane then sizes against a
-96px rail while the rail draws 220. `:root:has(body.railopen)` is what
+80px rail while the rail draws 220. `:root:has(body.railopen)` is what
 lets a body class move a root-level token.
 
 ### Two sizing traps, both the same one
@@ -13396,7 +13546,7 @@ mark and the gap count only where the mark draws, which is right whichever spell
 ## The navigation bar below 600px
 
 The rail is `display: none` under 600px. So a phone reached no filter, no alert list, no search, no
-table and no camera wall. M3 states no rail at that width either: 96px of a 360px screen is 27% of
+table and no camera wall. M3 states no rail at that width either: 80px of a 360px screen is 22% of
 it.
 
 `#navbar` is M3's navigation bar. Every number comes from the M3 Expressive component set's
@@ -13482,7 +13632,7 @@ A rail item for it puts the map's own control on the far side of the window from
 
 ### Why the search became a pane occupant, and then a card
 
-A 300px field does not fit a 96px rail. So below 600px the search is a pane occupant, which is M3's
+A 300px field does not fit an 80px rail. So below 600px the search is a pane occupant, which is M3's
 full-screen search view.
 
 Above 600px it is M3's docked search view instead: a card floating over the map's top-left corner,
@@ -13512,7 +13662,7 @@ the first is invisible.
 
 ### The rail expands, and the preference holds it
 
-96px against 220px. `PREFS.railOpen` holds the width and `syncRail()` writes the control from the
+80px against 220px. `PREFS.railOpen` holds the width and `syncRail()` writes the control from the
 preference, never the reverse.
 
 `--rail-w` is declared on `:root` and never on `body`. `--pane` is computed on `:root` and reads it
@@ -14225,3 +14375,1120 @@ check caps the body for that probe instead.
 the top of the file belongs to the document that reloaded away, and the start values of a chip's
 transition are exactly the unchecked ones: 16px of padding and a checkmark 0 wide. Every reload
 re-injects it now.
+
+## The overflow moved to the navigation bar, and Settings joined it
+
+A reader asked for a More item at the end of the bottom bar on 2026-08-25. It holds Settings,
+Help and About.
+
+### One More button, not two
+
+The overflow menu stood in the app bar's trailing group. So the new item and the old button were the
+same control at the same width, 600 pixels apart on one screen. So this change deletes `#apps`.
+`.hactions` stays, because `place()` in `js/ui.js` prepends the theme switch into it, and because an absolutely
+positioned group is what keeps the centred wordmark centred.
+
+`#appMenu` keeps its id and its rows. Only the button that opens it moved.
+
+### The fifth slot, and why it has no rail twin
+
+M3 caps a navigation bar at five items. The bar carried four after the layer controls became chips
+over the map. So the freed slot takes the overflow.
+
+Every other item here is its rail twin with one prefix changed, and `railActive()` in `js/map.js`
+matches on that suffix. `#navMore` breaks the pairing on purpose. The rail carries Settings, Help
+and About as items of its own, so there is nothing above 600px for an overflow to hold.
+`m3-check.html` asserts that `#railMore` does not exist.
+
+The item needs no handler. `popovertarget` opens the menu, so the browser does the work. It states
+`aria-expanded` and never `aria-current`, which is the rule the search already obeys: a menu is an
+action and only a destination can be the current one.
+
+### Settings is a shell, and the shell is the deliverable
+
+The reader said the contents come later. So the dialog holds a header and one line that states what
+is not there yet.
+
+It is a `.docbox`, which makes it a full-screen dialog below 600px and a basic one above. That is
+what every prose pane here already is, so it needed no rule of its own.
+
+It is a rail item as well as a menu row. A destination the navigation bar hides behind a menu still
+needs one way in above 600px, and the rail has room. `openSettings()` in `js/ui.js` joins the table
+that already binds Help and About to two controls each.
+
+The line inside the pane is not a placeholder to leave. A destination that states nothing is a
+destination a reader opens once. Delete the line the day a control lands there.
+
+### What the checks had to learn
+
+`m3-check.html` holds the dialog roll call, and it fails on any id the table does not name. So the table declares `settingsBox` as
+`fullscreen`. It is deliberately NOT in the `DIALOGS` list beside
+it. That loop asserts each pane has something to scroll, and an empty pane cannot answer it. The
+kind sweep still covers the variant, which is the fault the roll call exists for.
+
+`paint-check.html` counted the bar's four items. It reads the overflow item's `popovertarget`
+instead, because the count alone cannot say what took the slot.
+
+## Settings took the two saved lists and the developer controls
+
+The reader asked for both on 2026-08-25, in one instruction. The Settings pane shipped as a shell
+earlier the same day, and this is what filled it.
+
+### A saved list is not a filter
+
+The favorites and the ignored sensors were collapsed `<details>` sections in the filters drawer.
+Neither one filters anything. Each is a list a reader reviews and edits. That is what a settings
+pane is for.
+
+The district picker stayed in the drawer, because it IS a filter. So the drawer now holds one
+section and the line under it.
+
+### Open sections, never a `<details>`
+
+They were collapsed in the drawer for a stated reason. Two scrolling lists stacked over the layer
+switches pushed those switches off a phone screen. Nothing sits under these two but Developer.
+
+A reader who opened Settings to review a list must not press again to see it.
+
+The count keeps its own `<b>` and its own id, so `js/render.js` needed no change. `.docbox h3` is an
+11px uppercase label, and `#settingsBox .secth` makes that heading a flex row so the count can take
+`margin-left: auto`. That is the count's own rule in the drawer: a long title must never push the
+number off the row.
+
+### The developer controls came the other way
+
+About states what this site is and where the data comes from. These controls change what the app
+does. So the block left About for the foot of Settings.
+
+Four things in `js/ui.js` moved with it. `openSettings()` calls `paintDev()`. The `poll` listener
+repaints while `settingsBox` is open. The `onclose` that clears `#devMsg` moved. And the two
+in-flight guards that stop a late force result writing into a closed dialog.
+
+`#aboutBox .testtog` became `#settingsBox .testtog`. That rule pins the pill to its own width. Left
+behind, the pill draws as a full-width amber bar across the pane the day somebody switches test mode
+on. A rule written for an element travels with the element.
+
+### The trade-off, stated
+
+Every alarm standard this app reads says a muted alarm needs a way to find it. Two things name a
+silenced sensor. They are the ignored list, and the `· N ignored` count in the filters panel.
+
+The list is now two presses away rather than one. The count stayed where it was. So a reader who
+asks why the map looks empty still meets the count, and the list is one press from there.
+
+`paint-check.html` asserts that the count did NOT follow the list. Moving both puts every sign of a
+silenced sensor behind one door.
+
+### What the checks had to learn
+
+`m3-check.html` now runs `settingsBox` through the full `DIALOGS` sweep, not the kind sweep alone.
+That covers the trailing X above 600px, the pinned header and the scroll.
+
+The scroll probe needed a repair first. Settings holds two lists that are empty on a fresh
+browser, so it fits a 1000px window and has nothing to scroll. The loop caps the pane for the probe,
+the way the drawer probe already does.
+
+**The cap fires only on a pane that PINS its header.** The two flex-column dialogs scroll a body
+inside themselves and their header is `static`. Capping one of those makes the dialog itself the
+scroller, and a static header then travels with it. That is a fault the cap invented, measured at
+12px on `#dataBox` and 75px on `#camBox`.
+
+`paint-check.html` asserts the new parent of all six ids rather than the absence of the old
+sections. An absence check passes on markup somebody deleted by mistake, and `render.js` writes into
+those ids on every poll.
+
+## The two Settings sections are M3 lists
+
+The reader asked for the list shape on 2026-08-25, straight after the sections landed.
+
+Every number comes from `List/list.css` in the M3 Expressive component set, which cites
+m3.material.io/components/lists:
+
+    item        min-block-size 56px, 72px at two lines, 88px at three
+    layout      a flex row, centred, gap 16px, padding 8px 16px
+    leading     min 24px wide and 48px tall, in on-surface-variant
+    content     flex: 1 with min-inline-size 0, a column
+    headline    body-large
+    supporting  body-medium, in on-surface-variant
+    trailing    min 48px on both axes
+
+### The standard appearance, never segmented
+
+Segmented gives every row its own container and a 16dp outer corner, which is a card. This app draws
+one card in a pane already, the station section. A two-row list of cards reads as two cards rather
+than as a list.
+
+### The markup already carried the three slots
+
+`.picklist li` is the item and its own layout in one box. `.glyph` is the leading slot, `.nm` is the
+content, and `.solo` is the trailing one. `js/render.js` emits the rows it always did. Only the
+numbers moved, and they live in `css/chrome.css` beside `#settingsBox`.
+
+The rows are static and the trailing button is the action. So no pointer cursor and no hover tint.
+`.picklist` gives those to a row that opens something, and neither of these does.
+
+### Two things left, and one number diverges
+
+The bordered box went. A standard M3 list has no container of its own.
+
+`max-height: 26vh` went with it. That put a second scroller inside a pane that already scrolls. The
+cost is a long pane for a reader holding forty favorites, and this pane is where that list belongs.
+
+**This block drops the 16dp inline padding rather than halves it.** The pane already pads 24px. A list that
+pads 16px inside that stands its rows 16px in from the Developer prose under them, and one pane
+states one inset. `m3-check.html` asserts the subheader, the rows and the Developer block on one
+line.
+
+### One heading style, and it is M3's list subheader
+
+`title-small` in `on-surface-variant`, 48dp tall. Developer heads no list and takes the same style,
+because one pane states one heading.
+
+`List/list.css` carries no subheader, so those numbers come from the spec page rather than from a
+file this repo can grep. That is the one place in this block where a number is not greppable.
+
+It overrides `.docbox h3`, the 11px uppercase label. About and Help are prose panes and this one is
+a list.
+
+### The trailing slot, and why the pill did not grow
+
+M3 puts 48dp on the trailing slot. There is no slot element here. A 48px pill is a button the
+height of the row. So the pill keeps its 19px and its `::after` grows the hit area to 49.
+
+### `.muted` needed three classes to beat
+
+The supporting line is a `<span class="muted">`, and `.muted` carries a `font-size` of its own. A
+declaration on the element wins against an inherited value, whatever the parent's selector says.
+That trap is written up in CLAUDE.md and it shipped once, on the rain chart's window labels.
+
+## The alert list splits into two tabs
+
+Shipped 2026-08-25, on the repository owner's instruction. The list in `#side` holds two panes now.
+Sensors leads. Notices follows.
+
+### Why
+
+The panel answered two different questions in one scroll. A station alert says a sensor here reports
+trouble. A regional notice says MET or JPS published a claim about an area. Neither one is evidence
+for the other.
+
+The old panel ordered them against each other. An outage notice sat above everything. A weather
+warning was spliced in after the last `HAPPENING NOW` group and before the first forecast. That
+splice is gone. Two panes cannot outrank each other, so no rule has to say which leads.
+
+### M3 primary tabs
+
+The component is `Tabs/tabs.css` from the M3 Expressive set. A 48dp row. Labels at `title-small`.
+The active label takes the primary role and the inactive one takes `on-surface-variant`. A 3dp
+indicator with rounded top corners sits under the active label alone.
+
+Primary and not secondary. These two panes are the top-level split of this destination. They are not
+a division inside one of its sections.
+
+The row carries the component's own divider. The layout rule against a dividing line names the map
+card, the app bar and the pane. A tab bar with no line under it does not read as a tab bar.
+
+The row scrolls with the body. A sticky bar here pins to the scroller's padding box, so it needs the
+negative of `#sideBody`'s own padding and not `top: 0`. Nobody asked for it, and the list fits a
+screen at any size of flood.
+
+### Each tab states its own count
+
+Sensors counts every station on alert, stale rows included. That is the number of rows the pane
+draws. Notices counts the rows the other pane draws. A notice this build has no words for draws no
+row, so it is not counted either.
+
+**The badge on the navigation rail and the navigation bar does not move.** It still counts `live`,
+which excludes a station that stopped reporting. A badge is a demand for attention. The tab count
+names what a pane holds. The two answer different questions, so the two numbers can differ.
+
+### The trade-off on the outage notice
+
+An outage notice used to sit above everything, including `HAPPENING NOW`. It is a caveat on the
+sensor list rather than an item beside it. `All clear. Nothing rising or in danger` can be false
+precisely because a source stopped answering.
+
+It is in the Notices pane now. So the caveat is behind one press, and the tab count is the whole of
+what states it while the Sensors pane is on screen.
+
+The count is on screen at all times, and the notice leads its own pane. Say the word to move the
+outage banner back above the tabs.
+
+### The categories are M3 list subheaders, over an email list
+
+The repository owner asked for the email shape on 2026-08-25. Each category is a list subheader.
+The notices under it are M3 three-line list items. Service Notice leads, then Flood Alert, then
+Forecast Warning.
+
+An email list is the analogy and not a decoration. Every row here is a bulletin somebody published,
+with a sender, a subject, a preview and a time. A reader scans the column and opens one row at a
+time. The card shell this replaced put a coloured left rule and a heading block around each
+category, which is the shape of an alert rather than of a message.
+
+The numbers are `List/list.css`'s own, at the three-line height. The item is 88px with 12px of
+vertical padding, top aligned, on a 16px gap. The leading slot is a 40px avatar holding the category
+glyph at 24px. The headline is `body-large`. The supporting line is `body-medium` in
+`on-surface-variant`. The trailing time is `label-small` in the same role.
+
+The subheader is the one this app already draws in Settings. `title-small` in `on-surface-variant`,
+48dp, with its count pushed to the trailing end. `List/list.css` carries no subheader, so those
+numbers come from the spec page. That is the same divergence the Settings block already names.
+
+**The coloured left rule is gone and the avatar carries the colour.** The card shell stated the
+category three times: a rule, a heading glyph and a heading word. An email row states its sender
+once, in the avatar, and that is what stays readable after the subheader scrolls away. The avatar is
+a tint and not a fill, because this colour names a source and never a status. A column of saturated
+40px discs reads as a severity ramp.
+
+**The preview clips to two lines**, which is one more than the card row gave. CSS trims it. The
+whole sentence stays in the DOM for a screen reader and for anyone who copies it, and the modal the
+row opens holds it whole. That was already the rule at one line.
+
+**The time is the start of the validity window**, at the precision its age needs. A clock today, a
+date on any other day. `stamp()` in `popup.js` is that rule and this reads it rather than restating
+it. An outage publishes no window, so its row draws no time. An empty trailing slot is the honest
+answer.
+
+`warnWhen()` moved from `js/ui.js` to `js/util.js` for this. Two surfaces read it now, and `ui.js`
+imports `alerts.js`, so the other direction is a cycle.
+
+There is no divider between rows. M3 offers one and this app separates by space, which is the rule
+the pane already obeys. The tab bar above keeps its divider, because that is a tab bar.
+
+### The choice lives in the module, not in the DOM
+
+`alerts()` rebuilds the whole card on every poll. So a tab held as a checked radio, or as a class on
+a node, is lost every few minutes. `tab` is a module variable in `js/alerts.js`, and `build()` reads
+it. A reader on the Notices pane stays there.
+
+`setAlertTab()` resets `scrollTop`. `openSide()` keeps the scroll position while the key is
+unchanged, which is what a poll wants. It is not what a tab swap wants. Forty rows deep in Sensors
+leaves Notices showing a blank pane.
+
+The three `#sideBody > …:first-child` cancels moved to `.apane > …:first-child`. Those rules stop
+the first card drawing a second line under a head that already ends in one. The head is lifted into
+`#sideHead`, and the cards sit one box deeper now.
+
+## Heavy rain joins the alert path, on a rung of its own
+
+The repository owner asked for this on 2026-08-25. Rainfall in JPS's heavy class and above now
+raises every alert surface. Before this, rain reached the map and the camera pill alone.
+
+`isCritical()` in `js/util.js` gains one clause: `raining(s) && s.status >= 3`. That is `> 30` mm in
+an hour, which is `rainStatus()`'s own class 3 cutoff. `isHot()` reads `isCritical()`, so the change
+lands on five surfaces at once.
+
+- the "On alert" list in the supporting pane
+- the app bar count, the rail badge and the warning glyph
+- the installed app's icon badge and the tab title
+- the ticker
+- the desktop toast
+
+### Class 3 and not class 4
+
+Class 4 is `> 60` mm an hour. The archive holds **13 samples** over that mark across 30 days. A
+surface that fires 13 times a month says nothing about most storms.
+
+Class 3 fired in **66 ten-minute buckets** over the same 30 days. Only 10 of those days held any at
+all. The busiest day was 2026-08-14, with 30 gauges entering the set.
+
+### The fourth tier, and why one red was wrong
+
+The first build put heavy rain in the `now` tier. The repository owner opened the panel and asked
+where the amber had gone. Every card was red.
+
+Amber was not missing. It is the `soon` tier, and no river was rising that afternoon. **But the
+question found a real fault.** The three tiers carry certainty and urgency and they carry no
+severity at all. Four gauges at 38 mm an hour and a river over its danger mark are both observed and
+both immediate. One red said the two were the same claim.
+
+CAP keeps severity on its own axis for exactly this reason. So `tier()` gains a fourth rung.
+
+| tier | what it is | colour | tag |
+|---|---|---|---|
+| `now` | river at danger, siren sounding, rain in class 4 | red | `HAPPENING NOW` |
+| `heavy` | rain in class 3 | amber | `HEAVY RAIN` |
+| `soon` | river forecast to reach danger within 3 h | amber | `FORECAST` |
+| `stale` | on alert, but offline or over 24 h old | grey | `NOT CURRENT` |
+
+**`heavy` sits above `soon` because it is observed and a forecast is not.** It sits under `now`
+because class 3 is not the top of the rain scale. `atDanger()` still reads class 4, so a class 3
+gauge keeps its violet pin, and the rung and the map agree about it.
+
+**`heavy` and `soon` share `--s-warning`, and the tag word is what tells them apart.** That is the
+shape `now` already had. One red covers a river at its mark and a sounding siren, and the tag names
+which. A fourth hue puts four traffic-light steps on a panel with three things to say.
+
+The rung test comes **before** `isCritical()` in `tier()`, which already answers true for a class 3
+gauge.
+
+### The app bar glyph went amber for free
+
+The glyph reads `STATUS_COLOR[live.some(s => tier(s) === 'now') ? 3 : 1]`. Heavy rain is no longer
+`now`, so rain alone paints it amber. The red favicon follows the glyph, so that followed too.
+Neither line needed an edit.
+
+Red on the app bar still means a river at its danger mark, a sounding siren, or rain past 60 mm an
+hour.
+
+### How it clears the alert design standard
+
+**ISA-18.2's flood threshold is 10 alarms in 10 minutes.** Two of the 66 buckets reached it. They
+are 2026-08-14 05:00 with 11 gauges and 2026-07-29 09:00 with 10.
+
+The toast already stands down at that exact number. `FLOOD_N` is 10, and past it the toast keeps its
+ledger current and shows nothing. So the one surface that interrupts a reader already has a guard,
+and that guard predates this change.
+
+**CAP keeps severity apart from certainty.** The fourth rung is that split reaching a reader. Heavy
+rain is observed and it has no rate to project, so it never takes `soon`.
+
+**Cry-wolf cost.** `raining()` is the guard, not `status` alone. That is the same test `sounding()`
+carries for a siren. A gauge whose own odometer denies the rain it claims raises nothing. Measured
+2026-08-14, 5 of the 48 gauges this app can check claimed rain their own totals denied. One held
+4.5 mm for twelve hours against an odometer that never moved.
+
+### The feed's status field contradicts its own class table
+
+This is the fault that decided the filter. This work found it while measuring the change.
+
+`api.php` kept JPS's published `status` wherever the feed sent a real code. It derived a class only
+where the feed sent `-1`. Measured 2026-08-25, 4 of 281 gauges disagreed with `rainStatus()`, and
+every one of them was a class low.
+
+TAMAN FRIM KEPONG reported **51.5 mm an hour** against its own published `spHeavy` of **31**, in the
+same response, and JPS still published `status: 2`. TAMAN TUN TEJA reported 40.5 the same way.
+
+A filter on that field is wrong in both directions. It lists a gauge at 38.5 mm/h and skips the one
+at 51.5. That reads as a fault in the app.
+
+**`api.php` scores every rainfall reading through `rainStatus()` now.** The `-1` test is gone. One
+definition of a status, and it is this file's. That moves a pin colour and a heat weight on those 4
+gauges. It moves each one upward, and only where the feed understates its own reading.
+
+After the change, no gauge disagrees.
+
+**The river branch still tests `-1`.** No river was measured disagreeing, so nothing here changes
+one.
+
+### What did not change
+
+**`atDanger()` still reads class 4.** That function asks whether a sensor sits at the top of its own
+scale. The map red, the `.danger` halo, the cluster badge and `leads()` are untouched. So is the
+heat weighting.
+
+**The camera pill carries two rungs and the panel carries four.** `camAlert()` in `js/stations.js`
+drops a `heavy` station before it ranks anything. Three reasons, and any one is enough.
+
+1. A glyph on a photograph has no room for a third severity. That is the argument that already
+   excludes `stale` there.
+2. The pill answers the map's question, which that function's own header states, and the map still
+   reads class 4.
+3. `?shots=` scores an archived frame at `RAIN_DANGER`, one mark and not two.
+
+So `RAIN_DANGER` stays at 60.1. An earlier draft moved it to 30.1. At 30.1 the archive answers a
+question no live frame asks.
+
+`.camtile` and `.camwarn` therefore need no `t-heavy` rule, and they have none.
+
+### Wording
+
+`ALERT_TITLE` splits on JPS's own two words. `rainfall|heavy` reads `Heavy rain` and `rainfall|now`
+reads `Very heavy rain`. The two never share a card, so neither phrase has to cover the other.
+
+`rainfall|stale` is new, and it is reachable, unlike the flood gauge key beside it. A gauge frozen
+on an old heavy reading is hot and stale at once. The payload holds one stopped in October 2025.
+
+**Three lines said `at danger` about a sensor that stands at no danger mark.** Each takes a rain
+branch above the shared rung.
+
+| surface | before | after |
+|---|---|---|
+| ticker tile | `at danger` with no number | `heavy rain · 40.5 mm/h` |
+| toast row | `At danger` | `Heavy rain · 40.5 mm/h` |
+| toast all-clear row | `Back below its danger mark` | `Rain has eased` |
+| toast all-clear head | `2 stations back below danger` | `2 stations no longer on alert` |
+
+The all-clear head changed because that list can hold a rain gauge. The rows under it still name
+what eased at every station.
+
+**The toast head counts three tiers now.** Rain used to fall into the `soon` count by subtraction,
+and the head then called an observed downpour a forecast. One kind of news gets the noun, and two or
+three read as a joined list.
+
+    1 station in heavy rain
+    2 at danger now, 4 in heavy rain
+    1 at danger now, 4 in heavy rain, 2 forecast to reach danger
+
+### The panel row and its chip
+
+`reading()` in `js/alerts.js` takes a rain branch above its `level` test. A rain gauge has no level,
+so the right-hand column was empty. It prints the rate, and nothing under it. The rate is the whole
+claim. A stale row keeps the stamp, which is what that column says for every other kind.
+
+**The head needed a chip of its own, or the chips stop partitioning the list under them.** Rain is
+the one kind no existing chip counted, so a heavy-rain alert raised the head count with nothing
+beside it to say what the alert was. The chip is `rainy`, and its label reads `in heavy rain`.
+
+It takes `--s-warning`, not the danger red the two chips above it take. That is the colour the cards
+under it carry. It counts the **kind** and not one tier, so a class 4 gauge is red in its own card
+and counted in this chip all the same. The chip says how much rain is on the list. The cards say how
+bad each one is.
+
+Measured against the live payload on the poll this shipped: 4 rain and 1 siren, a badge of 5, and
+chips that sum to 5.
+
+### The check
+
+`js/alerts.js` evaluates the DOM at module scope, so node cannot load it. The rung itself lives in
+`js/util.js`, which node can. The Verify block in CLAUDE.md holds a 24-assertion harness over it.
+
+It covers the ladder in both directions, the guard, and the four places a tier name has to appear:
+`TIER_TAG`, `chrome.css`, `ALERT_TITLE`, and the line in `camAlert()` that drops it. **A tier with no tag and no
+CSS rule draws a card with a bare grey rule and errors nowhere.** That is the fault the last four
+assertions exist to catch.
+
+## Settings, rebuilt against six M3 components
+
+A reader listed seven changes on 2026-08-25. Every number below comes from the M3 Expressive
+component set, which cites its own page on m3.material.io:
+https://github.com/bczak/m3you/tree/development/src/components
+
+### Segmented lists
+
+The two saved lists and the developer controls are `List/list.css`'s segmented appearance. Every row
+is a filled container on `surface-container`. The rows keep a 4dp corner and the group's own first
+and last row take the 16dp one, so a group reads as one shape.
+
+The standard appearance stood here for one revision. Segmented is what M3 gives a settings group.
+
+**The gap is 8px and the reference states 2px.** The reference writes `--md-list-item-gap` for rows that read
+as one block. These groups each hold a different kind of row, and 2px between a two-line station and
+the next reads as one long block with hairlines cut into it.
+
+### The trailing action is an icon button
+
+It was a text pill reading `remove` or `restore`. Now `heart_minus` removes a favorite and
+`visibility` restores an ignored sensor. That second glyph pairs with the `visibility_off` on its own
+section heading.
+
+M3 puts 48dp on the trailing slot. The pill needed an `::after` to reach a touch target, and a real
+icon button carries 48dp on both axes.
+
+**The words ride `data-tip`, never `title`.** A `title` never opens on touch, which is a rule this
+app already states. `js/sparktip.js` answers that attribute on hover and on tap alike.
+
+### Test mode is an M3 switch
+
+`Switch/switch.css`: a 68x48 target, a 52x32 track with a 2px outline, a 16dp handle off and a 24dp
+handle on, and a 28dp handle while pressed.
+
+`:has(:checked)` reads the input, because the reference is React and writes `data-checked`. This app
+has no build step and no framework.
+
+**The amber `.testtog` pill is gone.** It carried a checkbox and the words TEST MODE, on the argument
+that the mode is a warning state rather than a preference. The three signals that argument was
+really about all stayed: the striped app bar, the badge, and the chip.
+
+**The variant is `primary`, not `error`.** Test mode is a mode rather than a fault.
+
+### The developer order is the reader's own
+
+Test mode, then the readings, then Refresh now, Raw payload and Reset settings.
+
+The readings are a row of the same group that takes no press. It holds a table rather than a
+headline, so `align-items: center` and the 72px floor both go. No button, no anchor, no pointer
+cursor.
+
+The three actions are M3's list ACTION mode: a button that fills the item, so the row is the target
+rather than the words inside it.
+
+**The Pages build hides the ROW, never the button.** A hidden button leaves an empty container in the
+middle of a segmented group, which draws as a gap rather than as nothing.
+
+### A snackbar, in place of `#devMsg`
+
+`Snackbar/snackbar.css`: min(344px, window - 32), a 4dp corner, `inverse-surface`, 48px on one line,
+`body-medium`.
+
+`#devMsg` was a muted line under the buttons, inside a pane that scrolls. So the answer to a press
+sits below the fold on a scrolled pane, while the reader watches the button.
+
+**It is a `popover`, and that is the only way it can be seen.** It reports on a control inside a
+modal dialog, and a modal dialog is in the top layer. No `z-index` reaches over that, which is the
+rule `js/sparktip.js` already obeys from the other side. `manual`, so a press elsewhere does not
+dismiss it and `js/ui.js` owns its clock.
+
+**One timer, cleared on every call.** Two messages in a row otherwise share the first one's clock,
+and the second vanishes early.
+
+### An M3 dialog for the reset confirmation
+
+`Dialog/dialog.css`: min(560px, window - 48), a 28dp corner, 24px of padding, `headline-small` over
+`body-medium`, and a footer on the trailing edge with an 8px gap.
+
+It replaced a native `confirm()`. That dialog takes the browser's own chrome, cannot be written in
+this app's voice, and blocks the main thread while a poll lands under it.
+
+**It carries no close X, and the roll call allows that.** A confirmation answers with its two
+buttons. A third way out states a third answer this dialog does not have. `m3-check.html` runs the
+header assertions only where there is a header.
+
+**It opens over `#settingsBox`.** Below 600px that pane is a full-screen dialog, which M3 states as
+the one variant that admits another dialog over it. Both are in the top layer, so neither needs a
+`z-index`.
+
+**Cancel is first and the destructive answer is last**, which is M3's order. Escape and the backdrop
+both close it with nothing done.
+
+### What the check learned
+
+`m3-check.html` gained 40 assertions: the segmented corners, the icon button on both axes, every
+switch measurement in both states, the developer order as an ordered list, the dialog's own numbers,
+and the snackbar's box.
+
+One of them is worth naming. Cancel must leave `localStorage` alone. That is the assertion that
+notices a Reset wired to the wrong button, and that mistake wipes every preference a reader has.
+
+## The heatmap opacity slider comes back, in Settings
+
+*2026-08-25.* A reader asked for the wash opacity to be adjustable again.
+
+The control existed once. It sat under both ramps on the legend, and the same reader cut it on
+2026-08-24. That cut was right. A slider under the ramp charged every glance at the scale for one
+decision a reader makes once. The number it left behind, 75%, is the figure the control existed to
+reach.
+
+**The home is the whole of what changed.** The legend is a scale a reader reads on every glance.
+The opacity is a setting they pick once. So the control moved to the pane that holds the settings
+somebody picks once, and the legend states the scale alone.
+
+`#settingsBox` gained a third section, `Map`, over one row. The two lists above it are lists a
+reader edits. The Developer block under it changes what the app does for a developer. This row
+changes how the map draws, which is what the heading names.
+
+### The numbers
+
+`HEAT_OPACITY` in `js/heat.js` still holds 75%, as the default. `PREFS.heatOpacity` holds the pick.
+`heatOpacity()` reads the preference and falls back to the constant, so a reader who never touched
+the slider gets the number the cut left behind.
+
+The floor is 20% and there is no zero. A wash at zero is a layer switched off with its chip still
+naming a value, which is the chip contradicting the map. The heat chip's own `Off` is how a reader
+turns the layer off.
+
+Nothing here touches `_fade`. That term is the layer telling a reader its blob has stopped covering the
+ground it names, and it multiplies this number rather than replaces it.
+
+### The control
+
+It is a native `<input type="range">`. `accent-color` paints the filled track and the handle in this
+app's primary, which is the anatomy M3's own slider states: an active track over an inactive one,
+under a round handle. A transcribed M3 slider buys a value label on the handle and a stepped track,
+and this row needs neither. The value sits beside the slider instead, because a wash a reader just
+set to 45% has to be a number they can go back to.
+
+It carries `autocomplete="off"`, and `js/ui.js` writes it from the preference rather than the
+reverse. That is the rule every preference-owned control here obeys. A browser restores form state
+across a reload and fires no `change`, so a control this app never wrote holds a state the
+preference denies.
+
+The handler is `oninput` rather than `onchange`. The wash is what a reader watches while they drag.
+`heatOpacity()` is one style write per layer, so there is nothing to throttle.
+
+### What was not built
+
+There is no per-layer opacity. Two washes never draw at once, because `PREFS.heatLayer` is one
+string, and it holds one answer. So a second number is only ever the same number under another
+name.
+
+## One glyph closes every panel, and it is the back arrow
+
+The repository owner reported the panels as inconsistent on 2026-08-25.
+
+The two sets disagreed. Filters, the station card and the search led with a back arrow. Settings,
+Help, About, the table and the camera wall put an × in the same place. Both were right by M3, which
+gives a destination a leading navigation icon and a full-screen dialog a close icon.
+
+**Measuring found nothing, and that mattered.** The three prose panes are pixel-identical at both
+widths: a 40px button, a 20px glyph, the glyph centre 28px inside the leading edge below 600px. The
+difference was the mark itself, not its box.
+
+### Which way it went
+
+M3 argues for the ×: an arrow claims the view saves as it goes, and a dialog dismisses. The owner
+chose the arrow anyway, and the reason holds. A phone shows one full-screen surface at a time. Two
+glyphs in one position for one action reads as a fault, not as a component boundary.
+
+So `#aboutBox`, `#helpBox`, `#settingsBox`, `#dataBox` and `#camBox` take `arrow_back`, labelled
+Back, leading at both widths. Above 600px the button moved from the trailing edge to the leading one,
+which is the move `#pane` already made on 2026-08-21.
+
+### Two dialogs keep the ×
+
+`#lightbox` and `#warnBox` are basic dialogs at every width. Neither ever fills the screen, so
+neither shares the position the complaint is about.
+
+The lightbox has a second reason. It carries a scrubber and a step-back button. An arrow in its
+header reads as "previous frame".
+
+### The specificity trap this walked into
+
+The base rule states the leading margin as `#dataBox .modalhead .dclose`. That is one id, and it
+beats three classes wherever it lands. The phone block's own `.dtop .modalhead .dclose` therefore
+lost, and the table and the camera wall drew their glyph 30px in against the 28 every other
+full-screen bar holds.
+
+`m3-check.html` caught it on the first run. The phone rules name their ids now.
+
+### What the check gained
+
+Three assertions per pane above 600px: that the form carries `order: -1`, that the button sits on the
+leading half of its bar, and that the glyph is `arrow_back` rather than `close`. The phone pass
+already asserted the 28px centre, and only its wording changed.
+
+## Every dialog scrolls a body, not itself
+
+*2026-08-25.* A reader opened Settings and found the scrollbar outside the pane. They asked for the
+scrollbar to sit inside the dialog panel, under the header, on every dialog.
+
+Five dialogs can scroll. The table and the camera wall were already right. Each is a flex column
+with a `.dtop` that takes no height back and a body that scrolls under it.
+
+The three prose panes were not. `.docbox` carried `overflow: auto` on the dialog itself, so the
+dialog was the scroller. Its scrollbar therefore ran the full height of the box, beside the header
+as well as beside the prose.
+
+### The sticky header is gone
+
+The header was held in place with `position: sticky`. That pinned the bar and answered neither
+half of what a reader asked for. A dialog that scrolls itself runs its scrollbar past the header
+whatever the header is pinned by.
+
+It also cost four negative margins and a negative `top`. A scroller holds a sticky box inside its scrollport,
+and a scroller's scrollport is its padding box. So `top: 0` pinned the bar 24px down, and every one
+of those offsets had to stay in step with the padding it cancelled.
+
+`.docbox` is a flex column now. The header is `flex: none`, `.docbody` is `flex: 1; overflow: auto`,
+and the dialog takes `overflow: hidden`. A structural seam has no offset to drift.
+
+`--pane` still states the pane's padding once. The header and the body each read it back.
+
+### Two things this repaired on the way
+
+A second phone-width rule stated `padding: 18px` on `.docbox`, beside a compact `--pane: 18px`. The
+padding sits on `.docbody` now. So the rule went, rather than agree with `--pane` by luck.
+
+`#warnBox` never scrolled at all. It takes the browser's own height cap, and a MET bulletin runs to
+about 1,800 characters. That text ran out of the bottom of the dialog. No reader can reach the end
+of it. `#warnBody` scrolls now, and the icon and the headline above it are `flex: none`.
+
+### What the check learned
+
+`m3-check.html` asserts the property rather than the mechanism. Every one of the five holds a
+`static` header over one body that scrolls, and the dialog itself scrolls nothing.
+
+One assertion is the reader's own request, stated as geometry: the scroller starts at or below the
+header's bottom edge. A scrollbar beside the bar fails it.
+
+**Cap the body, never the dialog.** Settings holds two saved lists that are empty on a fresh
+browser, so on a 1000px window it fits and there is nothing to scroll. A cap makes one. Capping the
+dialog instead makes the dialog the scroller, and the header then travels with it, which is a fault
+the cap invented.
+
+## The alert pane took two M3 components
+
+The repository owner asked for both on 2026-08-25. Every alert group heads itself with an M3 assist
+chip, and the places under it are an M3 segmented list. Each replaced a shape this app had invented
+for itself.
+
+### The kind is an assist chip
+
+The group head drew a `.badge`: an uppercase pill in the kind's own hue, on a 16% tint of that hue.
+
+It is the same M3 assist chip `#sideKinds` already draws. A 32dp container,
+`shape-corner-small` (8dp), a 1dp outline over no fill, `label-large` and an 18dp leading icon, with
+8dp behind that icon and 16dp past the label.
+
+**One selector, not a second copy of the numbers.** `#sideKinds .badge` became
+`#sideKinds .badge, .alert .badge`. A duplicate block drifts the first time somebody edits one half.
+
+**The colour splits the way M3 splits it.** The label takes `on-surface` and the leading icon takes
+the station kind's own hue. A chip whose text is painted by the kind reads as a status, and this app
+reserves that reading.
+
+**`.badge` is still untouched in the all-stations table.** That is a dense grid rather than a pane,
+and a 32dp chip in a table cell is a row height.
+
+**Two hack rules went with the pill.** `.alert .badge, .alert .tg { vertical-align: middle }` and
+`.alert .tg { margin-bottom: 6px }` held two inline boxes on one line. The chip is 32dp against the
+tag's 19, and the shared rule zeroes the margin those two answer. `.alerttop` is a flex
+row and places both by itself.
+
+### The places are a segmented list
+
+They drew a bare list: a 6dp radius, a 7px inset, and an accent tint on hover.
+
+`.mseg` is M3's list at `appearance: segmented`. Every row is a filled container on
+`surface-container`, the rows keep a 4dp inner corner, and the group's own first and last row take
+the 16dp outer one. So the four places read as one set rather than as four cards.
+
+**This work hoisted `.mseg` out of `#settingsBox`.** Two surfaces draw one now, and that block
+states the numbers once. `#settingsBox` keeps only what it diverges on, which is `cursor: default` and no state layer,
+because a saved row is static and its trailing button is the action. An alert row opens a station
+card, so it keeps the pointer and the layer.
+
+The rows map onto M3's own three slots. The leading slot is a 24dp glyph, the content slot is the
+name over a `body-medium` supporting line, and the trailing slot is the reading at 48dp.
+
+**One divergence, and it is older than this change.** M3 paints the leading glyph
+`on-surface-variant`. This app paints it with the TIER colour, the same one the card's left rule
+carries, so the rule and the glyph say one thing.
+
+**The hover state layer sits OVER the container rather than instead of it.** The accent tint it had
+answers a row with no fill under it. Painting a tint in place of the container makes a
+hovered row look like a row from a different list.
+
+### The cost, measured
+
+An M3 two-line item is 72dp and the old row was about 42px.
+
+Measured against the live payload on the poll this shipped, with 13 places on the list:
+
+| | before | after |
+|---|---|---|
+| desktop, 1200px window | about 550px | 1272px |
+| phone, 360px | about 550px | 1192px |
+| pane `scrollHeight` | under one screen | 1748px against a 688px pane |
+
+**So the pane scrolls about two and a half screens where it used to hold one.** CLAUDE.md's own
+entry on this panel states that fitting a screen at any size of flood is the point of it. That
+property is gone at this row height.
+
+**Rows grow past 72px because the name wraps.** A 299px row spends 32px on padding, 24px on the
+glyph, 32px on two gaps and up to 90px on the reading. That leaves about 128px for a station name at
+`body-large`. `SUNGAI DAMANSARA` needs about 150px.
+
+**This work invented no divergence to shave it.** It measured three, and all three are small. An 8px
+in-row gap saves 80px of 1272. An 8px gap with a 12px inset saves 120px. Dropping the headline to
+`body-medium` breaks the hierarchy against the supporting line, which is `body-medium` already.
+CLAUDE.md's own rule is to transcribe the component rather than approximate it, so the component
+ships as M3 states it and this entry carries the cost instead.
+
+Two things bring it down if the height matters more than the component does. The reading's second
+line can move into the content slot, which is M3's three-line item at 88dp and frees about 40px of
+name width. Or the pane can cap the rows it draws and count the rest.
+
+### The check
+
+`m3-check.html` gained `alertPane()`, 36 assertions over both components.
+
+**The check writes its own markup rather than reading the live payload.** That is the rule `CARD` in
+the same file already states: a check that reads the weather reports on the weather.
+
+**So the other end asserts the markup contract.** The node harness in CLAUDE.md's Verify block reads
+`js/alerts.js` as source and asserts that `groupCard()` emits `alerttop` and `slist mseg`.
+Neither half is enough alone. A card that never uses those classes still passes the
+CSS check, and the source check cannot see a pixel.
+
+Three faults here put nothing obviously wrong on screen.
+
+The chip rule is a shared selector. Drop the second half and the card goes back to the uppercase
+pill, which still looks deliberate.
+
+The hoist made `.mseg > li` one class and one element, and `.picklist li` beside it is the same
+specificity. So source order alone can move Settings, and nothing on the alert side would show it.
+The Settings row is measured in the same block for that reason.
+
+A segmented group is one shape. A rule that gives every row 16dp all round reads as a stack of
+cards. A rule that gives none of them the outer corner reads as a plain list. Both look intentional,
+so the check reads all three rows of a three-row group.
+
+**`alertPane()` runs AFTER `desktop()`, never before it.** It switches transitions off in the shared
+frame, and `desktop()` reads its motion declarations before its own `settle()`. Called first, this
+probe answered every one of those with `none`, and 16 assertions failed on markup that was right.
+
+## The station panel becomes an M3 list
+
+A reader asked for it on 2026-08-25. One list item per sensor, the readings under it as a segmented
+list, and the kind's glyph in a disc.
+
+### What it replaced
+
+Each sensor was one M3 filled card. That card held a meter, a metric row, a graph and a totals chart
+on one flat surface. Each of those answers a different question, and the card said so nowhere. A
+rainfall gauge drew a state block, a 12 hour graph and five window totals as one wall of ink.
+
+The head was a 12px bold label beside an 18px glyph. That is smaller than every other list in this
+app, and the panel is the surface a reader spends most time on.
+
+### What draws now
+
+`.sensor` is the group and paints nothing. `.sensorhead` is the item. `.sbody` is the readings.
+
+The item is M3's list item. A 40px avatar disc leads it, the headline is `body-large` in the regular
+weight, and a trailing supporting line carries the distance, the MET point, or a member's own name.
+The numbers come from `List/list.css` in the M3 Expressive component set.
+
+The readings are M3's list at `appearance: segmented`. Every block takes a filled container on
+`surface-container`, at a 4dp inner corner. Only the first and the last block take the 16dp outer
+one, so the group reads as one sensor.
+
+A block a kind does not draw makes no segment. `sensorBody()` filters before it wraps, so the outer
+corner lands on the ends a reader can see. A river draws three segments. A siren draws one.
+
+**The gap is 2px, and `.mseg` beside it takes 8px.** 2px is `--md-list-item-gap`'s own number.
+`.mseg` diverges because its groups hold different kinds of row. Every segment here belongs to one
+sensor and has to read as one block.
+
+### The avatar is shared, and that is the point
+
+The Notices pane already drew a 40px tinted disc over each bulletin. The station panel draws the
+same disc over each sensor. One `.avat` rule in `css/chrome.css` states it, and `avat()` in
+`js/popup.js` emits it. The class was `.navat` while the Notices pane was the only caller.
+
+**A tinted disc rather than a filled one.** This colour names a station kind or a source. It never
+names a status. A saturated 40px disc down a list reads as a severity ramp, and this app reserves
+that reading for the four status tokens.
+
+**The disc cannot be the `<i>` itself.** An `.i` is a box of `currentColor` with the glyph masked out
+of it, so a background on that box is clipped away with the rest. The wrapper is the only place a
+disc can go. That is the rule the favorite heart already obeys for its drop shadow.
+
+### Two things moved with it
+
+**The flash lands on the head.** `.sensor` paints nothing now, and every segment carries its own
+opaque container. A tint on the group shows in the 2px gaps and nowhere else. The head is the
+list item, and a list item is what takes a state layer. The keyframe ends on `transparent` again.
+It ended on `--hover` while the section was a filled card, because fading to nothing erased the
+container the flash was drawn on.
+
+**`.subhead` cancels its top margin inside a segment.** It leads its own `<li>`, and that item states
+12px of padding. A 10px margin over the first line stands the line 22px down. The old rule cancelled
+against `.sensorhead`, which is not a sibling of anything in the body any more.
+
+### Four surfaces, one shape
+
+The weather section, the weather panel's half-hour stack and the nearest-camera section each have a
+head and content. Each wraps its content in a `.sbody` too. The station card and the weather panel
+stand in one pane, one at a time. A head over loose content in one, and a head over a segmented
+group in the other, is one component in two shapes.
+
+### The check
+
+`m3-check.html` reads the avatar, the item and the segments. Its fixture card carries the real shape
+rather than the two bare stubs it held before.
+
+Three faults here put nothing wrong on screen. A group with no fill and no rule looks the same as a
+group whose fill failed to load. A group whose every corner is 16dp reads as a stack of cards, which
+is the shape this replaced. And a group at 8px between segments reads as separate blocks. The check
+asserts the ends, the inner corner and the 2px.
+
+### Two faults the run turned up
+
+**A row injected before a wait is a row a poll can replace.** The Settings probe wrote its fixture
+row into `#favList` and then waited 120ms. `favPanel()` rewrites that list from the preference on
+every poll, so the check measured the reader's own favorites whenever a poll landed inside the wait.
+`:last-child` then reached row 1 of several. The write moved after the wait. Reading a computed
+style flushes layout by itself, so nothing has to be awaited after it.
+
+**A stale assertion outlived the design it was written for.** The same probe asserted 16dp on the
+bottom of `#favList`'s last row. The clear action became that group's own footer row, in a `.mfoot`
+list under it, so only the footer closes the group. The assertion belonged to the revision before
+that row left its `.rowbtns` box.
+
+## Emptying a saved list asks first
+
+*2026-08-25.* A reader asked for Remove all favorites and Stop ignoring all to confirm, the way
+Reset settings already did.
+
+Each of the three empties a list somebody built one sensor at a time. Nothing undoes that except
+doing the work again. The ignored list fails in the safe direction, because clearing it un-silences
+sensors and can only add alerts. Safe is not the same as expected.
+
+**Clearing a whole list confirms. Removing one row does not.** A row names its own sensor and its
+control sits beside it, so a mis-tap costs one star and the row says which one. The button at the
+foot of the list takes everything and names nothing.
+
+### One dialog, three callers
+
+`#confirmBox` was written for Reset settings, with its headline and its body in the markup. It
+answers all three presses now. `ask(title, body, verb, done)` in `js/ui.js` writes the three strings
+and arms the action.
+
+Three dialogs is three copies of one component. The day M3 moves a number, two of them stay behind.
+
+**The confirming button names the act, never `OK`.** M3 states it, and here it is the last word a
+reader who mis-tapped has left to read. The three verbs are `Reset`, `Remove` and `Stop ignoring`.
+
+**The armed action is taken in hand before the close, never read back after it.** A dialog fires
+`close` asynchronously, so a handler that disarms runs after the confirming handler returns. Taking
+it in hand also makes one press do one thing. A second click on a closing dialog finds nothing
+armed. `onclose` covers the two answers that never reach the button, Escape and the backdrop.
+
+### What the check learned
+
+A shared dialog invents one fault. A second caller opens it still carrying the first caller's
+headline, and a reader confirms the wrong act.
+
+So `m3-check.html` presses all three and asserts that each one rewrites the words. It compares them
+against each other rather than against a literal, which is what makes the assertion about staleness
+and not about wording.
+
+It answers Cancel every time. Confirming empties a real saved list on the machine the check runs on,
+and the assertion that Cancel changes nothing already covers the wiring that matters.
+
+The two list buttons disable themselves on an empty list, and a fresh browser has both empty. The
+check enables them, because what it is about is the wiring behind the press.
+
+## Test mode moved to the map, and each list swallowed its own action
+
+Two asks from the repository owner on 2026-08-25.
+
+### Switching test mode on leaves the pane
+
+The whole point of the mode is the map. A settings pane over it is the one thing that cannot show a
+fake flood. So the switch closes the pane after half a second, and a snackbar says what happened.
+
+Half a second is long enough for the thumb to finish its travel. The pane then leaves after the
+control answers rather than instead of it.
+
+**The snackbar follows the close, never precedes it.** A `<dialog>` fires `close` asynchronously, so
+a message shown first sits on screen while the pane is still open. `settingsBox.close()` is a
+no-op when the mode was switched off from the map chip, so one path serves both.
+
+### The chip replaced the badge
+
+`#testbadge` was a fat amber pill in `#pills` carrying a label, a sentence and a Turn off button.
+`#testChip` is one chip on the map chip row, drawn from `body.testmode` alone, with a trailing × that
+turns the mode off. That is M3's input chip: a thing that is on, dismissed from the place that states
+it.
+
+It keeps the amber and takes no chip surface. Every other chip on that row reports a choice the
+reader made about the map. This one reports that the map is lying.
+
+**It is the only thing that says so above 600px**, because `<header>` does not draw there and the
+striped bar is a compact-width signal alone. That is a narrower guard than the pill it replaced, and
+it is the accepted cost of the instruction. Anything that weakens it further goes through the alert
+design standard first.
+
+`js/test.js` writes no markup now. The chip is in `index.html`, so `js/ui.js` binds the way out
+directly rather than delegating from `#pills`.
+
+### Each clear action became its list's last row
+
+`Remove all favorites` and `Stop ignoring all` were full-width links in a `.rowbtns` box under their
+lists. Each read as a control the list had nothing to do with.
+
+**Two elements and one group, because `js/render.js` owns the list's `innerHTML`.** The next poll
+wipes any row written inside the `<ul>`. So the action is a one-row list of its own, and the
+corners are what say the two are one thing: the list drops its bottom outer corner and `.mfoot` takes
+it. The seam is the group's own 8px.
+
+### Three faults this turned up
+
+**`hidePopover()` throws when the popover is already closed.** So does `showPopover()` on an open
+one. `snack()` called `hidePopover()` first to restart the enter animation. Every call threw on that
+first line. The snackbar never drew once, and nothing said so — the throw landed inside
+a handler with no surface. `togglePopover(force)` is the idempotent pair.
+
+**Closing the pane took the snackbar down with it.** That rule came across from `#devMsg`, a line
+INSIDE the pane. A snackbar is not inside the pane, it has its own four-second clock, and M3 ties its
+life to that clock. It also made the message above impossible: the pane closes and then speaks.
+
+**`--top-chips` was a literal, and the live payload broke it.** Two values held it, one row on a
+desktop and two on a phone. How many lines the row takes depends on the data: `On alert · 63` is
+three digits wider than `On alert · 1`, and at 360px that alone pushes the chips onto a third line.
+The strip below then sat on the chips. A `ResizeObserver` on the row writes the token now, so any
+number of lines works. The literals stay as the value before the module runs.
+
+`paint-check.html` asserted `exactly two rows` and went red on upstream churn — the
+equality-against-live-data trap this repo already records. It asserts that the row wrapped, and the
+overlap assertions under it prove the strip clears whatever it wrapped to.
+
+## The alert head became a chip row
+
+The repository owner asked for this on 2026-08-25, in the same breath as the group chips. Every kind
+of alert the head counts is an M3 assist chip now, and so is the ordering line beside the title.
+
+### The counts
+
+They drew `.tally b`: a 12px pill, 999px round, with the number in its own status colour on a 16%
+tint of that colour.
+
+Each is the M3 assist chip the group heads below already take, and the one a station card's kinds
+take. So the pane states a kind one way wherever it states one.
+
+**The colour splits M3's way.** The label takes `on-surface` and only the 18dp leading icon takes the
+status hue. A count whose NUMBER is painted by the status reads as a reading, and a count of stations
+is not one. The pill did paint the number.
+
+**A glyph and a number, not `2 at danger`.** That decision is older than the chip and it stands. The
+head is one panel-width, and the words wrapped as soon as three counts were non-zero, which is
+exactly when the list matters most. Each count keeps its `title` and its `aria-label`.
+
+**One contrast expression went with the pill.** `.tally b` set its ink to
+`color-mix(in srgb, var(--c) 70%, var(--on-surface))`, because a 12px number in its own colour on a
+tint of itself starts under 4.5:1. A chip does not have that problem: the label sits on the page in
+`on-surface`. `.state` in `css/base.css` is still exactly that shape and still carries the
+expression, and the comment there now says why its neighbour dropped it.
+
+### `Nearest first`
+
+It was `· nearest first`, a muted fragment written INSIDE `.popname`.
+
+`openSide()` lifts `.popname` whole into the app bar's headline. **A 32dp chip inside a headline is
+not a chip**, so the fragment had to leave the title to become one.
+
+It states how the rows are ordered rather than what is in them. So its glyph takes `--muted` and no
+status hue, and it comes last, because the counts are what a reader scans for.
+
+### The row is `.badges`, and that is what makes the lift work
+
+`openSide()` moves `:scope > .badge, :scope > .badges` out of `.pophead` and into `#sideKinds`, the
+app bar's own chip line. The alert head now reads exactly as a station card does: a headline over a
+row of chips.
+
+`.tally` was neither, so it stayed in the body. `.pophead` never emptied behind it, and an empty
+seam still draws its own bottom margin over the first thing under it.
+
+The row is emitted only when it holds something. An empty `.badges` is still a child. So
+`#sideKinds:empty` fails to match it, and the app bar keeps a line for nothing.
+
+### Measured
+
+Rendered against the live payload with a fix set, at a 1200px window:
+
+```
+chips: 5   sideKinds box 328x72
+  "1"              60x32   icon --s-danger
+  "1"              60x32   icon --s-danger
+  "2"              60x32   icon --s-warning
+  "2"              60x32   icon --s-warning
+  "Nearest first" 131x32   icon --muted
+```
+
+Four counts and the ordering chip need 403px against a 328px row, so the row wraps to two lines and
+the app bar grows to 180px. That is the same thing a five-sensor station card does, and `.badges`
+already wraps for it.
+
+### What did not change
+
+**The tier tag is still `.tg`, and it is the one pill left in this pane.** `HAPPENING NOW`,
+`HEAVY RAIN`, `FORECAST` and `NOT CURRENT` are ALL-CAPS blocks, which CLAUDE.md's writing rules name
+as a deliberate visual language rather than as messages. An M3 chip sets `label-large` with
+`text-transform: none`, so converting it drops the caps. That is a decision about the app's own
+language and not about the component, so it waits to be asked for.
+
+### The check
+
+`m3-check.html` gained nine assertions inside `alertPane()`. Its fixed card now carries a head row,
+so the check drives the real `openSide()` and reads the chips back out of `#sideKinds`.
+
+**The lift is half of what those assert.** A chip correct in every pixel that stays in the body is
+still wrong, and the old pill was exactly that. So the check reads the count out of the app
+bar, reads the headline back as `On alert` alone, and asserts that `.pophead` is gone from the body.
+
+The node harness in CLAUDE.md's Verify block asserts the other end. It reads `js/alerts.js` as
+source: `alerts()` emits a `.badges` row, `Nearest first` is a chip in it, and no `class="tally"`
+survives. A half-finished revert leaves markup that renders and says nothing.

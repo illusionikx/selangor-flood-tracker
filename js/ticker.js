@@ -111,6 +111,11 @@ export function ticker() {
     const t = tier(s);
     const why = t === 'stale'      ? 'last known · not current'
       : s.kind === 'siren'         ? 'siren sounding'
+      /* Rain before the shared `status >= 3` rung. A rain gauge has no level, so that rung read
+         `at danger` with no number, over a sensor that is not at a danger mark of any kind.
+         JPS's own two words, the same split ALERT_TITLE draws in the panel. The tier colour beside
+         this carries the rest: `t-heavy` is amber and `t-now` is red. */
+      : s.kind === 'rainfall'      ? `${s.status >= 4 ? 'very heavy' : 'heavy'} rain · ${s.hourly} mm/h`
       : s.status >= 3              ? `at danger${s.level != null ? ` · ${s.level.toFixed(2)} m` : ''}`
       : `reaches danger ${s.eta != null && s.eta < 1 ? 'within the hour' : `in ~${s.eta} h`}`;
     return `<button class="tk-i" data-go="${s.id}" tabindex="-1">

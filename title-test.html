@@ -127,7 +127,7 @@ const check = (label, r) => {
       if (r.home !== want) fail.push(`${w}px: the heading is in the ${r.home}, not the ${want}`);
       /* **A shut rail draws no heading at all.** The repository owner asked for that on 2026-08-24:
          a collapsed rail carries the destinations and nothing else. It drew the drop alone before,
-         in 96px of column. */
+         in 80px of column. */
       if (wide && r.drawn) fail.push(`${w}px: a shut rail drew "${r.txt}" rather than nothing`);
       if (wide) railShutDrawn.add(r.drawn);
       /* Only the phone layout may widen its box as the viewport narrows, so it restarts the ladder.

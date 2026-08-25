@@ -29,10 +29,17 @@ export const ALERT_TITLE = {
   'river|now':   ['Water level at danger', 'Water levels at danger'],
   'river|soon':  ['Forecast to reach danger', 'Forecast to reach danger'],
   'river|stale': ['Water level not current', 'Water levels not current'],
-  // These two reach the camera pill only. The panel draws from `isHot()`, which does not cover
-  // either kind, so nothing here puts a flood gauge or a rain gauge in the list.
+  // This one reaches the camera pill only. `isHot()` does not cover a flood gauge, so nothing here
+  // puts one in the panel.
   'gauge|now':    ['Flood gauge at danger', 'Flood gauges at danger'],
-  'rainfall|now': ['Very heavy rain', 'Very heavy rain'],
+  /* Rainfall reaches the panel too, since `isCritical()` covers JPS's heavy class and above.
+     `heavy` is class 3 and `now` is class 4, and JPS's own two words carry the split. So the two
+     never share a card and neither phrase has to cover the other.
+     `rainfall|stale` is reachable, unlike the gauge above. A gauge frozen on an old heavy reading
+     is hot and stale at once, and the payload holds one stopped in October 2025. */
+  'rainfall|heavy': ['Heavy rain', 'Heavy rain'],
+  'rainfall|now':   ['Very heavy rain', 'Very heavy rain'],
+  'rainfall|stale': ['Rainfall not current', 'Rainfall not current'],
 };
 
 /* The shell each kind of regional notice draws in. `kind` arrives on every row in `warnings[]`.

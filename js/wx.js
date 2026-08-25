@@ -6,7 +6,7 @@
 import { FEED_WX, WX_THIN_PX, WEATHER, wxSky, MET_NAME, NEAR_MAX_KM } from './config.js';
 import { state, PREFS } from './state.js';
 import { map, pinGlyph, openSide, side, focusOn, flashTo, ping } from './map.js';
-import { wxIcon, wxTone, stamp } from './popup.js';
+import { wxIcon, wxTone, stamp, avat } from './popup.js';
 import { askJson } from './ask.js';
 import { el, distKm, titleCase } from './util.js';
 
@@ -132,11 +132,13 @@ function card(p, name = p.n, sub = MET_NAME) {
     </div>
     <div class="sensor">
       <div class="sensorhead">
-        <i class="glyph i i-${wxIcon(p.rungs[0], { sky: p.sky })}"
-           style="color:${wxTone(p.rungs[0], { sky: p.sky })}"></i>
+        ${avat(wxIcon(p.rungs[0], { sky: p.sky }), wxTone(p.rungs[0], { sky: p.sky }))}
         <b>Weather</b>
       </div>
-      <div class="wxsteps">${cards}</div>
+      ${/* One segment, the same `.sbody` shape every sensor on a station card draws. This panel and
+            that card stand in one pane, one at a time, so a head over loose content here and a head
+            over a segmented group there is one component in two shapes. */''}
+      <ul class="sbody"><li><div class="wxsteps">${cards}</div></li></ul>
     </div>`;
 }
 
