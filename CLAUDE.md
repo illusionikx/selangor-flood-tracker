@@ -2292,7 +2292,18 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   is 27% of it, and M3 states no rail under 600px.
   **Five items, which is the cap M3 states.** The rail carries seven destinations. Help and About
   are the two visited least, so they move to `#appMenu`, the app bar's overflow menu at that width.
-  The search is a rail FAB and a bar item, because a bar has no FAB slot.
+  **The middle slot holds the map layers, and the search left this bar for the app bar.** A reader
+  asked for both on 2026-08-25. The search was the middle item and it is `.hlead` now, the app bar's
+  leading action. `#navLayers` took the slot it vacated.
+  **`#navLayers` is a second element, never `#paint` moved.** A bar item is a pill over a label and
+  `#paint` is a 60px FAB, so one node cannot be both. That is the same shape every rail item already
+  uses against its bar twin. It carries `popovertarget="paintmenu"`, so the browser opens the panel
+  and there is nothing in `js/ui.js` to keep in step.
+  **So two buttons name `#paintmenu` and only one of them draws.** The placement handler in
+  `js/ui.js` used `querySelector`, which answers the first in document order. That is `#navLayers`,
+  and it is `display: none` above 600px, so the menu measured a rectangle of zeros and placed itself
+  in the top-left corner. It takes the button with a box now. Any second invoker for one popover
+  needs that rule.
   **Every id in the bar is its rail twin with one prefix changed.** `railFilters` against
   `navFilters`. `NAV` in `js/ui.js` binds both from one table and builds each id out of one string.
   `railActive()` in `js/map.js` matches on that suffix. `js/alerts.js` writes both badges. Only one
@@ -2313,19 +2324,28 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   and `#mapfoot` state a bottom measured up from the map's own edge. That edge moved 64px and those
   three did not, so the zoom box climbed past two of them. `paint-check.html` reported it. Nothing
   else in this app reads that geometry.
-  **`.mapbtn` declares `--fab` on itself.** A rule that stacks `#locate` above `#paint` cannot
+  **`#paint` is `display: none` below 600px now, so `#locate` holds that slot alone.** It takes the
+  same 136 without the `--fab` step that used to stack it above a second button. The button stays in
+  the document rather than leaving it, because `#paintmenu` names it through `popovertarget` and a
+  rotate past 600px then needs nothing to notice.
+  **`.mapbtn` declares `--fab` on itself.** A rule that stacks one map button above another cannot
   inherit it, so it states the fallback. Without one the whole `calc()` is invalid and the button
-  falls to the top of the page.
-- **The app bar below 600px carries one absolutely positioned action group, `.hactions`.** It holds
-  the theme switch and the overflow menu. `<header>` does not draw above 600px at all, so nothing
-  has to hide either one there.
+  falls to the top of the page. It is the desktop pair that still stacks.
+- **The app bar below 600px carries two absolutely positioned action groups.** `.hactions` is the
+  trailing one, holding the theme switch and the overflow menu. `.hlead` is the leading one, holding
+  the search. `<header>` does not draw above 600px at all, so nothing has to hide any of them there.
+  **The search keeps the id `navFind` there.** `NAV` in `js/ui.js` binds it and `railSync()` writes
+  its `aria-expanded`, and both match on the suffix its rail twin shares. So only the shape changed.
+  It carries no pill and no label: a bar item names a destination in words, and an app bar action
+  names itself in a tooltip. `railActive()` never reaches it either, which is already the rule — the
+  search is an action at both widths, so it states `aria-expanded` and never `aria-current`.
   **Out of flow, because the bar centres the brand on the WINDOW.** That is M3's center-aligned
   small top app bar, whose title centres in the container rather than in the space the actions
   leave. A flex item on the trailing end moves the mark by half its own width.
   **One box and not two positioned buttons.** Each button placed for itself needs a literal offset
   that has to stay in step with the width of the one beside it. 8px on the group puts the trailing
   glyph centre 28px inside the window edge, which is the number every app bar in this app lands a
-  trailing glyph on.
+  trailing glyph on. The leading group takes the same 8px, on the other edge.
   **The theme switch is one node with two homes**, and `place()` in `js/ui.js` moves it beside
   `#brand`. `append` into the rail and `prepend` into the group: the rail puts it under its items
   and the bar puts it before the overflow, which M3 keeps furthest out.
@@ -2891,7 +2911,9 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   them.
 - All user settings live in one `prefs` blob in `localStorage` (`PREFS` + `save()`).
 - **The layer controls live on the map, in two groups, and the drawer keeps the sensor kinds.**
-  `#paint` is a `.mapbtn` in the map's bottom zoom cluster. Its popover holds two layers at the top
+  `#paint` is a `.mapbtn` in the map's bottom zoom cluster, **above 600px alone**. Below it the
+  navigation bar's middle item opens the same panel and the map draws no button at all — see the
+  navigation bar entry in the gotcha list. Its popover holds two layers at the top
   level and no headings over them: `Stations` and `Weather`. Inside `Stations` sit two labelled
   sections, `Heatmap` (water level, rainfall) and `Icon` (favorites, on alert).
   **All three groups are M3 CONNECTED BUTTON GROUPS, single-select, and multi-select is applicable
@@ -3073,9 +3095,10 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   never stand out by colour.
   **Its height is the zoom BOX's height on a desktop, and `--fab` is the one number that carries
   it.** 60, being two 30px zoom buttons stacked. M3's flat 56 stood here first and left the button
-  4px short of the box beside it. **A phone keeps that 60 and there is no override.** The rule is
-  about two boxes standing side by side, and on a phone this one stands above the zoom box instead.
-  It followed the rule there for one revision, at 88px, which is a quarter of a 360px screen. M3's FAB is a 16px radius under a 24px glyph on a 56px
+  4px short of the box beside it. **`#locate` keeps that 60 on a phone and there is no override.**
+  The rule is about two boxes standing side by side, and on a phone the one map button left stands
+  above the zoom box instead. It followed the rule there for one revision, at 88px, which is a
+  quarter of a 360px screen. M3's FAB is a 16px radius under a 24px glyph on a 56px
   box, which is exactly 2/7 and 3/7 of it, so two `calc()`s hold those ratios at any size.
   `paint-check.html` asserts the height against the zoom box, never against a number.
   A second try made it an accent FAB with a label, still alone in that corner. A reader said it

@@ -645,9 +645,10 @@ await wait(400);
 is(menu.querySelector('.mhint'), null, 'the weather caption is gone, because the state it named is');
 
 // --- phone width -------------------------------------------------------------------------------
-/* 360px, the width the app bar is measured against. The button is ABOVE the zoom box here rather
-   than beside it, because #legend takes the width left of those buttons. Same 56px at both widths,
-   which is M3's FAB and already clears the 44px touch target. */
+/* 360px, the width the app bar is measured against. **The layers button does not draw here at
+   all.** The navigation bar carries the layers in its middle slot, so `#locate` is the one button
+   left on the map and it takes the slot above the zoom box. `#legend` takes the width left of those
+   buttons, so there is nowhere beside them to stand. */
 /* Reloaded at this width rather than resized to it. A phone LANDS here, and landing is the path
    that leaves the drawer shut — resizing an open one only exercises the breakpoint listener. */
 f.style.width = '360px';
@@ -659,15 +660,17 @@ pd.body.classList.add('rising');          // the state that puts #risebadge on s
 await wait(300);
 
 is(pd.body.classList.contains('drawer'), false, 'phone: lands with the drawer shut');
-const pr = pbtn.getBoundingClientRect();
-const pz = pd.querySelector('.leaflet-control-zoom').getBoundingClientRect();
-const pza = pd.querySelector('.leaflet-control-zoom a').getBoundingClientRect();
-/* No size override here. The desktop button matches the zoom BOX because the two stand side by
-   side, and this one stands above it, so there is no edge to line up with. It matched for one
-   revision, at 88px, which is a quarter of a 360px screen. */
-is(Math.round(pr.height), Math.round(r.height), 'phone: the same button as the desktop one');
-is(Math.round(pr.width), Math.round(pr.height), 'phone: and still square');
-is(pr.height >= 44, true, 'phone: which clears the touch target on its own');
+/* **The map draws no layers button at this width, and that is the change of 2026-08-25.** The
+   navigation bar carries the layers in its middle slot instead, so a phone reaches the panel from
+   the bar rather than from the map.
+   **`#paint` stays in the document.** `#paintmenu` names it through `popovertarget`, and the
+   stylesheet hides it. So a rotate past 600px brings it back with nothing to notice. */
+is(pw.getComputedStyle(pbtn).display, 'none', 'phone: the map draws no layers button');
+const pnav = pd.getElementById('navLayers');
+is(!!pnav, true, 'phone: the navigation bar carries the layers instead');
+is(pnav.getAttribute('popovertarget'), 'paintmenu',
+   'phone: and it opens the same panel, through the browser and not a handler');
+is(pnav.closest('#navbar')?.id, 'navbar', 'phone: from inside the bar itself');
 /* The press shortcut is a pointer-device affordance, and a tap keeps the native toggle. So nothing
    here may name it, or it names an action a phone cannot take. `data-tip` opens on a tap, which is
    exactly why the sentence must not be sitting in it at this width. */
@@ -675,6 +678,16 @@ is(/switch/i.test(pbtn.dataset.tip || ''), false,
    'phone: the press shortcut is not named, because a tap cannot take it');
 is(pbtn.getAttribute('title'), 'Map layers',
    'phone: so the button falls back to a plain title naming the control');
+
+/* **`#locate` took the slot the layers button held**, beside the zoom box and above it. That button
+   used to stack one `--fab` step higher. With one button left on the map there is one slot, and
+   nothing else in this app reads that geometry. */
+const pr = pd.getElementById('locate').getBoundingClientRect();
+const pz = pd.querySelector('.leaflet-control-zoom').getBoundingClientRect();
+const pza = pd.querySelector('.leaflet-control-zoom a').getBoundingClientRect();
+is(Math.round(pr.height), Math.round(r.height), 'phone: the same box the desktop button takes');
+is(Math.round(pr.width), Math.round(pr.height), 'phone: and still square');
+is(pr.height >= 44, true, 'phone: which clears the touch target on its own');
 is(pr.width > pza.width, true, 'phone: still larger than a zoom button, which is 44 here');
 /* ABOVE the zoom box here, not beside it. #legend takes `left: 12px; right: 68px` at this width, so
    the strip left of the zoom buttons belongs to the legend and there is nowhere to stand. */
@@ -687,11 +700,8 @@ is(pr.left < plg.right && plg.left < pr.right && pr.top < plg.bottom && plg.top 
 
 const pb = pd.getElementById('pills').getBoundingClientRect();
 is(pb.width > 0, true, 'phone: the rising pill is on screen, so there is something to clear');
-/* It used to share the top-left corner with this button and needed measuring against it. The button
-   is at the bottom now, so the two cannot meet. Kept as an assertion rather than deleted: the
-   button has moved twice already. */
 is(pr.left < pb.right && pb.left < pr.right && pr.top < pb.bottom && pb.top < pr.bottom, false,
-   'phone: the rising pill clears the button');
+   'phone: the rising pill clears that button');
 
 /* --- the panel is an M3 bottom sheet at this width ------------------------------------------- */
 /* Motion is read FIRST, before anything switches it off. `getComputedStyle` reports the override,
@@ -708,10 +718,10 @@ pd.head.insertAdjacentHTML('beforeend',
   '<style>*{transition:none !important;animation:none !important}</style>');
 await wait(120);
 const pm = pd.getElementById('paintmenu'), pmr = pm.getBoundingClientRect();
-/* Anchored to the bottom edge and centred, at the reference's own width. 16px of map shows down
-   each side at 360px, which is why only the top corners are rounded. */
+/* Anchored to the bottom edge and centred, at M3's own width. Under 640dp there is no window left
+   over to inset, so the sheet spans it. That is why only the top corners are rounded. */
 is(Math.round(pmr.bottom), pw.innerHeight, 'phone: the sheet sits on the bottom edge');
-is(Math.round(pmr.width), Math.min(640, pw.innerWidth - 32), 'phone: M3 min(640, 100% - 32)');
+is(Math.round(pmr.width), Math.min(640, pw.innerWidth), 'phone: M3 min(640, 100%), no side inset');
 is(Math.round(pmr.left), Math.round(pw.innerWidth - pmr.right), 'phone: and centred');
 is(pmCs.borderTopLeftRadius + ' ' + pmCs.borderBottomLeftRadius, '28px 0px',
    'phone: M3 28dp on the TOP corners only, because the bottom one has no edge to round');

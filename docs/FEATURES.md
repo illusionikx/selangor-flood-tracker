@@ -13536,3 +13536,65 @@ Auto setting that no longer exists.
 Both sections are one `Getting around` list now, because the rail and the bar hold the same
 controls under the same names. The map's own two controls and the feed status moved to a second
 list, `On the map`.
+
+## The search took the app bar and the layers took the navigation bar
+
+A reader asked for two moves on 2026-08-25. Put the search on the leading edge of the phone app
+bar. Put the map layers in the middle of the navigation bar.
+
+The two moves are one change. The navigation bar caps at five items. So the search had to leave
+before the layers arrived.
+
+### What moved
+
+The search was the middle item of `#navbar`. It is `.hlead` now, a leading action group in
+`<header>`, positioned the way `.hactions` already positions the trailing pair. Both groups are out
+of flow, because this bar centres its brand on the window. A flex item on either end moves that mark
+by half its own width. Both take 8px, which puts a glyph centre 28px inside the edge. That is the
+number every app bar in this app lands a glyph on.
+
+The button keeps the id `navFind`. `NAV` in `js/ui.js` binds it from one table, and `railSync()`
+writes its `aria-expanded` beside its rail twin. Both match on the suffix. So no code changed. Only
+the shape did.
+
+It carries no pill and no label there. A navigation bar item names a destination in words. An app
+bar action names itself in a tooltip, which is what every other icon in this bar does.
+
+`#navLayers` took the middle slot. It carries `popovertarget="paintmenu"`, so the browser opens the
+panel and there is no handler to keep in step.
+
+### The layers button is two elements, not one node moved
+
+`#brand` and the theme switch each have two homes, and `place()` in `js/ui.js` moves each node. The
+layers control does not follow that pattern. A navigation bar item is a pill over a label, and
+`#paint` is a 60px round button. One node cannot be both without a rule that rebuilds its children
+on a breakpoint.
+
+Two elements is the shape every rail item already uses against its bar twin. So `#paint` stays map
+furniture above 600px and `display: none` below it.
+
+### Two invokers for one popover cost one line
+
+The placement handler in `js/ui.js` read `document.querySelector('[popovertarget="paintmenu"]')`.
+That answers the first match in document order, which is `#navLayers`. Above 600px that element is
+`display: none`, and a hidden box measures zero. So the panel placed itself against a rectangle of
+zeros in the top-left corner of the window.
+
+The handler takes the button that has a box now. Every other menu in this app has one invoker, so
+this answers the same element it always did for them.
+
+### The map lost a button, so the other one moved down
+
+`#locate` stacked one `--fab` step above `#paint`. With one button left on the map there is one
+slot. `#locate` takes the 136px the layers button held, without the step.
+
+`paint-check.html` is the only thing in this app that reads that geometry, and it reported the same
+class of fault when the navigation bar first landed.
+
+### What this does not do
+
+The layers button keeps its glyph, its fill and its 60px box above 600px. Nothing about the desktop
+map moved.
+
+`#paint` stays in the document below 600px. It is hidden rather than removed, so a rotate past
+600px brings it back with nothing to notice.

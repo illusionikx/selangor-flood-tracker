@@ -78,7 +78,7 @@
      bridges M3's colour names onto this app's palette. Colour is not in this file on purpose. -->
 <link rel="stylesheet" href="vendor/m3/tokens.css?v=1">
 <link rel="stylesheet" href="css/base.css?v=175">
-<link rel="stylesheet" href="css/chrome.css?v=265">
+<link rel="stylesheet" href="css/chrome.css?v=266">
 <link rel="stylesheet" href="css/map.css?v=160">
 
 <!-- Water tint for the dark basemap. CARTO's dark_all is greyscale — all 18 of its tones have zero
@@ -292,6 +292,21 @@
        `#railApps` is NOT written here. It has two homes and js/ui.js moves the node, the way
        `#brand` already moves. It lands first in this group, so the overflow keeps the trailing
        edge. -->
+  <!-- **The bar's one leading action, and it is the search.** M3 gives a small top app bar a
+       leading slot, and a reader asked for the search there on 2026-08-25. It used to be the middle
+       item of the navigation bar. That freed the middle slot for the map layers.
+       **It keeps the id `navFind`.** `js/ui.js` binds it from the one handler table, and
+       `railSync()` writes its `aria-expanded` beside its rail twin. Both match on the suffix, so
+       neither one had to change. Only the shape did.
+       **It carries no pill and no label.** A navigation bar item names a destination in words. An
+       app bar action names itself in a tooltip, which is what every other icon in this bar does.
+       `railActive()` never reaches it either, and that is already the rule: the search is an action
+       at both widths, so it states `aria-expanded` and never `aria-current`. -->
+  <div class="hlead">
+    <button class="icon" id="navFind" aria-controls="pane" aria-expanded="false"
+            title="Go to a station" aria-label="Go to a station"
+      ><i class="i i-search"></i></button>
+  </div>
   <div class="hactions">
     <!-- **M3's overflow menu.** A navigation bar caps at five items, and this app has seven
          destinations. Help and About are the two a reader visits least, so they go here.
@@ -410,9 +425,17 @@
   <button class="navitem" id="navAlerts" aria-controls="pane" aria-expanded="false"
     ><span class="railpill"><i class="i i-warning"></i><b class="railbadge"></b></span
     ><span class="raillabel">Alerts</span></button>
-  <button class="navitem" id="navFind" aria-controls="pane" aria-expanded="false"
-    ><span class="railpill"><i class="i i-search"></i></span
-    ><span class="raillabel">Search</span></button>
+  <!-- **The map layers, in the middle slot.** A reader asked for that on 2026-08-25. `#paint` is a
+       FAB on the map above 600px and it draws nothing below it, so this item is the only way in at
+       this width.
+       **It is a second element and not the same node moved.** A navigation bar item is a pill over
+       a label and a FAB is a 60px round button, so one node cannot be both. That is the shape every
+       rail item already uses against its bar twin.
+       **It needs no handler.** `popovertarget` opens the same panel `#paint` opens, so the browser
+       does the work and there is nothing in `js/ui.js` to keep in step. -->
+  <button class="navitem" id="navLayers" popovertarget="paintmenu"
+    ><span class="railpill"><i class="i i-layers"></i></span
+    ><span class="raillabel">Layers</span></button>
   <button class="navitem" id="navTable"
     ><span class="railpill"><i class="i i-table"></i></span
     ><span class="raillabel">Table</span></button>

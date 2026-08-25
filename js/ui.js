@@ -810,7 +810,15 @@ el('favClear').onclick = () => setFavs(new Set());
 document.addEventListener('toggle', e => {
   const box = e.target;
   if (e.newState !== 'open' || !box.classList?.contains('menu')) return;
-  const btn = document.querySelector(`[popovertarget="${box.id}"]`);
+  /* **Two buttons open `#paintmenu` and only one of them ever draws.** The layers control is map
+     furniture above 600px and a navigation bar item below it, so the document holds both and the
+     stylesheet hides one. A bare `querySelector` answers the first in document order. That is the
+     bar item, which is `display: none` above 600px, and a hidden box measures zero. So the menu
+     placed itself against a rectangle of zeros in the top-left corner. Take the button that has a
+     box instead. Every other menu here has one invoker, so this answers the same element it always
+     did for them. */
+  const btn = [...document.querySelectorAll(`[popovertarget="${box.id}"]`)]
+    .find(b => b.getClientRects().length);
   if (!btn) return;
   /* Below 600px `#paintmenu` is a bottom sheet, and a sheet is placed by the stylesheet against the
      bottom edge rather than against its button. The three properties are CLEARED rather than left

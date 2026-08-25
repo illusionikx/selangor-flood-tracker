@@ -105,6 +105,12 @@ header {
   header .hactions {
     position: absolute; right: 8px; display: flex; align-items: center;
   }
+  /* **The leading group is the same box on the other edge**, and the same 8px puts its glyph centre
+     28px inside the window. Out of flow for the reason the trailing group is: this bar centres its
+     brand on the WINDOW, so a flex item on either end moves the mark by half its own width. */
+  header .hlead {
+    position: absolute; left: 8px; display: flex; align-items: center;
+  }
 }
 /* The bar is a title, a strip and a cluster of controls, and the strip takes what the other two
    leave. It used to take a share of the viewport instead, first `min(58vw, 656px)` and then a flat
@@ -2986,9 +2992,15 @@ body.side #side { display: flex; }
   /* **`--navbar-h` rides these literals too.** The 136 is measured up from the MAP's bottom edge,
      and below 600px that edge sits a navigation bar above the window. Without the term the two
      buttons stay where the window puts them and the zoom box climbs past them. */
-  #paint, #locate { right: 10px; }
-  #paint  { bottom: calc(136px + var(--navbar-h)); }
-  #locate { bottom: calc(136px + var(--navbar-h) + var(--fab, 60px) + 8px); }
+  /* **`#paint` draws nothing at this width, because the navigation bar carries the layers.** A
+     reader asked for that on 2026-08-25. So the map holds one button here rather than two, and
+     `#locate` takes the slot beside the zoom box that `#paint` held. It is the same 136, without
+     the `--fab` step that used to stack it above a second button.
+     **`display: none` rather than a JS guard**, so a rotate past 600px needs nothing to notice. The
+     button stays in the document, and `#paintmenu` still names it through `popovertarget`. The
+     placement handler in `js/ui.js` takes whichever of the two buttons has a box. */
+  #paint { display: none; }
+  #locate { right: 10px; bottom: calc(136px + var(--navbar-h)); }
   /* The legend earns its space: the heatmap is the one layer whose colours mean nothing without it,
      and it is the layer a phone shows most of. Compacted rather than dropped — full width beside the
      zoom buttons, and the sentence explaining the doubling goes, since the tip already says it. */

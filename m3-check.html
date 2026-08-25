@@ -288,13 +288,19 @@ async function phone() {
   is(w.getComputedStyle(mapEl, '::after').content, 'none', 'and no card edge');
   is(Math.round(r(mapEl).width), VW, 'the map is the full width of the window');
 
-  /* **The same two assertions `bands()` makes at 700/900/1400px, run here too.** `#paint` carries
-     its own bottom rule inside the phone media query, and `#locate` needs one beside it — without
-     one, `bands()` cannot catch it, because that loop never runs a width under 700px. */
-  const lb = r(d.getElementById('locate')), pb = r(d.getElementById('paint'));
-  is(Math.round(lb.left), Math.round(pb.left),
-     'phone: locate and layers share one column in the zoom cluster');
-  is(lb.bottom <= pb.top + 0.5, true, 'phone: and locate sits above layers');
+  /* **`#locate` is the one button left on the map here, and it needs its own phone rule.** The
+     layers moved to the navigation bar on 2026-08-25, so `#paint` draws nothing at this width and
+     `#locate` takes the slot it held above the zoom box. Without a rule of its own it falls back to
+     the desktop `calc()`, which adds a `--fab` step for a button that is no longer under it.
+     `bands()` cannot catch that, because that loop never runs a width under 700px. */
+  is(cs(d.getElementById('paint')).display, 'none',
+     'phone: the map draws no layers button, because the navigation bar carries them');
+  const lb = r(d.getElementById('locate')),
+        zb = r(d.querySelector('.leaflet-control-zoom'));
+  is(Math.round(lb.right), Math.round(zb.right),
+     'phone: locate shares the column the zoom cluster takes');
+  is(lb.bottom <= zb.top + 0.5, true, 'phone: and sits above the zoom box');
+  is(Math.round(zb.top - lb.bottom) <= 12, true, 'phone: up against it, not one step adrift');
 
   is(pane.tagName, 'DIALOG', 'the pane is a real <dialog>, not a div dressed as one');
   is(!!d.getElementById('scrim'), false,
@@ -355,6 +361,27 @@ async function phone() {
   is(Math.round(parseFloat(cs(phoneTheme.querySelector('.i')).fontSize)), 24,
      'phone: and the switch keeps the 24px glyph the rail draws on it');
 
+  /* --- the app bar's leading action ---
+     A reader asked for the search on the leading edge on 2026-08-25. M3 gives a small top app bar a
+     leading slot, and this bar had none.
+     **The same three facts as the trailing group.** It is out of flow, so the brand still centres on
+     the window. Its glyph centre lands 28px inside the leading edge, which is the number every app
+     bar in this app lands a glyph on. And it holds the search.
+     **Assert the ID, because the id is the wiring.** `js/ui.js` binds `navFind` from one handler
+     table and `railSync()` writes its `aria-expanded` beside `railFind`. Both match on the suffix.
+     So a rename here draws a button that opens nothing, and nothing on screen says why. */
+  const hlead = d.querySelector('header .hlead');
+  is(!!hlead, true, 'phone: the app bar carries a leading action group');
+  is(cs(hlead).position, 'absolute',
+     'phone: out of flow, so the centred brand never sees it either');
+  is([...hlead.children].map(c => c.id).filter(Boolean).join(','), 'navFind',
+     'phone: holding the search, and nothing else');
+  const leadGlyph = r(hlead.firstElementChild.querySelector('.i'));
+  is(Math.round((leadGlyph.left + leadGlyph.right) / 2), 28,
+     'phone: its glyph centre sits 28px inside the leading edge');
+  is(d.getElementById('navFind').closest('#navbar'), null,
+     'phone: and it left the navigation bar, which is what freed the middle slot');
+
   /* --- the navigation bar ---
      M3 states no rail below 600px, and 96px of a 360px screen is 27% of it. The bar holds the same
      destinations, capped at the five M3 allows. Help and About go to the app bar's overflow menu.
@@ -368,8 +395,16 @@ async function phone() {
   is(cs(nav).display !== 'none', true, 'phone: and it is not merely in the markup');
   is(Math.round(r(nav).height), 64, 'phone: M3 navigation bar, 64dp with no safe-area inset');
   is([...nav.querySelectorAll('.navitem')].map(b => b.id).join(','),
-     'navFilters,navAlerts,navFind,navTable,navCams',
+     'navFilters,navAlerts,navLayers,navTable,navCams',
      'phone: five items, which is what M3 caps this component at');
+  /* **The middle slot holds the map layers, and it opens the panel natively.** `#paint` is a FAB on
+     the map above 600px and it draws nothing below it, so this item is the only way in at this
+     width. It carries no handler: `popovertarget` names the same panel, so there is nothing in
+     `js/ui.js` to keep in step with it. */
+  is(d.getElementById('navLayers').getAttribute('popovertarget'), 'paintmenu',
+     'phone: the middle item opens the layers panel, through the browser and not a handler');
+  is(cs(d.getElementById('paint')).display, 'none',
+     'phone: so the map draws no layers button of its own');
   is([Math.round(r(nav).bottom), Math.round(r(nav).left), Math.round(VW - r(nav).right)].join(','),
      [VH, 0, 0].join(','), 'phone: spanning the window along its bottom edge');
   is(cs(d.getElementById('rail')).display, 'none',
