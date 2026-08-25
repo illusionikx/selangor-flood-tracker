@@ -95,8 +95,17 @@ export function railSync() {
     b.setAttribute('aria-expanded', String(cls.contains('drawer')));
   for (const d of document.querySelectorAll('dialog[open]'))
     if (DIALOG_ITEM[d.id]) return railActive(DIALOG_ITEM[d.id]);
+  /* **The location item is selected while its own card is the pane's occupant.** A reader asked for
+     that on 2026-08-25. `@here` is the key `js/locate.js` opens under, and it is the one card in
+     this pane that a navigation destination names. A station card and a weather card select
+     nothing, because neither is a destination this bar carries.
+     It is written as `railLocate`, the way every branch here is, and `railActive()` strips that
+     prefix and matches on the suffix. So the missing rail twin costs nothing: the loop finds
+     `#navLocate` and no rail item, which is the answer above 600px anyway. */
   railActive(cls.contains('drawer') ? 'railFilters'
-           : cls.contains('side') && side.key === '@alerts' ? 'railAlerts' : null);
+           : !cls.contains('side') ? null
+           : side.key === '@alerts' ? 'railAlerts'
+           : side.key === '@here' ? 'railLocate' : null);
 }
 
 function syncPane() {
@@ -270,20 +279,26 @@ function setBasemap() {
   setWater(key === 'dark');
 }
 
-// **Two themes, and the button flips between them.** `PREFS.theme` holds `light` or `dark` and
-// nothing else. The repository owner cut the third choice on 2026-08-24, so the three-way control
-// and the `system` value are gone.
-// **A first visit still opens the way the reader's desktop looks.** The system's answer seeds the
-// preference once and is then stored, so the app never starts on the wrong shade for somebody who
-// has never pressed anything. Nothing follows the system after that: a stored theme is a theme the
-// reader owns, and a page that restyles itself at sunset is what "no auto" refuses.
-// The `themePick` migration went with the third choice. It existed to stop a resolved value from
-// the old two-state toggle reading as a deliberate pick. A resolved value IS the pick again.
+// `PREFS.theme` is the one place this app keeps the reader's pick. The picker is three rows in
+// Settings and the rail's button reports what is on screen. See the block under this line.
 const sysDark = matchMedia('(prefers-color-scheme: dark)');
-if (PREFS.theme !== 'light' && PREFS.theme !== 'dark') {
-  PREFS.theme = sysDark.matches ? 'dark' : 'light';
-  save();
-}
+/* **Three choices, and the third one is Auto.** The repository owner cut Auto on 2026-08-24 and
+   asked for it back on 2026-08-25, with the picker in Settings and the rail's button reporting the
+   shade on screen.
+   **Auto keeps following the device, and that is the whole of what it buys.** The listener below is
+   live, so a phone that crosses into its own dark hours restyles this app while `auto` is the pick.
+   What this reverses seeded the preference once from the same query and then stored the answer,
+   which is a stored pick that merely started in the right place.
+   **`auto` is the default and nothing is seeded any more.** That seed existed because no value meant
+   "ask the device". One does now.
+   **A stored `light` or `dark` is a theme the reader owns**, and the device never moves it. */
+export const THEMES = ['auto', 'light', 'dark'];
+if (!THEMES.includes(PREFS.theme)) { PREFS.theme = 'auto'; save(); }
+/* **The listener lives here rather than in js/ui.js, because this module owns the theme.** A page
+   that draws a map without the chrome still follows the device. `js/ui.js` adds a second listener of
+   its own, for the rail button's glyph alone. Registration order runs this one first, because that
+   module imports this one. */
+sysDark.addEventListener('change', () => { if (PREFS.theme === 'auto') applyTheme(); });
 
 export function setTheme(t) {
   PREFS.theme = t;
@@ -295,7 +310,8 @@ export function setTheme(t) {
 // stored theme before anything draws. It returns the theme on screen, which is what the button reads
 // to name its own next press.
 export function applyTheme() {
-  const t = PREFS.theme === 'dark' ? 'dark' : 'light';
+  const t = PREFS.theme === 'auto' ? (sysDark.matches ? 'dark' : 'light')
+          : PREFS.theme === 'dark' ? 'dark' : 'light';
   document.documentElement.dataset.theme = t;
   // The standalone window's title bar. Same value the header paints itself, so an installed app
   // has no seam above its own header — see the --surface tokens in css/base.css.
@@ -313,7 +329,12 @@ export const cluster = L.markerClusterGroup({
   // Tighten as you zoom rather than switching clustering off — several stations share exact
   // coordinates (a rainfall and a river gauge on the same mast), so they overlap at any zoom.
   // Those stay clustered to the end and fan out on click instead of hiding each other.
-  maxClusterRadius: z => z >= 15 ? 14 : z >= 13 ? 26 : 48,
+  // Screen pixels, three bands: street, city, state. The far band was 48 and is 34, measured
+  // against the 459 sites in the payload. It covers zoom 0 to 12, across which the spacing
+  // between two sites changes fourfold, so one number cannot suit both ends. 34 is picked for
+  // the city end: it leaves 280 sites inside a neighbour's radius at zoom 12 against 335 at 48.
+  // At zoom 10 it buys almost nothing — 434 against 452 — and no radius does.
+  maxClusterRadius: z => z >= 15 ? 14 : z >= 13 ? 26 : 34,
   showCoverageOnHover: false,
   spiderfyOnMaxZoom: true,
   spiderfyDistanceMultiplier: 1.6,

@@ -4,7 +4,7 @@ import { KINDS, MAST, camSrc, FEED, STATIC, NEAR_MAX_KM, NOTICE, NOTICE_KIND, NA
        } from './config.js';
 import { state, PREFS, PREFS_KEY, save } from './state.js';
 import { el, distKm, dkey, ignoredIds, leads, favIds, isFav, squash, termsOf, matches, esc,
-         warnWhen } from './util.js';
+         warnWhen, snack } from './util.js';
 import { setTheme, applyTheme, flashTo, closeSide, showPlace, side, railSync } from './map.js';
 import { showHere } from './locate.js';
 import { syncHeat, heatOpacity, HEAT_OPACITY } from './heat.js';
@@ -51,22 +51,48 @@ const withTimeline = fn => (tlMod ??= import('./timeline.js')).then(fn, err => {
 
 // --- theme ---------------------------------------------------------------------------------------
 
-/* **One button, two themes.** It was a popover holding a three-way pill. The repository owner cut
-   Auto and the pill on 2026-08-24.
-   **The glyph and the words name the NEXT press, never the theme on screen.** A reader can already
-   see which shade they are looking at. What a control has to say is what it does.
+/* **Three choices in Settings, and one switch on the rail.** The picker is three radio rows in
+   `#settingsBox`, and the repository owner asked for both on 2026-08-25. The rail keeps a button
+   because a theme is one press away on a desktop and four presses away through a settings pane.
+   **The rail glyph names the SHADE ON SCREEN, and that reverses what stood here.** It named the
+   next press, on the argument that a reader can already see the shade they are looking at. Under
+   Auto that argument fails: the pick is a word, and the one thing a reader cannot read off the page
+   is which shade that word resolved to. So the glyph is the state and the words carry the act.
+   **The words name the pick as well, and only where the pick is Auto.** `Light theme.` on its own
+   is a reader's own choice reported back. `Automatic. Light now.` is the extra fact.
+   **One press sets an explicit shade, which leaves Auto.** A button cannot cycle three values
+   without becoming a control that has to be pressed twice to be read, and Settings is where Auto
+   comes back.
    `applyTheme()` runs here, once, at module evaluation. It paints the stored theme before the map
    draws, and `js/map.js` states why the call lives on this side. The theme on screen is read back
    from the root element, which is the one place this app keeps it. */
 const themeBtn = el('railApps'), themeNow = () => document.documentElement.dataset.theme;
 function syncThemeBtn() {
-  const next = themeNow() === 'dark' ? 'light' : 'dark';
-  themeBtn.querySelector('.i').className = 'i i-' + next + '_mode';
-  themeBtn.title = themeBtn.ariaLabel = next === 'dark' ? 'Dark theme' : 'Light theme';
+  const now = themeNow(), other = now === 'dark' ? 'light' : 'dark';
+  themeBtn.querySelector('.i').className = 'i i-' + now + '_mode';
+  const said = PREFS.theme === 'auto'
+    ? `Automatic. ${now === 'dark' ? 'Dark' : 'Light'} now.`
+    : `${now === 'dark' ? 'Dark' : 'Light'} theme.`;
+  themeBtn.title = themeBtn.ariaLabel = `${said} Switch to ${other}.`;
+  for (const b of document.querySelectorAll('#themeList input'))
+    b.checked = b.value === PREFS.theme;
 }
 applyTheme();
 syncThemeBtn();
 themeBtn.onclick = () => { setTheme(themeNow() === 'dark' ? 'light' : 'dark'); syncThemeBtn(); };
+/* **The picker writes the preference and `syncThemeBtn()` writes every control back from it**, which
+   is the rule this app states for every preference-owned control. So the rows and the rail button
+   cannot report two answers, whichever of the two a reader pressed. */
+el('themeList').onchange = e => {
+  if (e.target.name !== 'theme') return;
+  setTheme(e.target.value);
+  syncThemeBtn();
+};
+/* **A second listener on the same query, and js/map.js holds the first.** That one re-paints the
+   app when the device crosses into its dark hours under Auto. This one re-draws the button that
+   reports the shade. Registration order runs the paint first, because this module imports that one,
+   so the glyph is read off a root element already carrying the new value. */
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', syncThemeBtn);
 
 // --- about and help dialogs ----------------------------------------------------------------------
 // <dialog> handles the backdrop, Esc and focus; the only wiring needed is opening it and treating a
@@ -97,34 +123,11 @@ aboutBox.onclick = e => { if (e.target === aboutBox) aboutBox.close(); };
 helpBox.onclick  = e => { if (e.target === helpBox)  helpBox.close(); };
 settingsBox.onclick = e => { if (e.target === settingsBox) settingsBox.close(); };
 
-/* **M3's snackbar, and it replaced `#devMsg`.** That was a muted line under the buttons, inside a
-   pane that scrolls. So the answer to a press could sit below the fold while the reader watched the
-   button. A snackbar reports at the foot of the screen, whatever the pane is showing.
-   **It is a `popover`.** The dialog it reports on is modal, so it is in the top layer, and no
-   `z-index` reaches over that. `manual`, so a press anywhere else does not dismiss it.
-   **One timer, cleared on every call.** Two messages in a row otherwise share the first one's clock,
-   and the second vanishes early. `SNACK_MS` is M3's own short duration for a message with no
-   action to take. */
-const SNACK_MS = 4000;
+/* **The snackbar moved to js/util.js**, because js/locate.js raises one too and that module is
+   imported BY this one. Its whole design note travelled with it. */
 /* Half a second, so the switch's own travel finishes before the pane leaves. Shorter reads as the
    pane closing INSTEAD of the control answering. Longer reads as a pane that closed by itself. */
 const TEST_CLOSE_MS = 500;
-let snackAt = 0;
-/* **`togglePopover()`, never `showPopover()`/`hidePopover()`.** Both of those THROW rather than do
-   nothing when the popover is already in the state they ask for: `hidePopover()` on a closed one
-   raises `InvalidStateError`, and `showPopover()` on an open one does the same. The first version
-   called `hidePopover()` first, to restart the enter animation, and every single call threw on the
-   first line. So the snackbar never drew once, and nothing said so — the throw landed inside a
-   handler with no surface. `togglePopover(force)` is the idempotent pair.
-   The restart went with it. A second message replaces the text and resets the clock, and the
-   messages this app raises are seconds apart. */
-function snack(msg) {
-  const b = el('snack');
-  b.textContent = msg;
-  clearTimeout(snackAt);
-  b.togglePopover(true);
-  snackAt = setTimeout(() => b.togglePopover(false), SNACK_MS);
-}
 // A message belongs to the dialog session that produced it. Closing the pane takes it with it, so a
 // result nobody has seen cannot outlive the control that asked for it.
 /* **Closing the pane does NOT take the snackbar down, and this line used to.** The rule came across
@@ -1007,8 +1010,7 @@ document.addEventListener('click', () => {
   const wide = matchMedia('(min-width: 601px)');
   const brand = el('brand'), slot = document.querySelector('#rail .railbrand'),
         bar = document.querySelector('header'), find = el('findpane'), paneEl = el('pane'),
-        railFindBtn = el('railFind'), rail = el('rail'), themeSwitch = el('railApps'),
-        hactions = document.querySelector('header .hactions');
+        railFindBtn = el('railFind');
   /* Before the ticker, or the brand lands after it in the bar. `prepend` states that rather than
      leaving it to whatever the last mover did.
      **The search moves the other way.** It is written outside the pane, because a closed `<dialog>`
@@ -1027,14 +1029,10 @@ document.addEventListener('click', () => {
     const focused = document.activeElement, keepFocus = focused && find.contains(focused);
     (wide.matches ? slot : bar).prepend(brand);
     (wide.matches ? document.body : paneEl).append(find);
-    /* **The theme switch moves too, and for the same reason the brand does.** The rail is
-       `display: none` below 600px, so a phone had no theme control at all.
-       **`append` into the rail and `prepend` into the group**, because the trailing edge belongs to
-       different things at the two widths. The rail puts the switch under its items. The app bar
-       puts it before the overflow menu, which M3 keeps furthest out.
-       Nothing here holds focus worth keeping: the press that flips the theme does not cross the
-       breakpoint. */
-    if (wide.matches) rail.append(themeSwitch); else hactions.prepend(themeSwitch);
+    /* **The theme switch does NOT move any more.** It travelled into the app bar's trailing group
+       below 600px, because the rail is `display: none` there and a phone otherwise carried no theme
+       control at all. The picker is three rows in Settings from 2026-08-25, so a phone has one, and
+       the switch stays in the rail. `#brand` and `#findpane` are the two nodes left with two homes. */
     if (keepFocus) focused.focus({ preventScroll: true });
     railFindBtn.setAttribute('aria-controls', wide.matches ? 'findpane' : 'pane');
   };
@@ -1162,10 +1160,17 @@ el('findBack').onclick = () => setFind(false);
    **Search opens rather than toggles**, at both widths. It closes on blur, on Escape and on its own
    back arrow, which is three ways out already. A fourth on the control that opened it dismisses the
    field the moment a reader reaches back for it. */
+/* **`Locate` has a bar item and no rail twin, and the guard above is what lets it.** Above 600px the
+   map draws `#locate` itself, over the ground a fix lands on. Below 600px that button does not draw
+   and this item is the only way to one.
+   **It presses the map button rather than repeating what that button does.** Every path through
+   `js/locate.js` hangs off one handler: a first fix, a stored fix, the recentre, the ripple and the
+   card. A second caller here is a second copy of the one that matters. */
 const NAV = {
   Filters: openFilters,
   Alerts:  toggleAlerts,
   Find:    () => setFind(true),
+  Locate:  () => el('locate').click(),
   Table:   openTable,
   Cams:    openWall,
 };

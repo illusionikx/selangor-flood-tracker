@@ -73,8 +73,8 @@ export function render() {
      which layer it draws with nothing opened. Written from the preference, never read back off the
      chip, which is the rule every control in this function obeys. */
   const wx = PREFS.mapLayer === 'weather';
-  el('layerChipLabel').textContent = wx ? 'Weather' : 'Stations';
-  el('layerChipIcon').className = `i glyph i-${wx ? 'partly_cloudy_day' : 'place'}`;
+  el('layerChipLabel').textContent = wx ? 'Weather' : 'Hydrology';
+  el('layerChipIcon').className = `i glyph i-${wx ? 'partly_cloudy_day' : 'water_drop'}`;
   const pinFilter = syncPins();
   Object.keys(marks).forEach(k => marks[k] = []);
   siteMark.clear();

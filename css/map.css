@@ -122,19 +122,23 @@
 /* One 8px gap whether or not there is a sibling above. Over a sibling it separates two sensors, and
    at the top of the body it clears the app bar. A `:first-child` cancel stood here and keyed on
    position, which is what moved the day `.pophead` emptied and `openSide()` removed it. */
-/* A cell inside a segment steps back to the page tone, or the two containers are one flat block.
-   Both surfaces that draw `.wxcol` sit inside a `.sensor`: the station card's weather section, and
-   the weather panel's half-hour stack. */
-.sensor .wxcol { background: var(--surface); }
-/* M3's list item: a 16px gap, a 40px leading avatar, and a headline at `body-large` in the regular
-   weight. That is the `.nrow` headline's own rule, so a sensor and a bulletin read the same.
+/* M3's list item: a 16px gap, a leading slot and a headline at `body-large` in the regular weight.
+   That is the `.nrow` headline's own rule, so a sensor and a bulletin read the same.
    `min-height` and not `height`: a headline this app never truncates can wrap, which is the rule a
    station name already earns everywhere else.
    The radius is here for the flash alone. A list item takes its state layer on its own shape. */
 .sensorhead {
-  display: flex; align-items: center; gap: 16px;
+  display: flex; align-items: center; gap: 12px;
   min-height: 56px; padding: 4px; border-radius: var(--md-sys-shape-corner-large);
 }
+/* **M3's leading slot: 24px of glyph, and NO disc.** It wore the Notices pane's 40px tinted avatar
+   for one revision and a reader cut it on 2026-08-25. An avatar names a sender. A sensor kind is not
+   a sender, and six discs down one card read as six of them.
+   `.glyph` is 18px in `css/base.css`, which is written for the drawer's own dense rows. A list item
+   states 24. The gap drops to 12 with the disc gone: 16px beside a 40px avatar is M3's own pair, and
+   the same 16 beside a bare 24px glyph leaves the headline standing further out than the supporting
+   line under the whole group. */
+.sensorhead .glyph { flex: none; font-size: 24px; min-width: 24px; }
 .sensorhead b {
   font-weight: 400;
   font-size: var(--md-sys-typescale-body-large-size);
@@ -175,53 +179,14 @@
    left of the headline above it. */
 .sensor > .place, .sensor > .muted { padding-inline: 4px; }
 
-/* The MET section. Two cells, each one a glyph, the words that belong to it, and its own title on
-   the bottom edge. The split is 1:3, because `Now` holds two short numbers and `Later` holds a
-   sentence. It was three cells of equal width, which read as two thin cells beside a full one.
-   Nothing sets `align-items` on the grid, so the two cells stretch to one height. `margin-top: auto`
-   on the title then parks both titles on the same line, whatever is above them.
-   **Nothing sets `min-width: 0` on a cell, and that is what holds 1:3 up.** A `1fr` track is
-   `minmax(auto, 1fr)`, so a cell never goes under its own content unless something zeroes that
-   floor. `Now` needs about 81px and its quarter share is about 79px on a 360px panel, so the two
-   are within a hair on this screen and the floor is the whole story on a narrower one: at 84vw the
-   quarter share falls to about 65px and the glyph would stand outside its own cell. `Later` gives up
-   those pixels instead, and its sentence wraps, which is what a sentence does. The floor is still
-   off every item inside a cell — see `.wxrow > *` below, where a forecast line does have to shrink. */
-.wx { display: grid; grid-template-columns: 1fr 3fr; gap: 10px; }
-/* 12px of side padding rather than 10. At 1:3 the `Now` cell is about the width of its own content,
-   so the padding is the whole of what centres the pair inside it.
-   `--g` is the glyph box, and it is declared HERE rather than on `.wx`. Two surfaces draw this
-   card: the station panel's weather section, and the weather panel's half-hour stack. Only the
-   first has a `.wx` grid over it. So a `--g` on `.wx` resolved for one surface and not the
-   other. `.wxbig` then fell back to this rule's own 12px. That is a glyph the size of the
-   words beside it, on the surface that is nothing but glyphs.
-   `.wxcol` is the one box both surfaces share. */
-.wxcol { display: flex; flex-direction: column; gap: 6px; font-size: 12px; line-height: 1.35;
-  padding: 8px 12px; border-radius: 8px; background: var(--hover); --g: 28px; }
-/* One gap for both cells. `space-between` spent `Now`'s slack between the glyph and the numbers
-   first, which put a 30px gap in one cell beside a small one in the other — the same distance stated
-   twice, differently, on one row. */
-.wxrow { display: flex; align-items: center; gap: 12px; min-width: 0; }
-.wxrow > * { min-width: 0; }
-.wxrow > .wxline { flex: 1; }
-/* The title sits under the glyph and centres on it, so `--g` is the glyph box and both read it. The
-   two titles are narrower than the box, so nothing spills. `nowrap` is the guard for the day one is
-   not: a title wider than `--g` overhangs evenly instead of breaking into two lines. */
-.wxsub { font-size: 11px; color: var(--muted); margin-top: auto;
-  width: var(--g); text-align: center; white-space: nowrap; }
-/* High over low, so the cell stays a third of the row and the forecast sentence gets the rest. The
-   pair sits against the glyph, so it aligns left like the sentence in the other cell.
-   `cursor: help` because it carries a `data-tip` that names both ends. */
-.wxtemp { display: flex; flex-direction: column; font-size: 11px; line-height: 1.4; cursor: help; }
-/* The weather glyph carries the state, so it is the largest thing in the column and nothing writes
-   that state out again underneath it — the word is on `data-tip`, and `js/sparktip.js` opens it on
-   hover and on a tap. There is no `.wxcol .i` rule any more. Two classes beat one, so that rule
-   held this glyph at 14px and the large one never drew large. */
-/* The colour is written on the element, off `wxTone()` in popup.js, so the glyph and its hue are
-   one decision made in one place. `--k-weather` stays as the fallback: it is what this section
-   wore before, and a caller that states no tone still draws in the section's own colour. */
-.wxbig { font-size: var(--g); color: var(--k-weather); flex: none; cursor: help; }
-.wxline { color: var(--on-surface); font-size: 11px; }
+/* **THE MET SECTION DRAWS THE SAME M3 LIST ITEM THE WEATHER PANEL DRAWS**, so there is no rule
+   here at all. See `.wxstep` further down this file.
+   It was TWO CELLS of a `1fr 3fr` grid inside one segment: `.wx`, `.wxcol`, `.wxrow`, `.wxsub`,
+   `.wxbig`, `.wxline` and `.wxtemp`, plus a `--g` glyph token and a `.sensor .wxcol` cancel. Every
+   one of those is deleted, and the whole cell is written up in `docs/FEATURES.md`.
+   Each cell drew a glyph over a title, with the state itself on `data-tip` and nothing written out.
+   Two cells cannot be a head over a list, and the pane holds this card and the weather panel one at
+   a time. So a reader met one component in two shapes. */
 /* The weather section needs no seam of its own, and `.wxsec` is gone. It carried a bottom rule while
    the sensor under it was a loose body with no head. Every card wraps its sensor in a `.sensor` now,
    which draws its own top rule, so the two together were the double line that
@@ -547,36 +512,90 @@
   to   { background: transparent; }
 }
 
-/* One card per half hour MET publishes. It is built like the weather card's own `Later` cell.
-   A glyph sits on the left, the word beside it, and the clock under the pair.
-   The cards STACK and never run sideways. A sideways strip hides the later hours behind a swipe,
-   and a hidden hour on a flood map helps nobody. A full-width card also lets the word sit beside
-   its glyph, which is what the `Later` cell already draws. */
-.wxsteps { display: grid; gap: 6px; }
-/* `.wxsub` is `width: var(--g)`, which is 28px and narrower than "14:30". The card's own two titles
-   are narrower than the glyph box. These are wider, so the width comes off here. Left, not
-   centred: the clock lines up under the glyph above it. */
-.wxsteps .wxsub { width: auto; text-align: left; }
-/* The step happening now. The chip labels it and the outline finds it. So a reader scanning nine
-   cards lands on the right one before reading any of them.
-   `.wxline` already carries `flex: 1` inside `.wxrow`, so the chip lands hard right with no rule
-   of its own. */
-.wxcol.now { outline: 2px solid var(--accent); outline-offset: -2px; }
-.wxnow { flex: none; font-size: 9px; letter-spacing: .06em; color: var(--accent);
-  border: 1px solid var(--accent); border-radius: 4px; padding: 1px 5px; }
-/* The bottom line of a step card: the clock on the left, and the day's two temperatures on the
-   right of the card happening now. The pair had a card of its own above the stack and it is gone.
-   One day-scale fact does not earn the height of a step beside nine half-hour ones.
-   `margin-top: auto` moves off `.wxsub` and onto this row, which is what parks every card's bottom
-   line on one level whatever stands above it. `.wxsub` keeps that declaration for the station
-   card, where it is still a direct child of `.wxcol`. */
-.wxfoot { display: flex; align-items: center; gap: 10px; margin-top: auto; }
-.wxfoot .wxsub { margin-top: 0; }
-/* Low then high, in the order a scale runs in. `margin-left: auto` puts the pair on the card's
-   right edge, opposite the clock.
-   The clock's own 11px, because the two share a line. A larger figure beside it reads as the
-   heading of a row whose heading is the clock. */
-.wxtemps { display: flex; gap: 10px; margin-left: auto; font-size: 11px; line-height: 1.35; }
+/* **THE WEATHER LIST ITEM, and TWO surfaces draw it.** They are every half hour in the weather
+   panel's stack, and the two rows of the station card's own weather section. `wxItem()` in
+   `js/popup.js` builds the markup once and this states the numbers once, so the two cannot drift.
+   The stack was a `.wxsteps` grid of `.wxcol` cards inside ONE segment of `.sbody`. That drew a
+   container inside a container, and the outer one said nothing the nine inner ones did not. The
+   section beside it was two cells of a `1fr 3fr` grid, inside one segment of its own. A reader
+   asked for the component on both, on 2026-08-25.
+   `.sbody` above states the group: the 2px gap, the 4dp inner corner, and the 16dp outer corner on
+   the two ends alone. This states the ITEM, and every number is `List/list.css`'s own two-line row.
+   `.mseg > li` in `css/chrome.css` states the same numbers for the Settings groups and the alert
+   groups. They are not one selector, because those two rows hold text and this one holds a glyph, a
+   word, a clock and a pair of temperatures.
+   **The steps STACK and never run sideways.** A sideways strip hides the later hours behind a
+   swipe, and a hidden hour on a flood map helps nobody.
+   `.sbody > li` states a 12px inset for a graph or a picture. A list item states 8px and 16px, so
+   this needs the element as well as the class to beat it. */
+.sbody > li.wxstep {
+  display: flex; align-items: center; gap: 16px; padding: 8px 16px; min-height: 72px;
+}
+/* **The leading slot is M3's AVATAR, and `.avat` in `css/chrome.css` states its shape.** A 40px
+   tinted disc under a 24px glyph. The repository owner asked for the disc on 2026-08-25, so this
+   rule adds nothing and only names the caller.
+   The station panel cut its own avatar the same day, and that is not a contradiction. A sensor kind
+   is not a sender, and six discs down one card read as six of them. Here the disc carries the ONE
+   thing that changes down the stack, which is the weather at that half hour. `--c` is written on
+   the element, off `wxTone()` in popup.js, so the disc and the pin agree about every rung.
+   16px is the gap M3 pairs with a 40px avatar, and `.nrow` beside it states the same. */
+.wxstep .wxtext { flex: 1; min-width: 0; }
+/* The headline, at `body-large` in the REGULAR weight. That is `.nrow b`'s own rule, so a step, a
+   sensor and a bulletin all read the same. */
+.wxstep .wxtext b {
+  display: block; font-weight: 400;
+  font-size: var(--md-sys-typescale-body-large-size);
+  line-height: var(--md-sys-typescale-body-large-line-height);
+  letter-spacing: var(--md-sys-typescale-body-large-tracking);
+}
+/* The supporting line, at `body-medium` in `on-surface-variant`. It is the clock, and it is not
+   `.muted`: that class carries a `font-size` of its own and a declaration on the element beats an
+   inherited one. The same trap is written up in CLAUDE.md against the rain chart's labels. */
+.wxstep .wxwhen {
+  display: block; color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--md-sys-typescale-body-medium-size);
+  line-height: var(--md-sys-typescale-body-medium-line-height);
+  letter-spacing: var(--md-sys-typescale-body-medium-tracking);
+}
+/* The step happening now. The marker labels it and the outline finds it. So a reader scanning nine
+   steps lands on the right one before reading any of them.
+   The outline goes on the ITEM, because the item is what carries the shape it follows. */
+.wxstep.now { outline: 2px solid var(--accent); outline-offset: -2px; }
+/* **A play arrow and the word, in the accent and in bold.** The repository owner asked for that on
+   2026-08-25, over an outlined 9px `NOW` chip.
+   **It stands IN PLACE OF the clock**, so it takes `.wxwhen`'s own slot in the supporting line. A
+   supporting line answers which half hour the row states, and `Now` answers it.
+   The colour and the weight are the whole of the highlight, so there is no border and no fill. An
+   outlined chip beside the item's own 2px outline drew two rings around one fact.
+   `body-medium` and not a label size: it stands where the clock stood, and a line that changes size
+   from row to row moves the headline above it. */
+.wxstep .wxnow {
+  display: flex; align-items: center; gap: 2px;
+  color: var(--accent); font-weight: 700;
+  font-size: var(--md-sys-typescale-body-medium-size);
+  line-height: var(--md-sys-typescale-body-medium-line-height);
+  letter-spacing: var(--md-sys-typescale-body-medium-tracking);
+}
+.wxstep .wxnow .i { font-size: 18px; }
+/* **M3's TRAILING SUPPORTING TEXT, and the whole of that slot.** A reader asked for the spec on
+   2026-08-25. It is `label-small` in `on-surface-variant`, on one line at the end of the item.
+   `flex: none`, so the headline and the supporting line under it take every pixel this does not.
+   It wore the item's own `on-surface` for a revision, at the headline's weight. A trailing line that
+   paints as dark as the headline reads as a second headline, and this is one day-scale fact beside
+   a row about one half hour.
+   **HIGH OVER LOW, on TWO lines, and M3 states one.** The repository owner asked for the stack on
+   2026-08-25. That is the one divergence here, and the pair had a card of its own above the stack
+   before it: one day-scale fact does not earn the height of a step beside nine half-hour ones.
+   Two 16px lines is 32px inside a 72px item that pads 8px, so the row does not grow.
+   `flex-end`, so the two figures line their right edges up on the item's own inset. No gap: the
+   line height is the space, the same way two lines of one paragraph meet.
+   `.wxtrail` is gone. It stacked two things in this slot while the `NOW` chip stood here, and that
+   chip is the supporting line now. */
+.wxtemps { flex: none; display: flex; flex-direction: column; align-items: flex-end;
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--md-sys-typescale-label-small-size);
+  line-height: var(--md-sys-typescale-label-small-line-height);
+  letter-spacing: var(--md-sys-typescale-label-small-tracking); }
 .wxt { display: flex; align-items: center; gap: 3px; }
 /* Blue for the low and terracotta for the high. It is the one temperature idiom a reader already
    holds, and it says in a colour what the pair otherwise spends two words on. See the note on

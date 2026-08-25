@@ -71,15 +71,15 @@
 <link rel="modulepreload" href="js/ui.js">
 <link rel="stylesheet" href="vendor/leaflet.css">
 <link rel="stylesheet" href="vendor/markercluster.css">
-<link rel="stylesheet" href="vendor/fonts.css?v=51">
-<link rel="stylesheet" href="css/icons.css?v=101">
+<link rel="stylesheet" href="vendor/fonts.css?v=52">
+<link rel="stylesheet" href="css/icons.css?v=105">
 <!-- M3's own token scales, baked from the M3 Expressive component set by `php m3-build.php`.
      Before `base.css`, which derives `--m3-travel`, `--m3-grow` and `--m3-swap` from them and
      bridges M3's colour names onto this app's palette. Colour is not in this file on purpose. -->
-<link rel="stylesheet" href="vendor/m3/tokens.css?v=1">
-<link rel="stylesheet" href="css/base.css?v=185">
-<link rel="stylesheet" href="css/chrome.css?v=299">
-<link rel="stylesheet" href="css/map.css?v=161">
+<link rel="stylesheet" href="vendor/m3/tokens.css?v=2">
+<link rel="stylesheet" href="css/base.css?v=188">
+<link rel="stylesheet" href="css/chrome.css?v=315">
+<link rel="stylesheet" href="css/map.css?v=170">
 
 <!-- Water tint for the dark basemap. CARTO's dark_all is greyscale — all 18 of its tones have zero
      chroma — so no saturate() or hue-rotate() can pull water out of it. What it does have is one
@@ -297,17 +297,25 @@
             title="Go to a station" aria-label="Go to a station"
       ><i class="i i-search"></i></button>
   </div>
-  <!-- **The bar's trailing actions, as one group. The theme switch is the only one left.** The
-       overflow menu stood here too. It moved to the navigation bar's fifth slot on 2026-08-25, on a
-       reader's instruction. Two More buttons at one width is one control in two places.
+  <!-- **The bar's trailing actions, as one group, and the overflow menu is the only one in it.** A
+       reader asked for the More button here on 2026-08-25. It stood in the navigation bar's fifth
+       slot, and that slot went to the location button.
+       **The theme switch is NOT here any more.** It moved into Settings, with Auto back beside
+       Light and Dark, and the rail keeps a button of its own above 600px. So this group holds one
+       control at one width and nothing moves between homes.
        **It is one absolutely positioned box, never two.** The bar centres the brand on the WINDOW,
        which is M3's center-aligned variant. A flex item on the trailing end moves that mark by half
        its own width. Two separately positioned buttons need two literals that have to stay in step,
-       and a group needs one. The box stays for that reason, and because `place()` in js/ui.js
-       prepends into it.
-       `#railApps` is NOT written here. It has two homes and js/ui.js moves the node, the way
-       `#brand` already moves. -->
-  <div class="hactions"></div>
+       and a group needs one.
+       **It keeps the id `navMore`, and it is an app bar ACTION here rather than a bar item.** So it
+       draws as a plain icon button with no pill and no label, which is the shape `#navFind` already
+       takes on the other edge. `popovertarget` is the whole of the wiring: the browser opens the
+       menu and there is nothing in js/ui.js to keep in step. -->
+  <div class="hactions">
+    <button class="icon" id="navMore" popovertarget="appMenu"
+            title="More" aria-label="More"
+      ><i class="i i-more_vert"></i></button>
+  </div>
   </header>
 <!-- **M3's overflow menu.** A navigation bar caps at five items, and this app has more destinations
      than that. Settings, Help and About are the three a reader visits least, so they go here.
@@ -399,29 +407,39 @@
     ><span class="railpill"><i class="i i-flood"></i></span
     ><span class="raillabel">About</span></button>
   </div>
-  <!-- The theme picker keeps its own button. It is a setting rather than a destination, so it sits
-       under the spacer and takes no rail item. The `.menu` class on the popover is what the
-       delegated placement handler in js/ui.js keys on, so this needs no positioning code. That
-       handler places a menu by the edge it opens FROM, and this button is in the left half and the
-       bottom half — which is `#paint`'s own case. -->
-  <!-- **Two themes, and this button IS the switch.** It held a popover carrying a three-way pill,
-       Auto, Light and Dark. The repository owner cut Auto and the pill on 2026-08-24, so one press
-       flips the theme and there is no box to open.
-       **The glyph names what the press DOES, never the theme on screen.** A sun on a light page is
-       the state a reader can already see. A moon on it is the state one press away. `js/ui.js`
-       writes the glyph and the label from the resolved theme. -->
-  <button id="railApps" class="icon" title="Dark theme" aria-label="Dark theme"
-    ><i class="i i-dark_mode"></i></button>
+  <!-- The theme switch keeps its own button. It is a setting rather than a destination, so it sits
+       under the items and takes no rail item.
+       **THE RAIL IS ITS ONLY HOME NOW.** The node used to move into the app bar's trailing group
+       below 600px, because the rail does not draw there. The picker is three rows in Settings from
+       2026-08-25, so a phone reaches the theme through More, then Settings, and this button never
+       leaves the rail.
+       **The glyph names the SHADE ON SCREEN, and that reverses what stood here.** It named the next
+       press instead, on the argument that a reader can already see the shade they are looking at.
+       The repository owner asked for the state on 2026-08-25, and Auto is why: under Auto the pick
+       is a word, and the only thing a reader cannot read off the page is which shade that word
+       resolved to. `js/ui.js` writes the glyph and the words.
+       **One press still sets an explicit shade**, which leaves Auto. Settings is where Auto comes
+       back, and the button's own words say the pick is automatic while it holds. -->
+  <button id="railApps" class="icon" title="Light theme" aria-label="Light theme"
+    ><i class="i i-light_mode"></i></button>
 </nav>
 <!-- M3's navigation bar, below 600px alone. Every number comes from
      https://github.com/bczak/m3you/blob/development/src/components/NavigationBar/navigation-bar.css
+     **This is M3's FLEXIBLE navigation bar, and the flexible half is the item arrangement.** The
+     items stack their glyph over their label in a window of ordinary height. In a window whose
+     height is compact, under M3's own 480dp, the glyph and the label sit on one row inside a wider
+     indicator and the bar stops being 64px of a 420px screen. `css/chrome.css` carries both sets of
+     numbers and neither is invented.
      **Five items, which is what M3 caps this component at.** The rail carries eight destinations.
-     Settings, Help and About are the three visited least, so the fifth slot holds an overflow menu
-     rather than a destination. The search is a rail FAB and an app bar action, because a bar has no
-     FAB slot.
+     Settings, Help and About are the three visited least, so they live in the overflow menu, and
+     that menu opens from the app bar rather than from a slot here. The search is a rail FAB and an
+     app bar action, because a bar has no FAB slot.
+     **The middle slot is the location button.** A reader asked for it there on 2026-08-25. Below
+     600px `#locate` does not draw on the map at all, so this item is the only way to a fix at this
+     width, and two controls for one action at one width is the fault this app already names.
      **Every id is its rail twin with one prefix changed.** `js/ui.js` binds both from one table and
      `railActive()` in js/map.js matches on the suffix, so the two components cannot drift apart.
-     `#navMore` is the one exception, and it states its reason where it is written.
+     `#navLocate` is the one exception, and it states its reason where it is written.
      It reuses `.railpill`, `.raillabel` and `.railbadge`. One indicator, defined once. -->
 <nav id="navbar" aria-label="Main">
   <button class="navitem" id="navFilters" aria-controls="pane" aria-expanded="false"
@@ -430,32 +448,32 @@
   <button class="navitem" id="navAlerts" aria-controls="pane" aria-expanded="false"
     ><span class="railpill"><i class="i i-warning"></i><b class="railbadge"></b></span
     ><span class="raillabel">Alerts</span></button>
-  <!-- **The map layers, in the middle slot.** A reader asked for that on 2026-08-25. `#paint` is a
-       FAB on the map above 600px and it draws nothing below it, so this item is the only way in at
-       this width.
-       **It is a second element and not the same node moved.** A navigation bar item is a pill over
-       a label and a FAB is a 60px round button, so one node cannot be both. That is the shape every
-       rail item already uses against its bar twin.
-       **It needs no handler.** `popovertarget` opens the same panel `#paint` opens, so the browser
-       does the work and there is nothing in `js/ui.js` to keep in step. -->
+  <!-- **The location button, in the middle slot.** A reader asked for it there on 2026-08-25.
+       `#locate` is a button on the map above 600px and `css/chrome.css` stops it drawing below that,
+       so this item is the only way to a fix at this width.
+       **It is a second element and not the same node moved.** A navigation bar item is a pill over a
+       label and `#locate` is a 40px round map button, so one node cannot be both. That is the shape
+       every rail item already uses against its bar twin.
+       **It has no rail twin, and it must not grow one.** Above 600px the map draws the button
+       itself, over the ground the fix lands on, which is where a location control belongs whenever
+       there is room for it.
+       **It is a DESTINATION and it takes `aria-current`.** Pressing it opens the "You are here"
+       card in the supporting pane, and `railSync()` in js/map.js marks the item while that card is
+       the pane's occupant. Every other card in that pane selects nothing, because a station is not
+       a destination this bar names.
+       **js/locate.js mirrors the button's three states onto this item.** A crosshair on a control
+       whose last fix failed says nothing, and the failure has to arrive as text as well. -->
+  <button class="navitem" id="navLocate" aria-controls="pane"
+    ><span class="railpill"><i class="i i-my_location"></i></span
+    ><span class="raillabel">Here</span></button>
   <button class="navitem" id="navTable"
     ><span class="railpill"><i class="i i-table"></i></span
     ><span class="raillabel">Table</span></button>
   <button class="navitem" id="navCams"
     ><span class="railpill"><i class="i i-photo_camera"></i></span
     ><span class="raillabel">Cameras</span></button>
-  <!-- **The overflow, in the fifth and last slot.** A reader asked for it there on 2026-08-25. It
-       stood in the app bar's trailing group, and one More button is all this width gets.
-       **It has no rail twin, and it must not grow one.** The rail carries Settings, Help and About
-       as items of its own, so there is nothing above 600px for an overflow to hold. That is why the
-       id breaks the `rail`/`nav` pairing every other item here keeps.
-       **It needs no handler.** `popovertarget` opens the menu, so the browser does the work and
-       there is nothing in js/ui.js to keep in step.
-       **It states `aria-expanded` and never `aria-current`.** The menu is an action, the same rule
-       the search already obeys, so `railActive()` never reaches it. The browser writes the value. -->
-  <button class="navitem" id="navMore" popovertarget="appMenu" aria-label="More"
-    ><span class="railpill"><i class="i i-more_vert"></i></span
-    ><span class="raillabel">More</span></button>
+  <!-- **There is no More item here.** It held the fifth slot until 2026-08-25 and a reader moved it
+       to the app bar's trailing edge, which freed this slot for the location button above. -->
 </nav>
 <!-- Native <dialog>: modal behaviour, backdrop, Esc-to-close and focus trapping come free. -->
 <!-- Two dialogs, one shape. `.docbox` carries the box and the prose rules both of them need; the
@@ -465,7 +483,7 @@
   <!-- Controls first in the source, so the back arrow is the first thing reachable by keyboard.
        It leads the row, the way the pane's own arrow does and the way the other four panes do. -->
   <div class="modalhead">
-    <form method="dialog"><button class="icon dclose" title="Back" aria-label="Back"
+    <form class="apptop" method="dialog"><button class="icon dclose" title="Back" aria-label="Back"
       ><i class="i i-arrow_back"></i></button></form>
   </div>
   <div class="docbody">
@@ -609,8 +627,8 @@
      comes here for. Developer is last, under a heading that names it. -->
 <dialog id="settingsBox" class="docbox">
   <div class="modalhead">
-    <h2>Settings</h2>
-    <form method="dialog"><button class="icon dclose" title="Back" aria-label="Back"
+    <div class="apflex"><h2>Settings</h2></div>
+    <form class="apptop" method="dialog"><button class="icon dclose" title="Back" aria-label="Back"
       ><i class="i i-arrow_back"></i></button></form>
   </div>
   <div class="docbody">
@@ -623,7 +641,7 @@
        stacked over the layer switches pushed those off a phone screen. Nothing sits under these two
        but Developer, and a reader who opened Settings to review a list should not press again to see
        it. The count keeps the same `<b>` and the same id, so `render.js` needed no change. -->
-  <h3><i class="i i-favorite"></i>Favorite sensors<b id="favN"></b></h3>
+  <h3>Favorite sensors<b id="favN"></b></h3>
   <ul id="favList" class="picklist mseg"></ul>
   <!-- **The clear action is the group's LAST ROW, not a button under it.** A reader asked for that
        on 2026-08-25. It was a full-width link in a `.rowbtns` box, which read as a control the list
@@ -636,7 +654,7 @@
        empty: this list and the `· N ignored` count in the drawer are the only two places that say a
        sensor has been silenced, and a muted alarm nobody can find is the thing every alarm standard
        warns about. -->
-  <h3><i class="i i-visibility_off"></i>Ignored sensors<b id="ignoredN"></b></h3>
+  <h3>Ignored sensors<b id="ignoredN"></b></h3>
   <ul id="ignoredList" class="picklist mseg"></ul>
   <ul class="picklist mseg mfoot"><li><button class="mrow" id="ignoredClear"
     ><i class="glyph i i-visibility"></i><span class="nm">Stop ignoring all</span></button></li></ul>
@@ -649,10 +667,38 @@
        is what this section is named for. The two lists above it are lists a reader edits.
        **The glyph is the heat chip's own.** One name and one mark for one thing: `gradient` is what
        the chip draws with no layer chosen, so it stands for the heatmap as a whole. -->
+  <!-- **The theme, as three rows.** A reader asked for the picker here on 2026-08-25, and asked for
+       Auto back with it. The rail's button is a switch between two shades and cannot state a third
+       choice, so the choice lives where a setting lives.
+       **Auto is first, because it is the default.** It was cut on 2026-08-24 with the three-way
+       pill that carried it, and the argument then was that a page which restyles itself at sunset
+       is what "no auto" refuses. That is now a choice a reader makes rather than one this app makes
+       for them.
+       **Radio rows and never a switch.** Three choices is not a state a switch can hold, which is
+       the same rule that keeps the two heat layers in one string rather than in two booleans.
+       **The check is the trailing slot and it holds its box while it is hidden.** A check that took
+       the row's own space only while it drew would shift the words on every press. That is the shape
+       every chip menu on the map already uses.
+       **`autocomplete="off"` on all three**, because a preference owns them: `js/ui.js` writes the
+       control from `PREFS.theme` and never the reverse, and a browser restoring form state across a
+       reload fires no `change`. -->
+  <h3>Theme</h3>
+  <ul id="themeList" class="picklist mseg">
+    <li><label class="mrow"><input type="radio" name="theme" value="auto" autocomplete="off"
+        ><i class="glyph i i-theme_auto"></i><span class="nm">Automatic</span
+        ><i class="i i-check mcheck" aria-hidden="true"></i></label></li>
+    <li><label class="mrow"><input type="radio" name="theme" value="light" autocomplete="off"
+        ><i class="glyph i i-light_mode"></i><span class="nm">Light</span
+        ><i class="i i-check mcheck" aria-hidden="true"></i></label></li>
+    <li><label class="mrow"><input type="radio" name="theme" value="dark" autocomplete="off"
+        ><i class="glyph i i-dark_mode"></i><span class="nm">Dark</span
+        ><i class="i i-check mcheck" aria-hidden="true"></i></label></li>
+  </ul>
+
   <h3>Map</h3>
   <ul id="mapList" class="picklist mseg">
     <li><i class="glyph i i-gradient"></i><span class="nm">Heatmap opacity<br
-        ><span class="muted">How strongly the wash paints over the map.</span></span
+        ><span class="muted">Both heat layers use this value.</span></span
       ><span class="mslide"><b id="washPct"></b><input type="range" id="washOpacity"
           min="20" max="100" step="5" autocomplete="off" aria-label="Heatmap opacity"></span></li>
   </ul>
@@ -669,7 +715,7 @@
     <!-- M3's switch, in the list's trailing slot. The row's own label is the headline and the
          warning sits on the supporting line, so the pill that used to carry both is gone. -->
     <li><i class="glyph i i-science"></i><span class="nm">Test mode<br
-        ><span class="muted">Fake alerts, in this browser only. Nothing reaches JPS.</span></span
+        ><span class="muted">This mode fakes alerts in this browser only. Nothing reaches JPS.</span></span
       ><label class="msw"><input type="checkbox" id="testMode" autocomplete="off"
           ><span class="mswtrack"><span class="mswthumb"></span></span></label></li>
     <li class="readout"><table id="devstats"></table></li>
@@ -716,8 +762,8 @@
      logo lockup is its heading and this page has no lockup to stand in for one. -->
 <dialog id="helpBox" class="docbox">
   <div class="modalhead">
-    <h2>Help</h2>
-    <form method="dialog"><button class="icon dclose" title="Back" aria-label="Back"
+    <div class="apflex"><h2>Help</h2></div>
+    <form class="apptop" method="dialog"><button class="icon dclose" title="Back" aria-label="Back"
       ><i class="i i-arrow_back"></i></button></form>
   </div>
   <div class="docbody">
@@ -1116,8 +1162,8 @@
 <dialog id="dataBox">
   <div class="dtop">
     <div class="modalhead">
-      <h2>All stations</h2>
-      <form method="dialog"><button class="icon dclose" title="Back" aria-label="Back"
+      <div class="apflex"><h2>All stations</h2></div>
+      <form class="apptop" method="dialog"><button class="icon dclose" title="Back" aria-label="Back"
       ><i class="i i-arrow_back"></i></button></form>
     </div>
     <input id="dataFind" type="text" autocomplete="off" placeholder="Filter by name, district or basin…"
@@ -1135,8 +1181,8 @@
 <dialog id="camBox">
   <div class="dtop">
     <div class="modalhead">
-      <h2>All cameras</h2>
-      <form method="dialog"><button class="icon dclose" title="Back" aria-label="Back"
+      <div class="apflex"><h2>All cameras</h2></div>
+      <form class="apptop" method="dialog"><button class="icon dclose" title="Back" aria-label="Back"
       ><i class="i i-arrow_back"></i></button></form>
     </div>
     <input id="camFind" type="text" autocomplete="off" placeholder="Filter by name or district…"
@@ -1385,12 +1431,12 @@
   <button type="button" class="chip mchip" id="layerChip" popovertarget="layerMenu"
           aria-haspopup="menu" aria-label="Map layer">
     <i class="i glyph" id="layerChipIcon" aria-hidden="true"></i>
-    <span id="layerChipLabel">Stations</span>
+    <span id="layerChipLabel">Hydrology</span>
     <i class="i i-expand_more tail" aria-hidden="true"></i>
   </button>
   <div class="menu chipmenu" id="layerMenu" popover role="menu" aria-label="Map layer">
     <label class="mi"><input type="radio" name="maplayer" id="stations" value="stations" autocomplete="off"
-      ><i class="i i-check mcheck" aria-hidden="true"></i><i class="i i-place"></i><span>Stations</span></label>
+      ><i class="i i-check mcheck" aria-hidden="true"></i><i class="i i-water_drop"></i><span>Hydrology</span></label>
     <label class="mi"><input type="radio" name="maplayer" id="wxLayer" value="weather" autocomplete="off"
       ><i class="i i-check mcheck" aria-hidden="true"></i><i class="i i-partly_cloudy_day"></i><span>Weather</span></label>
   </div>
@@ -1527,16 +1573,15 @@
     <div class="ramp rain"></div>
     <div class="ticks muted"><span>light</span><span>moderate</span><span>heavy</span><span>violent</span></div>
   </div>
-  <!-- The weather key. Three colors and two glyphs, because the map states rain and heavy rain with
-       one cloud in two colors. See WEATHER in js/config.js. -->
+  <!-- The weather key. THREE rungs, which is the whole of the nowcast's own vocabulary. It held
+       five for a while: `Cloudy` and `Storm` came off the MET daily forecast, and the repository
+       owner cut both on 2026-08-25. See WEATHER in js/config.js. -->
   <div id="lgWx" class="lgsec">
     <div class="title">Weather</div>
     <div class="wxkey muted">
       <span><i class="i i-sunny" style="color:var(--wx-clear)"></i>Clear</span>
-      <span><i class="i i-cloud" style="color:var(--wx-cloud)"></i>Cloudy</span>
       <span><i class="i i-rainy_light" style="color:var(--wx-rain)"></i>Rain</span>
       <span><i class="i i-rainy_heavy" style="color:var(--wx-heavy)"></i>Heavy</span>
-      <span><i class="i i-flash_on" style="color:var(--wx-storm)"></i>Storm</span>
     </div>
   </div>
   <!-- **No opacity slider.** It rode under both ramps and a reader cut it on 2026-08-24. The wash

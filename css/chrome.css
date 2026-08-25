@@ -578,14 +578,64 @@ body.railopen #rail .railbadge { top: -6px; right: -6px; }
     outline: 2px solid var(--md-sys-color-primary); outline-offset: -2px;
     border-radius: var(--md-sys-shape-corner-medium);
   }
-  /* The selected state, written by the same `railActive()` that writes the rail's. */
-  #navbar .navitem[aria-current="page"] { color: var(--md-sys-color-on-surface); }
+  /* The selected state, written by the same `railActive()` that writes the rail's.
+     **The LABEL takes `secondary` here and the rail's takes `on-surface`.** That is the reference's
+     own split: `[data-active][data-orientation="vertical"]` states `secondary`, and it is the one
+     divergence this bar carried against the file it is transcribed from. The glyph still takes
+     `on-secondary-container`, because it stands on the indicator and the label does not. */
+  #navbar .navitem[aria-current="page"] { color: var(--md-sys-color-secondary); }
   #navbar .navitem[aria-current="page"] .railpill {
     background: var(--md-sys-color-secondary-container);
   }
   #navbar .navitem[aria-current="page"] .i { color: var(--md-sys-color-on-secondary-container); }
   #navbar .navitem[aria-current="page"] .raillabel { font-weight: 700; }
+  /* **Every item answers a pointer with a state layer, and this bar carried none.** The rail has had
+     one on all four of its controls since 2026-08-25 and its bar twin was left out, which draws
+     correctly and answers nothing.
+     **The layer goes on the INDICATOR, never on the whole item.** An item is a 72px column holding a
+     56 by 32 pill over a label, and M3 lights the pill alone. A layer over the column paints the
+     label's box too, which reads as a row in a list rather than as an indicator. That is the same
+     rule the rail states, one component over.
+     **A selected pill names its own container as the second colour of the mix.** A mix ending in
+     `transparent` over a filled shape erases that fill, which is the trap the rail already records.
+     `:active` and not `:focus`: a focus ring already answers the keyboard, and M3 gives focus and
+     pressed the same 10%. */
+  #navbar .navitem:hover .railpill {
+    background: color-mix(in srgb, var(--md-sys-color-on-surface-variant)
+      var(--m3-state-hover), transparent);
+  }
+  #navbar .navitem:active .railpill {
+    background: color-mix(in srgb, var(--md-sys-color-on-surface-variant)
+      var(--m3-state-press), transparent);
+  }
+  #navbar .navitem[aria-current="page"]:hover .railpill {
+    background: color-mix(in srgb, var(--md-sys-color-on-secondary-container)
+      var(--m3-state-hover), var(--md-sys-color-secondary-container));
+  }
+  #navbar .navitem[aria-current="page"]:active .railpill {
+    background: color-mix(in srgb, var(--md-sys-color-on-secondary-container)
+      var(--m3-state-press), var(--md-sys-color-secondary-container));
+  }
 }
+/* --- the flexible half, and it is DECLINED with a measurement behind it ---
+   M3's flexible navigation bar states two item arrangements, and the reference carries both under
+   `data-orientation`. Vertical stacks the glyph over the label and is what the block above draws.
+   Horizontal puts the two on one row inside an indicator that wraps the whole item, and M3 asks for
+   it where the window's HEIGHT is compact — 480dp, the window size class.
+   **It was built, measured and cut, and the number is why.** Every one of the reference's numbers
+   held: a 64px container, 12px of block padding, a 20px gap, a 40px item inset 16px, a 20px corner
+   on the item's own box, and the pill down to the glyph's 24px. Then the five items measured
+   **569px against a 360px window**.
+   **There is no window in this app where that arrangement both applies and fits.** This bar draws
+   below 600px alone, because M3 states no rail there and 80px of a 360px screen is 22% of it. Above
+   600px the rail runs the full height, which is what a phone held sideways gets: 760 by 360 is a
+   medium width, so it never reaches this component at all. So the band where the horizontal
+   arrangement could apply is 569px to 600px, and it is 31px wide.
+   **Do not restore it by making the items smaller.** Shrinking the inset or dropping a label is the
+   component approximated rather than transcribed, which is the fault this repo's own M3 rule exists
+   to stop. Restore it the day this bar draws in a window wider than 569px.
+   `m3-check.html` measures the decline at a compact height, so a media query added back here fails
+   a check rather than clipping a label with nothing on screen to say so. */
 @media (max-width: 600px) and (prefers-reduced-motion: reduce) {
   #navbar .navitem, #navbar .railpill { transition: none; }
 }
@@ -707,10 +757,20 @@ body.railopen #rail .railbadge { top: -6px; right: -6px; }
 /* Three states, and `setBtn()` in js/locate.js writes all three. The words ride `data-tip` and the
    state rides the glyph. A broken control changes its glyph, never its hue: an amber glyph on a
    flood map reads as an alert on the water. */
-#locate.busy { pointer-events: none; }
+/* **`pointer-events: none` used to sit on `.busy` and it is gone.** It refused the press for the
+   whole ten seconds a fix can take, and a button that answers nothing reads as a button that spins
+   for ever. That is the fault this file already records against the words landing in a `title`.
+   `btn.onclick` in js/locate.js refuses the second attempt itself now, and raises a snackbar to say
+   so, which is a refusal a reader can read. */
 #locate.busy .i { animation: pulse 1s infinite; }
 #locate.on .i { --i: var(--i-near_me); color: var(--accent); }
 #locate.fail .i { --i: var(--i-location_disabled); }
+
+/* The bar twin below 600px. **The pulse crosses and the paint does not** — see `setBtn()` in
+   js/locate.js. The glyph itself is written there, because a bar item takes no `.mapbtn` class and
+   no rule above can reach it. `busy` and the resting state draw one mark, so without this the
+   phone's only location control says nothing at all while it waits. */
+#navLocate.busy .i { animation: pulse 1s infinite; }
 
 /* --- sources dialog -------------------------------------------------------------------------- */
 
@@ -748,13 +808,10 @@ body.railopen #rail .railbadge { top: -6px; right: -6px; }
    border, and its own answer to the seam is `header-on-scroll-container-color` with elevation
    level2, which is a scroll state and needs script. These surfaces separate by space, which is the
    cut a reader already made on the map card, the app bar and the supporting pane. */
-.docbox .modalhead {
-  flex: none;
-  min-height: 56px;
-  margin: 0 0 10px;
-  padding: 0 var(--pane);
-  background: var(--surface);
-}
+/* **The box, the height and the background all come from the shared app bar now.** See
+   `#barHead, #sideHead` below. These five wore a 56px row of their own above 600px and the pane's
+   112px bar below it, so one panel changed shape as a reader crossed the breakpoint and no two
+   panels agreed with each other. */
 /* **The scroller, and the only box in this pane that scrolls.** `flex: 1` with `overflow: auto`, the
    three numbers `#sideBody` and `table.data` already take.
    **`overflow: auto` is what lets it shrink.** A flex item's automatic minimum size is its content,
@@ -774,7 +831,6 @@ body.railopen #rail .railbadge { top: -6px; right: -6px; }
    38px button, and Help a 35px one. 56px is the same number the phone block below already states,
    and it is M3's top app bar. The pull survives on the inline edge alone, which is the half that
    puts the button's hit area on the pane's own padding rather than 10px inside it. */
-.docbox .modalhead .dclose { margin: 0 -10px 0 0; }
 .docbox h2 { font-size: 18px; font-weight: 500; }
 
 /* Title and close on one line, both dialogs. In the header rather than a footer button: these
@@ -818,8 +874,14 @@ body.railopen #rail .railbadge { top: -6px; right: -6px; }
    every width — floating cards that never fill the screen — so both keep the ×. The lightbox has a
    second reason: a back arrow beside a scrubber and a step-back button reads as "previous frame". */
 #dataBox .modalhead form, #camBox .modalhead form, .docbox .modalhead form { order: -1; }
-#dataBox .modalhead .dclose, #camBox .modalhead .dclose, .docbox .modalhead .dclose {
-  margin: -8px 0 -8px -10px;
+/* **No margin left to keep in step with anything.** `.apptop` places this button, the way it
+   places the pane's own back arrow: 8px above a 48px target inside a 56px row, which lands the
+   glyph 28px in and 32px down. Each of these five carried a negative margin instead, derived from
+   the padding of the box around it, and the three paddings behind them were 18, 20 and 24.
+   **22px, which is `.icon`'s own size.** `.modalhead .dclose` sets 20 for the two basic dialogs
+   that keep an X, and a mark two pixels short of the pane's reads as a smaller button. */
+.docbox .modalhead .dclose, #dataBox .modalhead .dclose, #camBox .modalhead .dclose {
+  margin: 0; font-size: 22px;
 }
 /* No `max-width` on the paragraph. A 70ch cap was tried when the dialog went to 820px, to keep a
    line under about 100 characters. It gave the pane two right edges: the prose stopped short while
@@ -827,9 +889,10 @@ body.railopen #rail .railbadge { top: -6px; right: -6px; }
    edge for everything beats a comfortable measure here. Anything that wants a narrower line has to
    narrow the whole pane, grid included. */
 .docbox p { margin: 10px 0; line-height: 1.5; }
-/* Nothing left in this row but the back arrow. It LEADS, the way it does in the other four and in
-   the pane: this row read flex-end while the button was an X on the trailing edge. */
-#aboutBox .modalhead { justify-content: flex-start; margin-bottom: 0; }
+/* **56px, because About carries no headline.** M3 marks the headline optional, and this pane's
+   identity is the logo lockup in the content below. A 112px bar over a lone back arrow is an empty
+   label block. */
+#aboutBox .modalhead { min-height: 56px; }
 
 /* The disclaimer, lifted out of the run of grey paragraphs. It is the one line on this page with
    legal and safety weight, and as a third muted paragraph it was the easiest thing to skip.
@@ -1084,7 +1147,26 @@ body.rising #risebadge { display: flex; }
   width: 100%; min-height: inherit; padding: 8px 16px; box-sizing: border-box;
   background: none; border: 0; border-radius: inherit; cursor: pointer; text-align: start;
   color: var(--md-sys-color-on-surface); font: inherit; text-decoration: none;
+  /* **`margin: 0`, because the three theme rows draw this as a `<label>`.** `css/base.css` styles
+     that element with `margin: 6px 0`, written for the drawer's own stacked filter rows, and it
+     lands on every label in the app. Here it would stand a row 6px inside its own container and
+     read as a padding mistake on the item. That trap is written up in CLAUDE.md, and it has bitten
+     the theme picker once already and the chip menus once. */
+  margin: 0;
 }
+/* **The theme rows, and they are the one radio group in this pane.** The input carries the state
+   and nothing draws it, the way every chip menu on the map already works. The check is the trailing
+   slot, and it holds its 20px box while it is hidden so no press moves the words beside it. */
+#settingsBox .mrow input { position: absolute; opacity: 0; width: 0; height: 0; margin: 0; }
+#settingsBox .mcheck {
+  flex: none; margin-inline-start: auto; font-size: 20px;
+  visibility: hidden; color: var(--accent);
+}
+#settingsBox .mrow:has(input:checked) .mcheck { visibility: visible; }
+/* The leading glyph takes the accent with the check. The row's WEIGHT does not move: M3's selected
+   list item states no weight change, and a bold row here would bold its supporting line too. */
+#settingsBox .mrow:has(input:checked) .glyph { color: var(--accent); }
+#settingsBox .mrow:has(:focus-visible) { outline: 2px solid var(--accent); outline-offset: -2px; }
 #settingsBox .mrow:hover { background: var(--m3-hover); }
 #settingsBox .mrow:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 #settingsBox .mrow:disabled {
@@ -1125,8 +1207,10 @@ body.rising #risebadge { display: flex; }
   font-weight: var(--md-sys-typescale-title-small-weight);
   letter-spacing: var(--md-sys-typescale-title-small-tracking);
 }
-/* The glyph takes the leading slot's own 24px, so a heading and the rows under it share one line. */
-#settingsBox h3 .i { font-size: 24px; }
+/* **No glyph and no disc on a heading.** Both stood here for one revision, the glyph since the
+   headings arrived and the disc on 2026-08-25. The repository owner cut both the same day.
+   That lands on M3's own list subheader, which states a label and nothing else. `display: flex`
+   stays for the count alone. */
 /* The count must never be pushed off the row by a long title, which is its rule in the drawer too. */
 #settingsBox h3 b { margin-left: auto; font-weight: 500; font-variant-numeric: tabular-nums; }
 /* **A group's action is its LAST ROW, and `.mfoot` is what joins the two boxes.** A reader asked
@@ -1146,8 +1230,16 @@ body.rising #risebadge { display: flex; }
   border-start-start-radius: var(--md-sys-shape-corner-extra-small);
   border-start-end-radius: var(--md-sys-shape-corner-extra-small);
 }
-/* A one-line action row, at M3's 56px rather than the two-line 72. */
-#settingsBox .mfoot > li { min-height: 56px; }
+/* A one-line row. It drops the two-line 72px floor. Two groups draw one: the clear action under
+   each saved list, and the three theme rows.
+   **It measures 64 and not 56, and the floor is not what decides that.** The leading slot is 48px
+   tall and the row pads 8px above and below it. M3 reaches 56 by padding a one-line row 4px, and
+   that change moves the clear rows and the three developer actions with it.
+   **The theme rows lost a supporting line on 2026-08-25, on the repository owner's instruction.**
+   Each one read `Follow this device.` or `Dark ink on a pale map.`, and each said what the word
+   above it already says. A row left at 72px then draws as a two-line item with its second line
+   missing. */
+#settingsBox .mfoot > li, #settingsBox #themeList > li { min-height: 56px; }
 
 /* --- M3 switch -----------------------------------------------------------------------------------
    Transcribed from `Switch/switch.css`, which cites m3.material.io/components/switch/specs:
@@ -1294,12 +1386,16 @@ body.rising #risebadge { display: flex; }
 #dataBox::backdrop { background: #0009; }
 /* Search stays put while the list scrolls under it — the filter is useless if you have to scroll
    back up to change it after seeing the result. */
+/* **The inline padding moved onto the field.** `.dtop` holds the app bar and the filter box, and
+   an app bar states its own insets: 4px to the button and 16px to the headline. A 20px pad on the
+   box around it put both of those 20px further in than the pane's. */
 #dataBox .dtop {
-  flex: none; padding: 16px 20px 12px;
+  flex: none; padding: 0 0 12px;
   background: var(--surface);
 }
-#dataBox h2 { font-size: 18px; font-weight: 500; }
+#dataBox #dataFind { margin-inline: 16px; }
 #dataBox #dataFind { margin-bottom: 6px; }
+#dataBox #dataCount { margin-inline: 16px; }
 
 /* The table's stand-in for a popup's still: no room for the image itself in a row, so it opens the
    same lightbox the popup image does. */
@@ -1431,16 +1527,24 @@ table.data button[data-pop] { cursor: pointer; }
 .tipbox .tiprow > span:first-child { flex: 1; min-width: 0; }
 .tipbox .tv { display: flex; align-items: center; gap: 6px; flex: none; }
 .tipbox .tv b { font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; }
-/* The Details menu on a sensor, in the top layer for the same reason the table's panels
-   are: a Leaflet popup is a small scrolling box, and a menu drawn inside one would be
-   clipped by it. Placement is ui.js's; the `display` pair doubles as the fallback where
-   `popover` is unsupported. */
+/* **M3's menu**, and every number is
+   https://github.com/bczak/m3you/blob/development/src/components/Menu/menu.css — a
+   `surface-container` column at `shape-corner-large`, 4px of padding and a 2px gap, holding 48px
+   items at `shape-corner-extra-small`, with the group's own first and last row taking
+   `shape-corner-medium`.
+   **Four surfaces draw one, so the numbers are stated here once.** They are the phone's overflow
+   (`#appMenu`), the three map chip menus, a sensor's ⋮ and the weather card's ⋮. A menu drawn for
+   one of them and approximated for the next is the fault this app's own M3 rule exists to stop.
+   In the top layer for the same reason the table's panels are: the station panel is a scrolling
+   box, and a menu drawn inside one would be clipped by it. Placement is ui.js's; the `display` pair
+   doubles as the fallback where `popover` is unsupported. */
 .menu {
   position: fixed; margin: 0; inset: auto; display: none;
-  /* 340, not the viewport: a menu sizes to `fit-content`, and the nearest-webcam row now carries a
-     station name that runs to 50 characters. Without a cap that one row drew a menu half the width
-     of a desktop window. The name wraps inside 340 instead. */
-  min-width: 210px; max-width: min(340px, calc(100vw - 16px));
+  flex-direction: column; gap: 2px;
+  /* M3 states 112px and 280px. **The cap diverges.** The nearest-webcam row carries a station name
+     that runs to 50 characters, and inside 280 that one row drew a menu half the width of a desktop
+     window. The name wraps inside 340 instead. */
+  min-width: 112px; max-width: min(340px, calc(100vw - 16px));
   /* The placement handler in js/ui.js always opens this menu downward and slides it up to fit. A box
      taller than the screen cannot fit, so it must scroll instead. `dvh`, because a phone browser
      counts its own address bar in `vh` and would leave the last row under it. */
@@ -1450,31 +1554,76 @@ table.data button[data-pop] { cursor: pointer; }
      a definite full-screen height, and the app menu's grid stretched its four rows down the page. Every
      other UA declaration on `:popover-open` is already restated above; this is the one that was left. */
   height: auto;
-  padding: 4px; border: 1px solid var(--outline); border-radius: 10px; color: var(--on-surface);
+  padding: 4px; border-radius: var(--md-sys-shape-corner-large);
+  background: var(--md-sys-color-surface-container); color: var(--md-sys-color-on-surface);
+  /* **`--shadow`, not `elevation-2`**, which is the divergence every dialog here already states:
+     this app holds one elevation. **The 1px outline went with the change.** M3 separates a menu from
+     the surface under it by elevation alone, and a line inside that shadow states one seam twice. */
+  border: 0; box-shadow: var(--shadow);
 }
-.menu:popover-open { display: block; }
+.menu:popover-open { display: flex; }
 .mi {
-  display: flex; align-items: flex-start; gap: 10px; width: 100%; padding: 8px 10px;
-  font: 400 13px/1.35 Roboto, sans-serif; color: inherit; text-align: left;
-  background: none; border: 0; border-radius: 6px; cursor: pointer;
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  /* **`margin: 0`, because a chip menu's rows are `<label>` and `css/base.css` styles that element.**
+     That rule is `label { display: flex; align-items: center; gap: 8px; margin: 6px 0 }`, written
+     for the drawer's stacked filter rows, and it lands on every `<label>` in the app. So the three
+     chip menus stood their rows 10px off the panel's top and bottom against 4px on the sides, and
+     14px apart against the 2px `.menu`'s own gap states. `#appMenu` was right the whole time, because
+     its rows are `<button>` and `<a>`. **The fault reads as a padding mistake on the panel and is a
+     margin on the row**, which is the trap this app's own rule about `<label>` as a compact control
+     already names. It goes on `.mi` rather than on `.chipmenu .mi`: the item is the item whatever
+     element draws it, and the next menu row written as a label needs no second cancel. */
+  margin: 0;
+  /* **`min-height`, not the reference's fixed `height`.** M3 truncates a menu label with an
+     ellipsis. This app does not, and that rule is older: a station name cut in half names another
+     station. So the nearest-webcam row and the provenance block wrap, and the item grows.
+     **The block padding is a divergence for the same reason.** A fixed 48px row needs none. A row
+     free to grow to three lines needs the text held off its own ends. */
+  min-height: 48px; padding: 8px 12px;
+  font-size: var(--md-sys-typescale-body-medium-size);
+  line-height: var(--md-sys-typescale-body-medium-line-height);
+  font-weight: var(--md-sys-typescale-body-medium-weight);
+  letter-spacing: var(--md-sys-typescale-body-medium-tracking);
+  font-family: Roboto, sans-serif; color: inherit; text-align: left;
+  background: none; border: 0; border-radius: var(--md-sys-shape-corner-extra-small);
+  cursor: pointer;
   text-decoration: none;   /* one item is an <a> — see mapLink() in popup.js */
 }
-.mi:hover { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+/* The group's own ends take the outer corner. That is the shape the alert list's segmented rows
+   already draw one pane over, and M3 states it for both components. */
+.mi:first-child { border-start-start-radius: var(--md-sys-shape-corner-medium);
+                  border-start-end-radius: var(--md-sys-shape-corner-medium); }
+.mi:last-child  { border-end-start-radius: var(--md-sys-shape-corner-medium);
+                  border-end-end-radius: var(--md-sys-shape-corner-medium); }
+.mi:only-child  { border-radius: var(--md-sys-shape-corner-medium); }
+/* M3's own state layer, at `on-surface`. It was an accent wash, and this app spends that colour on
+   a thing that is selected. A hovered row is not one. */
+.mi:hover { background: color-mix(in srgb, var(--md-sys-color-on-surface) var(--m3-state-hover), transparent); }
 /* A row that reports there is nothing to offer. `:disabled` covers the pointer and the keyboard for
    free, so the only thing left is to stop it looking pressable — the hover wash included, which the
    rule above would otherwise still paint under a cursor that can do nothing there. */
 .mi:disabled { color: var(--muted); cursor: default; }
 .mi:disabled:hover { background: none; }
-.mi .i { font-size: 18px; color: var(--muted); margin-top: 1px; }
-.mi small { font-size: 11px; }
-/* The label takes the slack, so a row that also carries a number on the right keeps the number
-   whole and wraps the station name instead. Every other row has one child and looks the same
-   either way. `min-width: 0` because a flex item refuses to shrink below its content without it. */
-.mi > span { min-width: 0; }
-/* The nearest water level's reading, on the right of its row in the card menu. `color()` paints it,
-   the same function the pin and the card use — 1.74 m is a quiet river or a flood, and the mark it
-   is measured against is not on this row. */
-.mi .mv { flex: none; font-size: 13px; font-weight: 500; }
+.mi .i { font-size: 20px; flex: none; color: var(--md-sys-color-on-surface-variant); }
+/* M3's `__supporting`, at `body-small`. */
+.mi small { font-size: var(--md-sys-typescale-body-small-size);
+            line-height: var(--md-sys-typescale-body-small-line-height); }
+/* M3's `__content`. The label column takes the slack, so a row that also carries a number on the
+   right keeps the number whole and wraps the station name instead. Every other row has one child
+   and looks the same either way. `min-width: 0` because a flex item refuses to shrink below its
+   content without it. */
+.mi > span { flex: 1; min-width: 0; }
+/* M3's `__trailing`, at `label-large`. It is the nearest water level's reading, on the right of its
+   row in the card menu. **It keeps `color()`'s paint** rather than the reference's
+   `on-surface-variant`: 1.74 m is a quiet river or a flood, and the mark it is measured against is
+   not on this row. */
+.mi .mv {
+  flex: none; margin-inline-start: auto;
+  font-size: var(--md-sys-typescale-label-large-size);
+  line-height: var(--md-sys-typescale-label-large-line-height);
+  font-weight: var(--md-sys-typescale-label-large-weight);
+  letter-spacing: var(--md-sys-typescale-label-large-tracking);
+}
 /* **The app menu is gone, and `.seg` with it.** That popover held four destination tiles and one
    row: a three-way theme pill. The tiles are rail items now, and the repository owner cut Auto and
    the pill on 2026-08-24, so `#railApps` is the switch itself and there is no box to open.
@@ -1485,7 +1634,9 @@ table.data button[data-pop] { cursor: pointer; }
    one button would promise a second one. */
 .mi.info { cursor: default; }
 .mi.info:hover { background: none; }
-.menu hr { margin: 4px 6px; border: 0; border-top: 1px solid var(--outline); }
+/* M3's `__divider`: a 1px rule in `outline-variant`, inset 8px, with no block margin of its own. */
+.menu hr { height: 1px; margin: 0 8px; border: 0;
+           border-top: 1px solid var(--md-sys-color-outline-variant); }
 /* Smaller than the app-bar buttons: this one sits inside a 360px panel, in the card's own corner
    beside the close button, or at the end of a sensor row. Positioned in map.css for the first. */
 .dots { width: 28px; height: 28px; font-size: 18px; margin-left: auto; }
@@ -1533,11 +1684,14 @@ table.data .dash { color: var(--outline); }
    on the element itself does to a closed dialog. */
 #camBox[open] { display: flex; }
 #camBox::backdrop { background: #0009; }
+/* **The inline padding moved onto the field.** `.dtop` holds the app bar and the filter box, and
+   an app bar states its own insets: 4px to the button and 16px to the headline. A 20px pad on the
+   box around it put both of those 20px further in than the pane's. */
 #camBox .dtop {
-  flex: none; padding: 16px 20px 12px;
+  flex: none; padding: 0 0 12px;
   background: var(--surface);
 }
-#camBox h2 { font-size: 18px; font-weight: 500; }
+#camBox #camFind { margin-inline: 16px; }
 
 /* The tally, in the footer under the grid. Same shell rule as `.dtop` in reverse: `flex: none` so
    it keeps its own height while `#camGrid` takes the rest, and a border on the edge it faces. */
@@ -2184,10 +2338,9 @@ body.testmode #testChip {
 }
 body.testmode #testChip:hover { background: #d0650a; }
 #testChip .tail { font-size: 18px; margin-left: -2px; }
-/* The menu a chip opens. `.menu` already places itself, scrolls and caps its own width — this only
-   states that a row here is a radio and not a button. */
-.chipmenu .mi { align-items: center; }
-.chipmenu .mi .i { margin-top: 0; }
+/* The menu a chip opens. `.menu` is M3's menu component and states every number — this only says
+   that a row here is a radio and not a button. The two rules that centred the row and its glyph are
+   gone: an M3 menu item centres its own content. */
 .chipmenu input { position: absolute; width: 1px; height: 1px; opacity: 0; margin: 0; }
 /* The selected row's check, and it holds its 18px box whether or not it draws. A check that took
    the row's own space only while it was on would shift every label sideways on a press. */
@@ -2532,9 +2685,18 @@ body.side #side { display: flex; }
    ellipsis. This app does not, and the reason is older than this change: a station name cut in half
    names another station. So a long name takes a second 36px line and the bar grows. M3 Expressive
    states a two-line form for this variant, so a grown bar is inside the family. */
-#barHead, #sideHead {
-  flex: none; display: flex; flex-direction: column;
-  min-height: 112px;
+/* **ALL SEVEN SURFACES TAKE THIS BAR, at every width, and the five dialogs joined on 2026-08-25.**
+   The repository owner asked for one back button and one bar across every panel. Above 600px those
+   five drew a 56px row with the headline beside the button at `headline-small`, and the table and
+   the camera wall drew 36px. So a reader met four shapes for one thing.
+   **This reverses "a full-screen dialog's header is NOT a top app bar".** That rule reads M3
+   correctly: above 600px these are basic dialogs, and a basic dialog takes a headline on a floating
+   card rather than any bar. What it cost is the thing it lost on. A panel is a panel to a reader,
+   and one that restyles its own header at 600px reads as a fault. */
+#barHead, #sideHead,
+.docbox .modalhead, #dataBox .modalhead, #camBox .modalhead {
+  flex: none; display: flex; flex-direction: column; align-items: stretch;
+  min-height: 112px; margin: 0; padding: 0; gap: 0;
   background: var(--surface); color: var(--on-surface);
 }
 .apptop {
@@ -2555,8 +2717,8 @@ body.side #side { display: flex; }
 #sideTitle { min-width: 0; }
 /* `headline-medium`, in `on-surface`. It was `title-large` in `--muted`: an app bar headline is the
    screen's own name and takes the full ink, where a side sheet title is a label over a panel. */
-#sideTitle .popname, #barHead h2 {
-  margin: 0; font-weight: 400; color: var(--on-surface);
+#sideTitle .popname, .apflex h2 {
+  flex: none; margin: 0; font-weight: 400; color: var(--on-surface);
   font-size: var(--md-sys-typescale-headline-medium-size);
   line-height: var(--md-sys-typescale-headline-medium-line-height);
 }
@@ -2579,13 +2741,17 @@ body.side #side { display: flex; }
    **The colour splits the way M3 splits it.** The label takes `on-surface` and the leading icon
    takes the accent role, which here is the station kind's own hue. That is what the app already
    asks a badge to say, and the kind ladder stays out of the status ladder either way.
-   **THE ALERT PANEL JOINED THIS RULE ON 2026-08-25, on a reader's instruction.** Every alert group
-   heads itself with the kind it holds, and that is the same claim `#sideKinds` makes about a place.
-   One kind, one shape. `.badge` is still untouched in the all-stations table, which is a dense grid
-   rather than a pane, and a 32dp chip in a table cell is a row height. */
+   **THE ALERT PANE'S HEAD CHIPS TAKE THIS RULE TOO, and they do it by landing here.** The counts
+   and `Nearest first` ride in a `.badges` row that `openSide()` lifts into `#sideKinds`, so no
+   second selector is needed and none exists.
+   **A GROUP inside that pane briefly took it as well, through `.alert .badge`, and a reader cut
+   that chip on 2026-08-25.** It stated the kind a third time, over a heading that names it and rows
+   that all carry its glyph. So the selector is `#sideKinds` alone again.
+   `.badge` is still untouched in the all-stations table, which is a dense grid rather than a pane,
+   and a 32dp chip in a table cell is a row height. */
 #sideKinds:empty { display: none; }
 #sideKinds .badges { display: flex; flex-wrap: wrap; gap: 8px; }
-#sideKinds .badge, .alert .badge {
+#sideKinds .badge {
   height: 32px; margin: 0; padding: 0 16px 0 8px; gap: 8px;
   border: 1px solid var(--outline); border-radius: var(--md-sys-shape-corner-small);
   background: none; color: var(--on-surface); text-transform: none;
@@ -2594,7 +2760,7 @@ body.side #side { display: flex; }
   font-weight: var(--md-sys-typescale-label-large-weight);
   letter-spacing: var(--md-sys-typescale-label-large-tracking);
 }
-#sideKinds .badge .i, .alert .badge .i { font-size: 18px; color: var(--c); }
+#sideKinds .badge .i { font-size: 18px; color: var(--c); }
 #sideActions { display: flex; align-items: center; }
 /* **The trailing slot holds two buttons: the favorite, then the ⋮.** The heart was a row inside
    that menu and a reader pulled it out on 2026-08-21. A menu row states its action in words, which
@@ -2757,32 +2923,50 @@ body.side #side { display: flex; }
    `css/base.css` still needs that expression and still carries it. A chip does not: the label is
    `on-surface` over the page and only the 18dp leading icon takes the status hue. */
 .empty { padding: 12px 0 0; margin: 0; }
-/* Tier, twice over: a coloured left rule for the glance and a word for the meaning. Colour alone
-   would be a code nobody was taught, and a word alone does not survive a scroll past forty of them.
-   The rule is indented rather than full-bleed so the list still reads as one list. */
-.alert { padding: 14px 0 14px 10px; border-top: 1px solid var(--outline); border-left: 3px solid transparent; }
-/* Same rule as .sensor's: the head is lifted out of #sideBody into #sideHead and already ends in a
-   line, so the first row must not draw a second one under it. */
-.apane > .alert:first-child { border-top: 0; padding-top: 4px; }
-.alert.t-now   { border-left-color: var(--s-danger); }
-/* `heavy` and `soon` share one amber, and the tag word is what tells them apart. That is the shape
-   `now` already has: one red over a river at its mark and over a sounding siren. A fourth hue would
-   put four traffic-light steps on a panel that has three things to say about severity. */
-.alert.t-heavy { border-left-color: var(--s-warning); }
-.alert.t-soon  { border-left-color: var(--s-warning); }
-.alert.t-stale { border-left-color: var(--outline); opacity: .82; }
+/* **A group is a subheader over a list, and it draws no shell at all.** A reader cut the coloured
+   left rule on 2026-08-25, with the kind chip beside it.
+   The rule stated the tier a third time. The tier tag is the word and the subheader's own glyph is
+   the colour, and a rule down the side of the group is neither of those said again. **That is the
+   argument the Notices pane made when it dropped its own card shell**, one pane over.
+   **The divider between groups went the same way.** This pane separates by space, which is the rule
+   the Notices pane already obeys and the rule M3's layout guidance states. `.nsub` carries its own
+   8px top margin, so the gap is the subheader's and not a border's.
+   **The tag still tells `heavy` from `soon`.** Both take one amber, the shape `now` already has:
+   one red over a river at its mark and over a sounding siren. A fourth hue would put four
+   traffic-light steps on a pane with three things to say about severity. */
+.alert { padding: 0 0 8px; }
+.alert.t-stale { opacity: .82; }
+/* The subheader wraps rather than squashing its own tag. A 312px pane holds a 24px glyph, a title
+   of about 150px and a tag of about 100px with 16px gaps, which is 306 before the title grows. */
+.alert .nsub { flex-wrap: wrap; margin-top: 12px; }
+/* `.tg` carries its own 6px left margin, written for a tag that followed an inline title. The
+   subheader is a flex row with a 16px gap, so the two stack to 22px between the title and the tag
+   and only one of them is stated where a reader would look for it. */
+.alert .nsub .tg { margin-left: 0; }
+.apane > .alert:first-child .nsub { margin-top: 0; }
+/* **AN ALERT SUBHEADER CARRIES NO GLYPH, so nothing here styles one.** The Notices pane's does, and
+   `.nsub .i` above is written for that pane alone.
+   Three shapes were tried in the alert head and the repository owner cut all three on 2026-08-25. A
+   tier-coloured glyph stated the tier a third time, right after the left rule was cut for doing
+   that. A neutral one repeated the mark every row under it already carries. An `avat()` disc made a
+   40dp mark out of the repeat. M3's list subheader is a label and nothing else, so text is the
+   component rather than a divergence from it. */
+/* The tier colour, on every row's leading glyph, which is where a reader looks once the heading has
+   scrolled away.
+   **`.slist .i` and never `.alert.t-now .i`.** The shorter form reaches anything with an `.i` added
+   to this card later, which is the fault a bare `.modalhead` rule already caused once. It would
+   reach the subheader's glyph too and undo the rule directly above. */
+.alert.t-now   .slist .i { color: var(--s-danger); }
+.alert.t-heavy .slist .i { color: var(--s-warning); }
+.alert.t-soon  .slist .i { color: var(--s-warning); }
+.alert.t-stale .slist .i { color: var(--muted); }
 .tg {
   display: inline-block; margin-left: 6px; padding: 2px 7px; border-radius: 999px;
   font-size: 10px; font-weight: 500; letter-spacing: .5px; vertical-align: 1px;
 }
-/* The kind chip and the tier tag on one row, in a flex box. They were two inline-level boxes held
-   together by `vertical-align: middle` and a matched bottom margin. The chip is an M3 assist chip
-   now, at 32dp against the tag's 18, and `#sideKinds .badge` zeroes the margin those two hacks were
-   written against. A row places both by itself and neither number has to stay in step.
-   `margin-left: 0` cancels `.tg`'s own 6px: that offset was written for an inline tag following an
-   inline badge, and a flex gap states the same space once. */
-.alerttop { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 6px; }
-.alerttop .tg { margin-left: 0; }
+/* `.alerttop` is gone. The group head is an M3 list subheader now, and the kind chip that row held
+   is gone with it — see `.alert` above. `.nsub` places the glyph, the title and the tag by itself.
+   The tag keeps its own 6px left margin from `.tg`, which is what separates it from the title. */
 .tg-now   { background: color-mix(in srgb, var(--s-danger) 16%, transparent); color: var(--s-danger); }
 .tg-heavy { background: color-mix(in srgb, var(--s-warning) 16%, transparent); color: var(--s-warning); }
 .tg-soon  { background: color-mix(in srgb, var(--s-warning) 16%, transparent); color: var(--s-warning); }
@@ -2823,11 +3007,6 @@ body.side #side { display: flex; }
 .slist > li:hover {
   background: color-mix(in srgb, var(--on-surface) 8%, var(--md-sys-color-surface-container));
 }
-/* The glyph takes the tier's own colour, the same one the card's left rule carries. */
-.alert.t-now   .slist .i { color: var(--s-danger); }
-.alert.t-heavy .slist .i { color: var(--s-warning); }
-.alert.t-soon  .slist .i { color: var(--s-warning); }
-.alert.t-stale .slist .i { color: var(--muted); }
 .alert.grouped p { margin: 8px 0 0; }
 
 /* --- notices, as an email list -------------------------------------------------------------------
@@ -2879,12 +3058,12 @@ body.side #side { display: flex; }
   color: var(--on-surface); font: inherit;
 }
 .nrow:hover { background: var(--hover); }
-/* The avatar. A tinted disc rather than a filled one: this colour names a source or a station kind,
-   never a status, and a saturated 40px disc down a list reads as a severity ramp.
-   **TWO panes draw one, so the numbers live here and nowhere else.** The Notices pane puts it over a
-   bulletin. The station panel puts it over a sensor, through `avat()` in `js/popup.js`. The class
-   was `.navat` while the Notices pane was the only caller. One name for one thing, and this thing is
-   an avatar rather than a notice.
+/* The avatar. A tinted disc rather than a filled one: this colour names a source, never a status,
+   and a saturated 40px disc down a list reads as a severity ramp.
+   **The Notices pane is the only caller, and a sender is why.** Every row here is a bulletin
+   somebody published, and an avatar names who. The station panel wore one over each sensor for one
+   revision and a reader cut it on 2026-08-25: a sensor kind is not a sender, and six discs down one
+   card read as six of them. That slot is a bare 24px glyph again — see `.sensorhead .glyph`.
    `--c` is written on the element, so a caller states the colour and this rule states the shape. */
 .avat {
   flex: none; display: grid; place-items: center;
@@ -3545,15 +3724,16 @@ body.side #side { display: flex; }
      `margin-bottom: 30px` here and Leaflet's gutter adds 10, so the zoom box sits 40px up. Two 44px
      buttons make it 88 tall. 40 + 88 + 8 = 136. paint-check.html asserts the adjacency, so a change
      to either number fails a check rather than drifting apart on screen. */
-  /* `#locate` needs its own pair here too. The desktop rule above already stacks the two through
-     one shared `--fab` step. This phone block gives `#paint` a literal 136px bottom instead.
-     Without a pair here, `#locate` falls back to that desktop `calc()` and lands in a different
-     column. Same step, `--fab` plus 8px, added onto the 136 above rather than restated as a
-     second literal. */
-  /* **`--navbar-h` rides these literals too.** The 136 is measured up from the MAP's bottom edge,
-     and below 600px that edge sits a navigation bar above the window. Without the term the two
-     buttons stay where the window puts them and the zoom box climbs past them. */
-  #locate { right: 10px; bottom: calc(136px + var(--navbar-h)); }
+  /* **`#locate` does not draw at this width, and the navigation bar's middle item replaced it.** A
+     reader asked for the location button in that slot on 2026-08-25. Two controls for one action at
+     one width is one control in two places, which is the fault this app already names against a
+     second More button. So the map keeps the button wherever there is room for it, and a phone
+     reaches a fix from the bar.
+     **`display: none` and not a move.** A bar item is a pill over a label and this is a 40px round
+     map button, so one node cannot be both — the shape every rail item already uses against its bar
+     twin. `js/locate.js` still owns this node and still writes its three states onto it, and it
+     mirrors the glyph and the words onto the bar item beside it. */
+  #locate { display: none; }
   /* The legend earns its space: the heatmap is the one layer whose colours mean nothing without it,
      and it is the layer a phone shows most of. Compacted rather than dropped — full width beside the
      zoom buttons, and the sentence explaining the doubling goes, since the tip already says it. */
@@ -3654,40 +3834,10 @@ body.side #side { display: flex; }
      so their close button jumped to the leading edge while the box around it stayed a floating card
      with a 12px corner and a scrim. A full-screen header on a basic container reads as a mistake in
      the header, and it is a mistake in the selector. */
-  #dataBox .modalhead, #camBox .modalhead, .docbox .modalhead {
-    flex-direction: column; align-items: stretch; justify-content: flex-end;
-    min-height: 112px; margin-bottom: 0; gap: 0; padding-bottom: 12px;
-  }
-  /* The icon row. `order: -1` puts it above the headline without moving the button in the source.
-     `align-items: flex-start` and the 48px minimum are the reference's own `__top-row`. */
-  #dataBox .modalhead form, #camBox .modalhead form, .docbox .modalhead form {
-    order: -1; display: flex; align-items: flex-start; min-height: 48px;
-  }
-  /* `headline-medium`, the rung `#sideHead` takes. The token comes from `vendor/m3/tokens.css`, so
-     the two headers cannot drift on the one number that matters. */
-  #dataBox .modalhead h2, #camBox .modalhead h2, .docbox .modalhead h2 {
-    font-weight: 400;
-    font-size: var(--md-sys-typescale-headline-medium-size);
-    line-height: var(--md-sys-typescale-headline-medium-line-height);
-  }
-  /* **About keeps a bar of one row, because it has no headline to put on a second.** M3 marks the
-     headline optional, and that pane's identity is the logo lockup in the content below. A 112px
-     band over a lone close button is an empty label block. */
-  #aboutBox .modalhead { min-height: 56px; padding-bottom: 0; }
-  /* **The close glyph still lands 28px in, and the negative margin is what puts it there.** The pane
-     reaches 28 as 4px of top-row padding around a 48px target. These four reach it as 8px around a
-     40px one, and the margin cancels the pane padding that would otherwise push the button further
-     in. One per padding: the two prose dialogs sit on 18, the table and the wall on 20.
-     **The headline no longer starts at 56px, and that is the change.** It sat beside the X on one
-     row. It leads the label block now, so it starts on the pane's own padding, which is M3's 16 to
-     within the 2px these panes already use for their body text. The headline lining up with the
-     prose under it beats matching 16 exactly. */
-  .docbox .modalhead .dclose { margin: 0 0 0 -10px; }
-  /* **These two name their ids, and the base rule above is why.** That rule states the leading
-     margin as `#dataBox .modalhead .dclose`, which is one id and beats three classes wherever it
-     lands. A bare `.dtop .modalhead .dclose` therefore lost, and both panes drew their glyph 30px
-     in against the 28 every other full-screen bar here holds. */
-  #dataBox .dtop .modalhead .dclose, #camBox .dtop .modalhead .dclose { margin: 0 0 0 -12px; }
+  /* **Nothing here writes the header any more.** These five wear the same app bar as the
+     supporting pane, stated once beside `#barHead, #sideHead`, and it is the same bar at both
+     widths. This block held six rules that rebuilt it out of a 40px target, a negative margin per
+     surface and a second copy of the headline scale. */
 
   /* **No line under a full-screen header, and that is the fourth surface to lose one.** The map
      card, the app bar and the supporting pane each carried a rule and a reader cut all three on
@@ -3800,7 +3950,9 @@ body.side #side { display: flex; }
    which is a phone-sized box already calling itself a desktop.
 
    The chrome is M3's basic dialog, and two of its four parts are declined on purpose.
-   **Taken:** the 28dp corner, and `headline-small`'s 24px on the headline.
+   **Taken:** the 28dp corner. **Declined since 2026-08-25:** `headline-small`'s 24px. These five
+   head themselves with the supporting pane's app bar at every width, so the headline states one
+   size across every panel.
    **Declined:** `surface-container-high`. This app holds one surface tone, in two theme sets, in
    `css/base.css` and nowhere else. A second tone five percent off the first is invisible over a
    scrim and is a colour invented outside that file, which is the one thing the palette rule
@@ -3828,7 +3980,10 @@ body.side #side { display: flex; }
 @media (min-width: 601px) {
   /* One expression for the room left after the inset, so no dialog can drift from the others. */
   #dataBox, #camBox, .docbox { border-radius: 28px; }
-  #dataBox h2, #camBox h2, .docbox h2 { font-size: 24px; }
+  /* **No `headline-small` rung any more.** M3 gives a basic dialog a 24px headline, and these five
+     wore it above 600px. The header is the pane's own app bar at both widths now, so the headline
+     reads `headline-medium` off `.apflex h2` and states one size. That rule is two classes and this
+     one named ids, so an id beat it and the desktop drew 24 while the phone drew 28. */
 
   /* These three are full-screen below 600px and basic above it, so their enter swaps with the
      variant. `dlgOpen` itself is declared at the top level beside the basic-dialog block, because

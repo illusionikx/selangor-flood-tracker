@@ -2,7 +2,7 @@
 // zoom-to-fit included.
 
 import { state, PREFS, save } from './state.js';
-import { el } from './util.js';
+import { el, snack } from './util.js';
 import { map, focusOn, openSide, ping, pinGlyph } from './map.js';
 import { herePopup } from './popup.js';
 import { alerts } from './alerts.js';
@@ -21,11 +21,37 @@ let wantPopup = false;   // only pop up when the user asked; never on the landin
    reach, so a failure has to arrive as text as well. */
 // `mapbtn` is the base class now. The button sits on the map, beside the layers button, not in
 // the app bar. `.mapbtn` sets the size and the shape, so a state change must keep the class.
+/* **The navigation bar carries a twin below 600px, and this writes both.** `#locate` does not draw
+   at that width — see `css/chrome.css` — and `#navLocate` is the only way to a fix there. A
+   crosshair on an item whose last attempt failed says nothing, and a failure has to arrive as text
+   as well, so the glyph and the words are mirrored rather than left on the hidden node.
+   **The STATE crosses too, and only the PAINT stays behind.** The glyph and the words alone left
+   the bar item unable to say one of the three. `busy` and the resting state draw the same
+   `my_location` mark, so a reader on a phone pressed and watched nothing change for ten seconds.
+   The class crosses so the pulse can. The `.on` accent and the `.busy` refusal do not: that paint
+   belongs to a round button standing on a photograph of a city, and the item beside it reports its
+   own selected state through `aria-current`, which `railSync()` writes from the card on screen.
+   `classList`, never `className`: the item carries `navitem`, and every rule in that component
+   keys on it. */
+const twin = el('navLocate');
+// The same three glyphs `#locate.busy`, `#locate.on` and `#locate.fail` resolve in css/chrome.css.
+// Stated here because a bar item takes no `.mapbtn` class, so no rule of that block can reach it.
+const GLYPH = { busy: 'my_location', on: 'near_me', fail: 'location_disabled' };
+/* What state the control is in, and the words that state carries. `btn.onclick` reads both: two of
+   the three states have nothing on screen that says why, and a snackbar is what says it. */
+let mode = '', words = '';
 const setBtn = (cls, label, tip) => {
+  mode = cls || '';
+  words = tip || label;
   btn.className = cls ? `mapbtn ${cls}` : 'mapbtn';
-  btn.setAttribute('aria-label', tip || label);
+  btn.setAttribute('aria-label', words);
   if (tip) { btn.dataset.tip = tip; btn.removeAttribute('title'); }
   else { delete btn.dataset.tip; btn.title = label; }
+  if (!twin) return;
+  twin.querySelector('.i').className = 'i i-' + (GLYPH[cls] || 'my_location');
+  twin.setAttribute('aria-label', words);
+  for (const c of ['busy', 'on', 'fail']) twin.classList.toggle(c, c === cls);
+  if (tip) twin.dataset.tip = tip; else delete twin.dataset.tip;
 };
 
 /* Two settings in two places refuse a location, and naming the wrong one sends the reader in a
@@ -93,8 +119,19 @@ export function findMe(setView) {
    click nothing on screen changes except the view. This is what says "there — that one is you". */
 const flashMe = () => ping(at, 'me');
 
+/* **Two of the three states answer with a snackbar, and both had nothing to say before.** The glyph
+   carries the state and `data-tip` carries the reason, and a tip opens on hover. A phone has no
+   hover, and the bar item is the only way to a fix at that width. So a reader pressed, waited, and
+   met a control that appeared to do nothing.
+   **Busy refuses a second attempt.** `map.locate()` is already running, and a second call is a
+   second wait rather than a faster one.
+   **Fail says the reason and then tries again.** Without the retry, one refusal leaves the control
+   dead for the rest of the session, and a reader who has just turned location on has no way back.
+   The words are `failTip()`'s own, so the snackbar and the tip make one claim. */
 btn.onclick = () => {
+  if (mode === 'busy') return snack(words);
   wantPopup = true;
+  if (mode === 'fail') { snack(words); return findMe(true); }
   if (!at) return findMe(true);       // no fix yet — prompt for one
   showHere();                         // already have one: recentre and show what is around you
   focusOn(at, 13);

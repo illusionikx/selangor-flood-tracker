@@ -80,7 +80,19 @@
      motion rather than a second motion, and it is worth having: the rail, the app bar's leading
      edge, the map's leading inset and the diagnostics popover all cite the rail's own spec here.
      If M3 ever splits the two curves, these four edges follow the rail and not the sheets. */
-  --m3-rail: var(--md-sys-motion-duration-short2) var(--md-sys-motion-easing-standard);
+  /* **150ms, and it was 300.** `NavigationRail/navigation-rail.css` states `duration-short2`, and
+     that is what stood here. The repository owner reported a stuttery collapse and expand on
+     2026-08-25, and it was measured: the map card is a live rasterized surface, so animating its
+     width re-rasters it every frame. At 1536px and a 1.25 device pixel ratio that costs about 16ms
+     a frame on top of the floor, which is a missed frame at 60Hz on every frame of the travel.
+     `duration-extra-short3` is a rung of M3's OWN scale, not an invented number. Measured on the
+     light theme at that ratio: frames over 33ms fell from 25 of 108 to 10 of 135, and the median
+     frame from 26.0ms to 17.2ms against a 16.6ms floor. Halving the travel does not make a frame
+     cheaper. It halves how many of them there are.
+     **This is the one place `--m3-rail` stops being a second NAME for `--m3-travel`.** The two cite
+     the same M3 curve and now carry different durations, so `m3-check.html` reads the map card's two
+     edges as `0.3s, 0.15s` rather than as one value twice. */
+  --m3-rail: var(--md-sys-motion-duration-extra-short3) var(--md-sys-motion-easing-standard);
   /* **M3's state layer, as a `color-mix()` percentage rather than an opacity.** M3 paints a hover
      or a pressed state as a translucent sheet of the surface's own CONTENT colour, over that
      surface's own shape. `vendor/m3/tokens.css` carries the scale, 0.08 and 0.10, so no number is
@@ -288,8 +300,7 @@
      Do not reach for `--wx-heavy` and `--wx-clear` instead. Those two name heavy rain and a clear
      sky on the same card, and one token cannot say `hot` and `clear` in one place. */
   --wx-cold: #3f7fb8; --wx-warm: #b06a3c;
-  --wx-clear: #d8a93f; --wx-cloud: #b8ae9e; --wx-rain: #93a9bb; --wx-heavy: #2f7fc9;
-  --wx-storm: #8a6dff;
+  --wx-clear: #d8a93f; --wx-rain: #93a9bb; --wx-heavy: #2f7fc9;
   /* A clear night, and the ONE weather token that is not shared with the map set below. Off white is
      what a moon is, and off white on this theme's card (#f1f3f4) is nothing at all. The map keeps
      the off white, because a pin carries a dark drop shadow and the card glyph carries none. So
@@ -363,8 +374,7 @@
      One set serves both themes, like every other token in this block. A pin has to win over
      the basemap. Heavy differs from rain by SATURATION, never by lightness: a darker heavy pin
      disappears into the dark tile. */
-  --wx-clear: #d8a93f; --wx-cloud: #b8ae9e; --wx-rain: #93a9bb; --wx-heavy: #2f7fc9;
-  --wx-storm: #8a6dff;
+  --wx-clear: #d8a93f; --wx-rain: #93a9bb; --wx-heavy: #2f7fc9;
   /* The two ends of the day. See the light block above for why this pair does not join the status
      set. Lighter here than there, because it draws on a near-black card rather than on paper. */
   --wx-cold: #7fb6e0; --wx-warm: #e0975f;
@@ -459,8 +469,14 @@ td:last-child { text-align: right; padding-left: 16px; }
    Still a real checkbox underneath, just clipped, so every handler, the prefs persistence and
    keyboard access stay as they were. */
 /* The sensor kinds, and they were a wrapping row of chips in the drawer. A reader moved them onto
-   the map on 2026-08-25, where they are the rows of a menu chip. So this box only stacks them. */
-#layers { display: flex; flex-direction: column; }
+   the map on 2026-08-25, where they are the rows of a menu chip.
+   **`display: contents`, so the rows are flex items of the MENU rather than of this box.** It was a
+   flex column of its own, and a column with no gap: the kinds stacked flush while the other three
+   chip menus spaced their rows by the 2px `.menu` states. Restating that gap here puts one number in
+   two files. Taking the box out of the layout instead hands `.menu` its own children, so the gap,
+   the corner on the group's first and last row, and anything added to `.menu` later all reach these
+   rows for free. `#kindMenu` is this element's only home, so nothing else measures against it. */
+#layers { display: contents; }
 .chip {
   box-sizing: border-box; position: relative;
   display: inline-flex; align-items: center; gap: 8px; margin: 0; padding: 0 16px;

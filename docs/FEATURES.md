@@ -13227,7 +13227,40 @@ the canvas to a 0×0 box**: it includes size containment, and a canvas takes its
 a canvas whose box is 0×0, so the wash reads as painted while nothing draws. Read
 `getBoundingClientRect()` as well as the pixels, on anything that claims a canvas survived.
 
-**Nothing was changed on the strength of these numbers.** Every one comes from headless software
+**The device pixel ratio was the variable that hid all of this.** Every run above was at ratio 1.
+The repository owner works at 1536px with a 1.25 ratio, where Leaflet also asks CARTO for `@2x`
+tiles. Rerun at 1.25 the light theme goes from a 16.9ms median frame to 27.8ms, and the dark theme
+from 45.8 to 73.4. The floor does not move: with no animation at all both themes sit at 16.6ms.
+**So the travel is the cost, and the cost scales with device pixels.** The map card is a live
+rasterized surface, so animating its width re-rasters it every frame.
+
+**Six mitigations were measured and none of them works.** `will-change: left`, `will-change:
+transform`, `contain: paint` on the map, `border-radius: 0`, dropping `overflow: hidden`, and moving
+the dark theme's filter chain onto each tile. The per-tile move is the interesting failure: the chain
+is `feComponentTransfer` plus `brightness` plus `contrast`, all per-pixel with no neighbour sampling,
+so it renders pixel-identical and was confirmed by screenshot. It changed nothing (45.3ms against
+46.9). The cost is the filtering work, not the region it covers.
+
+**What shipped is the duration.** `--m3-rail` went from `duration-short2` to
+`duration-extra-short3`, a rung of M3's own scale. Measured on the light theme at ratio 1.25, frames
+over 33ms fell from 25 of 108 to 10 of 135 and the median frame from 26.0ms to 17.2ms, against a
+16.6ms floor. **Halving the travel does not make a frame cheaper. It halves how many of them there
+are.** Snapping the map card while the rail still travels was measured beside it and is worse: 25.1ms
+against 17.2ms, because the rail's own travel re-rasters the card anyway.
+
+**The dark theme is a wall, and the tile filter is the wall.**
+`:root[data-lift="yes"] .leaflet-tile-pane` carries `filter: url(#watertint) brightness(1.75)
+contrast(.92)`. At ratio 1.25 that theme runs at a 67.6ms median frame and 41 of 43 frames miss.
+Nothing on the list above moves it, and neither does the duration: at 150ms the median is the same
+and only the count of bad frames falls. Removing the filter outright takes the median from 43.4ms to
+17.9ms at ratio 1. Removing the SVG tint alone takes it to 31.1ms.
+A second dark-theme cost sits beside it: `L.Canvas._update` redraws all 6,635 water shapes on
+`moveend`, about **130ms of main-thread JavaScript per press**. That one is not raster and it does
+not care what machine it runs on.
+Neither is touched here. The tint and the water layer are deliberate features with their own
+entries in this file, and cutting one is a decision about how the dark map looks.
+
+**Nothing else was changed on the strength of these numbers.** Every one comes from headless software
 rasterization, where composite area is expensive and on a GPU it is nearly free. The response is also
 not linear — a 7% cut off the canvas's edge recovered most of the median and the next 21% recovered
 little, which is the shape of a raster-tile threshold rather than of a real cost curve. The one datum
@@ -15226,7 +15259,7 @@ app, and the panel is the surface a reader spends most time on.
 
 `.sensor` is the group and paints nothing. `.sensorhead` is the item. `.sbody` is the readings.
 
-The item is M3's list item. A 40px avatar disc leads it, the headline is `body-large` in the regular
+The item is M3's list item. A 24px kind glyph leads it, the headline is `body-large` in the regular
 weight, and a trailing supporting line carries the distance, the MET point, or a member's own name.
 The numbers come from `List/list.css` in the M3 Expressive component set.
 
@@ -15241,19 +15274,28 @@ corner lands on the ends a reader can see. A river draws three segments. A siren
 `.mseg` diverges because its groups hold different kinds of row. Every segment here belongs to one
 sensor and has to read as one block.
 
-### The avatar is shared, and that is the point
+### The leading slot is a bare glyph, and it wore a disc for one revision
 
-The Notices pane already drew a 40px tinted disc over each bulletin. The station panel draws the
-same disc over each sensor. One `.avat` rule in `css/chrome.css` states it, and `avat()` in
-`js/popup.js` emits it. The class was `.navat` while the Notices pane was the only caller.
+The Notices pane draws a 40px tinted disc over each bulletin. The station panel took the same disc
+over each sensor, and a reader cut it on 2026-08-25.
 
-**A tinted disc rather than a filled one.** This colour names a station kind or a source. It never
-names a status. A saturated 40px disc down a list reads as a severity ramp, and this app reserves
-that reading for the four status tokens.
+**An avatar names a SENDER.** That is right for a bulletin: somebody published it. A sensor kind is
+not a sender, and six discs down one card read as six of them.
 
-**The disc cannot be the `<i>` itself.** An `.i` is a box of `currentColor` with the glyph masked out
-of it, so a background on that box is clipped away with the rest. The wrapper is the only place a
-disc can go. That is the rule the favorite heart already obeys for its drop shadow.
+So the slot is M3's own: 24px of glyph in the kind's own colour. `kindGlyph()` in `js/popup.js`
+emits it and `.sensorhead .glyph` in `css/map.css` sizes it. `.avat` in `css/chrome.css` stays, and
+the Notices pane is its only caller again.
+
+**The gap dropped to 12px, and M3 states 16.** That 16 is written for a 40px avatar. Beside a bare
+24px glyph it stands the headline further out than the supporting line under the whole group.
+
+**`.glyph` is 18px in `css/base.css`**, which is written for the drawer's own dense rows. A list item
+states 24. So a slot that loses this rule shrinks rather than vanishes, and still looks deliberate.
+
+**Never test a glyph's `backgroundColor` for a disc.** An `.i` IS a box of `currentColor` with the
+glyph masked out of it, so that property reads the station kind's own hue on a correct glyph. It
+failed the check on markup that was right. The BOX is what says there is no disc: an avatar is 40px
+and a leading slot is 24.
 
 ### Two things moved with it
 
@@ -15276,7 +15318,7 @@ group in the other, is one component in two shapes.
 
 ### The check
 
-`m3-check.html` reads the avatar, the item and the segments. Its fixture card carries the real shape
+`m3-check.html` reads the leading slot, the item and the segments. Its fixture card carries the real shape
 rather than the two bare stubs it held before.
 
 Three faults here put nothing wrong on screen. A group with no fill and no rule looks the same as a
@@ -15492,3 +15534,908 @@ bar, reads the headline back as `On alert` alone, and asserts that `.pophead` is
 The node harness in CLAUDE.md's Verify block asserts the other end. It reads `js/alerts.js` as
 source: `alerts()` emits a `.badges` row, `Nearest first` is a chip in it, and no `class="tally"`
 survives. A half-finished revert leaves markup that renders and says nothing.
+
+## An alert group is a subheader over a list, and nothing else
+
+The repository owner cut two things on 2026-08-25: the kind chip at the head of each group, and the
+coloured rule down its left edge. The head chips under the title stay.
+
+### The chip stated the kind a third time
+
+A group head drew an M3 assist chip reading `Water level`, over a heading reading `Water levels at
+danger`, over rows that every one of them carry the water-drop glyph.
+
+**The Notices pane made the same argument one pane over, and it made it first.** That pane dropped
+its own card shell. Its note says a shell stated the category three times: a rule, a heading glyph
+and a heading word.
+
+So the group head is `.nsub`, the M3 list SUBHEADER that pane already draws. One component and two
+panes, so the numbers are stated once: `title-small` in `on-surface-variant` at 48dp. The Notices
+pane adds a 24dp leading glyph to its own. This pane adds nothing — see below.
+
+```
+Water levels at danger  HAPPENING NOW
+```
+
+`.alert .badge` has no user left, so `#sideKinds .badge` is the whole selector again. The kind glyph
+went to the subheader's own leading slot for three revisions and then left it too — see below.
+
+### The left rule stated the tier a third time
+
+`.alert` carried `border-left: 3px solid` in the tier colour, and a 10px inset to clear it.
+
+Every row's glyph under it takes that same tier colour. So the group states the tier down the list
+rather than down its own side.
+
+### The head carries no glyph, and three shapes were tried before text won
+
+The subheader held a mark for three revisions of one afternoon, and the repository owner cut each.
+
+**A tier-coloured glyph.** It stated the tier a third time in the head, right after the left rule was
+cut for doing exactly that.
+
+**A neutral one.** It still repeated the mark every row under it already carries.
+
+**An `avat()` disc**, the 40dp tinted one a sensor row and a bulletin draw, in the station kind's own
+colour. It made a 40dp mark out of the repeat.
+
+**M3's list subheader is a label and nothing else**, so text is the component rather than a
+divergence from it. The kind is in the heading's own words, and the glyph is on every row below,
+which is where a reader looks once the heading has scrolled away.
+
+So the tier is stated twice in the head and once per row: the tag's word, the tag's own tint, and
+each row's leading glyph.
+
+**The Notices pane keeps its glyph, so nothing here may be written against a bare `.nsub`.** That
+selector reaches both panes. `.nsub .i` styles the Notices glyph and the alert head simply has none,
+which is why no alert rule exists for it.
+
+**The divider between groups went with it.** `.alert` also carried `border-top: 1px solid
+var(--outline)`. This pane separates by space, which is the rule the Notices pane already obeys and
+the rule M3's layout guidance states. `.nsub` carries its own 12px top margin, so the gap belongs to
+the subheader and not to a border.
+
+### The tier tag stays, and it is not the rule in another shape
+
+The rule was colour, and colour alone is a code nobody was taught. The tag is the word.
+
+CAP's certainty axis is what that word carries. `now` is observed, `soon` is a forecast, `stale` is
+a claim this app cannot stand behind. `HEAVY RAIN` and `FORECAST` share one amber, so the word is
+the only thing that tells the two apart.
+
+**Two spacings collapsed into one.** `.tg` carries a 6px left margin, written for a tag that
+followed an inline title. The subheader is a flex row with M3's 16px gap, and the two stacked to
+22px. `.alert .nsub .tg` cancels the margin.
+
+**The subheader wraps rather than squashing.** A 302px row holds a 24px glyph, a title of about
+150px and a tag of about 100px with 16px gaps. `Water levels at danger` with `HAPPENING NOW` beside
+it takes two lines and the subheader grows to 64px. The other three groups fit one line.
+
+### Measured
+
+Rendered against the live payload at a 1200px window, four groups:
+
+```
+alert t-now    nsub 302x48   "Triggered sirens  HAPPENING NOW"     row glyph --s-danger
+alert t-now    nsub 302x64   "Water levels at danger  HAPPENING NOW"  row glyph --s-danger
+alert t-heavy  nsub 302x48   "Heavy rain  HEAVY RAIN"                 row glyph --s-warning
+alert t-soon   nsub 302x48   "Forecast to reach danger  FORECAST"     row glyph --s-warning
+badge inside a group: 0   glyphs in a subheader: 0   border-left 0 and border-top 0 on every card
+```
+
+### The check
+
+`alertPane()` in `m3-check.html` asserts both deletions and the component that replaced them.
+
+**A deletion needs its own assertion.** Markup left behind by a half-finished revert draws a control
+nobody meant to ship, and it errors nowhere. So the check reads the chip count inside `.alert`
+as 0, reads `.alerttop` as absent, and reads both border widths as `0px`.
+
+**One stale assertion failed here, and that failure is worth keeping.** It compared the row glyph's
+colour against the card's `borderLeftColor`. On a box with no border that property answers
+the element's own `color`, so it compared the tier red against the body ink. It failed on markup
+that was right. The subheader has no glyph to compare against at all now, and its
+absence is what the check reads instead.
+
+**A second one threw rather than failed.** It compared the head chip's ink against `.alert .badge`,
+which no longer exists, and `getComputedStyle(null)` throws. That took the whole block with it. 155 assertions
+stopped reporting, and the verdict still read one failure. It compares against
+`#sideBody`'s own ink now. **Anything asserted against a second element has to survive that element
+being deleted.**
+
+## Every segment of a sensor's body carries a title
+
+A reader asked for it on 2026-08-25, the same day the panel became an M3 list. Each item of the
+segmented list under a sensor now names what it holds.
+
+### Five words
+
+`Right now` heads a reading at this moment. `Trend` heads where it is going. `Last N h` heads a
+timeline. `Totals` heads the accumulation chart. `Latest still` heads a picture.
+
+That is the whole vocabulary. A river, a flood gauge and a rainfall station read down the same
+headings, so a reader who learns one card has learned every card.
+
+### Two mechanisms, and the split is the span
+
+`sensorBody()` titles the block where it knows the kind. That covers the siren state, the flood
+gauge block, the river meter and the metric row.
+
+The block titles itself where only it knows its own span. `sparkline()`, `rainBars()` and
+`sirenBand()` each head their own window, and that window is read off the readings they hold.
+`rainState()` heads `Right now` and `rainAcc()` heads `Totals`. An empty title in `sensorBody()`'s
+own table means the block writes its own.
+
+**Do not move a span title to the wrapper.** It cannot know one. A wrong span is worse than none.
+
+### What moved to make room
+
+**The river graph's span left its caption.** It read `3.42–5.32 m over 9 h`. The heading states the
+span now, which is what `rainBars()` beside it already did. Left in both places the card printed
+`Last 9 h` over `over 9 h`, 40px apart. The caption states the range alone.
+
+**The siren's state and its band became two segments.** They answer `is it sounding` and `for how
+long`. One title cannot head both. Every other kind already split the two that way.
+
+**The river's rate row is keyed `Rate`.** It was `Trend`, and the segment around it is headed
+`Trend`. A key repeating its own heading 20px above it is one fact twice. `Rate` is also the exact
+word for a figure in m/h, and it is the field's own name in the payload.
+
+**The nearest-camera section became one segment.** The name and the picture were two, and a group of
+two titles each item. That puts a heading over a line that is already a name.
+
+### The band heads a constant, and it is the only block allowed to
+
+`sirenBand()` heads `SPARK_H` rather than a measured span. It frames on the clock. So the ground it
+covers is the constant and never the record. A measured span prints `Last 0 min` on the 103 sirens
+of 212 that hold one sample.
+
+### A group of one takes no title
+
+The section head already named the only thing under it. A title there states the section twice. The
+camera is the kind that reaches it on a station card. The weather section, the weather panel's
+half-hour stack and the nearest-camera section reach it for the same reason.
+
+### The check
+
+Both ends are guarded, and neither is enough alone.
+
+The node harness in CLAUDE.md's Verify block walks every station in the payload. It fails on a
+segment with no title, and on a lone segment that grew one. It counts 649 groups of several and 93
+groups of one. It also asserts that each of the three self-titling blocks still states its window,
+and that the river caption no longer prints the span.
+
+`m3-check.html` reads the title off the rendered pane. It asserts that each segment leads with one,
+and that the title cancels its own top margin. A `.subhead` carries `margin: 10px 0 3px`, and a
+segment states 12px of padding. Left uncancelled, the first line of every segment stands 22px down.
+
+## The Settings headings carry no glyph and no disc
+
+The repository owner asked for a disc behind each heading glyph on 2026-08-25, then cut the disc and
+the glyph together the same day.
+
+That lands on M3's own list subheader, which states a label and nothing else.
+
+Two things went with them. Map and Developer had gained a glyph so that all four headings read as one
+ladder, and `--i-code` came into `css/icons.css` for Developer. Both are gone.
+
+`m3-check.html` asserts the absence of each. Markup left behind by a half-finished revert draws a
+disc on one heading and nothing on the next, and neither errors.
+
+### The one thing worth keeping from the attempt
+
+An `.i` in this app is a box of `currentColor` with the glyph masked out of it. That same mask clips
+away a background on the `.i` itself, so a disc drawn there paints nothing and errors nowhere. The
+effect has to go on a wrapper, with the mask on the `.i` inside it.
+
+That is the trap the favorite heart already carries, and it is now recorded twice.
+
+## The menus are M3 menus
+
+The repository owner asked for the phone's overflow menu to follow M3's menu guideline on
+2026-08-25.
+
+`.menu` is that component now. The reference is
+[`Menu/menu.css`](https://github.com/bczak/m3you/blob/development/src/components/Menu/menu.css),
+which cites `m3.material.io/components/menus/specs`.
+
+The container is a `surface-container` column at `shape-corner-large`, with 4px of padding and a 2px
+gap. An item is a 48px flex row, centred, inset 12px, at `body-medium`, with a 20px leading glyph in
+`on-surface-variant`. The group's own first and last row take `shape-corner-medium` and every row
+between them takes `shape-corner-extra-small`. The state layer is M3's own, `on-surface` at 8%. The
+divider is 1px of `outline-variant`, inset 8px, with no block margin.
+
+### One component, six surfaces
+
+The rules live in `css/chrome.css` once. Six surfaces draw a menu:
+
+- `#appMenu`, the phone's overflow, which is what the request named
+- `#layerMenu`, `#heatMenu` and `#kindMenu`, the three map chip menus
+- a sensor's ⋮, from `dots()` in `js/popup.js`
+- the weather card's ⋮, from `wxDots()`
+
+A menu transcribed for one surface and approximated for the next is the fault this repository's own
+M3 rule exists to stop. So the request moved all six.
+
+Two rules in the chip block went away with the change. `.chipmenu .mi { align-items: center }` and
+`.chipmenu .mi .i { margin-top: 0 }` each restated what an M3 item does for itself.
+
+### What the app took, and what it kept
+
+Four divergences, and each states its reason where it is written.
+
+The cap is `min(340px, 100vw - 16px)` and M3 states 280px. The nearest-webcam row carries a station
+name that runs to 50 characters. Inside 280 that one row drew a menu half the width of a desktop
+window.
+
+The item takes `min-height: 48px` and the reference takes a fixed `height`. M3 truncates a menu
+label with an ellipsis. This app does not, and that rule is older: a station name cut in half names
+another station. So the nearest-webcam row wraps to two lines and the provenance block to three.
+
+The item takes block padding for the same reason. A fixed 48px row needs none. A row free to grow
+needs the text held off its own ends.
+
+The elevation is `--shadow` and not `elevation-2`. This app holds one elevation, which is the
+divergence every dialog here already states.
+
+**The 1px outline went with the change.** M3 separates a menu from the surface under it by elevation
+alone. A line inside that shadow states one seam twice.
+
+**The `.mv` reading keeps `color()`'s paint.** M3 paints a trailing label `on-surface-variant`.
+1.74 m is a quiet river or a flood, and the mark it is measured against is not on that row.
+
+### The check
+
+`m3menu()` in `paint-check.html` holds the numbers. It runs on the three chip menus at a desktop
+width, and on `#appMenu` at a phone width. That second call matters. Above 600px the rail carries
+Settings, Help and About as items of its own, so nothing opens the overflow menu there.
+
+Two faults here put nothing wrong on screen. A row that keeps the old 13px text and 6px corner still
+reads as a menu. So a half-finished transcription ships and looks deliberate. The outer corner lands
+on the group's first and last row alone, which is invisible on any menu of one row.
+
+**The row height is asserted as a floor and never as 48.** The two wrapping rows are this app's own
+divergence. A check that names 48 fails on the markup that divergence asks for.
+
+## The chip label reads Hydrology, and the chip menus lost 6px they never asked for
+
+The repository owner made two requests on 2026-08-25. The layer chip is to read `Hydrology` rather
+than `Stations`, and its glyph is to be the water drop rather than the map pin. Then the owner
+looked at the open menu and named a spacing fault in it.
+
+### The label and the glyph
+
+Four sites held the word: the chip's own label, the menu row under it, the line in
+`render()` that writes the chip from `PREFS.mapLayer`, and the assertion in `paint-check.html`.
+`Weather` is unchanged, so the pair still reads as two answers to one question.
+
+The glyph is `water_drop`, at both sites. That mark is already in `css/icons.css` for the river
+kind, so this needed no icon fetch. The map pin said `a place on a map`, which is every layer this
+app draws.
+
+Nothing renamed the ids. `#stations` and the `stations` value in `PREFS.mapLayer` still spell the old
+word, and renaming them moves no pixel.
+
+### The 6px
+
+A reader reported that a chip menu holds unequal space around its rows, and that `#appMenu` on the
+navigation bar does not. The measurement agreed. A chip menu stood its rows 10px off the panel's top
+and bottom against 4px on the sides, and 14px apart against the 2px `.menu` states.
+
+**The cause is a rule three files away.** `css/base.css` styles the `<label>` element itself, at
+`margin: 6px 0`, for the drawer's own stacked filter rows. A chip menu's rows are
+`<label class="mi">`, so each one took that margin. `#appMenu`'s rows are `<button>` and `<a>`, so
+they never did. This repository already carries that trap as a rule: any `<label>` used as a compact
+control needs `margin: 0` stated. This is its second site.
+
+`.mi` states it now. It goes on the item rather than on `.chipmenu .mi`, because the item is the item
+whatever element draws it.
+
+**The kinds menu carried the same fault upside down.** Its rows sit inside a `<div id="layers">`
+wrapper, a flex column with no gap of its own. So `.menu`'s 2px never reached them and they stacked
+flush. That box is `display: contents` now. The rows become flex items of the menu, so the gap and
+the outer corner on the group's first and last row both reach them with no number restated.
+
+### What the check missed
+
+`m3menu()` in `paint-check.html` already asserted `padding: 4px` and `row-gap: 2px`, and both passed
+on every one of these menus while they were wrong. Each fault lives on a different box from the one
+those declarations name. A margin lives on the child, and a wrapper stands between the panel and the
+rows.
+
+So that function measures the four gaps now: panel to first row, panel to last row, panel to the
+side, and row to row. It also asserts that a row states no margin. A property measured on the
+rendered box cannot be defeated by an element selector in another file.
+
+All four menus now read 4px on every side and 2px between rows. `paint-check.html` holds 277
+assertions and reads PASS.
+
+## The weather panel's half hours become segments of the list
+
+The repository owner asked for it on 2026-08-25. The panel drew one segment holding a `.wxsteps`
+grid of nine cards. Each half hour is an item of the list now.
+
+### What was wrong with one segment
+
+A segment is a block a reader takes in on its own. Every half hour here is one. It states a glyph, a
+word and a clock, and it answers about one instant.
+
+So the old shape drew a container inside a container. The outer segment said nothing the nine inner
+cards did not. The station panel beside it states the same component once, so a reader met two
+readings of one shape in one pane.
+
+### What the shape is now
+
+`.sbody` states the whole group, and it is the class every sensor on a station card already draws.
+It gives a 2px gap, a 4dp corner on each item, and the 16dp corner on the two ends alone.
+
+`stepCard()` in `js/wx.js` emits an `<li class="wxstep">`. The `.wxcol` inside it keeps the row, the
+glyph, the word and the clock, and gives up its own container.
+
+### What each rule does
+
+`.wxstep > .wxcol` cancels the padding, the radius and the fill. That is two classes, so it beats
+`.sensor .wxcol` on source order. Keep it below that rule.
+
+The station card's weather section draws the same `.wxcol` box inside a `.wx` grid. That one keeps
+its fill, because there is no list item under it.
+
+`.wxstep.now` carries the outline. It moved off `.wxcol`, because the item is what carries the shape
+the outline follows.
+
+### The slots take M3's own two-line item
+
+The repository owner named each slot on 2026-08-25. A step used to draw a 28px glyph over a 12px
+word, with an 11px clock under the pair. None of those three numbers is M3's.
+
+The slots are the component's own now:
+
+- leading: the weather glyph at 24px, inside a 40px tinted disc
+- headline: the weather word, at `body-large` in the regular weight
+- supporting: the clock, at `body-medium` in `on-surface-variant`
+- trailing: the day's two ends stacked, at `label-small` in `on-surface-variant`
+
+The word leads because this panel answers about weather. The clock says which half hour states it,
+which is the job of a supporting line.
+
+`.mseg > li` in `css/chrome.css` holds the same numbers for the Settings groups and the alert
+groups. The two are not one selector. Those rows hold text, and this one holds a disc, a word, a
+clock and a pair of temperatures.
+
+The clock is not `.muted`. That class carries a `font-size` of its own, and a declaration on the
+element beats an inherited one.
+
+### The leading disc, and why it is not the disc the station panel cut
+
+`.avat` in `css/chrome.css` states the shape: a 40px disc under a 24px glyph, tinted 16% of the
+colour the caller writes on the element. The Notices pane already draws it, so this surface states
+no number of its own.
+
+The station panel cut its own avatar on the same day, and that is not a contradiction. That slot
+named a sensor KIND, which never changes down a card, so six discs read as six senders.
+
+Here the disc carries the one thing that does change down the stack. Every step reports a different
+half hour, and `wxTone()` colours the disc for that step's rung. So a reader finds the wet hours by
+colour before reading a word.
+
+### The day's two ends are M3's trailing supporting text
+
+A reader asked for the spec on 2026-08-25. The pair wore the item's own `on-surface`, which is the
+headline's colour. A trailing line as dark as the headline reads as a second headline, and this is
+one day-scale fact beside a row about one half hour.
+
+It is `label-small` in `on-surface-variant` now, at the end of the item. `flex: none`, so the
+headline and the clock take every pixel it does not.
+
+**High over low, on two lines, and M3 states one.** The repository owner asked for the stack on
+2026-08-25. That is the one divergence in this slot. Two 16px lines is 32px inside a 72px item that
+pads 8px, so the row does not grow.
+
+The order is the markup's rather than a `column-reverse`, so a screen reader hears what the eye
+reads. It is also the order the station card's own stacked pair states. A vertical scale runs high
+at the top.
+
+The two arrows keep their own hues, blue for the low and terracotta for the high. That is this app's
+one temperature idiom, and it says in a colour what the pair otherwise spends two words on.
+
+`.wxtrail` is gone. It stacked two things in this slot while the `NOW` chip stood there, and that
+chip is the supporting line now.
+
+### The marker on the step happening now
+
+A play arrow and the word `Now`, in the accent and in bold. It was a 9px `NOW` chip with a 1px
+outline.
+
+**It stands in place of the clock.** The repository owner asked for that on 2026-08-25. A supporting
+line answers which half hour the row states, and `Now` answers it. The row a reader is on is the one
+row that needs no time read off it, and a clock beside the word says one thing twice.
+
+The colour and the weight are the whole of the highlight. The item already carries a 2px accent
+outline, so an outlined chip inside it drew two rings around one fact.
+
+It takes `body-medium`, which is the clock's own size. A supporting line that changes size from row
+to row moves the headline above it.
+
+`Now` is sentence case, the rule every rendered string here obeys. The ALL-CAPS blocks this app
+keeps are a severity language, and this states a position in a list.
+
+**It is a `<span>` and not a `<b>`.** `.wxstep .wxtext b` is two classes and an element, so it beats
+any two-class rule on that box. As a `<b>` the marker drew at the headline's own 16/24 and stood the
+headline 2px higher than every other row's. The weight is in the stylesheet instead.
+
+### The head's glyph stops moving
+
+It read the first step's rung, so it drew rain while the reader looked at a stack of nine steps.
+That head names the sensor. It does the job the kind glyph does over a river or a siren, and those
+never move.
+
+It draws `partly_cloudy_day` in `--k-weather` now. That is the mark the Weather layer chip already
+carries. The rung ladder draws `sunny` for a clear sky, and a rung is not a name for the layer.
+
+### The cost
+
+A step grows from about 56px to 72px, so the stack of nine grows about 144px. That is M3's own
+two-line floor, and this repo transcribes a component rather than approximates it.
+
+### Measured
+
+A throwaway probe loaded the app with `PREFS.wx` set, pressed a weather pin and read the panel back.
+It found nine items. Each one is 72px, padded `8px 16px`, with a 16px gap.
+
+The disc is 40x40 at a 50% radius, under a 24px glyph. The headline is 16/24. The clock is 14/20 in
+`on-surface-variant`. The marker is weight 700 at 14/20 in the accent, beside an 18px play arrow,
+and that row carries no clock.
+
+The two temperatures are 11/16 in `on-surface-variant`, in a 32x32 box ending 16px from the item
+edge. That is the item's own inline padding. High sits over low, and the two figures line their
+right edges up. The headline beside them reads `rgb(31, 31, 31)`, so the two roles are apart.
+
+The group takes a 16px corner at each end, a 4px corner between, and a 2px gap. Every headline
+starts 14px down its own item. The body overflows by 0px.
+
+## Clustering opens up at city zoom
+
+`maxClusterRadius` in `js/map.js` is three screen-pixel bands. Street (zoom 15 and up) is 14. City
+(13 and 14) is 26. State (0 to 12) was 48 and is 34.
+
+### Why the far band moved
+
+The state band covers zoom 0 to 12. Across that range the distance between two sites, measured in
+screen pixels, changes fourfold. So one number cannot suit both ends of it.
+
+The numbers come from the 459 sites in the payload. This table counts the sites whose nearest
+neighbour sits inside the radius. A chip then hides each of them.
+
+| Zoom | at 48 px | at 34 px | at 26 px |
+|---|---|---|---|
+| 10 | 452 | 434 | 420 |
+| 11 | 412 | 382 | 343 |
+| 12 | 335 | 280 | 215 |
+
+34 answers the city end. It frees about 55 sites at zoom 12.
+
+**No radius opens up zoom 10.** At 10 px it still swallows 307 of 459. The whole state
+on one screen is denser than any radius can open up. Do not chase it.
+
+### What this does not change
+
+The other two bands hold. The street band still keeps co-located sites in one chip, and those still
+fan out on a click. That is the rule the comment above the line already states.
+
+### The three options that lost
+
+Turning clustering off past a zoom takes the fan-out with it. Two sites 30 m apart then hide each
+other, and a reader cannot reach the one underneath.
+
+Raising `SITE_M` in `api.php` merges more sensors into one pin. That changes what a station card
+holds, which is a larger decision than a map density one.
+
+Removing the cluster layer draws 459 pins at once, and the state view is where they overlap most.
+
+
+## The station card's weather section joins the same list
+
+The repository owner asked for it on 2026-08-25, after the weather panel took the component. The
+two stand in one pane, one at a time. A head over two cells in one and a head over a list in the
+other is one component in two shapes.
+
+### What it was
+
+Two cells of a `1fr 3fr` grid, inside one segment of `.sbody`. The left cell drew a 28px glyph
+beside the day's two temperatures, titled `Now`. The right cell drew a glyph beside a rain sentence,
+titled `Later`.
+
+The glyph carried the whole state and nothing wrote the word out. The state rode `data-tip`, which
+opens on one hover and one tap.
+
+### What it is now
+
+Two M3 two-line list items, the same ones the weather panel's stack draws:
+
+- `Clear` over `▶ Now`, with `↑33° ↓24°` in the trailing slot
+- `Rain` over `From 18:30 until 21:00`
+
+### One place states the markup
+
+`wxItem()`, `wxWhen()`, `wxTemps()` and `WX_NOW` live in `js/popup.js` and `js/wx.js` imports them.
+`.wxstep` in `css/map.css` states the numbers once.
+
+They live in `popup.js` because `wx.js` already imports that module. The other direction is a cycle.
+
+### The headline is the ladder's own word
+
+The repository owner asked for that on 2026-08-25. The dry case read `No rain`, which is a fifth
+name for a rung this app calls `Clear` on the pin, in the legend, in the weather panel and on the
+map. One name for one thing is a rule this repo already holds.
+
+The ladder holds three rungs, and it is now the whole vocabulary of this map. See the next section.
+
+### The sentence split across two lines
+
+The rain sentence opened with the same weather word the headline states. So the card read
+`Heavy rain` and then `Heavy rain until 19:30`, 20px apart.
+
+The headline keeps the weather and the supporting line keeps the span. That is the split every item
+in this component obeys, and the panel's clock is the same slot.
+
+The span takes a capital, the sentence-case rule every rendered string here obeys. `cap()` in
+`js/util.js` works per word and lowercases the rest, so it is the wrong tool. It is not exported
+either.
+
+### Eight rules deleted
+
+`.wx`, `.wxcol`, `.wxrow`, `.wxsub`, `.wxbig`, `.wxline`, `.wxtemp` and the `.sensor .wxcol`
+cancel. The `--g` glyph token went with them. A probe over both surfaces found none of them left.
+
+### Measured
+
+A probe opened a station card carrying a weather section, then the weather panel. Both read the
+same. Every item is 72px with a 40x40 disc. Every headline starts 14px down at 16/24.
+
+Every supporting line is 14/20 in `on-surface-variant`. The group takes 16px corners at its ends, a
+4px corner between, and a 2px gap. The head draws `partly_cloudy_day` on both. Neither surface holds
+one of the eight deleted classes, and neither body overflows.
+
+A node harness evaluates `metSection()` as it ships and reads back the seven wording branches. Dry,
+dry under cloud, light rain, an open heavy span, a storm over a wet rung, a storm that must not
+touch rung 0, and the rule that every headline comes out of the ladder. It sits in the Verify block
+of `CLAUDE.md`.
+
+**Read the ITEMS and never the whole section.** The head is a `<b>` too, and `WX_NOW` carries a
+glyph. The first draft searched the section, read the title `Weather` as a headline and the play
+arrow as the weather, and failed four assertions on markup that was right.
+
+## The back arrow lands on one number, and Settings states one word per theme
+
+Two changes, both asked for on 2026-08-25.
+
+### 28px to the glyph, on every panel and at every width
+
+The supporting pane already landed its arrow there. So did the five dialogs below 600px. Above
+600px those five landed on 35 and 31 instead.
+
+The button carried a 10px negative margin, which put its ink on the prose under it. The padding
+behind that margin is 24px on the three prose panes and 20px on the table and the camera wall. So
+the arrow moved from panel to panel while the panel did not.
+
+The inline margin now cancels the header padding and the 1px border, and leaves the 8px a 40px
+target needs. Measured after: About, Help, Settings, the table and the camera wall all read 28 at
+1200px and at 360px. The supporting pane reads 28 as 4px around a 48px target.
+
+One rule went with the change. `.docbox .modalhead .dclose { margin: 0 -10px 0 0 }` sat above a
+later rule of equal weight and had won nothing since the arrow moved to the leading edge.
+
+### The theme rows lost their supporting line
+
+Each row read `Automatic` over `Follow this device.`, `Light` over `Dark ink on a pale map.`, and
+`Dark` over `Pale ink on a dark map.`. Every second line said what the word above it says.
+
+A row with one line drops the two-line 72px floor. Left at 72 the three draw as a two-line item
+with the second line missing.
+
+They measure 64, which is the height the clear action under each saved list already draws. M3's
+one-line item is 56. The leading slot is 48px tall and the row pads 8px above and below it, so 56
+needs a 4px pad that moves six other rows. That divergence is older than this change.
+
+### Two supporting lines reworded
+
+`How strongly the wash paints over the map.` opened with a question word, which the writing
+standard refuses. It reads `Both heat layers use this value.` now, and that states a fact the
+headline does not carry.
+
+`Fake alerts, in this browser only.` is a fragment. It reads `This mode fakes alerts in this
+browser only.` now.
+
+## Auto comes back, the More button moves up, and the bar gets a location item
+
+Four asks, all from the repository owner on 2026-08-25. Move the theme control into Settings. Put
+Auto back. Move the More menu to the right side of the app bar. Put the location button in the
+middle of the navigation bar, and make it a real destination. Then hold the navigation bar to M3's
+flexible navigation bar spec.
+
+### The theme has three choices again
+
+`PREFS.theme` holds `auto`, `light` or `dark`. `applyTheme()` in `js/map.js` resolves `auto` against
+`prefers-color-scheme` and stamps the answer on the root element. Nothing else changed about how a
+surface reads the theme.
+
+`auto` is the default now, and nothing is seeded on a first visit. The version this reverses read
+the device once and stored the answer, because no value meant "ask the device". One does now.
+
+A listener on the same media query keeps `auto` following the device. A phone that crosses into its
+own dark hours restyles this app while `auto` holds. That is the whole of what the third choice
+buys.
+
+### The rail button reports the state, and it used to name the next press
+
+The old rule said a reader can already see the shade they are looking at. Under Auto that argument
+fails. The pick is a word, and which shade that word resolved to is the one thing the page does not
+say.
+
+So the glyph is the state and the words carry the act. The button reads `Automatic. Dark now. Switch
+to light.` under Auto, and `Dark theme. Switch to light.` under a shade a reader pinned.
+
+One press still sets an explicit shade, which leaves Auto. A button cannot cycle three values
+without becoming a control a reader must press twice to read. Settings is where Auto comes back.
+
+`syncThemeBtn()` in `js/ui.js` writes both surfaces from `PREFS.theme`. So the rows and the button
+cannot report two answers, whichever of the two a reader pressed.
+
+### The rail is that button's only home
+
+It used to travel into the app bar below 600px, because the rail does not draw there. A phone
+otherwise carried no theme control at all. The picker answers that now, so the node stays put and
+`place()` in `js/ui.js` moves two nodes rather than three.
+
+### The More button takes the app bar's trailing edge
+
+It has been round this loop twice in one day. It began in the app bar, moved to the navigation
+bar's fifth slot, and moved back. The move frees the slot the location button needed.
+
+It draws as a plain icon button with no pill and no label, which is what the search already does on
+the leading edge. `popovertarget` is the whole of the wiring.
+
+### The location button becomes the bar's middle item
+
+`#locate` does not draw below 600px any more. Two controls for one action at one width is one
+control in two places. That is the fault this app already names against a second More button.
+
+The item presses `#locate` rather than repeating what that button does. Every path through
+`js/locate.js` hangs off one handler.
+
+It is a destination, so it takes `aria-current`. `railSync()` marks it while the "You are here" card
+is the pane's occupant. A station card and a weather card select nothing.
+
+`js/locate.js` mirrors the glyph and the words onto it. A crosshair on a control whose last fix
+failed says nothing, and a failure must arrive as text as well. The paint does not cross. That
+belongs to a round button standing on a photograph of a city.
+
+### The flexible arrangement was built, measured and cut
+
+M3 states two item arrangements. Vertical stacks the glyph over the label. Horizontal puts the two
+on one row inside an indicator that wraps the whole item. M3 asks for it where the window height is
+compact.
+
+The horizontal one was built to the reference's own numbers:
+
+- a 64px container
+- 12px of block padding
+- a 20px gap between items
+- a 40px item, inset 16px
+- a 20px corner on the item's own box
+- the pill down to the glyph's 24px
+
+Every one of those measured correct.
+
+Then the five items measured **569px against a 360px window**.
+
+There is no window in this app where that arrangement both applies and fits. The bar draws below
+600px alone, and a phone held sideways is 760 by 360 and gets the rail. The band left is 569px to
+600px, and it is 31px wide.
+
+Shrinking the inset or dropping a label is the component approximated rather than transcribed. So
+the arrangement is declined and the number is written down. `shortPhone()` in `m3-check.html` takes
+the frame to 360 by 420 and asserts that a compact height changes nothing.
+
+### Two real gaps in the vertical arrangement closed
+
+The bar carried no state layer at all. The rail gained one on all four of its controls, and its bar
+twin was left out. A control with no hover rule draws correctly and answers nothing.
+
+The layer goes on the indicator, never on the whole item. An item is a 72px column. It holds a 56 by
+32 pill over a label, so a layer over the column paints the label's box too.
+
+A selected pill names its own container as the second colour of the mix. A mix that ends in
+`transparent` erases the fill under it.
+
+The selected label also took the rail's `on-surface`. The reference gives the vertical arrangement
+`secondary`. It reads `secondary` now.
+
+### The Auto glyph is hand-drawn
+
+Material Symbols publishes `brightness_auto`, a sun with the letter A cut out of it. At 24px beside
+`light_mode` that letter reads as two sun shapes side by side.
+
+`--i-theme_auto` is the half-filled circle every platform draws for "follow the device". The ring is
+two arcs of opposite sweep, so nonzero winding leaves the middle hollow. The half takes the outer
+circle's own sweep, so it fills one side back in. `--i-compare` is the precedent for a hand-drawn
+glyph in that file.
+
+### The check
+
+`m3-check.html` gained six blocks:
+
+- the theme picker, as three radios in one group
+- the round trip between the rows and the rail button
+- the app bar group, holding one control
+- the bar's five ids, with the location button in the middle
+- the state layer, as a CSSOM walk
+- the compact-height decline
+
+One assertion failed on markup that was right. The CSSOM walk treated `rule.cssRules` as the mark of
+a group rule. A `CSSStyleRule` carries its own empty list in every modern engine, so the walk
+skipped every style rule and reported that no rule exists.
+
+## The location card lost its glyph on the weather layer
+
+The "Your Location" card draws a `near_me` glyph beside its title. On the station layer it drew. On
+the weather layer it drew nothing.
+
+`hereCard()` in `js/wx.js` passes that title into `card()` as markup. `card()` then passed the title
+through `titleCase()`.
+
+`titleCase()` splits a name on whitespace, commas, brackets and hyphens. It capitalizes each token
+that is not an acronym. So it rewrote the markup:
+
+- `class="i i-near_me"` became `Class="I I-Near_me"`
+- `var(--me)` became `var(--Me)`
+
+An HTML attribute name is case-insensitive, so `Class` still applied. A CSS class is case-sensitive,
+so `.i` and `.i-near_me` did not match. The glyph then had no mask and no size, and it drew nothing.
+The custom property lost its case too, so the color fell back.
+
+**The repair moves the case rule into the default.** `card()` takes a name that is already cased,
+and the point's own name is cased where the default is written. `hereCard()` is the one caller that
+passes a name, and that name is markup this app wrote.
+
+`herePopup()` in `js/popup.js` writes the same glyph into the station-layer card directly, so that
+card was correct the whole time. That is what made the fault read as a weather-layer bug rather than
+as one rule reaching a string it was not written for.
+
+**Never pass markup to `titleCase()`.** It is written for a place name from a feed.
+
+## Every panel wears one header
+
+The repository owner asked for it on 2026-08-25. All six panels now draw M3's medium flexible top
+app bar: the supporting pane, About, Help, Settings, the all-stations table and the camera wall.
+
+### What a reader met before
+
+Measured across the five dialogs and the pane, at 1200px and at 360px:
+
+```
+                headH   button   glyph   glyph-y   headline
+pane (station)   112    48x48     22       32      28px @ 16
+dialogs @360     112    40x40     20       20      28px @ 18
+prose @1200       56    40x40     20       28      24px, beside the button
+table, wall      36     40x40     20       18      24px, beside the button
+```
+
+So one panel changed shape as a reader crossed 600px, and no two panels agreed with each other.
+
+### What it is now
+
+Every one of the six reads 112px, a 48x48 target, a 22px glyph 28px in and 32px down, and
+`headline-medium` 16px in on the row below. About draws 56px, because it carries no headline.
+
+The dialogs carry the pane's own `.apptop` and `.apflex` parts, so one rule beside
+`#barHead, #sideHead` states every number. `m3-check.html` asserts the parts by class and then measures them, and
+it reads the headline size off the pane rather than off a literal.
+
+### The spec this reverses
+
+`Dialog/dialog.css` gives the full-screen variant a 56px header of its own. Above 600px these five
+are basic dialogs, which M3 gives a `headline-small` on a floating card and no bar at all.
+
+That reading is right about the components and wrong about the reader. A panel is a panel. One that
+restyles its own header at 600px reads as a fault, and nobody ever sees the boundary the rule was
+drawn along.
+
+### Four rules deleted
+
+`#dataBox h2`, `#camBox h2` and the `headline-small` rung each named an id, so each beat the class
+rule the bar states its headline with. That is how the desktop drew 24px while the phone drew 28.
+
+The `.dclose` margins went with them. Each was a negative number derived from the padding of the box
+around it, and the three paddings behind them were 18, 20 and 24. `.apptop` places all six buttons
+now, so there is no offset left to keep in step with anything.
+
+### The table and the wall moved their padding
+
+`.dtop` holds the app bar and the filter field. An app bar states its own insets, so a 20px pad on
+the box around it put both of them 20px further in than the pane's. The field carries the inset now.
+
+## The location control reports fetching and failed, and answers a press in both
+
+The location button has three states. `setBtn()` in `js/locate.js` writes all three. Two of them
+said nothing a reader could reach.
+
+**The bar item could not say "fetching".** Below 600px `#locate` does not draw, and `#navLocate` in
+the navigation bar is the only way to a fix. `setBtn()` mirrored the glyph and the words onto that
+item. It did not mirror the state class. The busy glyph is `my_location`, which is also the resting
+glyph. So the item drew one mark for two states, and a reader pressed and watched nothing change for
+up to ten seconds.
+
+`setBtn()` mirrors the class now, and `#navLocate.busy .i` takes the same pulse the map button
+takes. **Only the pulse crosses.** The `.on` accent belongs to a round button standing on a
+photograph of a city. The item beside it reports its own selected state through `aria-current`.
+
+**The words only ever opened on hover, and a phone has none.** The reason for a failure rides
+`data-tip`, and `js/sparktip.js` answers that on tap as well. A reader still has to know there is
+something to tap.
+
+So a press now raises a snackbar:
+
+- **Busy** says what the control is doing and refuses a second attempt. `map.locate()` is already
+  running. A second call is a second wait, not a faster one.
+- **Fail** says the reason and then tries again. The words are `failTip()`'s own, so the snackbar
+  and the tip make one claim.
+
+**The retry is what keeps the control alive.** Without it, one refusal leaves the button dead for
+the rest of the session, and a reader who has just switched location on has no way back.
+
+**`pointer-events: none` left `#locate.busy`.** It refused the press for the whole ten seconds, and
+a button that answers nothing reads as a button that spins for ever. That is the fault this repo
+already records against the words landing in a `title`. The handler refuses the second attempt
+itself now, and it says so.
+
+**`snack()` moved from `js/ui.js` to `js/util.js`.** `js/locate.js` raises one, and `js/ui.js`
+imports `js/locate.js`. The other direction is a cycle. `js/util.js` is the module both already
+reach.
+
+
+## Cloud and thunderstorm leave the weather map
+
+The repository owner cut both on 2026-08-25. The ladder is `Clear`, `Rain` and `Heavy rain`, and
+nothing else.
+
+### The reason
+
+The map draws the MET **nowcast**. That feed publishes three words: `Tiada Hujan`, `Hujan` and
+`Hujan Lebat`. It has no word for cloud and no word for lightning.
+
+Both extra words came from a different feed, the MET **daily forecast** for a district. So each one
+drew a claim about a whole district over a whole day, on one point at one instant.
+
+A temperature comes off that same daily feed and stays. The card prints it as a day-scale figure
+with an arrow for each end, so it states its own scale. A glyph on the map does not.
+
+### What went
+
+- `WX_CLOUD` and `WX_STORM` in `js/config.js`, and the `wxSky()` that picked between them
+- the `sky` branch in `wxIcon()`, and the `cloud` and `flash_on` rows of `WX_TONE`
+- `--wx-cloud` and `--wx-storm` in `css/base.css`, both themes
+- `--i-cloud` and `--i-flash_on` in `css/icons.css`, with their two `.i-` rules
+- the `Cloudy` and `Storm` keys on the legend, so it holds three
+- `$row['sky']` in `metDaily()` in `sources.php`, so the payload carries the field nowhere
+- ten `--selftest` assertions that scored the word
+
+One assertion replaces those ten. It holds the deletion: a `summary_forecast` naming a thunderstorm
+must add no field to the row.
+
+### Measured
+
+A rebuild answers 742 stations with a `met` and 0 carrying a `sky`. `?wx=1` answers 50 points, 0
+with a `sky`, 50 with a temperature. So the join that supplies the temperature is untouched.
+
+A probe rendered the weather pins, the legend, the weather panel and a station card.
+
+Every headline is one of the three words. The pins draw `clear_night` and `rainy_light`, which are
+rung 0 at night and rung 1.
+
+### The check that lied about the clock
+
+The node harness asserted `sunny` for rung 0. Rung 0 has **two** glyphs and the Malaysian hour picks
+one, so that assertion passed all day and failed all night on code that was right.
+
+It asserts the SET now, `sunny` or `clear_night`. Anything asserting a rung 0 glyph has to.

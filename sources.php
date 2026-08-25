@@ -590,21 +590,16 @@ function metDaily(string $json): array {
         if (!str_starts_with($id, 'Ds') || $name === '') continue;
         if (!isset($r['min_temp'], $r['max_temp'])) continue;
         $row = ['tmin' => (int)$r['min_temp'], 'tmax' => (int)$r['max_temp']];
-        /* `sky` exists because the nowcast has no word for cloud. Its whole vocabulary is
-           `Tiada Hujan`, `Hujan` and `Hujan Lebat`, and `Tiada Hujan` means no rain, not clear sky.
-           So the map drew a sun over an overcast afternoon and had nothing else to draw.
-           This feed does carry cloud. Measured 2026-08-18 over 500 rows, `summary_forecast` holds
-           nine values built from four phenomena: no rain, `Mendung`, `Hujan` and `Ribut petir`.
-           The four are mutually exclusive on a row, so one word names the day's headline.
-           Two of the four are read. `mendung` is cloud and `ribut petir` is a thunderstorm. Rain is
-           not, because the nowcast already answers for the instant the map draws, and no rain is
-           the absence of a headline. `wxSky()` in js/config.js decides which rungs each of the two
-           may touch: cloud refines a dry rung and a storm refines a wet one. The order here is
-           belt and braces. The four phenomena do not co-occur on a row, so nothing tested first
-           can steal a row from the test after it. */
-        $sum = strtolower((string)($r['summary_forecast'] ?? ''));
-        if (str_contains($sum, 'ribut petir'))   $row['sky'] = 'storm';
-        elseif (str_contains($sum, 'mendung'))   $row['sky'] = 'cloud';
+        /* **THIS ROW CARRIES THE TWO TEMPERATURES AND NOTHING ELSE.** It carried a `sky` word too,
+           read out of `summary_forecast`: `mendung` became `cloud` and `ribut petir` became
+           `storm`. The repository owner cut both on 2026-08-25.
+           The map draws the NOWCAST, whose whole vocabulary is `Tiada Hujan`, `Hujan` and
+           `Hujan Lebat`. This feed is a forecast for a whole district over a whole day. So a word
+           taken from it drew a claim about that district on one point at one instant. A
+           temperature is a day-scale fact and the card states it as one. A glyph on the map does
+           not.
+           `WEATHER` in js/config.js is the vocabulary now, and it holds three rungs. Do not put
+           either word back without a source that reports it for the instant the map draws. */
         $out[strtolower(trim($name))] = $row;
     }
     return $out;

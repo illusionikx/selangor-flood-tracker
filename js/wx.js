@@ -3,10 +3,10 @@
 // Loaded on demand. A reader who never opens weather mode loads none of this and fetches none of
 // its data. That is why the points ride ?wx=1 and not the payload every poll already carries.
 
-import { FEED_WX, WX_THIN_PX, WEATHER, wxSky, MET_NAME, NEAR_MAX_KM } from './config.js';
+import { FEED_WX, WX_THIN_PX, WEATHER, MET_NAME, NEAR_MAX_KM } from './config.js';
 import { state, PREFS } from './state.js';
 import { map, pinGlyph, openSide, side, focusOn, flashTo, ping } from './map.js';
-import { wxIcon, wxTone, stamp, avat } from './popup.js';
+import { wxIcon, wxTone, stamp, kindGlyph, wxItem, wxWhen, wxTemps, WX_NOW } from './popup.js';
 import { askJson } from './ask.js';
 import { el, distKm, titleCase } from './util.js';
 
@@ -45,8 +45,8 @@ function paint() {
         // Matches `.pin`'s box in map.css, the same way render.js does. Leaflet positions the
         // marker off this and not off the CSS.
         className: '', iconSize: [39, 39], iconAnchor: [19.5, 19.5],
-        html: `<span class="pin" style="--c:${wxTone(r, { pin: true, sky: p.sky })}">${
-          pinGlyph(wxIcon(r, { pin: true, sky: p.sky }))}</span>`,
+        html: `<span class="pin" style="--c:${wxTone(r, { pin: true })}">${
+          pinGlyph(wxIcon(r, { pin: true }))}</span>`,
       }),
     })
       .on('click', () => { openSide('@wx-' + p.id, card(p)); focusOn([p.lat, p.lng], 12); })
@@ -67,51 +67,46 @@ const dots = p => `<button class="icon dots" popovertarget="mnu-wx"
     </span></div>
   </div>`;
 
-/* One card per half hour, built like the weather card's `Later` cell. It reads a glyph, then the
-   word beside it, then the clock under the pair.
-   The word is written out rather than left on `data-tip` alone. The weather card can leave it
-   there, because a reader takes in its two glyphs at once. Nine glyphs in a stack would each need
-   a tap to name, and `data-tip` opens one at a time.
-   `w.line` reads "Heavy rain" where `w.word` reads "Heavy", and a full-width card has room for the
+/* One list item per half hour MET publishes.
+   The word is written OUT rather than left on `data-tip` alone. The station card's weather section
+   can leave it there, because a reader takes in its two glyphs at once. Nine glyphs in a stack
+   would each need a tap to name, and `data-tip` opens one at a time.
+   `w.line` reads "Heavy rain" where `w.word` reads "Heavy", and a full-width row has room for the
    longer one. Rung 0 has no `line`, so `word` answers there.
-   `aria-hidden` on the glyph, because the word beside it already says the same thing. A screen
-   reader must not say it twice. */
-const stepCard = (rung, clock, now, sky, temp = '') => {
-  const w = wxSky(rung, sky) || WEATHER[rung] || WEATHER[0];
-  return `<div class="wxcol${now ? ' now' : ''}">
-      <div class="wxrow">
-        <i class="i wxbig i-${wxIcon(rung, { clock, sky })}"
-           style="color:${wxTone(rung, { clock, sky })}" aria-hidden="true"></i>
-        <span class="wxline">${w.line || w.word}</span>
-        ${now ? '<b class="wxnow">NOW</b>' : ''}
-      </div>
-      <div class="wxfoot"><span class="wxsub">${clock}</span>${temp}</div>
-    </div>`;
+
+   M3's TWO-LINE list item, and `wxItem()` in `js/popup.js` builds it. The station card's weather
+   section draws the same component, so the markup is stated once and neither surface can drift.
+   The leading slot is the weather glyph in a tinted disc. The headline is the weather word. The
+   supporting line is the clock, and `WX_NOW` replaces it on the step happening now.
+   The word leads because this panel answers about weather. The clock says which half hour states
+   it, which is what a supporting line is for.
+   The trailing slot holds the day's two ends, on the one step that carries them. */
+const stepCard = (rung, clock, now, temp = '') => {
+  const w = WEATHER[rung] || WEATHER[0];
+  return wxItem(wxIcon(rung, { clock }), wxTone(rung, { clock }), w.line || w.word,
+    now ? WX_NOW : wxWhen(clock), temp, now);
 };
 
-function card(p, name = p.n, sub = MET_NAME) {
-  /* The day's two ends, low then high, under the NOW badge on the step happening now. They had a
-     card of their own above the stack, titled `Today`. That card carried one fact and took the
-     height of a step, and a reader scanning the stack met it first. It is one day-scale number
-     beside nine half-hour ones, so it rides the card a reader is already looking at instead.
-     The arrow says which end each figure is, and its colour says it a second time, so the pair
-     needs no word. `aria-label` carries the words for a reader who hears the card.
-     It shares the bottom line with the clock, at the clock's own size. The pair is a fact about the
-     day and the clock is a fact about the step, so neither one outranks the other. */
-  const temp = p.tmax == null ? '' : `<div class="wxtemps">
-      <span class="wxt lo" aria-label="Low ${p.tmin} degrees">
-        <i class="i i-arrow_downward" aria-hidden="true"></i>${p.tmin}°</span>
-      <span class="wxt hi" aria-label="High ${p.tmax} degrees">
-        <i class="i i-arrow_upward" aria-hidden="true"></i>${p.tmax}°</span>
-    </div>`;
+/* `name` arrives ALREADY CASED, and the point's own name is cased in the default. `titleCase()`
+   splits on a hyphen and capitalises each token, so a title holding markup came out with
+   `class="I I-Near_me"` and `var(--Me)`. A CSS class is case-sensitive, so the glyph lost its mask
+   and drew nothing. Only `hereCard()` passes a name, and that name is markup this app wrote. */
+function card(p, name = titleCase(p.n), sub = MET_NAME) {
+  /* The day's two ends, in the trailing slot of the step happening now. They had a card of their
+     own above the stack, titled `Today`. That card carried one fact and took the height of a step,
+     and a reader scanning the stack met it first. It is one day-scale number beside nine half-hour
+     ones, so it rides the row a reader is already looking at instead.
+     `wxTemps()` in `js/popup.js` builds it, because the station card's weather section draws the
+     same pair in the same slot. */
+  const temp = p.tmax == null ? '' : wxTemps(p.tmax, p.tmin);
 
   const cards = [
     /* The last two readings and no more. The card is a forecast, and the half hour behind it is
        there to say which way the weather is going. An hour of it pushed the steps that have not
        happened yet under the fold. */
-    ...p.past.slice(-2).map(([ts, r]) => stepCard(r, hhmm(ts * 1000), false, p.sky)),
-    stepCard(p.rungs[0], hhmm(p.stamp * 1000), true, p.sky, temp),
-    ...p.rungs.slice(1).map((r, i) => stepCard(r, p.clocks[i + 1], false, p.sky)),
+    ...p.past.slice(-2).map(([ts, r]) => stepCard(r, hhmm(ts * 1000), false)),
+    stepCard(p.rungs[0], hhmm(p.stamp * 1000), true, temp),
+    ...p.rungs.slice(1).map((r, i) => stepCard(r, p.clocks[i + 1], false)),
   ].join('');
 
   /* `.pophead` first, always. openSide() splits it — the name goes up into the sheet's title and
@@ -127,18 +122,29 @@ function card(p, name = p.n, sub = MET_NAME) {
      every line above the last one. */
   return `<div class="pophead">
       ${dots(p)}
-      <div class="popname">${titleCase(name)}</div>
+      <div class="popname">${name}</div>
       <div class="muted">${sub}</div>
     </div>
     <div class="sensor">
+      ${/* **THE HEAD'S GLYPH IS FIXED, and it followed the rung for one revision.** A reader cut
+            that on 2026-08-25. The head names the sensor, the same job the kind glyph does over a
+            river or a siren. Those never move. Every item under it already states its own rung, so
+            a head that moved with the first of them stated one step's weather twice and every
+            other step's weather wrongly.
+            `partly_cloudy_day` in `--k-weather`, which is the mark the Weather layer chip already
+            draws. The rung ladder draws `sunny` for a clear sky, and that is a rung rather than a
+            name for the whole layer. */''}
       <div class="sensorhead">
-        ${avat(wxIcon(p.rungs[0], { sky: p.sky }), wxTone(p.rungs[0], { sky: p.sky }))}
+        ${kindGlyph('partly_cloudy_day', 'var(--k-weather)')}
         <b>Weather</b>
       </div>
-      ${/* One segment, the same `.sbody` shape every sensor on a station card draws. This panel and
-            that card stand in one pane, one at a time, so a head over loose content here and a head
-            over a segmented group there is one component in two shapes. */''}
-      <ul class="sbody"><li><div class="wxsteps">${cards}</div></li></ul>
+      ${/* ONE SEGMENT PER HALF HOUR, the same `.sbody` shape every sensor on a station card draws.
+            This panel and that card stand in one pane, one at a time, so a head over a segmented
+            group in one and a head over loose content in the other is one component in two shapes.
+            The steps were a `.wxsteps` grid of cards inside ONE segment. A segment is a block a
+            reader takes in on its own, and every step here is one: a glyph, a word and a clock. So
+            the group states that once rather than nesting a second set of cards inside it. */''}
+      <ul class="sbody">${cards}</ul>
     </div>`;
 }
 

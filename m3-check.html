@@ -125,18 +125,21 @@ const CARD = `<div class="pophead">
   </div>
   <div class="sensor" data-sensor="a">
     <div class="sensorhead">
-      <span class="avat" style="--c:var(--k-river)"><i class="i i-water_drop"></i></span>
+      <i class="glyph i i-water_drop" style="color:var(--k-river)"></i>
       <b>Water level</b>
       <span class="muted">SG. DAMANSARA</span>
     </div>
-    <ul class="sbody"><li><div class="state">3.42 m</div></li><li><div class="spark"></div></li></ul>
+    <ul class="sbody">
+      <li><div class="subhead">Right now</div><div class="state">3.42 m</div></li>
+      <li><div class="subhead">Last 9 h</div><div class="spark"></div></li>
+    </ul>
   </div>
   <div class="sensor" data-sensor="b">
     <div class="sensorhead">
-      <span class="avat" style="--c:var(--k-rainfall)"><i class="i i-rainy"></i></span>
+      <i class="glyph i i-rainy" style="color:var(--k-rainfall)"></i>
       <b>Rainfall</b>
     </div>
-    <ul class="sbody"><li><div class="state">0.0 mm/h</div></li></ul>
+    <ul class="sbody"><li><div class="subhead">Right now</div><div class="state">0.0 mm/h</div></li></ul>
   </div>`;
 /* `JSON.stringify` rather than a nested template literal: the card is HTML with quotes in it, and
    the escaping of a template inside a template inside an injected module is the kind of thing that
@@ -315,18 +318,18 @@ async function phone() {
   is(w.getComputedStyle(mapEl, '::after').content, 'none', 'and no card edge');
   is(Math.round(r(mapEl).width), VW, 'the map is the full width of the window');
 
-  /* **`#locate` is the one button left on the map, and it needs its own phone rule.** The layer
-     controls are a chip row over the map since 2026-08-25, so the button that opened their panel is
-     gone and `#locate` takes the slot it held above the zoom box. Without a rule of its own it falls
-     back to the desktop `calc()`, which adds a `--fab` step for a button that is no longer under it.
-     `bands()` cannot catch that, because that loop never runs a width under 700px. */
+  /* **There is no button on the map at this width at all.** The layer controls became a chip row on
+     2026-08-25, and the location button moved into the navigation bar's middle slot the same day. So
+     the map's bottom strip holds the legend, the credit and Leaflet's own zoom cluster and nothing
+     else.
+     **Assert that `#locate` does not DRAW, never that it is absent.** `js/locate.js` still owns that
+     node and still writes its three states onto it, and it mirrors the glyph and the words onto
+     `#navLocate`. A check that read the element as gone would pass the day somebody deleted the one
+     control the desktop needs. */
   is(d.getElementById('paint'), null, 'phone: the layers button is gone at every width');
-  const lb = r(d.getElementById('locate')),
-        zb = r(d.querySelector('.leaflet-control-zoom'));
-  is(Math.round(lb.right), Math.round(zb.right),
-     'phone: locate shares the column the zoom cluster takes');
-  is(lb.bottom <= zb.top + 0.5, true, 'phone: and sits above the zoom box');
-  is(Math.round(zb.top - lb.bottom) <= 12, true, 'phone: up against it, not one step adrift');
+  is(cs(d.getElementById('locate')).display, 'none',
+     'phone: and the map draws no location button, because the bar carries one');
+  is(!!d.getElementById('navLocate'), true, 'phone: which is where the location control lives here');
 
   /* **The credit is the lowest thing on the map here as well.** A reader stated that rule for every
      width on 2026-08-25, and `bands()` never runs a width under 700px. The phone block writes its
@@ -384,35 +387,38 @@ async function phone() {
      'phone: with the brand glyph on the centre line');
   is(d.getElementById('brand').closest('header') !== null, true,
      'phone: and the brand is in the bar, not the rail and not the news pill');
-  /* **The bar's trailing actions, asked for on 2026-08-24.** The rail is `display: none` here, so
-     the theme switch had no home and a phone carried no theme control at all.
-     **The theme switch is the only one left.** The overflow menu stood here too, and it moved to the
-     navigation bar's fifth slot on 2026-08-25. Two More buttons at one width is one control in two
-     places, and this asserts that only one of them survived.
-     `js/ui.js` moves the theme node, the way `#brand` already moves.
+  /* **The bar's trailing actions, and the overflow menu is the only one in the group.** A reader
+     asked for the More button here on 2026-08-25. It stood in the navigation bar's fifth slot, and
+     that slot went to the location button.
+     **The theme switch LEFT this group the same day, and that reverses what stood here.** It used to
+     travel between the rail and this bar, because the rail is `display: none` at this width and a
+     phone otherwise carried no theme control at all. The picker is three rows in Settings now, so a
+     phone has one, and the switch never leaves the rail. This asserts both halves: the group holds
+     one control, and the switch is not it.
      **Assert the trailing GLYPH centre, never a button's own edge.** 28px inside the trailing edge
      is the number every app bar in this app lands a trailing glyph on, and a control that grew
      would fail a box-edge literal while still being right.
      **And assert that the group is out of flow.** A flex item on the trailing end pushes a centred
      title off centre by half its width, which is the whole reason this is positioned. The centre
      assertion above runs with the group already in the bar, so it covers the outcome. This states
-     the mechanism, so a spacer-based repair fails here rather than silently passing. */
+     the mechanism, so a spacer-based repair fails here rather than silently passing.
+     **`popovertarget` is the whole of the wiring.** A missing attribute draws a button that opens
+     nothing and errors nowhere. */
   const hact = d.querySelector('header .hactions');
   is(!!hact, true, 'phone: the app bar carries a trailing action group');
   is(cs(hact).position, 'absolute',
      'phone: out of flow, so the centred brand never sees it');
-  const phoneTheme = d.getElementById('railApps');
-  is(phoneTheme.parentElement === hact, true,
-     'phone: the theme switch moved into that group');
-  is([...hact.children].map(c => c.id).filter(Boolean).join(','), 'railApps',
-     'phone: the theme switch alone, because the overflow is a navigation bar item now');
+  is([...hact.children].map(c => c.id).filter(Boolean).join(','), 'navMore',
+     'phone: the overflow menu alone, because the theme picker moved into Settings');
+  is(d.getElementById('railApps').closest('header'), null,
+     'phone: and the theme switch stays in the rail, with no second home to keep in step');
+  is(d.getElementById('navMore').getAttribute('popovertarget'), 'appMenu',
+     'phone: the overflow opens the menu, with no handler to keep in step');
   is(d.getElementById('apps'), null,
-     'phone: and the app bar overflow is gone, never a second More beside the bar one');
+     'phone: and the old app bar overflow id is gone, never two More buttons at one width');
   const lastGlyph = r(hact.lastElementChild.querySelector('.i'));
   is(Math.round(VW - (lastGlyph.left + lastGlyph.right) / 2), 28,
      'phone: the trailing glyph centre sits 28px inside the window edge');
-  is(Math.round(parseFloat(cs(phoneTheme.querySelector('.i')).fontSize)), 24,
-     'phone: and the switch keeps the 24px glyph the rail draws on it');
 
   /* --- the app bar's leading action ---
      A reader asked for the search on the leading edge on 2026-08-25. M3 gives a small top app bar a
@@ -448,17 +454,25 @@ async function phone() {
   is(cs(nav).display !== 'none', true, 'phone: and it is not merely in the markup');
   is(Math.round(r(nav).height), 64, 'phone: M3 navigation bar, 64dp with no safe-area inset');
   is([...nav.querySelectorAll('.navitem')].map(b => b.id).join(','),
-     'navFilters,navAlerts,navTable,navCams,navMore',
+     'navFilters,navAlerts,navLocate,navTable,navCams',
      'phone: five items, which is what M3 caps this component at');
-  /* **The fifth slot is an overflow, and it opens the menu through the browser.** A reader asked for
-     it on 2026-08-25. `popovertarget` is the wiring, so a missing attribute draws a button that does
-     nothing and errors nowhere — the same fault the layers item states below.
-     It is the one item with no rail twin, because the rail carries all three of those destinations
-     as items of its own. */
-  is(d.getElementById('navMore').getAttribute('popovertarget'), 'appMenu',
-     'phone: the overflow item opens the menu, with no handler to keep in step');
-  is(d.getElementById('railMore'), null,
-     'phone: and it has no rail twin, because the rail needs no overflow');
+  /* **The middle slot is the location button.** A reader asked for it there on 2026-08-25, and the
+     overflow moved to the app bar to free the slot. Assert the POSITION, not merely that the item
+     exists: "at the centre" is what was asked for, and an item appended to the end still draws.
+     **It has no rail twin, because the map draws `#locate` itself wherever there is room.** That is
+     why this id breaks the `rail`/`nav` pairing every other item here keeps.
+     **It is a destination and takes `aria-current`**, which `railSync()` writes while the "You are
+     here" card is the pane's occupant. So it states no `aria-expanded`: that attribute belongs to
+     the search and the filters, which report on a pane they toggle. */
+  const navIds = [...nav.querySelectorAll('.navitem')].map(b => b.id);
+  is(navIds[Math.floor(navIds.length / 2)], 'navLocate',
+     'phone: with the location button in the middle slot, which is what was asked for');
+  is(d.getElementById('railLocate'), null,
+     'phone: and it has no rail twin, because the map draws that button itself above 600px');
+  is(d.getElementById('navLocate').hasAttribute('aria-expanded'), false,
+     'phone: it is a destination, so it states no aria-expanded');
+  is(d.getElementById('navMore').closest('#navbar'), null,
+     'phone: and the overflow left this bar, which is what freed that slot');
   /* **The layers item is gone, and so is the panel it opened.** The layer controls are a chip row
      over the map since 2026-08-25. A bar item pointing at a panel that no longer exists opens
      nothing and errors nowhere, which is the fault this asserts against. */
@@ -485,6 +499,56 @@ async function phone() {
      'phone: the alert item carries the rail badge, not a copy of it');
   is(Math.round(r(nav.querySelector('#navFilters .railpill')).width), 56,
      'phone: and the shared 56dp indicator pill reaches this component');
+  /* **The selected LABEL takes `secondary` here, and the rail's takes `on-surface`.** That is the
+     reference's own split, and this bar carried the rail's value for a whole revision. Read it
+     against a probe rather than against a literal: the bridge in `css/base.css` is what resolves
+     that role, so a hex here reports on the number this file remembers. */
+  {
+    const probe = d.createElement('div');
+    probe.style.color = 'var(--md-sys-color-secondary)';
+    d.body.appendChild(probe);
+    const want = cs(probe).color;
+    probe.remove();
+    d.body.classList.add('drawer');
+    await settled();
+    is(cs(d.getElementById('navFilters')).color, want,
+       'phone: a selected item takes M3’s `secondary`, which is the vertical arrangement’s own');
+    d.body.classList.remove('drawer');
+    await settled();
+  }
+  /* **Every item answers a pointer with a state layer, and this bar had none for a revision.** A
+     `:hover` cannot be driven from a script, so this is a CSSOM walk: a control with no hover rule
+     draws correctly and answers nothing, which no rendered measurement can see. That is the shape
+     the rail's own state-layer block already uses. */
+  {
+    const seen = [];
+    for (const sheet of d.styleSheets) {
+      let rules; try { rules = sheet.cssRules; } catch { continue; }
+      /* **Test `selectorText` BEFORE recursing, never instead of it.** A `CSSStyleRule` carries its
+         own `cssRules` list in every modern engine, for nested rules, and that list is a truthy
+         empty object. So a walk that treats `rule.cssRules` as "this is a group" skips every style
+         rule there is and reports that no rule exists. This block did exactly that and failed on
+         markup that was right. */
+      const walk = list => {
+        for (const rule of list) {
+          if (rule.selectorText && /#navbar\b/.test(rule.selectorText)
+              && /:hover|:active/.test(rule.selectorText)
+              && rule.style.getPropertyValue('background')) seen.push(rule.selectorText);
+          if (rule.cssRules) walk(rule.cssRules);
+        }
+      };
+      walk(rules);
+    }
+    is(seen.some(s => /:hover/.test(s) && !/aria-current/.test(s)), true,
+       'phone: a bar item declares a hover state layer');
+    is(seen.some(s => /aria-current[^)]*:hover/.test(s)), true,
+       'phone: and a SELECTED item declares its own, over its own container rather than over nothing');
+    is(seen.some(s => /:active/.test(s)), true, 'phone: with a pressed layer beside it');
+    /* `every` on an empty array answers true, so the count is what stops this passing vacuously the
+       day the walk above breaks again. */
+    is(seen.length >= 4 && seen.every(s => /\.railpill/.test(s)), true,
+       'phone: every one of them on the INDICATOR, never on the whole 72px column');
+  }
   is(Math.round(r(phoneMap).top), Math.round(r(phoneBar).bottom),
      'phone: the map starts where the bar ends');
   is(parseFloat(cs(phoneMap).borderTopLeftRadius) > 0, true,
@@ -711,14 +775,17 @@ async function desktop() {
      every frame. It does, and that is what keeps live tiles in the card as it grows rather than
      revealing a blank strip for 300ms. `right` for the pane's own arrival, `left` for the rail's:
      the navigation rail now runs the full height on the leading edge, and the map's own leading
-     inset has to travel with it. `--m3-travel` (pane) and `--m3-rail` (rail) are two NAMES for one
-     motion — M3's own token table gives `easing-emphasized` and `easing-standard` the same curve —
-     so both edges carry the same duration and the same easing. Read as two equal values rather than
-     one, or a rail with its own timing would pass here unnoticed. */
+     inset has to travel with it. `--m3-travel` (pane) and `--m3-rail` (rail) cite the same M3 curve
+     — M3's own token table gives `easing-emphasized` and `easing-standard` the same one — and they
+     carry DIFFERENT durations since 2026-08-25. The rail's travel re-rasters the map card every
+     frame, so it took `duration-extra-short3` and the pane kept `duration-short2`. Read the two
+     edges as two values, never as one value twice: that is what tells a deliberate 150 from a rail
+     that quietly lost its own timing. */
   const mapCs = cs(d.getElementById('map'));
   is(mapCs.transitionProperty, 'right, left',
      'the map card transitions its trailing edge for the pane and its leading edge for the rail');
-  is(mapCs.transitionDuration, '0.3s, 0.3s', 'one duration on each edge, M3 duration-short2');
+  is(mapCs.transitionDuration, '0.3s, 0.15s',
+     'the pane on M3 duration-short2, the rail on duration-extra-short3');
   is(mapCs.transitionTimingFunction, `${M3_EASE}, ${M3_EASE}`,
      'one easing on each edge — --m3-travel and --m3-rail cite the same M3 curve');
 
@@ -727,8 +794,8 @@ async function desktop() {
   const headerCsMotion = cs(d.getElementById('ticker'));
   is(headerCsMotion.transitionProperty, 'left, right',
      'the news pill travels with the rail on one edge and with the pane on the other');
-  is(headerCsMotion.transitionDuration, '0.3s, 0.3s',
-     "on the rail's own --m3-rail and the pane's own --m3-travel");
+  is(headerCsMotion.transitionDuration, '0.15s, 0.3s',
+     "the rail's own --m3-rail leads here, so the two read in the other order");
   is(headerCsMotion.transitionTimingFunction, `${M3_EASE}, ${M3_EASE}`,
      'and both cite the same M3 curve');
 
@@ -884,7 +951,7 @@ async function desktop() {
     is(cs(d.querySelector('header')).display, 'none',
        'the app bar does not draw, so its trailing group cannot either');
     is(d.getElementById('railApps').closest('#rail') !== null, true,
-       'and the theme switch went back to the foot of the rail');
+       'and the theme switch stands at the foot of the rail, which is its one home now');
     is(cs(d.getElementById('navbar')).display, 'none',
        'the navigation bar does not draw above 600px');
     // `header > button` counts only a direct child of the bar, never a descendant.
@@ -1054,33 +1121,61 @@ async function desktop() {
     is(cs(d.getElementById('railFind')).display !== 'none', true,
        'shut rail: and so does the search FAB');
 
-    /* --- the theme button is the switch ---
-       It held a popover carrying a three-way pill, Auto, Light and Dark. Two states now, and one
-       press flips them. The glyph names the NEXT press: a reader can already see the shade they
-       are looking at. `prefs` is captured and restored by the block around this one, so pressing
-       a preference-owned control here costs a reader nothing. */
+    /* --- the theme: a picker in Settings and a switch on the rail ---
+       It held a popover carrying a three-way pill. That pill and Auto were cut on 2026-08-24, and
+       the repository owner asked for Auto back on 2026-08-25 with the picker in Settings.
+       **The rail glyph names the SHADE ON SCREEN, and that reverses what this block asserted.** It
+       named the next press, on the argument that a reader can already see the shade. Under Auto the
+       pick is a WORD, and the one thing a reader cannot read off the page is which shade that word
+       resolved to.
+       **So the two halves have to be asserted apart.** The glyph is the state and the words carry
+       the act, and a control that got one of the two right would otherwise pass.
+       `prefs` is captured and restored by the block around this one, so pressing a
+       preference-owned control here costs a reader nothing. */
     const themeBtn = d.getElementById('railApps'), root = d.documentElement;
     const themeWas = root.dataset.theme;
-    /* The three-way pill is gone. `#appMenu` is back for a different job: it is the phone navigation
-       bar's overflow menu, holding Settings, Help and About, which are rail items at THIS width. So
-       the claim is that it carries no theme control, never that the element is absent. */
+    /* The three-way pill is gone from the MENU. `#appMenu` is back for a different job: it is the
+       phone overflow, holding Settings, Help and About, which are rail items at THIS width. So the
+       claim is that the menu carries no theme control, never that the element is absent. */
     is(!!d.querySelector('#appMenu #themeRow'), false,
-       'the theme popover is gone: one press flips the shade now');
+       'the theme popover is gone: the picker is three rows in Settings now');
     is([...d.querySelectorAll('#appMenu .mi')].map(b2 => b2.id).join(','),
        'menuSettings,menuHelp,menuAbout',
        'and the menu that kept the id holds the three destinations the navigation bar cannot');
     is(themeBtn.hasAttribute('popovertarget'), false, 'and the button opens no box');
+    /* **Three rows, and Auto is one of them.** They are radios in one group, because three choices
+       is not a state a switch can hold — the rule that keeps the two heat layers in one string. */
+    is([...d.querySelectorAll('#themeList input')].map(i2 => i2.value).join(','),
+       'auto,light,dark', 'Settings holds the three choices, with Auto first');
+    is(new Set([...d.querySelectorAll('#themeList input')].map(i2 => i2.type + i2.name)).size, 1,
+       'as one radio group, so two answers at once is unrepresentable');
     for (let i = 0; i < 2; i++) {
-      const before = root.dataset.theme, want = before === 'dark' ? 'light' : 'dark';
-      is(!!themeBtn.querySelector('.i-' + want + '_mode'), true,
-         'the glyph names the next press, not the theme on screen');
-      is(themeBtn.getAttribute('aria-label'), want === 'dark' ? 'Dark theme' : 'Light theme',
-         'and so do its words');
+      const now = root.dataset.theme, other = now === 'dark' ? 'light' : 'dark';
+      is(!!themeBtn.querySelector('.i-' + now + '_mode'), true,
+         'the glyph names the shade ON SCREEN, which is the one thing Auto hides');
+      is(themeBtn.getAttribute('aria-label').endsWith('Switch to ' + other + '.'), true,
+         'and its words name the act, so the glyph and the label say two different things');
       themeBtn.click();
       await settled();
-      is(root.dataset.theme, want, 'one press flips the theme, with no box in between');
+      is(root.dataset.theme, other, 'one press flips the theme, with no box in between');
     }
     is(root.dataset.theme, themeWas, 'and two presses land back where this block started');
+    /* **A press on the rail sets an explicit shade, which LEAVES Auto**, and the rows have to say
+       so. A picker that went on reporting Auto over a shade a reader pinned is the two surfaces
+       reporting two answers, which is what one writer exists to stop. */
+    is(d.querySelector('#themeList input[value="auto"]').checked, false,
+       'a press on the rail leaves Auto, and the picker reports that');
+    is(d.querySelector('#themeList input:checked').value, root.dataset.theme,
+       'with the row for the shade on screen checked instead');
+    /* And back the other way: the picker writes the preference and the button re-reads it. */
+    const autoRow = d.querySelector('#themeList input[value="auto"]');
+    autoRow.checked = true;
+    autoRow.dispatchEvent(new w.Event('change', { bubbles: true }));
+    await settled();
+    is(themeBtn.getAttribute('aria-label').startsWith('Automatic.'), true,
+       'and picking Auto is reported back on the rail button, in its own words');
+    is(!!themeBtn.querySelector('.i-' + root.dataset.theme + '_mode'), true,
+       'while the glyph still names the shade that word resolved to');
 
     /* --- the diagnostics popover, against the header it is really anchored to ---
        `#netstats` is a child of `<header>`, and `header` is its own nearest positioned ancestor.
@@ -1421,14 +1516,22 @@ async function desktop() {
      12 + Math.round(r(secs[1]).top - r(secs[0]).bottom),
      'and the first one clears the header on the sheet padding plus one item gap');
 
-  /* The item itself. The avatar is the same 40px tinted disc the Notices pane draws, through one
-     `.avat` rule that both panes read. A second copy of those numbers is how two panes drift. */
+  /* The item itself. **The leading slot is a bare 24px glyph and it must NOT wear a disc.** It wore
+     the Notices pane's 40px tinted avatar for one revision, and a reader cut it on 2026-08-25: an
+     avatar names a sender, a sensor kind is not one, and six discs down one card read as six of
+     them. `.glyph` is 18px in `css/base.css`, which is the drawer's own dense row, so a slot that
+     loses this rule shrinks rather than vanishes and still looks deliberate. */
   const head = secs[0].querySelector('.sensorhead');
-  const disc = head.querySelector('.avat');
-  is(!!disc, true, 'the sensor leads with an avatar, not a bare glyph');
-  is(cs(disc).width + ' ' + cs(disc).height, '40px 40px', 'M3 list avatar: 40dp');
-  is(cs(disc).borderTopLeftRadius, '50%', 'and a disc, which is what makes it an avatar');
-  is(cs(head).gap, '16px', 'M3 list item gap');
+  const slot = head.querySelector('.glyph');
+  is(!!slot, true, 'the sensor leads with its kind glyph');
+  is(!head.querySelector('.avat'), true, 'and never the Notices pane avatar disc');
+  is(cs(slot).fontSize, '24px', 'M3 list leading slot: 24dp of glyph');
+  /* **Never `backgroundColor` here.** An `.i` IS a box of `currentColor` with the glyph masked out
+     of it, so that property reads the station kind's own hue on a correct glyph. It read the disc
+     that is gone and failed on markup that is right. The BOX is what says there is no disc: an
+     avatar is 40px and a leading slot is 24. */
+  is(Math.round(r(slot).height), 24, 'and a 24px box, not the 40px one an avatar takes');
+  is(cs(head).gap, '12px', 'a bare glyph takes 12px, where a 40px avatar took M3 own 16');
   is(parseFloat(cs(head).minHeight) >= 56, true, 'and at least M3 one-line height');
   is(cs(head.querySelector('b')).fontWeight, '400',
      'the headline is body-large in the REGULAR weight, the rule `.nrow b` already states');
@@ -1445,6 +1548,17 @@ async function desktop() {
      'each segment is a filled container, or the group is invisible');
   is(Math.round(r(segs[1]).top - r(segs[0]).bottom), 2,
      'and they read as one block at M3 own 2px, never at the 8px `.mseg` takes');
+  /* **Every segment in a group of several carries a title, and it leads the segment.** A meter, a
+     metric row and a graph each answer a different question, and the title is what says which. The
+     first line inside a segment cancels its own top margin: the item states 12px of padding, and a
+     10px margin over that first line stands it 22px down. A group of ONE takes no title, because
+     the head above it already named the only thing under it — the camera is the kind that reaches
+     that, and the node harness in CLAUDE.md holds both halves over the live payload. */
+  const heads = segs.map(x => x.firstElementChild);
+  is(heads.every(h => h && h.classList.contains('subhead')), true,
+     'each segment leads with its own title');
+  is(cs(heads[0]).marginTop, '0px',
+     'and that title cancels its top margin, or it stands 22px inside a 12px segment');
   /* M3's side sheet has a header. The drawer went unnamed for a long time on the argument that the
      hamburger which opened it stays on screen — true, and it still left the panel with no title. */
   /* **A pinned header needs a height of its own.** `.modalhead` was written as a row in the flow, so
@@ -1671,7 +1785,26 @@ async function desktop() {
     const b = d.getElementById(id);
     b.showModal();
     const mh = b.querySelector('.modalhead');
-    is(cs(mh).flexDirection, 'row', id + ': one row above 600px');
+    /* **THE SAME APP BAR THE PANE WEARS, AT THIS WIDTH TOO**, asked for on 2026-08-25. These five
+       drew a 56px row here with the headline beside the button, and the table and the wall drew 36.
+       So one panel changed shape at 600px and no two panels agreed with each other.
+       **Assert the PARTS, not a second copy of the numbers.** `.apptop` and `.apflex` are the pane's
+       own classes, so a header holding them cannot drift from it. The measurements under them catch
+       a rule that lands on the class and is then beaten by an id, which is how the headline drew 24
+       here and 28 on a phone for a whole revision. */
+    const top = mh.querySelector('.apptop'), h2b = mh.querySelector('.apflex');
+    is(cs(mh).flexDirection, 'column', id + ': the pane’s app bar, so the icons and the headline are two rows');
+    is(!!top, true, id + ': its icon row is `.apptop`, the part the pane places');
+    is(Math.round(r(mh).height) >= (h2b ? 112 : 56), true,
+       id + ': M3 112dp with a headline, and the 56dp top row without one');
+    const g = mh.querySelector('.dclose .i');
+    is(Math.round(r(mh.querySelector('.dclose')).width), 48, id + ': a 48dp target, the pane’s own');
+    is(Math.round((r(g).left + r(g).right) / 2 - r(mh).left), 28, id + ': glyph 28px in');
+    is(Math.round((r(g).top + r(g).bottom) / 2 - r(mh).top), 32, id + ': and 32px down');
+    /* Against the pane's own headline, never against a literal. `getComputedStyle` resolves a
+       font-size inside a shut `<dialog>`, so this holds with `#pane` closed. */
+    if (h2b) is(cs(h2b.querySelector('h2')).fontSize, cs(d.querySelector('#barHead h2')).fontSize,
+       id + ': and one headline size across every panel');
     /* **The five full-screen-capable panes lead with a back arrow at BOTH widths**, asked for on
        2026-08-25. The pane already did, so one glyph in one position now answers every panel. This
        reverses the trailing X these carried above 600px. */
@@ -1867,6 +2000,12 @@ async function desktop() {
     is(cs(sh).textTransform, 'none',
        'settings subheader: not `.docbox h3`, the 11px uppercase label the prose panes take');
     is(Math.round(r(sh).height) >= 48, true, 'settings subheader: M3 48dp');
+    /* **No glyph and no disc on a heading.** Both stood here for one revision and the repository
+       owner cut them on 2026-08-25. That lands on M3's own list subheader, which states a label and
+       nothing else. Assert the absence: markup left behind by a half-finished revert draws a disc on
+       one heading and nothing on the next, and neither errors. */
+    is(sb.querySelector('h3 .hdisc'), null, 'settings: no disc on a heading');
+    is(sb.querySelector('h3 .i'), null, 'settings: and no glyph either, which is M3 subheader');
     /* Developer heads no list and takes the same style anyway. One pane states one heading. */
     const devH = [...sb.querySelectorAll('h3')].pop();
     is(cs(devH).fontSize, cs(sh).fontSize,
@@ -2000,11 +2139,7 @@ const ALERT_CARD = `<div class="pophead"><div class="popname">On alert</div>
       <span class="badge" style="--c:var(--muted)"><i class="i i-near_me"></i>Nearest first</span>
     </div></div>
   <div class="alert t-now grouped">
-    <div class="alerttop">
-      <span class="badge" style="--c:var(--k-river)"><i class="i i-water_drop"></i>Water level</span>
-      <span class="tg tg-now">HAPPENING NOW</span>
-    </div>
-    <div class="popname">Water levels at danger</div>
+    <h3 class="nsub">Water levels at danger<span class="tg tg-now">HAPPENING NOW</span></h3>
     <ul class="slist mseg">
       <li data-go="a"><i class="i i-water_drop"></i>
         <span class="nm">SG A<br><small class="muted">Shah Alam, Selangor</small></span>
@@ -2042,8 +2177,11 @@ async function alertPane() {
   is(cs(headChips[0]).textTransform, 'none', 'alert head: not the 12px pill it replaced');
   /* The colour splits M3's way. A count whose NUMBER is painted by the status reads as a reading,
      and a count of stations is not one. The pill did paint the number. */
-  is(cs(headChips[0]).color, cs(d.querySelector('.alert .badge')).color,
-     'alert head: the label takes on-surface, the same ink the kind chip takes');
+  /* `on-surface`, which is the pane's own body ink. Compared against `#sideBody` and not against a
+     second chip: the group chip this once matched is gone, and `getComputedStyle(null)` throws
+     rather than fails, so it took the whole block with it. */
+  is(cs(headChips[0]).color, cs(d.getElementById('sideBody')).color,
+     'alert head: the label takes on-surface, the ink the pane itself uses');
   is(cs(headChips[0].querySelector('.i')).color !== cs(headChips[0]).color, true,
      'alert head: and only the leading icon carries the status hue');
   is(headChips[1].textContent.trim(), 'Nearest first',
@@ -2053,32 +2191,44 @@ async function alertPane() {
   // `.pophead` empties once every piece is lifted, and an empty seam still draws its own margin.
   is(!!d.querySelector('#sideBody .pophead'), false, 'alert head: the seam empties and is removed');
 
-  /* M3's ASSIST CHIP, the same numbers `#sideKinds` already takes. A 32dp container,
-     `shape-corner-small` (8dp), a 1dp outline over no fill, `label-large` (14px) and an 18dp leading
-     icon, 8dp behind that icon and 16dp past the label. The colour splits M3's way: the label takes
-     `on-surface` and the icon takes the station kind's own hue. */
-  const chip = d.querySelector('.alert .badge');
-  is(!!chip, true, 'alert: the group heads itself with a kind chip');
-  is(cs(chip).height, '32px', 'alert chip: M3 assist chip container');
-  is(cs(chip).paddingLeft + ' ' + cs(chip).paddingRight, '8px 16px',
-     'alert chip: 8dp behind the icon, 16dp past the label');
-  is(cs(chip).borderRadius, '8px', 'alert chip: shape-corner-small');
-  is(cs(chip).borderTopWidth, '1px', 'alert chip: a 1dp outline');
-  is(cs(chip).backgroundColor, 'rgba(0, 0, 0, 0)', 'alert chip: and no fill under it');
-  is(cs(chip).fontSize, '14px', 'alert chip: label-large');
-  /* The pill was uppercase with a tinted fill and its own bottom margin. A chip is none of those,
-     and that margin is what the two `vertical-align` hacks under it were written against. */
-  is(cs(chip).textTransform, 'none', 'alert chip: not the uppercase pill it replaced');
-  is(cs(chip).margin, '0px', 'alert chip: and it carries no margin of its own');
-  is(cs(chip.querySelector('.i')).fontSize, '18px', 'alert chip: an 18dp leading icon');
+  /* **A GROUP DRAWS NO CHIP AND NO SHELL.** A reader cut both on 2026-08-25. The kind chip stated
+     the kind a third time, over a heading that names it and rows that all carry its glyph. The
+     coloured left rule stated the tier a third time beside a tag that says it in words.
+     Both deletions are asserted, because markup left behind by a half-finished revert draws a
+     control nobody meant to ship and errors nowhere. */
+  is(d.querySelectorAll('.alert .badge').length, 0, 'alert group: no kind chip inside the card');
+  is(!!d.querySelector('.alerttop'), false, 'alert group: and no row left over for it to sit in');
+  const card = d.querySelector('.alert');
+  is(cs(card).borderLeftWidth, '0px', 'alert group: no coloured left rule');
+  is(cs(card).borderTopWidth, '0px', 'alert group: and no divider above it — this pane spaces');
 
-  // The chip and the tier tag on one flex row. They were two inline boxes held by `vertical-align`.
-  const top = d.querySelector('.alerttop');
-  is(cs(top).display, 'flex', 'alert head: the chip and the tag share a flex row');
-  is(cs(top).alignItems, 'center', 'alert head: centred, not baseline-aligned');
-  const tag = d.querySelector('.alert .tg');
-  is(Math.round(r(tag).top + r(tag).height / 2) === Math.round(r(chip).top + r(chip).height / 2),
-     true, 'alert head: a 19px tag centres against a 32px chip');
+  /* **The head is the M3 list SUBHEADER the Notices pane draws, `.nsub`.** One component, two
+     panes, so the numbers are stated once: `title-small` in `on-surface-variant` at 48dp, with a
+     24dp leading glyph. */
+  const sub = d.querySelector('.alert .nsub');
+  is(!!sub, true, 'alert group: it heads itself with a list subheader');
+  is(cs(sub).minHeight, '48px', 'alert subheader: M3 48dp');
+  is(cs(sub).fontSize, cs(d.querySelector('.nsub')).fontSize,
+     'alert subheader: the same title-small the Notices pane takes');
+  /* **NO GLYPH AND NO DISC, and this is the third shape the head has had.** A tier-coloured glyph
+     stated the tier a third time, right after the left rule was cut for doing that. A neutral one
+     repeated the mark every row under it already carries. An `avat()` disc made a 40dp mark out of
+     the repeat. The repository owner cut all three on 2026-08-25.
+     M3's list subheader is a label and nothing else, so this is the component and not a divergence.
+     **The Notices pane keeps its own glyph**, so the absence is asserted on this subheader alone —
+     a rule written against `.nsub` reaches both panes. */
+  is(sub.querySelectorAll('.i').length, 0, 'alert subheader: no glyph, this pane states the kind in words');
+  is(!!sub.querySelector('.avat'), false, 'alert subheader: and no disc around one');
+  is(!!d.querySelector('.nlist') || !!d.querySelector('.nrow'), false,
+     'alert subheader: the Notices pane is not on screen, so its own glyph is untouched here');
+  // It wraps rather than squashing. A 302px row holds a 24px glyph, a title and a ~100px tag.
+  is(cs(sub).flexWrap, 'wrap', 'alert subheader: wraps rather than squashing its own tag');
+  /* The tag stays. The rule was colour and colour alone is a code nobody was taught, so the word is
+     what carries CAP's certainty axis. Its own 6px margin is cancelled: the flex gap states the
+     space once. */
+  const tg = sub.querySelector('.tg');
+  is(!!tg, true, 'alert subheader: the tier tag stays, because it is the word and not the rule');
+  is(cs(tg).marginLeft, '0px', 'alert subheader: and the flex gap spaces it, not its own margin');
 
   /* M3's LIST at `appearance: segmented`. The container, the two corners and the typescale come
      from `.mseg`, which Settings draws from as well. */
@@ -2107,10 +2257,11 @@ async function alertPane() {
   is(cs(g).fontSize + ' ' + cs(g).minWidth, '24px 24px', 'alert row: a 24dp leading slot');
   is(cs(li[0].querySelector('.rd')).minWidth, '48px', 'alert row: a 48dp trailing slot');
   is(cs(li[0].querySelector('small')).fontSize, '14px', 'alert row: body-medium supporting line');
-  // This app paints the leading glyph with the TIER colour rather than `on-surface-variant`. That is
-  // the one divergence, and it is what makes the rule down the card and the glyph say one thing.
-  is(cs(g).color, cs(d.querySelector('.alert.t-now')).borderLeftColor,
-     'alert row: the glyph takes the tier colour the card rule carries');
+  /* This app paints the leading glyph with the TIER colour rather than `on-surface-variant`. That is
+     the one divergence. It used to be asserted against the card's left rule, and that rule is gone —
+     `borderLeftColor` on a border-less box answers the element's own `color`, so the assertion
+     compared the tier red against the body ink and failed on markup that was right. The subheader
+     assertion above carries the claim now. */
 
   // A row opens a station card, so it keeps a pointer. Settings rows are static and must not.
   is(cs(li[0]).cursor, 'pointer', 'alert row: pressable');
@@ -2355,10 +2506,50 @@ async function bands() {
   f.style.width = '1200px';
 }
 
+/* --- M3's FLEXIBLE navigation bar, at a compact HEIGHT -------------------------------------------
+   The bar states two item arrangements. Vertical stacks the glyph over the label, and horizontal
+   puts the two on one row inside an indicator that wraps the whole item. M3 asks for horizontal
+   where the window's height is compact, which is 480dp.
+   **This app declines the horizontal arrangement, and this probe is what holds the decline.** It was
+   built to the reference's own numbers and then measured: five items needed 569px against a 360px
+   window. The band where it could apply at all is 569px to 600px, because this bar draws below
+   600px alone and a phone held sideways is 760 by 360 and gets the rail instead.
+   **So the assertion is that a compact height changes NOTHING.** Nothing else in this file can say
+   that: `phone()` runs one 360x760 frame and `bands()` never runs a width under 700px, so a media
+   query added back here would clip a label with nothing on screen to say so.
+   **Resize the HEIGHT alone, and put it back.** The width stays 360, so this crosses one query
+   rather than running a second phone pass. */
+async function shortPhone() {
+  const f = document.getElementById('phone');
+  const { d, w, cs, r, settle } = await ready('phone');
+  /* Geometry only in this probe, so the override goes in first. `phone()` has already read every
+     motion declaration this frame carries, and it runs before this one. */
+  settle();
+  f.style.height = '420px';
+  await new Promise(res => setTimeout(res, 200));
+  say('--- the navigation bar at a compact height, ' + w.innerWidth + 'x' + w.innerHeight + ' -----');
+  is(w.innerHeight, 420, 'short phone: the frame really resized, so a height query would have fired');
+  const nav = d.getElementById('navbar'), item = d.getElementById('navLocate');
+  is(cs(nav).display !== 'none', true, 'short phone: the bar still draws');
+  is(Math.round(r(nav).height), 64, 'short phone: still M3’s 64dp container');
+  is(cs(item).flexDirection, 'column',
+     'short phone: and still the VERTICAL arrangement, which is the decline this probe holds');
+  is(cs(nav).gap, 'normal', 'short phone: with no 20px item gap, which only the horizontal one states');
+  is(Math.round(r(d.querySelector('#navbar .railpill')).width), 56,
+     'short phone: and the 56dp pill, never the glyph’s own 24px box');
+  /* The reason the decline stands, restated as a measurement rather than as prose. Five items at
+     M3's horizontal numbers need more room than this window has, and this is that window. */
+  is(w.innerWidth < 569, true,
+     'short phone: the window is narrower than the 569px five horizontal items measured');
+  f.style.height = '760px';
+  await new Promise(res => setTimeout(res, 200));
+}
+
 (async () => {
   out.textContent = '';
   try {
     await phone();
+    await shortPhone();
     /* **`#railToggle` writes the REAL `localStorage` of `flood-exp.test`, because `#desk` loads the
        same `index.html` a reader's own browser does.** `desktop()` and `bands()` both press it now,
        to reach a 220px rail for real rather than assert a number nobody's press ever produces.

@@ -2352,21 +2352,15 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
     $ok('the parser drops state rows',      !isset($day['selangor']));
     $ok('the parser drops town rows',       !isset($day['pelabuhan klang']));
     $ok('two districts come back in all',   count($day) === 2);
-    /* The sky word. The nowcast has no term for cloud, so this feed supplies one, and it applies to
-       rung 0 alone — see WX_CLOUD in js/config.js. These hold the parse, not the district join. */
-    $sky = fn(string $s) => metDaily(json_encode([[
+    /* **THE ROW CARRIES THE TWO TEMPERATURES AND NOTHING ELSE.** Ten assertions here scored a `sky`
+       word read out of `summary_forecast`, and the repository owner cut that word on 2026-08-25.
+       This one holds the deletion: a `summary_forecast` naming a thunderstorm must add no field.
+       See metDaily() in sources.php for why the word went. */
+    $none = metDaily(json_encode([[
         'location' => ['location_id' => 'Ds057', 'location_name' => 'Petaling'],
-        'min_temp' => 24, 'max_temp' => 34, 'summary_forecast' => $s]]))['petaling']['sky'] ?? null;
-    $ok('mendung is cloud',                 $sky('Mendung di beberapa tempat') === 'cloud');
-    $ok('a bare mendung is cloud',          $sky('Mendung') === 'cloud');
-    $ok('case does not matter',             $sky('MENDUNG DI KAWASAN PEDALAMAN') === 'cloud');
-    $ok('no rain is not cloud',             $sky('Tiada Hujan') === null);
-    $ok('a thunderstorm is storm',          $sky('Ribut petir di beberapa tempat') === 'storm');
-    $ok('an inland thunderstorm is storm',  $sky('Ribut petir di beberapa tempat di kawasan pedalaman') === 'storm');
-    $ok('a widespread thunderstorm is storm', $sky('Ribut petir menyeluruh') === 'storm');
-    $ok('a thunderstorm is not cloud',      $sky('Ribut petir di beberapa tempat') !== 'cloud');
-    $ok('rain is not cloud',                $sky('Hujan di beberapa tempat') === null);
-    $ok('a row with no summary has no sky', !isset($day['petaling']['sky']));
+        'min_temp' => 24, 'max_temp' => 34,
+        'summary_forecast' => 'Ribut petir di beberapa tempat']]))['petaling'] ?? [];
+    $ok('a summary adds no field to the row', array_keys($none) === ['tmin', 'tmax']);
     $ok('rubbish parses to nothing',        metDaily('not json') === []);
     $ok('an empty body parses to nothing',  metDaily('') === []);
 

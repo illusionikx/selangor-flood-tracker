@@ -5,6 +5,34 @@ import { KINDS, KIND_RANK, RIVER_COLOR, RAIN_COLOR, STATUS_COLOR, GAUGE_COLOR, N
 import { PREFS } from './state.js';
 
 export const el  = id => document.getElementById(id);
+
+/* **M3's snackbar, and it replaced `#devMsg`.** That was a muted line under the buttons, inside a
+   pane that scrolls. So the answer to a press could sit below the fold while the reader watched the
+   button. A snackbar reports at the foot of the screen, whatever the pane is showing.
+   **It is a `popover`.** The dialog it reports on is modal, so it is in the top layer, and no
+   `z-index` reaches over that. `manual`, so a press anywhere else does not dismiss it.
+   **One timer, cleared on every call.** Two messages in a row otherwise share the first one's clock,
+   and the second vanishes early. `SNACK_MS` is M3's own short duration for a message with no
+   action to take.
+   **`togglePopover()`, never `showPopover()`/`hidePopover()`.** Both of those THROW rather than do
+   nothing when the popover is already in the state they ask for: `hidePopover()` on a closed one
+   raises `InvalidStateError`, and `showPopover()` on an open one does the same. The first version
+   called `hidePopover()` first, to restart the enter animation, and every single call threw on the
+   first line. So the snackbar never drew once, and nothing said so — the throw landed inside a
+   handler with no surface. `togglePopover(force)` is the idempotent pair.
+   The restart went with it. A second message replaces the text and resets the clock, and the
+   messages this app raises are seconds apart.
+   **It lives here rather than in js/ui.js, because js/locate.js raises one too.** That module is
+   imported BY ui.js, so it cannot import it back. This file is the one both already reach. */
+export const SNACK_MS = 4000;
+let snackAt = 0;
+export function snack(msg) {
+  const b = el('snack');
+  b.textContent = msg;
+  clearTimeout(snackAt);
+  b.togglePopover(true);
+  snackAt = setTimeout(() => b.togglePopover(false), SNACK_MS);
+}
 /* **Set a radio and mirror the answer onto the chip around it, because `:has()` will not.** Chromium
    does not restyle a `:has(input:checked)` subject when a SCRIPT changes that checkedness. Measured:
    `matches()` answers true and `getComputedStyle` still hands back the unchecked value. Every box in

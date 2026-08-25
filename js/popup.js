@@ -2,22 +2,21 @@
 // status footer. The same meter/state blocks are reused by the alert panel.
 
 import { KINDS, SOURCES, SPARK_H, NO_INFO, ALERT_TITLE, RIVER_COLOR, RAIN_COLOR,
-         GAUGE_COLOR, RAIN_STOPS, NEAR_MAX_KM, camSrc, WEATHER, wxSky, MET_NAME,
+         GAUGE_COLOR, RAIN_STOPS, NEAR_MAX_KM, camSrc, WEATHER, MET_NAME,
          ACC_ROWS } from './config.js';
 import { PREFS } from './state.js';
 import { noSec, distKm, hasInfo, hasWx, isStale, statusColor, scalePos,
          levelStops, gaugeStops, gaugeColor, color, isFav, titleCase } from './util.js';
 import { nearestOf, nearestCam, nearestLevel, nearestWx, camAlert } from './stations.js';
 
-/* The leading slot of every sensor row: the kind's glyph inside a tinted disc.
-   It is the same avatar the Notices pane draws over a bulletin, and `.avat` in `css/chrome.css` is
-   the one place its numbers live. So the two panes cannot drift.
-   **The disc cannot be the `<i>` itself.** An `.i` is a box of `currentColor` with the glyph masked
-   out of it, so a background on that box is clipped away with everything else outside the glyph.
-   The wrapper is the only place a disc can go. That is the same rule the favorite heart already
-   obeys for its drop shadow. */
-export const avat = (icon, tone) =>
-  `<span class="avat" style="--c:${tone}"><i class="i i-${icon}"></i></span>`;
+/* The leading slot of every sensor row: the kind's glyph, in the kind's own colour.
+   M3's list item gives that slot 24px of glyph in a 48px box, and `.sensorhead .glyph` in
+   `css/map.css` states both. One helper, so six call sites cannot drift on a size or a tone.
+   **It wore a tinted disc for one revision and a reader cut it on 2026-08-25.** The Notices pane
+   keeps its own, `.avat` in `css/chrome.css`, and that pane is the only caller again. A bulletin
+   has a sender and an avatar names one. A sensor kind is not a sender, and six discs down a card
+   read as six senders. */
+export const kindGlyph = (icon, tone) => `<i class="glyph i i-${icon}" style="color:${tone}"></i>`;
 
 /* The warning that rides a camera picture, in the lightbox and nowhere else. Empty string when
    nothing near the lens is on alert, so it costs nothing to interpolate unconditionally.
@@ -228,17 +227,17 @@ export function camNear(from, cam) {
   const k = KINDS.camera;
   return `<div class="sensor cam">
     <div class="sensorhead">
-      ${avat(k.icon, k.color)}
+      ${kindGlyph(k.icon, k.color)}
       <b>Nearest camera</b>
       <span class="muted">${distKm(from, cam).toFixed(1)} km</span>
     </div>
-    ${/* The name and the picture are two segments of one `.sbody`, the shape every sensor on a
-          station card draws. The name is pressable and the picture is not, so they are two items
-          rather than one. */''}
-    <ul class="sbody">
-      <li><div class="place" data-cam="${cam.id}" title="Show ${cam.name} on the map">${cam.name}</div></li>
-      <li>${camImg(cam, `Latest still from ${cam.name}`)}</li>
-    </ul>
+    ${/* ONE segment of a `.sbody`, the shape every sensor on a station card draws. The name and the
+          picture were two, and a group of two titles each item — which puts a heading over a line
+          that is already a name. They belong together anyway: the name says whose view this is. */''}
+    <ul class="sbody"><li>
+      <div class="place" data-cam="${cam.id}" title="Show ${cam.name} on the map">${cam.name}</div>
+      ${camImg(cam, `Latest still from ${cam.name}`)}
+    </li></ul>
   </div>`;
 }
 
@@ -401,7 +400,10 @@ const rainState = s => {
 function sensorBody(s) {
   const body = [];
 
-  if (s.kind === 'river' && s.rate != null) body.push(metric('Trend', rateHtml(s)));
+  /* `Rate`, and it was `Trend`. The segment around these two rows is headed `Trend` now, and a key
+     repeating its own heading 20px above it is one fact twice. `Rate` is the more exact word for a
+     figure in m/h, and it is the field's own name in the payload. */
+  if (s.kind === 'river' && s.rate != null) body.push(metric('Rate', rateHtml(s)));
   // The number the "rising" flag is actually a cutoff on. Shown whenever it is climbing, flagged or
   // not, so "not rising" can be read as "still hours away" rather than taken on trust.
   if (s.kind === 'river' && s.eta != null) body.push(metric('Reaches danger',
@@ -448,12 +450,16 @@ function sensorBody(s) {
      block alone, which left the one kind whose whole question is "and for how long" as the one kind
      with no timeline. It has no samples in the window — that is what being out of contact means
      here — so what it draws is the empty rail across the full twelve hours. See `sirenBand()`. */
+  /* **The state and the band are two segments, and they were one.** They answer two questions and
+     one title cannot head both: the state answers `is it sounding` and the band answers `for how
+     long`. Every other kind already splits the two that way, so a siren carrying `Right now` over a
+     12 hour timeline was the one card where a title named half of what sat under it. */
   const stuck = s.kind === 'siren' && s.backed === false;
-  const siren = s.kind !== 'siren' ? '' : `${hasInfo(s)
+  const siren = s.kind !== 'siren' ? '' : hasInfo(s)
     ? `<div class="state ${s.status > 0 && !stuck ? 'on' : 'off'}">${s.status > 0 ? 'TRIGGERED' : 'IDLE'}</div>
        ${stuck ? '<div class="muted">Faulty signal. No river nearby is high.</div>' : ''}`
-    : '<div class="state">OUT OF CONTACT</div>'}
-    ${sirenBand(s.history)}`;
+    : '<div class="state">OUT OF CONTACT</div>';
+  const sirenLog = s.kind !== 'siren' ? '' : sirenBand(s.history);
   const gauge = s.kind !== 'gauge' ? '' : gaugeBlock(s);
 
   // A camera shows its own view. The offer of the nearest one, and a camera card's offer of the
@@ -464,15 +470,36 @@ function sensorBody(s) {
   /* One segment per block, as an M3 list at `appearance: segmented`. The blocks were a loose run
      inside one filled card, so a meter, a metric row and a graph all read as one wall. Each answers
      a different question, and a segment is what says so.
+
+     **Every segment carries a title, and the pair is `[title, block]`.** Five words cover every kind
+     this app draws: `Right now` for a reading at this moment, `Trend` for where it is going,
+     `Last N h` for a timeline, `Totals` for the accumulation chart, and `Latest still` for a
+     picture. So a river, a gauge and a rainfall station read down the same three or four headings.
+
+     **An empty title means the block writes its own, and only a block that measures its own span
+     does.** `rainState()` states `Right now`. `sparkline()`, `rainBars()` and `sirenBand()` each
+     state the ground they cover, and only they can: the span is read off the readings they hold.
+     `rainAcc()` states `Totals`. Everything else is titled here, where the kind is known.
+
      **A block this kind does not draw makes no `<li>`.** The filter runs before the wrap, so
      `:first-child` and `:last-child` reach the blocks a reader can see and the group takes its
-     outer corner on the real ends. A river draws three segments, a siren one, a camera one.
-     Every block keeps its own markup. This wraps them and changes none of them. */
-  return `<ul class="sbody">${[still, siren, gauge, wet,
-    s.kind === 'river' ? meter(s) : '',
-    body.length ? `<div class="popbody">${body.join('')}</div>` : '',
-    spark, rain, acc]
-    .filter(h => h && h.trim()).map(h => `<li>${h}</li>`).join('')}</ul>`;
+     outer corner on the real ends. A river draws three segments and a camera one.
+
+     **A group of ONE item takes no title, because the section head already named it.** A title over
+     the only thing under it states the section twice. The camera is the only kind that reaches it
+     here, and the weather section and the nearest-camera section reach it for the same reason. */
+  const segs = [
+    ['Latest still', still],
+    ['Right now', siren], ['', sirenLog],
+    ['Right now', gauge],
+    ['', wet],
+    ['Right now', s.kind === 'river' ? meter(s) : ''],
+    ['Trend', body.length ? `<div class="popbody">${body.join('')}</div>` : ''],
+    ['', spark], ['', rain], ['', acc],
+  ].filter(([, h]) => h && h.trim());
+
+  return `<ul class="sbody">${segs.map(([t, h]) =>
+    `<li>${segs.length > 1 && t ? SUB(t) : ''}${h}</li>`).join('')}</ul>`;
 }
 
 /* One clock, at the precision the fact needs.
@@ -558,24 +585,22 @@ const night = clock => {
 
 /* One glyph name for a rung. Only a clear sky has a night form.
    `pin` picks the map's ladder — see WEATHER in config.js for why the two differ at rung 2. */
-export const wxIcon = (r, { clock, pin, sky } = {}) => {
-  /* A refinement first, where there is one. It outranks the night glyph on purpose: a moon says the
-     sky is clear, which is the one thing an overcast night is not. `wxSky()` in config.js holds
-     which rungs each refinement may touch, so this function does not restate the rule. */
-  const s = wxSky(r, sky);
-  if (s) return s.icon;
+/* **It took a `sky` refinement for a while and it does not now.** A cloud glyph on rung 0 and a
+   bolt on the wet rungs both came off the MET DAILY forecast, and the repository owner cut them on
+   2026-08-25. See `WEATHER` in config.js. */
+export const wxIcon = (r, { clock, pin } = {}) => {
   const w = WEATHER[r] || WEATHER[0];
   if (night(clock) && w.night) return w.night;
   return (pin && w.pin) || w.icon;
 };
 
 /* The `--wx-*` tone that belongs to a glyph, read off the glyph itself. So the mark and its colour
-   cannot drift: a refinement, a night form and a rung all answer here through `wxIcon()` alone, and
-   this holds no ladder of its own to keep in step with that one.
-   The moon is the one tone with no pin behind it. `--wx-clear` is a gold that says daylight, so an
-   overcast-free night wearing it states the wrong half of the sky. */
-const WX_TONE = { sunny: 'clear', clear_night: 'moon', cloud: 'cloud',
-  rainy_light: 'rain', rainy_heavy: 'heavy', flash_on: 'storm' };
+   cannot drift: a night form and a rung both answer here through `wxIcon()` alone, and this holds
+   no ladder of its own to keep in step with that one.
+   The moon is the one tone with no pin behind it. `--wx-clear` is a gold that says daylight, so a
+   clear night wearing it states the wrong half of the sky. */
+const WX_TONE = { sunny: 'clear', clear_night: 'moon',
+  rainy_light: 'rain', rainy_heavy: 'heavy' };
 export const wxTone = (r, o) => `var(--wx-${WX_TONE[wxIcon(r, o)] || 'clear'})`;
 
 /* The weather section's ⋮, and it holds provenance alone. Every other ⋮ on a card carries actions
@@ -627,59 +652,95 @@ const wxDots = m => `<button class="icon dots" popovertarget="mnu-met"
    rather than as the two facts MET published. A half-drawn section costs a reader more than the
    temperature is worth, so a station missing any part of the outlook shows no weather at all. The
    grid's first column stays `auto`, because a cell must still size to itself and not stretch. */
+/* --- the weather list item, shared -------------------------------------------------------------
+   **TWO surfaces draw a weather reading, and both draw M3's two-line list item.** They are this
+   card's weather section, and every half hour in the weather panel's stack. `js/wx.js` imports
+   these, so the markup is stated once and `.wxstep` in `css/map.css` states the numbers once.
+   It lives HERE and not in `js/wx.js`, because `wx.js` already imports this module. The other
+   direction is a cycle. */
+
+/* The leading slot is M3's avatar, a 40px tinted disc under the weather glyph. `--c` is written on
+   the element, off `wxTone()`, so the disc and the map pin agree about every rung.
+   The `now` flag is the accent outline. The panel's stack takes it to find one row among nine. This
+   card holds two rows and needs no such marker, so it passes nothing. */
+export const wxItem = (icon, tone, head, sub, trail = '', now = false) =>
+  `<li class="wxstep${now ? ' now' : ''}">
+      <span class="avat" style="--c:${tone}"><i class="i i-${icon}" aria-hidden="true"></i></span>
+      <div class="wxtext"><b>${head}</b>${sub}</div>
+      ${trail}
+    </li>`;
+
+/* The supporting line: the clock in the panel's stack, and the span on this card. */
+export const wxWhen = t => `<span class="wxwhen">${t}</span>`;
+
+/* The supporting line for the reading happening NOW. A play arrow and the word, in the accent and
+   in bold, standing where the clock stands. A supporting line answers which moment the row states,
+   and `Now` answers it.
+   A `<span>` and NOT a `<b>`. `.wxstep .wxtext b` is two classes and an element, so it beats a
+   two-class rule on this box. As a `<b>` the marker drew at the headline's own 16/24 and stood the
+   headline 2px higher than every other row's. The weight is in the stylesheet instead. */
+export const WX_NOW =
+  '<span class="wxnow"><i class="i i-play_arrow" aria-hidden="true"></i>Now</span>';
+
+/* The trailing slot: the day's two ends, high over low on two lines. The arrow says which end each
+   figure is and its colour says it a second time, so the pair needs no word. `aria-label` carries
+   the words for a reader who hears the card.
+   The order is the MARKUP's and never a `column-reverse`, so a screen reader hears what the eye
+   reads. */
+export const wxTemps = (tmax, tmin) => `<div class="wxtemps">
+      <span class="wxt hi" aria-label="High ${tmax} degrees">
+        <i class="i i-arrow_upward" aria-hidden="true"></i>${tmax}°</span>
+      <span class="wxt lo" aria-label="Low ${tmin} degrees">
+        <i class="i i-arrow_downward" aria-hidden="true"></i>${tmin}°</span>
+    </div>`;
+
 function metSection(s) {
   const m = s?.met;
   // ponytail: one gate for the whole section, shared with nearestWx(). Widen only if a partial shape
   // is worth drawing again.
   if (!hasWx(m)) return '';
 
+  /* **THE HEADLINE IS THE LADDER'S OWN WORD, and never a phrase written here.** The repository
+     owner asked for that on 2026-08-25. The dry case read `No rain`, which is a fifth name for a
+     rung the app already calls `Clear` on the map, in the legend, in the weather panel and on the
+     pin. One name for one thing is a rule this repo already states.
+     The ladder is `Clear`, `Rain` and `Heavy rain`, and that is the whole of the nowcast's own
+     vocabulary. Two more words, `Cloudy` and `Thunderstorm`, came off the MET daily forecast for a
+     while and the repository owner cut both the same day. */
+  const later = m.rung ?? 0;
   const w = r => WEATHER[r] || WEATHER[0];
+  const word = r => w(r).line || w(r).word;
 
   /* Four shapes, and every one names both ends. `until` says the rain ends. `past` says the MET
      outlook ended, and never that the rain did. A fifth shape for the dry case: `metSpan()` returns
-     null when no step in the window is wet, so there is no span to word. The cell said nothing at
-     all then, and a glyph on its own is not an answer to "what happens next". */
-  const rain = m.rung == null ? 'No rain in the next 3 hours' :
-    `${w(m.rung).line}${m.from ? ` ${m.from}${m.open ? ',' : ''}` : ''} `
-    + `${m.open ? 'past' : 'until'} ${m.to}`;
+     null when no step in the window is wet, so there is no span to word. The window answers there.
+     **The sentence SPLITS across the item's two lines now.** It was one string, and it opened with
+     the same weather word the headline states. So the headline and the line under it said
+     `Heavy rain` and then `Heavy rain until 19:30`, 20px apart. The headline keeps the weather and
+     the supporting line keeps the span, which is the split every item in this component obeys. */
+  const span = `${m.from ? `from ${m.from}${m.open ? ',' : ''} ` : ''}${m.open ? 'past' : 'until'} ${m.to}`;
+  // Sentence case, the rule every rendered string here obeys. `cap()` in util.js works per word and
+  // lowercases the rest, so it is the wrong tool and it is not exported either.
+  const laterWhen = m.rung == null ? 'In the next 3 hours' : span[0].toUpperCase() + span.slice(1);
 
-  /* The glyph is the state, so the state is not also written under it. The word rides on `data-tip`,
-     which `js/sparktip.js` opens on hover and on a tap — a `title` would say nothing to a thumb.
-     `aria-label` carries the same word for a reader who hears the card instead. */
-  const big = r => `<i class="i wxbig i-${wxIcon(r)}" role="img" style="color:${wxTone(r)}"`
-    + ` aria-label="${w(r).word}" data-tip="${w(r).word}"></i>`;
-
-  /* Two columns, each one glyph and the words that belong to it. The two temperatures stack, high
-     over low, and neither one is labelled — the order says which is which, and the same pair in
-     one line made a reader work it out. `data-tip` names both ends for anyone the order does not
-     answer, on the same hover and the same tap as the glyph beside it. */
-  const now = m.now == null && m.tmax == null ? '' : `<div class="wxcol">
-      <div class="wxrow">
-        ${m.now == null ? '' : big(m.now)}
-        ${m.tmax == null ? '' : `<span class="wxtemp" data-tip="Max ${m.tmax}° · Min ${m.tmin}°">
-          <span>${m.tmax}°</span><span>${m.tmin}°</span>
-        </span>`}
-      </div>
-      <span class="wxsub">Now</span>
-    </div>`;
-
-  const later = m.rung ?? 0;
-  const out = m.hr1 == null ? '' : `<div class="wxcol">
-      <div class="wxrow">
-        ${big(later)}
-        <span class="wxline">${rain}</span>
-      </div>
-      <span class="wxsub">Later</span>
-    </div>`;
-
+  /* Two M3 list items, one per question. `Now` states the sky at this moment and the day's two
+     ends. The second states what happens next and when.
+     **They were two cells of a `1fr 3fr` grid inside ONE segment**, each one a glyph over a title,
+     with the whole state on `data-tip` and nothing written out. The repository owner asked for the
+     component on 2026-08-25, one pane over, and this card stands in the same pane. A head over two
+     cells here and a head over a list there is one component in two shapes. */
   return `<div class="sensor" data-sensor="@met">
       <div class="sensorhead">
-        ${avat(wxIcon(m.rung ?? m.now ?? 0), wxTone(m.rung ?? m.now ?? 0))}
+        ${kindGlyph('partly_cloudy_day', 'var(--k-weather)')}
         <b>Weather</b>
         <span class="muted">${m.at}</span>
         ${wxDots(m)}
       </div>
-      <ul class="sbody"><li><div class="wx">${now}${out}</div></li></ul>
+      <ul class="sbody">
+        ${m.now == null ? '' : wxItem(wxIcon(m.now), wxTone(m.now), word(m.now), WX_NOW,
+          m.tmax == null ? '' : wxTemps(m.tmax, m.tmin))}
+        ${m.hr1 == null ? '' : wxItem(wxIcon(later), wxTone(later), word(later), wxWhen(laterWhen))}
+      </ul>
     </div>`;
 }
 
@@ -713,7 +774,7 @@ export function popup(s) {
     ${metSection(s)}
     <div class="sensor" data-sensor="${s.id}">
       <div class="sensorhead">
-        ${avat(kind.icon, tone)}
+        ${kindGlyph(kind.icon, tone)}
         <b>${kind.one || kind.label}</b>
       </div>
       ${sensorBody(s)}
@@ -777,7 +838,7 @@ export function sitePopup(members) {
     ${metSection(lead)}
     ${camFirst(members).map(m => `<div class="sensor" data-sensor="${m.id}">
       <div class="sensorhead">
-        ${avat(KINDS[m.kind].icon, hasInfo(m) ? KINDS[m.kind].color : 'var(--muted)')}
+        ${kindGlyph(KINDS[m.kind].icon, hasInfo(m) ? KINDS[m.kind].color : 'var(--muted)')}
         <b>${KINDS[m.kind].one || KINDS[m.kind].label}</b>
         ${m.name !== lead.name ? `<span class="muted">${m.name}</span>` : ''}
         ${dots(m)}
@@ -820,7 +881,7 @@ export function herePopup(e, loaded) {
     if (s && distKm(at, s) > NEAR_MAX_KM) s = null;
     /* `title`, not `head`: the card's own head is written below, and shadowing that name inside the
        callback would put a sensor's glyph where the card's badge belongs. */
-    const title = `${avat(kind.icon, s ? kind.color : 'var(--muted)')
+    const title = `${kindGlyph(kind.icon, s ? kind.color : 'var(--muted)')
       }<b>${kind.one || kind.label}</b>`;
     // nearestOf() only ever returns a station that is reporting, so there is no "no reading" case
     // here — either the nearest one inside the cap has something to say or nothing does.
@@ -1098,7 +1159,14 @@ export function sparkline(points, kind = 'river', st = null) {
      below already carries for its peak mark, broken at a second site by the later change that let
      the axis grow. Anything stating a graph's range reads the data.
      Two readings or it is not a range, so one reading and none carry no caption at all. */
-  return `<div class="spark"${has ? readout(inWin, x, v => `${v} m`, kind) : ''}>
+  /* **The span moved into the heading, and the caption states the range alone.** Every block of a
+     sensor's body is one segment of a segmented list now, and every segment carries a title. This
+     graph's title is the ground it covers, which is the same heading `rainBars()` below already
+     draws. Left in both places, the card printed `Last 9 h` over `3.42–5.32 m over 9 h`, which is
+     one fact twice, 40px apart. The heading is a measurement rather than the `SPARK_H` cap, so a
+     station watched for two hours says two hours. */
+  return SUB(`Last ${spanText(secs)}`) + `<div class="spark"${
+      has ? readout(inWin, x, v => `${v} m`, kind) : ''}>
     <svg viewBox="0 0 100 28" preserveAspectRatio="none" aria-hidden="true">
       ${defs}
       ${rules(ticks)}
@@ -1106,7 +1174,7 @@ export function sparkline(points, kind = 'river', st = null) {
     </svg>
     ${axisHtml(ticks)}
     ${inWin.length > 1
-      ? `<div class="muted">${lo0.toFixed(2)}–${hi0.toFixed(2)} m over ${spanText(secs)}</div>` : ''}
+      ? `<div class="muted">${lo0.toFixed(2)}–${hi0.toFixed(2)} m</div>` : ''}
   </div>`;
 }
 
@@ -1171,7 +1239,11 @@ export function sirenBand(points) {
   // this is not a reading. See base.css.
   // Capitalised, because the readout prints this word where every other graph prints a number, and
   // a lower-case word beside `1.74 m` reads as a fragment of a sentence rather than a reading.
-  return `<div class="spark band"${
+  /* **The heading states `SPARK_H`, not a measured span, and this band is the one graph where that
+     is right.** Every other block here reads its span off the readings it holds. This one frames on
+     the clock, so the ground it covers is the constant and never the record. A measured span would
+     print `Last 0 min` on the 103 sirens of 212 that hold one sample. */
+  return SUB(`Last ${spanText(SPARK_H * 3600)}`) + `<div class="spark band"${
       inWin.length ? readout(inWin, x, v => v > 0 ? 'Sounding' : 'Quiet', 'siren') : ''}>
     <svg viewBox="0 0 100 28" preserveAspectRatio="none" aria-hidden="true">
       ${rules(ticks)}${rail}${bars}

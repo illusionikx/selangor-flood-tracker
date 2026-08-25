@@ -139,15 +139,28 @@ function groupCard(items, kind, t, hereAt) {
       : (b.lead.ratio || 0) - (a.lead.ratio || 0)));
 
   const [one, many] = ALERT_TITLE[`${kind}|${t}`] || [k.label, k.label];
-  /* The kind chip and the tier tag share a flex row now. They were two inline-level boxes, and the
-     chip is an M3 assist chip at 32dp against the tag's 18. See `.alerttop` in css/chrome.css.
-     The rows are an M3 SEGMENTED list, which is `.mseg` in that same file. */
+  /* **The group head is the M3 list SUBHEADER the Notices pane already draws, `.nsub`.** A reader
+     cut the kind chip on 2026-08-25 and the coloured left rule with it.
+     The chip stated the kind a third time. The heading under it already named it — `Water levels at
+     danger` is a water level — and every row under that carries the same glyph. **That is the
+     argument the Notices pane made when it dropped its own card shell**, one pane over, and it holds
+     here for the same reason.
+     The coloured left rule went the same day and for the same reason: it stated the tier a third
+     time beside a tag that says it in words.
+     **THE HEAD CARRIES NO GLYPH AT ALL, and three shapes were tried before that.** A tier-coloured
+     glyph stated the tier a third time in the head, right after the rule was cut for doing exactly
+     that. A neutral one still repeated the mark every row under it already carries. A tinted
+     `.avat` disc, the one a bulletin draws one pane over, made a 40dp mark out of it. The
+     repository owner cut all three between 2026-08-25 and settled on text.
+     **M3's list subheader is a label and nothing else, so this is the component rather than a
+     divergence from it.** The kind is in the heading's own words, and the glyph is on every row
+     below, which is where a reader looks once the heading has scrolled away.
+     **The tier TAG stays, and it is not the rule in another shape.** The rule was colour, and colour
+     alone is a code nobody was taught. The tag is the word, and CAP's certainty axis is what that
+     word carries: `now` is observed, `soon` is a forecast, `stale` is a claim we cannot stand behind.
+     The rows are an M3 SEGMENTED list, which is `.mseg` in `css/chrome.css`. */
   return `<div class="alert t-${t} grouped">
-    <div class="alerttop">
-      <span class="badge" style="--c:${k.color}"><i class="i i-${k.icon}"></i>${k.one || k.label}</span>
-      ${TIER_TAG[t]}
-    </div>
-    <div class="popname">${rows.length > 1 ? many : one}</div>
+    <h3 class="nsub">${rows.length > 1 ? many : one}${TIER_TAG[t]}</h3>
     <ul class="slist mseg">${rows.map(({ lead: s, n }) => `<li data-go="${s.id}"
         title="Show ${s.name} on the map">
         <i class="i i-${(size.get(s.site || s.id) || 1) > 1 ? 'layers' : k.icon}"></i>

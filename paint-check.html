@@ -155,7 +155,7 @@ for (const id of FILTERS) {
 // --- a menu chip states its own value -----------------------------------------------------------
 /* The label IS the answer, so the map says what it draws with nothing opened. Written from the
    preference by render() and syncHeat(), never read back off the chip. */
-is(el('layerChipLabel').textContent.trim(), 'Stations', 'the layer chip states the layer on screen');
+is(el('layerChipLabel').textContent.trim(), 'Hydrology', 'the layer chip states the layer on screen');
 {
   const want = [['heatOff', '', 'Heatmap', 'gradient'], ['heat', 'water', 'Water level', 'water_drop'],
                 ['rainHeat', 'rain', 'Rainfall', 'rainy']];
@@ -174,6 +174,52 @@ is(el('layerChipLabel').textContent.trim(), 'Stations', 'the layer chip states t
 }
 
 // --- the menus ----------------------------------------------------------------------------------
+/* **`.menu` is M3's menu component, and one set of numbers serves every surface that draws one.**
+   They are the phone's overflow (`#appMenu`), the three map chip menus, a sensor's ⋮ and the weather
+   card's ⋮. The reference is
+   https://github.com/bczak/m3you/blob/development/src/components/Menu/menu.css
+   Two faults here put nothing wrong on screen. A row that keeps the old 13px text and 6px corner
+   reads as a menu, so a half-finished transcription ships looking deliberate. And the outer corner
+   lands on the group's own first and last row alone, which is invisible on any menu of one row.
+   **Assert a row's HEIGHT as a floor, never as 48.** The nearest-webcam row wraps to two lines and
+   the provenance block to three, which is this app's own divergence from the reference. */
+function m3menu(win, m, id) {
+  const w = win;
+  const cs = w.getComputedStyle(m);
+  is(cs.borderRadius, '16px', id + ': the container takes shape-corner-large');
+  is(cs.padding, '4px', id + ': and M3’s own 4px of padding');
+  is(cs.rowGap, '2px', id + ': with a 2px gap between its rows');
+  is(parseFloat(cs.borderTopWidth), 0, id + ': and no outline, because a menu separates by elevation');
+  is(cs.boxShadow !== 'none', true, id + ': which is the elevation it separates by');
+  const rows = [...m.querySelectorAll('.mi')];
+  const r0 = w.getComputedStyle(rows[0]), rl = w.getComputedStyle(rows[rows.length - 1]);
+  is(r0.fontSize, '14px', id + ': a row is body-medium');
+  is(r0.lineHeight, '20px', id + ': on its own 20px line');
+  is(r0.alignItems, 'center', id + ': centred, the way an M3 item centres its content');
+  is(r0.paddingLeft, '12px', id + ': inset 12px, which is the reference’s own number');
+  is(Math.round(rows[0].getBoundingClientRect().height) >= 48, true,
+     id + ': and at least 48px tall, the floor a wrapping row grows from');
+  /* **Measure the gaps, because the declarations above passed while the menu was wrong.** The three
+     chip menus stood their rows 10px off the panel's top and bottom against 4px on the sides, and
+     14px apart against the 2px stated. `.menu` was right the whole time. The rows are `<label>`, and
+     `css/base.css` styles that element with `margin: 6px 0` for the drawer's own filter rows. So a
+     rule this file already asserted was being cancelled by an element selector three files away.
+     **The kinds menu carried the same fault in the other direction.** Its rows sat in a `<div>`
+     wrapper, so `.menu`'s gap never reached them and they stacked flush at 0px. One assertion on the
+     panel cannot see either: both leave `padding` at 4px and `row-gap` at 2px on the box asked. */
+  const mb = m.getBoundingClientRect(), b0 = rows[0].getBoundingClientRect();
+  const bl = rows[rows.length - 1].getBoundingClientRect();
+  is(r0.marginTop, '0px', id + ': a row states no margin, whatever element draws it');
+  is(Math.round(b0.top - mb.top), 4, id + ': so the first row sits on the panel’s own 4px');
+  is(Math.round(mb.bottom - bl.bottom), 4, id + ': and the last row on the same 4px under it');
+  is(Math.round(b0.left - mb.left), 4, id + ': which is the inset the sides take too');
+  if (rows.length > 1)
+    is(Math.round(rows[1].getBoundingClientRect().top - b0.bottom), 2,
+       id + ': and the rows are 2px apart, reached through any wrapper between them');
+  is(r0.borderTopLeftRadius, '12px', id + ': the first row takes the outer corner at its top');
+  is(r0.borderBottomLeftRadius, '4px', id + ': and the inner one at its bottom');
+  is(rl.borderBottomLeftRadius, '12px', id + ': the last row takes the outer corner at its bottom');
+}
 /* The shared placement handler in js/ui.js opens a menu away from the nearest edge and clamps it on
    screen. These chips lead on the map's own leading edge, so the menu opens rightward and downward.
    **A menu placed against a box that measures zero lands in the top-left corner of the window.**
@@ -191,6 +237,7 @@ for (const pair of [['layerChip', 'layerMenu', 2], ['heatChip', 'heatMenu', 3],
   is(Math.abs(mb.left - cb.left) <= 1, true, menuId + ': aligned to its chip leading edge');
   is(mb.top >= cb.bottom - 1, true, menuId + ': opening downward, away from the nearest edge');
   is(m.querySelectorAll('.mi').length, rows, menuId + ': holding all of its rows');
+  m3menu(w, m, menuId);
   /* **The kinds are the one MULTI-select group here, so their rows are checkboxes.** Every other
      menu holds one answer in one string. This one holds a set, and `PREFS.layers` is a map of
      booleans. A radio group there could not draw two kinds at once. */
@@ -208,8 +255,8 @@ for (const pair of [['layerChip', 'layerMenu', 2], ['heatChip', 'heatMenu', 3],
   const off = [...m.querySelectorAll('.mi')].find(r => !r.querySelector('input').checked);
   is(w.getComputedStyle(off.querySelector('.mcheck')).visibility, 'hidden',
      menuId + ': while an unselected row hides its own');
-  is(Math.round(off.querySelector('.mcheck').getBoundingClientRect().width), 18,
-     menuId + ': keeping its 18px box, so no label shifts on a press');
+  is(Math.round(off.querySelector('.mcheck').getBoundingClientRect().width), 20,
+     menuId + ': keeping its 20px box, so no label shifts on a press');
   m.hidePopover();
   await wait(200);
 }
@@ -479,16 +526,15 @@ is(Math.round(prb.height) > 32, true, 'phone: it wrapped, rather than cutting a 
     is(Math.round(b.height), 32, 'phone: ' + (c.id || '?') + ' is still the 32px M3 chip');
   }
 }
-/* **`#locate` took the slot the layers button held**, above the zoom box. With one button left on
-   the map there is one slot, and nothing else in this app reads that geometry. */
-const pr = pbox('locate');
-const pz = pd.querySelector('.leaflet-control-zoom').getBoundingClientRect();
-is(pr.bottom <= pz.top, true, 'phone: the locate button sits ABOVE the zoom box');
-is(Math.round(pz.top - pr.bottom) <= 12, true, 'phone: and up against it, not adrift');
-is(Math.round(pr.right), Math.round(pz.right), 'phone: sharing its right edge');
-const plg = pbox('legend');
-is(pr.left < plg.right && plg.left < pr.right && pr.top < plg.bottom && plg.top < pr.bottom, false,
-   'phone: and clear of the legend, which takes the width beside the zoom buttons');
+/* **No button draws on the map at this width.** `#locate` held the slot above the zoom box until
+   2026-08-25, when a reader moved the location control into the navigation bar's middle slot. Two
+   controls for one action at one width is one control in two places.
+   **Assert that it does not DRAW, never that it is absent.** `js/locate.js` still owns that node and
+   still writes its three states onto it, and it mirrors the glyph and the words onto `#navLocate`. A
+   check reading the element as gone would pass the day somebody deleted the desktop's own button. */
+is(pw.getComputedStyle(pel('locate')).display, 'none',
+   'phone: the map draws no location button, because the bar carries one');
+is(!!pel('navLocate'), true, 'phone: which is where that control lives at this width');
 /* The chip row is at the top and the button cluster is at the bottom, so these two can only meet on
    a very short screen. Asserted anyway: that is exactly the screen a reader has. */
 for (const id of ['locate', 'legend', 'credit', 'pills']) {
@@ -505,6 +551,19 @@ for (const id of ['locate', 'legend', 'credit', 'pills']) {
   const m = pel('layerMenu'), mb = m.getBoundingClientRect();
   is(m.matches(':popover-open'), true, 'phone: the layer menu opens');
   is(mb.left >= 0 && mb.right <= pw.innerWidth, true, 'phone: clamped inside the window');
+  m.hidePopover();
+}
+/* **The overflow menu, which is the one this width alone can reach.** Above 600px the rail carries
+   Settings, Help and About as items of its own, so nothing opens `#appMenu` there. It draws the same
+   component the chip menus draw, and this is what says so. */
+{
+  await wait(200);
+  pel('navMore').click();
+  await wait(400);
+  const m = pel('appMenu');
+  is(m.matches(':popover-open'), true, 'phone: the overflow menu opens from the bar');
+  is(m.querySelectorAll('.mi').length, 3, 'phone: holding Settings, Help and About');
+  m3menu(pw, m, 'phone: appMenu');
   m.hidePopover();
 }
 

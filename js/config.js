@@ -276,40 +276,16 @@ export const WEATHER = [
   { icon: 'rainy_heavy', pin: 'rainy_heavy', word: 'Heavy', line: 'Heavy rain' },
 ];
 
-/* Cloud is a refinement of rung 0, never a rung of its own. The rungs are an intensity ladder, and
-   `api.php` writes `rungs[0]` into the `level` table on every refresh. A fourth rung would change
-   what every stored row means, and nothing can go back and rescore them.
-   It exists because the nowcast has no word for cloud. Its whole vocabulary is `Tiada Hujan`,
-   `Hujan` and `Hujan Lebat`, and `Tiada Hujan` means no rain. It does not mean clear sky. So the
-   sun this app drew on rung 0 was already the wider claim of the two.
-   The word comes from the MET daily forecast, through `sky` on the point — the same feed and the
-   same district join that already supply the temperature on that card. **It only ever replaces
-   Clear.** Rain and heavy rain are what the nowcast observed for the instant the map draws, and a
-   day-scale forecast does not get to overrule them.
-   The trade-off is real and it is one way round. `Mendung di beberapa tempat` is a claim about a
-   district over a day, drawn here on one point at one moment. It is accepted only inside the case
-   where MET itself makes no claim about the sky at all. */
-export const WX_CLOUD = { icon: 'cloud', word: 'Cloudy', line: 'Cloudy', tone: 'cloud' };
-
-/* Thunderstorm is the mirror of cloud, and it refines the WET rungs for the same kind of reason.
-   The nowcast cannot observe lightning. Its three words are about rain and nothing else. The daily
-   forecast can, and `Ribut petir` is its most common value by far: 331 of 500 rows on 2026-08-18,
-   and 13 of the 16 districts this map covers.
-   **It applies only from rung 1 up.** Both sources have to agree that something is falling. The
-   nowcast says it rains here now, and the district's day is forecast to carry storms, so calling
-   that rain a thunderstorm adds the one fact the nowcast has no word for. At rung 0 nothing is
-   falling, and a bolt over a dry point would be the forecast overruling the observation.
-   `flash_on` is the bare bolt rather than `thunderstorm`, which is a cloud with bolts under it. At
-   pin size the cloud in that glyph reads as the same cloud `rainy` and `cloud` already draw, and
-   the three then differ only in their hatching. */
-export const WX_STORM = { icon: 'flash_on', word: 'Storm', line: 'Thunderstorm', tone: 'storm' };
-
-/* The one place that decides whether a point takes a refinement instead of its rung. The pin
-   glyph, the pin colour and the card word all read it, so the three cannot drift. Returns null
-   where the rung answers for itself. */
-export const wxSky = (r, sky) =>
-  r === 0 && sky === 'cloud' ? WX_CLOUD :
-  r >= 1  && sky === 'storm' ? WX_STORM : null;
+/* **THE LADDER ABOVE IS THE WHOLE VOCABULARY, and two refinements are deleted.** They were
+   `WX_CLOUD` (`Cloudy`, a cloud glyph) on rung 0 and `WX_STORM` (`Thunderstorm`, a bolt) on rungs
+   1 and up, picked by a `wxSky()` this file no longer holds. The repository owner cut both on
+   2026-08-25.
+   **The nowcast is the source this map draws, and it publishes neither.** Its whole vocabulary is
+   `Tiada Hujan`, `Hujan` and `Hujan Lebat`. Cloud and lightning came from the MET DAILY forecast
+   instead, joined by district. So each one drew a claim about a district over a whole day, on one
+   point at one instant. The map states what the nowcast observed and nothing else.
+   `sky` is gone from the payload too. See `metDaily()` in `sources.php`. Do not put either word
+   back without a source that reports it for the instant the map draws. */
 
 /* How close two weather pins may draw before the map keeps only the first. A pin draws 31.2px
    wide, so 40 leaves about 9px of air. Measured at latitude 3.1, this thins hard at zoom 11 and
