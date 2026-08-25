@@ -13354,40 +13354,44 @@ clears the cluster is no proof that the row inside it does.
 ## The phone app bar states the name
 
 The bar drew the flood glyph alone, centred, with the two trailing buttons beside it. The repository
-owner asked for the words in its place on 2026-08-24.
+owner asked for `KV Flood Watch` in its place on 2026-08-24, then for the mark and `KVFW` together on
+2026-08-25. The bar draws that pair now.
 
-`#brand` now draws `KV Flood Watch` at that width and hides `.mark`. Nothing about the styling is new
-here. `#brand b` paints `Flood Watch` in `--accent` at 500, and the heading is 22px at both widths.
-So the phone reads the same lockup the open rail reads.
+Nothing about the styling is new. `#brand b` paints `FW` in `--accent` at 500, and the heading is
+22px at both widths. So the phone reads the same lockup the open rail reads, in the spelling that
+fits it.
 
-### The cap keeps the words off the buttons
+### 92px, measured
+
+The lockup is a 24px mark, the heading's own 8px gap and 59.31px of `KVFW` at 22px Roboto. `#brand`
+carries `container-type: inline-size`, so it cannot take its width from its own content. This block
+states the number instead. Remeasure it if the font, the size or the letters change.
 
 The trailing group is 80px wide at `right: 8px`, and the bar centres the brand on the WINDOW. So the
-words reach the buttons below 332px. `min(156px, calc(100vw - 176px))` reserves the same 88px on each
-side of centre. 156 is the measured width of the spelling at 22px Roboto, which the ladder above it
-already carries.
+lockup needs 268px of window to clear it. `NARROW_PX` blocks the page under 300px. The two never
+meet, so no cap holds them apart and nothing truncates.
 
-Below 332px the words ellipsise. A reader on a 320px screen sees `KV Flood Watc…`. That is what M3
-states for a title too long for its bar, and it is the trade this accepts. The alternative is a
-second rung that puts the glyph back under 332px, which is one more spelling, one more rule and one
-more threshold to keep measured.
+`KV Flood Watch` needs 156px and the same clearance, which is 332px of window. That is why the long
+spelling did not stay: a 320px phone drew it under the buttons or ellipsised it.
 
-### The diagnostics keep a way in
+### The drop-alone rung went with the change
 
-`#brand .mark` is the target that opens `#netstats`, and this bar hides it. So `js/ui.js` binds the
-tap to the heading rather than to the mark. The class still goes on the mark, because the popover
-reads `#brand .mark.open` and `:has()` matches a hidden element.
+`@container (max-width: 93px)` hid the word and left the mark. No box can reach it now. The rail is
+164px open and draws nothing shut, and the phone bar is 92px. So the rule stated a fact about
+nothing.
 
-A handler left on the mark takes the feed diagnostics away from every phone, and nothing on screen
-says so.
+This file has deleted a rung three times for that reason, after `KVFW` and `.w-lg`. `KVFW` is back
+because a box came back for it, which is the same test read the other way.
 
-### What the check caught
+### What the checks caught
 
-`title-test.html` held the phone expectation as rung 0, the drop alone, at every width down to
-`NARROW_PX`. It states `.w-md` now.
+`title-test.html` held the phone expectation as the drop alone at every width. It states `.w-sm` now,
+and its reachability table names three boxes with one fixed answer each.
 
-The fit rule is the rail's alone now. That rule fails a spelling wider than its own box, and this
-bar truncates on purpose. It reported a fault at 320px and at each of the twenty widths under it.
+The lockup measurement was wrong, and only a hidden mark shows it. `need` read the word, the mark and
+the gap between them. One revision hid the mark and drew the words in its place, so that sum asked
+for 8px nothing on screen took. It reported `KV Flood Watch` overflowing a box it fits exactly. The
+mark and the gap count only where the mark draws, which is right whichever spelling the bar holds.
 
 ## The navigation bar below 600px
 

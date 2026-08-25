@@ -28,7 +28,7 @@
 <style>body { font: 13px/1.5 monospace; margin: 16px } .f { color: #b00 }</style>
 <pre id="out">running…</pre>
 <script>
-const RUNG = { 'w-md': 1 };                                // 1 is the one spelling. 0 is the drop.
+const RUNG = { 'w-sm': 1, 'w-md': 2 };            // 2 is `KV Flood Watch`, 1 is `KVFW`, 0 is neither.
 const rows = [], fail = [];
 /* Reachability, not just fit — see the block at the foot of the run. Three boxes, tracked apart,
    because each one is supposed to draw a DIFFERENT fixed answer or a different RANGE of answers,
@@ -59,7 +59,10 @@ function read(d, win) {
     home,
     box: h.clientWidth, rung, count: shown(word) ? on.length : 0,
     txt: rung ? on[0].textContent : '(logo)',
-    need: rung ? on[0].getBoundingClientRect().width + mark.getBoundingClientRect().width + gap : 0,
+    /* **The mark and the gap count only where the mark draws.** The phone bar hides it and draws the
+       words in its place, so a lockup measured as word + mark + gap asks for 8px that nothing on
+       screen takes. That reported a spelling overflowing a box it fits exactly. */
+    need: rung ? on[0].getBoundingClientRect().width + (shown(mark) ? mark.getBoundingClientRect().width + gap : 0) : 0,
   };
 }
 
@@ -67,10 +70,7 @@ const check = (label, r) => {
   if (r.err) return fail.push(`${label}: ${r.err}`);
   rows.push(`${label.padEnd(20)} ${r.home.padEnd(5)} box ${String(r.box).padStart(4)}px  ${r.txt}`);
   if (r.count > 1) fail.push(`${label}: ${r.count} spellings drawn at once`);
-  /* **The fit rule is the rail's alone.** The phone bar caps the heading at `100vw - 176px`, so the
-     two trailing buttons keep their column, and `.word` ellipsises under 332px on purpose. A rule
-     that reads a deliberate truncation as a fault fails at every width a 320px phone answers for. */
-  if (r.rung && r.home === 'rail' && r.need > r.box + 1)
+  if (r.rung && r.need > r.box + 1)
     fail.push(`${label}: "${r.txt}" wants ${r.need.toFixed(0)}px of a ${r.box}px box`);
   return r;
 };
@@ -132,8 +132,9 @@ const check = (label, r) => {
       if (wide) railShutDrawn.add(r.drawn);
       /* Only the phone layout may widen its box as the viewport narrows, so it restarts the ladder.
          The 601/600 step changes the home as well, so it restarts there too. */
-      if (!wide && r.rung !== RUNG['w-md'])
-        fail.push(`${w}px: the phone bar drew "${r.txt}" rather than the wordmark`);
+      /* The bar states one width, so it has one answer: the mark and `KVFW` beside it. */
+      if (!wide && r.rung !== RUNG['w-sm'])
+        fail.push(`${w}px: the phone bar drew "${r.txt}" rather than the short spelling`);
       if (!wide) phoneRungs.add(r.rung);
     }
 
@@ -163,7 +164,7 @@ const check = (label, r) => {
 
        rail, shut       --   nothing at all: a collapsed rail carries destinations and no brand
        rail, open    164px   always `.w-md`, the one spelling left
-       phone bar     156px   always `.w-md` too, and the mark is hidden under it
+       phone bar      92px   always `.w-sm`, the mark and `KVFW`, which measure 91.31 of it
 
      The per-width checks above already fail the moment any one reading breaks its own row of that
      table -- a shut rail drawing anything, a phone width drawing a word, anything fitting nothing
@@ -175,13 +176,12 @@ const check = (label, r) => {
     fail.push(`rail, shut drew a heading at some width: ${[...railShutDrawn]}`);
   if (railOpenRungs.size !== 1 || !railOpenRungs.has(RUNG['w-md']))
     fail.push(`rail, open drew rung ${[...railOpenRungs]}, not only .w-md`);
-  /* **The phone bar has no ladder either, and it draws the words rather than the drop.** The
-     repository owner asked for the wordmark on 2026-08-24. `KV Flood Watch` needs 156px and the bar
-     states that width, so there is one answer at every phone width and the mark is hidden under it.
-     A rung of 0 here means the mark came back or the word went, and each of those is the bar drawing
-     something nobody asked for. */
-  if (phoneRungs.size !== 1 || !phoneRungs.has(RUNG['w-md']))
-    fail.push(`the phone bar drew rung ${[...phoneRungs]}, not only .w-md`);
+  /* **Three boxes, three fixed answers, and no ladder left anywhere.** Each box states its own
+     width, so nothing here crosses a threshold as a window narrows. That is what retired the
+     drop-alone rung: no box can reach it. A rung with no box is a span, a rule and a threshold that
+     all state a fact about nothing, which this file has now deleted three times. */
+  if (phoneRungs.size !== 1 || !phoneRungs.has(RUNG['w-sm']))
+    fail.push(`the phone bar drew rung ${[...phoneRungs]}, not only .w-sm`);
   out.innerHTML = rows.join('\n') + '\n\n' +
     (fail.length ? `<b class="f">FAIL</b>\n` + fail.join('\n') : '<b>PASS</b>');
 })().catch(e => { out.innerHTML = `<b class="f">THREW</b>\n${(e && e.stack) || e}`; });

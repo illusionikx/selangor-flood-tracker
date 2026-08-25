@@ -150,9 +150,11 @@ header {
    already acted on once, when `KVFW` went the same way. */
 #brand .word > span { display: none; }
 #brand .word > .w-md { display: inline; }
-/* Under the shorter spelling there is nothing left to shorten, so the drop carries the identity on
-   its own. The tab title says the rest. */
-@container (max-width: 93px) { #brand .word { display: none; } }
+/* **The drop-alone rung is gone, and its threshold with it.** It hid the word under 93px of
+   container. Every box this heading can occupy is fixed and both are wider: 164px in an open rail
+   and 92px in the phone bar, which draws `KVFW` and needs 91.31 of that. A collapsed rail draws no
+   heading at all. So the rule stated a fact about nothing, which is what this file already deleted
+   `KVFW` and `.w-lg` over once each. `title-test.html`'s own reachability check is what names it. */
 #brand b { font-weight: 500; color: var(--accent); }
 #brand .brand { font-size: 24px; color: var(--accent); flex: none; }
 /* Just the glyph's own box, so the status dot has a corner to hang off. `cursor: help` and the hover
@@ -2931,22 +2933,23 @@ body.side #side { display: flex; }
   /* **`--hdr` is 0 here too, and the header is the same pill it is on a desktop.** It was 85px of
      two-row bar: the brand on line one and the ticker on line two. The repository owner asked for
      that space back on 2026-08-24. */
-  /* **The wordmark alone, centred in the bar, and the glyph is gone.** The repository owner asked
-     for the words on 2026-08-24. A phone bar holds one thing, so that one thing states the name a
-     reader can read. `#brand b` paints `Flood Watch` in `--accent` at both widths, so the styling is
-     the rail's own and this block states none of it.
+  /* **The mark and the short spelling, centred in the bar.** The repository owner asked for the
+     glyph on 2026-08-24, then for `KV Flood Watch` in its place, then for the two together on
+     2026-08-25. `#brand b` paints `FW` in `--accent` at both widths, so the styling is the rail's
+     own and this block states none of it.
      `container-type: inline-size` contains this box, so the width is stated rather than left to the
-     content — the rule the rail states from its own side. 156px is the measured width of
-     `KV Flood Watch` at 22px Roboto, the same number the ladder above already carries.
-     **The cap is what keeps the words off the two trailing buttons.** That group is 80px wide at
-     `right: 8px`, and the bar centres the brand on the WINDOW. So the words reach the buttons under
-     332px. `100vw - 176px` reserves the same 88px on each side of centre, and `.word` ellipsises
-     inside it. Below 332px a reader sees `KV Flood Watc…`, which is what M3 states for a title too
-     long for its bar. */
-  #brand { flex: none; width: min(156px, calc(100vw - 176px)); max-width: none; }
-  /* The mark is the diagnostics target, and the words take its place here. `js/ui.js` binds the tap
-     to the heading rather than to the mark, so a hidden mark keeps the popover a phone can open. */
-  #brand .mark { display: none; }
+     content — the rule the rail states from its own side. 92px is what the lockup measures: a 24px
+     mark, the heading's own 8px gap and 59.31px of `KVFW` at 22px Roboto. Remeasure it if the font,
+     the size or the letters change.
+     **It clears the two trailing buttons at every width this app answers for.** That group is 80px
+     wide at `right: 8px` and the bar centres the brand on the WINDOW, so the lockup needs
+     92 + 176 = 268px of window. `NARROW_PX` blocks the page under 300px. So the two never meet, and
+     no cap has to hold them apart. */
+  #brand { flex: none; width: 92px; max-width: none; }
+  /* The long spelling has no box left below 600px, and the short one has no box above it. So the
+     two swap here rather than ladder. */
+  #brand .word > .w-md { display: none; }
+  #brand .word > .w-sm { display: inline; }
   /* **The phone wordmark ladder is gone, because its box is gone.** This block recalibrated the
      crossing for a heading that had a whole row to itself, 288 to 588px wide. The brand is 32px of
      mark in a shared pill now, so no phone width draws a spelling at all and there is nothing left
