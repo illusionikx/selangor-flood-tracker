@@ -1883,6 +1883,7 @@ body.find #findpane { display: flex; flex-direction: column; }
   left: calc(var(--map-l) + 12px); right: calc(var(--map-r) + 12px);
   bottom: calc(8px + var(--gap) + var(--navbar-h));
   display: flex; flex-wrap: wrap; align-items: flex-end; gap: 6px 12px;
+  justify-content: space-between;
   container-type: inline-size;
 }
 /* One line of credit is 337px wide, measured. So a row narrower than that wraps it, and a wrapped
@@ -2421,11 +2422,18 @@ body.side #side { display: flex; }
 /* Leaflet's own attribution box is disabled; we render the credit ourselves, out of the way. It is a
    flex item of `#mapfoot` now rather than a box of its own, so its offsets and its `--pane-w` term
    live on that wrapper.
-   **It is flush right on a desktop and flush left on a phone, and a reader asked for that pair on
-   2026-08-25.** The column aligns its items to the leading edge, so `margin-left: auto` is what
-   moves this one. That is a CROSS-axis auto margin, and it beats `align-items` rather than reads
-   it. The phone block cancels it and the `text-align` beside it together. Cancel one alone and the
-   box goes to one edge with its text against the other.
+   **It is flush RIGHT while it shares the legend's line, and flush LEFT the moment it takes a line
+   of its own.** A reader asked for that on 2026-08-25, in three steps: flush right, then flush left
+   on a phone, then left wherever the two stop fitting.
+   **`justify-content: space-between` on the row is the whole of it, and there is no threshold.**
+   That property distributes per flex LINE. Two items on one line go to the two ends. One item on a
+   line goes to the start. So the row states the rule and nothing has to guess the width where the
+   wrap happens. An auto margin stood here first and could not: it pins the box to the trailing end
+   on every line, wrapped or not, and no query can tell a CSS box that it wrapped.
+   **`text-align: left` at every width, and the phone block states nothing.** The alignment only
+   shows where the credit takes more than one text line, and that only happens on a line of its own,
+   where the box leads on the left. A right-aligned text in a left-placed box is the fault this
+   replaced, drawn one step in.
    **Flush means the map's own edge.** It stopped 118px short for a revision, and a reader called
    that floating. The container query on `#mapfoot` hands the button column back on the one map
    width where this line wraps. */
@@ -3056,9 +3064,9 @@ body.side #side { display: flex; }
      trailing edge holds the whole row clear of the zoom cluster, so neither child needs a
      reservation of its own. Left in place, the legend loses 56px it needs for its one line. */
   #mapfoot { left: 12px; right: 68px; --btncol: 0px; bottom: calc(6px + var(--navbar-h)); }
-  /* Flush LEFT here, under the legend's own leading edge. On a phone the map is the whole window
-     and the credit is the one thing down here a reader reads rather than presses. */
-  #credit { font-size: 10px; line-height: 1.4; margin-left: 0; text-align: left; }
+  /* The row places it here too. At this width it always takes a line of its own, so
+     `space-between` leads it on the left with nothing to state. */
+  #credit { font-size: 10px; line-height: 1.4; }
   #legend { font-size: 10px; padding: 3px 8px; }
   #legend .title { font-size: 10px; }
   #legend .ramp { width: 60px; }

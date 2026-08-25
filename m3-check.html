@@ -323,6 +323,7 @@ async function phone() {
   /* Flush LEFT at this width, against flush right on a desktop. The phone block has to cancel the
      auto margin AND the `text-align`, and the box is what reports whether it cancelled both. */
   is(Math.round(cr.left - r(d.getElementById('mapfoot')).left), 0, 'phone: the credit is flush left');
+  is(Math.round(cr.left - lgp.left), 0, 'phone: on the same leading edge as the scale');
 
   is(pane.tagName, 'DIALOG', 'the pane is a real <dialog>, not a div dressed as one');
   is(!!d.getElementById('scrim'), false,
@@ -1659,19 +1660,18 @@ async function bands() {
        label + ': the scale is one line wherever the map leaves room for one');
     is(lg.right <= foot2.right - 106 + 0.5, true,
        label + ': and it never reaches under the zoom cluster');
-    /* **Flush with the map's own edge, and flush left on a phone.** A reader asked for the pair on
-       2026-08-25, after a revision that stopped this line 118px short and read as floating.
-       Read the BOX and not the `text-align`: cancelling one of the two leaves the box on one edge
-       with its text against the other, and only the box says which edge it sits on.
-       **One line is flush and a wrapped one gives the button column back.** The credit needs 337px
-       for one line, so it wraps in the medium band alone, and a wrapped line rises into the band
-       the zoom cluster takes. A container query hands it `--btncol` there. Assert both cases off
-       the box's own height, or the check states one width's answer at every width. */
-    const foot2 = r(d.getElementById('mapfoot'));
-    const oneLine = credit.height < 24;
-    is(Math.round(foot2.right - credit.right), oneLine ? 0 : 106,
-       label + (oneLine ? ': the credit is flush with the map edge'
-                        : ': the credit wraps, so it takes the button column back'));
+    /* **Flush RIGHT while it shares the scale's line, and flush LEFT the moment it takes its own.**
+       A reader asked for that on 2026-08-25. `justify-content: space-between` states it per flex
+       line, so there is no width to assert and nothing to keep in step.
+       **Read which line it is on, never a width.** The two share a line when their bottoms agree,
+       which is what `align-items: flex-end` guarantees. Assert the case the layout is actually in,
+       or the check states one width's answer at every width.
+       Read the BOX and not the `text-align`. A right-aligned text in a left-placed box is a real
+       fault and the alignment alone cannot see it. */
+    const shared = Math.abs(lg.bottom - credit.bottom) < 1;
+    is(Math.round(shared ? foot2.right - credit.right : credit.left - foot2.left), 0,
+       label + (shared ? ': the credit is flush right while it shares the scale line'
+                       : ': the credit leads on the left once it takes a line of its own'));
     const lb = r(d.getElementById('locate')), pb = r(d.getElementById('paint'));
     is(Math.round(lb.left), Math.round(pb.left),
        label + ': locate and layers share one column in the zoom cluster');

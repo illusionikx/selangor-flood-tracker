@@ -1342,6 +1342,14 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
   content and then contains it measures 0 — the trap `#brand` already carries.
   **The legend keeps the reservation at every width, through `max-width`.** It stands inside the band
   the cluster takes, and it never wraps out of it.
+  **THE CREDIT IS FLUSH RIGHT WHILE IT SHARES THE SCALE'S LINE, AND LEADS ON THE LEFT ONCE IT TAKES
+  ITS OWN.** A reader asked for that on 2026-08-25, after asking for flush right and then for flush
+  left on a phone. `justify-content: space-between` is the whole of it, and there is no threshold.
+  That property distributes per flex LINE: two items on one line go to the two ends, and one item on
+  a line goes to the start. An auto margin stood here first and cannot do this. It pins the box to
+  the trailing end on every line, wrapped or not, and no query can tell a CSS box that it wrapped.
+  `text-align` is left at every width for the same reason. The alignment only shows on a line of its
+  own, where the box already leads on the left.
   **The phone reserves that column on the WRAPPER instead, at `right: 68px`, and sets `--btncol` to
   0.** Both children are clear of the cluster there, so a second reservation on the legend is 56px
   the scale needs for its one line. One token carries it, so the container query on the credit goes
