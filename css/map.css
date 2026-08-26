@@ -221,7 +221,7 @@
    `transform` rather than a smaller font: it takes the halo, the rise ring and the drop shadow down
    with it in one step, and it leaves the 39px layout box alone — that box is repeated as `iconSize`
    in render.js and is what actually positions the marker over its station. */
-.pin:not(.me, .place) { transform: scale(.8); }
+.pin:not(.me, .place, .sel) { transform: scale(.8); }
 /* The glyph itself. An SVG element, not a mask — see `pinGlyph()` in map.js for why. `1em` off the
    `.pin`'s `font-size`, so every rule that sizes a pin by its font (`.me`, `.place`) sizes the
    glyph too.
@@ -359,6 +359,11 @@
    [24, 44] and the pin points at the wrong spot. Matching iconSize (48px box, 48px font, exempt
    from the scale rule) is what .pin.me already does for the same divIcon shape. */
 .pin.place { width: 48px; height: 48px; font-size: 48px; color: var(--accent); }
+/* The pin whose card is open. `markSel()` in map.js swaps that pin's drawing for the teardrop and
+   adds this class, so the box grows and the glyph changes and nothing else does. It states no
+   colour: `.pin` above already reads `--c`, which the pin's own markup still carries, so a station
+   at danger stays red while a reader has its card open. */
+.pin.sel { width: 48px; height: 48px; font-size: 48px; }
 /* The accuracy circle. Coloured here rather than through Leaflet's path options — those are SVG
    presentation attributes and cannot take a token. Same trick as .mastring above. */
 .mecircle { stroke: var(--me); fill: var(--me); }

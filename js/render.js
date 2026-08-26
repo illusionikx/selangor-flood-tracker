@@ -5,7 +5,7 @@ import { state, PREFS, save } from './state.js';
 import { el, color, atDanger, statusColor, leads, hasInfo, isIgnored, ignoredIds,
          favIds, isFav, scalePos, levelStops, gaugeStops, setBox } from './util.js';
 import { marks, siteMark, shown, syncCluster, focusOn, side, openSide,
-         showMast, hideMast, pinGlyph } from './map.js';
+         showMast, hideMast, markSel, pinGlyph } from './map.js';
 import { heat, rainHeat, syncHeat, thinHeat } from './heat.js';
 import { sitePopup } from './popup.js';
 
@@ -219,6 +219,10 @@ export function render() {
      They own their own contents and are not in `sites`. */
   const open = side.key && side.key[0] !== '@' && sites.get(side.key);
   if (open) openSide(side.key, sitePopup(open), open.length > 1 ? [open[0].lat, open[0].lng] : null);
+  /* Every marker above is new, so the open card's pin draws its ordinary glyph again. `openSide()`
+     marks it on a real open, and this is the rebuild that happens under one already open. It runs
+     after the loop, because it reads the marker back out of `siteMark`. */
+  markSel(side.key);
 
   syncCluster();
   // Thinned, not raw: overlapping blobs composite, and these are intensities rather than counts.

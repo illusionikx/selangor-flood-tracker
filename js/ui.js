@@ -73,7 +73,7 @@ function syncThemeBtn() {
   const said = PREFS.theme === 'auto'
     ? `Automatic. ${now === 'dark' ? 'Dark' : 'Light'} now.`
     : `${now === 'dark' ? 'Dark' : 'Light'} theme.`;
-  themeBtn.title = themeBtn.ariaLabel = `${said} Switch to ${other}.`;
+  themeBtn.dataset.tip = themeBtn.ariaLabel = `${said} Switch to ${other}.`;
   for (const b of document.querySelectorAll('#themeList input'))
     b.checked = b.value === PREFS.theme;
 }

@@ -255,7 +255,15 @@
      ISA-18.2 asks that priority be distinguishable at a glance — that is what this pays for. */
   --s-normal: #22bb55; --s-alert: #e68e16; --s-warning: #ff7e33; --s-danger: #ff3b33;
   --s-none: #6d7176;
-  /* The rung between "nothing" and the first published mark, and the only place it is used is a
+  /* **NOTHING READS THIS TOKEN, ON EITHER THEME, SINCE 2026-08-26.** The repository owner cut every
+     sensor to three colours that day: its own kind, the alert amber, the danger red. So this rung
+     has no ladder left to sit on. `GAUGE_COLOR` gives it the gauge's own taupe, and `.state.kind`
+     says `WATER ON GROUND` in that same taupe. See the ladders in `js/config.js`.
+     It is kept declared rather than deleted, because a rung cut out of a palette cannot go back
+     without measuring the whole set again. Delete it the day somebody is sure. **Do not reach for it
+     meanwhile**: a fourth rung on any ladder here is what the three-colour rule exists to stop.
+     What it was for, kept because it is the argument to answer before reviving it:
+     The rung between "nothing" and the first published mark, and the only place it is used is a
      flood gauge with water standing on it. A gauge is the one sensor whose thresholds start above
      the thing worth knowing: JPS marks 0.15 m and 0.3 m, so two centimetres of water over a spot
      known to flood shared a code with dry ground. Amber overstates it and green denies it.
@@ -353,7 +361,8 @@
      theme's red, which is not a coincidence: red is the one rung where "reads on white" and "reads
      on near-black" overlap, so the two themes agree on the colour that matters most. */
   --s-normal: #26e275; --s-alert: #ffc000; --s-warning: #fe8400; --s-danger: #ff3a37;
-  --s-trace: #add72f;   /* same halfway hue, on this theme's own lightness */
+  --s-trace: #add72f;   /* same halfway hue, on this theme's own lightness. Nothing reads it — see
+                           the light block above for why it is kept and what replaced it. */
   /* Not saturated with the others: "no reading" is the absence of a colour, and a tinted grey is a
      hue, which is a claim. */
   --s-none: #9aa0a6;
@@ -730,11 +739,18 @@ dialog:focus, dialog:focus-visible { outline: none; }
 .state.off { color: color-mix(in srgb, var(--s-normal) 70%, var(--on-surface)); background: color-mix(in srgb, var(--s-normal) 12%, transparent); }
 .state.on  { color: color-mix(in srgb, var(--s-danger) 70%, var(--on-surface)); background: color-mix(in srgb, var(--s-danger) 14%, transparent); }
 .state.mid { color: color-mix(in srgb, var(--s-alert)  70%, var(--on-surface)); background: color-mix(in srgb, var(--s-alert) 18%, transparent); }
-/* The two extra rungs a flood gauge needs. It is the one sensor that uses the whole ramp — dry,
-   water on the ground, past its warning mark, flooded — so it is the one that needed both the
-   yellow-green under the amber and the orange between amber and red. */
-.state.trace { color: color-mix(in srgb, var(--s-trace) 70%, var(--on-surface)); background: color-mix(in srgb, var(--s-trace) 20%, transparent); }
-.state.warn  { color: color-mix(in srgb, var(--s-warning) 70%, var(--on-surface)); background: color-mix(in srgb, var(--s-warning) 16%, transparent); }
+/* **`.state.trace` and `.state.warn` are deleted, and the rung under them is what replaced them.**
+   A flood gauge used the whole four-rung ramp: dry, water on the ground, past its warning mark,
+   flooded. So it needed a yellow-green under the amber and an orange between amber and red. On
+   2026-08-26 the repository owner cut every sensor to three colours — its own kind, the alert amber,
+   the danger red — so those two rungs have no ladder to sit on.
+   `.state.kind` is where the lower one went. It paints the chip in the sensor's OWN colour, read off
+   `--c` the way `.badge` beside it already does, so a gauge holding water under its first published
+   mark says so in the same taupe its pin wears. That is the whole point of the three-colour rule: a
+   reading below the first mark is not a rung of the traffic light, and this app spent two hues
+   pretending it was.
+   The upper one folded into `.state.mid`, which is the alert amber the pin now takes at 0.15 m. */
+.state.kind { color: color-mix(in srgb, var(--c) 70%, var(--on-surface)); background: color-mix(in srgb, var(--c) 18%, transparent); }
 
 /* --- sparkline ------------------------------------------------------------------------------ */
 
@@ -912,10 +928,18 @@ dialog:focus, dialog:focus-visible { outline: none; }
    amber or a red reading on the one background in the app those tokens were never checked against —
    the status palette is held to its contrast ratios on `--surface`. The outline is what keeps a
    same-coloured box off a same-coloured card now that the fill no longer does it. */
+/* **`pre`, not `nowrap`, so a tip can take a second line.** `js/sparktip.js` writes the label with
+   `textContent`, so a newline in `data-tip` is the only line break available to it and no caller
+   builds markup. The app bar's nearest-webcam button uses it: what the button IS leads, and what it
+   found follows. `pre` honours that newline and still never wraps on its own, which is the half
+   `nowrap` was there for. A tip with no newline is unchanged, so every graph readout is untouched.
+   `text-align: center` because the box is centred over the thing it names, and a ragged second line
+   under a 40px glyph reads as a fault. It is inert on a one-line tip. */
 .sparktip {
   position: fixed; inset: auto; margin: 0; padding: 3px 8px; border-radius: 6px;
   border: 1px solid var(--outline);
-  font: 500 11px/1.5 Roboto, sans-serif; white-space: nowrap; pointer-events: none;
+  font: 500 11px/1.5 Roboto, sans-serif; white-space: pre; text-align: center;
+  pointer-events: none;
   color: var(--on-surface); background: var(--surface); box-shadow: var(--shadow);
   transform: translate(-50%, -100%);
 }

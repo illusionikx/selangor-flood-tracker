@@ -45,13 +45,16 @@ const setBtn = (cls, label, tip) => {
   words = tip || label;
   btn.className = cls ? `mapbtn ${cls}` : 'mapbtn';
   btn.setAttribute('aria-label', words);
-  if (tip) { btn.dataset.tip = tip; btn.removeAttribute('title'); }
-  else { delete btn.dataset.tip; btn.title = label; }
+  /* **One channel for the words, and it is `data-tip`.** This wrote a `title` in the states that
+     had no tip of their own, so the resting button carried a native tooltip and the failed one a
+     styled one. Two shapes for one control. Every `title` in this app went the same way on
+     2026-08-26, and the reason is the one this file already states: a `title` opens on no phone. */
+  btn.dataset.tip = words;
   if (!twin) return;
   twin.querySelector('.i').className = 'i i-' + (GLYPH[cls] || 'my_location');
   twin.setAttribute('aria-label', words);
   for (const c of ['busy', 'on', 'fail']) twin.classList.toggle(c, c === cls);
-  if (tip) twin.dataset.tip = tip; else delete twin.dataset.tip;
+  twin.dataset.tip = words;
 };
 
 /* Two settings in two places refuse a location, and naming the wrong one sends the reader in a

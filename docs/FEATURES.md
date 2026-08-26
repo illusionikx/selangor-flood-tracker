@@ -16588,6 +16588,32 @@ this card is not about, and this app reserves those hues for status.
 So the number rides `data-tip` and the button jumps to the station card, where the meter states it
 properly.
 
+### The tip takes two lines
+
+The repository owner asked for that on 2026-08-26. What the button IS leads, and what it found
+follows.
+
+    Nearest webcam
+    KG BARU · 2.1 km
+
+That is the split the menu row made with a `<small class="muted">` second line, and it is why the
+row read as well as it did.
+
+`js/sparktip.js` writes the label with `textContent`. So a newline in `data-tip` is the only break
+available, and no caller can build markup.
+
+**`.sparktip` takes `white-space: pre`.** It was `nowrap`, which swallows the newline and runs the
+tip on one long line. That looks deliberate.
+
+`pre-line` also honours the break, and it lets any long tip wrap wherever it likes. `pre` honours
+the break and still never wraps on its own, which is the half `nowrap` was there for.
+
+A tip with no newline is unchanged, so every graph readout is untouched. `text-align: center` is
+inert on those, and it stops a ragged second line under a 40px glyph.
+
+**The `aria-label` keeps one line, joined with a stop.** A screen reader announces a newline as a
+pause with no punctuation, so the two halves run together as one phrase.
+
 ### An empty offer takes `aria-disabled`, never the attribute
 
 With nothing inside the cap the button still draws. A control that disappears leaves a reader unable
@@ -16605,7 +16631,170 @@ takes M3's 38% and drops the hover disc.
 `ui.js` runs one delegated `[data-cam]` listener and one delegated `[data-go]` listener, both on the
 document. A button anywhere reaches them.
 
-`m3-check.html` gains three assertions. The probe card carries a `.near` button, and the check reads
+`m3-check.html` gains six assertions. The probe card carries a `.near` button, and the check reads
 it back out of `#sideActions`, before the favorite, with its tip intact.
 
-All seven runnable checks are green. `m3-check.html` holds 885 assertions.
+## Every `title` attribute is gone, and `data-tip` is the one tooltip
+
+The repository owner asked for that on 2026-08-26, after meeting a native tooltip beside the styled
+one.
+
+32 sites carried a `title`. 20 in `index.html`, 12 across five modules, and four scripts wrote one
+at runtime.
+
+### Why the old exemption was wrong
+
+`CLAUDE.md` already said a `title` opens on no phone. It allowed one as a duplicate of something
+already visible, and named the jump hint on an alert row and the count on a chip.
+
+Two reasons retire that. A duplicate `title` says nothing new, so deleting it costs nothing. And
+beside `data-tip` it draws a second tooltip shape for one control, at a different delay, in the
+operating system's own colours.
+
+`#locate` shipped exactly that. `setBtn()` in `js/locate.js` wrote a `title` in the states with no
+tip of their own, so the resting button raised a native tooltip and a failed fix raised a styled
+one. The table's `.gline` did the same against the table's own hover panel.
+
+### Nothing is lost to a screen reader
+
+Every control that carried a `title` already carried an `aria-label`. So the sweep is a rename.
+
+Anything that needs both keeps them apart, for the reason `paintSpeed()` in `js/timeline.js` states:
+the tip carries the key binding and the accessible name must not. A reader announcing
+"Play open-paren k" reads the binding as part of the control's name.
+
+### A pure duplicate was deleted, never converted
+
+`Show <name> on the map` sat on four visible station names. `Sort by <label>` sat on a visible
+column head.
+
+A styled tip that repeats the words under the pointer is noise. On touch it also parks until the
+next press elsewhere, which puts it over the card that press just opened.
+
+`.gline` in the table lost one for the stronger version of the same reason. That element already
+opens the table's own hover panel through `hook`.
+
+### Leaflet writes the last two
+
+The zoom buttons carry a `title` that Leaflet writes at `addTo()`. `js/map.js` takes it off and puts
+the words on `data-tip`.
+
+They sit on the map beside `#locate`, which draws a styled tip. So the pair disagreed at the one
+place a reader meets them together.
+
+This is not a patch to `vendor/leaflet.js`. That file already carries three edits this app has to
+keep, and a fourth for a cosmetic rule is one more thing a version bump loses.
+
+Leaflet writes its own `aria-label` beside the `title`, and it writes both once. So there is nothing
+to keep in step.
+
+### The guard is a grep
+
+A `title` costs nothing to add, and nothing on screen says it is there. The Verify block in
+`CLAUDE.md` greps `js/*.js` and `index.html` for `title=` and for a script that writes one.
+`document.title` is the window title bar and is excluded.
+
+A second command reads the rendered page. The grep covers the app's own files. Only the rendered
+page covers a vendored library writing an attribute at runtime.
+
+All seven runnable checks are green. `m3-check.html` holds 902 assertions.
+
+## The open card turns its own pin into a teardrop
+
+The repository owner asked for it on 2026-08-26. The supporting pane names a place in words. The map
+draws four hundred pins and says nothing about which of them those words are about. On a wide window
+the two stand side by side, and a reader has to find the pin by name.
+
+**The selected pin becomes a teardrop. Nothing stands beside it.**
+
+### A second marker came first, and it is gone
+
+The mark began as a marker of its own, over the pin. It moved under the pins, then over them
+again. Each of those three puts two marks on one point, so the two overlap however they stack. The
+repository owner cut the second marker the same day.
+
+`SEL_Z` and `LABEL_Z` went with it. The jump label is back on its own 1000, which is the number it
+carried before any of this.
+
+### One marker, and only its icon changes
+
+`markSel(key)` in `js/map.js` is the whole of it. It looks the marker up in `siteMark`, holds the
+icon that marker arrived with, and hands it a new one. The next call restores the held icon first.
+
+**It answers to a KEY and never to a marker.** `render()` throws every marker away on every poll, so
+the marker a key names is a different object after each one.
+
+### It swaps the drawing and nothing else
+
+The new icon is the pin's own markup with two edits. The first `<use>` re-points at the teardrop,
+and the span takes one class.
+
+So the colour, the offline fade, the rise ring, the danger halo and the favorite heart all survive.
+**A rebuilt string carries the glyph and loses the rest**, and a lost halo takes an alarm off the
+one pin a reader has open.
+
+The station glyph is the FIRST `<use>` in that markup and the heart is the second, so a
+`String.replace()` on the first match names it.
+
+`.pin.sel` in `css/map.css` states the 48px box and no colour. `.pin` above it already reads `--c`,
+which the pin's own markup still carries.
+
+### The tip is the anchor
+
+The glyph is `place`, which is Material's `location_on` under the other name. So this needs no new
+icon and no rebake of `css/icons.css`.
+
+Material puts the point 8% of the box above the bottom edge. That is 4px in a 48px box, so
+`iconAnchor` is `[24, 44]`. `showPlace()` already states that number for the same glyph.
+
+A station pin takes its MIDDLE as its anchor, and `setIcon()` moves the anchor with the drawing. So
+the teardrop's tip lands where the pin's centre stood.
+
+### A rebuild has to re-apply it
+
+`render()` and `paint()` each call `markSel()` at the end, after `siteMark` holds the fresh markers.
+Without that the open card's pin draws its ordinary glyph again on the next poll.
+
+`openSide()` calls it on a real open. `closeSide()` calls it with null. A key with no pin marks
+nothing, and that covers `@here` and `@alerts`. The location card draws a crosshair of its own.
+
+### A weather pin takes the same mark
+
+`siteMark` is the map from the key `openSide()` takes to the marker that opens it. `js/wx.js` writes
+its own pins into it, so one lookup answers for a station and for a weather point alike.
+
+`render.js` clears that map on every poll before `tick()` calls `paint()`, so no entry outlives its
+pin. A `@wx-` key can collide with no station id, so nothing touches `flashTo()`'s own lookup.
+
+A zoom can thin the selected weather point away. Then `paint()` writes no entry, `markSel()` finds
+no marker, and the map draws no teardrop. That is correct: there is no pin to mark.
+
+### It never clusters
+
+A cluster chip that swallows the teardrop leaves the map unable to say which place the pane
+describes. **A zoom out is how a reader looks for that pin**, so the one gesture that asks the
+question is the one that used to lose the answer.
+
+`favLayer` in `js/map.js` already holds the pins that stand outside the cluster, and a favorite is
+its first tenant. `loose()` is the one test both go through. `markSel()` calls `syncCluster()` after
+it swaps the icon, so the arriving pin leaves the cluster and the leaving pin goes back in.
+
+**The re-sort runs on a real change of selection alone.** The early return in `markSel()` is what
+guarantees that. A poll re-opens the card on screen and reaches that function every time, and a
+re-sort of four hundred markers on the poll loop buys nothing.
+
+A poll that DOES move the selection sorts twice, because `render()` calls `syncCluster()` itself a
+few lines later. That is one extra call against a branch in the caller, and a branch is the thing
+that goes stale.
+
+The trade is the one `favLayer` already carries. A chip counts what it hides, so a chip over a patch
+of 13 pins reads 12 while one of them is the open card. That number is correct. `CLAUDE.md` states
+the rule.
+
+### Two things this costs
+
+The state rings are circles around the pin's box. A teardrop's box is 48px with the point at its
+foot, so the danger halo sits higher than it does around a station glyph.
+
+`.pin.sel` and `.pin.place` are one glyph. A searched place and an open card read as the same mark,
+and only their colour tells them apart.

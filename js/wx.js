@@ -5,7 +5,7 @@
 
 import { FEED_WX, WX_THIN_PX, WEATHER, MET_NAME, NEAR_MAX_KM } from './config.js';
 import { state, PREFS } from './state.js';
-import { map, pinGlyph, openSide, side, focusOn, flashTo, ping } from './map.js';
+import { map, pinGlyph, openSide, side, siteMark, markSel, focusOn, flashTo, ping } from './map.js';
 import { wxIcon, wxTone, stamp, kindGlyph, wxItem, wxWhen, wxTemps, WX_NOW } from './popup.js';
 import { askJson } from './ask.js';
 import { el, distKm, titleCase } from './util.js';
@@ -40,7 +40,7 @@ function paint() {
   if (PREFS.mapLayer !== 'weather') return;
   for (const p of thin(pts)) {
     const r = p.rungs[0];
-    L.marker([p.lat, p.lng], {
+    const m = L.marker([p.lat, p.lng], {
       icon: L.divIcon({
         // Matches `.pin`'s box in map.css, the same way render.js does. Leaflet positions the
         // marker off this and not off the CSS.
@@ -51,14 +51,24 @@ function paint() {
     })
       .on('click', () => { openSide('@wx-' + p.id, card(p)); focusOn([p.lat, p.lng], 12); })
       .addTo(layer);
+    /* `siteMark` is the map from the key `openSide()` takes to the marker that opens it, and this
+       pin is one of those. `showSel()` reads it back to place the selection teardrop, so a weather
+       point takes the same mark a station does. `render.js` clears that map on every poll before
+       `tick()` calls this, so no entry here outlives its pin. A `@wx-` key can collide with no
+       station id, so `flashTo()`'s own lookup is untouched. */
+    siteMark.set('@wx-' + p.id, m);
   }
+  /* Every pin above is new, so the open card's pin draws its ordinary glyph again. That is the same
+     rebuild `render.js` answers at the tail of `render()`. A zoom that thins the selected point away
+     leaves no marker, and then this marks nothing. */
+  markSel(side.key);
 }
 
 /* Provenance, and only provenance. This app prints a timestamp inside a menu and nowhere else. The
    third line is here for the same reason. Which half of the strip this app observed is a fact
    about the plumbing, not about the weather. */
 const dots = p => `<button class="icon dots" popovertarget="mnu-wx"
-    title="Details" aria-label="Details about this forecast"><i class="i i-more_vert"></i></button>
+    data-tip="Details" aria-label="Details about this forecast"><i class="i i-more_vert"></i></button>
   <div id="mnu-wx" class="menu surface" popover>
     <div class="mi info"><span>
       <small class="muted">Issued ${stamp(p.stamp * 1000)}</small><br>

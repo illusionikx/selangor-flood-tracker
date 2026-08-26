@@ -29,6 +29,18 @@ const withClip = fn => (clipMod ??= import('./clip.js')).then(fn, err => {
 export const map = L.map('map', { maxZoom: 18, attributionControl: false, zoomControl: false })
   .setView(PREFS.center || [3.2, 101.4], PREFS.zoom || 9);
 L.control.zoom({ position: 'bottomright' }).addTo(map);
+/* **The two zoom buttons were the last `title` on the page, and Leaflet writes them.** Every other
+   one in this app went on 2026-08-26, because a `title` opens on no phone and a second tooltip
+   shape beside the styled one reads as a fault. These sit on the map, beside `#locate`, which draws
+   a styled tip. So the pair disagreed at the one place a reader meets them together.
+   Moved here rather than patched into `vendor/leaflet.js`. That file already carries three edits
+   this app has to keep, and a fourth for a cosmetic rule is one more thing a version bump loses.
+   Leaflet writes its own `aria-label` beside the `title`, so a screen reader loses nothing. It also
+   writes both once, at `addTo()`, and never again — there is nothing here to keep in step. */
+for (const a of document.querySelectorAll('.leaflet-control-zoom a')) {
+  a.dataset.tip = a.title;
+  a.removeAttribute('title');
+}
 
 /* --- the supporting pane --------------------------------------------------------------------- */
 
@@ -362,16 +374,23 @@ export const shown = k => document.querySelector(`#layers input[data-kind="${k}"
    own stations at a glance is the whole point of setting one. markercluster has no per-marker opt
    out, so they go on a plain layer group beside it. The split lives here because this function
    already walks `marks` and already gates on `shown(k)`, and layer visibility must stay in one
-   place. */
+   place.
+   **The open card's pin is the second tenant, and it arrived on 2026-08-26.** `markSel()` turns
+   that pin into a teardrop, and a teardrop a cluster chip swallows says nothing at all. The reader
+   is looking at the map to find the place the pane is describing, and a zoom out is how they look
+   for it. It keeps the name `favLayer`, because what the two tenants share is that they stand
+   outside the cluster. */
 export const favLayer = L.layerGroup().addTo(map);
+
+const loose = m => m.options.fav || m === selPin;
 
 export function syncCluster(alsoShow) {
   cluster.clearLayers();
   favLayer.clearLayers();
   for (const [k, list] of Object.entries(marks)) {
     if (!(shown(k) || k === alsoShow)) continue;
-    cluster.addLayers(list.filter(m => !m.options.fav));
-    for (const m of list) if (m.options.fav) favLayer.addLayer(m);
+    cluster.addLayers(list.filter(m => !loose(m)));
+    for (const m of list) if (loose(m)) favLayer.addLayer(m);
   }
 }
 
@@ -400,6 +419,58 @@ export function showMast(latlng) {
 }
 
 export function hideMast() { mastRing?.remove(); mastRing = null; }
+
+// --- selection mark ------------------------------------------------------------------------------
+
+/* The pin whose card the supporting pane is showing turns into a teardrop. The pane names the place
+   in words. The map draws four hundred pins and says nothing about which of them the words are
+   about, and on a wide window the two sit side by side.
+   **It REPLACES the pin rather than standing over it.** A second marker over the first was the
+   first answer, and two marks on one point overlap however they are stacked. So there is one
+   marker, and only its icon changes.
+   **The tip is the anchor, and that is the whole geometry.** `place` is Material's `location_on`,
+   the same drawing, so this needs no new icon. Its point sits 8% of the box above the bottom edge,
+   which is 4px in a 48px box, so the anchor is [24, 44]. That is the number `showPlace()` below
+   already states for the same glyph. A station pin is anchored at its MIDDLE instead, and
+   `setIcon()` moves the anchor with the drawing, so the teardrop's tip lands where the pin's centre
+   stood.
+   **Only the DRAWING is swapped, and the pin's own markup carries everything else.** This re-points
+   the first `<use>` at the teardrop and adds one class. So the colour, the offline fade, the rise
+   ring, the danger halo and the favorite heart all survive. A rebuilt string carries the glyph and
+   loses the rest, and losing the halo takes an alarm off the one pin a reader is looking at.
+   The station glyph is the FIRST `<use>` in that markup, and the heart is the second. So a
+   `String.replace()` on the first match is what names it.
+   **A rebuild has to re-apply it.** `render()` throws every marker away on every poll, so the fresh
+   marker for the open card draws its ordinary glyph. Both painters call this at the end, after
+   `siteMark` is filled. It answers to a key rather than to a marker for the same reason.
+   The restore reads the marker this app last marked, so a marker already thrown away takes a
+   `setIcon()` that reaches nothing. That is safe: Leaflet redraws on `setIcon` only while the
+   marker is on a map. */
+let selPin = null, selWas = null;
+
+export function markSel(key) {
+  const pin = key ? siteMark.get(key) : null;
+  if (pin === selPin) return;
+  if (selPin) selPin.setIcon(selWas);
+  selPin = pin;
+  if (pin) {
+    selWas = pin.options.icon;
+    pinGlyph('place');   // build the symbol; the swap below only re-points a <use> at it
+    pin.setIcon(L.divIcon({ className: '', iconSize: [48, 48], iconAnchor: [24, 44],
+      html: selWas.options.html
+        .replace(/^<span class="pin/, '<span class="pin sel')
+        .replace(/#g-\w+/, '#g-place') }));
+  }
+  /* **Move it out of the cluster, and move the last one back in.** `loose()` above reads `selPin`,
+     so one re-sort answers both halves and neither is written twice.
+     It runs on a real change of selection alone, which the early return above is what guarantees.
+     A poll re-opens the card on screen and reaches this function every time, and a re-sort of four
+     hundred markers on the poll loop is a cost with nothing to buy.
+     `render()` calls `syncCluster()` itself a few lines after this, so the poll that DOES change
+     the selection pays for the sort twice. That is one extra call against a branch in the caller,
+     and the branch is the thing that goes stale. */
+  syncCluster();
+}
 
 // --- station panel ------------------------------------------------------------------------------
 
@@ -470,6 +541,10 @@ export function openSide(key, html, mastAt) {
   // Only on a real open: render() calls openSide() on every poll to refresh the card in place.
   document.body.classList.add('side');
   mastAt ? showMast(mastAt) : hideMast();
+  /* `siteMark` is the map from the key this function takes to the marker that opens it, so one
+     lookup answers for a station pin and for a weather pin alike. A key with no pin marks nothing,
+     and that covers `@here` and `@alerts`. The location card draws a crosshair of its own. */
+  markSel(key);
   syncAlertBtn();
   /* The rail's own MutationObserver misses a same-occupant swap.
      Swapping from the alert list to a station card keeps the side class on.
@@ -497,6 +572,7 @@ export function closeSide() {
      honest repair of the thing that raced. */
   if (document.body.classList.contains('side')) document.body.classList.remove('side');
   hideMast();
+  markSel(null);
   syncAlertBtn();
 }
 

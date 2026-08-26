@@ -77,9 +77,9 @@
      Before `base.css`, which derives `--m3-travel`, `--m3-grow` and `--m3-swap` from them and
      bridges M3's colour names onto this app's palette. Colour is not in this file on purpose. -->
 <link rel="stylesheet" href="vendor/m3/tokens.css?v=2">
-<link rel="stylesheet" href="css/base.css?v=189">
+<link rel="stylesheet" href="css/base.css?v=191">
 <link rel="stylesheet" href="css/chrome.css?v=319">
-<link rel="stylesheet" href="css/map.css?v=171">
+<link rel="stylesheet" href="css/map.css?v=173">
 
 <!-- Water tint for the dark basemap. CARTO's dark_all is greyscale — all 18 of its tones have zero
      chroma — so no saturate() or hue-rotate() can pull water out of it. What it does have is one
@@ -128,7 +128,7 @@
 <dialog id="lightbox">
   <div class="modalhead">
     <h2 id="lbTitle"></h2>
-    <form method="dialog"><button class="icon dclose" title="Close" aria-label="Close"
+    <form method="dialog"><button class="icon dclose" data-tip="Close" aria-label="Close"
       ><i class="i i-close"></i></button></form>
   </div>
   <div class="lbbody">
@@ -202,20 +202,20 @@
                because it is the one that takes the other two away (see js/timeline.js). -->
           <div class="tlleft">
             <div class="tltransport" role="group" aria-label="Playback">
-              <button class="icon tlstep" data-d="-1" title="Previous frame (,)" aria-label="Previous frame"
+              <button class="icon tlstep" data-d="-1" data-tip="Previous frame (,)" aria-label="Previous frame"
               ><i class="i i-skip_previous"></i></button>
-              <button class="icon tlplay" title="Play (k)" aria-label="Play"><i class="i i-play_arrow"></i></button>
-              <button class="icon tlstep" data-d="1" title="Next frame (.)" aria-label="Next frame"
+              <button class="icon tlplay" data-tip="Play (k)" aria-label="Play"><i class="i i-play_arrow"></i></button>
+              <button class="icon tlstep" data-d="1" data-tip="Next frame (.)" aria-label="Next frame"
               ><i class="i i-skip_next"></i></button>
-              <button class="icon tlnow" title="Go to now (End)" aria-label="Go to now"
+              <button class="icon tlnow" data-tip="Go to now (End)" aria-label="Go to now"
               ><i class="i i-last_page"></i></button>
             </div>
-            <!-- Three states on one button, cycling. The glyph, the title and the label are all
+            <!-- Three states on one button, cycling. The glyph, the tip and the label are all
                  written by paintSpeed() in js/timeline.js, so the markup carries the resting state
                  only. No aria-pressed: that attribute states two states and this control has three. -->
-            <button class="icon tlspeed" title="Playback speed (1x)" aria-label="Playback speed 1x"
+            <button class="icon tlspeed" data-tip="Playback speed (1x)" aria-label="Playback speed 1x"
             ><i class="i i-1x_mobiledata"></i></button>
-            <button class="icon tlcmp" title="Compare against the live image"
+            <button class="icon tlcmp" data-tip="Compare against the live image"
                     aria-label="Compare against the live image" aria-pressed="false"
             ><i class="i i-compare"></i></button>
           </div>
@@ -294,7 +294,7 @@
        at both widths, so it states `aria-expanded` and never `aria-current`. -->
   <div class="hlead">
     <button class="icon" id="navFind" aria-controls="pane" aria-expanded="false"
-            title="Go to a station" aria-label="Go to a station"
+            data-tip="Go to a station" aria-label="Go to a station"
       ><i class="i i-search"></i></button>
   </div>
   <!-- **The bar's trailing actions, as one group, and the overflow menu is the only one in it.** A
@@ -313,7 +313,7 @@
        menu and there is nothing in js/ui.js to keep in step. -->
   <div class="hactions">
     <button class="icon" id="navMore" popovertarget="appMenu"
-            title="More" aria-label="More"
+            data-tip="More" aria-label="More"
       ><i class="i i-more_vert"></i></button>
   </div>
   </header>
@@ -368,9 +368,11 @@
        places a FAB there, and the search is what takes it here. A FAB is an ACTION and never a
        destination, so it carries no indicator pill and no `aria-current`. `aria-expanded` states
        whether the search is on screen, and `railSync()` in js/map.js is its one writer.
-       It carries a `title` as well as its label, because a collapsed FAB shows no words at all. -->
+       It carries a `data-tip` as well as its label, because a collapsed FAB shows no words at all.
+       Never a `title`: every one in this app went on 2026-08-26, because a `title` opens on no
+       phone and a second tooltip shape beside the styled one reads as a fault. -->
   <button id="railFind" class="railfab" aria-controls="pane" aria-expanded="false"
-          title="Search" aria-label="Search"
+          data-tip="Search" aria-label="Search"
     ><i class="i i-search"></i><span class="fablab">Search</span></button>
   <!-- M3's items box: `flex: 1`, so it takes the slack and the theme button below it sits on the
        bottom edge. The `.railsp` spacer that used to do that is gone with it. -->
@@ -412,7 +414,7 @@
        resolved to. `js/ui.js` writes the glyph and the words.
        **One press still sets an explicit shade**, which leaves Auto. Settings is where Auto comes
        back, and the button's own words say the pick is automatic while it holds. -->
-  <button id="railApps" class="icon" title="Light theme" aria-label="Light theme"
+  <button id="railApps" class="icon" data-tip="Light theme" aria-label="Light theme"
     ><i class="i i-light_mode"></i></button>
 </nav>
 <!-- M3's navigation bar, below 600px alone. Every number comes from
@@ -474,7 +476,7 @@
   <!-- Controls first in the source, so the back arrow is the first thing reachable by keyboard.
        It leads the row, the way the pane's own arrow does and the way the other four panes do. -->
   <div class="modalhead">
-    <form class="apptop" method="dialog"><button class="icon dclose" title="Back" aria-label="Back"
+    <form class="apptop" method="dialog"><button class="icon dclose" data-tip="Back" aria-label="Back"
       ><i class="i i-arrow_back"></i></button></form>
   </div>
   <div class="docbody">
@@ -619,7 +621,7 @@
 <dialog id="settingsBox" class="docbox">
   <div class="modalhead">
     <div class="apflex"><h2>Settings</h2></div>
-    <form class="apptop" method="dialog"><button class="icon dclose" title="Back" aria-label="Back"
+    <form class="apptop" method="dialog"><button class="icon dclose" data-tip="Back" aria-label="Back"
       ><i class="i i-arrow_back"></i></button></form>
   </div>
   <div class="docbody">
@@ -755,7 +757,7 @@
 <dialog id="helpBox" class="docbox">
   <div class="modalhead">
     <div class="apflex"><h2>Help</h2></div>
-    <form class="apptop" method="dialog"><button class="icon dclose" title="Back" aria-label="Back"
+    <form class="apptop" method="dialog"><button class="icon dclose" data-tip="Back" aria-label="Back"
       ><i class="i i-arrow_back"></i></button></form>
   </div>
   <div class="docbody">
@@ -1011,14 +1013,24 @@
 
     <span class="pins">
       <span class="pin" style="--c:var(--s-alert)"><i class="i i-water_drop"></i></span>
-      <span class="pin" style="--c:var(--s-warning)"><i class="i i-water_drop"></i></span>
       <!-- `--c` is not optional on a sample. `.pin` reads `color: var(--c, var(--accent))`, so a pin
            with no `--c` draws in the accent blue — which is what this one did, under a line of text
            promising the reader it fills red. See the legend rule in the Verify block in CLAUDE.md. -->
       <span class="pin danger" style="--c:var(--s-danger)"><i class="i i-water_drop"></i></span>
     </span>
-    <span>A river past its <b>alert</b>, <b>warning</b> and <b>danger</b> marks. At danger it fills
-       red, keeps a pulsing halo, and draws over everything else.</span>
+    <span>Every sensor wears three colors and no more: its own kind while it is quiet,
+       <b>amber</b> while it climbs, <b>red</b> at the top of its own scale. At danger a pin also
+       keeps a pulsing halo and draws over everything else.</span>
+
+    <span class="pins">
+      <span class="pin" style="--c:var(--s-alert)"><i class="i i-water_drop"></i></span>
+      <span class="pin" style="--c:var(--s-alert)"><i class="i i-straighten"></i></span>
+      <span class="pin" style="--c:var(--s-alert)"><i class="i i-rainy"></i></span>
+    </span>
+    <span>Where amber starts, per kind. A water level at its <b>alert mark</b>. A flood gauge at
+       <b>0.15 m</b> of water. A rain gauge above <b>30 mm an hour</b>. Red follows at the danger
+       mark, at 0.3 m, and above 60 mm an hour. A siren has no middle state: it is idle, or it is
+       sounding.</span>
 
     <span class="pins"><span class="pin rise" style="--c:var(--k-river)"
       ><i class="i i-water_drop"></i></span></span>
@@ -1149,7 +1161,7 @@
   <div class="dtop">
     <div class="modalhead">
       <div class="apflex"><h2>All stations</h2></div>
-      <form class="apptop" method="dialog"><button class="icon dclose" title="Back" aria-label="Back"
+      <form class="apptop" method="dialog"><button class="icon dclose" data-tip="Back" aria-label="Back"
       ><i class="i i-arrow_back"></i></button></form>
     </div>
     <input id="dataFind" type="text" autocomplete="off" placeholder="Filter by name, district or basin…"
@@ -1168,7 +1180,7 @@
   <div class="dtop">
     <div class="modalhead">
       <div class="apflex"><h2>All cameras</h2></div>
-      <form class="apptop" method="dialog"><button class="icon dclose" title="Back" aria-label="Back"
+      <form class="apptop" method="dialog"><button class="icon dclose" data-tip="Back" aria-label="Back"
       ><i class="i i-arrow_back"></i></button></form>
     </div>
     <input id="camFind" type="text" autocomplete="off" placeholder="Filter by name or district…"
@@ -1204,7 +1216,7 @@
   <i id="warnBoxIcon" class="i i-rainy_heavy" style="color:var(--k-weather)"></i>
   <div class="modalhead">
     <h2 id="warnBoxTitle">Forecast Warning</h2>
-    <form method="dialog"><button class="icon dclose" title="Close" aria-label="Close"
+    <form method="dialog"><button class="icon dclose" data-tip="Close" aria-label="Close"
       ><i class="i i-close"></i></button></form>
   </div>
   <div id="warnBody"></div>
@@ -1251,7 +1263,7 @@
        and the tab order now follows the reading order at both widths. -->
   <div id="sideHead">
     <div class="apptop">
-      <button id="sideClose" class="icon" title="Back" aria-label="Back"
+      <button id="sideClose" class="icon" data-tip="Back" aria-label="Back"
         ><i class="i i-arrow_back"></i></button>
       <span class="apsp"></span>
       <div id="sideActions"></div>
@@ -1292,7 +1304,7 @@
            So the arrow draws at every width. It used to draw above 600px alone, because the pane
            carried a title bar with an arrow of its own. That bar is gone. -->
       <div id="gotobar">
-        <button id="findBack" class="icon" title="Back" aria-label="Back"
+        <button id="findBack" class="icon" data-tip="Back" aria-label="Back"
           ><i class="i i-arrow_back"></i></button>
         <input id="goto" type="text" autocomplete="off" placeholder="Go to a station…"
                role="combobox" aria-expanded="false" aria-controls="gotoHits"
@@ -1314,7 +1326,7 @@
 <div id="toast" class="surface" role="status" aria-live="polite"></div>
 <!-- On the map, not in the app bar. It acts on the map, and the rail beside it holds destinations.
      Stacked above `#paint` in one column, so the two read as one cluster with the zoom buttons. -->
-<button id="locate" class="mapbtn" title="Show my location" aria-label="Show my location"
+<button id="locate" class="mapbtn" data-tip="Show my location" aria-label="Show my location"
   ><i class="i i-my_location"></i></button>
 <!-- Bottom of the map, in the zoom control's own cluster: beside it on a desktop, above it on a
      phone where the legend takes the width. FAB-sized, because it opens the map's own settings and

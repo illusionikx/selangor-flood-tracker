@@ -68,19 +68,52 @@ export const SOURCES = {
    spells it the same way. */
 export const MET_NAME = 'MET Malaysia';
 
-// Upstream status codes: river -1 offline, 0 normal, 1 alert, 2 warning, 3 danger. A river above its
-// first mark is wearing the traffic light, so it uses the status tokens themselves — there was never
-// a second amber, only a second spelling of one.
+/* **A SENSOR WEARS THREE COLOURS AND NEVER A FOURTH: its own kind, the alert amber, or the danger
+   red.** The repository owner set that rule on 2026-08-26, for the map first and then for the card,
+   the table and the meter with it. So these three ladders answer one question — how close is this
+   sensor to trouble — with one vocabulary, whatever the sensor is.
+
+   **Where each ladder crosses.** A water level takes amber at its alert mark and red at its danger
+   mark. A flood gauge takes amber at 0.15 m and red at 0.3 m. A rain gauge takes amber above
+   30 mm an hour and red above 60. A siren has no ladder at all: it reads 0 or 1, so it is its kind
+   colour or red, which is what `color()` in util.js already did.
+
+   **What this cost, and it is a real cost.** Four rungs went. A river's warning mark and its alert
+   mark are one amber now, so a reader cannot tell them apart by colour. A flood gauge's dry ground
+   and its unnamed water are one taupe. A rain gauge's dry, light and moderate classes are one
+   violet. Every one of those distinctions is still on the card in WORDS, and the meter still draws
+   every published mark as a tick with its own label. Colour stopped carrying them.
+   **The argument for paying it.** A map is a ten-second scan. Six ramps of four rungs each is a code
+   nobody was taught, and this app already measured the two ambers 14 degrees apart on the hue wheel.
+   Three colours is a code a reader learns once.
+
+   **`--s-warning` IS STILL LIVE and must not be deleted.** No level ladder reaches it any more. The
+   TIER language still does: `.alert.t-soon`, `.alert.t-heavy`, the ticker, the camera tile and the
+   timeline ticks all paint it, and that answers how urgent rather than how high. Two different
+   questions, so two ladders of different lengths is correct.
+   **`--s-trace` HAS NO CALLER LEFT ANYWHERE.** Its only user was the flood gauge's rung 1, on the
+   pin, in `GAUGE_COLOR` and in `.state.trace`. All three are gone. The token stays declared in
+   `css/base.css`, on both themes, with a note saying so. It costs two lines, and a rung deleted from
+   a palette is a rung nobody can put back without measuring it against the whole set again. Delete
+   it the day somebody is sure. Do not reach for it meanwhile: a fourth rung on any ladder here is
+   the thing this rule exists to stop. */
 export const RIVER_COLOR = { '-1': 'var(--s-none)', 0: 'var(--k-river)',
-  1: 'var(--s-alert)', 2: 'var(--s-warning)', 3: 'var(--s-danger)' };
-export const RAIN_COLOR  = { '-1': 'var(--s-none)', 0: 'var(--k-rain-dry)', 1: 'var(--k-rainfall)',
-  2: 'var(--k-rainfall)', 3: 'var(--k-rain-heavy)', 4: 'var(--s-danger)' };
+  1: 'var(--s-alert)', 2: 'var(--s-alert)', 3: 'var(--s-danger)' };
+export const RAIN_COLOR  = { '-1': 'var(--s-none)', 0: 'var(--k-rainfall)', 1: 'var(--k-rainfall)',
+  2: 'var(--k-rainfall)', 3: 'var(--s-alert)', 4: 'var(--s-danger)' };
 
 /* The same rainfall ramp as real values, for the heat layer's canvas gradient — leaflet.heat builds
    an ImageData from it, and `var(--k-rainfall)` means nothing to a 2D context. One theme's worth,
    because a translucent blob is composited over the basemap rather than read against it, and the
    layer already dims and brightens with what is under it. Keep these in step with RAIN_COLOR's
-   *hues*: a violet blob and a violet rainfall pin have to mean the same thing. */
+   *hues*: a violet blob and a violet rainfall pin have to mean the same thing.
+   **THAT RULE IS BROKEN RIGHT NOW AND IT IS A DECISION SOMEBODY STILL HAS TO MAKE.** RAIN_COLOR
+   went to three colours on 2026-08-26, so at class 3 the pin is amber and the blob under it is
+   still violet #c77dff. The wash was left alone on purpose: it paints ground rather than a station,
+   and turning a whole state amber and red is a change to what the map looks like, not to what a
+   sensor is called. Either follow it — `{ 1: '#a893ff', 2: '#a893ff', 3: '#ffc000', 4: '#ff3a37' }`,
+   and move `.ramp.rain` in chrome.css with it — or write down that the wash keeps its own ladder
+   and why. Do not leave this note standing. */
 export const RAIN_HEAT = { 1: '#6f7bff', 2: '#8f7bff', 3: '#c77dff', 4: '#ff4d4d' };
 
 // Which sensor speaks for a mast when several share one: a river gauge says more about a flood than
@@ -88,14 +121,23 @@ export const RAIN_HEAT = { 1: '#6f7bff', 2: '#8f7bff', 3: '#c77dff', 4: '#ff4d4d
 // the pin's lead sensor and for the order sensors are listed in, so both tell the same story.
 export const KIND_RANK = ['river', 'siren', 'gauge', 'rainfall', 'camera'];
 
-// Traffic light by status: normal → alert → warning → danger.
+/* Traffic light by status: normal → alert → warning → danger. **This is the TIER ladder now, and it
+   is not a sensor's level.** It answers how urgent a claim is, which is what the alert panel's
+   groups, the app bar glyph and the favicon ask. The three ladders above answer how high a sensor
+   is, and they hold three colours. Do not fold the two together: `heavy` and `soon` are two tiers
+   that share `--s-warning`, and a river's alert mark and warning mark are two marks that share
+   `--s-alert`. Four rungs here, three there, and each is right for its own question. */
 export const STATUS_COLOR = ['var(--s-normal)', 'var(--s-alert)', 'var(--s-warning)', 'var(--s-danger)'];
 
-/* A flood gauge's own ramp, indexed by `gaugeTone()` in util.js. The same four rungs, except that
-   the first step off dry ground is `--s-trace` and not the alert amber. JPS marks a gauge at 0.15 m
-   and 0.3 m only, so the band under the first mark is real water that upstream never named, and
-   amber claims more about two centimetres than anyone knows. Green denies it outright. */
-export const GAUGE_COLOR = ['var(--s-normal)', 'var(--s-trace)', 'var(--s-warning)', 'var(--s-danger)'];
+/* A flood gauge's own ladder, indexed by `gaugeTone()` in util.js. Its two published marks are
+   0.15 m and 0.3 m, so those two take the amber and the red. Everything under the first mark is the
+   kind's own taupe.
+   **`--s-trace` used to sit at rung 1 and does not any more.** That rung is real water standing on a
+   spot known to flood, under a mark upstream never published. It earned a colour of its own while
+   this app drew four rungs. Under the three-colour rule it cannot have one: the alert amber claims a
+   mark that does not exist, and a fifth hue is the code the rule exists to delete. The card still
+   says `water is level with the gauge marker` in words, which is where that rung lives now. */
+export const GAUGE_COLOR = ['var(--k-gauge)', 'var(--k-gauge)', 'var(--s-alert)', 'var(--s-danger)'];
 
 export const NO_INFO = 'var(--s-none)';   // grey: offline or reporting nothing
 

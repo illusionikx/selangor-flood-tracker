@@ -5,7 +5,7 @@ import { KINDS, SOURCES, SPARK_H, NO_INFO, ALERT_TITLE, RIVER_COLOR, RAIN_COLOR,
          GAUGE_COLOR, RAIN_STOPS, NEAR_MAX_KM, camSrc, WEATHER, MET_NAME,
          ACC_ROWS } from './config.js';
 import { PREFS } from './state.js';
-import { noSec, distKm, hasInfo, hasWx, isStale, statusColor, scalePos,
+import { noSec, distKm, hasInfo, hasWx, isStale, color, statusColor, scalePos,
          levelStops, gaugeStops, gaugeColor, isFav, titleCase } from './util.js';
 import { nearestOf, nearestCam, nearestLevel, nearestWx, camAlert } from './stations.js';
 
@@ -157,7 +157,7 @@ const favBtn = (ids, set) => `<button class="icon fav" data-fav="${ids}"
    the per-sensor favorite is what lets somebody star one gauge of six. */
 export const dots = (s, extra = '', lift = false) => `${lift ? extra + favBtn(s.id, isFav(s)) : ''}
   <button class="icon dots" popovertarget="mnu-${s.id}"
-    title="Details" aria-label="Details and actions for ${s.name}"><i class="i i-more_vert"></i></button>
+    data-tip="Details" aria-label="Details and actions for ${s.name}"><i class="i i-more_vert"></i></button>
   <div id="mnu-${s.id}" class="menu surface" popover>
     ${sourceInfo(s)}
     ${lift ? '' : favItem(s.id, isFav(s))}
@@ -174,7 +174,7 @@ export const dots = (s, extra = '', lift = false) => `${lift ? extra + favBtn(s.
    none of the rows below it can. */
 const siteDots = (lead, ids, all, extra) => `${extra}${favBtn(ids, all)}
   <button class="icon dots" popovertarget="mnu-site-${lead.id}"
-    title="Details" aria-label="Details and actions for ${lead.name}"><i class="i i-more_vert"></i></button>
+    data-tip="Details" aria-label="Details and actions for ${lead.name}"><i class="i i-more_vert"></i></button>
   <div id="mnu-site-${lead.id}" class="menu surface" popover>
     ${mapLink(lead)}
   </div>`;
@@ -237,7 +237,7 @@ export function camNear(from, cam) {
           picture were two, and a group of two titles each item — which puts a heading over a line
           that is already a name. They belong together anyway: the name says whose view this is. */''}
     <ul class="sbody"><li>
-      <div class="place" data-cam="${cam.id}" title="Show ${cam.name} on the map">${cam.name}</div>
+      <div class="place" data-cam="${cam.id}">${cam.name}</div>
       ${camImg(cam, `Latest still from ${cam.name}`)}
     </li></ul>
   </div>`;
@@ -259,10 +259,17 @@ export function camNear(from, cam) {
    the same answer the favorite's own comment above already states.
    **The reading is in the words and never in the ink.** This glyph names another station's kind, and
    an app bar action painted by a status is a status claim about a station the card is not about.
-   With nothing inside the cap the button still draws, `disabled`, saying so. A control that
-   disappears leaves a reader unable to tell "there is none" from "the app forgot". */
+   With nothing inside the cap the button still draws, `aria-disabled`, saying so. A control that
+   disappears leaves a reader unable to tell "there is none" from "the app forgot".
+   **THE TIP TAKES TWO LINES, and the newline is the whole of it.** What the button IS leads, and
+   what it found follows: `Nearest webcam` over `KG BARU · 2.1 km`. That is the split the menu row
+   made with a `<small class="muted">` second line, and it is why the row read as well as it did.
+   `js/sparktip.js` writes the label with `textContent`, so a newline is the only break available.
+   `.sparktip` takes `white-space: pre` for it, which honours the break and still never wraps.
+   **The `aria-label` keeps ONE line, joined with a stop.** A screen reader announces a newline as a
+   pause with no punctuation, so the two halves run together as one phrase. */
 const nearBtn = (icon, attr, what, note) => `<button class="icon near" ${attr}
-    data-tip="${what} · ${note}" aria-label="${what}. ${note}"><i class="i i-${icon}"></i></button>`;
+    data-tip="${what}\n${note}" aria-label="${what}. ${note}"><i class="i i-${icon}"></i></button>`;
 
 /* A camera on the *same mast* is not a nearest-anything. It is this station's own view, so it names
    no place and drops the distance, which would read "0.0 km". `from` may be a bare latlng from a map
@@ -300,9 +307,11 @@ export function meter(s) {
   const stops = levelStops(s);   // shared with the heat weight — see util.js
   if (s.level == null || !stops) return '<div class="muted">No level reading</div>';
 
-  const col = statusColor(s.status);
+  // `color()` and not `statusColor()`: the figure states this river's level, and one function
+  // answers that for every surface. The tier ladder has four rungs and a sensor has three.
+  const col = color(s);
   const marks = stops.slice(1, -1).map(([v, p], i) =>
-    `<i class="tick" style="left:${p}%" title="${i ? 'warning' : 'alert'} ${v} m"></i>`).join('');
+    `<i class="tick" style="left:${p}%" data-tip="${i ? 'warning' : 'alert'} ${v} m"></i>`).join('');
   const names = ['alert', 'warning', 'danger'].slice(-stops.length + 1);
   const labels = stops.slice(1).map(([v, p], i) =>
     `<span style="left:${p}%"><b>${v}</b>${names[i]}</span>`).join('');
@@ -332,12 +341,20 @@ export function meter(s) {
    exists to say whether a flood-prone spot is wet, and grey is the colour this app uses for a sensor
    that cannot say. Every rung comes from `gaugeTone()` now — see util.js. */
 /* Third element is the table's short form: a pill in a scannable column cannot carry "water on
-   ground", but it must not disagree with the popup either, so both come out of here. */
+   ground", but it must not disagree with the popup either, so both come out of here.
+   **The first element moved onto the three-colour rule on 2026-08-26.** `warn` and `trace` are gone
+   from `css/base.css` with the two ramp rungs they painted. The chip takes the same colour the pin
+   takes: `kind` is the gauge's own taupe under the first published mark, `mid` is the alert amber at
+   0.15 m, `on` is the danger red at 0.3 m.
+   `off` keeps its green, and that is the one divergence. It is the all-clear chip every kind here
+   shares — a siren's `IDLE` and a rain gauge's dry state both wear it — so changing it is a decision
+   about the state chip's own language rather than about what a level is called. The pin draws dry
+   ground taupe, and the chip says `DRY GROUND` in words directly above it. */
 export const gaugeState = s => s.depth <= 0
   ? ['off', 'DRY GROUND', 'dry']
   : s.status >= 2 ? ['on', 'FLOODED', 'flooded']
-  : s.status >= 1 ? ['warn', 'WATER RISING', 'rising']
-  : ['trace', 'WATER ON GROUND', 'water'];
+  : s.status >= 1 ? ['mid', 'WATER RISING', 'rising']
+  : ['kind', 'WATER ON GROUND', 'water'];
 
 // A flood gauge measures water depth OVER a flood-prone spot: negative means the ground is dry.
 // Several offline gauges are frozen on old flood readings, so staleness is stated, never implied.
@@ -349,7 +366,9 @@ function gaugeBlock(s) {
   const pct = scalePos(s.depth, gaugeStops(s));   // shared with the heat weight — see util.js
   const col = gaugeColor(s);   // same rung the pin and the table cell take
 
-  return `<div class="state ${stale ? '' : tone}">${stale ? 'OFFLINE' : word}</div>
+  // `--c` is what `.state.kind` reads: the rung under the first published mark takes the gauge's
+  // own taupe, so the chip and the pin agree. Every other tone ignores it.
+  return `<div class="state ${stale ? '' : tone}" style="--c:${col}">${stale ? 'OFFLINE' : word}</div>
     <div class="meter">
       ${wet ? `<div class="mtop">
           <b style="color:${stale ? 'var(--muted)' : col}">${s.depth} m of water</b>
@@ -395,8 +414,14 @@ const SUB = t => `<div class="subhead">${t}</div>`;
 const rainState = s => {
   if (!hasInfo(s)) return SUB('Right now') + '<div class="state">NO READING</div>';
   const stuck = s.backed === false;
+  /* The three-colour rule, on the chip this time. It read `>= 3 ? on : >= 1 ? mid : off`, so light
+     rain wore the alert amber and heavy rain wore the danger red — two rungs above where the ladder
+     crosses now. Amber starts at JPS's heavy class (over 30 mm an hour) and red at very heavy (over
+     60), which is what the pin, the table pill and `isCritical()` all read. Everything under that is
+     the kind's own violet, through `--c`. */
   return SUB('Right now')
-    + `<div class="state ${stuck ? 'off' : s.status >= 3 ? 'on' : s.status >= 1 ? 'mid' : 'off'}"
+    + `<div class="state ${stuck ? 'off' : s.status >= 4 ? 'on' : s.status >= 3 ? 'mid'
+        : s.status >= 1 ? 'kind' : 'off'}" style="--c:${color(s)}"
       >${RAIN_STATE[s.status] || 'NOT RAINING'}</div>
     ${stuck ? '<div class="muted">Faulty signal. No rain reached this gauge.</div>' : ''}`;
 };
@@ -571,7 +596,7 @@ const region = s => {
    attribute: it centres the pin and names it on the map for the length of the ripple.
    Emitted after the heart, because the CSS reserves that corner with an adjacent-sibling rule. */
 const goName = s =>
-  `<div class="popname" data-go="${s.id}" title="Show ${titleCase(s.name)} on the map">${titleCase(s.name)}</div>`;
+  `<div class="popname" data-go="${s.id}">${titleCase(s.name)}</div>`;
 
 /* This code reads the hour in Malaysia. It does not read the hour where the reader sits.
    Every time on this page is MYT, because JPS stamps its readings that way. A moon beside a
@@ -627,7 +652,7 @@ export const wxTone = (r, o) => `var(--wx-${WX_TONE[wxIcon(r, o)] || 'clear'})`;
    its metres, a river its own. This card holds one distance in one place and this is the place.
    Two facts, then, and both are about the plumbing: when MET issued this, and how far away. */
 const wxDots = m => `<button class="icon dots" popovertarget="mnu-met"
-    title="Details" aria-label="Details about this weather"><i class="i i-more_vert"></i></button>
+    data-tip="Details" aria-label="Details about this weather"><i class="i i-more_vert"></i></button>
   <div id="mnu-met" class="menu surface" popover>
     <div class="mi info"><span>
       ${!m.stamp ? '' : `<small class="muted">Updated ${stamp(m.stamp * 1000)}</small><br>`}
@@ -900,7 +925,7 @@ export function herePopup(e, loaded) {
         <span class="muted">${distKm(at, s).toFixed(1)} km</span>
         ${dots(s)}
       </div>
-      <div class="place" data-go="${s.id}" title="Show ${s.name} on the map">${s.name}</div>
+      <div class="place" data-go="${s.id}">${s.name}</div>
       ${region(s)}
       ${sensorBody(s)}
     </div>`;
@@ -1007,14 +1032,16 @@ const rules = ticks => ticks.filter(t => !t.now).map(t =>
    nothing on the samples that matter. Only a sample past a published mark takes a hue, and every
    sample that takes one also takes the glyph: the colour and the triangle are one statement, so a
    tinted number can never be the only warning a reader has to notice.
-   Keyed by kind because the ramps answer different questions. A river takes the traffic light from
-   its first mark up (`RIVER_COLOR`): amber at the alert mark, orange at the warning mark, red at
-   danger. Rainfall has no marks of its own, only JPS's four intensity classes, so it stays plain up
-   to *heavy* — light and moderate rain is most of the rain there ever is, and a warning triangle on
-   a drizzle is the cry-wolf failure the alert standard is about.
-   A flood gauge keeps `--s-trace` at rung 1 and no glyph with it: that is real water under the first
-   published mark, so it is neither normal nor a threshold pass. Its glyph starts at rung 2, the
-   0.15 m warning. This is not a new alert surface and does not widen `isCritical()`: it is a readout
+   Keyed by kind because the ladders cross at different readings. A river takes the amber from its
+   alert mark and the red at danger (`RIVER_COLOR`). Rainfall has no marks of its own, only JPS's
+   four intensity classes, so it stays plain up to *heavy* — light and moderate rain is most of the
+   rain there ever is, and a warning triangle on a drizzle is the cry-wolf failure the alert
+   standard is about.
+   **A flood gauge starts at rung 2 now, and it used to start at rung 1.** Rung 1 is real water
+   under the first published mark, and it wore `--s-trace`. Under the three-colour rule that rung is
+   the kind's own taupe, and a taupe number in a readout is a colour that says nothing. So the test
+   is `c > 1`, which puts it back in step with the glyph beside it. Both start at the 0.15 m mark.
+   This is not a new alert surface and does not widen `isCritical()`: it is a readout
    under a pointer, on a sample somebody went looking for, and it counts nothing, badges nothing and
    interrupts nobody. The alert standard is about what claims attention; this waits to be asked.
    The code itself is `api.php`'s — see `sparkPoints()`. Nothing here derives a status.
@@ -1026,7 +1053,7 @@ const rules = ticks => ticks.filter(t => !t.now).map(t =>
 const TONE = {
   river:    c => [c > 0 ? RIVER_COLOR[c] : c < 0 ? NO_INFO : '', c >= 1],
   rainfall: c => [c > 2 ? RAIN_COLOR[c]  : c < 0 ? NO_INFO : '', c >= 3],
-  gauge:    c => [c > 0 ? GAUGE_COLOR[c] : '', c >= 2],
+  gauge:    c => [c > 1 ? GAUGE_COLOR[c] : '', c >= 2],
   siren:    (c, v) => [v > 0 ? statusColor(3) : '', v > 0],
 };
 
@@ -1070,10 +1097,12 @@ const spanText = secs => secs < 3600
 
    The x axis spans the readings actually held, capped at SPARK_H hours. Times are 24-hour, like
    every other clock in this app and in the JPS data behind it. */
-/* Which rung of the traffic light each published mark is. `statusColor()` and nothing else, because
-   these are the same three marks the meter draws and a fourth spelling of amber is how palettes
-   drift. A flood gauge publishes only the upper two, and they land on the same two rungs. */
-const MARK_RUNG = { alert: 1, warning: 2, danger: 3 };
+/* What colour each published mark line takes. Three marks and two colours: a sensor wears its kind,
+   the alert amber or the danger red, and a mark line says which of those the reading is about to
+   become. So the alert mark and the warning mark are one amber, exactly as the pin and the figure
+   above them are. **The two lines are still told apart, by position and by the label on each.**
+   A flood gauge publishes only the upper two marks and they land on the same two colours. */
+const MARK_COLOR = { alert: 'var(--s-alert)', warning: 'var(--s-alert)', danger: 'var(--s-danger)' };
 
 export function sparkline(points, kind = 'river', st = null) {
   points = points || [];
@@ -1136,7 +1165,7 @@ export function sparkline(points, kind = 'river', st = null) {
   const y = v => (26 - (v - lo) / span * 24).toFixed(2);
   const marked = marks.map(([n, v]) =>
     `<line class="mk" x1="0" x2="100" y1="${y(v)}" y2="${y(v)}" vector-effect="non-scaling-stroke"
-      style="stroke:${statusColor(MARK_RUNG[n])}"/>`).join('');
+      style="stroke:${MARK_COLOR[n]}"/>`).join('');
   const pts = inWin.map(([t, v]) => `${x(t)},${y(v)}`).join(' ');
   // The station's own colour, not a red-for-rising / green-for-falling line. Direction is already
   // stated next to it as a rate with an arrow, and a traffic-light hue on a *type* is the one thing

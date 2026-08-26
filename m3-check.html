@@ -116,7 +116,8 @@ function inFrame(d, code) {
    the badges. Fixed rather than taken from the live payload, so the assertions below cannot move
    with the weather. */
 const CARD = `<div class="pophead">
-    <button class="icon near" data-cam="camera-1" data-tip="Nearest webcam · KG BARU · 2.1 km"></button>
+    <button class="icon near" data-cam="camera-1" data-tip="Nearest webcam
+KG BARU · 2.1 km"></button>
     <button class="icon fav" data-fav="a,b" data-tip="Add to favorites"></button>
     <button class="icon dots" popovertarget="probemenu"></button>
     <div class="menu" id="probemenu" popover></div>
@@ -1513,6 +1514,17 @@ async function desktop() {
      & Node.DOCUMENT_POSITION_FOLLOWING ? true : false, true, 'and it leads the favorite');
   is(!!nearB.dataset.tip, true,
      'carrying the station name and distance in `data-tip`, which is what a `title` could not do');
+  /* **The tip takes two lines, and `white-space` is the whole of it.** `js/sparktip.js` writes the
+     label with `textContent`, so a newline in the attribute is the only break available and no
+     caller can build markup. `nowrap` swallows that newline and the tip runs on one long line —
+     which looks deliberate, and is the fault this assertion exists for. The readout box is built on
+     first use, so this probes a bare element rather than waiting for a pointer that cannot be
+     driven from a script. */
+  is(nearB.dataset.tip.includes('\n'), true, 'the tip carries a newline, so it takes two lines');
+  const tp = d.body.appendChild(Object.assign(d.createElement('div'), { className: 'sparktip' }));
+  is(cs(tp).whiteSpace, 'pre', 'and `.sparktip` honours it, without wrapping on its own');
+  is(cs(tp).textAlign, 'center', 'centred, because the box is centred over what it names');
+  tp.remove();
   is(cs(d.getElementById('sideBody')).padding, '12px 24px', 'M3 side sheet body padding');
 
   /* --- the station panel is an M3 LIST, one item per sensor ---
@@ -2145,7 +2157,7 @@ async function desktop() {
    reads `js/alerts.js` as source. Neither half is enough alone. */
 const ALERT_CARD = `<div class="pophead"><div class="popname">On alert</div>
     <div class="badges">
-      <span class="badge" style="--c:var(--s-danger)" title="2 at danger" aria-label="2 at danger"
+      <span class="badge" style="--c:var(--s-danger)" data-tip="2 at danger" aria-label="2 at danger"
         ><i class="i i-warning"></i>2</span>
       <span class="badge" style="--c:var(--muted)"><i class="i i-near_me"></i>Nearest first</span>
     </div></div>

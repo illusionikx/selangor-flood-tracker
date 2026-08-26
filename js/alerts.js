@@ -162,7 +162,7 @@ function groupCard(items, kind, t, hereAt) {
   return `<div class="alert t-${t} grouped">
     <h3 class="nsub">${rows.length > 1 ? many : one}${TIER_TAG[t]}</h3>
     <ul class="slist mseg">${rows.map(({ lead: s, n }) => `<li data-go="${s.id}"
-        title="Show ${s.name} on the map">
+        >
         <i class="i i-${(size.get(s.site || s.id) || 1) > 1 ? 'layers' : k.icon}"></i>
         ${fav.has(s.site || s.id)
           ? '<i class="i i-favorite fvm" role="img" aria-label="Favorite"></i>' : ''}
@@ -351,7 +351,7 @@ export function alerts() {
      stations is not one.
      **Glyph and number, not "2 at danger".** That decision is older than the chip: the head is one
      panel-width and the words wrapped as soon as three counts were non-zero, which is exactly when
-     the list matters most. Each count keeps its `title` and its `aria-label`, so nothing is
+     the list matters most. Each count keeps its `data-tip` and its `aria-label`, so nothing is
      conveyed by the glyph alone. */
   const tally = [
     [danger, 'warning',     'at danger', STATUS_COLOR[3]],
@@ -360,7 +360,7 @@ export function alerts() {
     [rising, 'expand_less', 'rising', STATUS_COLOR[2]],
     [stale,  'wifi_off',    'not current', 'var(--muted)'],
   ].filter(([n]) => n)
-   .map(([n, icon, what, c]) => `<span class="badge" style="--c:${c}" title="${n} ${what}"
+   .map(([n, icon, what, c]) => `<span class="badge" style="--c:${c}" data-tip="${n} ${what}"
         aria-label="${n} ${what}"><i class="i i-${icon}"></i>${n}</span>`).join('');
 
   /* The warning glyph carries **severity, not headcount**: red the moment one station is at its
@@ -394,7 +394,7 @@ export function alerts() {
   for (const btn of document.querySelectorAll('#railAlerts, #navAlerts')) {
     btn.style.setProperty('--c', c);
     btn.querySelector('.railbadge').textContent = live.length || '';
-    btn.title = what;
+    btn.dataset.tip = what;
     btn.setAttribute('aria-label', what);
   }
 

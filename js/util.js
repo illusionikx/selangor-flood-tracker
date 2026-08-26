@@ -190,8 +190,9 @@ export const gaugeTone = s => s.depth == null || s.depth <= 0 ? 0
   : s.status >= 2 ? 3
   : s.status >= 1 ? 2 : 1;
 
-// The colour that goes with it. Not `statusColor()` — a gauge's rung 1 is `--s-trace`, not the
-// alert amber, because upstream never published a mark down there. See GAUGE_COLOR in config.js.
+/* The colour that goes with it. Not `statusColor()`: that is the TIER ladder and it holds four
+   rungs, and a sensor holds three. Rungs 0 and 1 are both the kind's own taupe now, so this answers
+   for dry ground as well and no caller needs a ternary in front of it. See GAUGE_COLOR. */
 export const gaugeColor = s => GAUGE_COLOR[gaugeTone(s)];
 
 /* The weather section is all or nothing — see metSection() in popup.js for why a half-drawn outlook
@@ -209,6 +210,15 @@ export const hasInfo = s => s.online && ({
   camera:   !!s.image,
 }[s.kind] ?? false);
 
+/* **THE ONE FUNCTION THAT SAYS WHAT COLOUR A SENSOR IS, and it answers three things and no more.**
+   The sensor's own kind colour while it is quiet, the alert amber while it is climbing, the danger
+   red at the top of its own scale. The repository owner set that rule on 2026-08-26. Where each
+   ladder crosses is in RIVER_COLOR, RAIN_COLOR and GAUGE_COLOR in config.js, beside the cost.
+   **Every surface that paints a level reads THIS**, and that is what the same instruction bought:
+   the pin, the card's headline number, the meter's figure, the table's bar and its number. Before
+   it, the pin read these ladders while the meter and the table read `statusColor()`, so a river at
+   its normal level drew a blue pin over a green bar. Two answers to one question.
+   `statusColor()` is the tier ladder and is not this. Do not reach for it to paint a reading. */
 export function color(s) {
   if (!hasInfo(s)) return NO_INFO;
   if (s.kind === 'river')    return RIVER_COLOR[s.status] || KINDS.river.color;
@@ -216,8 +226,8 @@ export function color(s) {
   // siren that is not sounding drops back to its kind colour on the line below.
   if (s.kind === 'rainfall') return RAIN_COLOR[raining(s) ? s.status : 0] || KINDS.rainfall.color;
   if (s.kind === 'siren')    return s.status > 0 ? statusColor(3) : KINDS.siren.color;   // red only when sounding
-  // Taupe only while the ground is dry. Any depth at all is a status, and wears a status colour.
-  if (s.kind === 'gauge')    return gaugeTone(s) ? gaugeColor(s) : KINDS.gauge.color;
+  // No ternary: GAUGE_COLOR's rung 0 is the kind's own taupe, so dry ground answers here too.
+  if (s.kind === 'gauge')    return gaugeColor(s);
   return KINDS[s.kind].color;
 }
 

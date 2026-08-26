@@ -40,7 +40,7 @@ function drawHead() {
        `<i class="i i-${KINDS[k].icon}" style="color:${KINDS[k].color}"></i>`])]
     .map(([key, label, icon]) => `<th data-sort="${key}"${
       sortCol === key ? ` class="on ${sortDir > 0 ? 'up' : 'down'}"` : ''
-    } title="Sort by ${label}">${icon}${label}</th>`).join('')}</tr>`;
+    }>${icon}${label}</th>`).join('')}</tr>`;
 }
 drawHead();
 
@@ -240,9 +240,14 @@ export function dataTable() {
    is the other way round: the level is the answer, and the status is carried in its colour. */
 const pill = (text, c, hook = '') => `<span class="badge" style="--c:${c}"${hook}>${text}</span>`;
 
-// Rain intensity on the server's own rainStatus() cutoffs (>0 / >10 / >30 / >60 mm an hour), short
-// enough for a column. Colour is the status ramp, not the violet rainfall hue — this is a status.
-const RAIN = [['dry', 0], ['light', 1], ['moderate', 2], ['heavy', 3], ['very heavy', 3]];
+/* Rain intensity on the server's own rainStatus() cutoffs (>0 / >10 / >30 / >60 mm an hour), short
+   enough for a column. **The word is here and the colour is not.** The colour comes from `color()`,
+   the one function that says what a sensor's colour is.
+   It carried its own tone column until 2026-08-26, and that column had drifted: it scored *heavy*
+   and *very heavy* the same red while the pin drew violet and red. Two answers to one question, in
+   two files. The column also skipped `raining()`, so a gauge whose own odometer denied its reading
+   still drew a red pill beside a violet pin. */
+const RAIN = ['dry', 'light', 'moderate', 'heavy', 'very heavy'];
 
 /* What a cell is hiding: the sensors behind a merged reading, or a sensor whose own name differs from
    the place it sits at. Both used to cost a line under the badge; both are now one marker.
@@ -267,8 +272,8 @@ const tipVal = m => {
     m.image ? KINDS.camera.color : NO_INFO);
   if (m.kind === 'river') return val(`${m.level} m`);
   if (m.kind === 'rainfall') {
-    const [label, tone] = RAIN[Math.max(0, m.status)] || RAIN[0];
-    return pill(label, statusColor(tone)) + val(`${m.hourly} mm/h`);
+    const st = Math.max(0, m.status);
+    return pill(RAIN[st] || RAIN[0], color(m)) + val(`${m.hourly} mm/h`);
   }
   const [, , label] = gaugeState(m);
   return pill(label, gaugeColor(m)) + val(`${Math.abs(m.depth)} m`);
@@ -327,11 +332,15 @@ function gauge(m, hook) {
 
   // Bar left, figure right, so both edges line up down the column. Past the danger mark the number
   // is replaced by a triangle: "112%" is a percentage you have to stop and reason about, and this
-  // column is scanned. The exact figure stays in the row's title for anyone who wants it.
+  // column is scanned. The exact figure is in the row's own hover panel, which `hook` opens.
+  // It carried a `title` too, so one element raised a native tooltip and a styled panel at once.
   const pc = m.level / max * 100;
-  return `<div class="gline" title="${pc.toFixed(0)}% of danger (${max} m)"${hook}>
+  return `<div class="gline"${hook}>
       <div class="minibar">
-        <span style="width:${scalePos(m.level, stops).toFixed(1)}%;background:${statusColor(m.status)}"></span>
+        ${/* `color()` and not `statusColor()`: the bar and the number under it state one river's
+              level, and they drew two different answers for it. A river at its normal level had a
+              green bar over a blue figure. One function says what a sensor's colour is. */''}
+        <span style="width:${scalePos(m.level, stops).toFixed(1)}%;background:${color(m)}"></span>
         ${stops.slice(1, -1).map(([, p]) => `<i style="left:${p}%"></i>`).join('')}
       </div>
       ${pc >= 100
@@ -371,8 +380,10 @@ function cell(own, lead, scope = '') {
         + '<div class="val muted">No danger mark</div>');
   }
   if (m.kind === 'rainfall') {
-    const [label, tone] = RAIN[Math.max(0, m.status)] || RAIN[0];
-    return wrap(`${pill(label, statusColor(tone), hook)}<div class="val">${
+    // `color()`, so the pill, the pin and the card cannot disagree about one gauge. It also carries
+    // `raining()`: a gauge whose own odometer denies its reading drops back to the kind violet.
+    const st = Math.max(0, m.status);
+    return wrap(`${pill(RAIN[st] || RAIN[0], color(m), hook)}<div class="val">${
       m.hourly} mm<span class="muted">/h</span></div>`);
   }
   // Gauge: depth over a flood-prone spot, so negative is dry ground, not a missing reading.

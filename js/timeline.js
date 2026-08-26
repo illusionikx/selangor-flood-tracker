@@ -282,9 +282,9 @@ function stop() {
   clearTimeout(lead);
   lead = null;
   play.firstElementChild.className = 'i i-play_arrow';
-  // Title and label diverge: the tooltip carries the key, the accessible name must not — a screen
+  // Tip and label diverge: the tooltip carries the key, the accessible name must not — a screen
   // reader announcing "Play open-paren k" reads the binding as part of the control's name.
-  play.title = 'Play (k)';
+  play.dataset.tip = 'Play (k)';
   play.ariaLabel = 'Play';
 }
 
@@ -352,12 +352,12 @@ function tapFlash() {
    numerals 320 units tall in a 960 grid, so "1.5x" stands about 6.7px high. The tint says the clip
    is running fast without anybody reading it. `.on` is the same class compare uses, and the overlay
    shape already restyles it in white, so this needs no CSS of its own.
-   Title and label diverge for the reason `stop()` gives: a screen reader must not read the state out
+   Tip and label diverge for the reason `stop()` gives: a screen reader must not read the state out
    of a parenthesis it thinks is part of the control's name. */
 function paintSpeed() {
   speed.firstElementChild.className = `i i-${RATE_ICON[rate]}`;
   speed.classList.toggle('on', rate > 0);
-  speed.title = `Playback speed (${RATES[rate]}x)`;
+  speed.dataset.tip = `Playback speed (${RATES[rate]}x)`;
   speed.ariaLabel = `Playback speed ${RATES[rate]}x`;
 }
 
@@ -388,7 +388,7 @@ function toggle() {
      how it got here". Costs nothing to arrange — the modulo already wraps, and the resting position
      is already painted. */
   play.firstElementChild.className = 'i i-pause';
-  play.title = 'Pause (k)';
+  play.dataset.tip = 'Pause (k)';
   play.ariaLabel = 'Pause';
   timer = setInterval(() => {
     // The range can change underneath a running clip. A range holding nothing would make this a

@@ -328,9 +328,29 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   doc. Every hex outside that block goes stale the next time the palette moves. The palette moved
   four times. The one exception is a **canvas**: the heat gradient cannot resolve a token, so
   `RAIN_HEAT` in `config.js` keeps real values.
-- `--s-trace` is a fifth rung, sitting between normal and alert, and a flood gauge is its only user.
-  It exists because JPS marks a gauge at 0.15 m and 0.3 m. So water under the first mark is a real
-  reading with no published name. See `GAUGE_COLOR` in `config.js`.
+- **A SENSOR WEARS THREE COLOURS AND NEVER A FOURTH: its own kind, the alert amber, or the danger
+  red.** The repository owner set that rule on 2026-08-26, for the map first and then for the card,
+  the table and the meter with it. `color()` in `js/util.js` is the one function that answers it, and
+  every surface that paints a reading reads that function.
+  **Where each ladder crosses.** A water level takes amber at its alert mark and red at its danger
+  mark. A flood gauge takes amber at 0.15 m and red at 0.3 m. A rain gauge takes amber above
+  30 mm an hour and red above 60, which is `isCritical()`'s own cutoff. A siren has no middle state
+  at all: it is idle in its own pink, or sounding in red.
+  **Four rungs went and the cost is real.** A river's alert mark and its warning mark are one amber.
+  A flood gauge's dry ground and its unnamed water are one taupe. A rain gauge's dry, light and
+  moderate classes are one violet. Every one of those is still on the card in WORDS, and the meter
+  still draws each published mark as a tick with its own label. Colour stopped carrying them.
+  The argument for paying it: a map is a ten-second scan, six ramps of four rungs is a code nobody
+  was taught, and the two ambers measured 14 degrees apart on the hue wheel.
+  **`STATUS_COLOR` is the TIER ladder and is not this.** It keeps four rungs, because `heavy` and
+  `soon` are two tiers that share `--s-warning`. Two questions, two ladders of different lengths.
+  Never reach for `statusColor()` to paint a reading.
+- **`--s-trace` HAS NO CALLER ANYWHERE, and it stays declared.** It was the rung between normal and
+  alert, and a flood gauge holding water under its first published mark was its only user. The
+  three-colour rule above took that rung. The token is kept in `css/base.css` on both themes, with a
+  note saying so, because a rung cut out of a palette cannot go back without measuring the whole set
+  again. Delete it the day somebody is sure. Do not reach for it meanwhile.
+  `--s-warning` is still live, and only the tier language reaches it.
 - `hasInfo(s)` decides colour vs grey. A station with no reading must never look confident.
 
 ## Gotchas that have already bitten
@@ -1104,6 +1124,19 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
   opens and the one thing it has to say is unreachable. It carries no `data-cam` and no `data-go`
   either, and both jumps are delegated on those. So there is nothing for a press to reach and nothing
   to disable.
+  **THE TIP TAKES TWO LINES, and a newline in `data-tip` is the whole of it.** What the button IS
+  leads and what it found follows: `Nearest webcam` over `KG BARU · 2.1 km`. That is the split the
+  menu row made with a `<small class="muted">` second line, and it is why the row read as well as it
+  did. `js/sparktip.js` writes the label with `textContent`, so a newline is the only break available
+  and no caller can build markup.
+  **`.sparktip` takes `white-space: pre` for it, never `pre-line` and never `nowrap`.** `nowrap`
+  swallows the newline and the tip runs on one long line, which looks deliberate. `pre-line` honours
+  it and also lets any long tip wrap wherever it likes. `pre` honours the break and still never wraps
+  on its own, which is the half `nowrap` was there for. A tip with no newline is unchanged, so every
+  graph readout is untouched. `text-align: center` is inert on those and stops a ragged second line
+  under a 40px glyph.
+  **The `aria-label` keeps ONE line, joined with a stop.** A screen reader announces a newline as a
+  pause with no punctuation, so the two halves run together as one phrase.
   **A sensor's inline ⋮ keeps the favorite as a row.** `dots(s, extra, lift)` takes `lift` only from
   the card header. Six hearts down a six-sensor mast is six controls for what the header already
   offers once, and the per-sensor favorite is what lets somebody star one gauge of six.
@@ -1761,6 +1794,12 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
   So a chip goes neutral when the only critical pin near it is an unclustered favorite drawing itself
   red. Nothing leaves the screen. Do not "fix" the count by folding the favorites back in. That
   makes the badge claim to hide pins that are visible.
+  **The open card's pin is the second tenant of `favLayer`, from 2026-08-26.** `markSel()` turns it
+  into a teardrop, and a chip that swallows that teardrop leaves the map unable to say which place
+  the pane describes. A zoom out is how a reader looks for it. `loose()` in `map.js` is the one test
+  both tenants go through, and `markSel()` calls `syncCluster()` on a real change of selection so
+  the last pin goes back in. The count above reads one lower again, for the same reason and with
+  the same answer.
 - **Offline gauges are frozen on old flood readings** (3.55m from April). So they are *not sampled
   into `.history.db`*, and carry no `history`. A flat line at a number from months ago reads as
   "steady". That is the one thing a graph of a dead sensor must not say. Anything offline or
@@ -1854,11 +1893,20 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
   publishes 3 codes against 2 marks. So any depth under 0.15 m shared code 0 with *dry ground*. A
   wet spot painted the same taupe as a dry one. That is the colour this app reserves for a sensor
   that cannot report. `gaugeTone()` gives the rung: dry → 0, any water → 1, the warning mark → 2,
-  danger → 3. `GAUGE_COLOR` gives the colour, which is **not** `STATUS_COLOR`. Rung 1 is
-  `--s-trace`, because upstream published no mark down there and amber claims one. Four
+  danger → 3. `GAUGE_COLOR` gives the colour, which is **not** `STATUS_COLOR`. Four
   surfaces read it: pin, card, table cell, table hover panel. It deliberately changes **no alert
   surface**. `isHot()` never covered gauges, so the count, the badge and the ticker do not move. If
   a gauge ever needs to alert, that goes through the alert design standard first.
+  **RUNG 1 TOOK `--s-trace` AND TAKES THE GAUGE'S OWN TAUPE NOW**, on the three-colour rule of
+  2026-08-26. So the pin at rung 0 and the pin at rung 1 are one colour again, which is the exact
+  fault this entry was written about. **It is not the same fault.** Then, a wet gauge wore the colour
+  this app uses for a sensor that cannot report, and the card said nothing else. Now it wears the
+  gauge's own kind colour, which every reporting gauge wears, and the card says `WATER ON GROUND` in
+  that same taupe through `.state.kind`. Grey still means no reading and nothing else.
+  `gaugeTone()` keeps all four rungs. Only the colour table under it lost two.
+  **The readout on the graph moved with it.** `TONE.gauge` in `popup.js` tested `c > 0` and tests
+  `c > 1`. A taupe number in a readout is a colour that says nothing, and the warning glyph beside it
+  already started at rung 2.
 - **The Selangor list publishes `-1` for "no status" on stations that report a number.** 144
   of 233 rain gauges and 15 rivers, on the payload this was found. `api.php` derives the code
   from the reading, through the same `rainStatus()` / `wlStatus()` the two scraped feeds already
@@ -2070,12 +2118,35 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
   mouse, and takes no styling. So anything whose meaning lives in a `title` means nothing on half the
   devices this runs on. That is why the camera warning prints its words on the picture (`Water level
   3.42 m`). It is why the table uses a `popover` panel instead. And it is why a new affordance that
-  needs explaining needs it *on screen*. A `title` is acceptable only as a duplicate of something
-  already visible. Examples are the jump hint on an alert row, and the count on a chip.
-  **The nearest-webcam offer tested this rule and lost.** It spent one revision as a corner glyph
-  with the camera name and distance in a `title` alone. That is a fact a phone cannot reach. The
-  fix was not a better tooltip but a different control. A menu row states the name, the
-  distance and the reading as text. Reach for the row shape before the glyph shape.
+  needs explaining needs it *on screen*.
+  **THERE IS NO `title` ATTRIBUTE LEFT IN THIS APP, AND THAT REVERSES THE EXEMPTION THIS ENTRY
+  CARRIED.** The rule used to allow one as a duplicate of something already visible, and named the
+  jump hint on an alert row and the count on a chip. The repository owner cut every one on
+  2026-08-26. Two reasons, and the second is what the exemption missed. A duplicate `title` says
+  nothing new, so deleting it costs nothing. And beside `data-tip` it draws a SECOND tooltip shape
+  for one control, at a different delay, in the operating system's own colours. `#locate` shipped
+  exactly that: a native tip at rest and a styled one after a failed fix.
+  **`data-tip` is the one channel, and `js/sparktip.js` is the one reader.** It answers on hover and
+  on tap alike. Every control that carried a `title` already carried an `aria-label`, so nothing was
+  lost to a screen reader. Anything that needs both keeps them apart for the reason `paintSpeed()`
+  states: a tip carries the key binding, and an accessible name must not.
+  **A `title` that only repeated visible text was DELETED rather than converted.** `Show <name> on
+  the map` sat on four visible station names and `Sort by <label>` on a visible column head. A
+  styled tip repeating the words under the pointer is noise, and on touch it parks until the next
+  press elsewhere — over the card that press just opened. The table's `.gline` lost one for the
+  stronger version of the same reason: that element already opens the table's own hover panel.
+  **Leaflet writes the last two, and `js/map.js` takes them off after `addTo()`.** The zoom buttons
+  sit on the map beside `#locate`, which draws a styled tip, so the pair disagreed at the one place a
+  reader meets them together. It is not patched into `vendor/leaflet.js`: that file already carries
+  three edits this app has to keep, and a fourth for a cosmetic rule is one more thing a version bump
+  loses. Leaflet writes its own `aria-label` beside the `title`, and writes both once.
+  **A grep in the Verify block is the guard, and a rendered-page read is the second half.** A `title`
+  costs nothing to add and nothing on screen says it is there. The grep covers the app's own files.
+  Only the rendered page covers a vendored library writing one at runtime.
+  **The nearest-webcam offer tested this rule twice, and lost once.** It spent one revision as a
+  corner glyph with the camera name and distance in a `title` alone. That is a fact a phone cannot
+  reach, and the fix was a different control rather than a better tooltip. It is a glyph again since
+  2026-08-26, with the same words on `data-tip`, which is the attribute that answer needed.
 - **A timestamp is printed inside a ⋮ menu and nowhere else.** `sourceInfo()` does it for a sensor.
   `wxDots()` does it for the weather section, the only other reading on a card. Three
   facts ride there, all about the plumbing. Are we hearing from this station? What was the stamp on
@@ -3939,7 +4010,9 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   sample was at**. `sparkPoints()` scores it through `wlStatus()` / `rainStatus()` / `gaugeStatus()`.
   The hover readout prints a normal sample in its own ink, and colours only a sample past a published
   mark. The warning glyph goes on every sample that takes a colour. See `TONE` in `popup.js`. A
-  flood gauge's `--s-trace` rung is the one exception. A siren carries no third element and needs none.
+  flood gauge starts one rung later than the others, at its 0.15 m mark, because the rung under that
+  mark wears the gauge's own taupe and a taupe number in a readout says nothing. A siren carries no
+  third element and needs none.
   Its samples are 0 and 1, which *is* the status, so `TONE.siren` reads the value. **Never score a
   historical value client-side.** Add a scorer in `api.php` instead. Every reader destructures `[ts, value]`, so
   a kind without one is not a special case anywhere. The graphs
@@ -4095,9 +4168,14 @@ is(/class=\"mi\" data-fav/.test(inline),true,'dots: it keeps the favorite as a m
 is(/aria-disabled=\"true\"/.test(M.camLink(S,null)),true,'camLink: no camera -> aria-disabled');
 is(/disabled>|disabled /.test(M.camLink(S,null).replace(/aria-disabled/g,'')),false,
    'camLink: and never the attribute, which would close the tip');
-is(/data-tip=\"Nearest water level · R · 0.0 km · 1.74 m\"/
-   .test(M.levelLink(S,{id:'wl-2',name:'R',level:1.74})),true,
+// TWO LINES: what the button is, then what it found. sparktip.js writes the label with
+// textContent, so the newline is the only break available and .sparktip takes white-space: pre.
+is(M.levelLink(S,{id:'wl-2',name:'R',level:1.74})
+   .includes('data-tip=\"Nearest water level\nR · 0.0 km · 1.74 m\"'),true,
    'levelLink: the tip carries the name, the distance and the reading a title could not');
+is(M.levelLink(S,{id:'wl-2',name:'R',level:1.74})
+   .includes('aria-label=\"Nearest water level. R · 0.0 km · 1.74 m\"'),true,
+   'levelLink: and the aria-label keeps ONE line, because a reader announces a newline as a pause');
 
 // kindChips() draws the station panel's app bar row: one chip per KIND, never one per sensor. A
 // place with two sirens drew the word Siren twice, which reads as a rendering fault. Three things
@@ -4373,7 +4451,7 @@ printf("rows: %d, points: %d, newest: %s\n",
 # **A short budget TRUNCATES this check rather than failing it.** At 120000 it stopped as the desktop
 # pass started, after 122 of 274 assertions, with nothing failed and no verdict printed. At 240000
 # it printed the opening line alone, once the rail and the bar joined it. Read the last line: no
-# `PASS` means the run did not finish, whatever the counts above it say. It holds 885 assertions.
+# `PASS` means the run did not finish, whatever the counts above it say. It holds 902 assertions.
 
 # The app bar wordmark ladder, in rendered pixels. Loads the app in an iframe at fifteen widths and
 # asserts one spelling at a time, never wider than its rail, and never a longer spelling on a
@@ -4667,6 +4745,21 @@ const names = JSON.parse(fs.readFileSync('.cache.json','utf8')).stations.map(s=>
 is(names.filter(n => M(n).replace(/\s/g,'').length !== n.replace(/\s/g,'').length).length, 0,
    'no name loses or gains a character');
 console.log(bad?'FAILURES: '+bad:'all pass'); process.exit(bad?1:0);"
+
+# No `title` attribute anywhere, and no script that writes one. A `title` opens on no phone, so its
+# words are missing on half the devices this runs on, and beside the styled tip it draws a second
+# tooltip shape for one control. `data-tip` is the one channel — see js/sparktip.js. A `title` costs
+# nothing to add and nothing on screen says it is there, so this grep is the only thing that catches
+# one coming back. `document.title` is the window title bar and is not a tooltip.
+grep -rn '\btitle=\|\.title *=' js/*.js index.html | grep -v 'document\.title' \
+  && echo "FAIL: a title attribute is back" || echo "OK: data-tip is the only tooltip"
+
+# Leaflet writes its own on the two zoom buttons, and js/map.js takes them off after `addTo()`. That
+# repair is in an app file, so the grep above cannot see it go. Read the RENDERED page instead: it
+# is the only check that covers a vendored library writing an attribute at runtime. Expect nothing.
+"/c/Program Files/Google/Chrome/Application/chrome.exe" --headless=new --disable-gpu \
+  --ignore-certificate-errors --virtual-time-budget=25000 --dump-dom https://flood-exp.test/ \
+  | grep -o 'title="[^"]*"' | sort -u
 
 # Every module must carry a modulepreload link, except the six loaded on demand. There is no build
 # step to generate that list, so it goes stale silently when somebody adds a module.
