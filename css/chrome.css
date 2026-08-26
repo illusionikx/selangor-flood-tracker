@@ -1499,7 +1499,20 @@ table.data { flex: 1; display: block; overflow: auto; width: 100%; border-collap
    sections is what lets them exceed the dialog, since `display: table` would otherwise honour 100%.
    The whole thead is the sticky element, not its cells: as separate `display: table` boxes the two
    sections lay out independently, and sticking the box freezes the row as one piece. */
-table.data thead, table.data tbody { display: table; width: 100%; min-width: 820px; }
+/* **`table-layout: fixed`, and the columns did not line up without it.** These are two separate
+   `display: table` boxes, so each runs its own auto-layout pass. Auto layout reads the content, and
+   the two boxes hold different content: a header states a nowrap label beside a glyph, and a cell
+   states a pill over a number. So identical `width` declarations still produced different columns.
+   Measured at 1400px, header against body: Water level 164.5 against 164.3, Siren 162.1 against
+   164.3, and Flood gauge 174.8 against 164.3. Every column below the first sat up to 8.3px off its
+   own heading.
+   Fixed layout reads the declared widths alone, so both boxes lay out the same way and the two
+   agree by construction rather than by luck.
+   **Nothing is clipped at the floor.** At the 820px minimum a sensor column is exactly 120px, and
+   the widest heading, `Flood gauge`, needs 93.5px with its glyph and its own padding. The sort
+   arrow adds 22px to whichever column carries it, which still fits. Re-measure before widening a
+   heading, because fixed layout truncates rather than stretches. */
+table.data thead, table.data tbody { display: table; table-layout: fixed; width: 100%; min-width: 820px; }
 table.data thead { position: sticky; top: 0; z-index: 4; }
 /* Two sticky rows, so the offset has to be hard-coded: the column headings sit at the top and the
    district headings park just under them. `.dhead th`'s own `top` states `.chead th`'s height.

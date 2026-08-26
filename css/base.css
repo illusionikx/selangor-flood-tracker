@@ -483,7 +483,14 @@
    unit, so source order is the whole of what makes this win. `#side` is an id and beats both
    outright, on either theme, which is what makes the panel take one set rather than swap with the
    theme the way every other card surface does. */
-.pin, #side {
+/* **`#dataBox` JOINED THIS BLOCK ON 2026-08-26, on the repository owner's instruction.** The
+   all-stations table names a kind twice: a glyph beside each column heading, and a pill in every
+   cell that `color()` paints. Both drew the paper set at 0.620 while the map and the panel drew
+   0.690, so one app stated the six kinds in two palettes. That is the fault `#side` already joined
+   this block to repair, one surface over.
+   It is an id like `#side`, so it beats `:root[data-theme="dark"]` on either theme. The table takes
+   one set rather than swapping with the theme, which is what the map and the panel already do. */
+.pin, #side, #dataBox {
   --k-river: #48a5dc; --k-rainfall: #a48adb; --k-siren: #d67b9b;
   --k-gauge: #d2874b; --k-camera: #26b39b; --k-mast: #95a549;
   /* The three that are not station kinds. `#side` needs them because the Weather section is a row
