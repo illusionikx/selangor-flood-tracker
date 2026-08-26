@@ -1571,6 +1571,13 @@ table.data tr[data-mast]:active > td {
 }
 /* No coordinates upstream, so nothing to fly to — say so rather than offer a jump that goes nowhere. */
 table.data .nomap { font-style: italic; }
+/* This padding wraps `.shotbtn` ("Show image") to two lines at 360px, in most camera cells. 88px
+   of content width is not enough for the icon, the gap and the words.
+
+   Ruled: accept it. In 87 of 89 wrapped cells the row already needs that height for another
+   cell, so the row does not grow. Only 2 rows grow, by about 20px, at one breakpoint, on a
+   table that already scrolls sideways there. A phone-only exception on this rule trades the one
+   inset back for two rows. */
 table.data td { padding: 10px var(--pane); border-bottom: 1px solid var(--outline); vertical-align: top; }
 /* The location freezes while the readings scroll under it — a row of numbers with the place name
    scrolled off is unreadable. Sticky needs its own background, or the cells slide through it. */
@@ -2919,7 +2926,7 @@ body.side #side { display: flex; }
    that chip on 2026-08-25.** It stated the kind a third time, over a heading that names it and rows
    that all carry its glyph. So the selector is `#sideKinds` alone again.
    `.badge` is still untouched in the all-stations table, which is a dense grid rather than a pane.
-   It spent one revision as a 32dp chip there too, and the repository owner reversed that on
+   It spent one revision as a 32dp chip there too. The repository owner reversed that on
    2026-08-26, after seeing it on screen. A chip in a table cell is a row height. */
 #sideKinds:empty { display: none; }
 #sideKinds .badges { display: flex; flex-wrap: wrap; gap: 8px; }

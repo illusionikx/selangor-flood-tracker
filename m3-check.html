@@ -2842,8 +2842,10 @@ async function rowState() {
    screen. A cell states its word over its number again, in `.badge`, and the chip is gone from
    the whole table.
 
-   A deletion needs an assertion, or a half-finished revert leaves a rule nothing reports. So
-   this probe checks the chip is absent from the whole table, not only that the pill is back. */
+   A deletion needs an assertion, or a half-finished revert leaves a rule nothing reports. This
+   fixture never held a `.mchip` element, so testing the DOM for one proves nothing. That check
+   passes with the rule present or absent. Read the STYLESHEET instead, the way `rowState()`
+   above already reads css/base.css for its own two assertions. */
 const CELLS = `<tr data-mast="probe">
     <td class="nm">SUNGAI DAMANSARA</td>
     <td class="k"><div class="cv"><span class="badge" style="--c:var(--s-alert)">light</span>
@@ -2858,8 +2860,18 @@ async function cellPills() {
   b.showModal();
   d.getElementById('dataBody').innerHTML = CELLS;
   is(!!d.querySelector('td.k .badge'), true, "a cell's value carries .badge");
-  is(!!d.querySelector('table.data .mchip'), false,
-     '.mchip does not appear anywhere inside table.data');
+
+  /* Two assertions, not one. An absence check alone still passes if somebody deletes the map's
+     own chip row along with the table's. The second assertion proves that rule stays. */
+  const chromeRules = [...d.styleSheets]
+    .filter(s => (s.href || '').includes('chrome.css'))
+    .flatMap(s => [...s.cssRules]);
+  const tableMchip = chromeRules.some(r => r.selectorText
+    && r.selectorText.includes('table.data') && r.selectorText.includes('mchip'));
+  is(tableMchip, false, 'no rule scoped to table.data mentions mchip');
+  const mapMchip = chromeRules.some(r => r.selectorText === '#mapchips .mchip');
+  is(mapMchip, true, 'the map’s own #mapchips .mchip rule is untouched');
+
   /* Read off the panel's own token, never as a hand-copied literal. `#dataBox` states `--pane`
      once and every box below the app bar reads it back. */
   const pane = cs(b).getPropertyValue('--pane').trim();
