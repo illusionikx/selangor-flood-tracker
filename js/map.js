@@ -39,9 +39,9 @@ L.control.zoom({ position: 'bottomright' }).addTo(map);
    `show()`: a non-modal dialog is a plain positioned box, which is what a standard side sheet
    beside a live map has to be.
    **A `MutationObserver` on the body class rather than a call at each site.** The pane is open when
-   one of its occupants is, and four functions write those classes — `setDrawer()`, `openSide()`,
-   `closeSide()` and the breakpoint listener in ui.js. Watching the fact beats remembering four
-   calls, which is the same argument the size observer below makes.
+   one of its occupants is, and three functions write those classes — `openSide()`, `closeSide()`
+   and `setFind()` in ui.js. Watching the fact beats remembering three calls, which is the same
+   argument the size observer below makes.
    Crossing 600px with the pane open closes and reopens it under the other method. See the `close`
    listener below for the trap that hides in those two lines. */
 const pane = el('pane'), narrow = matchMedia('(max-width: 600px)');
@@ -89,10 +89,7 @@ export function railSync() {
      the `find` class directly below 600px, so a write in `setFind()` alone goes stale on that path.
      This runs above the dialog scan, because a dialog opening over the search does not close it. */
   for (const b of navPair('Find')) b.setAttribute('aria-expanded', String(cls.contains('find')));
-  /* The filters item states the same thing about the same pane, and `setDrawer()` wrote it. Both
-     `setFind()` and this module clear the `drawer` class without going through that function. */
-  for (const b of navPair('Filters'))
-    b.setAttribute('aria-expanded', String(cls.contains('drawer')));
+  /* **There is no Filters item.** It opened `#bar`, and a reader deleted that panel on 2026-08-26. */
   for (const d of document.querySelectorAll('dialog[open]'))
     if (DIALOG_ITEM[d.id]) return railActive(DIALOG_ITEM[d.id]);
   /* **The location item is selected while its own card is the pane's occupant.** A reader asked for
@@ -102,8 +99,7 @@ export function railSync() {
      It is written as `railLocate`, the way every branch here is, and `railActive()` strips that
      prefix and matches on the suffix. So the missing rail twin costs nothing: the loop finds
      `#navLocate` and no rail item, which is the answer above 600px anyway. */
-  railActive(cls.contains('drawer') ? 'railFilters'
-           : !cls.contains('side') ? null
+  railActive(!cls.contains('side') ? null
            : side.key === '@alerts' ? 'railAlerts'
            : side.key === '@here' ? 'railLocate' : null);
 }
@@ -114,18 +110,16 @@ function syncPane() {
      view: a card that floats over the map's top-left corner, outside this dialog entirely. Below it
      the search is M3's full-screen search view, which is what this pane is there. So the class means
      two different surfaces, and only one of them is a pane occupant. */
-  const want = cls.contains('drawer') || cls.contains('side')
-            || (cls.contains('find') && narrow.matches);
+  const want = cls.contains('side') || (cls.contains('find') && narrow.matches);
   railSync();
   if (!want) { pane.close(); return; }
   if (pane.open && paneModal === narrow.matches) return;
   pane.close();
   paneModal = narrow.matches;
   if (paneModal) { pane.showModal(); return; }
-  /* **`show()` runs the dialog focusing steps too, and on a desktop that is wrong.** Landing opens
-     the filters, and the pane would take focus into the district filter box before a reader has
-     touched anything. A modal full-screen dialog SHOULD take focus, so only this branch puts it
-     back. */
+  /* **`show()` runs the dialog focusing steps too, and on a desktop that is wrong.** The pane would
+     take focus into its first control before a reader has touched anything. A modal full-screen
+     dialog SHOULD take focus, so only this branch puts it back. */
   const had = document.activeElement;
   pane.show();
   if (had && had !== document.body) had.focus({ preventScroll: true });
@@ -141,7 +135,7 @@ function syncPane() {
    never opened again for the rest of the session. `pane.open` cannot lie about that. It is false
    only when the element is genuinely shut, which is the one case that should clear the classes. */
 pane.addEventListener('close', () => {
-  if (!pane.open) document.body.classList.remove('drawer', 'side');
+  if (!pane.open) document.body.classList.remove('side');
   /* **`find` is only this pane's to clear at compact width.** Above 600px the search is a docked
      card outside this dialog, and `syncPane()` closes the pane precisely BECAUSE the search opened.
      Clearing the class here then took the card away in the same frame it arrived, and the press
@@ -472,14 +466,8 @@ export function openSide(key, html, mastAt) {
     const box = el('side');
     box.classList.remove('swap'); box.offsetWidth; box.classList.add('swap');
   }
-  /* At phone width the two panels are 84vw each and the drawer is painted over this one, so only one
-     of them may be open. The notice goes out as an event rather than a call because ui.js owns the
-     drawer and ui.js already imports this module — importing setDrawer back would close the cycle.
-     Only on a real open: render() calls openSide() on every poll to refresh the card in place. */
-  if (!document.body.classList.contains('side')) {
-    document.body.classList.add('side');
-    document.dispatchEvent(new Event('sideopen'));
-  }
+  // Only on a real open: render() calls openSide() on every poll to refresh the card in place.
+  document.body.classList.add('side');
   mastAt ? showMast(mastAt) : hideMast();
   syncAlertBtn();
   /* The rail's own MutationObserver misses a same-occupant swap.

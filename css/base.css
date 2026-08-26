@@ -157,7 +157,7 @@
   --gap: 0px;
   --seam: 0px;
   /* Header height, and everything that hangs beneath it. One number because the header grows to two
-     lines on a phone (the ticker wraps under the buttons) and the map, drawer, search box and alert
+     lines on a phone (the ticker wraps under the buttons) and the map, the search box and the alert
      panel all have to follow it down — they were six hard-coded 64/76/124/128s before. */
   /* **The app bar's height, and it exists on a phone alone.** Above 600px the rail runs the full
      height and nothing stands above the two panes, so `--hdr` is `0px` there. Below it the bar is
@@ -400,14 +400,14 @@ td:last-child { text-align: right; padding-left: 16px; }
 
 /* Slim scrollbars on the app's own scroll panes. Still `overflow: auto`, so they appear only when
    the content actually overflows — a permanent gutter on a list of four districts is noise. */
-.scroll, .picklist, #sideBody, #barBody {
+.scroll, .picklist, #sideBody {
   scrollbar-width: thin;
   scrollbar-color: color-mix(in srgb, var(--on-surface) 28%, transparent) transparent;
 }
 .scroll::-webkit-scrollbar, .picklist::-webkit-scrollbar,
-#sideBody::-webkit-scrollbar, #barBody::-webkit-scrollbar { width: 8px; height: 8px; }
+#sideBody::-webkit-scrollbar { width: 8px; height: 8px; }
 .scroll::-webkit-scrollbar-thumb, .picklist::-webkit-scrollbar-thumb,
-#sideBody::-webkit-scrollbar-thumb, #barBody::-webkit-scrollbar-thumb {
+#sideBody::-webkit-scrollbar-thumb {
   background: color-mix(in srgb, var(--on-surface) 28%, transparent);
   border: 2px solid transparent; background-clip: content-box; border-radius: 999px;
 }
@@ -447,7 +447,8 @@ td:last-child { text-align: right; padding-left: 16px; }
 /* --- controls ------------------------------------------------------------------------------ */
 
 /* Every filter chip in this app, and they are M3 FILTER CHIPS. Two surfaces call `.chip`: the
-   drawer's sensor kinds through `#layers`, and the layer chips over the map through `#mapchips`. Transcribed from `Chip/chip.css` in the
+   sensor kinds through `#layers`, and the layer chips over the map through `#mapchips`. Both sit in
+   the chip row over the map. Transcribed from `Chip/chip.css` in the
    M3 Expressive component set, at `data-variant="filter"`:
    https://github.com/bczak/m3you/blob/development/src/components/Chip/chip.css
    A 32dp container, `shape-corner-small` (8dp), `label-large`, an 18dp leading icon, 8dp behind
@@ -551,7 +552,6 @@ td:last-child { text-align: right; padding-left: 16px; }
    there is no free space for an auto margin to push into. */
 .chip .hint, .mnote .note { font-size: 11px; opacity: .7; white-space: nowrap; }
 .chip .hint:empty, .mnote .hint:empty { display: none; }
-#shown { margin: 10px 2px 0; font-size: 12px; }
 
 select, #goto, #dataFind, #camFind {
   width: 100%; padding: 8px 10px; margin-bottom: 10px; font: inherit; font-size: 13px;
@@ -567,17 +567,6 @@ select:focus-visible, #goto:focus-visible, #dataFind:focus-visible, #camFind:foc
    of its own, and a second one around it reads as an error state. Controls inside keep their rings. */
 dialog:focus, dialog:focus-visible { outline: none; }
 
-/* Search box and the list it filters, as one outlined box. The border is the box's, not each part's:
-   a filter above the thing it filters is one control, and two rectangles with a gap between them
-   read as two. `overflow: hidden` so the list's own hover fills stop at the rounded corners, and the
-   input's focus ring is drawn inwards for the same reason. */
-.pickbox { border: 1px solid var(--outline); border-radius: 8px; overflow: hidden; }
-.pickbox input {
-  width: 100%; padding: 8px 10px; margin: 0; font: inherit; font-size: 13px;
-  background: none; color: var(--on-surface);
-  border: 0; border-bottom: 1px solid var(--outline);
-}
-.pickbox input:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 
 /* Searchable select: reads as a plain select until you click, then it's a filter box over a grouped,
    scrollable list. Placement is map furniture and lives in chrome.css. */
@@ -651,96 +640,8 @@ dialog:focus, dialog:focus-visible { outline: none; }
    classes deep on purpose, one more than the rule it has to beat, rather than four and lucky. */
 .alert.grouped .slist .i.fvm { flex: none; font-size: 14px; color: var(--fav); }
 
-/* One spacing for every drawer section, so the four read as one stack — they were two rules and a
-   flex gap, which made the seam between the two columns twice the others. */
-#bar .sect { margin-bottom: 12px; }
-
-/* District filter: the same list, inline and permanent — it is multi-select, and a dropdown that
-   closed on every pick would make hiding three districts three round trips. */
-#districtList { max-height: 40vh; }         /* the border is .pickbox's — see above */
-/* The row *is* the checkbox, as with the layer chips: a real input underneath, visually replaced by
-   the row's own state, so the list stays as plain as the go-to one next to it.
-   `relative` for the "only" button, which is laid over the count rather than beside it. */
-#districtList li { position: relative; padding: 0 4px 0 0; }
-#districtList label {
-  flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px;
-  margin: 0; padding: 7px 8px; font-size: 13px;
-}
-#districtList label span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-#districtList input { position: absolute; width: 1px; height: 1px; opacity: 0; margin: 0; }
-#districtList li:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: -2px; }
-/* A hidden district keeps its name and count — you need to see what you switched off. */
-#districtList li:has(input:not(:checked)) label { opacity: .4; text-decoration: line-through; }
-.solo {
-  flex: none; padding: 2px 9px; cursor: pointer;
-  font: 500 11px Roboto, sans-serif; color: var(--accent);
-  background: none; border: 1px solid var(--outline); border-radius: 999px;
-}
-/* Where there is no hover there is nothing to reveal the button with, so it does not run there at
-   all. Pinned visible it was permanent, and permanent beside the count made every row in the list
-   carry a number and a control at once. The count is what the row is for, so the count is what stays.
-   Solo is a shortcut, not the only way through: the checkboxes hide districts on any device.
-   **The district list is the only user of this class now.** The ignored list and the favorites both
-   drew a `.solo` pill, pinned visible, because restoring a saved sensor is what those lists are for.
-   Each carries an M3 icon button in its trailing slot since 2026-08-25 — see `.mtrail` in
-   `css/chrome.css`. */
-@media (hover: none) { #districtList .solo { display: none; } }
-/* Where there is a hover, the count is the resting state and the button is what hovering swaps in. */
-@media (hover: hover) {
-  .solo { visibility: hidden; }
-  #districtList li:hover .solo, #districtList li:focus-within .solo { visibility: visible; }
-  /* Over the count, not beside it: reserving a lane for a button that is only there on hover pushed
-     every district's number in from the edge all the time. Its fill is the hovered row's own colour
-     — accent 14% resolved against the surface instead of over it — so it reads as part of the row
-     rather than a chip floating on one. */
-  #districtList .solo {
-    position: absolute; right: 4px; top: 50%; transform: translateY(-50%);
-    background: color-mix(in srgb, var(--accent) 14%, var(--surface));
-  }
-  /* Keyboard gets the same tint hover gets, or the button would land on an untinted row. */
-  #districtList li:focus-within { background: color-mix(in srgb, var(--accent) 14%, transparent); }
-}
-/* Collapsible filter sections. The stock marker is replaced by a chevron on the right, because the
-   count sits there too and a triangle on the left with a number on the right reads as two controls.
-   `list-style: none` plus the ::-webkit-details-marker rule: Safari still needs the second. */
-/* **`title-small`, in sentence case, which is M3's own list subheader.** It drew at 11px, 500,
-   uppercase and tracked. `.mgroup` in `#paintmenu` carried the identical language and moved to this
-   token on 2026-08-25, so the drawer was the last surface here writing a heading in a size this app
-   picked rather than transcribed. `on-surface-variant` bridges to `--muted`, so the colour did not
-   move. `text-transform` is gone rather than overridden: M3 writes a subheader in sentence case,
-   this app's writing standard already does, and an uppercase transform breaks a screen reader on
-   anything acronym-shaped. */
-.sect > summary {
-  display: flex; align-items: center; gap: 8px; padding: 6px 0; cursor: pointer;
-  color: var(--md-sys-color-on-surface-variant); list-style: none;
-  font-size: var(--md-sys-typescale-title-small-size);
-  line-height: var(--md-sys-typescale-title-small-line-height);
-  font-weight: var(--md-sys-typescale-title-small-weight);
-  letter-spacing: var(--md-sys-typescale-title-small-tracking);
-}
-.sect > summary::-webkit-details-marker { display: none; }
-.sect > summary::after {
-  content: ''; width: 18px; height: 18px; flex: none; background: currentColor;
-  -webkit-mask: var(--i-expand_more) center / contain no-repeat;
-          mask: var(--i-expand_more) center / contain no-repeat;
-  transition: transform .15s;
-}
-.sect[open] > summary::after { transform: rotate(180deg); }
-.sect > summary:hover { color: var(--on-surface); }
-/* The count is the whole point of a collapsed section — it must not be pushed off by a long title. */
-.sect > summary b { margin-left: auto; font-weight: 500; font-variant-numeric: tabular-nums; }
-.sect > summary .i { font-size: 18px; }
-.sect > summary + * { margin-top: 4px; }
-
-/* **The favorites and the ignored sensors are M3 lists, and their rules live in `css/chrome.css`
-   beside `#settingsBox`.** They were two `<details>` sections in this drawer, styled here as another
-   `.picklist` so they read as siblings of the district filter. They left the drawer on 2026-08-25,
-   and they are the only two lists in this app that are a settings surface rather than a filter.
-   `.picklist` still supplies the row's own shape. Only the M3 numbers sit in the other file. */
-
-.rowbtns { display: flex; gap: 8px; margin-top: 8px; }
-.rowbtns .link { justify-content: center; }
-.link:disabled { opacity: .45; cursor: default; background: color-mix(in srgb, var(--accent) 10%, transparent); }
+/* The favorites and the ignored sensors are M3 lists, and their rules live in `css/chrome.css`
+   beside `#settingsBox`. `.picklist` above still supplies the row's own shape. */
 
 .icon {
   width: 40px; height: 40px; padding: 0; flex: none;

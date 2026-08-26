@@ -12,7 +12,7 @@
     LISTS     the two saved lists, the developer group   M3 segmented, with a switch, an icon
               every alert group in the On alert pane      M3 segmented, under an assist chip
                                                          button, a snackbar and a confirmation
-    SHEETS    #bar #side                            side sheet >= 601px, bottom sheet <= 600px
+    SHEETS    #side                                 side sheet >= 601px, bottom sheet <= 600px
     BANDS     the four dialogs across M3's window size classes
 
   Transcribed from the M3 Expressive component set, so every number here is greppable against a
@@ -33,7 +33,8 @@
   The browser's own stylesheet caps every dialog at `calc(100% - 6px - 2em)`, which is wider than
   the pane in three of four bands, so it bites in one and three look right.
 
-  `body.drawer #legend` translated by `--drawer` after the phone override for that token went, which
+  A furniture box translated by a token whose phone override had gone pushed the legend past the
+  viewport, which
   pushed the legend past the viewport, put a scrollbar on the document, shortened the ICB and left
   BOTH bottom sheets 15px above the edge they are anchored to. A layout fault two elements away.
 
@@ -156,8 +157,7 @@ const OPEN_CARD = "import { openSide } from '/js/map.js'; openSide('probe', " + 
      exempt      deliberately neither, and each names its reason where it is defined */
 const KIND = {
   dataBox: 'fullscreen', camBox: 'fullscreen', aboutBox: 'fullscreen', helpBox: 'fullscreen',
-  // Settings, added 2026-08-25. It took the two saved lists out of the filters panel and the
-  // developer controls out of About the same day.
+  // Settings, added 2026-08-25. It holds the two saved lists and the developer controls.
   settingsBox: 'fullscreen',
   lightbox: 'basic', warnBox: 'basic',
   /* The reset confirmation, added 2026-08-25 in place of a native `confirm()`. **It carries no
@@ -203,15 +203,17 @@ async function phone() {
   }
   /* The supporting pane transitions rather than animates, so it gets the exit as well as the enter.
      **The motion is on the pane and never on an occupant.** One box travels, so switching the
-     station card for the filters swaps the content of a container already in place. Two sheets
-     sliding through each other is what that switch looked like while each carried its own travel. */
+     station card for the search swaps the content of a container already in place. Two sheets
+     sliding through each other is what that switch looked like while each carried its own travel.
+     **The two occupants are `#side` and `#findpane`.** The search is a pane occupant at THIS width
+     alone, which is why every probe below runs in the compact frame. */
   /* The pane transitions on `[open]` and gets an enter AND an exit. `@starting-style` supplies the
      closed state `show()` and `showModal()` leave nothing to transition from. `allow-discrete` on
      `display` and on `overlay` is what keeps the box, and the top layer, alive across that exit.
      A keyframe bought the enter alone, so the pane arrived over 300ms and left in one frame. Both
      variants travel in from the edge they are anchored to. */
   const paneEl = d.getElementById('pane');
-  d.body.classList.add('drawer');
+  d.body.classList.add('find');
   await settled();
   is(paneEl.open, true, 'the observer opens the pane when an occupant asks for it');
   const paneCs = cs(paneEl);
@@ -238,19 +240,19 @@ async function phone() {
      stops drawing. So this has to be a real swap, with the pane open and one occupant replacing
      another. Removing every class closes the pane instead, and a closing pane is the one case an
      occupant DOES fade, or the pane slides off holding nothing. */
-  d.body.classList.remove('drawer');
+  d.body.classList.remove('find');
   d.body.classList.add('side');
   await settled();
   is(paneEl.open, true, 'swap: the pane stays open while its occupant is replaced');
-  is(cs(d.getElementById('bar')).transitionDuration.split(',')[0].trim(), '0s',
+  is(cs(d.getElementById('findpane')).transitionDuration.split(',')[0].trim(), '0s',
      'swap: the outgoing occupant leaves at once, the way a replaced station does');
   d.body.classList.remove('side');
   await settled();
   is(cs(d.getElementById('side')).transitionDuration.split(',')[0].trim(), '0.3s',
      'close: the occupant on screen fades with the pane, so nothing slides off empty');
-  d.body.classList.add('drawer');
+  d.body.classList.add('find');
   await settled();
-  const inCs = cs(d.getElementById('bar'));
+  const inCs = cs(d.getElementById('findpane'));
   is(inCs.transitionDuration.split(',')[0].trim(), '0.22s', 'swap: the incoming one takes 220ms');
   is(inCs.transitionDelay.split(',')[0].trim(), '0s', 'and it starts at once, waiting for nothing');
   is(inCs.transitionTimingFunction.split(/,\s*(?=cubic-bezier|ease|linear|steps)/)[0],
@@ -258,7 +260,7 @@ async function phone() {
   is(inCs.transitionProperty.includes('translate'), true, 'it slides in as well as fades');
   is(inCs.transitionProperty.includes('scale'), false,
      'and it does not scale: that was the fade through, and a reader cut it');
-  is(cs(d.getElementById('bar')).animationName, 'none',
+  is(cs(d.getElementById('findpane')).animationName, 'none',
      'a transition and not a keyframe, so the container itself never moves');
   /* The other event, read off the same element the app animates. Equal numbers are the assertion:
      one token feeds both, so a change to either has to move both or fail here. */
@@ -269,7 +271,7 @@ async function phone() {
      'a station swap runs for exactly as long as an occupant swap');
   is(swapCs.animationTimingFunction, M3_EASE, 'on the same curve');
   sideEl.classList.remove('swap');
-  d.body.classList.remove('drawer');
+  d.body.classList.remove('find');
   await settled();
   settle();
   const box = e => [r(e).top, r(e).left, r(e).width, r(e).height].map(Math.round).join(',');
@@ -285,8 +287,9 @@ async function phone() {
      full-screen for one revision. That looks identical on screen and is not the same thing: only a
      modal dialog gets the top layer, a focus trap, and a page behind it that is inert. A styled div
      also cannot be covered by another dialog, and four of them open over this one.
-     **One box, two occupants.** `#bar` and `#side` are content inside the pane, so each is asserted
-     against the same box. A destination that changed shape with its content is not one destination.
+     **One box, two occupants.** `#side` and `#findpane` are content inside the pane, so each is
+     asserted against the same box. A destination that changed shape with its content is not one
+     destination.
 
      The scrim, the drag handle and the swipe are all gone, and that is the point rather than a
      regression. They belonged to the bottom sheet this replaced. */
@@ -454,19 +457,21 @@ async function phone() {
   is(cs(nav).display !== 'none', true, 'phone: and it is not merely in the markup');
   is(Math.round(r(nav).height), 64, 'phone: M3 navigation bar, 64dp with no safe-area inset');
   is([...nav.querySelectorAll('.navitem')].map(b => b.id).join(','),
-     'navFilters,navAlerts,navLocate,navTable,navCams',
-     'phone: five items, which is what M3 caps this component at');
-  /* **The middle slot is the location button.** A reader asked for it there on 2026-08-25, and the
-     overflow moved to the app bar to free the slot. Assert the POSITION, not merely that the item
-     exists: "at the centre" is what was asked for, and an item appended to the end still draws.
+     'navAlerts,navLocate,navTable,navCams',
+     'phone: four items, inside the three-to-five M3 states for this component');
+  /* **THE LOCATION BUTTON IS NO LONGER AT THE CENTRE, and that is a cost of the panel deletion.** A
+     reader asked for the middle slot on 2026-08-25, and the filters item that made five was deleted
+     Four items have no centre slot, so it keeps its place in the reading order instead.
      **It has no rail twin, because the map draws `#locate` itself wherever there is room.** That is
      why this id breaks the `rail`/`nav` pairing every other item here keeps.
      **It is a destination and takes `aria-current`**, which `railSync()` writes while the "You are
      here" card is the pane's occupant. So it states no `aria-expanded`: that attribute belongs to
-     the search and the filters, which report on a pane they toggle. */
+     the search, which reports on a pane it toggles. */
   const navIds = [...nav.querySelectorAll('.navitem')].map(b => b.id);
-  is(navIds[Math.floor(navIds.length / 2)], 'navLocate',
-     'phone: with the location button in the middle slot, which is what was asked for');
+  is(navIds.indexOf('navLocate'), 1,
+     'phone: the location button keeps its place, with no centre slot left to hold');
+  is(d.getElementById('navFilters'), null,
+     'phone: and no filters item, because that panel was deleted');
   is(d.getElementById('railLocate'), null,
      'phone: and it has no rail twin, because the map draws that button itself above 600px');
   is(d.getElementById('navLocate').hasAttribute('aria-expanded'), false,
@@ -493,11 +498,11 @@ async function phone() {
   /* Every item splits the window evenly. A basis of `auto` sizes each to its own word, so `Cameras`
      takes more room than `Table` and the five stop reading as one row. */
   const navW = [...nav.querySelectorAll('.navitem')].map(b => Math.round(r(b).width));
-  is(new Set(navW).size, 1, 'phone: five equal columns, whatever each label says');
+  is(new Set(navW).size, 1, 'phone: four equal columns, whatever each label says');
   /* The indicator is the rail's own, drawn once and shared. A second copy drifts. */
   is(!!nav.querySelector('#navAlerts .railbadge'), true,
      'phone: the alert item carries the rail badge, not a copy of it');
-  is(Math.round(r(nav.querySelector('#navFilters .railpill')).width), 56,
+  is(Math.round(r(nav.querySelector('#navAlerts .railpill')).width), 56,
      'phone: and the shared 56dp indicator pill reaches this component');
   /* **The selected LABEL takes `secondary` here, and the rail's takes `on-surface`.** That is the
      reference's own split, and this bar carried the rail's value for a whole revision. Read it
@@ -509,11 +514,16 @@ async function phone() {
     d.body.appendChild(probe);
     const want = cs(probe).color;
     probe.remove();
-    d.body.classList.add('drawer');
+    /* **Press the item, never set the attribute by hand.** `railSync()` derives `aria-current` from
+       the live DOM and runs from a MutationObserver, so a hand-written attribute is cleared by the
+       next body-class write and this assertion then reads an unselected item. The class that used to
+       drive this is gone, so the alert list stands in. */
+    const item = d.getElementById('navAlerts');
+    item.click();
     await settled();
-    is(cs(d.getElementById('navFilters')).color, want,
+    is(cs(item).color, want,
        'phone: a selected item takes M3’s `secondary`, which is the vertical arrangement’s own');
-    d.body.classList.remove('drawer');
+    d.body.classList.remove('side');
     await settled();
   }
   /* **Every item answers a pointer with a state layer, and this bar had none for a revision.** A
@@ -563,7 +573,7 @@ async function phone() {
   /* **The search is in this loop for the pane assertions and NOT for the header ones.** M3 gives a
      search view no title bar: its own search bar is the header, and it carries the back arrow. So
      the pane's `#findHead` is gone, and the block guarded below is the block that measured it. */
-  for (const [id, cls, name] of [['bar', 'drawer', 'filters'], ['side', 'side', 'station panel'],
+  for (const [id, cls, name] of [['side', 'side', 'station panel'],
                                  ['findpane', 'find', 'search']]) {
     d.body.classList.add(cls);
     await settled();
@@ -582,8 +592,8 @@ async function phone() {
        around a 48px target. The other four full-screen dialogs are 8px around a 40px one. Both land
        the glyph on 28px, so the centre is the fact that survives either convention. */
     if (id !== 'findpane') {
-      const hd = d.querySelector(id === 'bar' ? '#barHead' : '#sideHead');
-      const x = d.getElementById(id === 'bar' ? 'barClose' : 'sideClose');
+      const hd = d.querySelector('#sideHead');
+      const x = d.getElementById('sideClose');
       const xr = r(x);
       is(Math.round(r(hd).height) >= 112, true, name + ': M3 112dp medium flexible app bar');
       is(Math.round((xr.left + xr.right) / 2), 28,
@@ -756,8 +766,8 @@ async function phone() {
      job. The one line still needed is the `close` listener in map.js that clears the body class, and
      the assertion above this covers it.
      The scrim and the swipe are not here to assert. They went with the bottom sheet. */
-  is(!!d.getElementById('barClose'), true, 'the filters carry a close button');
-  is(!!d.getElementById('sideClose'), true, 'and so does the station card');
+  is(!!d.getElementById('sideClose'), true, 'the station card carries a close button');
+  is(!!d.getElementById('findBack'), true, 'and the search bar carries the arrow that is its own');
   d.body.classList.add('side');
   await settled();
   is(pane.matches(':modal'), true, 'the pane is modal, which is what makes Escape reach it at all');
@@ -817,10 +827,10 @@ async function desktop() {
      change and the whole of what can silently go wrong. A map that keeps its full width under an
      opaque pane looks identical until a reader tries to press something in the covered strip, and
      `focusOn()` then centres a station under the panel that describes it. */
-  const bar = d.getElementById('bar'), side = d.getElementById('side');
+  const side = d.getElementById('side');
   const pane2 = d.getElementById('pane'), mapBox = d.getElementById('map'), VW = w.innerWidth;
   const VH = w.innerHeight;
-  d.body.classList.remove('drawer', 'side');
+  d.body.classList.remove('side');
   await settled();
 
   /* --- the main pane is drawn as a card ---
@@ -901,8 +911,10 @@ async function desktop() {
        'no top pad: M3 reserves 44px for a status bar this app does not draw');
     const items = [...railEl.querySelectorAll('.railitem')];
     is(items.map(b => b.id).join(','),
-       'railFilters,railAlerts,railTable,railCams,railSettings,railHelp,railAbout',
-       'seven rail items, in the order the spec states');
+       'railAlerts,railTable,railCams,railSettings,railHelp,railAbout',
+       'six rail items, in the order the spec states');
+    is(d.getElementById('railFilters'), null,
+       'and no Filters item, because there is no panel for one to open');
     const first = items[0];
     is(Math.round(r(first).height), 64, 'M3 item min-height 64px');
     is(cs(first.querySelector('.i')).fontSize, '24px', 'M3 icon 24px');
@@ -1059,33 +1071,33 @@ async function desktop() {
     is(cs(toggleGlyph).rotate, 'none', 'and it is not a turned `menu_open` any more');
 
     /* --- every rail item draws the glyph its own markup states ---
-       `setDrawer()` rewrote `#railFilters`'s glyph to `menu` and `menu_open`, which is right for the
-       hamburger this control used to be in the app bar. The markup went to `filter_alt` and that
-       writer kept winning, on the first `setDrawer()` of every landing. So the new glyph never drew
-       once, and reading the markup said it did.
-       **Assert the glyph against a probe wearing the class the MARKUP names**, at both drawer
-       states. A literal here would need a copy of the path data. */
+       `setDrawer()` rewrote `#railFilters`'s glyph on every landing, so a new glyph in the markup
+       never drew once and reading the markup said it did. That item and that writer were deleted
+       with it. The trap is a class of trap, so the assertion stays on the items that are left.
+       **Assert the glyph against a probe wearing the class the MARKUP names**, at both pane states.
+       A literal here would need a copy of the path data. */
     const drewAsMarkup = label => {
-      for (const [id, cls] of [['railFilters', 'i-filter_alt'], ['railAlerts', 'i-warning'],
+      for (const [id, cls] of [['railAlerts', 'i-warning'],
                                ['railTable', 'i-table'], ['railCams', 'i-photo_camera'],
                                ['railFind', 'i-search']])
         is(cs(d.querySelector('#' + id + ' .i')).maskImage, glyphMask(cls),
            label + ': ' + id + ' draws ' + cls);
     };
-    d.body.classList.remove('drawer');
+    d.body.classList.remove('side');
     await settled();
-    drewAsMarkup('drawer shut');
-    d.body.classList.add('drawer');
+    drewAsMarkup('pane shut');
+    d.body.classList.add('side');
     await settled();
-    drewAsMarkup('drawer open');
-    /* **`aria-expanded` is derived, and this path never calls `setDrawer()`.** Writing the class
-       directly is what `setFind()` does below 600px, and a write inside `setDrawer()` went stale on
-       exactly that. */
-    is(d.getElementById('railFilters').getAttribute('aria-expanded'), 'true',
-       'and the filters item states the pane is open, derived rather than written by the opener');
-    d.body.classList.remove('drawer');
+    drewAsMarkup('pane open');
+    /* **`aria-expanded` is derived, and nothing writes it at the opener.** `railSync()` reads the
+       live body class, so a class written directly still reaches it. */
+    d.body.classList.add('find');
     await settled();
-    is(d.getElementById('railFilters').getAttribute('aria-expanded'), 'false',
+    is(d.getElementById('railFind').getAttribute('aria-expanded'), 'true',
+       'and the search states the pane is open, derived rather than written by the opener');
+    d.body.classList.remove('find', 'side');
+    await settled();
+    is(d.getElementById('railFind').getAttribute('aria-expanded'), 'false',
        'and states it shut again when something else clears the class');
 
     /* --- Help draws a picture of each control, and that picture has to be the control's own ---
@@ -1102,7 +1114,7 @@ async function desktop() {
        compare against: two draw the same `flood` and `info` marks the About pane and the alert list
        already use, and the rail toggle swaps its own glyph. So the pairs below are the five that a
        drift in either file can put wrong. */
-    for (const [id, label] of [['railFilters', 'Filters'], ['railTable', 'Table'],
+    for (const [id, label] of [['railTable', 'Table'],
                                ['railCams', 'Cameras'], ['railAlerts', 'Alerts'],
                                ['railFind', 'Go to a station']]) {
       const h = helpGlyph(label);
@@ -1115,7 +1127,7 @@ async function desktop() {
     for (const sel of shutHidden)
       is(cs(railEl.querySelector(sel)).display, 'none',
          'shut rail: ' + sel + ' does not draw');
-    for (const id of ['railFilters', 'railAlerts', 'railTable', 'railCams'])
+    for (const id of ['railAlerts', 'railTable', 'railCams'])
       is(cs(d.getElementById(id)).display !== 'none', true,
          'shut rail: ' + id + ' still draws, because a destination is what the rail is for');
     is(cs(d.getElementById('railFind')).display !== 'none', true,
@@ -1238,13 +1250,15 @@ async function desktop() {
        'back to 80px, so nothing after this block inherits an open rail');
 
     /* --- the selected state: the rail lights the item for whatever is on screen --- */
+    /* **Press the item, never write the class.** `railSync()` reads `side.key`, so the alert list
+       has to really open for its own item to light. */
     const active = () => [...railEl.querySelectorAll('[aria-current="page"]')].map(b => b.id);
-    d.body.classList.remove('drawer', 'side', 'find');
+    d.body.classList.remove('side', 'find');
     await settled();
     is(active().join(','), '', 'a bare map selects no rail item');
-    d.body.classList.add('drawer');
+    d.getElementById('railAlerts').click();
     await settled();
-    is(active().join(','), 'railFilters', 'the filters light their own item and nothing else');
+    is(active().join(','), 'railAlerts', 'the alert list lights its own item and nothing else');
     /* **Compare against a probe, never against a hex.** `getComputedStyle` reports a background as
        `rgb(...)` and a custom property as whatever the author wrote, so the two never match as
        strings. A throwaway span painted with the same token settles both through the same engine.
@@ -1252,11 +1266,11 @@ async function desktop() {
     const probe = d.createElement('span');
     probe.style.background = 'var(--md-sys-color-secondary-container)';
     d.body.appendChild(probe);
-    is(cs(d.getElementById('railFilters').querySelector('.railpill')).backgroundColor,
+    is(cs(d.getElementById('railAlerts').querySelector('.railpill')).backgroundColor,
        cs(probe).backgroundColor,
        'and the indicator takes the selected fill this app already uses');
     probe.remove();
-    d.body.classList.remove('drawer');
+    d.body.classList.remove('side');
     await settled();
     is(active().join(','), '', 'and closing it clears the item');
 
@@ -1281,22 +1295,15 @@ async function desktop() {
     await new Promise(res => setTimeout(res, 200));
     is(w.innerWidth, 500, 'the frame really crossed 600px');
     is(active().join(','), 'railCams', 'crossing 600px with the wall open must not clear it');
-    /* **Close it here, still narrow, and only then resize back.** `js/ui.js` runs its own
-       `phone.addEventListener('change', ...)` on the same breakpoint, and that listener reopens
-       the drawer on the way back to a wide window whenever `PREFS.drawer` has not been explicitly
-       closed. Resizing wide again BEFORE this close folds that unrelated, legitimate reopen into
-       what should be a bare check of the dialog's own item — the drawer really is back, and
-       `railSync()` is right to light it, which is not the fault this assertion exists to catch. */
+    // Close it while still narrow, then resize back: that is the order this assertion reads in.
     d.getElementById('camBox').close();
     await settled();
     is(active().join(','), '', 'closing the wall while still narrow clears the item');
     f.style.width = '1200px';
     d.body.offsetHeight;
     await new Promise(res => setTimeout(res, 200));
-    /* The resize back may have reopened the drawer through `js/ui.js`'s own breakpoint listener,
-       which is real, correct behavior and not this block's concern. Clear it, so the RAIL block
-       still ends bare for whatever runs after it, the same state it has ended in since Step 1. */
-    d.body.classList.remove('drawer');
+    /* End bare for whatever runs after this block, the same state it has ended in since Step 1. */
+    d.body.classList.remove('side', 'find');
     await settled();
   }
   is(cs(mapBox).borderTopLeftRadius, '16px', 'M3 shape-corner-large');
@@ -1338,7 +1345,9 @@ async function desktop() {
   }
   is(Math.round(VW - r(d.querySelector('.leaflet-control-zoom')).right), 10 + GAP,
      'the zoom control gets it free, having never left the map container');
-  d.body.classList.add('drawer');
+  /* **The station card is the only occupant above 600px.** The search is the pane's other occupant
+     at compact width alone: above 600px it is M3's docked search view, a card over the map. */
+  d.body.classList.add('side');
   await settled();
   is(cs(pane2).boxShadow, 'none', 'a standard side sheet has no elevation');
   /* M3 gives it a 1px `outline-variant` on the edge facing the content, and this app declines it.
@@ -1367,22 +1376,23 @@ async function desktop() {
      the control measures from that edge. */
   is(Math.round(VW - r(d.querySelector('.leaflet-control-zoom')).right), 360 + SEAM + 10,
      'and the zoom control follows the map, having never left it');
-  /* The occupants are content. Neither states a width, a position or an edge of its own. */
-  is(cs(bar).display, 'flex', 'the filters occupy the pane');
-  is(cs(side).display, 'none', 'and only one occupant draws at a time');
-  /* The occupant is not the scroller. Its body is, which is the shape `#side` already had. */
-  is(cs(bar).overflowY, 'visible', 'the filters occupant does not scroll itself');
-  is(cs(d.getElementById('barBody')).overflowY, 'auto', 'its body does');
-  /* **Absolute, and the swap is why.** They were `flex: 1` children of a column, so two visible at
-     once would split the pane's height between them for the 90ms the fade through overlaps. Filling
-     the pane absolutely lets the outgoing one leave while the incoming one is already in place. The
-     pane still owns the box: the occupants state `inset: 0` and nothing else about it. */
-  is(cs(bar).position + ' ' + cs(side).position, 'absolute absolute',
-     'both occupants fill the pane absolutely, so a swap can overlap them');
-  const bi = r(bar), pi = r(pane2);
+  /* The occupant is content. It states no width, no position and no edge of its own. */
+  is(cs(side).display, 'flex', 'the station card occupies the pane');
+  is(cs(d.getElementById('findpane')).display, 'none',
+     'and the search draws nothing here: above 600px it is a card over the map, not an occupant');
+  /* The occupant is not the scroller. Its body is. */
+  is(cs(side).overflowY, 'visible', 'the occupant does not scroll itself');
+  is(cs(d.getElementById('sideBody')).overflowY, 'auto', 'its body does');
+  /* **Absolute, and the swap is why.** An occupant was a `flex: 1` child of a column, so two visible
+     at once split the pane's height between them. Filling the pane absolutely lets the outgoing one
+     leave while the incoming one is already in place. The pane still owns the box: the occupant
+     states `inset: 0` and nothing else about it. */
+  is(cs(side).position, 'absolute',
+     'the occupant fills the pane absolutely, so a swap can overlap two of them');
+  const bi = r(side), pi = r(pane2);
   is([bi.left - pi.left, bi.top - pi.top, pi.right - bi.right, pi.bottom - bi.bottom]
-     .map(Math.round).join(','), '0,0,0,0', 'and each states inset: 0 and nothing more');
-  d.body.classList.remove('drawer');
+     .map(Math.round).join(','), '0,0,0,0', 'and it states inset: 0 and nothing more');
+  d.body.classList.remove('side');
   await settled();
   is(Math.round(r(mapBox).width), VW - GAP - GAP - RAIL,
      'shut again, the map takes the width straight back, less one gap on each side and the rail');
@@ -1457,10 +1467,14 @@ async function desktop() {
   const sub2 = d.querySelector('#sideSub .muted');
   is(cs(sub2).fontSize, '14px', 'the supporting text is body-medium');
   is(cs(sub2).fontWeight, '500', 'at the weight M3 states for it');
-  /* Against `#shown`, not against a `.muted` in this card's body: the region line was the only one
-     there and it has moved up here. `getComputedStyle` resolves `color` on a `display: none`
-     element, so the drawer being the pane's other occupant costs nothing. */
-  is(cs(sub2).color, cs(d.getElementById('shown')).color, 'in on-surface-variant');
+  // Against a probe: it settles the token through the same engine, this file's rule for a colour.
+  {
+    const p = d.createElement('span');
+    p.style.color = 'var(--md-sys-color-on-surface-variant)';
+    d.body.appendChild(p);
+    is(cs(sub2).color, cs(p).color, 'in on-surface-variant');
+    p.remove();
+  }
   is(cs(sc2).position, 'static', 'the button is a flex item, so nothing floats and nothing is padded');
   /* **Leading at THIS width too, and that is the change.** It was a trailing close X above 600px and
      a leading one below it, moved by `order: -1`. M3 gives a top app bar a leading navigation icon,
@@ -1559,8 +1573,6 @@ async function desktop() {
      'each segment leads with its own title');
   is(cs(heads[0]).marginTop, '0px',
      'and that title cancels its top margin, or it stands 22px inside a 12px segment');
-  /* M3's side sheet has a header. The drawer went unnamed for a long time on the argument that the
-     hamburger which opened it stays on screen — true, and it still left the panel with no title. */
   /* **A pinned header needs a height of its own.** `.modalhead` was written as a row in the flow, so
      it sized to its title and pulled its close button back onto that line with a negative margin on
      all four sides. Pinning it made it a bar with a divider, and the vertical pull then hung the
@@ -1576,41 +1588,25 @@ async function desktop() {
     b.close();
   }
 
-  d.body.classList.remove('side'); d.body.classList.add('drawer');
-  const bh = d.getElementById('barHead');
-  is(cs(bh).display, 'flex', 'the side sheet carries a header, which M3 says it does');
-  /* **112, and the `<h2>` keeps no margin.** This read `>= 64` while the header was a side sheet's,
-     and a `<h2>` carrying the UA's own `0.83em` block margin drew an 86px box under it for a whole
-     revision. `#sideHead` beside it was 64, and nothing here saw the difference because no check
-     ever put the two side by side. Both are the same app bar now, so both are asserted the same. */
-  is(Math.round(r(bh).height), 112, 'M3 112dp medium flexible app bar');
-  is(cs(bh.querySelector('h2')).fontSize, '28px', 'with a headline-medium headline');
-  is(cs(bh.querySelector('h2')).marginTop, '0px', 'and the heading keeps no UA margin of its own');
-  is(cs(bh.querySelector('h2')).fontSize, cs(d.querySelector('#sideTitle .popname')).fontSize,
-     'which is the same headline the station panel takes, this pane having one');
-  /* **Both occupants are a fixed header over a scrolling body, and the drawer was one box doing
-     both.** So its own title scrolled away with the sections under it, and the fade through's
-     `scale` ran on a scroll container in one occupant and a static flex column in the other. Assert
-     the SHAPE and then the BEHAVIOUR: an occupant that scrolls itself and one whose header happens
-     to fit are different faults, and only the second is invisible. */
-  for (const [box, body, head] of [['bar', 'barBody', 'barHead'], ['side', 'sideBody', 'sideHead']]) {
-    is(cs(d.getElementById(box)).overflowY, 'visible', box + ': the occupant is not the scroller');
-    is(cs(d.getElementById(body)).overflowY, 'auto', box + ': its body is');
-    is(cs(d.getElementById(head)).flexGrow + ' ' + cs(d.getElementById(head)).flexShrink, '0 0',
-       box + ': and its header is a flex: none sibling of that body');
-  }
-  const bb = d.getElementById('barBody');
-  /* **The body is capped for the probe, because the drawer no longer overfills a tall pane.** It
-     lost its sensor-kind section on 2026-08-25 and what is left fits a 1000px window, so there is
-     nothing to scroll and the line under this one proves nothing. What is asserted is that the
-     header stays put WHILE the body scrolls, and a cap is the smallest thing that creates a scroll
-     without inventing content. */
+  /* **The occupant is a fixed header over a scrolling body.** One box doing both scrolls its own
+     title away with the content under it. Assert the SHAPE and then the BEHAVIOUR: an occupant that
+     scrolls itself and one whose header happens to fit are different faults, and only the second is
+     invisible. */
+  is(cs(d.getElementById('side')).overflowY, 'visible', 'side: the occupant is not the scroller');
+  is(cs(d.getElementById('sideBody')).overflowY, 'auto', 'side: its body is');
+  is(cs(sh).flexGrow + ' ' + cs(sh).flexShrink, '0 0',
+     'side: and its header is a flex: none sibling of that body');
+  const bb = d.getElementById('sideBody');
+  /* **The body is capped for the probe.** A short card fits a 1000px window, so there is nothing to
+     scroll and the line under this one proves nothing. What is asserted is that the header stays put
+     WHILE the body scrolls, and a cap is the smallest thing that creates a scroll without inventing
+     content. */
   bb.style.maxHeight = '80px';
   await settled();
   bb.scrollTop = 200;
   const moved = bb.scrollTop;
-  is(moved > 0, true, 'the filters body has something to scroll, or the next line proves nothing');
-  is(Math.round(r(bh).top), Math.round(r(d.getElementById('bar')).top),
+  is(moved > 0, true, 'the card body has something to scroll, or the next line proves nothing');
+  is(Math.round(r(sh).top), Math.round(r(d.getElementById('side')).top),
      'and its header stays on the occupant top edge while the body scrolls under it');
   bb.scrollTop = 0;
   bb.style.maxHeight = '';
@@ -1621,7 +1617,7 @@ async function desktop() {
      with the bottom sheet, and this variant paints no backdrop of its own either. */
   is(pane2.matches(':modal'), false, 'and it is NOT modal, so the map stays live beside it');
   is(!!d.getElementById('scrim'), false, 'with no scrim box left in the document');
-  d.body.classList.remove('drawer'); d.body.classList.remove('side');
+  d.body.classList.remove('side');
   await settled();
 
   /* --- the docked search, above 600px ---
@@ -1702,9 +1698,9 @@ async function desktop() {
   is(cs(d.getElementById('gotoBox')).rowGap, '8px', 'with a real gap between them');
 
   /* --- the results list, as M3's own list ---
-     Scoped to `#gotoHits`, never to `.picklist`: the district filter, the ignored list and the
-     favorites list all wear that class and none of them is a search result. A widened rule restyles
-     all four, and only one of them is on screen here, so nothing would say so.
+     Scoped to `#gotoHits`, never to `.picklist`: the ignored list, the favorites list and the three
+     Settings groups all wear that class and none of them is a search result. A widened rule restyles
+     every one of them, and only this one is on screen here, so nothing would say so.
      `#gotoHits` is `hidden` until a query runs, so this drives the real field and waits. */
   d.getElementById('goto').value = 'a';
   d.getElementById('goto').dispatchEvent(new w.Event('input', { bubbles: true }));
@@ -1765,14 +1761,15 @@ async function desktop() {
   is(cs(d.getElementById('side')).display, 'flex', 'and the card itself keeps drawing');
 
   /* The mirror, with `find` left open from the click above rather than closed and reopened — a
-     second close-then-open here would race the same blur timer the comment above avoids. */
-  d.getElementById('railFilters').click();
+     second close-then-open here would race the same blur timer the comment above avoids.
+     The alert list is the second surface. */
+  d.getElementById('railAlerts').click();
   is(d.body.classList.contains('find'), true,
-     'opening the drawer above 600px leaves the search open beside it');
+     'opening the alert list above 600px leaves the search open beside it');
   is(cs(findEl).display, 'flex', 'and the docked card keeps drawing');
 
   d.getElementById('findBack').click();
-  d.body.classList.remove('drawer', 'side');
+  d.body.classList.remove('side');
   await settled();
 
   /* Shut is `display: none`, not a box parked off screen. The pane is a `<dialog>`, so the browser's
@@ -1803,7 +1800,8 @@ async function desktop() {
     is(Math.round((r(g).top + r(g).bottom) / 2 - r(mh).top), 32, id + ': and 32px down');
     /* Against the pane's own headline, never against a literal. `getComputedStyle` resolves a
        font-size inside a shut `<dialog>`, so this holds with `#pane` closed. */
-    if (h2b) is(cs(h2b.querySelector('h2')).fontSize, cs(d.querySelector('#barHead h2')).fontSize,
+    if (h2b) is(cs(h2b.querySelector('h2')).fontSize,
+       cs(d.querySelector('#sideTitle .popname')).fontSize,
        id + ': and one headline size across every panel');
     /* **The five full-screen-capable panes lead with a back arrow at BOTH widths**, asked for on
        2026-08-25. The pane already did, so one glyph in one position now answers every panel. This

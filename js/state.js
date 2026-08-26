@@ -11,7 +11,7 @@ export const state = {
   // having asked for it, and the badge explaining why the map is on fire is easy to dismiss as
   // decoration. A reload is the one thing everyone tries, so a reload must clear it.
   test: false,
-  pinned: null,    // id of a station a jump forced past the drawer filters, until the user pans off
+  pinned: null,    // id of a station a jump forced past the map filters, until the user pans off
   // Mast radius, in metres, for the hover ring. api.php's SITE_M is the real one and overwrites this
   // on every poll — this is only what to draw before the first payload lands.
   siteM: 50,

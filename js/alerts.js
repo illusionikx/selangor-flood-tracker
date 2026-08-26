@@ -3,8 +3,8 @@
 // list itself in the station panel, which is the same popout a pin opens.
 
 import { KINDS, STATUS_COLOR, NO_INFO, ALERT_TITLE, NOTICE, NOTICE_KIND } from './config.js';
-import { state, PREFS } from './state.js';
-import { distKm, dkey, isHot, tier, TIER_RANK, isIgnored, noSec, isFav, esc,
+import { state } from './state.js';
+import { distKm, isHot, tier, TIER_RANK, isIgnored, noSec, isFav, esc,
          warnWhen } from './util.js';
 import { side, openSide, closeSide } from './map.js';
 import { etaText, stamp } from './popup.js';
@@ -304,8 +304,8 @@ function bannerCard(list, kind) {
 }
 
 export function alerts() {
-  const hidden = new Set(PREFS.hidden || []);
-  const hot = state.data.filter(s => !hidden.has(dkey(s)) && !isIgnored(s) && isHot(s));
+  // `PREFS.ignored` is the only suppression this panel obeys.
+  const hot = state.data.filter(s => !isIgnored(s) && isHot(s));
   // Counts describe what is actually known right now, so anything stale is excluded from all three
   // and counted separately. A number that silently includes a reading from April is a lie with a
   // digit in front of it.
@@ -435,11 +435,9 @@ export function alerts() {
   };
 
   if (!hot.length) {
-    // Name the place only when there is one place to name; otherwise say the view is filtered, so a
-    // quiet panel is never mistaken for a quiet state when half the districts are switched off.
-    const on = new Set(state.data.filter(s => !hidden.has(dkey(s))).map(s => s.district));
-    const where = on.size === 1 ? ` in ${[...on][0]}`
-                : hidden.size   ? ' in the districts you are showing' : '';
+    // Name the place only when there is one place to name.
+    const on = new Set(state.data.map(s => s.district));
+    const where = on.size === 1 ? ` in ${[...on][0]}` : '';
     /* An ignored sensor that is *itself* on alert is the one case where "All clear" would be a plain
        lie, so it is stated — not listed, because listing it would undo the thing the user asked for,
        but counted, so the all-clear is one the reader can weigh. The number they need is the ignored

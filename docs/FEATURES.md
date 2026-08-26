@@ -16439,3 +16439,70 @@ The node harness asserted `sunny` for rung 0. Rung 0 has **two** glyphs and the 
 one, so that assertion passed all day and failed all night on code that was right.
 
 It asserts the SET now, `sunny` or `clear_night`. Anything asserting a rung 0 glyph has to.
+
+## The filters panel is deleted, and the ignored count went with it
+
+**2026-08-26.** A reader asked to remove the filters panel and its content. `#bar` was the third
+occupant of the supporting pane. It is gone, and so is everything inside it.
+
+### What went
+
+- `#bar`, `#barHead`, `#barBody`, `#barClose`
+- the district picker: `#districts`, `#districtFind`, `#districtList`, `#districtAll`,
+  `#districtNone`, `#districtN`
+- `#shown`, the summary line under those sections
+- `#railFilters` in the rail, `#navFilters` in the navigation bar
+- `setDrawer()`, `openFilters()`, `wantDrawer()`, the breakpoint listener, the `sideopen` listener
+  and the district handlers in `js/ui.js`
+- `districts()` in `js/render.js`, and the four lines of `counts()` that wrote `#shown`
+- the `sideopen` event itself, which had no listener left
+- the `drawer` body class, in every stylesheet and every module
+- `.sect`, `.pickbox`, `.solo`, `#districtList`, `.rowbtns` and `.link:disabled` in `css/base.css`,
+  the two `.rowbtns` rules in `css/chrome.css`, and `--i-filter_alt` in `css/icons.css`
+- `PREFS.hidden`, `PREFS.drawer` and `PREFS.sect`
+
+Net 200 lines of code removed.
+
+### Why the district filter went with the panel
+
+The panel held one control. A filter with no surface is a stored set that hides districts with no
+way to bring them back. So the filter had to go with the panel. A reader who hid three districts
+before this change never sees them again.
+
+`js/alerts.js` dropped its own copy of that filter too. `PREFS.ignored` is the only suppression the
+alert panel obeys now.
+
+### The cost, stated plainly
+
+**The `· N ignored` count is gone and nothing replaced it.** A muted alarm needs two always-visible
+indications: the ignored list, and a standing count. The list moved to Settings on 2026-08-25, and
+that count was the one a reader met without asking for it.
+
+`#ignoredN` on the Settings heading is the whole of what is left. It sits behind a press. That is a
+real weakening of the alarm rule, and it is the reader's call rather than an oversight. Anything
+that restores a standing indication needs a home that is not this panel.
+
+**The location button is no longer at the centre of the navigation bar.** A reader asked for the
+middle slot on 2026-08-25. That bar held five items and now holds four, and four items have no
+centre slot. M3 states three to five for this component, so four needs no other change.
+
+### The checks
+
+`paint-check.html` asserts the deletion: twelve ids read null. Markup left behind by a half-finished
+revert draws a dead panel and errors nowhere.
+
+`m3-check.html` had a harder time. It measured the pane with two occupants and the panel was one of
+them. Three blocks moved:
+
+- the occupant swap runs on `#side` against `#findpane`, in the compact frame, because the search is
+  a pane occupant at that width alone
+- the rail's selected state presses `#railAlerts`, because a body class alone cannot set it:
+  `railSync()` reads `side.key`, so the list has to really open
+- the desktop pane block measures `#side` alone, because above 600px the search floats over the map
+
+**Two faults in that file cost a run each.** A second `const sh` in one function made the whole
+script a parse error, so the page printed `running...` and nothing else. And an `aria-current`
+written by hand was cleared by the next body-class write, which made a correct rule read as broken.
+Press the control instead.
+
+All seven runnable checks are green. `m3-check.html` holds 882 assertions.

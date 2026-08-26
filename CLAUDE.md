@@ -26,11 +26,11 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `index.html` | markup only — no inline CSS or JS |
 | `title-test.html` | `chrome --headless --dump-dom` — one of seven runnable checks. Guards the wordmark ladder in both of the heading's homes, the app bar and the navigation rail, in rendered pixels |
 | `narrow-test.html` | `chrome --headless --dump-dom` — one of seven runnable checks. Guards the narrow-window block: its threshold, its coverage, its refusal to be dismissed, and that it is modal |
-| `paint-check.html` | `chrome --headless --dump-dom` — one of seven runnable checks. Guards the layer chips over the map: that the panel and its two openers are gone, that a menu chip states its own value and a filter chip carries a checkmark, that the heatmap and the two filters leave with the station layer, that a filter chip clears itself on a second press, that nothing else on the map lands on the row, and that below 600px the row wraps rather than scrolling |
+| `paint-check.html` | `chrome --headless --dump-dom` — one of seven runnable checks. Guards the layer chips over the map: that the panel and its two openers are gone, that the filters panel and every district id are gone too, that a menu chip states its own value and a filter chip carries a checkmark, that the heatmap and the two filters leave with the station layer, that a filter chip clears itself on a second press, that nothing else on the map lands on the row, and that below 600px the row wraps rather than scrolling |
 | `m3-check.html` | `chrome --headless --dump-dom` — one of seven runnable checks. Guards every M3 surface in rendered pixels: the nine dialogs against the roll call and the kind each is declared as, the four-band ladder, the map as an inset card, the one motion that changes what the pane holds, the supporting pane's headers and all five dialog headers as one M3 medium flexible top app bar, measured against each other at both widths, the supporting pane at M3's canonical ratios with the map giving up exactly that width, the pane as a side sheet above 600px and a full-screen dialog below it, and the station panel as an M3 list, one item per sensor, with its readings as a segmented list under a 24px kind glyph. Also the navigation rail at both its widths, the navigation bar below 600px, and that every enter carries M3's own duration and easing |
 | `css/icons.css` | every icon, as an SVG mask. Generated — see docs/FEATURES.md for the fetch |
 | `css/base.css` | tokens, reset, controls, blocks shared by popup + alert panel |
-| `css/chrome.css` | page furniture: app bar, status dot, drawer, legend, splash |
+| `css/chrome.css` | page furniture: app bar, status dot, rail, navigation bar, legend, splash |
 | `css/map.css` | Leaflet overrides, pins, cluster badges, popup template |
 | `js/app.js` | entry point — decides what happens on landing, nothing else |
 | `js/oops.js` | reports a browser throw, a rejected promise or a failed asset to `log.php`. No imports, and `app.js` imports it first |
@@ -43,7 +43,7 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `heat-test.html` | `chrome --headless --dump-dom` — one of seven runnable checks. Guards the rain layer's paint distance, its dry-gauge erase and its handover between neighbours, in canvas pixels |
 | `js/popup.js` | popup + meter + gauge + sparkline templates. Also `wxItem()` and its three helpers, the weather list item both weather surfaces draw |
 | `js/sparktip.js` | the hover/tap readout on every graph, and the label on any `data-tip`. One delegated listener, no imports |
-| `js/render.js` | rebuilds markers and heat points, and the drawer summary table |
+| `js/render.js` | rebuilds markers and heat points, the two saved lists, and the kind counts |
 | `js/alerts.js` | "On alert": the app bar's warning glyph, the list it opens in `#side`, the icon badge, the red favicon. Also the MET warning cards above that list |
 | `js/table.js` | the all-stations table dialog, grouped district → mast → sensor |
 | `js/locate.js` | geolocation, the "You are here" marker, and the amber button a failed fix leaves behind |
@@ -54,7 +54,7 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `js/test.js` | test mode: fakes a flood in the client's copy of the payload |
 | `js/lazy.js` | `lazy()` — loads a deferred module and drives `aria-busy` for its skeleton |
 | `js/net.js` | `load()` poll loop and the diagnostics popover on the brand glyph |
-| `js/ui.js` | all DOM wiring: drawer, filters, chips, panels, lightbox, delegated jumps |
+| `js/ui.js` | all DOM wiring: theme, chips, panels, lightbox, delegated jumps |
 | `js/wall.js` | the camera wall: every camera on one page, one timer for all of them |
 | `js/wx.js` | the MET weather layer: the map mode, the pins, and the half-hour panel. `hereCard()` draws that panel over the reader's own fix, and `carry()` hands a card across a layer switch. Deferred |
 | `manifest.json` | PWA manifest. `.json`, not `.webmanifest` — see the gotcha below |
@@ -619,7 +619,7 @@ frames only exist because we ran when they were taken. To re-test the capture pa
   rivers that are mildly tidal at the mouth. **Do not replace it with a station list.**
 - **Never `rm .history.db` to test a cold start.** It destroys the accumulated samples. Every
   `rising` flag goes false for an hour. Anything keyed off `rising` goes quiet at once: the filter,
-  the alert panel, the drawer counts, the heat weighting. To re-test the scrape path, expire the page
+  the alert panel, the kind counts, the heat weighting. To re-test the scrape path, expire the page
   cache instead: `UPDATE page SET ts=0`. If you must delete it, copy the file first.
 - **The scrapers fail silently by design** — a layout change yields zero rows, not an error. The
   payload's `sources` counters (`kl.parsed/added`, `national.parsed/applied`) are the alarm: if
@@ -863,9 +863,10 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
   was missing. That read as a Leaflet zoom bug, and was chased as one. `#dataBox[open]`,
   `#lightbox[open]` and `.sparktip:popover-open` are the pattern. The same trap caught a plain
   `[hidden]` attribute too. `.link { display: flex }` in `base.css` beats the browser's own
-  `[hidden] { display: none }`. So the Developer section's "Refresh now" button needed
-  `.rowbtns .link[hidden] { display: none }` to actually disappear. That button is hidden on the
-  GitHub Pages build, where the query it needs does nothing.
+  `[hidden] { display: none }`. So the Developer section's "Refresh now" button needed a
+  `display: none` rule of its own to actually disappear. That button is hidden on the GitHub Pages
+  build, where the query it needs does nothing. `js/ui.js` hides its whole `<li>` now, which is a
+  plain `<li>` with no author `display`, so the trap does not reach it.
 - **Every `<dialog>` in this app is one of three kinds, and a bare `.modalhead` selector broke two
   of them.** `#dataBox`, `#camBox` and the two `.docbox` panes are **full-screen** below 600px and
   **basic** above it. `#lightbox` and `#warnBox` are **basic at every width**. `#eggBox` and
@@ -995,9 +996,8 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
   what "here" is. Anything that wants a *persistent* label on the map is the thing this rule forbids.
 - **Both headers in the pane are M3's MEDIUM FLEXIBLE top app bar, and each was something else
   before.** `#sideHead` was the side sheet header, 64px with a `title-large` title on the icons' own
-  row. `#barHead` was that above 600px and the full-screen dialog's 56px bar below it. A reader asked
-  for one headline across the pane, at `headline-medium`, on 2026-08-21. So both take one component
-  at both widths. The numbers are `AppBar/app-bar.css`'s own:
+  row. A reader asked for one headline across the pane, at `headline-medium`, on 2026-08-21. So it
+  takes one component at both widths. The numbers are `AppBar/app-bar.css`'s own:
 
       112px container, in two rows
       top row     min-height 56px, padding 8px 4px 0, align-items flex-start, a flex: 1 spacer
@@ -1138,7 +1138,7 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
 - **One motion changes what the supporting pane holds, and two events read it.** `--m3-swap` is
   220ms on `easing-emphasized`. It slides the arriving surface 14px in from the trailing edge and
   fades it. A station swapped for another inside `#side` takes it through `sideSwap`. An occupant
-  swapped for another inside `#pane` takes it through a transition on `#bar` and `#side`. One token
+  swapped for another inside `#pane` takes it through a transition on `#side` and `#findpane`. One token
   feeds both, so the two cannot drift.
   **This reverses M3's fade through, on a reader's instruction, 2026-08-21.** That pattern fades the
   outgoing surface over the first 30% of 300ms. It then fades and scales the incoming one from 92%
@@ -1156,26 +1156,14 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
   occupant has to be in place before it slides. The pane still owns the box: the occupants state
   `inset: 0` and nothing else about it. `m3-check.html` asserts both halves, because an occupant that
   positions itself and one that states a size are different faults.
-- **Both occupants of `#pane` are a fixed header over a scrolling body, and the drawer was not.**
-  `#side` has always been a flex column. `#sideHead` is `flex: none` and `#sideBody` takes the rest
-  and scrolls under it. `#bar` was one box doing both jobs. It carried `padding: 20px` and
-  `overflow: auto` itself. So its own title scrolled away with the sections below it, measured at
-  109px of travel on a 1400px window. The header then needed `margin: -20px -20px 4px` to bleed
-  across that padding. That is a number written for a layout that no longer exists. `#barBody` is
-  the scroller now. It takes `flex: 1`, `overflow: auto` and `padding: 12px 24px`, which are
-  `#sideBody`'s own three numbers.
-  **The motion was the second cost, and a reader named it first.** The enter then scaled the
-  incoming occupant from 92%. So it ran on a scroll container in one occupant and on a static flex
-  column in the other. Two panels in one pane entered differently. The scale is gone now for a
-  separate reason, and the shape still has to match.
-  `m3-check.html` asserts the shape and then the behavior. An occupant that scrolls itself and one
-  whose header happens to fit are different faults. Only the second one is invisible.
-- **An `<h2>` keeps the UA block margin, and `css/base.css` resets `h1` alone.** `#barHead` asks for
-  `min-height: 64px` and drew 86. The UA margin is `0.83em`, which is 18px above and below at 22px.
-  `#sideHead` beside it drew 64, because its title is a `<div>`. The two headers stand in the same
-  pane, one at a time. So a reader meets the difference and no single pane shows it.
-  `m3-check.html` asserted `>= 64` and passed on the fault for a whole revision. It asserts 64 now.
-  Any heading placed in a header row in this app needs `margin: 0` stated.
+- **An occupant of `#pane` is a fixed header over a scrolling body.** `#side` is a flex column:
+  `#sideHead` is `flex: none` and `#sideBody` takes the rest and scrolls under it. One box doing
+  both jobs scrolls its own title away with the content below it, measured at 109px of travel on a
+  1400px window. `m3-check.html` asserts the shape and then the behavior. An occupant that scrolls
+  itself and one whose header happens to fit are different faults, and only the second is invisible.
+- **An `<h2>` keeps the UA block margin, and `css/base.css` resets `h1` alone.** That margin is
+  `0.83em`, 18px above and below at 22px, so a header asking for 64px drew 86. Any heading placed in
+  a header row in this app needs `margin: 0` stated.
 - **The card treatment and the gap turn on together, and the radius is why.** With `--gap` at 0 the
   map fills the window, and a 16px radius on a full-bleed box notches the four screen corners and
   shows the page through them. So the radius and the edge live in the same `min-width: 601px` query
@@ -1231,8 +1219,8 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
   fast-forwards a `setTimeout` past a queued task, and a 300ms wait resolved before the event was
   delivered. `m3-check.html` awaits the `close` event itself.
 - **`syncPane()` runs from a `MutationObserver` on the body class, so the open is one microtask
-  behind the class that asks for it.** Four functions write those classes — `setDrawer()`,
-  `openSide()`, `closeSide()` and the breakpoint listener in ui.js. Watching the fact beats
+  behind the class that asks for it.** Three functions write those classes — `openSide()`,
+  `closeSide()` and `setFind()` in ui.js. Watching the fact beats
   remembering four calls. Anything that asserts on the pane has to wait a tick first.
 - **A module that wires an element at import time makes every test page carry that element.**
   `js/map.js` reaches `#pane` and `#map` at module scope, and `heat-test.html` imports it for the
@@ -1243,7 +1231,7 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
   owner asked for that on 2026-08-25. `#pane`, `#aboutBox`, `#helpBox`, `#settingsBox`, `#dataBox`
   and `#camBox` all draw M3's MEDIUM FLEXIBLE top app bar, at every width: 112px in two rows, a 48px
   target 4px in on a 56px top row, and `headline-medium` on the row under it. The numbers are stated
-  once, beside `#barHead, #sideHead` in `css/chrome.css`, and each dialog's markup carries the same
+  once, beside `#sideHead` in `css/chrome.css`, and each dialog's markup carries the same
   `.apptop` and `.apflex` parts the pane carries.
   **This reverses "a full-screen dialog's header is NOT a top app bar".** That rule is M3 read
   correctly. `Dialog/dialog.css` gives the full-screen variant a 56px header of its own, and above
@@ -1319,6 +1307,11 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
   pane are all deleted. **There is no bottom sheet left in this app.** `#paintmenu` was the last
   one, and the layer controls became a chip row over the map on 2026-08-25. `.grab` and
   `swipeSheet()` went with it.
+- **A FILTER WITH NO SURFACE IS WORSE THAN NO FILTER.** The filters panel and the district picker
+  inside it were deleted together on 2026-08-26. Deleting the panel alone leaves a stored `hidden`
+  set that hides districts with no control to bring them back. `PREFS.hidden`, `PREFS.drawer` and
+  `PREFS.sect` are dead keys in a reader's stored blob. See `docs/FEATURES.md`, *The filters panel is
+  deleted, and the ignored count went with it*, for the alarm indication this cost.
 - **The map is a pane, so Leaflet has to be told when its box changes.** `#map` is
   `inset: var(--hdr) var(--pane-w) 0 0`, and `--pane-w` is the supporting pane's width while that
   pane is open. So the map narrows rather than being covered. Leaflet listens to `window.resize` and
@@ -1427,17 +1420,13 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
   **`right`, not a transform**, which is what the old rule used: `#toast` already owns its
   `transform` for the slide it opens with, and two rules writing one property is how a toast arrives
   360px off the edge it belongs to.
-- **`focusOn()` carries no offset any more. Do not put one back.** It compensated for a
-  drawer covering the leading strip and a station panel covering the trailing one. The map's own box
-  ends at the pane now, so the container IS the visible strip. `setDrawer()`'s `map.panBy()` went the
-  same way, and the `map` import in `js/ui.js` went with it.
-- **One pane, one occupant, at EVERY width.** `#bar` and `#side` had a rail each on opposite edges
-  and stood side by side above 600px. They are two occupants of one box now, so a second one
-  opening replaces the first. `setDrawer(true)` calls `closeSide()`, and the `sideopen` event calls
-  `setDrawer(false)`. Both were phone-only tests before. Neither remembers the close, so a desktop
-  preference for an open drawer survives the station card that replaced it.
+- **`focusOn()` carries no offset any more. Do not put one back.** It compensated for panels
+  covering the two edges of the map. The map's own box ends at the pane now, so the container IS the
+  visible strip.
+- **One pane, one occupant.** Below 600px the search is an occupant too, so `setFind(true)` calls
+  `closeSide()`. Above 600px the search floats over the map and shares the screen by design.
 - **The pane animates and its occupants do not.** One box moves, so switching the station card for
-  the filters swaps the content of a container already in place. Each panel carried its own travel
+  the search swaps the content of a container already in place. Each panel carried its own travel
   while each had its own box, and that switch drew two sheets sliding through each other.
   **A transition on `[open]`, and it buys an enter AND an exit.** `show()` and `showModal()` both
   flip `display`, so there is no closed state to transition from. `@starting-style` supplies one.
@@ -1742,7 +1731,7 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
   fades itself out needs that declaration. `opacity` and a transitioned `visibility` together never
   stop a click. Both of this app's full-screen fades were written that way.
 - **`focusOn()` centres on the strip of map that is actually visible.** That strip is now bounded on
-  both sides. The drawer takes the left, the panel the right, and the two shifts subtract. Skipped
+  both sides. The pane takes the trailing side. Skipped
   below 600px, where the panel covers the map outright and there is no strip to aim at.
 - **Stations within `SITE_M` (50 m) are one place.** `api.php` stamps a `site` key. The map draws one
   pin per site, not per station (671 → 417). Anything reaching for a marker must go through
@@ -2105,18 +2094,6 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
   still pops, because the tile leaving the left edge is the whole strip leaving. `MIN_TILES` (3)
   guarantees a follower. And `#ticker` must have a **fixed flex basis**. Sized to content, the
   header re-laid itself out every poll as the alert count changed.
-- **`.solo` is hidden until hover, globally.** The rule lives on the class, not on `#districtList`.
-  So any new list reusing that pill button gets an invisible control on a mouse. `#ignoredList` and
-  `#favList` both override it back to `visible`, because restoring is the whole point of either
-  panel. They share one `::after` that grows the hit area past the small pill, `inset: -10px -6px`.
-  A two-line row must not grow around the control to make it a real touch target. The two selectors
-  are merged in `css/base.css` on purpose, so the ignored list and the favorites list cannot drift
-  apart.
-- **`<details>` cannot animate closed** (children go `display:none`) and hides non-`<summary>`
-  children entirely. That is why the drawer is a `body.drawer` class and the credit sits outside.
-  The two filter sections *inside* the drawer (`#districts`, `#ignored`) are `<details>` precisely
-  because they want no animation. Their counts live on the `<summary>`, so a collapsed section still
-  reports what it holds. Do not move a count into the body.
 - **`border-collapse: collapse` drops padding on the table box** — `#netstats` uses `separate`.
 - **leaflet.heat sizes in screen pixels.** `heatScale()` converts a layer's ground distance to
   pixels per zoom so blobs stay ground-fixed. Do **not** also call `heat.redraw()`. The plugin
@@ -2327,7 +2304,7 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
   so long. Add a layer and then remove it, and the same call throws. **`render()` calls
   `setLatLngs()` on both heat layers on every poll, and `setLatLngs()` ends in `redraw()`.** So the
   next poll after switching a heatmap off threw partway through `render()`, and every line after it
-  stopped: the markers, the cluster, the alert panel and `#shown`. The map froze on its last good
+  stopped: the markers, the cluster and the alert panel. The map froze on its last good
   poll until somebody reloaded, with only `js/oops.js` to say why. `SoftHeat.redraw()` in
   `js/heat.js` bails when there is no map. **The fix is app-side on purpose**, so the vendored file
   keeps its three patches as the only edits to it. `heatScale()` states the same rule from the other
@@ -2789,9 +2766,9 @@ and `--muted` flip with the theme while the picture behind them does not. White 
 - **The navigation bar is what a compact window gets, and the rail does not draw there at all.**
   `#navbar` is M3's navigation bar, from `NavigationBar/navigation-bar.css`. 80px of a 360px screen
   is 22% of it, and M3 states no rail under 600px.
-  **Five items, which is the cap M3 states.** The rail carries eight destinations. Settings, Help
-  and About are the three visited least, so they move to `#appMenu`, and the fifth slot holds the
-  button that opens it.
+  **Five items was the cap M3 states, and the bar holds four now.** The rail carried eight
+  destinations. Settings, Help and About are the three visited least, so they move to `#appMenu`.
+  The filters item went with its panel on 2026-08-26.
   **The middle slot holds the map layers, and the search left this bar for the app bar.** A reader
   asked for both on 2026-08-25. The search was the middle item and it is `.hlead` now, the app bar's
   leading action, and the search took the slot it vacated.
@@ -2799,10 +2776,13 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   map since 2026-08-25. A bar item that opens a panel which no longer exists opens nothing and errors
   nowhere.
   **THE MIDDLE SLOT HOLDS THE LOCATION BUTTON FROM 2026-08-25, and `#navMore` left this bar the same
-  day.** A reader asked for both. So the five items are Filters, Alerts, Location, Table and Cameras,
-  and the overflow is the app bar's trailing action instead. `m3-check.html` asserts the POSITION and
-  not merely that the item exists: "at the centre" is what was asked for, and an item appended to the
-  end still draws.
+  day.** A reader asked for both. So the five items were Filters, Alerts, Location, Table and
+  Cameras, and the overflow is the app bar's trailing action instead.
+  **THE BAR HOLDS FOUR ITEMS FROM 2026-08-26, AND THE LOCATION BUTTON IS NOT AT THE CENTRE ANY
+  MORE.** The repository owner deleted the filters panel that day, so `#navFilters` went with it.
+  Four items have no centre slot, so the property a reader asked for is gone and the item keeps its
+  place in the reading order instead. M3 states three to five for this component, so four needs no
+  other change. `m3-check.html` asserts the position it holds now rather than the centre.
   **`#navLocate` has no rail twin, and it must not grow one.** Above 600px the map draws `#locate`
   itself, over the ground a fix lands on, which is where a location control belongs whenever there is
   room for it. That is why this id breaks the `rail`/`nav` pairing every other item here keeps.
@@ -3356,8 +3336,7 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   and drops both canvases while the mode is on. So leaving the mode restores whatever heatmap the
   reader had, with nothing remembered and nothing to get wrong. Do not add a "previous layer" field.
   **`PREFS.wx` persists across a reload**, which means a reader can land on a map with no flood
-  stations on it. `#shown` states `Weather map · flood stations hidden`. The Layers section summary
-  reads `weather`. Those two lines are the whole of what says why, so do not delete either one.
+  stations on it. The layer chip states `Weather`, and that chip is the whole of what says why.
 - **Two MET points stand 80 m apart and never separate.** `Serdang` and `Seri Kembangan` measure
   16 screen pixels apart at zoom 15. So `WX_THIN_PX` keeps one of them at every zoom a reader uses.
   That is right. Two points 80 m apart report one weather. But somebody who knows both names will
@@ -3443,8 +3422,10 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   component only after reading its CSS in the reference set.
   **The window is M3's supporting-pane canonical layout**, and the numbers come from that page:
   https://m3.material.io/foundations/layout/canonical-examples/supporting-pane
-  `#map` is the main pane and `#pane` is the supporting one. `#pane` holds one of three occupants at
-  a time: the station card, the weather card and the filters.
+  `#map` is the main pane and `#pane` is the supporting one. `#pane` holds one occupant at a time.
+  Above 600px that is the station card alone. Below 600px the search joins it, because M3's
+  full-screen search view is a destination there. **The filters panel was the third occupant and it
+  is deleted**, on the repository owner's instruction of 2026-08-26.
   **Medium splits the window equally. Expanded gives 70% to the main pane and 30% to the supporting
   one**, and the two bands above expanded keep that ratio. `--pane` carries it, with two corrections
   the ratio alone does not survive. See the entry on its floor below.
@@ -3499,13 +3480,13 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   `HEAVY RAIN`, `HAPPENING NOW`) are a deliberate visual language and are **not** messages — leave
   them.
 - All user settings live in one `prefs` blob in `localStorage` (`PREFS` + `save()`).
-- **The layer controls are a bare CHIP ROW over the map, and the drawer keeps the sensor kinds.**
+- **The layer controls are a bare CHIP ROW over the map, and there is no panel left at all.**
   `#mapchips` sits on the map's leading edge, under the ticker, on the legend's own 12px line. A
-  reader asked for that on 2026-08-25.
+  reader asked for that on 2026-08-25, and deleted the filters panel that stood beside it on
+  2026-08-26. **Every map control this app has is a chip on this row.**
   **Four chips, in two M3 kinds.** A chip that opens a menu states its VALUE as its label and carries
   a trailing `expand_more`. A chip that is on or off states a NAME and answers with a leading
-  checkmark. `Chip/chip.css` is the reference, and `.chip` in `css/base.css` is the component — the
-  same class the drawer's sensor kinds draw.
+  checkmark. `Chip/chip.css` is the reference, and `.chip` in `css/base.css` is the component.
   `layerChip` picks Stations or Weather. `heatChip` picks Off, Water level or Rainfall. `kindChip`
   holds the five sensor kinds. `alertChip` and `favChip` are filter chips.
   **The sensor kinds moved off the drawer on 2026-08-25 and they are a MENU chip, not five chips.**
@@ -3515,7 +3496,8 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   means every kind draws — which is what the drawer section's own `<summary>` count used to say.
   **A kind is not a filter over stations.** It is which of a station's sensors this map draws at all.
   That is why it stayed in the drawer while Favorites and On alert left, and why it sits under the
-  station layer here rather than beside the two filters.
+  station layer here rather than beside the two filters. The drawer itself is gone since 2026-08-26,
+  so this chip is the only home it has.
   **`checked` in the markup is safe on these and on nothing else.** `js/ui.js` generates the rows
   from `PREFS.layers` on every load, so a browser has no form state left to restore. A radio written
   once in `index.html` is the case that rule forbids.
@@ -3530,8 +3512,8 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   so cancelling put the chip straight back on and undid the line under it. The test also reads
   `PREFS.pinFilter`, never `e.target.checked`: activation runs before dispatch, so the box reads
   `true` on a first press as well as a second.
-  **The drawer holds the district picker and the ignored list, and nothing about the map's paint.**
-  The sensor kinds were the last section to leave it.
+  **There is no panel behind these chips.** Every control this app has is a chip on this row or a
+  row in Settings.
   **`#paintmenu`, `#paint` and `#navLayers` are all gone.** The chips ARE the control, so a panel, a
   round button that opened it, and a navigation bar item pointing at the same panel are three things
   with no job. The bar carries four items now. `#locate` took the slot beside the zoom box.
@@ -3562,8 +3544,8 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   `.chip.on` beside it. The `:has()` half stays, because it answers a real pointer press with no
   script involved. Anything new that writes one of these boxes goes through `setBox()`.
   **The rule for what goes where: a control the reader reaches for WHILE LOOKING AT THE MAP is a chip
-  on the map. A control that shapes which stations exist at all stays in the drawer**, beside the
-  district picker and the ignored list.
+  on the map. Everything else is a row in Settings**, beside the two saved lists. The drawer was the
+  third home and it is deleted, so a new control has two places to land rather than three.
   **Every mutually-exclusive group is ONE choice held in ONE string**: `PREFS.mapLayer`,
   `PREFS.heatLayer` and `PREFS.pinFilter`. Never a pair of booleans: that shape holds both-on, and
   this repo already paid for it once — see `syncHeat()`.
@@ -3579,16 +3561,16 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   rule: `Every station not climbing is hidden`. The repository owner heard the trade-off on
   2026-08-18 and chose the narrow filter. **Do not "fix" the mismatch by widening the chip without
   asking.** Widening it to `isHot()` is one line in `render.js` and it is a decision, not a bug.
-- **`PREFS.ignored` is the only alarm-suppression control**, and it is applied *further* than the
-  district filter: `isIgnored()` gates pins, heat, the alert panel, the ticker **and** the toast. The
-  last two deliberately ignore the district picker. Ignoring one named sensor is a request about
-  that sensor, so it holds there too. Anything that suppresses an alert must keep both always-visible
-  indications. They are the "Ignored sensors" list, drawn even when empty, and the `· N ignored`
-  count in `#shown`. The all-clear must keep saying when a silenced sensor is itself on alert.
-  **The list moved to Settings on 2026-08-25 and the count stayed in the filters panel.** The
-  repository owner asked for the move. So the two indications now sit behind two different presses,
-  and neither one may follow the other. The count is what a reader meets without asking for it, and
-  it is the reason the move is acceptable at all. Do not move `#shown` to Settings beside the list.
+- **`PREFS.ignored` is the only suppression of any kind.** `isIgnored()` gates pins, heat, the alert
+  panel, the ticker **and** the toast. Ignoring one named sensor is a request about that sensor, so
+  it holds on every surface.
+  **NO INDICATION OF IT IS ALWAYS VISIBLE, AND THAT BREAKS A RULE THIS FILE USED TO STATE.** A muted
+  alarm needs two: the "Ignored sensors" list, and a standing count. The list moved to Settings on
+  2026-08-25 and the count went with the filters panel on 2026-08-26, both on the repository owner's
+  instruction. `#ignoredN` on that Settings heading is the whole of what is left, behind a press.
+  The all-clear line still names an ignored sensor that is itself on alert. That is the one surface
+  a reader meets without asking. **Anything that restores a standing indication takes it through the
+  alert design standard first**, and needs a home that is not the filters panel.
 - **A place with several sensors is a Monitoring Station. A place with one sensor is a Monitoring
   Node, or the name of its kind.** The kinds are Water level, Rainfall, Siren, Flood gauge, Camera. The word
   *mast* is gone from every rendered string. The hardware is usually a small gated shed, so the
@@ -3650,7 +3632,7 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   others.** The exclusivity guard read `e.target === el('heat') && …`. So it only fixed the pair
   when one of those two boxes was what changed. A pair that arrived already both-on survived every toggle
   of the two pin filters that share that handler. Meanwhile `PREFS.heatLayer` saved `water`, and the
-  drawer went on showing both. The test moved to the pair, whoever fired the event.
+  panel went on showing both. The test moved to the pair, whoever fired the event.
   **Both of those repairs failed, because a handler is not the only writer of a checkbox.** The bug
   came back showing two answers at once. Both ramps drew on the legend, both chips lit, and the
   section summary still named one. `syncHeat()` re-read the boxes on every poll, and the summary was written
@@ -3859,8 +3841,8 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   literal. It always answers Cancel: confirming would empty a real saved list on the machine it runs
   on.
   **The markup already carried the three slots, so `js/render.js` emits the rows it always did.**
-  `.picklist li` is the item, `.glyph` is the leading slot, `.nm` is the content and `.solo` is the
-  trailing one. The rows are static and the button is the action, so no pointer cursor and no hover
+  `.picklist li` is the item, `.glyph` is the leading slot, `.nm` is the content and `.mtrail` is
+  the trailing one. The rows are static and the button is the action, so no pointer cursor and no hover
   tint.
   **Two things left and one number diverges.** The bordered box went, because a standard list has no
   container. `max-height: 26vh` went with it, because it put a second scroller inside a pane that
@@ -4347,7 +4329,7 @@ printf("rows: %d, points: %d, newest: %s\n",
   --ignore-certificate-errors --virtual-time-budget=40000 --window-size=1600,1000 --dump-dom \
   https://flood-exp.test/paint-check.html | perl -0777 -ne 'print $1 if /<pre id="out">(.*?)<\/pre>/s'
 
-# The six M3 full-screen dialogs below 600px: the drawer, the station panel, the table, the camera
+# The M3 full-screen dialogs below 600px: the station panel, the search, the table, the camera
 # wall, About and Help. Loads the app twice, at 360px and at 1200px. Four faults here put nothing
 # wrong on screen. A sticky header with `top: 0` pins at the scroller's PADDING edge and holds the
 # bar 18 or 20px down. A headline drifting off M3's 56dp is invisible on any one pane. A rule
@@ -4813,9 +4795,17 @@ So the check loads the app a second time at 1200px and reads the wide layout bac
 the 360px panel, the trailing ×, the two slide transforms and the four floating dialogs.
 
 **A variant with no scrim has to keep a way out.** The scrim tap and the swipe both went with the
-drawer they belonged to. So the check asserts the drawer has a close button at all, and drives a
-real Escape through the document to reach the handler the app registered.
+bottom sheet they belonged to. So the check asserts the station card has a close button at all, and
+drives a real Escape through the document to reach the handler the app registered.
 
 It reuses two rules the checks above it already state. Transitions are switched off in the frame
 before anything is measured. And geometry is read with the pane OPEN, because a closed dialog is
 `display: none` and every rect inside it reads zero.
+
+**Press the control, never write `aria-current` by hand.** `railSync()` derives that attribute from
+the live DOM and runs from a `MutationObserver`, so a hand-written value is cleared by the next
+body-class write. The assertion then reads an unselected item and calls a correct rule broken.
+
+**A second `const` of one name in one function is a parse error, and this file prints `running...`
+and nothing else.** No assertion runs, no `THREW` line appears, and the whole page looks like a
+hang. Extract the script and run `node --check` on it before blaming the app.

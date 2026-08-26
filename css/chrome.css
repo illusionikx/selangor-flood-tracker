@@ -1,4 +1,5 @@
-/* Page furniture around the map: app bar, status chip, drawer, legend, alert panel, splash. */
+/* Page furniture around the map: app bar, status chip, rail, navigation bar, legend, alert panel,
+   splash. */
 
 /* **The map is a pane, not a backdrop.** Its box ends where the supporting pane begins, so the two
    sit beside each other rather than one over the other. That is M3's supporting-pane layout, and it
@@ -809,7 +810,7 @@ body.railopen #rail .railbadge { top: -6px; right: -6px; }
    level2, which is a scroll state and needs script. These surfaces separate by space, which is the
    cut a reader already made on the map card, the app bar and the supporting pane. */
 /* **The box, the height and the background all come from the shared app bar now.** See
-   `#barHead, #sideHead` below. These five wore a 56px row of their own above 600px and the pane's
+   `#sideHead` below. These five wore a 56px row of their own above 600px and the pane's
    112px bar below it, so one panel changed shape as a reader crossed the breakpoint and no two
    panels agreed with each other. */
 /* **The scroller, and the only box in this pane that scrolls.** `flex: 1` with `overflow: auto`, the
@@ -1017,19 +1018,6 @@ body.rising #risebadge { display: flex; }
 #devstats td { padding: 3px 0; vertical-align: top; }
 #devstats td:first-child { width: 42%; color: var(--muted); }
 
-/* `.link` was written for a <button>, which carries no underline of its own. `#devRaw` is the only
-   `<a class="link">` in the app, and an anchor keeps the browser's own underline unless told
-   otherwise. Here, beside the other Developer rules, rather than in base.css: this stylesheet's
-   `?v=` is already bumped for this change, and base.css would need the same bump for one rule. */
-.rowbtns a.link { text-decoration: none; }
-
-/* `.link` sets `display: flex`, and an author rule beats the user agent's `[hidden]` rule — so the
-   attribute alone does not hide this button. The Pages build has no api.php to force. */
-.rowbtns .link[hidden] { display: none; }
-
-/* **No `.rowbtns` left in Settings.** The three developer controls became list rows on 2026-08-25,
-   and the two clear actions became the last row of their own list the same day. See `.mfoot`. */
-
 /* --- Settings, as M3 lists -----------------------------------------------------------------------
    Transcribed from `List/list.css` in the M3 Expressive component set, which cites
    m3.material.io/components/lists:
@@ -1211,7 +1199,7 @@ body.rising #risebadge { display: flex; }
    headings arrived and the disc on 2026-08-25. The repository owner cut both the same day.
    That lands on M3's own list subheader, which states a label and nothing else. `display: flex`
    stays for the count alone. */
-/* The count must never be pushed off the row by a long title, which is its rule in the drawer too. */
+/* The count must never be pushed off the row by a long title. */
 #settingsBox h3 b { margin-left: auto; font-weight: 500; font-variant-numeric: tabular-nums; }
 /* **A group's action is its LAST ROW, and `.mfoot` is what joins the two boxes.** A reader asked
    for that on 2026-08-25: the action was a full-width link in a `.rowbtns` box, which read as a
@@ -2038,43 +2026,17 @@ body:has(#brand .mark.open) #netstats { opacity: 1; visibility: visible; }
 }
 #netstats .note td { padding-top: 10px; line-height: 1.45; font-size: 11px; }
 
-/* --- drawer --------------------------------------------------------------------------------- */
+/* --- the pane's occupants ------------------------------------------------------------------------
+   Two of them: `#side` at every width, and `#findpane` below 600px.
 
-/* <details> can't animate its close (children go display:none), so a body class drives it. */
-#bar {
-  /* fixed, not absolute: the header is the positioned ancestor and it is only --hdr tall */
-  /* `height: calc(100dvh - …)`, not `bottom: 0`. A phone's browser resolves a fixed box's `bottom`
-     against the *large* viewport — the one with the address bar retracted — so the drawer was taller
-     than the strip actually on screen. Its content fitted inside that taller box, which meant no
-     scrollbar and a bottom section parked behind the browser chrome, unreachable. `dvh` is the
-     viewport as it stands right now, and it follows the bar in and out. */
-  /* **The pane owns the box now.** This was a fixed 288px rail on the leading edge. It is one of
-     three occupants of `#pane`, so it fills that pane and states nothing about where the pane is or
-     how wide it is. See `.paneswap` below for why that is `position: absolute` and not `flex: 1`.
-     **The header does not scroll, so this box is not the scroller.** `#barBody` is, which is the
-     shape `#side` has always had: a header that is a `flex: none` sibling, and a body that takes the
-     rest and scrolls under it. The drawer was one box doing both jobs, so its own title scrolled
-     away with the sections below it. Measured at 109px of travel on a 1400px window. It also put
-     the fade through's `scale` on a scroll container in one occupant and on a static flex column in
-     the other, which is why the two panels entered differently. */
-  /* No gap between the two columns of the drawer: every section already carries its own 12px, and a
-     24px seam on top of that made the one between Ignored sensors and Heatmap twice any other. */
-  display: none; flex-direction: column;
-}
-/* M3's side sheet body, the same three numbers `#sideBody` takes: `flex: 1`, `overflow-y: auto` and
+   M3's side sheet body, the same three numbers `#sideBody` takes: `flex: 1`, `overflow-y: auto` and
    `padding: 12px 24px`. `overscroll-behavior: contain`, because without it a scroll past the end of
-   the drawer chains to the document and takes the whole page with it. */
-#barBody, #findBody {
+   the box chains to the document and takes the whole page with it. */
+#findBody {
   flex: 1; overflow: auto; overscroll-behavior: contain; padding: 12px 24px;
   display: flex; flex-direction: column;
 }
-body.drawer #bar { display: flex; }
-/* The tie-break, for a state the JS already makes unreachable. `setDrawer(true)` closes the card and
-   the `sideopen` event closes the drawer, so one occupant draws. Two body classes can still both be
-   set by something that writes them directly, and two occupants stacked in one pane is the one shape
-   this container cannot draw. The card wins: it is the more specific answer of the two. */
-body.side #bar { display: none; }
-/* The same shape, for the search. */
+/* The search occupant. */
 #findpane { display: none; }
 body.find #findpane { display: flex; flex-direction: column; }
 /* --- the search, as M3's search view ------------------------------------------------------------
@@ -2228,27 +2190,16 @@ body.find #findpane { display: flex; flex-direction: column; }
 #gotoHits li.sel {
   background: color-mix(in srgb, var(--accent) 14%, transparent);
 }
-/* The same tie-break, below 600px only, where the search really is a pane occupant. A body class
-   can still set `find` beside `drawer` or `side` directly, and this container draws one occupant.
+/* The tie-break, below 600px only, where the search really is a pane occupant. A body class can set
+   `find` beside `side` directly, and this container draws one occupant.
    **Above 600px the search is not a pane occupant, so this must not reach there.** The search floats
-   over the map at that width and shares the screen with the drawer or a station card by design — see
-   `setFind()` and `setDrawer()` in ui.js. This rule used to run at every width and silently undid
-   that: whichever of the three classes landed last always won, and a station card left the docked
-   search hidden behind it for no reason a reader could see. */
+   over the map at that width and shares the screen with a station card by design — see `setFind()`
+   in ui.js. This rule used to run at every width and silently undid that: whichever class landed
+   last always won, and a station card left the docked search hidden behind it for no reason a
+   reader could see. */
 @media (max-width: 600px) {
-  body:is(.drawer, .side) #findpane { display: none; }
+  body.side #findpane { display: none; }
 }
-/* `flex-shrink: 0`, and it is what makes the drawer scroll at all. `#barBody` is a column flex
-   container with a fixed height, so a taller child does not overflow it — it *shrinks* to the
-   container, its own content spills out of the shrunken box, and the scrollHeight never exceeds the
-   height. The result is a panel whose last sections are both clipped and unreachable. Only ever
-   visible on a phone, where the sections are stacked in a narrow column and run past one screen. */
-#barBody > div { min-width: 0; flex-shrink: 0; }
-/* **Nothing steps aside for the drawer any more, and the legend is why the rule is worth naming.**
-   It used to translate by `--drawer` because the drawer took the leading rail and the map ran
-   underneath it. Both halves of that are gone: the drawer is an occupant of the trailing pane, and
-   the map's own box stops at that pane. The legend sits on the leading edge of a map that never
-   moves. */
 
 /* --- the paint chooser ------------------------------------------------------------------------ */
 
@@ -2270,8 +2221,7 @@ body.find #findpane { display: flex; flex-direction: column; }
   right: calc(var(--map-r) + 48px); bottom: calc(36px + var(--gap) + var(--navbar-h)); }
 
 /* It steps aside for the station panel exactly as the zoom buttons and the credit do — see the
-   `body.side` block further down, which this joins. Nothing here rides the drawer any more: that
-   panel is on the left and this button is not. */
+   `body.side` block further down, which this joins. */
 
 /* --- the layer chips, over the map ---------------------------------------------------------------
    **The layer controls are a bare chip row now, and they were a panel behind a round button.** A
@@ -2576,22 +2526,22 @@ body:has(#wxLayer:checked) :is(#heatChip, #kindChip, #alertChip, #favChip) { dis
    still has to be in place before it slides. The pane still owns the box: the occupants state
    `inset: 0` and nothing else about it. */
 .paneswap { position: absolute; inset: 0; }
-#bar, #side, #findpane { opacity: 0; }
-body.drawer #bar, body.side #side, body.find #findpane {
+#side, #findpane { opacity: 0; }
+body.side #side, body.find #findpane {
   opacity: 1; translate: 0;
   transition: opacity var(--m3-swap), translate var(--m3-swap);
 }
 /* The entering surface's start values. A separate block rather than a nested one: this file uses no
    CSS nesting anywhere else, and one shape for one job beats two. */
 @starting-style {
-  body.drawer #bar, body.side #side, body.find #findpane { opacity: 0; translate: 14px; }
+  body.side #side, body.find #findpane { opacity: 0; translate: 14px; }
 }
-body:not(.ready) #bar, body:not(.ready) #side, body:not(.ready) #findpane { transition: none; }
+body:not(.ready) #side, body:not(.ready) #findpane { transition: none; }
 /* Reduced motion keeps the fade and drops the slide, which is the trade `sideSwap` already takes.
    Something still has to say the pane changed. */
 @media (prefers-reduced-motion: reduce) {
   @starting-style {
-    body.drawer #bar, body.side #side, body.find #findpane { opacity: 0; translate: 0; }
+    body.side #side, body.find #findpane { opacity: 0; translate: 0; }
   }
 }
 
@@ -2611,7 +2561,7 @@ body:not(.ready) #bar, body:not(.ready) #side, body:not(.ready) #findpane { tran
    `:root:has(body…)` is what lets a body class move a root-level token. `--rail-w` states the same
    rule from its own side, and this is the second time this app has paid for it. */
 @media (min-width: 601px) {
-  :root:has(body.drawer), :root:has(body.side) { --pane-w: var(--pane); }
+  :root:has(body.side) { --pane-w: var(--pane); }
 }
 /* **A floor under the ratio, because 30% of a small expanded window is not a pane.** M3 gives the
    supporting pane 30% from 840px up. At 840 that is 252px, which is under M3's own 256dp minimum for
@@ -2632,8 +2582,7 @@ body:not(.ready) #bar, body:not(.ready) #side, body:not(.ready) #findpane { tran
 
 /* --- station panel ---------------------------------------------------------------------------- */
 
-/* Fixed to the right edge, under the app bar. Above the map furniture (400) and below the header
-   (600); the drawer (500) is on the opposite edge, so the two never meet. */
+/* The station card. It is one of the pane's two occupants, and the only one above 600px. */
 #side {
   /* The pane owns the box — see `#pane` below. This fills it and states nothing about where it is. */
   display: none; flex-direction: column;
@@ -2693,7 +2642,7 @@ body.side #side { display: flex; }
    correctly: above 600px these are basic dialogs, and a basic dialog takes a headline on a floating
    card rather than any bar. What it cost is the thing it lost on. A panel is a panel to a reader,
    and one that restyles its own header at 600px reads as a fault. */
-#barHead, #sideHead,
+#sideHead,
 .docbox .modalhead, #dataBox .modalhead, #camBox .modalhead {
   flex: none; display: flex; flex-direction: column; align-items: stretch;
   min-height: 112px; margin: 0; padding: 0; gap: 0;
@@ -3044,8 +2993,7 @@ body.side #side { display: flex; }
 }
 /* The glyph takes the leading slot's own 24px, so a subheader and the rows under it share one line. */
 .nsub .i { font-size: 24px; color: var(--c); }
-/* The count must never be pushed off the row by a long heading — its rule in Settings and in the
-   drawer alike. */
+/* The count must never be pushed off the row by a long heading — its rule in Settings too. */
 .nsub b { margin-left: auto; font-weight: 500; font-variant-numeric: tabular-nums; }
 /* The first subheader sits under the tab row, which already ends in a line. */
 .apane > .nsub:first-child { margin-top: 0; }
@@ -3835,7 +3783,7 @@ body.side #side { display: flex; }
      with a 12px corner and a scrim. A full-screen header on a basic container reads as a mistake in
      the header, and it is a mistake in the selector. */
   /* **Nothing here writes the header any more.** These five wear the same app bar as the
-     supporting pane, stated once beside `#barHead, #sideHead`, and it is the same bar at both
+     supporting pane, stated once beside `#sideHead`, and it is the same bar at both
      widths. This block held six rules that rebuilt it out of a 40px target, a negative margin per
      surface and a second copy of the headline scale. */
 
@@ -4042,9 +3990,8 @@ body.side #side { display: flex; }
    `--outline` here. The width is this app's own: the reference caps a side sheet at 320px and its
    own header comment cites M3's 400px, and 360 sits inside M3's 256-400 band. 360 is what a camera
    still needs, which is written down beside the token.
-   **One width for all three occupants.** The filters were a 288px rail of their own before the pane
-   held them. A pane that resized as its content swapped would reflow the map beside it on every
-   switch, so `--drawer` is not read by any rule here any more. */
+   **One width for both occupants.** A pane that resized as its content swapped reflows the map
+   beside it on every switch. */
 
 /* **There is no `#scrim` any more, and neither variant wants one.** A standard side sheet is not
    modal, so above 600px there is nothing to dim. Below it the pane is a full-screen dialog, which
@@ -4058,13 +4005,8 @@ body.side #side { display: flex; }
    `surface`, NO radius and NO elevation, and separates it from the content with a 1px
    `outline-variant` line on the edge that faces that content. `#pane` states all four itself, so
    there is nothing left for this block to correct. */
-@media (min-width: 601px) {
-  /* M3's side sheet header: 64px, centred, `title-large`, and the close on the trailing edge.
-     `#barHead` draws at this width now. The drawer had no header at all before, on the argument
-     that the hamburger which opened it stayed on screen — true, and it still left the panel
-     unnamed. M3's side sheet has a header, so it has one.
-     `#sideHead` is the same header, filled from the station card — see its own rules further up. */
-}
+/* `#sideHead` is M3's side sheet header, filled from the station card — see its own rules further
+   up. Nothing is left for this width to correct, so the block that stood here is gone. */
 
 /* --- full-screen dialog, <= 600px ------------------------------------------------------------- */
 
@@ -4079,9 +4021,6 @@ body.side #side { display: flex; }
     inset: 0; width: 100%; height: 100dvh;
     border: 0; border-radius: 0; box-shadow: none;
   }
-  /* Both occupants scroll in a body of their own, so both take the same compact inset. */
-  #barBody { padding: 8px 16px 16px; }
-
   /* **This width changes nothing about the header any more, and that is the entry.** The leading
      button used to be a trailing close X above 600px and a leading one below it, moved by
      `order: -1`. It is a back arrow on the leading edge at every width now, so there is no order to
@@ -4141,7 +4080,7 @@ body:not(.ready) #pane { transition: none; }
    occupant replaced while the pane STAYS open still leaves at once — that is the rule the block
    above states, and a cross fade there is the second motion a reader already cut. Only the occupant
    that was on screen has an opacity to fade from, so the other two cannot stack under it. */
-#pane:not([open]) #bar, #pane:not([open]) #side, #pane:not([open]) #findpane {
+#pane:not([open]) #side, #pane:not([open]) #findpane {
   transition: opacity var(--m3-travel);
 }
 @media (max-width: 600px) {

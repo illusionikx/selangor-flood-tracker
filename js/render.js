@@ -2,7 +2,7 @@
 
 import { KINDS, MAST, HEAT_FLOOR, HEAT_KM, RAIN_KM, RAIN_STOPS } from './config.js';
 import { state, PREFS, save } from './state.js';
-import { el, color, dkey, atDanger, statusColor, leads, hasInfo, isIgnored, ignoredIds,
+import { el, color, atDanger, statusColor, leads, hasInfo, isIgnored, ignoredIds,
          favIds, isFav, scalePos, levelStops, gaugeStops, setBox } from './util.js';
 import { marks, siteMark, shown, syncCluster, focusOn, side, openSide,
          showMast, hideMast, pinGlyph } from './map.js';
@@ -49,7 +49,7 @@ function syncPins() {
   el('favOnly').disabled = !starred;
   /* The count alone, and nothing where there is none to state. The empty case used to carry a
      sentence, and the segment beside it is already dead and dimmed by `disabled`. One fact does not
-     get two looks, and `#shown` under the map carries the standing indication either way. */
+     get two looks. */
   el('risingHint').textContent = rising ? `· ${rising}` : '';
   el('favHint').textContent = starred ? `· ${starred}` : '';
   return PREFS.pinFilter;
@@ -57,7 +57,6 @@ function syncPins() {
 
 
 export function render() {
-  const hidden = new Set(PREFS.hidden || []);
   /* Written from the preference on every render and never read back off the box. That is the rule
      the two chips below and syncHeat() all obey. A browser restores a checkbox across a reload
      without firing `change`, so the control cannot be the source of truth. */
@@ -94,10 +93,9 @@ export function render() {
     if (!s.lat || !s.lng) continue;
     const pinned = s.id === state.pinned;   // a jumped-to station outranks every filter
     if (!pinned) {
-      // Same escape hatch as a hidden district: a jump still shows the pin, so a station reached
-      // from the table or the go-to box is never a flight to an empty patch of map.
+      // A jump still shows the pin, so a station reached from the table or the go-to box is never a
+      // flight to an empty patch of map.
       if (isIgnored(s)) continue;
-      if (hidden.has(dkey(s))) continue;
       if (pinFilter === 'alert' && !s.rising) continue;
       if (pinFilter === 'fav' && !isFav(s)) continue;
     }
@@ -149,11 +147,9 @@ export function render() {
   state.perKind = perKind;
 
   /* Two ways the station pins come off the map, and the counts above still run for both. They
-     describe the station set rather than the pins, and #shown reports that set in words.
+     describe the station set rather than the pins.
      Weather mode takes the map: no station pin and no heat. `Stations` is the reader switching the
-     pins off on their own, with the wash left alone. `!== false`, so an unset preference counts as
-     on. That is the test `PREFS.drawer` uses, and it is why a first visit lands on a map with pins
-     rather than an empty one. */
+     pins off on their own, with the wash left alone. */
   if (PREFS.mapLayer === 'stations') for (const [key, members] of sites) {
     members.sort(leads);
     const lead = members[0];
@@ -270,7 +266,6 @@ export function render() {
   });
   syncHeat();   // layers + legend follow the chips; see heat.js
   counts();
-  districts();
   ignoredPanel();
   favPanel();
   // Every poll rebuilds the map; the table has to follow or it sits on readings the map has already
@@ -286,51 +281,12 @@ export function render() {
   if (el('camBox').open) import('./wall.js').then(m => m.paint(), () => {});
 }
 
-/* The district filter: every district the feeds returned, grouped under its state, each with the
-   number of stations it holds. Multi-select rather than a <select>, because the useful actions are
-   "hide these three" and "only this one". A dropdown makes both a series of round trips.
-   Rebuilt from state.data on every render — 24 rows is not worth diffing. */
-export function districts() {
-  const q = el('districtFind').value.trim().toLowerCase();
-  const hidden = new Set(PREFS.hidden || []);
-
-  const tally = new Map();
-  for (const s of state.data) {
-    const row = tally.get(dkey(s))
-      || { state: s.state || '—', district: s.district || 'Unknown', n: 0 };
-    row.n++;
-    tally.set(dkey(s), row);
-  }
-
-  let last = null;
-  el('districtList').innerHTML = [...tally]
-    .filter(([, r]) => !q || `${r.state} ${r.district}`.toLowerCase().includes(q))
-    .sort(([, a], [, b]) => a.state.localeCompare(b.state) || a.district.localeCompare(b.district))
-    .map(([k, r]) => {
-      const head = r.state !== last ? `<li class="head">${r.state}</li>` : '';
-      last = r.state;
-      return `${head}<li>
-        <label><input type="checkbox" data-d="${k}"${hidden.has(k) ? '' : ' checked'}
-          ><span>${r.district}</span><b>${r.n}</b></label>
-        <button class="solo" data-solo="${k}" title="Show only ${r.district}"
-                aria-label="Show only ${r.district}">only</button>
-      </li>`;
-    }).join('') || '<li class="none">No district matches that</li>';
-
-  // On the summary, so a collapsed section still says it is holding something back.
-  el('districtN').textContent = hidden.size ? `${hidden.size} hidden` : '';
-  // Disabled rather than hidden: a button that comes and goes moves the rows under the pointer.
-  el('districtAll').disabled = !hidden.size;
-  el('districtNone').disabled = hidden.size >= tally.size;
-}
-
 /* The sensors switched off from a station card's Details button, listed so they can be switched back on.
    Always drawn, never hidden when empty. An ignored sensor is a muted alarm. A muted alarm you
-   cannot find is the failure ISA-18.2 spends a chapter on. This list and the `· N ignored` count in
-   the filters panel are the only two places that name a silenced sensor. So neither of them gets to
-   disappear. **The list moved to Settings on 2026-08-25 and the count stayed in the filters.** So
-   the two indications now sit behind two different presses, and the count is the one a reader meets
-   without asking for it. Row order is the order they were ignored in. It is a short list, and "the one I just
+   cannot find is the failure ISA-18.2 spends a chapter on. **THIS LIST IS THE ONLY PLACE LEFT THAT
+   NAMES A SILENCED SENSOR.** The `· N ignored` count rode `#shown` in the filters panel, and a
+   reader deleted that panel on 2026-08-26. So there is no always-visible indication any more, and
+   `#ignoredN` below is the whole of what is left. Row order is the order they were ignored in. It is a short list, and "the one I just
    switched off" is at the bottom where you left it.
    That promise means walking `ids` — a `Set` built by insertion order — rather than filtering
    `state.data`, the shape this had before: `state.data` is the merged payload's own order, which is
@@ -384,20 +340,16 @@ function favPanel() {
   el('favClear').disabled = !rows.length;
 }
 
-// What the filters actually left on the map. Counted per *station*, not per marker: several sensors
-// now share one pin, and a chip reading "1" for a mast holding three sirens would be wrong about the
-// thing the chip controls. state.perKind is the filtered tally, minus the layer switches themselves,
-// so each chip's number is "what this layer would add".
+// The per-kind numbers in the sensor-kinds menu. Counted per *station*, not per marker: several
+// sensors now share one pin, and a row reading "1" for a mast holding three sirens would be wrong
+// about the thing the row controls. state.perKind is the filtered tally, minus the layer switches
+// themselves, so each row's number is "what this kind would add".
 function counts() {
   const perKind = state.perKind || {};
-  let total = 0;
-  for (const k of Object.keys(marks)) {
+  for (const k of Object.keys(marks))
     document.querySelector(`#layers [data-n="${k}"]`).textContent = perKind[k] ?? 0;
-    if (shown(k)) total += perKind[k] ?? 0;
-  }
-  /* **On the chip itself, which is where the drawer's `<summary>` count used to be.** A menu chip
-     states its own value, and the value of a multi-select group is how much of it is off. `Sensors`
-     alone is the whole set drawing, which needs no number. */
+  /* On the chip itself. A menu chip states its own value, and the value of a multi-select group is
+     how much of it is off. `Sensors` alone is the whole set drawing, which needs no number. */
   const off = Object.keys(marks).filter(k => !shown(k)).length;
   el('kindChipLabel').textContent = off ? `Sensors · ${off} off` : 'Sensors';
   /* The class the row's own fill reads. Chromium does not restyle a `:has(input:checked)` subject
@@ -405,20 +357,4 @@ function counts() {
      time — see `setBox()` in js/util.js for the same repair on the chips. */
   for (const cb of document.querySelectorAll('#layers input'))
     cb.closest('.mi').classList.toggle('on', cb.checked);
-  const pins = Object.values(marks).reduce((n, l) => n + l.length, 0);
-  // The ignored count rides here rather than only in its own panel: this line is the one the eye
-  // lands on to ask "why is the map this empty", and a sensor you silenced last week is exactly the
-  // answer it should give. That carries more weight since the list itself moved to Settings.
-  const ign = ignoredIds();
-  const nIgn = state.data.filter(s => ign.has(s.id)).length;
-  /* Weather hides every station, so the tally would read "0 of 729" and explain nothing. This line
-     is the one the eye lands on to ask why the map is empty, so it answers instead.
-     There is no third branch any more. `PREFS.mapLayer` holds one of two values, so a map with no
-     layer at all is unreachable and the line that named it had nothing left to say. */
-  el('shown').textContent = PREFS.mapLayer === 'weather'
-    ? 'Weather map · flood stations hidden'
-    : `${total} of ${state.data.length} stations on the map` +
-      (pins && pins < total ? ` · ${pins} pins` : '') +
-      (PREFS.pinFilter === 'fav' ? ' · favorites only' : '') +
-      (nIgn ? ` · ${nIgn} ignored` : '');
 }

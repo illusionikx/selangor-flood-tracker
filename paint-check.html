@@ -362,26 +362,24 @@ for (const id of ['legend', 'pills', 'credit', 'locate', 'mapfoot']) {
   }
 }
 
-// --- the drawer keeps the districts and nothing else ----------------------------------------------
-/* **The drawer holds the district picker, and nothing else.** The sensor kinds left for the map chip
-   menu on 2026-08-25, and the two saved lists left for Settings the same day.
-   **A saved list is not a filter.** Each one is a list a reader reviews and edits. The district
-   picker stays because it IS a filter, which is the rule this pane is named for. */
-is(el('layersect'), null, 'the drawer has no layers section');
-is(el('kinds'), null, 'nor a sensor-kinds section');
+// --- there is no panel, only the chip row ---------------------------------------------------------
+/* **Assert the deletion.** Markup left behind by a half-finished revert draws a dead panel, or a bar
+   item that opens nothing, and errors nowhere. */
+for (const id of ['bar', 'barHead', 'layersect', 'kinds', 'shown',
+                  'districts', 'districtList', 'districtFind', 'districtAll', 'districtNone',
+                  'railFilters', 'navFilters'])
+  is(el(id), null, 'no #' + id);
 is(el('layers').closest('#kindMenu')?.id, 'kindMenu', 'the kinds live in the map chip menu instead');
-is(!!el('districts'), true, 'and the drawer keeps the district picker');
 /* **Assert the new PARENT, never that the id is gone.** The lists moved, so an absence check passes
    on markup somebody deleted by mistake, and `render.js` writes into both by id on every poll. A
    missing `#favList` is a throw halfway through `render()`, which stops the markers and the alert
    panel with it. */
 for (const id of ['favList', 'favClear', 'favN', 'ignoredList', 'ignoredClear', 'ignoredN'])
   is(el(id)?.closest('#settingsBox')?.id, 'settingsBox', id + ' lives in Settings now');
-is(el('favList').closest('#bar'), null, 'and the favorites left the filters panel');
-is(el('ignoredList').closest('#bar'), null, 'and so did the ignored list');
-/* **The `· N ignored` count did NOT follow the list.** It is the one always-visible sign that a
-   sensor is silenced, and every alarm standard this app reads says a muted alarm needs one. */
-is(el('shown').closest('#bar')?.id, 'bar', 'the ignored count stays in the filters panel');
+/* **`#ignoredN` is the only count of silenced sensors this app draws**, and the alarm rule in
+   CLAUDE.md is why it may not go quietly. */
+is(el('ignoredN')?.closest('#settingsBox')?.id, 'settingsBox',
+   'and the Settings heading carries the only ignored count there is');
 
 // --- a filter chip clears itself on a second press -----------------------------------------------
 /* **There is no `All` chip, and that is M3's own filter-chip behaviour.** Pressing a selected chip
@@ -475,8 +473,7 @@ is(el('shown').closest('#bar')?.id, 'bar', 'the ignored count stays in the filte
 }
 
 // --- phone width ---------------------------------------------------------------------------------
-/* Reloaded at this width rather than resized to it. A phone LANDS here, and landing is the path that
-   leaves the drawer shut. */
+/* Reloaded at this width rather than resized to it. A phone LANDS here. */
 f.style.width = '360px';
 f.contentWindow.location.reload();
 await new Promise(r => f.addEventListener('load', r, { once: true }));
@@ -492,7 +489,6 @@ const pel = id => pd.getElementById(id);
 const pbox = id => pel(id).getBoundingClientRect();
 pd.body.classList.add('rising');          // the state that puts #risebadge on screen
 await wait(300);
-is(pd.body.classList.contains('drawer'), false, 'phone: lands with the drawer shut');
 
 /* **Four chips need about 440px and a compact map is 360, so the row WRAPS.** A row that scrolled
    sideways would hide the chips past its edge with nothing on screen to say they exist. */

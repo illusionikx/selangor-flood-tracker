@@ -1,16 +1,16 @@
-// DOM wiring: drawer, theme, filters, layer chips, panels, lightbox and the delegated jumps.
+// DOM wiring: theme, layer chips, panels, lightbox and the delegated jumps.
 
 import { KINDS, MAST, camSrc, FEED, STATIC, NEAR_MAX_KM, NOTICE, NOTICE_KIND, NARROW_PX
        } from './config.js';
 import { state, PREFS, PREFS_KEY, save } from './state.js';
-import { el, distKm, dkey, ignoredIds, leads, favIds, isFav, squash, termsOf, matches, esc,
+import { el, distKm, ignoredIds, leads, favIds, isFav, squash, termsOf, matches, esc,
          warnWhen, snack } from './util.js';
 import { setTheme, applyTheme, flashTo, closeSide, showPlace, side, railSync } from './map.js';
 import { showHere } from './locate.js';
 import { syncHeat, heatOpacity, HEAT_OPACITY } from './heat.js';
 import { byId } from './stations.js';
 import { camWarn } from './popup.js';
-import { render, districts } from './render.js';
+import { render } from './render.js';
 import { alerts, toggleAlerts, setAlertTab } from './alerts.js';
 import { ticker } from './ticker.js';
 import { load, feedRows, sourceRows, lastPayload } from './net.js';
@@ -471,75 +471,9 @@ function camFilter() {
 }
 el('camFind').oninput = camFilter;
 
-// --- drawer ------------------------------------------------------------------------------------
-
 const phone = matchMedia('(max-width: 600px)');
-const menu = el('railFilters');
-// `remember: false` for opens and closes the layout forced rather than the user chose — otherwise a
-// phone-width auto-close would overwrite the preference and there'd be nothing to restore later.
-/* `pan` is dead and kept only so the four existing call sites still read. The drawer used to cover
-   a strip of map, so opening it panned the map half its width to keep the view centred on what was
-   left. The drawer is an occupant of the supporting pane now and the map's own box stops at that
-   pane, so the container narrows instead of being covered. `map.invalidateSize()` recentres it —
-   see the observer in map.js. */
-function setDrawer(open, pan = true, remember = true) {
-  /* **One pane, one occupant, below 600px.** The two panels shared a screen while each had a rail
-     of its own on opposite edges. They are the same box now, so a second one opening would land on
-     the first. See the `sideopen` listener below for the other half of this.
-     `find` clears the same way below 600px, where the search is a pane occupant too. Without it,
-     opening the drawer over an open search left `find` set. `syncPane()`'s `want` stayed true on
-     that class alone, so the pane never closed, and `#findpane` could reappear behind the drawer.
-     **Above 600px the search floats over the map and is not a pane occupant, so it stays put.**
-     A reader who opens the filters while reading the docked search wants both on screen at once —
-     that is what a floating box is for. Only `closeSide()` still runs at every width: the drawer
-     and the station card share `#pane` at both widths, and that rule has not changed. */
-  if (open) { closeSide(); if (phone.matches) document.body.classList.remove('find'); }
-  document.body.classList.toggle('drawer', open);
-  /* **The glyph does not change, and a writer here overwrote the one the markup states.** This line
-     swapped `menu` for `menu_open`, which is right for the hamburger this control used to be in the
-     app bar. The markup went to `filter_alt` and this writer kept winning, on the first
-     `setDrawer()` of every landing. So the new glyph never drew once.
-     A rail item states its selection through M3's own indicator pill, which `railSync()` in
-     js/map.js drives. One glyph, one meaning: the button names a filter and draws one.
-     `aria-expanded` moved to `railSync()` with it. `setFind()` above clears the `drawer` class
-     directly below 600px, so a write here goes stale on that path — the fault the search FAB
-     already had. */
-  if (remember) { PREFS.drawer = open; save(); }
-}
-const openFilters = () => setDrawer(!document.body.classList.contains('drawer'));
-/* Open on desktop unless the user has closed it — `!== false`, not `!!`, so an unset preference
-   counts as open. The drawer holds every filter and the layer chips, and a first visit used to land
-   on a bare map with all of that behind an unlabelled hamburger; there is room for it beside the map
-   at this width, which is the whole reason it is a drawer rather than a sheet.
-   Landing on a phone starts with the map and nothing over it: at that width the drawer *is* the
-   screen, so opening one would hand the user a filter panel where they expected a map. Its own
-   default is therefore still closed, and a desktop preference never leaks into it.
-   `remember: false` — this is the layout deciding, so the preference survives for the desktop visit
-   that set it. */
-const wantDrawer = () => !phone.matches && PREFS.drawer !== false;
-setDrawer(wantDrawer(), false, false);
-
-// Crossing the breakpoint in either direction: shut at phone width, where the drawer *is* the whole
-// screen and an open one hides the map it is filtering; back to the desktop default on the way out.
-// Neither is remembered — the layout is deciding here, not the user, and overwriting the preference
-// would leave nothing to restore.
-phone.addEventListener('change', () => setDrawer(wantDrawer(), false, false));
-
-/* One panel at a time, at EVERY width. This was phone-only, back when the drawer had the leading
-   rail and the station panel the trailing one and the two could stand side by side. They are two
-   occupants of one supporting pane now, so a second one opening replaces the first.
-   The station panel's half arrives as an event because map.js owns openSide() and this module
-   already imports map.js. A call back the other way would close the import cycle.
-   `remember: false` — the layout is deciding here, not the reader, so a desktop preference for an
-   open drawer survives the station card that replaced it. */
-document.addEventListener('sideopen', () => setDrawer(false, false, false));
 
 // --- the ways out of the pane -------------------------------------------------------------------
-
-/* The drawer had no close button while the hamburger that opened it stayed on screen. Below 600px
-   the pane covers that hamburger, so `#barHead` carries an X of its own. The station panel's × was
-   always there. */
-el('barClose').onclick = () => setDrawer(false);
 
 /* **Escape needs no handler here any more, and the element is the reason.** `#pane` is a `<dialog>`.
    Below 600px it opens with `showModal()`, so Escape and the Android back gesture reach it natively
@@ -626,7 +560,7 @@ el('riseOff').onclick = () => {
   PREFS.pinFilter = '';
   save();
   risePill();
-  applyFilter(false);
+  applyFilter();
 };
 
 /* **A selected filter chip clears itself on a second press, which is M3's own behaviour.** The pin
@@ -653,7 +587,7 @@ for (const id of ['favOnly', 'risingOnly']) el(id).addEventListener('click', e =
   PREFS.pinFilter = '';
   save();
   risePill();
-  applyFilter(false);
+  applyFilter();
 });
 
 el('heatOff').onchange = el('heat').onchange = el('rainHeat').onchange =
@@ -687,7 +621,7 @@ el('heatOff').onchange = el('heat').onchange = el('rainHeat').onchange =
      where there is no drawer over the result of the press. The argument for closing it was that at
      phone width the drawer IS the screen, so a filter whose effect you cannot see is one you have
      to close the drawer to judge. These are not behind it now. */
-  applyFilter(false);
+  applyFilter();
 };
 
 /* The weather mode toggle. The pref is written first and the module reads it, so the box can never
@@ -746,46 +680,10 @@ async function carry() {
 }
 el('stations').addEventListener('change', carry);
 
-// --- district filter ------------------------------------------------------------------------------
-// render.js draws the list; this only interprets clicks on it. `hidden` holds the districts switched
-// off, so a district the feeds add later shows up by default rather than silently missing.
-
-function applyFilter(closeDrawer) {
+// Every chip on the map calls this: drop the jump override, then redraw.
+function applyFilter() {
   state.pinned = null;      // touching the filters means you meant them — drop any jump override
   render(); alerts();
-  // On a phone the drawer is the map, so a filter you can't see the effect of is one you have to
-  // close the drawer to judge. Only for the decisive actions — not each checkbox in a multi-select.
-  if (closeDrawer && phone.matches) setDrawer(false, false, false);
-}
-
-function setHidden(keys, closeDrawer) {
-  PREFS.hidden = [...keys];
-  save();
-  applyFilter(closeDrawer);
-}
-
-el('districtFind').oninput = districts;
-el('districtList').onchange = e => {
-  const k = e.target.dataset.d;
-  if (!k) return;
-  const keys = new Set(PREFS.hidden || []);
-  e.target.checked ? keys.delete(k) : keys.add(k);
-  setHidden(keys, false);
-};
-el('districtList').onclick = e => {
-  const solo = e.target.closest('[data-solo]')?.dataset.solo;
-  if (solo) setHidden(new Set(state.data.map(dkey).filter(k => k !== solo)), true);
-};
-el('districtAll').onclick = () => setHidden(new Set(), true);
-el('districtNone').onclick = () => setHidden(new Set(state.data.map(dkey)), false);
-
-// --- collapsible filter sections ------------------------------------------------------------------
-// `open` is the element's own state, so there is nothing to sync — only to remember. Keyed by id in
-// the same prefs blob as everything else. Districts default open, ignored closed.
-
-for (const d of document.querySelectorAll('#bar .sect')) {
-  d.open = PREFS.sect?.[d.id] ?? d.open;
-  d.ontoggle = () => { (PREFS.sect ??= {})[d.id] = d.open; save(); };
 }
 
 // --- ignored sensors -------------------------------------------------------------------------------
@@ -1113,20 +1011,18 @@ let hits = [], sel = -1;
 let nearPlace = null;
 
 /* The button opens the search as a pane occupant, not as a box beside it. `#findpane` is one of
-   `#pane`'s three occupants — see `syncPane()` in map.js. The back arrow, Escape, picking a
+   `#pane`'s two occupants — see `syncPane()` in map.js. The back arrow, Escape, picking a
    station, and a blur on the field all close it. */
 function setFind(open) {
   document.body.classList.toggle('find', open);
-  /* **Below 600px the search is a pane occupant, so opening it replaces whatever was there.** The
-     other two do the same to each other already — see `setDrawer()` and the `sideopen` listener.
+  /* **Below 600px the search is a pane occupant, so opening it replaces the station card.**
      **Above 600px the search floats over the map instead**, on the leading edge under the app bar.
-     It is not a pane occupant there, so it clears nothing and nothing clears it. A station card or
-     an open drawer stays exactly where it was — sharing the screen with a floating box is the whole
-     point of drawing one. */
-  if (open && phone.matches) { closeSide(); document.body.classList.remove('drawer'); }
+     It is not a pane occupant there, so it clears nothing and nothing clears it. A station card
+     stays exactly where it was — sharing the screen with a floating box is the whole point of
+     drawing one. */
+  if (open && phone.matches) closeSide();
   /* `railSync()` in map.js writes the FAB's `aria-expanded`, from the body class this line just
-     set. One writer: `setDrawer()` clears `find` directly below 600px, and a write here would go
-     stale on that path. */
+     set. */
   /* The box is `visibility: hidden` while shut — that is what keeps it out of the tab order — and
      you cannot focus a hidden element. Reading offsetWidth forces the style flush that applies the
      class, so by the next line the box is visible and the button that had focus is `display: none`
@@ -1166,8 +1062,9 @@ el('findBack').onclick = () => setFind(false);
    **It presses the map button rather than repeating what that button does.** Every path through
    `js/locate.js` hangs off one handler: a first fix, a stored fix, the recentre, the ripple and the
    card. A second caller here is a second copy of the one that matters. */
+/* **There is no `Filters` entry, and the panel it opened is gone.** A reader deleted `#bar` and the
+   district picker inside it on 2026-08-26. */
 const NAV = {
-  Filters: openFilters,
   Alerts:  toggleAlerts,
   Find:    () => setFind(true),
   Locate:  () => el('locate').click(),
