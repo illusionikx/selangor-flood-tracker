@@ -2783,6 +2783,26 @@ async function tableHead(frame, label) {
   b.close();
 }
 
+/* **M3's state layer**: the surface's own content colour at 8% on hover and 10% on press. This row
+   took `var(--hover)` on hover and answered a press with nothing.
+   **A `:hover` cannot be driven from a script**, so this walks the CSSOM. A control left out of the
+   rule draws correctly and answers nothing, which is the fault this catches. */
+async function rowState() {
+  const { d } = await ready('desk');
+  say('--- the table row state layer --------------------------------------------');
+  const css = [...d.styleSheets]
+    .filter(s => (s.href || '').includes('chrome.css'))
+    .flatMap(s => [...s.cssRules]).map(x => x.cssText).join('\n');
+  is(/tr\[data-mast\]:hover[^}]*--m3-state-hover/.test(css), true, 'a row answers a hover');
+  is(/tr\[data-mast\]:active[^}]*--m3-state-press/.test(css), true, 'and a press');
+  /* The percentages come from the vendored state scale. A hand-copied 8% drifts the day M3 moves
+     it, and nothing on screen says so. */
+  is(/--m3-state-hover:/.test([...d.styleSheets]
+      .filter(s => (s.href || '').includes('base.css'))
+      .flatMap(s => [...s.cssRules]).map(x => x.cssText).join('\n')), true,
+     'the state scale is derived, not hand-copied');
+}
+
 (async () => {
   out.textContent = '';
   try {
@@ -2826,6 +2846,9 @@ async function tableHead(frame, label) {
          ordering rule belongs to the frame, not to any one probe. */
       await tableHead('phone', 'phone');
       await tableHead('desk', 'desktop');
+      /* `rowState()` only reads the CSSOM, so ordering after `tableHead()` costs nothing. It sits
+         last because every probe above it settled the frame first. */
+      await rowState();
     } finally {
       if (origPrefs === null) deskWin.localStorage.removeItem('prefs');
       else deskWin.localStorage.setItem('prefs', origPrefs);

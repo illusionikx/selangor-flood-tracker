@@ -1530,7 +1530,17 @@ table.data tr.here td.nm {
   box-shadow: inset 3px 0 var(--accent);
 }
 table.data tr[data-mast] { cursor: pointer; }
-table.data tr[data-mast]:hover { background: var(--hover); }
+/* **M3's state layer**, at the percentages `css/base.css` derives from the vendored state scale.
+   This row took `var(--hover)` on hover and answered a press with nothing.
+   **The sticky name cell has to take the same mix**, or the row lights up and its first column
+   stays behind. That cell paints its own opaque background, because a sticky box with none lets
+   the cells slide through it. */
+table.data tr[data-mast]:hover > td {
+  background: color-mix(in srgb, var(--on-surface) var(--m3-state-hover), var(--surface));
+}
+table.data tr[data-mast]:active > td {
+  background: color-mix(in srgb, var(--on-surface) var(--m3-state-press), var(--surface));
+}
 /* No coordinates upstream, so nothing to fly to — say so rather than offer a jump that goes nowhere. */
 table.data .nomap { font-style: italic; }
 table.data td { padding: 10px 8px; border-bottom: 1px solid var(--outline); vertical-align: top; }
@@ -1546,7 +1556,12 @@ table.data td.nm, table.data .chead th:first-child {
 }
 table.data td.nm { z-index: 1; }
 table.data .chead th:first-child { z-index: 3; }   /* the corner is sticky in both directions */
-table.data tr[data-mast]:hover td.nm { background: var(--hover); }
+table.data tr[data-mast]:hover td.nm {
+  background: color-mix(in srgb, var(--on-surface) var(--m3-state-hover), var(--surface));
+}
+table.data tr[data-mast]:active td.nm {
+  background: color-mix(in srgb, var(--on-surface) var(--m3-state-press), var(--surface));
+}
 /* Every sensor column the same width, so the eye can travel down one without re-measuring. */
 table.data td.k, table.data .chead th:not(:first-child) { width: 120px; }
 table.data td.k { font-size: 12px; font-variant-numeric: tabular-nums; }
