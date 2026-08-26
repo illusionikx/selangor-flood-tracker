@@ -1531,15 +1531,17 @@ table.data tr.here td.nm {
 }
 table.data tr[data-mast] { cursor: pointer; }
 /* **M3's state layer**, at the percentages `css/base.css` derives from the vendored state scale.
-   This row took `var(--hover)` on hover and answered a press with nothing.
-   **The sticky name cell has to take the same mix**, or the row lights up and its first column
-   stays behind. That cell paints its own opaque background, because a sticky box with none lets
-   the cells slide through it. */
+   This row took `var(--hover)` on hover and answered a press with nothing. A plain `td` has no
+   resting fill, so the mix names `transparent` underneath it, the same as `tr.here > td` beside it.
+
+   **The sticky name cell has to take the same mix.** Otherwise the row lights up and its first
+   column stays behind. That cell paints its own opaque background, because a sticky box with none
+   lets the cells slide through it. */
 table.data tr[data-mast]:hover > td {
-  background: color-mix(in srgb, var(--on-surface) var(--m3-state-hover), var(--surface));
+  background: color-mix(in srgb, var(--on-surface) var(--m3-state-hover), transparent);
 }
 table.data tr[data-mast]:active > td {
-  background: color-mix(in srgb, var(--on-surface) var(--m3-state-press), var(--surface));
+  background: color-mix(in srgb, var(--on-surface) var(--m3-state-press), transparent);
 }
 /* No coordinates upstream, so nothing to fly to — say so rather than offer a jump that goes nowhere. */
 table.data .nomap { font-style: italic; }

@@ -2783,24 +2783,58 @@ async function tableHead(frame, label) {
   b.close();
 }
 
-/* **M3's state layer**: the surface's own content colour at 8% on hover and 10% on press. This row
+/* M3's state layer: the surface's own content colour at 8% on hover and 10% on press. This row
    took `var(--hover)` on hover and answered a press with nothing.
-   **A `:hover` cannot be driven from a script**, so this walks the CSSOM. A control left out of the
-   rule draws correctly and answers nothing, which is the fault this catches. */
+
+   A `:hover` cannot be driven from a script, so this checks two things per rule. First, that the
+   mix RESOLVES: a probe element carrying the expression proves the percentage is not a dropped
+   declaration, the shape the rail's own state-layer check already uses.
+
+   Second, that each of the four selectors still DECLARES its own rule, walked by name rather than
+   joined into one string. An unanchored join let an earlier version pass while only `td.nm`'s
+   rules were broken, because the row's own rules still carried the text it searched for. */
 async function rowState() {
-  const { d } = await ready('desk');
+  const { d, cs } = await ready('desk');
   say('--- the table row state layer --------------------------------------------');
-  const css = [...d.styleSheets]
-    .filter(s => (s.href || '').includes('chrome.css'))
+
+  const resolves = (token, frac) => {
+    const p = d.createElement('div');
+    p.style.background = `color-mix(in srgb, var(--on-surface) var(${token}), transparent)`;
+    d.body.appendChild(p);
+    const v = cs(p).backgroundColor.replace(/\s/g, '');
+    p.remove();
+    return new RegExp(frac.replace('.', '\\.') + '\\)?$').test(v);
+  };
+  is(resolves('--m3-state-hover', '0.08'), true,
+     'the hover mix resolves to 8% of the content colour, not a dropped declaration');
+  is(resolves('--m3-state-press', '0.1'), true, 'and the press mix resolves to 10%');
+
+  const rules = [];
+  for (const sheet of d.styleSheets) {
+    let list; try { list = sheet.cssRules; } catch { continue; }
+    for (const rule of list)
+      if (rule.selectorText && rule.selectorText.includes('tr[data-mast]')) rules.push(rule);
+  }
+  const declares = (selector, token) => {
+    const rule = rules.find(x => x.selectorText === selector);
+    return !!rule && rule.style.getPropertyValue('background').includes(token);
+  };
+  is(declares('table.data tr[data-mast]:hover > td', '--m3-state-hover'), true,
+     'the row itself declares a hover layer');
+  is(declares('table.data tr[data-mast]:active > td', '--m3-state-press'), true,
+     'and a press layer');
+  is(declares('table.data tr[data-mast]:hover td.nm', '--m3-state-hover'), true,
+     'the sticky name cell declares its own hover layer');
+  is(declares('table.data tr[data-mast]:active td.nm', '--m3-state-press'), true,
+     'and its own press layer');
+
+  /* Both fractions live in css/base.css, derived from the vendored state scale. A hand-copied
+     number drifts the day M3 moves it, and nothing on screen says so. */
+  const baseCss = [...d.styleSheets]
+    .filter(s => (s.href || '').includes('base.css'))
     .flatMap(s => [...s.cssRules]).map(x => x.cssText).join('\n');
-  is(/tr\[data-mast\]:hover[^}]*--m3-state-hover/.test(css), true, 'a row answers a hover');
-  is(/tr\[data-mast\]:active[^}]*--m3-state-press/.test(css), true, 'and a press');
-  /* The percentages come from the vendored state scale. A hand-copied 8% drifts the day M3 moves
-     it, and nothing on screen says so. */
-  is(/--m3-state-hover:/.test([...d.styleSheets]
-      .filter(s => (s.href || '').includes('base.css'))
-      .flatMap(s => [...s.cssRules]).map(x => x.cssText).join('\n')), true,
-     'the state scale is derived, not hand-copied');
+  is(/--m3-state-hover:/.test(baseCss), true, 'the hover fraction is derived, not hand-copied');
+  is(/--m3-state-press:/.test(baseCss), true, 'and the press fraction too');
 }
 
 (async () => {
@@ -2846,8 +2880,8 @@ async function rowState() {
          ordering rule belongs to the frame, not to any one probe. */
       await tableHead('phone', 'phone');
       await tableHead('desk', 'desktop');
-      /* `rowState()` only reads the CSSOM, so ordering after `tableHead()` costs nothing. It sits
-         last because every probe above it settled the frame first. */
+      /* `rowState()` reads the CSSOM and a probe element, so ordering after `tableHead()` costs
+         nothing. It sits last because every probe above it settled the frame first. */
       await rowState();
     } finally {
       if (origPrefs === null) deskWin.localStorage.removeItem('prefs');
