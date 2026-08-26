@@ -1476,33 +1476,53 @@ table.data { flex: 1; display: block; overflow: auto; width: 100%; border-collap
 table.data thead, table.data tbody { display: table; width: 100%; min-width: 820px; }
 table.data thead { position: sticky; top: 0; z-index: 4; }
 /* Two sticky rows, so the offset has to be hard-coded: the column headings sit at the top and the
-   district headings park just under them. 30px is .chead's own height (11px text + 2×6px padding
-   + border) — change one and the other has to follow. */
+   district headings park just under them. `.dhead th`'s own `top` states `.chead th`'s height.
+   Change one number and the other has to follow.
+   **56dp, which is M3's minimum touch target.** A column head is a sort control. This one was
+   30px tall, and a phone reader often missed it.
+   `label-large` in `on-surface-variant`, the same scale `.mtext`, `.badge` and `.mi .mv` already
+   state in this file. Read the size, weight and tracking off those tokens, never as literals. */
 table.data .chead th {
-  text-align: left; padding: 6px 8px; cursor: pointer; user-select: none;
-  font-size: 11px; font-weight: 500; letter-spacing: .06em; text-transform: uppercase;
-  white-space: nowrap; background: var(--surface); border-bottom: 1px solid var(--outline);
+  text-align: left; padding: 0 8px; cursor: pointer; user-select: none;
+  height: 56px; white-space: nowrap;
+  color: var(--muted); text-transform: none;
+  font-size: var(--md-sys-typescale-label-large-size);
+  line-height: var(--md-sys-typescale-label-large-line-height);
+  font-weight: var(--md-sys-typescale-label-large-weight);
+  letter-spacing: var(--md-sys-typescale-label-large-tracking);
+  background: var(--surface); border-bottom: 1px solid var(--outline);
 }
-table.data .chead th:hover { background: var(--hover); }
+table.data .chead th:hover {
+  background: color-mix(in srgb, var(--on-surface) var(--m3-state-hover), var(--surface));
+}
 table.data .chead th.on { color: var(--accent); }
-/* The arrow is drawn, not an icon: it has to sit inside an uppercase, letter-spaced cell. */
-table.data .chead th.on::after {
-  content: ''; display: inline-block; margin-left: 5px; vertical-align: .1em;
-  border: 4px solid transparent;
+/* **The sort mark is a real glyph now.** The old triangle needed an uppercase, letter-spaced cell
+   to sit inside. Sentence case removes that need.
+   `js/table.js` emits the `<i>` and picks the direction. This rule only sizes it. */
+table.data .chead th .i-arrow_upward, table.data .chead th .i-arrow_downward {
+  font-size: 18px; margin-left: 4px; vertical-align: -.2em;
 }
-table.data .chead th.up::after   { border-bottom-color: currentColor; margin-bottom: 4px; }
-table.data .chead th.down::after { border-top-color: currentColor; margin-top: 4px; }
 table.data .chead .i { margin-right: 5px; vertical-align: -.15em; }
-/* Sticky district headings: scrolling a long district, you still know which one you are in. */
-/* **`0` on the left, `var(--pane)` on the right.** This row spans the table's own width, so its
+/* Sticky district headings: scrolling a long district, you still know which one you are in.
+   **`0` on the left, `var(--pane)` on the right.** This row spans the table's own width, so its
    left edge already sits on the table's padding. Its own left padding would stack on top of that
-   the same way `td.nm`'s did — see the comment there. */
+   the same way `td.nm`'s did — see the comment there.
+   **The district head sticks under the column head, so `top` must match `.chead th`'s height.**
+   Change one number and the other has to follow.
+   This head is M3's list subheader, the same component `.nsub`, `#settingsBox h3` and
+   `#dataCount` already draw. Read the size, weight and tracking off their tokens, never as
+   literals. */
 table.data .dhead th {
-  position: sticky; top: 30px; z-index: 2; text-align: left; padding: 10px var(--pane) 6px 0;
-  font-size: 11px; font-weight: 500; letter-spacing: .06em; text-transform: uppercase;
+  position: sticky; top: 56px; z-index: 2; text-align: left; padding: 0 var(--pane) 0 0;
+  min-height: 48px;
+  color: var(--muted); text-transform: none;
+  font-size: var(--md-sys-typescale-title-small-size);
+  line-height: var(--md-sys-typescale-title-small-line-height);
+  font-weight: var(--md-sys-typescale-title-small-weight);
+  letter-spacing: var(--md-sys-typescale-title-small-tracking);
   background: var(--hover); border-bottom: 1px solid var(--outline);
 }
-table.data .dhead .muted { text-transform: none; letter-spacing: normal; margin-left: 6px; }
+table.data .dhead .muted { margin-left: 6px; }
 /* Not a mast and not clickable — it is a reading of where you are, not a place you can fly to. */
 table.data tr.here > td { background: color-mix(in srgb, var(--accent) 7%, transparent); }
 table.data tr.here td.nm {
@@ -1730,6 +1750,15 @@ table.data .dash { color: var(--outline); }
      only token in this app reading that inset. Above 600px the panel never touches the edge.
      The three inline overrides that stood here are gone: `--pane` states the inset once now. */
   table.data { padding-bottom: env(safe-area-inset-bottom, 0px); }
+  /* 220px is 61% of a 360px screen, and the table scrolls sideways behind this column. A reading
+     had about 140px left to draw in. */
+  table.data td.nm, table.data .chead th:first-child { width: 160px; min-width: 160px; }
+  /* **760px, not 820px.** The rule below assumes a 220px name column plus five 120px kind
+     columns. Narrowing the name column to 160px drops the real sum to 760px. An unmoved floor
+     then stretched every column past its own stated width to fill the gap.
+     Move the floor together with the column it belongs to. Otherwise the two numbers drift
+     apart, the same way `.chead`'s height and `.dhead`'s offset already do. */
+  table.data thead, table.data tbody { min-width: 760px; }
 }
 
 /* --- all cameras ----------------------------------------------------------------------------- */

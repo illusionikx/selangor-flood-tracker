@@ -2696,6 +2696,93 @@ async function countLine() {
   }
 }
 
+/* The table's column structure. **A fixed head, never the live one**: `js/table.js` arrives through
+   `lazy()`, and a probe that waits for the payload asserts on the weather.
+   The markup mirrors what `drawHead()` now emits. The sorted `<th>` carries `class="on"` and an
+   `arrow_upward` glyph after its label. It never carries the old `up`/`down` classes or a CSS
+   triangle.
+   **All five kind columns ride along, not just one.** `table.data td.k, table.data .chead
+   th:not(:first-child)` sets every non-name column to 120px, matching the real six-column head
+   `KIND_RANK` produces. A fixture with fewer columns leaves the browser's table layout free to
+   stretch the name column past its own width. The floor assumes six columns, not two. */
+const HEAD = `<tr class="chead">
+    <th data-sort="name" class="on">Station<i class="i i-arrow_upward"></i></th>
+    <th data-sort="river"><i class="i i-water_drop"></i>Water level</th>
+    <th data-sort="siren"><i class="i i-siren"></i>Siren</th>
+    <th data-sort="gauge"><i class="i i-flood"></i>Flood gauge</th>
+    <th data-sort="rainfall"><i class="i i-rainy"></i>Rainfall</th>
+    <th data-sort="camera"><i class="i i-videocam"></i>Camera</th>
+  </tr>`;
+const DROW = `<tr class="dhead"><th colspan="6">Gombak <span class="muted">12</span></th></tr>`;
+
+async function tableHead(frame, label) {
+  const { d, w, cs, r, settle } = await ready(frame);
+  say('--- the table head, ' + label + ' -----------------------------------------');
+  settle();
+  const b = d.getElementById('dataBox');
+  b.showModal();
+  d.getElementById('dataHead').innerHTML = HEAD;
+  d.getElementById('dataBody').innerHTML = DROW;
+  const th = d.querySelector('.chead th[data-sort="river"]');
+  const root = cs(d.documentElement);
+
+  /* **56dp, which is M3's minimum touch target.** This head was 30px, and a column head is a sort
+     control. A phone reader tapped it and often missed. */
+  is(Math.round(r(th).height), 56, label + ': the sort target is 56dp');
+
+  /* `label-large`, in `on-surface-variant`. It was 11px uppercase with .06em of letter-spacing.
+     **Read the tracking off the token, never assert `normal`.** `label-large` carries a real
+     tracking value, `0.1px` — the same trap the count line's own check already names. */
+  is(cs(th).fontSize, root.getPropertyValue('--md-sys-typescale-label-large-size').trim(),
+     label + ': label-large');
+  is(cs(th).textTransform, 'none', label + ': sentence case, not uppercase');
+  is(cs(th).letterSpacing, root.getPropertyValue('--md-sys-typescale-label-large-tracking').trim(),
+     label + ': and the label-large tracking');
+
+  /* **The sort mark is a glyph now.** It was a CSS triangle, drawn from borders. It existed
+     only because an uppercase, letter-spaced cell cannot hold a glyph. Sentence case removes the
+     reason. Assert `mask-image`, never the `--i` token. A rule that sets `--i` and never joins
+     the mask list in css/icons.css draws an empty box. That shipped once. */
+  const mark = d.querySelector('.chead th.on .i-arrow_upward');
+  is(!!mark, true, label + ': the sorted head carries an arrow glyph');
+  is(cs(mark).maskImage !== 'none', true, label + ': and the glyph actually paints');
+
+  /* **The district head sticks UNDER the column head, and the two numbers must agree.** `.dhead`
+     stuck at `top: 30px`, which was `.chead`'s own height. The head is 56px now. Two numbers
+     that must match are exactly the shape that goes stale. Assert them against each other. */
+  const dh = d.querySelector('.dhead th');
+  is(parseFloat(cs(dh).top), Math.round(r(th).height), label + ': the district head clears it');
+
+  /* **The district head is M3's list subheader too**, the same component `.nsub`, `#settingsBox
+     h3` and `#dataCount` already draw. Read its scale off `title-small`, never a literal. */
+  is(cs(dh).fontSize, root.getPropertyValue('--md-sys-typescale-title-small-size').trim(),
+     label + ': the district head is title-small');
+  is(cs(dh).textTransform, 'none', label + ': and sentence case, not uppercase');
+  is(cs(dh).letterSpacing, root.getPropertyValue('--md-sys-typescale-title-small-tracking').trim(),
+     label + ': and the title-small tracking');
+
+  /* **220px is a floor above 600px, not a fixed width.** `width: 100%` on the two `display:
+     table` sections lets the six columns fill whatever room a wide dialog offers.
+     Measured against the real payload, a 1200px window stretches this column to 296px. That
+     growth is deliberate. A reading gets more room to draw in on a big screen.
+     So no rendered pixel count can tell a 220px floor from a 150px one once the stretch takes
+     over. A check against the rendered box cannot tell them apart. Read the RULE instead.
+     Below 600px the box holds no stretch, so the check reads the box there. The same media
+     query narrows this column to 160px and moves `min-width` from 820px to 760px on the two
+     sections. Reverting that move brings the stretch back, and the check then reads 173,
+     proving it still watches the right thing. */
+  if (w.innerWidth <= 600) {
+    const nameW = Math.round(r(d.querySelector('.chead th:first-child')).width);
+    is(nameW, 160, label + ': the name column is 160px on a phone');
+  } else {
+    const rule = [...d.styleSheets].filter(s => (s.href || '').includes('chrome.css'))
+      .flatMap(s => [...s.cssRules])
+      .find(x => x.selectorText === 'table.data td.nm, table.data .chead th:first-child');
+    is(rule && rule.style.minWidth, '220px', label + ': the name column keeps a 220px floor');
+  }
+  b.close();
+}
+
 (async () => {
   out.textContent = '';
   try {
@@ -2734,6 +2821,11 @@ async function countLine() {
          `searchBar()`, for the same reason `searchBar()` runs after `panelInset()`. Nothing here
          reads motion. The ordering rule belongs to the frame, not to any one probe. */
       await countLine();
+      /* `tableHead()` calls `settle()` on its own frame too. It runs after `countLine()`, for the
+         same reason `countLine()` runs after `searchBar()`. Nothing here reads motion. The
+         ordering rule belongs to the frame, not to any one probe. */
+      await tableHead('phone', 'phone');
+      await tableHead('desk', 'desktop');
     } finally {
       if (origPrefs === null) deskWin.localStorage.removeItem('prefs');
       else deskWin.localStorage.setItem('prefs', origPrefs);

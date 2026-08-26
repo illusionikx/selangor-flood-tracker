@@ -33,14 +33,16 @@ const rank = s => KIND_RANK.indexOf(s.kind);
    already answers better, and lose the one this view exists for ("what is there, and where"). */
 let sortCol = 'nm', sortDir = 1;
 
+/* The sort mark is a glyph now, not a class pair and a CSS triangle. `arrow_upward` means the
+   smallest value sits at the top, which is what an ascending sort puts there. */
 function drawHead() {
   el('dataHead').innerHTML = `<tr class="chead">${
     [['nm', 'Location', ''], ...KIND_RANK.map(k =>
       [k, KINDS[k].one || KINDS[k].label,
        `<i class="i i-${KINDS[k].icon}" style="color:${KINDS[k].color}"></i>`])]
-    .map(([key, label, icon]) => `<th data-sort="${key}"${
-      sortCol === key ? ` class="on ${sortDir > 0 ? 'up' : 'down'}"` : ''
-    }>${icon}${label}</th>`).join('')}</tr>`;
+    .map(([key, label, icon]) => `<th data-sort="${key}"${sortCol === key ? ' class="on"' : ''}>${
+      icon}${label}${sortCol === key
+      ? `<i class="i i-arrow_${sortDir > 0 ? 'upward' : 'downward'}"></i>` : ''}</th>`).join('')}</tr>`;
 }
 drawHead();
 
