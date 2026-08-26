@@ -1393,7 +1393,20 @@ body.rising #risebadge { display: flex; }
   flex: none; padding: 0 0 12px;
   background: var(--surface);
 }
-#dataBox #dataCount { margin-inline: var(--pane); }
+/* **M3's list subheader**, the same component the alert panel, the Notices pane and Settings draw:
+   `title-small` in `on-surface-variant`, 48dp, at the pane's own inset. One panel states one
+   heading style, and a count sitting at 12px under a 28px headline was a third size in one box.
+   **The size has to be stated.** `.muted` carries a `font-size` of its own as well as the colour,
+   and a declaration on the element beats anything the context passes down. That is the trap the
+   rain chart's axis labels already record. */
+#dataBox #dataCount, #camBox #camCount {
+  display: flex; align-items: center;
+  min-height: 48px; margin: 0; padding: 0 var(--pane);
+  color: var(--muted);
+  font-size: var(--md-sys-typescale-title-small-size);
+  line-height: var(--md-sys-typescale-title-small-line-height);
+  font-weight: 500;
+}
 /* **The headline box moves to a margin, so it starts where the filter field starts.** `.apflex`
    states its inset as padding everywhere else, which puts the box itself flush with the app bar's
    own edge and the headline text 16px inside it. The filter field below has no box of its own to
@@ -1753,12 +1766,10 @@ table.data .dash { color: var(--outline); }
   flex: none; padding: 0 0 12px;
   background: var(--surface);
 }
-/* The tally, in the footer under the grid. Same shell rule as `.dtop` in reverse: `flex: none` so
-   it keeps its own height while `#camGrid` takes the rest, and a border on the edge it faces. */
-#camBox #camCount {
-  flex: none; margin: 0; padding: 10px var(--pane);
-  border-top: 1px solid var(--outline); background: var(--surface);
-}
+/* The tally keeps its place UNDER the grid, and that divergence carries its own reason: a total
+   belongs after the list, where a reader arrives at it having seen what it is totalling. `flex:
+   none` so it keeps its height while `#camGrid` takes the rest. */
+#camBox #camCount { flex: none; border-top: 1px solid var(--outline); background: var(--surface); }
 
 /* --- loading skeletons ----------------------------------------------------------------------- */
 /* js/table.js and js/wall.js load only when their dialog opens. Both boxes show this shape until
@@ -1849,6 +1860,11 @@ table.data .dash { color: var(--outline); }
    travels along instead. */
 #camBar {
   position: relative; z-index: 1; flex: none; height: 4px; margin-bottom: -4px;
+  /* M3's linear progress indicator: a 4dp track, the active indicator in `primary` and the track in
+     `primary-container`. This app bridges the pair onto `--accent` and a low-weight mix of it.
+     **Three parts of the M3 Expressive variant are declined.** The rounded ends, the 4dp gap
+     between the active indicator and the track, and the stop indicator each shape a widget parked
+     in a layout. This bar is the state of a boundary, which the comment above states in full. */
   background: color-mix(in srgb, var(--accent) 20%, transparent);
   opacity: 0; transition: opacity .15s;
 }
@@ -2052,10 +2068,10 @@ table.data .dash { color: var(--outline); }
 @media (max-width: 600px) {
   #camBox { width: 100vw; height: 100dvh; max-width: none; border-radius: 0; border: 0; }
   /* See the note on the table above. The tally is the lowest thing in this panel, so it is the
-     one that lands under the home indicator. The two padding overrides that stood here are gone:
-     `--pane` is 16px at every width, so the grid needs no second value. */
+     one that lands under the home indicator. The base rule now states the vertical padding as 0,
+     so only the safe area adds to it here. */
   #camBox #camCount {
-    padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 }
 

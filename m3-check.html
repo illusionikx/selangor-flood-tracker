@@ -2659,6 +2659,40 @@ async function searchBar(frame, label) {
   }
 }
 
+/* **The count is M3's list subheader**, the component the alert panel, the Notices pane and
+   Settings already draw: `title-small` in `on-surface-variant`, 48dp, at the pane's own inset. One
+   panel states one heading style. */
+async function countLine() {
+  const { d, cs, r, settle } = await ready('desk');
+  say('--- the count line -------------------------------------------------------');
+  settle();
+  for (const [box, id] of [['dataBox', 'dataCount'], ['camBox', 'camCount']]) {
+    const b = d.getElementById(box);
+    b.showModal();
+    const p = d.getElementById(id);
+    p.textContent = '450 stations';
+    const st = cs(p);
+    const root = cs(d.documentElement);
+    is(st.fontSize, root.getPropertyValue('--md-sys-typescale-title-small-size').trim(),
+       id + ': title-small');
+    is(Math.round(r(p).height), 48, id + ': 48dp');
+    /* **The size alone cannot tell one scale from another here.** `title-small`, `label-large` and
+       `body-medium` are all 14px in the vendored token set. So assert the two properties that
+       actually change: this line was 12px `.muted` with no height, and every old table heading in
+       this app was uppercase and letter-spaced. */
+    is(st.textTransform, 'none', id + ': sentence case');
+    is(st.letterSpacing, 'normal', id + ': and no letter-spacing');
+    /* `on-surface-variant`, which this app bridges onto `--muted`. Compare against a probe carrying
+       the token, never against a hex: the palette has moved four times and every copy went stale. */
+    const probe = d.createElement('span');
+    probe.style.color = root.getPropertyValue('--muted').trim();
+    d.body.appendChild(probe);
+    is(st.color, cs(probe).color, id + ': in on-surface-variant');
+    probe.remove();
+    b.close();
+  }
+}
+
 (async () => {
   out.textContent = '';
   try {
@@ -2693,6 +2727,10 @@ async function searchBar(frame, label) {
          not to any one probe. */
       await searchBar('phone', 'phone');
       await searchBar('desk', 'desktop');
+      /* `countLine()` calls `settle()` on the shared `#desk` frame too. It runs after
+         `searchBar()`, for the same reason `searchBar()` runs after `panelInset()`. Nothing here
+         reads motion. The ordering rule belongs to the frame, not to any one probe. */
+      await countLine();
     } finally {
       if (origPrefs === null) deskWin.localStorage.removeItem('prefs');
       else deskWin.localStorage.setItem('prefs', origPrefs);
