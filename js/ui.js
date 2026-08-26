@@ -471,6 +471,28 @@ function camFilter() {
 }
 el('camFind').oninput = camFilter;
 
+/* One delegated handler for both search bars. It dispatches `input` rather than calling either
+   filter directly: `dataFind` and `camFind` already have their own `oninput`, and a second caller
+   is a second copy of the one that matters.
+   **The button's own visibility is written from the field, never from the click.** A reader can
+   also empty the field by hand, and a handler on the button alone never runs on that path. That is
+   the rule this repo already states for every preference-owned control. */
+const syncClear = f => {
+  const b = document.querySelector(`[data-clear="${f.id}"]`);
+  if (b) b.hidden = !f.value;
+};
+document.addEventListener('input', e => {
+  if (e.target.matches('#dataFind, #camFind')) syncClear(e.target);
+});
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-clear]');
+  if (!b) return;
+  const f = el(b.dataset.clear);
+  f.value = '';
+  f.dispatchEvent(new Event('input', { bubbles: true }));
+  f.focus();
+});
+
 const phone = matchMedia('(max-width: 600px)');
 
 // --- the ways out of the pane -------------------------------------------------------------------

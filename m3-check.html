@@ -2583,7 +2583,10 @@ async function panelInset(frame, label) {
     const b = d.getElementById(id);
     b.showModal();
     const head = r(b.querySelector('.apflex'));
-    const field = r(b.querySelector('.dtop input'));
+    /* **The ROW, not the `<input>` inside it.** Task 2 wraps the field in `.m3search`, an M3
+       search bar with a leading glyph. The row is the filter now, and it is the row's own box
+       that lines up with the headline — the text inside it sits further in, past the glyph. */
+    const field = r(b.querySelector('.dtop .m3search'));
     is(Math.round(field.left - head.left), 0, id + ': the filter starts on the headline');
     const body = id === 'dataBox'
       ? b.querySelector('table.data .chead th:first-child') || b.querySelector('table.data')
@@ -2616,6 +2619,44 @@ async function safeArea() {
      'the table reads the bottom safe area');
 }
 
+/* **M3's search bar**, and every number is
+   https://github.com/bczak/m3you/blob/development/src/components/Search/search.css — a 56dp
+   container at a full corner on `surface-container-high`, a 24dp leading glyph 16dp in, and
+   `body-large` text.
+   **A DIVERGENCE this app states out loud:** in M3 a search bar opens a search view. These two
+   filter what is already on screen. The go-to box is a real search view and wears the same shape,
+   so this app draws one search shape for two behaviors. */
+async function searchBar(frame, label) {
+  const { d, w, cs, r, settle } = await ready(frame);
+  say('--- the search bar, ' + label + ' -----------------------------------------');
+  settle();
+  for (const [id, field] of [['dataBox', 'dataFind'], ['camBox', 'camFind']]) {
+    const b = d.getElementById(id);
+    b.showModal();
+    const bar = b.querySelector('.m3search');
+    is(Math.round(r(bar).height), 56, id + ': 56dp container');
+    is(cs(bar).borderRadius, '28px', id + ': a full corner');
+    const glyph = bar.querySelector('.i-search');
+    is(!!glyph, true, id + ': a leading search glyph');
+    is(Math.round(r(glyph).width), 24, id + ': the glyph is 24dp');
+    is(Math.round(r(glyph).left - r(bar).left), 16, id + ': and it sits 16dp in');
+    /* The clear button appears only once the field holds something. A control that is always
+       there offers to clear an empty field. */
+    const clear = bar.querySelector('[data-clear]');
+    is(clear.hidden, true, id + ': the clear button is hidden while the field is empty');
+    const input = d.getElementById(field);
+    input.value = 'x';
+    input.dispatchEvent(new w.Event('input', { bubbles: true }));
+    is(clear.hidden, false, id + ': and it appears once the field holds something');
+    /* Pressing it must clear the field AND rerun the filter, or the list stays filtered by a
+       query the reader can no longer see. */
+    clear.click();
+    is(input.value, '', id + ': pressing it clears the field');
+    is(clear.hidden, true, id + ': and it goes away again');
+    b.close();
+  }
+}
+
 (async () => {
   out.textContent = '';
   try {
@@ -2644,6 +2685,11 @@ async function safeArea() {
       await panelInset('phone', 'phone');
       await panelInset('desk', 'desktop');
       await safeArea();
+      /* AFTER every probe above, for the same reason as `panelInset()` above: `searchBar()` also
+         calls `settle()` on a shared frame, and nothing here reads motion, but the ordering rule
+         belongs to the frame and not to any one probe. */
+      await searchBar('phone', 'phone');
+      await searchBar('desk', 'desktop');
     } finally {
       if (origPrefs === null) deskWin.localStorage.removeItem('prefs');
       else deskWin.localStorage.setItem('prefs', origPrefs);

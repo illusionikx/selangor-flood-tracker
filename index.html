@@ -77,8 +77,8 @@
      Before `base.css`, which derives `--m3-travel`, `--m3-grow` and `--m3-swap` from them and
      bridges M3's colour names onto this app's palette. Colour is not in this file on purpose. -->
 <link rel="stylesheet" href="vendor/m3/tokens.css?v=2">
-<link rel="stylesheet" href="css/base.css?v=191">
-<link rel="stylesheet" href="css/chrome.css?v=319">
+<link rel="stylesheet" href="css/base.css?v=192">
+<link rel="stylesheet" href="css/chrome.css?v=320">
 <link rel="stylesheet" href="css/map.css?v=173">
 
 <!-- Water tint for the dark basemap. CARTO's dark_all is greyscale — all 18 of its tones have zero
@@ -1164,8 +1164,17 @@
       <form class="apptop" method="dialog"><button class="icon dclose" data-tip="Back" aria-label="Back"
       ><i class="i i-arrow_back"></i></button></form>
     </div>
-    <input id="dataFind" type="text" autocomplete="off" placeholder="Filter by name, district or basin…"
-           aria-label="Filter stations">
+    <!-- M3's search bar, from the M3 Expressive set's Search/search.css. A DIVERGENCE this app
+         states out loud: in M3 a search bar opens a search view, and this one filters the list
+         already on screen. The go-to box is a real search view and wears the same shape, so this
+         app now draws one search shape for two behaviors. That is the cost of one shape. -->
+    <div class="m3search">
+      <i class="i i-search" aria-hidden="true"></i>
+      <input id="dataFind" type="text" autocomplete="off"
+             placeholder="Filter by name, district or basin" aria-label="Filter stations">
+      <button type="button" class="icon m3clear" data-clear="dataFind"
+              aria-label="Clear the filter" hidden><i class="i i-close"></i></button>
+    </div>
     <p id="dataCount" class="muted"></p>
   </div>
   <div class="skelrows" aria-hidden="true">
@@ -1183,8 +1192,13 @@
       <form class="apptop" method="dialog"><button class="icon dclose" data-tip="Back" aria-label="Back"
       ><i class="i i-arrow_back"></i></button></form>
     </div>
-    <input id="camFind" type="text" autocomplete="off" placeholder="Filter by name or district…"
-           aria-label="Filter cameras">
+    <div class="m3search">
+      <i class="i i-search" aria-hidden="true"></i>
+      <input id="camFind" type="text" autocomplete="off"
+             placeholder="Filter by name or district" aria-label="Filter cameras">
+      <button type="button" class="icon m3clear" data-clear="camFind"
+              aria-label="Clear the filter" hidden><i class="i i-close"></i></button>
+    </div>
   </div>
   <!-- The batch-in-flight bar, on the seam between the header and the grid. It takes no height of
        its own — see the comment in css/chrome.css — so js/wall.js only ever toggles `.on` and the

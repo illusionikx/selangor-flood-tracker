@@ -1393,8 +1393,6 @@ body.rising #risebadge { display: flex; }
   flex: none; padding: 0 0 12px;
   background: var(--surface);
 }
-#dataBox #dataFind { margin-inline: var(--pane); }
-#dataBox #dataFind { margin-bottom: 6px; }
 #dataBox #dataCount { margin-inline: var(--pane); }
 /* **The headline box moves to a margin, so it starts where the filter field starts.** `.apflex`
    states its inset as padding everywhere else, which puts the box itself flush with the app bar's
@@ -1404,6 +1402,42 @@ body.rising #risebadge { display: flex; }
    margin holds the headline text exactly where it was and moves the box to match. Scoped to these
    two dialogs: every other panel's `.apflex` keeps the shared rule. */
 #dataBox .apflex, #camBox .apflex { padding-left: 0; margin-left: var(--pane); }
+
+/* **M3's search bar.** Every number is
+   https://github.com/bczak/m3you/blob/development/src/components/Search/search.css:
+   a 56dp container at a full corner, `surface-container-high`, a 24dp leading glyph 16dp in, and
+   `body-large` text. This app bridges `surface-container-high` onto `--hover`, which is its own
+   container tone — the palette rule holds one surface tone and forbids inventing a second.
+   **The row carries the surface, never the input.** That is the reference's own split, and it is
+   what lets the glyph and the clear button sit inside one shape. */
+#dataBox .m3search, #camBox .m3search {
+  display: flex; align-items: center; gap: 16px;
+  min-height: 56px; margin-inline: var(--pane); margin-bottom: 6px; padding: 0 16px;
+  border-radius: 28px; background: var(--hover); color: var(--on-surface);
+}
+#dataBox .m3search .i-search, #camBox .m3search .i-search {
+  flex: none; font-size: 24px; color: var(--muted);
+}
+/* The input paints nothing. The row around it is the control. */
+#dataBox .m3search input, #camBox .m3search input {
+  flex: 1; min-width: 0; margin: 0; padding: 0; border: 0; background: none;
+  color: var(--on-surface); font: inherit;
+  font-size: var(--md-sys-typescale-body-large-size);
+  line-height: var(--md-sys-typescale-body-large-line-height);
+}
+#dataBox .m3search input:focus-visible, #camBox .m3search input:focus-visible { outline: none; }
+/* The ring goes on the row, because the row is the shape a reader sees. */
+#dataBox .m3search:focus-within, #camBox .m3search:focus-within {
+  outline: 2px solid var(--accent); outline-offset: 1px;
+}
+#dataBox .m3search .m3clear, #camBox .m3search .m3clear { flex: none; font-size: 20px; }
+/* `display: flex` on `.icon` beats the browser's own `[hidden]` rule, so it has to be said again.
+   This is the third element in this app to need the restatement — `.link` and `.camwarn` carry it
+   too. */
+#dataBox .m3search .m3clear[hidden], #camBox .m3search .m3clear[hidden] { display: none; }
+
+/* The old two-rule block for these fields is gone. It stated a width, a margin and a 8px corner
+   that the row above now owns. */
 
 /* The table's stand-in for a popup's still: no room for the image itself in a row, so it opens the
    same lightbox the popup image does. */
@@ -1719,8 +1753,6 @@ table.data .dash { color: var(--outline); }
   flex: none; padding: 0 0 12px;
   background: var(--surface);
 }
-#camBox #camFind { margin-inline: var(--pane); }
-
 /* The tally, in the footer under the grid. Same shell rule as `.dtop` in reverse: `flex: none` so
    it keeps its own height while `#camGrid` takes the rest, and a border on the edge it faces. */
 #camBox #camCount {

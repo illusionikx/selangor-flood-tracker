@@ -562,13 +562,12 @@ td:last-child { text-align: right; padding-left: 16px; }
 .chip .hint, .mnote .note { font-size: 11px; opacity: .7; white-space: nowrap; }
 .chip .hint:empty, .mnote .hint:empty { display: none; }
 
-select, #goto, #dataFind, #camFind {
+select, #goto {
   width: 100%; padding: 8px 10px; margin-bottom: 10px; font: inherit; font-size: 13px;
   background: var(--surface); color: var(--on-surface);
   border: 1px solid var(--outline); border-radius: 8px;
 }
-select:focus-visible, #goto:focus-visible, #dataFind:focus-visible, #camFind:focus-visible,
-.icon:focus-visible {
+select:focus-visible, #goto:focus-visible, .icon:focus-visible {
   outline: 2px solid var(--accent); outline-offset: 1px;
 }
 /* A dialog is a container, not a control. `showModal()` focuses it when it finds nothing focusable
