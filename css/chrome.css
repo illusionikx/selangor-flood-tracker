@@ -2064,8 +2064,8 @@ table.data .dash { color: var(--outline); }
   /* **M3's filled card.** A `corner-medium` on `surface-container-highest`, which css/base.css
      bridges onto `--hover`, this app's own container tone. The tile already drew that tone. It drew
      a 10px corner and answered a pointer with nothing.
-     **The token, never the number.** This file already reads the shape scale at five other rules,
-     and a re-bake has to move every surface at once. */
+     **The token, never the number.** Every other rounded surface in this file reads the shape
+     scale, and a re-bake has to move all of them at once. */
   border-radius: var(--md-sys-shape-corner-medium);
   background: var(--hover); color: var(--on-surface); text-align: left;
 }
