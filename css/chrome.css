@@ -1551,9 +1551,12 @@ table.data .dhead th {
 table.data .dhead .muted { margin-left: 6px; }
 /* Not a mast and not clickable — it is a reading of where you are, not a place you can fly to. */
 table.data tr.here > td { background: color-mix(in srgb, var(--accent) 7%, transparent); }
+/* **No rail on the leading edge, and the tint carries the row alone.** The name cell drew
+   `inset 3px 0 var(--accent)` and the repository owner cut it on 2026-08-26. The tint already
+   marks the row across its whole width, so the rail stated the same thing a second time on one
+   cell of it. */
 table.data tr.here td.nm {
   background: color-mix(in srgb, var(--accent) 7%, var(--surface));
-  box-shadow: inset 3px 0 var(--accent);
 }
 table.data tr[data-mast] { cursor: pointer; }
 /* **M3's state layer**, at the percentages `css/base.css` derives from the vendored state scale.
