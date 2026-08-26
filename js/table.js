@@ -280,9 +280,10 @@ const RAIN = ['dry', 'light', 'moderate', 'heavy', 'very heavy'];
 const tipVal = m => {
   if (!hasInfo(m)) return pill('offline', NO_INFO);
   const val = text => `<b style="color:${color(m)}">${text}</b>`;
+  // color(m), not statusColor(): an idle siren takes its own kind pink, never the status green.
   if (m.kind === 'siren') {
     return !m.online ? pill('offline', NO_INFO)
-      : m.status > 0 ? pill('triggered', statusColor(3)) : pill('idle', statusColor(0));
+      : m.status > 0 ? pill('triggered', color(m)) : pill('idle', color(m));
   }
   if (m.kind === 'camera') return pill(m.image ? 'has a feed' : 'offline',
     m.image ? KINDS.camera.color : NO_INFO);
@@ -372,10 +373,11 @@ function cell(own, lead, scope = '') {
   // Kinds with no chip to hang the hook on get their own line for it.
   const line = inner => `<div class="line"${hook}>${inner}</div>`;
 
+  // color(m), not statusColor(): an idle siren takes its own kind pink, never the status green.
   if (m.kind === 'siren') {
     return wrap(!hasInfo(m) || !m.online ? chip('offline', NO_INFO, 'siren', hook)
-      : m.status > 0 ? chip('triggered', statusColor(3), 'siren', hook)
-      : chip('idle', statusColor(0), 'siren', hook));
+      : m.status > 0 ? chip('triggered', color(m), 'siren', hook)
+      : chip('idle', color(m), 'siren', hook));
   }
   // The camera keeps its button. A button names an action, and a chip states a reading.
   if (m.kind === 'camera') {
