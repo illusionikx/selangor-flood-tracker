@@ -2846,10 +2846,22 @@ async function rowState() {
    fixture never held a `.mchip` element, so testing the DOM for one proves nothing. That check
    passes with the rule present or absent. Read the STYLESHEET instead, the way `rowState()`
    above already reads css/base.css for its own two assertions. */
+/* **Six columns, because the alignment fault needed more than two to show.** The head states a
+   nowrap label beside a glyph and a cell states a pill over a number, and that difference is what
+   made two auto-laid table boxes disagree. A two-column fixture hides it.
+   The head this pairs with is `HEAD`, declared once further up for `tableHead()`. **Do not declare
+   a second one here.** Two `const` of one name is a parse error, and this file then prints
+   `running...` and nothing else. Its own header states that trap and this is where it bit. */
 const CELLS = `<tr data-mast="probe">
     <td class="nm">SUNGAI DAMANSARA</td>
     <td class="k"><div class="cv"><span class="badge" style="--c:var(--s-alert)">light</span>
       <div class="val">4 mm<span class="muted">/h</span></div></div></td>
+    <td class="k"><div class="cv"><span class="badge" style="--c:var(--k-siren)">idle</span></div></td>
+    <td class="k"><div class="cv"><span class="badge" style="--c:var(--k-gauge)">dry</span>
+      <div class="val"><span class="muted">0.14 m below</span></div></div></td>
+    <td class="k"><div class="cv"><span class="badge" style="--c:var(--k-rainfall)">dry</span>
+      <div class="val">0 mm<span class="muted">/h</span></div></div></td>
+    <td class="k"><div class="cv"><span class="dash">—</span></div></td>
   </tr>`;
 
 async function cellPills() {
@@ -2879,6 +2891,22 @@ async function cellPills() {
   is(cs(td).paddingLeft, pane, "the cell's own inset equals --pane");
   is(cs(d.querySelector('table.data')).paddingLeft, pane,
      'and matches the gap at the table’s own left edge');
+
+  /* **Every column head sits over its own cell, and this went wrong in silence.** The head and
+     the body are two separate `display: table` boxes, so each ran its own auto-layout pass over
+     its own content. Identical `width` declarations still produced different columns, because a
+     head states a nowrap label beside a glyph and a cell states a pill over a number. Measured at
+     1400px before `table-layout: fixed`: Flood gauge drew 174.8px of head over 164.3px of body.
+     **Assert the LEFT EDGES, never the widths alone.** Two columns can share a width and still
+     start at different places, once a column to their left is off. */
+  d.getElementById('dataHead').innerHTML = HEAD;
+  const heads = [...d.querySelectorAll('table.data .chead th')];
+  const cells = [...d.querySelectorAll('#dataBody tr[data-mast] td')];
+  is(heads.length === cells.length && heads.length > 1, true,
+     'the head and the body draw the same column count');
+  const off = heads.map((th, i) => Math.abs(r(th).left - r(cells[i]).left));
+  is(Math.max(...off) < 0.6, true,
+     'every column head starts on its own cell, to within half a pixel');
   b.close();
 }
 
