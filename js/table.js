@@ -249,7 +249,7 @@ const pill = (text, c, hook = '') => `<span class="badge" style="--c:${c}"${hook
    panel alone. That panel opens on a click, so a phone reader reaches the word in one tap.
 
    The kind glyph is the leading icon, and it needs no new icon. The alert panel already paints a
-   row's kind glyph with its tier colour, so this repeats that component instead of inventing
+   row's kind glyph with its tier colour. So this repeats that component instead of inventing
    one. */
 const chip = (text, c, kind, hook = '') =>
   `<span class="mchip" style="--c:${c}"${hook}><i class="i i-${KINDS[kind].icon}"></i>${text}</span>`;
@@ -390,7 +390,7 @@ function cell(own, lead, scope = '') {
   /* The river keeps its meter AND gains a chip. The repository owner asked for that on
      2026-08-26.
 
-     A river cell now measures about 84px against 52px for every other kind. Measured on the
+     A river cell now measures about 84px against 53px for every other kind. Measured on the
      cached payload, 118 of 459 places hold a river, so about one row in four runs tall. The
      repository owner accepts that cost, and this comment states it rather than hides it.
 
@@ -407,7 +407,7 @@ function cell(own, lead, scope = '') {
     // `color()`, so the chip, the pin and the card cannot disagree about one gauge. It also
     // carries `raining()`: a gauge whose own odometer denies its reading drops back to the kind
     // violet.
-    return wrap(chip(`${m.hourly} mm/h`, statusColor(Math.max(0, m.status)), 'rainfall', hook));
+    return wrap(chip(`${m.hourly} mm/h`, color(m), 'rainfall', hook));
   }
   // A flood gauge: depth over a flood-prone spot, so negative is dry ground, not a missing
   // reading. The unit words ride in the label now, the same way a river's "m" always did.

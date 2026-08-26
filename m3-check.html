@@ -2924,7 +2924,7 @@ async function cellChips() {
          nothing. */
       await rowState();
       /* `cellChips()` calls `settle()` on the shared `#desk` frame too. It runs after
-         `rowState()`, because Task 6 is the last table probe, and every probe above it already
+         `rowState()`, because Task 6 is the last table probe. Every probe above it already
          settled the frame. */
       await cellChips();
     } finally {
