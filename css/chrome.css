@@ -782,7 +782,9 @@ body.railopen #rail .railbadge { top: -6px; right: -6px; }
    block, and at 440px the source descriptions ran to four lines each. */
 .docbox {
   /* `--pane` is this pane's own padding, and both the header and the body read it back. It is 24px
-     here and 18px on a phone, and stating it once is what stops the two drifting apart. */
+     here and 16px on a phone, not 18: the app bar states its headline 16px in at every width, and
+     18px under it reads as a mistake rather than as an indent. Stating it once is what stops the
+     header and the body drifting apart from each other. */
   --pane: 24px;
   max-width: min(820px, calc(100vw - 32px)); padding: 0;
   /* **The dialog does not scroll. Its body does.** So the bar cannot scroll away, and the scrollbar
@@ -1722,7 +1724,7 @@ table.data .dash { color: var(--outline); }
 /* The tally, in the footer under the grid. Same shell rule as `.dtop` in reverse: `flex: none` so
    it keeps its own height while `#camGrid` takes the rest, and a border on the edge it faces. */
 #camBox #camCount {
-  flex: none; margin: 0; padding: 10px 20px;
+  flex: none; margin: 0; padding: 10px var(--pane);
   border-top: 1px solid var(--outline); background: var(--surface);
 }
 
