@@ -1436,7 +1436,7 @@ body.rising #risebadge { display: flex; }
    too. */
 #dataBox .m3search .m3clear[hidden], #camBox .m3search .m3clear[hidden] { display: none; }
 
-/* The old two-rule block for these fields is gone. It stated a width, a margin and a 8px corner
+/* The old two-rule block for these fields is gone. It stated a width, a margin and an 8px corner
    that the row above now owns. */
 
 /* The table's stand-in for a popup's still: no room for the image itself in a row, so it opens the

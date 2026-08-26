@@ -2583,9 +2583,11 @@ async function panelInset(frame, label) {
     const b = d.getElementById(id);
     b.showModal();
     const head = r(b.querySelector('.apflex'));
-    /* **The ROW, not the `<input>` inside it.** Task 2 wraps the field in `.m3search`, an M3
-       search bar with a leading glyph. The row is the filter now, and it is the row's own box
-       that lines up with the headline — the text inside it sits further in, past the glyph. */
+    /* **The ROW, not the `<input>` inside it.** The input now sits behind a
+       leading glyph. It no longer lines up with the headline on its own.
+       Task 2 wraps the field in `.m3search`, an M3 search bar. The row is
+       the filter now. Its own box lines up with the headline. The text
+       inside it sits further in, past the glyph. */
     const field = r(b.querySelector('.dtop .m3search'));
     is(Math.round(field.left - head.left), 0, id + ': the filter starts on the headline');
     const body = id === 'dataBox'
@@ -2685,9 +2687,10 @@ async function searchBar(frame, label) {
       await panelInset('phone', 'phone');
       await panelInset('desk', 'desktop');
       await safeArea();
-      /* AFTER every probe above, for the same reason as `panelInset()` above: `searchBar()` also
-         calls `settle()` on a shared frame, and nothing here reads motion, but the ordering rule
-         belongs to the frame and not to any one probe. */
+      /* `searchBar()` calls `settle()` on the shared frame too. It runs after
+         `panelInset()`, for the same reason `panelInset()` runs after `bands()`.
+         Nothing here reads motion. The ordering rule belongs to the frame,
+         not to any one probe. */
       await searchBar('phone', 'phone');
       await searchBar('desk', 'desktop');
     } finally {
