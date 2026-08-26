@@ -231,19 +231,52 @@
    `--s-danger` is the one value left alone. Red runs out of sRGB before the others: at L 67 it fits
    only C 60 and comes out salmon, which is not a colour anyone reads as danger. It also happens to
    be the one rung where the light and dark themes agree, and that is worth keeping. */
+/* **THE SIX KIND HUES ARE BUILT TO A RULE NOW, AND THE RULE IS IN OKLCh.** The repository owner
+   asked for the whole hue range, and for a chroma that separates a kind from the functional set, on
+   2026-08-26. `kind-color-lab.html` derives every value below at load and prints the block; nothing
+   here was picked by eye.
+   **One chroma for all six: 0.119.** The window has a FLOOR as well as a ceiling, and that is the
+   part the measurements added. The functional set holds BOTH ends of the chroma axis: `--s-none` is
+   grey at 0.012 and the other three run 0.17 to 0.23. So a kind pushed low enough to clear the vivid
+   set lands on the no-reading grey instead. The window is about 0.09 to 0.16 and 0.119 is its middle.
+   **Six hues around the whole wheel, 60 degrees apart.** Water is pinned at 238 and rain at 298,
+   because meaning outranks a score, and the other four take the seats those two leave: siren 358,
+   flood gauge 58, camera 178, several sensors 118. A search swept the phase and the chroma and kept
+   the set whose WORST pair is furthest apart — worst of all is 11.9, against 5.9 for the palette
+   this replaces.
+   **OKLCh and not HSL.** OKLab chroma is perceptually even across hues, so one number means the same
+   thing at blue and at yellow. The old set was built by eye and ran 0.06 to 0.17, with four of the
+   six inside one 85 degree arc.
+   **Three lightnesses, one per surface**, and each is a block of its own below. 0.620 on paper,
+   0.760 on the dark theme, 0.690 on a map pin. See the `.pin` block for why the pin diverges. */
 :root {
-  --k-river: #3a88ff; --k-rainfall: #8964ff; --k-siren: #ff3c7e;
-  /* --k-weather is not a station kind. It colours the MET section on a card, which describes the
-     place and not a sensor at it. It sits in this block because every colour value in this app
-     does, and it must never take a traffic-light hue. */
-  /* --k-source is not a station kind either. It colours a source that stated it is down, and it
-     must never take a traffic-light hue. */
-  /* --k-notice is not a station kind either. It colours a JPS claim about an area, never a
-     station's own reading, so it must not borrow --k-river. */
-  --k-gauge: #a06f5d; --k-camera: #23a3b1; --k-mast: #5d6deb; --k-weather: #4a7f8c; --k-source: #8d7fa8;
-  --k-notice: #2f6690;
-  /* Rainfall's own ramp: dry, then the two mid classes wear the kind colour, then heavy. Very heavy
-     is --s-danger, like every other "this is now an emergency". */
+  --k-river: #2f8fc5; --k-rainfall: #8f75c4; --k-siren: #be6586;
+  --k-gauge: #bb7235; --k-camera: #009c86; --k-mast: #808f32;
+  /* **THESE THREE ARE NOT STATION KINDS, AND THEY FOLLOW THE SAME RULE ANYWAY.** They were the last
+     survivors of the old eye-built set, and a reader found the first one on the station panel on
+     2026-08-26: the Weather section draws a `.sensorhead` glyph in the same list as the sensor
+     kinds, and it read visibly duller than every neighbour.
+     Measured before: weather L 0.565 C 0.060, source L 0.624 C 0.063, notice L 0.493 C 0.089.
+     **C 0.060 is UNDER the palette's own chroma floor**, which is the exact fault that floor exists
+     to stop — a colour pushed low enough drifts toward the no-reading grey. And notice sat at hue
+     244, which is water's own 238, while its own comment forbade borrowing `--k-river`.
+     **They take the block's lightness and the kinds' chroma, on the three seat MIDPOINTS.** The six
+     kinds hold 238/298/358/58/118/178, so a midpoint is the furthest a seventh hue can stand from
+     both neighbours. Weather 208 keeps its teal, source 328 keeps its violet, notice 268 keeps its
+     blue and stops being water.
+     **The cost is measured and accepted.** A midpoint sits about 6 dE from its nearest kind against
+     11.8 between two kinds. That is half. It is paid because these never appear among 400 pins:
+     each draws once, in one row, beside its own word.
+     None of them may ever take a traffic-light hue. */
+  --k-weather: #0097a8;   /* C clipped to 0.107 by sRGB at this lightness, as --k-camera is */
+  --k-source: #ac6baa; --k-notice: #6782ce;
+  /* **NOTHING READS THESE TWO, ON EITHER THEME, SINCE 2026-08-26.** They were rainfall's own ramp:
+     dry, then the two mid classes in the kind colour, then heavy. The three-colour rule took that
+     ramp — `RAIN_COLOR` is kind violet, then the alert amber above 30 mm an hour, then the danger
+     red above 60. Kept declared for the reason `--s-trace` is: a rung cut out of a palette cannot go
+     back without measuring the whole set again. Delete them the day somebody is sure.
+     `RAIN_HEAT` in `js/config.js` is NOT one of these. It holds the heat wash's own ramp as real
+     values, because a canvas cannot resolve a token, and it still draws. */
   --k-rain-dry: #6a70ca; --k-rain-heavy: #c069ff;
   /* Third pass: all four spent down to the 3:1 floor exactly, measured on #efefef — the darkest paper
      the light basemap puts behind a mark. Red gained the most (L 0.583 → 0.655) because red has the
@@ -283,7 +316,23 @@
      pin, which no station glyph resembles, and 48px against every station's 29.
      For scale, `--s-alert` beside it holds 2.55 on white — this is not an outlier in the set, it is
      one step past the amber it already sits next to. */
-  --me: #e0a500;
+  /* **GREEN SINCE 2026-08-26, on the repository owner's instruction, and it was hazard yellow.**
+     The mark is a bare dot with no glyph now, so the notes above about a house in a pin describe
+     something that is gone. What separates it from a station is three things and colour is the
+     smallest of them: it is a solid disc where every station is a disc with a glyph knocked out, it
+     is 14px against a station's 22, and it sits inside a translucent accuracy circle no station has.
+     **The value was searched, not picked.** It maximises the closest distance to everything that
+     shares the MAP with it — the six kinds, the alert amber, the danger red, the no-reading grey and
+     the accent the searched-place pin wears. Worst of those is 14.8, against the olive of the
+     several-sensors mark.
+     **L 0.58 is the only rung that clears 3:1 on BOTH basemaps**, at 3.51 on the light tile and 3.58
+     on the dark one, and `--me` is one value on both themes because a pin is. Every lighter green
+     falls under 3:1 on the pale tile: 2.98 at L 0.62, 2.57 at 0.66.
+     **It is 22.3 from `--s-normal`, which is the collision to watch and is not on the map.** No pin
+     wears the normal green any more — the three-colour rule gave a quiet sensor its own kind colour.
+     `--s-normal` draws on a card chip and a table pill, where this dot never appears. Re-measure if
+     that ever changes. */
+  --me: #00950d;
   /* A favorite. Pink, because a heart that is not pink is not read as a heart — the shape and the
      colour are one idiom, which is why this takes a hue of its own rather than --accent.
      It shares a band with --k-siren, and that is the collision to know about: a siren pin is pink
@@ -349,11 +398,15 @@
    missing from this block would quietly fall back to the theme value and draw one pin off-palette.
    `--me` and `--fav` are here for the two marks inside `.pin` that read them. */
 :root[data-theme="dark"], .pin {
-  --k-river: #66b2ff; --k-rainfall: #a893ff; --k-siren: #ff7aa4;
-  /* --k-notice colours a JPS claim about an area, never a station's own reading, so it must not
-     borrow --k-river. */
-  --k-gauge: #d4a48f; --k-camera: #2fd6e8; --k-mast: #96a4ee; --k-weather: #7fb3c0; --k-source: #a99bc4;
-  --k-notice: #6fa8d8;
+  /* The same six hues at the same chroma, at lightness 0.760. See the `:root` block for the rule.
+     **This set is the DARK THEME's, and the map pin does not take it any more.** A pin is a filled
+     disc now and needs its own lightness, which the `.pin` block below states. */
+  --k-river: #60bcf4; --k-rainfall: #baa0f3; --k-siren: #ee90b1;
+  --k-gauge: #e99d61; --k-camera: #47cab1; --k-mast: #aabb60;
+  /* The three that are not station kinds, at this block's lightness. Same rule, same midpoint hues.
+     See the `:root` block for what they were and why they moved. */
+  --k-weather: #36c6d8; --k-source: #da95d7; --k-notice: #91aefd;
+  /* Nothing reads these two — see the light block above. */
   --k-rain-dry: #8e95f0; --k-rain-heavy: #d488ff;
   /* Third pass: chroma to the sRGB edge on each hue, which for the three warm rungs meant dropping a
      little lightness — they were already at the edge where they sat. The floor here is 4.5 on the
@@ -366,11 +419,16 @@
   /* Not saturated with the others: "no reading" is the absence of a colour, and a tinted grey is a
      hue, which is a claim. */
   --s-none: #9aa0a6;
-  --me: #ffbb1a;
+  /* The same green as the light block. `--me` is ONE value on both themes now, because the mark it
+     paints is a map pin and a pin is one palette. See the light block for the search and the two
+     contrast figures that fix the lightness. */
+  --me: #00950d;
   /* More magenta than --k-siren (#ff7aa4), which is the whole of the room this band has on this
      theme. On the map the heart also carries a --surface halo, so it is never read against the
      basemap alone. */
   --fav: #ff85d0;
+  /* --k-siren is #ee90b1 on this theme now, and the note above measured the old #ff7aa4. The room
+     between the two is the same room. */
   /* The weather layer uses natural sky colors, in warm hues that do not join the status set.
      The status rule above reserves --s-alert and its neighbors for status, and states there is
      no exception. This does not breach it. --wx-clear is its own token, muted away from
@@ -392,6 +450,45 @@
      weather tone and it must read as one of the six, on a pin as well as on a card.
      See the light block above for the one value in this set that the two themes do not share. */
   --wx-moon: #e6e3da;
+}
+/* **THE MAP PIN AND THE STATION PANEL TAKE A THIRD SET OF THE SIX.** A station pin is a filled disc
+   with the glyph knocked out of it in white, so the fill has to be dark enough for white to read.
+   The block above is lightness 0.760: white on that measures about 2.0:1, which is not legible.
+   These are the same hues at the same chroma at lightness 0.690, where white measures 2.6 to 2.9.
+   **The repository owner set that rung on 2026-08-26**, off `kind-color-lab.html`'s ladder, and set
+   the flip threshold with it. `ink()` there keeps white while white clears 2.4:1 and turns the glyph
+   black above that. 0.690 is the brightest rung that still carries white on all six.
+   **2.4 is under WCAG 1.4.11's 3:1 for a graphical object, and that is a decision rather than an
+   oversight.** What it buys is a brighter disc: 0.620 clears 3:1 and the repository owner called it
+   too dark to read as the same colour as the card. The glyph is a 17px shape inside a 29px disc with
+   a `--surface` edge round the whole mark, not a hairline.
+   **`#side` JOINED THIS SELECTOR ON 2026-08-26, on a reader's instruction.** The station panel drew
+   its kind glyphs from the paper block while the map drew the pin they came from at 0.690, and a
+   reader read the two side by side and called the panel wrong. A glyph on the card is the exact hex
+   of the pin now.
+   **What that costs, measured, and it is real.** On the light card 0.690 gives every kind glyph 2.6
+   to 2.9:1 against 3.4 to 3.9 at 0.620. So a kind glyph on white paper is now UNDER WCAG's 3:1, the
+   same divergence the knockout above already states, and for the same reason: the brighter rung is
+   the one that reads as the same colour as the mark it names. On the dark card it is 5.5 to 6.1:1
+   and nothing is given up.
+   **Three surfaces still draw a kind at 0.620 and this did not reach them**: the all-stations table,
+   the go-to search rows, and the layer chip's kind menu. A reader asked for the panel. Those three
+   are named here rather than swept in, so the next person meets a decision and not a drift.
+   **This selector states the SIX AND THE THREE THAT ARE NOT KINDS.** Every other token — the status
+   ramp, `--me`, `--fav`, the weather set — comes from the block above and must keep coming from
+   there, or the two go out of step. The three non-kinds are here because the Weather section is a
+   row in the panel's own sensor list: left out, it would draw at 0.620 beside neighbours at 0.690,
+   which is the exact fault this change repairs.
+   It sits after that block on purpose: `.pin` and `:root[data-theme="dark"]` are each one selector
+   unit, so source order is the whole of what makes this win. `#side` is an id and beats both
+   outright, on either theme, which is what makes the panel take one set rather than swap with the
+   theme the way every other card surface does. */
+.pin, #side {
+  --k-river: #48a5dc; --k-rainfall: #a48adb; --k-siren: #d67b9b;
+  --k-gauge: #d2874b; --k-camera: #26b39b; --k-mast: #95a549;
+  /* The three that are not station kinds. `#side` needs them because the Weather section is a row
+     in its sensor list. A pin never resolves one, so they cost the map nothing. */
+  --k-weather: #00afc2; --k-source: #c380c1; --k-notice: #7c98e5;
 }
 
 * { box-sizing: border-box; }

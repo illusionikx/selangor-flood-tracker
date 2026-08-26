@@ -351,10 +351,13 @@ export const cluster = L.markerClusterGroup({
     for (const m of kids) { kinds.add(m.options.kind); critical ||= m.options.critical; }
     const mixed = kinds.size > 1;
     return L.divIcon({
-      // Two pixels of air around `.cluster`'s 24px chip. Down 30% from 36/34 — the chip is a count,
-      // not a station, and at the old size it read as the largest mark on the map. Both numbers move
-      // together or the badge stops sitting over the pins it is hiding.
-      className: '', iconSize: [25, 25],
+      /* One pixel of air around `.cluster`'s 21px chip. Down 30% from 36/34, then a further 12.5%
+         on 2026-08-26 when every mark on the map came down — the chip is a count, not a station,
+         and at the old size it read as the largest mark on the map. Both numbers move together or
+         the badge stops sitting over the pins it is hiding.
+         **A cluster is the one mark the `scale(.7)` rule in css/map.css cannot reach**, because
+         that rule names `.pin`. So this pair is edited by hand whenever the set moves. */
+      className: '', iconSize: [22, 22],
       html: `<span class="cluster${critical ? ' danger' : ''}${mixed ? ' mixed' : ''}">${kids.length}</span>`,
     });
   },
@@ -455,11 +458,25 @@ export function markSel(key) {
   selPin = pin;
   if (pin) {
     selWas = pin.options.icon;
-    pinGlyph('place');   // build the symbol; the swap below only re-points a <use> at it
-    pin.setIcon(L.divIcon({ className: '', iconSize: [48, 48], iconAnchor: [24, 44],
-      html: selWas.options.html
-        .replace(/^<span class="pin/, '<span class="pin sel')
-        .replace(/#g-\w+/, '#g-place') }));
+    /* **BUILT FRESH, and it used to be the station's own html patched twice.** That worked while a
+       station pin was a bare glyph: swap the class, re-point the `<use>` at the teardrop, done.
+       A station pin is a DISC now — a `<circle>` with the glyph knocked out of it — so re-pointing
+       the `<use>` left a teardrop cut out of a coloured disc, which is not what a selected pin is.
+       Only the colour is carried over. `--c` is the one thing the old markup holds that this needs,
+       and lifting it keeps the rule that a station at danger stays red while its card is open.
+       **THE TIP IS AT 11/12 OF THE BOX, NOT AT THE FOOT OF IT, and that is the number to get right.**
+       A teardrop is anchored at its tip, and `--i-place` does not paint to the bottom of its own
+       viewBox: measured with `getBBox()`, the path ends at 33 of a 36px box, which is 0.9167. The
+       old [24, 44] on a 48px box encoded exactly that ratio — 0.9167 × 48 is 44 — and a rewrite to
+       25px used [12.5, 25], which put every selected mark 2px above its station.
+       **So the anchor is `box × 0.9167`, and it moves whenever `.pin.sel`'s size does.** Both live
+       in `css/map.css`, which states where 32 comes from. A wrong anchor here is silent: the mark
+       still draws, it just stops pointing at the station it names.
+       **29.3 is fractional on purpose.** Leaflet takes a fractional pixel, and rounding this to 29
+       to keep it tidy is the same error the 25px rewrite made, in a smaller size. */
+    const c = selWas.options.html.match(/--c:([^"]*)/)?.[1] || 'var(--accent)';
+    pin.setIcon(L.divIcon({ className: '', iconSize: [32, 32], iconAnchor: [16, 29.3],
+      html: `<span class="pin sel" style="--c:${c}">${pinGlyph('place')}</span>` }));
   }
   /* **Move it out of the cluster, and move the last one back in.** `loose()` above reads `selPin`,
      so one re-sort answers both halves and neither is written twice.
@@ -679,7 +696,7 @@ const sprite = document.body.appendChild(
   Object.assign(document.createElementNS('http://www.w3.org/2000/svg', 'svg'), { id: 'glyphs' }));
 sprite.setAttribute('aria-hidden', 'true');
 const built = new Set();
-export function pinGlyph(name) {
+export function pinGlyph(name, disc = false) {
   if (!built.has(name)) {
     built.add(name);
     const url = getComputedStyle(document.documentElement).getPropertyValue('--i-' + name);
@@ -696,7 +713,22 @@ export function pinGlyph(name) {
     sprite.insertAdjacentHTML('beforeend', `<symbol id="g-${name}" viewBox="0 -960 960 960">${
       body[1].replaceAll('<path ', "<path vector-effect='non-scaling-stroke' ")}</symbol>`);
   }
-  return `<svg class="pinglyph"><use href="#g-${name}"/></svg>`;
+  /* **A STATION PIN IS A DISC WITH THE GLYPH KNOCKED OUT OF IT, and `disc` is what asks for one.**
+     The repository owner picked that shape on 2026-08-26. A filled circle carries far more of the
+     kind's colour than a bare glyph does, which is what a muted palette needs to read at 29px.
+     `<use>` honours `width`/`height` on a `<symbol>`, so the symbol's own 960 unit viewBox maps into
+     this 40 unit one with no transform to keep in step. 24 of 40 is the glyph at 60% of the disc.
+     **`stroke="none"` on the use is not decoration.** `.pinglyph` strokes every path in `--surface`
+     for the bare form, and that rule inherits through the `<use>` shadow tree. Left on, a white
+     glyph inside a disc wears a white outline and thickens into a blob.
+     **Three callers do NOT pass `disc` and must not.** The favorite heart is a badge on the pin's
+     corner rather than the mark itself. `.pin.me` and `.pin.place` are not stations: they are 48px,
+     they wear `--me` and `--accent` from a different part of the palette, and white on either fails.
+     So the map draws discs for stations and bare glyphs for the two marks that are not one. */
+  return disc
+    ? `<svg class="pinglyph disc" viewBox="0 0 40 40"><circle cx="20" cy="20" r="17.5"/>` +
+      `<use href="#g-${name}" x="8" y="8" width="24" height="24" stroke="none"/></svg>`
+    : `<svg class="pinglyph"><use href="#g-${name}"/></svg>`;
 }
 
 /* A place the reader searched for. One marker at a time, kept until another place replaces it — the
@@ -710,9 +742,14 @@ let placeMark = null;
 export function showPlace(latlng) {
   if (placeMark) placeMark.remove();
   placeMark = L.marker(latlng, { icon: L.divIcon({
-    // Same box and same tip anchor as the "you are here" pin: a pin points at its tip, not its
-    // middle, and Material draws the glyph with a little air below it inside the viewBox.
-    className: '', iconSize: [48, 48], iconAnchor: [24, 44],
+    /* A pin points at its TIP, not its middle, and Material draws the glyph with a little air below
+       it inside the viewBox. **The anchor is `box × 0.9167`**, the ratio `markSel()` above measures
+       with `getBBox()` and states in full. 42 × 0.9167 is 38.5.
+       **This box is NOT the "you are here" box any more**, and that comment stood here while both
+       were 48. That mark keeps a 48px box anchored at its centre, because it is a dot rather than a
+       teardrop. This one came down to 42 with the rest of the set on 2026-08-26. `.pin.place` in
+       `css/map.css` states where 42 comes from, and both numbers move together. */
+    className: '', iconSize: [42, 42], iconAnchor: [21, 38.5],
     html: `<span class="pin place">${pinGlyph('place')}</span>`,
   }) }).addTo(map);
   focusOn(latlng, 13);

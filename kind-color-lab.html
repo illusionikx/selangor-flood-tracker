@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Station kind colour</title>
+<link rel="stylesheet" href="css/icons.css?v=klab2">
+<style>
+/* The station kind palette, as it SHIPS. It links css/icons.css for the real glyph paths, derives
+   every colour in OKLCh at load, and then fetches css/base.css and checks what it derived against
+   what the app actually holds.
+   **This page was seven competing options and is now one palette.** The repository owner picked K7
+   on 2026-08-26 and asked for the losers to go the same day. What is left is the rule, the marks it
+   draws, and the measurements that hold it honest. See docs/FEATURES.md for the options and why
+   each one lost — the record lives there, not here.
+   ponytail: no build step, no imports, one file. */
+* { box-sizing: border-box; }
+body { margin: 0; font: 400 14px/1.55 Roboto, system-ui, sans-serif;
+       background: #e9eaec; color: #1f1f1f; padding: 24px; }
+h1 { font: 500 24px/1.3 Roboto, system-ui, sans-serif; margin: 0 0 6px; }
+h2 { font: 500 19px/1.3 Roboto, system-ui, sans-serif; margin: 34px 0 4px;
+     border-top: 2px solid #c8cacd; padding-top: 18px; }
+h3 { font: 500 15px/1.3 Roboto, system-ui, sans-serif; margin: 18px 0 6px; }
+p, ul { max-width: 84ch; margin: 6px 0; color: #3c4043; }
+ul { padding-left: 20px; } li { margin: 4px 0; }
+code { font: 400 12px/1 ui-monospace, monospace; background: #dcdee1; padding: 1px 4px;
+       border-radius: 3px; }
+.cost { border-left: 3px solid #b06a3c; padding-left: 10px; margin: 10px 0; max-width: 84ch; }
+.cost b { color: #8a4f28; }
+.ok   { border-left: 3px solid #1a6b33; padding-left: 10px; margin: 10px 0; max-width: 84ch; }
+.ok b { color: #14572a; }
+
+/* --- the pin, copied from css/map.css ---------------------------------------------------------- */
+/* `scale(.7)` and not `.8`: every mark on the map came down 12.5% on 2026-08-26, once a station pin
+   became a filled disc. A disc carries far more ink than the bare glyph the .8 was measured
+   against. Both shapes below are drawn at the size the app draws them. */
+.pin { position: relative; display: grid; place-items: center; width: 39px; height: 39px;
+       color: var(--c); font-size: 36px; transform: scale(.7);
+       filter: drop-shadow(0 1px 1px rgb(0 0 0 / .45)); }
+.pinglyph { width: 1em; height: 1em; fill: currentColor;
+            stroke: var(--stroke); stroke-width: 2; paint-order: stroke; }
+/* The disc form. Same box as the bare glyph, so the two shapes are compared at one size. The circle
+   carries its own fill and edge as presentation attributes, because each mark states its own colour
+   and there is no token to inherit here. */
+.pindisc { width: 1em; height: 1em; display: block; }
+#glyphs { display: none; }
+
+/* --- the map backdrop: a land band and a water band -------------------------------------------- */
+.mp { border-radius: 14px; overflow: hidden; box-shadow: 0 1px 3px rgb(0 0 0 / .35);
+      background: linear-gradient(var(--land) 0 52%, var(--wtr) 52% 100%); }
+.mp.lt { --land: #f4f1ea; --wtr: #b3d1e6; --stroke: #fff;    --ink: #1f1f1f; }
+.mp.dk { --land: #2b2b2b; --wtr: #15364e; --stroke: #202124; --ink: #e8eaed; }
+.mplab { font: 500 10px/1 Roboto, system-ui, sans-serif; letter-spacing: .09em;
+         text-transform: uppercase; color: var(--ink); opacity: .5; padding: 8px 12px 0; }
+.marks { display: flex; flex-wrap: wrap; gap: 2px; padding: 4px 8px 10px; }
+.mk { width: 76px; text-align: center; }
+.mk .box { height: 44px; display: grid; place-items: center; }
+.mk .nm { font: 400 10px/1.25 Roboto, system-ui, sans-serif; color: var(--ink); opacity: .8; }
+.mk .hx { font: 400 9px/1.3 ui-monospace, monospace; color: var(--ink); opacity: .45; }
+.drow { padding-top: 4px; }
+.drow > b { display: block; padding: 0 12px; font: 500 10px/1.6 Roboto, system-ui, sans-serif;
+            color: var(--ink); opacity: .6; }
+.drow .marks { padding-top: 0; padding-bottom: 6px; }
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 8px 0 0; }
+@media (max-width: 980px) { .pair { grid-template-columns: 1fr; } }
+
+/* --- the chroma plot --------------------------------------------------------------------------- */
+.plot { position: relative; height: 300px; border-radius: 10px; background: #fff;
+        border: 1px solid #c8cacd; margin: 12px 0 4px; max-width: 900px; }
+.plot .band { position: absolute; left: 0; right: 0; }
+.plot .band b { position: absolute; left: 8px; top: 3px;
+                font: 400 10px/1 Roboto, system-ui, sans-serif; color: #5f6368; }
+.dot { position: absolute; width: 15px; height: 15px; border-radius: 50%;
+       transform: translate(-50%, 50%); border: 2px solid #fff;
+       box-shadow: 0 0 0 1px #0006; }
+.dot.f { border-radius: 3px; }
+.dot i { position: absolute; left: 18px; top: -1px; white-space: nowrap; font-style: normal;
+         font: 400 10px/1 Roboto, system-ui, sans-serif; color: #202124;
+         background: #ffffffcc; padding: 2px 3px; border-radius: 2px; }
+.pax { position: absolute; bottom: -17px; font: 400 10px/1 Roboto, system-ui, sans-serif;
+       color: #5f6368; transform: translateX(-50%); }
+.pkey { font-size: 12px; color: #3c4043; margin-top: 22px; }
+.pkey b { display: inline-block; width: 13px; height: 13px; vertical-align: -2px;
+          border: 2px solid #fff; box-shadow: 0 0 0 1px #0006; margin-right: 4px; }
+
+/* --- charts ------------------------------------------------------------------------------------ */
+/* **A width, because `.chart`'s own children are `flex: 1` on a zero basis.** Without one the box
+   takes its width from content, the content asks for nothing, and the chart draws as an empty
+   plate. It looked like a rendering fault and was a sizing rule. */
+.chart { display: flex; align-items: flex-end; gap: 8px; height: 130px; padding: 8px 10px;
+         background: #fff; border: 1px solid #c8cacd; border-radius: 10px; width: 320px;
+         flex: none; }
+.chart.dk { background: #202124; border-color: #3c4043; }
+.chart div { flex: 1; border-radius: 3px 3px 0 0; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 6px 0 0; max-width: 460px;
+          font-size: 11px; }
+.legend span { display: flex; align-items: center; gap: 5px; }
+.legend i { width: 11px; height: 11px; border-radius: 3px; }
+.charts { display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-start; }
+
+table.dt { border-collapse: collapse; font-size: 12px; margin: 8px 0; }
+table.dt th, table.dt td { border: 1px solid #c8cacd; padding: 3px 8px; text-align: left; }
+table.dt th { background: #dcdee1; font-weight: 500; }
+table.dt td.n { text-align: right; font-family: ui-monospace, monospace; }
+.bad { color: #b3261e; font-weight: 500; }
+.good { color: #1a6b33; font-weight: 500; }
+pre.css { background: #202124; color: #e8eaed; padding: 12px 14px; border-radius: 8px;
+          font: 400 11.5px/1.6 ui-monospace, monospace; overflow-x: auto; max-width: 900px; }
+</style>
+</head>
+<body>
+
+<h1>Station kind colour</h1>
+<p>Six kinds need six colours: water level, rainfall, siren, flood gauge, camera, several sensors.
+  The repository owner set the rule on 2026-08-26 — the whole hue range, and a chroma that separates
+  a kind from the functional set. This page measures that rather than eyeballs it.</p>
+<p><b>Every hex below is derived at load, in OKLCh.</b> Nothing on this page was typed by hand. The
+  page then fetches <code>css/base.css</code> and checks what it derived against what the app holds,
+  so a palette here cannot drift from the palette that ships.</p>
+
+<div id="out">running...</div>
+
+<script>
+/* ================= colour maths ================= */
+const s2l = c => c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+const l2s = c => c <= 0.0031308 ? c * 12.92 : 1.055 * Math.pow(c, 1 / 2.4) - 0.055;
+const hex2rgb = h => h.match(/\w\w/g).map(x => parseInt(x, 16) / 255);
+const rgb2hex = r => '#' + r.map(v =>
+  Math.round(Math.max(0, Math.min(1, v)) * 255).toString(16).padStart(2, '0')).join('');
+
+/* Björn Ottosson's OKLab matrices. OKLab is the space to do this in: its chroma is perceptually
+   even across hues, so "the same chroma" means the same thing at blue and at yellow. HSL saturation
+   does not, which is why a palette built in HSL comes out lopsided. */
+function rgb2oklab([R, G, B]) {
+  const r = s2l(R), g = s2l(G), b = s2l(B);
+  const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
+  const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
+  const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
+  return [0.2104542553 * l + 0.7936177850 * m - 0.0040720468 * s,
+          1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * s,
+          0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * s];
+}
+function oklab2rgb([L, a, b]) {
+  const l = (L + 0.3963377774 * a + 0.2158037573 * b) ** 3;
+  const m = (L - 0.1055613458 * a - 0.0638541728 * b) ** 3;
+  const s = (L - 0.0894841775 * a - 1.2914855480 * b) ** 3;
+  return [l2s( 4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s),
+          l2s(-1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s),
+          l2s(-0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s)];
+}
+const lch = hex => { const [L, a, b] = rgb2oklab(hex2rgb(hex));
+  return [L, Math.hypot(a, b), (Math.atan2(b, a) * 180 / Math.PI + 360) % 360]; };
+const lch2lab = (L, C, H) => [L, C * Math.cos(H * Math.PI / 180), C * Math.sin(H * Math.PI / 180)];
+
+/* sRGB is not a cylinder, so a chroma that fits at blue can fall outside it at yellow. Binary-search
+   the chroma down until the colour is representable, and report where that bit. A palette that
+   silently clips is a palette whose rule is not the rule it claims. */
+const inGamut = c => c.every(v => v >= -0.0006 && v <= 1.0006);
+function lchHex(L, C, H) {
+  if (inGamut(oklab2rgb(lch2lab(L, C, H)))) return [rgb2hex(oklab2rgb(lch2lab(L, C, H))), C];
+  let lo = 0, hi = C;
+  for (let i = 0; i < 26; i++) { const m = (lo + hi) / 2;
+    if (inGamut(oklab2rgb(lch2lab(L, m, H)))) lo = m; else hi = m; }
+  return [rgb2hex(oklab2rgb(lch2lab(L, lo, H))), lo];
+}
+/* Distance in OKLab, scaled by 100 so the numbers read like a familiar delta-E. It is not CIEDE2000
+   and this page never calls it that. Two colours under about 10 start to read as one at pin size. */
+const dE = (h1, h2) => { const a = rgb2oklab(hex2rgb(h1)), b = rgb2oklab(hex2rgb(h2));
+  return Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]) * 100; };
+// WCAG contrast, for the glyph against the disc it is cut out of.
+const rl = hex => { const [r, g, b] = hex2rgb(hex).map(s2l);
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
+const onWhite = hex => 1.05 / (rl(hex) + 0.05);
+const onBlack = hex => (rl(hex) + 0.05) / 0.05;
+
+/* ================= the rule ================= */
+const KIND = [
+  ['river',    'Water level',      'water_drop'],
+  ['rainfall', 'Rainfall',         'rainy'],
+  ['siren',    'Siren',            'campaign'],
+  ['gauge',    'Flood gauge',      'straighten'],
+  ['camera',   'Camera',           'photo_camera'],
+  ['mast',     'Several sensors',  'layers'],
+];
+/* The functional set, exactly as css/base.css holds it. The pin block is the dark one.
+   **`--s-normal` IS IN THE PALETTE AND NEVER ON A PIN, so it is split out.** The three-colour rule
+   of 2026-08-26 gave a quiet sensor its own KIND colour, so no pin has worn the normal green since.
+   It draws on a card chip and a table pill, where none of these marks appears.
+   This page measured it as a fourth disc for one run and reported two ink flips, against the one
+   `DARK_INK_FILL` in `js/config.js` holds. The app was right. A collision that is not on the map is
+   not a collision, and the same reasoning already keeps `--me` out of that argument.
+   It stays in `FUNC_ALL` for the chroma plot, because the chroma window is a claim about the whole
+   functional set. Re-measure if a pin ever wears it. */
+const FUNC_PIN = { 'no reading': '#9aa0a6', 'alert': '#ffc000', 'danger': '#ff3a37' };
+const FUNC_ALL = { ...FUNC_PIN, 'normal (never on a pin)': '#26e275' };
+
+/* **ONE CHROMA FOR ALL SIX, and it sits in the middle of a window with two ends.** The functional
+   set holds BOTH ends of the chroma axis: the no-reading grey at 0.011 and the vivid three from
+   0.17 to 0.23. So "different from functional" means different from a vivid colour AND different
+   from grey. A kind pushed low enough to clear the vivid set lands on the no-reading grey instead.
+   The window is about 0.09 to 0.16 and this is its middle. */
+const C = 0.119;
+
+/* **SIX SEATS EXACTLY 60 DEGREES APART, and there is nothing left to search about hue.** Water is
+   pinned blue and rain is pinned violet, because meaning outranks a score. Those two anchors are
+   60 degrees apart, and six points 60 degrees apart is exactly one turn of the wheel. So the even
+   continuation IS the maximum-separation answer for six kinds.
+   The phase was searched — it slides all six against the FIXED functional hues without letting a
+   river stop being blue — and it landed here. The seats are stated rather than re-searched, because
+   a search that must reproduce a fixed answer is a search that breaks the day somebody tunes it.
+   Two earlier attempts are worth not repeating, and docs/FEATURES.md records both. Rotating the
+   whole wheel hit its own cap and drew a periwinkle river and a brown siren. Placing the four free
+   hues by farthest-point insertion scored BELOW the plain even spread, because greedy placement is
+   myopic and kept pushing the siren and the flood gauge together. */
+/* **THE SEAT MAP IS STATED, NEVER TAKEN FROM THE ARRAY'S ORDER.** `KIND` is listed in the order the
+   app ranks a sensor, and that is not the order the six sit on the wheel: the camera takes seat 5
+   and several sensors takes seat 4. This page derived the hue from the array index for one run, and
+   the check at the foot of the page caught it — six values disagreeing with `css/base.css`, camera
+   and several sensors wearing each other's colour. Two lists in one order by luck is a fault
+   waiting for somebody to re-sort the array. */
+const H0 = 238;   // water level, the anchor
+const SEAT = { river: 0, rainfall: 1, siren: 2, gauge: 3, mast: 4, camera: 5 };
+const HUE = Object.fromEntries(KIND.map(([k]) => [k, (H0 + SEAT[k] * 60) % 360]));
+
+/* **THREE LIGHTNESSES, ONE PER SURFACE, and the third one is what the disc shape added.** A bare
+   glyph is a thin coloured mark read against the basemap. A disc is a solid block of that colour
+   with a WHITE glyph knocked out of it, and white on a colour at 0.760 measures about 1.9:1. That
+   is unreadable. So the map pin takes a block of its own.
+   0.690 is the brightest rung that still carries white on all six. The repository owner rejected
+   0.550 on 2026-08-26 — at that lightness a disc reads as a different colour from the same kind's
+   bare glyph, and it does. */
+const L = { lt: 0.620, pin: 0.690, dark: 0.760 };
+const NAMES = { lt: ':root', dark: ':root[data-theme="dark"], .pin', pin: '.pin, #side' };
+
+const build = Lv => {
+  const set = {}, clipped = [];
+  for (const [k] of KIND) {
+    const [hex, got] = lchHex(Lv, C, HUE[k]);
+    set[k] = hex;
+    if (got < C - 0.002) clipped.push([k, got]);
+  }
+  return { set, clipped };
+};
+const BLOCK = Object.fromEntries(Object.entries(L).map(([n, Lv]) => [n, build(Lv)]));
+
+/* **THE KNOCKOUT PICKS ITS OWN INK, and one fill in the whole set flips.** Each mark takes white or
+   black, whichever contrasts with its own fill, so a lightness is free to move without a palette
+   going illegible.
+   **The threshold is deliberately under what WCAG asks.** It started at 3.0, which is WCAG 1.4.11's
+   bar for a graphical object, and that flipped everything to black by lightness 0.69 — the very
+   rung this palette wanted. The repository owner asked for more tolerance on 2026-08-26.
+   **What that costs, stated plainly.** A white glyph on a fill between 2.4 and 3.0 is under the
+   published bar. It is a 15px shape on a 22px disc rather than a hairline, and every mark carries a
+   `--surface` edge, so it is legible. It is not compliant. */
+const INK_MIN = 2.4;
+const ink = fill => onWhite(fill) >= INK_MIN ? '#ffffff' : '#101314';
+
+/* ================= glyph sprite, the way js/map.js does it ================= */
+const sprite = document.body.appendChild(document.createElementNS('http://www.w3.org/2000/svg', 'svg'));
+sprite.id = 'glyphs';
+const built = new Set();
+function pinGlyph(name) {
+  if (!built.has(name)) {
+    built.add(name);
+    const url = getComputedStyle(document.documentElement).getPropertyValue('--i-' + name);
+    const b = url.match(/<svg[^>]*>(.*)<\/svg>/s);
+    if (!b) return '';
+    sprite.insertAdjacentHTML('beforeend', '<symbol id="g-' + name + '" viewBox="0 -960 960 960">' +
+      b[1].replaceAll('<path ', "<path vector-effect='non-scaling-stroke' ") + '</symbol>');
+  }
+  return '<svg class="pinglyph"><use href="#g-' + name + '"/></svg>';
+}
+
+/* ================= render ================= */
+/* The disc: a filled circle in the kind's colour, the app's own `--surface` edge, and the glyph
+   knocked out. `<use>` honours width and height on a `<symbol>`, so the 960 unit viewBox maps into
+   the 40 unit one without a transform. `stroke="none"` cancels the outline the bare-glyph rule puts
+   on every path in the sprite — left on, a white glyph inside a disc wears a white outline and
+   thickens into a blob. */
+const disc = (glyph, hex) =>
+  '<svg class="pindisc" viewBox="0 0 40 40"><circle cx="20" cy="20" r="17.5" fill="' + hex +
+  '" stroke="var(--stroke)" stroke-width="2.5"/><use href="#g-' + glyph +
+  '" x="8" y="8" width="24" height="24" fill="' + ink(hex) + '" stroke="none"/></svg>';
+
+const cell = (inner, label, hex) =>
+  '<div class="mk"><div class="box">' + inner + '</div><div class="nm">' + label + '</div>' +
+  '<div class="hx">' + (hex || '') + '</div></div>';
+const mkDisc = (glyph, hex, label) =>
+  cell('<span class="pin">' + disc(glyph, hex) + '</span>', label, hex);
+const mk = (glyph, hex, label) =>
+  cell('<span class="pin" style="--c:' + hex + '">' + pinGlyph(glyph) + '</span>', label, hex);
+
+const panels = (lab, rows) => '<div class="pair">' +
+  ['lt', 'dk'].map(m => '<div class="mp ' + m + '"><div class="mplab">' +
+    (m === 'lt' ? 'light' : 'dark') + ' basemap &middot; ' + lab + '</div>' +
+    rows + '</div>').join('') + '</div>';
+
+const row = (title, marks) =>
+  '<div class="drow"><b>' + title + '</b><div class="marks">' + marks + '</div></div>';
+
+function charts(set) {
+  const bars = cls => '<div class="chart' + cls + '">' +
+    KIND.map(([k], i) => '<div style="background:' + set[k] + ';height:' +
+      [88, 62, 100, 44, 74, 30][i] + '%"></div>').join('') + '</div>';
+  return '<div class="charts">' + bars('') + bars(' dk') + '</div>' +
+    '<div class="legend">' + KIND.map(([k, nm]) =>
+      '<span><i style="background:' + set[k] + '"></i>' + nm + '</span>').join('') + '</div>';
+}
+
+/* The separation table. Two questions, and only one of them is serious.
+   Two KINDS collapsing is survivable: every pin carries its own glyph, so a water drop and a
+   loudspeaker are two marks whatever colour they are. A kind collapsing into a FUNCTIONAL colour is
+   not. A quiet river and a river at its danger mark wear the same water drop, and colour is the only
+   thing that tells them apart. */
+function numbers(set, clipped) {
+  const ks = KIND.map(([k]) => k);
+  let minK = 1e9, pairK = '', minF = 1e9, pairF = '', minL = 1e9, pairL = '';
+  for (let i = 0; i < ks.length; i++) {
+    for (let j = i + 1; j < ks.length; j++) {
+      const d = dE(set[ks[i]], set[ks[j]]);
+      if (d < minK) { minK = d; pairK = ks[i] + ' / ' + ks[j]; } }
+    for (const [fn, fh] of Object.entries(FUNC_PIN)) {
+      const d = dE(set[ks[i]], fh);
+      if (d < minF) { minF = d; pairF = ks[i] + ' / ' + fn; }
+      /* Grey is left out of the serious row, and a count is why. `.pin.off` fades an offline pin to
+         0.6 opacity as well as greying it. Measured on the live payload: 86 pins are grey, all 86
+         are faded, and NOT ONE station is grey without also being faded. So grey carries two
+         channels and the vivid three carry one. This is the number with nothing else behind it. */
+      if (fn !== 'no reading' && d < minL) { minL = d; pairL = ks[i] + ' / ' + fn; } } }
+  // FUNC_ALL here and FUNC_PIN above: a DISTANCE is only real between two colours that can share a
+  // surface, and the chroma WINDOW is a claim about the whole functional set.
+  const kc = ks.map(k => lch(set[k])[1]), fc = Object.values(FUNC_ALL).map(h => lch(h)[1]);
+  const kmax = Math.max(...kc), kmin = Math.min(...kc);
+  const fmin = Math.min(...fc.filter(c => c > 0.05)), grey = Math.min(...fc);
+  const cls = v => v >= 12 ? 'good' : v >= 8 ? '' : 'bad';
+  const r = ks.map(k => [k, ink(set[k]) === '#ffffff' ? onWhite(set[k]) : onBlack(set[k])])
+    .sort((a, b) => a[1] - b[1]);
+  const whiteWorst = Math.min(...ks.map(k => onWhite(set[k])));
+  return '<table class="dt"><tr><th>measure</th><th>value</th><th>closest pair</th></tr>' +
+    '<tr><td>closest two kinds</td><td class="n ' + cls(minK) + '">' + minK.toFixed(1) +
+      '</td><td>' + pairK + '</td></tr>' +
+    '<tr><td>closest kind to any colour a pin can wear</td><td class="n ' + cls(minF) + '">' +
+      minF.toFixed(1) + '</td><td>' + pairF + '</td></tr>' +
+    '<tr><td><b>closest kind to the alert amber or the danger red</b> ' +
+      '<i>(one glyph, and nothing else to read)</i></td><td class="n ' + cls(minL) + '"><b>' +
+      minL.toFixed(1) + '</b></td><td>' + pairL + '</td></tr>' +
+    '<tr><td>kind chroma range</td><td class="n">' + kmin.toFixed(3) + ' to ' + kmax.toFixed(3) +
+      '</td><td>functional runs ' + grey.toFixed(3) + ' to ' + Math.max(...fc).toFixed(3) +
+      '</td></tr>' +
+    '<tr><td>chroma clear of the vivid set</td><td class="n ' +
+      (fmin - kmax > 0.04 ? 'good' : fmin - kmax > 0 ? '' : 'bad') + '">' + (fmin - kmax).toFixed(3) +
+      '</td><td>lowest vivid chroma is ' + fmin.toFixed(3) + ' (alert)</td></tr>' +
+    '<tr><td>chroma clear of the no-reading grey</td><td class="n ' +
+      (kmin - grey > 0.06 ? 'good' : kmin - grey > 0.03 ? '' : 'bad') + '">' +
+      (kmin - grey).toFixed(3) + '</td><td>grey is ' + grey.toFixed(3) + '</td></tr>' +
+    '<tr><td>glyph on the disc, worst of the six</td><td class="n ' +
+      (r[0][1] >= 4.5 ? 'good' : r[0][1] >= 3 ? '' : 'bad') + '">' + r[0][1].toFixed(1) +
+      ':1</td><td>' + r[0][0] + ', ' + (ink(set[r[0][0]]) === '#ffffff' ? 'white' : 'black') +
+      '</td></tr>' +
+    '<tr><td>a WHITE glyph, worst of the six</td><td class="n ' +
+      (whiteWorst >= INK_MIN ? '' : 'bad') + '">' + whiteWorst.toFixed(1) +
+      ':1</td><td>the flip threshold is ' + INK_MIN + ':1</td></tr>' +
+    (clipped.length
+      ? '<tr><td>chroma clipped by sRGB</td><td class="n bad">' + clipped.length + '</td><td>' +
+        clipped.map(([k, c]) => k + ' ' + c.toFixed(3)).join(', ') + '</td></tr>' : '') +
+    '</table>';
+}
+
+const line = set => KIND.map(([k]) => '--k-' + k + ': ' + set[k] + ';').join(' ');
+
+let H = '';
+
+/* ---- 1. the rule ---- */
+H += '<h2>1. The rule</h2>' +
+  '<ul>' +
+  '<li><b>One chroma for all six, at ' + C + '.</b> The window has a FLOOR as well as a ceiling, ' +
+  'and that is the one thing the measurements added to the instruction. The functional set holds ' +
+  'both ends of the chroma axis: the no-reading grey at ' +
+  lch(FUNC_ALL['no reading'])[1].toFixed(3) + ', and the vivid three from ' +
+  Math.min(...Object.entries(FUNC_ALL).filter(([n]) => n !== 'no reading')
+    .map(([, h]) => lch(h)[1])).toFixed(2) + ' to ' +
+  Math.max(...Object.values(FUNC_ALL).map(h => lch(h)[1])).toFixed(2) + '. So a kind pushed low ' +
+  'enough to clear the vivid set lands on the no-reading grey instead.</li>' +
+  '<li><b>Six hues exactly 60 degrees apart</b>, from water at ' + H0 + ': ' +
+  KIND.map(([k, nm]) => nm.toLowerCase() + ' ' + HUE[k]).join(', ') + '. Water is pinned blue and ' +
+  'rain is pinned violet because meaning outranks a score, those two anchors are 60 degrees apart, ' +
+  'and six points 60 degrees apart is one turn of the wheel. So the even spread IS the ' +
+  'maximum-separation answer and there is nothing left to search about hue.</li>' +
+  '<li><b>Three lightnesses, one per surface.</b> ' + L.lt + ' on white paper, ' + L.dark +
+  ' on the dark theme, and <b>' + L.pin + ' on a map pin</b>, which is a block of its own. A disc ' +
+  'is a solid block of colour with a glyph knocked out of it, and white on ' + L.dark +
+  ' measures ' + onWhite(BLOCK.dark.set.river).toFixed(1) + ':1 at best.</li>' +
+  '<li><b>OKLCh and not HSL.</b> OKLab chroma is perceptually even across hues, so one number ' +
+  'means the same thing at blue and at yellow. An HSL palette built to one saturation comes out ' +
+  'lopsided.</li>' +
+  '</ul>' +
+  '<div class="cost"><b>What this trades.</b> A hue is free to sit anywhere, so a kind can land ' +
+  'near a functional hue: the flood gauge at ' + HUE.gauge + ' against the alert amber at ' +
+  Math.round(lch(FUNC_PIN.alert)[2]) + ', the siren at ' + HUE.siren + ' against the danger red ' +
+  'at ' + Math.round(lch(FUNC_PIN.danger)[2]) + '. That is the point of the instruction and it is ' +
+  'also the risk in it. Judge each one in the strip where the six kinds and the three colours a ' +
+  'pin can wear stand side by side, and read the third row of the table.</div>' +
+  '<div class="cost"><b>Colour blindness is OUT OF SCOPE</b>, on the repository owner\'s call of ' +
+  '2026-08-26. This page used to simulate all three kinds and grey the columns rather than delete ' +
+  'them. Those measurements existed to justify one losing option, and that option is gone, so they ' +
+  'went with it. What they said, kept as the record: an even spread around the wheel puts two ' +
+  'kinds on the red-green axis on purpose, which is why Okabe-Ito and Tol do not space hues ' +
+  'evenly. It is survivable between two kinds, because every pin carries its own glyph. It is not ' +
+  'survivable between a kind and a status, because those two share one.</div>';
+
+/* ---- 2. the palette ---- */
+H += '<h2>2. The palette</h2>' +
+  '<p>Three blocks, one per surface, derived from the rule above.</p>' +
+  '<div id="check"></div>';
+for (const n of ['lt', 'pin', 'dark'])
+  H += '<h3>' + NAMES[n] + ' &middot; L ' + L[n] + '</h3>' +
+    '<pre class="css">' + line(BLOCK[n].set) + '</pre>';
+
+/* ---- 3. the marks ---- */
+/* Both shapes on both basemaps, at the size the app draws them. The station disc is what ships; the
+   bare glyph is what the two marks that are NOT stations still draw. */
+H += '<h2>3. The marks, at the size they draw</h2>' +
+  '<p><b>A station pin is a disc</b>, at L ' + L.pin + ', with the glyph knocked out. The circle is ' +
+  '35 of 40 viewBox units on a 36px font at <code>scale(.7)</code>, which is ' +
+  (36 * 0.7 * 35 / 40).toFixed(2) + 'px, and the glyph inside it is 24 of 40, so ' +
+  (36 * 0.7 * 24 / 40).toFixed(2) + 'px.</p>' +
+  '<p><b>The bare glyph is what the marks that are NOT stations draw</b> — the selected teardrop, ' +
+  'the searched place, and a weather point. Those sit outside this palette apart from the selected ' +
+  'pin, which carries the station\'s own <code>--c</code> so a station at danger stays red while a ' +
+  'reader has its card open.</p>' +
+  panels('disc, L ' + L.pin + ' &middot; then the three a pin can wear, at their own lightness',
+    row('the six kinds', KIND.map(([k, nm, g]) => mkDisc(g, BLOCK.pin.set[k], nm)).join('')) +
+    row('the three colours a pin can wear',
+      Object.entries(FUNC_PIN).map(([nm, h]) => mkDisc('water_drop', h, nm)).join(''))) +
+  '<h3>The same six as a bare glyph, for the marks that are not stations</h3>' +
+  panels('bare glyph, L ' + L.pin,
+    row('the six kinds', KIND.map(([k, nm, g]) => mk(g, BLOCK.pin.set[k], nm)).join('')) +
+    row('the three colours a pin can wear',
+      Object.entries(FUNC_PIN).map(([nm, h]) => mk('water_drop', h, nm)).join('')));
+
+/* ---- 4. the ink flip ---- */
+const flips = Object.entries(FUNC_PIN).concat(KIND.map(([k, nm]) => [nm, BLOCK.pin.set[k]]))
+  .filter(([, h]) => ink(h) !== '#ffffff');
+H += '<h2>4. The knockout ink, and the one fill that flips</h2>' +
+  '<p>Each mark takes white or black, whichever contrasts with its own fill. The threshold is <b>' +
+  INK_MIN + ':1</b>: keep white while white still clears that much, and only then turn black.</p>' +
+  '<p><b>Exactly ' + flips.length + ' fill of the nine a pin can wear flips, and it is the alert ' +
+  'amber.</b> ' +
+  'White on it measures ' + onWhite(FUNC_PIN.alert).toFixed(2) + ':1 against black at ' +
+  onBlack(FUNC_PIN.alert).toFixed(2) + ':1. It cannot be darkened to suit a knockout, because a ' +
+  'status colour IS its brightness. <code>DARK_INK_FILL</code> in <code>js/config.js</code> holds ' +
+  'that list, and <code>render.js</code> compares the fill it is about to set. <b>Re-measure and ' +
+  'edit that list whenever a token in the status ramp moves.</b> A pin whose glyph disappears is ' +
+  'silent.</p>' +
+  '<table class="dt"><tr><th>fill</th><th>hex</th><th>white on it</th><th>black on it</th>' +
+  '<th>ink</th></tr>' +
+  KIND.map(([k, nm]) => [nm, BLOCK.pin.set[k]])
+    .concat(Object.entries(FUNC_PIN).map(([nm, h]) => [nm, h]))
+    .map(([nm, h]) => '<tr><td>' + nm + '</td><td class="n">' + h + '</td>' +
+      '<td class="n ' + (onWhite(h) >= INK_MIN ? 'good' : '') + '">' + onWhite(h).toFixed(2) +
+      ':1</td><td class="n">' + onBlack(h).toFixed(2) + ':1</td><td>' +
+      (ink(h) === '#ffffff' ? 'white' : '<b>black</b>') + '</td></tr>').join('') +
+  '</table>' +
+  '<div class="cost"><b>Dragging the functional set down to the disc lightness was tried first and ' +
+  'it destroyed the status set.</b> One white glyph then served every disc, and the alert amber ' +
+  'came out ' + lchHex(L.pin, lch(FUNC_PIN.alert)[1], lch(FUNC_PIN.alert)[2])[0] +
+  ' — a dark olive that says nothing about a warning. The kinds take a lightness block and the ' +
+  'functional set keeps its own.</div>';
+
+/* ---- 5. what a sensor may wear ---- */
+/* The three-colour rule, drawn. This is the constraint the whole palette serves: a kind colour has
+   to be tellable from the alert amber and the danger red, because all three land on ONE glyph. */
+H += '<h2>5. A sensor wears three colours and never a fourth</h2>' +
+  '<p>The repository owner set that rule on 2026-08-26. Its own kind, the alert amber, or the ' +
+  'danger red — plus the no-reading grey where a sensor cannot report. ' +
+  '<code>color()</code> in <code>js/util.js</code> is the one function that answers it.</p>' +
+  '<p><b>This is why the third row of the table above is the serious one.</b> All four colours ' +
+  'land on the SAME glyph, so colour is the only thing telling a quiet river from a river at its ' +
+  'danger mark. Two kinds collapsing is survivable, because a water drop and a loudspeaker are two ' +
+  'marks whatever colour they are.</p>' +
+  panels('one kind, every rung it can wear',
+    KIND.map(([k, nm, g]) => row(nm,
+      [['its own kind', BLOCK.pin.set[k]], ['alert', FUNC_PIN.alert],
+       ['danger', FUNC_PIN.danger], ['no reading', FUNC_PIN['no reading']]]
+        .map(([lab, hex]) => mkDisc(g, hex, lab)).join(''))).join(''));
+
+/* ---- 6. legend and chart ---- */
+H += '<h2>6. Legend and chart, on the light-theme block</h2>' +
+  '<p>The same six away from a basemap, which is where a card chip and a table pill draw them.</p>' +
+  charts(BLOCK.lt.set);
+
+/* ---- 7. the numbers ---- */
+H += '<h2>7. The numbers</h2>' +
+  '<p>Measured on the pin block, which is the one that draws over a basemap.</p>' +
+  numbers(BLOCK.pin.set, BLOCK.pin.clipped) +
+  '<p>Chroma up the side, hue across. <b>Circles are station kinds and squares are functional ' +
+  'colours.</b> The rule is that the circles sit in one band and the squares in another.</p>' +
+  '<div class="plot" id="plot0"></div>' +
+  '<p class="pkey"><b style="background:#5f6368;border-radius:50%"></b>station kind &nbsp; ' +
+  '<b style="background:#5f6368"></b>functional</p>';
+
+document.getElementById('out').innerHTML = H;
+
+/* ---- plot the chroma-against-hue chart ---- */
+const plot = document.getElementById('plot0');
+const CMAX = 0.26;
+for (let c = 0; c <= 0.25; c += 0.05) {
+  const d = document.createElement('div');
+  d.className = 'band';
+  d.style.cssText = 'bottom:' + (c / CMAX * 100) + '%;border-top:1px solid #e3e5e8;height:0';
+  d.innerHTML = '<b>C ' + c.toFixed(2) + '</b>';
+  plot.appendChild(d);
+}
+for (let h = 0; h <= 360; h += 60) {
+  const a = document.createElement('div');
+  a.className = 'pax'; a.style.left = (h / 360 * 100) + '%'; a.textContent = h + '°';
+  plot.appendChild(a);
+}
+const put = (hex, label, func) => {
+  const [, Cc, Hh] = lch(hex);
+  const d = document.createElement('div');
+  d.className = 'dot' + (func ? ' f' : '');
+  d.style.cssText = 'background:' + hex + ';left:' + (Hh / 360 * 100) + '%;bottom:' +
+    (Cc / CMAX * 100) + '%';
+  d.innerHTML = '<i>' + label + ' ' + Cc.toFixed(2) + '</i>';
+  plot.appendChild(d);
+};
+for (const [k, nm] of KIND) put(BLOCK.pin.set[k], nm, false);
+// FUNC_ALL: the plot is the chroma window, which is a claim about the whole functional set.
+for (const [nm, h] of Object.entries(FUNC_ALL)) put(h, nm, true);
+
+/* ---- check what this page derived against what the app actually holds ----
+   **This is the half that makes the page worth keeping.** Deriving a palette proves the maths. It
+   does not prove the stylesheet still carries it, and a lab that quietly disagrees with the app is
+   worse than no lab.
+   `css/base.css` is same-origin, so one fetch answers it. The three blocks are found by their own
+   selectors, and the `.pin` one has to be searched LAST-WINS: `:root[data-theme="dark"], .pin`
+   declares the same tokens above it, and source order is the whole of what makes the override win.
+   A failed fetch degrades to a note rather than a broken page. Opening this file over `file://`
+   is the ordinary way that happens. */
+(async () => {
+  const box = document.getElementById('check');
+  let css;
+  try { css = await (await fetch('css/base.css')).text(); }
+  catch { box.innerHTML = '<div class="cost"><b>Could not read css/base.css.</b> The blocks below ' +
+    'are what the rule derives. Nothing checked them against the app. Serve this page over http ' +
+    'rather than opening the file.</div>'; return; }
+  // Every `--k-*: #hex` in the file, in source order, so the last one for a token is what wins.
+  const found = {};
+  for (const m of css.matchAll(/--k-(river|rainfall|siren|gauge|camera|mast)\s*:\s*(#[0-9a-f]{6})/gi))
+    (found[m[1]] ||= []).push(m[2].toLowerCase());
+  const rows = [];
+  // Three blocks, in the order they appear: :root, then the dark/.pin pair, then .pin.
+  for (const [i, n] of ['lt', 'dark', 'pin'].entries())
+    for (const [k, nm] of KIND) {
+      const want = BLOCK[n].set[k], got = found[k]?.[i];
+      if (got !== want) rows.push([NAMES[n], nm, want, got || 'missing']);
+    }
+  box.innerHTML = rows.length
+    ? '<div class="cost"><b>' + rows.length + ' value in css/base.css disagrees with the rule.</b> ' +
+      'Either the rule moved and the stylesheet did not, or somebody typed a hex by hand.</div>' +
+      '<table class="dt"><tr><th>block</th><th>kind</th><th>the rule</th><th>the stylesheet</th></tr>' +
+      rows.map(r => '<tr><td>' + r[0] + '</td><td>' + r[1] + '</td><td class="n">' + r[2] +
+        '</td><td class="n bad">' + r[3] + '</td></tr>').join('') + '</table>'
+    : '<div class="ok"><b>css/base.css matches the rule, all ' + (KIND.length * 3) +
+      ' values.</b> Every hex the app holds is reproduced by chroma ' + C + ', six hues ' +
+      '60 degrees apart from ' + H0 + ', at L ' + L.lt + ' / ' + L.pin + ' / ' + L.dark + '.</div>';
+})();
+</script>
+</body>
+</html>

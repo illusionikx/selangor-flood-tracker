@@ -3,7 +3,7 @@
 
 import { state, PREFS, save } from './state.js';
 import { el, snack } from './util.js';
-import { map, focusOn, openSide, ping, pinGlyph } from './map.js';
+import { map, focusOn, openSide, ping } from './map.js';
 import { herePopup } from './popup.js';
 import { alerts } from './alerts.js';
 
@@ -157,7 +157,11 @@ function place(latlng, accuracy, setView) {
        [24, 44] under a crosshair stands the mark 20px north of the fix. This held `home_pin` before,
        and that glyph took the tip anchor for the reason this line no longer has. */
     className: '', iconSize: [48, 48], iconAnchor: [24, 24],
-    html: `<span class="pin me">${pinGlyph('my_location')}</span>`,
+    /* **A BARE DOT, drawn by `.pin.me::before` in map.css — there is no glyph here any more.** The
+       repository owner asked for that on 2026-08-26. The box stays 48px and anchored at its centre:
+       `.pin` is a centring grid, so the dot lands on the fix with no second number to keep in step,
+       and the accuracy circle below still draws behind it. */
+    html: '<span class="pin me"></span>',
   }) }).on('click', showHere);
 
   // Coloured from `.mecircle` in map.css rather than through Leaflet's `color` option, for the same

@@ -28,6 +28,7 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `narrow-test.html` | `chrome --headless --dump-dom` — one of seven runnable checks. Guards the narrow-window block: its threshold, its coverage, its refusal to be dismissed, and that it is modal |
 | `paint-check.html` | `chrome --headless --dump-dom` — one of seven runnable checks. Guards the layer chips over the map: that the panel and its two openers are gone, that the filters panel and every district id are gone too, that a menu chip states its own value and a filter chip carries a checkmark, that the heatmap and the two filters leave with the station layer, that a filter chip clears itself on a second press, that nothing else on the map lands on the row, and that below 600px the row wraps rather than scrolling |
 | `m3-check.html` | `chrome --headless --dump-dom` — one of seven runnable checks. Guards every M3 surface in rendered pixels: the nine dialogs against the roll call and the kind each is declared as, the four-band ladder, the map as an inset card, the one motion that changes what the pane holds, the supporting pane's headers and all five dialog headers as one M3 medium flexible top app bar, measured against each other at both widths, the supporting pane at M3's canonical ratios with the map giving up exactly that width, the pane as a side sheet above 600px and a full-screen dialog below it, and the station panel as an M3 list, one item per sensor, with its readings as a segmented list under a 24px kind glyph. Also the navigation rail at both its widths, the navigation bar below 600px, and that every enter carries M3's own duration and easing |
+| `kind-color-lab.html` | the station kind palette, derived in OKLCh at load. **Not a check** — it renders for a person to read, and it prints no verdict. It fetches `css/base.css` and reports whether the app still holds what the rule builds, so open it after any palette edit. It was seven competing options until 2026-08-26 and holds one palette now |
 | `css/icons.css` | every icon, as an SVG mask. Generated — see docs/FEATURES.md for the fetch |
 | `css/base.css` | tokens, reset, controls, blocks shared by popup + alert panel |
 | `css/chrome.css` | page furniture: app bar, status dot, rail, navigation bar, legend, splash |
@@ -310,6 +311,38 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
 
 ## Colour language — do not violate
 
+- **THE SIX KIND HUES ARE BUILT TO A RULE, IN OKLCh, AND `kind-color-lab.html` DERIVES THEM.** The
+  repository owner set that rule on 2026-08-26: the whole hue range, and a chroma that separates a
+  kind from the functional set. One chroma for all six, at 0.119. Six hues 60 degrees apart, with
+  water pinned at 238 and rain at 310 because meaning outranks a score, and the other four taking the
+  seats those two leave.
+  **The chroma window has a FLOOR as well as a ceiling.** The functional set holds both ends of the
+  axis: `--s-none` is grey at 0.012 and the other three run 0.17 to 0.23. A kind pushed low enough to
+  clear the vivid set lands on the no-reading grey instead. The window is about 0.09 to 0.16.
+  **THREE LIGHTNESSES, ONE PER SURFACE, and this replaced a two-block palette.** 0.620 on paper,
+  0.760 on the dark theme, and **0.690 on a map pin AND on the station panel**, which is a block of
+  its own. See the pin entry below.
+  **`#side` JOINED THAT BLOCK ON 2026-08-26, on a reader's instruction.** The panel drew its kind
+  glyphs from the paper block while the map drew the pin they came from at 0.690, and a reader read
+  the two side by side and called the panel wrong. A glyph on the card is the exact hex of the pin
+  now, on BOTH themes — `#side` is an id, so it beats `:root` and `:root[data-theme="dark"]` alike.
+  **The cost is measured and accepted.** On the light card 0.690 gives a kind glyph 2.6 to 2.9:1
+  against 3.4 to 3.9 at 0.620, so it is now under WCAG 1.4.11's 3:1 for a graphical object. That is
+  the same divergence the disc knockout already states. On the dark card it is 5.5 to 6.1:1.
+  **Three surfaces still draw a kind at 0.620 and the change did not reach them**: the all-stations
+  table, the go-to search rows, and the layer chip's kind menu. The instruction named the panel.
+  Written down rather than swept in.
+  **`--k-weather`, `--k-source` and `--k-notice` are not station kinds and they follow the rule
+  anyway, since 2026-08-26.** They were the last of the old eye-built set. Measured before: weather
+  L 0.565 C 0.060, source L 0.624 C 0.063, notice L 0.493 C 0.089. **C 0.060 is under the chroma
+  floor**, which is the exact fault that floor exists to stop, and notice sat on hue 244 — water's
+  own 238 — while its own comment forbade borrowing `--k-river`. They take each block's lightness at
+  the kinds' chroma, on the three seat MIDPOINTS: weather 208, source 328, notice 268. A midpoint is
+  about 6 dE from its nearest kind against 11.8 between two kinds, and that is paid because none of
+  them ever appears among 400 pins. **All three are in the `.pin, #side` block too**, because the
+  Weather section is a row in the panel's own sensor list. A pin resolves none of them.
+  **Colour blindness is out of scope**, on the repository owner's call the same day. The lab page
+  still measures it and still greys those columns rather than deleting them.
 - **Station type** never uses a traffic-light hue: river blue, rainfall violet, siren pink, gauge
   taupe, camera cyan, mast indigo. Tokens `--k-*`.
 - **Status only**: green → amber → orange → red (`--s-normal` / `--s-alert` / `--s-warning` /
@@ -319,15 +352,18 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   trouble. On a flood map an amber glyph in the app bar reads as an alert on the water.
   **A broken control changes its glyph, never its hue.** See `--i-location_disabled`.
 - **The values live in `css/base.css` and nowhere else**, two sets, one per theme — except on a map
-  pin. `.pin` shares the dark theme's set on both themes, through the selector
-  `:root[data-theme="dark"], .pin` on the map-palette block. The pin glyph carries a real `stroke`,
-  so its fill no longer has to hold 3:1 against white paper alone. Every other surface that
+  pin and on the station panel. `.pin` shares the dark theme's set on both themes, through the
+  selector `:root[data-theme="dark"], .pin` on the map-palette block, and `.pin, #side` states the
+  six kinds again below it at 0.690. The pin glyph carries a real `stroke`, so its fill no longer has
+  to hold 3:1 against white paper alone. Every other surface that
   paints a kind or a status still swaps with the theme. Any token a pin resolves must be in that
   block: `--c` arrives as an inline style on `.pin` itself. So a missing one falls back to the theme
   value, and draws a single pin off-palette. Do not write a hex into a JS file, or copy one into a
   doc. Every hex outside that block goes stale the next time the palette moves. The palette moved
   four times. The one exception is a **canvas**: the heat gradient cannot resolve a token, so
-  `RAIN_HEAT` in `config.js` keeps real values.
+  `RAIN_HEAT` in `config.js` keeps real values. The water gradient in `js/heat.js` keeps its own for
+  the same reason, and the two `#legend .ramp` rules restate both a second time. Those four are one
+  ladder in four places and they move together. See the wash gotcha below.
 - **A SENSOR WEARS THREE COLOURS AND NEVER A FOURTH: its own kind, the alert amber, or the danger
   red.** The repository owner set that rule on 2026-08-26, for the map first and then for the card,
   the table and the meter with it. `color()` in `js/util.js` is the one function that answers it, and
@@ -805,6 +841,108 @@ frames only exist because we ran when they were taken. To re-test the capture pa
   still lives in one place, and adding an icon is still one line there. **Only the map pins take this
   path.** Every other icon in the app is still a mask, because nothing else needs a second colour.
   See `docs/FEATURES.md`, *Three attempts at an outline on a station glyph*.
+  **A STATION PIN IS A DISC NOW, and the bare glyph above is what the other two marks still draw.**
+  The repository owner picked the shape on 2026-08-26. `pinGlyph(name, disc)` in `js/map.js` emits a
+  `<circle>` in the kind's colour with the glyph knocked out of it, and `render.js` is the ONE caller
+  that passes `true`. A filled disc carries far more of a muted colour than a thin mark does, which
+  is what the new palette needs at 29px.
+  **Three callers deliberately do not pass it.** The favorite heart is a badge on the corner rather
+  than the mark. `.pin.me` and `.pin.place` are not stations: 48px, `--me` and `--accent` from
+  another part of the palette, and white on either fails. So the map draws discs for stations and
+  bare glyphs for the two marks that are not one.
+  **`stroke="none"` on the `<use>` is load-bearing.** `.pinglyph` strokes every path in `--surface`
+  for the bare form and that rule inherits through the `<use>` shadow tree. Left on, a white glyph
+  inside a disc wears a white outline and thickens into a blob.
+  **The pin takes a THIRD block of the six kinds, at lightness 0.690.** A white knockout needs the
+  fill dark enough to read: the dark theme's 0.760 measures 1.9:1 and 0.690 measures 2.6 to 2.9. The
+  `.pin` block in `css/base.css` states the six and **nothing else** — every other token a pin
+  resolves still comes from the shared block above it, and source order is the whole of what makes
+  the override win.
+  **The alert amber flips its ink to black, and it is the only fill that does.** White on `--s-alert`
+  is 1.64:1 against 12.79:1 for black. It cannot be darkened to suit a knockout, because a status
+  colour IS its brightness. `DARK_INK_FILL` in `js/config.js` holds the list, the measurement for
+  every fill a pin can wear, and the reason it is a list rather than a calculation: `render.js`
+  compares a `var()` string and there is no hex to measure. **Re-measure and edit that list whenever
+  a token in the status ramp moves.** A pin whose glyph disappears is silent.
+  **The Help legend draws the disc in CSS and the map draws it in SVG, so the two are checked by
+  eye.** Those samples are static markup holding a masked `<i>`, and there is no sprite to `<use>`
+  until `pinGlyph()` has run once. `.docbox .pins .pin` in `css/chrome.css` converts the SVG's own
+  numbers: a 35-of-40 circle on a 1em box is 31.5px, and its 2.5 unit edge is 2.25px. The samples
+  carry `inkdark` by hand on every amber one.
+- **FOUR MARK SHAPES ON THE MAP, AND EACH IS SIZED AGAINST THE STATION DISC.** The repository owner
+  set all four on 2026-08-26. The disc is the ruler: `.pin`'s 36px font at `scale(.7)` is 25.2px, its
+  circle is 35 of 40 viewBox units of that (**22.1px**), and the glyph knocked out of it is 24 of 40
+  (**15.1px**).
+  | mark | shape | size |
+  |---|---|---|
+  | a station | disc, glyph knocked out | 22.1px circle |
+  | a weather point | bare glyph, `.pin.wx` | 21.9px |
+  | the selected pin | bare teardrop, `.pin.sel` | **32px** |
+  | you are here | solid dot, no glyph | 14px plus a 2px ring |
+  | a searched place | bare teardrop, `.pin.place` | **42px** |
+  **THE WHOLE SET CAME DOWN 12.5% LATER THE SAME DAY, on the repository owner's own reading of the
+  map: "getting busy".** A station pin became a filled disc that day, and a disc carries far more ink
+  than the bare glyph the old `scale(.8)` was measured against. So the set was sized for a mark that
+  no longer existed.
+  **`scale(.8)` went to `scale(.7)` and that is ONE line for two of the five rows.** `.pin.wx` is a
+  plain `.pin` box, so it is inside the same `:not()` list and the scale already takes it. Editing
+  `.pin.wx`'s own 31.25px as well would take a weather pin down twice.
+  **A scale is the only knob here that needs no anchor arithmetic.** It leaves the 39px layout box
+  alone, and that box is what `iconSize` repeats in `render.js` and `wx.js`. That is the whole reason
+  it is a transform rather than a smaller font.
+  **The other three each state their own size AND their own anchor, and both halves have to move.**
+  `.pin.me` is a dot anchored at its centre, so only the dot's width moves. The two teardrops are
+  anchored at the tip, so each takes `box x 0.9167` — see the entry below.
+  **`.pin.place` is no longer the odd one out.** It was left at 48px when the selected pin came down
+  to 36, and this file recorded that as a live inconsistency. It came down with the rest, so the two
+  teardrops match again.
+  **A fractional anchor is CORRECT and must not be rounded.** 32 x 0.9167 is 29.3 and 42 x 0.9167 is
+  38.5. Leaflet takes a fractional pixel. Rounding one to keep the number tidy is the same silent 2px
+  error the entry below records.
+  **`markSel()` builds its icon fresh now, and it used to patch the station's html twice.** That
+  worked while a station pin was a bare glyph: swap the class, re-point the `<use>` at the teardrop.
+  A station pin is a disc, so re-pointing the `<use>` left a teardrop cut out of a coloured disc.
+  Only `--c` is carried over, which is what keeps a station at danger red while its card is open.
+  **THE TIP IS AT 11/12 OF THE BOX, NOT AT THE FOOT OF IT.** `--i-place` does not paint to the bottom
+  of its own viewBox: measured with `getBBox()`, the path ends at 33 of a 36px box, which is 0.9167.
+  The old `[24, 44]` on a 48px box encoded exactly that ratio. A rewrite to 25px used `[12.5, 25]`
+  and put every selected mark 2px above its station. **So the anchor is `box x 0.9167`, and it moves
+  whenever `.pin.sel`'s size does.** A wrong anchor here is silent: the mark still draws, it just
+  stops pointing at the station it names.
+  **The selected pin is the one exception to the one-size rule**, at 32px rather than the disc's 22.
+  Every other mark is sized to the disc so the set reads at one size. This one is deliberately half
+  again bigger, because its whole job is to pick one station out of the four hundred around it.
+  **THE CLUSTER BADGE FOLLOWS THE SET, and it is the one mark the scale cannot reach.** That rule
+  names `.pin` and a cluster is a `.cluster`, so its size is a literal in two places rather than a
+  transform: `.cluster` in `css/map.css` and `iconSize` in `js/map.js`. **Edit both by hand whenever
+  the set moves**, or the badge stops sitting over the pins it is hiding. It is 21px in a 22px box.
+  **The TYPE came down with the box and the EDGES did not.** 11px overflows a 21px chip: `434`, the
+  widest count this network can produce, measures about 19.5px at 11 against the 19px of inner width
+  the border leaves. 10px measures about 17.8px and fits. The 1px border and the 2px danger ring
+  stay, because an edge here is a screen pixel rather than a fraction of a mark — the same rule
+  `pinGlyph()` states from the other side with `vector-effect: non-scaling-stroke`.
+  **The Help legend's own `.cluster` override is DELETED.** It drew 28px and said it was scaling the
+  chip down to sit in a text column. The map's chip passed under it, so that rule had inverted: it
+  scaled the sample up by a third, and the legend disagreed with the map about the one mark it exists
+  to keep honest. The `.pin` samples never had this problem, because the `:not()` rule reaches them.
+- **"YOU ARE HERE" IS A GREEN DOT WITH NO GLYPH, and it was an amber crosshair.** The repository
+  owner asked for both on 2026-08-26. `locate.js` emits an empty `<span class="pin me">` and
+  `.pin.me::before` draws the dot, so there is no glyph to size and no sprite to build.
+  **The box stays 48px and only the dot shrinks.** Leaflet gets `iconSize [48, 48]` anchored at its
+  centre and `.pin` is a centring grid, so the dot lands on the fix with no second number to keep in
+  step. Shrinking the box would put the dot in the divIcon's top-left corner, 15px off the fix.
+  **`--me` is `#00950d` and it was searched, not picked.** It maximises the closest distance to
+  everything that shares the map: worst is 14.8, against the several-sensors olive. **L 0.58 is the
+  only rung clearing 3:1 on BOTH basemaps** — 3.51 on the light tile, 3.58 on the dark — and every
+  lighter green falls under 3:1 on the pale one. It is one value on both themes now, because a pin
+  is one palette.
+  **It is 22.3 from `--s-normal`, and that collision is not on the map.** No pin wears the normal
+  green since the three-colour rule gave a quiet sensor its own kind colour. `--s-normal` draws on a
+  card chip and a table pill, where this dot never appears. Re-measure if that changes.
+  The old entry above this one describes a house in a pin and a crosshair. Both are gone. What
+  separates this mark from a station is three things, and colour is the smallest: it is solid where
+  every station is a disc with a shape cut out of it, it is two thirds the size, and it sits inside
+  a translucent accuracy circle no station has.
 - **Both glyphs on a map pin carry an explicit `z-index`, and the painting order alone did not hold
   them.** `.pin` draws the station mark and, on a favorited place, a heart badge over its bottom-right
   corner. The heart is the last child *and* it is positioned. So CSS2.1 painting order puts it at
@@ -2277,6 +2415,20 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
   replace any of this with interpolation. A dry gauge can deny
   ground, never supply a value. See `docs/FEATURES.md`, *The rainfall heatmap claimed rain over
   250 km² from one gauge*.
+- **NEITHER HEAT WASH FOLLOWS THE THREE-COLOUR RULE, AND THAT IS SETTLED.** The repository owner
+  ruled on 2026-08-26, when the rule reached every other surface that draws a reading. Four things
+  keep the old four-rung ladder: the two gradients in `js/heat.js` and the two `#legend .ramp` rules
+  in `css/chrome.css` that describe them.
+  **A wash paints GROUND and a pin names a SENSOR.** The rule exists because a reader scanning four
+  hundred marks cannot learn a six-ramp code. A wash is one continuous field, read against a legend
+  standing beside it rather than against the mark next to it. So the argument for folding rungs does
+  not reach here.
+  **The cost is real and is accepted.** At JPS's heavy class the rainfall pin is amber and the blob
+  under it is violet. On the water layer the pin folds the warning mark into the alert amber and the
+  wash still paints it orange. Only the legend says so, and both tips now name that split.
+  **Do not "fix" this by copying `RIVER_COLOR` or `RAIN_COLOR` into a gradient.** Anything that moves
+  a gradient moves its ramp in the same change. `RAIN_HEAT`'s own comment in `js/config.js` holds the
+  argument once, and every other site points at it.
 - **A heat blob's alpha is its colour as well as its size.** So the brush's own falloff walks down
   the legend. simpleheat's `_colorize()` looks the gradient up by alpha. The stock brush fades
   across most of a blob. So one rain gauge reading 27 mm/h, JPS's *heavy* class, painted heavy at
@@ -3642,12 +3794,20 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   map's corner read as a map pin. An accent FAB with a label shouted. Then a panel behind a `layers`
   button, then a bottom sheet on a phone, then connected button groups inside that panel, then size-lg
   square outlined buttons. Each one put a settings dialog between a reader and a setting.
-- **`#risebadge` reads `ON ALERT` and the chip that raises it filters on `s.rising`.** That is
-  narrower than `isHot()`, which is what the app bar counts, the badge shows and the panel lists. So
-  the map chip hides stations the app bar counts, and the pill's own sentence carries the real
-  rule: `Every station not climbing is hidden`. The repository owner heard the trade-off on
-  2026-08-18 and chose the narrow filter. **Do not "fix" the mismatch by widening the chip without
-  asking.** Widening it to `isHot()` is one line in `render.js` and it is a decision, not a bug.
+- **`#risebadge` reads `ON ALERT` and the chip that raises it filters on `isHot()`, WHICH REVERSES
+  THIS ENTRY.** It filtered on `s.rising` alone from 2026-08-18. That flag is a forecast about one
+  river, and `isHot()` is what the app bar counts, the icon badge shows and the alert panel lists. So
+  a sounding siren, a river already at its danger mark and heavy rain each lit the map and left the
+  chip DEAD, because `syncPins()` disables a filter with no members. A reader met that on 2026-08-26
+  and the repository owner widened it.
+  **A disabled chip beside red pins reads as a fault in the app**, and the pill's sentence could not
+  answer it. That sentence is on the map only while the filter is ON. The chip is dead in the exact
+  case a reader asks the question.
+  **So the chip and the app bar are ONE number now.** `syncPins()` counts `!isIgnored(s) && isHot(s)`,
+  which is the alert panel's own expression. The ignore test is what makes the two agree.
+  **The cost is real and is accepted.** There is no way left to ask for climbing rivers alone. A
+  reader who wants that reads the alert panel, where `soon` is a tier of its own with a chip counting
+  it. **Do not narrow it back without asking.** Both directions are a decision, not a bug.
 - **`PREFS.ignored` is the only suppression of any kind.** `isIgnored()` gates pins, heat, the alert
   panel, the ticker **and** the toast. Ignoring one named sensor is a request about that sensor, so
   it holds on every surface.
@@ -4578,6 +4738,62 @@ grep -q 'live.filter(s => s.rising && tier(s) === .soon.)' js/alerts.js \
 php -r '$p=json_decode(file_get_contents(".cache.json"),true);
 foreach($p["stations"] as $s) if($s["kind"]==="river"&&($s["status"]??0)>=3&&!empty($s["rising"]))
   printf("%-8s %-26s at danger AND rising\n",$s["id"],$s["name"]);'
+
+# color() in js/util.js, the three-colour rule. A sensor wears its own kind, the alert amber or the
+# danger red, and never a fourth. Nothing else in this repo can see a fourth colour: the ladders live
+# in three tables in config.js, each read by a different surface, and a rung added to one of them
+# draws correctly and errors nowhere.
+# Two halves. Where each ladder crosses, stated once per kind, so a moved cutoff fails here rather
+# than on a wet afternoon. Then every station in the live payload, which is what catches a rung this
+# file forgot to name.
+# The MODULES are read as they ship, with only their own tables lifted out, so no copy can drift.
+# **Grab RIVER_COLOR and RAIN_COLOR to `\};` and not to `;`.** Both are object literals spanning two
+# lines, and a lazy `.*?;` stops at the semicolon inside the first line's `--s-none)`.
+node --input-type=module -e "
+import fs from 'fs';
+const cfg = fs.readFileSync('js/config.js','utf8'), util = fs.readFileSync('js/util.js','utf8');
+const grab = (s, re) => s.match(re)[0].replace(/export /g,'');
+const C = re => grab(cfg, re), U = re => grab(util, re);
+const M = new Function(
+  C(/const KINDS = \{[\s\S]*?\n\};/) +
+  C(/const RIVER_COLOR = [\s\S]*?\};/) + C(/const RAIN_COLOR  = [\s\S]*?\};/) +
+  C(/const STATUS_COLOR = .*;/) + C(/const GAUGE_COLOR = .*;/) + C(/const NO_INFO = .*;/) +
+  U(/const statusColor = .*;/) + U(/const gaugeTone = s =>[\s\S]*?: 1;/) +
+  U(/const gaugeColor = .*;/) + U(/const hasInfo = s =>[\s\S]*?\?\? false\);/) +
+  U(/const sounding = .*;/) + U(/const raining = .*;/) +
+  U(/function color\(s\) \{[\s\S]*?\n\}/) + '; return { color, KINDS };')();
+let bad=0; const is=(g,w,n)=>{const ok=g===w; if(!ok)bad++;
+  console.log((ok?'ok  ':'FAIL')+'  '+n+'  -> '+JSON.stringify(g)+(ok?'':'  want '+JSON.stringify(w)));};
+const R=st=>({kind:'river',online:true,level:1,status:st});
+is(M.color(R(0)),'var(--k-river)','river: normal -> its own blue');
+is(M.color(R(1)),'var(--s-alert)','river: alert mark -> amber');
+is(M.color(R(2)),'var(--s-alert)','river: warning mark -> the SAME amber');
+is(M.color(R(3)),'var(--s-danger)','river: danger mark -> red');
+const G=(d,st)=>({kind:'gauge',online:true,depth:d,status:st});
+is(M.color(G(-0.2,0)),'var(--k-gauge)','gauge: dry ground -> its own taupe');
+is(M.color(G(0.05,0)),'var(--k-gauge)','gauge: water under 0.15 m -> the SAME taupe');
+is(M.color(G(0.2,1)),'var(--s-alert)','gauge: past the 0.15 m mark -> amber');
+is(M.color(G(0.4,2)),'var(--s-danger)','gauge: past the 0.3 m mark -> red');
+const P=(st,h,b=true)=>({kind:'rainfall',online:true,hourly:h,status:st,backed:b});
+is(M.color(P(1,5)),'var(--k-rainfall)','rain: light -> its own violet');
+is(M.color(P(2,20)),'var(--k-rainfall)','rain: moderate -> the SAME violet');
+is(M.color(P(3,45)),'var(--s-alert)','rain: heavy, over 30 mm/h -> amber');
+is(M.color(P(4,70)),'var(--s-danger)','rain: very heavy, over 60 -> red');
+is(M.color(P(3,45,false)),'var(--k-rainfall)','rain: a gauge its own odometer denies keeps the violet');
+is(M.color({kind:'siren',online:true,status:0}),'var(--k-siren)','siren: idle -> its own pink');
+is(M.color({kind:'siren',online:true,status:1,backed:true}),'var(--s-danger)',
+   'siren: sounding -> red, and no middle rung');
+is(M.color({kind:'camera',online:true,image:'x'}),'var(--k-camera)','camera: always its own cyan');
+is(M.color({kind:'river',online:false,level:1,status:3}),'var(--s-none)',
+   'no reading outranks every rung');
+const ok = k => new Set([M.KINDS[k].color,'var(--s-alert)','var(--s-danger)','var(--s-none)']);
+const seen={};
+for (const s of JSON.parse(fs.readFileSync('.cache.json','utf8')).stations) {
+  const c = M.color(s); (seen[s.kind] ||= new Set()).add(c);
+  if (!ok(s.kind).has(c)) { bad++; console.log('  FOURTH COLOUR',s.kind,s.id,c); } }
+for (const k of Object.keys(seen).sort())
+  console.log('    '+k.padEnd(9)+[...seen[k]].sort().join(' '));
+console.log(bad?'FAILURES: '+bad:'all pass'); process.exit(bad?1:0);"
 
 # tier() in js/util.js, the four-rung alert ladder. `js/alerts.js` evaluates the DOM at module scope
 # so node cannot load it, and the rung itself lives here where node can.

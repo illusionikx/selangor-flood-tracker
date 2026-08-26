@@ -45,7 +45,10 @@ function paint() {
         // Matches `.pin`'s box in map.css, the same way render.js does. Leaflet positions the
         // marker off this and not off the CSS.
         className: '', iconSize: [39, 39], iconAnchor: [19.5, 19.5],
-        html: `<span class="pin" style="--c:${wxTone(r, { pin: true })}">${
+        /* `.wx` sizes the glyph, and nothing else reads it. A weather pin keeps the BARE glyph —
+           a station is a disc and this is not a station — and `css/map.css` sizes it to the disc's
+           own diameter so the two marks stand at one size. */
+        html: `<span class="pin wx" style="--c:${wxTone(r, { pin: true })}">${
           pinGlyph(wxIcon(r, { pin: true }))}</span>`,
       }),
     })

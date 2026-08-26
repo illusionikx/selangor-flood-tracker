@@ -220,8 +220,17 @@
    It is a bare glyph now, so it pays the same as the rest.
    `transform` rather than a smaller font: it takes the halo, the rise ring and the drop shadow down
    with it in one step, and it leaves the 39px layout box alone — that box is repeated as `iconSize`
-   in render.js and is what actually positions the marker over its station. */
-.pin:not(.me, .place, .sel) { transform: scale(.8); }
+   in render.js and is what actually positions the marker over its station.
+   **IT IS .7 SINCE 2026-08-26, AND IT WAS .8.** The repository owner asked for every mark on the map
+   to come down, on the same complaint this rule was written for: a station pin became a filled disc
+   that day, and a disc carries far more ink than the bare glyph the .8 was measured against.
+   **This one line takes the STATIONS and the WEATHER PINS**, because `.pin.wx` is a plain `.pin` box
+   and is not in the `:not()` list. The three marks that ARE in it each state their own size, and all
+   three came down 12.5% in the same change so the set still reads at one size.
+   **A scale is the only knob here that needs no anchor arithmetic.** The layout box does not move, so
+   `iconSize` and `iconAnchor` in render.js and wx.js are untouched. That is the whole reason this is
+   a transform. */
+.pin:not(.me, .place, .sel) { transform: scale(.7); }
 /* The glyph itself. An SVG element, not a mask — see `pinGlyph()` in map.js for why. `1em` off the
    `.pin`'s `font-size`, so every rule that sizes a pin by its font (`.me`, `.place`) sizes the
    glyph too.
@@ -239,7 +248,7 @@
    inherit, so a rule here lands on the outer `<svg>`, which paints nothing, and never reaches the
    path inside the `<use>` shadow tree. `pinGlyph()` in map.js stamps it on the path instead, and the
    note is there. Everything below inherits into that shadow tree and belongs here. Two is two pixels
-   at 31px on the map and at 48px on the "you are here" pin alike, and `scale(.8)` does not thin it.
+   at 25px on the map and at 42px on a searched place alike, and `scale(.7)` does not thin it.
    **Two draws a one-pixel edge, not a two-pixel one.** A stroke is centred on the path and
    `paint-order` hides the inner half, so what you see is half the number. One pixel is what
    `.pin .fv` draws with its four hard shadows, so two here makes the heart and the glyph carry the
@@ -266,6 +275,29 @@
      kept in step for a box nothing is laid out against. */
   paint-order: stroke; overflow: visible;
 }
+/* **THE DISC FORM, which is what a station pin draws.** `pinGlyph(name, true)` in `js/map.js` emits
+   it and states why there. The circle takes the kind's colour and the glyph is knocked out of it in
+   white. Only `.me` and `.place` still draw the bare form above.
+   `--pin-ink` is white here and nothing flips it, because `.pin`'s own palette block in
+   `css/base.css` holds the six kinds at a lightness where white reads on all six. A status colour
+   is the case that would need a flip, and a status pin is the same six-kind box wearing `--s-danger`
+   or `--s-alert`: red measures 3.5:1 against white and amber measures 1.6, so the amber pin is the
+   one to look at if a rung ever moves. It is `.pin.rise`, and the ring around it is what says so.
+   **`fill` on the circle and not `color`.** `.pin` sets `color: var(--c)`, so `currentColor` is the
+   kind colour and the circle picks it up without naming a token here. That is the same route the
+   bare glyph's `fill` already takes.
+   The edge is `--surface`, at the bare glyph's own width, so a disc and a glyph read as one set of
+   marks. `vector-effect` is NOT on this circle: the disc only ever draws at one size, so a stroke
+   that scales with the box is a stroke that never scales. */
+.pinglyph.disc { --pin-ink: #fff; }
+.pinglyph.disc circle { fill: currentColor; stroke: var(--surface); stroke-width: 2.5; }
+.pinglyph.disc use { fill: var(--pin-ink); }
+/* The one fill white cannot sit on. `--s-alert` measures 1.64:1 against white and 12.79:1 against
+   black, and it cannot be darkened to suit a knockout because a status colour IS its brightness.
+   `DARK_INK_FILL` in `js/config.js` holds the list and the measurement; `render.js` adds this class
+   by comparing the fill it is about to set. Literal values, not tokens: this pair is the knockout
+   ink, and a token would follow the theme inside a disc that does not. */
+.pin.inkdark .pinglyph.disc { --pin-ink: #101314; }
 /* **The outline above is the third attempt, and the first two were fakes.** First four hard drop
    shadows, one per direction. Then the glyph painted twice from the same mask, a copy scaled up in
    grey behind it. Both were reverted.
@@ -347,9 +379,35 @@
    It carries the edge and the shadow every `.pin` does and states neither of its own. Its old rule
    set a heavier shadow, a second number for the same job. A white halo was tried long before either
    and reads as a glow: on the dark basemap the mark wore a bright fringe, which is a lit object. */
+/* **"YOU ARE HERE" IS A BARE DOT NOW, and the crosshair the notes above describe is gone.** The
+   repository owner asked for it on 2026-08-26: a disc with no glyph in it, sized like the glyph
+   INSIDE a station disc rather than like the disc itself, with the accuracy circle behind it.
+   **14px is that number, and it has been 17.5 then 16.** All three landed on 2026-08-26. A station's
+   disc is 22.1px across and the glyph knocked out of it is 15.1px, so this dot sits just inside that
+   glyph and is under two thirds of a station mark. That ratio is what the three numbers hold: the
+   dot came down with the rest of the set rather than on its own. It cannot be read as a station:
+   every station is a disc with a shape cut out of it, and this one is solid.
+   **The ring is outside the 14, so the mark is 18px on the tile.** That is still the smallest thing
+   the map draws, and it has to be: a fix is one point rather than an area, and the accuracy circle
+   behind it is what states how much area.
+   **The box stays 48px and only the dot shrinks.** `locate.js` hands Leaflet an `iconSize` of
+   [48, 48] anchored at its centre, and `.pin` is a centring grid, so a `::before` lands on the fix
+   with no arithmetic to keep in step. Shrinking the box instead would put the dot in the divIcon's
+   top-left corner, 15px up and left of where the reader is standing.
+   `font-size: 0` because there is no glyph left to size, and it stops the empty span reserving a
+   text line inside the grid.
+   The edge is `--surface` so the two marks read as one set, and `content-box` so the 14 is the dot
+   with the ring outside it. **2px, and the disc's SVG stroke is 2.5 — those are the same edge in two
+   units.** That stroke is 2.5 of a 40 unit viewBox rendered at 28.8px, which is 1.8px, and it is
+   centred on the path so 1.8px is the whole visible ring. 2 is the nearest CSS pixel. Chrome rounds
+   a fractional border anyway: 2.5px here read back as 2. */
 .pin.me {
-  width: 48px; height: 48px; font-size: 48px;
+  width: 48px; height: 48px; font-size: 0;
   background: none; border: 0; box-shadow: none; color: var(--me);
+}
+.pin.me::before {
+  content: ''; width: 14px; height: 14px; border-radius: 50%;
+  background: currentColor; border: 2px solid var(--surface); box-sizing: content-box;
 }
 /* A searched place. Accent rather than the location blue: this is somewhere the reader asked about,
    not where they are, and the two marks must not read as the same thing.
@@ -358,12 +416,38 @@
    above, which draws a ~31px glyph inside a 48px container, so the glyph's tip sits nowhere near
    [24, 44] and the pin points at the wrong spot. Matching iconSize (48px box, 48px font, exempt
    from the scale rule) is what .pin.me already does for the same divIcon shape. */
-.pin.place { width: 48px; height: 48px; font-size: 48px; color: var(--accent); }
+/* **42px since 2026-08-26, and it was 48.** It was the one mark left at the old size when the
+   selected pin came down, and this file recorded that as a live inconsistency. The repository owner
+   asked for the whole set to shrink, so it came down the same 12.5% as the other three and the two
+   teardrops match again.
+   **`showPlace()` in `js/map.js` states the matching `iconSize` and `iconAnchor`.** Same tip rule as
+   `.pin.sel` below: the anchor is `box × 0.9167`, which is 38.5 here and was 44 at 48px. */
+.pin.place { width: 42px; height: 42px; font-size: 42px; color: var(--accent); }
 /* The pin whose card is open. `markSel()` in map.js swaps that pin's drawing for the teardrop and
    adds this class, so the box grows and the glyph changes and nothing else does. It states no
    colour: `.pin` above already reads `--c`, which the pin's own markup still carries, so a station
    at danger stays red while a reader has its card open. */
-.pin.sel { width: 48px; height: 48px; font-size: 48px; }
+/* **32px, and it has been 48, then 25, then 36.** The repository owner set 25 on 2026-08-26, which
+   is the station disc's own diameter, raised it to 36 the same day, and brought the whole set down
+   12.5% later that day. **This mark is the exception to the one-size rule the weather pin obeys**:
+   every other mark is sized to the disc so the set reads at one size, and this one is deliberately
+   half again bigger, because its whole job is to pick one station out of the four hundred around it.
+   For scale, a station disc is 22.1px across — `.pin`'s 36px font at `scale(.7)` is 25.2px, and the
+   circle is 35 of 40 viewBox units of that.
+   **`markSel()` in `js/map.js` states the matching `iconSize` and `iconAnchor`, and they move with
+   this number.** A teardrop is anchored at its TIP, and **the tip is at 11/12 of the box, not at the
+   foot of it**: `--i-place` ends at 33 of a 36px box, measured with `getBBox()`. So the anchor is
+   `box × 0.9167`, which is 29.3 here, was 33 at 36px and was 44 on the old 48px box. Change the size
+   without the anchor and the mark stops pointing at its station — silently, because it still draws.
+   **The anchor is fractional and that is correct.** Leaflet takes a fractional pixel. Rounding it to
+   keep the number tidy is the same 2px error this entry already records. */
+.pin.sel { width: 32px; height: 32px; font-size: 32px; }
+/* The weather pins, for the same reason and at the same size. They are plain `.pin` boxes at 39px
+   with an `iconSize` to match, so only the glyph moves: `scale(.7)` is still on, and 31.25 times .7
+   is 21.9, against the 22.1 disc above. `js/wx.js` carries the class.
+   **This number did not move when the set came down.** It is inside the `:not()` list, so the scale
+   already took it. Editing it as well would take it down twice. */
+.pin.wx { font-size: 31.25px; }
 /* The accuracy circle. Coloured here rather than through Leaflet's path options — those are SVG
    presentation attributes and cannot take a token. Same trick as .mastring above. */
 .mecircle { stroke: var(--me); fill: var(--me); }
@@ -378,10 +462,19 @@
    Anything else drawn onto the map takes this pair too. */
 .cluster {
   display: grid; place-items: center;
-  /* 30% off 34, with the type and the danger ring taken down with it. The box is repeated as
-     `iconSize` in map.js, which is what positions the badge, so the two move together. */
-  width: 24px; height: 24px; border-radius: 999px;
-  font-size: 11px; font-weight: 500; color: #fff; background: #5f6368;
+  /* 30% off 34, then a further 12.5% on 2026-08-26 when every mark on the map came down. The box is
+     repeated as `iconSize` in map.js, which is what positions the badge, so the two move together.
+     **The chip is NOT in the `scale(.7)` rule and cannot be.** That rule names `.pin`, and a cluster
+     is a `.cluster`. So this is the one mark on the map whose size is a literal rather than a
+     transform, and it is the one that has to be edited by hand when the set moves.
+     **The TYPE came down with the box and the EDGES did not.** 11px would overflow: `434`, the
+     widest count this network can produce, measures about 19.5px at 11 against the 19px of inner
+     width a 21px chip leaves inside its border. At 10px it is about 17.8px and fits.
+     The 1px border and the 2px danger ring below both stay, because an edge here is a screen pixel
+     rather than a fraction of a mark. That is the same rule `pinGlyph()` states from the other side:
+     `vector-effect: non-scaling-stroke` holds a pin's own stroke at one pixel through this scale. */
+  width: 21px; height: 21px; border-radius: 999px;
+  font-size: 10px; font-weight: 500; color: #fff; background: #5f6368;
   border: 1px solid var(--surface); filter: drop-shadow(0 1px 1px rgba(0, 0, 0, .45));
 }
 .cluster.mixed { border-style: dashed; }              /* more than one kind inside */

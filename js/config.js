@@ -105,15 +105,17 @@ export const RAIN_COLOR  = { '-1': 'var(--s-none)', 0: 'var(--k-rainfall)', 1: '
 /* The same rainfall ramp as real values, for the heat layer's canvas gradient — leaflet.heat builds
    an ImageData from it, and `var(--k-rainfall)` means nothing to a 2D context. One theme's worth,
    because a translucent blob is composited over the basemap rather than read against it, and the
-   layer already dims and brightens with what is under it. Keep these in step with RAIN_COLOR's
-   *hues*: a violet blob and a violet rainfall pin have to mean the same thing.
-   **THAT RULE IS BROKEN RIGHT NOW AND IT IS A DECISION SOMEBODY STILL HAS TO MAKE.** RAIN_COLOR
-   went to three colours on 2026-08-26, so at class 3 the pin is amber and the blob under it is
-   still violet #c77dff. The wash was left alone on purpose: it paints ground rather than a station,
-   and turning a whole state amber and red is a change to what the map looks like, not to what a
-   sensor is called. Either follow it — `{ 1: '#a893ff', 2: '#a893ff', 3: '#ffc000', 4: '#ff3a37' }`,
-   and move `.ramp.rain` in chrome.css with it — or write down that the wash keeps its own ladder
-   and why. Do not leave this note standing. */
+   layer already dims and brightens with what is under it.
+   **THE WASH KEEPS ITS OWN FOUR-RUNG LADDER, and the repository owner settled that on 2026-08-26.**
+   `RAIN_COLOR` above went to three colours that day, so at JPS's heavy class the pin is amber and
+   the blob under it is still violet. That is the decision and not a drift.
+   **A wash paints GROUND and a pin names a SENSOR, and the three-colour rule is about a sensor.**
+   The rule exists because a reader scanning four hundred marks cannot learn a six-ramp code. A wash
+   is one continuous field, and a reader reads it against a legend standing beside it rather than
+   against the mark next to it. So the argument for folding rungs does not reach here.
+   The cost is real and is accepted: at class 3 the two disagree, and only the legend says so.
+   Do not "fix" this by copying `RAIN_COLOR` in. Move `.ramp.rain` in css/chrome.css with it if it
+   ever does move. */
 export const RAIN_HEAT = { 1: '#6f7bff', 2: '#8f7bff', 3: '#c77dff', 4: '#ff4d4d' };
 
 // Which sensor speaks for a mast when several share one: a river gauge says more about a flood than
@@ -140,6 +142,25 @@ export const STATUS_COLOR = ['var(--s-normal)', 'var(--s-alert)', 'var(--s-warni
 export const GAUGE_COLOR = ['var(--k-gauge)', 'var(--k-gauge)', 'var(--s-alert)', 'var(--s-danger)'];
 
 export const NO_INFO = 'var(--s-none)';   // grey: offline or reporting nothing
+
+/* **Fills a WHITE knockout cannot sit on.** A station pin is a disc with its glyph cut out of it in
+   white, and white needs the fill to be dark enough to read against. Measured across every colour a
+   pin can wear:
+
+     --s-alert  #ffc000   white 1.64:1   black 12.79:1   <- the only one that fails
+     --s-danger #ff3a37   white 3.55:1   black  5.91:1
+     --s-none   #9aa0a6   white 2.64:1   black  7.95:1
+     the six kinds        white 2.6-2.9  black  7.7-8.0
+
+   The kinds sit at lightness 0.690 on purpose, which is the brightest rung that still carries white
+   on all six — see the `.pin` block in `css/base.css`. The alert amber is not in that block. It is a
+   status, and a status colour IS its brightness, so it cannot be dropped to suit a knockout.
+   So it flips its ink instead. `render.js` compares the fill it is about to set against this list
+   and adds `.inkdark`, and `css/map.css` swaps `--pin-ink` on that class.
+   **A LIST AND NOT A MEASUREMENT, because the fill is a `var()` string at this point and there is no
+   hex to measure.** Re-measure with `kind-color-lab.html` and edit this list whenever a token in the
+   status ramp moves. A pin whose glyph disappears is the failure this prevents, and it is silent. */
+export const DARK_INK_FILL = ['var(--s-alert)'];
 
 // "rising" is decided in api.php — a station reaching its own danger mark within RISE_ETA at the
 // rate it is climbing. One definition, server-side, so the panel and the filter cannot disagree

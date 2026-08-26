@@ -301,7 +301,10 @@ export const heat = new SoftHeat([], {
      sits on its own alert / warning / danger scale, so yellow means "past alert", orange "past
      warning" and red "at danger" — the same reading the pin and the meter give, in the same
      colours. Nothing is drawn below the alert slot, so the flat run under it is never seen.
-     The legend ramp in the panel is this gradient; change both together. */
+     The legend ramp in the panel is this gradient; change both together.
+     **This keeps FOUR rungs while the pin above it draws two, and that is settled.** The
+     three-colour rule of 2026-08-26 covers a sensor, and a wash paints ground. See RAIN_HEAT's own
+     comment in config.js for the whole argument, stated once. */
   gradient: { 0: '#ffd166', [HEAT_ALERT]: '#ffd166', [HEAT_WARNING]: '#ff9f1c', 1: '#ff4d4d' },
 });
 
@@ -309,11 +312,13 @@ export const heat = new SoftHeat([], {
    questions — "how high is the water" and "how hard is it coming down" — and a station carrying both
    would have summed a river level with the rain falling on it into one number that answers neither.
    Two layers also means either can be read alone, which is the point of the two chips.
-   Colours are RAIN_HEAT — the same classes the rainfall pins wear, as real values rather than the
-   tokens the pins use, because this gradient is baked into an ImageData and a canvas cannot resolve
-   a `var()`. One set for both themes: a blob is composited *over* the basemap at low alpha rather
-   than read against it. The flat run below the first class *is* seen here, unlike the water layer:
-   anything above 0 mm is drawn, so drizzle paints the lightest violet rather than nothing. */
+   Colours are RAIN_HEAT — its own four-rung ladder, as real values rather than the tokens the pins
+   use, because this gradient is baked into an ImageData and a canvas cannot resolve a `var()`. One
+   set for both themes: a blob is composited *over* the basemap at low alpha rather than read against
+   it. The flat run below the first class *is* seen here, unlike the water layer: anything above
+   0 mm is drawn, so drizzle paints the lightest violet rather than nothing.
+   **It keeps four rungs while the rainfall pin draws three, and that is settled.** See RAIN_HEAT's
+   own comment in config.js for the argument. Do not fold class 3 to amber here. */
 export const rainHeat = new SoftHeat([], {
   ...BASE,
   groundKm: RAIN_KM,

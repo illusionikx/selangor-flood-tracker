@@ -77,7 +77,7 @@
      Before `base.css`, which derives `--m3-travel`, `--m3-grow` and `--m3-swap` from them and
      bridges M3's colour names onto this app's palette. Colour is not in this file on purpose. -->
 <link rel="stylesheet" href="vendor/m3/tokens.css?v=2">
-<link rel="stylesheet" href="css/base.css?v=194">
+<link rel="stylesheet" href="css/base.css?v=195">
 <link rel="stylesheet" href="css/chrome.css?v=329">
 <link rel="stylesheet" href="css/map.css?v=180">
 
@@ -1479,20 +1479,22 @@
          and one thing takes one name. The ramp beside it is what says heat. It is also 35px of a
          360px screen, which is the difference between one line and two. -->
     <div class="title">Water level
-      <span class="info" tabindex="0" aria-label="How the heatmap is calculated">
+      <span class="info" tabindex="0" aria-label="Water level heatmap calculation">
         <i class="i i-info"></i>
         <span class="tip">
-          <p><b>How it is worked out</b></p>
-          <p>Each station scores its reading against its <i>own</i> thresholds, so a small stream at
-             its limit is as hot as a big river at its limit. Rivers and flood gauges both count —
-             whichever is further up its scale wins the spot.</p>
-          <p>The color is the band it has crossed: yellow past its alert mark, orange past warning,
-             red at danger. The same three marks the station's own meter draws.</p>
-          <p>A flood gauge that has tripped goes straight to red — water standing over a spot known
-             to flood is something observed, not forecast.</p>
-          <p>Below the alert mark, nothing is drawn. A map that is warm everywhere says nothing.</p>
-          <p class="muted">Rainfall has its own layer and scale; sirens and offline stations are not
-             included.</p>
+          <p><b>Calculation</b></p>
+          <p>Each station scores its reading against its <i>own</i> marks. A small stream at its
+             limit draws the same color as a big river at its limit.</p>
+          <p>Rivers and flood gauges both count. The station further up its own scale wins the
+             spot.</p>
+          <p>The color names the mark the station passed. Yellow is the alert mark. Orange is the
+             warning mark. Red is the danger mark. The station meter draws the same three marks.</p>
+          <p>A flood gauge at its danger mark goes straight to red. Water over a spot that floods is
+             an observation, not a forecast.</p>
+          <p>Below the alert mark, the map draws nothing. A map that is warm everywhere says
+             nothing.</p>
+          <p class="muted">Rainfall has its own layer and its own scale. Sirens and offline stations
+             are not included.</p>
         </span>
       </span>
     </div>
@@ -1507,18 +1509,19 @@
        panel: exactly one layer is ever on, and two floating boxes on a phone is one too many. -->
   <div id="lgRain" class="lgsec">
     <div class="title">Rainfall
-      <span class="info" tabindex="0" aria-label="How the rainfall heatmap is calculated">
+      <span class="info" tabindex="0" aria-label="Rainfall heatmap calculation">
         <i class="i i-info"></i>
         <span class="tip">
-          <p><b>How it is worked out</b></p>
-          <p>Rain in the last hour, on the intensity classes JPS publishes: light above 0 mm,
-             moderate above 10, heavy above 30, violent above 60.</p>
-          <p>One color per class. A pin folds heavy rain into the alert amber and this scale does
-             not, so read the blob against this ramp rather than against the pin standing in it.</p>
-          <p>Every reporting rain gauge counts, and only rain that is actually falling is drawn — a
-             dry gauge paints nothing.</p>
-          <p class="muted">This is rain, not flooding. It says where the water is arriving, not
-             where it is standing — the water-level heat answers that.</p>
+          <p><b>Calculation</b></p>
+          <p>The scale shows the rain of the last hour, on the intensity classes JPS publishes.
+             Light is above 0 mm. Moderate is above 10 mm. Heavy is above 30 mm. Violent is above
+             60 mm.</p>
+          <p>Each class takes one color. A pin folds heavy rain into the alert amber and this scale
+             does not. Read the blob against this ramp, not against the pin on it.</p>
+          <p>Every rain gauge that reports counts. The map draws only rain that falls now. A dry
+             gauge draws nothing.</p>
+          <p class="muted">This is rain, not a flood. It shows where the water arrives, not where
+             the water stands. The water level scale answers that.</p>
         </span>
       </span>
     </div>

@@ -1,9 +1,9 @@
 // Rebuilds every marker and the heat layer from the current station set.
 
-import { KINDS, MAST, HEAT_FLOOR, HEAT_KM, RAIN_KM, RAIN_STOPS } from './config.js';
+import { KINDS, MAST, HEAT_FLOOR, HEAT_KM, RAIN_KM, RAIN_STOPS, DARK_INK_FILL } from './config.js';
 import { state, PREFS, save } from './state.js';
 import { el, color, atDanger, statusColor, leads, hasInfo, isIgnored, ignoredIds,
-         favIds, isFav, scalePos, levelStops, gaugeStops, setBox } from './util.js';
+         favIds, isFav, scalePos, levelStops, gaugeStops, setBox, isHot } from './util.js';
 import { marks, siteMark, shown, syncCluster, focusOn, side, openSide,
          showMast, hideMast, markSel, pinGlyph } from './map.js';
 import { heat, rainHeat, syncHeat, thinHeat } from './heat.js';
@@ -29,7 +29,13 @@ let wxSeen = false;
    every render, so a clear that only touched a box would be undone by the next render, and a clear
    that only touched the screen would come back on the next reload. */
 function syncPins() {
-  const rising = state.data.filter(s => s.rising).length;
+  /* `isHot()`, never `s.rising`. The app bar count, the icon badge and the alert panel all read
+     `isHot()`. The chip read the forecast flag alone, so a sounding siren, a river already at its
+     danger mark and heavy rain lit the map and left the chip dead. The repository owner widened it
+     on 2026-08-26. The cost is that there is no way left to ask for climbing rivers alone.
+     Ignored sensors are excluded, the same rule the alert panel obeys, so the number here and the
+     number in the app bar are one number. */
+  const rising = state.data.filter(s => !isIgnored(s) && isHot(s)).length;
   const starred = state.data.filter(isFav).length;
 
   // Only on the way into the empty state. This runs on every poll for every reader who has starred
@@ -96,7 +102,7 @@ export function render() {
       // A jump still shows the pin, so a station reached from the table or the go-to box is never a
       // flight to an empty patch of map.
       if (isIgnored(s)) continue;
-      if (pinFilter === 'alert' && !s.rising) continue;
+      if (pinFilter === 'alert' && !isHot(s)) continue;
       if (pinFilter === 'fav' && !isFav(s)) continue;
     }
 
@@ -173,6 +179,10 @@ export function render() {
     sounding siren. It covers a flood gauge under water, and rainfall in the top class. A pin the eye
        has to decode is a pin nobody reads in the ten seconds that matter. */
     const c = critical ? statusColor(3) : quiet ? MAST.color : color(lead);
+    /* A pin is a disc with its glyph knocked out in white, and the alert amber is the one fill white
+       cannot sit on: 1.64:1 against 12.79:1 for black. See DARK_INK_FILL in config.js for the whole
+       measurement and for why this is a list rather than a calculation. */
+    const inkdark = DARK_INK_FILL.includes(c) ? ' inkdark' : '';
     const marker = L.marker([lead.lat, lead.lng], {
       kind: lead.kind, critical, fav,                     // read back by the cluster badge and the split
       zIndexOffset: critical ? 1000 : rising ? 500 : 0,   // keep the urgent pins on top
@@ -184,8 +194,8 @@ export function render() {
         the count went with the plate it sat on. `.multi` still rides on the span. The hover ring
         and the panel key both ask whether this pin is a mast. */
         html: `<span class="pin${multi ? ' multi' : ''}${lead.online ? '' : ' off'}${
-                     rising ? ' rise' : ''}${critical ? ' danger' : ''}" style="--c:${c}">${
-               pinGlyph(multi ? MAST.icon : KINDS[lead.kind].icon)}${
+                     rising ? ' rise' : ''}${critical ? ' danger' : ''}${inkdark}" style="--c:${c}">${
+               pinGlyph(multi ? MAST.icon : KINDS[lead.kind].icon, true)}${
                fav ? `<b class="fv">${pinGlyph('favorite')}</b>` : ''}</span>`,
       }),
     });
