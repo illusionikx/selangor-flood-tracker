@@ -341,8 +341,9 @@
 /* You are not a station. This mark is bigger than a station pin and does not shrink with them,
    because the reader is not a 672nd reading in the set. Colour and shape both say so, and the
    accuracy circle under it is already a mark no station has.
-   `home_pin` — a pin with a house in it, so the *shape* says "a marker, and it is yours" before the
-   colour says anything. Anchored at its tip, not its centre. See locate.js.
+   `my_location` — the crosshair the locate button wears, so the control and its mark read as one
+   thing. Anchored at its centre, because the crosshair IS the point. See locate.js. It held
+   `home_pin` before, which is a pin with a house in it, and a pin is anchored at its tip.
    It carries the edge and the shadow every `.pin` does and states neither of its own. Its old rule
    set a heavier shadow, a second number for the same job. A white halo was tried long before either
    and reads as a glow: on the dark basemap the mark wore a bright fringe, which is a lit object. */

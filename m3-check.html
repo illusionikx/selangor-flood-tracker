@@ -116,6 +116,7 @@ function inFrame(d, code) {
    the badges. Fixed rather than taken from the live payload, so the assertions below cannot move
    with the weather. */
 const CARD = `<div class="pophead">
+    <button class="icon near" data-cam="camera-1" data-tip="Nearest webcam · KG BARU · 2.1 km"></button>
     <button class="icon fav" data-fav="a,b" data-tip="Add to favorites"></button>
     <button class="icon dots" popovertarget="probemenu"></button>
     <div class="menu" id="probemenu" popover></div>
@@ -1500,6 +1501,18 @@ async function desktop() {
      'and `data-tip`, because a `title` never opens on touch and half these devices are phones');
   is(!!d.querySelector('#sideActions .menu [data-fav]'), false,
      'so the menu no longer carries the same action a second time');
+  /* **The nearest webcam or water level leads the row, on the favorite's leading side.** The
+     repository owner asked for that on 2026-08-26, and it was a menu row before. What can break
+     silently is the SELECTOR: `openSide()` lifts a fixed list of classes out of `.pophead`, and a
+     class it does not name simply stays in the body, where `.pophead` is then removed and the
+     control disappears. `querySelectorAll` answers in document order, so the order is the
+     template's and the selector cannot restore it. */
+  const nearB = d.querySelector('#sideActions .near');
+  is(!!nearB, true, 'the nearest-camera offer is a button in the trailing actions');
+  is(nearB && nearB.compareDocumentPosition(favB)
+     & Node.DOCUMENT_POSITION_FOLLOWING ? true : false, true, 'and it leads the favorite');
+  is(!!nearB.dataset.tip, true,
+     'carrying the station name and distance in `data-tip`, which is what a `title` could not do');
   is(cs(d.getElementById('sideBody')).padding, '12px 24px', 'M3 side sheet body padding');
 
   /* --- the station panel is an M3 LIST, one item per sensor ---

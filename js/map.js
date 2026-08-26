@@ -432,10 +432,11 @@ export function openSide(key, html, mastAt) {
      leaving the last station's name over the next one's readings. */
   const head = body.querySelector('.pophead');
   el('sideTitle').replaceChildren(...[head?.querySelector('.popname')].filter(Boolean));
-  /* `.fav` first, so the heart lands to the left of the ⋮: `querySelectorAll` answers in document
-     order, and `dots()` emits the button before it. The popover takes no room in the row. */
+  /* The row reads offer, favorite, ⋮. `querySelectorAll` answers in DOCUMENT order and never in
+     selector order, so the order comes from `dots()` emitting the three in that sequence. The
+     popover takes no room in the row. */
   el('sideActions').replaceChildren(
-    ...(head ? head.querySelectorAll(':scope > .fav, :scope > .dots, :scope > .menu') : []));
+    ...(head ? head.querySelectorAll(':scope > .near, :scope > .fav, :scope > .dots, :scope > .menu') : []));
   /* **The region line is the app bar's supporting text.** `#sideHead` is M3's medium flexible top
      app bar now, and that component states a headline over an optional line under it. The card's
      own muted line is what that has always been: `Shah Alam, Selangor` under a station name, the

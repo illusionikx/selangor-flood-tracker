@@ -1011,8 +1011,12 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
   ellipsis. This app does not, and that rule is older: a station name cut in half names another
   station. M3 Expressive states a two-line form for this variant, so a grown bar stays in the family.
 - **The card arrives as one string and FIVE pieces of it move.** `openSide()` takes the `.popname`
-  into `#sideTitle`, the `.dots` and the popover it targets into `#sideActions`, the region line into
-  `#sideSub`, and the sensor badges into `#sideKinds`.
+  into `#sideTitle`, the `.near`, the `.fav`, the `.dots` and the popover it targets into
+  `#sideActions`, the region line into `#sideSub`, and the sensor badges into `#sideKinds`.
+  **That selector is a fixed list of classes, and one it does not name simply stays in the body.**
+  `.pophead` is then removed as empty, so the control disappears with nothing on screen to say it
+  existed. `querySelectorAll` answers in DOCUMENT order, so the order of the row comes from `dots()`
+  and the selector cannot restore it.
   **The region line moved up on the same instruction, and that reverses an entry.** It stayed in the
   body because M3 puts supporting content there. That is the SIDE SHEET's rule. An app bar states a
   headline and an optional line under it, and this line always was that: `Shah Alam, Selangor` under
@@ -1077,19 +1081,29 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
   paints a round `--hover` disc the width of its box. So the smaller shape drew two discs of two
   sizes, under two glyphs of two sizes. `.dots` stays 28px everywhere it
   is alone on a row. `right: 32px` puts the two boxes edge to edge, the way two toolbar icons meet.
-  **The trailing actions hold two controls: the favorite, then the ⋮.** The heart has been round
-  this loop three times, and the last move is a reader's, 2026-08-21. A sensor-count chip held the
-  slot first. Then the heart. Then the heart and a nearest-webcam glyph together, and that pair
-  reserved `padding-right: 108px` of a 328px line and stood 4.5px into the district line below. So
-  every control became a row inside the one menu.
+  **The trailing actions hold three controls: the nearest webcam or water level, the favorite, then
+  the ⋮.** The heart has been round this loop three times, and the offer four. A sensor-count chip
+  held the slot first. Then the heart. Then the heart and a nearest-webcam glyph together, and that
+  pair reserved `padding-right: 108px` of a 328px line and stood 4.5px into the district line below.
+  So every control became a row inside the one menu. A reader pulled the heart back out on
+  2026-08-21 and the offer back out on 2026-08-26.
   **The header is an M3 top app bar now, and that answers the objection rather than ignores it.** The
   actions have a 56px row of their own. They take nothing from the headline under them, so the 108px
   reservation that condemned the pair does not exist any more.
-  **The webcam offer stays a row, and the reason it lost is unchanged.** That row states a station
-  name, a distance and a reading in visible text. A glyph can only put those in a `title`, and a
-  `title` never opens on touch. The favorite has nothing of that kind to say: its whole state is the
-  heart's own fill, hollow or solid. `data-tip` carries the verb, and `js/sparktip.js` answers it on
-  tap as well as on hover.
+  **THE WEBCAM OFFER IS A BUTTON AGAIN, AND THIS REVERSES THE ENTRY THAT KEPT IT A ROW.** That entry
+  said a row states a station name, a distance and a reading in visible text, and a glyph can only
+  put those in a `title`, which never opens on touch. **The premise about `title` is right and the
+  conclusion was wrong.** `data-tip` is not a `title`. `js/sparktip.js` answers it on tap as well as
+  on hover, and the favorite beside it already reaches its words that way.
+  **The reading is a word in that tip and never the glyph's ink.** The row painted the level with
+  `color()`, because 1.74 m is either a quiet river or a flood and the mark is not on the row. An app
+  bar action painted by a status makes a status claim about a station the card is not about. So the
+  number goes to the station card the button jumps to, where the meter states it properly.
+  **With nothing inside the cap the button still draws, and it takes `aria-disabled` rather than the
+  `disabled` ATTRIBUTE.** A disabled button fires no pointer event in Chrome, so its `data-tip` never
+  opens and the one thing it has to say is unreachable. It carries no `data-cam` and no `data-go`
+  either, and both jumps are delegated on those. So there is nothing for a press to reach and nothing
+  to disable.
   **A sensor's inline ⋮ keeps the favorite as a row.** `dots(s, extra, lift)` takes `lift` only from
   the card header. Six hearts down a six-sensor mast is six controls for what the header already
   offers once, and the per-sensor favorite is what lets somebody star one gauge of six.
@@ -2087,7 +2101,9 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
   single "ignore" item, which promised actions and held one. So it became an ⓘ when the provenance
   moved in. It is a `more_vert` ⋮ now. The menu also carries the favorite, the nearest webcam or
   water level, the map link and the ignore. Four actions is not an information glyph. Count the
-  actions before changing it again.
+  actions before changing it again. **A sensor's own menu holds three of those four now, and the
+  card HEADER's menu holds two.** The favorite left it on 2026-08-21 and the nearest-webcam offer on
+  2026-08-26. Both are buttons in the app bar's trailing actions.
 - **A marquee needs three things measured, not guessed.** `js/ticker.js` renders the item set twice
   and translates `-50%`. That shows no seam only if one copy is at least as wide as the box. So it
   repeats the set to cover the box *before* doubling. Width alone is not enough. A single wide item
@@ -4036,7 +4052,7 @@ const hasInfo=s=>s.info!==false,isStale=()=>false,statusColor=n=>'S'+n,scalePos=
 const levelStops=()=>null,gaugeStops=()=>null,gaugeColor=()=>'',color=()=>'',isFav=()=>false;
 const nearestOf=()=>null,nearestCam=()=>null,nearestLevel=()=>null,camAlert=()=>null;\`;
 const M = new Function(stubs+noSec+src+
-  '; return { stamp, spanText, sirenBand, sparkline, rainBars, dots, kindChips, sensorBody };')();
+  '; return { stamp, spanText, sirenBand, sparkline, rainBars, dots, kindChips, sensorBody, camLink, levelLink };')();
 const now=Math.floor(Date.now()/1000), H=3600;
 let bad=0; const is=(g,w,n)=>{const ok=g===w; if(!ok)bad++;
   console.log((ok?'ok  ':'FAIL')+'  '+n+'  -> '+JSON.stringify(g)+(ok?'':'  want '+JSON.stringify(w)));};
@@ -4057,15 +4073,31 @@ is(M.spanText(1800),'30 min','spanText: under an hour keeps minutes');
 // same action on one card twice, and nothing on screen says which of the two is stale.
 // Escape every double quote in here. The whole harness is one double-quoted shell string, and a
 // bare backtick in a comment runs as a command substitution.
-const S={ id:'wl-1', name:'TEST', kind:'river', source:'selangor',
+// The nearest-webcam offer is the same rule at a second control. It left the menu on 2026-08-26 and
+// leads the row. A caller that emits it INSIDE the menu draws a correct-looking row that openSide()
+// then throws away with the emptied pophead. No backtick and no double quote in this comment: the
+// whole harness is one double-quoted shell string, and the rule above already states why.
+const S={ id:'wl-1', name:'TEST', kind:'river', source:'selangor', site:'s1',
           updated:'01/01/2026 00:00:00', lat:3, lng:101 };
-const head=M.dots(S,'',true), inline=M.dots(S);
+const near=M.camLink(S,{ id:'camera-9', name:'KG BARU', site:'s2' });
+const head=M.dots(S,near,true), inline=M.dots(S);
 is(/class=\"icon fav\"/.test(head),true,'dots: the card header emits a favorite BUTTON');
 is((head.match(/data-fav/g)||[]).length,1,'dots: and exactly one favorite control, never two');
 is(/class=\"mi\" data-fav/.test(head),false,'dots: so its menu carries no favorite ROW');
 is(head.indexOf('icon fav')<head.indexOf('icon dots'),true,'dots: the heart comes before the kebab');
+is(head.indexOf('icon near')<head.indexOf('icon fav'),true,'dots: and the offer before the heart');
+is(head.indexOf('icon near')<head.indexOf('class=\"menu'),true,'dots: outside the menu, never in it');
 is(/class=\"icon fav\"/.test(inline),false,'dots: a sensor row emits no button of its own');
+is(/icon near/.test(inline),false,'dots: and no offer at all, which belongs to the place');
 is(/class=\"mi\" data-fav/.test(inline),true,'dots: it keeps the favorite as a menu row');
+// An empty offer still draws, and it must not take the disabled ATTRIBUTE: a disabled button fires
+// no pointer event in Chrome, so the one thing it has to say never opens.
+is(/aria-disabled=\"true\"/.test(M.camLink(S,null)),true,'camLink: no camera -> aria-disabled');
+is(/disabled>|disabled /.test(M.camLink(S,null).replace(/aria-disabled/g,'')),false,
+   'camLink: and never the attribute, which would close the tip');
+is(/data-tip=\"Nearest water level · R · 0.0 km · 1.74 m\"/
+   .test(M.levelLink(S,{id:'wl-2',name:'R',level:1.74})),true,
+   'levelLink: the tip carries the name, the distance and the reading a title could not');
 
 // kindChips() draws the station panel's app bar row: one chip per KIND, never one per sensor. A
 // place with two sirens drew the word Siren twice, which reads as a rendering fault. Three things
@@ -4341,7 +4373,7 @@ printf("rows: %d, points: %d, newest: %s\n",
 # **A short budget TRUNCATES this check rather than failing it.** At 120000 it stopped as the desktop
 # pass started, after 122 of 274 assertions, with nothing failed and no verdict printed. At 240000
 # it printed the opening line alone, once the rail and the bar joined it. Read the last line: no
-# `PASS` means the run did not finish, whatever the counts above it say. It holds 573 assertions.
+# `PASS` means the run did not finish, whatever the counts above it say. It holds 885 assertions.
 
 # The app bar wordmark ladder, in rendered pixels. Loads the app in an iframe at fifteen widths and
 # asserts one spelling at a time, never wider than its rail, and never a longer spelling on a

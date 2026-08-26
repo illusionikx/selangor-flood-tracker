@@ -6,7 +6,7 @@ import { KINDS, SOURCES, SPARK_H, NO_INFO, ALERT_TITLE, RIVER_COLOR, RAIN_COLOR,
          ACC_ROWS } from './config.js';
 import { PREFS } from './state.js';
 import { noSec, distKm, hasInfo, hasWx, isStale, statusColor, scalePos,
-         levelStops, gaugeStops, gaugeColor, color, isFav, titleCase } from './util.js';
+         levelStops, gaugeStops, gaugeColor, isFav, titleCase } from './util.js';
 import { nearestOf, nearestCam, nearestLevel, nearestWx, camAlert } from './stations.js';
 
 /* The leading slot of every sensor row: the kind's glyph, in the kind's own colour.
@@ -145,19 +145,22 @@ const favBtn = (ids, set) => `<button class="icon fav" data-fav="${ids}"
    time, so only one copy of a given sensor's menu is ever in the document. */
 /* `extra` is the nearest webcam or water level, and only the card *header* passes one. A mast lists
    its sensors with a menu on each, and that offer belongs to the place rather than to the rainfall
-   gauge whose row happens to hold it. */
+   gauge whose row happens to hold it.
+   **It is a BUTTON now and it leads the trailing actions**, on the repository owner's instruction of
+   2026-08-26. It was a row inside the menu below. So the row reads offer, favorite, ⋮ — see
+   `nearBtn()` for why a glyph can carry a station name here and could not before. A caller that
+   passes no `extra` emits nothing, which is the mast that already holds its own camera. */
 /* `lift` marks the CARD HEADER's own menu, the one `openSide()` takes up into the app bar. There the
    favorite is a button beside the ⋮ rather than a row inside it, so the row would be the same action
    twice. Every other caller is a sensor's inline ⋮ inside `.sensorhead`, which stays as it was: a
    heart on each of a six-sensor mast's rows is six controls for what the header already offers, and
    the per-sensor favorite is what lets somebody star one gauge of six. */
-export const dots = (s, extra = '', lift = false) => `${lift ? favBtn(s.id, isFav(s)) : ''}
+export const dots = (s, extra = '', lift = false) => `${lift ? extra + favBtn(s.id, isFav(s)) : ''}
   <button class="icon dots" popovertarget="mnu-${s.id}"
     title="Details" aria-label="Details and actions for ${s.name}"><i class="i i-more_vert"></i></button>
   <div id="mnu-${s.id}" class="menu surface" popover>
     ${sourceInfo(s)}
     ${lift ? '' : favItem(s.id, isFav(s))}
-    ${extra}
     ${mapLink(s)}
     <button class="mi" data-ignore="${s.id}"><i class="i i-visibility_off"></i>
       <span>Ignore this sensor</span>
@@ -169,11 +172,10 @@ export const dots = (s, extra = '', lift = false) => `${lift ? favBtn(s.id, isFa
    six answers. No ignore, because that is a request about one sensor and every sensor's own row
    already offers it. The favorite acts on all of them, which is the one thing this menu can say that
    none of the rows below it can. */
-const siteDots = (lead, ids, all, extra) => `${favBtn(ids, all)}
+const siteDots = (lead, ids, all, extra) => `${extra}${favBtn(ids, all)}
   <button class="icon dots" popovertarget="mnu-site-${lead.id}"
     title="Details" aria-label="Details and actions for ${lead.name}"><i class="i i-more_vert"></i></button>
   <div id="mnu-site-${lead.id}" class="menu surface" popover>
-    ${extra}
     ${mapLink(lead)}
   </div>`;
 
@@ -244,20 +246,23 @@ export function camNear(from, cam) {
 /* Everywhere else — every station card, every mast card — the nearest thing is offered, not shown.
    The alert panel would be N proxied fetches at JPS for pictures of places you are scrolling past.
    A station card would be one picture you did not ask for.
-   It is a row in the card's own menu. It was a full-width button under the header, carrying a second
-   bold place name above the reading, and then a bare glyph in the header corner with the name in a
-   `title` — which a phone never opens. A menu row is the shape that states the name, the distance
-   and the reading in plain text and still costs the card no height.
-   `.mi`, the same row the menu's other items use. The glyph names the kind, so a reader who opens
-   the menu for the favorite reads what else is here without a legend.
-   What the row *is* leads, and what it found follows. The station name led first, with the label and
-   the distance underneath, which named a place before saying why it was on the menu. It also gave
-   the row no fixed first line, so the empty case had nothing to be the short version of. Both rows
-   now read `Nearest webcam` or `Nearest water level`, then the place and the distance, or the reason
-   there is neither. */
-const nearItem = (icon, attr, what, note, right = '') =>
-  `<button class="mi" ${attr}><i class="i i-${icon}"></i>
-     <span>${what}<br><small class="muted">${note}</small></span>${right}</button>`;
+   **IT IS A BUTTON IN THE CARD HEADER'S TRAILING ACTIONS, TO THE LEFT OF THE FAVORITE.** The
+   repository owner asked for that on 2026-08-26. It has been round this loop three times: a
+   full-width button under the header, then a bare glyph in the header corner, then a menu row.
+   **The glyph lost the first time and the objection is answered rather than ignored.** That version
+   carried the station name in a `title`, and a `title` never opens on touch. `data-tip` does. The
+   button states the name, the distance and the reading there, and `js/sparktip.js` names anything
+   carrying that attribute on hover and on tap alike. It is the same door the favorite beside it
+   already uses.
+   The old corner also owed the title 108px of a 328px line. The header is an M3 top app bar now, so
+   the actions have a 56px row of their own and take nothing from the headline under them. That is
+   the same answer the favorite's own comment above already states.
+   **The reading is in the words and never in the ink.** This glyph names another station's kind, and
+   an app bar action painted by a status is a status claim about a station the card is not about.
+   With nothing inside the cap the button still draws, `disabled`, saying so. A control that
+   disappears leaves a reader unable to tell "there is none" from "the app forgot". */
+const nearBtn = (icon, attr, what, note) => `<button class="icon near" ${attr}
+    data-tip="${what} · ${note}" aria-label="${what}. ${note}"><i class="i i-${icon}"></i></button>`;
 
 /* A camera on the *same mast* is not a nearest-anything. It is this station's own view, so it names
    no place and drops the distance, which would read "0.0 km". `from` may be a bare latlng from a map
@@ -268,26 +273,27 @@ const nearItem = (icon, attr, what, note, right = '') =>
    The empty row states no distance: the cap is ours, and a reader wants the verdict rather than our
    arithmetic. */
 export const camLink = (from, cam) => !cam
-  ? nearItem('photo_camera', 'disabled', 'Nearest webcam', 'No webcam nearby')
+  ? nearBtn('photo_camera', 'aria-disabled="true"', 'Nearest webcam', 'None nearby')
   : from.site && from.site === cam.site
-    ? `<button class="mi" data-cam="${cam.id}"><i class="i i-photo_camera"></i>
-         <span>Show webcam</span></button>`
-    : nearItem('photo_camera', `data-cam="${cam.id}"`, 'Nearest webcam',
+    ? nearBtn('photo_camera', `data-cam="${cam.id}"`, 'Webcam', 'On this station')
+    : nearBtn('photo_camera', `data-cam="${cam.id}"`, 'Nearest webcam',
         `${cam.name} · ${distKm(from, cam).toFixed(1)} km`);
 
 /* The reverse, for a camera standing on its own. Every other card offers the nearest picture. A
    camera card offered nothing, and a picture of water is a question about a number — "is that high?"
    — which the frame cannot answer. So it carries the nearest water level, named, with its reading.
-   The reading takes `color()`, the same function the pin and the card use, because the number alone
-   means nothing without the mark it is measured against: 1.74 m is either a quiet river or a flood.
-   The row jumps to that station, where the meter states it properly.
+   **The reading is a word in `data-tip` now, and it took `color()` before.** That paint answered a
+   real point: 1.74 m is either a quiet river or a flood, and the mark it is measured against is not
+   on the row. The button carries no reading a colour could paint. Painting the GLYPH instead makes
+   a status claim about a station this card is not about, which is the rule the button's own comment
+   above states. So the number goes to the station card, where the meter states it properly, and the
+   button jumps there.
    Only on a camera that is not on a mast with a river. Where they share a mast the card already
    shows both, and this would point at the section under it. */
 export const levelLink = (from, s) => !s
-  ? nearItem(KINDS.river.icon, 'disabled', 'Nearest water level', 'No water level nearby')
-  : nearItem(KINDS.river.icon, `data-go="${s.id}"`, 'Nearest water level',
-      `${s.name} · ${distKm(from, s).toFixed(1)} km`,
-      `<b class="mv" style="color:${color(s)}">${s.level} m</b>`);
+  ? nearBtn(KINDS.river.icon, 'aria-disabled="true"', 'Nearest water level', 'None nearby')
+  : nearBtn(KINDS.river.icon, `data-go="${s.id}"`, 'Nearest water level',
+      `${s.name} · ${distKm(from, s).toFixed(1)} km · ${s.level} m`);
 
 export function meter(s) {
   const max = s.danger || s.warning || s.alert;
@@ -917,7 +923,7 @@ export function herePopup(e, loaded) {
      It goes nowhere on a press: `.popname` without `data-go` is the shape the alert panel's own
      head already uses. */
   return `<div class="pophead">
-      <div class="popname"><i class="i i-near_me" style="color:var(--me)"></i> Your Location</div>
+      <div class="popname"><i class="i i-my_location" style="color:var(--me)"></i> Your Location</div>
       ${/* Not `Accurate to about N m`. The figure is already a radius the browser is unsure of,
             so `about` hedges a number that is itself the hedge. */''}
       <div class="muted">Accurate to ${Math.round(e.accuracy)} m</div>

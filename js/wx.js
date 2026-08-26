@@ -161,7 +161,7 @@ export function hereCard(at) {
     !best || distKm(at, x) < distKm(at, best) ? x : best, null);
   const km = p && distKm(at, p);
   if (!p || km > NEAR_MAX_KM) return '';
-  return card(p, '<i class="i i-near_me" style="color:var(--me)"></i> Your Location',
+  return card(p, '<i class="i i-my_location" style="color:var(--me)"></i> Your Location',
     `${p.n} · ${km.toFixed(1)} km`);
 }
 

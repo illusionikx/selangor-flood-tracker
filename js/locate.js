@@ -36,7 +36,7 @@ let wantPopup = false;   // only pop up when the user asked; never on the landin
 const twin = el('navLocate');
 // The same three glyphs `#locate.busy`, `#locate.on` and `#locate.fail` resolve in css/chrome.css.
 // Stated here because a bar item takes no `.mapbtn` class, so no rule of that block can reach it.
-const GLYPH = { busy: 'my_location', on: 'near_me', fail: 'location_disabled' };
+const GLYPH = { busy: 'my_location', on: 'my_location', fail: 'location_disabled' };
 /* What state the control is in, and the words that state carries. `btn.onclick` reads both: two of
    the three states have nothing on screen that says why, and a snackbar is what says it. */
 let mode = '', words = '';
@@ -147,15 +147,14 @@ function place(latlng, accuracy, setView) {
   if (layer) layer.remove();
 
   marker = L.marker(latlng, { icon: L.divIcon({
-    /* A map pin, so it reads as a marker rather than as one more sensor glyph — and `home_pin`
-       rather than a plain teardrop, because the shape inside it is what says *whose* pin.
-       A pin points at its **tip**: the anchor is the bottom-centre of the box, not the middle, or
-       the mark would sit half its own height north of you. That is the whole difference between
-       this and the crosshair it replaced, which was the point it marked. */
-    // 44, not 48: Material draws the glyph inside its viewBox with a little air, so the pin's tip
-    // sits ~8% of the box above its bottom edge. Anchoring to the box would float the mark.
-    className: '', iconSize: [48, 48], iconAnchor: [24, 44],
-    html: `<span class="pin me">${pinGlyph('home_pin')}</span>`,
+    /* `my_location`, the same crosshair the locate button wears, so the control and the mark it
+       drops read as one thing.
+       **A crosshair is anchored at its CENTRE, and a pin is anchored at its tip.** The mark IS the
+       point here, rather than a teardrop hanging over it, so the anchor is the middle of the box.
+       [24, 44] under a crosshair stands the mark 20px north of the fix. This held `home_pin` before,
+       and that glyph took the tip anchor for the reason this line no longer has. */
+    className: '', iconSize: [48, 48], iconAnchor: [24, 24],
+    html: `<span class="pin me">${pinGlyph('my_location')}</span>`,
   }) }).on('click', showHere);
 
   // Coloured from `.mecircle` in map.css rather than through Leaflet's `color` option, for the same

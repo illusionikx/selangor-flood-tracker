@@ -16505,4 +16505,107 @@ script a parse error, so the page printed `running...` and nothing else. And an 
 written by hand was cleared by the next body-class write, which made a correct rule read as broken.
 Press the control instead.
 
-All seven runnable checks are green. `m3-check.html` holds 882 assertions.
+
+## The location mark and the locate button wear one glyph, `my_location`
+
+The repository owner asked for both on 2026-08-26. The map mark drew `home_pin`, a house inside a
+map pin. The button drew `near_me` once it held a fix, an arrow that states a heading this app
+cannot read. Both draw the crosshair now, which is the mark the button already wears at rest.
+
+**So the control, the mark it drops and the card that mark opens are one shape.** A reader presses a
+crosshair, a crosshair lands on the map, and the card it opens heads itself with the same glyph.
+Three shapes for one place read as three things.
+
+### The anchor moves with the glyph
+
+**A pin takes the tip as its anchor. A crosshair takes its centre.** `iconAnchor` goes from
+`[24, 44]` to `[24, 24]`. A crosshair on the tip anchor stands 20px north of the fix, and nothing on
+screen says so. That is one line in `js/locate.js`, and the comment beside it states the rule.
+
+### What the button keeps
+
+`#locate.on` now changes the ink alone, from `--muted` to `--accent`. The `--i` override in
+`css/chrome.css` goes, because the markup already carries `my_location`. `#locate.busy` keeps
+its pulse and `#locate.fail` keeps `location_disabled`. **A broken control still changes its glyph,
+never its hue.**
+
+`GLYPH.on` in `js/locate.js` follows, so the navigation bar twin below 600px draws the same mark.
+That item reports its own selected state through `aria-current`, which is the rule that file already
+states.
+
+### This reverses two earlier entries, and one reason expired
+
+*"You are here" is a pin, in hazard yellow* lists a `my_location` crosshair among the four rejected
+predecessors, as "correct, and invisible next to the river blue". **The colour is `--me` now, a
+hazard yellow, so nothing about that mark is river blue any more.** The shape argument stands on its
+own: the crosshair IS the point, and no station glyph is a crosshair.
+
+This change touches neither the colour, the 48px box nor the accuracy circle. Every argument in that entry about
+`--me` and the 3:1 floor still holds. Only the drawing inside the box moved.
+
+`--i-home_pin` stays in `css/icons.css` with no user. A fetch generates that file, and deleting one rule
+without editing the fetch above it means the next rebake puts the rule back.
+
+## The nearest webcam and the nearest water level become a button in the app bar
+
+The repository owner asked for the offer beside the favorite on 2026-08-26, on its leading side.
+
+The station panel's app bar now holds three trailing actions. They are the nearest webcam or water
+level, the favorite, then the kebab.
+
+### What moved
+
+`nearItem()` in `js/popup.js` is deleted. `nearBtn()` replaces it and emits an `.icon` button.
+`camLink()` and `levelLink()` call it. `dots()` and `siteDots()` emit `extra` before the favorite
+rather than inside the menu.
+
+`openSide()` in `js/map.js` lifts `:scope > .near` too. That selector is a fixed list of classes,
+and a class it does not name stays in the body. `.pophead` is then removed as empty, so the control
+disappears with nothing on screen to say it existed.
+
+### This is the fifth shape, and the fourth reverses the third
+
+| shape | why it lost |
+|---|---|
+| 1 | a full-width button under the header | it carried a second bold place name |
+| 2 | a bare glyph in the header corner | the name lived in a `title`, which no phone opens |
+| 3 | a row inside the kebab menu | the header became an app bar with a row of its own |
+| 4 | a button in the trailing actions | — |
+
+**The premise about `title` is right and the conclusion was wrong.** `data-tip` is not a `title`.
+`js/sparktip.js` answers it on tap as well as on hover. The favorite beside it already reaches its
+own words that way, and this button reaches the station name, the distance and the reading the same
+way.
+
+### The reading is a word, never the glyph's ink
+
+The menu row painted the level with `color()`. That answered a real point. 1.74 m is either a quiet
+river or a flood, and the mark it is measured against is not on the row.
+
+A button has no reading to paint. Painting the glyph instead makes a status claim about a station
+this card is not about, and this app reserves those hues for status.
+
+So the number rides `data-tip` and the button jumps to the station card, where the meter states it
+properly.
+
+### An empty offer takes `aria-disabled`, never the attribute
+
+With nothing inside the cap the button still draws. A control that disappears leaves a reader unable
+to tell "there is none" from "the app forgot".
+
+A disabled button fires no pointer event in Chrome. So its `data-tip` never opens and the one thing
+it has to say is unreachable.
+
+It carries no `data-cam` and no `data-go` either, and both jumps are delegated on those attributes.
+So there is nothing for a press to reach and nothing to disable. `#sideActions .icon[aria-disabled]`
+takes M3's 38% and drops the hover disc.
+
+### Nothing in the handlers changed
+
+`ui.js` runs one delegated `[data-cam]` listener and one delegated `[data-go]` listener, both on the
+document. A button anywhere reaches them.
+
+`m3-check.html` gains three assertions. The probe card carries a `.near` button, and the check reads
+it back out of `#sideActions`, before the favorite, with its tip intact.
+
+All seven runnable checks are green. `m3-check.html` holds 885 assertions.

@@ -764,7 +764,10 @@ body.railopen #rail .railbadge { top: -6px; right: -6px; }
    `btn.onclick` in js/locate.js refuses the second attempt itself now, and raises a snackbar to say
    so, which is a refusal a reader can read. */
 #locate.busy .i { animation: pulse 1s infinite; }
-#locate.on .i { --i: var(--i-near_me); color: var(--accent); }
+/* A fix changes the ink and never the glyph. The button held `near_me`, an arrow that states a
+   heading this app cannot read. `my_location` is the crosshair the markup already carries, so the
+   button, the mark on the map and the card the mark opens are one shape. */
+#locate.on .i { color: var(--accent); }
 #locate.fail .i { --i: var(--i-location_disabled); }
 
 /* The bar twin below 600px. **The pulse crosses and the paint does not** — see `setBtn()` in
@@ -2711,13 +2714,23 @@ body.side #side { display: flex; }
 }
 #sideKinds .badge .i { font-size: 18px; color: var(--c); }
 #sideActions { display: flex; align-items: center; }
-/* **The trailing slot holds two buttons: the favorite, then the ⋮.** The heart was a row inside
-   that menu and a reader pulled it out on 2026-08-21. A menu row states its action in words, which
-   a bare glyph cannot, so the button carries `data-tip` and `js/sparktip.js` answers it on tap as
-   well as on hover. The state was always visible either way, in the heart's own fill.
-   The menu is a popover and takes no space in the row. Only the two buttons do. `.dots` carries
+/* **The trailing slot holds three buttons: the nearest webcam or water level, the favorite, then
+   the ⋮.** The heart was a row inside that menu and a reader pulled it out on 2026-08-21. The offer
+   followed on 2026-08-26. A menu row states its action in words, which a bare glyph cannot, so each
+   button carries `data-tip` and `js/sparktip.js` answers it on tap as well as on hover. The heart's
+   state was always visible either way, in its own fill.
+   The menu is a popover and takes no space in the row. Only the buttons do. `.dots` carries
    `position: absolute` for the cards that still float it over a corner, and this cancels that. */
 #sideActions .icon { position: static; margin: 0; font-size: 22px; }
+/* With nothing inside the cap the offer still draws, saying so. M3's disabled state is 38% of the
+   content colour, and this app has no other disabled icon button to share a rule with.
+   **`aria-disabled`, never the `disabled` ATTRIBUTE.** A disabled button fires no pointer event in
+   Chrome, so its `data-tip` never opens and the one thing it has to say is unreachable. It carries
+   no `data-cam` and no `data-go` either, and both jumps are delegated on those. So there is nothing
+   for a press to reach and nothing to disable. The hover disc goes, or a dead control answers a
+   pointer as a live one does. */
+#sideActions .icon[aria-disabled="true"] { opacity: .38; cursor: default; }
+#sideActions .icon[aria-disabled="true"]:hover { background: none; }
 /* An empty header still draws its own height, and it must not: a card with no name would leave a
    64px band of nothing over the readings. */
 #sideHead:has(#sideTitle:empty) { display: none; }
