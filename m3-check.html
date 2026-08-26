@@ -2556,6 +2556,54 @@ async function shortPhone() {
   await new Promise(res => setTimeout(res, 200));
 }
 
+/* **One panel states ONE inset.** Before this, `#dataBox` stated four: 16px to the headline, 16px
+   to the filter, 20px to a row's name and 14px to that name on a phone. So the headline and the
+   first column under it did not line up at either width.
+   **Assert the two LEFT EDGES against each other, never against a literal.** A literal passes the
+   day somebody moves the app bar and leaves the body behind, which is the exact drift this exists
+   to catch. */
+async function panelInset(frame, label) {
+  const { d, w, cs, r, settle } = await ready(frame);
+  say('--- one inset, ' + label + ' ---------------------------------------------');
+  settle();
+
+  for (const id of ['dataBox', 'camBox']) {
+    const b = d.getElementById(id);
+    b.showModal();
+    const head = r(b.querySelector('.apflex'));
+    const field = r(b.querySelector('.dtop input'));
+    is(Math.round(field.left - head.left), 0, id + ': the filter starts on the headline');
+    const body = id === 'dataBox'
+      ? b.querySelector('table.data .chead th:first-child') || b.querySelector('table.data')
+      : d.getElementById('camGrid');
+    /* The table may hold no rows yet, because js/table.js is deferred. So read the box's own
+       padding rather than a cell that may not exist. */
+    const pad = id === 'dataBox'
+      ? parseFloat(cs(b.querySelector('table.data')).paddingLeft)
+      : parseFloat(cs(body).paddingLeft);
+    is(pad, 16, id + ': the body inset is 16px');
+    is(parseFloat(cs(b).getPropertyValue('--pane')), 16, id + ': --pane is 16px');
+    b.close();
+  }
+}
+
+/* **The bottom safe area.** Both panels take `100dvh` on a phone, so the last row and the tally sit
+   under the iOS home indicator. `env(safe-area-inset-bottom)` reads 0 in headless Chrome, so this
+   asserts that the DECLARATION reaches the element, not that the inset has a value. A machine with
+   no notch cannot test a notch. */
+async function safeArea() {
+  const { d } = await ready('phone');
+  say('--- the bottom safe area, phone ------------------------------------------');
+  const css = [...d.styleSheets]
+    .filter(s => (s.href || '').includes('chrome.css'))
+    .flatMap(s => [...s.cssRules])
+    .map(x => x.cssText).join('\n');
+  is(/#camBox\s+#camCount[^}]*safe-area-inset-bottom/.test(css), true,
+     'camCount reads the bottom safe area');
+  is(/table\.data[^}]*safe-area-inset-bottom/.test(css), true,
+     'the table reads the bottom safe area');
+}
+
 (async () => {
   out.textContent = '';
   try {
@@ -2577,6 +2625,13 @@ async function shortPhone() {
          was right. The file header states the rule and this is where it bites. */
       await alertPane();
       await bands();
+      /* AFTER `bands()`, for the same reason as `alertPane()` above: `panelInset()` calls
+         `settle()` on the shared `#desk` frame, and a probe reading motion after that sees the
+         override rather than the rule. Nothing here reads motion, but the ordering rule is the
+         frame's and not any one probe's to break. */
+      await panelInset('phone', 'phone');
+      await panelInset('desk', 'desktop');
+      await safeArea();
     } finally {
       if (origPrefs === null) deskWin.localStorage.removeItem('prefs');
       else deskWin.localStorage.setItem('prefs', origPrefs);
