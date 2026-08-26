@@ -2679,9 +2679,12 @@ async function countLine() {
     /* **The size alone cannot tell one scale from another here.** `title-small`, `label-large` and
        `body-medium` are all 14px in the vendored token set. So assert the two properties that
        actually change: this line was 12px `.muted` with no height, and every old table heading in
-       this app was uppercase and letter-spaced. */
+       this app was uppercase and letter-spaced.
+       **The tracking is read off the token, never asserted as `normal`.** `title-small` carries a
+       real tracking value, `0.1px`. Asserting `normal` would pass only while the rule omits it. */
     is(st.textTransform, 'none', id + ': sentence case');
-    is(st.letterSpacing, 'normal', id + ': and no letter-spacing');
+    is(st.letterSpacing, root.getPropertyValue('--md-sys-typescale-title-small-tracking').trim(),
+       id + ': and the title-small tracking');
     /* `on-surface-variant`, which this app bridges onto `--muted`. Compare against a probe carrying
        the token, never against a hex: the palette has moved four times and every copy went stale. */
     const probe = d.createElement('span');

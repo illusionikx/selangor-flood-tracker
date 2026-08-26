@@ -1398,14 +1398,17 @@ body.rising #risebadge { display: flex; }
    heading style, and a count sitting at 12px under a 28px headline was a third size in one box.
    **The size has to be stated.** `.muted` carries a `font-size` of its own as well as the colour,
    and a declaration on the element beats anything the context passes down. That is the trap the
-   rain chart's axis labels already record. */
+   rain chart's axis labels already record.
+   Two other rules state this same subheader: `.nsub` and `#settingsBox h3`. State the tracking
+   and the weight the same way they do. */
 #dataBox #dataCount, #camBox #camCount {
   display: flex; align-items: center;
   min-height: 48px; margin: 0; padding: 0 var(--pane);
-  color: var(--muted);
+  color: var(--muted); text-transform: none;
   font-size: var(--md-sys-typescale-title-small-size);
   line-height: var(--md-sys-typescale-title-small-line-height);
-  font-weight: 500;
+  font-weight: var(--md-sys-typescale-title-small-weight);
+  letter-spacing: var(--md-sys-typescale-title-small-tracking);
 }
 /* **The headline box moves to a margin, so it starts where the filter field starts.** `.apflex`
    states its inset as padding everywhere else, which puts the box itself flush with the app bar's
