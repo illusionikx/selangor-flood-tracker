@@ -2901,7 +2901,7 @@ async function richTip() {
   const root = cs(d.documentElement);
   const tok = n => root.getPropertyValue(n).trim();
 
-  is(cs(tip).borderRadius, '12px', 'a 12dp corner');
+  is(cs(tip).borderRadius, tok('--md-sys-shape-corner-medium'), 'a 12dp corner');
   is(cs(tip).padding, '12px 16px', 'M3 rich tooltip padding');
 
   /* The container tone, read off a probe and never off a literal. The bridge in `css/base.css`

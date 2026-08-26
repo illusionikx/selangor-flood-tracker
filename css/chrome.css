@@ -1674,7 +1674,7 @@ table.data button[data-pop] { cursor: pointer; }
 .tipbox {
   position: fixed; margin: 0; inset: auto; display: none;
   min-width: 240px; max-width: min(320px, calc(100vw - 16px));
-  padding: 12px 16px; border: 0; border-radius: 12px;
+  padding: 12px 16px; border: 0; border-radius: var(--md-sys-shape-corner-medium);
   background: var(--hover); box-shadow: var(--shadow);
   color: var(--on-surface);
   font-size: var(--md-sys-typescale-body-medium-size);
