@@ -2940,6 +2940,53 @@ async function richTip() {
   b.close();
 }
 
+/* **M3's filled card**: `surface-container-highest`, a 12dp corner, no outline, and a state layer.
+   This app bridges `surface-container-highest` onto `--hover`, which `.camtile` already drew.
+   **The 2px alert border stays, as a stated DIVERGENCE.** It is this app's status language, not a
+   card outline. M3's outlined card states a 1dp neutral line, and 1dp of red around a 254px tile is
+   much quieter than 2px. */
+async function camCard() {
+  const { d, cs, settle } = await ready('desk');
+  say('--- the camera tile ------------------------------------------------------');
+  settle();
+  const b = d.getElementById('camBox');
+  b.showModal();
+  d.getElementById('camGrid').innerHTML =
+    `<button class="camtile done" data-cam="1"><span class="camname">PROBE</span></button>
+     <button class="camtile done t-now" data-cam="2"><span class="camname">PROBE</span></button>`;
+  const tile = d.querySelector('.camtile');
+  /* Read the shape token, never the number. The claim is that a tile wears `corner-medium`, not
+     that it measures 12px. A literal goes stale the day the scale is re-baked, and it then reports
+     the drift as a fault in the tile. */
+  const tok = n => cs(d.documentElement).getPropertyValue(n).trim();
+  is(cs(tile).borderRadius, tok('--md-sys-shape-corner-medium'), 'a 12dp corner');
+  is(cs(tile).borderTopWidth, '2px', 'and 2px of border reserved');
+  is(cs(tile).borderTopColor, 'rgba(0, 0, 0, 0)', 'transparent while the tile is quiet');
+  /* The alert border keeps its token. Never a hex: the palette has moved four times. */
+  const probe = d.createElement('span');
+  probe.style.color = 'var(--s-danger)';
+  d.body.appendChild(probe);
+  is(cs(d.querySelector('.camtile.t-now')).borderTopColor, cs(probe).color,
+     'and the alert tier still paints it');
+  probe.remove();
+  b.close();
+}
+
+/* A `:hover` cannot be driven from a script, so the state layer is a CSSOM walk.
+   **Three assertions, and the third is the one that matters.** An inset `box-shadow` paints with
+   the tile's own background, and `.camtile > img` is an in-flow descendant that paints after it.
+   So a shadow layer is invisible the moment a picture arrives, which is every tile that works. */
+async function camCardState() {
+  const { d } = await ready('desk');
+  const css = [...d.styleSheets]
+    .filter(s => (s.href || '').includes('chrome.css'))
+    .flatMap(s => [...s.cssRules]).map(x => x.cssText).join('\n');
+  is(/\.camtile:hover::after[^}]*--m3-state-hover/.test(css), true, 'a tile answers a hover');
+  is(/\.camtile:active::after[^}]*--m3-state-press/.test(css), true, 'and a press');
+  is(/\.camtile:(hover|active)\s*\{[^}]*box-shadow/.test(css), false,
+     'and never an inset shadow, which the picture paints over');
+}
+
 (async () => {
   out.textContent = '';
   try {
@@ -2994,6 +3041,12 @@ async function richTip() {
          `cellChips()`, because Task 7 is the next table probe. Every probe above it already
          settled the frame. */
       await richTip();
+      /* `camCard()` calls `settle()` on the shared `#desk` frame too. It runs after `richTip()`,
+         because Task 8 is the next probe in this phase. Every probe above it already settled
+         the frame. */
+      await camCard();
+      /* `camCardState()` reads the CSSOM alone, so ordering after `camCard()` costs nothing. */
+      await camCardState();
     } finally {
       if (origPrefs === null) deskWin.localStorage.removeItem('prefs');
       else deskWin.localStorage.setItem('prefs', origPrefs);

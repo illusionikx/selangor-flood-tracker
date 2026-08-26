@@ -1001,9 +1001,12 @@ body.rising #risebadge { display: flex; }
 .docbox .key .tg { margin-left: 0; }        /* the panel indents it after a badge; here it leads */
 .docbox .pins { display: flex; gap: 6px; }
 /* The pins are the map's own `.pin` / `.cluster`, at the size they are drawn — a legend redrawn in
-   a second style is a legend that can disagree with the map. Scale the cluster chip down to sit in
-   a text column rather than dominate it. */
-.docbox .pins .cluster { width: 28px; height: 28px; font-size: 12px; }
+   a second style is a legend that can disagree with the map.
+   **The cluster chip carried an override and it is deleted.** It drew 28px here against the map's
+   34, and its comment said it was scaled down to sit in a text column rather than dominate it. The
+   map's chip is 21px since 2026-08-26, so that rule had turned into the opposite of what it claimed:
+   it scaled the sample UP by a third, and the legend disagreed with the map about the one mark it
+   was written to keep honest. 21px sits in a 13px text column without help. */
 /* **THE SAMPLES DRAW THE DISC IN CSS, and the map draws it in SVG. The two have to be checked
    against each other by eye.** A station pin became a disc with the glyph knocked out on
    2026-08-26. On the map that is an inline `<circle>` plus a `<use>`, built by `pinGlyph()` in
@@ -2057,7 +2060,13 @@ table.data .dash { color: var(--outline); }
    the leak for the next thing that paints near a tile. */
 .camtile {
   position: relative; isolation: isolate; display: block; padding: 0; overflow: hidden;
-  cursor: pointer; aspect-ratio: 16 / 9; border: 2px solid transparent; border-radius: 10px;
+  cursor: pointer; aspect-ratio: 16 / 9; border: 2px solid transparent;
+  /* **M3's filled card.** A `corner-medium` on `surface-container-highest`, which css/base.css
+     bridges onto `--hover`, this app's own container tone. The tile already drew that tone. It drew
+     a 10px corner and answered a pointer with nothing.
+     **The token, never the number.** This file already reads the shape scale at five other rules,
+     and a re-bake has to move every surface at once. */
+  border-radius: var(--md-sys-shape-corner-medium);
   background: var(--hover); color: var(--on-surface); text-align: left;
 }
 /* A camera JPS publishes with no coordinate at all — see js/wall.js's tileHtml() and CAM_FIX's own
@@ -2068,6 +2077,23 @@ table.data .dash { color: var(--outline); }
    without reaching for a status hue: this app reserves green, amber, orange and red for what a
    sensor is reporting, and "we do not know where this camera is" is not a reading of anything. */
 .camtile.unmapped { cursor: default; border-style: dashed; opacity: .75; }
+
+/* **M3's state layer**, at the percentages css/base.css derives from the vendored state scale.
+   **A pseudo-element over the picture, and never an inset `box-shadow`.** A shadow paints with the
+   tile's own background, and `.camtile > img` is an in-flow descendant that paints after it. So a
+   shadow layer is invisible on every tile that holds a picture, which is every tile that works.
+   `z-index: 4` clears the stack this tile already carries: `.camsay` 1, `::before` 2, `.camfail` 3.
+   `overflow: hidden` on the tile clips this to the same 12dp corner, so no radius is restated. */
+.camtile:hover::after, .camtile:active::after {
+  content: ''; position: absolute; inset: 0; z-index: 4; pointer-events: none;
+}
+.camtile:hover::after {
+  background: color-mix(in srgb, var(--on-surface) var(--m3-state-hover), transparent);
+}
+.camtile:active::after {
+  background: color-mix(in srgb, var(--on-surface) var(--m3-state-press), transparent);
+}
+
 .camtile > img { display: block; width: 100%; height: 100%; object-fit: cover; }
 /* js/wall.js swaps a tile's still for a strip once it is armed: one wide image, `--n` cells, and
    `--i` of them moved past the left edge to show cell `--i`. `height: 100%` above still applies —
