@@ -17269,3 +17269,80 @@ which is the name the legend section carries.
 
 No claim about the layers moved. The rainfall panel still states the four JPS classes and still
 states that a pin folds heavy rain into the alert amber where the ramp does not.
+
+## The all-stations table and the camera wall reach M3
+
+The repository owner brought `#dataBox` and `#camBox` onto Material Design 3 on 2026-08-26. Both
+panels already shared the app bar and the back arrow with every other pane. This work closes the
+gap in what sits under that bar.
+
+### M3 publishes no data table component
+
+M2 shipped one. M3 dropped it. So no reference file supplies a table whole. Every part of this one
+either borrows a named M3 component or states why it diverges. A camera tile has the easier path.
+It maps onto M3's filled card directly, so most of that work is plain transcription.
+
+### Five decisions, and the cost of each
+
+The repository owner made five choices, and accepted a stated cost on every one.
+
+The table kept its columns. The alternative was one M3 list item per place. That alternative loses
+the column scan, since a reader can no longer run an eye down one sensor kind.
+
+A camera tile became a filled card, and it kept its 2px alert border. An outlined card states a 1dp
+neutral line instead. Around a 254px tile, 1dp of red reads far quieter than the 2px this app
+already uses for a station in trouble.
+
+The two filter fields became M3 search bars. M3 pairs a search bar with a search view, and these
+two fields only filter rows already on screen. The go-to box is a real search view, and it already
+wears this same 56px shape. So the app now draws one search shape for two behaviors. The honest
+alternative, M3's outlined text field, draws a second field shape instead.
+
+The cell badges became M3 assist chips, which reversed a rule `CLAUDE.md` held. And a river cell
+kept its meter and also gained a chip.
+
+### The chip that came back
+
+The chip shipped, and the repository owner reverted it the same day.
+
+Its label carried the reading, and its 18dp leading glyph carried the status hue. So the status
+word left the cell, and only the hover panel still stated it. A river cell kept its meter and
+gained a chip too, and it grew to about 84px against about 53px for every other kind. Measured on
+the cached payload: 118 of 459 places carry a river, so about one row in four ran tall.
+
+The repository owner looked at the result on screen and reverted it. The rule that condemned the
+chip already stood in `CLAUDE.md`, written before this branch existed: a 32dp chip in a table cell
+is a row height. This work built the chip over that rule anyway. The measurement it warned about
+is the one that sank it.
+
+### Two fixes survived the revert
+
+Two changes that shipped with the chip stayed after the revert. The siren branch and the rainfall
+branch each call `color()` now, never `statusColor()`. Before this, an idle siren wore
+`--s-normal` green in the table, while its own pin wore the siren pink on the map. That is a fourth
+colour on one sensor, and the three-colour rule this app holds does not allow one.
+
+### Two smaller cuts, the same day
+
+The table now states one inset, not two. It stated 16px on its left edge and a bare 8px at every
+column divider. Both numbers read `var(--pane)` now, so the two can never drift apart again.
+
+The `My location` row also lost its 3px accent rail. That row already carries an accent tint across
+its full width, so the rail on one cell restated the same fact a second time.
+
+### What the one inset costs
+
+Moving the camera cell's padding onto `var(--pane)` wraps `.shotbtn` onto two lines at 360px.
+Measured against the cached payload: 87 of 89 wrapped cells already need that row height for
+another cell in the same row, so the row does not grow. Only two rows grow, by about 20px, at one
+breakpoint, on a table that already scrolls sideways there. The repository owner accepted that
+cost rather than keep two insets.
+
+### Four faults, not four guesses
+
+Four faults justified this work, and measurement backed every one of them. One panel stated four
+insets at once: 16px to the headline, 16px to the filter field, 20px to a table row's name, and
+20px to the camera grid, each shrinking on a phone to a different number again. Neither panel read
+the bottom safe area, so the last table row and the camera count sat under the iOS home indicator.
+The sort control stood 30px tall, under M3's own 48dp minimum touch target. And the name column
+took 220px of a 360px screen, which is 61% of the width available.

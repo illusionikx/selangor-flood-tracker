@@ -27,7 +27,7 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `title-test.html` | `chrome --headless --dump-dom` — one of seven runnable checks. Guards the wordmark ladder in both of the heading's homes, the app bar and the navigation rail, in rendered pixels |
 | `narrow-test.html` | `chrome --headless --dump-dom` — one of seven runnable checks. Guards the narrow-window block: its threshold, its coverage, its refusal to be dismissed, and that it is modal |
 | `paint-check.html` | `chrome --headless --dump-dom` — one of seven runnable checks. Guards the layer chips over the map: that the panel and its two openers are gone, that the filters panel and every district id are gone too, that a menu chip states its own value and a filter chip carries a checkmark, that the heatmap and the two filters leave with the station layer, that a filter chip clears itself on a second press, that nothing else on the map lands on the row, and that below 600px the row wraps rather than scrolling |
-| `m3-check.html` | `chrome --headless --dump-dom` — one of seven runnable checks. Guards every M3 surface in rendered pixels: the nine dialogs against the roll call and the kind each is declared as, the four-band ladder, the map as an inset card, the one motion that changes what the pane holds, the supporting pane's headers and all five dialog headers as one M3 medium flexible top app bar, measured against each other at both widths, the supporting pane at M3's canonical ratios with the map giving up exactly that width, the pane as a side sheet above 600px and a full-screen dialog below it, and the station panel as an M3 list, one item per sensor, with its readings as a segmented list under a 24px kind glyph. Also the navigation rail at both its widths, the navigation bar below 600px, and that every enter carries M3's own duration and easing |
+| `m3-check.html` | `chrome --headless --dump-dom` — one of seven runnable checks. Guards every M3 surface in rendered pixels: the nine dialogs against the roll call and the kind each is declared as, the four-band ladder, the map as an inset card, the one motion that changes what the pane holds, the supporting pane's headers and all five dialog headers as one M3 medium flexible top app bar, measured against each other at both widths, the supporting pane at M3's canonical ratios with the map giving up exactly that width, the pane as a side sheet above 600px and a full-screen dialog below it, and the station panel as an M3 list, one item per sensor, with its readings as a segmented list under a 24px kind glyph. Also the navigation rail at both its widths, the navigation bar below 600px, and that every enter carries M3's own duration and easing. Also the table dialog and the camera wall. Both take the one inset, shared by the search bar, the count line and the grid. The search bar states its own 56px shape. The sort target reaches 56dp. A tile states its container tone and a 12dp corner. The check also guards the two deletions, so a half-finished revert cannot ship silently |
 | `kind-color-lab.html` | the station kind palette, derived in OKLCh at load. **Not a check** — it renders for a person to read, and it prints no verdict. It fetches `css/base.css` and reports whether the app still holds what the rule builds, so open it after any palette edit. It was seven competing options until 2026-08-26 and holds one palette now |
 | `css/icons.css` | every icon, as an SVG mask. Generated — see docs/FEATURES.md for the fetch |
 | `css/base.css` | tokens, reset, controls, blocks shared by popup + alert panel |
@@ -1207,6 +1207,13 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
   group heads itself with the kind it holds, and that is the same claim `#sideKinds` makes about a
   place. `.badge` is still untouched in the all-stations table, which is a dense grid rather than a
   pane, and a 32dp chip in a table cell is a row height.
+  **THE CELLS TOOK CHIPS FOR ONE REVISION, AND CAME BACK ON 2026-08-26.** The chip's label
+  carried the reading, and its 18dp leading glyph carried the status hue. So the status word left
+  the cell. A river cell kept its meter and gained a chip. It then ran to about 84px, against about
+  53px for every other kind. So about one row in four ran tall. The repository owner looked at it
+  and reverted it the same day.
+  **THE MEASUREMENT THAT CONDEMNED IT IS THE ONE THIS RULE ALREADY STATED.** A chip in a table cell
+  is a row height.
   **It is `:scope > .muted`, never `.muted`.** The alert list writes `· nearest first` INSIDE its own
   `.popname`. A descendant search lifts that fragment out of the title it belongs to.
   **Every card then leaves `.pophead` empty, so `openSide()` removes it.** An empty seam
@@ -3581,6 +3588,44 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   That is right. Two points 80 m apart report one weather. But somebody who knows both names will
   only ever find one. The layer thins rather than clusters, for the same family of reason. A
   cluster badge reading 6 cannot say WHICH weather.
+- **A search bar here filters in place and opens no view.** M3 gives a search bar a search view,
+  but `.m3search` only filters rows already on screen. The go-to box is a real search view, and
+  `#gotobar` states the same 56px shape. So this app draws one search shape for two behaviors. The
+  alternative, M3's outlined text field, is the honest component, and it draws a second field shape.
+- **A camera tile is an M3 filled card carrying a 2px status border.** That border is this app's
+  status language, not a card outline. M3's outlined card states a 1dp neutral line. Around a 254px
+  tile, 1dp of red reads much quieter than 2px. Do not convert it.
+- **The table states ONE inset, and it stated two.** `table.data` itself carries the left inset as
+  `padding-left: var(--pane)`. Both `td` and `.chead th` now pad with `var(--pane)` too, where each
+  once stated a bare 8px. So the left edge read 16px while every column divider read 8.
+  `box-sizing: border-box` in `css/base.css:494` keeps the column math steady, since padding sits
+  inside each 120px column, not outside it. `table.data td.nm` keeps `padding-left: 0`, since the
+  table already places it.
+- **`#camBar` declines three parts of the M3 Expressive linear progress indicator.** They are the
+  rounded ends, the 4dp gap between the active indicator and the track, and the stop indicator. Each
+  shapes a widget parked in a layout. This bar is the state of a boundary.
+- **`--pane` is 16px for `#dataBox` and `#camBox`, and 24px for `.docbox` above 600px.** M3 states
+  two insets, and the content picks which one applies. An app bar or a list item takes 16dp, and a
+  dialog's own prose takes 24dp. These two panels hold list content, and `.docbox` holds paragraphs
+  instead. `.docbox` also drops from 18px to 16px on a phone. 18px under a 16px headline reads as a
+  mistake, not an indent.
+- **The hover panel states its own background and its own shadow, and it carried `class="surface"`
+  for both.** Two files once declared one background at equal specificity, and load order alone
+  decided which won. That is not a rule anybody can read. This rule also states `border: 0`, since
+  the `[popover]` UA sheet sets a solid 3px border on every popover. Without that reset, the outline
+  returns at three times the deleted 1px width. `.menu` already restates it for the same reason.
+- **A camera tile's state layer is a pseudo-element, and it never takes an inset `box-shadow`.** CSS
+  paints an inset shadow with the element's own background, then paints in-flow descendants over it.
+  `.camtile > img` is an in-flow descendant, so the shadow stays invisible behind every working
+  picture. It shows only on a tile that failed to load. `isolation: isolate` makes this certain,
+  because the tile then forms its own stacking context. The overlay takes `z-index: 4`, above
+  `.camsay` at 1, `::before` at 2, and `.camfail` at 3.
+- **The phone name column and the table's own `min-width` are one number in two places.** The name
+  column went 220px to 160px below 600px, because 220 is 61% of a 360px screen. `table.data thead`
+  and `table.data tbody` carry a `min-width` that must equal the sum of the six columns. It was 820
+  (220 plus five times 120), and it is 760 below 600px. Leave the old floor in place, and the six
+  columns stretch to fill 820px on a 360px screen. The table still draws, but only the columns are
+  wrong.
 ## Conventions
 
 - **Anything that alerts is checked against the alert design standard** in
