@@ -100,13 +100,20 @@ app bar reads it back:
 
 Four numbers become one number.
 
-### The compact value moves to 16px
+### The value is 16px, at every width
 
-`.docbox` sets `--pane: 18px` on a phone. Move it to 16px. The app bar states its headline 16px in,
-at every width. 24px under a 16px headline reads as deliberate indentation. 18px under it reads as
-a mistake. 16px lands the body on the app bar's own line.
+`#dataBox` and `#camBox` set `--pane: 16px` at both widths. The app bar states its headline 16px in,
+at every width. So the headline and the first column under it land on one line.
 
-This is one number, and it corrects all five panels at once.
+**M3 states two insets, and the content decides which one.** An app bar and a list item state 16dp.
+A dialog's own content states 24dp. These two panels hold list content, not prose. So they take
+16dp.
+
+`.docbox` keeps 24px above 600px. It holds prose, and 24px under a 16px headline reads as deliberate
+indentation for a paragraph.
+
+`.docbox` moves from 18px to 16px on a phone. 18px under a 16px headline reads as a mistake rather
+than as an indent. That is one number, and it corrects three more panels.
 
 ### The bottom safe area
 
@@ -125,6 +132,9 @@ Both fields take one class. The numbers come from the M3 Expressive component se
 - a trailing `close` glyph that clears the field
 
 Both fields leave the `select, #goto` rule in `css/base.css`.
+
+`css/icons.css` needs no change. It already holds `--i-search`, `--i-close`, `--i-arrow_upward` and
+`--i-arrow_downward`.
 
 ### The count line
 
@@ -250,7 +260,7 @@ Delete the rule that says the chip conversion stops at the pane. See decision 4.
 | `css/chrome.css` | most of this work |
 | `css/base.css` | the field rule loses two selectors, `--pane` moves to 16px on a phone |
 | `js/table.js` | the cell builder, the sort mark |
-| `css/icons.css` | `arrow_upward` and `close`, where either one is absent |
+| `js/ui.js` | the clear button on both search bars |
 | `m3-check.html` | one block per surface |
 | `CLAUDE.md` | the four divergences, and one deletion |
 | `docs/FEATURES.md` | what shipped and why |
