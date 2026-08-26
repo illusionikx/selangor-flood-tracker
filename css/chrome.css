@@ -1657,25 +1657,49 @@ table.data .minibar i {
 table.data [data-pop] { cursor: help; }
 table.data button[data-pop] { cursor: pointer; }
 
-/* Top-layer panel, so the table's own scrolling can't clip it. Placement is set by table.js; the
-   `display` pair is also the fallback — a browser without popover support never matches
-   `:popover-open`, so the panel stays hidden instead of spilling into the cell. */
+/* **M3's rich tooltip**: a `surface-container` container, a 12dp corner, 12px by 16px of padding,
+   a `title-small` subhead and `body-medium` rows. This app bridges `surface-container` onto
+   `--hover`, its own container tone.
+   **It states its own background and its own shadow**, and it carried `class="surface"` for both
+   before. Two files declaring one background at equal specificity is decided by load order, and
+   that is not a rule anybody can read.
+   **The 1px outline is deleted.** M3 gives this component none, and the shadow is what lifts it
+   off the table. This app's one elevation is `--shadow`, the divergence every dialog here states.
+   Top layer, so the table's own scrolling cannot clip it. That was already true and is why this
+   is a `popover`.
+   **This rule states `border: 0` rather than omitting it.** The `[popover]` UA sheet sets a
+   solid medium border, 3px, on every popover. `.menu` already restates it as `0` for the same
+   reason. Drop this line, and the outline this task deletes comes back at three times its old
+   width. */
 .tipbox {
   position: fixed; margin: 0; inset: auto; display: none;
-  min-width: 200px; max-width: min(320px, calc(100vw - 16px));
-  padding: 10px 12px; border: 1px solid var(--outline); border-radius: 10px;
-  color: var(--on-surface); font-size: 12px;
+  min-width: 240px; max-width: min(320px, calc(100vw - 16px));
+  padding: 12px 16px; border: 0; border-radius: 12px;
+  background: var(--hover); box-shadow: var(--shadow);
+  color: var(--on-surface);
+  font-size: var(--md-sys-typescale-body-medium-size);
+  line-height: var(--md-sys-typescale-body-medium-line-height);
+  font-weight: var(--md-sys-typescale-body-medium-weight);
+  letter-spacing: var(--md-sys-typescale-body-medium-tracking);
 }
 .tipbox:popover-open { display: block; }
+/* The subhead. It was 11px uppercase with .06em of letter-spacing, which is this app's old table
+   language rather than any M3 component.
+   **`title-small` and `body-medium` are both 14px on 20px here.** So the weight and the tracking
+   are the whole of what separates this line from the rows under it. State all four. */
 .tipbox .tiphead {
-  margin-bottom: 6px; font-size: 11px; font-weight: 500; letter-spacing: .06em;
-  text-transform: uppercase; color: var(--muted);
+  margin-bottom: 6px;
+  color: var(--muted);
+  font-size: var(--md-sys-typescale-title-small-size);
+  line-height: var(--md-sys-typescale-title-small-line-height);
+  font-weight: var(--md-sys-typescale-title-small-weight);
+  letter-spacing: var(--md-sys-typescale-title-small-tracking);
+  text-transform: none;
 }
 .tipbox .tiprow { display: flex; gap: 12px; align-items: baseline; padding: 3px 0; }
 /* General sibling, not adjacent: a merged panel now puts each sensor's graph between its rows, so
    `+` would only ever match the second row of a graph-less kind. */
 .tipbox .tiprow ~ .tiprow { border-top: 1px solid var(--outline); }
-.tipbox { min-width: 240px; }
 .tipbox .tipnote { margin-top: 4px; }
 .tipbox .spark { margin: 8px 0 2px; }
 .tipbox .spark + .muted, .tipbox .spark .muted { font-size: 11px; }
@@ -2618,7 +2642,10 @@ body:has(#wxLayer:checked) :is(#heatChip, #kindChip, #alertChip, #favChip) { dis
   width: 72px; flex: none;
   height: 8px; border-radius: 999px; margin: 0;
   /* The visible slice of the heat gradient — HEAT_ALERT to danger — so the warning stop lands at
-     (0.68 − 0.38) / (1 − 0.38). Change with heat.js's gradient and config.js's slots. */
+     (0.68 − 0.38) / (1 − 0.38). Change with heat.js's gradient and config.js's slots.
+     **FOUR rungs here against the pin's three, and that is settled.** The three-colour rule of
+     2026-08-26 covers a sensor, and this ramp describes a wash that paints ground. See RAIN_HEAT's
+     own comment in js/config.js for the argument, stated once. */
   background: linear-gradient(90deg, #ffd166 0%, #ff9f1c 48%, #ff4d4d 100%);
 }
 /* Rainfall's slice runs from the first class, so the four evenly-spaced RAIN_STOPS slots land on

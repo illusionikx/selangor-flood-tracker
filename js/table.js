@@ -329,7 +329,7 @@ function summary(own, lead, scope) {
   // down — two panels with one id and getElementById would only ever find the first.
   const id = `sum-${scope}${own[0].id}`;
   return [` data-pop="${id}"`,
-    `<div id="${id}" class="tipbox surface" popover>
+    `<div id="${id}" class="tipbox" popover>
       <div class="tiphead">${own.length > 1
         ? `${own.length} sensors here, summarised` : own[0].name}</div>
       ${own.length > 1

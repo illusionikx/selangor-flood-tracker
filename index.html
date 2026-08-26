@@ -77,9 +77,9 @@
      Before `base.css`, which derives `--m3-travel`, `--m3-grow` and `--m3-swap` from them and
      bridges M3's colour names onto this app's palette. Colour is not in this file on purpose. -->
 <link rel="stylesheet" href="vendor/m3/tokens.css?v=2">
-<link rel="stylesheet" href="css/base.css?v=192">
-<link rel="stylesheet" href="css/chrome.css?v=323">
-<link rel="stylesheet" href="css/map.css?v=173">
+<link rel="stylesheet" href="css/base.css?v=194">
+<link rel="stylesheet" href="css/chrome.css?v=326">
+<link rel="stylesheet" href="css/map.css?v=178">
 
 <!-- Water tint for the dark basemap. CARTO's dark_all is greyscale — all 18 of its tones have zero
      chroma — so no saturate() or hue-rotate() can pull water out of it. What it does have is one
@@ -1012,7 +1012,7 @@
        color, and none of the five is ever used for status.</span>
 
     <span class="pins">
-      <span class="pin" style="--c:var(--s-alert)"><i class="i i-water_drop"></i></span>
+      <span class="pin inkdark" style="--c:var(--s-alert)"><i class="i i-water_drop"></i></span>
       <!-- `--c` is not optional on a sample. `.pin` reads `color: var(--c, var(--accent))`, so a pin
            with no `--c` draws in the accent blue — which is what this one did, under a line of text
            promising the reader it fills red. See the legend rule in the Verify block in CLAUDE.md. -->
@@ -1023,9 +1023,9 @@
        keeps a pulsing halo and draws over everything else.</span>
 
     <span class="pins">
-      <span class="pin" style="--c:var(--s-alert)"><i class="i i-water_drop"></i></span>
-      <span class="pin" style="--c:var(--s-alert)"><i class="i i-straighten"></i></span>
-      <span class="pin" style="--c:var(--s-alert)"><i class="i i-rainy"></i></span>
+      <span class="pin inkdark" style="--c:var(--s-alert)"><i class="i i-water_drop"></i></span>
+      <span class="pin inkdark" style="--c:var(--s-alert)"><i class="i i-straighten"></i></span>
+      <span class="pin inkdark" style="--c:var(--s-alert)"><i class="i i-rainy"></i></span>
     </span>
     <span>Where amber starts, per kind. A water level at its <b>alert mark</b>. A flood gauge at
        <b>0.15 m</b> of water. A rain gauge above <b>30 mm an hour</b>. Red follows at the danger
@@ -1456,11 +1456,13 @@
      badge stood here too, and it is a chip on the map chip row since 2026-08-25. The strip stays a
      strip: it centres on the map and it is where a second standing state would go. -->
 <div id="pills">
-  <!-- ON ALERT, matching the chip in #paint that raises it. One name for one thing. The sentence
-       under it states what the filter actually does, which is narrower than the app bar's own
-       "on alert" count: this hides every station that is not forecast to reach danger. -->
+  <!-- ON ALERT, matching the chip on #mapchips that raises it. One name for one thing. The sentence
+       under it states what the filter does. It reads `isHot()` now, the same rule the app bar count,
+       the icon badge and the alert panel read, so the chip and the count are one number. It named
+       the forecast flag alone until 2026-08-26, and the chip then sat dead over a map full of red
+       pins. -->
   <div id="risebadge"><i class="i i-visibility_off"></i><b>ON ALERT</b>
-    <span>Every station not climbing is hidden</span>
+    <span>Every station not on alert is hidden</span>
     <button id="riseOff">Show all</button></div>
 </div>
 <!-- **The legend and the credit share one row, and the credit drops under it when they do not fit.**
@@ -1497,6 +1499,8 @@
     <div class="ramp"></div>
     <!-- The three marks themselves, in the order the ramp crosses them. The prose that used to sit
          under it is in the tip — the panel is a legend, not a page. -->
+    <!-- The three marks themselves, in the order the ramp crosses them. The prose that used to sit
+         under it is in the tip — the panel is a legend, not a page. -->
     <div class="ticks muted"><span>alert</span><span>warning</span><span>danger</span></div>
   </div>
   <!-- Rainfall's own scale, drawn only while that layer is on. Separate section rather than a second
@@ -1509,7 +1513,8 @@
           <p><b>How it is worked out</b></p>
           <p>Rain in the last hour, on the intensity classes JPS publishes: light above 0 mm,
              moderate above 10, heavy above 30, violent above 60.</p>
-          <p>The colors are the rainfall pins' own, so a blob and a pin under it agree.</p>
+          <p>One color per class. A pin folds heavy rain into the alert amber and this scale does
+             not, so read the blob against this ramp rather than against the pin standing in it.</p>
           <p>Every reporting rain gauge counts, and only rain that is actually falling is drawn — a
              dry gauge paints nothing.</p>
           <p class="muted">This is rain, not flooding. It says where the water is arriving, not

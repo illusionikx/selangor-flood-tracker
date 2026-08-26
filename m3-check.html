@@ -2877,6 +2877,69 @@ async function cellChips() {
   b.close();
 }
 
+/* **M3's rich tooltip**: a `surface-container` container, a 12dp corner, 12px by 16px of
+   padding, a `title-small` subhead and `body-medium` rows. The panel already held a head over
+   rows and already lived in the top layer, so this is tokens and numbers only.
+   **`title-small` and `body-medium` are both 14px on 20px**, so a size assertion cannot tell
+   one from the other. Every type assertion here reads the tracking and the weight too.
+   **It must keep its own pills.** The panel sits inside a cell in the DOM, so the cell's rules
+   reach it. The top layer changes where a thing paints, not what selectors match it. */
+async function richTip() {
+  const { d, cs, r, settle } = await ready('desk');
+  say('--- the hover panel ------------------------------------------------------');
+  settle();
+  const b = d.getElementById('dataBox');
+  b.showModal();
+  d.getElementById('dataBody').innerHTML = `<tr><td class="k">
+    <div id="probetip" class="tipbox" popover>
+      <div class="tiphead">2 sensors here</div>
+      <div class="tiprow"><span>SG. DAMANSARA</span><span class="tv">
+        <span class="badge" style="--c:var(--s-alert)">light</span></span></div>
+    </div></td></tr>`;
+  const tip = d.getElementById('probetip');
+  tip.showPopover();
+  const root = cs(d.documentElement);
+  const tok = n => root.getPropertyValue(n).trim();
+
+  is(cs(tip).borderRadius, '12px', 'a 12dp corner');
+  is(cs(tip).padding, '12px 16px', 'M3 rich tooltip padding');
+
+  /* The container tone, read off a probe and never off a literal. The bridge in `css/base.css`
+     is what resolves the role, so a literal here states the answer twice. */
+  const probe = d.createElement('div');
+  probe.style.background = 'var(--hover)';
+  d.body.appendChild(probe);
+  const want = cs(probe).backgroundColor;
+  probe.remove();
+  is(cs(tip).backgroundColor, want, 'surface-container, not the page surface');
+
+  /* The outline is deleted. M3 gives this component no outline, and the shadow is what lifts it.
+     A deletion needs an assertion, or a half-finished revert draws a line nothing reports. */
+  is(cs(tip).borderTopWidth, '0px', 'no outline');
+  is(cs(tip).boxShadow !== 'none', true, 'and it keeps this app one elevation');
+
+  const head = cs(tip.querySelector('.tiphead'));
+  is(head.fontSize, tok('--md-sys-typescale-title-small-size'), 'title-small subhead: size');
+  is(head.lineHeight, tok('--md-sys-typescale-title-small-line-height'), 'and its line height');
+  is(head.letterSpacing, tok('--md-sys-typescale-title-small-tracking'), 'and its tracking');
+  is(head.fontWeight, tok('--md-sys-typescale-title-small-weight'), 'and its weight');
+  is(head.textTransform, 'none', 'sentence case, not the old uppercase block');
+
+  const row = cs(tip.querySelector('.tiprow'));
+  is(row.fontSize, tok('--md-sys-typescale-body-medium-size'), 'body-medium rows: size');
+  is(row.letterSpacing, tok('--md-sys-typescale-body-medium-tracking'), 'and its tracking');
+  is(row.fontWeight, tok('--md-sys-typescale-body-medium-weight'), 'and its weight');
+
+  /* The head and the rows must not land on one scale. Both are 14px, so this is the assertion
+     that says the two components are actually different. */
+  is(head.letterSpacing !== row.letterSpacing, true, 'the two scales stay apart');
+
+  /* The panel keeps the word the cell gave up, so a pill in here must still draw. */
+  is(Math.round(r(tip.querySelector('.badge')).height) > 0, true, 'and it still draws its pills');
+  tip.hidePopover();
+  b.close();
+}
+
 (async () => {
   out.textContent = '';
   try {
@@ -2927,6 +2990,10 @@ async function cellChips() {
          `rowState()`, because Task 6 is the last table probe. Every probe above it already
          settled the frame. */
       await cellChips();
+      /* `richTip()` calls `settle()` on the shared `#desk` frame too. It runs after
+         `cellChips()`, because Task 7 is the next table probe. Every probe above it already
+         settled the frame. */
+      await richTip();
     } finally {
       if (origPrefs === null) deskWin.localStorage.removeItem('prefs');
       else deskWin.localStorage.setItem('prefs', origPrefs);
