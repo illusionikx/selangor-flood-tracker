@@ -2838,42 +2838,35 @@ async function rowState() {
   is(/--m3-state-press:/.test(baseCss), true, 'and the press fraction too');
 }
 
-/* M3's assist chip, the same component `#sideKinds` and the alert head draw. It is 32dp, at
-   `shape-corner-small`, with a 1dp outline, `label-large` text, and an 18dp leading icon.
+/* The repository owner reversed the M3 assist chip here on 2026-08-26, after seeing it on
+   screen. A cell states its word over its number again, in `.badge`, and the chip is gone from
+   the whole table.
 
-   The colour splits M3's way. The label takes `on-surface`, and the 18dp leading icon takes the
-   status hue. A chip whose label wears the status starts under 4.5 to 1 against its own tint.
-   That is the contrast problem `.state` in css/base.css already records. */
+   A deletion needs an assertion, or a half-finished revert leaves a rule nothing reports. So
+   this probe checks the chip is absent from the whole table, not only that the pill is back. */
 const CELLS = `<tr data-mast="probe">
     <td class="nm">SUNGAI DAMANSARA</td>
-    <td class="k"><div class="cv"><span class="mchip" style="--c:var(--s-alert)"
-      ><i class="i i-rainy"></i>4 mm/h</span></div></td>
+    <td class="k"><div class="cv"><span class="badge" style="--c:var(--s-alert)">light</span>
+      <div class="val">4 mm<span class="muted">/h</span></div></div></td>
   </tr>`;
 
-async function cellChips() {
+async function cellPills() {
   const { d, cs, r, settle } = await ready('desk');
-  say('--- the table cell chips -------------------------------------------------');
+  say('--- the table cell pills ---------------------------------------------------');
   settle();
   const b = d.getElementById('dataBox');
   b.showModal();
   d.getElementById('dataBody').innerHTML = CELLS;
-  const chip = d.querySelector('.mchip');
-  const root = cs(d.documentElement);
-  is(Math.round(r(chip).height), 32, 'the chip is 32dp');
-  /* Read the radius and the size off their own tokens, never as a hand-copied pixel figure. That
-     is the same rule the column head and the count line already state for label-large and
-     title-small. */
-  is(cs(chip).borderRadius, root.getPropertyValue('--md-sys-shape-corner-small').trim(),
-     'shape-corner-small');
-  is(cs(chip).fontSize, root.getPropertyValue('--md-sys-typescale-label-large-size').trim(),
-     'label-large');
-  is(cs(chip).borderTopWidth, '1px', 'a 1dp outline');
-  const glyph = chip.querySelector('.i');
-  is(Math.round(r(glyph).width), 18, 'an 18dp leading icon');
-  /* The label is on-surface and the glyph carries the status. Compare the two against each
-     other, never against a hex. */
-  is(cs(chip).color === cs(glyph).color, false, 'the label is not painted by the status');
-  is(Math.round(r(d.querySelector('td.k')).height), 53, 'so a chip cell is 53px');
+  is(!!d.querySelector('td.k .badge'), true, "a cell's value carries .badge");
+  is(!!d.querySelector('table.data .mchip'), false,
+     '.mchip does not appear anywhere inside table.data');
+  /* Read off the panel's own token, never as a hand-copied literal. `#dataBox` states `--pane`
+     once and every box below the app bar reads it back. */
+  const pane = cs(b).getPropertyValue('--pane').trim();
+  const td = d.querySelector('table.data td.k');
+  is(cs(td).paddingLeft, pane, "the cell's own inset equals --pane");
+  is(cs(d.querySelector('table.data')).paddingLeft, pane,
+     'and matches the gap at the table’s own left edge');
   b.close();
 }
 
@@ -3033,12 +3026,12 @@ async function camCardState() {
       /* `rowState()` reads the CSSOM and a probe element, so ordering after `tableHead()` costs
          nothing. */
       await rowState();
-      /* `cellChips()` calls `settle()` on the shared `#desk` frame too. It runs after
-         `rowState()`, because Task 6 is the last table probe. Every probe above it already
+      /* `cellPills()` calls `settle()` on the shared `#desk` frame too. It runs after
+         `rowState()`, because Task 10 is the last table probe. Every probe above it already
          settled the frame. */
-      await cellChips();
+      await cellPills();
       /* `richTip()` calls `settle()` on the shared `#desk` frame too. It runs after
-         `cellChips()`, because Task 7 is the next table probe. Every probe above it already
+         `cellPills()`, because Task 7 is the next table probe. Every probe above it already
          settled the frame. */
       await richTip();
       /* `camCard()` calls `settle()` on the shared `#desk` frame too. It runs after `richTip()`,

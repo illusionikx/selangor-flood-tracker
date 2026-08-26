@@ -1509,7 +1509,7 @@ table.data thead { position: sticky; top: 0; z-index: 4; }
    `label-large` in `on-surface-variant`, the same scale `.mtext`, `.badge` and `.mi .mv` already
    state in this file. Read the size, weight and tracking off those tokens, never as literals. */
 table.data .chead th {
-  text-align: left; padding: 0 8px; cursor: pointer; user-select: none;
+  text-align: left; padding: 0 var(--pane); cursor: pointer; user-select: none;
   height: 56px; white-space: nowrap;
   color: var(--muted); text-transform: none;
   font-size: var(--md-sys-typescale-label-large-size);
@@ -1571,7 +1571,7 @@ table.data tr[data-mast]:active > td {
 }
 /* No coordinates upstream, so nothing to fly to — say so rather than offer a jump that goes nowhere. */
 table.data .nomap { font-style: italic; }
-table.data td { padding: 10px 8px; border-bottom: 1px solid var(--outline); vertical-align: top; }
+table.data td { padding: 10px var(--pane); border-bottom: 1px solid var(--outline); vertical-align: top; }
 /* The location freezes while the readings scroll under it — a row of numbers with the place name
    scrolled off is unreadable. Sticky needs its own background, or the cells slide through it. */
 /* **`padding-left: 0`, not `var(--pane)`.** `table.data` now carries the inset itself, and this
@@ -1595,45 +1595,23 @@ table.data td.k, table.data .chead th:not(:first-child) { width: 120px; }
 table.data td.k { font-size: 12px; font-variant-numeric: tabular-nums; }
 table.data td.none { text-align: center; padding: 28px; }
 
-/* **M3's assist chip, the same component `#sideKinds .badge` already draws.** The container is
-   32dp at `shape-corner-small`, with a 1dp outline and an 18dp leading icon. The label takes
-   `label-large`. https://github.com/bczak/m3you/blob/development/src/components/Chip/chip.css
+/* Compact: 120px columns can't carry popup-sized type, and the badge is the thing being scanned. */
+table.data .cv b { font-weight: 500; font-size: 13px; }
+table.data .cv .val { margin-top: 3px; font-size: 11px; line-height: 1.35; }
+table.data .cv .val b { font-size: 12px; font-weight: 500; }
+table.data .cv .muted { font-size: 11px; }
+/* A status badge fills its cell, so the colour band itself lines up down the column and can be read
+   without reading the word.
 
-   This reverses a rule this repo held. That rule said the chip conversion stopped at the pane. A
-   32dp chip in a table cell is a row height.
-
-   The repository owner reversed it on 2026-08-26. This repo deletes the old rule rather than
-   leaving it to disagree with this one.
-
-   The colour splits M3's way, the same way `#sideKinds .badge` already splits it. The label takes
-   `on-surface`, and the 18dp leading icon takes the status hue through `--c`.
-
-   A status-coloured label on a tint of itself starts under 4.5 to 1. That is the contrast problem
-   `.state` in css/base.css already records.
-
-   The padding is M3's own asymmetry. It is 8dp on the leading edge and 16dp on the trailing edge,
-   the same numbers `#sideKinds .badge` already states.
-
-   The cost, accepted: a column scan was a column of filled colour bands. It is a column of
-   coloured glyphs at a fixed position now.
-
-   A cell holds one chip and its own padding, plus the row's own 1px divider. 32 plus 2 times 10
-   plus 1 is 53px. `table.data td` states that padding and that divider already, above. */
-table.data .mchip {
-  display: inline-flex; align-items: center; gap: 8px;
-  height: 32px; padding: 0 16px 0 8px;
-  border: 1px solid var(--outline); border-radius: var(--md-sys-shape-corner-small);
-  color: var(--on-surface); background: none;
-  font-size: var(--md-sys-typescale-label-large-size);
-  line-height: var(--md-sys-typescale-label-large-line-height);
-  letter-spacing: var(--md-sys-typescale-label-large-tracking);
-  font-weight: var(--md-sys-typescale-label-large-weight);
-  white-space: nowrap;
+   The repository owner reversed the M3 assist chip that stood here on 2026-08-26, after seeing it
+   on screen. This rule is back to what it was before that chip. */
+table.data .cv .badge {
+  display: flex; width: 100%; justify-content: center; margin: 0;
+  padding: 3px 4px; font-size: 10px; letter-spacing: .2px;
 }
-table.data .mchip .i { flex: none; font-size: 18px; color: var(--c); }
 table.data .shotbtn { width: 100%; justify-content: center; }
 /* Marks a merged cell and carries the breakdown in its title. Pushed to the far edge of whatever it
-   sits in — inside the chip for the kinds that have one, on its own line for the kinds that don't. */
+   sits in — inside the badge for the kinds that have one, on its own line for the kinds that don't. */
 table.data .cv .line { display: flex; align-items: center; gap: 6px; }
 /* The popup's meter shrunk to a column: same piecewise scale, no labels — the number above it is
    the reading, this is only its shape. */
@@ -2940,8 +2918,9 @@ body.side #side { display: flex; }
    **A GROUP inside that pane briefly took it as well, through `.alert .badge`, and a reader cut
    that chip on 2026-08-25.** It stated the kind a third time, over a heading that names it and rows
    that all carry its glyph. So the selector is `#sideKinds` alone again.
-   `.badge` is gone from the all-stations table now. The repository owner reversed that rule on
-   2026-08-26. `table.data .mchip` states the same chip there, in its own rule. */
+   `.badge` is still untouched in the all-stations table, which is a dense grid rather than a pane.
+   It spent one revision as a 32dp chip there too, and the repository owner reversed that on
+   2026-08-26, after seeing it on screen. A chip in a table cell is a row height. */
 #sideKinds:empty { display: none; }
 #sideKinds .badges { display: flex; flex-wrap: wrap; gap: 8px; }
 #sideKinds .badge {
