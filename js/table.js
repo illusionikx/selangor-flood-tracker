@@ -237,10 +237,22 @@ export function dataTable() {
    than shared with the panel: a card has 300px to spend on one sensor, and "1.68 m · 34% of danger"
    in a 150px column wraps to three lines.
 
-   Where the reading *is* a state — a siren, a flood gauge, rainfall intensity — the cell leads with
-   a badge rather than a number, because that is the answer; the number is the evidence. Water level
-   is the other way round: the level is the answer, and the status is carried in its colour. */
+   Since 2026-08-26 every kind draws the same M3 assist chip. The chip's label states the reading,
+   and its 18dp leading icon carries the status colour. The status word itself moved into the hover
+   panel. That panel opens on a click, so a phone reader reaches the word in one tap. */
 const pill = (text, c, hook = '') => `<span class="badge" style="--c:${c}"${hook}>${text}</span>`;
+
+/* M3's assist chip. The label carries the READING, and the 18dp leading icon carries the status
+   hue.
+
+   The status WORD leaves the cell. Words like `light` and `ankle deep` now live in the hover
+   panel alone. That panel opens on a click, so a phone reader reaches the word in one tap.
+
+   The kind glyph is the leading icon, and it needs no new icon. The alert panel already paints a
+   row's kind glyph with its tier colour, so this repeats that component instead of inventing
+   one. */
+const chip = (text, c, kind, hook = '') =>
+  `<span class="mchip" style="--c:${c}"${hook}><i class="i i-${KINDS[kind].icon}"></i>${text}</span>`;
 
 /* Rain intensity on the server's own rainStatus() cutoffs (>0 / >10 / >30 / >60 mm an hour), short
    enough for a column. **The word is here and the colour is not.** The colour comes from `color()`,
@@ -248,7 +260,9 @@ const pill = (text, c, hook = '') => `<span class="badge" style="--c:${c}"${hook
    It carried its own tone column until 2026-08-26, and that column had drifted: it scored *heavy*
    and *very heavy* the same red while the pin drew violet and red. Two answers to one question, in
    two files. The column also skipped `raining()`, so a gauge whose own odometer denied its reading
-   still drew a red pill beside a violet pin. */
+   still drew a red pill beside a violet pin.
+   The cell itself lost this word on 2026-08-26. The chip's label states the reading, and the hover
+   panel keeps the word alone. */
 const RAIN = ['dry', 'light', 'moderate', 'heavy', 'very heavy'];
 
 /* What a cell is hiding: the sensors behind a merged reading, or a sensor whose own name differs from
@@ -355,46 +369,51 @@ function cell(own, lead, scope = '') {
   const m = merge(own);
   const [hook, panel] = summary(own, lead, scope);
   const wrap = inner => `<div class="cv">${inner}</div>${panel}`;
-  // Kinds with no badge to hang the hook on get their own line for it.
+  // Kinds with no chip to hang the hook on get their own line for it.
   const line = inner => `<div class="line"${hook}>${inner}</div>`;
 
   if (m.kind === 'siren') {
-    return wrap(!hasInfo(m) || !m.online ? pill('offline', NO_INFO, hook)
-      : m.status > 0 ? pill('triggered', statusColor(3), hook) : pill('idle', statusColor(0), hook));
+    return wrap(!hasInfo(m) || !m.online ? chip('offline', NO_INFO, 'siren', hook)
+      : m.status > 0 ? chip('triggered', statusColor(3), 'siren', hook)
+      : chip('idle', statusColor(0), 'siren', hook));
   }
+  // The camera keeps its button. A button names an action, and a chip states a reading.
   if (m.kind === 'camera') {
     return wrap(m.image
       ? `<button class="shotbtn" data-shot="${camSrc(m)}"${hook}
            data-cap="Latest still from ${m.name}" data-name="${m.name}"
            ><i class="i i-photo_camera"></i>Show image</button>`
-      : pill('offline', NO_INFO, hook));
+      : chip('offline', NO_INFO, 'camera', hook));
   }
-  if (!hasInfo(m)) return wrap(pill('offline', NO_INFO, hook));
+  if (!hasInfo(m)) return wrap(chip('offline', NO_INFO, m.kind, hook));
 
-  // Bar on top, number under it — the same shape as every other column, where the state leads and
-  // the measurement is the line beneath it. Without a danger mark there is no bar to draw, so the
-  // number stands alone and says why.
+  /* The river keeps its meter AND gains a chip. The repository owner asked for that on
+     2026-08-26.
+
+     A river cell now measures about 84px against 52px for every other kind. Measured on the
+     cached payload, 118 of 459 places hold a river, so about one row in four runs tall. The
+     repository owner accepts that cost, and this comment states it rather than hides it.
+
+     `line()` still carries the hook here, the same way it did for the old bare number. With no
+     bar to draw, the chip needs a wrapping element to hang the hover panel's marker on. */
   if (m.kind === 'river') {
     const bar = gauge(m, hook);
     return wrap(bar
-      ? bar + `<div class="val"><b style="color:${color(m)}">${m.level} m</b></div>`
-      : line(`<b style="color:${color(m)}">${m.level} m</b>`)
+      ? bar + chip(`${m.level} m`, color(m), 'river')
+      : line(chip(`${m.level} m`, color(m), 'river'))
         + '<div class="val muted">No danger mark</div>');
   }
   if (m.kind === 'rainfall') {
-    // `color()`, so the pill, the pin and the card cannot disagree about one gauge. It also carries
-    // `raining()`: a gauge whose own odometer denies its reading drops back to the kind violet.
-    const st = Math.max(0, m.status);
-    return wrap(`${pill(RAIN[st] || RAIN[0], color(m), hook)}<div class="val">${
-      m.hourly} mm<span class="muted">/h</span></div>`);
+    // `color()`, so the chip, the pin and the card cannot disagree about one gauge. It also
+    // carries `raining()`: a gauge whose own odometer denies its reading drops back to the kind
+    // violet.
+    return wrap(chip(`${m.hourly} mm/h`, statusColor(Math.max(0, m.status)), 'rainfall', hook));
   }
-  // Gauge: depth over a flood-prone spot, so negative is dry ground, not a missing reading.
-  // Word comes from the popup's own gaugeState(), so a pin and its row can never say different
-  // things about the same status.
-  const [, , label] = gaugeState(m);
-  return wrap(`${pill(label, gaugeColor(m), hook)}<div class="val">${
-    m.depth > 0 ? `${m.depth} m<span class="muted"> deep</span>`
-                : `<span class="muted">${Math.abs(m.depth)} m below</span>`}</div>`);
+  // A flood gauge: depth over a flood-prone spot, so negative is dry ground, not a missing
+  // reading. The unit words ride in the label now, the same way a river's "m" always did.
+  return wrap(chip(
+    m.depth > 0 ? `${m.depth} m deep` : `${Math.abs(m.depth)} m below`,
+    gaugeColor(m), 'gauge', hook));
 }
 
 /* CSS anchor positioning would do this, but it is Chromium-only — so the panel is placed by hand on

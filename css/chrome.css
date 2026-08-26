@@ -1004,6 +1004,29 @@ body.rising #risebadge { display: flex; }
    a second style is a legend that can disagree with the map. Scale the cluster chip down to sit in
    a text column rather than dominate it. */
 .docbox .pins .cluster { width: 28px; height: 28px; font-size: 12px; }
+/* **THE SAMPLES DRAW THE DISC IN CSS, and the map draws it in SVG. The two have to be checked
+   against each other by eye.** A station pin became a disc with the glyph knocked out on
+   2026-08-26. On the map that is an inline `<circle>` plus a `<use>`, built by `pinGlyph()` in
+   `js/map.js`. These samples are static markup holding a masked `<i>`, and there is no sprite to
+   `<use>` until that function has run once.
+   So the disc is a background here. The numbers are the SVG's own, converted: the circle is 35 of
+   40 viewBox units on a 1em box, which is 31.5px at this font size, and its 2.5 unit edge is 2.25px.
+   `currentColor` is the kind colour, because `.pin` already sets `color: var(--c)`.
+   **The `<i>` inside is `#fff` and not `--surface`.** An `.i` is a box of `currentColor` with the
+   glyph masked out of it, so this is the knockout ink and it matches `--pin-ink` in `css/map.css`.
+   A theme-following token would turn the glyph near-black on the dark theme, inside a disc that
+   does not change with the theme.
+   The rule names `.pins` so it cannot reach the map, where `.pin` holds the real SVG and a
+   background would draw a second disc behind it. */
+.docbox .pins .pin:not(.me, .place) {
+  width: 31.5px; height: 31.5px; background: currentColor; border-radius: 50%;
+  border: 2.25px solid var(--surface); box-sizing: border-box;
+}
+.docbox .pins .pin > .i { color: #fff; font-size: 19px; }
+/* The alert amber is the one fill white cannot sit on — see `.pin.inkdark` in `css/map.css` for the
+   measurement. On the map `render.js` adds that class by comparing the fill. Here the samples are
+   static, so `index.html` carries it by hand on every amber one. */
+.docbox .pins .pin.inkdark > .i { color: #101314; }
 
 /* The left cell of a how-to row: the control's own glyph, then its own name. Aligned to the first
    line, because a name can wrap to two and the glyph belongs beside the first. */
@@ -1568,20 +1591,46 @@ table.data tr[data-mast]:active td.nm {
 table.data td.k, table.data .chead th:not(:first-child) { width: 120px; }
 table.data td.k { font-size: 12px; font-variant-numeric: tabular-nums; }
 table.data td.none { text-align: center; padding: 28px; }
-/* Compact: 120px columns can't carry popup-sized type, and the badge is the thing being scanned. */
-table.data .cv b { font-weight: 500; font-size: 13px; }
-table.data .cv .val { margin-top: 3px; font-size: 11px; line-height: 1.35; }
-table.data .cv .val b { font-size: 12px; font-weight: 500; }
-table.data .cv .muted { font-size: 11px; }
-/* A status badge fills its cell, so the colour band itself lines up down the column and can be read
-   without reading the word. */
-table.data .cv .badge {
-  display: flex; width: 100%; justify-content: center; margin: 0;
-  padding: 3px 4px; font-size: 10px; letter-spacing: .2px;
+
+/* **M3's assist chip, the same component `#sideKinds .badge` already draws.** The container is
+   32dp at `shape-corner-small`, with a 1dp outline and an 18dp leading icon. The label takes
+   `label-large`. https://github.com/bczak/m3you/blob/development/src/components/Chip/chip.css
+
+   This reverses a rule this repo held. That rule said the chip conversion stopped at the pane. A
+   32dp chip in a table cell is a row height.
+
+   The repository owner reversed it on 2026-08-26. This repo deletes the old rule rather than
+   leaving it to disagree with this one.
+
+   The colour splits M3's way, the same way `#sideKinds .badge` already splits it. The label takes
+   `on-surface`, and the 18dp leading icon takes the status hue through `--c`.
+
+   A status-coloured label on a tint of itself starts under 4.5 to 1. That is the contrast problem
+   `.state` in css/base.css already records.
+
+   The padding is M3's own asymmetry. It is 8dp on the leading edge and 16dp on the trailing edge,
+   the same numbers `#sideKinds .badge` already states.
+
+   The cost, accepted: a column scan was a column of filled colour bands. It is a column of
+   coloured glyphs at a fixed position now.
+
+   A cell holds one chip and its own padding, plus the row's own 1px divider. 32 plus 2 times 10
+   plus 1 is 53px. `table.data td` states that padding and that divider already, above. */
+table.data .mchip {
+  display: inline-flex; align-items: center; gap: 8px;
+  height: 32px; padding: 0 16px 0 8px;
+  border: 1px solid var(--outline); border-radius: var(--md-sys-shape-corner-small);
+  color: var(--on-surface); background: none;
+  font-size: var(--md-sys-typescale-label-large-size);
+  line-height: var(--md-sys-typescale-label-large-line-height);
+  letter-spacing: var(--md-sys-typescale-label-large-tracking);
+  font-weight: var(--md-sys-typescale-label-large-weight);
+  white-space: nowrap;
 }
+table.data .mchip .i { flex: none; font-size: 18px; color: var(--c); }
 table.data .shotbtn { width: 100%; justify-content: center; }
 /* Marks a merged cell and carries the breakdown in its title. Pushed to the far edge of whatever it
-   sits in — inside the badge for the kinds that have one, on its own line for the kinds that don't. */
+   sits in — inside the chip for the kinds that have one, on its own line for the kinds that don't. */
 table.data .cv .line { display: flex; align-items: center; gap: 6px; }
 /* The popup's meter shrunk to a column: same piecewise scale, no labels — the number above it is
    the reading, this is only its shape. */
@@ -2838,8 +2887,8 @@ body.side #side { display: flex; }
    **A GROUP inside that pane briefly took it as well, through `.alert .badge`, and a reader cut
    that chip on 2026-08-25.** It stated the kind a third time, over a heading that names it and rows
    that all carry its glyph. So the selector is `#sideKinds` alone again.
-   `.badge` is still untouched in the all-stations table, which is a dense grid rather than a pane,
-   and a 32dp chip in a table cell is a row height. */
+   `.badge` is gone from the all-stations table now. The repository owner reversed that rule on
+   2026-08-26. `table.data .mchip` states the same chip there, in its own rule. */
 #sideKinds:empty { display: none; }
 #sideKinds .badges { display: flex; flex-wrap: wrap; gap: 8px; }
 #sideKinds .badge {

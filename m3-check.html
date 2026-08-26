@@ -2786,9 +2786,10 @@ async function tableHead(frame, label) {
 /* M3's state layer: the surface's own content colour at 8% on hover and 10% on press. This row
    took `var(--hover)` on hover and answered a press with nothing.
 
-   A `:hover` cannot be driven from a script, so this checks two things per rule. First, that the
-   mix RESOLVES: a probe element carrying the expression proves the percentage is not a dropped
-   declaration, the shape the rail's own state-layer check already uses.
+   A `:hover` cannot be driven from a script, so this checks two things per rule.
+
+   First, the mix must RESOLVE. A probe element carries the expression and proves the percentage
+   is not a dropped declaration. That is the shape the rail's own state-layer check already uses.
 
    Second, that each of the four selectors still DECLARES its own rule, walked by name rather than
    joined into one string. An unanchored join let an earlier version pass while only `td.nm`'s
@@ -2837,6 +2838,45 @@ async function rowState() {
   is(/--m3-state-press:/.test(baseCss), true, 'and the press fraction too');
 }
 
+/* M3's assist chip, the same component `#sideKinds` and the alert head draw. It is 32dp, at
+   `shape-corner-small`, with a 1dp outline, `label-large` text, and an 18dp leading icon.
+
+   The colour splits M3's way. The label takes `on-surface`, and the 18dp leading icon takes the
+   status hue. A chip whose label wears the status starts under 4.5 to 1 against its own tint.
+   That is the contrast problem `.state` in css/base.css already records. */
+const CELLS = `<tr data-mast="probe">
+    <td class="nm">SUNGAI DAMANSARA</td>
+    <td class="k"><div class="cv"><span class="mchip" style="--c:var(--s-alert)"
+      ><i class="i i-rainy"></i>4 mm/h</span></div></td>
+  </tr>`;
+
+async function cellChips() {
+  const { d, cs, r, settle } = await ready('desk');
+  say('--- the table cell chips -------------------------------------------------');
+  settle();
+  const b = d.getElementById('dataBox');
+  b.showModal();
+  d.getElementById('dataBody').innerHTML = CELLS;
+  const chip = d.querySelector('.mchip');
+  const root = cs(d.documentElement);
+  is(Math.round(r(chip).height), 32, 'the chip is 32dp');
+  /* Read the radius and the size off their own tokens, never as a hand-copied pixel figure. That
+     is the same rule the column head and the count line already state for label-large and
+     title-small. */
+  is(cs(chip).borderRadius, root.getPropertyValue('--md-sys-shape-corner-small').trim(),
+     'shape-corner-small');
+  is(cs(chip).fontSize, root.getPropertyValue('--md-sys-typescale-label-large-size').trim(),
+     'label-large');
+  is(cs(chip).borderTopWidth, '1px', 'a 1dp outline');
+  const glyph = chip.querySelector('.i');
+  is(Math.round(r(glyph).width), 18, 'an 18dp leading icon');
+  /* The label is on-surface and the glyph carries the status. Compare the two against each
+     other, never against a hex. */
+  is(cs(chip).color === cs(glyph).color, false, 'the label is not painted by the status');
+  is(Math.round(r(d.querySelector('td.k')).height), 53, 'so a chip cell is 53px');
+  b.close();
+}
+
 (async () => {
   out.textContent = '';
   try {
@@ -2881,8 +2921,12 @@ async function rowState() {
       await tableHead('phone', 'phone');
       await tableHead('desk', 'desktop');
       /* `rowState()` reads the CSSOM and a probe element, so ordering after `tableHead()` costs
-         nothing. It sits last because every probe above it settled the frame first. */
+         nothing. */
       await rowState();
+      /* `cellChips()` calls `settle()` on the shared `#desk` frame too. It runs after
+         `rowState()`, because Task 6 is the last table probe, and every probe above it already
+         settled the frame. */
+      await cellChips();
     } finally {
       if (origPrefs === null) deskWin.localStorage.removeItem('prefs');
       else deskWin.localStorage.setItem('prefs', origPrefs);
