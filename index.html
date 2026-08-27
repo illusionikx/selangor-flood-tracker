@@ -30,18 +30,16 @@
      back plated in exactly the thing that was deliberately removed. This one is opaque white on
      purpose, with a smaller glyph because iOS rounds the corners itself. Built by icon-build.php. -->
 <link rel="apple-touch-icon" href="icon-180.png?v=3">
-<!-- The only third party this page contacts, and it answers on three origins. js/map.js builds
-     tile URLs from `{s}.basemaps.cartocdn.com`, and Leaflet expands `{s}` over its default
-     subdomains `abc`, so warming one of them covers about a third of the tiles.
+<!-- The only third party this page contacts. **One origin now, and it was three.** CARTO answered
+     on `a`, `b` and `c`, because Leaflet expands `{s}` over its default subdomains. Esri publishes
+     one host and no `{s}`, so warming it covers every tile rather than a third of them.
      No `crossorigin` here. Leaflet sets no `crossOrigin` on its tile layer, so the tiles load as
      plain images with no CORS. A preconnect made in anonymous-CORS mode opens a connection the
      browser will not reuse for them, which wastes the TCP and TLS work and keeps only the DNS
      lookup. The attribute has to match how the resource is actually fetched.
      Leaflet builds the first tile URL only after the whole module graph has loaded, so without
-     these the browser starts this work at the latest possible moment. -->
-<link rel="preconnect" href="https://a.basemaps.cartocdn.com">
-<link rel="preconnect" href="https://b.basemaps.cartocdn.com">
-<link rel="preconnect" href="https://c.basemaps.cartocdn.com">
+     this the browser starts the work at the latest possible moment. -->
+<link rel="preconnect" href="https://server.arcgisonline.com">
 <!-- The import graph is seven levels deep and there is no build step to flatten it, so the browser
      discovers each level only after it parses the one above. That is seven round trips before
      js/net.js can ask for the payload. These links let it fetch all of them at once.
@@ -79,44 +77,12 @@
 <link rel="stylesheet" href="vendor/m3/tokens.css?v=2">
 <link rel="stylesheet" href="css/base.css?v=196">
 <link rel="stylesheet" href="css/chrome.css?v=331">
-<link rel="stylesheet" href="css/map.css?v=180">
+<link rel="stylesheet" href="css/map.css?v=181">
 
-<!-- Water tint for the dark basemap. CARTO's dark_all is greyscale — all 18 of its tones have zero
-     chroma — so no saturate() or hue-rotate() can pull water out of it. What it does have is one
-     tone for *filled* water: the sea and the lakes are painted #262626 (luminance 38) while land
-     is #090909 (9). So this keys on that one value and paints it blue, and every other tone passes
-     through unchanged.
-     This reaches the sea and the lakes and stops there. A river is one pixel wide, so from zoom 12
-     it antialiases into the tones roads and buildings use, and no filter can separate it. js/map.js
-     draws rivers from vendored geometry instead.
-     64 bands is the minimum that works: it puts 38 in a band of its own, between 34 and 42, which
-     are road and boundary tones that must not take the colour. 32 bands merges 34 with 38 and 48
-     merges 38 with 42. The other 63 entries are their own band's centre, so they are an identity
-     map to within one level.
-     `color-interpolation-filters="sRGB"` is not optional. SVG filters default to linearRGB, which
-     would move every tone before this table reads it and key on the wrong band.
-     See docs/FEATURES.md for how the tone was identified and why an overlay was not used. -->
-<svg id="mapfx" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-  <filter id="watertint" color-interpolation-filters="sRGB">
-    <feComponentTransfer>
-      <feFuncR type="discrete" tableValues="0.0078 0.0234 0.0391 0.0547 0.0703 0.0859 0.1016 0.1172 0.1328 0.0275 0.1641 0.1797 0.1953
-            0.2109 0.2266 0.2422 0.2578 0.2734 0.2891 0.3047 0.3203 0.3359 0.3516 0.3672 0.3828 0.3984
-            0.4141 0.4297 0.4453 0.4609 0.4766 0.4922 0.5078 0.5234 0.5391 0.5547 0.5703 0.5859 0.6016
-            0.6172 0.6328 0.6484 0.6641 0.6797 0.6953 0.7109 0.7266 0.7422 0.7578 0.7734 0.7891 0.8047
-            0.8203 0.8359 0.8516 0.8672 0.8828 0.8984 0.9141 0.9297 0.9453 0.9609 0.9766 0.9922"/>
-      <feFuncG type="discrete" tableValues="0.0078 0.0234 0.0391 0.0547 0.0703 0.0859 0.1016 0.1172 0.1328 0.1059 0.1641 0.1797 0.1953
-            0.2109 0.2266 0.2422 0.2578 0.2734 0.2891 0.3047 0.3203 0.3359 0.3516 0.3672 0.3828 0.3984
-            0.4141 0.4297 0.4453 0.4609 0.4766 0.4922 0.5078 0.5234 0.5391 0.5547 0.5703 0.5859 0.6016
-            0.6172 0.6328 0.6484 0.6641 0.6797 0.6953 0.7109 0.7266 0.7422 0.7578 0.7734 0.7891 0.8047
-            0.8203 0.8359 0.8516 0.8672 0.8828 0.8984 0.9141 0.9297 0.9453 0.9609 0.9766 0.9922"/>
-      <feFuncB type="discrete" tableValues="0.0078 0.0234 0.0391 0.0547 0.0703 0.0859 0.1016 0.1172 0.1328 0.1647 0.1641 0.1797 0.1953
-            0.2109 0.2266 0.2422 0.2578 0.2734 0.2891 0.3047 0.3203 0.3359 0.3516 0.3672 0.3828 0.3984
-            0.4141 0.4297 0.4453 0.4609 0.4766 0.4922 0.5078 0.5234 0.5391 0.5547 0.5703 0.5859 0.6016
-            0.6172 0.6328 0.6484 0.6641 0.6797 0.6953 0.7109 0.7266 0.7422 0.7578 0.7734 0.7891 0.8047
-            0.8203 0.8359 0.8516 0.8672 0.8828 0.8984 0.9141 0.9297 0.9453 0.9609 0.9766 0.9922"/>
-    </feComponentTransfer>
-  </filter>
-</svg>
+<!-- The water tint stood here until 2026-08-27 and is deleted. It was an SVG filter keying on the
+     one exact tone CARTO painted filled water, and Esri serves the canvas as lossy JPEG, which has
+     no exact tones. See the block at the head of css/map.css for the measurement and for what the
+     map lost. Do not rebuild it against a JPEG provider. -->
 
 <!-- A camera still. A <dialog>, not a div: it opens from the all-stations table, which is itself a
      modal dialog, and only the top layer can paint over one — Esc, the backdrop and focus trapping
@@ -528,7 +494,7 @@
        makes a claim that can be checked against the code. The plan for this change carries a grep
        behind every one. A table was tried here and reverted: a claim about what this site does not
        do is an argument, and an argument reads as a row of specifications only if the reader
-       already trusts it. The tile sentence is there because the credits below name CARTO, and a
+       already trusts it. The tile sentence is there because the credits below name Esri, and a
        page that credits a third party while claiming to load nothing from one contradicts itself in
        a single screen. Anything that ever posts a coordinate must delete the last sentence. -->
   <h3>Warranty</h3>
@@ -537,7 +503,7 @@
 
   <h3>Privacy</h3>
   <p class="muted">The site keeps no account, runs no analytics and sets no cookies. It loads no
-     tracking script from any provider. CARTO serves the map tiles, so CARTO sees which tiles your
+     tracking script from any provider. Esri serves the map tiles, so Esri sees which tiles your
      browser requests, and nothing else on this page comes from them. A place you search for goes
      to the server of this site. That server asks OpenStreetMap where the place is. The request
      happens only when you select the search row, never as you type. A location you share stays in the browser,
@@ -596,7 +562,7 @@
   <p class="muted">Built by <a href="https://github.com/illusionikx" target="_blank" rel="noopener">illusionikx</a>.
      Released under the <a href="https://opensource.org/licenses/MIT" target="_blank" rel="noopener">MIT
      license</a>. Free to use, copy, modify and redistribute, with no warranty of any kind.</p>
-  <p class="muted">Map tiles &copy; <a href="https://carto.com/attributions" target="_blank" rel="noopener">CARTO</a>,
+  <p class="muted">Map tiles by <a href="https://www.esri.com/" target="_blank" rel="noopener">Esri</a>,
      data &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>
      contributors. Icons and the app mark are <a href="https://fonts.google.com/icons" target="_blank"
      rel="noopener">Material Symbols</a> (Apache 2.0).
@@ -1545,7 +1511,7 @@
 </div>
 <div id="credit" class="muted">
   &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>,
-  &copy; <a href="https://carto.com/attributions">CARTO</a> ·
+  tiles <a href="https://www.esri.com/">Esri</a> ·
   data: JPS <a href="https://publicinfobanjir.water.gov.my/">Malaysia</a>,
   <a href="https://infobanjirjps.selangor.gov.my/">Selangor</a>,
   <a href="https://infobanjirjpskl.water.gov.my/">WP</a>

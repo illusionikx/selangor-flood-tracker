@@ -287,7 +287,7 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   `offline`, `cacheAge`, `sourceUpdated`.
 - **`?place=<query>` — the go-to box's place search.** It proxies OpenStreetMap Nominatim
   server-side, so this adds no new third party to the *browser*. The browser still talks only to this
-  origin and to CARTO's basemap tiles. See the third-party gotcha below. PHP alone reaches Nominatim.
+  origin and to Esri's basemap tiles. See the third-party gotcha below. PHP alone reaches Nominatim.
   `placeQuery()` trims, collapses and lowercases the query. It rejects a query outside 2–80
   characters, or one with invalid UTF-8. `placeParam()` guards the one call site that turns
   `$_GET['place']` into the string it expects — see the array-cast gotcha below. Results are bounded
@@ -2758,7 +2758,8 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   `https?://(cdn|unpkg|jsdelivr|fonts\.googleapis)`. That pattern matches only a host starting `cdn`
   right after the scheme, so `basemaps.cartocdn.com` passed clean on the wrong letters alone.
   `js/map.js:24` fetches tiles from that host on every pan and every zoom. The Credits block in the
-  same pane already names CARTO for exactly those tiles. The claim shipped false anyway. A guess at
+  same pane already named CARTO for exactly those tiles. The claim shipped false anyway. The host
+  is `server.arcgisonline.com` now and the lesson is unchanged. A guess at
   what a violation looks like proves nothing. The check must list every absolute URL the code
   contains, then classify each one as fetched or merely linked. Any future "we send no X" or "we load
   nothing from Y" sentence needs that same full sweep. A short grep aimed at known offenders is not
@@ -2961,8 +2962,9 @@ and `--muted` flip with the theme while the picture behind them does not. White 
 - **The rail's travel re-rasters the map card every frame, and `--m3-rail` is 150ms because of it.**
   Measured 2026-08-25 at 1536px and a 1.25 device pixel ratio, which is the repository owner's own
   screen. **The device pixel ratio is the variable that hid this**: at ratio 1 the light theme sits
-  at a 16.9ms median frame and looks fine, and at 1.25 it is 27.8ms. Leaflet also asks CARTO for
-  `@2x` tiles past ratio 1. The floor does not move — with no animation at all both themes sit at
+  at a 16.9ms median frame and looks fine, and at 1.25 it is 27.8ms. Leaflet also asked CARTO for
+  `@2x` tiles past ratio 1, and Esri caches no retina tile, so that half no longer applies and the
+  measurement was not repeated. The floor does not move — with no animation at all both themes sit at
   16.6ms — so the travel is the whole of it, and the map card is a live rasterized surface whose
   width is what animates.
   **Six mitigations were measured and none works.** `will-change: left`, `will-change: transform`,
@@ -2977,14 +2979,19 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   **`--m3-rail` therefore stops being a second NAME for `--m3-travel`.** The two still cite the same
   M3 curve. `m3-check.html` reads the map card's two edges as `0.3s, 0.15s` now, and the news pill's
   as `0.15s, 0.3s`, because the rail's edge leads there.
-  **The dark theme is a wall and the tile filter is the wall.** `filter: url(#watertint)
-  brightness(1.75) contrast(.92)` on `.leaflet-tile-pane` puts that theme at a 67.6ms median frame
-  with 41 of 43 frames missed. Nothing above moves it and neither does the duration. Removing the
-  filter takes the median from 43.4 to 17.9 at ratio 1, and removing the SVG tint alone takes it to
-  31.1. Beside it, `L.Canvas._update` redraws all 6,635 water shapes on `moveend`, about **130ms of
-  main-thread JavaScript per press** — that one is not raster and does not care about the machine.
-  Neither is touched. Both are deliberate features, and cutting one is a decision about how the dark
-  map looks rather than a fix.
+  **THE DARK THEME WAS A WALL, THE TILE FILTER WAS THE WALL, AND THE WALL CAME DOWN ON 2026-08-27.**
+  `filter: url(#watertint) brightness(1.75) contrast(.92)` on `.leaflet-tile-pane` put that theme at
+  a 67.6ms median frame with 41 of 43 frames missed. Nothing above moved it and neither did the
+  duration. Measured then: removing the filter takes the median from 43.4 to 17.9 at ratio 1, and
+  removing the SVG tint alone takes it to 31.1.
+  **That deletion was not made for the frame rate.** The basemap moved to Esri, which serves lossy
+  JPEG, and a tint keying on one exact tone cannot read one. The frame rate is what it paid.
+  **Re-measure before quoting any number in this entry.** Every figure above was taken with the
+  filter live.
+  **`L.Canvas._update` is the cost that remains**, redrawing all 6,635 water shapes on `moveend`, at
+  about **130ms of main-thread JavaScript per press**. That one is not raster and does not care
+  about the machine. It is untouched, because it is a deliberate feature: cutting it is a decision
+  about how the dark map looks rather than a fix.
 - **A rail toggle also drops frames on the heat canvas, and nothing was changed for that either.**
   Measured 2026-08-25 with a throwaway probe. Leaflet is not the cost: `invalidateSize` runs
   16 times a press at 1.2ms each, and tile work is 0.5ms. The one `SoftHeat` repaint lands 200ms
@@ -3202,38 +3209,54 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   the mark. The five windows nest, so the longest is the tallest column. Anything new that prints
   a value inside a plot needs both halves.
 
-- **The dark basemap is greyscale, and its *filled* water is the brighter tone, not the darker one.**
-  All 18 colors in CARTO `dark_all` have a chroma of zero, so `saturate()` and `hue-rotate()` have
-  nothing to act on. Filled water is luminance 38 and land is luminance 9. Read the river gotcha
-  below before assuming this covers every river on screen. It does not. Two guesses got both facts wrong before any
-  measurement. The first reached for `saturate()`. The second assumed water was the dark tone. Draw a tile as ASCII art, one character per tone, and the coastline names itself. The
-  Straits of Malacca is a solid block of 38 on the west edge of tile `dark_all/10/800/503`.
-  `#watertint` in `index.html` keys on that one value. **Four rules hold it together and each one
-  fails silently.** The band table has **64 entries**. 64 is the smallest count that isolates
-  38 from 34 and 42, the road and boundary tones. At 32 bands 34 and 38 merge. At 48 bands 38 and
-  42 merge. The filter carries **`color-interpolation-filters="sRGB"`**. SVG filters run in
-  linearRGB by default, and move every tone into a different band before the table reads it.
-  The tint and the existing `brightness(1.75) contrast(.92)` lift are **one `filter` declaration in
-  `css/map.css`, tint first**. A second rule setting `filter` on the same element replaces this
-  value rather than adding to it. The tint has to read the raw tones before the lift moves them.
-  And the emitted color is **darker than what lands on screen**, because that lift multiplies it:
-  `#071b2a` draws as `#15364e`. Preview the whole chain against a real tile, never the tint
-  alone. CARTO owns this tone, so a restyle upstream aims the tint at nothing and errors nowhere.
-- **Nothing can reference an SVG filter inside a `display: none` subtree.** `#mapfx` in `index.html`
-  holds `#watertint` and must stay in the render tree. `css/map.css` takes it out of the flow with
-  `position: absolute; width: 0; height: 0` instead. The rule is in the stylesheet and not on the
-  element, because `index.html` carries no inline CSS.
+- **THE BASEMAP IS ESRI AND IT WAS CARTO, AND THE TILE FILTER IS DELETED.** CARTO ended keyless
+  access on 2026-08-27. Every tile came back with `API KEY REQUIRED` burned into the picture.
+  **Measure that before believing a retry helps.** Every subdomain answered HTTP 200 with a real
+  tile, each tile differed by coordinate, and a browser `Referer` and `User-Agent` changed the
+  response hash not at all. It is a policy change rather than a rate limit, so it does not clear
+  itself.
+  `TILES` in `js/config.js` holds `World_Light_Gray` and `World_Dark_Gray`, and `js/map.js` adds a
+  `_Base` or a `_Reference` suffix.
+  **AN ARCGIS TILE PATH IS `{z}/{y}/{x}`, ROW BEFORE COLUMN.** That is the reverse of the XYZ order
+  every other provider here uses, and it fails silently: the tiles still load, and they are simply
+  the wrong part of the world. There is no `{s}` and no `{r}`.
+  **Esri publishes the ground and the place names as two services**, so the map adds two layers per
+  theme. The labels take the `labels` pane at z-index 260, above the water this app draws at 250. At
+  the tile pane's own 200 a drawn river covers the name of the town it runs through. That pane takes
+  no pointer events, or it sits between the reader and every pin under it.
+  **`maxNativeZoom: 16` beside `maxZoom: 18`, and the second number alone is wrong.** Esri caches no
+  tile past zoom 16 over this area. Zoom 17 and 18 both answer with one shared `Map data not yet
+  available` plate — measured, the light and the dark service return the identical file — which is a
+  second watermark. `maxNativeZoom` stretches the zoom-16 tile across the two zooms above it, so the
+  app keeps its own zoom range and only the ground goes soft. Every pin, label and heat blob is
+  drawn by this app and stays sharp.
+  **`#watertint` KEYED ON ONE EXACT TONE, AND A JPEG HAS NO EXACT TONES.** `dark_all` is a PNG
+  painting filled water at luminance 38 against land at 9, so a 64-band discrete table could isolate
+  that one value. Esri serves the canvas as lossy JPEG. Measured on one sea tile: 145 distinct
+  colours where a PNG holds a handful, and every flat block fringes at its own edge. A discrete band
+  cannot separate water from road there, and a table retuned against those artifacts paints a halo
+  along every coastline. **Do not rebuild it against a JPEG provider.**
+  The `brightness(1.75) contrast(.92)` lift went for a plainer reason. It raises a near-black tile,
+  and Esri's dark canvas is a mid-grey that 1.75 blows out.
+  **Four things went together**: the `filter` rule in `css/map.css`, the `#mapfx` SVG in
+  `index.html`, the `#mapfx` rule that held it out of the flow, and the `data-lift` attribute
+  `setBasemap()` wrote. One of them carried its own trap worth keeping in mind for anything new: an
+  SVG filter cannot be referenced out of a `display: none` subtree, so the holder had to stay in the
+  render tree and leave the flow by other means.
+  **The sea and the large lakes lost their blue and are still separable.** Only the tint ever
+  reached them. Measured on the rendered page: sea reads `#232227` and land reads `#4d4d4f` to
+  `#5b5b5d`, so the sea is the **darker** tone here, the reverse of `dark_all`. The rivers and the
+  ponds keep their blue, because `water.json` is a vector overlay in a pane of its own that owes the
+  basemap nothing.
+  **One preconnect replaced three.** CARTO answered on `a`, `b` and `c`, because Leaflet expands
+  `{s}` over its default subdomains. Esri publishes one host.
+  **Three surfaces name the tile provider and all three must agree.** They are the credit line under
+  the map, the Privacy paragraph in About, and the Credits block below it. A page crediting one
+  party while its map fetches from another states a false thing about where a reader's requests go.
 
-- **The dark basemap loses water two different ways, and neither one is fixable with a filter.**
-  `#watertint` gets the sea and the large lakes because CARTO fills those with one exact tone.
-  **CARTO antialiases a river into the road tones.** A river is one pixel wide. So the style draws
-  it as a line. That line blends toward the land tone, by however much of each pixel it covers. **Measure before
-  assuming a tone means what it looks like.** Mark every pixel Voyager paints as water, then read
-  the dark tile at those same positions. At zoom 10 the sea maps to tone 38 for 80% of its pixels.
-  At zoom 12 and 13 over Kuala Lumpur, tone 38 is not in the tile at all. The river pixels
-  spread over tones 33 to 50 instead. Tone 37 is the peak and is only 20% to 27% river. The rest is roads
-  and buildings, so keying it paints three wrong pixels per right one.
-  **A retention pond is not drawn at all.** That is a separate fault with a separate cause: CARTO
+- **A GREY CANVAS BASEMAP DRAWS ALMOST NO SMALL WATER, and no filter can recolour what is absent.**
+  Measured on CARTO `dark_all`, and Esri's dark canvas drops the same class of water. **That is a
+  fault of area, not of screen size.** CARTO
   drops small water on area, not on screen size. Tasik Taman Desa at 0.115 km² holds 2,036 water
   pixels at zoom 13. A median pond at 0.0017 km² holds **zero** at zoom 13, 14 and 15 alike. It
   is 8 screen pixels wide at the last of those. No zoom brings it back, and a filter cannot recolour
@@ -3244,9 +3267,8 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   one is 6,635 DOM nodes carried through every pan. It has **its own pane at z-index 250**, between
   the tiles at 200 and the overlays at 400. So heat, pins and the accuracy circle draw over the
   water. It reads **`--water` from `css/base.css` at the moment it builds the layer**, not when the
-  fetch returns. That token exists on the dark theme only. That token is the **finished**
-  colour and the tint in `index.html` is the raw one. The tile pane filter cannot reach this
-  pane. Move one and move the other. And the fetch stays **lazy and swallows its own failure**. A
+  fetch returns. That token exists on the dark theme only, and it is now the one place the water
+  colour is stated. And the fetch stays **lazy and swallows its own failure**. A
   light-theme reader never pays the 234 KB, and a failure leaves a plainer map rather than a broken
   one. `water.json` has no `?v=`, so a rebake needs a hard reload.
 - **Tolerance and scope are different knobs on `water-build.php`, and the wrong one costs bytes for

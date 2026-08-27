@@ -194,7 +194,7 @@
 
 /* Station kinds and the traffic-light statuses, as tokens rather than the constants they used to be
    in `config.js`. Every one of these is painted on two very different backgrounds — the warm paper
-   of the CARTO voyager basemap and the near-black of dark_all — and one hex cannot serve both. A
+   of the light basemap and the mid-grey of the dark one — and one hex cannot serve both. A
    colour picked to read on white is mud on black; one picked to read on black is a pastel on white.
    So there are two sets: **saturated and dark for the light theme, light and softened for the dark
    one.** `config.js` emits `var(--k-river)` where it used to emit `#4da3ff`, which lands in the same

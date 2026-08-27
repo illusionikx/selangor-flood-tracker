@@ -2,14 +2,18 @@
 /**
  * php water-build.php — rebakes water.json, the water the dark basemap does not draw.
  *
- * Two faults, one file. CARTO's dark basemap draws a river as a one-pixel antialiased line, whose
- * pixels land in the same tones as roads, so the tint in index.html cannot reach it. And CARTO
- * drops small water from its style outright: a 0.0017 square kilometer retention pond has zero
- * water pixels at zoom 13, 14 and 15 alike, so there is nothing on the tile to recolour. Measured
- * both ways — see docs/FEATURES.md.
+ * A grey canvas basemap draws almost no small water. Measured on CARTO's dark_all, which served
+ * this map until 2026-08-27: a 0.0017 square kilometer retention pond has zero water pixels at
+ * zoom 13, 14 and 15 alike. Esri's dark canvas, which replaced it, drops the same class of water.
+ * The box holds 6,489 water bodies with a median area of 0.0037 square kilometers, so this is most
+ * of them. See docs/FEATURES.md.
  *
  * So this bakes the geometry once and js/map.js draws it. Rivers become lines and everything else
- * becomes filled shapes, both in the same colour the tint paints the sea.
+ * becomes filled shapes, both in `--water`.
+ *
+ * A second fault applied to CARTO alone and is recorded because it shaped this file. That style
+ * drew a river as a one-pixel antialiased line, whose pixels landed in the same tones as roads, so
+ * the SVG tint in index.html could not reach it. That tint is deleted. See css/map.css.
  *
  * Run this by hand and commit the result. It is not part of any request path. Overpass is a free
  * service with no funding for a poller, and this data changes about as often as a river moves.

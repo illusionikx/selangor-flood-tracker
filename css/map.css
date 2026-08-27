@@ -1,30 +1,27 @@
 /* Leaflet overrides, station pins, cluster badges and the popup template. */
 
-/* CARTO's dark basemap is near-black; lift it so rivers and roads stay legible, and tint its one
-   filled-water tone blue so the sea and the lakes read as water. Rivers are too narrow for this to
-   reach — js/map.js draws those from vendored geometry. Only the tile pane is filtered — markers,
-   heat and popups sit in other panes and keep their true colours.
-
-   The two run as one declaration, in this order, and neither part may be split into a rule of its
-   own. A second rule setting `filter` on the same element replaces this value rather than adding
-   to it. And #watertint keys on the raw tile tones, so it has to read them before brightness()
-   moves every one of them into a different band. The tint is chosen for how it lands *after* the
-   lift, which is why the value in index.html is darker than what appears on screen.
-
-   `data-lift="yes"` and the dark theme are the same condition — js/map.js sets the attribute from
-   the theme in setBasemap(), on the line above the one that swaps the tiles. */
-:root[data-lift="yes"] .leaflet-tile-pane { filter: url(#watertint) brightness(1.75) contrast(.92); }
-
-/* The filter lives in an <svg> in the markup, which must stay out of the flow without being
-   display:none — a filter cannot be referenced out of a subtree that is not rendered. */
-#mapfx { position: absolute; width: 0; height: 0; }
+/* **THE DARK BASEMAP CARRIES NO FILTER, and it carried two until 2026-08-27.** They were
+   `url(#watertint) brightness(1.75) contrast(.92)` on the tile pane, under a `data-lift` attribute
+   js/map.js wrote from the theme. Both are deleted, along with the `#mapfx` SVG in index.html and
+   the `#mapfx` rule that held it out of the flow.
+   **The tint keyed on one exact tone and a JPEG has no exact tones.** CARTO's `dark_all` is a PNG
+   whose filled water is luminance 38 against land at 9, so a 64-band discrete table could isolate
+   that one value and paint it blue. Esri serves the canvas as lossy JPEG. Measured on one sea tile:
+   145 distinct colours where a PNG would hold a handful, and every flat block fringes at its own
+   edge. A discrete band cannot separate water from road there, and a table retuned against JPEG
+   artifacts would paint a halo around every coastline.
+   **The lift went for a plainer reason.** It exists to raise a near-black tile. Esri's dark canvas
+   is a mid-grey, so 1.75 blows it out.
+   **The water is not lost.** js/map.js still draws rivers and ponds from `water.json`, which is a
+   vector overlay in a pane of its own and owes the basemap nothing. What did go is the sea and the
+   large lakes, which only the tint ever reached. Both now read in Esri's own grey.
+   Do not rebuild either one against a JPEG provider. A tint needs a tile with exact tones. */
 
 /* What shows where a tile has not arrived. Leaflet's own value is `#ddd`, in both themes and under
    any basemap. Zooming out asks for four times the tiles with nothing to retain over the new area,
    so they land one at a time over that grey and the empty ones read as pale boxes on a dark map.
-   `--surface` rather than a sampled land colour: an unpainted tile is the page showing through, it
-   follows the theme toggle for free, and #fff against Voyager's #fbf8f3 and #202124 against the
-   lifted dark basemap are both close enough that a gap stops announcing itself.
+   `--surface` rather than a sampled land colour: an unpainted tile is the page showing through, and
+   it follows the theme toggle for free.
    This is not what put a table on the map mid-zoom. That was `#dataBox` laid out behind it — see
    the `[open]` rule in chrome.css. */
 .leaflet-container { background: var(--surface); }

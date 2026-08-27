@@ -203,8 +203,17 @@ map.on('moveend zoomend', () => {
 
 // --- basemap & theme ---------------------------------------------------------------------------
 
-const tileURL = k => `https://{s}.basemaps.cartocdn.com/${TILES[k]}/{z}/{x}/{y}{r}.png`;
-let tiles;
+/* Esri's Canvas basemaps. CARTO served this map until 2026-08-27, and its keyless tiles now arrive
+   with `API KEY REQUIRED` burned into the picture. See TILES in js/config.js.
+   **An ArcGIS tile path is `{z}/{y}/{x}` — the row comes before the column.** That is the reverse
+   of the XYZ order every other provider uses, and it fails silently: the tiles still load, they are
+   simply the wrong part of the world. There is no `{s}`, because the host has no subdomains, and no
+   `{r}`, because Esri caches no retina tile to ask for.
+   Two layers per theme, because Esri publishes the ground and the place names as separate services.
+   `_Base` is the ground and `_Reference` is the labels. */
+const ESRI = 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas';
+const tileURL = (k, part) => `${ESRI}/${TILES[k]}_${part}/MapServer/tile/{z}/{y}/{x}`;
+let tiles, labels;
 
 const isDark = () => document.documentElement.dataset.theme === 'dark';
 
@@ -221,6 +230,15 @@ const isDark = () => document.documentElement.dataset.theme === 'dark';
 // are here" circle all still draw over the water rather than under it.
 map.createPane('water');
 map.getPane('water').style.zIndex = 250;
+
+/* The place names, above the water this app draws and under everything it reports. Esri publishes
+   them as a service of their own, so they are a second tile layer rather than part of the ground.
+   The pane exists to put them over the water: at the tile pane's own 200 a drawn river would cover
+   the name of the town it runs through. It takes no pointer events, because a tile pane that
+   answers a click sits between the reader and every pin under it. */
+map.createPane('labels');
+map.getPane('labels').style.zIndex = 260;
+map.getPane('labels').style.pointerEvents = 'none';
 
 let waterGeo, water, asking;
 
@@ -278,10 +296,17 @@ function setWater(on) {
 
 function setBasemap() {
   const key = isDark() ? 'dark' : 'light';
-  // Only the dark basemap needs lifting; the light one would wash out.
-  document.documentElement.dataset.lift = key === 'dark' ? 'yes' : 'no';
   if (tiles) map.removeLayer(tiles);
-  tiles = L.tileLayer(tileURL(key), { maxZoom: 18 }).addTo(map);
+  if (labels) map.removeLayer(labels);
+  /* **`maxNativeZoom`, never `maxZoom` alone.** Esri's canvas cache stops at zoom 16 over this
+     area. Zoom 17 and 18 both answer with one shared `Map data not yet available` plate — measured,
+     the light and the dark service return the identical file — and that is a second watermark, of
+     the kind this whole change exists to remove. `maxNativeZoom` stretches the zoom-16 tile across
+     the two zooms above it instead. So the app keeps its own zoom range and only the ground goes
+     soft. Every pin, label and heat blob is drawn by this app and stays sharp. */
+  const opt = { maxZoom: 18, maxNativeZoom: 16 };
+  tiles  = L.tileLayer(tileURL(key, 'Base'), opt).addTo(map);
+  labels = L.tileLayer(tileURL(key, 'Reference'), { ...opt, pane: 'labels' }).addTo(map);
   setWater(key === 'dark');
 }
 

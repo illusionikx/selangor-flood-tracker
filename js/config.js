@@ -207,9 +207,14 @@ export const NOTICE = {
   },
 };
 
-// CARTO styles. 'auto' follows the theme; the rest are an explicit choice in the drawer.
-// One basemap per theme. ponytail: a picker existed and nobody needs three flavours of grey.
-export const TILES = { light: 'rastertiles/voyager', dark: 'dark_all' };
+/* Esri Canvas basemaps, one per theme. ponytail: a picker existed and nobody needs three flavours
+   of grey.
+   **CARTO served these until 2026-08-27 and cannot any more.** Every keyless tile came back with
+   `API KEY REQUIRED` burned into the picture, at every zoom and under every referer. That is a
+   policy change rather than a rate limit, so it does not clear itself.
+   Each name takes a `_Base` or a `_Reference` suffix in js/map.js. Esri ships the ground and the
+   place names as two separate services. */
+export const TILES = { light: 'World_Light_Gray', dark: 'World_Dark_Gray' };
 
 // Sparkline window. Must not exceed the server's own SPARK_WIN — it sends nothing older.
 export const SPARK_H     = 12;     // hours on the graph's x axis

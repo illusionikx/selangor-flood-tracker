@@ -273,7 +273,7 @@ const WX_PAST   = 3600;
 const WX_PLACES = __DIR__ . '/wx-places.json';
 
 /* MET Malaysia. Two products, two hosts, both reached from PHP only — the browser still talks to
-   this origin and to CARTO and to nothing else.
+   this origin and to Esri and to nothing else.
    MET_KM is the radius a nowcast point speaks across. It comes from the decorrelation distance
    for rainfall, which grows with the period measured: about 7.8 km at 10 minutes and about 26.5 km
    at 3 hours. The card states a claim about a 3-hour window, so 16.5 km sits well inside it. A line
@@ -523,7 +523,7 @@ if (isset($_GET['cam'])) {
 
 /* ?place=<query> — turn a place name into a coordinate, inside the coverage area only.
    This adds no third party to the browser. The browser still talks only to this origin and to
-   CARTO's basemap tiles (js/map.js, named in the About pane's Credits). Nominatim is reached from
+   Esri's basemap tiles (js/map.js, named in the About pane's Credits). Nominatim is reached from
    here, server-side, which is what keeps the About pane's privacy paragraph honest.
    Explicit, never per keystroke: the client calls this only when the reader picks the search row,
    as Nominatim's usage policy asks. */

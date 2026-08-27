@@ -17346,3 +17346,90 @@ insets at once: 16px to the headline, 16px to the filter field, 20px to a table 
 the bottom safe area, so the last table row and the camera count sat under the iOS home indicator.
 The sort control stood 30px tall, under M3's own 48dp minimum touch target. And the name column
 took 220px of a 360px screen, which is 61% of the width available.
+
+## CARTO put a watermark on every tile, so the basemap moved to Esri
+
+On 2026-08-27 the map drew `API KEY REQUIRED` across every tile. CARTO ended keyless access to its
+basemaps. The repository owner chose the keyless replacement the same day.
+
+### It is a policy change, not a rate limit
+
+Four measurements came before any code moved.
+
+Every subdomain answered HTTP 200 with a real tile. Each tile differed by coordinate, so CARTO
+served no placeholder. A browser `Referer` and a browser `User-Agent` changed nothing. The response
+hash stayed identical with no referer at all.
+
+CARTO burns the words into the picture itself.
+
+So nothing here clears itself, and no retry helps. The two ways out were a CARTO account or a
+different provider.
+
+### Esri Canvas answers with no key
+
+The repository owner picked Esri. `server.arcgisonline.com` serves `World_Light_Gray` and
+`World_Dark_Gray`. Neither needs a key and neither needs an account.
+
+Three differences from CARTO shaped the work.
+
+An ArcGIS tile path is `{z}/{y}/{x}`. The row comes before the column, which is the reverse of the
+XYZ order every other provider uses. That fault is silent. The tiles still load. They are simply
+the wrong part of the world.
+
+Esri publishes the ground and the place names as two services. `_Base` draws the ground and
+`_Reference` draws the labels. So the map now adds two tile layers per theme. The labels take a
+pane at z-index 260, above the water this app draws at 250. At the tile pane's own 200, a drawn
+river covers the name of the town it runs through.
+
+Esri caches no tile past zoom 16 over this area. Zoom 17 and zoom 18 both answer with one shared
+`Map data not yet available` plate. The light service and the dark service return the identical
+file. That is a second watermark.
+
+So the layer states `maxNativeZoom: 16` beside `maxZoom: 18`. Leaflet then stretches the zoom-16
+tile across the two zooms above it. The app keeps its own zoom range and only the ground goes soft.
+This app draws every pin, label and heat blob itself, so all three stay sharp.
+
+### Delete the water tint, and never rebuild it
+
+`#watertint` keyed on one exact tone. CARTO's `dark_all` is a PNG that paints filled water at
+luminance 38 against land at 9. A 64-band discrete table isolates that one value.
+
+Esri serves the canvas as lossy JPEG. Measured on one sea tile: 145 distinct colours, where a PNG
+holds a handful. Every flat block fringes at its own edge. A discrete band cannot separate water
+from road there. A table retuned against those artifacts paints a halo along every coastline.
+
+The `brightness(1.75) contrast(.92)` lift went for a plainer reason. It exists to raise a
+near-black tile. Esri's dark canvas is a mid-grey, so 1.75 blows it out.
+
+Four things went together. They are the `filter` rule in `css/map.css`, the `#mapfx` SVG in
+`index.html`, the `#mapfx` rule that held it out of the flow, and the `data-lift` attribute
+`js/map.js` wrote.
+
+### What the map lost, and what it kept
+
+The sea and the large lakes lost their blue. Only the tint ever reached them, and both read in
+Esri's own grey now.
+
+They are still separable. Measured on the rendered page: sea reads `#232227` and land reads
+`#4d4d4f` to `#5b5b5d`. The sea is the **darker** tone here, which is the reverse of `dark_all`.
+
+The rivers and the ponds kept their blue. `water.json` is a vector overlay in a pane of its own,
+and it owes the basemap nothing. `water-build.php` still earns its place, because Esri drops the
+same class of small water CARTO dropped.
+
+### The other edits
+
+One preconnect replaced three. CARTO answered on `a`, `b` and `c`, because Leaflet expands `{s}`
+over its default subdomains. Esri publishes one host and no `{s}`.
+
+Three surfaces name the tile provider and all three now name Esri. They are the credit line under
+the map, the Privacy paragraph in About, and the Credits block below it. A page that credits one
+party while its map fetches from another states a false thing about where the reader's requests go.
+
+### What was not done
+
+Nobody tinted the dark sea back to blue. A discrete band does separate `#232227` from the land
+tones. The coastline then fringes, for the reason stated above. The repository owner can ask for
+this against a measurement rather than against a guess.
+
+All seven runnable checks pass after this change.
