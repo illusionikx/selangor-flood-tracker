@@ -17499,3 +17499,75 @@ Nobody touched markercluster or the tile layer. Both cost real time per zoom, an
 A change there needs its own measurement.
 
 `heat-test.html` passes after this change.
+
+## The map stops at the coverage area, and the small water is gone
+
+A reader said the map felt cluttered and that it ran on forever. Three changes answer that. The
+repository owner chose each of them on 2026-09-02.
+
+Small roads were part of the request and are untouched. The basemap is an Esri raster tile, so the
+roads are baked into the picture. Esri publishes no quieter service on that raster path, and fading
+the tiles fades the coastline and the place names with them. The heat wash needs that ground.
+
+### Small water is dropped at bake time
+
+`water-build.php` holds two size floors. `MIN_AREA_KM2` is one hectare and `MIN_RIVER_KM` is one
+kilometre. Anything under either one never reaches `water.json`.
+
+The counts: 850 rivers and 1,060 water bodies survive, against 2,775 and 3,864 before. The floors
+cut 1,925 rivers and 2,804 bodies. The file falls from 963 KB to 634 KB.
+
+**This reverses part of that file's own reason for existing.** Its header says the file is there
+because the basemap hides small water, and that is still true close in. It stopped being the whole
+truth at zoom 10, where the unfiltered set drew as a blue web over the whole state. A drain behind a
+house is not a flood risk a reader reads off a map of six thousand of them.
+
+The other option was a zoom rule: keep every shape and draw the small ones only past zoom 12. The
+repository owner chose the cut. It needs no client code and no per-shape size in the file.
+
+The script prints what each floor took, so the next person tunes against a number.
+
+### Everything outside Selangor is shaded
+
+`border-build.php` bakes `border.json` from OpenStreetMap. It is one ring, 864 points, 15 KB.
+
+The shape is Selangor's own outer ring. Kuala Lumpur and Putrajaya are enclaves, so OpenStreetMap
+carries them as inner rings of that relation, and dropping every inner ring fills both of them back
+in. One shape covers all three of this app's states.
+
+`js/map.js` draws one polygon whose outer ring is a finite box three coverage spans wide, and whose
+hole is that outline. It sits in a pane of its own at z-index 270, over the place names and under
+the heat wash and the pins. The fill is an SVG pattern of diagonal stripes. Two tokens in
+`css/base.css` paint it, so the theme swap costs no JavaScript.
+
+The stripe is black on paper and white on the dark theme. A darker stripe on a wash that is already
+45% black has nowhere left to go.
+
+### The zoom floor and the pan limit come off that same file
+
+`setLimits()` takes the coverage bounds, pads them by half their size on each side, and uses that
+one box for both. It is the `maxBounds`, and the zoom floor is `getBoundsZoom()` of it. So the two
+cannot disagree. `maxBoundsViscosity` is 1, which is a wall rather than a rubber band.
+
+The box is twice the coverage on both axes, which is what the request asked for. The floor recomputes
+inside the `ResizeObserver` that already calls `invalidateSize()`, because the level that fits
+Selangor on a desktop leaves half of it off a phone.
+
+Measured at six widths from 320 to 1920: the floor is reachable at every one, and a pan to Bangkok
+lands back on the coverage centre.
+
+### What was not done
+
+The outline includes Selangor's water, which reaches west to longitude 100.39. So a straight-edged
+block of the Strait of Malacca draws unshaded. That is where Selangor legally is. Clipping it to the
+station box puts an arbitrary vertical line through open water instead.
+
+### The check
+
+`map-limits-test.html` is the eighth runnable check. It probes the drawn mask with `isPointInFill`,
+so it reads the fill rule the browser paints with rather than the numbers behind it. It asserts the
+floor, the limit, the pane order, and that the pattern sprite is rendered rather than hidden. It
+also asserts the two water floors, at half their stated values, so raising a floor cannot turn it
+red and deleting one must.
+
+All eight runnable checks pass after this change.

@@ -81,6 +81,10 @@ jobs:
           # The dark basemap's rivers and ponds. Committed and not optional on that theme, so the
           # same unconditional cp applies — a missing file leaves the dark map without its water.
           cp water.json site/
+          # The coverage outline. Committed, and it carries three things rather than one: the
+          # shading outside the area, the zoom floor and the pan limit. A missing file leaves a map
+          # a reader can zoom out to the whole world, so the cp is unconditional as well.
+          cp border.json site/
           # img/ is optional — it holds only the About egg, which hides itself when the picture is
           # missing (js/ui.js). Copied conditionally so an absent directory can never fail a bake and
           # leave the map frozen on the last deployment over a decoration.

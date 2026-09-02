@@ -26,8 +26,12 @@ const withClip = fn => (clipMod ??= import('./clip.js')).then(fn, err => {
 
 // maxZoom on the map, not just the tile layer: markercluster is added below at module load, before
 // setBasemap() has run, and it throws "Map has no maxZoom specified" if no layer declares one yet.
-export const map = L.map('map', { maxZoom: 18, attributionControl: false, zoomControl: false })
-  .setView(PREFS.center || [3.2, 101.4], PREFS.zoom || 9);
+/* `maxBoundsViscosity: 1` is a hard wall rather than a rubber band. Leaflet's default of 0 lets a
+   drag leave the bounds and then springs back when the finger lifts, which reads as the map fighting
+   the reader. The bounds themselves arrive with border.json — see setLimits() below. */
+export const map = L.map('map', {
+  maxZoom: 18, attributionControl: false, zoomControl: false, maxBoundsViscosity: 1,
+}).setView(PREFS.center || [3.2, 101.4], PREFS.zoom || 9);
 L.control.zoom({ position: 'bottomright' }).addTo(map);
 /* **The two zoom buttons were the last `title` on the page, and Leaflet writes them.** Every other
    one in this app went on 2026-08-26, because a `title` opens on no phone and a second tooltip
@@ -192,7 +196,13 @@ narrow.addEventListener('change', syncPane);
 let sized;
 new ResizeObserver(() => {
   cancelAnimationFrame(sized);
-  sized = requestAnimationFrame(() => map.invalidateSize({ debounceMoveend: true }));
+  sized = requestAnimationFrame(() => {
+    map.invalidateSize({ debounceMoveend: true });
+    /* The zoom floor is measured against the window, so it moves with the box. **After
+       `invalidateSize()`, never before it.** `getBoundsZoom()` reads `map.getSize()`, and that
+       answers for the old box until the line above tells Leaflet about the new one. */
+    setLimits();
+  });
 }).observe(el('map'));
 
 map.on('moveend zoomend', () => {
@@ -239,6 +249,103 @@ map.getPane('water').style.zIndex = 250;
 map.createPane('labels');
 map.getPane('labels').style.zIndex = 260;
 map.getPane('labels').style.pointerEvents = 'none';
+
+/* **Everything outside the coverage area is shaded, and the same file sets the zoom floor and the
+   pan limit.** The map used to run on forever. A reader could zoom out to the whole world, and the
+   pins then sat on a continent with no line to say which part of it this app answers for. The
+   repository owner asked for all three on 2026-09-02.
+   `border.json` is Selangor's own outline, baked by border-build.php. Kuala Lumpur and Putrajaya are
+   enclaves inside it, and that script fills them in by dropping the relation's inner rings. So one
+   shape covers all three of this app's states and nothing here has to union anything.
+   Its own pane above the place names, so a town outside the area is shaded with the ground it sits
+   on. Under the overlay pane at 400, so the heat wash, the pins and the "you are here" circle all
+   still draw over it. It takes no pointer events, for the reason the labels pane states. */
+map.createPane('mask');
+map.getPane('mask').style.zIndex = 270;
+map.getPane('mask').style.pointerEvents = 'none';
+
+/* The diagonal stripes, as an SVG pattern in a hidden sprite. `css/map.css` paints the two shapes
+   inside it, so the theme swap costs no JavaScript and no re-read of a token. The pattern measures
+   in `userSpaceOnUse`, which is screen pixels at rest, so a stripe is the same width at every zoom.
+   A hidden `<svg>` in the document is enough: `fill: url(#hatch)` resolves against the whole
+   document rather than against the SVG the path lives in. `js/map.js` already appends one sprite
+   this way for the pin glyphs, further down. */
+const hatch = document.body.appendChild(
+  Object.assign(document.createElementNS('http://www.w3.org/2000/svg', 'svg'), { id: 'hatchdef' }));
+hatch.setAttribute('aria-hidden', 'true');
+hatch.innerHTML =
+  '<defs><pattern id="hatch" width="9" height="9" patternUnits="userSpaceOnUse"'
+  + ' patternTransform="rotate(45)">'
+  + '<rect width="9" height="9" class="hatchbg"/>'
+  + '<rect width="3" height="9" class="hatchline"/>'
+  + '</pattern></defs>';
+
+/* How far past the coverage the shaded ring reaches, in multiples of the coverage's own span. The
+   pan limit below is 0.25 of that span, so three spans is about eleven times as far as a reader can
+   ever travel. Nothing can reach the edge of it.
+   **It is NOT a ring around the whole world, and one was tried first.** A world ring projects to
+   coordinates in the tens of millions at zoom 9. Blink rasterizes a pattern fill over the path's own
+   bounding box, gives up somewhere inside a box that size, and paints the rest flat. The symptom is
+   a wide unstriped diagonal band lying across the map, which reads as a bug in the stripes rather
+   than as a size limit. A finite ring near the shape cannot reach that state.
+   **The fill rule punches the holes, and Leaflet's own default is the one that works.** `evenodd`
+   asks how many rings a point sits inside and fills the odd answers, so a hole punches whichever way
+   its points happen to wind. `nonzero` asks for the signed sum instead, so a hole wound the same way
+   as the outer ring fills solid rather than clearing. OpenStreetMap states no winding, and this app
+   cannot fix one it did not author. Do not set `fillRule` here. */
+const MASK_SPANS = 3;
+
+let cover;                       // the coverage bounds, once border.json has answered
+
+/* The zoom floor and the pan limit, both off the coverage extent. Re-run on every resize, because
+   `getBoundsZoom()` answers for the window this map has right now: the level that fits Selangor on
+   a desktop leaves half of it off a phone.
+   **One level looser than the fit.** The exact fit puts the state's edges hard against the window,
+   with no ground around it, and a coastline with nothing on the seaward side reads as a crop.
+   **ONE box answers both, and that is what keeps the floor honest.** `pad(0.5)` grows a box by half
+   its size on each side, so `ROAM` is twice the coverage on both axes. The floor is the zoom that
+   fits that box, and the box is what a drag may not leave. So the two cannot disagree.
+   Two numbers can, and the first version had them. A floor of `getBoundsZoom(cover) - 1` beside a
+   pan box of `cover.pad(0.25)` reports a floor the box then refuses, because a level out doubles
+   the ground on screen while a quarter pad adds half of it. `getMinZoom()` still answers the number
+   it was given, and nothing errors. Measured at six widths from 320 to 1920, this shape reaches its
+   own floor at every one of them. */
+const ROAM = 0.5;    // half the coverage span of margin on each side, so twice the span in all
+
+function setLimits() {
+  if (!cover) return;
+  const box = cover.pad(ROAM);
+  map.setMaxBounds(box);
+  map.setMinZoom(map.getBoundsZoom(box));
+}
+
+/* Fetched inline rather than deferred to an idle callback, which is what the water below does.
+   Two reasons. It is 4 KB gzipped against water.json's 165 KB. And it carries the zoom floor, so a
+   reader who lands zoomed out would otherwise see the world for as long as the browser felt like
+   waiting. A failure is silent and leaves an unlimited map, which is the state this replaces. */
+fetch('border.json')
+  .then(r => r.ok ? r.json() : Promise.reject(r.status))
+  .then(geo => {
+    const [w, s, e, n] = geo.bounds;
+    cover = L.latLngBounds([[s, w], [n, e]]);
+    const dx = (e - w) * MASK_SPANS, dy = (n - s) * MASK_SPANS;
+    const outer = [[w - dx, s - dy], [e + dx, s - dy], [e + dx, n + dy], [w - dx, n + dy],
+                   [w - dx, s - dy]];
+    // One Polygon: that ring, then every coverage ring as a hole. `border-build.php` writes a
+    // MultiPolygon of single-ring polygons, so the first ring of each is the whole of it.
+    L.geoJSON({
+      type: 'Feature', properties: {}, geometry: {
+        type: 'Polygon',
+        coordinates: [outer, ...geo.features[0].geometry.coordinates.map(p => p[0])],
+      },
+    }, {
+      renderer: L.svg({ pane: 'mask' }),
+      interactive: false,
+      style: { className: 'covermask', stroke: false, fillOpacity: 1 },
+    }).addTo(map);
+    setLimits();
+  })
+  .catch(() => {});
 
 let waterGeo, water, asking;
 

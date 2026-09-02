@@ -19,15 +19,15 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `api.php` | server-side proxy + cache + source merge + poll history + camera image proxy + rate-limited `?force=1` + place lookup (`?place=`, proxies Nominatim) + weather layer lookup (`?wx=1`) |
 | `sources.php` | scrapers for the two HTML-only upstreams (national portal, JPS WP) and the three MET feeds (nowcast, forecast, warning). Also the national portal's rainfall table, gazetteer and 7-day history endpoints. Also the two JPS notice parsers: the MET mirror, the flood alert |
 | `shots.php` | camera archive: capture, retention tiers, lookup, and the on-request strip (`buildSheet()`) the wall and the clip play. Required by `api.php` |
-| `shots-test.php` | `php shots-test.php` — one of seven runnable checks. Guards retention. Exercises `pruneShots()` |
+| `shots-test.php` | `php shots-test.php` — one of eight runnable checks. Guards retention. Exercises `pruneShots()` |
 | `log.php` | where a browser error lands. `js/oops.js` is the only caller. Appends one JSON line to `.client-errors.log` |
 | `watch.php` | reads a payload on stdin and complains when it is wrong. The poll cron pipes into it. Reports a change of state, never a state |
 | `.user.ini` | per-directory PHP settings. Holds one line, `session.auto_start=0`, and the reason it is there |
 | `index.html` | markup only — no inline CSS or JS |
-| `title-test.html` | `chrome --headless --dump-dom` — one of seven runnable checks. Guards the wordmark ladder in both of the heading's homes, the app bar and the navigation rail, in rendered pixels |
-| `narrow-test.html` | `chrome --headless --dump-dom` — one of seven runnable checks. Guards the narrow-window block: its threshold, its coverage, its refusal to be dismissed, and that it is modal |
-| `paint-check.html` | `chrome --headless --dump-dom` — one of seven runnable checks. Guards the layer chips over the map: that the panel and its two openers are gone, that the filters panel and every district id are gone too, that a menu chip states its own value and a filter chip carries a checkmark, that the heatmap and the two filters leave with the station layer, that a filter chip clears itself on a second press, that nothing else on the map lands on the row, and that below 600px the row wraps rather than scrolling |
-| `m3-check.html` | `chrome --headless --dump-dom` — one of seven runnable checks. Guards every M3 surface in rendered pixels: the nine dialogs against the roll call and the kind each is declared as, the four-band ladder, the map as an inset card, the one motion that changes what the pane holds, the supporting pane's headers and all five dialog headers as one M3 medium flexible top app bar, measured against each other at both widths, the supporting pane at M3's canonical ratios with the map giving up exactly that width, the pane as a side sheet above 600px and a full-screen dialog below it, and the station panel as an M3 list, one item per sensor, with its readings as a segmented list under a 24px kind glyph. Also the navigation rail at both its widths, the navigation bar below 600px, and that every enter carries M3's own duration and easing. Also the table dialog and the camera wall. Both take the one inset, shared by the search bar, the count line and the grid. The search bar states its own 56px shape. The sort target reaches 56dp. A tile states its container tone and a 12dp corner. The check also guards the two deletions, so a half-finished revert cannot ship silently |
+| `title-test.html` | `chrome --headless --dump-dom` — one of eight runnable checks. Guards the wordmark ladder in both of the heading's homes, the app bar and the navigation rail, in rendered pixels |
+| `narrow-test.html` | `chrome --headless --dump-dom` — one of eight runnable checks. Guards the narrow-window block: its threshold, its coverage, its refusal to be dismissed, and that it is modal |
+| `paint-check.html` | `chrome --headless --dump-dom` — one of eight runnable checks. Guards the layer chips over the map: that the panel and its two openers are gone, that the filters panel and every district id are gone too, that a menu chip states its own value and a filter chip carries a checkmark, that the heatmap and the two filters leave with the station layer, that a filter chip clears itself on a second press, that nothing else on the map lands on the row, and that below 600px the row wraps rather than scrolling |
+| `m3-check.html` | `chrome --headless --dump-dom` — one of eight runnable checks. Guards every M3 surface in rendered pixels: the nine dialogs against the roll call and the kind each is declared as, the four-band ladder, the map as an inset card, the one motion that changes what the pane holds, the supporting pane's headers and all five dialog headers as one M3 medium flexible top app bar, measured against each other at both widths, the supporting pane at M3's canonical ratios with the map giving up exactly that width, the pane as a side sheet above 600px and a full-screen dialog below it, and the station panel as an M3 list, one item per sensor, with its readings as a segmented list under a 24px kind glyph. Also the navigation rail at both its widths, the navigation bar below 600px, and that every enter carries M3's own duration and easing. Also the table dialog and the camera wall. Both take the one inset, shared by the search bar, the count line and the grid. The search bar states its own 56px shape. The sort target reaches 56dp. A tile states its container tone and a 12dp corner. The check also guards the two deletions, so a half-finished revert cannot ship silently |
 | `kind-color-lab.html` | the station kind palette, derived in OKLCh at load. **Not a check** — it renders for a person to read, and it prints no verdict. It fetches `css/base.css` and reports whether the app still holds what the rule builds, so open it after any palette edit. It was seven competing options until 2026-08-26 and holds one palette now |
 | `css/icons.css` | every icon, as an SVG mask. Generated — see docs/FEATURES.md for the fetch |
 | `css/base.css` | tokens, reset, controls, blocks shared by popup + alert panel |
@@ -39,9 +39,10 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `js/state.js` | `state` (data + hereAt) and the `PREFS` blob. Breaks module cycles. |
 | `js/util.js` | pure helpers + `hasInfo()` / `color()` / `isIgnored()` |
 | `js/stations.js` | queries over the station set (`nearestOf`, `nearestCam`, `byId`) |
-| `js/map.js` | map instance, basemap/theme, cluster, the station panel (`openSide`), `focusOn` / `flashTo` |
+| `js/map.js` | map instance, basemap/theme, cluster, the station panel (`openSide`), `focusOn` / `flashTo`. Also the coverage mask, the zoom floor and the pan limit, all three off `border.json` |
 | `js/heat.js` | both heat layers (water level, rainfall), ground-fixed sizing per layer, shared opacity. Also the field pass where a gauge reporting no rain denies the ground a wet one claims |
-| `heat-test.html` | `chrome --headless --dump-dom` — one of seven runnable checks. Guards the rain layer's paint distance, its dry-gauge erase and its handover between neighbours, in canvas pixels |
+| `heat-test.html` | `chrome --headless --dump-dom` — one of eight runnable checks. Guards the rain layer's paint distance, its dry-gauge erase and its handover between neighbours, in canvas pixels |
+| `map-limits-test.html` | `chrome --headless --dump-dom` — one of eight runnable checks. Guards the coverage mask, the zoom floor, the pan limit and the two water floors. It probes the drawn shape with `isPointInFill`, so it reads the fill rule the browser paints with. It also asserts that the pattern sprite is rendered rather than `display: none`, which is the one thing that empties the stripes with nothing to say so |
 | `js/popup.js` | popup + meter + gauge + sparkline templates. Also `wxItem()` and its three helpers, the weather list item both weather surfaces draw |
 | `js/sparktip.js` | the hover/tap readout on every graph, and the label on any `data-tip`. One delegated listener, no imports |
 | `js/render.js` | rebuilds markers and heat points, the two saved lists, and the kind counts |
@@ -62,8 +63,10 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `sw.js` | service worker: network-first shell cache, and the reason Chrome offers "Install app" |
 | `icon.svg` | the app mark: bare glyph, no fill. Source for the PNGs *and* the `--i-flood` mask |
 | `icon-build.php` | `php icon-build.php` — rebakes the two icons and prints the mask rule to paste |
-| `water-build.php` | `php water-build.php` — rebakes `water.json` from OpenStreetMap. Run by hand, never in a request |
-| `water.json` | the water the dark basemap will not draw: 2,775 rivers + 3,860 ponds, baked and committed |
+| `water-build.php` | `php water-build.php` — rebakes `water.json` from OpenStreetMap. Holds the two size floors, `MIN_AREA_KM2` and `MIN_RIVER_KM`. Run by hand, never in a request |
+| `water.json` | the water the dark basemap will not draw: 850 rivers + 1,060 ponds, baked and committed. It held 2,775 and 3,864 until the size floors landed on 2026-09-02 |
+| `border-build.php` | `php border-build.php` — bakes `border.json`, Selangor's outline, from OpenStreetMap. Run by hand, never in a request |
+| `border.json` | the coverage outline, and the one source for three things: the shading outside it, the zoom floor and the pan limit. One ring, 864 points, 15 KB |
 | `wx-build.php` | `php wx-build.php` — bakes `wx-places.json` from Nominatim. Run by hand, never in a request |
 | `wx-places.json` | the district behind each weather point, baked and committed |
 | `icon-192.png`, `icon-512.png` | manifest icons (`any`) and the favicon — the glyph on transparency |
@@ -77,7 +80,7 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `.github/workflows/pages.yml` | bakes the static GitHub Pages build — runs the PHP on cron, publishes `api.json` |
 | `docs/DEPLOY.md` | both targets: Pages (what it cannot do) and a Debian box / Proxmox LXC (spec, nginx, cron, container traps) |
 | `docs/GOTCHAS.md` | every trap that already cost a debugging session. Left this file on 2026-08-27, over the 150,000-character limit. `## Gotchas` below indexes it |
-| `docs/VERIFY.md` | the seven runnable checks and every sweep over the live payload. Left this file the same day, for the same reason |
+| `docs/VERIFY.md` | the eight runnable checks and every sweep over the live payload. Left this file the same day, for the same reason |
 | `.cache.json` | last payload (gitignored) |
 | `.php-error.log` | this app's own PHP errors, and nothing else (gitignored) |
 | `.client-errors.log` | one JSON line per browser error, written by `log.php` (gitignored) |
@@ -586,7 +589,17 @@ order that file holds them. A trap names itself here, and the file states the ev
 - THE BASEMAP IS ESRI AND IT WAS CARTO, AND THE TILE FILTER IS DELETED.
 - A GREY CANVAS BASEMAP DRAWS ALMOST NO SMALL WATER, and no filter can recolo...
 - Tolerance and scope are different knobs on `water-build.php`, and the wrong...
+- `MIN_AREA_KM2` and `MIN_RIVER_KM` are size floors, and they REVERSE what th...
 - A lake's outline is several ways in one relation, so closing each one separ...
+- `border-build.php` fetches Selangor alone, and dropping its inner rings is ...
+- Do not set `fillRule` on the mask.
+- The mask's outer ring is finite, and a ring around the whole world is what ...
+- A `<pattern>` sprite must NOT be `display: none`, and a `<use>` sprite may be.
+- The stripe inside that tile is a filled `<rect>`, and a stroked `<line>` dr...
+- The mask's stripe is white on the dark theme and black on paper.
+- One box holds the zoom floor and the pan limit, and two numbers cannot be t...
+- `setLimits()` runs after `invalidateSize()` and never before it.
+- The coverage outline includes Selangor's water, and the unshaded wedge in t...
 - The MET nowcast page has no endpoint to find.
 - `MET_KM` is a flat 15 km, not a radius scaled to how far each point reaches.
 - The warning feed carries no coordinates.
@@ -1241,8 +1254,8 @@ copy.
 
 The commands moved to [`docs/VERIFY.md`](docs/VERIFY.md) on 2026-08-27, for the reason the gotcha
 section above states. That file holds every sweep that reads the live payload. It also holds the
-seven runnable checks, and it says which risk each one guards.
+eight runnable checks, and it says which risk each one guards.
 
-Run the checks that cover what you changed. The seven are `php shots-test.php`,
+Run the checks that cover what you changed. The eight are `php shots-test.php`,
 `php api.php --selftest`, `heat-test.html`, `title-test.html`, `narrow-test.html`,
-`paint-check.html` and `m3-check.html`.
+`paint-check.html`, `m3-check.html` and `map-limits-test.html`.

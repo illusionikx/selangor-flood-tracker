@@ -23,6 +23,17 @@
 const TOL_DEG  = 0.0003;   // Douglas-Peucker tolerance, about 33 m. Finer than a screen pixel at
                            // zoom 18, which is the deepest this map goes. Tolerance controls the
                            // detail *within* a shape and never which shapes are present.
+
+/* The size floors, and they REVERSE part of the reason above. The header says this file exists
+   because the basemap hides small water. That is still true close in. It stopped being the whole
+   truth at zoom 10, where the unfiltered set drew 2,775 rivers as a blue web over the whole state
+   and answered no question a reader had. A drain behind a house is not a flood risk a reader reads
+   off a map of six thousand of them.
+   So the floors cut the shapes that only ever added texture. Anything at or above them still draws
+   at every zoom, exactly as before. The repository owner asked for this on 2026-09-02.
+   Tune these against the counts this script prints, never against a guess. */
+const MIN_AREA_KM2 = 0.01;   // one hectare. The median body in the box is 0.0037 km².
+const MIN_RIVER_KM = 1.0;    // a river shorter than a kilometre is a drain at this map's zooms.
 const COORD_DP = 4;        // About 11 m per unit. Two more digits cost 40% of the file for detail
                            // no zoom in this app can show.
 const ENDPOINT = 'https://overpass-api.de/api/interpreter';
@@ -72,6 +83,38 @@ function clean(array $pts): array {
         if (!$out || $q !== end($out)) $out[] = $q;
     }
     return $out;
+}
+
+/**
+ * Area of a closed ring in square kilometres.
+ *
+ * The shoelace formula in degrees, with longitude scaled by the cosine of the ring's own middle
+ * latitude. A degree of longitude is 111 km at the equator and 111 km times that cosine everywhere
+ * else, so an unscaled shoelace overstates every shape by about 0.1% here and by a great deal
+ * further north. The sign says which way the ring winds, and nothing here cares, so take the size.
+ */
+function areaKm2(array $ring): float {
+    $n = count($ring);
+    if ($n < 4) return 0.0;
+    $lat = 0.0;
+    foreach ($ring as $p) $lat += $p[1];
+    $k = 111.32 * cos($lat / $n * M_PI / 180);
+    $sum = 0.0;
+    for ($i = 0, $j = $n - 1; $i < $n; $j = $i++)
+        $sum += ($ring[$j][0] * $k) * ($ring[$i][1] * 110.57)
+              - ($ring[$i][0] * $k) * ($ring[$j][1] * 110.57);
+    return abs($sum) / 2;
+}
+
+/** Length of an open line in kilometres, summed segment by segment. */
+function lineKm(array $pts): float {
+    $km = 0.0;
+    for ($i = 1; $i < count($pts); $i++) {
+        $k = 111.32 * cos(($pts[$i][1] + $pts[$i - 1][1]) / 2 * M_PI / 180);
+        $km += hypot(($pts[$i][0] - $pts[$i - 1][0]) * $k,
+                     ($pts[$i][1] - $pts[$i - 1][1]) * 110.57);
+    }
+    return $km;
 }
 
 /**
@@ -136,6 +179,7 @@ if (!is_array($els)) fail('Overpass returned no elements — the query or the se
 // --- trim ----------------------------------------------------------------------------------------
 
 $lines = []; $areas = []; $points = 0;
+$cut = ['pond' => 0, 'river' => 0];   // what the two floors above took, printed at the end
 
 foreach ($els as $el) {
     $isRiver = ($el['tags']['waterway'] ?? '') === 'river';
@@ -150,15 +194,19 @@ foreach ($els as $el) {
             if (($m['role'] ?? '') === 'inner') $inner[] = $g; else $outer[] = $g;
         }
         foreach (rings($outer) as $ring) {
-            $poly = [];
+            $poly = []; $kept = 0;
             foreach (array_merge([$ring], rings($inner)) as $r) {
                 $c = clean(simplify($r, TOL_DEG));
                 if (count($c) < 4) continue;
                 if ($c[0] !== end($c)) $c[] = $c[0];      // rounding can unclose a ring
-                $poly[] = $c; $points += count($c);
+                $poly[] = $c; $kept += count($c);
             }
-            if ($poly) $areas[] = $poly;
-            $inner = [];                                   // holes belong to the first ring only
+            $inner = [];                                   // holes belong to the first ring only.
+            // Cleared BEFORE the floor below, or a cut first ring hands its holes to the second.
+            // The floor reads the OUTER ring alone. A lake with a wooded island in it is still a
+            // lake the size of its own shore.
+            if ($poly && areaKm2($poly[0]) < MIN_AREA_KM2) { $cut['pond']++; continue; }
+            if ($poly) { $areas[] = $poly; $points += $kept; }
         }
         continue;
     }
@@ -168,12 +216,15 @@ foreach ($els as $el) {
     if (count($g) < 2) continue;
     $c = clean(simplify($g, TOL_DEG));
     if (count($c) < 2) continue;
-    $points += count($c);
 
-    if ($isRiver) { $lines[] = $c; continue; }
-    if (count($c) < 4) { $points -= count($c); continue; }
+    if ($isRiver) {
+        if (lineKm($c) < MIN_RIVER_KM) { $cut['river']++; continue; }
+        $lines[] = $c; $points += count($c); continue;
+    }
+    if (count($c) < 4) continue;
     if ($c[0] !== end($c)) $c[] = $c[0];
-    $areas[] = [$c];
+    if (areaKm2($c) < MIN_AREA_KM2) { $cut['pond']++; continue; }
+    $areas[] = [$c]; $points += count($c);
 }
 
 if (!$lines || !$areas) fail('rivers or water bodies came back empty — refusing to write the file');
@@ -190,4 +241,6 @@ file_put_contents(OUT, $json);
 
 printf("water-build: %d rivers, %d water bodies, %d points, %d KB on disk, about %d KB gzipped\n",
        count($lines), count($areas), $points, strlen($json) / 1024, strlen(gzencode($json, 9)) / 1024);
+printf("water-build: the floors cut %d rivers under %.2f km and %d bodies under %.4f km2\n",
+       $cut['river'], MIN_RIVER_KM, $cut['pond'], MIN_AREA_KM2);
 echo "water-build: commit water.json. js/map.js fetches it by name, so there is no ?v= to bump.\n";

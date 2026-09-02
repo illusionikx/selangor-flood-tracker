@@ -714,3 +714,34 @@
 .wxkey { display: flex; flex-wrap: wrap; gap: 2px 8px; font-size: inherit; }
 .wxkey span { display: inline-flex; align-items: center; gap: 3px; }
 .wxkey .i { font-size: 14px; }
+
+/* --- the coverage mask ------------------------------------------------------------------------ */
+
+/* Everything outside Selangor, Kuala Lumpur and Putrajaya, shaded with diagonal stripes. The shape
+   is one SVG path in the `mask` pane, built in js/map.js from border.json. The two colours are
+   tokens in css/base.css, so the theme swap needs no JavaScript.
+   **The fill is set here rather than on the element, and that is deliberate.** Leaflet writes
+   `fill` as a presentation attribute from its own style options. A CSS declaration outranks a
+   presentation attribute, so this wins with no attribute poking after the layer is added, and
+   nothing has to guess when Leaflet next rewrites its own styles. */
+.covermask { fill: url(#hatch); stroke: none; }
+
+/* The pattern's own sprite. It paints nothing itself and must take no space: a bare `<svg>` in the
+   body is 300 by 150 pixels by default, which would push the page down by 150.
+   **It must NOT be `display: none`, and `#glyphs` two hundred lines up may be.** That is the whole
+   of the difference between the two sprites, and it cost a debugging session. A `<use>` copies a
+   shape out of a tree that was never rendered, so `#glyphs` works hidden. A `<pattern>` is a paint
+   server whose tile Blink builds from the LAYOUT tree, and `display: none` gives its children no
+   layout to build from. The pattern still resolves, so `getComputedStyle` answers
+   `url("#hatch")` on the path and every child answers its own right fill. The tile is simply empty,
+   and the mask then draws as a flat wash with no stripes in it. Nothing errors.
+   Zero size with the overflow clipped is the shape that renders and takes no room. */
+#hatchdef { position: absolute; width: 0; height: 0; overflow: hidden; }
+.hatchbg { fill: var(--mask-bg); }
+/* **The stripe is a filled rect and it was a stroked line, which drew nothing.** A `<pattern>` clips
+   its content to its own tile. A line on the tile's edge carries half its stroke width outside that
+   tile, so a 2px stroke showed 1px, landed between two device pixels once rotated, and antialiased
+   to about half its colour. The mask then read as a flat wash with no direction in it, which is the
+   one thing it exists to have. A rect sits wholly inside the tile and cannot reach that state.
+   3 of 9, so a third of the ground carries a stripe. */
+.hatchline { fill: var(--mask-line); }

@@ -1,0 +1,181 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Coverage mask and map limits check</title>
+<!-- Eighth runnable check in this repo. It guards the three things border.json pays for: the shading
+     over everything outside the coverage area, the zoom floor, and the pan limit. It also guards the
+     two size floors in water-build.php.
+
+     Every fault here is SILENT. A mask that draws nothing looks like a map. A mask whose stripes
+     never render looks like a flat wash somebody chose. A zoom floor the pan box refuses still
+     answers its own number to `getMinZoom()`. And a water.json rebaked with the floors removed just
+     puts six thousand shapes back on the map. None of them throws, and none of them is visible in a
+     diff.
+
+     Run it headless. It prints its own verdict into the output box below, so there is nothing to
+     look at. docs/VERIFY.md carries the command. Do not write that element's own tag into this
+     comment — the reader there cuts the output out of the dumped DOM by matching it, and a second
+     copy in a comment is the one it finds first. -->
+<!-- **This page loads stylesheets and heat-test.html does not, and the mask is why.** Three of the
+     things asserted below are painted rather than computed: the pattern the mask asks for, the two
+     paints inside that pattern's tile, and the z-index of every Leaflet pane. Without these files
+     the mask draws in Leaflet's own default blue, both tile shapes resolve to black, and
+     `overlayPane` has no z-index at all. -->
+<link rel="stylesheet" href="vendor/leaflet.css">
+<link rel="stylesheet" href="css/base.css">
+<link rel="stylesheet" href="css/map.css">
+<style>#map{width:900px;height:700px}</style>
+<div id="map"></div>
+<!-- The elements js/map.js wires at module scope. A missing one is a TypeError at import time, and
+     then nothing on this page runs at all. -->
+<button id="sideClose"></button>
+<dialog id="pane"></dialog>
+<input id="heatOpacity" type="range" min="0" max="100" value="100">
+<span id="heatOpacityVal"></span>
+<pre id="out">running</pre>
+<script>
+  const out = document.getElementById('out'), log = [];
+  window.say = (...a) => { log.push(a.join(' ')); out.textContent = log.join('\n'); };
+  window.onerror = (m, f, l) => say('ERROR', m, 'at', f + ':' + l);
+  window.onunhandledrejection = e => say('REJECT', e.reason && (e.reason.stack || e.reason.message));
+</script>
+<script src="vendor/leaflet.js"></script>
+<script src="vendor/markercluster.js"></script>
+<script src="vendor/leaflet-heat.js"></script>
+<script type="module">
+const { say } = window;
+const fails = [];
+const ok = (name, pass, detail) => { say((pass ? 'ok   ' : 'FAIL ') + name + '   ' + detail);
+                                     if (!pass) fails.push(name); };
+
+/* HALF the floors water-build.php states, on purpose. This asserts that the floors EXIST, never
+   that they hold one value. Raising either constant must not turn this page red, and deleting them
+   must. Hard-coding the real numbers here would put a copy of a PHP constant in a JavaScript file,
+   with nothing to keep the two together. */
+const FLOOR_RIVER_KM = 0.5, FLOOR_AREA_KM2 = 0.005;
+
+const settle = ms => new Promise(r => setTimeout(r, ms));
+
+try {
+  const { map } = await import('./js/map.js');
+
+  // border.json is fetched at module load, so the mask arrives a tick or two after the import.
+  let path = null;
+  for (let i = 0; i < 60 && !path; i++) { await settle(100); path = document.querySelector('.covermask'); }
+  ok('the mask draws', !!path, path ? 'one .covermask path' : 'nothing after 6 s');
+  if (!path) throw new Error('no mask, so nothing below can be measured');
+
+  // --- the shape ---------------------------------------------------------------------------------
+
+  const d = path.getAttribute('d') || '';
+  const subs = d.split('M').filter(Boolean).length;
+  ok('it is a ring with a hole in it', subs >= 2, subs + ' subpaths, wanted 2 or more');
+
+  /* `isPointInFill` reads the same fill rule the browser paints with, so this asks the rendered
+     shape rather than the numbers behind it. The path is written in Leaflet's layer coordinates, so
+     that is the space a probe point has to be in.
+     **Every probe has to be ON SCREEN.** Leaflet clips a polygon to the viewport plus its padding,
+     so a point off the edge is outside the clipped path whatever the map says about it. Ipoh sat
+     here for one revision and failed for exactly that reason, which reads as a hole in the mask
+     over Perak. `assert` refuses a probe the view does not hold, so the next one cannot hide. */
+  map.setView([3.1, 101.5], 9, { animate: false });
+  await settle(200);
+  const at = ll => {
+    if (!map.getBounds().contains(L.latLng(ll))) throw new Error('probe ' + ll + ' is off screen');
+    const p = map.latLngToLayerPoint(L.latLng(ll));
+    return path.isPointInFill(new DOMPoint(p.x, p.y));
+  };
+
+  ok('Shah Alam is not shaded', !at([3.073, 101.518]), 'inside the coverage');
+  ok('Kuala Lumpur is not shaded', !at([3.139, 101.687]), 'an enclave, filled in by dropping the '
+     + 'inner rings');
+  ok('Putrajaya is not shaded', !at([2.926, 101.696]), 'the second enclave');
+  ok('Seremban is shaded', at([2.725, 101.938]), 'Negeri Sembilan, outside the coverage');
+  ok('Bentong is shaded', at([3.522, 101.908]), 'Pahang, outside the coverage');
+
+  // --- the stripes -------------------------------------------------------------------------------
+
+  /* The pattern cannot be read off a pixel here, because this page has no way to sample the
+     compositor. So it is read off the two things that broke it.
+     **`display: none` on the sprite is the fault this line exists for.** A `<pattern>` is a paint
+     server whose tile Blink builds from the layout tree, and a hidden sprite gives its children no
+     layout. The pattern still resolves, every fill still computes, and the tile is empty. The mask
+     then draws as a flat wash and nothing anywhere says so. */
+  const def = document.getElementById('hatchdef');
+  ok('the pattern sprite is rendered', def && getComputedStyle(def).display !== 'none',
+     def ? 'display ' + getComputedStyle(def).display : 'no #hatchdef at all');
+  const bg = document.querySelector('#hatch .hatchbg'), line = document.querySelector('#hatch .hatchline');
+  const fills = [bg, line].map(e => e && getComputedStyle(e).fill);
+  ok('the tile holds two different paints', !!bg && !!line && fills[0] !== fills[1],
+     fills.join(' against '));
+  ok('the mask asks for that pattern', getComputedStyle(path).fill.includes('#hatch'),
+     getComputedStyle(path).fill);
+
+  // --- the limits --------------------------------------------------------------------------------
+
+  /* One box answers the floor and the limit, so a floor the box refuses cannot happen. Read the
+     zoom AFTER the animation settles: `getZoom()` answers the target the instant `setZoom()` is
+     called, so a synchronous read reports a level the map never reached. */
+  const floor = map.getMinZoom();
+  map.setZoom(floor - 3);
+  await settle(900);
+  ok('the zoom floor holds', map.getZoom() === floor,
+     'asked for ' + (floor - 3) + ', floor is ' + floor + ', landed on ' + map.getZoom());
+
+  const box = map.options.maxBounds;
+  ok('the floor is the box', box && floor === map.getBoundsZoom(box),
+     'floor ' + floor + ', the box fits at ' + (box && map.getBoundsZoom(box)));
+
+  map.panTo([13.75, 100.50], { animate: false });   // Bangkok
+  await settle(300);
+  const c = map.getCenter();
+  ok('a pan cannot leave the area', box.contains(c),
+     'landed on ' + c.lat.toFixed(2) + ', ' + c.lng.toFixed(2));
+
+  // --- the water floors --------------------------------------------------------------------------
+
+  /* Shoelace in degrees with longitude scaled by the cosine of the ring's own middle latitude, and
+     summed segments for a line. Both are water-build.php's own arithmetic, restated here because
+     this page cannot run PHP. They answer the same question to about a tenth of a percent, which is
+     far inside the margin the half-floors above already carry. */
+  const areaKm2 = r => {
+    let lat = 0; for (const p of r) lat += p[1];
+    const k = 111.32 * Math.cos(lat / r.length * Math.PI / 180);
+    let s = 0;
+    for (let i = 0, j = r.length - 1; i < r.length; j = i++)
+      s += r[j][0] * k * r[i][1] * 110.57 - r[i][0] * k * r[j][1] * 110.57;
+    return Math.abs(s) / 2;
+  };
+  const lineKm = p => {
+    let km = 0;
+    for (let i = 1; i < p.length; i++) {
+      const k = 111.32 * Math.cos((p[i][1] + p[i - 1][1]) / 2 * Math.PI / 180);
+      km += Math.hypot((p[i][0] - p[i - 1][0]) * k, (p[i][1] - p[i - 1][1]) * 110.57);
+    }
+    return km;
+  };
+
+  const water = await (await fetch('water.json')).json();
+  const lines = water.features.find(f => f.properties.t === 'line').geometry.coordinates;
+  const areas = water.features.find(f => f.properties.t === 'area').geometry.coordinates;
+  const shortest = Math.min(...lines.map(lineKm));
+  const smallest = Math.min(...areas.map(p => areaKm2(p[0])));
+  ok('no river under the floor', shortest >= FLOOR_RIVER_KM,
+     lines.length + ' rivers, shortest ' + shortest.toFixed(2) + ' km, floor ' + FLOOR_RIVER_KM);
+  ok('no water body under the floor', smallest >= FLOOR_AREA_KM2,
+     areas.length + ' bodies, smallest ' + smallest.toFixed(4) + ' km2, floor ' + FLOOR_AREA_KM2);
+
+  // --- the pane order ----------------------------------------------------------------------------
+
+  /* The mask has to sit over the place names, so a town outside the area is shaded with the ground
+     it stands on. It has to sit under the overlay pane, or it shades the heat wash and the pins. */
+  const z = n => +getComputedStyle(map.getPane(n)).zIndex;
+  ok('the mask is over the names and under the pins',
+     z('mask') > z('labels') && z('mask') < z('overlayPane'),
+     'labels ' + z('labels') + ', mask ' + z('mask') + ', overlay ' + z('overlayPane'));
+
+  say('');
+  say(fails.length ? 'FAILED: ' + fails.join(', ') : 'PASS');
+} catch (e) {
+  say('THREW', e && (e.stack || e.message));
+}
+</script>

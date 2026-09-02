@@ -2919,12 +2919,89 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   nothing.** Douglas-Peucker controls the detail inside a shape the query already returned. Taking
   the rivers from 33 m to 11 m grows them from 105 KB to 199 KB. It adds no pond, because a pond was
   never a line in that query. If something is **missing**, change the query. If something looks
-  **crude**, change the tolerance. There is also no area floor, on purpose. A small pond simplifies
-  to a handful of points. So keeping every one costs the same 130 KB as a 0.001 km² cutoff.
+  **crude**, change the tolerance. There is now a third knob, and it answers neither question — see
+  the size floors below.
+- **`MIN_AREA_KM2` and `MIN_RIVER_KM` are size floors, and they REVERSE what this file used to say.**
+  It said there was no area floor on purpose, because a small pond simplifies to a handful of points
+  and keeping every one costs about what a cutoff costs. That argument is about bytes and it is
+  still true. It is not the reason the floors exist.
+  **The reason is the zoom-10 view.** The unfiltered set drew 2,775 rivers as a blue web over the
+  whole state, and a drain behind a house is not a flood risk a reader reads off a map of six
+  thousand of them. The repository owner asked for the cut on 2026-09-02. Measured: 850 rivers and
+  1,060 bodies survive, the file falls from 963 KB to 634 KB, and 1,925 rivers and 2,804 bodies go.
+  The header's own claim, that this file exists because the basemap hides small water, still holds
+  close in and stopped being the whole truth far out.
+  **The floor reads a relation's OUTER ring alone.** A lake with a wooded island in it is still a
+  lake the size of its own shore.
+  **`$inner` is cleared BEFORE the floor is applied.** Holes belong to the first ring only, so a cut
+  first ring that skipped that line would hand its holes to the second one.
+  `map-limits-test.html` guards the floors at HALF their stated values, so raising either constant
+  cannot turn the check red and deleting them must.
 - **A lake's outline is several ways in one relation, so closing each one separately draws wedges.**
   `rings()` in `water-build.php` chains member ways end to end, flipping one that joins backwards.
   It keeps only what closes. An open chain means the relation is broken upstream. The script
   drops it rather than guess at a shape. Inner rings become holes, so an island stays dry.
+- **`border-build.php` fetches Selangor alone, and dropping its inner rings is what fills in Kuala
+  Lumpur and Putrajaya.** Both are enclaves, so OpenStreetMap carries them as inner rings of the
+  Selangor relation. One shape therefore covers all three of this app's states, and nothing has to
+  union anything.
+  **Fetching their own relations and punching three holes is the version that fails.** The mask is
+  one ring with the coverage cut out of it. Under the nonzero fill rule two overlapping holes wind
+  to -1 rather than to 0, so the overlap fills back in and the capital draws shaded. Under
+  `evenodd`, which is Leaflet's own default and what this app uses, a point inside two holes is at an
+  even count and fills as well. Either way the enclave is wrong. One hole per outer ring cannot
+  reach that state.
+  The script checks it. A point in Kuala Lumpur and a point in Putrajaya must both land inside the
+  result, and it refuses to write the file otherwise. Nothing downstream would have said so.
+- **Do not set `fillRule` on the mask.** Leaflet's default is `evenodd`, which asks how many rings a
+  point sits inside and fills the odd answers. So a hole punches whichever way its own points
+  happen to wind. `nonzero` takes the signed sum instead, and a hole wound the same way as the outer
+  ring then fills solid rather than clearing. OpenStreetMap states no winding, and this app cannot
+  fix one it did not author.
+- **The mask's outer ring is finite, and a ring around the whole world is what it replaces.** A world
+  ring projects to coordinates in the tens of millions at zoom 9. Blink rasterizes a pattern fill
+  over the path's own bounding box and gives up somewhere inside a box that size, painting the rest
+  flat. The symptom is a wide unstriped diagonal band lying across the map, which reads as a bug in
+  the stripes rather than as a size limit. `MASK_SPANS` is three coverage spans of margin, which is
+  about eleven times as far as the pan limit lets a reader travel.
+- **A `<pattern>` sprite must NOT be `display: none`, and a `<use>` sprite may be.** This app has one
+  of each. `#glyphs` holds the pin shapes and is hidden, because `<use>` copies out of a tree that
+  was never rendered. `#hatchdef` holds the mask's stripes and must render, because a pattern is a
+  paint server whose tile Blink builds from the LAYOUT tree. With no layout there are no children to
+  build from.
+  **Everything measurable still passes in the broken state**, which is why this cost a session. The
+  pattern resolves, `getComputedStyle` answers `url("#hatch")` on the path, and both shapes inside
+  the tile answer their own right fills. The tile is simply empty, the mask draws as a flat wash,
+  and nothing errors. Only a pixel says so. `position: absolute` with zero size and the overflow
+  clipped is the shape that renders and takes no room.
+- **The stripe inside that tile is a filled `<rect>`, and a stroked `<line>` drew nothing.** A
+  pattern clips its content to its own tile. A line on the tile's edge carries half its stroke width
+  outside the tile, so a 2px stroke showed 1px, landed between two device pixels once rotated, and
+  antialiased to about half its colour. A rect sits wholly inside the tile and cannot reach that.
+- **The mask's stripe is white on the dark theme and black on paper.** A darker stripe on a wash that
+  is already 45% black has nowhere left to go: the first version measured about twelve levels apart
+  on a `#202124` tile and read as a flat wash with no direction in it. The pair reverses rather than
+  scales.
+- **One box holds the zoom floor and the pan limit, and two numbers cannot be trusted to agree.**
+  `setLimits()` in `js/map.js` takes `cover.pad(0.5)`, sets it as `maxBounds`, and takes the floor
+  from `getBoundsZoom()` of that same box. A floor derived separately reports a level the box then
+  refuses, and `getMinZoom()` still answers the number it was given. Nothing errors, so the floor is
+  simply a lie. Measured at six widths from 320 to 1920, the shipped shape reaches its own floor at
+  every one.
+  **`getBoundsZoom()` fits BOTH axes and returns the tighter one**, and which axis binds depends on
+  the window: height on a desktop, width on a phone. So a fixed pad beside a fixed offset agrees at
+  one width and not at the next.
+  **Read the zoom AFTER the animation settles.** `getZoom()` answers the target the instant
+  `setZoom()` is called, so a synchronous read reports a level the map never reached. Two
+  measurements during this work were wrong for that reason alone, and both looked like real faults.
+- **`setLimits()` runs after `invalidateSize()` and never before it.** `getBoundsZoom()` reads
+  `map.getSize()`, and that answers for the old box until `invalidateSize()` tells Leaflet about the
+  new one. Both sit in the same `requestAnimationFrame` inside the `ResizeObserver`.
+- **The coverage outline includes Selangor's water, and the unshaded wedge in the strait is not a
+  bug.** The relation reaches west to longitude 100.39 and south to latitude 2.40, well past the
+  station extent `BOX` states. So a straight-edged block of the Strait of Malacca draws clear. It is
+  where Selangor legally is, and this mask claims nothing more than that. Clipping it to `BOX` puts
+  an arbitrary vertical line through open water instead, which is a worse lie in the same place.
 - **The MET nowcast page has no endpoint to find.** It renders its Leaflet map on the server and
   bakes all 294 points into `L.marker(...)` statements. There is no request to intercept, so
   `metPoints()` parses the JavaScript source with a regex. `data.gov.my` publishes three weather
