@@ -2959,29 +2959,38 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   ring then fills solid rather than clearing. OpenStreetMap states no winding, and this app cannot
   fix one it did not author.
 - **The mask's outer ring is finite, and a ring around the whole world is what it replaces.** A world
-  ring projects to coordinates in the tens of millions at zoom 9. Blink rasterizes a pattern fill
-  over the path's own bounding box and gives up somewhere inside a box that size, painting the rest
-  flat. The symptom is a wide unstriped diagonal band lying across the map, which reads as a bug in
-  the stripes rather than as a size limit. `MASK_SPANS` is three coverage spans of margin, which is
-  about eleven times as far as the pan limit lets a reader travel.
-- **A `<pattern>` sprite must NOT be `display: none`, and a `<use>` sprite may be.** This app has one
-  of each. `#glyphs` holds the pin shapes and is hidden, because `<use>` copies out of a tree that
-  was never rendered. `#hatchdef` holds the mask's stripes and must render, because a pattern is a
-  paint server whose tile Blink builds from the LAYOUT tree. With no layout there are no children to
-  build from.
-  **Everything measurable still passes in the broken state**, which is why this cost a session. The
-  pattern resolves, `getComputedStyle` answers `url("#hatch")` on the path, and both shapes inside
-  the tile answer their own right fills. The tile is simply empty, the mask draws as a flat wash,
-  and nothing errors. Only a pixel says so. `position: absolute` with zero size and the overflow
-  clipped is the shape that renders and takes no room.
-- **The stripe inside that tile is a filled `<rect>`, and a stroked `<line>` drew nothing.** A
-  pattern clips its content to its own tile. A line on the tile's edge carries half its stroke width
-  outside the tile, so a 2px stroke showed 1px, landed between two device pixels once rotated, and
-  antialiased to about half its colour. A rect sits wholly inside the tile and cannot reach that.
-- **The mask's stripe is white on the dark theme and black on paper.** A darker stripe on a wash that
-  is already 45% black has nowhere left to go: the first version measured about twelve levels apart
-  on a `#202124` tile and read as a flat wash with no direction in it. The pair reverses rather than
-  scales.
+  ring projects to coordinates in the tens of millions at zoom 9. Blink rasterizes a fill over the
+  path's own bounding box and gives up somewhere inside a box that size. While the mask was striped
+  the symptom was a wide unstriped band across the map, which reads as a bug in the stripes rather
+  than as a size limit. `MASK_SPANS` is three circle widths of margin, about eleven times as far as
+  the pan limit lets a reader travel. Keep it finite whatever the fill is.
+- **The mask draws a CIRCLE and it drew Selangor's outline, and the outline is not coming back
+  without a reason.** The repository owner called the real shape too busy on 2026-09-02, the same day
+  it shipped. The outline stays in `border.json` because `border-build.php` needs it to place the
+  circle and `map-limits-test.html` needs it to check one. Switching back is one line in `js/map.js`.
+- **The diagonal stripes are deleted rather than switched off.** They cost an SVG `<pattern>` in a
+  sprite of its own, two shapes inside its tile, a second colour token, and the two traps below. The
+  wash is flat now, and `map-limits-test.html` asserts that `#hatchdef` and `#hatch` are both absent,
+  so a half-finished revert cannot ship.
+  **The two traps are recorded because the next pattern will meet them.**
+  A `<pattern>` sprite must NOT be `display: none`, and a `<use>` sprite may be. `#glyphs` holds the
+  pin shapes and is hidden, because `<use>` copies out of a tree that was never rendered. A pattern
+  is a paint server whose tile Blink builds from the LAYOUT tree, and with no layout there are no
+  children to build from. **Everything measurable still passes in that state**, which is why it cost
+  a session: the pattern resolves, `getComputedStyle` answers `url("#hatch")` on the path, and every
+  child answers its own right fill. The tile is simply empty and nothing errors. `position: absolute`
+  with zero size and the overflow clipped is the shape that renders and takes no room.
+  And a stripe inside a tile has to be a filled `<rect>`. A pattern clips its content to its own
+  tile, so a stroked line on the tile's edge carries half its width outside and shows half of itself.
+- **The wash is faint and the hairline is what states the boundary.** `--mask-bg` is 0.06 on paper
+  and 0.30 on the dark theme, down from an effective 0.09 and 0.50 once both stripe values were
+  counted. So `--mask-edge` is load-bearing rather than decoration, and a `stroke: none` leaves a
+  circle nobody can find. `map-limits-test.html` asserts the stroke for that reason alone.
+  **The edge reverses between themes and the wash does not.** It is black on paper and white on the
+  dark theme, because a darker line on a wash that is already 30% black has nowhere left to go.
+- **The stroke on the mask path draws the circle and nothing else.** It lands on the outer ring too,
+  and that ring sits three circle widths out, past any zoom the pan limit allows. So one property
+  states the boundary and no second element is needed.
 - **One box holds the zoom floor and the pan limit, and two numbers cannot be trusted to agree.**
   `setLimits()` in `js/map.js` takes `cover.pad(0.5)`, sets it as `maxBounds`, and takes the floor
   from `getBoundsZoom()` of that same box. A floor derived separately reports a level the box then
@@ -2991,17 +3000,41 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   **`getBoundsZoom()` fits BOTH axes and returns the tighter one**, and which axis binds depends on
   the window: height on a desktop, width on a phone. So a fixed pad beside a fixed offset agrees at
   one width and not at the next.
-  **Read the zoom AFTER the animation settles.** `getZoom()` answers the target the instant
-  `setZoom()` is called, so a synchronous read reports a level the map never reached. Two
-  measurements during this work were wrong for that reason alone, and both looked like real faults.
+  **Read the zoom AFTER the map says it has stopped, and never after a guessed delay.** `getZoom()`
+  answers the target the instant `setZoom()` is called, so a synchronous read reports a level the map
+  never reached. A `setZoom()` that also has to travel back inside `maxBounds` runs a pan and THEN a
+  zoom, and the pair outlasts one animation: a fixed 900 ms read the zoom mid-flight and reported a
+  floor that was not broken. `map-limits-test.html` waits on `moveend` with a timeout as a backstop.
+  Three measurements during this work were wrong for this reason alone, and every one looked like a
+  real fault.
 - **`setLimits()` runs after `invalidateSize()` and never before it.** `getBoundsZoom()` reads
   `map.getSize()`, and that answers for the old box until `invalidateSize()` tells Leaflet about the
   new one. Both sit in the same `requestAnimationFrame` inside the `ResizeObserver`.
-- **The coverage outline includes Selangor's water, and the unshaded wedge in the strait is not a
-  bug.** The relation reaches west to longitude 100.39 and south to latitude 2.40, well past the
-  station extent `BOX` states. So a straight-edged block of the Strait of Malacca draws clear. It is
-  where Selangor legally is, and this mask claims nothing more than that. Clipping it to `BOX` puts
-  an arbitrary vertical line through open water instead, which is a worse lie in the same place.
+- **The circle is placed and sized on LAND alone, and only `border-build.php` can do that.** Selangor
+  reaches west to longitude 100.39 in the Strait of Malacca. A circle built from the whole outline
+  sat 47% on water, measured by sampling 60,000 points against the coast. Dropping the sea brings it
+  to 29%.
+  **OpenStreetMap marks the sea boundary `maritime=yes` on the member WAY, and `out geom` carries no
+  tags at all.** So the script makes a second Overpass call, `rel(id); way(r); out tags;`, and
+  matches by way id. Measured 2026-09-02: 14 of Selangor's 136 member ways. The script refuses to
+  write the file when that count is zero, because a tagging change would otherwise put the circle
+  back over the water with nothing to say so.
+  **Dropping the sea ways leaves an OPEN arc, so `rings()` cannot be used on it.** That function
+  keeps only what closes, which is right for a lake and wrong here. `longestChain()` chains without
+  requiring closure, and a straight chord then stands in for the coast. The real coastline is inside
+  that chord, so the land ring is a little generous seaward and exact everywhere else. That is the
+  right way to be wrong: a circle that covers a strip of shore is honest, and one that clips Klang
+  is not.
+  **The centre is the AREA centroid, never the mean of the points.** A border carries its vertices
+  where it wiggles, so a mean is pulled toward the fiddly stretches and away from the plain ones.
+- **The minimum enclosing circle is the wrong circle here, and it was measured before it was
+  rejected.** It is smaller — 84.97 km against 95.57 — and it sits further west, at longitude
+  101.271 against 101.509. So it lands 45% on water against 29%. The centroid with a radius reaching
+  the farthest land point is what ships. Smallest is not the goal. Least water is.
+- **A radius that exactly reaches the farthest point puts that point ON the boundary.** `RIM` in
+  `js/map.js` adds one percent for that reason. Without it `isPointInFill` is free to answer either
+  way on that one point, floating point picks, and the mask shades a single corner of Selangor. The
+  check read one point of 852 as covered and looked like a real hole.
 - **The MET nowcast page has no endpoint to find.** It renders its Leaflet map on the server and
   bakes all 294 points into `L.marker(...)` statements. There is no request to intercept, so
   `metPoints()` parses the JavaScript source with a regex. `data.gov.my` publishes three weather

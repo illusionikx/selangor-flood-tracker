@@ -423,11 +423,11 @@ printf("rows: %d, points: %d, newest: %s\n",
 # it printed the opening line alone, once the rail and the bar joined it. Read the last line: no
 # `PASS` means the run did not finish, whatever the counts above it say. It holds 902 assertions.
 
-# The coverage mask, the zoom floor, the pan limit and the two water floors. Every fault here is
-# silent. A mask that draws nothing looks like a map. A mask whose pattern tile is empty looks like
-# a flat wash somebody chose, and a `display: none` sprite is enough to cause it. A zoom floor the
-# pan box refuses still answers its own number to `getMinZoom()`. And a water.json rebaked with the
-# size floors removed simply puts six thousand shapes back on the map. Reads PASS.
+# The coverage circle, the zoom floor, the pan limit and the two water floors. Every fault here is
+# silent. A mask that draws nothing looks like a map. A circle rebaked against changed OpenStreetMap
+# tagging slides back over the Strait of Malacca and still looks like a circle. A zoom floor the pan
+# box refuses still answers its own number to `getMinZoom()`. And a water.json rebaked with the size
+# floors removed simply puts six thousand shapes back on the map. Reads PASS.
 "/c/Program Files/Google/Chrome/Application/chrome.exe" --headless=new --disable-gpu \
   --ignore-certificate-errors --virtual-time-budget=40000 --window-size=1200,900 --dump-dom \
   https://flood-exp.test/map-limits-test.html | perl -0777 -ne 'print $1 if /<pre id="out">([^<]*)</s'

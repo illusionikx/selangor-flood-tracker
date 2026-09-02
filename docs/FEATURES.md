@@ -17571,3 +17571,58 @@ also asserts the two water floors, at half their stated values, so raising a flo
 red and deleting one must.
 
 All eight runnable checks pass after this change.
+
+## The coverage mask becomes a circle on the land
+
+The striped outline shipped and the repository owner read it the same day. Two notes: the stripes
+looked odd, and the shape had to be a circle. A third note followed the first circle, which sat
+about half over the Strait of Malacca.
+
+### A circle instead of the outline
+
+`js/map.js` draws a 72-point ground circle as the hole in the mask. The outline stays in
+`border.json`, because `border-build.php` needs it to place the circle and `map-limits-test.html`
+needs it to check one. Going back to the real shape is one line.
+
+### The stripes are deleted
+
+The diagonal pattern cost an SVG `<pattern>` in a sprite of its own, two shapes inside its tile, a
+second colour token, and two traps. All of it is gone. The check asserts that both ids are absent,
+so a half-finished revert cannot ship.
+
+The wash is lighter: `--mask-bg` is 0.06 on paper and 0.30 on the dark theme, against an effective
+0.09 and 0.50 once both stripe values are counted. The boundary is now stated by a 1px hairline in a
+new `--mask-edge`. That token is black on paper and white on the dark theme, because a darker line
+on a wash that is already 30% black has nowhere left to go.
+
+### The circle sits on the land
+
+The first circle took its centre from the outline's bounds and its radius from the farthest outline
+point. Selangor reaches west to longitude 100.39, so the sea half pulled the centre toward the coast
+and set the size. Sampling 60,000 points against the coast put that circle 47% on water.
+
+`border-build.php` answers it. OpenStreetMap marks a sea boundary `maritime=yes` on the member way,
+and `out geom` returns no tags, so the script makes a second Overpass call for the tags alone. 14 of
+Selangor's 136 member ways are sea. Dropping them leaves the land border as one open arc, which a
+straight chord closes. The centre is that ring's area centroid and the radius reaches its farthest
+point.
+
+The result: 3.3202 N, 101.5094 E, 95.57 km, and 29% water.
+
+The script refuses to write the file when no way carries the tag. Without that guard, a tagging
+change slides the circle back over the water with nothing to say so.
+
+### What was rejected
+
+The minimum enclosing circle. It is smaller, at 84.97 km against 95.57, and it sits further west, at
+longitude 101.271 against 101.509. So it lands 45% on water. Smallest is not the goal here. Least
+water is.
+
+### What the circle costs
+
+A circle over a state shaped like Selangor takes ground that is not Selangor. Bentong in Pahang and
+Tanjung Malim in Perak both fall inside it. Seremban, Port Dickson, Ipoh and Melaka do not. That is
+the cost of the shape rather than a fault, and the check asserts Bentong is inside on purpose: a
+change that tightens the radius until Bentong falls out has almost certainly clipped Selangor.
+
+All eight runnable checks pass after this change.

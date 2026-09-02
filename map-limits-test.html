@@ -58,6 +58,17 @@ const settle = ms => new Promise(r => setTimeout(r, ms));
 try {
   const { map } = await import('./js/map.js');
 
+  /* Wait for the map to say it has stopped, never for a guessed number of milliseconds. A
+     `setZoom()` that also has to travel back inside `maxBounds` runs a pan and then a zoom, and the
+     pair takes longer than one animation. Measured here: a fixed 900 ms read the zoom mid-flight
+     and reported a level the map was still leaving, which reads as a broken floor. The timeout is a
+     backstop, so a map that never moves fails this page rather than hanging it. */
+  const stopped = (ms = 4000) => new Promise(r => {
+    const done = () => { map.off('moveend', done); clearTimeout(t); r(); };
+    const t = setTimeout(done, ms);
+    map.on('moveend', done);
+  });
+
   // border.json is fetched at module load, so the mask arrives a tick or two after the import.
   let path = null;
   for (let i = 0; i < 60 && !path; i++) { await settle(100); path = document.querySelector('.covermask'); }
@@ -85,30 +96,56 @@ try {
     return path.isPointInFill(new DOMPoint(p.x, p.y));
   };
 
-  ok('Shah Alam is not shaded', !at([3.073, 101.518]), 'inside the coverage');
-  ok('Kuala Lumpur is not shaded', !at([3.139, 101.687]), 'an enclave, filled in by dropping the '
-     + 'inner rings');
+  ok('Shah Alam is not shaded', !at([3.073, 101.518]), 'inside the circle');
+  ok('Kuala Lumpur is not shaded', !at([3.139, 101.687]), 'an enclave of Selangor, and the circle '
+     + 'holds every part of the state');
   ok('Putrajaya is not shaded', !at([2.926, 101.696]), 'the second enclave');
-  ok('Seremban is shaded', at([2.725, 101.938]), 'Negeri Sembilan, outside the coverage');
-  ok('Bentong is shaded', at([3.522, 101.908]), 'Pahang, outside the coverage');
+  ok('Melaka is shaded', at([2.190, 102.250]), 'well past the radius on the south east');
+  /* **Bentong is INSIDE and that is not a fault.** A circle that holds all of Selangor's land holds
+     a piece of Pahang with it. The assertion is here the right way round on purpose: a future change
+     that tightens the radius until Bentong falls out has almost certainly clipped Selangor itself,
+     and that is the fault worth catching. */
+  ok('Bentong is not shaded', !at([3.522, 101.908]), 'Pahang, and inside the radius');
 
-  // --- the stripes -------------------------------------------------------------------------------
+  /* **The circle has to hold every point of the LAND ring, and that ring is not the whole outline.**
+     `border-build.php` drops the sea boundary before it places the circle, so the maritime corner in
+     the Strait of Malacca is outside on purpose and asserting the full outline would fail on correct
+     code. Probe the ring's own points, and never its bounding box: a box corner sits further from
+     the centre than any point on the shape. Four corners were asserted here for one revision and
+     this page went red over nothing. */
+  const geo = await (await fetch('border.json')).json();
+  const land = geo.features.find(f => f.properties.t === 'land');
+  ok('the file carries a land ring and a circle', !!land && Array.isArray(geo.circle),
+     land ? 'circle ' + geo.circle.join(', ') : 'no land feature');
+  const pts = land.geometry.coordinates[0];
+  const onScreen = pts.filter(([x, y]) => map.getBounds().contains(L.latLng([y, x])));
+  const shaded = onScreen.filter(([x, y]) => at([y, x]));
+  ok('the circle holds the land it was built from',
+     onScreen.length > 20 && shaded.length === 0,
+     onScreen.length + ' of ' + pts.length + ' land points are on screen, ' + shaded.length
+     + ' of them shaded');
 
-  /* The pattern cannot be read off a pixel here, because this page has no way to sample the
-     compositor. So it is read off the two things that broke it.
-     **`display: none` on the sprite is the fault this line exists for.** A `<pattern>` is a paint
-     server whose tile Blink builds from the layout tree, and a hidden sprite gives its children no
-     layout. The pattern still resolves, every fill still computes, and the tile is empty. The mask
-     then draws as a flat wash and nothing anywhere says so. */
-  const def = document.getElementById('hatchdef');
-  ok('the pattern sprite is rendered', def && getComputedStyle(def).display !== 'none',
-     def ? 'display ' + getComputedStyle(def).display : 'no #hatchdef at all');
-  const bg = document.querySelector('#hatch .hatchbg'), line = document.querySelector('#hatch .hatchline');
-  const fills = [bg, line].map(e => e && getComputedStyle(e).fill);
-  ok('the tile holds two different paints', !!bg && !!line && fills[0] !== fills[1],
-     fills.join(' against '));
-  ok('the mask asks for that pattern', getComputedStyle(path).fill.includes('#hatch'),
-     getComputedStyle(path).fill);
+  /* The circle sits on the land rather than on the strait. `border-build.php` earns that by dropping
+     the sea ways, and a rebake against changed tagging would silently put it back over the water.
+     The centre has to be east of the land ring's own middle longitude, which the sea version was
+     not. */
+  const lons = pts.map(p => p[0]);
+  const mid = (Math.min(...lons) + Math.max(...lons)) / 2;
+  ok('the circle sits east of the land ring middle', geo.circle[1] > mid,
+     'centre ' + geo.circle[1].toFixed(4) + ', land middle ' + mid.toFixed(4));
+
+  // --- the paint ---------------------------------------------------------------------------------
+
+  /* The wash is faint by instruction, so the hairline is what states the boundary. A stroke of
+     `none` leaves a circle nobody can find, and it is the one property here whose loss is invisible
+     in every other assertion on this page. */
+  const paint = getComputedStyle(path);
+  ok('the wash is a flat colour', paint.fill.startsWith('rgb'), paint.fill);
+  ok('the circle carries an edge', paint.stroke !== 'none' && parseFloat(paint.strokeWidth) > 0,
+     paint.stroke + ' at ' + paint.strokeWidth);
+  /* The stripes are deleted rather than switched off, so a half-finished revert cannot ship. */
+  ok('the stripes are gone', !document.getElementById('hatchdef') && !document.getElementById('hatch'),
+     'no #hatchdef and no #hatch');
 
   // --- the limits --------------------------------------------------------------------------------
 
@@ -117,7 +154,7 @@ try {
      called, so a synchronous read reports a level the map never reached. */
   const floor = map.getMinZoom();
   map.setZoom(floor - 3);
-  await settle(900);
+  await stopped();
   ok('the zoom floor holds', map.getZoom() === floor,
      'asked for ' + (floor - 3) + ', floor is ' + floor + ', landed on ' + map.getZoom());
 

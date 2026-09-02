@@ -114,6 +114,60 @@ function rings(array $ways): array {
     return $rings;
 }
 
+/**
+ * Chain ways end to end WITHOUT requiring the result to close, and return the longest chain.
+ *
+ * `rings()` above keeps only what closes, which is right for a lake and wrong for the land half of
+ * a state border. Dropping the sea ways leaves the land boundary as an open arc from one end of the
+ * coast to the other, and that arc is the thing this needs.
+ */
+function longestChain(array $ways): array {
+    $best = []; $pool = array_values($ways);
+    while ($pool) {
+        $cur = array_shift($pool);
+        $grew = true;
+        while ($grew) {
+            $grew = false;
+            foreach ($pool as $i => $w) {
+                if (end($cur) === $w[0])       $cur = array_merge($cur, array_slice($w, 1));
+                elseif (end($cur) === end($w)) $cur = array_merge($cur, array_slice(array_reverse($w), 1));
+                elseif ($cur[0] === end($w))   $cur = array_merge($w, array_slice($cur, 1));
+                elseif ($cur[0] === $w[0])     $cur = array_merge(array_reverse($w), array_slice($cur, 1));
+                else continue;
+                unset($pool[$i]); $pool = array_values($pool); $grew = true;
+                break;
+            }
+        }
+        if (count($cur) > count($best)) $best = $cur;
+    }
+    return $best;
+}
+
+/**
+ * Area centroid of a closed ring, as [lng, lat].
+ *
+ * The mean of the points is NOT this, and the difference is the whole reason for the formula. A
+ * border carries its vertices where it wiggles, so a mean is pulled toward the fiddly stretches and
+ * away from the plain ones. The area centroid asks where the shape balances instead.
+ */
+function centroid(array $ring): array {
+    $a = 0.0; $cx = 0.0; $cy = 0.0;
+    for ($i = 0, $j = count($ring) - 1; $i < count($ring); $j = $i++) {
+        $f = $ring[$j][0] * $ring[$i][1] - $ring[$i][0] * $ring[$j][1];
+        $a += $f;
+        $cx += ($ring[$j][0] + $ring[$i][0]) * $f;
+        $cy += ($ring[$j][1] + $ring[$i][1]) * $f;
+    }
+    if (abs($a) < 1e-12) fail('the land ring has no area — the chain did not close');
+    return [$cx / (3 * $a), $cy / (3 * $a)];
+}
+
+/** Distance in kilometres between two [lng, lat] pairs. */
+function km(array $p, array $q): float {
+    $k = 111.32 * cos(($p[1] + $q[1]) / 2 * M_PI / 180);
+    return hypot(($p[0] - $q[0]) * $k, ($p[1] - $q[1]) * 110.57);
+}
+
 /** Ray casting. Answers whether a point sits inside any one of the rings. */
 function inside(array $rings, array $pt): bool {
     [$x, $y] = $pt;
@@ -165,16 +219,47 @@ if (!$rel) fail('no relation came back — check the name and the admin_level in
 
 printf("border-build: relation %d, %s\n", $rel['id'], $rel['tags']['name'] ?? '(no name)');
 
+/* A second call, for the member ways' TAGS. `out geom` gives a relation's members with their
+   geometry and their role, and with no tags at all. The sea boundary is what this needs to find,
+   and OpenStreetMap marks it `maritime=yes` on the way. Measured 2026-09-02: 14 of Selangor's 136
+   member ways carry it. */
+echo "border-build: asking Overpass for the member way tags\n";
+$ch = curl_init(ENDPOINT);
+curl_setopt_array($ch, [
+    CURLOPT_RETURNTRANSFER => true,
+    CURLOPT_POST           => true,
+    CURLOPT_POSTFIELDS     => http_build_query(
+        ['data' => "[out:json][timeout:180];rel({$rel['id']});way(r);out tags;"]),
+    CURLOPT_TIMEOUT        => 240,
+    CURLOPT_USERAGENT      => 'klang-valley-flood-watch/1.0 (border-build.php, run by hand)',
+]);
+$tagBody = curl_exec($ch);
+$tagCode = curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+if ($tagBody === false) fail('curl: ' . curl_error($ch));
+curl_close($ch);
+if ($tagCode !== 200) fail("Overpass answered $tagCode on the tag query — try again");
+$tagEls = json_decode($tagBody, true)['elements'] ?? null;
+if (!is_array($tagEls)) fail('the tag query returned no elements');
+
+$sea = [];
+foreach ($tagEls as $w) if (($w['tags']['maritime'] ?? '') === 'yes') $sea[$w['id']] = true;
+if (!$sea) fail('no member way is tagged maritime=yes — the tagging changed, so read it by hand '
+              . 'before trusting a circle placed on this data');
+printf("border-build: %d of %d member ways are sea\n", count($sea), count($tagEls));
+
 // --- build ---------------------------------------------------------------------------------------
 
-$outer = [];
+$outer = []; $land = [];
 foreach ($rel['members'] ?? [] as $m) {
     if (($m['role'] ?? '') === 'inner') continue;   // see the winding note on rings()
     $g = [];
     foreach ($m['geometry'] ?? [] as $p) if ($p) $g[] = [$p['lon'], $p['lat']];
-    if (count($g) >= 2) $outer[] = $g;
+    if (count($g) < 2) continue;
+    $outer[] = $g;
+    if (!isset($sea[$m['ref']])) $land[] = $g;      // the same way, minus the sea boundary
 }
 if (!$outer) fail('the relation carries no outer way with geometry');
+if (!$land)  fail('every member way is sea — the tag query and the geometry query disagree');
 
 $raw = rings($outer);
 if (!$raw) fail('no outer ring closed — the relation is broken upstream, so try again later');
@@ -200,16 +285,52 @@ foreach ($polys as $p) foreach ($p[0] as [$x, $y]) {
     $bounds[2] = max($bounds[2], $x); $bounds[3] = max($bounds[3], $y);
 }
 
-/* `bounds` rides on the file as [west, south, east, north], because js/map.js needs the extent
-   before it needs the shape: the zoom floor and the pan limit come off it. Reading it here costs
-   nothing and saves the client a pass over every point on every load. */
-$json = json_encode(['type' => 'FeatureCollection', 'bounds' => $bounds, 'features' => [
-    ['type' => 'Feature', 'properties' => ['t' => 'cover'],
-     'geometry' => ['type' => 'MultiPolygon', 'coordinates' => $polys]],
-]]);
+/* --- the land ring, and the circle that sits on it ---------------------------------------------
+   **The circle is placed and sized on LAND alone, and the whole outline is why it has to be.**
+   Selangor's boundary reaches into the Strait of Malacca. A circle drawn from the whole shape sat
+   with about 55% of its area on water, because the sea half pulls the centre west and sets the
+   radius. The repository owner asked for a circle on the land on 2026-09-02.
+   Dropping the sea ways leaves the land border as one open arc, from the north end of the coast to
+   the south end. Closing that arc with a straight chord gives a polygon that is Selangor's land with
+   a straight west edge. The real coast is inside that chord, so the ring is a little generous on the
+   seaward side and exact everywhere else. That is the right way to be wrong here: a circle that
+   covers a strip of shore is honest, and one that clips Klang is not. */
+$arc = longestChain($land);
+if (count($arc) < 4) fail('the land ways did not chain — the relation changed upstream');
+$ring = clean(simplify($arc, TOL_DEG));
+if ($ring[0] !== end($ring)) $ring[] = $ring[0];    // the chord that stands in for the coast
+
+[$cx, $cy] = centroid($ring);
+$radius = 0.0;
+foreach ($ring as $p) $radius = max($radius, km([$cx, $cy], $p));
+
+/* Both enclaves have to be inside the CIRCLE as well, not only inside the outline. The circle is
+   what a reader sees, and a capital city outside it is shaded. */
+foreach (INSIDE as $name => $pt)
+    if (km([$cx, $cy], $pt) > $radius)
+        fail(sprintf('%s is %.1f km out against a %.1f km radius — the land ring is wrong',
+                     $name, km([$cx, $cy], $pt), $radius));
+
+/* `bounds` rides on the file as [west, south, east, north]. `circle` is [lat, lng, km] and is what
+   js/map.js actually draws: the client does no geometry, because the sea has to be excluded and
+   only this script knows which ways are sea. The full outline stays in `features` so the check page
+   can ask whether the circle still holds the land it was built from. */
+$json = json_encode([
+    'type' => 'FeatureCollection',
+    'bounds' => $bounds,
+    'circle' => [round($cy, 5), round($cx, 5), round($radius, 2)],
+    'features' => [
+        ['type' => 'Feature', 'properties' => ['t' => 'cover'],
+         'geometry' => ['type' => 'MultiPolygon', 'coordinates' => $polys]],
+        ['type' => 'Feature', 'properties' => ['t' => 'land'],
+         'geometry' => ['type' => 'Polygon', 'coordinates' => [$ring]]],
+    ],
+]);
 file_put_contents(OUT, $json);
 
 printf("border-build: %d ring(s), %d points, %d KB on disk, about %d KB gzipped\n",
        count($polys), $points, strlen($json) / 1024, strlen(gzencode($json, 9)) / 1024);
 printf("border-build: bounds west %.4f south %.4f east %.4f north %.4f\n", ...$bounds);
+printf("border-build: land ring %d points, circle %.5f, %.5f radius %.2f km\n",
+       count($ring), $cy, $cx, $radius);
 echo "border-build: commit border.json. js/map.js fetches it by name, so there is no ?v= to bump.\n";

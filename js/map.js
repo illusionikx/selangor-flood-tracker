@@ -250,73 +250,78 @@ map.createPane('labels');
 map.getPane('labels').style.zIndex = 260;
 map.getPane('labels').style.pointerEvents = 'none';
 
-/* **Everything outside the coverage area is shaded, and the same file sets the zoom floor and the
-   pan limit.** The map used to run on forever. A reader could zoom out to the whole world, and the
-   pins then sat on a continent with no line to say which part of it this app answers for. The
-   repository owner asked for all three on 2026-09-02.
+/* **Everything outside a circle around the coverage area is shaded, and that circle sets the zoom
+   floor and the pan limit too.** The map used to run on forever. A reader could zoom out to the
+   whole world, and the pins then sat on a continent with no line to say which part of it this app
+   answers for. The repository owner asked for all three on 2026-09-02.
    `border.json` is Selangor's own outline, baked by border-build.php. Kuala Lumpur and Putrajaya are
    enclaves inside it, and that script fills them in by dropping the relation's inner rings. So one
    shape covers all three of this app's states and nothing here has to union anything.
-   Its own pane above the place names, so a town outside the area is shaded with the ground it sits
+   **The outline is not what draws.** It ran as the hole itself for one revision, in diagonal
+   stripes, and the repository owner called that too busy the same day. It stays in the file because
+   `map-limits-test.html` asks whether the circle still holds the land it was built from, and going
+   back to the real shape is one line here and no rebake.
+   Its own pane above the place names, so a town outside the circle is shaded with the ground it sits
    on. Under the overlay pane at 400, so the heat wash, the pins and the "you are here" circle all
    still draw over it. It takes no pointer events, for the reason the labels pane states. */
 map.createPane('mask');
 map.getPane('mask').style.zIndex = 270;
 map.getPane('mask').style.pointerEvents = 'none';
 
-/* The diagonal stripes, as an SVG pattern in a hidden sprite. `css/map.css` paints the two shapes
-   inside it, so the theme swap costs no JavaScript and no re-read of a token. The pattern measures
-   in `userSpaceOnUse`, which is screen pixels at rest, so a stripe is the same width at every zoom.
-   A hidden `<svg>` in the document is enough: `fill: url(#hatch)` resolves against the whole
-   document rather than against the SVG the path lives in. `js/map.js` already appends one sprite
-   this way for the pin glyphs, further down. */
-const hatch = document.body.appendChild(
-  Object.assign(document.createElementNS('http://www.w3.org/2000/svg', 'svg'), { id: 'hatchdef' }));
-hatch.setAttribute('aria-hidden', 'true');
-hatch.innerHTML =
-  '<defs><pattern id="hatch" width="9" height="9" patternUnits="userSpaceOnUse"'
-  + ' patternTransform="rotate(45)">'
-  + '<rect width="9" height="9" class="hatchbg"/>'
-  + '<rect width="3" height="9" class="hatchline"/>'
-  + '</pattern></defs>';
-
-/* How far past the coverage the shaded ring reaches, in multiples of the coverage's own span. The
-   pan limit below is 0.25 of that span, so three spans is about eleven times as far as a reader can
-   ever travel. Nothing can reach the edge of it.
+/* How far past the circle the shaded ring reaches, in multiples of the circle's own width. The pan
+   limit below is a quarter of that width, so three widths is about eleven times as far as a reader
+   can ever travel. Nothing can reach the edge of it.
    **It is NOT a ring around the whole world, and one was tried first.** A world ring projects to
-   coordinates in the tens of millions at zoom 9. Blink rasterizes a pattern fill over the path's own
-   bounding box, gives up somewhere inside a box that size, and paints the rest flat. The symptom is
-   a wide unstriped diagonal band lying across the map, which reads as a bug in the stripes rather
-   than as a size limit. A finite ring near the shape cannot reach that state.
-   **The fill rule punches the holes, and Leaflet's own default is the one that works.** `evenodd`
-   asks how many rings a point sits inside and fills the odd answers, so a hole punches whichever way
-   its points happen to wind. `nonzero` asks for the signed sum instead, so a hole wound the same way
-   as the outer ring fills solid rather than clearing. OpenStreetMap states no winding, and this app
-   cannot fix one it did not author. Do not set `fillRule` here. */
+   coordinates in the tens of millions at zoom 9, and Blink gives up filling a box that size and
+   paints part of it flat. A finite ring near the shape cannot reach that state.
+   **The fill rule punches the hole, and Leaflet's own default is the one that works.** `evenodd`
+   asks how many rings a point sits inside and fills the odd answers, so the hole punches whichever
+   way its points wind. `nonzero` takes the signed sum instead, and a hole wound the same way as the
+   outer ring fills solid rather than clearing. Do not set `fillRule` here. */
 const MASK_SPANS = 3;
+const CIRCLE_PTS = 72;           // one point every five degrees, which is smooth at every zoom here
+/* A margin on the radius, so the land ring's farthest point sits INSIDE the circle rather than on
+   it. The build script sets the radius to exactly that distance, so without this the point lands on
+   the boundary, where `isPointInFill` is free to answer either way and floating point picks. The
+   mask then shades one corner of Selangor, and a check reads one point of 852 as covered. One
+   percent of 96 km is under a kilometre. */
+const RIM = 1.01;
 
-let cover;                       // the coverage bounds, once border.json has answered
+let cover;                       // the circle's own bounds, once border.json has answered
 
-/* The zoom floor and the pan limit, both off the coverage extent. Re-run on every resize, because
-   `getBoundsZoom()` answers for the window this map has right now: the level that fits Selangor on
-   a desktop leaves half of it off a phone.
-   **One level looser than the fit.** The exact fit puts the state's edges hard against the window,
-   with no ground around it, and a coastline with nothing on the seaward side reads as a crop.
+/* The zoom floor and the pan limit, both off the circle. It is what a reader sees, so it is what
+   the map stops at. Re-run on every resize, because `getBoundsZoom()` answers for the window this
+   map has right now: the level that fits the circle on a desktop leaves half of it off a phone.
    **ONE box answers both, and that is what keeps the floor honest.** `pad(0.5)` grows a box by half
-   its size on each side, so `ROAM` is twice the coverage on both axes. The floor is the zoom that
+   its size on each side, so `ROAM` is twice the circle on both axes. The floor is the zoom that
    fits that box, and the box is what a drag may not leave. So the two cannot disagree.
    Two numbers can, and the first version had them. A floor of `getBoundsZoom(cover) - 1` beside a
    pan box of `cover.pad(0.25)` reports a floor the box then refuses, because a level out doubles
    the ground on screen while a quarter pad adds half of it. `getMinZoom()` still answers the number
    it was given, and nothing errors. Measured at six widths from 320 to 1920, this shape reaches its
    own floor at every one of them. */
-const ROAM = 0.5;    // half the coverage span of margin on each side, so twice the span in all
+const ROAM = 0.5;    // half the circle's width of margin on each side, so twice the width in all
 
 function setLimits() {
   if (!cover) return;
   const box = cover.pad(ROAM);
   map.setMaxBounds(box);
   map.setMinZoom(map.getBoundsZoom(box));
+}
+
+/* The circle, as a ring of longitude and latitude pairs. A ground circle rather than a screen one:
+   it names a place, so it has to grow with the zoom the way the coast under it does.
+   Longitude is scaled by the cosine of each point's OWN latitude, not of the centre's. Scaling by
+   the centre alone draws an ellipse that is right on the middle row and wrong at the top and the
+   bottom, which over 93 km is about a kilometre out at the poles of the ring. */
+function ring(lat, lng, km, n = CIRCLE_PTS) {
+  const out = [];
+  for (let i = 0; i <= n; i++) {
+    const a = i / n * 2 * Math.PI;
+    const y = lat + km * Math.cos(a) / 110.57;
+    out.push([lng + km * Math.sin(a) / (111.32 * Math.cos(y * Math.PI / 180)), y]);
+  }
+  return out;
 }
 
 /* Fetched inline rather than deferred to an idle callback, which is what the water below does.
@@ -326,22 +331,37 @@ function setLimits() {
 fetch('border.json')
   .then(r => r.ok ? r.json() : Promise.reject(r.status))
   .then(geo => {
-    const [w, s, e, n] = geo.bounds;
-    cover = L.latLngBounds([[s, w], [n, e]]);
-    const dx = (e - w) * MASK_SPANS, dy = (n - s) * MASK_SPANS;
-    const outer = [[w - dx, s - dy], [e + dx, s - dy], [e + dx, n + dy], [w - dx, n + dy],
-                   [w - dx, s - dy]];
-    // One Polygon: that ring, then every coverage ring as a hole. `border-build.php` writes a
-    // MultiPolygon of single-ring polygons, so the first ring of each is the whole of it.
+    /* **`border-build.php` places and sizes this circle, and the sea is why it cannot happen here.**
+       Selangor's boundary reaches into the Strait of Malacca, and a circle built from the whole
+       shape sat 47% on water. Only the build script can tell the land border from the sea one,
+       because OpenStreetMap marks that on the member WAY as `maritime=yes` and the geometry this
+       file could read carries no tags at all. So the script drops the sea ways, closes the land arc
+       with a chord, and writes the centroid and the radius. Measured: 3.3202 N, 101.5094 E, 95.57 km
+       and 29% water, against 3.1375 N, 101.1787 E, 93.2 km and 47%. The repository owner asked for
+       the move on 2026-09-02.
+       A circle over a state this shape takes ground that is not Selangor, and that is the cost of a
+       circle rather than a fault. */
+    const [cy, cx, km] = geo.circle;
+    const hole = ring(cy, cx, km * RIM);
+
+    // The circle's own extent, which is what the limits above read.
+    cover = L.latLngBounds(hole.map(([x, y]) => [y, x]));
+    const dx = (cover.getEast() - cover.getWest()) * MASK_SPANS;
+    const dy = (cover.getNorth() - cover.getSouth()) * MASK_SPANS;
+    const [bw, bs] = [cover.getWest() - dx, cover.getSouth() - dy];
+    const [be, bn] = [cover.getEast() + dx, cover.getNorth() + dy];
+    const outer = [[bw, bs], [be, bs], [be, bn], [bw, bn], [bw, bs]];
+
+    /* One Polygon: that ring, then the circle as its hole. **The stroke draws the circle and only
+       the circle.** It lands on the outer ring too, and that sits three widths out, so no zoom this
+       map allows can bring it on screen. A wash this faint needs its edge stated, and one property
+       states it. */
     L.geoJSON({
-      type: 'Feature', properties: {}, geometry: {
-        type: 'Polygon',
-        coordinates: [outer, ...geo.features[0].geometry.coordinates.map(p => p[0])],
-      },
+      type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [outer, hole] },
     }, {
       renderer: L.svg({ pane: 'mask' }),
       interactive: false,
-      style: { className: 'covermask', stroke: false, fillOpacity: 1 },
+      style: { className: 'covermask', fillOpacity: 1 },
     }).addTo(map);
     setLimits();
   })
