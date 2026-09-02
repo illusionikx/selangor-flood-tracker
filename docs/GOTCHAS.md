@@ -416,6 +416,14 @@ frames only exist because we ran when they were taken. To re-test the capture pa
   edit unless the URL changes. The stylesheet links carry `?v=` — **bump it when you touch a css
   file**, the same as `vendor/fonts.css`. ES module imports have no such guard. Hard-reload
   (Ctrl+Shift+R) after a `js/` change, or the browser can run the old module.
+  **A driven browser needs more than a reload.** `page.reload()` revalidates the document and still
+  serves every module out of the HTTP cache. Unregistering the service worker and deleting the
+  `shell` cache does not help either, because the module never came from there. Turn the HTTP cache
+  off over the DevTools protocol: send `Network.enable` and then
+  `Network.setCacheDisabled({cacheDisabled: true})`. **`Network.enable` first is not optional.**
+  Without it the second command is accepted and does nothing, and the page goes on running the old
+  file. The symptom is a fix that measures as if it never landed. A stack trace naming a line number
+  the edited file no longer has is the proof.
   **The app icons carry `?v=` too**, in four places — the two `<link>` tags in `index.html` and the
   two `icons[].src` in `manifest.json`. `icon-build.php` rewrites the PNGs under the same names. A
   browser holds a favicon for far longer than three hours. So bumping that number is the only
@@ -2181,6 +2189,23 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
   **Switching the heat chip from rainfall to water is what reaches it.** That leaves `rainHeat`
   added-then-removed, holding a canvas and no map. `syncHeat()` adds and removes before it calls
   `heatScale()`. So a layer just switched on is on the map by then, and still gets sized.
+- **A zoom fires `zoomend` and then `moveend`, and the heat layer paints on the second one.** The
+  vendored layer binds `_reset` to `moveend`, and `_reset` calls `_redraw()` directly. So a paint is
+  already on its way by the time any `zoomend` handler runs. `heatScale()` called `l.redraw()` from
+  that handler for a while. **The two paints cannot coalesce.** `redraw()` schedules through
+  `requestAnimationFrame` and guards on `_frame`. The `_redraw()` override clears `_frame` at the end
+  of every paint. So the synchronous paint from `_reset` clears the guard, and the frame callback
+  then paints a second time.
+  The gesture is 18 wheel steps over about 9.5 seconds, with the chip on rainfall. Three runs each
+  way, taken alternately, medians. With the second paint: 32 paints for 628 ms, 3,661 ms of blocked
+  main-thread time, 43 long tasks, and 141 ms for the longest. Without it: 16 paints for 336 ms,
+  1,983 ms blocked, 28 long tasks, and 121 ms. Three rain gauges reported that day. A busy network
+  pays more, because the field cost rises with the readings in reach.
+  **The `zoomend` handler passes `paint = false` now.** `_redraw()` reads the radius when it runs.
+  `heatOpacity()` writes the fade as a style on the canvas. So neither needs a paint from
+  `heatScale()`.
+  The comment on the `map.on('zoomend', …)` line stated this rule while the code broke it. A stale
+  comment is not evidence. Count the calls to `_redraw()` against the count of `zoomend`.
 - **The water layer has no denial and must not get one, and everything else it shares.** Both layers
   are `SoftHeat`. So the field render, `BLEND`, `FEATHER`, the clamped-sum coverage and the bucket
   index are one implementation and reach both. Only `setDry()` is called on one of them, from

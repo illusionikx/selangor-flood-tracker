@@ -17433,3 +17433,69 @@ tones. The coastline then fringes, for the reason stated above. The repository o
 this against a measurement rather than against a guess.
 
 All seven runnable checks pass after this change.
+
+## The heat wash painted twice on every zoom
+
+A reader reported that the map felt slow, and that repeated zooming looked like a redraw. A
+measurement found one cause that this app owns.
+
+### What was measured
+
+The browser ran under the DevTools protocol. A wrapper counted the calls into the heat layer, and a
+`PerformanceObserver` counted the long tasks. The gesture was 18 wheel steps, nine in and nine out,
+over about 9.5 seconds. The chip was on rainfall, and three rain gauges reported that day.
+
+The heat layer painted twice for every zoom.
+
+A stack trace named both callers. The first paint came from `_reset` on `moveend`, which is the
+vendored layer's own binding. The second came from `heatScale()` on `zoomend`, through
+`requestAnimationFrame`.
+
+### Why the two paints never coalesced
+
+`redraw()` guards on `_frame`, so two calls in one frame paint once. That guard cannot hold here.
+`_reset` calls `_redraw()` directly rather than through `redraw()`. The `_redraw()` override clears
+`_frame` at the end of every paint. So the synchronous paint cleared the guard, and the pending
+frame callback then painted again.
+
+### The change
+
+`heatScale()` takes a `paint` flag. The `zoomend` handler passes `false`. Every other caller keeps
+the paint, because no repaint follows those.
+
+Nothing else had to move. `_redraw()` reads the blob radius when it runs, so the later paint takes
+the new one. The fade is a style on the canvas, and `heatOpacity()` writes it at the foot of
+`heatScale()` either way.
+
+### The result
+
+The A and the B ran alternately, three times each, in one page. The medians follow. Machine noise
+moves a single run by a third, so an interleaved median is the only figure worth quoting here.
+
+| | two paints | one paint |
+|---|---|---|
+| paints | 32 | 16 |
+| paint time | 628 ms | 336 ms |
+| blocked main-thread time | 3,661 ms | 1,983 ms |
+| long tasks | 43 | 28 |
+| longest task | 141 ms | 121 ms |
+
+A CPU profile puts the remaining heat cost at about 6 ms per zoom. A busy rain network pays more
+than this, because the field cost rises with the readings in reach.
+
+The rest of the cost is the map itself. Leaflet's tile update and markercluster's zoom animation
+hold the largest remaining shares of script time. Browser style, layout and paint hold the rest.
+None of that is this app's code.
+
+### What the comment already said
+
+The `map.on('zoomend', …)` line carried a comment that stated this exact rule. It said that the
+`moveend` paint is enough, and that a second call paints the canvas twice per zoom. The code under
+it called `redraw()` anyway. The comment was right and dead for the whole time.
+
+### What was not done
+
+Nobody touched markercluster or the tile layer. Both cost real time per zoom, and both are vendored.
+A change there needs its own measurement.
+
+`heat-test.html` passes after this change.
