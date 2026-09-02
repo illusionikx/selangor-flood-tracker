@@ -42,7 +42,7 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `js/map.js` | map instance, basemap/theme, cluster, the station panel (`openSide`), `focusOn` / `flashTo`. Also the coverage mask, the zoom floor and the pan limit, all three off `border.json` |
 | `js/heat.js` | both heat layers (water level, rainfall), ground-fixed sizing per layer, shared opacity. Also the field pass where a gauge reporting no rain denies the ground a wet one claims |
 | `heat-test.html` | `chrome --headless --dump-dom` — one of eight runnable checks. Guards the rain layer's paint distance, its dry-gauge erase and its handover between neighbours, in canvas pixels |
-| `map-limits-test.html` | `chrome --headless --dump-dom` — one of eight runnable checks. Guards the coverage circle, the zoom floor, the pan limit and the two water floors. It probes the drawn shape with `isPointInFill`, so it reads the fill rule the browser paints with. It asserts that the circle holds every point of the land ring, that its centre sits east of that ring's middle, that the faint wash still carries its hairline, and that the deleted stripes stay deleted |
+| `map-limits-test.html` | `chrome --headless --dump-dom` — one of eight runnable checks. Guards the coverage circle, the zoom floor, the pan limit and the two water floors. It probes the drawn shape with `isPointInFill`, so it reads the fill rule the browser paints with. It asserts that the circle holds every point of the land ring, that its centre sits east of that ring's middle, that the faint stripes still carry their hairline, and that the pattern sprite is rendered rather than `display: none`, which is the one thing that empties the tile with nothing to say so |
 | `js/popup.js` | popup + meter + gauge + sparkline templates. Also `wxItem()` and its three helpers, the weather list item both weather surfaces draw |
 | `js/sparktip.js` | the hover/tap readout on every graph, and the label on any `data-tip`. One delegated listener, no imports |
 | `js/render.js` | rebuilds markers and heat points, the two saved lists, and the kind counts |
@@ -595,8 +595,8 @@ order that file holds them. A trap names itself here, and the file states the ev
 - Do not set `fillRule` on the mask.
 - The mask's outer ring is finite, and a ring around the whole world is what ...
 - The mask draws a CIRCLE and it drew Selangor's outline, and the outline is ...
-- The diagonal stripes are deleted rather than switched off.
-- The wash is faint and the hairline is what states the boundary.
+- The diagonal stripes went and came back lighter, all on 2026-09-02.
+- The stripes are faint and the hairline is what states the boundary.
 - The stroke on the mask path draws the circle and nothing else.
 - One box holds the zoom floor and the pan limit, and two numbers cannot be t...
 - `setLimits()` runs after `invalidateSize()` and never before it.

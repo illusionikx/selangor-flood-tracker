@@ -268,6 +268,27 @@ map.createPane('mask');
 map.getPane('mask').style.zIndex = 270;
 map.getPane('mask').style.pointerEvents = 'none';
 
+/* The diagonal stripes, as an SVG pattern in a sprite of its own. `css/map.css` paints the two
+   shapes inside it, so the theme swap costs no JavaScript and no re-read of a token. The pattern
+   measures in `userSpaceOnUse`, which is screen pixels at rest, so a stripe is the same width at
+   every zoom. A sprite anywhere in the document is enough: `fill: url(#hatch)` resolves against the
+   whole document rather than against the SVG the path lives in.
+   **The sprite must not be `display: none`, and `#glyphs` further down this file may be.** A `<use>`
+   copies a shape out of a tree that was never rendered. A `<pattern>` is a paint server whose tile
+   Blink builds from the LAYOUT tree, so a hidden sprite gives it no children to build from. See
+   `#hatchdef` in css/map.css, which carries the rule that keeps it rendered and out of the flow.
+   **The stripe is a filled `<rect>` and never a stroked `<line>`.** A pattern clips its content to
+   its own tile, so a line on the tile's edge loses the half of its width that falls outside. */
+const hatch = document.body.appendChild(
+  Object.assign(document.createElementNS('http://www.w3.org/2000/svg', 'svg'), { id: 'hatchdef' }));
+hatch.setAttribute('aria-hidden', 'true');
+hatch.innerHTML =
+  '<defs><pattern id="hatch" width="9" height="9" patternUnits="userSpaceOnUse"'
+  + ' patternTransform="rotate(45)">'
+  + '<rect width="9" height="9" class="hatchbg"/>'
+  + '<rect width="3" height="9" class="hatchline"/>'
+  + '</pattern></defs>';
+
 /* How far past the circle the shaded ring reaches, in multiples of the circle's own width. The pan
    limit below is a quarter of that width, so three widths is about eleven times as far as a reader
    can ever travel. Nothing can reach the edge of it.
@@ -354,8 +375,8 @@ fetch('border.json')
 
     /* One Polygon: that ring, then the circle as its hole. **The stroke draws the circle and only
        the circle.** It lands on the outer ring too, and that sits three widths out, so no zoom this
-       map allows can bring it on screen. A wash this faint needs its edge stated, and one property
-       states it. */
+       map allows can bring it on screen. The stripes are faint by instruction, so the edge is stated
+       on its own rather than left to them, and one property states it. */
     L.geoJSON({
       type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [outer, hole] },
     }, {

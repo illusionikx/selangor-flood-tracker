@@ -717,19 +717,36 @@
 
 /* --- the coverage mask ------------------------------------------------------------------------ */
 
-/* Everything outside a circle around Selangor, shaded. The shape is one SVG path in the `mask` pane,
-   built in js/map.js from border.json. Both colours are tokens in css/base.css, so the theme swap
-   needs no JavaScript.
+/* Everything outside a circle around Selangor, shaded with faint diagonal stripes. The shape is one
+   SVG path in the `mask` pane, built in js/map.js from border.json. Every colour is a token in
+   css/base.css, so the theme swap needs no JavaScript.
    **The two declarations are set here rather than on the element, and that is deliberate.** Leaflet
    writes `fill` and `stroke` as presentation attributes from its own style options. A CSS
    declaration outranks a presentation attribute, so these win with no attribute poking after the
    layer is added, and nothing has to guess when Leaflet next rewrites its own styles.
    **The stroke draws the circle and nothing else.** It lands on the outer ring as well, and that
-   ring sits three circle widths out, past any zoom the pan limit allows. A wash this faint needs
-   its edge stated, and one property states it.
-   **Diagonal stripes stood here for one revision.** They cost an SVG `<pattern>` in a sprite of its
-   own, two shapes inside its tile, a second token, and two traps: a pattern whose sprite is
-   `display: none` builds an empty tile, and a stroked line on the tile's edge is clipped in half.
-   The repository owner called the result too busy on 2026-09-02 and took a flat wash. All of it is
-   deleted rather than left switched off. */
-.covermask { fill: var(--mask-bg); stroke: var(--mask-edge); stroke-width: 1; }
+   ring sits three circle widths out, past any zoom the pan limit allows. The stripes are faint by
+   instruction, so the edge is stated on its own rather than left to them.
+   **The stripes went for one revision and came back lighter.** The repository owner called the first
+   set too busy on 2026-09-02, over Selangor's real outline, and asked for them again the same day
+   once the shape was a circle. Only the values moved: see `--mask-line` in css/base.css. */
+.covermask { fill: url(#hatch); stroke: var(--mask-edge); stroke-width: 1; }
+
+/* The pattern's own sprite. It paints nothing itself and must take no space: a bare `<svg>` in the
+   body is 300 by 150 pixels by default, which would push the page down by 150.
+   **It must NOT be `display: none`, and `#glyphs` above may be.** That is the whole of the
+   difference between the two sprites, and it cost a debugging session. A `<use>` copies a shape out
+   of a tree that was never rendered, so `#glyphs` works hidden. A `<pattern>` is a paint server
+   whose tile Blink builds from the LAYOUT tree, and `display: none` gives its children no layout to
+   build from. The pattern still resolves, so `getComputedStyle` answers `url("#hatch")` on the path
+   and every child answers its own right fill. The tile is simply empty, the mask draws as a flat
+   wash, and nothing errors. Only a pixel says so.
+   Zero size with the overflow clipped is the shape that renders and takes no room. */
+#hatchdef { position: absolute; width: 0; height: 0; overflow: hidden; }
+.hatchbg { fill: var(--mask-bg); }
+/* **The stripe is a filled rect and never a stroked line.** A `<pattern>` clips its content to its
+   own tile. A line on the tile's edge carries half its stroke width outside that tile, so a 2px
+   stroke showed 1px, landed between two device pixels once rotated, and antialiased to about half
+   its colour. A rect sits wholly inside the tile and cannot reach that state.
+   3 of 9, so a third of the ground carries a stripe. */
+.hatchline { fill: var(--mask-line); }

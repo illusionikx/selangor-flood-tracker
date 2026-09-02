@@ -136,16 +136,28 @@ try {
 
   // --- the paint ---------------------------------------------------------------------------------
 
-  /* The wash is faint by instruction, so the hairline is what states the boundary. A stroke of
+  /* The stripes are faint by instruction, so the hairline is what states the boundary. A stroke of
      `none` leaves a circle nobody can find, and it is the one property here whose loss is invisible
      in every other assertion on this page. */
   const paint = getComputedStyle(path);
-  ok('the wash is a flat colour', paint.fill.startsWith('rgb'), paint.fill);
+  ok('the mask asks for the pattern', paint.fill.includes('#hatch'), paint.fill);
   ok('the circle carries an edge', paint.stroke !== 'none' && parseFloat(paint.strokeWidth) > 0,
      paint.stroke + ' at ' + paint.strokeWidth);
-  /* The stripes are deleted rather than switched off, so a half-finished revert cannot ship. */
-  ok('the stripes are gone', !document.getElementById('hatchdef') && !document.getElementById('hatch'),
-     'no #hatchdef and no #hatch');
+
+  /* The pattern cannot be read off a pixel here, because this page has no way to sample the
+     compositor. So it is read off the two things that broke it.
+     **`display: none` on the sprite is the fault this line exists for.** A `<pattern>` is a paint
+     server whose tile Blink builds from the layout tree, and a hidden sprite gives its children no
+     layout. The pattern still resolves, every fill still computes, and the tile is empty. The mask
+     then draws as a flat wash and nothing anywhere says so. */
+  const def = document.getElementById('hatchdef');
+  ok('the pattern sprite is rendered', def && getComputedStyle(def).display !== 'none',
+     def ? 'display ' + getComputedStyle(def).display : 'no #hatchdef at all');
+  const bg = document.querySelector('#hatch .hatchbg');
+  const line = document.querySelector('#hatch .hatchline');
+  const fills = [bg, line].map(e => e && getComputedStyle(e).fill);
+  ok('the tile holds two different paints', !!bg && !!line && fills[0] !== fills[1],
+     fills.join(' against '));
 
   // --- the limits --------------------------------------------------------------------------------
 

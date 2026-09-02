@@ -17584,16 +17584,24 @@ about half over the Strait of Malacca.
 `border.json`, because `border-build.php` needs it to place the circle and `map-limits-test.html`
 needs it to check one. Going back to the real shape is one line.
 
-### The stripes are deleted
+### The stripes went and came back lighter
 
-The diagonal pattern cost an SVG `<pattern>` in a sprite of its own, two shapes inside its tile, a
-second colour token, and two traps. All of it is gone. The check asserts that both ids are absent,
-so a half-finished revert cannot ship.
+The pattern was deleted for one revision, and the repository owner asked for it again the same day
+once the shape was a circle. Only the values moved.
 
-The wash is lighter: `--mask-bg` is 0.06 on paper and 0.30 on the dark theme, against an effective
-0.09 and 0.50 once both stripe values are counted. The boundary is now stated by a 1px hairline in a
-new `--mask-edge`. That token is black on paper and white on the dark theme, because a darker line
-on a wash that is already 30% black has nowhere left to go.
+| token | first set | now |
+|---|---|---|
+| `--mask-bg` light | 0.045 | 0.045 |
+| `--mask-line` light | 0.16 | 0.10 |
+| `--mask-bg` dark | 0.45 | 0.30 |
+| `--mask-line` dark | 0.055 white | 0.035 white |
+
+A 1px hairline in a new `--mask-edge` states the boundary, so neither the wash nor the stripes have
+to carry it. That token is black on paper and white on the dark theme, because a darker line on a
+wash that is already 30% black has nowhere left to go.
+
+**The flat-wash revision is not a decision against stripes.** It was a decision against those
+stripes on Selangor's real outline.
 
 ### The circle sits on the land
 

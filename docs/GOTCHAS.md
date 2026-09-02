@@ -2968,26 +2968,28 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   without a reason.** The repository owner called the real shape too busy on 2026-09-02, the same day
   it shipped. The outline stays in `border.json` because `border-build.php` needs it to place the
   circle and `map-limits-test.html` needs it to check one. Switching back is one line in `js/map.js`.
-- **The diagonal stripes are deleted rather than switched off.** They cost an SVG `<pattern>` in a
-  sprite of its own, two shapes inside its tile, a second colour token, and the two traps below. The
-  wash is flat now, and `map-limits-test.html` asserts that `#hatchdef` and `#hatch` are both absent,
-  so a half-finished revert cannot ship.
-  **The two traps are recorded because the next pattern will meet them.**
-  A `<pattern>` sprite must NOT be `display: none`, and a `<use>` sprite may be. `#glyphs` holds the
-  pin shapes and is hidden, because `<use>` copies out of a tree that was never rendered. A pattern
-  is a paint server whose tile Blink builds from the LAYOUT tree, and with no layout there are no
-  children to build from. **Everything measurable still passes in that state**, which is why it cost
-  a session: the pattern resolves, `getComputedStyle` answers `url("#hatch")` on the path, and every
-  child answers its own right fill. The tile is simply empty and nothing errors. `position: absolute`
-  with zero size and the overflow clipped is the shape that renders and takes no room.
-  And a stripe inside a tile has to be a filled `<rect>`. A pattern clips its content to its own
+- **The diagonal stripes went and came back lighter, all on 2026-09-02.** The repository owner called
+  the first set too busy over Selangor's real outline, took a flat wash for one revision, and asked
+  for the stripes again once the shape was a circle. Only the values moved: `--mask-line` is 0.10 on
+  paper against 0.16, and 0.035 on the dark theme against 0.055. **Do not read the flat-wash revision
+  as a decision against stripes.** It was a decision against those stripes on that shape.
+  **A `<pattern>` sprite must NOT be `display: none`, and a `<use>` sprite may be.** `#glyphs` holds
+  the pin shapes and is hidden, because `<use>` copies out of a tree that was never rendered. A
+  pattern is a paint server whose tile Blink builds from the LAYOUT tree, and with no layout there
+  are no children to build from. **Everything measurable still passes in that state**, which is why
+  it cost a session: the pattern resolves, `getComputedStyle` answers `url("#hatch")` on the path,
+  and every child answers its own right fill. The tile is simply empty and nothing errors.
+  `position: absolute` with zero size and the overflow clipped is the shape that renders and takes
+  no room.
+  **A stripe inside a tile has to be a filled `<rect>`.** A pattern clips its content to its own
   tile, so a stroked line on the tile's edge carries half its width outside and shows half of itself.
-- **The wash is faint and the hairline is what states the boundary.** `--mask-bg` is 0.06 on paper
-  and 0.30 on the dark theme, down from an effective 0.09 and 0.50 once both stripe values were
-  counted. So `--mask-edge` is load-bearing rather than decoration, and a `stroke: none` leaves a
-  circle nobody can find. `map-limits-test.html` asserts the stroke for that reason alone.
-  **The edge reverses between themes and the wash does not.** It is black on paper and white on the
-  dark theme, because a darker line on a wash that is already 30% black has nowhere left to go.
+- **The stripes are faint and the hairline is what states the boundary.** All three mask values are
+  under the first striped set, so `--mask-edge` is load-bearing rather than decoration, and a
+  `stroke: none` leaves a circle nobody can find. `map-limits-test.html` asserts the stroke for that
+  reason alone.
+  **The stripe and the edge reverse between themes and the wash does not.** Both are black on paper
+  and white on the dark theme, because a darker mark on a wash that is already 30% black has nowhere
+  left to go.
 - **The stroke on the mask path draws the circle and nothing else.** It lands on the outer ring too,
   and that ring sits three circle widths out, past any zoom the pan limit allows. So one property
   states the boundary and no second element is needed.
