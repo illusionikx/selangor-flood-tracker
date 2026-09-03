@@ -371,12 +371,12 @@
      a sixth colour on the map, and the palette rule above reserves every hue it has.
      Both are alpha over the basemap rather than solid colours, because the ground under them has to
      stay legible: a reader who pans to the edge is still reading a coastline.
-     **All three are LIGHTER than the first striped version**, on the repository owner's instruction
-     of 2026-09-02. That set ran 0.045 under a 0.16 stripe, and the reader called it too busy over
-     Selangor's real outline. The stripes came back the same day once the shape was a circle, at
-     0.10 against 0.16. The edge line carries the boundary now, so neither the wash nor the stripes
-     have to. Keep this trio faint. A reader who pans to the edge is still reading a coastline. */
-  --mask-bg: rgba(0,0,0,.045); --mask-line: rgba(0,0,0,.10); --mask-edge: rgba(0,0,0,.22);
+     **All three are LIGHTER than the first striped version**, on the repository owner's instruction.
+     That set ran 0.045 under a 0.16 stripe, and the reader called it too busy over Selangor's real
+     outline. The stripes came back once the shape was a circle, at 0.10, and again lighter at 0.06
+     on 2026-09-03. The edge line carries the boundary now, so neither the wash nor the stripes have
+     to. Keep this trio faint. A reader who pans to the edge is still reading a coastline. */
+  --mask-bg: rgba(0,0,0,.045); --mask-line: rgba(0,0,0,.06); --mask-edge: rgba(0,0,0,.22);
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
@@ -401,8 +401,11 @@
      **The STRIPE and the EDGE are white here and black on paper, and that reverses both.** A darker
      mark on a wash that is already 30% black has nowhere left to go. The wash goes down and the two
      marks go up, so the circle and its texture stay readable at either end of the theme.
-     The stripe is 0.035 against the first version's 0.055, for the reason the light theme states. */
-  --mask-bg: rgba(0,0,0,.30); --mask-line: rgba(255,255,255,.035); --mask-edge: rgba(255,255,255,.20);
+     The stripe is 0.022 against the first version's 0.055, for the reason the light theme states.
+     **It is near the floor of what a screen can draw.** Measured off the rendered page: the stripes
+     stand 4 levels of 255 apart on the dark theme, against 13 on paper. Under that the texture stops
+     reading as a direction at all. Do not take this one lower without looking at the pixels. */
+  --mask-bg: rgba(0,0,0,.30); --mask-line: rgba(255,255,255,.022); --mask-edge: rgba(255,255,255,.20);
 }
 /* **The map palette, and it is this set on both themes.** The selector is the whole of the change:
    the values below are the dark theme's, and `.pin` takes them whatever the theme is, so a station
