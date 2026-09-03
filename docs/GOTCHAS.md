@@ -3404,3 +3404,71 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   (220 plus five times 120), and it is 760 below 600px. Leave the old floor in place, and the six
   columns stretch to fill 820px on a 360px screen. The table still draws, but only the columns are
   wrong.
+- **A CSS `filter` on a map marker rasterizes again on every frame of a zoom.** A filter puts its
+  element on a render surface of its own. Leaflet scales the whole marker pane through a zoom
+  animation. So the browser paints each of those surfaces again for each frame. `.pin` cast
+  `filter: drop-shadow(0 1px 1px)`, and the map draws 260 marker icons at zoom 12 and 13. Measured
+  over six zoom steps and two pans, three runs each way taken alternately, medians: 65 frames in
+  4.2 s with the filter and 90 without it. The 95th-percentile frame fell from 241 ms to 197 ms, and
+  the long tasks fell from 1,765 ms to 1,285 ms. The repair is a shadow circle inside the pin, in its own
+  SVG. The compositor treats that circle as one more shape. See `pinGlyph()` in `js/map.js`. **The same
+  trap covers `box-shadow` on the wrong element.** A box shadow traces the border box. So it suits
+  the cluster chip, which is a circle with a border. It cannot draw a shadow round a glyph.
+  Reach for a shape before a filter wherever the mark is a shape.
+- **A frame count on this map climbs over the first minute. Measure A against B
+  alternately.** The first run of a gesture drew 44 frames and the sixth drew 111, with no change
+  between them. A test that runs every condition once, in order, names the last
+  condition the fastest one. Run the conditions in the order A B B A, three times each. Take the
+  median of each. The paired runs are what carry the answer: the shadow-circle build won all six of
+  its pairs.
+- **`disableClusteringAtZoom` names the first zoom that clusters NOTHING, and the README says the
+  opposite.** That file reads "at this zoom level and below, markers will not be clustered". The code
+  reads `this._maxZoom = disableClusteringAtZoom - 1`. It then builds one distance grid per zoom,
+  from the map minimum up to that number. So `disableClusteringAtZoom: 15` leaves zoom 14 clustering and
+  zoom 15 clear. One sweep over the 15 densest views counted the chips. Zoom 13 drew 487, zoom 14
+  drew 112, and zoom 15 drew none. Trust the source, and see `docs/VERIFY.md` for the sweep.
+- **Three numbers set the zoom ceiling together, and a new station moves one of them.** They are
+  `maxZoom` on the map, `disableClusteringAtZoom` on the cluster, and `maxClusterRadius`. The map
+  stops at 15, because `disableClusteringAtZoom: 15` makes 15 the first zoom that merges nothing.
+  Without that option the radius alone reached zero at 16, and 6 of the 460 sites still merged at 15.
+  A new station within 55 m of another one moves the radius answer. A change to `maxClusterRadius`
+  moves it as well. Nothing warns about either. The map draws a cluster chip at its own ceiling, and
+  `spiderfyOnMaxZoom` is the only way left to open that chip. Re-run the sweep in `docs/VERIFY.md`
+  after a change to any of the three.
+- **`zoomSnap: 0` is slower here and it breaks the cluster grid.** It is the native half of a
+  Google-style continuous wheel zoom, and it looked like a free win. It ran over twelve wheel events
+  in and twelve out. Zoom snap 1 drew 92 frames and 0.5 drew 84. Zoom snap 0 drew 57, with the
+  95th-percentile frame at 203 ms against 159 ms. It also lands the map on a fractional zoom, 12.0965
+  in that run. markercluster keys every distance grid by a whole zoom, and `maxClusterRadius` then
+  answers for 12.0965. The smooth-zoom plugin is the other half, and it is a dependency this app does
+  not take.
+- **`chunkedLoading` buys nothing at this size.** The plugin names it for a bulk add, and `render()`
+  bulk-adds 460 markers on every poll. Measured over five runs each way: 131 ms with it and 134 ms
+  without. It exists for an add that blocks for seconds.
+- **A pin token resolves against a `.pin`, and the root gives a different answer.** `css/base.css`
+  holds a palette block for the map: `:root[data-theme="dark"], .pin` hands a pin the dark set on
+  both themes, and `.pin, #side` states the six kinds again at their own lightness. So `--k-river`
+  has one value on the page and another on a pin. A DOM pin resolved `var(--c)` in its own context
+  for free. A canvas has no context, so `js/pins.js` keeps one hidden `<span class="pin">` off screen
+  and reads every token off that element. Reading `document.documentElement` instead draws the whole
+  map in the page palette, which is close enough to look deliberate.
+- **A sprite is a picture, so a theme swap has to throw the cache away.** The disc edge is
+  `--surface`, the heart is `--fav` and the rise ring is `--s-danger`. A DOM pin re-read all three on
+  its own. `applyTheme()` in `js/map.js` calls `resetSprites()` and then `pins.redraw()`. Miss either
+  and the map keeps the old shade until the next poll, or forever.
+- **The pin canvas takes no pointer events, and the map does the hit testing.** A canvas the size of
+  the map answers a press by swallowing every drag. `js/pins.js` listens on the map for `click`
+  and `mousemove` and looks up the nearest drawn mark within its own radius. Nearest, never last
+  drawn: two marks that overlap must answer with the one whose middle is closer.
+- **Cluster in PROJECTED pixels at a whole zoom, never in container pixels.** A container point moves
+  with every pan. Group on one and the map re-groups itself under a finger mid-drag. The layer
+  caches the grouping per zoom for the same reason, and `setItems()` is what clears that cache.
+- **A halo sampled on one frame reads as blank.** `@keyframes halo` fades from 0.9 to 0 with an
+  ease-out, so the ring spends most of its 1.8 s cycle under alpha 10. One `getImageData` at a random
+  instant returned zero painted pixels on a map whose halo ran correctly. Sample across a whole
+  cycle and take the maximum. Measured that way it peaks at 908 pixels and alpha 228.
+- **Two `stroke` attributes on one SVG element is a parse error, and an `<img>` fails silently.**
+  Building a sprite by string-patching the pin markup put `stroke="none"` in twice. `img.onerror`
+  fired with no message, `toDataURL` was never reached, and every sprite came back null. A CSS
+  `var()` inside a standalone SVG image is the second half of the same trap: it resolves against
+  nothing and the shape draws in black, or not at all.

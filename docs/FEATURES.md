@@ -17634,3 +17634,349 @@ the cost of the shape rather than a fault, and the check asserts Bentong is insi
 change that tightens the radius until Bentong falls out has almost certainly clipped Selangor.
 
 All eight runnable checks pass after this change.
+
+## The selected pin is red
+
+The teardrop over the open card's station is red. `--sel` in `css/base.css` holds the value,
+`#d32f2f`, beside the pin palette. `.pin.sel` in `css/map.css` reads it. The repository owner asked
+for the change on 2026-09-03.
+
+### What it replaced
+
+The mark lifted the station's own `--c`. So it wore that station's kind hue, or the danger red where
+the station sat at its danger mark. `markSel()` in `js/map.js` read that value out of the pin's
+markup with a regular expression and wrote it back into the new icon.
+
+A mark that changes colour with the station under it answers "what kind of station is this". The
+station's own pin answered that question a moment before. The selection mark answers a different
+question: which station is open. One colour states that.
+
+### Why not the status red
+
+`--s-danger` is `#ff3b33`. Every status surface paints that scarlet, and it means one thing. A
+selection mark in the same red claims the station is at its danger mark. `--sel` is darker and less
+orange, so a reader does not read the two as one signal.
+
+### Why the palette rule does not block it
+
+The colour language reserves the traffic-light hues for status. That rule governs a sensor and its
+reading. This is a mark on the map, the way "You are here" and a searched place are marks. No sensor
+wears it, and `color()` in `js/util.js` never answers it.
+
+### The cost
+
+A station at its danger mark loses its red while its card is open. The card itself states the
+reading, the meter draws the mark, and the alert list carries the station. So the fact is on screen
+three times over.
+
+`--sel` holds one value for both themes, which is what every token in the `.pin` block does.
+
+## The place name gets a gap before the readings
+
+The "You are here" card draws one section per sensor kind. Each section holds a head, the name of
+the station it found, the region of that station, and the readings. The name and the region ran flush
+into the segmented group under them. A reader met three blocks with no space between them.
+
+`.sensor > :is(.place, .muted) + .sbody` in `css/map.css` adds an 8px gap.
+
+### Why the gap goes on the group
+
+M3 separates a list group from the supporting content over it. The gap must not go on the name,
+because the name and the region are one two-line block. A margin under the name splits that pair.
+
+### Why 8px
+
+`css/map.css` already states 8px between two sensor sections. One file states one gap.
+
+### What it does not touch
+
+The rule needs a `.sbody` after the line. So the line `No river within 30 km` keeps its position.
+That section holds no readings, and a gap under a lone line adds space over nothing.
+
+## The map stops at zoom 15, and zoom 15 clusters nothing
+
+`maxZoom` on the map is 15. It was 18. `disableClusteringAtZoom` on the cluster is 15, so at that
+zoom every site draws as its own mark. `js/map.js` holds both numbers.
+
+### Where 15 comes from
+
+The repository owner asked for a ceiling at the zoom where every mark stands on its own. The first
+answer was 16, and it came out of a measurement rather than a guess. The second answer is 15, and it
+came out of an instruction: stop clustering there.
+
+The app carries 460 sites. `maxClusterRadius` states a radius per zoom, and two markers form a
+cluster when they stand closer than that radius. A script projected every site at each zoom, then
+tested each site against every other one:
+
+| zoom | radius | markers with a neighbour inside it |
+|---|---|---|
+| 12 | 34px | 282 |
+| 13 | 26px | 134 |
+| 14 | 26px | 72 |
+| 15 | 14px | 6 |
+| 16 | 14px | 0 |
+
+So the radius alone reaches zero at 16. Six markers of 460 held the line at 15.
+`disableClusteringAtZoom: 15` takes those six, because markercluster then builds no distance grid for
+zoom 15 at all.
+
+A second measurement checked the result through the app. The map opened the 15 densest
+neighbourhoods at three zooms, and a script counted the cluster chips on screen. Zoom 13 drew 487
+chips over those views, zoom 14 drew 112, and zoom 15 drew none.
+
+### Two sites overlap at 15
+
+The closest pair of sites stands 55 m apart. That is 23 screen pixels at zoom 16 and 11.5 at zoom 15,
+against a 27 pixel disc. So at 16 the two discs touched, and at 15 one disc covers the middle of the
+other. Both marks draw and both take a click. That is the price of the instruction, and this entry states
+it rather than hides it.
+
+No pair is closer than that. `api.php` folds sensors within `SITE_M` (50 m) into one site before a
+marker is ever built.
+
+### The README of the plugin states the option backwards
+
+The README says "at this zoom level and below, markers will not be clustered". The code reads
+`this._maxZoom = disableClusteringAtZoom - 1`. It then builds one distance grid per zoom, from the
+map minimum up to that number. So the option names the first zoom that clusters NOTHING. Every zoom
+under it still clusters. The measurement above settles it: zoom 14 still draws 112 chips.
+
+### Three things that went with the change
+
+The `z >= 15 ? 14` band left `maxClusterRadius`. markercluster builds no grid for a zoom that
+function never sees, so that branch had no way to run. A dead rung in a ladder of thresholds reads
+as a live one to the next person who tunes it.
+
+`spiderfyOnMaxZoom` stays and can no longer fire. It needs a cluster at the top zoom of the map, and there
+is none. It is one word, and it is the behaviour the map needs back the moment either number moves.
+
+The basemap now reaches one level higher than the map does. Esri caches its Canvas tiles to zoom 16
+over this area. Zoom 17 and 18 both answered with one shared `Map data not yet available` plate.
+`maxNativeZoom` stretched a zoom-16 tile over both to hide it. That plate is gone. The tile layers
+still declare `maxNativeZoom: 16`, as the guard for the day this ceiling goes up again.
+
+### What it costs
+
+A reader cannot zoom past a street. Nothing in this app draws detail below that level. The camera wall, the table and the
+station panel each answer a question about one station. None of the three is on the map.
+
+## A map pin casts its shadow inside its own SVG
+
+Each station pin draws a shadow circle behind its disc. `pinGlyph()` in `js/map.js` emits it, and
+`.pinglyph.disc .sh` in `css/map.css` paints it black at 38%. `.pin:not(.disc)` keeps the CSS
+`filter: drop-shadow` for the four marks that are not a station disc. `render.js` writes the `disc`
+class.
+
+### The fault
+
+`.pin` cast `filter: drop-shadow(0 1px 1px)`. A CSS filter puts its element on a render surface of
+its own. Leaflet scales the whole marker pane through a zoom, so every filtered pin rasterizes again
+on each frame of that travel. The map carries 260 marker icons at zoom 12 and 13.
+
+### The measurement
+
+One scripted gesture drove the map: six zoom steps between zoom 11 and 14, then two pans. The test
+counted animation frames over 4.2 seconds, and it read the long tasks over the same window.
+
+The conditions ran in the order A B B A, three times each. That order cancels the warm-up of the
+machine.
+Medians:
+
+| condition | frames | 95th percentile frame | long tasks |
+|---|---|---|---|
+| a filter on every pin | 65 | 241 ms | 1,765 ms |
+| the shadow circle | 90 | 197 ms | 1,285 ms |
+
+The shipped build won all six paired runs. It draws 38% more frames.
+
+### Four other changes, and why they did not ship
+
+The same gesture drove four other changes.
+
+- The marker layer is the whole cost. With every pin removed the gesture drew 226 frames against 87.
+  With the marker pane hidden, and the same markers still in the page, it drew 197. So the cost is
+  the paint, not the cluster arithmetic.
+- A wider `maxClusterRadius` at zoom 11 to 13 drew 107 frames against 87. It merges more stations,
+  which is a decision about the map rather than about its speed. Not taken.
+- `markerZoomAnimation: false` drew 105 against 86. It hides every pin during a zoom. Not taken.
+- The water layer on the dark theme drew 100 against 87 when removed. It redraws 1,910 canvas shapes
+  on each move. Not taken, because it is a feature and not waste.
+
+### The cluster chip took the same repair
+
+`.cluster` cast the same filter. The chip is a circle with a border, so a `box-shadow` traces the
+same shape and draws no render surface. `.cluster.danger` states both shadows in one property,
+because a shorthand overwrites what it does not name.
+
+### Where the filter stays
+
+Four marks are not a station disc: "You are here", a searched place, the selection teardrop and a
+weather pin. Each is a bare glyph with a stroke, and a shadow circle behind a glyph is not the same
+picture. The glossary in the Help dialog draws its own copies of these marks, and they carry no
+`disc` class either. At most a few of them are on screen at once.
+
+A weather pin is the exception to that count. Weather mode can draw about a hundred bare pins, and
+each one still carries a filter. Nobody measured that mode.
+
+### What the published advice says, and what it gave
+
+Four sources went into this work before the measurements above. Each one gets an answer here.
+
+The Leaflet.markercluster README names `chunkedLoading`, `removeOutsideVisibleBounds`, `animate`,
+`animateAddingMarkers` and `disableClusteringAtZoom`. `removeOutsideVisibleBounds` is on by default
+and this app already had it. `disableClusteringAtZoom` is what the zoom ceiling above now uses.
+`chunkedLoading` ran against the poll rebuild: 131 ms against 134 ms over five runs each. Three
+milliseconds reaches no reader. It exists for a bulk add that blocks for seconds, and 460 markers is
+not that. Not taken.
+`animateAddingMarkers` is already off, which is its own default and the faster one.
+https://github.com/Leaflet/Leaflet.markercluster
+
+The general advice for a slow marker map holds three items. Cluster. Draw only what is in view.
+Move the marks onto a canvas. This app already does the first two. Canvas is the real ceiling.
+The published numbers are large. At 100,000 markers a canvas holds about 300 Mb against 2.8 Gb,
+and it zooms in half a second against minutes. This app draws 460 sites, and 260 marker icons at its worst zoom. That sits
+three orders of magnitude under the case those numbers describe. A canvas layer also gives up four things this map draws with CSS on a
+DOM node. They are the state layer, the favorite badge, the danger halo and the rise ring. Not
+taken.
+https://medium.com/@silvajohnny777/optimizing-leaflet-performance-with-a-large-number-of-markers-0dea18c2ec99
+https://github.com/eJuke/Leaflet.Canvas-Markers
+
+The advice on CSS filters names two costs. They are slow to animate, and they are slow at scale. A
+blur can cost 250 ms of paint against 40 ms with the filter off. That is the fault this change
+removes. The
+same sources offer `will-change` as the repair. It is the wrong one here. It promotes the element to
+its own layer, and 260 promoted layers is the cost rather than the cure. A shape is the cure. This
+file already measured that token once, on the rail travel, and it failed there too.
+https://blog.kaelig.fr/post/47025488367/css-filters-in-the-real-world
+https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Values/filter-function/drop-shadow
+
+Leaflet zooms in whole steps, and a Google-style continuous wheel zoom needs either `zoomSnap: 0` or
+a plugin. `zoomSnap` is native, so it ran over twelve wheel events in and twelve out.
+Zoom snap 1 drew 92 frames and 0.5 drew 84. Zoom snap 0 drew 57, with a 95th-percentile frame of
+203 ms against 159 ms. It also landed the map on zoom 12.0965. Every distance grid markercluster holds
+carries a whole zoom as its key, and `maxClusterRadius` then answers for 12.0965. Slower and wrong.
+Not taken. The plugin is a dependency, and this app vendors no CDN and adds none.
+https://github.com/mutsuyuki/Leaflet.SmoothWheelZoom
+
+### Why a class and not `:has()`
+
+`.pin:has(> .pinglyph.disc)` states the same thing with no change to `render.js`. A relational
+selector over 260 markers has a cost of its own, and the class is one word in one template string.
+
+All eight runnable checks pass after this change.
+
+## One canvas draws every pin
+
+`js/pins.js` holds a Leaflet layer that draws every station pin and every cluster chip onto one
+canvas. Each pin was a `divIcon` before: an absolutely positioned `<span>` around an inline `<svg>`.
+Leaflet.markercluster went with the change, and so did its script tag, its stylesheet and both
+vendored files.
+
+### The measurement
+
+One scripted gesture drove the map: six zoom steps between zoom 11 and 14, then two pans. The test
+counted animation frames over 4.2 seconds and read the long tasks over the same window. Conditions
+ran in the order A B B A, three times each, to cancel the warm-up of the machine. Medians:
+
+| stage | frames | 95th percentile frame | long tasks |
+|---|---|---|---|
+| DOM pins, a CSS `filter` on each | 65 | 241 ms | 1,765 ms |
+| DOM pins, the shadow as a circle | 103 | 140 ms | 967 ms |
+| this canvas layer | 209 | 37 ms | 675 ms |
+| no pins on the map at all | 215 | 29 ms | 569 ms |
+
+The canvas reaches what an empty map reaches. Frames rose 3.2 times against the first row, and the
+95th-percentile frame fell by 85%.
+
+### Why the published thresholds did not predict it
+
+The guidance for a slow marker map says DOM markers hold up to about 10,000 objects. Canvas is for
+the range above that. This map draws 260 marker icons at its worst zoom, which is 40 times
+under that line. The threshold assumes a plain marker. A pin here is an SVG with a `<use>` into a
+shadow tree. It carries a stroke with `vector-effect` and a `scale(.7)`
+transform. Until this week it carried a `drop-shadow` filter as well. The renderer was the fault at 260 marks, not at 10,000.
+
+### What replaced the plugin
+
+Leaflet.markercluster is 30 KB and this app used about a tenth of it. `pins.js` carries the part it
+used, in three pieces.
+
+- Greedy grid clustering, one pass per zoom, at the radius `CLUSTER_R` already stated. A mark joins
+  the first cluster within the radius and starts one otherwise. It runs in projected pixels at a whole zoom, never in
+  container pixels. So a pan cannot regroup the map under the reader.
+- A chip drawn with `arc` and `fillText`. It is the count on a neutral disc. It turns red where a child is at its danger mark. It
+  turns dashed where the children are not all one kind. Those are the rules the
+  `iconCreateFunction` of the plugin carried.
+- A press on a chip zooms to what it holds, which is `zoomToBoundsOnClick`.
+
+`spiderfyOnMaxZoom` is gone. It needed a cluster at the top zoom, and zoom 15 clusters nothing.
+
+### The marker objects stayed, and that is what kept the change small
+
+`render.js` still builds one `L.Marker` per site. The canvas draws from that same array, and a press
+fires the `click` event of that marker. So `openSide()`, `flashTo()`, `siteMark`, the mast hover ring
+and the card refresh all work with no change. The layer knows nothing about a station.
+
+`render.js` gained one field, `pin`, beside the icon it already built. It names the glyph, the
+colour, the ink and the four states. The sprite cache keys on those fields, so two stations that
+look alike share one bitmap. The live payload produces 18 of them.
+
+### Where the tokens come from
+
+**A `.pin` resolves every token here, and the root never does.** `css/base.css` gives the map its own
+palette block. `:root[data-theme="dark"], .pin` hands the pin the dark set on both themes.
+`.pin, #side` then states the six kinds again at their own lightness. So `--k-river` has one value on the
+page and another on a pin. A DOM pin resolved `var(--c)` in its own context for free. `pins.js` keeps
+one hidden `<span class="pin">` off screen and reads every token off that.
+
+A sprite is a picture rather than a token, so `applyTheme()` clears the cache and redraws.
+
+### The danger halo still pulses
+
+`@keyframes halo` scales a ring from 0.85 to 2 and fades it from 0.9 to 0 over 1.8 seconds. A sprite
+cannot hold that, so the layer keeps a second canvas and a frame loop. **The loop runs only while a
+pin at its danger mark is on screen.** A calm map starts no loop. Reduced motion holds the ring still
+at opacity 0.8, which is what the media query in `css/map.css` already did.
+
+### What is still a DOM marker
+
+Four marks, and each is a different thing with its own rules. They are the teardrop over the
+selected station, "You are here", a searched place, and the weather pins. The first three are one element each. The weather pins
+are about a hundred, and weather mode was not measured.
+
+### The cost
+
+The pin appearance now lives in two places. `css/map.css` draws the DOM copies, which are the legend, the
+glossary and the four marks above. `pins.js` draws the canvas ones, from numbers taken out of that
+same file. Both files say so at the top of the block. A number changed in one and not the other puts
+the map and the legend out of step. Nothing errors.
+
+All eight runnable checks pass after this change.
+
+## MapLibre GL under Leaflet buys nothing here
+
+`maplibre-spike.html` is a throwaway page. The repository owner asked to try maplibre-gl-leaflet on
+2026-09-03. It runs the same gesture as every measurement above, against three basemaps, under the
+same 460 canvas marks. The order is A B C C B A, three times each.
+
+| basemap | frames | 95th percentile frame |
+|---|---|---|
+| none | 254 | 17.2 ms |
+| Esri raster, what the app draws | 254 | 19.5 ms |
+| MapLibre GL vector, OpenFreeMap | 254 | 21.4 ms |
+
+All three sit on the 60 frames per second ceiling. Once the marks are on a canvas, the basemap is not
+measurable. The GL row also has the worst of the three 95th-percentile frames.
+
+The GL basemap really drew. The page leaves that layer on screen at the end, for a person to look at.
+A row that measured a layer which never rendered is worse than no row.
+
+### Why it does not ship
+
+MapLibre GL JS is about 200 KB gzipped against the 42 KB of Leaflet. It also puts two hosts in the
+browser that this app never contacts. `CLAUDE.md` states that PHP reaches every upstream, and that
+the browser reaches this origin and the Esri tiles. The measurement gives nothing back for either cost.
+
+The issue that prompted the trial, maplibre-gl-leaflet #63, reports stuttery panning through that
+bridge and is open and unanswered. This harness did not reproduce it. That is not evidence against
+the report, since a headless run is not a hand on a mouse.

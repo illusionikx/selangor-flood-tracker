@@ -175,6 +175,11 @@
    rather than a reading, so it takes no container. It takes the head's own 4px inset, or it stands
    left of the headline above it. */
 .sensor > .place, .sensor > .muted { padding-inline: 4px; }
+/* That line ran flush into the segmented group under it. M3 separates a list group from the
+   supporting content above it, and 8px is the number this file already uses between two sensors.
+   It goes on the group and not on the line, so the pair (name over region) stays tight and the
+   `No river within 30 km` case, which has no group after it, is untouched. */
+.sensor > :is(.place, .muted) + .sbody { margin-top: 8px; }
 
 /* **THE MET SECTION DRAWS THE SAME M3 LIST ITEM THE WEATHER PANEL DRAWS**, so there is no rule
    here at all. See `.wxstep` further down this file.
@@ -209,8 +214,19 @@
 .pin {
   position: relative; display: grid; place-items: center; width: 39px; height: 39px;
   color: var(--c, var(--accent)); font-size: 36px;
-  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, .45));
 }
+/* **THE MAP'S STATION PINS ARE NOT IN THIS RULE, AND THEY USED TO BE THE WHOLE OF IT.** A CSS filter
+   puts its element on a render surface of its own. Leaflet scales the marker pane through a zoom, so
+   260 filtered pins re-rasterized on every frame of every zoom. Measured over one scripted gesture,
+   three runs of each condition taken alternately, medians: 87 frames in 4.2 s with the filter on
+   every pin against 120 with it on none, and the 95th-percentile frame fell from 193 ms to 110 ms.
+   `pinGlyph()` in `js/map.js` draws the shadow as a circle inside the disc instead, and `render.js`
+   writes `disc` on the span so this rule can step around it. See `.pinglyph.disc .sh` below.
+   **What is left carries the filter and must.** They are "you are here", a searched place, the
+   selected teardrop and a weather pin, none of which is a disc with a shadow to hide behind. The
+   glossary in the Help dialog draws its own copies of these marks, and they are not `.disc` either.
+   A handful of marks paying for a render surface is not what this rule was ever about. */
+.pin:not(.disc) { filter: drop-shadow(0 1px 1px rgba(0, 0, 0, .45)); }
 /* A fifth off every station pin, mast included. At 400 pins on a phone the map was more glyph than
    basemap, and a mark you cannot see the river under is not helping. The mast used to come down
    further, because it was the only pin that was a filled disc and a disc covers what it stands on.
@@ -288,6 +304,15 @@
    that scales with the box is a stroke that never scales. */
 .pinglyph.disc { --pin-ink: #fff; }
 .pinglyph.disc circle { fill: currentColor; stroke: var(--surface); stroke-width: 2.5; }
+/* **THE SHADOW, AS A CIRCLE RATHER THAN AS A `filter`.** It is the disc again, 1.3 units lower and a
+   tenth wider, and it is the first child so it paints under everything. The rule above it would give
+   it the kind's fill and the surface stroke, and a class beats an element selector, so this one wins
+   on specificity rather than on order.
+   **It has no blur and it does not need one.** The disc over it carries a 2.5 unit stroke in
+   `--surface`, so all that shows is a sliver along the foot — which is what a 1px drop shadow drew
+   anyway. Compared side by side at zoom 15 the two are the same picture.
+   `.pin:not(.disc)` above states the whole argument for the swap. */
+.pinglyph.disc .sh { fill: #000; fill-opacity: .38; stroke: none; }
 .pinglyph.disc use { fill: var(--pin-ink); }
 /* The one fill white cannot sit on. `--s-alert` measures 1.64:1 against white and 12.79:1 against
    black, and it cannot be darkened to suit a knockout because a status colour IS its brightness.
@@ -421,9 +446,14 @@
    `.pin.sel` below: the anchor is `box × 0.9167`, which is 38.5 here and was 44 at 48px. */
 .pin.place { width: 42px; height: 42px; font-size: 42px; color: var(--accent); }
 /* The pin whose card is open. `markSel()` in map.js swaps that pin's drawing for the teardrop and
-   adds this class, so the box grows and the glyph changes and nothing else does. It states no
-   colour: `.pin` above already reads `--c`, which the pin's own markup still carries, so a station
-   at danger stays red while a reader has its card open. */
+   adds this class, so the box grows, the glyph changes and the mark takes its own red.
+   **It states a colour now, and it used to carry the station's.** The mark lifted the pin's `--c`,
+   so it wore the kind hue or the danger red. The repository owner asked for one red on 2026-09-03.
+   A mark that changes colour with the station under it answers "what kind is this", which the
+   station's own pin already answered a moment ago. This one answers "which station is open".
+   `--sel` is in `css/base.css` beside the pin palette, and it is deeper than `--s-danger` so the
+   mark does not read as an alarm. `color` here beats `.pin`'s own `var(--c)` on specificity, so an
+   inline `--c` left on the markup would change nothing. `markSel()` writes none. */
 /* **32px, and it has been 48, then 25, then 36.** The repository owner set 25 on 2026-08-26, which
    is the station disc's own diameter, raised it to 36 the same day, and brought the whole set down
    12.5% later that day. **This mark is the exception to the one-size rule the weather pin obeys**:
@@ -438,7 +468,7 @@
    without the anchor and the mark stops pointing at its station — silently, because it still draws.
    **The anchor is fractional and that is correct.** Leaflet takes a fractional pixel. Rounding it to
    keep the number tidy is the same 2px error this entry already records. */
-.pin.sel { width: 32px; height: 32px; font-size: 32px; }
+.pin.sel { width: 32px; height: 32px; font-size: 32px; color: var(--sel); }
 /* The weather pins, for the same reason and at the same size. They are plain `.pin` boxes at 39px
    with an `iconSize` to match, so only the glyph moves: `scale(.7)` is still on, and 31.25 times .7
    is 21.9, against the 22.1 disc above. `js/wx.js` carries the class.
@@ -472,14 +502,18 @@
      `vector-effect: non-scaling-stroke` holds a pin's own stroke at one pixel through this scale. */
   width: 21px; height: 21px; border-radius: 999px;
   font-size: 10px; font-weight: 500; color: #fff; background: #5f6368;
-  border: 1px solid var(--surface); filter: drop-shadow(0 1px 1px rgba(0, 0, 0, .45));
+  /* **`box-shadow`, and it was a `filter: drop-shadow`.** The chip is a circle with a border, so a
+     box shadow traces exactly the shape the filter traced, and it draws no render surface. A hundred
+     of these stand on the map at zoom 11. See `.pin:not(.disc)` above for the measurement. */
+  border: 1px solid var(--surface); box-shadow: 0 1px 1px rgba(0, 0, 0, .45);
 }
 .cluster.mixed { border-style: dashed; }              /* more than one kind inside */
-/* The red glow stays a `box-shadow`: it is a ring around a circle, which a spread draws exactly, and
-   it is a state of this chip rather than the lift every mark on the map gets. */
+/* The red glow was already a `box-shadow`: it is a ring around a circle, which a spread draws
+   exactly. It states the lift again beside it, because one property carries both and a shorthand
+   overwrites what it does not name. */
 .cluster.danger {
   background: #d93025;
-  box-shadow: 0 0 0 2px color-mix(in srgb, #d93025 35%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, #d93025 35%, transparent), 0 1px 1px rgba(0, 0, 0, .45);
 }
 
 /* Ripple played over a station jumped to from a panel or link, over a searched place, and over your

@@ -39,7 +39,8 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `js/state.js` | `state` (data + hereAt) and the `PREFS` blob. Breaks module cycles. |
 | `js/util.js` | pure helpers + `hasInfo()` / `color()` / `isIgnored()` |
 | `js/stations.js` | queries over the station set (`nearestOf`, `nearestCam`, `byId`) |
-| `js/map.js` | map instance, basemap/theme, cluster, the station panel (`openSide`), `focusOn` / `flashTo`. Also the coverage mask, the zoom floor and the pan limit, all three off `border.json` |
+| `js/pins.js` | the station pins and the cluster chips, painted on ONE canvas. Sprite cache, greedy grid clustering, hit testing, and the danger halo's own frame loop. Replaced Leaflet.markercluster |
+| `js/map.js` | map instance, basemap/theme, the pin layer, the station panel (`openSide`), `focusOn` / `flashTo`. Also the coverage mask, the zoom floor and the pan limit, all three off `border.json`. Also the zoom ceiling, 15, and `disableClusteringAtZoom: 15` on the cluster, which is what makes 15 the zoom that merges nothing |
 | `js/heat.js` | both heat layers (water level, rainfall), ground-fixed sizing per layer, shared opacity. Also the field pass where a gauge reporting no rain denies the ground a wet one claims |
 | `heat-test.html` | `chrome --headless --dump-dom` — one of eight runnable checks. Guards the rain layer's paint distance, its dry-gauge erase and its handover between neighbours, in canvas pixels |
 | `map-limits-test.html` | `chrome --headless --dump-dom` — one of eight runnable checks. Guards the coverage circle, the zoom floor, the pan limit and the two water floors. It probes the drawn shape with `isPointInFill`, so it reads the fill rule the browser paints with. It asserts that the circle holds every point of the land ring, that its centre sits east of that ring's middle, that the faint stripes still carry their hairline, and that the pattern sprite is rendered rather than `display: none`, which is the one thing that empties the tile with nothing to say so |
@@ -74,7 +75,8 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `img/` | optional. Only `egg.webp` (the About easter egg). Absent is a supported state — see below |
 | `m3-build.php` | `php m3-build.php` — bakes `vendor/m3/tokens.css` from the M3 Expressive token set. Run by hand, never in a request |
 | `vendor/m3/tokens.css` | M3's shape, typescale, elevation, motion and state scales, vendored. Generated — **colour is deliberately not in it** |
-| `vendor/` | Leaflet, leaflet.heat (patched), markercluster, subsetted fonts, the M3 token scales — no CDN, hand-managed |
+| `vendor/` | Leaflet, leaflet.heat (patched), subsetted fonts, the M3 token scales — no CDN, hand-managed. **markercluster left on 2026-09-03**, when the pins moved to a canvas |
+| `maplibre-spike.html` | **throwaway, not a check and not part of the app.** Measures a MapLibre GL vector basemap against the Esri raster one under 460 canvas marks. It loads unpkg and OpenFreeMap, which the app itself never contacts. See docs/FEATURES.md for what it answered |
 | `lib/` | Composer's vendor dir (`symfony/dom-crawler`), gitignored — **not** `vendor/` |
 | `composer.json` | the one server-side dependency. Run `composer install` before first run |
 | `.github/workflows/pages.yml` | bakes the static GitHub Pages build — runs the PHP on cron, publishes `api.json` |
@@ -440,6 +442,19 @@ order that file holds them. A trap names itself here, and the file states the ev
 - A pseudo-element that sets `--i` paints nothing until its selector joins th...
 - `filter` runs before `mask`, so a filter on an `.i` is discarded.
 - A map pin's glyph is an inline `<svg><use>`, not a masked `<i>`, and the ou...
+- THE MAP'S PINS ARE PAINTED ON A CANVAS, so the pin appearance lives in TWO...
+- A CSS `filter` on a map marker rasterizes again on every frame of a zoom.
+- A frame count on this map climbs over the first minute. Measure A against B...
+- `disableClusteringAtZoom` names the first zoom that clusters NOTHING, and th...
+- Three numbers set the zoom ceiling together, and a new station moves one of ...
+- `zoomSnap: 0` is slower here and it breaks the cluster grid.
+- `chunkedLoading` buys nothing at this size.
+- A pin token resolves against a `.pin`, and the root gives a different answer.
+- A sprite is a picture, so a theme swap has to throw the cache away.
+- The pin canvas takes no pointer events, and the map does the hit testing.
+- Cluster in PROJECTED pixels at a whole zoom, never in container pixels.
+- A halo sampled on one frame reads as blank.
+- Two `stroke` attributes on one SVG element is a parse error, and an `<img>`...
 - FOUR MARK SHAPES ON THE MAP, AND EACH IS SIZED AGAINST THE STATION DISC.
 - "YOU ARE HERE" IS A GREEN DOT WITH NO GLYPH, and it was an amber crosshair.
 - Both glyphs on a map pin carry an explicit `z-index`, and the painting orde...
@@ -1249,6 +1264,22 @@ comes one `.sensor` section per sensor, each headed by its glyph and kind. A pla
   gaps below the first mark. One definition, in `util.js`: the meter, the table bar, the table's sort
   key and the heat weight all read it. Do not hand-copy the stops — `table.js` did, and its sort and
   its bar then disagreed.
+- **The station pins and the cluster chips are painted on ONE canvas, by `js/pins.js`.** Every pin
+  was a `divIcon` until 2026-09-03, and Leaflet.markercluster grouped them. Measured over one
+  scripted gesture, medians: 103 frames in 4.2 s as DOM nodes against 209 on the canvas, with the
+  95th-percentile frame falling from 140 ms to 37 ms. Drawing no marks at all gives 215, so the
+  canvas costs what an empty map costs.
+  **The marker objects stayed.** `render.js` still builds one `L.Marker` per site and the canvas
+  draws from that array, so a press fires the marker's own `click` and every handler already bound
+  runs unchanged. It gained one field, `pin`, which names the glyph, the colour, the ink and the
+  four states. The sprite cache keys on those, and the live payload makes 18 sprites.
+  **Four marks are still DOM**: the selected pin's teardrop, "You are here", a searched place and
+  the weather pins. Weather mode was never measured.
+  **So the pin appearance lives in two places.** `css/map.css` draws the DOM copies and the
+  legend, and `js/pins.js` draws the canvas ones off numbers taken from that same file. Change a
+  number in one and not the other and the map and the legend drift, with nothing to say so.
+  **Leaflet.markercluster is gone**, with its script tag, its stylesheet and both vendored files.
+  Its grouping is 30 lines of greedy grid in `pins.js`, at the same radius.
 - Vendored assets only — no CDN, so Tracking Prevention has nothing to block. `leaflet-heat.js` is
 **patched**, with `willReadFrequently` on 3 `getContext` calls. Do not overwrite it with a fresh
 copy.

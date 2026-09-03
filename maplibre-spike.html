@@ -1,0 +1,118 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>MapLibre GL basemap spike</title>
+<!-- **THROWAWAY. This page is a spike and not a ninth check.** The repository owner asked on
+     2026-09-03 to try maplibre-gl-leaflet after reading
+     https://github.com/maplibre/maplibre-gl-leaflet/issues/63, which is an open and unanswered
+     report of stuttery panning through that bridge.
+
+     It answers one question: does a GL vector basemap under Leaflet move more smoothly than the Esri
+     raster tiles the app draws today? It runs the app's own gesture — six zoom steps and two pans —
+     against three basemaps, in the order A B C C B A, three times each, and prints the medians.
+
+     **It loads two hosts the app itself never contacts.** unpkg serves maplibre-gl and the Leaflet
+     binding, and OpenFreeMap serves the vector style. `CLAUDE.md` states that the browser reaches
+     this origin and Esri's tiles and nothing else. Delete this file rather than let it drift into
+     the app. -->
+<style>
+  html, body { margin: 0; font: 13px/1.5 system-ui, sans-serif; background: #202124; color: #e8eaed; }
+  #map { position: absolute; inset: 0 380px 0 0; }
+  #out { position: absolute; inset: 0 0 0 auto; width: 380px; overflow: auto;
+         margin: 0; padding: 12px; white-space: pre-wrap; font: 12px/1.45 ui-monospace, monospace; }
+</style>
+<div id="map"></div>
+<pre id="out">loading</pre>
+<link rel="stylesheet" href="vendor/leaflet.css">
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+<script src="vendor/leaflet.js"></script>
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script src="https://unpkg.com/@maplibre/maplibre-gl-leaflet@0.0.20/leaflet-maplibre-gl.js"></script>
+<script>
+const out = document.getElementById('out'), log = [];
+const say = (...a) => { log.push(a.join(' ')); out.textContent = log.join('\n'); };
+window.onerror = (m, f, l) => say('ERROR', m, 'at', f + ':' + l);
+window.onunhandledrejection = e => say('REJECT', e.reason && (e.reason.message || e.reason));
+
+// The app's own numbers, so the three rows are comparable to what it draws today.
+const ESRI = 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/'
+           + 'World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}';
+const STYLE = 'https://tiles.openfreemap.org/styles/liberty';
+
+const map = L.map('map', { maxZoom: 15, minZoom: 8, attributionControl: false, zoomControl: false })
+  .setView([3.1390, 101.6869], 11);
+
+// 460 marks, at the density the live payload has, so every row carries the same marker load. This
+// spike is about the BASEMAP, so what draws the pins must not change between rows.
+const pts = [];
+for (let i = 0; i < 460; i++) {
+  const a = i * 2.399963, r = Math.sqrt(i / 460) * 0.55;
+  pts.push([3.14 + r * Math.cos(a), 101.69 + r * Math.sin(a) * 1.3]);
+}
+const dots = L.layerGroup(pts.map(p => L.circleMarker(p, {
+  renderer: L.canvas({ padding: 0.3 }), radius: 9.5, weight: 1.8,
+  color: '#202124', fillColor: '#4a86e8', fillOpacity: 1,
+}))).addTo(map);
+
+const rec = ms => new Promise(res => {
+  const f = [], t = [];
+  const po = new PerformanceObserver(l => { for (const e of l.getEntries()) t.push(e.duration); });
+  try { po.observe({ entryTypes: ['longtask'] }); } catch {}
+  let last = performance.now(); const t0 = last;
+  const tick = () => {
+    const n = performance.now(); f.push(n - last); last = n;
+    if (n - t0 < ms) requestAnimationFrame(tick);
+    else { po.disconnect(); f.sort((a, b) => a - b);
+      res({ frames: f.length, p95: +f[Math.floor(f.length * 0.95)].toFixed(1),
+            ltSum: Math.round(t.reduce((a, b) => a + b, 0)) }); }
+  };
+  requestAnimationFrame(tick);
+});
+
+const wait = ms => new Promise(r => setTimeout(r, ms));
+const gesture = async () => {
+  map.setView([3.1390, 101.6869], 11, { animate: false });
+  await wait(400);
+  for (const z of [12, 13, 14, 13, 12, 11]) { map.setZoom(z); await wait(450); }
+  map.panBy([300, 200]); await wait(500);
+  map.panBy([-300, -200]); await wait(500);
+};
+
+let layer = null;
+const build = {
+  none: () => null,
+  esri: () => L.tileLayer(ESRI, { maxZoom: 15, maxNativeZoom: 15 }),
+  gl: () => L.maplibreGL({ style: STYLE }),
+};
+
+async function run() {
+  say('gesture: 6 zoom steps + 2 pans, 4.2 s each');
+  say('460 marks on a canvas in every row, so only the basemap differs');
+  say('order A B C C B A, three times, medians\n');
+  const res = { none: [], esri: [], gl: [] };
+  const order = ['none', 'esri', 'gl', 'gl', 'esri', 'none'];
+  for (let rep = 0; rep < 3; rep++) {
+    for (const name of order) {
+      if (layer) { map.removeLayer(layer); layer = null; }
+      layer = build[name]();
+      if (layer) layer.addTo(map);
+      await wait(name === 'gl' ? 3500 : 1500);      // a GL style has to load before it can be fair
+      res[name].push(await rec(4200));
+      say(`  rep ${rep + 1} ${name.padEnd(5)} ${res[name].at(-1).frames} frames`);
+    }
+  }
+  const med = (a, k) => { const v = a.map(r => r[k]).sort((x, y) => x - y); return v[Math.floor(v.length / 2)]; };
+  say('\n            frames   p95      JS');
+  for (const k of ['none', 'esri', 'gl'])
+    say(`  ${k.padEnd(6)} ${String(med(res[k], 'frames')).padStart(8)} ${
+      String(med(res[k], 'p95')).padStart(7)} ${String(med(res[k], 'ltSum')).padStart(7)}`);
+  /* Leave the GL basemap on screen at the end, so a person opening this page sees what the third row
+     measured rather than a bare grid. A row that measured a layer which never drew is worse than no
+     row at all. */
+  if (layer) { map.removeLayer(layer); layer = null; }
+  layer = build.gl();
+  layer.addTo(map);
+  window.__spike = { map, build, glCanvas: () => !!document.querySelector('.maplibregl-canvas') };
+  say('\nDONE');
+}
+run();
+</script>

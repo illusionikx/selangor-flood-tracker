@@ -521,6 +521,16 @@
   /* The three that are not station kinds. `#side` needs them because the Weather section is a row
      in its sensor list. A pin never resolves one, so they cost the map nothing. */
   --k-weather: #00afc2; --k-source: #c380c1; --k-notice: #7c98e5;
+  /* **The selection mark, and it is the one mark that states a colour of its own.** The repository
+     owner asked for red on 2026-09-03. The teardrop over the open card's station used to lift that
+     station's own `--c`, so it wore the kind hue or the danger red, whichever the pin held.
+     **This is a deeper red than `--s-danger` on purpose.** That token is #ff3b33, the alarm scarlet
+     every status surface paints, and a selection mark in the same red claims the station is at its
+     danger mark. This one is darker and less orange, so the two do not read as one signal.
+     It is a MARK rather than a reading, so the three-colour rule does not reach it: no sensor wears
+     this, and `color()` never answers it. One value for both themes, the way every pin token here
+     is, and it clears its own ring against a white tile and against the dark basemap alike. */
+  --sel: #d32f2f;
 }
 
 * { box-sizing: border-box; }

@@ -973,3 +973,95 @@ body-class write. The assertion then reads an unselected item and calls a correc
 **A second `const` of one name in one function is a parse error, and this file prints `running...`
 and nothing else.** No assertion runs, no `THREW` line appears, and the whole page looks like a
 hang. Extract the script and run `node --check` on it before blaming the app.
+
+## The zoom ceiling
+
+`maxZoom` is 15, and `disableClusteringAtZoom` is 15 as well. So 15 is the first zoom that merges
+nothing. Three numbers hold that up: those two and `maxClusterRadius`. A new station near another one
+moves the radius answer, and so does a change to the radius. Nothing warns about either. The map
+draws a cluster chip at its own ceiling, and `spiderfyOnMaxZoom` is then the only way to open it.
+
+Open `https://flood-exp.test`, wait for the pins, and paste this into the console. It prints how many
+markers the radius alone still merges at each zoom.
+
+```js
+const M = await import('/js/map.js');
+const pts = Object.values(M.marks).flat().map(m => m.getLatLng());
+const radius = z => z >= 13 ? 26 : 34;   // keep in step with maxClusterRadius
+for (let z = 12; z <= 18; z++) {
+  const r = radius(z), p = pts.map(q => M.map.project(q, z));
+  const merged = p.filter((a, i) => p.some((b, j) =>
+    i !== j && (a.x - b.x) ** 2 + (a.y - b.y) ** 2 < r * r)).length;
+  console.log(z, 'radius', r, 'merged', merged);
+}
+```
+
+Measured on 2026-09-03 over 460 sites, with the old three-band radius: 282 merged at zoom 12, 134 at
+13, 72 at 14, 6 at 15, and none from 16. Those six at zoom 15 are what `disableClusteringAtZoom`
+takes.
+
+The second sweep asks the app itself, which is what a reader sees:
+
+```js
+const M = await import('/js/map.js');
+const pts = Object.values(M.marks).flat().map(m => m.getLatLng());
+const dense = pts.map(p => ({ p, n: pts.filter(q => q.distanceTo(p) < 800).length }))
+                 .sort((a, b) => b.n - a.n).slice(0, 15);
+for (const z of [13, 14, 15]) {
+  let chips = 0;
+  for (const s of dense) {
+    M.map.setView(s.p, z, { animate: false });
+    await new Promise(r => setTimeout(r, 420));
+    chips += document.querySelectorAll('#map .cluster').length;   // `#map` skips the legend swatch
+  }
+  console.log('zoom', z, 'chips over the 15 densest views', chips);
+}
+```
+
+It printed 487 at zoom 13, 112 at 14 and 0 at 15.
+
+**Scope the selector to `#map`.** The Help glossary draws a `.cluster` of its own, and a bare
+`querySelectorAll('.cluster')` counts it in every view. That reads as one stubborn cluster at every
+zoom, and that fault does not exist.
+
+## The map moves smoothly
+
+Run this after any change to the pins, the cluster or the layers on the map. It drives one gesture
+and counts animation frames. A condition runs against its rival in the order A B B A, three times
+each, because the first minute of a session is slower than the fourth and a straight run of
+conditions reports the last one as the fastest.
+
+```js
+const M = await import('/js/map.js');
+const rec = ms => new Promise(res => {
+  const f = [], t = []; let last = performance.now(); const t0 = last;
+  const po = new PerformanceObserver(l => { for (const e of l.getEntries()) t.push(e.duration); });
+  po.observe({ entryTypes: ['longtask'] });
+  const tick = () => { const n = performance.now(); f.push(n - last); last = n;
+    if (n - t0 < ms) requestAnimationFrame(tick);
+    else { po.disconnect(); f.sort((a, b) => a - b);
+      res({ frames: f.length, p95: +f[Math.floor(f.length * .95)].toFixed(1),
+            ltSum: Math.round(t.reduce((a, b) => a + b, 0)) }); } };
+  requestAnimationFrame(tick);
+});
+const gesture = async () => {
+  M.map.setView([3.1390, 101.6869], 11, { animate: false });
+  await new Promise(r => setTimeout(r, 400));
+  for (const z of [12, 13, 14, 13, 12, 11]) {
+    M.map.setZoom(z); await new Promise(r => setTimeout(r, 450));
+  }
+  M.map.panBy([300, 200]); await new Promise(r => setTimeout(r, 500));
+  M.map.panBy([-300, -200]); await new Promise(r => setTimeout(r, 500));
+};
+const p = rec(4200); gesture(); console.log(await p);
+```
+
+Measured on 2026-09-03 at 1536 by 864, dark theme, water layer on, water heatmap on: 209 frames in
+4.2 s, a 95th-percentile frame of 37 ms, and 675 ms of long tasks. Removing the pin layer outright
+gives 215 frames, so the marks now cost what drawing nothing costs.
+
+The same gesture reached 103 frames while the pins were DOM nodes, and 65 with a `drop-shadow`
+filter on each of them. See `docs/FEATURES.md` for the whole ladder.
+
+**The number is a comparison, never a grade.** It moves with the machine, the window and the
+payload. Take a reading before a change and one after it, in the order above.

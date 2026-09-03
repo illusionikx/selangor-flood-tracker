@@ -5,6 +5,7 @@ import { KINDS, TILES, FLASH_MS } from './config.js';
 import { state, PREFS, save } from './state.js';
 import { el, distKm } from './util.js';
 import { byId } from './stations.js';
+import { PinLayer, resetSprites } from './pins.js';
 
 /* One promise, shared by every call. Callbacks on one promise run in the order they were
    registered, so a stop() registered after a start() still runs after it. That is what closes the
@@ -24,13 +25,32 @@ const withClip = fn => (clipMod ??= import('./clip.js')).then(fn, err => {
   console.warn('clip.js did not load', err);
 });
 
-// maxZoom on the map, not just the tile layer: markercluster is added below at module load, before
-// setBasemap() has run, and it throws "Map has no maxZoom specified" if no layer declares one yet.
-/* `maxBoundsViscosity: 1` is a hard wall rather than a rubber band. Leaflet's default of 0 lets a
+/* maxZoom on the map, not just on the tile layer. The pin layer is added below at module load,
+   before `setBasemap()` has run, and every zoom question it asks — the cluster radius, the
+   unclustered floor — is answered against the map rather than against a layer that is not there yet.
+   Leaflet.markercluster used to throw "Map has no maxZoom specified" on the same line for the same
+   reason, and that plugin is gone. */
+/* **15 IS THE CEILING, AND IT WAS 18 AND THEN 16.** The repository owner asked on 2026-09-03 for the
+   map to stop where every mark stands on its own.
+   **16 was the measured answer, and 15 is the instruction that followed it.** Left to
+   `maxClusterRadius` alone, zoom 15 still merged 6 of the 460 sites and zoom 16 merged none. So the
+   first pass set the ceiling to 16. The repository owner then asked for zoom 15 to cluster nothing,
+   which is `disableClusteringAtZoom` on the cluster below. With that option set, 15 is the first
+   zoom that merges nothing, so 15 is where the map stops.
+   **Two sites OVERLAP at 15, and that is the price of the instruction.** The closest pair on the map
+   stands 55 m apart. That is 23px at zoom 16 and 11.5px at zoom 15, against a 27px disc. So at 16
+   their edges touched and at 15 one disc covers the middle of the other. Neither hides the other,
+   and either can be clicked. No pair is closer, because `api.php` folds sensors within `SITE_M`
+   (50 m) into one site before a marker is ever built.
+   **The basemap reaches 16, so one level of it is now unused.** Esri caches its Canvas tiles to zoom
+   16 over this area, and 17 and 18 both answered with one shared `Map data not yet available` plate.
+   That plate is gone with the two levels above 16. The tile layers still declare `maxNativeZoom` —
+   see setBasemap() — because it is the guard the day this ceiling goes up again.
+   `maxBoundsViscosity: 1` is a hard wall rather than a rubber band. Leaflet's default of 0 lets a
    drag leave the bounds and then springs back when the finger lifts, which reads as the map fighting
    the reader. The bounds themselves arrive with border.json — see setLimits() below. */
 export const map = L.map('map', {
-  maxZoom: 18, attributionControl: false, zoomControl: false, maxBoundsViscosity: 1,
+  maxZoom: 15, attributionControl: false, zoomControl: false, maxBoundsViscosity: 1,
 }).setView(PREFS.center || [3.2, 101.4], PREFS.zoom || 9);
 L.control.zoom({ position: 'bottomright' }).addTo(map);
 /* **The two zoom buttons were the last `title` on the page, and Leaflet writes them.** Every other
@@ -496,46 +516,29 @@ export function applyTheme() {
   // has no seam above its own header — see the --surface tokens in css/base.css.
   document.querySelector('meta[name=theme-color]').content = t === 'dark' ? '#202124' : '#ffffff';
   setBasemap();
+  /* **A pin sprite is a picture, so a theme swap has to throw the cache away.** The disc edge is
+     `--surface`, the heart is `--fav` and the rise ring is `--s-danger`, and all three move with the
+     shade. A DOM pin re-read its tokens on its own and a bitmap cannot.
+     **`pins` is declared below this function and is safe to touch.** Nothing in this module calls
+     `applyTheme()` at evaluation time. `js/ui.js` makes the first call, and that module imports this
+     one, so the whole file has run by then. */
+  resetSprites();
+  pins.redraw();
   return t;
 }
 
-// --- clustering --------------------------------------------------------------------------------
+// --- the pins ------------------------------------------------------------------------------------
 
-// One cluster for everything, regardless of category. A badge shows just the total in a neutral
-// chip — no kind icon or hue, because a cluster is usually mixed and a type colour would lie about
-// it — turning red if any child is at danger / sounding, dashed if it holds more than one kind.
-export const cluster = L.markerClusterGroup({
-  // Tighten as you zoom rather than switching clustering off — several stations share exact
-  // coordinates (a rainfall and a river gauge on the same mast), so they overlap at any zoom.
-  // Those stay clustered to the end and fan out on click instead of hiding each other.
-  // Screen pixels, three bands: street, city, state. The far band was 48 and is 34, measured
-  // against the 459 sites in the payload. It covers zoom 0 to 12, across which the spacing
-  // between two sites changes fourfold, so one number cannot suit both ends. 34 is picked for
-  // the city end: it leaves 280 sites inside a neighbour's radius at zoom 12 against 335 at 48.
-  // At zoom 10 it buys almost nothing — 434 against 452 — and no radius does.
-  maxClusterRadius: z => z >= 15 ? 14 : z >= 13 ? 26 : 34,
-  showCoverageOnHover: false,
-  spiderfyOnMaxZoom: true,
-  spiderfyDistanceMultiplier: 1.6,
-  iconCreateFunction(c) {
-    const kids = c.getAllChildMarkers();
-    const kinds = new Set();
-    let critical = false;
-    for (const m of kids) { kinds.add(m.options.kind); critical ||= m.options.critical; }
-    const mixed = kinds.size > 1;
-    return L.divIcon({
-      /* One pixel of air around `.cluster`'s 21px chip. Down 30% from 36/34, then a further 12.5%
-         on 2026-08-26 when every mark on the map came down — the chip is a count, not a station,
-         and at the old size it read as the largest mark on the map. Both numbers move together or
-         the badge stops sitting over the pins it is hiding.
-         **A cluster is the one mark the `scale(.7)` rule in css/map.css cannot reach**, because
-         that rule names `.pin`. So this pair is edited by hand whenever the set moves. */
-      className: '', iconSize: [22, 22],
-      html: `<span class="cluster${critical ? ' danger' : ''}${mixed ? ' mixed' : ''}">${kids.length}</span>`,
-    });
-  },
-}).addTo(map);
-
+/* **EVERY STATION PIN AND EVERY CLUSTER CHIP IS DRAWN ON ONE CANVAS, AND EACH WAS A DOM NODE.**
+   `js/pins.js` holds the layer and states the measurement: 103 frames against 230 over one scripted
+   gesture, with the 95th-percentile frame falling from 140 ms to 25 ms. A canvas layer costs what
+   drawing no marks at all costs.
+   **Leaflet.markercluster is gone with it**, along with its script tag and its stylesheet. The
+   clustering it did is 30 lines of greedy grid in `pins.js`, at the same radius, and this app used
+   about a tenth of what that plugin offers.
+   **The chip carries a count and no kind hue**, which is what the plugin's `iconCreateFunction` drew
+   here before. A cluster is usually mixed, so a type colour would lie about it. It turns red where a
+   child is at its danger mark or sounding, and dashed where it holds more than one kind. */
 export const marks = {};                 // lead kind -> site markers, whether currently shown or not
 for (const k of Object.keys(KINDS)) marks[k] = [];
 
@@ -546,28 +549,47 @@ export const siteMark = new Map();
 
 export const shown = k => document.querySelector(`#layers input[data-kind="${k}"]`)?.checked;
 
-/* Favorites never cluster. A star swallowed by a chip is a star that did not work, and finding your
-   own stations at a glance is the whole point of setting one. markercluster has no per-marker opt
-   out, so they go on a plain layer group beside it. The split lives here because this function
-   already walks `marks` and already gates on `shown(k)`, and layer visibility must stay in one
-   place.
-   **The open card's pin is the second tenant, and it arrived on 2026-08-26.** `markSel()` turns
-   that pin into a teardrop, and a teardrop a cluster chip swallows says nothing at all. The reader
-   is looking at the map to find the place the pane is describing, and a zoom out is how they look
-   for it. It keeps the name `favLayer`, because what the two tenants share is that they stand
-   outside the cluster. */
+/* Screen pixels, two bands: city and state. The far band was 48 and is 34, measured against the 459
+   sites in the payload. It covers zoom 0 to 12, across which the spacing between two sites changes
+   fourfold, so one number cannot suit both ends. 34 is picked for the city end: it leaves 280 sites
+   inside a neighbour's radius at zoom 12 against 335 at 48. At zoom 10 it buys almost nothing — 434
+   against 452 — and no radius does.
+   **A third band held 14px from zoom 15, and it is deleted rather than left.** `UNCLUSTER_Z` stops
+   the grouping before that band can be reached, so it was a dead rung in a ladder of thresholds and
+   the next person to tune it would read it as a live one. */
+const CLUSTER_R = z => (z >= 13 ? 26 : 34);
+/* **NOTHING CLUSTERS FROM ZOOM 15, WHICH IS THE MAP'S OWN CEILING.** The repository owner asked for
+   that on 2026-09-03. Measured before it: 6 markers of 460 still merged at 15 on the radius alone,
+   and the 15 densest views drew 11 chips between them. It reads as the first UNCLUSTERED zoom, which
+   is also how markercluster's own `disableClusteringAtZoom` behaved once its source was read. See
+   docs/VERIFY.md for the sweep. */
+const UNCLUSTER_Z = 15;
+
+export const pins = new PinLayer({ radius: CLUSTER_R, off: UNCLUSTER_Z }).addTo(map);
+
+/* **The selected pin stays a DOM marker, and it is the only one left.** `markSel()` swaps that pin
+   for a teardrop with its own CSS — a size, a red and an anchor at its tip — and none of that is
+   worth a second code path on the canvas. One marker is not a cost.
+   **Favorites are on the canvas now, and they used to be here.** They stood outside the cluster
+   because a star swallowed by a chip is a star that did not work. They still do: `loose` marks them
+   and `pins.js` never groups a loose item. The heart is drawn into the sprite.
+   The name stays `favLayer`, because what its tenants share is that they stand outside the cluster. */
 export const favLayer = L.layerGroup().addTo(map);
 
-const loose = m => m.options.fav || m === selPin;
-
 export function syncCluster(alsoShow) {
-  cluster.clearLayers();
   favLayer.clearLayers();
+  const items = [];
   for (const [k, list] of Object.entries(marks)) {
     if (!(shown(k) || k === alsoShow)) continue;
-    cluster.addLayers(list.filter(m => !loose(m)));
-    for (const m of list) if (loose(m)) favLayer.addLayer(m);
+    for (const m of list) {
+      if (m === selPin) { favLayer.addLayer(m); continue; }
+      /* `pin` is the appearance descriptor `render.js` writes beside the icon. A marker with none is
+         not a station pin and cannot be drawn from a sprite, so it falls back to the DOM layer. */
+      if (m.options.pin) items.push({ marker: m, pin: m.options.pin, loose: !!m.options.fav });
+      else favLayer.addLayer(m);
+    }
   }
+  pins.setItems(items);
 }
 
 // --- mast area ---------------------------------------------------------------------------------
@@ -635,8 +657,10 @@ export function markSel(key) {
        station pin was a bare glyph: swap the class, re-point the `<use>` at the teardrop, done.
        A station pin is a DISC now — a `<circle>` with the glyph knocked out of it — so re-pointing
        the `<use>` left a teardrop cut out of a coloured disc, which is not what a selected pin is.
-       Only the colour is carried over. `--c` is the one thing the old markup holds that this needs,
-       and lifting it keeps the rule that a station at danger stays red while its card is open.
+       **NOTHING IS CARRIED OVER, AND THE COLOUR USED TO BE.** This lifted the station's `--c`, so
+       the mark wore that station's kind hue or its danger red. The repository owner asked for one
+       red on 2026-09-03. `.pin.sel` in `css/map.css` states it, off `--sel`, and that rule beats
+       `.pin`'s own `var(--c)`. So an inline `--c` here would be read by nothing.
        **THE TIP IS AT 11/12 OF THE BOX, NOT AT THE FOOT OF IT, and that is the number to get right.**
        A teardrop is anchored at its tip, and `--i-place` does not paint to the bottom of its own
        viewBox: measured with `getBBox()`, the path ends at 33 of a 36px box, which is 0.9167. The
@@ -647,9 +671,8 @@ export function markSel(key) {
        still draws, it just stops pointing at the station it names.
        **29.3 is fractional on purpose.** Leaflet takes a fractional pixel, and rounding this to 29
        to keep it tidy is the same error the 25px rewrite made, in a smaller size. */
-    const c = selWas.options.html.match(/--c:([^"]*)/)?.[1] || 'var(--accent)';
     pin.setIcon(L.divIcon({ className: '', iconSize: [32, 32], iconAnchor: [16, 29.3],
-      html: `<span class="pin sel" style="--c:${c}">${pinGlyph('place')}</span>` }));
+      html: `<span class="pin sel">${pinGlyph('place')}</span>` }));
   }
   /* **Move it out of the cluster, and move the last one back in.** `loose()` above reads `selPin`,
      so one re-sort answers both halves and neither is written twice.
@@ -898,8 +921,21 @@ export function pinGlyph(name, disc = false) {
      corner rather than the mark itself. `.pin.me` and `.pin.place` are not stations: they are 48px,
      they wear `--me` and `--accent` from a different part of the palette, and white on either fails.
      So the map draws discs for stations and bare glyphs for the two marks that are not one. */
+  /* **THE FIRST CIRCLE IS THE PIN'S SHADOW, AND IT REPLACED A CSS `filter`.** `.pin` cast
+     `drop-shadow(0 1px 1px …)` for every mark on the map. A CSS filter forces its element onto a
+     render surface of its own, and Leaflet scales the whole marker pane through a zoom, so all 260
+     of them re-rasterized on every frame of it. Measured over one scripted gesture — six zoom steps
+     and two pans, three runs of each condition taken alternately, medians: 87 frames in 4.2 s with
+     the filter and 120 without it, with the 95th-percentile frame falling from 193 ms to 110 ms.
+     A circle is not a filter, so this costs the compositor nothing and draws the same picture: it is
+     the disc again, one and a third pixels lower, in black at 38%. The white stroke on the disc
+     above covers all but the sliver at the foot, which is what a 1px drop shadow showed anyway.
+     **`.pin:not(.disc)` still carries the CSS filter**, and `render.js` is what writes that class.
+     So the four marks that are not a station disc keep it: "you are here", a searched place, the
+     selected teardrop and a weather pin. There are at most a handful of those on screen at once. */
   return disc
-    ? `<svg class="pinglyph disc" viewBox="0 0 40 40"><circle cx="20" cy="20" r="17.5"/>` +
+    ? `<svg class="pinglyph disc" viewBox="0 0 40 40"><circle class="sh" cx="20" cy="21.3" r="17.6"/>` +
+      `<circle cx="20" cy="20" r="17.5"/>` +
       `<use href="#g-${name}" x="8" y="8" width="24" height="24" stroke="none"/></svg>`
     : `<svg class="pinglyph"><use href="#g-${name}"/></svg>`;
 }

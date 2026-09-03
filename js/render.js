@@ -186,6 +186,18 @@ export function render() {
     const marker = L.marker([lead.lat, lead.lng], {
       kind: lead.kind, critical, fav,                     // read back by the cluster badge and the split
       zIndexOffset: critical ? 1000 : rising ? 500 : 0,   // keep the urgent pins on top
+      /* **`pin` is what the canvas draws from, and the `icon` below it is what the DOM draws from.**
+         `js/pins.js` blits one sprite per distinct appearance, so it needs the appearance as fields
+         rather than as a string of markup to parse. The key it builds out of these is what decides
+         whether two stations share a bitmap.
+         The `icon` stays for the two marks that are still DOM: the selected pin, whose teardrop
+         `markSel()` swaps in, and any pin `syncCluster()` cannot hand to the canvas. Building a
+         `divIcon` that is never inserted costs an object. */
+      pin: {
+        icon: multi ? MAST.icon : KINDS[lead.kind].icon,
+        kind: lead.kind, c, ink: inkdark ? '#101314' : '#fff',
+        off: !lead.online, rise: rising, danger: critical, fav,
+      },
       icon: L.divIcon({
         // Matches `.pin`'s box in map.css — Leaflet positions the marker off this, not off the CSS.
         className: '', iconSize: [39, 39], iconAnchor: [19.5, 19.5],
@@ -193,7 +205,11 @@ export function render() {
         same bare glyph as the rest now. The `layers` mark is what says "a stack stands here", and
         the count went with the plate it sat on. `.multi` still rides on the span. The hover ring
         and the panel key both ask whether this pin is a mast. */
-        html: `<span class="pin${multi ? ' multi' : ''}${lead.online ? '' : ' off'}${
+        /* **`disc` says this mark carries its shadow inside its own SVG**, so `css/map.css` can keep
+           the CSS `drop-shadow` off it. That filter is what made a pan and a zoom stutter — see the
+           note in `pinGlyph()`. It is written here rather than derived with `:has()`, because a
+           relational selector over 260 markers is a cost of its own and this is one word. */
+        html: `<span class="pin disc${multi ? ' multi' : ''}${lead.online ? '' : ' off'}${
                      rising ? ' rise' : ''}${critical ? ' danger' : ''}${inkdark}" style="--c:${c}">${
                pinGlyph(multi ? MAST.icon : KINDS[lead.kind].icon, true)}${
                fav ? `<b class="fv">${pinGlyph('favorite')}</b>` : ''}</span>`,
