@@ -62,12 +62,14 @@ One SQL aggregation runs beside the `$hist` load in `api.php`:
 
     SELECT station, (ts + 28800) / 86400 AS d, MAX(level) - MIN(level) AS r, COUNT(*) AS n
     FROM level
-    WHERE station LIKE 'wl-%' AND station NOT LIKE '%#%' AND ts >= :since
+    WHERE station NOT LIKE '%#%' AND ts >= :since
     GROUP BY station, d
 
 `:since` is now minus `TIDE_WIN`. Measured: 890 station-days in 84 ms. The `28800` puts the day
 boundary on Malaysian midnight, and Malaysia has no daylight saving. The bucket only measures a
-swing, so the boundary does not matter much. It is there so a day is a day.
+swing, so the boundary does not matter much. It is there so a day is a day. Every station is
+grouped, because an id carries no kind. The trend pass reads the map for rivers alone. The `#`
+test keeps the rainfall odometer series out, since those rows are totals and not levels.
 
 A pure function reads the per-day ranges:
 
@@ -115,8 +117,18 @@ with 3 or fewer samples is a day the poll mostly missed.
     if ($s['tidal']) $eta = null;
 
 `rising` reads `$eta`, so it is false on a tidal station. `rate` is still published. The tide
-really climbs at 0.7 m/h, and the card can say so. `assess()` itself does not change, so the
-`?shots=` endpoint that calls it does not change either.
+really climbs at 0.7 m/h, and the card can say so. `assess()` itself does not change.
+
+**The camera strip.** `?shots=` scores each archived frame against the rivers near the camera,
+and a river takes `assess()` there too. Its own comment says the strip and the live rule must
+agree. So a tidal river takes the closure that never forecasts, the one a siren already takes.
+One condition changes.
+
+**A wet fortnight can flag an inland river, and the cost is priced.** A flashy river that swings
+0.5 m or more on 12 of 15 days reaches the quartile. It then loses its forecast tier until the
+fortnight ends, and keeps its `now` tier. No such fortnight sits in the archive to measure, so
+the risk is stated rather than counted. The low-water rule below is the repair: an inland river
+in a wet fortnight holds its trough high, and that rule forecasts on exactly that.
 
 **The payload.** Every river carries `tidal`, true or false.
 
