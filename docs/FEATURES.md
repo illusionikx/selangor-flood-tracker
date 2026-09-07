@@ -18030,37 +18030,68 @@ body focused.
 blocks the press as well as the focus. These tiles are how a reader reaches a station from the one
 strip nothing covers.
 
-## The water tolerance is 17 m, and it was 33 m, 2026-09-07
+## The water tolerance is 6.6 m, and it was 33 m, 2026-09-07
 
-A reader said the water bodies on the map look low poly. The cause is not the renderer and not the
-source. `water-build.php` runs Douglas-Peucker over every shape before it writes `water.json`.
-`TOL_DEG` set that tolerance to 0.0003 degrees, which is about 33 m.
+A reader said the water bodies look low poly, against a coverage mask that draws a smooth circle.
+The cause is not the renderer and not the source. `water-build.php` runs Douglas-Peucker over every
+shape before it writes `water.json`. `TOL_DEG` set that tolerance to 0.0003 degrees, about 33 m.
 
-### Why 33 m was too coarse
+### The arithmetic that started it, and why it was not enough
 
-The map stops at zoom 15. `js/map.js` states that ceiling. One pixel covers about 4.8 m at this
-latitude and that zoom. So a 33 m chord drew about 7 pixels of straight line, which is a visible
-facet.
+`js/map.js` stops the map at zoom 15. One pixel covers about 4.8 m at this latitude and that zoom.
+So a 33 m tolerance let a chord stand about 7 pixels off the true shore.
 
-The comment beside the constant claimed the tolerance was finer than a screen pixel at zoom 18.
-Both halves of that claim were wrong. This map never reaches zoom 18. At zoom 18 a 33 m chord is
-about 55 pixels.
+The comment beside the constant claimed 33 m was finer than a screen pixel at zoom 18. Both halves
+of that claim were wrong. This map never reaches zoom 18. At zoom 18 a 33 m chord is about 55
+pixels.
 
-The new value is 0.00015 degrees, about 17 m, or about 3.5 pixels at the map ceiling.
+The first repair took the tolerance to 17 m, about 3.5 pixels. The same reader rejected that too.
+The words were "not pixellated, but low poly". So the arithmetic named the right knob and the wrong
+value.
+
+### The value comes off a picture now
+
+A throwaway page drew one lake at zoom 15 from each candidate file, and from a build at `--tol=0`.
+The pictures separate what the arithmetic left open.
+
+| tolerance | rounding | on screen | gzipped |
+|---|---|---|---|
+| 33 m | 11 m | long straight runs | 170 KB |
+| 17 m | 11 m | facets on every bend | 251 KB |
+| 11 m | 11 m | facets on the long edges | 312 KB |
+| 6.6 m | 11 m | reads as a curve | 402 KB |
+| 6.6 m | 1.1 m | no visible gain over the row above | 544 KB |
+| 4.4 m | 1.1 m | no visible gain either | 660 KB |
+| none | 11 m | the source itself | 746 KB |
+
+`TOL_DEG` is 0.00006 now, about 6.6 m.
+
+### `COORD_DP` stays at 4
+
+The rounding grid is about 11 m, which is coarser than the tolerance. That inversion draws a
+staircase in theory. It does not here. The 1.1 m grid costs 142 KB gzipped and the two pictures
+are the same.
+The reader's own words said the same thing before the test ran.
+
+Take the grid to 5 only if a picture asks for it.
 
 ### What it cost
 
-`water.json` grows from 634 KB to 985 KB. Gzipped, it grows from 170 KB to 251 KB. `js/map.js`
+`water.json` grows from 634 KB to 1,732 KB. Gzipped, it grows from 170 KB to 402 KB. `js/map.js`
 fetches that file from an idle callback, after the app is up, and only on the dark theme. So the
-cost lands on nothing a reader waits for.
+cost lands on nothing a reader waits for. The service worker keeps a copy after the first load.
 
-`COORD_DP` stays at 4. That grid is about 11 m, which is still under the new tolerance. Take it to
-5 only if the tolerance goes under 11 m.
+### Two flags on the build script
+
+`--tol=0.0001` overrides `TOL_DEG` for one run. `--cached` reuses the last raw Overpass answer out
+of the system temp directory. Overpass is a free service, and the sweep above needed seven builds
+off one request.
+
+A run with no flag behaves as it always did.
 
 ### The counts moved, and the size floors did not
 
-The build now keeps 858 rivers and 1,144 water bodies, against 850 and 1,060. Neither floor
-changed.
+The build keeps 866 rivers and 1,185 water bodies, against 850 and 1,060. Neither floor changed.
 
 `water-build.php` simplifies a shape first, then measures the result against the floor.
 Simplification cuts corners, so it shortens a river and shrinks a pond. A gentler cut leaves more
@@ -18069,10 +18100,11 @@ of both, and more shapes clear the floor.
 This does not contradict the rule that tolerance and scope are separate knobs. The tolerance still
 adds no shape that the Overpass query never returned.
 
-### What was not done
+### The browser holds the old file for three hours
 
-The tolerance was not taken to 11 m. That value needs `COORD_DP` at 5 as well, and the two together
-cost about 40% more again for detail under one pixel.
+Herd serves everything with `Cache-Control: max-age=10800`, and `js/map.js` fetches `water.json` by
+name with no version in the URL. The service worker caches it as well. So a reader who judges a
+rebake without a hard reload judges the file from before it.
 
 `map-limits-test.html` passes with the new file. It guards both floors at half their stated values,
 so a rebake cannot turn it red by accident.

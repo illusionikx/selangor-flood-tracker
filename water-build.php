@@ -20,14 +20,20 @@
  * A 504 under load is routine. This script writes nothing when that happens, so retry.
  */
 
-const TOL_DEG  = 0.00015;  // Douglas-Peucker tolerance, about 17 m. The map stops at zoom 15, where
-                           // one pixel is about 4.8 m at this latitude. So a chord is about 3.5 px.
-                           // It was 0.0003, about 33 m, which is 7 px, and a reader read that as a
-                           // low-poly shape. The comment there claimed the tolerance was finer than
-                           // a pixel at zoom 18. Both numbers in that claim were wrong. This map
-                           // never reaches zoom 18, and 33 m is 55 px there.
-                           // Tolerance controls the detail *within* a shape and never which shapes
-                           // are present.
+const TOL_DEG  = 0.00006;  // Douglas-Peucker tolerance, about 6.6 m, which is about 1.4 px at the
+                           // deepest zoom this map reaches. Tolerance controls the detail *within*
+                           // a shape and never which shapes are present.
+                           //
+                           // It was 0.0003, about 33 m, and a reader read a lake as a low-poly
+                           // shape. The comment here claimed 33 m was finer than a pixel at zoom
+                           // 18. Both halves were wrong. `js/map.js` stops the map at zoom 15,
+                           // where one pixel covers about 4.8 m at this latitude, and 33 m is 55 px
+                           // at zoom 18.
+                           //
+                           // 17 m was the first repair and a reader rejected it as well. So the
+                           // value comes off rendered pictures rather than off arithmetic. Take a
+                           // screenshot at zoom 15 against a build at `--tol=0` and compare, and
+                           // measure any new value the same way.
 
 /* The size floors, and they REVERSE part of the reason above. The header says this file exists
    because the basemap hides small water. That is still true close in. It stopped being the whole
@@ -39,8 +45,11 @@ const TOL_DEG  = 0.00015;  // Douglas-Peucker tolerance, about 17 m. The map sto
    Tune these against the counts this script prints, never against a guess. */
 const MIN_AREA_KM2 = 0.01;   // one hectare. The median body in the box is 0.0037 km².
 const MIN_RIVER_KM = 1.0;    // a river shorter than a kilometre is a drain at this map's zooms.
-const COORD_DP = 4;        // About 11 m per unit. Two more digits cost 40% of the file for detail
-                           // no zoom in this app can show.
+/* Coordinate rounding, in decimal places. 4 is about 11 m and 5 is about 1.1 m. This is a FLOOR
+   under the tolerance above, not a second tolerance: a grid coarser than the tolerance turns a
+   smooth curve into a staircase, whatever Douglas-Peucker left. So keep the grid under the
+   tolerance. `--dp=5` overrides it for one run. */
+define('COORD_DP', (int) (preg_replace('/^--dp=/', '', implode(' ', preg_grep('/^--dp=/', $argv))) ?: 4));
 const ENDPOINT = 'https://overpass-api.de/api/interpreter';
 const OUT      = __DIR__ . '/water.json';
 
@@ -161,6 +170,16 @@ $query = "[out:json][timeout:300];("
        . "relation[\"landuse\"=\"basin\"]($bbox);"
        . ");out geom;";
 
+/* Two flags, and both exist to tune the tolerance by hand. `--tol=0.0001` overrides TOL_DEG for one
+   run. `--cached` reuses the last raw Overpass answer out of the system temp directory, so trying a
+   third tolerance costs that free service nothing. A run with no flag behaves as it always did. */
+$RAW = sys_get_temp_dir() . '/water-build-raw.json';
+$tol = TOL_DEG;
+foreach (array_slice($argv, 1) as $a) if (str_starts_with($a, '--tol=')) $tol = (float) substr($a, 6);
+$body = (in_array('--cached', $argv, true) && is_file($RAW)) ? file_get_contents($RAW) : null;
+if ($body !== null) echo "water-build: reusing the cached Overpass answer\n";
+
+if ($body === null) {
 echo "water-build: asking Overpass for water in $bbox\n";
 
 $ch = curl_init(ENDPOINT);
@@ -177,6 +196,8 @@ $code = curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
 if ($body === false) fail('curl: ' . curl_error($ch));
 curl_close($ch);
 if ($code !== 200) fail("Overpass answered $code — a 504 is routine under load, so try again");
+file_put_contents($RAW, $body);
+}
 
 $els = json_decode($body, true)['elements'] ?? null;
 if (!is_array($els)) fail('Overpass returned no elements — the query or the service changed');
@@ -201,7 +222,7 @@ foreach ($els as $el) {
         foreach (rings($outer) as $ring) {
             $poly = []; $kept = 0;
             foreach (array_merge([$ring], rings($inner)) as $r) {
-                $c = clean(simplify($r, TOL_DEG));
+                $c = clean(simplify($r, $tol));
                 if (count($c) < 4) continue;
                 if ($c[0] !== end($c)) $c[] = $c[0];      // rounding can unclose a ring
                 $poly[] = $c; $kept += count($c);
@@ -219,7 +240,7 @@ foreach ($els as $el) {
     $g = [];
     foreach ($el['geometry'] ?? [] as $p) if ($p) $g[] = [$p['lon'], $p['lat']];
     if (count($g) < 2) continue;
-    $c = clean(simplify($g, TOL_DEG));
+    $c = clean(simplify($g, $tol));
     if (count($c) < 2) continue;
 
     if ($isRiver) {

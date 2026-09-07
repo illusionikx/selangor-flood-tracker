@@ -2949,14 +2949,26 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   never a line in that query. If something is **missing**, change the query. If something looks
   **crude**, change the tolerance. There is now a third knob, and it answers neither question — see
   the size floors below.
-  **The tolerance is 17 m since 2026-09-07, and it was 33 m.** A reader called the water low-poly.
+  **The tolerance is 6.6 m since 2026-09-07, and it was 33 m.** A reader called the water low-poly.
   The map stops at zoom 15, where one pixel covers about 4.8 m at this latitude. So 33 m drew a
   7-pixel chord. The comment beside the constant claimed the tolerance was finer than a pixel at
   zoom 18. This map never reaches zoom 18, and 33 m is 55 pixels there. **Measure a tolerance
   against `maxZoom` in `js/map.js`, never against the deepest zoom a basemap offers.**
-  Measured: `water.json` goes from 634 KB to 985 KB, and from 170 KB to 251 KB gzipped.
-  `COORD_DP` stays at 4. That grid is 11 m, which is still under the tolerance. Take it to 5 only
-  if the tolerance goes under 11 m.
+  **The arithmetic picks the knob and a picture picks the value.** 17 m shipped first, on the
+  3.5-pixel figure, and the same reader rejected it as well. So the value now comes off screenshots
+  of one lake at zoom 15, against a build at `--tol=0`. 11 m still showed facets on a long edge and
+  6.6 m read as a curve. `water.json` goes from 634 KB to 1,732 KB, and from 170 KB to 402 KB
+  gzipped. Measure any new value the same way, and never off the pixel figure alone.
+  **`COORD_DP` stays at 4, and the arithmetic says it should not.** That grid is 11 m, which is now
+  coarser than the tolerance, and a grid coarser than the tolerance draws a staircase in theory.
+  The 1.1 m grid costs 142 KB gzipped, and the two screenshots are identical. Take it to 5 only
+  when a picture asks.
+  **`--tol=` and `--cached` on `water-build.php` are what made that sweep affordable.** The second
+  reuses the last raw Overpass answer out of the system temp directory. Seven builds came off one
+  request. A run with no flag behaves as it always did.
+  **A reader judging a rebake without a hard reload is judging the old file.** Herd serves
+  everything `max-age=10800`, `js/map.js` fetches `water.json` by name with no version, and the
+  service worker holds a copy as well. Three hours.
   **A finer tolerance also lets more shapes clear the size floors, which the entry below says the
   tolerance cannot do.** Both statements are true, and the reason is the order of the two steps.
   `water-build.php` simplifies a shape first and measures the result. Simplification cuts corners
