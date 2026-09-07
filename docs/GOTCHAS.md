@@ -2949,6 +2949,20 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   never a line in that query. If something is **missing**, change the query. If something looks
   **crude**, change the tolerance. There is now a third knob, and it answers neither question — see
   the size floors below.
+  **The tolerance is 17 m since 2026-09-07, and it was 33 m.** A reader called the water low-poly.
+  The map stops at zoom 15, where one pixel covers about 4.8 m at this latitude. So 33 m drew a
+  7-pixel chord. The comment beside the constant claimed the tolerance was finer than a pixel at
+  zoom 18. This map never reaches zoom 18, and 33 m is 55 pixels there. **Measure a tolerance
+  against `maxZoom` in `js/map.js`, never against the deepest zoom a basemap offers.**
+  Measured: `water.json` goes from 634 KB to 985 KB, and from 170 KB to 251 KB gzipped.
+  `COORD_DP` stays at 4. That grid is 11 m, which is still under the tolerance. Take it to 5 only
+  if the tolerance goes under 11 m.
+  **A finer tolerance also lets more shapes clear the size floors, which the entry below says the
+  tolerance cannot do.** Both statements are true, and the reason is the order of the two steps.
+  `water-build.php` simplifies a shape first and measures the result. Simplification cuts corners
+  off a shape, so it shortens a river and shrinks a pond. A gentler cut leaves more of both. The
+  floors admitted 8 more rivers and 84 more bodies on the same query. The tolerance still adds no
+  shape the query never returned, which is what that entry is about.
 - **`MIN_AREA_KM2` and `MIN_RIVER_KM` are size floors, and they REVERSE what this file used to say.**
   It said there was no area floor on purpose, because a small pond simplifies to a handful of points
   and keeping every one costs about what a cutoff costs. That argument is about bytes and it is

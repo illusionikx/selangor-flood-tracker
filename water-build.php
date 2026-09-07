@@ -20,9 +20,14 @@
  * A 504 under load is routine. This script writes nothing when that happens, so retry.
  */
 
-const TOL_DEG  = 0.0003;   // Douglas-Peucker tolerance, about 33 m. Finer than a screen pixel at
-                           // zoom 18, which is the deepest this map goes. Tolerance controls the
-                           // detail *within* a shape and never which shapes are present.
+const TOL_DEG  = 0.00015;  // Douglas-Peucker tolerance, about 17 m. The map stops at zoom 15, where
+                           // one pixel is about 4.8 m at this latitude. So a chord is about 3.5 px.
+                           // It was 0.0003, about 33 m, which is 7 px, and a reader read that as a
+                           // low-poly shape. The comment there claimed the tolerance was finer than
+                           // a pixel at zoom 18. Both numbers in that claim were wrong. This map
+                           // never reaches zoom 18, and 33 m is 55 px there.
+                           // Tolerance controls the detail *within* a shape and never which shapes
+                           // are present.
 
 /* The size floors, and they REVERSE part of the reason above. The header says this file exists
    because the basemap hides small water. That is still true close in. It stopped being the whole

@@ -18029,3 +18029,50 @@ body focused.
 `inert` is what the console message recommends, and this app does not use it here. That attribute
 blocks the press as well as the focus. These tiles are how a reader reaches a station from the one
 strip nothing covers.
+
+## The water tolerance is 17 m, and it was 33 m, 2026-09-07
+
+A reader said the water bodies on the map look low poly. The cause is not the renderer and not the
+source. `water-build.php` runs Douglas-Peucker over every shape before it writes `water.json`.
+`TOL_DEG` set that tolerance to 0.0003 degrees, which is about 33 m.
+
+### Why 33 m was too coarse
+
+The map stops at zoom 15. `js/map.js` states that ceiling. One pixel covers about 4.8 m at this
+latitude and that zoom. So a 33 m chord drew about 7 pixels of straight line, which is a visible
+facet.
+
+The comment beside the constant claimed the tolerance was finer than a screen pixel at zoom 18.
+Both halves of that claim were wrong. This map never reaches zoom 18. At zoom 18 a 33 m chord is
+about 55 pixels.
+
+The new value is 0.00015 degrees, about 17 m, or about 3.5 pixels at the map ceiling.
+
+### What it cost
+
+`water.json` grows from 634 KB to 985 KB. Gzipped, it grows from 170 KB to 251 KB. `js/map.js`
+fetches that file from an idle callback, after the app is up, and only on the dark theme. So the
+cost lands on nothing a reader waits for.
+
+`COORD_DP` stays at 4. That grid is about 11 m, which is still under the new tolerance. Take it to
+5 only if the tolerance goes under 11 m.
+
+### The counts moved, and the size floors did not
+
+The build now keeps 858 rivers and 1,144 water bodies, against 850 and 1,060. Neither floor
+changed.
+
+`water-build.php` simplifies a shape first, then measures the result against the floor.
+Simplification cuts corners, so it shortens a river and shrinks a pond. A gentler cut leaves more
+of both, and more shapes clear the floor.
+
+This does not contradict the rule that tolerance and scope are separate knobs. The tolerance still
+adds no shape that the Overpass query never returned.
+
+### What was not done
+
+The tolerance was not taken to 11 m. That value needs `COORD_DP` at 5 as well, and the two together
+cost about 40% more again for detail under one pixel.
+
+`map-limits-test.html` passes with the new file. It guards both floors at half their stated values,
+so a rebake cannot turn it red by accident.

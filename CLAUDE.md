@@ -65,7 +65,7 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `icon.svg` | the app mark: bare glyph, no fill. Source for the PNGs *and* the `--i-flood` mask |
 | `icon-build.php` | `php icon-build.php` — rebakes the two icons and prints the mask rule to paste |
 | `water-build.php` | `php water-build.php` — rebakes `water.json` from OpenStreetMap. Holds the two size floors, `MIN_AREA_KM2` and `MIN_RIVER_KM`. Run by hand, never in a request |
-| `water.json` | the water the dark basemap will not draw: 850 rivers + 1,060 ponds, baked and committed. It held 2,775 and 3,864 until the size floors landed on 2026-09-02 |
+| `water.json` | the water the dark basemap will not draw: 858 rivers + 1,144 ponds, baked and committed. It held 2,775 and 3,864 until the size floors landed on 2026-09-02. 985 KB, 251 KB gzipped, since the tolerance went to 17 m on 2026-09-07 |
 | `border-build.php` | `php border-build.php` — bakes `border.json` from OpenStreetMap. Two Overpass calls: Selangor's geometry, then its member way TAGS, so the sea boundary (`maritime=yes`) can be dropped before the circle is placed. Run by hand, never in a request |
 | `border.json` | `circle` is `[lat, lng, km]` and is the one source for three things: the shading outside it, the zoom floor and the pan limit. Also the full outline and the land ring, which only `border-build.php` and `map-limits-test.html` read. 30 KB, 4 KB gzipped |
 | `wx-build.php` | `php wx-build.php` — bakes `wx-places.json` from Nominatim. Run by hand, never in a request |
