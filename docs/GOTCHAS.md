@@ -692,7 +692,35 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
   overflow, so its body never scrolls and long prose simply runs off the screen.
   **`#warnBox` takes the same cap and needed the same body.** It had none, so a MET bulletin of
   about 1,800 characters ran out of the bottom of the dialog with no way to reach the end. `#warnBody`
-  is `flex: 1; overflow: auto` now, and the icon and the headline above it are `flex: none`.
+  is `flex: 1 1 auto; min-height: 0; overflow: auto` now. The icon and the headline above it are
+  `flex: none`. The next entry states why the basis is `auto` and not `0`.
+- **A zero flex basis measures zero in a flex column of AUTO height, and only WebKit says so.**
+  `#warnBox` is the one dialog here that no rule gives a height. Its size is what is inside it.
+  `#warnBody` carried `flex: 1`, which is `flex: 1 1 0%`. Blink resolves that container against the
+  content and drew the body correctly. WebKit resolves it against the flex base size, so the body
+  measured zero. The dialog then drew its icon and its headline over an empty box. A reader saw no
+  warning text at all.
+  **It reached a reader's phone, and every check here passed.** All eight checks run on Blink.
+  The repair is `flex: 1 1 auto` with `min-height: 0`. The basis lets the container size to its
+  content on both engines. The `min-height` supplies what the zero basis used to supply, which is
+  the shrink under the UA `max-height` cap above.
+  **Every other scrolling body in this app keeps its zero basis.** `.docbody`, `table.data` and the
+  supporting pane's body each stand in a box with a height stated, so a zero basis has real free
+  space to grow into. Only this one is measured against its own content.
+  **`m3-check.html` asserts the DECLARATION as well as the height.** Blink draws the broken rule
+  and the fixed rule the same way, so a pixel alone cannot separate them.
+- **A pointer press focuses a `<button>`, and `tabindex="-1"` does not stop it.** `#ticker` carries
+  `aria-hidden`, because the alert panel holds the same stations as a real list. Its tiles are
+  `<button>` elements with `tabindex="-1"`, so no keyboard reaches one. A tap focuses one all the
+  same. The browser then refuses the `aria-hidden` on the whole strip and reports it in the console.
+  **The cost to a reader is the focus, not the console line.** A dialog returns focus to whatever
+  held it when `showModal()` ran. So closing the warning put focus back inside a hidden strip.
+  **One `blur()` in the ticker's own click handler is the repair.** The strip owns that handler, and
+  `document` owns the `[data-banner]` handler. So the blur runs first. The dialog opens with the
+  body focused, and it hands the focus back there.
+  **Not `inert`, which is what the console message recommends.** That attribute blocks the press as
+  well as the focus. These tiles are how a reader reaches a station from the one strip nothing
+  covers.
 - **The four dialogs sit on a four-band ladder, and three variables carry it, not twelve rules.**
   `--dlg-inset` is the gap to the window edge, `--dlg-wide` caps the table and `--dlg-prose` caps
   the two prose panes. M3's window size classes name the bands: compact under 600, medium to 839,

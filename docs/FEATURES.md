@@ -17980,3 +17980,52 @@ the browser reaches this origin and the Esri tiles. The measurement gives nothin
 The issue that prompted the trial, maplibre-gl-leaflet #63, reports stuttery panning through that
 bridge and is open and unanswered. This harness did not reproduce it. That is not evidence against
 the report, since a headless run is not a hand on a mouse.
+
+## The warning dialog draws its body on WebKit, 2026-09-07
+
+A reader opened a notice on a phone and saw the header alone. The body was empty. The same dialog
+was correct in every desktop browser tested here, and in all eight checks.
+
+### The cause
+
+`#warnBox` is the one dialog in this app that no rule gives a height. Its size is what is inside it.
+`#warnBody` carried `flex: 1`, which is `flex: 1 1 0%`. A flex column of auto height has to size
+itself from its items. Blink sizes it from the content of each item. WebKit sizes it from the flex
+base size, which that rule sets to zero. So the body measured zero, and the dialog drew the icon
+and the headline over an empty box.
+
+### The repair
+
+`#warnBody` is `flex: 1 1 auto; min-height: 0` now. The basis lets both engines size the container
+from the content. The `min-height` supplies what the zero basis used to supply. That is the shrink
+under the browser's own `max-height` cap, which is what makes a long bulletin scroll inside the
+dialog instead of running off the bottom of it.
+
+Nothing else in this app needs the change. `.docbody`, `table.data` and the supporting pane's body
+each stand in a box with a height stated, so a zero basis has real free space to grow into.
+
+### The check
+
+`m3-check.html` gained five assertions. They read the declaration as well as the rendered height.
+Blink draws the broken rule and the fixed rule the same way, so a pixel alone cannot separate them.
+The file holds 1,012 assertions now.
+
+## The ticker gives up focus on a press, 2026-09-07
+
+The same report carried a console message. Chrome refused the `aria-hidden` on `#ticker`, because a
+tile inside it held focus.
+
+`#ticker` is `aria-hidden` on purpose. The alert panel holds the same stations as a real list, so a
+screen reader gets that list and not a moving strip. The tiles are `<button>` elements with
+`tabindex="-1"`, so no keyboard reaches one. A pointer press focuses one all the same.
+
+The cost to a reader is the focus, not the console line. A dialog returns focus to whatever held it
+when `showModal()` ran. So closing the warning put focus back inside a hidden strip.
+
+The ticker's own click handler blurs the pressed button now. The strip owns that handler, and
+`document` owns the `[data-banner]` handler. So the blur runs first, and the dialog opens with the
+body focused.
+
+`inert` is what the console message recommends, and this app does not use it here. That attribute
+blocks the press as well as the focus. These tiles are how a reader reaches a station from the one
+strip nothing covers.

@@ -415,13 +415,16 @@ printf("rows: %d, points: %d, newest: %s\n",
 # bar 18 or 20px down. A headline drifting off M3's 56dp is invisible on any one pane. A rule
 # written outside the media query moves the desktop, where nothing is meant to move. And a variant
 # with no scrim has to keep a way out, which is now the close X and Escape alone. Reads PASS.
+# It also guards the warning dialog's body, which is the one scroller in a flex column of auto
+# height. That one is asserted as a declaration as well as in pixels. Blink draws the broken rule
+# and the fixed rule the same way, and WebKit drew an empty box. See docs/GOTCHAS.md.
 "/c/Program Files/Google/Chrome/Application/chrome.exe" --headless=new --disable-gpu \
   --ignore-certificate-errors --virtual-time-budget=300000 --window-size=1600,1000 --dump-dom \
   https://flood-exp.test/m3-check.html | perl -0777 -ne 'print $1 if /<pre id="out">(.*?)<\/pre>/s'
 # **A short budget TRUNCATES this check rather than failing it.** At 120000 it stopped as the desktop
 # pass started, after 122 of 274 assertions, with nothing failed and no verdict printed. At 240000
 # it printed the opening line alone, once the rail and the bar joined it. Read the last line: no
-# `PASS` means the run did not finish, whatever the counts above it say. It holds 902 assertions.
+# `PASS` means the run did not finish, whatever the counts above it say. It holds 1,012 assertions.
 
 # The coverage circle, the zoom floor, the pan limit and the two water floors. Every fault here is
 # silent. A mask that draws nothing looks like a map. A circle rebaked against changed OpenStreetMap

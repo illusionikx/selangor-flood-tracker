@@ -3020,10 +3020,35 @@ async function camCardState() {
      'and never an inset shadow, which the picture paints over');
 }
 
+/* **The warning dialog's body, which is the one scroller here inside a flex column of AUTO height.**
+   Every other scrolling body in this app stands in a box with a height stated, so `flex-basis: 0`
+   has real free space to grow into. This one is sized by what is in it, and a zero basis measured
+   the body at zero on WebKit: the dialog drew its icon and its headline over an empty box, and a
+   reader could not read the warning at all. Blink sizes that container against the content, so
+   nothing here could see it.
+   **So the basis is asserted as a DECLARATION and the height in pixels.** This engine agrees with
+   the fixed rule and with the broken one alike, and only the declaration separates them. */
+async function warnBody() {
+  const { d, w, cs, r } = await ready('phone');
+  const box = d.getElementById('warnBox'), body = d.getElementById('warnBody');
+  body.innerHTML = '<h3>Probe</h3><p>' + 'A long bulletin. '.repeat(120) + '</p>';
+  box.showModal();
+  await settled();
+  const bs = cs(body);
+  is(bs.flexBasis, 'auto', 'warnBox body takes a content flex basis, never 0');
+  is(bs.minHeight, '0px', 'and states its own min-height, which a zero basis used to supply');
+  is(r(body).height > 100, true, 'so the body has real height under the headline');
+  is(body.scrollHeight > body.clientHeight, true, 'and a long bulletin still scrolls inside it');
+  is(r(body).bottom <= Math.round(r(box).bottom) + 1, true, 'and never runs out of the dialog');
+  box.close();
+  body.innerHTML = '';
+}
+
 (async () => {
   out.textContent = '';
   try {
     await phone();
+    await warnBody();
     await shortPhone();
     /* **`#railToggle` writes the REAL `localStorage` of `flood-exp.test`, because `#desk` loads the
        same `index.html` a reader's own browser does.** `desktop()` and `bands()` both press it now,

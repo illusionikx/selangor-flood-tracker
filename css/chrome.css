@@ -1952,9 +1952,19 @@ table.data .dash { color: var(--outline); }
    characters, and this box takes the browser's own `max-height` cap. With nothing scrolling, that
    text simply ran out of the bottom of the dialog and no reader could reach the end of it.
    `flex: none` on the two rows above it, or a long body shrinks the headline instead of scrolling.
-   `overflow: auto` is also what lets the body shrink at all — see `.docbody`. */
+   `overflow: auto` is also what lets the body shrink at all — see `.docbody`.
+
+   **`flex-basis` is `auto` here and it is `0` in every other scroller in this app.** This is the one
+   scrolling body inside a flex column of AUTO height. The four full-screen panes and the supporting
+   pane each stand in a box with a height stated, so a zero basis there has real free space to grow
+   into. This box is sized by what is in it. WebKit resolves that container against the flex BASE
+   size, so `flex: 1` measured the body at zero, and the dialog drew its icon and its headline over
+   nothing. Blink sizes the same container against the content and drew it correctly, which is why
+   every check here passed and one reader's phone did not.
+   `min-height: 0` is what a zero basis used to supply. Without it the body cannot shrink under the
+   browser's own `max-height` cap, and a long bulletin runs out of the bottom again. */
 #warnBox > .i, #warnBox .modalhead { flex: none; }
-#warnBox #warnBody { flex: 1; overflow: auto; overscroll-behavior: contain; }
+#warnBox #warnBody { flex: 1 1 auto; min-height: 0; overflow: auto; overscroll-behavior: contain; }
 /* M3 sizes a basic dialog's icon at 24px. It is a block on its own line above the headline, so the
    gap under it is the header's own — 8px here rather than M3's 16, because this app's dialogs run
    tighter than the reference and a 16px gap over an 8px `.modalhead` margin reads as two headers. */

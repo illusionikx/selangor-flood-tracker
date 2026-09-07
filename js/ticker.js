@@ -192,7 +192,18 @@ export function ticker() {
 
 // Delegated once: the strip is rebuilt on every poll and holds several copies of every station, so
 // per-item listeners would be rebound in bulk for the life of the page.
+/* **Nothing on this strip may keep focus, and the blur is what enforces it.** `#ticker` carries
+   `aria-hidden`, because the same stations are in the alert panel as a real list. A pointer press
+   focuses a `<button>` all the same, `tabindex="-1"` or not. A browser then refuses the
+   `aria-hidden` on the whole strip and says so in the console.
+   It also costs a reader more than a console line. A dialog returns focus to whatever held it when
+   `showModal()` ran, so closing the warning put focus back inside the hidden strip. Blurring here
+   runs before the `[data-banner]` handler in js/ui.js, which is bound on `document`, so the dialog
+   opens with the body focused and hands the focus back there.
+   The blur, not `inert`: `inert` blocks the press as well as the focus, and these tiles are how a
+   reader reaches a station from the one strip nothing covers. */
 el('ticker').onclick = e => {
+  e.target.closest('button')?.blur();
   const t = byId(e.target.closest('[data-go]')?.dataset.go);
   if (t) flashTo(t);
 };
