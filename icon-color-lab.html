@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Map colour lab</title>
+<link rel="stylesheet" href="css/icons.css?v=lab2">
+<style>
+/* A throwaway lab page for the map's own marks. It links css/icons.css for the real glyph paths and
+   states every colour itself, so it shows the OPTIONS rather than the app as it stands.
+   ponytail: no build step, no imports, one file. Delete it when the picks are made. */
+
+/* ---- the palette every panel starts from ------------------------------------------------------
+   `.pin` takes the DARK set on BOTH themes, so a station pin is one colour on white paper and on
+   the near-black basemap. Only `--accent` and `--surface` follow the theme. That is why the two
+   panels below hold the same pin colours and two different basemaps. */
+.mp {
+  --k-river: #66b2ff; --k-rainfall: #a893ff; --k-siren: #ff7aa4;
+  --k-gauge: #d4a48f; --k-camera: #2fd6e8; --k-mast: #96a4ee; --k-weather: #7fb3c0;
+  --k-rain-dry: #8e95f0; --k-rain-heavy: #d488ff;
+  --s-normal: #26e275; --s-alert: #ffc000; --s-warning: #fe8400; --s-danger: #ff3a37;
+  --s-trace: #add72f; --s-none: #9aa0a6;
+  --me: #ffbb1a; --fav: #ff85d0;
+  --wx-clear: #d8a93f; --wx-rain: #93a9bb; --wx-heavy: #2f7fc9; --wx-moon: #e6e3da;
+  --cluster: #5f6368; --cluster-danger: #d93025;
+  /* the two that DO follow the theme */
+  --surface: #fff; --accent: #1a73e8; --muted: #5f6368; --outline: #dadce0; --on-surface: #1f1f1f;
+  --land: #f4f1ea; --water: #b3d1e6;
+}
+.mp.dk {
+  --surface: #202124; --accent: #8ab4f8; --muted: #9aa0a6; --outline: #3c4043; --on-surface: #e8eaed;
+  --land: #2b2b2b; --water: #15364e;
+}
+
+/* ---- W. alert against warning ----------------------------------------------------------------
+   JPS publishes three river marks: Amaran, Amaran/Warning and Bahaya. So three rungs mirror three
+   published marks. Merging two throws one of them away. */
+.mp[data-w="W2"] { --s-alert: #ffab00; --s-warning: #ffab00; }   /* one amber for both rungs */
+.mp[data-w="W3"] { --s-alert: #ffd90a; --s-warning: #f96a12; }   /* keep three, widen the gap */
+
+/* ---- M. "you are here" against the alert amber, three degrees apart ---------------------------- */
+.mp[data-m="M2"] { --me: #f0c46a; }
+
+/* ---- R. the rain ladder ------------------------------------------------------------------------
+   Today rung 1 and rung 2 share one violet, so `--k-rain-2` starts as a copy of `--k-rainfall`.
+   R2 gives rung 2 a step of its own and moves rung 3 up the arc to keep the spacing even. */
+.mp { --k-rain-2: var(--k-rainfall); }
+.mp[data-r="R2"] { --k-rain-2: #c07eff; --k-rain-heavy: #e878e0; }
+
+/* ---- V. kind hue variety ----------------------------------------------------------------------
+   V2 moves the camera out of the river's arc and drains the mast's chroma. V3 keeps every hue and
+   separates the kinds from the statuses by chroma instead. V4 moves rainfall, which is the
+   expensive one: RAIN_HEAT, --k-rain-dry, --k-rain-heavy and .ramp.rain all move with it. */
+.mp[data-v="V2"] { --k-camera: #21e0c0; --k-mast: #9aa3b8; --k-gauge: #c99a72; }
+.mp[data-v="V3"] { --k-river: #7fb8f0; --k-rainfall: #ab9de0; --k-siren: #e88aa8;
+                   --k-gauge: #c7a292; --k-camera: #5cc4cf; --k-mast: #9ba4d0; }
+.mp[data-v="V4"] { --k-camera: #21e0c0; --k-mast: #9aa3b8;
+                   --k-rainfall: #c77dff; --k-rain-dry: #a68fe0; --k-rain-heavy: #ef6ad8; }
+
+/* ---- the pin, copied from css/map.css --------------------------------------------------------- */
+.pin { position: relative; display: grid; place-items: center; width: 39px; height: 39px;
+       color: var(--c, var(--accent)); font-size: 36px;
+       filter: drop-shadow(0 1px 1px rgb(0 0 0 / .45)); }
+.pin:not(.me, .place) { transform: scale(.8); }
+.pinglyph { width: 1em; height: 1em; fill: currentColor;
+            stroke: var(--surface); stroke-width: 2; paint-order: stroke; }
+.pin > .pinglyph { position: relative; z-index: 0; }
+.pin.off { opacity: .6; }
+.pin.me, .pin.place { width: 48px; height: 48px; font-size: 48px; }
+.pin.place { color: var(--accent); }
+.pin .fv { position: absolute; right: 1px; bottom: 1px; z-index: 2; width: 15px; height: 15px;
+           color: var(--fav); display: grid; place-items: center;
+           filter: drop-shadow(1px 0 0 var(--surface)) drop-shadow(-1px 0 0 var(--surface))
+                   drop-shadow(0 1px 0 var(--surface)) drop-shadow(0 -1px 0 var(--surface)); }
+.pin .fv .i { font-size: 15px; }
+.pin.danger::after { content: ''; position: absolute; inset: -6px; border-radius: 50%;
+                     box-shadow: 0 0 0 2px color-mix(in srgb, var(--s-danger) 45%, transparent); }
+.pin.rise::before { content: ''; position: absolute; inset: -5px; border-radius: 50%;
+                    border: 2px dashed color-mix(in srgb, var(--c) 60%, transparent); }
+.cluster { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 999px;
+           font: 500 11px/1 Roboto, system-ui, sans-serif; color: #fff; background: var(--cluster);
+           border: 1px solid var(--surface); filter: drop-shadow(0 1px 1px rgb(0 0 0 / .45)); }
+.cluster.mixed { border-style: dashed; }
+.cluster.danger { background: var(--cluster-danger);
+                  box-shadow: 0 0 0 2px color-mix(in srgb, var(--cluster-danger) 35%, transparent); }
+#glyphs { display: none; }
+
+/* ---- page furniture --------------------------------------------------------------------------- */
+* { box-sizing: border-box; }
+body { margin: 0; font: 400 14px/1.55 Roboto, system-ui, sans-serif;
+       background: #e9eaec; color: #1f1f1f; padding: 24px; }
+h1 { font: 500 24px/1.3 Roboto, system-ui, sans-serif; margin: 0 0 6px; }
+h2 { font: 500 19px/1.3 Roboto, system-ui, sans-serif; margin: 34px 0 4px;
+     border-top: 2px solid #c8cacd; padding-top: 18px; }
+h3 { font: 500 15px/1.3 Roboto, system-ui, sans-serif; margin: 18px 0 6px; }
+p { max-width: 82ch; margin: 6px 0; color: #3c4043; }
+code { font: 400 12px/1 ui-monospace, monospace; background: #dcdee1; padding: 1px 4px;
+       border-radius: 3px; }
+ul { max-width: 82ch; margin: 6px 0; padding-left: 20px; color: #3c4043; }
+li { margin: 5px 0; }
+.cost { border-left: 3px solid #b06a3c; padding-left: 10px; margin: 8px 0; }
+.cost b { color: #8a4f28; }
+
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 8px 0 0; }
+@media (max-width: 980px) { .pair { grid-template-columns: 1fr; } }
+
+/* the map backdrop: a land band and a water band, so every mark is judged over both */
+.mp { border-radius: 14px; overflow: hidden; box-shadow: 0 1px 3px rgb(0 0 0 / .35);
+      background: linear-gradient(var(--land) 0 50%, var(--water) 50% 100%); }
+.mplab { font: 500 10px/1 Roboto, system-ui, sans-serif; letter-spacing: .09em;
+         text-transform: uppercase; color: var(--on-surface); opacity: .55;
+         padding: 8px 12px 0; }
+.marks { display: flex; flex-wrap: wrap; gap: 4px 2px; padding: 6px 8px 12px; }
+.mk { width: 78px; text-align: center; }
+.mk .box { height: 46px; display: grid; place-items: center; }
+.mk .nm { font: 400 10px/1.25 Roboto, system-ui, sans-serif; color: var(--on-surface);
+          opacity: .8; }
+.mk .tok { font: 400 9px/1.3 ui-monospace, monospace; color: var(--on-surface); opacity: .5;
+           word-break: break-all; }
+
+/* The hue ruler. Every stop is a PERCENTAGE. A `deg` stop inside a `to right` gradient is invalid
+   and the browser drops the whole declaration, which draws a blank bar and errors nowhere. */
+.ruler { position: relative; height: 22px; border-radius: 6px; margin: 14px 0 4px;
+         background: linear-gradient(to right, #ff3b33 0%, #ffc000 16.667%, #26e275 33.333%,
+                     #2fd6e8 50%, #3a88ff 66.667%, #d488ff 83.333%, #ff3b33 100%); }
+/* Three label rows, so a crowded arc stays readable. `--r` is the row, set per mark. */
+.rl { position: absolute; top: -4px; width: 2px; background: #1f1f1f;
+      height: calc(30px + var(--r) * 15px); }
+.rl i { position: absolute; left: 3px; bottom: -1px; white-space: nowrap;
+        font: 400 10px/1 Roboto, system-ui, sans-serif; font-style: normal;
+        background: #e9eaec; padding: 1px 3px; border-radius: 2px; }
+.rl.s { background: #6b7075; }
+.rl.s i { color: #5f6368; }
+.ruwrap { padding-bottom: 46px; }
+.rkey { font-size: 12px; color: #3c4043; }
+.rkey b { display: inline-block; width: 12px; height: 12px; vertical-align: -2px;
+          border: 1px solid #1f1f1f; margin-right: 4px; }
+
+/* ramps */
+.ramp { display: flex; border-radius: 6px; overflow: hidden; height: 30px; margin: 4px 0 2px;
+        max-width: 640px; }
+.ramp span { flex: 1; }
+.rlab { display: flex; max-width: 640px; font: 400 10px/1.3 Roboto, system-ui, sans-serif;
+        color: #3c4043; margin-bottom: 12px; }
+.rlab span { flex: 1; text-align: center; }
+
+table.dt { border-collapse: collapse; font-size: 12px; margin: 8px 0 4px; }
+table.dt th, table.dt td { border: 1px solid #c8cacd; padding: 4px 8px; text-align: left; }
+table.dt th { background: #dcdee1; font-weight: 500; }
+table.dt .sw { display: inline-block; width: 14px; height: 14px; border-radius: 3px;
+               border: 1px solid #0003; vertical-align: -2px; margin-right: 5px; }
+</style>
+</head>
+<body>
+
+<h1>Map colour lab</h1>
+<div class="cost"><b>Shipped 2026-08-26.</b> Every sensor wears three colours and never a fourth:
+  its own kind, the alert amber, the danger red. Section 3 below shows the ladders as they now
+  stand. Sections 4 and R are the options that decision was made from, and they are kept as the
+  record. Three questions are still open: the location amber in section 4b, the kind hue variety in
+  section 5, and whether the rain heat wash follows its pin.</div>
+<p>Every mark the map draws, in one place, over a light basemap and a dark one. Then the level
+  ladders, then the questions.</p>
+<p><b>Station pins take the dark palette on both themes.</b> That is the rule in
+  <code>css/base.css</code>: the selector is <code>:root[data-theme="dark"], .pin</code>. So a pin is
+  the same colour on white paper and on the near-black basemap. Only <code>--accent</code> and the
+  glyph's own outline follow the theme. Each pair below therefore holds one set of pin colours over
+  two basemaps. That is the test that matters.</p>
+
+<div id="out"></div>
+
+<script>
+/* ---- build the glyph sprite the way js/map.js does -------------------------------------------- */
+const sprite = document.body.appendChild(document.createElementNS('http://www.w3.org/2000/svg', 'svg'));
+sprite.id = 'glyphs';
+const built = new Set();
+function pinGlyph(name) {
+  if (!built.has(name)) {
+    built.add(name);
+    const url = getComputedStyle(document.documentElement).getPropertyValue('--i-' + name);
+    const body = url.match(/<svg[^>]*>(.*)<\/svg>/s);
+    if (!body) return '<span style="font:400 10px/1 monospace">?' + name + '</span>';
+    sprite.insertAdjacentHTML('beforeend', '<symbol id="g-' + name + '" viewBox="0 -960 960 960">' +
+      body[1].replaceAll('<path ', "<path vector-effect='non-scaling-stroke' ") + '</symbol>');
+  }
+  return '<svg class="pinglyph"><use href="#g-' + name + '"/></svg>';
+}
+
+/* ---- every mark the map draws ------------------------------------------------------------------
+   [glyph, colour token, label, extra classes]. `raw` marks something that is not a pin. */
+const GROUPS = [
+  ['Station kinds, while quiet', [
+    ['water_drop',   '--k-river',    'Water level'],
+    ['rainy',        '--k-rainfall', 'Rainfall'],
+    ['campaign',     '--k-siren',    'Siren'],
+    ['straighten',   '--k-gauge',    'Flood gauge'],
+    ['photo_camera', '--k-camera',   'Camera'],
+    ['layers',       '--k-mast',     'Several sensors'],
+  ]],
+  ['Station pin states', [
+    ['water_drop', '--s-danger', 'At danger',   'danger'],
+    ['water_drop', '--s-alert',  'Climbing',    'rise'],
+    ['water_drop', '--s-none',   'No reading',  'off'],
+    ['water_drop', '--k-river',  'Favorite',    '', 'fav'],
+  ]],
+  ['Marks that are not a station', [
+    ['my_location', '--me',     'You are here', 'me'],
+    ['place',       '--accent', 'Place found',  'place'],
+    ['place',       '--accent', 'Pin selected', 'place'],
+  ]],
+  ['Weather pins. Weather mode draws no station pin.', [
+    ['sunny',       '--wx-clear', 'Clear, day'],
+    ['clear_night', '--wx-moon',  'Clear, night'],
+    ['rainy_light', '--wx-rain',  'Rain'],
+    ['rainy_heavy', '--wx-heavy', 'Heavy rain'],
+  ]],
+  ['Buttons and chips over the map. These DO follow the theme.', [
+    ['my_location',        '--muted',  'Locate'],
+    ['my_location',        '--accent', 'Locate, on'],
+    ['water_drop',         '--muted',  'Layer chip'],
+    ['partly_cloudy_day',  '--muted',  'Weather chip'],
+    ['layers',             '--muted',  'Heat chip'],
+    ['check',              '--accent', 'Filter, on'],
+  ]],
+];
+
+/* ---- the level ladders ------------------------------------------------------------------------ */
+const LADDERS = [
+  ['Water level. RIVER_COLOR in js/config.js. The alert mark and the warning mark are one amber.',
+   'water_drop',
+   [['--s-none', 'no reading'], ['--k-river', 'normal'], ['--s-alert', 'alert mark'],
+    ['--s-alert', 'warning mark'], ['--s-danger', 'danger mark']]],
+  ['Flood gauge. GAUGE_COLOR. Everything under the first published mark is the kind taupe.',
+   'straighten',
+   [['--k-gauge', 'dry ground'], ['--k-gauge', 'water, unnamed'], ['--s-alert', '0.15 m'],
+    ['--s-danger', '0.3 m']]],
+  ['Rain gauge. RAIN_COLOR. Amber above 30 mm an hour, red above 60.', 'rainy',
+   [['--s-none', 'no reading'], ['--k-rainfall', '0 mm/h'], ['--k-rainfall', 'to 10'],
+    ['--k-rainfall', 'to 30'], ['--s-alert', 'to 60'], ['--s-danger', 'over 60']]],
+  ['Siren. Its value is its status, so it has two rungs and no scale.', 'campaign',
+   [['--s-none', 'out of contact'], ['--k-siren', 'idle'], ['--s-danger', 'sounding']]],
+];
+
+/* ---- helpers ----------------------------------------------------------------------------------- */
+const hex2hsl = h => {
+  const [r, g, b] = h.match(/\w\w/g).map(x => parseInt(x, 16) / 255);
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn, l = (mx + mn) / 2;
+  let hu = 0;
+  if (d) {
+    hu = mx === r ? ((g - b) / d + (g < b ? 6 : 0)) : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+    hu *= 60;
+  }
+  return [hu, d ? d / (1 - Math.abs(2 * l - 1)) : 0, l];
+};
+const val = (el, tok) => getComputedStyle(el).getPropertyValue(tok).trim();
+
+function markHtml(m) {
+  const [g, tok, nm, cls = '', badge = ''] = m;
+  const fv = badge === 'fav'
+    ? '<b class="fv"><i class="i i-favorite"></i></b>' : '';
+  return '<div class="mk"><div class="box"><span class="pin ' + cls +
+    '" style="--c: var(' + tok + ')">' + pinGlyph(g) + fv + '</span></div>' +
+    '<div class="nm">' + nm + '</div><div class="tok">' + tok + '</div></div>';
+}
+
+function panel(mode, attrs, inner, label) {
+  return '<div class="mp' + (mode === 'dark' ? ' dk' : '') + '" ' + attrs + '>' +
+    '<div class="mplab">' + (label || mode) + ' basemap</div>' + inner + '</div>';
+}
+
+function pairHtml(attrs, inner, labels) {
+  return '<div class="pair">' +
+    panel('light', attrs, inner, labels && labels[0]) +
+    panel('dark', attrs, inner, labels && labels[1]) + '</div>';
+}
+
+const out = document.getElementById('out');
+let H = '';
+
+/* ================= 1. every mark ================= */
+H += '<h2>1. Every mark the map draws</h2>';
+for (const [title, marks] of GROUPS) {
+  H += '<h3>' + title + '</h3>';
+  H += pairHtml('', '<div class="marks">' + marks.map(markHtml).join('') + '</div>');
+}
+H += '<h3>Cluster badges. One fixed slate for every cluster, and a red when it hides an alert.</h3>';
+H += pairHtml('', '<div class="marks">' +
+  ['<div class="mk"><div class="box"><span class="cluster">12</span></div>' +
+     '<div class="nm">One kind</div><div class="tok">#5f6368</div></div>',
+   '<div class="mk"><div class="box"><span class="cluster mixed">31</span></div>' +
+     '<div class="nm">Several kinds</div><div class="tok">dashed edge</div></div>',
+   '<div class="mk"><div class="box"><span class="cluster danger">7</span></div>' +
+     '<div class="nm">Holds an alert</div><div class="tok">#d93025</div></div>'].join('') +
+  '</div>');
+
+/* ================= 2. the hue ruler ================= */
+H += '<h2>2. Where the hues sit</h2>' +
+  '<p>This is the answer to "more variety". The wheel is not empty. The status set owns the warm ' +
+  'half and the green, and it must keep them. Read the crowding rather than the colours.</p>' +
+  '<div class="ruwrap"><div class="ruler" id="ruler"></div></div>' +
+  '<p class="rkey"><b style="background:#1f1f1f"></b>station kind &nbsp; ' +
+  '<b style="background:#6b7075"></b>status, weather or a mark of its own</p>' +
+  '<h3>What the ruler shows</h3>' +
+  '<ul>' +
+  '<li><b>Alert 45&deg; and warning 31&deg; are 14 degrees apart.</b> Your reading is right. ' +
+  'Section 4 holds the options.</li>' +
+  '<li><b>"You are here" 42&deg; is 3 degrees off the alert amber 45&deg;.</b> ' +
+  '<code>--me</code> is #ffbb1a and <code>--s-alert</code> is #ffc000. Both draw on one map at ' +
+  'one time: your own pin, and any river at its alert mark. Different glyphs, near enough one ' +
+  'colour. This is a tighter collision than the pair you named.</li>' +
+  '<li><b>The flood gauge 18&deg; sits between danger 1&deg; and warning 31&deg;.</b> Only its low ' +
+  'chroma keeps it out of the status set. A taupe pin and an orange pin on one map is a thin ' +
+  'margin.</li>' +
+  '<li><b>Heavy rain 209&deg; lands on the water blue 210&deg;.</b> That one is legal: weather ' +
+  'mode draws no station pin, so the two never share a map.</li>' +
+  '<li><b>Four kinds sit inside 186&deg; to 252&deg;.</b> Camera, water level, several sensors and ' +
+  'rainfall. That 66 degree arc is the whole of the "not enough variety" reading. The wheel is ' +
+  'open from 252&deg; to 323&deg; and from 75&deg; to 145&deg;, and the second of those is ' +
+  'green, which the status set owns.</li>' +
+  '</ul>';
+
+/* ================= 3. the ladders ================= */
+H += '<h2>3. The level ladders</h2>' +
+  '<p>Each ladder is the pin at every rung, then the same rungs as a ramp.</p>';
+for (const [title, glyph, rungs] of LADDERS) {
+  H += '<h3>' + title + '</h3>';
+  H += pairHtml('', '<div class="marks">' +
+    rungs.map(([t, l]) => markHtml([glyph, t, l])).join('') + '</div>');
+  H += '<div class="ramp" data-ramp=\'' + JSON.stringify(rungs.map(r => r[0])) + '\'></div>' +
+    '<div class="rlab">' + rungs.map(r => '<span>' + r[1] + '</span>').join('') + '</div>';
+}
+H += '<h3>The two heat layers. These paint ground, not a pin.</h3>' +
+  '<p>The rain gradient <code>RAIN_HEAT</code> keeps real values, because a canvas cannot resolve a ' +
+  'token. Its hues must stay in step with the rain pin above it.</p>' +
+  '<div class="ramp" style="background:linear-gradient(to right,#6f7bff,#8f7bff,#c77dff,#ff4d4d)"></div>' +
+  '<div class="rlab"><span>to 10</span><span>to 30</span><span>to 60</span><span>over 60</span></div>' +
+  '<div class="ramp" data-ramp=\'["--s-normal","--s-alert","--s-warning","--s-danger"]\'></div>' +
+  '<div class="rlab"><span>normal</span><span>alert</span><span>warning</span><span>danger</span></div>';
+
+/* ---- the rain ladder spends two rungs on one colour --------------------------------------------- */
+H += '<h3>The rain ladder has six rungs and five colours</h3>' +
+  '<p>Compare the two ramps directly above. <code>RAIN_COLOR</code> paints "to 10" and "to 30" the ' +
+  'same violet #a893ff. <code>RAIN_HEAT</code> beside it already separates them, at #6f7bff and ' +
+  '#8f7bff. <b>So the blob on the ground and the pin standing in it disagree about rung 2.</b> ' +
+  'A reader who sees a darker blob under an unchanged pin reads that as a fault.</p>' +
+  '<p>Below, R2 gives rung 2 a step of its own and moves rung 3 up the arc to keep the spacing ' +
+  'even. Read it beside R1.</p>';
+for (const [id, name] of [['R1', 'R1. Today'], ['R2', 'R2. One colour per rung']]) {
+  H += '<h3>' + name + '</h3>';
+  const rungs = [['--s-none', 'no reading'], ['--k-rain-dry', '0 mm/h'],
+    ['--k-rainfall', 'to 10'], ['--k-rain-2', 'to 30'], ['--k-rain-heavy', 'to 60'],
+    ['--s-danger', 'over 60']];
+  H += pairHtml('data-r="' + id + '"', '<div class="marks">' +
+    rungs.map(([t, l]) => markHtml(['rainy', t, l])).join('') + '</div>');
+  H += '<div class="ramp" data-r="' + id + '" data-ramp=' +
+    '\'["--s-none","--k-rain-dry","--k-rainfall","--k-rain-2","--k-rain-heavy","--s-danger"]\'>' +
+    '</div><div class="rlab">' + rungs.map(r => '<span>' + r[1] + '</span>').join('') + '</div>';
+}
+H += '<div class="cost"><b>What R2 costs.</b> <code>RAIN_HEAT</code> in ' +
+  '<code>js/config.js</code> and <code>.ramp.rain</code> in <code>css/chrome.css</code> move with ' +
+  'it. Three places, and the heat canvas keeps real values because it cannot resolve a token.</div>';
+
+/* ================= 4. alert against warning ================= */
+H += '<h2>4. Alert against warning</h2>' +
+  '<p>You are right that the two are close. Measured below: they sit about 14 degrees apart on the ' +
+  'hue wheel and at almost one lightness.</p>' +
+  '<p><b>Where the pair actually meets on the map.</b> Only the water level pin wears both. A flood ' +
+  'gauge skips <code>--s-alert</code> and goes straight from <code>--s-trace</code> to ' +
+  '<code>--s-warning</code>. A rain gauge wears neither: its ladder is violet, then red. So this ' +
+  'decision moves one pin kind on the map, and the alert panel, the table and the meter beside it.</p>';
+
+const WOPTS = [
+  ['W1', 'W1. Today',
+   'Three rungs against three published JPS marks: Amaran, Warning, Bahaya. Nothing to change.'],
+  ['W2', 'W2. Merge the two into one amber',
+   'Two rungs: approaching, then at danger. One amber #ffab00 covers alert and warning alike.'],
+  ['W3', 'W3. Keep three, widen the gap',
+   'Alert moves to a yellow #ffd90a and warning to a deeper orange #f96a12. The gap goes from ' +
+   'about 14 degrees to about 33.'],
+];
+for (const [id, name, why] of WOPTS) {
+  H += '<h3>' + name + '</h3><p>' + why + '</p>';
+  const marks = [['water_drop', '--k-river', 'normal'], ['water_drop', '--s-alert', 'alert'],
+                 ['water_drop', '--s-warning', 'warning'], ['water_drop', '--s-danger', 'danger'],
+                 ['straighten', '--s-trace', 'gauge, water'],
+                 ['straighten', '--s-warning', 'gauge, 0.15 m']];
+  H += pairHtml('data-w="' + id + '"', '<div class="marks">' +
+    marks.map(markHtml).join('') + '</div>');
+  H += '<div class="ramp" data-w="' + id + '" data-ramp=' +
+    '\'["--k-river","--s-alert","--s-warning","--s-danger"]\'></div>' +
+    '<div class="rlab"><span>normal</span><span>alert</span><span>warning</span>' +
+    '<span>danger</span></div>';
+}
+H += '<div class="cost"><b>What W2 costs.</b> JPS publishes three marks per river, in ' +
+  '<code>wL1SPAlert</code>, <code>wL1SPWarning</code> and <code>wL1SPDanger</code>. Merging two ' +
+  'drops a distinction the upstream states. The meter on the station card draws three ticks at 38, ' +
+  '68 and 100 percent, so the card would still show three marks under a two-colour pin. ' +
+  '<code>tier()</code> and the alert panel are untouched either way: they never read ' +
+  '<code>--s-alert</code> against <code>--s-warning</code>.</div>';
+H += '<div class="cost"><b>What W3 costs.</b> A yellow alert moves toward ' +
+  '<code>--s-trace</code> (#add72f), the flood gauge\'s unnamed-water rung. Those two never share ' +
+  'a pin, but they do share the legend.</div>';
+
+/* ================= 4b. you are here against the alert amber ================= */
+H += '<h2>4b. "You are here" against the alert amber</h2>' +
+  '<p>Three degrees apart, and both draw on one map at one time. Read the pair below at their real ' +
+  'sizes. The location pin is 48px and a station pin is 31px, and it carries an accuracy ring the ' +
+  'station pin does not. So the size may already carry the difference. Judge that before moving a ' +
+  'colour.</p>';
+for (const [id, name, why] of [
+  ['M1', 'M1. Today', '--me #ffbb1a beside --s-alert #ffc000.'],
+  ['M2', 'M2. Hold the hue, drop the chroma',
+   '--me goes to #f0c46a. It stays amber, so it still says "you", and it stops competing with a ' +
+   'river at its alert mark.'],
+]) {
+  H += '<h3>' + name + '</h3><p>' + why + '</p>';
+  H += pairHtml('data-m="' + id + '"', '<div class="marks">' +
+    [['my_location', '--me', 'You are here', 'me'],
+     ['water_drop', '--s-alert', 'River, alert mark'],
+     ['water_drop', '--s-warning', 'River, warning mark'],
+     ['campaign', '--k-siren', 'Siren, idle']].map(markHtml).join('') + '</div>');
+}
+
+/* ================= 5. kind hue variety ================= */
+H += '<h2>5. More variety in the kind hues</h2>' +
+  '<p>Four of the six kinds sit inside a 70 degree arc: camera, water level, several sensors and ' +
+  'rainfall. On a quiet map that reads as one blue-violet family. Below are three ways out, ' +
+  'cheapest first.</p>';
+
+const VOPTS = [
+  ['V1', 'V1. Today', 'The six kinds as they stand. Read it as the baseline.'],
+  ['V2', 'V2. Move the camera out, drain the mast',
+   'Camera goes from cyan #2fd6e8 to a teal-green #21e0c0, which clears the water blue by about 45 ' +
+   'degrees. The several-sensors mark drops its chroma to a slate #9aa3b8, so a quiet stack reads ' +
+   'as structure rather than as a sixth colour. The flood gauge warms a little, away from ' +
+   '--s-warning. Nothing else moves.'],
+  ['V3', 'V3. Separate by chroma, not by hue',
+   'Every kind keeps its hue and drops chroma. Only the status set runs at full saturation. So the ' +
+   'map reads as muted kinds with vivid alerts, and a red pin jumps off it. This extends a split ' +
+   'the palette already makes for the weather set.'],
+  ['V4', 'V4. Move rainfall as well',
+   'V2, plus rainfall goes from violet #a893ff to a magenta #c77dff, which opens the gap to the ' +
+   'water blue. This is the expensive one.'],
+];
+for (const [id, name, why] of VOPTS) {
+  H += '<h3>' + name + '</h3><p>' + why + '</p>';
+  const marks = [
+    ['water_drop', '--k-river', 'Water level'], ['rainy', '--k-rainfall', 'Rainfall'],
+    ['campaign', '--k-siren', 'Siren'], ['straighten', '--k-gauge', 'Flood gauge'],
+    ['photo_camera', '--k-camera', 'Camera'], ['layers', '--k-mast', 'Several sensors'],
+    ['water_drop', '--s-danger', 'At danger'], ['water_drop', '--s-none', 'No reading'],
+  ];
+  H += pairHtml('data-v="' + id + '"', '<div class="marks">' +
+    marks.map(markHtml).join('') + '</div>');
+  H += '<div class="ruwrap"><div class="ruler" data-v="' + id + '"></div></div>';
+}
+H += '<div class="cost"><b>What V4 costs.</b> Rainfall is not one token. ' +
+  '<code>RAIN_HEAT</code> in <code>js/config.js</code> holds the same ramp as real values, because ' +
+  'the heat canvas cannot resolve a token. <code>--k-rain-dry</code> and ' +
+  '<code>--k-rain-heavy</code> sit either side of it, and <code>.ramp.rain</code> in ' +
+  '<code>css/chrome.css</code> draws the legend. Five places move together, or a violet blob sits ' +
+  'under a magenta pin.</div>';
+H += '<div class="cost"><b>What no option can buy.</b> The warm half of the wheel belongs to the ' +
+  'status set and must stay there. Green belongs to <code>--s-normal</code>. So a kind can only ' +
+  'take a hue from about 160 to 340 degrees, and six kinds plus the favorite heart plus the ' +
+  'weather set already share it. More variety means moving along that arc, or reaching for chroma ' +
+  'instead, which is V3.</div>';
+
+out.innerHTML = H;
+
+/* ---- paint the ramps from the live tokens ------------------------------------------------------ */
+for (const r of document.querySelectorAll('.ramp[data-ramp]')) {
+  const probe = document.createElement('div');
+  probe.className = 'mp';
+  if (r.dataset.w) probe.dataset.w = r.dataset.w;
+  if (r.dataset.r) probe.dataset.r = r.dataset.r;
+  document.body.appendChild(probe);
+  r.innerHTML = JSON.parse(r.dataset.ramp)
+    .map(t => '<span style="background:' + val(probe, t) + '"></span>').join('');
+  probe.remove();
+}
+
+/* ---- plot the hue rulers ----------------------------------------------------------------------- */
+const RULED = [
+  ['--k-river', 'water level', 1], ['--k-rainfall', 'rainfall', 1], ['--k-siren', 'siren', 1],
+  ['--k-gauge', 'flood gauge', 1], ['--k-camera', 'camera', 1], ['--k-mast', 'several sensors', 1],
+  ['--s-normal', 'normal', 0], ['--s-trace', 'trace', 0], ['--s-alert', 'alert', 0],
+  ['--s-warning', 'warning', 0], ['--s-danger', 'danger', 0],
+  ['--fav', 'favorite', 0], ['--me', 'you are here', 0], ['--wx-heavy', 'heavy rain', 0],
+];
+for (const ru of document.querySelectorAll('.ruler')) {
+  const probe = document.createElement('div');
+  probe.className = 'mp';
+  if (ru.dataset.v) probe.dataset.v = ru.dataset.v;
+  document.body.appendChild(probe);
+  /* Sort by hue, then walk the row down whenever the next mark sits inside 22 degrees of the last.
+     Crowding is what this ruler is about, so the labels have to survive it. */
+  const rows = RULED
+    .map(([tok, nm, kind]) => [val(probe, tok), nm, kind])
+    .filter(r => r[0][0] === '#')
+    .map(([hex, nm, kind]) => [hex2hsl(hex)[0], nm, kind])
+    .sort((a, b) => a[0] - b[0]);
+  let last = -99, row = 0;
+  for (const [hu, nm, kind] of rows) {
+    row = hu - last < 22 ? (row + 1) % 3 : 0;
+    last = hu;
+    const d = document.createElement('div');
+    d.className = 'rl' + (kind ? '' : ' s');
+    d.style.left = (hu / 360 * 100) + '%';
+    d.style.setProperty('--r', row);
+    d.innerHTML = '<i>' + nm + ' ' + Math.round(hu) + '&deg;</i>';
+    ru.appendChild(d);
+  }
+  probe.remove();
+}
+</script>
+</body>
+</html>
