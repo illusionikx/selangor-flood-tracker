@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Basemap spike — Klang Valley Flood Watch</title>
+
+<!--
+  THROWAWAY. Not a check, and not part of the app. It prints no verdict.
+
+  It answers one question: which tile service draws the sea, and how does this app's own water
+  layer sit on each one. The app uses Esri's Canvas pair, which paints the sea near-black. So a
+  river is blue and the Strait of Malacca is not.
+
+  Every map here shares one view. Pan or zoom any of them and the rest follow.
+
+  The tiles come from three hosts this app does not otherwise contact. Open this page by hand.
+  Nothing links to it, and no test loads it.
+-->
+
+<link rel="stylesheet" href="vendor/leaflet.css">
+<style>
+  :root {
+    --bg: #0d1117; --fg: #e6edf3; --dim: #8b949e; --line: #30363d; --water: #15364e;
+    --card: #161b22;
+  }
+  * { box-sizing: border-box }
+  body { margin: 0; background: var(--bg); color: var(--fg);
+         font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif }
+
+  header { position: sticky; top: 0; z-index: 5; background: var(--bg);
+           border-bottom: 1px solid var(--line); padding: 12px 16px }
+  h1 { margin: 0 0 4px; font-size: 16px; font-weight: 600 }
+  p  { margin: 0; color: var(--dim) }
+  .bar { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; margin-top: 10px }
+  label { display: inline-flex; align-items: center; gap: 6px; margin: 0 }
+  button { background: var(--card); color: var(--fg); border: 1px solid var(--line);
+           border-radius: 999px; padding: 5px 12px; font: inherit; cursor: pointer }
+  button:hover { border-color: #58a6ff }
+  code { color: var(--dim) }
+
+  .grid { display: grid; gap: 12px; padding: 12px;
+          grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)) }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+          overflow: hidden }
+  .m { height: 260px; background: #000 }
+  .cap { padding: 8px 10px; border-top: 1px solid var(--line) }
+  .nm { font-weight: 600 }
+  .note { color: var(--dim); font-size: 13px }
+  .sea { display: inline-block; width: 10px; height: 10px; border-radius: 2px;
+         margin-right: 6px; vertical-align: baseline; border: 1px solid var(--line) }
+  .app { color: #58a6ff }
+</style>
+
+<header>
+  <h1>Basemap spike</h1>
+  <p>One view across every tile service. The overlay is this app's own <code>water.json</code>,
+     in <code>--water</code> <span class="sea" style="background:#15364e"></span>.
+     Watch what each service does with the Strait of Malacca.</p>
+  <div class="bar">
+    <button data-go="3.02,101.32,11">Klang estuary</button>
+    <button data-go="3.14,101.69,13">Kuala Lumpur</button>
+    <button data-go="3.32,101.51,10">The whole area</button>
+    <button data-go="4.4069,100.8807,15">A lake, zoom 15</button>
+    <label><input type="checkbox" id="wx" checked> Draw <code>water.json</code></label>
+    <label><input type="checkbox" id="lb"> Esri labels</label>
+    <span class="note" id="pos"></span>
+  </div>
+</header>
+
+<div class="grid" id="grid"></div>
+
+<script src="vendor/leaflet.js"></script>
+<script>
+const ESRI = 'https://server.arcgisonline.com/ArcGIS/rest/services/';
+const esri = s => ESRI + s + '/MapServer/tile/{z}/{y}/{x}';   // {z}/{y}/{x} — row before column
+
+/* Each entry: the name, the tile URL, the deepest zoom the cache holds, and one fact.
+   `app` marks the two this app ships. */
+const MAPS = [
+  { nm: 'Esri Dark Gray Canvas', app: 1, url: esri('Canvas/World_Dark_Gray_Base'), max: 16,
+    note: 'This app, dark theme. The sea is near-black.' },
+  { nm: 'Esri Light Gray Canvas', app: 1, url: esri('Canvas/World_Light_Gray_Base'), max: 16,
+    note: 'This app, light theme. The sea is pale grey.' },
+  { nm: 'Esri Street Map', url: esri('World_Street_Map'), max: 19,
+    note: 'A full street style. It carries its own water colour.' },
+  { nm: 'Esri Topographic', url: esri('World_Topo_Map'), max: 19,
+    note: 'Contours and land cover under the streets.' },
+  { nm: 'Esri Ocean Base', url: esri('Ocean/World_Ocean_Base'), max: 13,
+    note: 'Built for the sea, and it draws no land here. The tiles answer "Map data not yet available" over this coast.' },
+  { nm: 'Esri Imagery', url: esri('World_Imagery'), max: 19,
+    note: 'Photography. Every reading would sit on a picture of a roof.' },
+  { nm: 'Esri National Geographic', url: esri('NatGeo_World_Map'), max: 16,
+    note: 'A printed-atlas style.' },
+  { nm: 'Esri Terrain Base', url: esri('World_Terrain_Base'), max: 13,
+    note: 'Relief with no roads, and the same empty answer over this coast.' },
+  { nm: 'OpenStreetMap standard', url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', max: 19,
+    note: 'The reference render. Its tile policy forbids a public app of this size.' },
+  { nm: 'OpenTopoMap', url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', max: 17,
+    sub: 'abc', note: 'OSM data with relief shading. A volunteer server.' },
+  { nm: 'CARTO Dark Matter', url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png', max: 19,
+    sub: 'abcd', note: 'This app used it until 2026-08-27. Keyless tiles now arrive with API KEY REQUIRED burned into the picture.' },
+  { nm: 'CARTO Positron', url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png', max: 19,
+    sub: 'abcd', note: 'The light twin, and the same watermark.' },
+];
+
+const start = [3.02, 101.32, 11];
+const maps = [];
+let waterGeo = null, syncing = false;
+
+const grid = document.getElementById('grid');
+for (const m of MAPS) {
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.innerHTML = '<div class="m"></div><div class="cap">'
+    + '<div class="nm' + (m.app ? ' app' : '') + '">' + m.nm + (m.app ? ' — in use' : '') + '</div>'
+    + '<div class="note">' + m.note + ' Deepest tile: zoom ' + m.max + '.</div></div>';
+  grid.appendChild(card);
+
+  const map = L.map(card.firstChild, {
+    center: [start[0], start[1]], zoom: start[2],
+    zoomControl: false, attributionControl: false, maxZoom: 18,
+  });
+  const opt = { maxZoom: 18, maxNativeZoom: m.max };
+  if (m.sub) opt.subdomains = m.sub;
+  L.tileLayer(m.url, opt).addTo(map);
+
+  map.createPane('water');
+  map.getPane('water').style.zIndex = 250;
+  map.createPane('labels');
+  map.getPane('labels').style.zIndex = 260;
+
+  map.on('move zoom', () => {
+    if (syncing) return;
+    syncing = true;
+    for (const o of maps) if (o !== map) o.setView(map.getCenter(), map.getZoom(), { animate: false });
+    say(map);
+    syncing = false;
+  });
+  maps.push(map);
+}
+
+/* One overlay per map, built when the file lands and rebuilt on every toggle. */
+let water = [], labels = [];
+
+fetch('water.json').then(r => r.json()).then(g => { waterGeo = g; drawWater(); });
+
+function drawWater() {
+  for (const l of water) l.remove();
+  water = [];
+  if (!waterGeo || !document.getElementById('wx').checked) return;
+  for (const map of maps) water.push(L.geoJSON(waterGeo, {
+    pane: 'water', renderer: L.canvas({ pane: 'water' }), interactive: false,
+    style: f => f.properties.t === 'area'
+      ? { stroke: false, fillColor: '#15364e', fillOpacity: 1 }
+      : { color: '#15364e', weight: 1.4, opacity: 1 },
+  }).addTo(map));
+}
+
+function drawLabels() {
+  for (const l of labels) l.remove();
+  labels = [];
+  if (!document.getElementById('lb').checked) return;
+  for (const map of maps) labels.push(L.tileLayer(esri('Canvas/World_Dark_Gray_Reference'),
+    { pane: 'labels', maxZoom: 18, maxNativeZoom: 16 }).addTo(map));
+}
+
+function say(map) {
+  const c = map.getCenter();
+  document.getElementById('pos').textContent =
+    c.lat.toFixed(4) + ', ' + c.lng.toFixed(4) + ' at zoom ' + map.getZoom();
+}
+
+document.getElementById('wx').addEventListener('change', drawWater);
+document.getElementById('lb').addEventListener('change', drawLabels);
+for (const b of document.querySelectorAll('[data-go]')) b.addEventListener('click', () => {
+  const [lat, lng, z] = b.dataset.go.split(',').map(Number);
+  syncing = true;
+  for (const m of maps) m.setView([lat, lng], z, { animate: false });
+  syncing = false;
+  say(maps[0]);
+});
+say(maps[0]);
+</script>
+</html>

@@ -76,6 +76,7 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `m3-build.php` | `php m3-build.php` — bakes `vendor/m3/tokens.css` from the M3 Expressive token set. Run by hand, never in a request |
 | `vendor/m3/tokens.css` | M3's shape, typescale, elevation, motion and state scales, vendored. Generated — **colour is deliberately not in it** |
 | `vendor/` | Leaflet, leaflet.heat (patched), subsetted fonts, the M3 token scales — no CDN, hand-managed. **markercluster left on 2026-09-03**, when the pins moved to a canvas |
+| `basemap-spike.html` | **throwaway, not a check and not part of the app.** Twelve tile services at one view, with `water.json` over each. It answers which basemap draws the sea, because Esri's Canvas pair paints it near-black and a reader asked why the sea is not blue. It contacts OpenStreetMap, OpenTopoMap and CARTO, which the app itself never does. See docs/FEATURES.md |
 | `maplibre-spike.html` | **throwaway, not a check and not part of the app.** Measures a MapLibre GL vector basemap against the Esri raster one under 460 canvas marks. It loads unpkg and OpenFreeMap, which the app itself never contacts. See docs/FEATURES.md for what it answered |
 | `lib/` | Composer's vendor dir (`symfony/dom-crawler`), gitignored — **not** `vendor/` |
 | `composer.json` | the one server-side dependency. Run `composer install` before first run |

@@ -18108,3 +18108,58 @@ rebake without a hard reload judges the file from before it.
 
 `map-limits-test.html` passes with the new file. It guards both floors at half their stated values,
 so a rebake cannot turn it red by accident.
+
+## The basemap spike, and why the sea is not blue, 2026-09-08
+
+A reader asked why the rivers draw blue and the Strait of Malacca does not.
+
+### The cause
+
+`water-build.php` asks Overpass for `natural=water`, `landuse=basin` and `waterway=river`. The open
+sea carries none of those tags. OpenStreetMap maps the sea as `natural=coastline`, which is a
+directed line with land on the left and sea on the right. A renderer builds the ocean fill from
+that line in a separate step. So Overpass cannot answer with a sea shape, and `water.json` holds
+none.
+
+The sea on screen is the basemap's own paint. Esri's Dark Gray Canvas draws it near-black against
+grey land. The tidal channels through the Klang estuary go the same way, because that water is
+coastline rather than `natural=water`.
+
+### The spike
+
+`basemap-spike.html` puts twelve tile services at one view. Pan or zoom any of them and the rest
+follow. A checkbox draws `water.json` over each one, so a reader can compare the app's own blue
+with each service's water.
+
+What it shows over the Klang estuary at zoom 11:
+
+| service | the sea |
+|---|---|
+| Esri Dark Gray Canvas, in use | near-black |
+| Esri Light Gray Canvas, in use | pale grey |
+| Esri Street Map | blue |
+| Esri Topographic | blue |
+| Esri National Geographic | blue |
+| Esri Imagery | photography |
+| Esri Ocean Base | blue, and no land at all here |
+| Esri Terrain Base | the same empty answer |
+| OpenStreetMap standard | blue |
+| OpenTopoMap | blue |
+| CARTO Dark Matter | API KEY REQUIRED across the tile |
+| CARTO Positron | the same watermark |
+
+The two CARTO rows are evidence for a note this repository already carried. Keyless CARTO tiles
+arrive with the demand burned into the picture.
+
+The page contacts OpenStreetMap, OpenTopoMap and CARTO. The app itself contacts none of them. Open
+the page by hand. Nothing links to it and no check loads it.
+
+### What was not decided
+
+The basemap did not change. A style that draws the sea blue also draws roads, land cover and
+labels in colours this app reserves for status. That is the trade the move to Esri Canvas already
+made.
+
+The other way to answer the question is a baked sea shape. One more Overpass query for
+`natural=coastline`, chained the way `rings()` chains a lake, then closed against the bounding box.
+That is about 40 lines and a winding rule to tell sea from land. It is not built.
