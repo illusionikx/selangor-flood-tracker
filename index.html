@@ -40,6 +40,12 @@
      Leaflet builds the first tile URL only after the whole module graph has loaded, so without
      this the browser starts the work at the latest possible moment. -->
 <link rel="preconnect" href="https://server.arcgisonline.com">
+<!-- CARTO's host, warmed for the day `CARTO_KEY` in js/config.js holds a key. Delete the Esri line
+     above on that day, and this comment with it. Two warmed origins is one wasted handshake, and
+     it is the price of a switch that is one constant rather than an edit across four files.
+     CARTO answers on `a` to `d` and on the bare host as well, and js/map.js asks the bare host, so
+     one line covers every tile. -->
+<link rel="preconnect" href="https://basemaps.cartocdn.com">
 <!-- The import graph is seven levels deep and there is no build step to flatten it, so the browser
      discovers each level only after it parses the one above. That is seven round trips before
      js/net.js can ask for the payload. These links let it fetch all of them at once.
@@ -81,7 +87,10 @@
 <!-- The water tint stood here until 2026-08-27 and is deleted. It was an SVG filter keying on the
      one exact tone CARTO painted filled water, and Esri serves the canvas as lossy JPEG, which has
      no exact tones. See the block at the head of css/map.css for the measurement and for what the
-     map lost. Do not rebuild it against a JPEG provider. -->
+     map lost. Do not rebuild it against a JPEG provider.
+     **A return to CARTO does not bring it back.** The filter needs a PNG, and CARTO serves one, so
+     the reason it went is only half gone. The other half stands: it reached the sea and the large
+     lakes alone, and `water.json` draws every pond it never touched. Two layers for one job. -->
 
 <!-- A camera still. A <dialog>, not a div: it opens from the all-stations table, which is itself a
      modal dialog, and only the top layer can paint over one — Esc, the backdrop and focus trapping
@@ -493,17 +502,20 @@
        makes a claim that can be checked against the code. The plan for this change carries a grep
        behind every one. A table was tried here and reverted: a claim about what this site does not
        do is an argument, and an argument reads as a row of specifications only if the reader
-       already trusts it. The tile sentence is there because the credits below name Esri, and a
-       page that credits a third party while claiming to load nothing from one contradicts itself in
-       a single screen. Anything that ever posts a coordinate must delete the last sentence. -->
+       already trusts it. The tile sentence is there because the credits below name a tile company,
+       and a page that credits a third party while claiming to load nothing from one contradicts
+       itself in a single screen. It names no company itself, because two of them draw here and
+       `CARTO_KEY` picks which. js/map.js rewrites every `.tileprov` link to match.
+       Anything that ever posts a coordinate must delete the last sentence. -->
   <h3>Warranty</h3>
   <p class="muted">No team stands behind this project, and it carries no warranty. A reading can be
      wrong, stale or missing. The source code is open, and a report of a mistake is welcome.</p>
 
   <h3>Privacy</h3>
   <p class="muted">The site keeps no account, runs no analytics and sets no cookies. It loads no
-     tracking script from any provider. Esri serves the map tiles, so Esri sees which tiles your
-     browser requests, and nothing else on this page comes from them. A place you search for goes
+     tracking script from any provider. One company serves the map tiles, and the Credits name it.
+     That company sees which tiles your browser requests, and nothing else on this page comes from
+     them. A place you search for goes
      to the server of this site. That server asks OpenStreetMap where the place is. The request
      happens only when you select the search row, never as you type. A location you share stays in the browser,
      and the site sends it nowhere.</p>
@@ -561,7 +573,7 @@
   <p class="muted">Built by <a href="https://github.com/illusionikx" target="_blank" rel="noopener">illusionikx</a>.
      Released under the <a href="https://opensource.org/licenses/MIT" target="_blank" rel="noopener">MIT
      license</a>. Free to use, copy, modify and redistribute, with no warranty of any kind.</p>
-  <p class="muted">Map tiles by <a href="https://www.esri.com/" target="_blank" rel="noopener">Esri</a>,
+  <p class="muted">Map tiles by <a class="tileprov" href="https://carto.com/" target="_blank" rel="noopener">CARTO</a>,
      data &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>
      contributors. Icons and the app mark are <a href="https://fonts.google.com/icons" target="_blank"
      rel="noopener">Material Symbols</a> (Apache 2.0).
@@ -1512,7 +1524,7 @@
 </div>
 <div id="credit" class="muted">
   &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>,
-  tiles <a href="https://www.esri.com/">Esri</a> ·
+  tiles <a class="tileprov" href="https://carto.com/">CARTO</a> ·
   data: JPS <a href="https://publicinfobanjir.water.gov.my/">Malaysia</a>,
   <a href="https://infobanjirjps.selangor.gov.my/">Selangor</a>,
   <a href="https://infobanjirjpskl.water.gov.my/">WP</a>

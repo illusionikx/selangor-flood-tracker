@@ -1,7 +1,7 @@
 // The Leaflet map itself: basemap/theme, the shared marker cluster, and the view helpers that
 // every panel uses to jump to a station.
 
-import { KINDS, TILES, FLASH_MS } from './config.js';
+import { KINDS, TILES, CARTO_KEY, FLASH_MS } from './config.js';
 import { state, PREFS, save } from './state.js';
 import { el, distKm } from './util.js';
 import { byId } from './stations.js';
@@ -243,6 +243,35 @@ map.on('moveend zoomend', () => {
    `_Base` is the ground and `_Reference` is the labels. */
 const ESRI = 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas';
 const tileURL = (k, part) => `${ESRI}/${TILES[k]}_${part}/MapServer/tile/{z}/{y}/{x}`;
+
+/* CARTO, which draws the moment `CARTO_KEY` holds a key. See that constant in js/config.js.
+   **The path order is `{z}/{x}/{y}` here and `{z}/{y}/{x}` above.** Esri is the odd one out, and
+   the wrong order fails silently: the tiles still load and they are the wrong part of the world.
+   **No `{s}`.** CARTO answers on `a` to `d` and on the bare host as well, measured 2026-09-08.
+   Four subdomains split one HTTP/2 connection into four, and index.html warms one origin.
+   **`{r}` is real here.** CARTO caches a `@2x` tile and Esri caches none, so `detectRetina` is on
+   for CARTO alone. Leaflet fills `{r}` with `@2x` on a retina screen and with nothing elsewhere.
+   **The style stem IS the theme key.** `dark_nolabels` and `dark_only_labels` split the ground from
+   the place names, which is the same split Esri publishes as `_Base` and `_Reference`. That is what
+   keeps the labels above this app's own water. */
+const CARTO = 'https://basemaps.cartocdn.com';
+const cartoURL = (k, part) => `${CARTO}/${k}_${part}/{z}/{x}/{y}{r}.png?key=${CARTO_KEY}`;
+
+/* One provider, picked once at module load. Nothing switches provider at run time, because the key
+   cannot change while the page is open. ponytail: delete the Esri half the day CARTO is settled. */
+const PROVIDER = CARTO_KEY
+  ? { ground: k => cartoURL(k, 'nolabels'), names: k => cartoURL(k, 'only_labels'),
+      opt: { maxZoom: 18, detectRetina: true } }
+  : { ground: k => tileURL(k, 'Base'), names: k => tileURL(k, 'Reference'),
+      opt: { maxZoom: 18, maxNativeZoom: 16 } };
+
+/* The credit names the provider that actually draws, because a licence term is not a comment.
+   index.html states CARTO, which is where this is going. So the Esri fallback rewrites it. */
+if (!CARTO_KEY) for (const a of document.querySelectorAll('.tileprov')) {
+  a.textContent = 'Esri';
+  a.href = 'https://www.esri.com/';
+}
+
 let tiles, labels;
 
 const isDark = () => document.documentElement.dataset.theme === 'dark';
@@ -471,10 +500,11 @@ function setBasemap() {
      the light and the dark service return the identical file — and that is a second watermark, of
      the kind this whole change exists to remove. `maxNativeZoom` stretches the zoom-16 tile across
      the two zooms above it instead. So the app keeps its own zoom range and only the ground goes
-     soft. Every pin, label and heat blob is drawn by this app and stays sharp. */
-  const opt = { maxZoom: 18, maxNativeZoom: 16 };
-  tiles  = L.tileLayer(tileURL(key, 'Base'), opt).addTo(map);
-  labels = L.tileLayer(tileURL(key, 'Reference'), { ...opt, pane: 'labels' }).addTo(map);
+     soft. Every pin, label and heat blob is drawn by this app and stays sharp.
+     CARTO caches to zoom 20, so its half of `PROVIDER` states no `maxNativeZoom` at all. */
+  const opt = PROVIDER.opt;
+  tiles  = L.tileLayer(PROVIDER.ground(key), opt).addTo(map);
+  labels = L.tileLayer(PROVIDER.names(key), { ...opt, pane: 'labels' }).addTo(map);
   setWater(key === 'dark');
 }
 

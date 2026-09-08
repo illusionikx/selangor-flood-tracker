@@ -207,13 +207,32 @@ export const NOTICE = {
   },
 };
 
+/* THE BASEMAP KEY, AND IT IS THE ONE SWITCH BETWEEN TWO PROVIDERS.
+   Empty means Esri draws. Set means CARTO draws. `PROVIDER` in js/map.js reads it once, and
+   nothing else in this app tests it.
+
+   **CARTO served this map until 2026-08-27.** Every keyless tile came back with `API KEY REQUIRED`
+   burned into the picture, at every zoom and under every referer. That is a policy change rather
+   than a rate limit, so the move to Esri followed. The repository owner asked to return to CARTO on
+   2026-09-08, with a key. Esri holds the map until that key lands.
+
+   **The key is public and it cannot be otherwise.** It travels in a tile URL that a browser has to
+   fetch, so anybody can read it out of the network panel. CARTO's own answer to that is a domain
+   restriction on the key, which is set in the CARTO account and not here. Set that restriction to
+   this site's domain before the key goes in.
+
+   **A wrong key fails silently.** Measured on 2026-09-08: a tile asked for with `?key=TESTKEY123`
+   answers 200 with the ordinary picture. So a bad key looks the same as a good one until the
+   watermark comes back. Read one tile by eye after the key lands.
+
+   The free tier is 5 million tiles a month, and it is for non-commercial use.
+   See https://carto.com/basemaps/apikey/ . */
+export const CARTO_KEY = '';
+
 /* Esri Canvas basemaps, one per theme. ponytail: a picker existed and nobody needs three flavours
    of grey.
-   **CARTO served these until 2026-08-27 and cannot any more.** Every keyless tile came back with
-   `API KEY REQUIRED` burned into the picture, at every zoom and under every referer. That is a
-   policy change rather than a rate limit, so it does not clear itself.
    Each name takes a `_Base` or a `_Reference` suffix in js/map.js. Esri ships the ground and the
-   place names as two separate services. */
+   place names as two separate services, and CARTO splits its own styles the same way. */
 export const TILES = { light: 'World_Light_Gray', dark: 'World_Dark_Gray' };
 
 // Sparkline window. Must not exceed the server's own SPARK_WIN — it sends nothing older.

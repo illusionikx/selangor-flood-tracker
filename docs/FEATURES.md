@@ -18163,3 +18163,71 @@ made.
 The other way to answer the question is a baked sea shape. One more Overpass query for
 `natural=coastline`, chained the way `rings()` chains a lake, then closed against the bounding box.
 That is about 40 lines and a winding rule to tell sea from land. It is not built.
+
+## The basemap returns to CARTO, behind one constant, 2026-09-08
+
+The repository owner asked to go back to CARTO. The key had not arrived. So this change prepares
+the switch and leaves Esri drawing until somebody sets the key.
+
+### The switch
+
+`CARTO_KEY` in `js/config.js` is the whole of it. Empty means Esri draws. Set means CARTO draws.
+`PROVIDER` in `js/map.js` reads that constant once at module load. Nothing else in the app tests
+it, and nothing switches provider while a page is open.
+
+`PROVIDER` holds three things per provider: the ground URL, the place-names URL, and the tile-layer
+options. `setBasemap()` reads those three and knows nothing about either company.
+
+### What to do when the key lands
+
+1. Set a domain restriction on the key, in the CARTO account. Restrict it to this site's domain.
+2. Put the key in `CARTO_KEY` in `js/config.js`.
+3. Load the map and look at one tile. A wrong key answers HTTP 200 with the ordinary picture, so
+   only the watermark tells you.
+4. Delete the Esri `preconnect` line in `index.html`.
+5. Delete the Esri half of `PROVIDER`, the `tileURL()` helper, the `ESRI` constant, and the
+   `.tileprov` rewrite under `PROVIDER`.
+6. Delete `TILES` from `js/config.js`.
+
+Steps 4 to 6 are cleanup. The map is correct after step 2.
+
+### The three ways CARTO differs from Esri
+
+CARTO answers `{z}/{x}/{y}` and Esri answers `{z}/{y}/{x}`. The wrong order fails silently. The
+tiles still load, and they show the wrong part of the world.
+
+CARTO caches a `@2x` tile and Esri caches none. So `detectRetina` is on for CARTO alone, and
+Leaflet fills `{r}` with `@2x` on a retina screen.
+
+CARTO caches to zoom 20 and Esri stops at 16. So the CARTO options state no `maxNativeZoom`, and
+the `Map data not yet available` plate above zoom 16 goes with Esri.
+
+### The paths, measured
+
+All four styles answer HTTP 200 at `basemaps.cartocdn.com/<style>/{z}/{x}/{y}.png`, with no
+`rastertiles/` prefix. The styles are `dark_nolabels`, `dark_only_labels`, `light_nolabels` and
+`light_only_labels`. The style stem is this app's own theme key, so `PROVIDER` needs no table.
+
+That split is what keeps the labels above the water this app draws. It is the same split Esri
+publishes as `_Base` and `_Reference`.
+
+The bare host answers, and so do the subdomains `a` to `d`. This app asks the bare host. Four
+subdomains split one HTTP/2 connection into four, and `index.html` warms one origin.
+
+### The credit is a licence term
+
+CARTO asks that its attribution and OpenStreetMap's stay on the map. `index.html` states CARTO in
+both places that name a tile company, and `js/map.js` rewrites every `.tileprov` link to read Esri
+while the key is empty. So the credit names the company that actually drew the tile, in both
+states.
+
+The About pane's privacy paragraph names no company at all now. It points at the Credits.
+
+### What was not done
+
+The tile filter did not come back. It keyed on the one exact tone CARTO paints filled water, and
+CARTO serves a PNG again, so the reason it went is half gone. The other half stands. It reached the
+sea and the large lakes alone, and `water.json` draws every pond it never touched.
+
+The sea is still not blue on the CARTO Dark Matter ground. That answer is a baked coastline shape,
+and it is still not built.

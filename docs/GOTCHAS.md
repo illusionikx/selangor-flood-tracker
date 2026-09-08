@@ -2881,8 +2881,29 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   the mark. The five windows nest, so the longest is the tallest column. Anything new that prints
   a value inside a plot needs both halves.
 
-- **THE BASEMAP IS ESRI AND IT WAS CARTO, AND THE TILE FILTER IS DELETED.** CARTO ended keyless
-  access on 2026-08-27. Every tile came back with `API KEY REQUIRED` burned into the picture.
+- **TWO PROVIDERS SIT IN `js/map.js` AND `CARTO_KEY` PICKS ONE.** Empty means Esri draws. Set means
+  CARTO draws. `PROVIDER` reads that constant once at module load, and nothing else in the app tests
+  it. The repository owner asked to return to CARTO on 2026-09-08, and the key had not arrived. So
+  Esri holds the map until it does.
+  **The switch is one constant and it reaches four things**: the two tile URLs, the tile options,
+  and the credit. `js/map.js` rewrites every `.tileprov` link to read Esri while the key is empty,
+  because index.html states CARTO and an attribution is a licence term rather than a comment.
+  **Two `preconnect` lines stand in index.html for the same reason.** Delete the Esri one on the day
+  the key lands, and delete the Esri half of `PROVIDER` with it.
+  **A WRONG CARTO KEY FAILS SILENTLY.** Measured 2026-09-08: `?key=TESTKEY123` answers HTTP 200 with
+  the ordinary picture. So a typo looks exactly like a working key until the watermark returns.
+  Look at one tile by eye after the key lands, and never trust the status code.
+  **CARTO's key is public by construction.** It travels in a tile URL a browser has to fetch.
+  CARTO's own answer is a domain restriction, set in the CARTO account. Set it before the key ships.
+  **The paths differ in three ways from Esri's.** CARTO is `{z}/{x}/{y}`, it caches a `@2x` tile, and
+  it caches to zoom 20. So its options carry `detectRetina` and no `maxNativeZoom`.
+  **`dark_nolabels` and `dark_only_labels` at the bare host, and the style stem is the theme key.**
+  Measured on 2026-09-08: all four light and dark variants answer 200 at
+  `basemaps.cartocdn.com/<style>/…`, with no `rastertiles/` prefix and no `{s}`. The subdomains
+  answer as well, and four of them split one HTTP/2 connection into four for nothing.
+  The free tier is 5 million tiles a month, for non-commercial use.
+- **THE BASEMAP WAS ESRI FROM 2026-08-27, AND THE TILE FILTER IS DELETED.** CARTO ended keyless
+  access that day. Every tile came back with `API KEY REQUIRED` burned into the picture.
   **Measure that before believing a retry helps.** Every subdomain answered HTTP 200 with a real
   tile, each tile differed by coordinate, and a browser `Referer` and `User-Agent` changed the
   response hash not at all. It is a policy change rather than a rate limit, so it does not clear
