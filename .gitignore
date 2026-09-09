@@ -23,3 +23,7 @@ shots/
 # The build output. `node build.mjs` writes it, and a deploy publishes it.
 site/
 node_modules/
+
+# The Playwright MCP server writes a console log and an accessibility tree here, with a session
+# timestamp in each file name. It writes new ones on every session, so the directory grows for ever.
+.playwright-mcp/
