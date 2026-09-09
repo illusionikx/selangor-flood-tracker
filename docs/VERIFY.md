@@ -438,8 +438,9 @@ printf("rows: %d, points: %d, newest: %s\n",
 # a missing `:not()` hands the answer to stylesheet order, and a rule left off the mask list in
 # css/icons.css draws an empty plate. The last one shipped. Also measures the button against every
 # other floating box, at 1536 and again at 360. Reads PASS.
+# The water layer grew, from 2,051 shapes to 9,169. So this budget rose to 60000.
 "/c/Program Files/Google/Chrome/Application/chrome.exe" --headless=new --disable-gpu \
-  --ignore-certificate-errors --virtual-time-budget=40000 --window-size=1600,1000 --dump-dom \
+  --ignore-certificate-errors --virtual-time-budget=60000 --window-size=1600,1000 --dump-dom \
   https://flood-exp.test/paint-check.html | perl -0777 -ne 'print $1 if /<pre id="out">(.*?)<\/pre>/s'
 
 # The M3 full-screen dialogs below 600px: the station panel, the search, the table, the camera
