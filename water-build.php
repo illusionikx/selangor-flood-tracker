@@ -131,31 +131,44 @@ function lineKm(array $pts): float {
     return $km;
 }
 
+// The backwards join cases closed no lake outline that the append-only walk left open. They exist
+// for the coastline, which is one chain that the walk can enter in the middle.
+
 /**
- * Chain a relation's member ways into closed rings.
+ * Chain member ways end to end, and return every chain.
  *
- * A large lake's outline is usually split across several ways, and each one on its own is an open
- * line. Closing them individually draws a lake as a handful of wedges. So walk each chain end to
- * end, flipping a way when it joins backwards, and keep only what actually closes.
+ * A large lake outline is several ways, and each one on its own is an open line. A coastline is the
+ * same shape of problem over a much longer chain. So walk each chain end to end and flip a way when
+ * it joins backwards. A chain grows at both ends, because the first way taken out of the pool can
+ * sit anywhere along the chain.
  */
-function rings(array $ways): array {
-    $rings = []; $pool = array_values($ways);
+function chains(array $ways): array {
+    $out = []; $pool = array_values($ways);
     while ($pool) {
         $cur = array_shift($pool);
         while ($cur[0] !== end($cur)) {
             $joined = false;
             foreach ($pool as $i => $w) {
-                if (end($cur) === $w[0])            $cur = array_merge($cur, array_slice($w, 1));
-                elseif (end($cur) === end($w))      $cur = array_merge($cur, array_slice(array_reverse($w), 1));
+                if (end($cur) === $w[0])       $cur = array_merge($cur, array_slice($w, 1));
+                elseif (end($cur) === end($w)) $cur = array_merge($cur, array_slice(array_reverse($w), 1));
+                elseif ($cur[0] === end($w))   $cur = array_merge($w, array_slice($cur, 1));
+                elseif ($cur[0] === $w[0])     $cur = array_merge(array_reverse($w), array_slice($cur, 1));
                 else continue;
                 unset($pool[$i]); $pool = array_values($pool); $joined = true;
                 break;
             }
-            if (!$joined) break;                   // an open chain: the relation is broken upstream
+            if (!$joined) break;               // an open chain: it runs off the edge, or it is broken
         }
-        if (count($cur) > 3 && $cur[0] === end($cur)) $rings[] = $cur;
+        $out[] = $cur;
     }
-    return $rings;
+    return $out;
+}
+
+/** The chains that close. A lake outline is one of these. */
+function rings(array $ways): array {
+    $out = [];
+    foreach (chains($ways) as $c) if (count($c) > 3 && $c[0] === end($c)) $out[] = $c;
+    return $out;
 }
 
 // --- fetch ---------------------------------------------------------------------------------------
