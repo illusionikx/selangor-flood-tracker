@@ -437,58 +437,88 @@ fetch('border.json')
   })
   .catch(() => {});
 
-let waterGeo, water, asking;
+/* Three bands, and the zoom each one starts at. A shape carries its band from its own size, stamped
+   at bake time. See water-build.php. Band 0 is what this map drew when the sizes were floors that
+   deleted a shape. 2,775 rivers at one zoom is a blue web. These three numbers stop that web
+   without deleting the water that answers a question close in. */
+const BAND_MIN = [0, 11, 13];
 
-function setWater(on) {
-  if (!on) { if (water) map.removeLayer(water); return; }
-  if (water) { water.addTo(map); return; }
+/* A river thins with its band. Band 2 holds 1,439 rivers. Weight 1.4 on all of them repeats the
+   web at zoom 13 that the floors removed from zoom 10. */
+const BAND_WEIGHT = [1.4, 1.1, 0.8];
 
-  // Fetched once, on the first dark theme of the session, and never at all on a light one.
-  if (!waterGeo) {
-    if (asking) return;
-    asking = true;
-    /* Past the first paint. This file is 242 KB gzipped, against 271 KB for the whole of the rest
-       of the landing, so fetching it inline nearly doubles what a dark theme reader waits for. It
-       draws rivers and ponds the basemap omits, which is decoration over a map that already works,
-       so it can arrive late. requestIdleCallback yields to anything the browser would rather do
-       first, and the setTimeout is the fallback for Safari, which does not implement it. */
-    /* Called as a method on `window`, never lifted off it. `requestIdleCallback` is a `Window`
-       operation, so invoking a detached reference gives it the wrong receiver and it throws. That
-       throw would land during module evaluation, because applyTheme() runs at the top level of
-       js/ui.js, which js/app.js imports statically. So a dark theme reader would lose the whole
-       app, not just the water. Safari has no requestIdleCallback, hence the timer. */
-    const later = fn => window.requestIdleCallback
-      ? window.requestIdleCallback(fn)
-      : setTimeout(fn, 1200);
-    try {
-      later(() => fetch('water.json')
-        .then(r => r.ok ? r.json() : Promise.reject(r.status))
-        .then(g => { waterGeo = g; if (isDark()) setWater(true); })
-        .catch(() => {}));
-    } catch {
-      /* Nothing about the water may take the app down. This runs inside module evaluation, so an
-         exception here stops js/ui.js and with it everything js/app.js does. A plainer map is the
-         documented outcome of a water failure, and that has to hold for a synchronous throw too,
-         not only for a rejected fetch. */
-    }
-    return;
-  }
+/* One group per band, made here so `waterBands[b]` is a stable reference before the fetch lands. */
+export const waterBands = [L.layerGroup(), L.layerGroup(), L.layerGroup()];
 
-  // Built here rather than in the fetch, so `--water` is read at the moment the layer is drawn.
-  // The token exists on the dark theme only, and this line is only ever reached on it.
+let waterGeo, seaLayer, asking;
+
+/* Read at paint time, never at import time. The token differs by theme and a reader can change the
+   theme while the page is open. One colour serves the sea, a pond and a river. A drawn pond
+   beside a drawn sea has to be the same water. A pond is a fill with no stroke. An outline
+   on a shape this small is most of the shape. */
+const waterStyle = f => {
   const c = getComputedStyle(document.documentElement).getPropertyValue('--water').trim();
+  return f.properties.t === 'line'
+    ? { color: c, weight: BAND_WEIGHT[f.properties.b], opacity: 1 }
+    : { stroke: false, fillColor: c, fillOpacity: 1 };
+};
 
-  // Canvas rather than SVG: 6,635 shapes is 6,635 DOM nodes to carry through every pan and zoom.
-  // One colour for both parts, and it is the colour the tint paints — a drawn pond beside a tinted
-  // lake has to be the same water. A pond is a fill with no stroke, because an outline on a shape
-  // this small is most of the shape. Opaque for the same reason the two must match exactly.
-  water = L.geoJSON(waterGeo, {
-    renderer: L.canvas({ pane: 'water' }),
-    interactive: false,
-    style: f => f.properties.t === 'area'
-      ? { stroke: false, fillColor: c, fillOpacity: 1 }
-      : { color: c, weight: 1.4, opacity: 1 },
-  }).addTo(map);
+// Canvas rather than SVG: 9,169 shapes is 9,169 DOM nodes to carry through every pan and zoom.
+function buildWater() {
+  const renderer = L.canvas({ pane: 'water' });
+  for (const f of waterGeo.features) {
+    const layer = L.geoJSON(f, { renderer, interactive: false, style: waterStyle });
+    if (f.properties.t === 'sea') { seaLayer = layer.addTo(map); continue; }
+    waterBands[f.properties.b].addLayer(layer);
+  }
+  syncBands();
+}
+
+/* The zoom decides which bands draw. Leaflet adds and removes the group, so there is no redraw of
+   this app's own and no per-frame work. */
+function syncBands() {
+  const z = map.getZoom();
+  waterBands.forEach((g, b) => {
+    if (z >= BAND_MIN[b]) { if (!map.hasLayer(g)) g.addTo(map); }
+    else if (map.hasLayer(g)) map.removeLayer(g);
+  });
+}
+map.on('zoomend', syncBands);
+
+/* A theme swap changes `--water`, and the layers hold the old colour until something restyles them.
+   `setStyle` takes the same function the build used, so there is one definition of the paint. */
+function paintWater() {
+  seaLayer?.setStyle(waterStyle);
+  for (const g of waterBands) g.eachLayer(l => l.setStyle(waterStyle));
+}
+
+function ensureWater() {
+  if (waterGeo) { paintWater(); return; }
+  if (asking) return;
+  asking = true;
+  /* Past the first paint. This file is about 560 KB gzipped, against 271 KB for the whole of the
+     rest of the landing. A fetch here more than doubles what a reader waits for. It draws water
+     the basemap omits, over a map that already works, so it can arrive late. requestIdleCallback
+     yields to anything the browser prefers to do first. The setTimeout is the fallback for Safari,
+     which does not implement it. */
+  /* Called as a method on `window`, never lifted off it. `requestIdleCallback` is a `Window`
+     operation, so invoking a detached reference gives it the wrong receiver and it throws. That
+     throw lands during module evaluation, because applyTheme() runs at the top level of js/ui.js,
+     which js/app.js imports statically. So every reader loses the whole app, not just the water. */
+  const later = fn => window.requestIdleCallback
+    ? window.requestIdleCallback(fn)
+    : setTimeout(fn, 1200);
+  try {
+    later(() => fetch('water.json')
+      .then(r => r.ok ? r.json() : Promise.reject(r.status))
+      .then(g => { waterGeo = g; buildWater(); })
+      .catch(() => {}));
+  } catch {
+    /* Nothing about the water takes the app down. This runs inside module evaluation, so an
+       exception here stops js/ui.js and with it everything js/app.js does. A plainer map is the
+       documented outcome of a water failure. That has to hold for a synchronous throw too, not
+       only for a rejected fetch. */
+  }
 }
 
 function setBasemap() {
@@ -505,7 +535,7 @@ function setBasemap() {
   const opt = PROVIDER.opt;
   tiles  = L.tileLayer(PROVIDER.ground(key), opt).addTo(map);
   labels = L.tileLayer(PROVIDER.names(key), { ...opt, pane: 'labels' }).addTo(map);
-  setWater(key === 'dark');
+  ensureWater();
 }
 
 // `PREFS.theme` is the one place this app keeps the reader's pick. The picker is three rows in

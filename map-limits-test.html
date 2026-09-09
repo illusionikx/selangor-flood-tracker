@@ -46,11 +46,17 @@ const fails = [];
 const ok = (name, pass, detail) => { say((pass ? 'ok   ' : 'FAIL ') + name + '   ' + detail);
                                      if (!pass) fails.push(name); };
 
-/* HALF the floors water-build.php states, on purpose. This asserts that the floors EXIST, never
+/* HALF the band-0 edges water-build.php states, on purpose. This asserts that the edges EXIST, never
    that they hold one value. Raising either constant must not turn this page red, and deleting them
-   must. Hard-coding the real numbers here would put a copy of a PHP constant in a JavaScript file,
-   with nothing to keep the two together. */
+   must. Hard-coding the real numbers here puts a copy of a PHP constant in a JavaScript file.
+   Nothing then keeps the two together. */
 const FLOOR_RIVER_KM = 0.5, FLOOR_AREA_KM2 = 0.005;
+
+/* The zoom each band starts at, restated from js/map.js. Three views probe three answers. */
+const BAND_MIN = [0, 11, 13];
+
+/* Open sea west of the Klang estuary, and two places nobody can mistake for water. */
+const SEA_AT = [3.02, 101.05], LAND_AT = [3.1390, 101.6869];
 
 const settle = ms => new Promise(r => setTimeout(r, ms));
 
@@ -203,14 +209,84 @@ try {
   };
 
   const water = await (await fetch('water.json')).json();
-  const lines = water.features.find(f => f.properties.t === 'line').geometry.coordinates;
-  const areas = water.features.find(f => f.properties.t === 'area').geometry.coordinates;
-  const shortest = Math.min(...lines.map(lineKm));
-  const smallest = Math.min(...areas.map(p => areaKm2(p[0])));
-  ok('no river under the floor', shortest >= FLOOR_RIVER_KM,
-     lines.length + ' rivers, shortest ' + shortest.toFixed(2) + ' km, floor ' + FLOOR_RIVER_KM);
-  ok('no water body under the floor', smallest >= FLOOR_AREA_KM2,
-     areas.length + ' bodies, smallest ' + smallest.toFixed(4) + ' km2, floor ' + FLOOR_AREA_KM2);
+  const feat = (t, b) => water.features.find(f => f.properties.t === t && f.properties.b === b);
+
+  // --- the bands -----------------------------------------------------------------------------
+
+  const lines0 = feat('line', 0).geometry.coordinates;
+  const areas0 = feat('area', 0).geometry.coordinates;
+  const shortest = Math.min(...lines0.map(lineKm));
+  const smallest = Math.min(...areas0.map(p => areaKm2(p[0])));
+  ok('no band 0 river under the edge', shortest >= FLOOR_RIVER_KM,
+     lines0.length + ' rivers, shortest ' + shortest.toFixed(2) + ' km, edge ' + FLOOR_RIVER_KM);
+  ok('no band 0 water body under the edge', smallest >= FLOOR_AREA_KM2,
+     areas0.length + ' bodies, smallest ' + smallest.toFixed(4) + ' km2, edge ' + FLOOR_AREA_KM2);
+
+  /* Every band has to carry shapes. A bake that stamped every shape band 0 passes the two
+     assertions above. It also puts the deleted water back on zoom 10. That is the fault the
+     bands exist to stop. */
+  for (let b = 0; b < 3; b++)
+    ok('band ' + b + ' carries shapes',
+       feat('line', b).geometry.coordinates.length > 0 &&
+       feat('area', b).geometry.coordinates.length > 0,
+       feat('line', b).geometry.coordinates.length + ' rivers, ' +
+       feat('area', b).geometry.coordinates.length + ' bodies');
+
+  /* Band 2 must hold water smaller than band 0 refuses. Otherwise the bands are a relabelling of one
+     set and the small water never came back. */
+  const small2 = Math.min(...feat('area', 2).geometry.coordinates.map(p => areaKm2(p[0])));
+  ok('band 2 holds water the old floor cut', small2 < FLOOR_AREA_KM2,
+     'smallest band 2 body ' + small2.toFixed(5) + ' km2');
+
+  // --- the sea -------------------------------------------------------------------------------
+
+  const seaRings = water.features.find(f => f.properties.t === 'sea').geometry.coordinates[0];
+  ok('the sea is one polygon with islands as holes', seaRings.length > 1,
+     'ring 0 plus ' + (seaRings.length - 1) + ' islands');
+
+  /* Ray casting, so this reads the shape rather than a claim about it. A sea that swallowed the
+     whole box and a sea that never closed both draw as a plausible picture. */
+  const inRing = (ring, x, y) => {
+    let inside = false;
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++)
+      if ((ring[i][1] > y) !== (ring[j][1] > y) &&
+          x < (ring[j][0] - ring[i][0]) * (y - ring[i][1]) / (ring[j][1] - ring[i][1]) + ring[i][0])
+        inside = !inside;
+    return inside;
+  };
+  ok('open water is inside the sea', inRing(seaRings[0], SEA_AT[1], SEA_AT[0]),
+     SEA_AT[1] + ', ' + SEA_AT[0]);
+  ok('Kuala Lumpur is outside the sea', !inRing(seaRings[0], LAND_AT[1], LAND_AT[0]),
+     LAND_AT[1] + ', ' + LAND_AT[0]);
+
+  // --- the zoom rule -------------------------------------------------------------------------
+
+  const { waterBands } = await import('./js/map.js');
+
+  /* The floor is computed from the coverage circle and the window, so it is not a literal. Read it.
+     `setZoom` rather than `setView`, because the pan box can refuse a centre. The assertions below
+     then report a band rule that is really a pan limit. */
+  const zmin = map.getMinZoom();
+
+  /* Both answers have to be exercised, or this block only ever proves that a band draws. The floor
+     has to sit under band 1 for the "stays off" case to run at all. If the circle ever pushes the
+     floor past 11, this line goes red. It then says why the block below lost its teeth. */
+  ok('the zoom floor sits under band 1', zmin < BAND_MIN[1],
+     'floor ' + zmin + ', band 1 starts at ' + BAND_MIN[1]);
+
+  /* This adds `animate: false`, which every other `setZoom` and `setView` call on this page already
+     carries. A CSS zoom transition schedules through `requestAnimationFrame`. This headless run
+     never services that frame. So `zoomend` never fires. The loop then reads a stale band forever.
+     Measured: three seconds of settling never moved `getZoom()` off 8. The next `setZoom` call
+     resolved it. It jumped straight to its own target instead. */
+  for (const z of [zmin, 12, 15]) {
+    map.setZoom(z, { animate: false });
+    await settle(400);
+    for (let b = 0; b < 3; b++)
+      ok('zoom ' + z + ' band ' + b + (z >= BAND_MIN[b] ? ' draws' : ' stays off'),
+         map.hasLayer(waterBands[b]) === (z >= BAND_MIN[b]),
+         'hasLayer ' + map.hasLayer(waterBands[b]));
+  }
 
   // --- the pane order ----------------------------------------------------------------------------
 
