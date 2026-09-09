@@ -18240,3 +18240,24 @@ sea and the large lakes alone, and `water.json` draws every pond it never touche
 
 The sea is still not blue on the CARTO Dark Matter ground. That answer is a baked coastline shape,
 and it is still not built.
+
+### The key did not arrive, 2026-09-09
+
+The request went to CARTO on 2026-09-08. No mail reached the address by the next day, in the inbox,
+the spam folder or the trash. CARTO's own page promises no approval queue, so a silent day means
+the form dropped the request.
+
+The repository owner chose to stay on Esri on 2026-09-09. The wiring stays as it is. Esri draws
+correctly, and the switch above is still one constant.
+
+The owner rejected two alternatives the same day.
+
+Stadia Maps issues a key at once with no credit card, and it needs no key at all on `localhost`.
+Its `alidade_smooth` and `alidade_smooth_dark` match Positron and Dark Matter in intent, and its
+tile URL takes the same `{z}/{x}/{y}{r}` shape. It publishes no labels-only raster tile. So the
+ground and the place names arrive as one image, and `water.json` would paint over the name of a
+town its river runs through. That is the exact fault the CARTO `nolabels` and `only_labels` split
+avoids.
+
+MapLibre GL vector tiles carry their own entry above, measured on 2026-09-03. They cost 200 KB of
+library and they measured a worse 95th-percentile frame than the raster basemap.

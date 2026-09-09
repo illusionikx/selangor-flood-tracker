@@ -215,6 +215,10 @@ export const NOTICE = {
    burned into the picture, at every zoom and under every referer. That is a policy change rather
    than a rate limit, so the move to Esri followed. The repository owner asked to return to CARTO on
    2026-09-08, with a key. Esri holds the map until that key lands.
+   **The key never arrived, and on 2026-09-09 the owner chose to stay on Esri.** The request went in
+   on 2026-09-08 and no mail reached the address by the next day, in the inbox, the spam folder or
+   the trash. CARTO's page promises no approval queue, so a silent day means the form dropped it.
+   Do not rip this wiring out. Esri draws correctly, and the switch stays one constant.
 
    **The key is public and it cannot be otherwise.** It travels in a tile URL that a browser has to
    fetch, so anybody can read it out of the network panel. The form that issues the key asks which
