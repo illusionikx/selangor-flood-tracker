@@ -451,8 +451,10 @@
    so it wore the kind hue or the danger red. The repository owner asked for one red on 2026-09-03.
    A mark that changes colour with the station under it answers "what kind is this", which the
    station's own pin already answered a moment ago. This one answers "which station is open".
-   `--sel` is in `css/base.css` beside the pin palette, and it is deeper than `--s-danger` so the
-   mark does not read as an alarm. `color` here beats `.pin`'s own `var(--c)` on specificity, so an
+   `--sel` is in `css/base.css` beside the pin palette, and it is BRIGHTER than `--s-danger` so the
+   mark does not read as an alarm. It was deeper than that token until 2026-09-09, and a reader read
+   the two as one red anyway. See that file for the measurement and for what the change costs.
+   `color` here beats `.pin`'s own `var(--c)` on specificity, so an
    inline `--c` left on the markup would change nothing. `markSel()` writes none. */
 /* **32px, and it has been 48, then 25, then 36.** The repository owner set 25 on 2026-08-26, which
    is the station disc's own diameter, raised it to 36 the same day, and brought the whole set down

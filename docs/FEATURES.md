@@ -17638,8 +17638,9 @@ All eight runnable checks pass after this change.
 ## The selected pin is red
 
 The teardrop over the open card's station is red. `--sel` in `css/base.css` holds the value,
-`#d32f2f`, beside the pin palette. `.pin.sel` in `css/map.css` reads it. The repository owner asked
-for the change on 2026-09-03.
+`#f87e75`, beside the pin palette. `.pin.sel` in `css/map.css` reads it. The repository owner asked
+for the change on 2026-09-03. The value was `#d32f2f` until 2026-09-09. See "The selection red got
+brighter" below for the reason it moved.
 
 ### What it replaced
 
@@ -17654,8 +17655,8 @@ question: which station is open. One colour states that.
 ### Why not the status red
 
 `--s-danger` is `#ff3b33`. Every status surface paints that scarlet, and it means one thing. A
-selection mark in the same red claims the station is at its danger mark. `--sel` is darker and less
-orange, so a reader does not read the two as one signal.
+selection mark in the same red claims the station is at its danger mark. `--sel` is brighter, so a
+reader does not read the two as one signal.
 
 ### Why the palette rule does not block it
 
@@ -17670,6 +17671,38 @@ reading, the meter draws the mark, and the alert list carries the station. So th
 three times over.
 
 `--sel` holds one value for both themes, which is what every token in the `.pin` block does.
+
+## The selection red got brighter
+
+A reader read the selection mark as an alarm on 2026-09-09. The mark was `#d32f2f`, a deep brick red.
+The alarm scarlet is `#ff3b33`. The two stood 9.2 dE apart in OKLCh, which was not enough.
+
+The repository owner asked for a brighter mark. `--sel` is `#f87e75` now.
+
+### What moved
+
+The hue did not move. Both values sit on hue 26. The lightness climbed from 0.568 to 0.730. That
+takes the distance from `--s-danger` to 11.1 dE.
+
+The chroma fell from 0.200 to 0.150. sRGB holds no bright red at the old chroma. Every point above
+lightness 0.72 on this hue falls outside the gamut.
+
+### The cost
+
+The warm band on this map is full. The nearest neighbour of the new value is the siren pink of the
+dark theme, `#ee90b1`, at 7.8 dE. The old value stood 22.2 dE from it. A sweep of the whole red band
+found no point that clears `--s-danger` by more than 11 dE and clears every station kind by more
+than 8 dE.
+
+The repository accepts that cost for two reasons. The two marks differ in size and in shape. The
+selection mark is a 32px teardrop and a siren pin is a 22px disc. A reader who mistakes the selection
+mark for an alarm pays more than a reader who mistakes it for a siren.
+
+### Contrast is not a new risk
+
+The teardrop carries a 2px stroke in `--surface` and one drop shadow. `.pinglyph` in `css/map.css`
+states the stroke. A brighter fill therefore still reads against the pale basemap of the light theme.
+The searched place mark already draws the same shape at a comparable lightness.
 
 ## The place name gets a gap before the readings
 

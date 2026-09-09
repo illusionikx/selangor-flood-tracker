@@ -524,13 +524,22 @@
   /* **The selection mark, and it is the one mark that states a colour of its own.** The repository
      owner asked for red on 2026-09-03. The teardrop over the open card's station used to lift that
      station's own `--c`, so it wore the kind hue or the danger red, whichever the pin held.
-     **This is a deeper red than `--s-danger` on purpose.** That token is #ff3b33, the alarm scarlet
-     every status surface paints, and a selection mark in the same red claims the station is at its
-     danger mark. This one is darker and less orange, so the two do not read as one signal.
+     **This is a BRIGHTER red than `--s-danger`, and it was a deeper one until 2026-09-09.** That
+     token is #ff3b33, the alarm scarlet every status surface paints, and a selection mark near it
+     claims the station is at its danger mark. The deep #d32f2f stood 9.2 dE from that scarlet in
+     OKLCh, and a reader read the two as one signal anyway. This value keeps the same hue, 26, and
+     climbs from lightness 0.568 to 0.730, which takes the distance to 11.1 dE.
+     **The chroma falls from 0.200 to 0.150 and it has to.** sRGB has no bright red left at the old
+     chroma. Every point above lightness 0.72 on this hue clips.
+     **The cost is that the warm band tightens.** The nearest neighbour is the dark theme's siren
+     pink at 7.8 dE, against 22.2 before. That is paid because the two marks differ in size and in
+     shape, a 32px teardrop against a 22px disc, and because reading a selection mark as an alarm
+     is the more expensive error of the two. A sweep of the whole red band found no point that
+     clears `--s-danger` by more than 11 dE and every kind by more than 8.
      It is a MARK rather than a reading, so the three-colour rule does not reach it: no sensor wears
      this, and `color()` never answers it. One value for both themes, the way every pin token here
      is, and it clears its own ring against a white tile and against the dark basemap alike. */
-  --sel: #d32f2f;
+  --sel: #f87e75;
 }
 
 * { box-sizing: border-box; }
