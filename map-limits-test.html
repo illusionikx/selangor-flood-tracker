@@ -31,6 +31,9 @@
 <dialog id="pane"></dialog>
 <input id="heatOpacity" type="range" min="0" max="100" value="100">
 <span id="heatOpacityVal"></span>
+<!-- `applyTheme()` writes this at call time, never at import time. Task 5's theme block below is
+     the first caller of `setTheme()` on this page, so nothing needed it before now. -->
+<meta name="theme-color" content="">
 <pre id="out">running</pre>
 <script>
   const out = document.getElementById('out'), log = [];
@@ -287,6 +290,29 @@ try {
          map.hasLayer(waterBands[b]) === (z >= BAND_MIN[b]),
          'hasLayer ' + map.hasLayer(waterBands[b]));
   }
+
+  // --- both themes ---------------------------------------------------------------------------
+
+  /* The light theme drew no water at all until 2026-09-09. `--water` had one value and
+     setBasemap() passed the theme to the layer. A missing token falls back to nothing. The
+     layer then paints in Leaflet's own default blue, with no error anywhere. */
+  /* `setTheme` writes the reader's own preference, and a person can open this page in their own
+     browser. So take the pick back at the end. */
+  const { setTheme } = await import('./js/map.js');
+  const { PREFS } = await import('./js/state.js');
+  const wasTheme = PREFS.theme;
+  const seen = {};
+  for (const t of ['light', 'dark']) {
+    setTheme(t);
+    await settle(300);
+    seen[t] = getComputedStyle(document.documentElement).getPropertyValue('--water').trim();
+    ok('the ' + t + ' theme states --water', /^#[0-9a-f]{6}$/i.test(seen[t]), seen[t] || '(empty)');
+  }
+  /* One value shared by both themes means one of them inherited the other. That draws a dark navy
+     sea on white paper, or a pale blue one on a near-black map. Neither throws. */
+  ok('each theme states its own water', seen.light !== seen.dark,
+     'light ' + seen.light + ', dark ' + seen.dark);
+  setTheme(wasTheme);
 
   // --- the pane order ----------------------------------------------------------------------------
 
