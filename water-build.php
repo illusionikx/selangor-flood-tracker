@@ -120,6 +120,19 @@ function areaKm2(array $ring): float {
     return abs($sum) / 2;
 }
 
+/**
+ * The signed shoelace of a ring, in square degrees.
+ *
+ * Only the SIGN is used. It says which way the ring winds. Leaflet fills a polygon with the nonzero
+ * rule, so an island has to wind against the sea around it or it paints as more sea.
+ */
+function signedArea(array $ring): float {
+    $s = 0.0;
+    for ($i = 0, $j = count($ring) - 1; $i < count($ring); $j = $i++)
+        $s += $ring[$j][0] * $ring[$i][1] - $ring[$i][0] * $ring[$j][1];
+    return $s / 2;
+}
+
 /** Length of an open line in kilometres, summed segment by segment. */
 function lineKm(array $pts): float {
     $km = 0.0;
@@ -171,6 +184,47 @@ function rings(array $ways): array {
     return $out;
 }
 
+/**
+ * Build the sea as one polygon with the islands as holes.
+ *
+ * OpenStreetMap maps the open sea as `natural=coastline`, a directed line with land on the left.
+ * There is no sea shape to ask for. So this closes the shore against a meridian west of everything
+ * the query returned. All three closing edges lie in open water.
+ *
+ * The result is one polygon. Ring 0 is the sea. Every later ring is an island, wound against ring 0.
+ */
+function sea(array $ways, float $tol): array {
+    $open = []; $isles = [];
+    foreach (chains($ways) as $c) {
+        if (count($c) > 3 && $c[0] === end($c)) $isles[] = $c; else $open[] = $c;
+    }
+    if (count($open) !== 1)
+        fail('the coastline walked into ' . count($open) . ' open chains, and one was expected');
+
+    $shore = clean(simplify($open[0], $tol));
+    $west  = INF;
+    foreach ($shore as $p) $west = min($west, $p[0]);
+    foreach ($isles as $r) foreach ($r as $p) $west = min($west, $p[0]);
+    $west -= 0.2;                              // clear of every point the query returned
+
+    // Out to the meridian at the far end, up or down it, and back in at the near end.
+    $ring   = $shore;
+    $ring[] = [$west, end($shore)[1]];
+    $ring[] = [$west, $shore[0][1]];
+    $ring[] = $shore[0];
+
+    $poly = [$ring];
+    $sign = signedArea($ring) <=> 0;
+    foreach ($isles as $r) {
+        $c = clean(simplify($r, $tol));
+        if (count($c) < 4) continue;
+        if ($c[0] !== end($c)) $c[] = $c[0];
+        if ((signedArea($c) <=> 0) === $sign) $c = array_reverse($c);
+        $poly[] = $c;
+    }
+    return $poly;
+}
+
 // --- fetch ---------------------------------------------------------------------------------------
 
 [$w, $n, $e, $s] = box();
@@ -214,6 +268,39 @@ file_put_contents($RAW, $body);
 
 $els = json_decode($body, true)['elements'] ?? null;
 if (!is_array($els)) fail('Overpass returned no elements — the query or the service changed');
+
+/* The coastline is its own query and its own cache file. It answers a different question and it
+   changes on a different clock, so a tolerance run must not refetch it. */
+$RAWC  = sys_get_temp_dir() . '/water-build-coast.json';
+$cq    = "[out:json][timeout:300];way[\"natural\"=\"coastline\"]($bbox);out geom;";
+$cbody = (in_array('--cached', $argv, true) && is_file($RAWC)) ? file_get_contents($RAWC) : null;
+if ($cbody === null) {
+    echo "water-build: asking Overpass for the coastline in $bbox\n";
+    $ch = curl_init(ENDPOINT);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_POST           => true,
+        CURLOPT_POSTFIELDS     => http_build_query(['data' => $cq]),
+        CURLOPT_TIMEOUT        => 420,
+        CURLOPT_USERAGENT      => 'klang-valley-flood-watch/1.0 (water-build.php, run by hand)',
+    ]);
+    $cbody = curl_exec($ch);
+    $ccode = curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+    if ($cbody === false) fail('curl: ' . curl_error($ch));
+    curl_close($ch);
+    if ($ccode !== 200) fail("Overpass answered $ccode for the coastline — a 504 is routine, so retry");
+    file_put_contents($RAWC, $cbody);
+}
+$cels = json_decode($cbody, true)['elements'] ?? null;
+if (!is_array($cels)) fail('the coastline query returned no elements');
+
+$cways = [];
+foreach ($cels as $el) {
+    $g = [];
+    foreach ($el['geometry'] ?? [] as $p) if ($p) $g[] = [$p['lon'], $p['lat']];
+    if (count($g) > 1) $cways[] = $g;
+}
+$seaPoly = sea($cways, $tol);
 
 // --- trim ----------------------------------------------------------------------------------------
 
@@ -268,9 +355,12 @@ foreach ($els as $el) {
 
 if (!$lines || !$areas) fail('rivers or water bodies came back empty — refusing to write the file');
 
-// Two features rather than a GeometryCollection, because js/map.js styles them differently: a river
-// is a stroke and a pond is a fill. `t` is the whole of what it reads.
+// Three features rather than a GeometryCollection, because js/map.js styles them differently: a
+// river is a stroke, a pond is a fill, and the sea is a fill with the islands cut out of it. `t` is
+// the whole of what it reads.
 $json = json_encode(['type' => 'FeatureCollection', 'features' => [
+    ['type' => 'Feature', 'properties' => ['t' => 'sea'],
+     'geometry' => ['type' => 'MultiPolygon', 'coordinates' => [$seaPoly]]],
     ['type' => 'Feature', 'properties' => ['t' => 'line'],
      'geometry' => ['type' => 'MultiLineString', 'coordinates' => $lines]],
     ['type' => 'Feature', 'properties' => ['t' => 'area'],
@@ -278,8 +368,9 @@ $json = json_encode(['type' => 'FeatureCollection', 'features' => [
 ]]);
 file_put_contents(OUT, $json);
 
-printf("water-build: %d rivers, %d water bodies, %d points, %d KB on disk, about %d KB gzipped\n",
-       count($lines), count($areas), $points, strlen($json) / 1024, strlen(gzencode($json, 9)) / 1024);
+printf("water-build: %d rivers, %d water bodies, %d islands, %d points, %d KB on disk, about %d KB gzipped\n",
+       count($lines), count($areas), count($seaPoly) - 1, $points,
+       strlen($json) / 1024, strlen(gzencode($json, 9)) / 1024);
 printf("water-build: the floors cut %d rivers under %.2f km and %d bodies under %.4f km2\n",
        $cut['river'], MIN_RIVER_KM, $cut['pond'], MIN_AREA_KM2);
 echo "water-build: commit water.json. js/map.js fetches it by name, so there is no ?v= to bump.\n";
