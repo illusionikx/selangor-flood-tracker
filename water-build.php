@@ -35,16 +35,18 @@ const TOL_DEG  = 0.00006;  // Douglas-Peucker tolerance, about 6.6 m, which is a
                            // screenshot at zoom 15 against a build at `--tol=0` and compare, and
                            // measure any new value the same way.
 
-/* The size floors, and they REVERSE part of the reason above. The header says this file exists
-   because the basemap hides small water. That is still true close in. It stopped being the whole
-   truth at zoom 10, where the unfiltered set drew 2,775 rivers as a blue web over the whole state
-   and answered no question a reader had. A drain behind a house is not a flood risk a reader reads
-   off a map of six thousand of them.
-   So the floors cut the shapes that only ever added texture. Anything at or above them still draws
-   at every zoom, exactly as before. The repository owner asked for this on 2026-09-02.
+/* THE SIZE FLOORS ARE BAND EDGES NOW, AND THEY NO LONGER DELETE A SHAPE.
+   They deleted one until 2026-09-09. The reason was never the file size. Measured across five
+   settings, the whole set holds 3.2 times the shapes for 35 percent more bytes. The reason was the
+   picture: 2,775 rivers drew as a blue web over the whole state at zoom 10, and answered no question
+   a reader had.
+   A zoom answers that instead. Band 0 is what the map drew under the old floors, and it draws at
+   every zoom. Band 1 joins it at zoom 11 and band 2 at zoom 13. See `BAND_MIN` in js/map.js.
    Tune these against the counts this script prints, never against a guess. */
-const MIN_AREA_KM2 = 0.01;   // one hectare. The median body in the box is 0.0037 km².
-const MIN_RIVER_KM = 1.0;    // a river shorter than a kilometre is a drain at this map's zooms.
+const MIN_AREA_KM2 = 0.01;   // band 0. One hectare. The median body in the box is 0.0037 km².
+const MIN_RIVER_KM = 1.0;    // band 0. A river shorter than a kilometre is a drain at zoom 10.
+const MID_AREA_KM2 = 0.002;  // band 1. Below this a body waits for zoom 13.
+const MID_RIVER_KM = 0.3;    // band 1. Below this a river waits for zoom 13.
 /* Coordinate rounding, in decimal places. 4 is about 11 m and 5 is about 1.1 m. This is a FLOOR
    under the tolerance above, not a second tolerance: a grid coarser than the tolerance turns a
    smooth curve into a staircase, whatever Douglas-Peucker left. So keep the grid under the
@@ -142,6 +144,11 @@ function lineKm(array $pts): float {
                      ($pts[$i][1] - $pts[$i - 1][1]) * 110.57);
     }
     return $km;
+}
+
+/** The band a shape belongs to, from its own size. 0 draws always, 1 from zoom 11, 2 from zoom 13. */
+function band(float $size, float $hi, float $mid): int {
+    return $size >= $hi ? 0 : ($size >= $mid ? 1 : 2);
 }
 
 // The backwards join cases closed no lake outline that the append-only walk left open. They exist
@@ -329,8 +336,7 @@ $seaPoly = sea($cways, $tol);
 
 // --- trim ----------------------------------------------------------------------------------------
 
-$lines = []; $areas = []; $points = 0;
-$cut = ['pond' => 0, 'river' => 0];   // what the two floors above took, printed at the end
+$lines = [[], [], []]; $areas = [[], [], []]; $points = 0;
 
 foreach ($els as $el) {
     $isRiver = ($el['tags']['waterway'] ?? '') === 'river';
@@ -349,15 +355,15 @@ foreach ($els as $el) {
             foreach (array_merge([$ring], rings($inner)) as $r) {
                 $c = clean(simplify($r, $tol));
                 if (count($c) < 4) continue;
-                if ($c[0] !== end($c)) $c[] = $c[0];      // rounding can unclose a ring
+                if ($c[0] !== end($c)) $c[] = $c[0];
                 $poly[] = $c; $kept += count($c);
             }
-            $inner = [];                                   // holes belong to the first ring only.
-            // Cleared BEFORE the floor below, or a cut first ring hands its holes to the second.
-            // The floor reads the OUTER ring alone. A lake with a wooded island in it is still a
-            // lake the size of its own shore.
-            if ($poly && areaKm2($poly[0]) < MIN_AREA_KM2) { $cut['pond']++; continue; }
-            if ($poly) { $areas[] = $poly; $points += $kept; }
+            $inner = [];                       // holes belong to the first ring only
+            if (!$poly) continue;
+            // The band reads the OUTER ring alone. A lake with a wooded island in it is still a lake
+            // the size of its own shore.
+            $areas[band(areaKm2($poly[0]), MIN_AREA_KM2, MID_AREA_KM2)][] = $poly;
+            $points += $kept;
         }
         continue;
     }
@@ -369,33 +375,33 @@ foreach ($els as $el) {
     if (count($c) < 2) continue;
 
     if ($isRiver) {
-        if (lineKm($c) < MIN_RIVER_KM) { $cut['river']++; continue; }
-        $lines[] = $c; $points += count($c); continue;
+        $lines[band(lineKm($c), MIN_RIVER_KM, MID_RIVER_KM)][] = $c;
+        $points += count($c);
+        continue;
     }
     if (count($c) < 4) continue;
     if ($c[0] !== end($c)) $c[] = $c[0];
-    if (areaKm2($c) < MIN_AREA_KM2) { $cut['pond']++; continue; }
-    $areas[] = [$c]; $points += count($c);
+    $areas[band(areaKm2($c), MIN_AREA_KM2, MID_AREA_KM2)][] = [$c];
+    $points += count($c);
 }
 
-if (!$lines || !$areas) fail('rivers or water bodies came back empty — refusing to write the file');
+if (!$lines[0] || !$areas[0]) fail('band 0 came back empty — refusing to write the file');
 
-// This writes three features rather than one GeometryCollection. js/map.js styles each one
-// differently. A river is a stroke. A pond is a fill. The sea is a fill with the islands cut out
-// of it. `t` is the whole of what it reads.
-$json = json_encode(['type' => 'FeatureCollection', 'features' => [
-    ['type' => 'Feature', 'properties' => ['t' => 'sea'],
-     'geometry' => ['type' => 'MultiPolygon', 'coordinates' => [$seaPoly]]],
-    ['type' => 'Feature', 'properties' => ['t' => 'line'],
-     'geometry' => ['type' => 'MultiLineString', 'coordinates' => $lines]],
-    ['type' => 'Feature', 'properties' => ['t' => 'area'],
-     'geometry' => ['type' => 'MultiPolygon', 'coordinates' => $areas]],
-]]);
+/* Seven features. A GeoJSON property belongs to a feature and not to one geometry inside it, so a
+   band is a feature of its own. js/map.js reads `t` and `b` and nothing else. */
+$feat = [['type' => 'Feature', 'properties' => ['t' => 'sea'],
+          'geometry' => ['type' => 'MultiPolygon', 'coordinates' => [$seaPoly]]]];
+for ($b = 0; $b < 3; $b++) {
+    $feat[] = ['type' => 'Feature', 'properties' => ['t' => 'line', 'b' => $b],
+               'geometry' => ['type' => 'MultiLineString', 'coordinates' => $lines[$b]]];
+    $feat[] = ['type' => 'Feature', 'properties' => ['t' => 'area', 'b' => $b],
+               'geometry' => ['type' => 'MultiPolygon', 'coordinates' => $areas[$b]]];
+}
+$json = json_encode(['type' => 'FeatureCollection', 'features' => $feat]);
 file_put_contents(OUT, $json);
 
-printf("water-build: %d rivers, %d water bodies, %d islands, %d points, %d KB on disk, about %d KB gzipped\n",
-       count($lines), count($areas), count($seaPoly) - 1, $points,
-       strlen($json) / 1024, strlen(gzencode($json, 9)) / 1024);
-printf("water-build: the floors cut %d rivers under %.2f km and %d bodies under %.4f km2\n",
-       $cut['river'], MIN_RIVER_KM, $cut['pond'], MIN_AREA_KM2);
+printf("water-build: %d islands, %d points, %d KB on disk, about %d KB gzipped\n",
+       count($seaPoly) - 1, $points, strlen($json) / 1024, strlen(gzencode($json, 9)) / 1024);
+for ($b = 0; $b < 3; $b++)
+    printf("water-build:   band %d: %d rivers, %d water bodies\n", $b, count($lines[$b]), count($areas[$b]));
 echo "water-build: commit water.json. js/map.js fetches it by name, so there is no ?v= to bump.\n";
