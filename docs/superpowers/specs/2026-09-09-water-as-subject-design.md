@@ -124,23 +124,19 @@ zoom 13 that the floors removed from zoom 10.
 
 `--water` gains a light theme value. `setWater()` stops testing the theme and always draws.
 
-The candidate values below come from OKLCh at hue 238, which is the hue the palette rule pins to
-water. The table states contrast against the basemap land tone and against `--k-river`, the river
-station pin.
+The light value comes from OKLCh at hue 238, which is the hue the palette rule pins to water. The
+table states contrast against the basemap land tone and against `--k-river`, the river station pin.
 
-| theme | candidate | OKLCh | against land | against the pin |
+| theme | value | OKLCh | against land | against the pin |
 |---|---|---|---|---|
-| light | `#8cc6ec` | L 0.80, C 0.08, H 238 | 1.50:1 | 1.22:1 |
-| dark, today | `#15364e` | L 0.32, C 0.06, H 243 | 1.49:1 | 5.62:1 |
-| dark, candidate | `#1b77a7` | L 0.54, C 0.11, H 238 | 1.70:1 | 2.21:1 |
+| light, new | `#8cc6ec` | L 0.80, C 0.08, H 238 | 1.50:1 | 1.22:1 |
+| dark, unchanged | `#15364e` | L 0.32, C 0.06, H 243 | 1.49:1 | 5.62:1 |
 
-The light candidate holds the same separation from land that the dark theme holds today. That makes
-the two themes symmetric.
+The light value holds the same separation from land that the dark theme holds today. The two themes
+then match, and that is the reason to pick it.
 
-The dark candidate answers a fault the measurement exposed. The current `--water` separates from
-land by 1.49:1. The untouched Esri sea separates by 1.87:1. So the water this app draws reads as
-less distinct than the water it replaces. The candidate reverses the relation and makes water brighter
-than land, which is how a hydrology map usually reads.
+The measurement also exposed a fault in the dark value. This design does not act on it. Read the
+section on that decision below.
 
 Take the final value from a rendered picture, not from the table. The tolerance in
 `water-build.php` states that method, and two readers rejected a value derived by arithmetic alone.
@@ -165,7 +161,7 @@ The palette rule stays. Water keeps hue 238. No status hue enters the map.
 | `water-build.php` | the coastline query, the chain walk, the box closure, the band stamp |
 | `water.json` | rebaked, three features, a band on each shape |
 | `js/map.js` | three layer groups, a `zoomend` handler, no theme test in `setWater()` |
-| `css/base.css` | a light theme `--water`, and a new dark value if the owner takes it |
+| `css/base.css` | a light theme `--water`. The dark value does not move |
 | `map-limits-test.html` | reads `water.json`, so check it against the new shape |
 
 Three comments in `js/map.js` are stale and this change corrects them. Line 450 states 242 KB
@@ -182,8 +178,13 @@ Run `paint-check.html` and `m3-check.html`, because the map card is in both.
 Take a screenshot at zoom 10, zoom 12 and zoom 15, on each theme. Compare each against the build
 before this change. A band that draws too much shows as a web, and no assertion can measure that.
 
-## Open decisions
+## The decision on the dark value
 
-The dark `--water` value is the one item this design does not settle. The owner asked for the light
-theme. Raising the dark value is a second change that the measurement argues for. Take it or leave
-it before the build starts.
+The dark `--water` stays at `#15364e`. The repository owner made that call on 2026-09-09.
+
+The measurement above stands and this design does not act on it. The dark theme keeps water darker
+than the land. It separates from land by 1.49:1 where the untouched Esri sea gives 1.87:1. The river
+pin keeps its 5.62:1 over the water it sits on.
+
+Only the light theme gains a value. Do not raise the dark value as a side effect of any task in the
+plan.
