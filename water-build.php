@@ -355,9 +355,9 @@ foreach ($els as $el) {
 
 if (!$lines || !$areas) fail('rivers or water bodies came back empty — refusing to write the file');
 
-// Three features rather than a GeometryCollection, because js/map.js styles them differently: a
-// river is a stroke, a pond is a fill, and the sea is a fill with the islands cut out of it. `t` is
-// the whole of what it reads.
+// This writes three features rather than one GeometryCollection. js/map.js styles each one
+// differently. A river is a stroke. A pond is a fill. The sea is a fill with the islands cut out
+// of it. `t` is the whole of what it reads.
 $json = json_encode(['type' => 'FeatureCollection', 'features' => [
     ['type' => 'Feature', 'properties' => ['t' => 'sea'],
      'geometry' => ['type' => 'MultiPolygon', 'coordinates' => [$seaPoly]]],
