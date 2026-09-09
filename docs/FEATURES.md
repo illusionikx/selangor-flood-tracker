@@ -18181,9 +18181,15 @@ options. `setBasemap()` reads those three and knows nothing about either company
 ### What to do when the key lands
 
 1. Request the key at https://carto.com/basemaps/apikey/ . The form asks for an email address, the
-   domain that will use the basemaps, and a line about the project. Name the deployed host, never
-   `flood-exp.test`. No CARTO account is needed, and the key arrives by email with no approval
-   queue.
+   domain that will use the basemaps, and a line about the project. No CARTO account is needed, and
+   the key arrives by email with no approval queue.
+   **This app runs on three hosts and only one is a real domain.** They are `flood-exp.test` under
+   Herd, a bare IP over plain http on the personal box, and `illusionikx.github.io` for the Pages
+   build. Name the Pages domain in the field, and name the other two in the description.
+   **Whether CARTO binds the key to the `Referer` is not known.** Their page states no rule either
+   way. So test one tile by eye on each host after the key lands. A watermark on one host and a
+   clean tile on another means the key is bound, and the answer is a reply to the CARTO email.
+   The bare IP is the host most likely to fail such a check, because an IP is not a domain.
 2. Put the key in `CARTO_KEY` in `js/config.js`.
 3. Load the map and look at one tile. A wrong key answers HTTP 200 with the ordinary picture, so
    only the watermark tells you.
