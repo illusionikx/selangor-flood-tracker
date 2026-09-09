@@ -18449,3 +18449,103 @@ hand-managed and it changes rarely.
 **The build strips only the comments from `index.html`.** Whitespace between elements is significant
 between inline boxes, and this app has no rule that says which of its elements are which. Comments
 were 51% of that file, and the blank lines followed them out. The rest stays as written.
+
+## Water becomes the subject of the map, 2026-09-09
+
+`water-build.php` now asks Overpass a second time, for `natural=coastline`. It bakes the sea as
+one polygon, with 32 islands as holes. The two size floors, `MIN_AREA_KM2` and `MIN_RIVER_KM`,
+stopped deleting a shape. Each shape now carries a zoom band instead. `water.json` holds seven
+features: the sea, and three bands each of rivers and water bodies. `js/map.js` draws the sea at
+every zoom. It adds or removes a band group on `zoomend`. `css/base.css` gained a light-theme
+`--water`. The dark value did not move.
+
+### What a reader sees
+
+The sea and the Klang estuary draw now, on both themes. Neither drew before. Small water returns
+as the reader zooms in. Band 1 draws from zoom 11. Band 2 draws from zoom 13. Water draws on the
+light theme now. Before this change, only the dark theme drew it.
+
+### Measurement 1: the size floors never bought bytes
+
+This plan baked five settings against the same cached Overpass answer.
+
+| floors | rivers | bodies | gzipped |
+|---|---|---|---|
+| 0.01 km2 and 1.0 km, the old floors | 866 | 1185 | 402 KB |
+| 0.005 km2 and 0.5 km | 1129 | 2263 | 445 KB |
+| 0.002 km2 and 0.3 km | 1336 | 4236 | 493 KB |
+| 0.001 km2 and 0.15 km | 1595 | 5016 | 513 KB |
+| none | 2775 | 6394 | 543 KB |
+
+The whole set holds 3.2 times the shapes for 35 percent more bytes. The floors bought a picture,
+not a file size. Their own comment named the picture: 2,775 rivers drew as a blue web at zoom 10.
+
+So the floors became band edges. They no longer cut a shape.
+
+### Measurement 2: the bands as they shipped
+
+| band | draws from zoom | rivers | water bodies |
+|---|---|---|---|
+| 0 | every zoom | 866 | 1185 |
+| 1 | 11 | 470 | 3051 |
+| 2 | 13 | 1439 | 2158 |
+
+The final file holds 2,511 KB on disk. It holds about 568 KB gzipped, with the sea.
+
+This plan verified the band windows are disjoint. Band 0 rivers run 1.0008 to 94.1182 km. Band 1
+runs 0.3003 to 0.9984 km. Band 2 runs 0.0111 to 0.2982 km. The bodies follow the same pattern,
+against 0.01 and 0.002 square kilometres.
+
+### Measurement 3: the coastline
+
+One Overpass query, for `natural=coastline` over `BOX`, returns 276 ways. It returns 15,235
+points. It holds exactly two open chain ends.
+
+The sea polygon holds one outer ring of 2,281 points. It holds 32 islands as holes. The outer ring
+covers 13,465.0 square kilometres. The outer ring winds one way. Every island winds the other way.
+
+### Measurement 4: the basemap paints water grey
+
+This plan sampled one tile at zoom 11 over the Klang estuary, from each Esri Canvas service.
+
+| service | land | sea |
+|---|---|---|
+| World Light Gray Canvas | `#e8e8e8` | `#d0cfd4` |
+| World Dark Gray Canvas | `#4d4d4f` | `#232227` |
+
+Esri separates its sea from its land. It does not make the sea blue.
+
+### Measurement 5: the light theme value
+
+`#8cc6ec` is L 0.80, C 0.08, hue 238 in OKLCh. It holds 1.50:1 against `#e8e8e8`, the light land
+tone. The dark `#15364e` holds 1.49:1 against `#4d4d4f`, its own land tone. So both themes separate
+water from land by the same amount.
+
+The measurement also argues for raising the dark value. The untouched Esri sea separates from its
+land by 1.87:1. The drawn water at 1.49:1 reads as less distinct than the grey it covers. The
+repository owner decided against a change on 2026-09-09.
+
+### The negative result: no free water overlay exists
+
+`Reference/World_Hydro_Reference_Overlay`, on `server.arcgisonline.com`, answers HTTP 404. The
+public catalogue there holds the folders Canvas, Elevation, Ocean, Polar, Reference and Specialty.
+It also holds eight root services. The `Reference` folder holds boundaries, places and
+transportation only. It publishes no hydrography service.
+
+A vector basemap can style water at the source. `maplibre-spike.html` measured that route on
+2026-09-03. It does not ship. So water emphasis has to come from this app's own baked data.
+
+### What was not done
+
+The dark `--water` stays `#15364e`. The measurement above argues for raising it. The repository
+owner did not act on that argument.
+
+`water.json` stays one file. Splitting the detail bands into a second file, fetched only past zoom
+11, is about ten lines. It is not built. Build it when somebody measures that the landing suffers.
+
+MapLibre did not come back.
+
+The self-touch in the sea ring stays. Ring points 903 and 906 hold one coordinate. They form a
+44 metre spur that leaves and returns to one vertex. That is a touch at a repeated vertex, not a
+crossing. It comes from the source coastline, after the 11 metre coordinate rounding this file
+applies.

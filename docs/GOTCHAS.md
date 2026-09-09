@@ -3602,3 +3602,35 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   fired with no message, `toDataURL` was never reached, and every sprite came back null. A CSS
   `var()` inside a standalone SVG image is the second half of the same trap: it resolves against
   nothing and the shape draws in black, or not at all.
+- **A COASTLINE OVERHANGS THE BOX, AND ITS ENDS ARE NOT ITS EXTREMES.** Overpass returns a whole
+  way when any part of it meets the box. So the shore runs past the coverage area at both ends. An
+  overhanging end carries a hook that turns back. Measured on the first sea polygon this plan
+  baked. The shore ran from `(100.73310, 4.00340)` to `(101.84670, 2.48270)`. Its own latitude
+  maximum was `4.00520`. Nine shore points sat north of the northern endpoint. They reached west to
+  longitude `100.7174`, west of that endpoint. The closing edge runs west at the endpoint latitude.
+  So it crossed the shore. That polygon self-crossed in the far north-west, and nothing said so.
+  The repair cuts the chain at its own latitude extremes, and keeps the piece between them. Both
+  ends are then extremal by construction. So each closing edge meets the shore at its own endpoint
+  alone. A guard states that as a check, because a latitude tie breaks it in silence. This plan found
+  the fault by adding the guard first, and watching it fire. A three-point inside-outside probe
+  passed on the broken polygon.
+- **An island has to wind against the sea around it.** Leaflet fills a canvas polygon with the
+  nonzero rule. An island ring that winds the same way as the sea paints as more sea, and nothing
+  reports it. `sea()` forces the winding from a signed area. It does not trust the order
+  OpenStreetMap published.
+- **A band is a feature, not a property on one geometry.** A GeoJSON property belongs to a
+  feature. A band stamped on a `MultiLineString` coordinate lands nowhere a reader can find. So
+  each band is a feature of its own, and the file holds seven.
+- **LEAFLET PAINTS ITS OWN DEFAULT WHEN A STYLE COLOUR IS AN EMPTY STRING.** Measured on this app
+  between two tasks of this plan. The layer drew on both themes while `--water` still held a dark
+  value alone. `getComputedStyle` returned an empty string on the light theme. Leaflet fell back to
+  its own default there. The light theme painted `rgb(51,136,255)`, which is `#3388ff`, across
+  501,135 pixels of the water canvas. 16,502 black pixels sat beside it. An unset token does not
+  draw nothing. It draws Leaflet blue. A layer that reads a token must be sure that token exists on
+  every theme.
+- **The same shapes can assemble differently while the counts hold.** Task 1 rebuilt the
+  way-walker to grow a chain at both ends. The river count held at 866 exactly. The body count held
+  at 1185 exactly, so a count gate passed. 26 outlines had assembled differently all the same. The
+  total water body area moved from 282.4935 to 282.5016 square kilometres, a change of 0.003
+  percent. The three largest lakes stayed identical to three decimal places. The point count moved
+  from 99,406 to 99,409. A count gate does not test a shape.

@@ -44,7 +44,7 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `js/map.js` | map instance, basemap/theme, the pin layer, the station panel (`openSide`), `focusOn` / `flashTo`. Also the coverage mask, the zoom floor and the pan limit, all three off `border.json`. Also the zoom ceiling, 15, and `disableClusteringAtZoom: 15` on the cluster, which is what makes 15 the zoom that merges nothing |
 | `js/heat.js` | both heat layers (water level, rainfall), ground-fixed sizing per layer, shared opacity. Also the field pass where a gauge reporting no rain denies the ground a wet one claims |
 | `heat-test.html` | `chrome --headless --dump-dom` — one of eight runnable checks. Guards the rain layer's paint distance, its dry-gauge erase and its handover between neighbours, in canvas pixels |
-| `map-limits-test.html` | `chrome --headless --dump-dom` — one of eight runnable checks. Guards the coverage circle, the zoom floor, the pan limit and the two water floors. It probes the drawn shape with `isPointInFill`, so it reads the fill rule the browser paints with. It asserts that the circle holds every point of the land ring, that its centre sits east of that ring's middle, that the faint stripes still carry their hairline, and that the pattern sprite is rendered rather than `display: none`, which is the one thing that empties the tile with nothing to say so |
+| `map-limits-test.html` | `chrome --headless --dump-dom` — one of eight runnable checks. Guards the coverage circle, the zoom floor, the pan limit, the water bands and the sea polygon, on both themes. It probes the drawn shape with `isPointInFill`, so it reads the fill rule the browser paints with. The sea assertions use ray casting over the raw JSON instead, so a point off the visible map still counts. It asserts that the circle holds every point of the land ring, that its centre sits east of that ring's middle, that the faint stripes still carry their hairline, and that the pattern sprite is rendered rather than `display: none`, which is the one thing that empties the tile with nothing to say so |
 | `js/popup.js` | popup + meter + gauge + sparkline templates. Also `wxItem()` and its three helpers, the weather list item both weather surfaces draw |
 | `js/sparktip.js` | the hover/tap readout on every graph, and the label on any `data-tip`. One delegated listener, no imports |
 | `js/render.js` | rebuilds markers and heat points, the two saved lists, and the kind counts |
@@ -65,8 +65,8 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `sw.js` | service worker: network-first shell cache, and the reason Chrome offers "Install app" |
 | `icon.svg` | the app mark: bare glyph, no fill. Source for the PNGs *and* the `--i-flood` mask |
 | `icon-build.php` | `php icon-build.php` — rebakes the two icons and prints the mask rule to paste |
-| `water-build.php` | `php water-build.php` — rebakes `water.json` from OpenStreetMap. Holds the two size floors, `MIN_AREA_KM2` and `MIN_RIVER_KM`, and the Douglas-Peucker tolerance `TOL_DEG`. Takes `--tol=` and `--dp=` to try a value, and `--cached` to reuse the last raw Overpass answer. Run by hand, never in a request |
-| `water.json` | the water the dark basemap will not draw: 866 rivers + 1,185 ponds, baked and committed. It held 2,775 and 3,864 until the size floors landed on 2026-09-02. 1,732 KB, 402 KB gzipped, since the tolerance went to 6.6 m on 2026-09-07 |
+| `water-build.php` | `php water-build.php` — rebakes `water.json` from OpenStreetMap. It runs two Overpass queries. The second asks for `natural=coastline`, to build the sea. `MIN_AREA_KM2` and `MIN_RIVER_KM` are band edges now. They no longer cut a shape. Band 0 rivers run 1.0008 to 94.1182 km. Band 1 runs 0.3003 to 0.9984 km. Band 2 runs 0.0111 to 0.2982 km. Bodies follow the same pattern against 0.01 and 0.002 square kilometres. Also holds the Douglas-Peucker tolerance `TOL_DEG`. Takes `--tol=` and `--dp=` to try a value, and `--cached` to reuse the last raw Overpass answer. Run by hand, never in a request |
+| `water.json` | seven features it bakes and commits: the sea, and three bands each of rivers and water bodies. Band 0 draws at every zoom. Band 1 draws from zoom 11. Band 2 draws from zoom 13. 2,511 KB on disk, about 568 KB gzipped, with the sea |
 | `border-build.php` | `php border-build.php` — bakes `border.json` from OpenStreetMap. Two Overpass calls: Selangor's geometry, then its member way TAGS, so the sea boundary (`maritime=yes`) can be dropped before the circle is placed. Run by hand, never in a request |
 | `border.json` | `circle` is `[lat, lng, km]` and is the one source for three things: the shading outside it, the zoom floor and the pan limit. Also the full outline and the land ring, which only `border-build.php` and `map-limits-test.html` read. 30 KB, 4 KB gzipped |
 | `wx-build.php` | `php wx-build.php` — bakes `wx-places.json` from Nominatim. Run by hand, never in a request |
@@ -682,6 +682,11 @@ order that file holds them. A trap names itself here, and the file states the ev
 - The hover panel states its own background and its own shadow, and it carrie...
 - A camera tile's state layer is a pseudo-element, and it never takes an inse...
 - The phone name column and the table's own `min-width` are one number in two...
+- A COASTLINE OVERHANGS THE BOX, AND ITS ENDS ARE NOT ITS EXTREMES.
+- An island has to wind against the sea around it.
+- A band is a feature, not a property on one geometry.
+- LEAFLET PAINTS ITS OWN DEFAULT WHEN A STYLE COLOUR IS AN EMPTY STRING.
+- The same shapes can assemble differently while the counts hold.
 
 ## Conventions
 
