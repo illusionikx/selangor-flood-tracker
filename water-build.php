@@ -38,7 +38,7 @@ const TOL_DEG  = 0.00006;  // Douglas-Peucker tolerance, about 6.6 m, which is a
 /* THE SIZE FLOORS ARE BAND EDGES NOW, AND THEY NO LONGER DELETE A SHAPE.
    They deleted one until 2026-09-09. The reason was never the file size. Measured across five
    settings, the whole set holds 3.2 times the shapes for 35 percent more bytes. The reason was the
-   picture: 2,775 rivers drew as a blue web over the whole state at zoom 10, and answered no question
+   picture: 2,775 rivers drew as a blue web over the whole state at zoom 10. It answered no question
    a reader had.
    A zoom answers that instead. Band 0 is what the map drew under the old floors, and it draws at
    every zoom. Band 1 joins it at zoom 11 and band 2 at zoom 13. See `BAND_MIN` in js/map.js.
@@ -159,8 +159,8 @@ function band(float $size, float $hi, float $mid): int {
  *
  * A large lake outline is several ways, and each one on its own is an open line. A coastline is the
  * same shape of problem over a much longer chain. So walk each chain end to end and flip a way when
- * it joins backwards. A chain grows at both ends, because the first way taken out of the pool can
- * sit anywhere along the chain.
+ * it joins backwards. A chain grows at both ends. The first way taken out of the pool can sit
+ * anywhere along the chain.
  */
 function chains(array $ways): array {
     $out = []; $pool = array_values($ways);
@@ -232,7 +232,7 @@ function sea(array $ways, float $tol): array {
     $lats = array_column($shore, 1);
     $ends = [$shore[0][1], end($shore)[1]];
     if (min($ends) > min($lats) || max($ends) < max($lats))
-        fail('the shore turns back past its own end latitudes, so the closing edges would cross it');
+        fail('the shore turns back past its own end latitudes, so the closing edges cross it');
 
     $west  = INF;
     foreach ($shore as $p) $west = min($west, $p[0]);
@@ -387,8 +387,8 @@ foreach ($els as $el) {
 
 if (!$lines[0] || !$areas[0]) fail('band 0 came back empty — refusing to write the file');
 
-/* Seven features. A GeoJSON property belongs to a feature and not to one geometry inside it, so a
-   band is a feature of its own. js/map.js reads `t` and `b` and nothing else. */
+/* Seven features. A GeoJSON property belongs to a feature and not to one geometry inside it.
+   So a band is a feature of its own. js/map.js reads `t` and `b` and nothing else. */
 $feat = [['type' => 'Feature', 'properties' => ['t' => 'sea'],
           'geometry' => ['type' => 'MultiPolygon', 'coordinates' => [$seaPoly]]]];
 for ($b = 0; $b < 3; $b++) {
