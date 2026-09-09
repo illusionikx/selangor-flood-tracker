@@ -124,7 +124,7 @@ function areaKm2(array $ring): float {
  * The signed shoelace of a ring, in square degrees.
  *
  * Only the SIGN is used. It says which way the ring winds. Leaflet fills a polygon with the nonzero
- * rule, so an island has to wind against the sea around it or it paints as more sea.
+ * rule. So an island has to wind against the sea around it, or it paints as more sea.
  */
 function signedArea(array $ring): float {
     $s = 0.0;
@@ -202,6 +202,31 @@ function sea(array $ways, float $tol): array {
         fail('the coastline walked into ' . count($open) . ' open chains, and one was expected');
 
     $shore = clean(simplify($open[0], $tol));
+    if (count($shore) < 2) fail('the mainland shore holds too few points to close');
+
+    /* Cut the chain back to its own latitude extremes, and keep the piece between them.
+       Overpass returns a whole way when any part of it meets the box, so the shore overhangs the
+       coverage area. An overhanging end carries a hook that turns back west past the end itself.
+       A closing edge drawn at that end latitude then crosses the shore, and the sea polygon paints
+       holes that the nonzero winding rule cannot answer for.
+       Cutting here makes both ends the extremes by construction. So each closing edge below meets
+       the shore at its own endpoint and nowhere else. The check under this proves it. */
+    $lats = array_column($shore, 1);
+    $hi = array_search(max($lats), $lats, true);
+    $lo = array_search(min($lats), $lats, true);
+    $shore = $hi < $lo
+        ? array_slice($shore, $hi, $lo - $hi + 1)
+        : array_reverse(array_slice($shore, $lo, $hi - $lo + 1));
+    if (count($shore) < 2) fail('the shore holds too few points between its own latitude extremes');
+
+    /* The two closing edges run west at the shore's own end latitudes. The cut above makes those
+       latitudes the extremes, so neither edge can meet the shore away from its endpoint. This
+       states that as a check, because a tie in latitude would break it in silence. */
+    $lats = array_column($shore, 1);
+    $ends = [$shore[0][1], end($shore)[1]];
+    if (min($ends) > min($lats) || max($ends) < max($lats))
+        fail('the shore turns back past its own end latitudes, so the closing edges would cross it');
+
     $west  = INF;
     foreach ($shore as $p) $west = min($west, $p[0]);
     foreach ($isles as $r) foreach ($r as $p) $west = min($west, $p[0]);
