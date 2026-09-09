@@ -81,6 +81,13 @@ const check = (label, r) => {
      remembers, not on the one the app uses. This is the floor the phone probes below need — the
      app blocks the whole page under it, so it is the narrowest real width the header ever answers
      for, and the one this ladder's phone crossing is measured against. */
+  /* **`?base=/site/` runs this check against the built output instead of against the source.** Both
+     targets are real. The source is what a person edits, and `site/` is what a browser gets. A check
+     that only ever reads the source guards nothing about what ships. The default is the source, so a
+     plain run behaves as it always did. See build.mjs.
+     The `NARROW_PX` fetch below stays on the source on purpose. It reads a constant out of a file
+     the build bundles away, and the value is the same on both targets. */
+  const BASE = new URLSearchParams(location.search).get('base') || '/';
   const NARROW_PX = +(await (await fetch('js/config.js')).text()).match(/NARROW_PX\s*=\s*(\d+)/)[1];
   /* **`#railToggle` writes the REAL `localStorage` of `flood-exp.test`, because every iframe here
      loads the same `index.html` a reader's own browser does.** Snapshot the stored `prefs` once,
@@ -95,7 +102,7 @@ const check = (label, r) => {
   for (const w of W) {
     const f = document.createElement('iframe');
     f.style.cssText = `width:${w}px;height:800px;border:0;position:absolute;left:-9999px`;
-    f.src = 'index.html';
+    f.src = BASE + 'index.html';
     document.body.append(f);
     await new Promise(r => f.addEventListener('load', r, { once: true }));
     await new Promise(r => setTimeout(r, 700));            // the map settles, the bar reflows

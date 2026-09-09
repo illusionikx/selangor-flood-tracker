@@ -186,12 +186,28 @@ mkdir -p /srv/flood
 git clone https://github.com/illusionikx/selangor-flood-tracker.git /srv/flood
 cd /srv/flood
 composer install --no-dev            # writes lib/, NOT vendor/ — vendor/ is hand-managed browser assets
+npm ci                               # writes node_modules/. Build tooling only, never served
+npm run build                        # writes site/, the thing a browser gets
+
+# The live document root, and it is NOT the checkout. See the warning below.
+mkdir -p /srv/www/flood
+rsync -a --delete --exclude='shots/' --exclude='.history.db*' --exclude='.cache.json' \
+      --exclude='.*.log' --exclude='.*.stamp' --exclude='.*.lock' --exclude='.watch.state' \
+      site/ /srv/www/flood/
 
 # PHP writes six things; www-data must own all of them. -R because the auto-update cron below
 # runs git as www-data, and git refuses a repo it does not own.
-mkdir -p shots
-chown -R www-data:www-data /srv/flood
+mkdir -p /srv/www/flood/shots
+chown -R www-data:www-data /srv/flood /srv/www/flood
 ```
+
+**Never point the document root at `/srv/flood/site`.** `build.mjs` deletes that directory at the
+start of every run, and the server build puts `api.php` in it. `api.php` writes its state into its
+own directory: `.history.db`, `.cache.json`, `shots/` and the two logs. So a rebuild against a live
+root takes a year of camera frames with it. That is the loss docs/GOTCHAS.md records for
+`rm -rf shots/`. The build refuses to run when it finds state in the output directory, which is a
+backstop and not the rule. The rule is the rsync above: build in the checkout, copy across, and let
+`--exclude` keep every runtime file the copy must not touch.
 
 That last line matters: `.cache.json`, `.history.db`, `.refresh.lock`, `shots/`, `.php-error.log` and
 `.client-errors.log` are all created by PHP at runtime, in the app directory. If `www-data` cannot
@@ -221,7 +237,8 @@ image rather than on separately-managed storage.
 server {
     listen 80;
     server_name flood.example.org;
-    root /srv/flood;
+    # The deployed build, never the checkout. See the warning in **Install** above.
+    root /srv/www/flood;
     index index.html;
 
     # Everything that is not a real file is the single page.
@@ -257,15 +274,33 @@ server {
                                               # .user.ini, .php-error.log, .client-errors.log
     location ~ ^/(composer\.(json|lock)|shots-test\.php)$ { return 404; }
 
-    # Stylesheets carry ?v=; the modules do not, so they must not be cached hard.
-    location ~* \.(css|woff2)$ { expires 30d; add_header Cache-Control "public"; }
-    location ~* \.js$          { expires 5m;  add_header Cache-Control "public"; }
-    location = /index.html     { expires -1;  add_header Cache-Control "no-cache"; }
+    # `build.mjs` names every stylesheet and every script by its content, so a name can never hold
+    # stale content. Different content is a different name. That is what makes `immutable` correct
+    # here, and it replaces the `?v=` ritual the stylesheets used to carry.
+    location ~* -[A-Z0-9]{8}\.(css|js)$ {
+        expires 1y; add_header Cache-Control "public, immutable";
+    }
+    # `vendor/` is hand-managed and keeps its own `?v=`. The fonts are byte-stable.
+    location ~* ^/vendor/ { expires 30d; add_header Cache-Control "public"; }
+    # index.html is the one unhashed entry point. It is what names the current build, so it must
+    # never be cached. Cache it and a deploy reaches nobody.
+    location = /index.html { expires -1; add_header Cache-Control "no-cache"; }
 
+    # The build writes a `.gz` and a `.br` beside every text file. Serving those costs nothing at
+    # request time. Compressing at level 11 for each request would cost too much to enable, so it
+    # is done once, by the build.
+    gzip_static on;
+    brotli_static on;
+    # The fallback, for a client that accepts neither precompressed form and for api.php's output,
+    # which no build can precompress.
     gzip on;
     gzip_types application/json application/javascript text/css image/svg+xml;
 }
 ```
+
+**`brotli_static` needs a module that stock nginx does not carry.** Debian ships it as
+`libnginx-mod-http-brotli-filter`. Install it, or delete that one line. The `.br` files then sit
+unread and cost only disk. Do not delete `gzip_static`. nginx carries that one by default.
 
 `fastcgi_read_timeout` is not optional. The default 60 s is survivable but a cold start that also
 triggers a capture round has taken 40 s here, and a 504 mid-rebuild leaves the visitor with nothing.
@@ -481,18 +516,26 @@ site to be reachable from the internet. Add one when this runs somewhere public,
 ### Updating
 
 ```bash
-cd /srv/flood && git pull && composer install --no-dev
+cd /srv/flood && git pull && composer install --no-dev && npm ci && npm run build
+rsync -a --delete --exclude='shots/' --exclude='.history.db*' --exclude='.cache.json' \
+      --exclude='.*.log' --exclude='.*.stamp' --exclude='.*.lock' --exclude='.watch.state' \
+      site/ /srv/www/flood/
 ```
 
-No build step, so that is the whole deploy. Bump the `?v=` on the stylesheet links when a CSS file
-changes (`index.html`), and hard-reload after a `js/` change — ES module imports carry no cache
-buster.
+**The `--exclude` list is the whole of what keeps a deploy safe, and `--delete` is why.** Without it
+the deployed root fills with files no build wrote. With it and no excludes, every deploy destroys the
+history and the camera archive. A deploy needs both halves.
 
-Worth automating, since it is a `git pull` on a timer and nothing else. Append to the same cron file:
+**Nothing needs a `?v=` bump any more, and no reader needs a hard reload.** The build names every
+stylesheet and every script by its content, `index.html` names those files, and `index.html` is
+served `no-cache`. So a deploy reaches a browser on its next visit, for CSS and JavaScript alike.
+That removes the two rituals this section used to end with.
+
+Worth automating, since it is a `git pull` and a build on a timer. Append to the same cron file:
 
 ```bash
 COMPOSER_HOME=/srv/flood/.composer
-*/15 * * * * www-data cd /srv/flood && git pull -q --ff-only && composer install --no-dev -q --no-interaction
+*/15 * * * * www-data cd /srv/flood && git pull -q --ff-only && composer install --no-dev -q --no-interaction && npm ci --silent && npm run build --silent && rsync -a --delete --exclude='shots/' --exclude='.history.db*' --exclude='.cache.json' --exclude='.*.log' --exclude='.*.stamp' --exclude='.*.lock' --exclude='.watch.state' site/ /srv/www/flood/
 ```
 
 Three details carry the weight. **`--ff-only`** refuses to merge, so a stray edit on the box stops
@@ -512,9 +555,10 @@ chmod +x /usr/local/bin/update
 `update` then works inside the container and as `pct exec 112 -- update` from the host. Running plain
 `git` as root in `/srv/flood` fails with *dubious ownership* — that is the guard working, not a fault.
 
-Cache behaviour is already right for this: `index.html` is no-cache and `js/` is 5 minutes, so clients
-pick up a deploy on their own. **CSS is the exception** — 30 days, busted only by the `?v=`. Forget to
-bump it and the server is updated while the browser is not.
+Cache behaviour is already right for this, and it needs no exception. nginx sends `index.html` with `no-cache`, and that file
+names the current build. Every file it names carries a content hash, and nginx serves each one
+`immutable` for a year. So a client picks up a deploy on its next visit, and never re-fetches a file that did not
+change. The 30-day CSS rule and its `?v=` are both gone. See **nginx** above.
 
 ---
 

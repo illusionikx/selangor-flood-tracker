@@ -11,10 +11,17 @@
 <script>
 const L = [], fail = [];
 const ok = (c, n) => { L.push((c ? 'ok   ' : 'FAIL ') + n); if (!c) fail.push(n); };
+/* **`?base=/site/` runs this check against the built output instead of against the source.** Both
+   targets are real. The source is what a person edits, and `site/` is what a browser gets. A check
+   that only ever reads the source guards nothing about what ships. The default is the source, so a
+   plain run behaves as it always did. See build.mjs.
+   The `NARROW_PX` fetch below stays on the source on purpose. It reads a constant out of a file the
+   build bundles away, and the value is the same on both targets. */
+const BASE = new URLSearchParams(location.search).get('base') || '/';
 const frame = async w => {
   const f = document.createElement('iframe');
   f.style.cssText = `width:${w}px;height:760px;border:0;position:absolute;left:-9999px`;
-  f.src = 'index.html';
+  f.src = BASE + 'index.html';
   document.body.append(f);
   await new Promise(r => f.addEventListener('load', r, { once: true }));
   await new Promise(r => setTimeout(r, 900));        // modules run, the map settles, the bar reflows

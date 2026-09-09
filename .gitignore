@@ -19,3 +19,7 @@ shots/
 .client-errors.log
 .watch.state
 .claude/settings.local.json
+
+# The build output. `node build.mjs` writes it, and a deploy publishes it.
+site/
+node_modules/

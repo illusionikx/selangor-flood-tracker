@@ -1,0 +1,13 @@
+{
+  "name": "flood-exp",
+  "private": true,
+  "type": "module",
+  "description": "Build tooling only. The app itself has no runtime dependency, and nothing in node_modules is ever sent to a browser.",
+  "scripts": {
+    "build": "node build.mjs",
+    "build:static": "node build.mjs --static"
+  },
+  "devDependencies": {
+    "esbuild": "0.24.2"
+  }
+}

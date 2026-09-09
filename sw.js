@@ -3,21 +3,50 @@
    2. Keep the shell (html, css, js, fonts, Leaflet) reachable with no connection, so an offline
       launch shows this app's own "NO INTERNET CONNECTION" screen instead of the browser's.
 
-   Network-first, cache-as-you-go. Not cache-first, and there is no precache list:
-   - Cache-first would add a *third* cache-busting ritual to a repo that already has two (the `?v=`
-     on the stylesheets and Herd's 3-hour max-age). An edit that showed up for nobody, invisibly,
-     until a cache name was bumped is a worse bug than a slightly slower load.
-   - A precache list is a copy of index.html's asset list, kept in a second file, that goes wrong
-     silently the first time someone adds a module. The first page view warms the cache with exactly
-     what the page actually asked for.
+   **The two lines below are written by `build.mjs`.** The repository holds them empty. A worker
+   served straight from the repository therefore precaches nothing and treats every file as
+   network-first, which is exactly how this file behaved before the build existed. So a source
+   checkout still runs.
+
+   **The shell is cache-first now, and it was network-first.** The comment this replaces argued that
+   cache-first would add a third cache-busting ritual to a repository that already had two, and that
+   an edit which reached nobody was worse than a slow load. That argument was right at the time and
+   is answered now: every built file carries a content hash in its name, so a name can never hold
+   stale content. Different content is a different name.
+
+   **`index.html` is the one exception and stays network-first.** It is the only unhashed entry
+   point, so it is what tells a browser which hashed files the current build uses. Serve it from the
+   cache first and a new build never reaches a reader.
 
    The readings are never cached, at any age. The splash already refuses to draw a map without a
-   connection, on the grounds that during a flood an out-of-date water level is worse than nothing;
-   a service worker quietly answering with yesterday's flood would defeat that from underneath. */
+   connection, on the grounds that during a flood an out-of-date water level is worse than nothing.
+   A service worker quietly answering with yesterday's flood would defeat that from underneath. */
 const CACHE = 'shell';
+const SHELL = [];
 
-self.addEventListener('install', () => self.skipWaiting());
-self.addEventListener('activate', e => e.waitUntil(self.clients.claim()));
+/* A built file carries an 8-character content hash before its extension, and `vendor/` carries a
+   `?v=` of its own. Both are safe to answer from the cache without asking the network. */
+const immutable = url =>
+  /-[A-Z0-9]{8}\.(?:js|css)$/.test(url.pathname) || /\/vendor\//.test(url.pathname);
+
+/* One failed file must not fail the whole install, because a failed install leaves no worker and
+   no "Install app" offer. Each entry is added on its own and a miss is dropped. */
+self.addEventListener('install', e => {
+  e.waitUntil(
+    caches.open(CACHE)
+      .then(c => Promise.allSettled(SHELL.map(u => c.add(u))))
+      .then(() => self.skipWaiting()),
+  );
+});
+
+/* A new build opens a new cache name, so every older one is dead the moment this activates. */
+self.addEventListener('activate', e => {
+  e.waitUntil(
+    caches.keys()
+      .then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k))))
+      .then(() => self.clients.claim()),
+  );
+});
 
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
@@ -27,6 +56,20 @@ self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET' || url.origin !== location.origin) return;
   if (/\/(api\.(php|json)|wx\.json)$/.test(url.pathname)) return;
 
+  // Cache-first for a hashed file. It cannot go stale, so the network is never asked twice for it.
+  // A miss falls through to the network and stores the answer, which is what serves a deferred
+  // chunk the install never precached.
+  if (immutable(url)) {
+    e.respondWith(
+      caches.match(e.request).then(hit => hit || fetch(e.request).then(res => {
+        if (res.ok) { const copy = res.clone(); caches.open(CACHE).then(c => c.put(e.request, copy)); }
+        return res;
+      })),
+    );
+    return;
+  }
+
+  // Everything else, `index.html` included: network-first, cache-as-you-go.
   e.respondWith(
     fetch(e.request)
       .then(res => {
@@ -36,6 +79,6 @@ self.addEventListener('fetch', e => {
         if (res.ok) { const copy = res.clone(); caches.open(CACHE).then(c => c.put(e.request, copy)); }
         return res;
       })
-      .catch(() => caches.match(e.request))
+      .catch(() => caches.match(e.request)),
   );
 });

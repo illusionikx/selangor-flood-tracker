@@ -53,9 +53,19 @@
   iframe { border: 0; position: absolute; left: -4000px; }
   pre { white-space: pre-wrap; }
 </style>
-<iframe id="phone" src="/index.html" style="width:360px;height:760px"></iframe>
-<iframe id="desk" src="/index.html" style="width:1200px;height:800px"></iframe>
+<iframe id="phone" style="width:360px;height:760px"></iframe>
+<iframe id="desk" style="width:1200px;height:800px"></iframe>
 <pre id="out">running...</pre>
+<script>
+/* **`?base=/site/` runs this check against the built output instead of against the source.** Both
+   targets are real. The source is what a person edits, and `site/` is what a browser gets: bundled,
+   minified, and named by content hash. A check that only ever reads the source guards nothing about
+   what ships, and minification is exactly the step that can break a rule this file measures.
+   The default is the source, so a plain run behaves as it always did. See build.mjs.
+   The src is set here rather than in the markup, so the browser never starts the wrong document. */
+const BASE = new URLSearchParams(location.search).get('base') || '/';
+for (const f of document.querySelectorAll('iframe')) f.src = BASE + 'index.html';
+</script>
 <script>
 const out = document.getElementById('out');
 let bad = 0, done = 0;
@@ -86,6 +96,16 @@ function ready(id) {
     if (f.contentDocument && f.contentDocument.readyState === 'complete') go(); else f.onload = go;
   });
 }
+
+/* **A stylesheet is `chrome.css` on the source target and `chrome-SJKGO523.css` on the built one**,
+   because `build.mjs` names every output by its content. So a filter that matches the whole file
+   name finds nothing against the build, and every assertion under it reads an empty rule list and
+   fails without saying why. Match the stem instead. Eight assertions failed exactly that way once.
+   The rules themselves are read back through the CSSOM, which serializes a minified sheet and a
+   source sheet to the same text. So only the name needed the repair. */
+const sheetRules = (d, stem) => [...d.styleSheets]
+  .filter(s => new RegExp(`/${stem}(?:-[A-Z0-9]{8})?\\.css`).test(s.href || ''))
+  .flatMap(s => [...s.cssRules]);
 
 // M3's easing-emphasized and easing-standard are the same curve in M3's own token table.
 const M3_EASE = 'cubic-bezier(0.2, 0, 0, 1)';
@@ -147,7 +167,16 @@ KG BARU · 2.1 km"></button>
 /* `JSON.stringify` rather than a nested template literal: the card is HTML with quotes in it, and
    the escaping of a template inside a template inside an injected module is the kind of thing that
    fails at parse time and prints nothing at all. */
-const OPEN_CARD = "import { openSide } from '/js/map.js'; openSide('probe', " + JSON.stringify(CARD) + ");";
+/* **The drive surface, and the one thing that differs between the two targets.** A probe has to run
+   inside the app's own module instance — see `inFrame()` above — so it imports a module by name.
+   Against the source that name is a real file. Against the build there are only content-hashed
+   chunks, so the name comes out of `site/build.json`. `js/probe.js` is the one module that answers
+   on both, and it puts `openSide` and `closeSide` on `window.__probe`.
+   Resolved in the runner at the foot of this file, before the first probe runs. */
+let PROBE = '/js/probe.js';
+const drive = js =>
+  `import ${JSON.stringify(PROBE)};\nconst { openSide, closeSide } = window.__probe;\n${js}`;
+const OPEN_CARD = () => drive("openSide('probe', " + JSON.stringify(CARD) + ");");
 
 /* **Every `<dialog>` in the app, and which of the three kinds it is.** The roll call is the point:
    the check reads the document for dialogs and fails on any id that is not in this table, so a new
@@ -299,7 +328,7 @@ async function phone() {
   /* Fill the station card through the real `openSide()` first. `#sideHead` hides itself while
      `#sideTitle` is empty — a 56px band of nothing over the readings is worse than no band — so an
      empty panel measures 0 and every header assertion below reads as broken. */
-  await inFrame(d, OPEN_CARD);
+  await inFrame(d, OPEN_CARD());
   d.body.classList.remove('side');
   await settled();
   /* **No card at this width, and the radius is why it has to be a query rather than a token.** With
@@ -1409,7 +1438,7 @@ async function desktop() {
      element is `.pophead`, and `openSide()` takes FOUR pieces out of it now. A template change that
      renames or reorders any of them leaves the header empty and the name buried in the body, and
      nothing else in this app would notice. */
-  await inFrame(d, OPEN_CARD);
+  await inFrame(d, OPEN_CARD());
   const sh = d.getElementById('sideHead'), st = d.getElementById('sideTitle');
   const sa = d.getElementById('sideActions'), sc2 = d.getElementById('sideClose');
   is(!!st.querySelector('.popname'), true, 'the split puts the place name in the title slot');
@@ -1431,11 +1460,11 @@ async function desktop() {
   /* **A mast emits a `.badges` box and a single-sensor card emits one bare `.badge`.** The lift
      names both, and only the box shape is in the fixture above. So the bare one is driven here.
      A selector that lost it would leave every node card's kind in a box nothing styles any more. */
-  await inFrame(d, "import { openSide } from '/js/map.js'; openSide('probe-one', "
-    + JSON.stringify(CARD.replace(/<div class="badges">([^]*?)<\/div>/, '$1')) + ");");
+  await inFrame(d, drive("openSide('probe-one', "
+    + JSON.stringify(CARD.replace(/<div class="badges">([^]*?)<\/div>/, '$1')) + ");"));
   is(!!d.getElementById('sideKinds').querySelector(':scope > .badge'), true,
      'a single-sensor card lifts its bare chip too, not only a mast box');
-  await inFrame(d, OPEN_CARD);
+  await inFrame(d, OPEN_CARD());
   /* --- each chip is an M3 ASSIST CHIP ---
      Transcribed from Chip/chip.css: a 32dp container, `shape-corner-small` (8dp), a 1dp outline,
      `label-large`, and an 18dp leading icon. The label takes `on-surface` and the icon takes the
@@ -1776,7 +1805,7 @@ async function desktop() {
   is(cs(findEl).display, 'none', 'closing collapses the card back to its rail item');
 
   // 3. The mutual clear no longer runs at this width — a floating box shares the screen by design.
-  await inFrame(d, OPEN_CARD);
+  await inFrame(d, OPEN_CARD());
   await settled();
   is(d.body.classList.contains('side'), true, 'a station card is open before the search opens');
   findBtnEl.click();
@@ -2180,8 +2209,8 @@ async function alertPane() {
   const { d, cs, r } = await ready('desk');
   d.head.insertAdjacentHTML('beforeend',
     '<style>*{transition:none !important;animation:none !important}</style>');
-  await inFrame(d, "import { openSide } from '/js/map.js'; openSide('@probe-alert', "
-    + JSON.stringify(ALERT_CARD) + ");");
+  await inFrame(d, drive("openSide('@probe-alert', "
+    + JSON.stringify(ALERT_CARD) + ");"));
   await settled();
 
   /* **The head's own chips, and the lift is half of what this asserts.** The counts and
@@ -2313,7 +2342,7 @@ async function alertPane() {
   }
   srow.remove();
   d.getElementById('settingsBox').close();
-  await inFrame(d, "import { closeSide } from '/js/map.js'; closeSide();");
+  await inFrame(d, drive('closeSide();'));
   await settled();
 }
 
@@ -2611,10 +2640,7 @@ async function panelInset(frame, label) {
 async function safeArea() {
   const { d } = await ready('phone');
   say('--- the bottom safe area, phone ------------------------------------------');
-  const css = [...d.styleSheets]
-    .filter(s => (s.href || '').includes('chrome.css'))
-    .flatMap(s => [...s.cssRules])
-    .map(x => x.cssText).join('\n');
+  const css = sheetRules(d, 'chrome').map(x => x.cssText).join('\n');
   is(/#camBox\s+#camCount[^}]*safe-area-inset-bottom/.test(css), true,
      'camCount reads the bottom safe area');
   is(/table\.data[^}]*safe-area-inset-bottom/.test(css), true,
@@ -2775,8 +2801,7 @@ async function tableHead(frame, label) {
     const nameW = Math.round(r(d.querySelector('.chead th:first-child')).width);
     is(nameW, 160, label + ': the name column is 160px on a phone');
   } else {
-    const rule = [...d.styleSheets].filter(s => (s.href || '').includes('chrome.css'))
-      .flatMap(s => [...s.cssRules])
+    const rule = sheetRules(d, 'chrome')
       .find(x => x.selectorText === 'table.data td.nm, table.data .chead th:first-child');
     is(rule && rule.style.minWidth, '220px', label + ': the name column keeps a 220px floor');
   }
@@ -2831,9 +2856,7 @@ async function rowState() {
 
   /* Both fractions live in css/base.css, derived from the vendored state scale. A hand-copied
      number drifts the day M3 moves it, and nothing on screen says so. */
-  const baseCss = [...d.styleSheets]
-    .filter(s => (s.href || '').includes('base.css'))
-    .flatMap(s => [...s.cssRules]).map(x => x.cssText).join('\n');
+  const baseCss = sheetRules(d, 'base').map(x => x.cssText).join('\n');
   is(/--m3-state-hover:/.test(baseCss), true, 'the hover fraction is derived, not hand-copied');
   is(/--m3-state-press:/.test(baseCss), true, 'and the press fraction too');
 }
@@ -2875,9 +2898,7 @@ async function cellPills() {
 
   /* Two assertions, not one. An absence check alone still passes if somebody deletes the map's
      own chip row along with the table's. The second assertion proves that rule stays. */
-  const chromeRules = [...d.styleSheets]
-    .filter(s => (s.href || '').includes('chrome.css'))
-    .flatMap(s => [...s.cssRules]);
+  const chromeRules = sheetRules(d, 'chrome');
   const tableMchip = chromeRules.some(r => r.selectorText
     && r.selectorText.includes('table.data') && r.selectorText.includes('mchip'));
   is(tableMchip, false, 'no rule scoped to table.data mentions mchip');
@@ -3011,9 +3032,7 @@ async function camCard() {
    So a shadow layer is invisible the moment a picture arrives, which is every tile that works. */
 async function camCardState() {
   const { d } = await ready('desk');
-  const css = [...d.styleSheets]
-    .filter(s => (s.href || '').includes('chrome.css'))
-    .flatMap(s => [...s.cssRules]).map(x => x.cssText).join('\n');
+  const css = sheetRules(d, 'chrome').map(x => x.cssText).join('\n');
   is(/\.camtile:hover::after[^}]*--m3-state-hover/.test(css), true, 'a tile answers a hover');
   is(/\.camtile:active::after[^}]*--m3-state-press/.test(css), true, 'and a press');
   is(/\.camtile:(hover|active)\s*\{[^}]*box-shadow/.test(css), false,
@@ -3047,6 +3066,9 @@ async function warnBody() {
 (async () => {
   out.textContent = '';
   try {
+    /* Against the build, the drive surface has a content-hashed name. `site/build.json` carries it.
+       Against the source the default already points at the real file. See `drive()` above. */
+    if (BASE !== '/') PROBE = BASE + (await (await fetch(BASE + 'build.json')).json()).probe;
     await phone();
     await warnBody();
     await shortPhone();

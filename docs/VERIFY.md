@@ -267,6 +267,39 @@ printf("%-5d %-28s %6.0f m  %-30s %s\n",$s["stationId"],$s["stationName"],$bd*10
 php m3-build.php
 git diff --quiet vendor/m3/tokens.css && echo "OK: matches the source" || echo "MOVED: read the diff, then bump ?v="
 
+# The build. It writes `site/`, which is what a browser gets: bundled, minified, and named by
+# content hash. The repository is what a person edits. Run it before the four render checks below,
+# or `?base=/site/` measures whatever the last build left behind.
+npm ci                        # once, or after package.json moves
+npm run build                 # the server build. `npm run build:static` is the GitHub Pages one.
+
+# **THE FOUR RENDER CHECKS TAKE A TARGET, AND BOTH TARGETS ARE REAL.** They are m3-check,
+# paint-check, title-test and narrow-test. With no query they load the source, which is what a
+# person edits. With `?base=/site/` they load the build, which is what a browser gets. Run both.
+#
+# A check that only ever reads the source guards nothing about what ships, and minification is
+# exactly the step that can break a rule these files measure. Two faults have already been found
+# that way, and neither showed on the source target:
+#   - `m3-check.html` filtered stylesheets on `href.includes('chrome.css')`. The build names that
+#     file `chrome-SJKGO523.css`, so eight assertions read an empty rule list and failed.
+#   - The same file drove the app with `import { openSide } from '/js/map.js'`. A bundle has no such
+#     module, the injected script never resolved, and the check HUNG with no verdict at all.
+# `js/probe.js` answers the second. `sheetRules()` answers the first.
+#
+# The other four checks are source-only and stay that way. `heat-test.html` and
+# `map-limits-test.html` import app modules directly to test pure logic, which a bundle cannot
+# expose and minification cannot change. `shots-test.php` and `api.php --selftest` are PHP.
+#
+# The four against the build. Same flags as the source runs below, same verdict line.
+CH="/c/Program Files/Google/Chrome/Application/chrome.exe"
+run() { "$CH" --headless=new --disable-gpu --ignore-certificate-errors \
+  --virtual-time-budget=$2 --window-size=$3 --dump-dom "https://flood-exp.test/$1?base=/site/" \
+  | perl -0777 -ne 'print $1 if /<pre id="out">(.*?)<\/pre>/s' | tail -1; }
+run m3-check.html    300000 1600,1000
+run paint-check.html  60000 1600,1000
+run title-test.html   40000 1800,1000
+run narrow-test.html  35000 1200,900
+
 php shots-test.php            # one of eight runnable checks. Guards camera retention. Must stay green.
 php api.php --selftest       # another. Guards the force-refresh rate limit, cache choice, and the
                               # place-lookup validator/rate limit. Must stay green.

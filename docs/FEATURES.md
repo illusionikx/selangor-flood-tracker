@@ -18261,3 +18261,158 @@ avoids.
 
 MapLibre GL vector tiles carry their own entry above, measured on 2026-09-03. They cost 200 KB of
 library and they measured a worse 95th-percentile frame than the raster basemap.
+
+## The build, 2026-09-09
+
+`site/` is what a browser gets. The repository is what a person edits. `build.mjs` turns the first
+into the second, and `npm run build` runs it.
+
+A reader asked whether the comments visible in developer tools were a problem. Two separate
+questions sit inside that one. They have different answers.
+
+### The security answer is that there is nothing there
+
+A grep over every file the browser receives found no key, no token, no password, no internal host
+and no path from the build machine. The set is `js/`, `css/`, `index.html` and `sw.js`. `CARTO_KEY`
+is an empty string. There is no `TODO`, `FIXME`, `HACK` or `XXX` anywhere in that set.
+
+A comment is a security problem when it leaks a secret, an internal address, a check somebody
+disabled, or a note that names a hole. This app has no accounts, no credentials and no writes that
+a reader can reach. The About dialog already names every upstream host. The comments describe design
+reasoning, which is not an attack surface.
+
+The server-side comments never ship at all. PHP executes `api.php`, `sources.php` and `shots.php`.
+A browser receives their output rather than their source.
+
+### The cost answer is 327 KB, and that is what changed
+
+Measured before the build existed:
+
+| | gzip | stripped of comments |
+|---|---|---|
+| `js/` | 252 KB | 69 KB |
+| `css/` | 155 KB | 30 KB |
+| `index.html` | 31 KB | 13 KB |
+| total | **439 KB** | **113 KB** |
+
+Comments were 71% of the raw bytes of the source that ships. That is 327 KB of every cold load. The
+readers are on phones, on a connection that can be bad during the flood this map exists for.
+
+Brotli alone answers 68 KB of it. I measured that first, because it is one line of nginx and no
+build at all. It is not the lever.
+
+### What the build does
+
+Six steps. `build.mjs` states each one where it runs.
+
+1. **Bundle and minify the JavaScript**, with code splitting at the five `import()` call sites. So
+   `lazy()` keeps its deferred modules and their loading skeletons. One chunk set also compresses better than 26
+   separate files, because gzip carries a 32 KB window and cannot see across a file boundary.
+2. **Minify the four stylesheets.** No bundling. Each one is a separate `<link>`, and `icons.css` is
+   generated on its own schedule.
+3. **Copy what ships unprocessed.** `vendor/` is hand-managed and already minified. The server build
+   copies the PHP as well, so `site/` is a complete document root and a deploy is one directory. The
+   static build leaves the PHP out, because GitHub Pages runs none.
+4. **Rewrite `index.html`** against the hashed names. The build generates the `modulepreload` list from
+   the real module graph.
+5. **Rewrite `sw.js`** against the same names.
+6. **Precompress** every text output with gzip, and with brotli at level 11.
+
+The cold load is 66 KB brotli. It was 371 KB brotli, and 439 KB gzip.
+
+### Content hashing removed three cache-busting rituals
+
+Every output name carries a hash of its own content. A name can never hold stale content, because
+different content is a different name. nginx answers `immutable` with a one-year age. Three existing
+workarounds went with it.
+
+- The `?v=` query on the stylesheet links. A person bumped four numbers by hand. A forgotten number
+  updated the server and left the browser behind. docs/DEPLOY.md carried that warning.
+- The three-hour `max-age` that Herd sends. docs/GOTCHAS.md records it as a trap to work around.
+- The service worker refused to trust its own cache, and always asked the network first.
+
+`index.html` is the one unhashed file and stays `no-cache`. It names the current build.
+
+### The service worker is cache-first now, and the reversal is the entry
+
+`sw.js` argued against cache-first in its own comment. Cache-first adds a third cache-busting
+ritual, and an edit that reaches nobody is worse than a slow load. That argument was right when a
+person performed the ritual. Content hashing answers it, because a build performs it instead.
+
+The worker precaches the eager shell on install. It serves any hashed file from the cache without
+asking the network. An offline launch works on a first visit rather than after a warm one. The
+worker caches a deferred chunk when something first asks for it, which keeps the five lazy modules off a
+first load. The readings are still never cached, at any age.
+
+### The `modulepreload` list is generated, and that deletes a gotcha
+
+docs/GOTCHAS.md records that the list drifts silently. Add a static import and forget the line, and
+the browser discovers that module one round trip late, with nothing on screen to say so. A manual
+step in docs/VERIFY.md guarded it. `build.mjs` walks the real module graph and writes the list, so
+nobody can make the mistake.
+
+### Source maps are what keep the app debuggable
+
+One argument stood against the change. Nobody can reach the box during a flood, and view-source
+was the truth. A `.js.map` and a `.css.map` ship beside every output. A browser fetches one only
+when a person opens developer tools. So a reader pays nothing for them.
+
+### The checks now run against both targets
+
+The four render checks take `?base=/site/` and load the build instead of the source. They are
+`m3-check`, `paint-check`, `title-test` and `narrow-test`. A check that only reads the source guards
+nothing about what ships.
+
+Two faults appeared at once, and neither one showed on the source target.
+
+`m3-check.html` filtered stylesheets on `href.includes('chrome.css')`. The build names that file
+`chrome-SJKGO523.css`, so eight assertions read an empty rule list. `sheetRules()` matches the stem
+now.
+
+The same file drove the app with `import { openSide } from '/js/map.js'`. A bundle publishes no such
+module. The injected script never resolved, the wait never returned, and the check hung with no
+verdict at all. `js/probe.js` answers that. It is a fixture that puts the drive surface on
+`window.__probe`. The build emits it as a second entry point in the same esbuild call, so it shares
+every chunk with the app. A separate build hands the probe a second module graph, with an empty
+`state` and a map that has no container.
+
+**The build emits the probe unconditionally, and not behind a flag.** An extra entry point changes how
+esbuild splits the chunks. So a build with the probe and a build without it are different artifacts,
+and a check must measure the artifact that ships. The eager set went from 6 chunks to 7 when the
+probe landed, which is that effect. The cost is one file of about 200 bytes that nothing requests.
+
+`heat-test.html` and `map-limits-test.html` stay on the source. They import app modules directly to
+test pure logic. A bundle cannot expose that logic, and the build cannot change it.
+
+### The trade-offs accepted
+
+**A node toolchain and a lockfile**, in a repository that had one server-side dependency and no
+client-side ones. Nothing in `node_modules/` is ever sent to a browser, which is the rule `lib/`
+already follows.
+
+**`site/` can differ from the source.** Every fault of the shape "works locally, broken in
+production" is now possible, and this app had none. The four render checks against both targets hold
+that line. They have already caught two.
+
+**A slower local loop.** Herd serves the source directly, so a person still edits and reloads with
+no build. Testing what ships costs one `npm run build` first.
+
+**The document root moved.** It was the checkout. It is `/srv/www/flood` now. `build.mjs` deletes
+its output directory on every run, and the server build puts `api.php` in there. `api.php` writes
+`.history.db`, `.cache.json` and `shots/` into its own directory, So a build against a live root
+takes a year of camera frames. The build refuses to run when it finds state in the output
+directory. That is a backstop. The rule is the rsync in docs/DEPLOY.md.
+
+### What was not done
+
+**Nothing left the source.** Not one comment. They record why each line is what it is.
+Moving them into a document recreates the drift this repository already records: a line nobody
+reworded is a line nobody re-read.
+
+**The build does not hash the icons or the manifest.** They keep their `?v=`, which already works, and iOS
+caches a home-screen icon on rules of its own. `vendor/` keeps its `?v=` for the same reason. It is
+hand-managed and it changes rarely.
+
+**The build strips only the comments from `index.html`.** Whitespace between elements is significant
+between inline boxes, and this app has no rule that says which of its elements are which. Comments
+were 51% of that file, and the blank lines followed them out. The rest stays as written.

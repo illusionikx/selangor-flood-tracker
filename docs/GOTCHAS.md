@@ -416,6 +416,11 @@ frames only exist because we ran when they were taken. To re-test the capture pa
   edit unless the URL changes. The stylesheet links carry `?v=` — **bump it when you touch a css
   file**, the same as `vendor/fonts.css`. ES module imports have no such guard. Hard-reload
   (Ctrl+Shift+R) after a `js/` change, or the browser can run the old module.
+  **This is a fault of the SOURCE target alone now, and the built target cannot have it.** `site/`
+  names every stylesheet and every script by its content, and nginx answers `immutable`. So a
+  deployed reader never needs a `?v=` bump or a hard reload. A person editing this directory under
+  Herd still does. The two targets differ here on purpose, and the source is the one that keeps the
+  old ritual.
   **A driven browser needs more than a reload.** `page.reload()` revalidates the document and still
   serves every module out of the HTTP cache. Unregistering the service worker and deleting the
   `shell` cache does not help either, because the module never came from there. Turn the HTTP cache
@@ -3222,13 +3227,40 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   when a caller asks for it. So the payload poll must call it with no `cache` option at all. The
   force-refresh button sets `no-store` on purpose, because defeating the cache is the whole point
   of that one button.
-- **The `modulepreload` list has no build step, and it drifts silently.** `index.html` lists every
-  module the browser fetches on landing. A person edits that list by hand. Add a static import and
-  forget the line. The page still works, but the browser discovers that module one round trip
-  late. Remove a static import and leave the line, and the browser fetches a module landing no
+- **The `modulepreload` list drifts silently in the source, and the build generates it.** `index.html`
+  lists every module the browser fetches on landing. A person edits that list by hand. Add a static
+  import and forget the line. The page still works, but the browser discovers that module one round
+  trip late. Remove a static import and leave the line, and the browser fetches a module landing no
   longer needs. Neither mistake throws an error or shows on the page. The Verify block in this
   file checks the list against `ls js/*.js`, and skips the five deferred modules by name. Run it
   after every change to an import or to this list.
+  **`build.mjs` walks the real module graph and writes the list into `site/index.html`**, so the
+  deployed page cannot carry this fault. The hand-written list in the source still can, and it still
+  governs what a person sees on `flood-exp.test`. Keep both correct.
+- **A CHECK THAT ONLY READS THE SOURCE GUARDS NOTHING ABOUT WHAT SHIPS.** `site/` is bundled,
+  minified and named by content hash. The four render checks take `?base=/site/` and read it. Two
+  faults appeared the first time they ran that way, and neither showed on the source target.
+  `m3-check.html` filtered stylesheets on `href.includes('chrome.css')`. The build names that file
+  `chrome-SJKGO523.css`, so eight assertions read an EMPTY rule list. An empty list fails without
+  saying why, which is the worst shape a failure can take. `sheetRules(d, stem)` matches the stem
+  now, and every new stylesheet read goes through it.
+  The same file drove the app with `import { openSide } from '/js/map.js'`. A bundle publishes no
+  such module. The injected script never resolved, `inFrame()` spun on its interval forever, and the
+  check HUNG with no verdict at all. Read the last line of a check: no `PASS` means it did not
+  finish, whatever the counts above it say. `js/probe.js` is the repair, and it is the one module
+  name that answers on both targets.
+  **Anything that reads a file name, a module path or a selector string has to work on both.** The
+  CSSOM is the safe half: a browser serializes a minified sheet and a source sheet to the same text,
+  so a regex over `cssText` needs no repair. The NAME is what moves.
+- **`build.mjs` deletes its output directory, and the server build puts `api.php` in there.**
+  `api.php` writes its state into its own directory: `.history.db`, `.cache.json`, `shots/` and the
+  two logs. So a build run against a live document root takes a year of camera frames with it, which
+  is the loss the `rm -rf shots/` entry above already records.
+  **Never point a document root at `site/`.** Build inside the checkout, then rsync across with the
+  runtime paths excluded. docs/DEPLOY.md carries the command and the exclude list, and `--delete`
+  without those excludes is the same loss by another route.
+  The build refuses to run when it finds `shots/`, `.history.db` or `.cache.json` in the output. That
+  is a backstop for the day somebody wires it wrong. It is not the rule.
 - **A loading skeleton takes its state from `aria-busy` on the dialog. It takes its look from
   `.skel` in `css/base.css`. Do not invent a second version of either.** `lazy()` sets
   `aria-busy="true"` on the box passed to it, and clears it once the module resolves or fails.

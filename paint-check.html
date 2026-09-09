@@ -21,7 +21,20 @@
 -->
 <style>html, body { margin: 0 } iframe { width: 1536px; height: 900px; border: 0 }</style>
 <pre id="out">running…</pre>
-<iframe id="f" src="/index.html"></iframe>
+<iframe id="f"></iframe>
+<script>
+/* **`?base=/site/` runs this check against the built output instead of against the source.** Both
+   targets are real. The source is what a person edits, and `site/` is what a browser gets: bundled,
+   minified, and named by content hash. A check that only ever reads the source guards nothing about
+   what ships, and minification is exactly the step that can break a rule this file measures.
+   The default is the source, so a plain run behaves as it always did. See build.mjs.
+   The src is set here rather than in the markup, so the browser never starts the wrong document.
+   A classic script, because the module below runs after this one and needs the frame already told
+   where to go. `fetch('js/...')` calls in that module stay on the source on purpose: they read a
+   constant out of a file the build bundles away. */
+const BASE = new URLSearchParams(location.search).get('base') || '/';
+document.getElementById('f').src = BASE + 'index.html';
+</script>
 <script type="module">
 const out = document.getElementById('out'), lines = [];
 let bad = 0;

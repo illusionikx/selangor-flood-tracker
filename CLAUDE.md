@@ -34,6 +34,7 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `css/chrome.css` | page furniture: app bar, status dot, rail, navigation bar, legend, splash |
 | `css/map.css` | Leaflet overrides, pins, cluster badges, popup template |
 | `js/app.js` | entry point — decides what happens on landing, nothing else |
+| `js/probe.js` | a check fixture, and not part of the app. `index.html` never names it. It puts `openSide` and `closeSide` on `window.__probe`, so a render check can drive the station panel through the app's OWN module instance on either target. The build emits it as a second entry point, unconditionally — see the file |
 | `js/oops.js` | reports a browser throw, a rejected promise or a failed asset to `log.php`. No imports, and `app.js` imports it first |
 | `js/config.js` | constants (kinds, palettes, thresholds, tile styles, `WEATHER`). Also `NOTICE`, the words for an upstream outage. No imports. |
 | `js/state.js` | `state` (data + hereAt) and the `PREFS` blob. Breaks module cycles. |
@@ -80,6 +81,10 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `maplibre-spike.html` | **throwaway, not a check and not part of the app.** Measures a MapLibre GL vector basemap against the Esri raster one under 460 canvas marks. It loads unpkg and OpenFreeMap, which the app itself never contacts. See docs/FEATURES.md for what it answered |
 | `lib/` | Composer's vendor dir (`symfony/dom-crawler`), gitignored — **not** `vendor/` |
 | `composer.json` | the one server-side dependency. Run `composer install` before first run |
+| `build.mjs` | `npm run build` — writes `site/`, the thing a browser gets. Bundles and minifies, names every output by content hash, generates the `modulepreload` list and the service worker's shell list, and precompresses with gzip and brotli. `npm run build:static` is the GitHub Pages variant. It refuses to run over a live document root |
+| `package.json` | build tooling only, one pinned dependency (esbuild). Nothing here reaches a browser |
+| `site/` | the build output (gitignored). What a deploy publishes. Never a document root — see `build.mjs` |
+| `node_modules/` | npm's output (gitignored). Build time only, the way `lib/` is server-side only |
 | `.github/workflows/pages.yml` | bakes the static GitHub Pages build — runs the PHP on cron, publishes `api.json` |
 | `docs/DEPLOY.md` | both targets: Pages (what it cannot do) and a Debian box / Proxmox LXC (spec, nginx, cron, container traps) |
 | `docs/GOTCHAS.md` | every trap that already cost a debugging session. Left this file on 2026-08-27, over the 150,000-character limit. `## Gotchas` below indexes it |
@@ -92,13 +97,30 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `shots/` | the camera archive — one dir per camera, `<unixts>.webp` per frame (gitignored) |
 
 **Composer is server-side only.** `composer install` writes to `lib/`, because `vendor/` already
-holds hand-vendored browser assets that Composer must never manage. The front end is still
-build-free and dependency-free. Nothing in `lib/` is ever sent to a browser.
+holds hand-vendored browser assets that Composer must never manage. The front end carries no runtime
+dependency. Nothing in `lib/` is ever sent to a browser, and nothing in `node_modules/` is either.
 
-**No build step.** The browser loads `js/app.js` as `<script type="module">` and resolves the
-`import`s itself. Vendored libraries stay classic `<script>` tags because they publish globals
-(`L`). Keep relative specifiers with the `.js` extension — there is no resolver to guess them.
-Dependencies must stay acyclic. Anything two modules both need lives in `state.js` or `config.js`.
+**THE SOURCE RUNS UNBUILT AND THE BUILD IS WHAT SHIPS, and both of those are load-bearing.**
+Herd serves this directory as it stands. The browser loads `js/app.js` as `<script type="module">`
+and resolves the `import`s itself, so a person edits and reloads with no build in the way. Vendored
+libraries stay classic `<script>` tags because they publish globals (`L`). Keep relative specifiers
+with the `.js` extension — there is no resolver to guess them. Dependencies must stay acyclic.
+Anything two modules both need lives in `state.js` or `config.js`.
+
+`npm run build` writes `site/`, and that is what a reader gets: bundled, minified, and named by
+content hash. It landed on 2026-09-09. The cold load fell from 439 KB gzip to 66 KB brotli, because
+a reader stops paying for the comments that carry this app's reasoning. **Not one comment left the
+source.** See "The build" in [`docs/FEATURES.md`](docs/FEATURES.md) for the measurements, the three
+cache-busting rituals it deleted, and the trade-offs taken.
+
+**Four render checks take `?base=/site/` and read the build instead of the source.** They are
+`m3-check`, `paint-check`, `title-test` and `narrow-test`. Run both targets. A check that only reads
+the source guards nothing about what ships, and it has already caught two faults that way.
+
+**Never build into a live document root.** `build.mjs` deletes its output directory on every run,
+and the server build puts `api.php` in there. `api.php` writes `.history.db`, `.cache.json` and
+`shots/` into its own directory. The build refuses to run when it finds state in the output, which
+is a backstop and not the rule. The rule is the rsync in [`docs/DEPLOY.md`](docs/DEPLOY.md).
 
 ## Data sources
 
@@ -628,7 +650,9 @@ order that file holds them. A trap names itself here, and the file states the ev
 - The two warning surfaces disagree about time on purpose, and `fresh` is the...
 - A MET warning counts toward nothing.
 - The payload poll must never pass `cache: 'no-store'`.
-- The `modulepreload` list has no build step, and it drifts silently.
+- The `modulepreload` list drifts silently in the source, and the build generates it.
+- A CHECK THAT ONLY READS THE SOURCE GUARDS NOTHING ABOUT WHAT SHIPS.
+- `build.mjs` deletes its output directory, and the server build puts `api.php` in there.
 - A loading skeleton takes its state from `aria-busy` on the dialog. It takes...
 - `lazy()` rethrows a failed import, so every caller owns a failure surface a...
 - The JPS MET mirror answers JSON that is not valid JSON.
@@ -1297,3 +1321,8 @@ eight runnable checks, and it says which risk each one guards.
 Run the checks that cover what you changed. The eight are `php shots-test.php`,
 `php api.php --selftest`, `heat-test.html`, `title-test.html`, `narrow-test.html`,
 `paint-check.html`, `m3-check.html` and `map-limits-test.html`.
+
+Four of them read two targets. Run `npm run build` first, then `m3-check`, `paint-check`,
+`title-test` and `narrow-test` a second time with `?base=/site/`. The other four stay on the
+source. `heat-test` and `map-limits-test` import app modules directly, which a bundle cannot
+expose. The two PHP checks never touch the front end.
