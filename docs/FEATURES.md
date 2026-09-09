@@ -18180,7 +18180,10 @@ options. `setBasemap()` reads those three and knows nothing about either company
 
 ### What to do when the key lands
 
-1. Set a domain restriction on the key, in the CARTO account. Restrict it to this site's domain.
+1. Request the key at https://carto.com/basemaps/apikey/ . The form asks for an email address, the
+   domain that will use the basemaps, and a line about the project. Name the deployed host, never
+   `flood-exp.test`. No CARTO account is needed, and the key arrives by email with no approval
+   queue.
 2. Put the key in `CARTO_KEY` in `js/config.js`.
 3. Load the map and look at one tile. A wrong key answers HTTP 200 with the ordinary picture, so
    only the watermark tells you.

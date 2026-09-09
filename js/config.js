@@ -217,16 +217,17 @@ export const NOTICE = {
    2026-09-08, with a key. Esri holds the map until that key lands.
 
    **The key is public and it cannot be otherwise.** It travels in a tile URL that a browser has to
-   fetch, so anybody can read it out of the network panel. CARTO's own answer to that is a domain
-   restriction on the key, which is set in the CARTO account and not here. Set that restriction to
-   this site's domain before the key goes in.
+   fetch, so anybody can read it out of the network panel. The form that issues the key asks which
+   domain will use it, so name the deployed host there. There is no account and no key settings
+   page to visit later.
 
    **A wrong key fails silently.** Measured on 2026-09-08: a tile asked for with `?key=TESTKEY123`
    answers 200 with the ordinary picture. So a bad key looks the same as a good one until the
    watermark comes back. Read one tile by eye after the key lands.
 
-   The free tier is 5 million tiles a month, and it is for non-commercial use.
-   See https://carto.com/basemaps/apikey/ . */
+   The free tier is 5 million tiles a calendar month, across the raster and vector services
+   together. See https://carto.com/basemaps/apikey/ . The form asks for an email address, that
+   domain, and a line about the project. It needs no CARTO account and it holds no approval queue. */
 export const CARTO_KEY = '';
 
 /* Esri Canvas basemaps, one per theme. ponytail: a picker existed and nobody needs three flavours

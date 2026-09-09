@@ -424,6 +424,17 @@ frames only exist because we ran when they were taken. To re-test the capture pa
   Without it the second command is accepted and does nothing, and the page goes on running the old
   file. The symptom is a fix that measures as if it never landed. A stack trace naming a line number
   the edited file no longer has is the proof.
+  **It bit on 2026-09-07, and on a phone the cost is 30 days rather than three hours.** The WebKit
+  repair for `#warnBody` changed `css/chrome.css` and left `?v=331` where it was. The Debian box
+  serves a stylesheet with `max-age=2592000`, which is the nginx block in `docs/DEPLOY.md`. So a
+  phone that had fetched the file once kept the broken rule, and a reader met the empty dialog two
+  days after the fix landed. A `?v=` that does not move ships the fix to nobody who has visited
+  before.
+  **Two more files sat in the same state.** The canvas pins changed `base.css` and `map.css` on
+  2026-09-03 without a bump, so a phone drew the new pins with the old rules for six days.
+  **Read the deployed file before you read the stylesheet.** The box had not pulled the commit
+  either. `curl -sI http://<box>/css/chrome.css` prints `Last-Modified`, and a date older than the
+  fix ends the investigation before it starts.
   **The app icons carry `?v=` too**, in four places — the two `<link>` tags in `index.html` and the
   two `icons[].src` in `manifest.json`. `icon-build.php` rewrites the PNGs under the same names. A
   browser holds a favicon for far longer than three hours. So bumping that number is the only
@@ -709,6 +720,15 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
   space to grow into. Only this one is measured against its own content.
   **`m3-check.html` asserts the DECLARATION as well as the height.** Blink draws the broken rule
   and the fixed rule the same way, so a pixel alone cannot separate them.
+  **Measured on 2026-09-09, and the engine that collapsed the body is still not in hand.**
+  The Playwright WebKit 26.6 build, the Windows port, drew both rules alike at 296px through a real banner
+  press on the deployed app. The phone that reported the fault runs iOS 26, and it held the old rule
+  on both reports. The box had not pulled the fix, and `?v=` had not moved. So the repair above
+  never ran on the engine it targets.
+  **The rule stays until that phone answers.** `flex-basis: auto` is the usual cure for Safari
+  collapsing a `flex: 1` child of an auto-height column. The next report from that phone, after the
+  bump lands, is the evidence this entry lacks. If the body is still empty there, read
+  `.client-errors.log` on the box before you touch the rule again.
 - **A pointer press focuses a `<button>`, and `tabindex="-1"` does not stop it.** `#ticker` carries
   `aria-hidden`, because the alert panel holds the same stations as a real list. Its tiles are
   `<button>` elements with `tabindex="-1"`, so no keyboard reaches one. A tap focuses one all the
@@ -2894,7 +2914,10 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   the ordinary picture. So a typo looks exactly like a working key until the watermark returns.
   Look at one tile by eye after the key lands, and never trust the status code.
   **CARTO's key is public by construction.** It travels in a tile URL a browser has to fetch.
-  CARTO's own answer is a domain restriction, set in the CARTO account. Set it before the key ships.
+  **The form that issues it asks which domain will use it, and there is no account behind it.**
+  So the domain is stated once, at request time, and no settings page exists to change it later.
+  Name the deployed host on that form, never `flood-exp.test`. The free tier is 5 million tiles a
+  calendar month, across the raster and vector services together.
   **The paths differ in three ways from Esri's.** CARTO is `{z}/{x}/{y}`, it caches a `@2x` tile, and
   it caches to zoom 20. So its options carry `detectRetina` and no `maxNativeZoom`.
   **`dark_nolabels` and `dark_only_labels` at the bare host, and the style stem is the theme key.**
