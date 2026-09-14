@@ -84,13 +84,9 @@
 <link rel="stylesheet" href="css/chrome.css?v=332">
 <link rel="stylesheet" href="css/map.css?v=188">
 
-<!-- The water tint stood here until 2026-08-27 and is deleted. It was an SVG filter keying on the
-     one exact tone CARTO painted filled water, and Esri serves the canvas as lossy JPEG, which has
-     no exact tones. See the block at the head of css/map.css for the measurement and for what the
-     map lost. Do not rebuild it against a JPEG provider.
-     **A return to CARTO does not bring it back.** The filter needs a PNG, and CARTO serves one, so
-     the reason it went is only half gone. The other half stands: it reached the sea and the large
-     lakes alone, and `water.json` draws every pond it never touched. Two layers for one job. -->
+<!-- The water tint stood here until 2026-08-27. It came back on 2026-09-14 for CARTO's Dark
+     Matter. js/map.js builds it into its own SVG sprite now, so no markup here carries it. See the
+     block at the head of css/map.css. -->
 
 <!-- A camera still. A <dialog>, not a div: it opens from the all-stations table, which is itself a
      modal dialog, and only the top layer can paint over one — Esc, the backdrop and focus trapping

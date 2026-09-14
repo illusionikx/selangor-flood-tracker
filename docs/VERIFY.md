@@ -438,7 +438,7 @@ printf("rows: %d, points: %d, newest: %s\n",
 # a missing `:not()` hands the answer to stylesheet order, and a rule left off the mask list in
 # css/icons.css draws an empty plate. The last one shipped. Also measures the button against every
 # other floating box, at 1536 and again at 360. Reads PASS.
-# The water layer grew, from 2,051 shapes to 9,169. So this budget rose to 60000.
+# The water layer raised this budget to 60000. That layer left on 2026-09-14, and the budget stays.
 "/c/Program Files/Google/Chrome/Application/chrome.exe" --headless=new --disable-gpu \
   --ignore-certificate-errors --virtual-time-budget=60000 --window-size=1600,1000 --dump-dom \
   https://flood-exp.test/paint-check.html | perl -0777 -ne 'print $1 if /<pre id="out">(.*?)<\/pre>/s'
@@ -460,20 +460,18 @@ printf("rows: %d, points: %d, newest: %s\n",
 # it printed the opening line alone, once the rail and the bar joined it. Read the last line: no
 # `PASS` means the run did not finish, whatever the counts above it say. It holds 1,012 assertions.
 
-# The coverage circle, the zoom floor, the pan limit, the water bands and the sea polygon, on both
-# themes. Every fault here is silent. A mask that draws nothing looks like a map. A circle rebaked
+# The coverage circle, the zoom floor and the pan limit. Also that the map draws no water of its
+# own, and that the dark tint recolours Dark Matter's water grey and nothing else. Also the river
+# lines on the dark theme, band by band. Every fault here is silent. A mask that draws nothing looks like a map. A circle rebaked
 # against changed OpenStreetMap tagging slides back over the Strait of Malacca and still looks like a
-# circle. A zoom floor the pan box refuses still answers its own number to `getMinZoom()`. A sea
-# polygon that swallows the box still draws as a plausible picture. And a bake that stamps every
-# shape band 0 still passes a naive size check. Reads PASS.
+# circle. A zoom floor the pan box refuses still answers its own number to `getMinZoom()`. Reads PASS.
 "/c/Program Files/Google/Chrome/Application/chrome.exe" --headless=new --disable-gpu \
   --ignore-certificate-errors --virtual-time-budget=40000 --window-size=1200,900 --dump-dom \
   https://flood-exp.test/map-limits-test.html | perl -0777 -ne 'print $1 if /<pre id="out">([^<]*)</s'
 # It probes the mask with `isPointInFill`, which reads the fill rule the browser paints with. **Every
 # probe has to be on screen.** Leaflet clips a polygon to the viewport, so a point off the edge is
 # outside the clipped path whatever the map says. The page throws on a probe the view does not hold,
-# rather than reporting a hole in the mask over Perak. The sea assertions use ray casting over the
-# raw JSON instead, so they carry no such rule.
+# rather than reporting a hole in the mask over Perak.
 
 # The app bar wordmark ladder, in rendered pixels. Loads the app in an iframe at fifteen widths and
 # asserts one spelling at a time, never wider than its rail, and never a longer spelling on a

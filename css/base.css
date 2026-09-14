@@ -364,17 +364,6 @@
      this is the light theme's own moon, at the same lightness the rest of this set holds on paper.
      Do not copy the map value up here. Do not push this one down there either. */
   --wx-moon: #7d8794;
-  /* The sea, the rivers and the ponds js/map.js draws over the light basemap. Read from here by
-     name, so no hex lands in a JavaScript file.
-     **L 0.80, C 0.08, hue 238 in OKLCh.** Hue 238 is where the palette rule above pins water. The
-     lightness holds this value 1.50:1 against Esri's own land tone #e8e8e8. The dark theme holds
-     1.49:1 against its own land. So the two themes separate water from land by the same amount.
-     **This theme drew no water at all until 2026-09-09.** Esri's Light Gray Canvas paints the sea
-     #d0cfd4 against land #e8e8e8. That separates them and does not make the sea blue. A hydrology
-     map cannot leave that grey.
-     Below `--k-river` #66b2ff in chroma, because a river pin has to win over its own water. The pin
-     also carries a stroke, which is what holds it on a fill this pale. */
-  --water: #8cc6ec;
   /* The shading over everything outside the coverage circle, and the hairline on that circle. See
      `.covermask` in css/map.css and the mask block in js/map.js.
      **Neutral on purpose, and neither carries a hue at all.** This says "not answered here", which
@@ -394,17 +383,17 @@
   --surface: #202124; --on-surface: #e8eaed; --muted: #9aa0a6; --outline: #3c4043;
   --hover: #303134; --accent: #8ab4f8;
   --shadow: 0 1px 2px rgba(0,0,0,.6), 0 2px 6px 2px rgba(0,0,0,.3);
-  /* The sea, the rivers and the ponds js/map.js draws over the dark basemap. Read from here by
-     name, so no hex lands in a JavaScript file.
-     **The value matched exactly what the tint once painted for the sea and the lakes.** A river
-     reads as more of the same water this way, rather than as a line drawn over the map. A brighter
-     value was tried first, on the theory that a thin line needs more contrast than a filled sea, and
-     it stood out as a drawn line instead of disappearing into the water.
-     This value was the finished output of an SVG tint that keyed on the basemap's own water tone.
-     That tint was deleted on 2026-08-27 with the move to Esri, so nothing has to match it now. See
-     css/map.css for why it went and why it must not come back.
-     Well below `--k-river` #66b2ff, the river *station* colour — a pin has to win over its water. */
-  --water: #15364e;
+  /* The water on Dark Matter, as ONE colour for the fill and the line. `tintWater()` in js/map.js
+     paints CARTO's water grey with it, and `showRivers()` draws every river line in it. So a line
+     inside a wide river vanishes into its own fill, and only a narrow river reads as a line. The
+     light theme states none, because Voyager draws its own blue.
+     **L 0.50, C 0.09, hue 238 in OKLCh, picked on 2026-09-14 from four shades side by side.**
+     Measured: 3.37:1 against Dark Matter's land at grey 9, and 2.43:1 against its lightest road at
+     grey 42. The dark river pin `#48a5dc` stands 2.16:1 brighter again, so a pin still wins.
+     **It was `#15364e`, and a reader saw no river.** That value stands 1.58:1 against the land, and
+     a 1px line needs more than a filled sea does. `#3879a0` held the lines for one revision as a
+     second colour, and it drew a bright line down the middle of every wide river. */
+  --water: #286a90;
   /* The coverage mask, stated again for this theme. See the light theme's own comment above for
      what these two are and why neither carries a hue. The wash is black rather than the theme's own
      surface: a dark basemap darkened is still a map, and a near-black wash the colour of the panels

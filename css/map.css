@@ -1,21 +1,18 @@
 /* Leaflet overrides, station pins, cluster badges and the popup template. */
 
-/* **THE DARK BASEMAP CARRIES NO FILTER, and it carried two until 2026-08-27.** They were
-   `url(#watertint) brightness(1.75) contrast(.92)` on the tile pane, under a `data-lift` attribute
-   js/map.js wrote from the theme. Both are deleted, along with the `#mapfx` SVG in index.html and
-   the `#mapfx` rule that held it out of the flow.
-   **The tint keyed on one exact tone and a JPEG has no exact tones.** CARTO's `dark_all` is a PNG
-   whose filled water is luminance 38 against land at 9, so a 64-band discrete table could isolate
-   that one value and paint it blue. Esri serves the canvas as lossy JPEG. Measured on one sea tile:
-   145 distinct colours where a PNG would hold a handful, and every flat block fringes at its own
-   edge. A discrete band cannot separate water from road there, and a table retuned against JPEG
-   artifacts would paint a halo around every coastline.
-   **The lift went for a plainer reason.** It exists to raise a near-black tile. Esri's dark canvas
-   is a mid-grey, so 1.75 blows it out.
-   **The water is not lost.** js/map.js still draws rivers and ponds from `water.json`, which is a
-   vector overlay in a pane of its own and owes the basemap nothing. What did go is the sea and the
-   large lakes, which only the tint ever reached. Both now read in Esri's own grey.
-   Do not rebuild either one against a JPEG provider. A tint needs a tile with exact tones. */
+/* **THE WATER TINT CAME BACK ON 2026-09-14, ON CARTO'S DARK MATTER AND NOWHERE ELSE.** The
+   repository owner asked for coloured water on the dark theme once the CARTO key landed.
+   `.watertint` sits on the ground tile layer alone, and js/map.js writes that class only for Dark
+   Matter. So the place names, the mask and every overlay stay unfiltered. See `tintWater()`.
+   **The tint keys on one exact tone and a JPEG has no exact tones.** Dark Matter is a palette PNG
+   that fills water with grey 38 against land at 9. Esri serves its canvas as lossy JPEG. Measured on
+   one sea tile: 145 distinct colours, and every flat block fringes at its own edge. A table keyed on
+   JPEG artifacts paints a halo around every coastline. So an Esri ground never takes the class.
+   **The brightness lift did not come back.** It ran as `brightness(1.75) contrast(.92)` beside the
+   old tint until 2026-08-27, and nobody asked for a lighter map.
+   **The dark theme draws river lines over the tint.** Dark Matter draws a river one pixel wide, and
+   grey 38 turned blue is still too dark to see on land at 9. See `showRivers()` in js/map.js. */
+.watertint { filter: url(#watertint); }
 
 /* What shows where a tile has not arrived. Leaflet's own value is `#ddd`, in both themes and under
    any basemap. Zooming out asks for four times the tiles with nothing to retain over the new area,

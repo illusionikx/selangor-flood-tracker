@@ -18604,3 +18604,263 @@ shape still pick it out.
 the day a reader asks for zoom 14 to cluster nothing.
 
 The frame measurement in "One canvas draws every pin" did not run again after this change.
+
+## The map draws no water of its own, 2026-09-14
+
+The repository owner asked for the blue water to leave the map. The sea, the rivers and the ponds
+all left. The map now shows only the water that the basemap paints.
+
+### What changed
+
+- `js/map.js` lost the `water` pane, the three band groups, the sea layer and `ensureWater()`.
+- `css/base.css` lost `--water` on both themes. Nothing else read that token.
+- `build.mjs` no longer copies `water.json` into `site/`.
+- `map-limits-test.html` lost its water floors, bands, sea and `--water` assertions. It now asserts
+  that no `water` pane exists.
+
+### What a reader gets
+
+The landing no longer fetches `water.json`. That file was about 568 KB gzipped, against 271 KB for
+the rest of the landing. The map also carries 9,169 fewer canvas shapes through every pan and zoom.
+
+On the light theme the sea reads as Esri's grey again. The dark theme also shows Esri's own tones.
+Small rivers and ponds that Esri does not draw are not on the map.
+
+### What was kept
+
+`water.json` and `water-build.php` stay in the repository. `basemap-spike.html` still reads the
+file. A revert is a code change and needs no rebake from Overpass.
+
+The `labels` pane stays at z-index 260. The coverage mask must sit over the place names, and
+`map-limits-test.html` asserts that order.
+
+The entries in docs/GOTCHAS.md about the water layer stay. They record what the layer cost, and a
+revert meets the same traps.
+
+## The light theme draws Esri Topographic, 2026-09-14
+
+The repository owner asked for the `arcgis/topographic/base` style on the light theme. The dark
+theme keeps Esri's Dark Gray Canvas.
+
+### Why the style is World_Topo_Map
+
+`arcgis/topographic/base` lives on Esri's basemap styles service. That service answered
+`499 Token Required` to every request without an ArcGIS key. The static tile service answered the
+same. This app holds no Esri key.
+
+`World_Topo_Map` is the raster version of the same style. It is on `server.arcgisonline.com`, the
+host the app already contacts, and it needs no key. So the browser contacts no new host.
+
+### What changed
+
+- `TILES` in `js/config.js` holds a service path per theme, as `ground` and `names`.
+- The light theme states no `names`. World_Topo_Map bakes its place names into the tile.
+- `setBasemap()` in `js/map.js` adds a label layer only where a theme states `names`.
+
+### What it costs
+
+The `base` in the style name means a ground with no labels. World_Topo_Map has no keyless variant
+without labels. So the place names sit in the tile pane under the pins and the heat wash. The
+coverage mask still shades them outside the circle.
+
+World_Topo_Map paints roads orange and yellow and parks green. The palette rule reserves those hues
+for station status. The basemap spike of 2026-09-08 recorded that trade.
+
+The sea and the rivers draw blue on the light theme again, in Esri's own paint.
+
+### What was not done
+
+The exact `arcgis/topographic/base` style needs an ArcGIS Location Platform key and a new tile URL.
+Add both the day a key exists.
+
+## Voyager on the light theme, and blue water on Dark Matter, 2026-09-14
+
+The CARTO key arrived, and the repository owner put it in `CARTO_KEY`. They picked Voyager for the
+light theme and Dark Matter for the dark theme. They also asked for coloured water on the dark theme.
+
+### The key
+
+A tile requested with the key and a `flood-exp.test` referer came back clean. The same tile with no
+key carries the `API KEY REQUIRED` watermark. Nobody tested the Pages host or the bare IP.
+
+### Voyager
+
+`CARTO_STYLE` in `js/config.js` names the style per theme. Voyager answers at
+`rastertiles/voyager_nolabels` and `rastertiles/voyager_only_labels`. The same stem at the bare host
+answers 404.
+
+Voyager paints roads orange and yellow, and parks green. The palette rule reserves those hues for
+station status. The owner picked the style with that trade in view.
+
+### The dark water
+
+Dark Matter is a palette PNG of about eleven greys. This change measured seven tiles, from zoom 9
+to 15, at 1x and 2x. Grey 38 (`#262626`) fills the sea, the lakes and the rivers. Land is grey 9.
+No road, park or building in those tiles uses grey 38. A preview that painted grey 38 blue coloured
+water and nothing else.
+
+`tintWater()` in `js/map.js` writes a 256-band discrete table into an SVG filter. Band 38 holds
+`--water`, `#15364e`. Every other band returns its own grey. The filter sits in the hatch sprite,
+because a filter needs a rendered SVG.
+
+`.watertint` goes on the ground tile layer alone. The place names, the mask, the heat wash and the
+pins stay unfiltered. `tint` in `PROVIDER` answers true for Dark Matter only.
+
+### What it costs
+
+The tint follows CARTO's grey. A CARTO restyle that moves the water by one level turns the map grey
+again, and nothing reports an error. See docs/GOTCHAS.md.
+
+The browser runs the filter on every frame of a zoom. The old tint ran on the whole tile pane until
+2026-08-27. This one covers one layer.
+
+### What was not done
+
+The Esri fallback did not change. Its light theme is still Topographic. An Esri ground never takes
+the tint, because Esri serves JPEG.
+
+The brightness lift that ran beside the old tint did not come back.
+
+`map-limits-test.html` checks the table, the class and the resolved filter. It cannot check what
+the tiles hold.
+
+## Full-size place names, and river lines on the dark theme, 2026-09-14
+
+The repository owner said that the text on the map was too small. They also said that they saw no
+river on the dark theme, and they suggested a line.
+
+### The text drew at half size
+
+`detectRetina: true` sat in the CARTO tile options from 2026-09-08. Nobody saw the fault, because
+CARTO held no key until today. On a screen with `devicePixelRatio` above 1, that option asks for
+the next zoom at 128px per tile.
+
+Measured at 125% scaling and zoom 12: the label layer requested zoom 13 `@2x` tiles and drew each
+at 128px. So every place name drew at half size, and every road at half width.
+
+The option is gone. Leaflet fills `{r}` with `@2x` on the same screens without it. The label layer
+now requests zoom 12 `@2x` tiles at 256px.
+
+The earlier screenshots in this change ran at a device scale of 1, where the option does nothing.
+That is why the fault passed the first look.
+
+### The rivers
+
+Dark Matter draws a river one pixel wide in grey 38. The tint turns that grey `#15364e`, which is
+too dark to see against land at grey 9.
+
+`water-build.php` now writes `rivers.json` beside `water.json`. It holds the three river bands and
+nothing else: 979 KB on disk and 241 KB gzipped. This change cut it from the committed
+`water.json` with the same `json_encode`, so no Overpass call ran.
+
+`showRivers()` in `js/map.js` draws the file on the dark theme alone. It uses a canvas in a
+`rivers` pane at z-index 250, under the place names. Band 0 draws at every zoom. Band 1 draws from
+zoom 11, and band 2 from zoom 13. The line weights are 2, 1.5 and 1 px. The light theme fetches
+nothing, because Voyager draws its own blue rivers.
+
+`--river` is `#3879a0`, which is L 0.55, C 0.09 and hue 238 in OKLCh. It stands 4.18:1 against
+land, 3.01:1 against the lightest road and 2.64:1 over the tinted water. The dark river pin stands
+1.74:1 brighter again.
+
+### The idle callback takes a timeout
+
+The fetch waits on `requestIdleCallback`. The headless run of `map-limits-test.html` uses a virtual
+time budget, and it gave the page no idle period. So the rivers never loaded there, and the same
+page passed in a normal browser. The callback now carries a 3-second timeout.
+
+### What it costs
+
+A reader on the dark theme fetches 241 KB after the first paint. A reader on the light theme
+fetches nothing.
+
+The sea and the lakes keep the darker tint. So a wide river shows a bright line inside a dark fill.
+
+### What was not done
+
+The light theme draws no river lines. The place names draw at CARTO's own size, and nothing enlarges
+them past it.
+
+## One colour for the dark water, and a 1px river line, 2026-09-14
+
+The repository owner said that a wide river must not show as a line. They restated the request: a
+river needs a line at least 1px wide.
+
+### The fault
+
+The previous entry drew river lines in `--river`, `#3879a0`, over a fill in `--water`, `#15364e`.
+OpenStreetMap maps a wide river as a centre line too. So a bright line ran down the middle of the
+Klang estuary and of every wide river.
+
+### The change
+
+`--river` is gone. The line takes `--water`, which is the colour the tint paints Dark Matter's water
+fill. Inside a wide river the line vanishes into its own fill, and only a narrow river reads as a
+line. Every band draws at 1px. The weights were 2, 1.5 and 1 px.
+
+`--water` moved from `#15364e` to `#286a90`, because one value now serves a filled sea and a 1px
+line. This change compared four shades at zoom 12 over the Klang estuary, at 125% scaling:
+
+| shade | against land | against the lightest road |
+|---|---|---|
+| `#15364e`, the old fill | 1.58:1 | 1.14:1 |
+| `#165b81` | 2.70:1 | 1.95:1 |
+| `#286a90`, picked | 3.37:1 | 2.43:1 |
+| `#3879a0`, the old line | 4.18:1 | 3.01:1 |
+
+At `#15364e` a narrow river still vanished. At `#3879a0` the sea read louder than the land beside it.
+
+### What it costs
+
+The sea on the dark theme is brighter than before.
+
+A centre line can leave a wide river's fill at a sharp bend, and that short stub shows.
+
+`map-limits-test.html` checks that a river line takes `--water` at 1px. It cannot check what a tile
+holds.
+
+### A tile edge is grey 37
+
+A dark line ran across the sea at every tile edge, at 125% scaling. A red map background showed no
+gap between the tiles. The line was grey 37. The browser shrinks each `@2x` tile, and
+`plus-lighter` in `vendor/leaflet.css` sums the two edge pixels to 37. The exact table left 37 grey.
+
+The table now paints 36 to 39 as water. That is the set the 64-band table caught until 2026-08-27.
+
+## The ground loads 1x tiles below 2x scaling, 2026-09-14
+
+The repository owner asked whether the map still loads well. This change measured a cold landing on
+the reference screen, 1536 by 864 at 125% scaling. It ran in a headless browser with no GPU, so a
+real screen draws faster than these numbers. The frame rate spread about 5 fps from run to run.
+
+| dark theme, zoom 12 | tiles at landing | zoom and pan |
+|---|---|---|
+| ground and names `@2x` | 48, 1,225 KB | 39 to 49 fps |
+| the water filter off | 48, 1,225 KB | 40 to 46 fps |
+| `rivers.json` blocked | 48, 1,225 KB | 42 to 44 fps |
+| `detectRetina` back on | 168, 3,260 KB | 27 fps |
+| Esri Canvas, one run | 48, 328 KB | 60 fps |
+| ground 1x, names `@2x` | 48, 491 KB | 42 to 50 fps |
+| ground and names 1x | 48, 435 KB | 49 to 50 fps |
+
+The water filter and the rivers moved no number past the spread. `rivers.json` is 243 KB gzipped,
+and it arrives after the first paint. The light theme loaded 1,732 KB of tiles.
+
+The tiles are the cost. A `@2x` CARTO tile is a 512px PNG, and a 125% screen shrinks it to 320
+device pixels.
+
+### The change
+
+`groundR()` in `js/map.js` drops `{r}` from the ground URL below a `devicePixelRatio` of 2. The place
+names keep it. A 1x label layer drew every name soft. A 1x ground and a `@2x` ground were hard to
+tell apart side by side, because the ground carries no text.
+
+At 125% scaling the dark landing fell from 1,225 KB to 491 KB. The light landing fell from 1,732 KB
+to 730 KB. At 2x scaling both layers still load `@2x`, measured at 1,225 KB. No tile edge line came
+back over the sea.
+
+### What it costs
+
+The ground is a little softer below 2x scaling. The frame rate did not move past the spread.
+
+`map-limits-test.html`, `paint-check.html` and `m3-check.html` pass on the source. The build checks
+did not run, because `npm run build` refuses to run while `site/` holds `shots/`.

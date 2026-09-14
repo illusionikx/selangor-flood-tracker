@@ -232,13 +232,32 @@ export const NOTICE = {
    The free tier is 5 million tiles a calendar month, across the raster and vector services
    together. See https://carto.com/basemaps/apikey/ . The form asks for an email address, that
    domain, and a line about the project. It needs no CARTO account and it holds no approval queue. */
-export const CARTO_KEY = '';
+export const CARTO_KEY = 'cb1_318h_1_2a16c41ebeb174eaf701c4d8';
 
-/* Esri Canvas basemaps, one per theme. ponytail: a picker existed and nobody needs three flavours
-   of grey.
-   Each name takes a `_Base` or a `_Reference` suffix in js/map.js. Esri ships the ground and the
-   place names as two separate services, and CARTO splits its own styles the same way. */
-export const TILES = { light: 'World_Light_Gray', dark: 'World_Dark_Gray' };
+/* One Esri basemap per theme, as service paths under `ArcGIS/rest/services`. `ground` is the tile
+   service. `names` is the place-name service over it. ponytail: a picker existed, and nobody needs
+   three basemaps.
+   **The light theme is World_Topo_Map, on the repository owner's instruction of 2026-09-14.** They
+   named `arcgis/topographic/base`. That style lives on Esri's basemap styles service, which answers
+   `499 Token Required` without an ArcGIS key. World_Topo_Map is the keyless raster twin, on the
+   host this app already uses. It bakes its place names into the ground, so it states no `names`.
+   **It paints roads orange and yellow, and the palette rule reserves those hues for status.** The
+   basemap spike of 2026-09-08 recorded that trade. See docs/FEATURES.md.
+   The dark theme keeps Esri's Canvas pair. Esri ships that ground and its place names as two
+   services, and CARTO splits its own styles the same way. */
+export const TILES = {
+  light: { ground: 'World_Topo_Map' },
+  dark:  { ground: 'Canvas/World_Dark_Gray_Base', names: 'Canvas/World_Dark_Gray_Reference' },
+};
+
+/* The CARTO style per theme, read the day `CARTO_KEY` holds a key. Each stem takes a `_nolabels` or
+   an `_only_labels` suffix in js/map.js.
+   **Voyager on the light theme and Dark Matter on the dark one, on the repository owner's
+   instruction of 2026-09-14.** Voyager paints roads orange and yellow, and the palette rule reserves
+   those hues for status. The owner took that trade. Voyager publishes no dark variant.
+   **Voyager sits under `rastertiles/` and Dark Matter at the bare host.** Measured on 2026-09-14:
+   `voyager_nolabels` at the bare host answers 404. */
+export const CARTO_STYLE = { light: 'rastertiles/voyager', dark: 'dark' };
 
 // Sparkline window. Must not exceed the server's own SPARK_WIN — it sends nothing older.
 export const SPARK_H     = 12;     // hours on the graph's x axis

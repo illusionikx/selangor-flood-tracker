@@ -1,7 +1,7 @@
 // The Leaflet map itself: basemap/theme, the shared marker cluster, and the view helpers that
 // every panel uses to jump to a station.
 
-import { KINDS, TILES, CARTO_KEY, FLASH_MS } from './config.js';
+import { KINDS, TILES, CARTO_KEY, CARTO_STYLE, FLASH_MS } from './config.js';
 import { state, PREFS, save } from './state.js';
 import { el, distKm } from './util.js';
 import { byId } from './stations.js';
@@ -233,37 +233,49 @@ map.on('moveend zoomend', () => {
 
 // --- basemap & theme ---------------------------------------------------------------------------
 
-/* Esri's Canvas basemaps. CARTO served this map until 2026-08-27, and its keyless tiles now arrive
-   with `API KEY REQUIRED` burned into the picture. See TILES in js/config.js.
+/* Esri's basemaps: Topographic on the light theme, Dark Gray Canvas on the dark one. CARTO served
+   this map until 2026-08-27, and its keyless tiles now arrive with `API KEY REQUIRED` burned into
+   the picture. See TILES in js/config.js.
    **An ArcGIS tile path is `{z}/{y}/{x}` — the row comes before the column.** That is the reverse
    of the XYZ order every other provider uses, and it fails silently: the tiles still load, they are
    simply the wrong part of the world. There is no `{s}`, because the host has no subdomains, and no
    `{r}`, because Esri caches no retina tile to ask for.
-   Two layers per theme, because Esri publishes the ground and the place names as separate services.
-   `_Base` is the ground and `_Reference` is the labels. */
-const ESRI = 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas';
-const tileURL = (k, part) => `${ESRI}/${TILES[k]}_${part}/MapServer/tile/{z}/{y}/{x}`;
+   Canvas takes two layers, because Esri publishes its ground and its place names as separate
+   services. Topographic bakes its names into the ground, so the light theme takes one layer. */
+const ESRI = 'https://server.arcgisonline.com/ArcGIS/rest/services';
+const tileURL = svc => `${ESRI}/${svc}/MapServer/tile/{z}/{y}/{x}`;
 
 /* CARTO, which draws the moment `CARTO_KEY` holds a key. See that constant in js/config.js.
    **The path order is `{z}/{x}/{y}` here and `{z}/{y}/{x}` above.** Esri is the odd one out, and
    the wrong order fails silently: the tiles still load and they are the wrong part of the world.
    **No `{s}`.** CARTO answers on `a` to `d` and on the bare host as well, measured 2026-09-08.
    Four subdomains split one HTTP/2 connection into four, and index.html warms one origin.
-   **`{r}` is real here.** CARTO caches a `@2x` tile and Esri caches none, so `detectRetina` is on
-   for CARTO alone. Leaflet fills `{r}` with `@2x` on a retina screen and with nothing elsewhere.
-   **The style stem IS the theme key.** `dark_nolabels` and `dark_only_labels` split the ground from
-   the place names, which is the same split Esri publishes as `_Base` and `_Reference`. That is what
-   keeps the labels above this app's own water. */
+   **`{r}` is real here, and `detectRetina` must stay OFF.** CARTO caches a `@2x` tile and Esri
+   caches none. Leaflet fills `{r}` with `@2x` whenever `devicePixelRatio` is above 1, with no option
+   needed. `detectRetina` does something else: it asks for the NEXT zoom at half the tile size. At
+   125% scaling that drew every place name at half its size, measured on 2026-09-14.
+   **`CARTO_STYLE` in js/config.js names the style per theme.** `_nolabels` and `_only_labels` split
+   the ground from the place names, which is the same split Esri publishes as `_Base` and
+   `_Reference`. */
 const CARTO = 'https://basemaps.cartocdn.com';
-const cartoURL = (k, part) => `${CARTO}/${k}_${part}/{z}/{x}/{y}{r}.png?key=${CARTO_KEY}`;
+const cartoURL = (k, part, r = '{r}') =>
+  `${CARTO}/${CARTO_STYLE[k]}_${part}/{z}/{x}/{y}${r}.png?key=${CARTO_KEY}`;
+
+/* **The ground takes `@2x` only at 2x scaling and above. The place names take it at any scaling
+   above 1x.** The ground carries no text. Measured on 2026-09-14 at 125% scaling, on the dark theme
+   at zoom 12: a 1x ground cut the landing tiles from 1,225 KB to 491 KB, and the two grounds side
+   by side were hard to tell apart. A 1x label layer drew every place name soft, so the names keep
+   `{r}`. A phone or a 4K screen at 2x or more still gets the sharp ground.
+   Read each time a layer is built, so a theme swap picks up a window moved to another screen. */
+const groundR = () => devicePixelRatio >= 2 ? '{r}' : '';
 
 /* One provider, picked once at module load. Nothing switches provider at run time, because the key
    cannot change while the page is open. ponytail: delete the Esri half the day CARTO is settled. */
 const PROVIDER = CARTO_KEY
-  ? { ground: k => cartoURL(k, 'nolabels'), names: k => cartoURL(k, 'only_labels'),
-      opt: { maxZoom: 18, detectRetina: true } }
-  : { ground: k => tileURL(k, 'Base'), names: k => tileURL(k, 'Reference'),
-      opt: { maxZoom: 18, maxNativeZoom: 16 } };
+  ? { ground: k => cartoURL(k, 'nolabels', groundR()), names: k => cartoURL(k, 'only_labels'),
+      opt: { maxZoom: 18 }, tint: k => CARTO_STYLE[k] === 'dark' }
+  : { ground: k => tileURL(TILES[k].ground), names: k => TILES[k].names && tileURL(TILES[k].names),
+      opt: { maxZoom: 18, maxNativeZoom: 16 }, tint: () => false };
 
 /* The credit names the provider that actually draws, because a licence term is not a comment.
    index.html states CARTO, which is where this is going. So the Esri fallback rewrites it. */
@@ -276,25 +288,13 @@ let tiles, labels;
 
 const isDark = () => document.documentElement.dataset.theme === 'dark';
 
-// The water the basemap does not draw, in two parts, for two different reasons.
-//
-// A river is a one-pixel antialiased line, so from zoom 12 its pixels land in the same tones as
-// roads and buildings — measured, the tone a river peaks at is only 20-27% river, so the tint in
-// index.html cannot key on it. And CARTO drops small water from its style outright: a 0.0017 km²
-// retention pond has zero water pixels at zoom 13, 14 and 15 alike, so there is nothing on the
-// tile to recolour at all. The tint still owns the sea and the large lakes, which are neither.
-// `water.json` is baked by water-build.php from OpenStreetMap. See docs/FEATURES.md.
-//
-// Its own pane, between the tiles (200) and the overlays (400), so heat blobs, pins and the "you
-// are here" circle all still draw over the water rather than under it.
-map.createPane('water');
-map.getPane('water').style.zIndex = 250;
-
-/* The place names, above the water this app draws and under everything it reports. Esri publishes
-   them as a service of their own, so they are a second tile layer rather than part of the ground.
-   The pane exists to put them over the water: at the tile pane's own 200 a drawn river would cover
-   the name of the town it runs through. It takes no pointer events, because a tile pane that
-   answers a click sits between the reader and every pin under it. */
+/* **This map draws no sea, lake or pond of its own since 2026-09-14.** It drew all three from
+   `water.json`, and the repository owner removed them. The dark theme draws river lines, which
+   `showRivers()` below owns. See docs/FEATURES.md.
+   The place names, under the coverage mask and everything this app reports. Esri publishes them as
+   a service of their own, so they are a second tile layer rather than part of the ground. The pane
+   puts them under the mask, so a town outside the circle is shaded with its ground. It takes no
+   pointer events, because a tile pane that answers a click sits between the reader and every pin. */
 map.createPane('labels');
 map.getPane('labels').style.zIndex = 260;
 map.getPane('labels').style.pointerEvents = 'none';
@@ -336,7 +336,89 @@ hatch.innerHTML =
   + ' patternTransform="rotate(45)">'
   + '<rect width="9" height="9" class="hatchbg"/>'
   + '<rect width="3" height="9" class="hatchline"/>'
-  + '</pattern></defs>';
+  + '</pattern>'
+  + '<filter id="watertint" color-interpolation-filters="sRGB"><feComponentTransfer>'
+  + '<feFuncR type="discrete"/><feFuncG type="discrete"/><feFuncB type="discrete"/>'
+  + '</feComponentTransfer></filter></defs>';
+
+/* **Dark Matter fills its water with ONE grey, 38 (#262626), and this filter paints that grey with
+   `--water`.** The repository owner asked for coloured water on the dark theme on 2026-09-14.
+   Measured on seven tiles from zoom 9 to 15, at 1x and 2x: each tile is a palette of about eleven
+   greys, land is grey 9, and no road, park or building uses grey 38.
+   **256 bands, so every other grey comes back exact, and FOUR greys are water.** A discrete table
+   picks band `floor(C * n)`. At n = 256 a byte j lands in band j, so `j / 255` hands a grey back
+   unchanged. Grey 38 alone left a dark line along every tile edge at 125% scaling. The browser
+   shrinks a `@2x` tile, and `plus-lighter` in vendor/leaflet.css sums two edge pixels to 37. So 36
+   to 39 are water, which is the set the 64-band table caught until 2026-08-27.
+   The filter lives in the hatch sprite, because a filter needs a rendered SVG. That is this sprite's
+   rule already.
+   **A palette PNG and nothing else.** Esri serves JPEG, where one flat grey fringes into dozens of
+   tones along an edge. So only a CARTO Dark Matter ground takes the class. See `tint` in PROVIDER. */
+const WATER = [36, 39];   // the first and the last grey that reads as water on screen
+function tintWater() {
+  const hex = getComputedStyle(document.documentElement).getPropertyValue('--water').trim();
+  if (!/^#[0-9a-f]{6}$/i.test(hex)) return;   // an empty table is the identity, so this draws grey
+  hatch.querySelectorAll('feComponentTransfer > *').forEach((f, i) => f.setAttribute('tableValues',
+    Array.from({ length: 256 }, (_, k) => k >= WATER[0] && k <= WATER[1]
+      ? parseInt(hex.slice(1 + 2 * i, 3 + 2 * i), 16) / 255 : k / 255)
+      .map(v => v.toFixed(4)).join(' ')));
+}
+
+/* **THE RIVERS DRAW AS 1PX LINES ON THE DARK THEME, AND NOWHERE ELSE.** The repository owner asked
+   on 2026-09-14 for every river to read as a line at least 1px wide. Dark Matter draws a narrow
+   river one pixel wide in grey 38, and many it does not draw at all. Voyager draws its own blue
+   rivers, so the light theme fetches nothing.
+   **A wide river stays an area, and the colour is what does that.** OpenStreetMap maps every river
+   as a centre line, whatever its width, and Dark Matter fills a wide one with grey 38. The line
+   takes `--water`, which is the colour the tint paints that fill. So inside a wide river the line
+   vanishes into its own water, and only a narrow river reads as a line. A second, brighter colour
+   drew a line down the middle of the Klang estuary for one revision, and the owner cut it.
+   `rivers.json` is the three river bands out of water-build.php, 241 KB gzipped against 568 KB for
+   the whole water file. */
+const BAND_MIN = [0, 11, 13];      // the zoom each band starts at. A band is stamped by size at bake
+export const riverBands = [L.layerGroup(), L.layerGroup(), L.layerGroup()];
+// Over the tiles at 200 and under the place names at 260, so a river never covers a town's name.
+map.createPane('rivers');
+map.getPane('rivers').style.zIndex = 250;
+let riversOn = false, riversAsked = false;
+
+function syncRivers() {
+  const z = map.getZoom();
+  riverBands.forEach((g, b) => {
+    const want = riversOn && z >= BAND_MIN[b];
+    if (want !== map.hasLayer(g)) want ? g.addTo(map) : map.removeLayer(g);
+  });
+}
+map.on('zoomend', syncRivers);
+
+function showRivers(on) {
+  riversOn = on;
+  if (on) {
+    // Read at paint time. The token exists on the dark theme alone.
+    const color = getComputedStyle(document.documentElement).getPropertyValue('--water').trim();
+    riverBands.forEach(g => g.eachLayer(l => l.setStyle({ color, weight: 1 })));
+  }
+  syncRivers();
+  if (!on || riversAsked) return;
+  riversAsked = true;
+  /* Past the first paint, the way the whole water file loaded before 2026-09-14. Called as a method
+     on `window`, because a detached `requestIdleCallback` throws, and this runs inside module
+     evaluation. Safari has none, so it waits on a timer.
+     **The timeout is for a page that never goes idle.** `map-limits-test.html` under a virtual time
+     budget is one such page, and it never loaded a river until the callback carried this. */
+  const later = fn => window.requestIdleCallback
+    ? window.requestIdleCallback(fn, { timeout: 3000 }) : setTimeout(fn, 1200);
+  later(() => fetch('rivers.json')
+    .then(r => r.ok ? r.json() : Promise.reject(r.status))
+    .then(geo => {
+      // Canvas, because 2,775 rivers as SVG is 2,775 nodes to carry through every pan and zoom.
+      const renderer = L.canvas({ pane: 'rivers' });
+      for (const f of geo.features)
+        riverBands[f.properties.b].addLayer(L.geoJSON(f, { renderer, interactive: false }));
+      showRivers(riversOn);
+    })
+    .catch(() => { riversAsked = false; }));   // a failed fetch leaves a plainer map, and a retry
+}
 
 /* How far past the circle the shaded ring reaches, in multiples of the circle's own width. The pan
    limit below is a quarter of that width, so three widths is about eleven times as far as a reader
@@ -394,10 +476,10 @@ function ring(lat, lng, km, n = CIRCLE_PTS) {
   return out;
 }
 
-/* Fetched inline rather than deferred to an idle callback, which is what the water below does.
-   Two reasons. It is 4 KB gzipped against water.json's 568 KB. And it carries the zoom floor, so a
-   reader who lands zoomed out would otherwise see the world for as long as the browser felt like
-   waiting. A failure is silent and leaves an unlimited map, which is the state this replaces. */
+/* Fetched inline rather than deferred to an idle callback. It is 4 KB gzipped, and it carries the
+   zoom floor, so a reader who lands zoomed out would otherwise see the world for as long as the
+   browser felt like waiting. A failure is silent and leaves an unlimited map, which is the state this
+   replaces. */
 fetch('border.json')
   .then(r => r.ok ? r.json() : Promise.reject(r.status))
   .then(geo => {
@@ -437,94 +519,6 @@ fetch('border.json')
   })
   .catch(() => {});
 
-/* Three bands, and the zoom each one starts at. A shape carries its band from its own size, stamped
-   at bake time. See water-build.php. Band 0 is what this map drew when the sizes were floors that
-   deleted a shape. 2,775 rivers at one zoom is a blue web. These three numbers stop that web
-   without deleting the water that answers a question close in. */
-const BAND_MIN = [0, 11, 13];
-
-/* A river thins with its band. Band 2 holds 1,439 rivers. Weight 1.4 on all of them repeats the
-   web at zoom 13 that the floors removed from zoom 10. */
-const BAND_WEIGHT = [1.4, 1.1, 0.8];
-
-/* One group per band, made here so `waterBands[b]` is a stable reference before the fetch lands. */
-export const waterBands = [L.layerGroup(), L.layerGroup(), L.layerGroup()];
-
-/* Exported for map-limits-test.html. `seaLayer` is reassigned when the fetch lands, so a function
-   reads it and a binding cannot. */
-export const waterSea = () => seaLayer;
-
-let waterGeo, seaLayer, asking;
-
-/* Read at paint time, never at import time. The token differs by theme and a reader can change the
-   theme while the page is open. One colour serves the sea, a pond and a river. A drawn pond
-   beside a drawn sea has to be the same water. A pond is a fill with no stroke. An outline
-   on a shape this small is most of the shape. */
-const waterStyle = f => {
-  const c = getComputedStyle(document.documentElement).getPropertyValue('--water').trim();
-  return f.properties.t === 'line'
-    ? { color: c, weight: BAND_WEIGHT[f.properties.b], opacity: 1 }
-    : { stroke: false, fillColor: c, fillOpacity: 1 };
-};
-
-// Canvas rather than SVG: 9,169 shapes is 9,169 DOM nodes to carry through every pan and zoom.
-function buildWater() {
-  const renderer = L.canvas({ pane: 'water' });
-  for (const f of waterGeo.features) {
-    const layer = L.geoJSON(f, { renderer, interactive: false, style: waterStyle });
-    if (f.properties.t === 'sea') { seaLayer = layer.addTo(map); continue; }
-    waterBands[f.properties.b].addLayer(layer);
-  }
-  syncBands();
-}
-
-/* The zoom decides which bands draw. Leaflet adds and removes the group, so there is no redraw of
-   this app's own and no per-frame work. */
-function syncBands() {
-  const z = map.getZoom();
-  waterBands.forEach((g, b) => {
-    if (z >= BAND_MIN[b]) { if (!map.hasLayer(g)) g.addTo(map); }
-    else if (map.hasLayer(g)) map.removeLayer(g);
-  });
-}
-map.on('zoomend', syncBands);
-
-/* A theme swap changes `--water`, and the layers hold the old colour until something restyles them.
-   `setStyle` takes the same function the build used, so there is one definition of the paint. */
-function paintWater() {
-  seaLayer?.setStyle(waterStyle);
-  for (const g of waterBands) g.eachLayer(l => l.setStyle(waterStyle));
-}
-
-function ensureWater() {
-  if (waterGeo) { paintWater(); return; }
-  if (asking) return;
-  asking = true;
-  /* Past the first paint. This file is about 568 KB gzipped, against 271 KB for the whole of the
-     rest of the landing. A fetch here more than doubles what a reader waits for. It draws water
-     the basemap omits, over a map that already works, so it can arrive late. requestIdleCallback
-     yields to anything the browser prefers to do first. The setTimeout is the fallback for Safari,
-     which does not implement it. */
-  /* Called as a method on `window`, never lifted off it. `requestIdleCallback` is a `Window`
-     operation, so invoking a detached reference gives it the wrong receiver and it throws. That
-     throw lands during module evaluation, because applyTheme() runs at the top level of js/ui.js,
-     which js/app.js imports statically. So every reader loses the whole app, not just the water. */
-  const later = fn => window.requestIdleCallback
-    ? window.requestIdleCallback(fn)
-    : setTimeout(fn, 1200);
-  try {
-    later(() => fetch('water.json')
-      .then(r => r.ok ? r.json() : Promise.reject(r.status))
-      .then(g => { waterGeo = g; buildWater(); })
-      .catch(() => {}));
-  } catch {
-    /* Nothing about the water takes the app down. This runs inside module evaluation, so an
-       exception here stops js/ui.js and with it everything js/app.js does. A plainer map is the
-       documented outcome of a water failure. That has to hold for a synchronous throw too, not
-       only for a rejected fetch. */
-  }
-}
-
 function setBasemap() {
   const key = isDark() ? 'dark' : 'light';
   if (tiles) map.removeLayer(tiles);
@@ -537,9 +531,15 @@ function setBasemap() {
      soft. Every pin, label and heat blob is drawn by this app and stays sharp.
      CARTO caches to zoom 20, so its half of `PROVIDER` states no `maxNativeZoom` at all. */
   const opt = PROVIDER.opt;
-  tiles  = L.tileLayer(PROVIDER.ground(key), opt).addTo(map);
-  labels = L.tileLayer(PROVIDER.names(key), { ...opt, pane: 'labels' }).addTo(map);
-  ensureWater();
+  // Only a Dark Matter ground takes the water tint. See `tintWater()` above.
+  const tint = PROVIDER.tint(key);
+  if (tint) tintWater();
+  showRivers(key === 'dark');
+  tiles = L.tileLayer(PROVIDER.ground(key), tint ? { ...opt, className: 'watertint' } : opt)
+    .addTo(map);
+  // A ground that bakes in its own place names states none. A second copy draws every name twice.
+  const names = PROVIDER.names(key);
+  labels = names ? L.tileLayer(names, { ...opt, pane: 'labels' }).addTo(map) : null;
 }
 
 // `PREFS.theme` is the one place this app keeps the reader's pick. The picker is three rows in

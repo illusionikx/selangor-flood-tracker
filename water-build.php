@@ -54,6 +54,7 @@ const MID_RIVER_KM = 0.3;    // band 1. Below this a river waits for zoom 13.
 define('COORD_DP', (int) (preg_replace('/^--dp=/', '', implode(' ', preg_grep('/^--dp=/', $argv))) ?: 4));
 const ENDPOINT = 'https://overpass-api.de/api/interpreter';
 const OUT      = __DIR__ . '/water.json';
+const RIVERS   = __DIR__ . '/rivers.json';   // the river lines alone, which js/map.js draws
 
 /** The coverage box, read from api.php so the two cannot drift apart. */
 function box(): array {
@@ -403,6 +404,10 @@ for ($b = 0; $b < 3; $b++) {
 }
 $json = json_encode(['type' => 'FeatureCollection', 'features' => $feat]);
 file_put_contents(OUT, $json);
+/* The three river bands alone. js/map.js draws them on the dark theme, and it reads nothing else
+   from this build since 2026-09-14. About 241 KB gzipped, against 568 KB for the whole file. */
+file_put_contents(RIVERS, json_encode(['type' => 'FeatureCollection', 'features' =>
+    array_values(array_filter($feat, fn($f) => $f['properties']['t'] === 'line'))]));
 
 printf("water-build: %d islands, %d points, %d KB on disk, about %d KB gzipped\n",
        count($seaPoly) - 1, $points, strlen($json) / 1024, strlen(gzencode($json, 9)) / 1024);

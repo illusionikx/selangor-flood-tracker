@@ -2928,10 +2928,13 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   Name the deployed host on that form, never `flood-exp.test`. The free tier is 5 million tiles a
   calendar month, across the raster and vector services together.
   **The paths differ in three ways from Esri's.** CARTO is `{z}/{x}/{y}`, it caches a `@2x` tile, and
-  it caches to zoom 20. So its options carry `detectRetina` and no `maxNativeZoom`.
-  **`dark_nolabels` and `dark_only_labels` at the bare host, and the style stem is the theme key.**
+  it caches to zoom 20. So its options carry no `maxNativeZoom`, and no `detectRetina` either. See the entry on
+  that option at the end of this file.
+  **`dark_nolabels` and `dark_only_labels` at the bare host, and Voyager under `rastertiles/`.**
   Measured on 2026-09-08: all four light and dark variants answer 200 at
-  `basemaps.cartocdn.com/<style>/…`, with no `rastertiles/` prefix and no `{s}`. The subdomains
+  `basemaps.cartocdn.com/<style>/…`, with no `rastertiles/` prefix and no `{s}`. Measured on
+  2026-09-14: Voyager answers only under `rastertiles/`, and `voyager_nolabels` at the bare host
+  answers 404. `CARTO_STYLE` in `js/config.js` names the stem per theme. The subdomains
   answer as well, and four of them split one HTTP/2 connection into four for nothing.
   The free tier is 5 million tiles a month, for non-commercial use.
 - **THE BASEMAP WAS ESRI FROM 2026-08-27, AND THE TILE FILTER IS DELETED.** CARTO ended keyless
@@ -2940,15 +2943,16 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   tile, each tile differed by coordinate, and a browser `Referer` and `User-Agent` changed the
   response hash not at all. It is a policy change rather than a rate limit, so it does not clear
   itself.
-  `TILES` in `js/config.js` holds `World_Light_Gray` and `World_Dark_Gray`, and `js/map.js` adds a
-  `_Base` or a `_Reference` suffix.
+  `TILES` in `js/config.js` holds a service path per theme. The light theme is `World_Topo_Map`
+  since 2026-09-14. The dark theme is the `Canvas/World_Dark_Gray` pair.
   **AN ARCGIS TILE PATH IS `{z}/{y}/{x}`, ROW BEFORE COLUMN.** That is the reverse of the XYZ order
   every other provider here uses, and it fails silently: the tiles still load, and they are simply
   the wrong part of the world. There is no `{s}` and no `{r}`.
-  **Esri publishes the ground and the place names as two services**, so the map adds two layers per
-  theme. The labels take the `labels` pane at z-index 260, above the water this app draws at 250. At
-  the tile pane's own 200 a drawn river covers the name of the town it runs through. That pane takes
-  no pointer events, or it sits between the reader and every pin under it.
+  **Esri publishes the Canvas ground and its place names as two services**, so the dark theme adds
+  two layers. The labels take the `labels` pane at z-index 260, under the coverage mask at 270. That
+  pane takes no pointer events, or it sits between the reader and every pin under it.
+  **World_Topo_Map bakes its names into the ground, so the light theme states no `names` and adds
+  one layer.** A Canvas label layer over it draws every town name twice.
   **`maxNativeZoom: 16` beside `maxZoom: 18`, and the second number alone is wrong.** Esri caches no
   tile past zoom 16 over this area. Zoom 17 and 18 both answer with one shared `Map data not yet
   available` plate — measured, the light and the dark service return the identical file — which is a
@@ -3639,3 +3643,28 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   total water body area moved from 282.4935 to 282.5016 square kilometres, a change of 0.003
   percent. The three largest lakes stayed identical to three decimal places. The point count moved
   from 99,406 to 99,409. A count gate does not test a shape.
+- **THE DARK WATER TINT KEYS ON GREY 38, AND CARTO OWNS THAT NUMBER.** `WATER_GREY` in `js/map.js`
+  is the one grey Dark Matter fills water with, measured on 2026-09-14. A CARTO restyle that moves
+  the water by one level leaves the table correct and the map grey. Nothing reports an error.
+  `map-limits-test.html` checks the table, and it cannot check a tile. So after a CARTO change,
+  fetch one sea tile and count its greys before you trust the tint.
+  **The table catches 36 to 39, and grey 38 alone drew a line at every tile edge.** At 125% scaling
+  the browser shrinks a `@2x` tile, and `plus-lighter` in `vendor/leaflet.css` sums two edge pixels
+  to grey 37. A red map background showed no gap between the tiles, so the line was a colour and not
+  a hole.
+  **Never put the class on an Esri ground.** Esri serves JPEG, and one flat grey fringes into
+  dozens of tones there. The table then catches a ring of edge pixels along every coast. `tint` in
+  `PROVIDER` answers false for every Esri theme.
+- **`detectRetina` halves a tile on any screen above 100%, and `{r}` needs no option.** Leaflet
+  fills `{r}` with `@2x` whenever `devicePixelRatio` is above 1. `detectRetina` does a second
+  thing: it asks for the next zoom at half the tile size. Measured on 2026-09-14 at 125% scaling
+  and zoom 12: the label layer asked for zoom 13 `@2x` tiles and drew each at 128px. So every place
+  name drew at half size.
+  **A screenshot at a device scale of 1 cannot show this.** `L.Browser.retina` is false there, and
+  the option does nothing. Measure a tile question with a Playwright context at
+  `deviceScaleFactor: 1.25`, which is the reference screen.
+- **`requestIdleCallback` never fires under `--virtual-time-budget`, so a deferred fetch takes a
+  timeout.** The headless run of `map-limits-test.html` gives the page no idle period. The rivers
+  waited 20 seconds there and never loaded, and the same page passed in a normal browser. So
+  `showRivers()` passes `{ timeout: 3000 }`. A page that is busy for real benefits from the same
+  line.

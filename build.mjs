@@ -142,7 +142,7 @@ const copy = (src, optional = false) => {
 
 copy('vendor');
 for (const f of ['manifest.json', 'icon-180.png', 'icon-192.png', 'icon-512.png',
-                 'water.json', 'border.json']) copy(f);
+                 'border.json', 'rivers.json']) copy(f);
 /* Optional, for the reason pages.yml already states: a missing decoration must never stop the map
    from updating. */
 for (const f of ['img', 'api.json', 'wx.json']) copy(f, true);
