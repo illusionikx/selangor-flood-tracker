@@ -768,6 +768,9 @@
    set too busy on 2026-09-02, over Selangor's real outline, and asked for them again the same day
    once the shape was a circle. Only the values moved: see `--mask-line` in css/base.css. */
 .covermask { fill: url(#hatch); stroke: var(--mask-edge); stroke-width: 1; }
+/* Under the stripes, past the square frame the ground stops at: the map's own ground colour, opaque.
+   It hides the edge tiles where they hang past the frame. See `Ground` in js/map.js. */
+.coverframe { fill: var(--surface); stroke: none; }
 
 /* The pattern's own sprite. It paints nothing itself and must take no space: a bare `<svg>` in the
    body is 300 by 150 pixels by default, which would push the page down by 150.

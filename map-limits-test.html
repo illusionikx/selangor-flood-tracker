@@ -241,36 +241,54 @@ try {
 
   // --- the tiles ---------------------------------------------------------------------------------
 
-  /* A tile wholly outside the circle is never asked for, because CARTO counts every tile. A revert to
-     a plain `L.tileLayer` asks for them again and draws a map that looks almost the same, so nothing
-     else on this page notices. The floor view spans the whole pan box, so it holds tiles far past the
-     circle. A slack of 5% keeps a tile that grazes the rim out of both counts. */
+  /* The ground fills a square frame around the circle, and no tile outside the frame is asked for,
+     because CARTO counts every tile. A revert to a plain `L.tileLayer` asks for them again and draws
+     a map that looks almost the same, so nothing else on this page notices. The floor view spans the
+     whole pan box, so it holds tiles far past the frame. */
+  const { frame } = await import('./js/map.js');
   map.setZoom(map.getMinZoom(), { animate: false });
   await settle(400);
   const [cy, cx, ckm] = geo.circle;
+  // The circle's extent, worked out here rather than read off the module that draws it.
+  const dLat = ckm / 110.57, dLng = ckm / (111.32 * Math.cos(cy * Math.PI / 180));
+  const disc = L.latLngBounds([cy - dLat, cx - dLng], [cy + dLat, cx + dLng]);
+  ok('the frame holds the circle, with room around it',
+     !!frame && frame.contains(disc.pad(0.1)),
+     frame ? frame.toBBoxString() + ' around ' + disc.toBBoxString() : 'no frame');
   const tileLayers = [];
   map.eachLayer(l => { if (l instanceof L.TileLayer) tileLayers.push(l); });
-  const far = (l, coords) => {
-    const b = l._tileCoordsToBounds(coords);
-    const near = L.latLng(Math.min(Math.max(cy, b.getSouth()), b.getNorth()),
-                          Math.min(Math.max(cx, b.getWest()), b.getEast()));
-    return map.distance(near, [cy, cx]) > ckm * 1000 * 1.05;
-  };
+  const outside = (l, coords) => !frame.intersects(l._tileCoordsToBounds(coords));
   let spanned = 0;
   const t0 = tileLayers[0];
-  if (t0) {
+  if (t0 && frame) {
     const r = t0._pxBoundsToTileRange(map.getPixelBounds());
     for (let x = r.min.x; x <= r.max.x; x++) for (let y = r.min.y; y <= r.max.y; y++) {
       const c = L.point(x, y);
       c.z = t0._tileZoom;
-      if (far(t0, c)) spanned++;
+      if (outside(t0, c)) spanned++;
     }
   }
-  ok('the floor view spans tiles outside the circle', spanned > 0, spanned + ' of them');
-  const asked = tileLayers.flatMap(l => Object.keys(l._tiles).map(k => [l, l._keyToTileCoords(k)]));
-  const askedFar = asked.filter(([l, c]) => far(l, c)).length;
-  ok('no tile outside the circle is asked for', asked.length > 0 && askedFar === 0,
-     asked.length + ' tiles across ' + tileLayers.length + ' layers, ' + askedFar + ' outside');
+  ok('the floor view spans tiles outside the frame', spanned > 0, spanned + ' of them');
+  const asked = frame
+    ? tileLayers.flatMap(l => Object.keys(l._tiles).map(k => [l, l._keyToTileCoords(k)])) : [];
+  const askedOut = asked.filter(([l, c]) => outside(l, c)).length;
+  ok('no tile outside the frame is asked for', asked.length > 0 && askedOut === 0,
+     asked.length + ' tiles across ' + tileLayers.length + ' layers, ' + askedOut + ' outside');
+
+  /* Past the frame the ground colour covers the tiles, so the overhang of each edge tile never
+     shows. A fill that computes transparent draws the ragged edge this frame exists to hide. */
+  const edge = document.querySelector('.coverframe');
+  const inEdge = ll => {
+    const p = map.latLngToLayerPoint(L.latLng(ll));
+    return edge.isPointInFill(new DOMPoint(p.x, p.y));
+  };
+  const past = [frame ? (frame.getNorth() + box.getNorth()) / 2 : cy, cx];
+  const fill = edge && getComputedStyle(edge).fill;
+  ok('the ground colour covers the tiles past the frame',
+     !!edge && fill === getComputedStyle(map.getContainer()).backgroundColor
+       && map.getBounds().contains(past) && inEdge(past) && !inEdge([cy, cx]),
+     edge ? 'fill ' + fill + ', a point past the frame is ' + (inEdge(past) ? 'covered' : 'bare')
+       : 'no .coverframe path');
 
   // --- the pane order ----------------------------------------------------------------------------
 

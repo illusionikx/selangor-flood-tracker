@@ -19011,3 +19011,42 @@ break the skip with no error.
 - A tile cache in `api.php`. Section 9.c.iii of the CARTO basemap terms bans a server-side proxy or
   cache. Section 9.c.ii bans a browser cache older than 30 days. See
   https://carto.com/legal/basemap-terms .
+
+## The ground fills a square frame around the circle, 2026-09-14
+
+The repository owner reversed the ragged edge from the entry above on the same day. The ground
+stopped at whichever tile touched the circle last. That drew a block of tiles inside the striped
+ring, and it read as a page that had not finished loading.
+
+### What changed
+
+The ground now fills a square frame. `frame` in `js/map.js` is the extent of the circle, grown by
+`FRAME` on each side. `FRAME` is 0.2, a fifth of the width of the circle. A tile that touches the
+frame loads, so the ground always reaches the edge of the frame.
+
+`.coverframe` in `css/map.css` paints `--surface` past the frame, under the stripes. It hides the
+part of each edge tile that hangs past the frame. So the edge is a straight line on every side, and
+the stripes run across it unbroken.
+
+`map-limits-test.html` checks that the frame holds the circle with room around it. It checks that
+the map asks for no tile outside the frame. It also checks that the ground colour covers a point
+past the frame and leaves the centre bare.
+
+### Measured
+
+The same session as the entry above, at 1536 by 864 and 125% scaling.
+
+| session step | every tile | the circle | the frame |
+|---|---|---|---|
+| landing at zoom 9 | 70 | 18 | 50 |
+| two wheel steps out, to the zoom floor | 48 | 8 | 18 |
+| five wheel steps in, to zoom 13 | 212 | 210 | 212 |
+| one pan at zoom 13 | 24 | 24 | 24 |
+
+### What it costs
+
+The frame asks for more tiles than the circle did. At zoom 9 an edge of the frame falls inside a
+tile, so a full column of tiles loads for a strip of ground. A smaller `FRAME` loads fewer tiles and
+shows less ground around the circle.
+
+Past the frame the map shows no ground, only the stripes on the ground colour.

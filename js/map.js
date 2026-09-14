@@ -441,27 +441,25 @@ const RIM = 1.01;
 
 let cover;                       // the circle's own bounds, once border.json has answered
 
-/* **A tile wholly outside the circle is never asked for, because CARTO counts every tile.** The
-   repository owner asked for fewer tile calls on 2026-09-14. Measured at 1536x864 and 125% scaling:
-   a landing at zoom 9 asked for 70 tiles, and 18 with this rule. The zoom floor went from 48 to 8.
-   Zoomed in, the view sits inside the circle and nothing changes.
-   **The cost is a square edge, and the owner accepted it.** The stripes are translucent, so the
-   ground under them shows. The ground now stops at the last tile that touches the circle, and at a
-   low zoom that edge is plain inside the striped ring.
-   **The map asks for no tile until border.json answers.** `disc` is `undefined` until then. The
+/* **The ground fills a square frame around the circle, and the map asks for no tile outside it.**
+   CARTO counts every tile, and the repository owner asked for fewer tile calls on 2026-09-14.
+   **The first version skipped every tile outside the circle itself, and the owner reversed it the
+   same day.** The ground then stopped at whichever tile edge came last, in a ragged block inside the
+   striped ring, and that read as a page that had not finished loading.
+   **So the ground stops at `frame`, and `.coverframe` paints the page colour past it.** `frame` is
+   the extent of the circle, grown by `FRAME` on each side. A tile that touches it loads, so the
+   ground always reaches the edge of the frame. The opaque fill hides the part of each tile past it.
+   The stripes draw over both, so only the ground under them changes at the edge.
+   **The map asks for no tile until border.json answers.** `frame` is `undefined` until then. The
    answer redraws both layers. A failure sets `false`, and the whole ground draws.
-   The distance uses the flat measure `ring()` uses, so the 72-point hole always sits inside it.
    `_isValidTile` and `_tileCoordsToBounds` are private Leaflet 1.9 methods. Check both on an upgrade. */
-let disc;                        // [lat, lng, km] of the drawn circle, or false when border.json failed
+const FRAME = 0.2;               // a fifth of the circle's width past it, on each side
+export let frame;                // L.LatLngBounds once border.json answers, or false when it failed
 const Ground = L.TileLayer.extend({
   _isValidTile(c) {
     if (!L.TileLayer.prototype._isValidTile.call(this, c)) return false;
-    if (disc === false) return true;
-    if (!disc) return false;
-    const [lat, lng, km] = disc, b = this._tileCoordsToBounds(c);
-    const y = Math.min(Math.max(lat, b.getSouth()), b.getNorth());
-    const x = Math.min(Math.max(lng, b.getWest()), b.getEast());
-    return Math.hypot((y - lat) * 110.57, (x - lng) * 111.32 * Math.cos(y * Math.PI / 180)) <= km;
+    if (frame === false) return true;
+    return !!frame && frame.intersects(this._tileCoordsToBounds(c));
   },
 });
 
@@ -518,34 +516,35 @@ fetch('border.json')
        A circle over a state this shape takes ground that is not Selangor, and that is the cost of a
        circle rather than a fault. */
     const [cy, cx, km] = geo.circle;
-    disc = [cy, cx, km * RIM];
-    tiles?.redraw();                 // no tile was asked for before this line. See `Ground` above.
-    labels?.redraw();
     const hole = ring(cy, cx, km * RIM);
 
     // The circle's own extent, which is what the limits above read.
     cover = L.latLngBounds(hole.map(([x, y]) => [y, x]));
+    frame = cover.pad(FRAME);
+    tiles?.redraw();                 // no tile was asked for before this line. See `Ground` above.
+    labels?.redraw();
+    const box = ([w, s, e, n]) => [[w, s], [e, s], [e, n], [w, n], [w, s]];
     const dx = (cover.getEast() - cover.getWest()) * MASK_SPANS;
     const dy = (cover.getNorth() - cover.getSouth()) * MASK_SPANS;
-    const [bw, bs] = [cover.getWest() - dx, cover.getSouth() - dy];
-    const [be, bn] = [cover.getEast() + dx, cover.getNorth() + dy];
-    const outer = [[bw, bs], [be, bs], [be, bn], [bw, bn], [bw, bs]];
+    const outer = box([cover.getWest() - dx, cover.getSouth() - dy,
+                       cover.getEast() + dx, cover.getNorth() + dy]);
+    const square = box([frame.getWest(), frame.getSouth(), frame.getEast(), frame.getNorth()]);
 
-    /* One Polygon: that ring, then the circle as its hole. **The stroke draws the circle and only
-       the circle.** It lands on the outer ring too, and that sits three widths out, so no zoom this
-       map allows can bring it on screen. The stripes are faint by instruction, so the edge is stated
-       on its own rather than left to them, and one property states it. */
-    L.geoJSON({
-      type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [outer, hole] },
-    }, {
-      renderer: L.svg({ pane: 'mask' }),
-      interactive: false,
-      style: { className: 'covermask', fillOpacity: 1 },
-    }).addTo(map);
+    /* Two Polygons, each that outer ring with a hole, in one SVG so they paint in the order added.
+       The ground colour past the frame goes first, and the stripes past the circle go over it.
+       **The stroke draws the circle and only the circle.** It lands on the outer ring too, and that
+       sits three widths out, so no zoom this map allows can bring it on screen. The stripes are faint
+       by instruction, so one property states the edge on its own rather than leave it to them.
+       `.coverframe` states no stroke. */
+    const renderer = L.svg({ pane: 'mask' });
+    for (const [inner, className] of [[square, 'coverframe'], [hole, 'covermask']])
+      L.geoJSON({
+        type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [outer, inner] },
+      }, { renderer, interactive: false, style: { className, fillOpacity: 1 } }).addTo(map);
     setLimits();
   })
   // A failed circle draws the whole ground, because a map with no ground is worse than every tile.
-  .catch(() => { if (disc === undefined) { disc = false; tiles?.redraw(); labels?.redraw(); } });
+  .catch(() => { if (frame === undefined) { frame = false; tiles?.redraw(); labels?.redraw(); } });
 
 function setBasemap() {
   const key = isDark() ? 'dark' : 'light';
