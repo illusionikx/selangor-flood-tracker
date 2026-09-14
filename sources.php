@@ -737,6 +737,32 @@ const WARN_HERE = ['selangor', 'kuala lumpur', 'putrajaya', 'lembah klang', 'kla
  * Melaka" and the central one still answers. CLAUDE.md names the row that needed this rule.
  *
  * The straits are open to a marine text alone. A land text must name a state or a district. */
+/* Where a reader can read the announcement itself.
+ *
+ * No feed publishes a link or an id for its rows. So each row links to the page that published its
+ * bulletin. MET keeps one page per bulletin, and the page holds the latest issue of it.
+ *
+ * Measured 2026-09-14:
+ *   IDM20016  strong winds and rough seas. It is the marine bulletin, and it carries storms over
+ *             water too.
+ *   IWR30002  thunderstorms over land.
+ *   IWR30003  the tropical cyclone advisory. Nothing here shows that feed.
+ *   IWR30004  earthquake information. WARN_DROP drops those rows.
+ *
+ * Continuous rain has no page this app confirmed. IWR30001 answered 404 on a dry day. So that
+ * warning, and any kind MET adds later, links to the JPS page that mirrors every MET warning. */
+const WARN_LINK_SEA   = 'https://www.met.gov.my/data/IDM20016.html';
+const WARN_LINK_STORM = 'https://www.met.gov.my/data/IWR30002.html';
+const WARN_LINK_ANY   = 'https://publicinfobanjir.water.gov.my/ramalan/met-alert/?lang=en';
+const FLOOD_LINK      = 'https://publicinfobanjir.water.gov.my/ramalan/amaran-banjir/?lang=en';
+
+/* `$hay` is the lowercased heading text the caller already built for WARN_DROP. */
+function warnLink(bool $sea, string $hay): string {
+    if ($sea) return WARN_LINK_SEA;
+    return str_contains($hay, 'thunderstorm') || str_contains($hay, 'ribut petir')
+        ? WARN_LINK_STORM : WARN_LINK_ANY;
+}
+
 function hereNames(string $text, bool $sea): bool {
     $where = strtolower($text);
     foreach (WARN_HERE as $k) if (str_contains($where, $k)) return true;
@@ -852,7 +878,7 @@ function metWarnings(string $json, int $now): array {
                   'fresh' => ($now - $from) < WARN_FRESH,
                   // One array carries every notice, and these two separate them. `weather` renders
                   // as this row always has. See mergeNotices().
-                  'kind' => 'weather', 'src' => 'met'];
+                  'kind' => 'weather', 'src' => 'met', 'link' => warnLink($sea, $hay)];
     }
     usort($out, fn($a, $b) => strcmp($b['from'], $a['from']));
     return $out;
@@ -913,7 +939,7 @@ function jpsMetWarnings(string $json, int $now): array {
         $out[] = ['title' => $title, 'text' => $text,
                   'from' => date('Y-m-d\TH:i:s', $from), 'to' => date('Y-m-d\TH:i:s', $to),
                   'fresh' => ($now - $from) < WARN_FRESH,
-                  'kind' => 'weather', 'src' => 'jps'];
+                  'kind' => 'weather', 'src' => 'jps', 'link' => warnLink($sea, $hay)];
     }
     return $out;
 }
@@ -1001,7 +1027,7 @@ function floodAlerts(string $json, int $now): array {
                   'from'  => date('Y-m-d\TH:i:s', $from),
                   'to'    => date('Y-m-d\TH:i:s', $to),
                   'fresh' => $said && ($now - $said) < WARN_FRESH,
-                  'kind'  => 'flood', 'src' => 'jps'];
+                  'kind'  => 'flood', 'src' => 'jps', 'link' => FLOOD_LINK];
     }
     return $out;
 }

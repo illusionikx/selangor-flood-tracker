@@ -2138,6 +2138,7 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
         ($r[0]['text'] ?? '') === 'Thunderstorms are expected until noon.');
     $ok('metWarnings stamps kind and src',
         ($r[0]['kind'] ?? '') === 'weather' && ($r[0]['src'] ?? '') === 'met');
+    $ok('a land storm links to the MET thunderstorm bulletin', ($r[0]['link'] ?? '') === WARN_LINK_STORM);
 
     echo "\nnoticeOf():\n";
     $ok('the notice page returns its id',  noticeOf('<html><title> Notis Gangguan </title><body></body></html>') === 'publicinfobanjir');
@@ -2446,6 +2447,8 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
         count(metWarnings(json_encode([$both]), $wnow)) === 1);
     $ok('a storm over our waters is not judged as land',
         count(metWarnings(json_encode([$wet]), $wnow)) === 1);
+    $ok('and it links to the marine bulletin',
+        (metWarnings(json_encode([$wet]), $wnow)[0]['link'] ?? '') === WARN_LINK_SEA);
     $ok('a sea warning for other waters still drops',
         metWarnings(json_encode([$sea]), $wnow) === []);
 
@@ -2494,6 +2497,8 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
        The kind is not on any list. The place is what admits it. */
     $odd = $row('Flash Flood Warning', 'Flooding expected in Klang, Selangor', $wnow - 60, $wnow + 3600);
     $ok('an unknown kind still shows', count(metWarnings(json_encode([$odd]), $wnow)) === 1);
+    $ok('and it links to the JPS page that mirrors every MET warning',
+        (metWarnings(json_encode([$odd]), $wnow)[0]['link'] ?? '') === WARN_LINK_ANY);
 
     /* The place test on a land row, checked both ways. One half admits every state in the
        country. The other half silences the one this map serves. Both need a check, or a wrong
@@ -2580,6 +2585,7 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
         str_contains($g[0]['text'] ?? '', 'Selangor')
         && !str_contains($g[0]['text'] ?? '', 'SECTION A')
         && !str_contains($g[0]['text'] ?? '', 'rough seas off Sarawak'));
+    $ok('a JPS rough seas row links to the MET marine bulletin', ($g[0]['link'] ?? '') === WARN_LINK_SEA);
 
     $ok('an unreadable body yields nothing', jpsMetWarnings('<html>Notis</html>', time()) === []);
     $ok('an empty feed yields nothing',      jpsMetWarnings('[]', time()) === []);
@@ -2601,6 +2607,7 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
     $ok('a live flood alert survives',   count($f) === 1);
     $ok('it is stamped flood and jps',
         ($f[0]['kind'] ?? '') === 'flood' && ($f[0]['src'] ?? '') === 'jps');
+    $ok('it links to the JPS flood alert page', ($f[0]['link'] ?? '') === FLOOD_LINK);
     $ok('the title names the alert type', ($f[0]['title'] ?? '') === 'Flood alert · Final');
     // POINew is a `!`-delimited list. A reader needs the places, not the delimiter.
     $ok('the text lists the points',

@@ -18650,6 +18650,57 @@ the day a reader asks for zoom 14 to cluster nothing.
 
 The frame measurement in "One canvas draws every pin" did not run again after this change.
 
+## The warning dialog links to the original announcement
+
+The repository owner asked on 2026-09-14 for a link to the original announcement in the warning
+dialog.
+
+### What it does
+
+The dialog prints a Source line under the validity line. The label names the host, and the link opens
+in a new tab. The Service Notice already prints a Source line of this shape.
+
+`api.php` stamps a `link` on every row of `warnings[]`. `warnLink()` in `sources.php` picks it:
+
+| row | link |
+|---|---|
+| a MET warning about the sea | `met.gov.my/data/IDM20016.html`, the strong winds and rough seas bulletin |
+| a MET thunderstorm warning about land | `met.gov.my/data/IWR30002.html`, the thunderstorm bulletin |
+| any other MET warning | `publicinfobanjir.water.gov.my/ramalan/met-alert/`, the JPS page that mirrors them all |
+| a JPS flood alert | `publicinfobanjir.water.gov.my/ramalan/amaran-banjir/` |
+
+The row from `api.data.gov.my` and the row from the JPS mirror take the same link. Both carry a MET
+bulletin, and MET published it first.
+
+### Why the link is per bulletin, not per announcement
+
+No feed publishes a link or an id for its rows. A JPS mirror row holds a date, a title, a heading, a
+message and a validity window. An `api.data.gov.my` row holds its issue stamp and its text. So the
+nearest thing to the announcement is the page that published its bulletin.
+
+MET keeps one page per bulletin. `IDM20016.html` held the marine bulletin issued at 08:50 on
+2026-09-14. The payload row from `api.data.gov.my` carried the same issue time.
+
+The parsers already decide whether a row is about the sea, so the link costs one test more. A
+thunderstorm over land is the only land warning with a page this app confirmed.
+
+### What it costs
+
+The page holds the latest issue of its bulletin. So a warning that MET reissued links to the newer
+text. The two usually match, because the dialog only opens a row inside its validity window.
+
+The link is outbound. The browser fetches nothing from MET or JPS until a reader presses it.
+
+### What was not done
+
+Continuous rain has no MET page here. `IWR30001` answered 404 on a dry day, and no other code held
+that bulletin. So a continuous rain warning links to the JPS mirror page. Check `IWR30001` again on a
+day MET issues one.
+
+The alert panel card and the ticker tile carry no link. The request named the dialog.
+
+Test mode's fake row carries no link, so it prints no Source line.
+
 ## The map draws no water of its own, 2026-09-14
 
 The repository owner asked for the blue water to leave the map. The sea, the rivers and the ponds

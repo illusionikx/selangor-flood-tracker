@@ -1556,12 +1556,19 @@ document.addEventListener('click', e => {
     icon.className = `i i-${b.icon}`;
     icon.style.color = b.c;
     el('warnBoxTitle').textContent = b.head;
+    /* The page that published this bulletin, stamped per row by `warnLink()` in sources.php. The
+       label names the host, the shape the Service Notice link above uses. Test mode's fake row
+       carries no link, so it prints no Source line. */
+    const src = it.link
+      ? `<p>Source: <a href="${esc(it.link)}" target="_blank" rel="noopener">${
+          esc(new URL(it.link).hostname.replace(/^www\./, ''))}</a></p>`
+      : '';
     el('warnBody').innerHTML = `<h3>${esc(it.title)}</h3><p>${esc(it.text)}</p>
-      <p class="muted">Valid ${esc(warnWhen(it.from))} to ${esc(warnWhen(it.to))}</p>`;
+      <p class="muted">Valid ${esc(warnWhen(it.from))} to ${esc(warnWhen(it.to))}</p>${src}`;
   }
   warnBox.showModal();
 });
-// Backdrop closes it, like every other dialog here. The × and Esc do the rest.
+// Backdrop closes it, like every other dialog here. The back arrow and Esc do the rest.
 warnBox.onclick = e => { if (e.target === warnBox) warnBox.close(); };
 
 // --- lightbox --------------------------------------------------------------------------------------
