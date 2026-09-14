@@ -239,6 +239,39 @@ try {
      riverBands.map(g => +map.hasLayer(g)).join(''));
   setTheme(wasTheme);
 
+  // --- the tiles ---------------------------------------------------------------------------------
+
+  /* A tile wholly outside the circle is never asked for, because CARTO counts every tile. A revert to
+     a plain `L.tileLayer` asks for them again and draws a map that looks almost the same, so nothing
+     else on this page notices. The floor view spans the whole pan box, so it holds tiles far past the
+     circle. A slack of 5% keeps a tile that grazes the rim out of both counts. */
+  map.setZoom(map.getMinZoom(), { animate: false });
+  await settle(400);
+  const [cy, cx, ckm] = geo.circle;
+  const tileLayers = [];
+  map.eachLayer(l => { if (l instanceof L.TileLayer) tileLayers.push(l); });
+  const far = (l, coords) => {
+    const b = l._tileCoordsToBounds(coords);
+    const near = L.latLng(Math.min(Math.max(cy, b.getSouth()), b.getNorth()),
+                          Math.min(Math.max(cx, b.getWest()), b.getEast()));
+    return map.distance(near, [cy, cx]) > ckm * 1000 * 1.05;
+  };
+  let spanned = 0;
+  const t0 = tileLayers[0];
+  if (t0) {
+    const r = t0._pxBoundsToTileRange(map.getPixelBounds());
+    for (let x = r.min.x; x <= r.max.x; x++) for (let y = r.min.y; y <= r.max.y; y++) {
+      const c = L.point(x, y);
+      c.z = t0._tileZoom;
+      if (far(t0, c)) spanned++;
+    }
+  }
+  ok('the floor view spans tiles outside the circle', spanned > 0, spanned + ' of them');
+  const asked = tileLayers.flatMap(l => Object.keys(l._tiles).map(k => [l, l._keyToTileCoords(k)]));
+  const askedFar = asked.filter(([l, c]) => far(l, c)).length;
+  ok('no tile outside the circle is asked for', asked.length > 0 && askedFar === 0,
+     asked.length + ' tiles across ' + tileLayers.length + ' layers, ' + askedFar + ' outside');
+
   // --- the pane order ----------------------------------------------------------------------------
 
   /* The mask has to sit over the place names, so a town outside the area is shaded with the ground

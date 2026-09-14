@@ -41,10 +41,10 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `js/util.js` | pure helpers + `hasInfo()` / `color()` / `isIgnored()` |
 | `js/stations.js` | queries over the station set (`nearestOf`, `nearestCam`, `byId`) |
 | `js/pins.js` | the station pins and the cluster chips, painted on ONE canvas. Sprite cache, greedy grid clustering, hit testing, and the danger halo's own frame loop. Replaced Leaflet.markercluster |
-| `js/map.js` | map instance, basemap/theme, the pin layer, the station panel (`openSide`), `focusOn` / `flashTo`. Also the coverage mask, the zoom floor and the pan limit, all three off `border.json`. Also `tintWater()`, the blue on Dark Matter's water, and `showRivers()`, the river lines on the dark theme. Also the zoom ceiling, 15, and `disableClusteringAtZoom: 15` on the cluster, which is what makes 15 the zoom that merges nothing |
+| `js/map.js` | map instance, basemap/theme, the pin layer, the station panel (`openSide`), `focusOn` / `flashTo`. Also the coverage mask, the zoom floor, the pan limit and the tile skip, all four off `border.json`. The map asks for no tile wholly outside the circle. Also `tintWater()`, the blue on Dark Matter's water, and `showRivers()`, the river lines on the dark theme. Also the zoom ceiling, 15, and `disableClusteringAtZoom: 15` on the cluster, which is what makes 15 the zoom that merges nothing |
 | `js/heat.js` | both heat layers (water level, rainfall), ground-fixed sizing per layer, shared opacity. Also the field pass where a gauge reporting no rain denies the ground a wet one claims |
 | `heat-test.html` | `chrome --headless --dump-dom` — one of eight runnable checks. Guards the rain layer's paint distance, its dry-gauge erase and its handover between neighbours, in canvas pixels |
-| `map-limits-test.html` | `chrome --headless --dump-dom` — one of eight runnable checks. Guards the coverage circle, the zoom floor and the pan limit. It probes the drawn shape with `isPointInFill`, so it reads the fill rule the browser paints with. It asserts that no water pane came back, that the dark water tint recolours greys 36 to 39 alone and only on a CARTO ground, that the river bands load and follow the zoom on the dark theme alone, that that the circle holds every point of the land ring, that its centre sits east of that ring's middle, that the faint stripes still carry their hairline, and that the pattern sprite is rendered rather than `display: none`, which is the one thing that empties the tile with nothing to say so |
+| `map-limits-test.html` | `chrome --headless --dump-dom` — one of eight runnable checks. Guards the coverage circle, the zoom floor and the pan limit. It probes the drawn shape with `isPointInFill`, so it reads the fill rule the browser paints with. It asserts that no water pane came back, that the dark water tint recolours greys 36 to 39 alone and only on a CARTO ground, that the river bands load and follow the zoom on the dark theme alone, that that the circle holds every point of the land ring, that its centre sits east of that ring's middle, that the map asks for no tile outside the circle, that the faint stripes still carry their hairline, and that the pattern sprite is rendered rather than `display: none`, which is the one thing that empties the tile with nothing to say so |
 | `js/popup.js` | popup + meter + gauge + sparkline templates. Also `wxItem()` and its three helpers, the weather list item both weather surfaces draw |
 | `js/sparktip.js` | the hover/tap readout on every graph, and the label on any `data-tip`. One delegated listener, no imports |
 | `js/render.js` | rebuilds markers and heat points, the two saved lists, and the kind counts |
@@ -69,7 +69,7 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `water.json` | **Not drawn and not shipped since 2026-09-14.** Only `basemap-spike.html` reads it. Seven features it bakes and commits: the sea, and three bands each of rivers and water bodies. Band 0 draws at every zoom. Band 1 draws from zoom 11. Band 2 draws from zoom 13. 2,511 KB on disk, about 568 KB gzipped, with the sea |
 | `rivers.json` | the three river bands out of `water.json`, baked beside it. `js/map.js` draws them as lines on the dark theme alone. 979 KB on disk, about 241 KB gzipped |
 | `border-build.php` | `php border-build.php` — bakes `border.json` from OpenStreetMap. Two Overpass calls: Selangor's geometry, then its member way TAGS, so the sea boundary (`maritime=yes`) can be dropped before the circle is placed. Run by hand, never in a request |
-| `border.json` | `circle` is `[lat, lng, km]` and is the one source for three things: the shading outside it, the zoom floor and the pan limit. Also the full outline and the land ring, which only `border-build.php` and `map-limits-test.html` read. 30 KB, 4 KB gzipped |
+| `border.json` | `circle` is `[lat, lng, km]` and is the one source for four things: the shading outside it, the zoom floor, the pan limit and which tiles the map asks for. Also the full outline and the land ring, which only `border-build.php` and `map-limits-test.html` read. 30 KB, 4 KB gzipped |
 | `wx-build.php` | `php wx-build.php` — bakes `wx-places.json` from Nominatim. Run by hand, never in a request |
 | `wx-places.json` | the district behind each weather point, baked and committed |
 | `icon-192.png`, `icon-512.png` | manifest icons (`any`) and the favicon — the glyph on transparency |
@@ -691,6 +691,7 @@ order that file holds them. A trap names itself here, and the file states the ev
 - THE DARK WATER TINT KEYS ON GREY 38, AND CARTO OWNS THAT NUMBER.
 - `detectRetina` halves a tile on any screen above 100%, and `{r}` needs no option.
 - `requestIdleCallback` never fires under `--virtual-time-budget`, so a deferred fetch takes a...
+- The ground asks for no tile until `border.json` answers.
 
 ## Conventions
 

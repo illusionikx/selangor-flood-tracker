@@ -441,6 +441,30 @@ const RIM = 1.01;
 
 let cover;                       // the circle's own bounds, once border.json has answered
 
+/* **A tile wholly outside the circle is never asked for, because CARTO counts every tile.** The
+   repository owner asked for fewer tile calls on 2026-09-14. Measured at 1536x864 and 125% scaling:
+   a landing at zoom 9 asked for 70 tiles, and 18 with this rule. The zoom floor went from 48 to 8.
+   Zoomed in, the view sits inside the circle and nothing changes.
+   **The cost is a square edge, and the owner accepted it.** The stripes are translucent, so the
+   ground under them shows. The ground now stops at the last tile that touches the circle, and at a
+   low zoom that edge is plain inside the striped ring.
+   **The map asks for no tile until border.json answers.** `disc` is `undefined` until then. The
+   answer redraws both layers. A failure sets `false`, and the whole ground draws.
+   The distance uses the flat measure `ring()` uses, so the 72-point hole always sits inside it.
+   `_isValidTile` and `_tileCoordsToBounds` are private Leaflet 1.9 methods. Check both on an upgrade. */
+let disc;                        // [lat, lng, km] of the drawn circle, or false when border.json failed
+const Ground = L.TileLayer.extend({
+  _isValidTile(c) {
+    if (!L.TileLayer.prototype._isValidTile.call(this, c)) return false;
+    if (disc === false) return true;
+    if (!disc) return false;
+    const [lat, lng, km] = disc, b = this._tileCoordsToBounds(c);
+    const y = Math.min(Math.max(lat, b.getSouth()), b.getNorth());
+    const x = Math.min(Math.max(lng, b.getWest()), b.getEast());
+    return Math.hypot((y - lat) * 110.57, (x - lng) * 111.32 * Math.cos(y * Math.PI / 180)) <= km;
+  },
+});
+
 /* The zoom floor and the pan limit, both off the circle. It is what a reader sees, so it is what
    the map stops at. Re-run on every resize, because `getBoundsZoom()` answers for the window this
    map has right now: the level that fits the circle on a desktop leaves half of it off a phone.
@@ -494,6 +518,9 @@ fetch('border.json')
        A circle over a state this shape takes ground that is not Selangor, and that is the cost of a
        circle rather than a fault. */
     const [cy, cx, km] = geo.circle;
+    disc = [cy, cx, km * RIM];
+    tiles?.redraw();                 // no tile was asked for before this line. See `Ground` above.
+    labels?.redraw();
     const hole = ring(cy, cx, km * RIM);
 
     // The circle's own extent, which is what the limits above read.
@@ -517,7 +544,8 @@ fetch('border.json')
     }).addTo(map);
     setLimits();
   })
-  .catch(() => {});
+  // A failed circle draws the whole ground, because a map with no ground is worse than every tile.
+  .catch(() => { if (disc === undefined) { disc = false; tiles?.redraw(); labels?.redraw(); } });
 
 function setBasemap() {
   const key = isDark() ? 'dark' : 'light';
@@ -535,11 +563,11 @@ function setBasemap() {
   const tint = PROVIDER.tint(key);
   if (tint) tintWater();
   showRivers(key === 'dark');
-  tiles = L.tileLayer(PROVIDER.ground(key), tint ? { ...opt, className: 'watertint' } : opt)
+  tiles = new Ground(PROVIDER.ground(key), tint ? { ...opt, className: 'watertint' } : opt)
     .addTo(map);
   // A ground that bakes in its own place names states none. A second copy draws every name twice.
   const names = PROVIDER.names(key);
-  labels = names ? L.tileLayer(names, { ...opt, pane: 'labels' }).addTo(map) : null;
+  labels = names ? new Ground(names, { ...opt, pane: 'labels' }).addTo(map) : null;
 }
 
 // `PREFS.theme` is the one place this app keeps the reader's pick. The picker is three rows in

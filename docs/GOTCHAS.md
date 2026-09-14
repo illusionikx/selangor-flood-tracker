@@ -3668,3 +3668,11 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   waited 20 seconds there and never loaded, and the same page passed in a normal browser. So
   `showRivers()` passes `{ timeout: 3000 }`. A page that is busy for real benefits from the same
   line.
+- **The ground asks for no tile until `border.json` answers.** `Ground` in `js/map.js` refuses every
+  tile while `disc` is `undefined`. The fetch answer sets `disc` and redraws both layers. A failure
+  sets `false` and redraws. A new path that sets `disc` must redraw too, or the ground stays blank.
+  A `border.json` request that hangs and never fails also leaves the ground blank, and nothing
+  guards that case.
+  **The skip uses two private Leaflet methods**, `_isValidTile` and `_tileCoordsToBounds`. If an
+  upgrade renames the first one, `extend` adds a method that nothing calls, and nothing throws.
+  `map-limits-test.html` catches it, because the floor view then asks for tiles outside the circle.

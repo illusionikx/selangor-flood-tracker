@@ -18864,3 +18864,54 @@ The ground is a little softer below 2x scaling. The frame rate did not move past
 
 `map-limits-test.html`, `paint-check.html` and `m3-check.html` pass on the source. The build checks
 did not run, because `npm run build` refuses to run while `site/` holds `shots/`.
+
+## The map asks for no tile outside the coverage circle, 2026-09-14
+
+The repository owner asked for fewer map calls. CARTO counts every tile against a free limit of 5
+million tile requests a month. This change measured a cold session in a fresh Chrome profile, at
+1536 by 864 and 125% scaling.
+
+| session step | tiles before | tiles after |
+|---|---|---|
+| landing at zoom 9 | 70 | 18 |
+| two wheel steps out, to the zoom floor | 48 | 8 |
+| five wheel steps in, to zoom 13 | 212 | 210 |
+| one pan at zoom 13 | 24 | 24 |
+
+Zoomed in, the view sits inside the circle, so the count does not change there.
+
+### The change
+
+`Ground` in `js/map.js` extends `L.TileLayer`. Its `_isValidTile` refuses a tile when the nearest
+point of the tile is farther from the centre than the drawn radius. Both tile layers use it, on
+CARTO and on the Esri fallback.
+
+The map asks for no tile until `border.json` answers. The answer redraws both layers. If the fetch
+fails, the whole ground draws.
+
+`map-limits-test.html` checks that the floor view spans tiles outside the circle. It also checks
+that the map asks for none of them.
+
+### What it costs
+
+The stripes outside the circle are translucent, so the ground under them shows. The ground now stops
+at a square tile edge inside the striped ring. At the zoom floor that edge is plain. The repository
+owner accepted it.
+
+The ground waits for `border.json`, which is 4 KB gzipped.
+
+`_isValidTile` and `_tileCoordsToBounds` are private Leaflet 1.9 methods. A Leaflet upgrade can
+break the skip with no error.
+
+### Measured and not built
+
+- `updateWhenIdle: true` and `updateWhenZooming: false` saved nothing. `updateWhenZooming: false`
+  alone asked for more tiles.
+- One layer with the names in the tiles (`voyager`, `dark_all`) halves every count. At 125% scaling
+  it doubles the bytes, because the ground then loads `@2x`. On the dark theme the river lines then
+  draw over the names.
+- 512px tiles with `zoomOffset: -1` cut the count by 64%. A CARTO `@2x` tile drawn at 512px shows
+  text and roads at twice their size.
+- A tile cache in `api.php`. Section 9.c.iii of the CARTO basemap terms bans a server-side proxy or
+  cache. Section 9.c.ii bans a browser cache older than 30 days. See
+  https://carto.com/legal/basemap-terms .
