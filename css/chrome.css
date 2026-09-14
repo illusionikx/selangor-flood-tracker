@@ -876,17 +876,19 @@ body.railopen #rail .railbadge { top: -6px; right: -6px; }
    **`order` rather than a source move.** The close button already sits first in three of the five,
    and the phone block already ordered the row above the headline. One property states the position
    at both widths instead.
-   **Named one by one, never as bare `.modalhead`.** `#lightbox` and `#warnBox` are basic dialogs at
-   every width — floating cards that never fill the screen — so both keep the ×. The lightbox has a
-   second reason: a back arrow beside a scrubber and a step-back button reads as "previous frame". */
+   **Named one by one, never as bare `.modalhead`.** `#lightbox` is a basic dialog at every width and
+   keeps the ×. A back arrow beside a scrubber and a step-back button reads as "previous frame".
+   `#warnBox` is basic at every width too, and it took the arrow on 2026-09-14. Its arrow is first in
+   the source, so it needs no `order`. */
 #dataBox .modalhead form, #camBox .modalhead form, .docbox .modalhead form { order: -1; }
 /* **No margin left to keep in step with anything.** `.apptop` places this button, the way it
    places the pane's own back arrow: 8px above a 48px target inside a 56px row, which lands the
    glyph 28px in and 32px down. Each of these five carried a negative margin instead, derived from
    the padding of the box around it, and the three paddings behind them were 18, 20 and 24.
-   **22px, which is `.icon`'s own size.** `.modalhead .dclose` sets 20 for the two basic dialogs
-   that keep an X, and a mark two pixels short of the pane's reads as a smaller button. */
-.docbox .modalhead .dclose, #dataBox .modalhead .dclose, #camBox .modalhead .dclose {
+   **22px, which is `.icon`'s own size.** `.modalhead .dclose` sets 20 for the lightbox, the one
+   dialog that keeps an X, and a mark two pixels short of the pane's reads as a smaller button. */
+.docbox .modalhead .dclose, #dataBox .modalhead .dclose, #camBox .modalhead .dclose,
+#warnBox .modalhead .dclose {
   margin: 0; font-size: 22px;
 }
 /* No `max-width` on the paragraph. A 70ch cap was tried when the dialog went to 820px, to keep a
@@ -1936,10 +1938,12 @@ table.data .dash { color: var(--outline); }
 
 /* --- warning modal ------------------------------------------------------------------------------ */
 
-/* One warning, read in full. Small on purpose: a title, a paragraph and a validity line,
-   nothing to scroll. */
+/* One warning, read in full. Small on purpose: a title, a paragraph and a validity line.
+   **No padding on the box.** The app bar states its own insets, the way it does in `.docbox`, so
+   the body carries the padding instead. */
 #warnBox {
-  max-width: min(480px, calc(100vw - 32px)); padding: 20px;
+  /* `overflow: hidden` clips the bar's square corners inside the 28dp one, the way `.docbox` does. */
+  max-width: min(480px, calc(100vw - 32px)); padding: 0; overflow: hidden;
   border: 1px solid var(--outline); border-radius: 12px;
   background: var(--surface); color: var(--on-surface); box-shadow: var(--shadow);
 }
@@ -1951,8 +1955,9 @@ table.data .dash { color: var(--outline); }
 /* **The text scrolls, the icon and the headline do not.** A MET bulletin runs to about 1,800
    characters, and this box takes the browser's own `max-height` cap. With nothing scrolling, that
    text simply ran out of the bottom of the dialog and no reader could reach the end of it.
-   `flex: none` on the two rows above it, or a long body shrinks the headline instead of scrolling.
-   `overflow: auto` is also what lets the body shrink at all — see `.docbody`.
+   The app bar above it is `flex: none` in the shared rule beside `#sideHead`, or a long body shrinks
+   the headline instead of scrolling. `overflow: auto` is also what lets the body shrink at all —
+   see `.docbody`.
 
    **`flex-basis` is `auto` here and it is `0` in every other scroller in this app.** This is the one
    scrolling body inside a flex column of AUTO height. The four full-screen panes and the supporting
@@ -1963,13 +1968,23 @@ table.data .dash { color: var(--outline); }
    every check here passed and one reader's phone did not.
    `min-height: 0` is what a zero basis used to supply. Without it the body cannot shrink under the
    browser's own `max-height` cap, and a long bulletin runs out of the bottom again. */
-#warnBox > .i, #warnBox .modalhead { flex: none; }
-#warnBox #warnBody { flex: 1 1 auto; min-height: 0; overflow: auto; overscroll-behavior: contain; }
-/* M3 sizes a basic dialog's icon at 24px. It is a block on its own line above the headline, so the
-   gap under it is the header's own — 8px here rather than M3's 16, because this app's dialogs run
-   tighter than the reference and a 16px gap over an 8px `.modalhead` margin reads as two headers. */
-#warnBox > .i { display: block; font-size: 24px; margin-bottom: 8px; }
-#warnBox h2 { font-size: 18px; font-weight: 500; }
+#warnBox #warnBody {
+  flex: 1 1 auto; min-height: 0; overflow: auto; overscroll-behavior: contain;
+  padding: 0 24px 24px;
+}
+/* **The icon sits IN LINE with the headline**, asked for on 2026-09-14. It stood above the headline
+   for one revision, in M3's basic dialog anatomy order.
+   It takes the headline's own size, and its top margin centres it on the FIRST line. So a title that
+   wraps keeps the icon beside its start, rather than centred on two lines.
+   **`flex: 1` on the headline, and the shared rule is why.** `.apflex h2` states `flex: none`. In a
+   row that stops the title shrinking, so a long one runs past the card instead of wrapping. */
+#warnBox .warnhead { display: flex; align-items: flex-start; gap: 12px; }
+#warnBox .warnhead > .i {
+  font-size: var(--md-sys-typescale-headline-medium-size);
+  margin-top: calc((var(--md-sys-typescale-headline-medium-line-height)
+                    - var(--md-sys-typescale-headline-medium-size)) / 2);
+}
+#warnBox .warnhead h2 { flex: 1; min-width: 0; }
 #warnBox #warnBody h3 { margin: 0 0 8px; font-size: 15px; font-weight: 500; }
 #warnBox #warnBody p { margin: 0 0 8px; line-height: 1.5; }
 
@@ -2898,7 +2913,7 @@ body.side #side { display: flex; }
    card rather than any bar. What it cost is the thing it lost on. A panel is a panel to a reader,
    and one that restyles its own header at 600px reads as a fault. */
 #sideHead,
-.docbox .modalhead, #dataBox .modalhead, #camBox .modalhead {
+.docbox .modalhead, #dataBox .modalhead, #camBox .modalhead, #warnBox .modalhead {
   flex: none; display: flex; flex-direction: column; align-items: stretch;
   min-height: 112px; margin: 0; padding: 0; gap: 0;
   background: var(--surface); color: var(--on-surface);
@@ -4137,11 +4152,9 @@ body.side #side { display: flex; }
 }
 #lightbox, #warnBox { border-radius: 28px; }
 #lightbox[open], #warnBox[open] { animation: dlgOpen var(--m3-grow); }
-/* `headline-small` is 24px, and only one of the two takes it. `#warnBox` holds a fixed short title
-   — `Forecast Warning` or `Service Notice`. `#lightbox` holds a camera's name and its district, on
-   two lines, and it wraps rather than truncating. M3's own rule about a long or variable headline
-   applies: at 24px on a 360px screen that name takes two lines of 32px before the picture starts. */
-#warnBox h2 { font-size: 24px; }
+/* **No `headline-small` rung on either one.** `#warnBox` took it until 2026-09-14, and then it took
+   the pane's app bar, which states `headline-medium` for every panel. `#lightbox` holds a camera's
+   name and its district on two lines, so it never took the 24px rung. */
 
 /* --- the four dialogs across M3's window size classes ------------------------------------------ */
 

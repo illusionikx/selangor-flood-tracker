@@ -1193,18 +1193,22 @@
      and js/ticker.js. Same shell as the other dialogs: a form/dclose pair for the native close,
      and ui.js closes it on a backdrop click too. -->
 <dialog id="warnBox" aria-labelledby="warnBoxTitle">
-  <!-- The icon is item 2 of M3's basic dialog anatomy and the headline is item 3, in a column. So it
-       sits ABOVE the headline rather than inline with it. It was inline for one revision and the
-       phone header rule then pushed it past the title to the trailing edge, which is what a bare
-       `.modalhead` selector reaching a basic dialog looks like on screen.
-       Left-aligned, not centred. M3 marks centring a prop rather than the default, and every other
-       dialog in this app leads its header on the same edge. `js/ui.js` writes the glyph and its
-       colour by id, so moving the element needed nothing there. -->
-  <i id="warnBoxIcon" class="i i-rainy_heavy" style="color:var(--k-weather)"></i>
+  <!-- **The pane's own app bar, with the back arrow leading.** The repository owner asked for that on
+       2026-09-14. The box stays a basic dialog, a floating card at every width. Only the header
+       changed.
+       The arrow comes first in the source, so a keyboard reaches it first and no `order` rule moves
+       it. The icon sits in line with the headline, in a row inside the label block. It is a sibling
+       of the `<h2>`, because `js/ui.js` writes the title with `textContent`. That script writes the
+       glyph and its colour by id, so the move needed nothing there. -->
   <div class="modalhead">
-    <h2 id="warnBoxTitle">Forecast Warning</h2>
-    <form method="dialog"><button class="icon dclose" data-tip="Close" aria-label="Close"
-      ><i class="i i-close"></i></button></form>
+    <form class="apptop" method="dialog"><button class="icon dclose" data-tip="Back" aria-label="Back"
+      ><i class="i i-arrow_back"></i></button></form>
+    <div class="apflex">
+      <div class="warnhead">
+        <i id="warnBoxIcon" class="i i-rainy_heavy" style="color:var(--k-weather)"></i>
+        <h2 id="warnBoxTitle">Forecast Warning</h2>
+      </div>
+    </div>
   </div>
   <div id="warnBody"></div>
 </dialog>

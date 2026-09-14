@@ -770,12 +770,32 @@ async function phone() {
     const mh = b.querySelector('.modalhead'), x = b.querySelector('.dclose');
     if (kind === 'basic') {
       /* A basic dialog keeps its close on the TRAILING edge and never fills the screen, at any
-         width. M3 puts the full-screen variant behind a task with steps, keyboard input or a nested
+         width. `#warnBox` is the one exception to the first half: it leads with the back arrow. M3 puts the full-screen variant behind a task with steps, keyboard input or a nested
          dialog, and none of these is that.
          **The header assertions run only where there IS a header.** `#confirmBox` carries none: a
          confirmation answers with its two buttons, and M3 marks the close X optional on this
          variant. The two below hold for every basic dialog either way. */
-      if (mh) {
+      if (id === 'warnBox') {
+        /* **The warning dialog wears the pane's app bar on a basic card**, asked for on 2026-09-14.
+           Assert the parts and the glyph centre against the pane, never a second copy of numbers. */
+        const g = x.querySelector('.i');
+        is(cs(mh).flexDirection, 'column', id + ' (basic): the pane’s app bar, two rows');
+        is(!!mh.querySelector('.apptop') && !!mh.querySelector('.apflex'), true,
+           id + ' (basic): built from `.apptop` and `.apflex`, the parts the pane places');
+        is(!!x.querySelector('.i-arrow_back'), true, id + ' (basic): an arrow, not an X');
+        is(Math.round((r(g).left + r(g).right) / 2 - r(mh).left), 28, id + ' (basic): glyph 28px in');
+        is(Math.round((r(g).top + r(g).bottom) / 2 - r(mh).top), 32, id + ' (basic): and 32px down');
+        is(Math.round(r(mh).height) >= 112, true, id + ' (basic): M3 112dp with a headline');
+        is(cs(mh.querySelector('h2')).fontSize, cs(d.querySelector('#sideTitle .popname')).fontSize,
+           id + ' (basic): one headline size across every panel');
+        /* The icon sits IN LINE with the title, asked for the same day. Centred on the FIRST line,
+           so a wrapped title keeps it beside its start. */
+        const ic = mh.querySelector('.warnhead > .i'), h = mh.querySelector('h2');
+        is(!!ic && Math.round(r(ic).right) <= Math.round(r(h).left), true,
+           id + ' (basic): the icon leads the headline on its own row');
+        is(Math.round((r(ic).top + r(ic).bottom) / 2 - r(h).top), Math.round(parseFloat(cs(h).lineHeight) / 2),
+           id + ' (basic): and is centred on the first line of the title');
+      } else if (mh) {
         is(cs(mh).flexDirection, 'row', id + ' (basic): × stays on the trailing edge, even on a phone');
         is(Math.round(r(x).right) < VW - 8, true, id + ' (basic): and inside the pane, not against it');
       }

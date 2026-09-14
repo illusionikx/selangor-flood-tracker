@@ -689,16 +689,24 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
   out of the document and fails on any id the table does not name, and on any name the document no
   longer holds. Nothing caught the fault above, because nothing knew those two dialogs existed. A
   new dialog now needs a decision rather than a default.
-- **`#warnBox`'s icon sits ABOVE its headline, which is M3's basic dialog anatomy order.** Icon is
-  item 2 and headline is item 3, in a column. It was inline before the headline for a long time, and
-  the bare `.modalhead` rule then reversed the row and pushed it past the title to the trailing edge.
+- **`#warnBox`'s icon sits IN LINE with its headline, in a row inside the app bar's label block.**
+  The repository owner asked for that on 2026-09-14. `.warnhead` holds the two. The icon takes the
+  headline's 28px, and its top margin centres it on the FIRST line, so a wrapped title keeps it
+  beside its start. The `<h2>` needs `flex: 1` there, because `.apflex h2` states `flex: none`.
+  **It stood ABOVE the headline for a while, in M3's basic dialog anatomy order.** A bare
+  `.modalhead` rule had reversed the older inline row and pushed the icon past the title to the
+  trailing edge. The shared app bar rules name each dialog by id, which keeps that fault away.
   Left-aligned rather than centred: M3 marks centring a prop rather than the default, and every other
   dialog here leads its header on the same edge. `js/ui.js` writes the glyph and its colour by id, so
   moving the element in the markup needed nothing there.
-  **`headline-small` is 24px and only one of the two basic dialogs takes it.** `#warnBox` holds a
-  fixed short title. `#lightbox` holds a camera's name and its district on two lines, and it wraps
-  rather than truncating. M3's own rule about a long or variable headline applies: at 24px on a 360px
-  screen that name takes two 32px lines before the picture starts.
+  **Since 2026-09-14 the dialog wears the pane's app bar.** The repository owner asked for the M3
+  header and a back arrow on this dialog. The box is still a basic
+  dialog at every width. The headline is `headline-medium` now, the size every other panel states.
+  **Neither basic dialog takes `headline-small` any more.** `#lightbox` holds a camera's name and
+  its district on two lines, so it never took that rung.
+  **The box carries no padding, and `#warnBody` carries 24px instead.** The app bar states its own
+  insets. A 20px pad on the box puts the glyph 48px in, against the 28px every other bar holds.
+  The box also takes `overflow: hidden`, so its 28dp corner clips the bar's square one.
 - **A browser's own stylesheet caps every `<dialog>`, and it silently ate one breakpoint band.**
   The UA sheet carries `dialog { max-width: calc(100% - 6px - 2em); max-height: calc(100% - 6px - 2em) }`.
   `#dataBox` and `#camBox` set `width` and `height` rather than `max-*`, so that cap still applies
@@ -1139,9 +1147,10 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
   **The five are `#aboutBox`, `#helpBox`, `#settingsBox`, `#dataBox` and `#camBox`.** Each is
   full-screen below 600px and a basic dialog above it, and the arrow leads at both widths. That is
   what `#pane` already does.
-  **`#lightbox` and `#warnBox` keep the ×.** Both are basic dialogs at every width — floating cards
-  that never fill the screen. The lightbox has a second reason: an arrow beside its scrubber and its
-  step-back button reads as "previous frame".
+  **`#lightbox` keeps the ×.** It is a basic dialog at every width, a floating card that never fills
+  the screen. An arrow beside its scrubber and its step-back button reads as "previous frame".
+  **`#warnBox` kept the × too, until 2026-09-14.** The repository owner asked for the app bar and the
+  back arrow on it. It wears both on a basic card, the shape these five wear above 600px.
   **The base rule names ids, so the phone block had to name them too.** `#dataBox .modalhead .dclose`
   is one id and beats three classes wherever it lands. A bare `.dtop .modalhead .dclose` in the phone
   block therefore lost, and both of those panes drew the glyph 30px in against the 28 every other

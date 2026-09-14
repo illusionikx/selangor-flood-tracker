@@ -15069,6 +15069,8 @@ neither shares the position the complaint is about.
 The lightbox has a second reason. It carries a scrubber and a step-back button. An arrow in its
 header reads as "previous frame".
 
+`#warnBox` took the arrow on 2026-09-14. See "The warning dialog wears the app bar" in this file.
+
 ### The specificity trap this walked into
 
 The base rule states the leading margin as `#dataBox .modalhead .dclose`. That is one id, and it
@@ -18549,6 +18551,49 @@ The self-touch in the sea ring stays. Ring points 903 and 906 hold one coordinat
 44 metre spur that leaves and returns to one vertex. That is a touch at a repeated vertex, not a
 crossing. It comes from the source coastline, after the 11 metre coordinate rounding this file
 applies.
+
+## The warning dialog wears the app bar
+
+The repository owner reported on 2026-09-14 that the forecast warning dialog did not follow M3. It
+drew a header of its own: a 24px icon, a `headline-small` title and a close × on the trailing edge.
+
+### What changed
+
+`#warnBox` now wears the medium flexible top app bar that the pane and the five other panels wear.
+The back arrow leads on the top row. The icon and the headline share one row in the label block
+under it. The headline takes `headline-medium`, the size every other panel states.
+
+The arrow is first in the source. So a keyboard reaches it first, and no `order` rule moves it.
+
+The box carries no padding now, and `#warnBody` carries 24px. The app bar states its own insets. The
+box also takes `overflow: hidden`, so its 28dp corner clips the bar.
+
+### What did not change
+
+The box is still a basic dialog at every width. It is a floating card with a scrim and a 28dp
+corner, and it does not fill a phone screen. M3 keeps the full-screen variant for a task with steps,
+keyboard input or a nested dialog. A warning read is none of those.
+
+This reverses "Two dialogs keep the ×" for `#warnBox` alone. The lightbox keeps its × for the reason
+that section states.
+
+### The icon
+
+M3's app bar has no slot for an icon. The first revision put it over the headline, in the basic
+dialog's own anatomy order. The repository owner asked for it in line with the title the same day.
+
+`.warnhead` holds the icon and the `<h2>` in a row. The icon takes the headline's 28px. Its top
+margin centres it on the first 36px line, so a wrapped title keeps the icon beside its start.
+
+The `<h2>` takes `flex: 1` in that row. The shared `.apflex h2` rule states `flex: none`, and in a
+row that stops a long title from wrapping.
+
+### The check
+
+`m3-check.html` asserts the new header in its phone sweep. It checks the two bar parts, the arrow
+glyph, and the glyph centre at 28px in and 32px down. It also checks the 112dp floor, and the
+headline size against the pane's own. Last, it checks that the icon leads the title on one row,
+centred on the first line.
 
 ## Bigger station pins, and less clustering
 
