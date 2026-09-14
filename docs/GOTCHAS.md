@@ -3614,10 +3614,11 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   alone. A guard states that as a check, because a latitude tie breaks it in silence. This plan found
   the fault by adding the guard first, and watching it fire. A three-point inside-outside probe
   passed on the broken polygon.
-- **An island has to wind against the sea around it.** Leaflet fills a canvas polygon with the
-  nonzero rule. An island ring that winds the same way as the sea paints as more sea, and nothing
-  reports it. `sea()` forces the winding from a signed area. It does not trust the order
-  OpenStreetMap published.
+- **An island has to wind against the sea around it.** RFC 7946, the GeoJSON specification,
+  requires a polygon's holes to wind opposite its exterior ring. That makes the file correct for
+  any consumer, not only this renderer. `sea()` forces the winding from a signed area, rather than
+  trusting the order OpenStreetMap published. Under `evenodd`, Leaflet's own default, a hole
+  punches whichever way it winds. So the renderer does not need this winding at all.
 - **A band is a feature, not a property on one geometry.** A GeoJSON property belongs to a
   feature. A band stamped on a `MultiLineString` coordinate lands nowhere a reader can find. So
   each band is a feature of its own, and the file holds seven.

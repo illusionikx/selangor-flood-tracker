@@ -266,6 +266,29 @@ try {
 
   const { waterBands } = await import('./js/map.js');
 
+  /* Load the water before the assertions below. `ensureWater()` runs only from `setBasemap()`,
+     which only `applyTheme()` calls. This page imports js/map.js directly and never imports
+     js/ui.js, which is what calls `applyTheme()` in the app. So without this line the groups below
+     are empty, and every `hasLayer` answer is about an empty group. */
+  const { applyTheme } = await import('./js/map.js');
+  applyTheme();
+  let waited = 0;
+  while (!waterBands[0].getLayers().length && waited < 20000) { await settle(250); waited += 250; }
+  ok('the water loaded', waterBands[0].getLayers().length > 0,
+     'waited ' + waited + ' ms');
+
+  /* Every band group has to hold what the bake filed under its own `b`. The loop below toggles
+     group membership, and an empty group answers `hasLayer` exactly as a full one does. */
+  for (let b = 0; b < 3; b++)
+    ok('band ' + b + ' group holds its shapes', waterBands[b].getLayers().length > 0,
+       waterBands[b].getLayers().length + ' layers');
+
+  /* The sea draws at every zoom and never leaves the map. It is the headline of this change and
+     nothing else here asserts it. */
+  const { waterSea } = await import('./js/map.js');
+  ok('the sea is on the map', !!waterSea() && map.hasLayer(waterSea()),
+     waterSea() ? 'on the map' : 'no sea layer');
+
   /* The floor is computed from the coverage circle and the window, so it is not a literal. Read it.
      `setZoom` rather than `setView`, because the pan box can refuse a centre. The assertions below
      then report a band rule that is really a pan limit. */

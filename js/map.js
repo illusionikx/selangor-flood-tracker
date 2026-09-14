@@ -395,7 +395,7 @@ function ring(lat, lng, km, n = CIRCLE_PTS) {
 }
 
 /* Fetched inline rather than deferred to an idle callback, which is what the water below does.
-   Two reasons. It is 4 KB gzipped against water.json's 165 KB. And it carries the zoom floor, so a
+   Two reasons. It is 4 KB gzipped against water.json's 568 KB. And it carries the zoom floor, so a
    reader who lands zoomed out would otherwise see the world for as long as the browser felt like
    waiting. A failure is silent and leaves an unlimited map, which is the state this replaces. */
 fetch('border.json')
@@ -450,6 +450,10 @@ const BAND_WEIGHT = [1.4, 1.1, 0.8];
 /* One group per band, made here so `waterBands[b]` is a stable reference before the fetch lands. */
 export const waterBands = [L.layerGroup(), L.layerGroup(), L.layerGroup()];
 
+/* Exported for map-limits-test.html. `seaLayer` is reassigned when the fetch lands, so a function
+   reads it and a binding cannot. */
+export const waterSea = () => seaLayer;
+
 let waterGeo, seaLayer, asking;
 
 /* Read at paint time, never at import time. The token differs by theme and a reader can change the
@@ -496,7 +500,7 @@ function ensureWater() {
   if (waterGeo) { paintWater(); return; }
   if (asking) return;
   asking = true;
-  /* Past the first paint. This file is about 560 KB gzipped, against 271 KB for the whole of the
+  /* Past the first paint. This file is about 568 KB gzipped, against 271 KB for the whole of the
      rest of the landing. A fetch here more than doubles what a reader waits for. It draws water
      the basemap omits, over a map that already works, so it can arrive late. requestIdleCallback
      yields to anything the browser prefers to do first. The setTimeout is the fallback for Safari,
