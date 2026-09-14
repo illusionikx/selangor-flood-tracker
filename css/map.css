@@ -234,7 +234,9 @@
    `transform` rather than a smaller font: it takes the halo, the rise ring and the drop shadow down
    with it in one step, and it leaves the 39px layout box alone — that box is repeated as `iconSize`
    in render.js and is what actually positions the marker over its station.
-   **IT IS .7 SINCE 2026-08-26, AND IT WAS .8.** The repository owner asked for every mark on the map
+   **IT IS .85 SINCE 2026-09-14.** A reader asked for bigger station pins. The disc is 26.8px across,
+   against 22.1px at .7. The selected pin, "you are here" and a searched place kept their own sizes.
+   **IT WAS .7 FROM 2026-08-26, AND .8 BEFORE THAT.** The repository owner asked for every mark on the map
    to come down, on the same complaint this rule was written for: a station pin became a filled disc
    that day, and a disc carries far more ink than the bare glyph the .8 was measured against.
    **This one line takes the STATIONS and the WEATHER PINS**, because `.pin.wx` is a plain `.pin` box
@@ -243,7 +245,7 @@
    **A scale is the only knob here that needs no anchor arithmetic.** The layout box does not move, so
    `iconSize` and `iconAnchor` in render.js and wx.js are untouched. That is the whole reason this is
    a transform. */
-.pin:not(.me, .place, .sel) { transform: scale(.7); }
+.pin:not(.me, .place, .sel) { transform: scale(.85); }
 /* The glyph itself. An SVG element, not a mask — see `pinGlyph()` in map.js for why. `1em` off the
    `.pin`'s `font-size`, so every rule that sizes a pin by its font (`.me`, `.place`) sizes the
    glyph too.
@@ -405,8 +407,9 @@
    repository owner asked for it on 2026-08-26: a disc with no glyph in it, sized like the glyph
    INSIDE a station disc rather than like the disc itself, with the accuracy circle behind it.
    **14px is that number, and it has been 17.5 then 16.** All three landed on 2026-08-26. A station's
-   disc is 22.1px across and the glyph knocked out of it is 15.1px, so this dot sits just inside that
-   glyph and is under two thirds of a station mark. That ratio is what the three numbers hold: the
+   disc was 22.1px across then and the glyph knocked out of it was 15.1px, so this dot sat just inside
+   that glyph at under two thirds of a station mark. The disc grew to 26.8px on 2026-09-14 and this
+   dot did not, so it is about half a station mark now. That ratio is what the three numbers hold: the
    dot came down with the rest of the set rather than on its own. It cannot be read as a station:
    every station is a disc with a shape cut out of it, and this one is solid.
    **The ring is outside the 14, so the mark is 18px on the tile.** That is still the smallest thing
@@ -461,8 +464,9 @@
    12.5% later that day. **This mark is the exception to the one-size rule the weather pin obeys**:
    every other mark is sized to the disc so the set reads at one size, and this one is deliberately
    half again bigger, because its whole job is to pick one station out of the four hundred around it.
-   For scale, a station disc is 22.1px across — `.pin`'s 36px font at `scale(.7)` is 25.2px, and the
-   circle is 35 of 40 viewBox units of that.
+   For scale, a station disc is 26.8px across — `.pin`'s 36px font at `scale(.85)` is 30.6px, and the
+   circle is 35 of 40 viewBox units of that. The disc grew on 2026-09-14 and this mark did not, so it
+   is a fifth bigger than a station now rather than half again.
    **`markSel()` in `js/map.js` states the matching `iconSize` and `iconAnchor`, and they move with
    this number.** A teardrop is anchored at its TIP, and **the tip is at 11/12 of the box, not at the
    foot of it**: `--i-place` ends at 33 of a 36px box, measured with `getBBox()`. So the anchor is
@@ -472,8 +476,8 @@
    keep the number tidy is the same 2px error this entry already records. */
 .pin.sel { width: 32px; height: 32px; font-size: 32px; color: var(--sel); }
 /* The weather pins, for the same reason and at the same size. They are plain `.pin` boxes at 39px
-   with an `iconSize` to match, so only the glyph moves: `scale(.7)` is still on, and 31.25 times .7
-   is 21.9, against the 22.1 disc above. `js/wx.js` carries the class.
+   with an `iconSize` to match, so only the glyph moves: `scale(.85)` is still on, and 31.25 times .85
+   is 26.6, against the 26.8 disc above. `js/wx.js` carries the class.
    **This number did not move when the set came down.** It is inside the `:not()` list, so the scale
    already took it. Editing it as well would take it down twice. */
 .pin.wx { font-size: 31.25px; }
@@ -491,19 +495,19 @@
    Anything else drawn onto the map takes this pair too. */
 .cluster {
   display: grid; place-items: center;
-  /* 30% off 34, then a further 12.5% on 2026-08-26 when every mark on the map came down. The box is
-     repeated as `iconSize` in map.js, which is what positions the badge, so the two move together.
-     **The chip is NOT in the `scale(.7)` rule and cannot be.** That rule names `.pin`, and a cluster
+  /* 30% off 34, then a further 12.5% on 2026-08-26 when every mark on the map came down. It went
+     back up to 25px on 2026-09-14, with the station pins. `R_CHIP` in `js/pins.js` repeats the box
+     for the canvas, which is what draws the chip on the map, so the two move together.
+     **The chip is NOT in the `scale(.85)` rule and cannot be.** That rule names `.pin`, and a cluster
      is a `.cluster`. So this is the one mark on the map whose size is a literal rather than a
      transform, and it is the one that has to be edited by hand when the set moves.
-     **The TYPE came down with the box and the EDGES did not.** 11px would overflow: `434`, the
-     widest count this network can produce, measures about 19.5px at 11 against the 19px of inner
-     width a 21px chip leaves inside its border. At 10px it is about 17.8px and fits.
+     **The TYPE moves with the box and the EDGES do not.** `434`, the widest count this network can
+     produce, measures 20.5px at 12px. A 25px chip leaves 23px of inner width inside its border.
      The 1px border and the 2px danger ring below both stay, because an edge here is a screen pixel
      rather than a fraction of a mark. That is the same rule `pinGlyph()` states from the other side:
      `vector-effect: non-scaling-stroke` holds a pin's own stroke at one pixel through this scale. */
-  width: 21px; height: 21px; border-radius: 999px;
-  font-size: 10px; font-weight: 500; color: #fff; background: #5f6368;
+  width: 25px; height: 25px; border-radius: 999px;
+  font-size: 12px; font-weight: 500; color: #fff; background: #5f6368;
   /* **`box-shadow`, and it was a `filter: drop-shadow`.** The chip is a circle with a border, so a
      box shadow traces exactly the shape the filter traced, and it draws no render surface. A hundred
      of these stand on the map at zoom 11. See `.pin:not(.disc)` above for the measurement. */

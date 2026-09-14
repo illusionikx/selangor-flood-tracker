@@ -613,15 +613,16 @@ export const siteMark = new Map();
 
 export const shown = k => document.querySelector(`#layers input[data-kind="${k}"]`)?.checked;
 
-/* Screen pixels, two bands: city and state. The far band was 48 and is 34, measured against the 459
-   sites in the payload. It covers zoom 0 to 12, across which the spacing between two sites changes
-   fourfold, so one number cannot suit both ends. 34 is picked for the city end: it leaves 280 sites
-   inside a neighbour's radius at zoom 12 against 335 at 48. At zoom 10 it buys almost nothing — 434
-   against 452 — and no radius does.
+/* Screen pixels, two bands: city and state. **24 and 18 since 2026-09-14, and they were 34 and 26.**
+   A reader asked for less clustering on the day the station pins grew to a 26.8px disc. Measured
+   over 458 sites, markers hidden in a chip: 202 against 264 at zoom 12, 94 against 129 at 13, and
+   46 against 70 at 14. Zoom 9 to 11 move less, because most sites there stand closer together than
+   either radius. The cost is overlap: two pins 18 to 27px apart draw one disc over the edge of the
+   other. Both still take a press, because the hit test picks the nearer middle.
    **A third band held 14px from zoom 15, and it is deleted rather than left.** `UNCLUSTER_Z` stops
    the grouping before that band can be reached, so it was a dead rung in a ladder of thresholds and
    the next person to tune it would read it as a live one. */
-const CLUSTER_R = z => (z >= 13 ? 26 : 34);
+const CLUSTER_R = z => (z >= 13 ? 18 : 24);
 /* **NOTHING CLUSTERS FROM ZOOM 15, WHICH IS THE MAP'S OWN CEILING.** The repository owner asked for
    that on 2026-09-03. Measured before it: 6 markers of 460 still merged at 15 on the radius alone,
    and the 15 densest views drew 11 chips between them. It reads as the first UNCLUSTERED zoom, which

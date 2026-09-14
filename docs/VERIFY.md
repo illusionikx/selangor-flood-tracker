@@ -1026,7 +1026,7 @@ markers the radius alone still merges at each zoom.
 ```js
 const M = await import('/js/map.js');
 const pts = Object.values(M.marks).flat().map(m => m.getLatLng());
-const radius = z => z >= 13 ? 26 : 34;   // keep in step with maxClusterRadius
+const radius = z => z >= 13 ? 18 : 24;   // keep in step with CLUSTER_R in js/map.js
 for (let z = 12; z <= 18; z++) {
   const r = radius(z), p = pts.map(q => M.map.project(q, z));
   const merged = p.filter((a, i) => p.some((b, j) =>

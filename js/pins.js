@@ -26,25 +26,25 @@
  * different mark with its own rules.
  */
 
-/* Every number here comes out of `css/map.css`, after the `scale(.7)` that rule applies to `.pin`.
+/* Every number here comes out of `css/map.css`, after the `scale(.85)` that rule applies to `.pin`.
    **Change a number there and change it here**, or the canvas mark and the DOM marks beside it
    (the legend, the glossary, "you are here") stop reading as one set.
    `.pin` is a 39px box with a 36px glyph. `.pinglyph.disc` draws in a 40-unit viewBox: a disc at
    r 17.5 with a 2.5 stroke, the shadow circle 1.3 lower at r 17.6, and the kind glyph in a 24-unit
    box at x8 y8. The rings are pseudo-elements sized by `inset` off the 39px box. */
-const SCALE = 0.7;
-const GLYPH_BOX = 36 * SCALE;                       // 25.2 — what one `.pinglyph` covers on screen
+const SCALE = 0.85;
+const GLYPH_BOX = 36 * SCALE;                       // 30.6 — what one `.pinglyph` covers on screen
 const U = GLYPH_BOX / 40;                           // one viewBox unit, in screen pixels
-export const R_DISC = 17.5 * U;                     // 11.03 — the disc a hit test aims at
+export const R_DISC = 17.5 * U;                     // 13.39 — the disc a hit test aims at
 const W_DISC = 2.5 * U;
 const R_SHADE = 17.6 * U, DY_SHADE = 1.3 * U;
-const G_SIZE = 24 * U;                              // 15.12 — the glyph knocked out of the disc
+const G_SIZE = 24 * U;                              // 18.36 — the glyph knocked out of the disc
 const R_RISE = (49 / 2 - 3 / 2) * SCALE, W_RING = 3 * SCALE;
 const R_HALO = (51 / 2 - 3 / 2) * SCALE;
 const FAV_SIZE = 17 * SCALE, FAV_OFF = 14 * SCALE;  // the heart, on the pin's lower trailing corner
-/* `.cluster` is a 21px chip with a 1px border and a 10px 500-weight count. It is the one mark on the
+/* `.cluster` is a 25px chip with a 1px border and a 12px 500-weight count. It is the one mark on the
    map whose size is a literal rather than a transform, which `css/map.css` states from its side. */
-const R_CHIP = 21 / 2, W_CHIP = 1, CHIP_FONT = '500 10px system-ui, sans-serif';
+const R_CHIP = 25 / 2, W_CHIP = 1, CHIP_FONT = '500 12px system-ui, sans-serif';
 const R_CHIP_GLOW = R_CHIP + 2;
 const SHADOW = 'rgba(0, 0, 0, .45)';                // the one lift every mark on this map casts
 

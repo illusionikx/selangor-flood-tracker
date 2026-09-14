@@ -513,13 +513,16 @@ frames only exist because we ran when they were taken. To re-test the capture pa
   numbers: a 35-of-40 circle on a 1em box is 31.5px, and its 2.5 unit edge is 2.25px. The samples
   carry `inkdark` by hand on every amber one.
 - **FOUR MARK SHAPES ON THE MAP, AND EACH IS SIZED AGAINST THE STATION DISC.** The repository owner
-  set all four on 2026-08-26. The disc is the ruler: `.pin`'s 36px font at `scale(.7)` is 25.2px, its
-  circle is 35 of 40 viewBox units of that (**22.1px**), and the glyph knocked out of it is 24 of 40
-  (**15.1px**).
+  set all four on 2026-08-26. The disc is the ruler: `.pin`'s 36px font at `scale(.85)` is 30.6px, its
+  circle is 35 of 40 viewBox units of that (**26.8px**), and the glyph knocked out of it is 24 of 40
+  (**18.4px**).
+  **The station disc and the weather pin grew on 2026-09-14, from `scale(.7)` and a 22.1px disc.** A
+  reader asked for bigger pins. The other three marks kept their sizes, so the selected pin is now a
+  fifth bigger than a station rather than half again. `SCALE` in `js/pins.js` moved with the rule.
   | mark | shape | size |
   |---|---|---|
-  | a station | disc, glyph knocked out | 22.1px circle |
-  | a weather point | bare glyph, `.pin.wx` | 21.9px |
+  | a station | disc, glyph knocked out | 26.8px circle |
+  | a weather point | bare glyph, `.pin.wx` | 26.6px |
   | the selected pin | bare teardrop, `.pin.sel` | **32px** |
   | you are here | solid dot, no glyph | 14px plus a 2px ring |
   | a searched place | bare teardrop, `.pin.place` | **42px** |
@@ -557,11 +560,12 @@ frames only exist because we ran when they were taken. To re-test the capture pa
   again bigger, because its whole job is to pick one station out of the four hundred around it.
   **THE CLUSTER BADGE FOLLOWS THE SET, and it is the one mark the scale cannot reach.** That rule
   names `.pin` and a cluster is a `.cluster`, so its size is a literal in two places rather than a
-  transform: `.cluster` in `css/map.css` and `iconSize` in `js/map.js`. **Edit both by hand whenever
-  the set moves**, or the badge stops sitting over the pins it is hiding. It is 21px in a 22px box.
-  **The TYPE came down with the box and the EDGES did not.** 11px overflows a 21px chip: `434`, the
-  widest count this network can produce, measures about 19.5px at 11 against the 19px of inner width
-  the border leaves. 10px measures about 17.8px and fits. The 1px border and the 2px danger ring
+  transform: `.cluster` in `css/map.css` and `R_CHIP` in `js/pins.js`. **Edit both by hand whenever
+  the set moves**, or the legend chip and the map chip stop matching. It is 25px since 2026-09-14,
+  and it was 21px.
+  **The TYPE moves with the box and the EDGES do not.** A 25px chip takes a 12px count: `434`, the
+  widest count this network can produce, measures 20.5px at 12px against the 23px of inner width the
+  border leaves. The 1px border and the 2px danger ring
   stay, because an edge here is a screen pixel rather than a fraction of a mark — the same rule
   `pinGlyph()` states from the other side with `vector-effect: non-scaling-stroke`.
   **The Help legend's own `.cluster` override is DELETED.** It drew 28px and said it was scaling the

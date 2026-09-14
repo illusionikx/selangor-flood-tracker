@@ -18549,3 +18549,58 @@ The self-touch in the sea ring stays. Ring points 903 and 906 hold one coordinat
 44 metre spur that leaves and returns to one vertex. That is a touch at a repeated vertex, not a
 crossing. It comes from the source coastline, after the 11 metre coordinate rounding this file
 applies.
+
+## Bigger station pins, and less clustering
+
+A reader asked on 2026-09-14 for bigger pins on the map and for less clustering. Two changes answer
+it.
+
+### The pins
+
+`SCALE` in `js/pins.js` went from 0.7 to 0.85. The `.pin:not(.me, .place, .sel)` rule in
+`css/map.css` went from `scale(.7)` to `scale(.85)`. The two numbers move together. The canvas
+draws the map, and the DOM draws the legend.
+
+| mark | before | after |
+|---|---|---|
+| station disc | 22.1px | 26.8px |
+| glyph in the disc | 15.1px | 18.4px |
+| weather pin | 21.9px | 26.6px |
+| cluster chip | 21px, 10px count | 25px, 12px count |
+
+The chip grew by the same ratio as the disc. `R_CHIP` in `js/pins.js` and `.cluster` in
+`css/map.css` hold that number. `434` is the widest count this network can produce. It measures
+20.5px at 12px, and the chip leaves 23px inside its border.
+
+### The clustering
+
+`CLUSTER_R` in `js/map.js` went from 34 and 26 screen pixels to 24 and 18. The first number covers
+zoom 12 and under. The second covers zoom 13 and 14. Zoom 15 still clusters nothing.
+
+A script grouped all 458 sites at each zoom and counted the markers that a chip hides.
+
+| zoom | 34 and 26, before | 24 and 18, after |
+|---|---|---|
+| 10 | 426 | 398 |
+| 11 | 364 | 317 |
+| 12 | 264 | 202 |
+| 13 | 129 | 94 |
+| 14 | 70 | 46 |
+
+Zoom 9 to 11 move less. Most sites there stand closer together than either radius.
+
+### What it costs
+
+Bigger pins and a smaller radius overlap. Two pins 18 to 27px apart draw one disc over the edge of
+the other. Both still take a press, because the hit test picks the nearer middle.
+
+The selected pin, "you are here" and a searched place kept their sizes. The selected teardrop is
+32px. It was half again bigger than a station disc, and it is a fifth bigger now. Its red and its
+shape still pick it out.
+
+### What was not done
+
+`UNCLUSTER_Z` stays 15. At 14 every pin draws alone, and 46 markers overlap a neighbour. Move it on
+the day a reader asks for zoom 14 to cluster nothing.
+
+The frame measurement in "One canvas draws every pin" did not run again after this change.
