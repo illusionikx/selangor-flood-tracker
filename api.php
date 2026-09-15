@@ -15,13 +15,23 @@
    still needs it, and this file has to be correct on a machine it does not own. */
 if (session_status() === PHP_SESSION_ACTIVE) session_write_close();
 
+/* **Where this app keeps its state: the locks, the caches, the stamps, the database, the camera
+   archive and the error log.** It is this file's own directory, except in one case.
+   **The build output inside a checkout keeps its state in the checkout.** The four render checks
+   that take `?base=/site/` load `site/index.html`, and the app then calls `site/api.php`. That copy
+   wrote `.history.db`, `.cache.json` and `shots/` into `site/`, and the next build refused to run.
+   `build.mjs` in the parent directory marks a checkout. A deployed root such as `/srv/www/flood` has
+   none, so a deploy keeps its state beside itself as before. shots.php and log.php apply the same
+   test. */
+define('STATE', is_file(dirname(__DIR__) . '/build.mjs') ? dirname(__DIR__) : __DIR__);
+
 /* Send this app's errors to a file of its own. Without this, `error_log()` below writes to stderr,
    which a FastCGI server folds into its own error log next to every unrelated line it writes. The
    log on the machine this was added on held about 28,000 lines, and an uncaught exception from here
    was one of them.
-   This is `ini_set()` rather than an ini file because `__DIR__` finds the right path on both deploy
+   This is `ini_set()` rather than an ini file because `STATE` finds the right path on both deploy
    targets. A committed absolute path is correct on one of them at most. */
-ini_set('error_log', __DIR__ . '/.php-error.log');
+ini_set('error_log', STATE . '/.php-error.log');
 
 /* A fatal after the first header() sends an HTML error page under a JSON content type, so a client
    that asked for JSON gets a parse error rather than something it can act on. The ?place= handler
@@ -101,7 +111,7 @@ const SIREN_STALE = 48 * 3600;
    `(station, ts)` primary key drops a repeated stamp. A six hour value therefore folds six hours of
    samples into one row. It also spends 12.5% of the 48 hour budget before the check above runs. */
 const SIREN_TTL   = 3600;
-const SIREN_STAMP = __DIR__ . '/.siren.stamp';
+const SIREN_STAMP = STATE . '/.siren.stamp';
 /* Range from a siren to the river that siren watches. JPS sounds a siren at the Amaran mark, so the
    alarm is a claim about a level we already hold. A 1 with no high river behind it is a stuck relay.
    Measured: 194 of 212 sirens have a river inside 5 km, 133 inside 2 km, 9 have none inside 10 km.
@@ -199,7 +209,7 @@ const CAM_ALERT_KM = 2;
    drops that rung before it ranks anything, so this scorer and the live pill still ask one
    question. Move this to 30.1 and the archive answers a question no live frame asks. */
 const RAIN_DANGER = 60.1;
-const CACHE = __DIR__ . '/.cache.json';
+const CACHE = STATE . '/.cache.json';
 /* The camera still cache. Every ?cam= request used to reach JPS, so N readers on the camera wall
    aimed N times 90 fetches at one agency. 300 seconds is the lifetime the Cache-Control
    on this endpoint already claims, and it matches POLL_MS in js/config.js. A still cannot change
@@ -207,14 +217,14 @@ const CACHE = __DIR__ . '/.cache.json';
    CAM_URLS is a small map of camera id to image URL, written at the end of each rebuild. The
    handler used to decode all 312 KB of .cache.json to read one string out of it. */
 const CAM_TTL  = 300;
-const CAM_DIR  = __DIR__ . '/.cam';
-const CAM_URLS = __DIR__ . '/.cams.json';
+const CAM_DIR  = STATE . '/.cam';
+const CAM_URLS = STATE . '/.cams.json';
 /* How long a stale still may stand in for a live one when the fetch fails. An upstream blip should
    cost a slightly old picture rather than the No picture panel. An upstream that stays down must
    not leave a frame of any age on screen with nothing saying so. */
 const CAM_STALE = 3600;
-const LOCK  = __DIR__ . '/.refresh.lock';   // held for the length of a rebuild; see below
-const HIST  = __DIR__ . '/.history.db';
+const LOCK  = STATE . '/.refresh.lock';   // held for the length of a rebuild; see below
+const HIST  = STATE . '/.history.db';
 const READ  = 86400;         // seconds of history loaded per poll (trend + sparkline)
 const RETAIN = 30 * 86400;   // seconds kept on disk; older samples are pruned
 /* Seconds of odometer history loaded per poll. The longest window is 72 hours and a baseline has to
@@ -227,15 +237,15 @@ const ACC_READ = 80 * 3600;
    worst case at ~4.5 requests a second. A cold rebuild already fires 270 in three seconds, which is
    90 a second, so the button cannot make a burst this site does not already make. */
 const FORCE_EVERY = 60;
-const FORCE_STAMP = __DIR__ . '/.force.stamp';
+const FORCE_STAMP = STATE . '/.force.stamp';
 
 /* Place search. One uncached lookup a second site-wide: Nominatim's policy asks no more, and this
    proxy is a public URL. A cached hit skips the limit, because it costs OpenStreetMap nothing. */
 const PLACE_EVERY = 1;
-const PLACE_STAMP = __DIR__ . '/.place.stamp';
+const PLACE_STAMP = STATE . '/.place.stamp';
 // A lock of its own, not the stamp file. Opening the stamp with mode 'c' creates and stamps it as a
 // side effect of the check, so the first request would find a stamp it had just made.
-const PLACE_LOCK  = __DIR__ . '/.place.lock';
+const PLACE_LOCK  = STATE . '/.place.lock';
 const PLACE_TTL   = 30 * 86400;   // place names do not move
 const NOMINATIM   = 'https://nominatim.openstreetmap.org/search';
 
@@ -244,7 +254,7 @@ const NOMINATIM   = 'https://nominatim.openstreetmap.org/search';
    So it drips: at most GAZ_FILL prefixes per refresh, at most once every GAZ_EVERY, site-wide. */
 const GAZ_FILL  = 5;                              // prefixes per refresh
 const GAZ_EVERY = 600;                            // seconds between drips, site-wide
-const GAZ_STAMP = __DIR__ . '/.gaz.stamp';
+const GAZ_STAMP = STATE . '/.gaz.stamp';
 const GAZ_KEY   = 'gazdone:';                     // one page row per prefix already queried
 const GAZ_DISTRICT_KM = 50;   // a placement must corroborate the district the portal itself assigns
 
@@ -254,7 +264,7 @@ const GAZ_DISTRICT_KM = 50;   // a placement must corroborate the district the p
    stations per refresh, at most once every HIST_EVERY, site-wide. */
 const HIST_FILL  = 5;                             // stations per refresh
 const HIST_EVERY = 600;                           // seconds between drips, site-wide
-const HIST_STAMP = __DIR__ . '/.hist.stamp';
+const HIST_STAMP = STATE . '/.hist.stamp';
 const HIST_KEY   = 'histdone:';                   // one page row per station already seeded
 
 /* The coverage box: Selangor, Kuala Lumpur and Putrajaya. The 683 stations span latitude 2.6088 to
@@ -3293,7 +3303,7 @@ if (beatDead($page('jps-beat')) && !in_array('jps-beat', $pagesOld, true)) $page
 
 // One-off carry-over from the flat file, so trends survive the switch instead of going null for an
 // hour. Deletes itself; drop this block once no deployment has a .history.json left.
-if (is_file($old = __DIR__ . '/.history.json')) {
+if (is_file($old = STATE . '/.history.json')) {
     $ins = $db->prepare('INSERT OR IGNORE INTO level (station, ts, level) VALUES (?, ?, ?)');
     $db->beginTransaction();
     foreach (json_decode(file_get_contents($old), true) ?: [] as $k => $points) {

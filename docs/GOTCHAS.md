@@ -3274,6 +3274,13 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   without those excludes is the same loss by another route.
   The build refuses to run when it finds `shots/`, `.history.db` or `.cache.json` in the output. That
   is a backstop for the day somebody wires it wrong. It is not the rule.
+  **A render check with `?base=/site/` runs `site/api.php`, and that copy filled `site/` with
+  state.** So the next build refused, on 2026-09-15. `STATE` in `api.php` now points a checkout's
+  `site/` at the checkout itself. `build.mjs` in the parent directory marks a checkout. `shots.php`
+  and `log.php` repeat that test, so change all three together.
+  **The backstop no longer catches a root pointed at `/srv/flood/site`.** That copy keeps its state
+  in `/srv/flood` now, so a build takes no frames with it. It still swaps the code under a live
+  site.
 - **A loading skeleton takes its state from `aria-busy` on the dialog. It takes its look from
   `.skel` in `css/base.css`. Do not invent a second version of either.** `lazy()` sets
   `aria-busy="true"` on the box passed to it, and clears it once the module resolves or fails.

@@ -12,7 +12,9 @@
  * One line is one report.
  */
 
-ini_set('error_log', __DIR__ . '/.php-error.log');   // the same file api.php writes to
+// The state directory, by the rule at `STATE` in api.php. This file does not require api.php.
+$state = is_file(dirname(__DIR__) . '/build.mjs') ? dirname(__DIR__) : __DIR__;
+ini_set('error_log', $state . '/.php-error.log');   // the same file api.php writes to
 
 /* Every time this app prints is Malaysian, and a log that disagrees is a log a reader has to convert
    before comparing it to a reading. api.php pins the same zone. This file does not require api.php,
@@ -36,7 +38,7 @@ if ($body === false || $body === '') exit;
 $rec = json_decode($body, true);
 if (!is_array($rec)) exit;
 
-$file = __DIR__ . '/.client-errors.log';
+$file = $state . '/.client-errors.log';
 if (is_file($file) && filesize($file) >= MAX_FILE) exit;
 
 /* One report is one line, so a newline inside the JSON would split it in two. json_encode writes no

@@ -202,11 +202,14 @@ chown -R www-data:www-data /srv/flood /srv/www/flood
 ```
 
 **Never point the document root at `/srv/flood/site`.** `build.mjs` deletes that directory at the
-start of every run, and the server build puts `api.php` in it. `api.php` writes its state into its
-own directory: `.history.db`, `.cache.json`, `shots/` and the two logs. So a rebuild against a live
-root takes a year of camera frames with it. That is the loss docs/GOTCHAS.md records for
-`rm -rf shots/`. The build refuses to run when it finds state in the output directory, which is a
-backstop and not the rule. The rule is the rsync above: build in the checkout, copy across, and let
+start of every run, and the server build puts `api.php` in it. A deployed `api.php` writes its state
+into its own directory: `.history.db`, `.cache.json`, `shots/` and the two logs. A rebuild against a
+live root took a year of camera frames with it. That is the loss docs/GOTCHAS.md records for
+`rm -rf shots/`.
+
+Since 2026-09-15 the copy in `/srv/flood/site` keeps its state in `/srv/flood`, because `build.mjs`
+sits there. See `STATE` in `api.php`. So that mistake no longer deletes the frames. A rebuild still
+swaps the code under a live site, and the build no longer refuses in that case. The rule is the rsync above: build in the checkout, copy across, and let
 `--exclude` keep every runtime file the copy must not touch.
 
 That last line matters: `.cache.json`, `.history.db`, `.refresh.lock`, `shots/`, `.php-error.log` and

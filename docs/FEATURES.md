@@ -19503,3 +19503,35 @@ draw, and the owner chose no coloured water instead.
 
 `map-limits-test.html` asserts on both themes that the ground takes no filter and that no river
 pane exists.
+
+## A build check leaves no state in the build, 2026-09-15
+
+The four render checks that read the build left `.history.db`, `.cache.json` and `shots/` in
+`site/`. The next `npm run build` then refused to run. The repository owner asked for a fix.
+
+### What was true
+
+A check loads `site/index.html` in a frame, and the app calls the `api.php` beside it. So
+`site/api.php` answered, and it wrote its state into `site/`. The build guard read that state as a
+live document root.
+
+### The change
+
+`STATE` in `api.php` names the state directory. It is the file's own directory, unless `build.mjs`
+sits in the parent directory. Then it is that parent, which is the checkout. `shots.php` and
+`log.php` apply the same test.
+
+A deploy under `/srv/www/flood` has no `build.mjs` above it, so its state stays where it was.
+
+### Trade-offs
+
+The source and the build share one cache, one database and one refresh lock in the checkout. So a
+build check reads the warm cache and makes no cold rebuild of its own.
+
+A root pointed at `/srv/flood/site` by mistake keeps its state in `/srv/flood` now. A build there no
+longer deletes the camera frames. The build guard also no longer refuses in that case.
+
+### The check
+
+`php -l` on the three files, `php api.php --selftest` and `php shots-test.php`. Then a build, the
+four build checks, and a listing of `site/` that holds none of the three state paths.

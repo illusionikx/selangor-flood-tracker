@@ -30,7 +30,9 @@
  * 3.7 GB — 165 frames a camera, and flat from the first year on, because the last tier deletes as
  * fast as capture adds.
  */
-const SHOTS      = __DIR__ . '/shots';
+// The archive sits in `STATE`, which api.php defines. shots-test.php loads this file alone, so the
+// archive then sits beside this file.
+define('SHOTS', (defined('STATE') ? STATE : __DIR__) . '/shots');
 const SHOT_EVERY = 1800;    // 30 min between captures — see above
 /* How old the newest stored frame may be and still stand in for a live picture. SHOT_EVERY is the
    gap between captures, not a ceiling on age: a camera whose capture keeps failing ages without

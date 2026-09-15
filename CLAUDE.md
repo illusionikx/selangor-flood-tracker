@@ -120,7 +120,8 @@ the source guards nothing about what ships, and it has already caught two faults
 
 **Never build into a live document root.** `build.mjs` deletes its output directory on every run,
 and the server build puts `api.php` in there. `api.php` writes `.history.db`, `.cache.json` and
-`shots/` into its own directory. The build refuses to run when it finds state in the output, which
+`shots/` into `STATE`. That is its own directory on a deploy, and the checkout for a checkout's
+`site/`, so a `?base=/site/` check leaves no state in the build. The build refuses to run when it finds state in the output, which
 is a backstop and not the rule. The rule is the rsync in [`docs/DEPLOY.md`](docs/DEPLOY.md).
 
 ## Data sources
