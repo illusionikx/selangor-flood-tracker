@@ -128,16 +128,10 @@ export function railSync() {
   /* **There is no Filters item.** It opened `#bar`, and a reader deleted that panel on 2026-08-26. */
   for (const d of document.querySelectorAll('dialog[open]'))
     if (DIALOG_ITEM[d.id]) return railActive(DIALOG_ITEM[d.id]);
-  /* **The location item is selected while its own card is the pane's occupant.** A reader asked for
-     that on 2026-08-25. `@here` is the key `js/locate.js` opens under, and it is the one card in
-     this pane that a navigation destination names. A station card and a weather card select
-     nothing, because neither is a destination this bar carries.
-     It is written as `railLocate`, the way every branch here is, and `railActive()` strips that
-     prefix and matches on the suffix. So the missing rail twin costs nothing: the loop finds
-     `#navLocate` and no rail item, which is the answer above 600px anyway. */
+  /* **The location card selects nothing since 2026-09-15.** `#navLocate` was the item it marked, and
+     a reader deleted that item. A station card and a weather card select nothing either. */
   railActive(!cls.contains('side') ? null
-           : side.key === '@alerts' ? 'railAlerts'
-           : side.key === '@here' ? 'railLocate' : null);
+           : side.key === '@alerts' ? 'railAlerts' : null);
 }
 
 function syncPane() {
@@ -171,7 +165,12 @@ function syncPane() {
    never opened again for the rest of the session. `pane.open` cannot lie about that. It is false
    only when the element is genuinely shut, which is the one case that should clear the classes. */
 pane.addEventListener('close', () => {
-  if (!pane.open) document.body.classList.remove('side');
+  /* **A native close is a close, so it runs `closeSide()` and not a bare class removal.** The class
+     alone left `side.key` set. Escape or the back gesture on the alert list kept `@alerts`, and the
+     next `alerts()` call reopened that list by itself. A first fix makes that call, so on a phone
+     the location button popped the list open. Measured at 360px on 2026-09-15.
+     `closeSide()` also stops a clip and clears the selected pin, which the bare removal skipped. */
+  if (!pane.open) closeSide();
   /* **`find` is only this pane's to clear at compact width.** Above 600px the search is a docked
      card outside this dialog, and `syncPane()` closes the pane precisely BECAUSE the search opened.
      Clearing the class here then took the card away in the same frame it arrived, and the press

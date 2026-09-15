@@ -535,15 +535,14 @@ is(Math.round(prb.height) > 32, true, 'phone: it wrapped, rather than cutting a 
     is(Math.round(b.height), 32, 'phone: ' + (c.id || '?') + ' is still the 32px M3 chip');
   }
 }
-/* **No button draws on the map at this width.** `#locate` held the slot above the zoom box until
-   2026-08-25, when a reader moved the location control into the navigation bar's middle slot. Two
-   controls for one action at one width is one control in two places.
-   **Assert that it does not DRAW, never that it is absent.** `js/locate.js` still owns that node and
-   still writes its three states onto it, and it mirrors the glyph and the words onto `#navLocate`. A
-   check reading the element as gone would pass the day somebody deleted the desktop's own button. */
-is(pw.getComputedStyle(pel('locate')).display, 'none',
-   'phone: the map draws no location button, because the bar carries one');
-is(!!pel('navLocate'), true, 'phone: which is where that control lives at this width');
+/* **The location button draws on the map at this width too, as the zoom control's first cell.** A
+   reader asked for that on 2026-09-15, and deleted `#navLocate` from the navigation bar the same day.
+   A bar item and a map cell for one action is one control in two places. */
+is(pw.getComputedStyle(pel('locate')).display !== 'none', true,
+   'phone: the map draws the location button');
+is(pel('locate').parentElement === pd.querySelector('.leaflet-control-zoom'), true,
+   'phone: inside the zoom control');
+is(pel('navLocate'), null, 'phone: and the navigation bar carries no second one');
 /* The chip row is at the top and the button cluster is at the bottom, so these two can only meet on
    a very short screen. Asserted anyway: that is exactly the screen a reader has. */
 for (const id of ['locate', 'legend', 'credit', 'pills']) {

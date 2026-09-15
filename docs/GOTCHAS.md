@@ -1232,20 +1232,18 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
   **It was a flex COLUMN for one revision, and that is the reversal to remember.** A column states
   two lines on a 1536px map with room for one. The legend is first and the credit second, so the
   wrap puts them in the order this entry is about.
-  **The scale states itself on ONE line, and the titles paid for it.** `Water-level heat` and
-  `Rainfall heat` are `Water level` and `Rainfall` now, which are the paint panel's own two names
-  for the same two layers. The ramp beside a title is what says heat. That is 35px on a 360px
-  screen, and it is the difference between one line and two. Measured after: 249px and 265px against
-  a 280px row.
-  **The medium band is the floor, and it cannot be repaired by shortening a word.** One line needs
-  about 273px and the row hands 38px to the zoom cluster, against a map of 236 to 300px there. So
-  no width in that band is both one line and clear of the cluster. `flex-wrap` on `.lgsec` breaks
-  the scale rather than run it under the buttons. `m3-check.html` asserts one line wherever the map
-  leaves room, and asserts the clearance at every width.
+  **The titles stay short.** `Water-level heat` and `Rainfall heat` became `Water level` and
+  `Rainfall` for a one-line scale, and those are the chip's own two names for the two layers. The
+  ramp under a title is what says heat.
+  **THE SCALE STACKS ON THREE LINES FROM 2026-09-15, AND THAT REVERSES THE ONE-LINE RULE.** A reader
+  asked for it. The title takes a line, the ramp takes the next, and the tick words spread across the
+  ramp's width under it. `.lgsec` is a one-column grid, so a narrow map no longer breaks the scale in
+  odd places. `m3-check.html` asserts the stack and the clearance from the zoom cluster at every band.
   **THE CREDIT IS THE LOWEST THING ON THE MAP, AT EVERY WIDTH.** That is a rule a reader stated with
   the stack, and it covers the legend, the zoom control and `#locate` alike. The
   arithmetic was already correct and nobody stated it as a rule. The credit sits 8px above the map's
-  bottom edge and the zoom cluster sits 36px up. On a phone that is 6px against 40px. **Anything new
+  bottom edge and the zoom cluster sits 36px up. On a phone the credit sits 6px up, and the zoom
+  cluster stands on the scale's foot above it, through `--foot-lift`. **Anything new
   that floats over the map takes a `bottom` at or above the zoom box's, never under it.**
   **The wrapper takes no pointer events and its children take them back.** The column spans the
   width of the map. A wrapper that took clicks would swallow every press along the bottom of it.
@@ -1274,8 +1272,8 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
   `text-align` is left at every width for the same reason. The alignment only shows on a line of its
   own, where the box already leads on the left.
   **The phone reserves that column on the WRAPPER instead, at `right: 68px`, and sets `--btncol` to
-  0.** Both children are clear of the cluster there, so a second reservation on the legend is 56px
-  the scale needs for its one line. One token carries it, so the container query on the credit goes
+  0.** Both children are clear of the cluster there, so a second reservation on the legend takes
+  56px of map width for nothing. One token carries it, so the container query on the credit goes
   quiet at that width too.
   **The pairwise check cannot see the ordering rule, so `m3-check.html` states it in two halves.** A
   button beside the credit on one band never intersects it, and that is the arrangement the rule
@@ -1286,12 +1284,13 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
   **Every child needs `min-width: 0`.** A flex item floors at its own min-content, and the credit's
   is a 65px word. In the medium band with the rail open the map is under 300px wide. The row then
   overflowed its own reservation by 6px and landed back on the layer button.
-  **The legend is one row, and every scale in it states itself on that row.** It was a stacked card:
-  a title, a ramp under it, and the tick words under that, at 288px with a `max-width` holding it off
-  the layer button. On one row there is no second line to drop to. So the title, the
-  ramp and the ticks run across, and only the ramp states a width, 72px on a desktop and 60 on a
-  phone. A ramp is the one thing here with no intrinsic width. `flex-wrap` is the floor: a phone too
-  narrow for the whole scale breaks it rather than overflow the map.
+  **The legend is a stacked card again, from 2026-09-15.** It was one row from 2026-08-25, with the
+  title, the ramp and the ticks run across and the ramp at 72px on a desktop and 60 on a phone. Now
+  the ramp states no width. The grid stretches it across its section, and the widest line sets that
+  width. The ticks take `space-between`, so the first word starts at the ramp's start and the last
+  ends at its end. The card corner is `shape-corner-medium`, because a pill radius on three lines
+  cuts into the corners. **The ⓘ lost `margin-left: auto`**, which would put it on the card's far
+  edge and push its 244px panel toward the screen edge.
   **`.info`'s panel opens toward the map now, on `left`.** It hung off `right: -8px`, which ran a
   244px panel leftward from the glyph. That was right while the legend was a 288px card with the
   glyph on its trailing edge. On the strip the glyph sits about 100px from the map's leading edge,
@@ -2731,7 +2730,7 @@ and `--muted` flip with the theme while the picture behind them does not. White 
 - **The navigation bar is what a compact window gets, and the rail does not draw there at all.**
   `#navbar` is M3's navigation bar, from `NavigationBar/navigation-bar.css`. 80px of a 360px screen
   is 22% of it, and M3 states no rail under 600px.
-  **Five items was the cap M3 states, and the bar holds four now.** The rail carried eight
+  **Five items was the cap M3 states, and the bar holds three now.** The rail carried eight
   destinations. Settings, Help and About are the three visited least, so they move to `#appMenu`.
   The filters item went with its panel on 2026-08-26.
   **The middle slot holds the map layers, and the search left this bar for the app bar.** A reader
@@ -2748,31 +2747,29 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   Four items have no centre slot, so the property a reader asked for is gone and the item keeps its
   place in the reading order instead. M3 states three to five for this component, so four needs no
   other change. `m3-check.html` asserts the position it holds now rather than the centre.
-  **`#navLocate` has no rail twin, and it must not grow one.** Above 600px the map draws `#locate`
-  itself, over the ground a fix lands on, which is where a location control belongs whenever there is
-  room for it. That is why this id breaks the `rail`/`nav` pairing every other item here keeps.
-  **It presses `#locate` rather than repeating what that button does.** Every path through
-  `js/locate.js` hangs off one handler: a first fix, a stored fix, the recentre, the ripple and the
-  card. A second caller is a second copy of the one that matters.
-  **It is a DESTINATION and takes `aria-current`**, and `railSync()` marks it while `side.key` is
-  `@here`. That is the one card in the supporting pane a navigation destination names. A station card
-  and a weather card select nothing.
-  **`js/locate.js` mirrors the glyph and the words onto it**, from the same `setBtn()` that writes
-  `#locate`. A crosshair on a control whose last fix failed says nothing, and a failure has to arrive
-  as text as well. Only the glyph and the words cross. The `.busy` and `.on` paint belongs to a map
-  control standing on a photograph of a city, and `GLYPH` in that file states the three names because
-  every `#locate.*` rule keys on that id and cannot reach the bar item.
+  **THE LOCATION ITEM IS GONE FROM 2026-09-15, AND THE BAR HOLDS THREE ITEMS.** A reader deleted
+  `#navLocate` when `#locate` became the zoom control's first cell at every width. A bar item and a
+  map cell for one action is one control in two places. So `setBtn()` in `js/locate.js` writes one
+  button, `railSync()` marks nothing for the `@here` card, and `NAV` in `js/ui.js` has no `Locate`.
+  **A press on `#locate` opens no card below 600px.** The card is a full-screen dialog there, and it
+  covered the map that the press had just moved. The recentre and the ripple answer the press. A tap
+  on the dot still opens the card. `m3-check.html` stubs the frame's geolocation to press both paths.
+  **The pane's native `close` runs `closeSide()`, and it removed the body class alone before.**
+  `side.key` survived that. Escape or the back gesture on the alert list kept `@alerts`. A first fix
+  then called `alerts()`, and `alerts()` reopened its list because the key still named it.
   **Below 600px `#pane` covers the bar**, because that pane is a full-screen dialog there. So the
   bar is a launcher at that width and never a state display.
   **`--navbar-h` holds `calc(64px + env(safe-area-inset-bottom, 0px))`**, and `viewport-fit=cover`
   in the viewport meta tag is what makes that inset report a real number. Without the tag it reads 0
   and the bar sits under the iOS home indicator.
-  **NO BUTTON DRAWS ON THE MAP AT THIS WIDTH.** `#locate` held the slot beside the zoom box until
-  2026-08-25, and the bar's middle item replaced it. `css/chrome.css` gives that node `display: none`
-  below 600px. **Assert that it does not DRAW, never that it is absent**: `js/locate.js` still owns
-  it and still writes its three states onto it, and a check reading the element as gone would pass
-  the day somebody deleted the button a desktop needs. `m3-check.html` and `paint-check.html` both
-  hold that shape.
+  **THE LOCATION BUTTON DRAWS ON THE MAP AT THIS WIDTH AGAIN, FROM 2026-09-15.** It hid below 600px
+  from 2026-08-25, while the bar carried the control. It is the zoom control's first cell now, at the
+  44px that `css/map.css` gives the zoom links here. `m3-check.html` reads its size against the plus,
+  and both render checks assert that `#navLocate` is absent.
+  **Below 600px the zoom control's foot is MEASURED, through `--foot-lift`.** It stands on the
+  scale's foot. The scale sits on the credit, and the credit takes one, two or three lines with the
+  width. A literal 40px matched two lines and stood 14px above one. `js/ui.js` writes the variable
+  from a `ResizeObserver` on `#mapfoot`, the same shape `--top-chips` uses.
   **`#mapfoot` still takes `--navbar-h` and still needs it.** It states a bottom measured up from the
   map's own edge. That edge moved 64px and the literal did not, so the zoom box climbed past it.
   `paint-check.html` reported it, and nothing else in this app reads that geometry.

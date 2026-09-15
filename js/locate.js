@@ -29,22 +29,9 @@ let wantPopup = false;   // only pop up when the user asked; never on the landin
    The label is the accessible name. A colour and a hover are two things a screen reader cannot
    reach, so a failure has to arrive as text as well. */
 // `#locate` in css/chrome.css sets the size and the shape, so the class carries the state alone.
-/* **The navigation bar carries a twin below 600px, and this writes both.** `#locate` does not draw
-   at that width — see `css/chrome.css` — and `#navLocate` is the only way to a fix there. A
-   crosshair on an item whose last attempt failed says nothing, and a failure has to arrive as text
-   as well, so the glyph and the words are mirrored rather than left on the hidden node.
-   **The STATE crosses too, and only the PAINT stays behind.** The glyph and the words alone left
-   the bar item unable to say one of the three. `busy` and the resting state draw the same
-   `my_location` mark, so a reader on a phone pressed and watched nothing change for ten seconds.
-   The class crosses so the pulse can. The `.on` accent and the `.busy` refusal do not: that paint
-   belongs to a map control standing on a photograph of a city, and the item beside it reports its
-   own selected state through `aria-current`, which `railSync()` writes from the card on screen.
-   `classList`, never `className`: the item carries `navitem`, and every rule in that component
-   keys on it. */
-const twin = el('navLocate');
-// The same three glyphs `#locate.busy`, `#locate.on` and `#locate.fail` resolve in css/chrome.css.
-// Stated here because those rules key on the `#locate` id, so none of them can reach the bar item.
-const GLYPH = { busy: 'my_location', on: 'my_location', fail: 'location_disabled' };
+/* **There is no navigation bar twin since 2026-09-15.** `#navLocate` carried the glyph, the words
+   and the state below 600px, while this button did not draw there. A reader deleted it when the
+   button joined the zoom control at every width. */
 /* What state the control is in, and the words that state carries. `btn.onclick` reads both: two of
    the three states have nothing on screen that says why, and a snackbar is what says it. */
 let mode = '', words = '';
@@ -58,11 +45,6 @@ const setBtn = (cls, label, tip) => {
      styled one. Two shapes for one control. Every `title` in this app went the same way on
      2026-08-26, and the reason is the one this file already states: a `title` opens on no phone. */
   btn.dataset.tip = words;
-  if (!twin) return;
-  twin.querySelector('.i').className = 'i i-' + (GLYPH[cls] || 'my_location');
-  twin.setAttribute('aria-label', words);
-  for (const c of ['busy', 'on', 'fail']) twin.classList.toggle(c, c === cls);
-  twin.dataset.tip = words;
 };
 
 /* Two settings in two places refuse a location, and naming the wrong one sends the reader in a
@@ -130,10 +112,15 @@ export function findMe(setView) {
    click nothing on screen changes except the view. This is what says "there — that one is you". */
 const flashMe = () => ping(at, 'me');
 
+/* **A press opens no card on a phone.** A reader asked for that on 2026-09-15. Below 600px the card
+   is a full-screen dialog, so it covers the map that the press just moved. The recentre and the
+   ripple answer the press there. A tap on the dot still opens the card. */
+const phone = matchMedia('(max-width: 600px)');
+const offerCard = () => { if (!phone.matches) showHere(); };
+
 /* **Two of the three states answer with a snackbar, and both had nothing to say before.** The glyph
    carries the state and `data-tip` carries the reason, and a tip opens on hover. A phone has no
-   hover, and the bar item is the only way to a fix at that width. So a reader pressed, waited, and
-   met a control that appeared to do nothing.
+   hover. So a reader pressed, waited, and met a control that appeared to do nothing.
    **Busy refuses a second attempt.** `map.locate()` is already running, and a second call is a
    second wait rather than a faster one.
    **Fail says the reason and then tries again.** Without the retry, one refusal leaves the control
@@ -144,7 +131,7 @@ btn.onclick = () => {
   wantPopup = true;
   if (mode === 'fail') { snack(words); return findMe(true); }
   if (!at) return findMe(true);       // no fix yet — prompt for one
-  showHere();                         // already have one: recentre and show what is around you
+  offerCard();                        // already have one: recentre and show what is around you
   focusOn(at, 13);
   flashMe();
 };
@@ -183,7 +170,7 @@ function place(latlng, accuracy, setView) {
   if (setView) focusOn(latlng, 13);   // map.locate() does this itself; a restored fix has to ask
   // Only when the user asked. The landing auto-locate places the marker without moving the view, and
   // a ripple over a corner of the map nobody is looking at is a flicker with no referent.
-  if (wantPopup) { showHere(); flashMe(); }
+  if (wantPopup) { offerCard(); flashMe(); }
   if (state.data.length) alerts();   // re-sort the alert list nearest-first now that we know where you are
   // A fix can land while the table is open — it has a "my location" row that could not exist a
   // moment ago. Redraw so the row appears rather than waiting for the next thing to touch it.

@@ -114,6 +114,22 @@ const M3_EASE = 'cubic-bezier(0.2, 0, 0, 1)';
    frame behind the class that asks for it. Every assertion about the pane waits on this. */
 const settled = () => new Promise(res => setTimeout(res, 120));
 
+/* **The scale is three lines**, asked for on 2026-09-15: the title, the ramp under it, and the tick
+   words under the ramp, spread across its width. This names what is out of place, or returns '' when
+   the stack holds. It returns `null` when no ramp draws, because the weather key carries none. */
+function scaleStack(d, r) {
+  const sec = [...d.querySelectorAll('#legend .lgsec')]
+    .find(s => s.querySelector('.ramp') && s.getClientRects().length);
+  if (!sec) return null;
+  const t = r(sec.querySelector('.title')), rp = r(sec.querySelector('.ramp'));
+  const tk = sec.querySelectorAll('.ticks span'), bad = [];
+  if (rp.top < t.bottom - 0.5) bad.push('the ramp stands beside the title');
+  if (r(sec.querySelector('.ticks')).top < rp.bottom - 0.5) bad.push('the ticks stand beside the ramp');
+  if (Math.abs(r(tk[0]).left - rp.left) > 1.5) bad.push('the first tick is off the ramp start');
+  if (Math.abs(r(tk[tk.length - 1]).right - rp.right) > 1.5) bad.push('the last tick is off the ramp end');
+  return bad.join(', ');
+}
+
 const DIALOGS = ['dataBox', 'camBox', 'aboutBox', 'helpBox', 'settingsBox'];
 
 /* Run a module INSIDE the frame, so it shares that document's module map and reaches the live
@@ -352,18 +368,22 @@ async function phone() {
   is(w.getComputedStyle(mapEl, '::after').content, 'none', 'and no card edge');
   is(Math.round(r(mapEl).width), VW, 'the map is the full width of the window');
 
-  /* **There is no button on the map at this width at all.** The layer controls became a chip row on
-     2026-08-25, and the location button moved into the navigation bar's middle slot the same day. So
-     the map's bottom strip holds the legend, the credit and Leaflet's own zoom cluster and nothing
-     else.
-     **Assert that `#locate` does not DRAW, never that it is absent.** `js/locate.js` still owns that
-     node and still writes its three states onto it, and it mirrors the glyph and the words onto
-     `#navLocate`. A check that read the element as gone would pass the day somebody deleted the one
-     control the desktop needs. */
+  /* **The location button draws here too, as the zoom control's first cell.** A reader asked for
+     that on 2026-09-15, and deleted the navigation bar's location item the same day. So the map's
+     bottom strip holds the legend, the credit and Leaflet's zoom control, with the button inside it.
+     **Read its size against the plus, never against a literal.** css/map.css sizes the zoom links
+     here and css/chrome.css sizes this cell, and the two can drift apart. */
   is(d.getElementById('paint'), null, 'phone: the layers button is gone at every width');
-  is(cs(d.getElementById('locate')).display, 'none',
-     'phone: and the map draws no location button, because the bar carries one');
-  is(!!d.getElementById('navLocate'), true, 'phone: which is where the location control lives here');
+  {
+    const lc = d.getElementById('locate'), zin = d.querySelector('.leaflet-control-zoom-in');
+    is(cs(lc).display !== 'none', true, 'phone: the map draws the location button');
+    is(lc.parentElement === d.querySelector('.leaflet-control-zoom'), true,
+       'phone: inside the zoom control');
+    is([r(lc).width, r(lc).height].map(Math.round).join(','),
+       [r(zin).width, r(zin).height].map(Math.round).join(','),
+       'phone: at the size the zoom links take here');
+    is(d.getElementById('navLocate'), null, 'phone: and the navigation bar carries no second one');
+  }
 
   /* **The credit is the lowest thing on the map here as well.** A reader stated that rule for every
      width on 2026-08-25, and `bands()` never runs a width under 700px. The phone block writes its
@@ -380,9 +400,28 @@ async function phone() {
   const lgp = r(d.getElementById('legend'));
   is(lgp.bottom <= cr.bottom + 0.5, true, 'phone: the credit never sits above the scale');
   /* At this width the row cannot hold both, so the credit takes a line of its own under the scale.
-     The scale itself still states one line, which is what a reader asked for on 2026-08-25. */
+     The scale itself stacks on three lines, which is what a reader asked for on 2026-09-15. */
   is(lgp.bottom <= cr.top + 0.5, true, 'phone: so here it sits under it');
-  is(lgp.height < 30, true, 'phone: and the scale is one line');
+  is(scaleStack(d, r), '', 'phone: the scale stacks its title, its ramp and its tick words');
+  /* **The zoom control's foot sits on the scale's foot**, which a reader asked for on 2026-09-15.
+     `--foot-lift` in js/ui.js measures that edge, because the credit under the scale takes one line
+     or two with the width. So this reads it at 360px, where the credit takes two lines, and again at
+     560px, where it takes one. The 40px literal it replaced held the first case alone. */
+  {
+    const f = document.getElementById('phone'), credit = d.getElementById('credit');
+    const gap = () => {
+      const lg = r(d.getElementById('legend')), base = lg.height ? lg : r(credit);
+      return Math.abs(r(d.querySelector('.leaflet-control-zoom')).bottom - base.bottom);
+    };
+    is(gap() < 1.5, true, 'phone: the zoom control stands on the scale\'s line');
+    f.style.width = '560px';
+    await new Promise(res => setTimeout(res, 300));
+    is(Math.round(r(credit).height / parseFloat(cs(credit).lineHeight)), 1,
+       'phone: at 560px the credit takes one line, the case the literal missed');
+    is(gap() < 1.5, true, 'phone: and the zoom control still stands on the scale\'s line there');
+    f.style.width = '360px';
+    await new Promise(res => setTimeout(res, 300));
+  }
   /* Flush LEFT at this width, against flush right on a desktop. The phone block has to cancel the
      auto margin AND the `text-align`, and the box is what reports whether it cancelled both. */
   is(Math.round(cr.left - r(d.getElementById('mapfoot')).left), 0, 'phone: the credit is flush left');
@@ -488,25 +527,14 @@ async function phone() {
   is(cs(nav).display !== 'none', true, 'phone: and it is not merely in the markup');
   is(Math.round(r(nav).height), 64, 'phone: M3 navigation bar, 64dp with no safe-area inset');
   is([...nav.querySelectorAll('.navitem')].map(b => b.id).join(','),
-     'navAlerts,navLocate,navTable,navCams',
-     'phone: four items, inside the three-to-five M3 states for this component');
-  /* **THE LOCATION BUTTON IS NO LONGER AT THE CENTRE, and that is a cost of the panel deletion.** A
-     reader asked for the middle slot on 2026-08-25, and the filters item that made five was deleted
-     Four items have no centre slot, so it keeps its place in the reading order instead.
-     **It has no rail twin, because the map draws `#locate` itself wherever there is room.** That is
-     why this id breaks the `rail`/`nav` pairing every other item here keeps.
-     **It is a destination and takes `aria-current`**, which `railSync()` writes while the "You are
-     here" card is the pane's occupant. So it states no `aria-expanded`: that attribute belongs to
-     the search, which reports on a pane it toggles. */
-  const navIds = [...nav.querySelectorAll('.navitem')].map(b => b.id);
-  is(navIds.indexOf('navLocate'), 1,
-     'phone: the location button keeps its place, with no centre slot left to hold');
+     'navAlerts,navTable,navCams',
+     'phone: three items, inside the three-to-five M3 states for this component');
+  /* **There is no location item.** It held a slot from 2026-08-25 to 2026-09-15. A reader deleted
+     it when `#locate` became a cell of the zoom control at every width. */
+  is(d.getElementById('navLocate'), null,
+     'phone: no location item, because the zoom control carries that button');
   is(d.getElementById('navFilters'), null,
      'phone: and no filters item, because that panel was deleted');
-  is(d.getElementById('railLocate'), null,
-     'phone: and it has no rail twin, because the map draws that button itself above 600px');
-  is(d.getElementById('navLocate').hasAttribute('aria-expanded'), false,
-     'phone: it is a destination, so it states no aria-expanded');
   is(d.getElementById('navMore').closest('#navbar'), null,
      'phone: and the overflow left this bar, which is what freed that slot');
   /* **The layers item is gone, and so is the panel it opened.** The layer controls are a chip row
@@ -824,6 +852,37 @@ async function phone() {
   is(pane.matches(':modal'), true, 'the pane is modal, which is what makes Escape reach it at all');
   d.body.classList.remove('side');
   await settled();
+
+  /* --- the location button opens no card on a phone ---
+     A reader asked for that on 2026-09-15. Below 600px the card is a full-screen dialog, and it
+     covered the map that the press had just moved. Both paths get a press: the first fix, and the
+     recentre on a fix the app already holds.
+     **Headless Chrome has no position to give**, so this stubs the frame's own geolocation with one
+     point in Kuala Lumpur. The fix lands in the stored `prefs`, so the old value goes back after. */
+  {
+    const was = w.localStorage.getItem('prefs');
+    const lc = d.getElementById('locate');
+    const tick = () => new Promise(res => setTimeout(res, 250));
+    Object.defineProperty(w.navigator.geolocation, 'getCurrentPosition', {
+      configurable: true,
+      value: ok => setTimeout(() => ok({
+        coords: { latitude: 3.1478, longitude: 101.6953, accuracy: 20 }, timestamp: Date.now(),
+      }), 0),
+    });
+    for (let i = 0; i < 20 && lc.classList.contains('busy'); i++) await tick();
+    is(d.body.classList.contains('side'), false, 'phone: no card is open before the press');
+    lc.click();
+    for (let i = 0; i < 20 && !lc.classList.contains('on'); i++) await tick();
+    is(lc.classList.contains('on'), true, 'phone: the stubbed position reaches the location button');
+    await settled();
+    is(d.body.classList.contains('side'), false, 'phone: a first fix from the button opens no card');
+    lc.click();
+    await settled();
+    is(d.body.classList.contains('side'), false,
+       'phone: and a recentre on a fix already held opens none either');
+    if (was === null) w.localStorage.removeItem('prefs');
+    else w.localStorage.setItem('prefs', was);
+  }
 }
 
 async function desktop() {
@@ -2507,14 +2566,13 @@ async function bands() {
        On a shared line the two bottoms are equal, which the tolerance covers. */
     const lg = r(d.getElementById('legend')), foot2 = r(d.getElementById('mapfoot'));
     is(lg.bottom <= credit.bottom + 0.5, true, label + ': the credit never sits above the scale');
-    /* **The scale states itself on one line wherever the map leaves room, and wraps rather than
-       run under the zoom cluster where it does not.** It broke onto two lines on a phone and a
-       reader asked for one on 2026-08-25. One line needs about 273px, measured, and the row hands
-       38px of its trailing edge to that cluster. The medium band leaves the map 236 to 300px, so
-       there is no width there that is both one line and clear. 30 is one 23px line with room. */
-    const room = r(d.getElementById('mapfoot')).width - 38;
-    is(room < 320 || lg.height < 30, true,
-       label + ': the scale is one line wherever the map leaves room for one');
+    /* **The scale stacks on three lines at every band, and it never runs under the zoom cluster.**
+       A reader asked for the stack on 2026-09-15. It stood on one line from 2026-08-25. The row
+       hands 38px of its trailing edge to that cluster. */
+    const stack = scaleStack(d, r);
+    if (stack !== null) {
+      is(stack, '', label + ': the scale stacks its title, its ramp and its tick words');
+    }
     is(lg.right <= foot2.right - 38 + 0.5, true,
        label + ': and it never reaches under the zoom cluster');
     /* **Flush RIGHT while it shares the scale's line, and flush LEFT the moment it takes its own.**
@@ -2612,7 +2670,7 @@ async function shortPhone() {
   await new Promise(res => setTimeout(res, 200));
   say('--- the navigation bar at a compact height, ' + w.innerWidth + 'x' + w.innerHeight + ' -----');
   is(w.innerHeight, 420, 'short phone: the frame really resized, so a height query would have fired');
-  const nav = d.getElementById('navbar'), item = d.getElementById('navLocate');
+  const nav = d.getElementById('navbar'), item = nav.querySelector('.navitem');
   is(cs(nav).display !== 'none', true, 'short phone: the bar still draws');
   is(Math.round(r(nav).height), 64, 'short phone: still M3’s 64dp container');
   is(cs(item).flexDirection, 'column',

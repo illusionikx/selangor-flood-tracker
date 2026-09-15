@@ -770,12 +770,6 @@ body.railopen #rail .railbadge { top: -6px; right: -6px; }
 #locate.on .i { color: var(--accent); }
 #locate.fail .i { --i: var(--i-location_disabled); }
 
-/* The bar twin below 600px. **The pulse crosses and the paint does not** — see `setBtn()` in
-   js/locate.js. The glyph itself is written there, because a bar item takes no `.mapbtn` class and
-   no rule above can reach it. `busy` and the resting state draw one mark, so without this the
-   phone's only location control says nothing at all while it waits. */
-#navLocate.busy .i { animation: pulse 1s infinite; }
-
 /* --- sources dialog -------------------------------------------------------------------------- */
 
 /* Wider than a plain dialog: this one carries the logo lockup, three source entries and a credits
@@ -2477,10 +2471,10 @@ body.find #findpane { display: flex; flex-direction: column; }
    **It takes the look of the zoom links, and it has to state that look again.** The
    `.leaflet-control-zoom a` rules in css/map.css key on `a`, and this is a `<button>`. Keep the size,
    the fill and the divider in step with those rules.
-   **It sits FIRST because Leaflet's own sheet drops the divider on the LAST link.** A cell after the
-   minus gives the minus a line under it. That line stays below 600px, where this cell does not draw.
+   **It sits FIRST because Leaflet's own sheet drops the divider on the LAST link.** The minus keeps
+   that place, so this cell states its own divider and no Leaflet rule needs a cancel.
    The outline goes inside the box, because the control clips its overflow to round its corners.
-   The phone block further down hides it, and that rule wins because it comes later in this file. */
+   The phone block further down grows it to 44px, and that rule wins because it comes later. */
 #locate {
   display: grid; place-items: center; width: 30px; height: 30px; padding: 0; cursor: pointer;
   background: var(--surface); color: var(--on-surface); font-size: 18px;
@@ -2661,36 +2655,33 @@ body:has(#wxLayer:checked) :is(#heatChip, #kindChip, #alertChip, #favChip) { dis
    lines there instead. */
 #mapfoot > * { pointer-events: auto; min-width: 0; }
 #credit { overflow-wrap: anywhere; }
-/* **The legend is one row now, and every scale in it states itself on that row.** It was a stacked
-   card: a title, a ramp under it, and the tick words under that, at 288px wide with a `max-width`
-   holding it off the layer button. On the credit's own line there is no second line to drop to, so
-   the title, the ramp and the ticks run across instead.
-   **The scale states itself on ONE line, at every width, and a reader asked for that on
-   2026-08-25.** It broke onto a second line on a phone, which drew the ramp over one word and its
-   four tick words under it. The titles lost the word `heat` for it: `Water level` and `Rainfall`
-   are the paint panel's own two names, and the ramp beside them is what says heat. That is 35px on
-   a 360px screen, and it is the difference between one line and two.
-   `flex-wrap` stays as the floor. A phone under about 320px still breaks the scale rather than
-   overflow the map, and a broken scale beats a cut one.
-   The plate stays. A ramp is paint and needs something to sit on, and the credit under it takes a
-   `text-shadow` for the same job. `fit-content` because a row of content states its own width, which
-   is the shape the weather section already had. `--btncol` is the trailing reservation. The legend
-   stands 56px above the map's bottom edge, which is inside the band the zoom cluster takes, so it
-   holds that column clear at every width. The credit under it only needs the same reservation when
-   it wraps. */
+/* **The scale is three lines: its title, the ramp under it, and the tick words under the ramp.** A
+   reader asked for that on 2026-09-15, at every width. It reverses the one-line strip of 2026-08-25.
+   That strip ran the title, the ramp and the ticks across one line. So the tick words stood beside
+   the ramp and named no point on it.
+   **The ticks spread across the ramp's own width**, through `space-between`, so each word stands
+   under the part of the ramp it names. The ramp takes the width of its section, and the widest line
+   sets that width. So the ramp states no width of its own.
+   **The titles keep the short names**: `Water level` and `Rainfall` are the chip's own two names,
+   and the ramp under them is what says heat.
+   The plate stays, at a card corner rather than a pill. A ramp is paint and needs something to sit
+   on, and a pill radius on a box three lines tall cuts into its corners. `fit-content` because the
+   content states its own width. `--btncol` is the trailing reservation. The credit under the scale
+   only needs the same reservation when it wraps. */
 #legend {
   width: fit-content; max-width: calc(100% - var(--btncol));
-  padding: 3px 10px; border-radius: 999px; font-size: 11px;
+  padding: 6px 10px; border-radius: var(--md-sys-shape-corner-medium); font-size: 11px;
 }
-#legend .lgsec { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+/* A grid of one column, so the title, the ramp and the ticks each take a line. The weather key is a
+   section too, and it takes its title over its key the same way. */
+#legend .lgsec { display: grid; gap: 4px; }
 #legend .title {
   display: flex; align-items: center; gap: 6px;
   font-weight: 500; font-size: 11px; margin: 0;
 }
-/* The ramp has no intrinsic width, so it is the one thing on this row that has to state one. 72px
-   reads three bands against three words. */
+/* No width here. The grid stretches the ramp across its section, which is the width the tick words
+   under it spread across. */
 #legend .ramp {
-  width: 72px; flex: none;
   height: 8px; border-radius: 999px; margin: 0;
   /* The visible slice of the heat gradient — HEAT_ALERT to danger — so the warning stop lands at
      (0.68 − 0.38) / (1 − 0.38). Change with heat.js's gradient and config.js's slots.
@@ -2704,21 +2695,24 @@ body:has(#wxLayer:checked) :is(#heatChip, #kindChip, #alertChip, #favChip) { dis
 #legend .ramp.rain {
   background: linear-gradient(90deg, #6f7bff 0%, #8f7bff 33.3%, #c77dff 66.7%, #ff4d4d 100%);
 }
-/* Inline, so the words follow the ramp rather than sit under it. `space-between` was written for a
-   box the ramp's own width. On one row they are three labels in a run. */
-#legend .ticks { display: flex; gap: 6px; font-size: 10px; }
+/* Under the ramp and across its width. The first word starts at the ramp's start, the last ends at
+   its end, and `gap` is the floor between two words on a narrow scale. */
+#legend .ticks { display: flex; justify-content: space-between; gap: 6px; font-size: 10px; }
 /* No rule between the two scales any more: the layers are mutually exclusive, so exactly one section
    is ever on screen. (It was `#legend.both`, set from render.js — never `#lgWater + #lgRain`, since
    an adjacent-sibling selector still matches a hidden sibling and drew a divider under nothing.) */
 
 /* Info bubble: the formula lives in here so the legend itself stays a legend. */
-.info { position: relative; margin-left: auto; color: var(--muted); cursor: help; }
+/* **The glyph sits beside the title, not on the card's trailing edge.** It carried `margin-left: auto`
+   while the scale was one line. On the three-line card that pushed it away from the title it
+   explains. Its panel stays on screen either way: measured at 360px, the panel ends at 311px beside
+   the title and at 326px on the far edge. */
+.info { position: relative; color: var(--muted); cursor: help; }
 .info > .i { font-size: 16px; display: block; }
 /* **It opens toward the map, not toward the window edge.** It used to hang off `right: -8px`, so a
-   244px panel ran leftward from the glyph. That was right while the legend was a 288px card and the
-   glyph sat on its trailing edge. On the one-row strip the glyph sits about 100px from the map's
-   leading edge, and the panel ran off it and was cut. It leads on the same edge the legend does now,
-   and `max-width` is the floor for a phone too narrow to hold 244. */
+   244px panel ran leftward from the glyph. The glyph sits near the map's leading edge now, so the
+   panel runs off that edge unless it leads on it. It leads on the same edge the legend does, and
+   `max-width` is the floor for a phone too narrow to hold 244. */
 .info .tip {
   position: absolute; z-index: 401; bottom: calc(100% + 8px); left: -8px; width: 244px;
   max-width: calc(100vw - var(--map-l) - 24px);
@@ -3941,27 +3935,11 @@ body.side #side { display: flex; }
      chip draws and this leaves 40px of air over a pill centred on a map, which nothing reads as a
      fault. A token that follows the real height needs a measurement, and CSS has none to give. */
   :root { --top-chips: calc(var(--top-free) + 80px); }
-  /* ABOVE the zoom box here rather than beside it. `#legend` takes `left: 12px; right: 68px` at this
-     width, so the strip left of the zoom buttons is the legend's and there is nowhere to stand.
-     No size override. `--fab` follows the zoom control's height on a desktop because the two stand
-     side by side there, and a button 4px short of the box beside it reads as a mistake. Here it
-     stands ABOVE that box, so there is no edge to line up with and nothing to match. Two 44px zoom
-     buttons make 88, and an 88px square is a quarter of a 360px screen for a control that opens a
-     panel. 60 clears the 44px touch target with room to spare.
-     Measured off the same two rules the desktop offset uses. `.leaflet-bottom.leaflet-right` carries
-     `margin-bottom: 30px` here and Leaflet's gutter adds 10, so the zoom box sits 40px up. Two 44px
-     buttons make it 88 tall. 40 + 88 + 8 = 136. paint-check.html asserts the adjacency, so a change
-     to either number fails a check rather than drifting apart on screen. */
-  /* **`#locate` does not draw at this width, and the navigation bar's middle item replaced it.** A
-     reader asked for the location button in that slot on 2026-08-25. Two controls for one action at
-     one width is one control in two places, which is the fault this app already names against a
-     second More button. So the map keeps the button wherever there is room for it, and a phone
-     reaches a fix from the bar.
-     **`display: none` and not a move.** A bar item is a pill over a label and this is a 30px cell
-     of the zoom control, so one node cannot be both — the shape every rail item already uses against its bar
-     twin. `js/locate.js` still owns this node and still writes its three states onto it, and it
-     mirrors the glyph and the words onto the bar item beside it. */
-  #locate { display: none; }
+  /* **`#locate` draws at this width too, and the navigation bar has no location item.** A reader
+     asked for both on 2026-09-15. It hid here from 2026-08-25, while the bar carried the control.
+     The cell takes the 44px that css/map.css gives the two zoom links here, so the three stay one
+     column. */
+  #locate { width: 44px; height: 44px; font-size: 22px; }
   /* The legend earns its space: the heatmap is the one layer whose colours mean nothing without it,
      and it is the layer a phone shows most of. Compacted rather than dropped — full width beside the
      zoom buttons, and the sentence explaining the doubling goes, since the tip already says it. */
@@ -3972,14 +3950,13 @@ body.side #side { display: flex; }
      the trailing edge, so neither the legend nor the credit under it runs into that cluster. */
   /* **`--btncol` is 0 here, because the wrapper reserves that column itself.** The 68px on the
      trailing edge holds the whole row clear of the zoom cluster, so neither child needs a
-     reservation of its own. Left in place, the legend loses 56px it needs for its one line. */
+     reservation of its own. Left in place, the legend loses 56px of the map's width for nothing. */
   #mapfoot { left: 12px; right: 68px; --btncol: 0px; bottom: calc(6px + var(--navbar-h)); }
   /* The row places it here too. At this width it always takes a line of its own, so
      `space-between` leads it on the left with nothing to state. */
   #credit { font-size: 10px; line-height: 1.4; }
-  #legend { font-size: 10px; padding: 3px 8px; }
+  #legend { font-size: 10px; padding: 6px 8px; }
   #legend .title { font-size: 10px; }
-  #legend .ramp { width: 60px; }
   #legend .ticks { font-size: 9px; gap: 4px; }
   /* The station panel takes the screen below the app bar, less the peek strip. Nothing steps aside
      for it here — it is over everything. */

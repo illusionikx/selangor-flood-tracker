@@ -19152,3 +19152,145 @@ still reads as blue.
 `filter: url(#watertint)`. The tile holds land at grey 9, a lake at 38 and a 1px road edge at 37.
 The check asserts that the lake turns `--water`, the edge stays grey 37 and the land stays grey 9.
 The old check read the table values, and it passed while the map drew the dots.
+
+## The location button draws on a phone, and opens no card there, 2026-09-15
+
+A reader asked for three changes on a phone, on the day the button joined the zoom control.
+
+### What changed
+
+`#locate` draws below 600px now, as the first cell of the zoom control. It takes 44px there, the
+size that `css/map.css` gives the two zoom links at that width. It hid below 600px from 2026-08-25.
+
+The navigation bar lost `#navLocate`, the Here item. It carries three items: Alerts, Table and
+Cameras. M3 states three to five items for this component.
+
+A press on `#locate` opens no card below 600px. The card is a full-screen dialog at that width, so
+it covered the map that the press had just moved. The recentre and the ripple still answer the
+press. A tap on the dot still opens the card.
+
+### What went with the item
+
+- `setBtn()` in `js/locate.js` writes one button, and its copy onto the bar item is gone.
+- `railSync()` in `js/map.js` marks nothing for the `@here` card.
+- `NAV` in `js/ui.js` has no `Locate` entry.
+- The `#navLocate.busy` rule in `css/chrome.css` is gone.
+
+### What did not change
+
+Above 600px a press still opens the card. The pane is a side sheet beside the map at that width, so
+the card covers nothing.
+
+### What it costs
+
+A phone reaches the "You are here" card through the dot alone. Nothing on the bar opens it now.
+
+### A closed alert list came back on a first fix
+
+On a phone, Escape or the back gesture closes the pane natively. The `close` listener in
+`js/map.js` removed the body class and left `side.key` set.
+
+After the alert list closed that way, the key stayed `@alerts`. A first fix calls `alerts()`, and `alerts()` reopens its list when the key
+names it. So a press on the location button popped the alert list open.
+
+The listener now calls `closeSide()`. That clears the key, stops a clip and clears the selected pin,
+the same as the close button.
+
+### Checks
+
+`m3-check.html` asserts that the button draws on a phone, inside the zoom control, at the size of
+the plus. It asserts three bar items and no `#navLocate`.
+
+It also gives the phone frame a fake position, one point in Kuala Lumpur. Then it presses the
+button twice, once for a first fix and once for a recentre. It asserts that neither press opens the
+pane.
+
+`paint-check.html` asserts that the button draws on a phone, and that `#navLocate` is absent.
+
+## The zoom control stands on the line of the scale on a phone, 2026-09-15
+
+A reader asked that the zoom control and the heatmap scale end on one line.
+
+### The cause
+
+Below 600px the zoom control sat at a fixed 40px above the bottom edge of the map. The scale sits on
+the credit, and the credit takes one, two or three lines with the window width. So 40px matched a
+two-line credit. At 590px the credit takes one line, and the control stood 14px above the scale.
+
+### What changed
+
+`js/ui.js` measures the distance from the bottom edge of the map to the foot of the scale. It writes
+that distance into `--foot-lift` on the root. Where no scale draws, it measures to the foot of the
+credit.
+
+A `ResizeObserver` on `#mapfoot` runs the measurement. A wrap in the credit changes the height of
+that box. A scale that appears or leaves also changes it.
+
+Below 600px, `css/map.css` sets the bottom margin of the corner to `--foot-lift` less the 10px
+control margin of Leaflet. The fallback is 40px, the value before the script runs.
+
+### Measured
+
+| window | credit lines | foot of the scale | foot of the zoom control |
+|---|---|---|---|
+| 590px | 1 | 26px | 26px |
+| 360px | 2 | 40px | 40px |
+| 320px | 2, and the scale wraps | 40px | 40px |
+
+### What did not change
+
+Above 600px the control keeps its 36px. The scale and the credit share one line there, and the
+credit runs under the zoom column. A control at the foot of the scale overlaps the credit there.
+
+### Checks
+
+`m3-check.html` asserts that the two feet share a line at 360px. Then it widens the phone frame to
+560px, asserts that the credit takes one line, and asserts the shared line again.
+
+## The heatmap scale stacks on three lines, 2026-09-15
+
+A reader asked for the scale on more than one line. It stood on one line from 2026-08-25.
+
+### What changed
+
+The scale takes three lines at every width:
+
+1. The title and its ⓘ.
+2. The ramp.
+3. The tick words, spread across the width of the ramp.
+
+`#legend .lgsec` is a grid of one column. The ramp states no width, so the grid stretches it across
+the section. The widest line sets that width.
+
+`#legend .ticks` takes `space-between`, so the first
+word starts at the start of the ramp and the last word ends at its end. Each word now stands under
+the part of the ramp it names.
+
+The weather key is a section of the same box. It takes its title over its key the same way.
+
+The card corner is `--md-sys-shape-corner-medium`, 12px. A pill radius on a box three lines tall
+cuts into its corners.
+
+The ⓘ lost `margin-left: auto`. On the three-line card that rule put the glyph on the far edge,
+away from the title it explains.
+
+### Measured
+
+With the water level scale:
+
+| window | card size | tick ends against the ramp | zoom control foot against the scale foot |
+|---|---|---|---|
+| 360px | 102 by 58px | 0px and 0px | 0px |
+| 1536px | 118 by 60px | 0px and 0px | 28px higher |
+
+Above 600px the zoom control keeps its own 36px, so its foot stands higher than the scale.
+
+### What it costs
+
+At 360px the card is 58px tall, against 22px for the one-line strip. On a phone the zoom control
+rises with it, because its foot follows the foot of the scale.
+
+### Checks
+
+`m3-check.html` asserts the stack on a phone and at every band. The ramp stands under the title, the
+ticks stand under the ramp, and the first and last tick words meet the ends of the ramp.

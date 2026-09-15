@@ -358,6 +358,26 @@ el('testMode').onchange = async () => {
   new ResizeObserver(syncChipRow).observe(row);
   syncChipRow();
 }
+/* **Below 600px the zoom control stands on the scale's own line, and that edge is MEASURED too.** A
+   reader asked for one line under both on 2026-09-15. The scale sits on the credit, and the credit
+   takes one, two or three lines with the window width. So no literal holds that edge: 40px matched
+   a two-line credit and stood 14px above a one-line one.
+   `--foot-lift` is the distance from the map's bottom edge to the foot of the scale, or to the foot
+   of the credit where no scale draws. css/map.css reads it below 600px alone. Above that width the
+   scale and the credit share one line, and the credit runs on under the zoom column there.
+   **`#mapfoot` is the box to observe.** A wrap in the credit and a scale that appears or leaves
+   both change its height. The map's bottom edge and the column's bottom edge move together. */
+{
+  const foot = el('mapfoot'), root = document.documentElement;
+  const syncFoot = () => {
+    const lg = el('legend').getBoundingClientRect();
+    const base = lg.height ? lg : el('credit').getBoundingClientRect();
+    root.style.setProperty('--foot-lift',
+      `${Math.round(el('map').getBoundingClientRect().bottom - base.bottom)}px`);
+  };
+  new ResizeObserver(syncFoot).observe(foot);
+  syncFoot();
+}
 
 /* The chip's own escape hatch: whoever is looking at a fake flood may not be whoever switched it on,
    and hunting through a pane to stop it is a poor way to find that out.
@@ -1078,18 +1098,13 @@ el('findBack').onclick = () => setFind(false);
    **Search opens rather than toggles**, at both widths. It closes on blur, on Escape and on its own
    back arrow, which is three ways out already. A fourth on the control that opened it dismisses the
    field the moment a reader reaches back for it. */
-/* **`Locate` has a bar item and no rail twin, and the guard above is what lets it.** Above 600px the
-   map draws `#locate` itself, over the ground a fix lands on. Below 600px that button does not draw
-   and this item is the only way to one.
-   **It presses the map button rather than repeating what that button does.** Every path through
-   `js/locate.js` hangs off one handler: a first fix, a stored fix, the recentre, the ripple and the
-   card. A second caller here is a second copy of the one that matters. */
+/* **There is no `Locate` entry since 2026-09-15.** The map's zoom control carries `#locate` at every
+   width, so the navigation bar lost its location item. */
 /* **There is no `Filters` entry, and the panel it opened is gone.** A reader deleted `#bar` and the
    district picker inside it on 2026-08-26. */
 const NAV = {
   Alerts:  toggleAlerts,
   Find:    () => setFind(true),
-  Locate:  () => el('locate').click(),
   Table:   openTable,
   Cams:    openWall,
 };

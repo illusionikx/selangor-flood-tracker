@@ -572,8 +572,10 @@
 /* Leaflet's 30px zoom buttons are a mouse target, not a thumb one — 44px is the smallest thing a
    finger hits reliably, and this is the control you use most while holding a phone one-handed. */
 @media (max-width: 600px) {
-  /* 30 + Leaflet's own 10px control margin = 40px, the legend's bottom. Both clear the credit. */
-  .leaflet-bottom.leaflet-right { margin-bottom: 30px; }
+  /* The control's foot lands on the scale's foot. `--foot-lift` is that distance, measured by
+     js/ui.js, less Leaflet's own 10px control margin. 40px is the value before the script runs, and
+     it matches a two-line credit. */
+  .leaflet-bottom.leaflet-right { margin-bottom: calc(var(--foot-lift, 40px) - 10px); }
   /* Both selectors, so this holds whether or not Leaflet decided the browser is touch-capable. The
      bare one alone lost to `.leaflet-touch .leaflet-bar a` and left 30px targets on every phone. */
   .leaflet-control-zoom a, .leaflet-touch .leaflet-control-zoom a {

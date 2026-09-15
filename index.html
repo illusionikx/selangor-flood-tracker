@@ -398,37 +398,17 @@
      Settings, Help and About are the three visited least, so they live in the overflow menu, and
      that menu opens from the app bar rather than from a slot here. The search is a rail FAB and an
      app bar action, because a bar has no FAB slot.
-     **The middle slot is the location button.** A reader asked for it there on 2026-08-25. Below
-     600px `#locate` does not draw on the map at all, so this item is the only way to a fix at this
-     width, and two controls for one action at one width is the fault this app already names.
+     **There is no location item.** It held a slot from 2026-08-25 to 2026-09-15. A reader deleted
+     it when `#locate` became a cell of the map's zoom control at every width. Two controls for one
+     action at one width is the fault this app already names.
      **Every id is its rail twin with one prefix changed.** `js/ui.js` binds both from one table and
      `railActive()` in js/map.js matches on the suffix, so the two components cannot drift apart.
-     `#navLocate` is the one exception, and it states its reason where it is written.
      It reuses `.railpill`, `.raillabel` and `.railbadge`. One indicator, defined once. -->
 <nav id="navbar" aria-label="Main">
-  <!-- Four items. M3 states three to five for this component. **The location item is not at the
-       centre**, because four items have no centre slot. -->
+  <!-- Three items. M3 states three to five for this component. -->
   <button class="navitem" id="navAlerts" aria-controls="pane" aria-expanded="false"
     ><span class="railpill"><i class="i i-warning"></i><b class="railbadge"></b></span
     ><span class="raillabel">Alerts</span></button>
-  <!-- **The location button, in the middle slot.** A reader asked for it there on 2026-08-25.
-       `#locate` is a cell of the map's zoom control above 600px and `css/chrome.css` stops it drawing
-       below that, so this item is the only way to a fix at this width.
-       **It is a second element and not the same node moved.** A navigation bar item is a pill over a
-       label and `#locate` is a 30px cell of the zoom control, so one node cannot be both. That is the shape
-       every rail item already uses against its bar twin.
-       **It has no rail twin, and it must not grow one.** Above 600px the map draws the button
-       itself, over the ground the fix lands on, which is where a location control belongs whenever
-       there is room for it.
-       **It is a DESTINATION and it takes `aria-current`.** Pressing it opens the "You are here"
-       card in the supporting pane, and `railSync()` in js/map.js marks the item while that card is
-       the pane's occupant. Every other card in that pane selects nothing, because a station is not
-       a destination this bar names.
-       **js/locate.js mirrors the button's three states onto this item.** A crosshair on a control
-       whose last fix failed says nothing, and the failure has to arrive as text as well. -->
-  <button class="navitem" id="navLocate" aria-controls="pane"
-    ><span class="railpill"><i class="i i-my_location"></i></span
-    ><span class="raillabel">Here</span></button>
   <button class="navitem" id="navTable"
     ><span class="railpill"><i class="i i-table"></i></span
     ><span class="raillabel">Table</span></button>
@@ -436,7 +416,7 @@
     ><span class="railpill"><i class="i i-photo_camera"></i></span
     ><span class="raillabel">Cameras</span></button>
   <!-- **There is no More item here.** It held the fifth slot until 2026-08-25 and a reader moved it
-       to the app bar's trailing edge, which freed this slot for the location button above. -->
+       to the app bar's trailing edge. The location item that took the freed slot is gone too. -->
 </nav>
 <!-- Native <dialog>: modal behaviour, backdrop, Esc-to-close and focus trapping come free. -->
 <!-- Two dialogs, one shape. `.docbox` carries the box and the prose rules both of them need; the
@@ -1453,8 +1433,7 @@
 <div id="legend" class="surface">
   <div id="lgWater" class="lgsec">
     <!-- **`Water level`, not `Water-level heat`.** The paint panel's own button carries that name,
-         and one thing takes one name. The ramp beside it is what says heat. It is also 35px of a
-         360px screen, which is the difference between one line and two. -->
+         and one thing takes one name. The ramp under it is what says heat. -->
     <div class="title">Water level
       <span class="info" tabindex="0" aria-label="Water level heatmap calculation">
         <i class="i i-info"></i>
