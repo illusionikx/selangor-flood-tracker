@@ -1385,7 +1385,7 @@ async function desktop() {
      query, on the one map width where that line wraps. It stopped 118px short for a revision, and
      a reader called the result floating. */
   is(Math.round(VW - foot.right), 12 + GAP, 'the footer column is flush with the map on both edges');
-  for (const [id, x, y] of [['mapfoot', 12, 8], ['locate', 48, 36]]) {
+  for (const [id, x, y] of [['mapfoot', 12, 8]]) {
     const e = r(d.getElementById(id));
     const lead = id === 'mapfoot';
     const off = lead ? Math.round(e.left) : Math.round(VW - e.right);
@@ -1396,6 +1396,14 @@ async function desktop() {
   }
   is(Math.round(VW - r(d.querySelector('.leaflet-control-zoom')).right), 10 + GAP,
      'the zoom control gets it free, having never left the map container');
+  /* **`#locate` is the zoom control's first cell since 2026-09-15**, so the inset reaches it through
+     that control. It stood beside the box as a sibling of `#map` before, with offsets of its own. */
+  {
+    const zc = d.querySelector('.leaflet-control-zoom'), lc = d.getElementById('locate');
+    is(zc.firstElementChild === lc, true, 'the location button is the zoom control\'s first cell');
+    is(Math.round(r(lc).width), Math.round(r(zc.querySelector('.leaflet-control-zoom-in')).width),
+       '  as wide as the plus under it');
+  }
   /* **The station card is the only occupant above 600px.** The search is the pane's other occupant
      at compact width alone: above 600px it is M3's docked search view, a card over the map. */
   d.body.classList.add('side');
@@ -1418,7 +1426,7 @@ async function desktop() {
   /* Leaflet's own controls live INSIDE the map container and follow it for free. These three are
      siblings of the map and position against the window, so each adds `--pane-w` to its own offset.
      A missed one sits under the pane, which is exactly where a reader cannot reach it. */
-  for (const [id, base] of [['mapfoot', 12], ['locate', 48], ['toast', 12], ['mapchips', 12]]) {
+  for (const [id, base] of [['mapfoot', 12], ['toast', 12], ['mapchips', 12]]) {
     is(Math.round(VW - r(d.getElementById(id)).right), base + 360 + SEAM,
        id + ' steps aside by the pane width, on top of the seam it already had');
   }
@@ -2467,8 +2475,10 @@ async function bands() {
        them there. */
     /* `#legend` and `#credit` are flex items of `#mapfoot` now, so the browser keeps those two
        apart. Both are still read here: a wrapper that clears the cluster does not prove that the
-       row inside it does. */
-    const FURNITURE = ['#ticker', '#legend', '#paint', '#locate', '#credit', '#pills', '#toast',
+       row inside it does.
+       `#locate` is not on the list. It is a cell of `.leaflet-control-zoom`, so the two always
+       intersect. The zoom control's own box covers it. */
+    const FURNITURE = ['#ticker', '#legend', '#paint', '#credit', '#pills', '#toast',
                        '.leaflet-control-zoom', '.leaflet-control-scale'];
     const boxes = FURNITURE.map(sel => [sel, d.querySelector(sel)])
       .filter(([, e]) => e && r(e).width > 1 && r(e).height > 1)
@@ -2500,12 +2510,12 @@ async function bands() {
     /* **The scale states itself on one line wherever the map leaves room, and wraps rather than
        run under the zoom cluster where it does not.** It broke onto two lines on a phone and a
        reader asked for one on 2026-08-25. One line needs about 273px, measured, and the row hands
-       106px of its trailing edge to that cluster. The medium band leaves the map 236 to 300px, so
+       38px of its trailing edge to that cluster. The medium band leaves the map 236 to 300px, so
        there is no width there that is both one line and clear. 30 is one 23px line with room. */
-    const room = r(d.getElementById('mapfoot')).width - 106;
+    const room = r(d.getElementById('mapfoot')).width - 38;
     is(room < 320 || lg.height < 30, true,
        label + ': the scale is one line wherever the map leaves room for one');
-    is(lg.right <= foot2.right - 106 + 0.5, true,
+    is(lg.right <= foot2.right - 38 + 0.5, true,
        label + ': and it never reaches under the zoom cluster');
     /* **Flush RIGHT while it shares the scale's line, and flush LEFT the moment it takes its own.**
        A reader asked for that on 2026-08-25. `justify-content: space-between` states it per flex
@@ -2519,11 +2529,12 @@ async function bands() {
     is(Math.round(shared ? foot2.right - credit.right : credit.left - foot2.left), 0,
        label + (shared ? ': the credit is flush right while it shares the scale line'
                        : ': the credit leads on the left once it takes a line of its own'));
-    /* **One button beside the zoom cluster, and there were two.** The layer controls are a chip row
-       over the map since 2026-08-25, so `#locate` took the slot that button held. */
-    const lb = r(d.getElementById('locate')), zb2 = r(d.querySelector('.leaflet-control-zoom'));
-    is(lb.right < zb2.left + 0.5, true, label + ': locate sits beside the zoom cluster');
-    is(Math.abs(lb.bottom - zb2.bottom) < 1.5, true, label + ': on its own baseline');
+    /* **The location button is the zoom control's top cell, since 2026-09-15.** It stood beside that
+       box before. Read the plus under it, so a cell that drifts out of the bar fails here. */
+    const lb = r(d.getElementById('locate'));
+    const zb2 = r(d.querySelector('.leaflet-control-zoom .leaflet-control-zoom-in'));
+    is(Math.abs(lb.bottom - zb2.top) < 1.5 && Math.abs(lb.left - zb2.left) < 1.5, true,
+       label + ': locate sits on top of the plus');
     /* The chip row runs along the TOP of the map, so nothing in the bottom strip can reach it. */
     const ch = r(d.getElementById('mapchips'));
     is(ch.bottom < foot2.top, true, label + ': and the chip row clears the whole bottom strip');

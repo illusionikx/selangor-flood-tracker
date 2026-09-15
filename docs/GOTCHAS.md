@@ -1238,7 +1238,7 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
   screen, and it is the difference between one line and two. Measured after: 249px and 265px against
   a 280px row.
   **The medium band is the floor, and it cannot be repaired by shortening a word.** One line needs
-  about 273px and the row hands 106px to the zoom cluster, against a map of 236 to 300px there. So
+  about 273px and the row hands 38px to the zoom cluster, against a map of 236 to 300px there. So
   no width in that band is both one line and clear of the cluster. `flex-wrap` on `.lgsec` breaks
   the scale rather than run it under the buttons. `m3-check.html` asserts one line wherever the map
   leaves room, and asserts the clearance at every width.
@@ -1257,8 +1257,9 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
   medium band alone. A wrapped line rises to 44px above the map's bottom edge and 80px at four
   lines, against a zoom cluster 36px up. So the wrap is the whole of the fault and the width where it
   wraps is the whole of the answer. `#mapfoot` is a container now, and
-  `@container (max-width: 360px)` hands the credit `--btncol` (106px) back. 106 is 118 less the
-  column's own 12px inset, and 118 is the button's reach, `48 + --fab`, and 10 more to stand off it.
+  `@container (max-width: 360px)` hands the credit `--btncol` (38px) back. 38 is 50 less the
+  column's own 12px inset. 50 is the zoom control's reach, `10 + 30`, and 10 more to stand off it.
+  It was 106px until 2026-09-15, while `#locate` stood beside that control as a 60px square.
   **`#mapfoot` can be a container because its width is definite.** It is absolutely positioned on
   both edges, so containment has nothing to collapse. A box that takes its width from its own
   content and then contains it measures 0 — the trap `#brand` already carries.
@@ -1300,8 +1301,9 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
   and correct against the card is still wrong if it lands on its neighbour.
 - **Three boxes step aside for the pane and the zoom control must not.** Leaflet's own controls live
   INSIDE the map container, and that container now stops at the pane, so they follow it for
-  free. `#toast`, `#mapfoot`, `#mapchips` and `#locate` are siblings of `#map` and position against the window, so
-  each adds `--pane-w` to its own `right`. `#pills` takes half of it off its centre line.
+  free. `#toast`, `#mapfoot` and `#mapchips` are siblings of `#map` and position against the window,
+  so each adds `--pane-w` to its own `right`. `#locate` left that list on 2026-09-15. It is a cell
+  of the zoom control now, so it follows the map for free as well. `#pills` takes half of it off its centre line.
   **`right`, not a transform**, which is what the old rule used: `#toast` already owns its
   `transform` for the slide it opens with, and two rules writing one property is how a toast arrives
   360px off the edge it belongs to.
@@ -2757,9 +2759,9 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   and a weather card select nothing.
   **`js/locate.js` mirrors the glyph and the words onto it**, from the same `setBtn()` that writes
   `#locate`. A crosshair on a control whose last fix failed says nothing, and a failure has to arrive
-  as text as well. Only the glyph and the words cross. The `.busy` and `.on` paint belongs to a round
-  button standing on a photograph of a city, and `GLYPH` in that file states the three names because
-  no `#locate.*` rule can reach an element carrying no `.mapbtn` class.
+  as text as well. Only the glyph and the words cross. The `.busy` and `.on` paint belongs to a map
+  control standing on a photograph of a city, and `GLYPH` in that file states the three names because
+  every `#locate.*` rule keys on that id and cannot reach the bar item.
   **Below 600px `#pane` covers the bar**, because that pane is a full-screen dialog there. So the
   bar is a launcher at that width and never a state display.
   **`--navbar-h` holds `calc(64px + env(safe-area-inset-bottom, 0px))`**, and `viewport-fit=cover`
@@ -2774,9 +2776,6 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   **`#mapfoot` still takes `--navbar-h` and still needs it.** It states a bottom measured up from the
   map's own edge. That edge moved 64px and the literal did not, so the zoom box climbed past it.
   `paint-check.html` reported it, and nothing else in this app reads that geometry.
-  **`.mapbtn` declares `--fab` on itself.** A rule that stacks one map button above another cannot
-  inherit it, so it states the fallback. Without one the whole `calc()` is invalid and the button
-  falls to the top of the page. It is the desktop pair that still stacks.
   **THE FLEXIBLE HALF IS DECLINED, AND A MEASUREMENT IS WHY.** M3 states two item arrangements.
   Vertical stacks the glyph over the label and is what this bar draws. Horizontal puts the two on one
   row inside an indicator that wraps the whole item, and M3 asks for it where the window's height is

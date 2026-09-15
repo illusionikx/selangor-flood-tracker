@@ -875,8 +875,8 @@ document.addEventListener('toggle', e => {
      almost everywhere. The ⋮ on a station card sits near the top of `#side`, so that flip put the
      menu above the top edge of the screen, where a reader could not reach it. A button in the
      bottom half always has more than half a viewport above it, so this rule cannot repeat that.
-     `#locate` is what needs it: it sits 36px off the bottom edge beside the zoom control, and a
-     menu opened downward from there is clamped up over the button it came from.
+     A control near the bottom edge is what needs it, and a menu opened downward from there is
+     clamped up over the button it came from.
 
      **The edge it opens FROM is the edge it is anchored BY, and that is not tidiness.** A menu whose
      contents can change height while it is open drifts away from its button if the far edge is the

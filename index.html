@@ -412,10 +412,10 @@
     ><span class="railpill"><i class="i i-warning"></i><b class="railbadge"></b></span
     ><span class="raillabel">Alerts</span></button>
   <!-- **The location button, in the middle slot.** A reader asked for it there on 2026-08-25.
-       `#locate` is a button on the map above 600px and `css/chrome.css` stops it drawing below that,
-       so this item is the only way to a fix at this width.
+       `#locate` is a cell of the map's zoom control above 600px and `css/chrome.css` stops it drawing
+       below that, so this item is the only way to a fix at this width.
        **It is a second element and not the same node moved.** A navigation bar item is a pill over a
-       label and `#locate` is a 40px round map button, so one node cannot be both. That is the shape
+       label and `#locate` is a 30px cell of the zoom control, so one node cannot be both. That is the shape
        every rail item already uses against its bar twin.
        **It has no rail twin, and it must not grow one.** Above 600px the map draws the button
        itself, over the ground the fix lands on, which is where a location control belongs whenever
@@ -1317,10 +1317,8 @@
      the alert list behind the app bar's warning glyph carries the same information without a time
      limit. -->
 <div id="toast" class="surface" role="status" aria-live="polite"></div>
-<!-- On the map, not in the app bar. It acts on the map, and the rail beside it holds destinations.
-     Stacked above `#paint` in one column, so the two read as one cluster with the zoom buttons. -->
-<button id="locate" class="mapbtn" data-tip="Show my location" aria-label="Show my location"
-  ><i class="i i-my_location"></i></button>
+<!-- `#locate` is not written here. js/locate.js builds it as the first cell of Leaflet's zoom
+     control, which does not exist until the map does. -->
 <!-- Bottom of the map, in the zoom control's own cluster: beside it on a desktop, above it on a
      phone where the legend takes the width. FAB-sized, because it opens the map's own settings and
      is the one control in that cluster that is not a zoom. It keeps the cluster's surface rather

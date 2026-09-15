@@ -2468,27 +2468,26 @@ body.find #findpane { display: flex; flex-direction: column; }
   body.side #findpane { display: none; }
 }
 
-/* --- the paint chooser ------------------------------------------------------------------------ */
+/* --- the location button ---------------------------------------------------------------------- */
 
-/* In the zoom control's cluster, not alone in a corner of the map. It is map furniture, so it sits
-   with the map furniture and wears its look — see `.mapbtn` in base.css.
-   **The offsets are measured off the zoom control and move with it.** `.leaflet-bottom.leaflet-right`
-   carries `margin-bottom: 26px` and Leaflet's own corner adds a 10px gutter, so the zoom box sits
-   36px up and 10px in. Its buttons are 30px, so the box is 30 wide and 60 tall.
-   Desktop puts this button to the LEFT of that box: 10 + 30 + 8 = 48px in, on the same 36px
-   baseline. It is 56px against the zoom box's 60, so the two read as one cluster with the settings
-   control given the FAB's size. paint-check.html asserts the adjacency in rendered pixels, so a
-   change to either margin fails a check rather than drifting apart on screen.
-   401, not 400: it stands over the legend and the alert panel, one rung under #gotoBox's results
-   list at 402 and well under the app bar at 600. */
-/* **One button beside the zoom control, and there were two.** `#paint` held the bottom slot and
-   `#locate` stacked above it. The layer controls are a chip row over the map now, so that button is
-   gone and `#locate` takes the slot it held. */
-#locate { position: absolute; z-index: 401;
-  right: calc(var(--map-r) + 48px); bottom: calc(36px + var(--gap) + var(--navbar-h)); }
-
-/* It steps aside for the station panel exactly as the zoom buttons and the credit do — see the
-   `body.side` block further down, which this joins. */
+/* **`#locate` is the first cell of Leaflet's zoom control, above the plus.** A reader asked for one
+   control on 2026-09-15. It stood 8px left of that box before, as a 60px square with its own offsets.
+   `js/locate.js` builds the node inside the control. So it rides the map card and follows the pane
+   with no offset of its own.
+   **It takes the look of the zoom links, and it has to state that look again.** The
+   `.leaflet-control-zoom a` rules in css/map.css key on `a`, and this is a `<button>`. Keep the size,
+   the fill and the divider in step with those rules.
+   **It sits FIRST because Leaflet's own sheet drops the divider on the LAST link.** A cell after the
+   minus gives the minus a line under it. That line stays below 600px, where this cell does not draw.
+   The outline goes inside the box, because the control clips its overflow to round its corners.
+   The phone block further down hides it, and that rule wins because it comes later in this file. */
+#locate {
+  display: grid; place-items: center; width: 30px; height: 30px; padding: 0; cursor: pointer;
+  background: var(--surface); color: var(--on-surface); font-size: 18px;
+  border: 0; border-bottom: 1px solid var(--outline);
+}
+#locate:hover { background: var(--hover); }
+#locate:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 
 /* --- the layer chips, over the map ---------------------------------------------------------------
    **The layer controls are a bare chip row now, and they were a panel behind a round button.** A
@@ -2624,9 +2623,9 @@ body:has(#wxLayer:checked) :is(#heatChip, #kindChip, #alertChip, #favChip) { dis
    one line of credit, ending in the middle of the map.
    The credit needs 337px for one line, measured. So it wraps only on a map narrower than that,
    which is the medium band and nothing else. Above 360px of column it is flush with the map's own
-   edge. Under it, `@container` gives it the button column back, at `margin-right: 106px`. That is
-   `118` less the column's own 12px inset, and 118 is the button's own reach, `48 + --fab`, and 10
-   more to stand off it.
+   edge. Under it, `@container` gives it the zoom column back, at `margin-right: 38px`. That is 50
+   less the column's own 12px inset. 50 is the zoom control's reach, `10 + 30`, and 10 more to stand
+   off it. It was 106px while `#locate` stood beside that control as a 60px square.
    **`#mapfoot` is the container, and it can be one because its width is definite.** It is absolutely
    positioned on both edges, so containment has nothing to collapse. A box that takes its width from
    its own content and then contains it measures 0 — the trap `#brand` already carries.
@@ -2641,7 +2640,7 @@ body:has(#wxLayer:checked) :is(#heatChip, #kindChip, #alertChip, #favChip) { dis
    number drifts. */
 #mapfoot {
   position: absolute; z-index: 400; pointer-events: none;
-  --btncol: 106px;
+  --btncol: 38px;
   left: calc(var(--map-l) + 12px); right: calc(var(--map-r) + 12px);
   bottom: calc(8px + var(--gap) + var(--navbar-h));
   display: flex; flex-wrap: wrap; align-items: flex-end; gap: 6px 12px;
@@ -3958,8 +3957,8 @@ body.side #side { display: flex; }
      one width is one control in two places, which is the fault this app already names against a
      second More button. So the map keeps the button wherever there is room for it, and a phone
      reaches a fix from the bar.
-     **`display: none` and not a move.** A bar item is a pill over a label and this is a 40px round
-     map button, so one node cannot be both — the shape every rail item already uses against its bar
+     **`display: none` and not a move.** A bar item is a pill over a label and this is a 30px cell
+     of the zoom control, so one node cannot be both — the shape every rail item already uses against its bar
      twin. `js/locate.js` still owns this node and still writes its three states onto it, and it
      mirrors the glyph and the words onto the bar item beside it. */
   #locate { display: none; }

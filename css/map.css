@@ -42,8 +42,8 @@
    in headless Chrome at 360px: the zoom buttons were 30px against the 44 this file asks for, and
    the control carried no shadow at all. It went unseen because both faults look like a choice.
    `!important` on the shadow, matching the `border` beside it, and the size is stated for both
-   touch states rather than left to Leaflet. The layers button stands against this control and wears
-   the same look — see `.mapbtn` in base.css — so the two have to agree. */
+   touch states rather than left to Leaflet. `#locate` is a cell of this control and states the same
+   look — see css/chrome.css — so the two have to agree. */
 .leaflet-control-zoom { border: 0 !important; box-shadow: var(--shadow) !important; border-radius: 8px; overflow: hidden; }
 .leaflet-control-zoom a, .leaflet-touch .leaflet-control-zoom a {
   width: 30px; height: 30px; line-height: 30px;

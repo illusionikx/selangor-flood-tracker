@@ -867,7 +867,8 @@ order that file holds them. A trap names itself here, and the file states the ev
   row in Settings.
   **`#paintmenu`, `#paint` and `#navLayers` are all gone.** The chips ARE the control, so a panel, a
   round button that opened it, and a navigation bar item pointing at the same panel are three things
-  with no job. The bar carries four items now. `#locate` took the slot beside the zoom box.
+  with no job. The bar carries four items now. `#locate` took the slot beside the zoom box, and on
+  2026-09-15 it became the zoom control's first cell, above the plus. `js/locate.js` builds it there.
   **`--top-chips` is the row's height plus its gap**, and `#toast`, `#pills` and the docked search
   all start under it. A row that scrolled sideways would hide chips with nothing on screen to say
   they exist.

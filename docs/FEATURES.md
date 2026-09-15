@@ -19051,6 +19051,52 @@ shows less ground around the circle.
 
 Past the frame the map shows no ground, only the stripes on the ground colour.
 
+## The location button joins the zoom control, 2026-09-15
+
+A reader asked for the location button to move into the zoom control. The button and the plus and
+minus are now one control.
+
+### What changed
+
+`#locate` is the first cell of the Leaflet zoom control, above the plus. `js/locate.js` builds the
+button inside `.leaflet-control-zoom` when the module loads. `index.html` no longer carries it.
+
+Before, the button stood 8px to the left of the zoom box, as a 60px square with its own offsets.
+Now the map card carries it. It follows the pane with no offset of its own.
+
+The cell takes the look of the two zoom links: 30px, the `--surface` fill and a 1px `--outline`
+divider. `#locate` in `css/chrome.css` states that look again, because the zoom rules in
+`css/map.css` key on `a`. `L.DomEvent.disableClickPropagation()` stops a press on the button from
+reaching the map.
+
+This change deletes `.mapbtn` from `css/base.css`. `#locate` was its last user.
+
+`--btncol` fell from 106px to 38px. The zoom column is 40px wide, against 118px for the old pair.
+So the legend and a wrapped credit get 68px back.
+
+### Why the button is first and not last
+
+The Leaflet stylesheet drops the divider on the last link in the bar. A cell after the minus gives the
+minus a line under it. Below 600px the cell does not draw, so that line then sits at the foot of the
+bar with nothing under it.
+
+### What did not change
+
+Below 600px the cell still does not draw. `#navLocate` in the navigation bar is still the one
+location control at that width.
+
+The three states did not change. `setBtn()` still writes `busy`, `on` and `fail` onto the button and
+onto `#navLocate`.
+
+The press animation went with `.mapbtn`. The zoom links have no press animation, and one control has
+one feel.
+
+### Checks
+
+`m3-check.html` asserts that `#locate` is the first child of the zoom control. At every band, it
+asserts that the button sits on top of the plus. It no longer lists `#locate` among the boxes that
+must not overlap, because the button is inside one of those boxes now.
+
 ## The dark water tint stops painting road edges blue, 2026-09-15
 
 A reader reported blue dots along the roads on the dark theme, on a high resolution screen.

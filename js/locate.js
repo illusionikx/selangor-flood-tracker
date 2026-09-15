@@ -7,7 +7,16 @@ import { map, focusOn, openSide, ping } from './map.js';
 import { herePopup } from './popup.js';
 import { alerts } from './alerts.js';
 
-const btn = el('locate');
+/* **The button is the first cell of Leaflet's zoom control, above the plus.** A reader asked for one
+   control on 2026-09-15. This module builds it there, so it rides the map card and follows the pane.
+   `index.html` does not carry it. A node written there would sit in the page flow until this runs.
+   **A press must not reach the map.** Leaflet stops propagation on its own two links alone, so a
+   button added to the bar needs the same call. */
+const zoomBar = document.querySelector('.leaflet-control-zoom');
+zoomBar.insertAdjacentHTML('afterbegin', '<button id="locate" data-tip="Show my location" '
+  + 'aria-label="Show my location"><i class="i i-my_location"></i></button>');
+const btn = zoomBar.firstElementChild;
+L.DomEvent.disableClickPropagation(btn);
 let layer, marker, at, acc;
 let wantPopup = false;   // only pop up when the user asked; never on the landing auto-locate
 
@@ -19,8 +28,7 @@ let wantPopup = false;   // only pop up when the user asked; never on the landin
    and on tap alike, so this needs no listener of its own.
    The label is the accessible name. A colour and a hover are two things a screen reader cannot
    reach, so a failure has to arrive as text as well. */
-// `mapbtn` is the base class now. The button sits on the map, beside the layers button, not in
-// the app bar. `.mapbtn` sets the size and the shape, so a state change must keep the class.
+// `#locate` in css/chrome.css sets the size and the shape, so the class carries the state alone.
 /* **The navigation bar carries a twin below 600px, and this writes both.** `#locate` does not draw
    at that width — see `css/chrome.css` — and `#navLocate` is the only way to a fix there. A
    crosshair on an item whose last attempt failed says nothing, and a failure has to arrive as text
@@ -29,13 +37,13 @@ let wantPopup = false;   // only pop up when the user asked; never on the landin
    the bar item unable to say one of the three. `busy` and the resting state draw the same
    `my_location` mark, so a reader on a phone pressed and watched nothing change for ten seconds.
    The class crosses so the pulse can. The `.on` accent and the `.busy` refusal do not: that paint
-   belongs to a round button standing on a photograph of a city, and the item beside it reports its
+   belongs to a map control standing on a photograph of a city, and the item beside it reports its
    own selected state through `aria-current`, which `railSync()` writes from the card on screen.
    `classList`, never `className`: the item carries `navitem`, and every rule in that component
    keys on it. */
 const twin = el('navLocate');
 // The same three glyphs `#locate.busy`, `#locate.on` and `#locate.fail` resolve in css/chrome.css.
-// Stated here because a bar item takes no `.mapbtn` class, so no rule of that block can reach it.
+// Stated here because those rules key on the `#locate` id, so none of them can reach the bar item.
 const GLYPH = { busy: 'my_location', on: 'my_location', fail: 'location_disabled' };
 /* What state the control is in, and the words that state carries. `btn.onclick` reads both: two of
    the three states have nothing on screen that says why, and a snackbar is what says it. */
@@ -43,7 +51,7 @@ let mode = '', words = '';
 const setBtn = (cls, label, tip) => {
   mode = cls || '';
   words = tip || label;
-  btn.className = cls ? `mapbtn ${cls}` : 'mapbtn';
+  btn.className = cls || '';
   btn.setAttribute('aria-label', words);
   /* **One channel for the words, and it is `data-tip`.** This wrote a `title` in the states that
      had no tip of their own, so the resting button carried a native tooltip and the failed one a

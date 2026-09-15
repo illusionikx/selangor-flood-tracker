@@ -55,7 +55,7 @@ export const map = L.map('map', {
 L.control.zoom({ position: 'bottomright' }).addTo(map);
 /* **The two zoom buttons were the last `title` on the page, and Leaflet writes them.** Every other
    one in this app went on 2026-08-26, because a `title` opens on no phone and a second tooltip
-   shape beside the styled one reads as a fault. These sit on the map, beside `#locate`, which draws
+   shape beside the styled one reads as a fault. These share one control with `#locate`, which draws
    a styled tip. So the pair disagreed at the one place a reader meets them together.
    Moved here rather than patched into `vendor/leaflet.js`. That file already carries three edits
    this app has to keep, and a fourth for a cosmetic rule is one more thing a version bump loses.
