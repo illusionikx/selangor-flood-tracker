@@ -180,6 +180,16 @@ for (const n of cssFiles)
   swap(new RegExp(`href="css/${n}\\.css(?:\\?v=\\d+)?"`),
        `href="${rel(cssOut[n])}"`, `the ${n}.css link`);
 swap(/src="js\/app\.js"/, `src="${rel(entry)}"`, 'the app.js script tag');
+/* GitHub Pages runs no PHP and serves the baked `api.json`. The preload has to name the file that
+   js/config.js fetches on that target, or the browser fetches the payload twice. */
+if (STATIC) swap(/<link rel="preload" href="api\.php"/, '<link rel="preload" href="api.json"',
+                 'the payload preload');
+
+/* The font, read off the stylesheet that asks for it. The service worker's cache key includes the
+   query, so a bare `vendor/roboto.woff2` in the shell list below precached a second copy of the font
+   under a key no request ever matched. Read here, the `?v=` in vendor/fonts.css cannot drift from it. */
+const font = fs.readFileSync('vendor/fonts.css', 'utf8').match(/url\((roboto\.woff2[^)]*)\)/)?.[1];
+need(font, 'vendor/fonts.css: no roboto.woff2 url.');
 
 /* Drop the markup comments. They are 51% of this file, and 15 KB of every cold load compressed.
    A plain regular expression is enough here and is not enough in general: an HTML comment cannot
@@ -212,7 +222,7 @@ fs.writeFileSync(path.join(OUT, 'index.html'), html);
 const buildId = path.basename(entry, '.js').split('-').pop();
 const shell = ['./', ...eager.map(rel), ...cssFiles.map(n => rel(cssOut[n])),
                'vendor/leaflet.js', 'vendor/leaflet-heat.js', 'vendor/leaflet.css',
-               'vendor/fonts.css?v=52', 'vendor/m3/tokens.css?v=2', 'vendor/roboto.woff2'];
+               'vendor/fonts.css?v=52', 'vendor/m3/tokens.css?v=2', `vendor/${font}`];
 
 let sw = fs.readFileSync('sw.js', 'utf8');
 const swap2 = (re, to, what) => {

@@ -202,13 +202,20 @@ function portalRainUrls(array $states = ['SEL', 'WLH', 'PTJ']): array {
  * so a parser that trusts the headers reads every value one column to the left in silence. */
 function portalRows(string $html): array {
     global $text;
-    $out = [];
+    /* ONE parse for the whole page. Each chunk becomes a row from its first cell on, so no stray tag
+       ahead of that cell can close the table early. The first version parsed each chunk as a
+       document of its own, and that was a DOMDocument per row: 167 ms for the three pages, measured
+       2026-09-15. The output is byte for byte the same on the stored live pages. */
+    $rows = '';
     foreach (explode('</tr>', $html) as $chunk) {
-        if (!str_contains($chunk, '<td')) continue;
-        $tds = crawl('<tr>' . $chunk . '</tr>')->filter('tr')->children('td');
-        if (count($tds) !== 13) continue;
-        $out[] = [$tds->each($text), $tds];
+        if (($at = strpos($chunk, '<td')) !== false) $rows .= '<tr>' . substr($chunk, $at) . '</tr>';
     }
+    $out = [];
+    if ($rows === '') return $out;
+    crawl($rows)->filter('tr')->each(function (Crawler $tr) use (&$out, $text) {
+        $tds = $tr->children('td');
+        if (count($tds) === 13) $out[] = [$tds->each($text), $tds];
+    });
     return $out;
 }
 

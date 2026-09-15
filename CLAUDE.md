@@ -693,6 +693,9 @@ order that file holds them. A trap names itself here, and the file states the ev
 - `detectRetina` halves a tile on any screen above 100%, and `{r}` needs no option.
 - `requestIdleCallback` never fires under `--virtual-time-budget`, so a deferred fetch takes a...
 - The ground asks for no tile until `border.json` answers.
+- `php api.php --selftest` runs near the top of the file and exits there, so a later `const` does...
+- A `preload` needs `crossorigin` when the code asks for the file with `fetch()`.
+- An index on `level(ts)` makes the rebuild slower, and `(ts, level)` makes it faster.
 
 ## Conventions
 

@@ -4,11 +4,9 @@
 
 import './oops.js';   // first, and it must stay first — see the file for why
 import { POLL_MS } from './config.js';
-import { state } from './state.js';
 import './ui.js';
 import { findMe } from './locate.js';
 import { load } from './net.js';
-import { render } from './render.js';
 
 requestAnimationFrame(() => document.body.classList.add('ready')); // no drawer slide on first paint
 
@@ -35,8 +33,8 @@ document.addEventListener('visibilitychange', () => {
   if (!document.hidden && Date.now() - polled > POLL_MS) poll();
 });
 
-let resizeTimer;   // popup width is baked in at render, so rebuild markers after a rotate
-addEventListener('resize', () => {
-  clearTimeout(resizeTimer);
-  resizeTimer = setTimeout(() => state.data.length && render(), 250);
-});
+/* **No `resize` handler, and there was one until 2026-09-15.** It ran a whole `render()` after every
+   resize, because the map popup baked its width in at render time. The popup is gone, and nothing
+   `render()` draws reads a width. On a phone the address bar fires `resize` as it hides, so the
+   handler rebuilt every pin on a scroll. The pins, the heat layers and the ticker each follow their
+   own box already. */

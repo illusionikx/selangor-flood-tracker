@@ -111,7 +111,7 @@ const aboutBox = el('aboutBox'), helpBox = el('helpBox');
    paid for that shape before — see the two repairs `syncHeat()` records.
    **Nothing here closes the menu.** `showModal()` closes every open popover itself, which is what
    the HTML spec states, so the row that opened a dialog leaves nothing behind it. */
-const openAbout = () => { closeSide(); aboutBox.scrollTop = 0; aboutBox.showModal(); };
+const openAbout = () => { closeSide(); aboutBox.scrollTop = 0; loadEgg(); aboutBox.showModal(); };
 const openHelp  = () => { closeSide(); helpBox.scrollTop  = 0; helpBox.showModal(); };
 const openSettings = () => {
   closeSide(); settingsBox.scrollTop = 0; settingsBox.showModal(); paintDev();
@@ -276,14 +276,23 @@ el('devReset').onclick = () => ask(
    surprise on a screen whose entire job is that nothing on it is a surprise. */
 const eggBox = el('eggBox');
 const EGG_HOLD = 1500;   // ms the picture is click-proof after opening — see below
-let taps = [], eggOk = true, eggAt = 0;
-// The image is fetched eagerly at page load, so a 404 is known long before anyone earns the egg.
-// Without this the gesture would open an empty box holding a broken-image glyph, which is a worse
-// reward than no egg at all — and it means this can ship before the picture does.
-eggBox.querySelector('img').onerror = () => { eggOk = false; };
+let taps = [], eggAt = 0;
+const eggImg = eggBox.querySelector('img');
+/* **The picture loads when About opens, and it loaded with the page until 2026-09-15.** It is 221 KB,
+   which was a third of every cold load, for a dialog almost nobody opens. Seven taps take long
+   enough for it to land.
+   The gesture fires only on a picture that DECODED, so a missing file opens nothing, and so does a
+   picture still on its way. An empty box holding a broken-image glyph is a worse reward than no egg
+   at all, and this can still ship before the picture does.
+   `el()` rather than `eggImg`, because `openAbout()` above calls this and a module-level `const`
+   cannot be read before its line runs. */
+function loadEgg() {
+  const img = el('eggBox').querySelector('img');
+  if (!img.getAttribute('src')) img.src = img.dataset.src;
+}
 aboutBox.querySelector('.logo').onclick = () => {
   taps = [...taps, Date.now()].slice(-7);
-  if (eggOk && taps.length === 7 && taps[6] - taps[0] < 5000) {
+  if (eggImg.complete && eggImg.naturalWidth && taps.length === 7 && taps[6] - taps[0] < 5000) {
     taps = [];
     eggAt = Date.now();
     eggBox.showModal();

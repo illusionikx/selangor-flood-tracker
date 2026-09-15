@@ -65,6 +65,10 @@ set_exception_handler(function (Throwable $e) use ($fatalJson) {
     // be a silent 500 with no record of what threw.
     error_log('api.php uncaught: ' . $e);
     $fatalJson();
+    /* A handler that returns ends the script with status 0. So `php api.php --selftest` once
+       crashed a third of the way in and still reported success, found 2026-09-15. A check that
+       crashes has to fail. */
+    if (PHP_SAPI === 'cli') exit(1);
 });
 register_shutdown_function(function () use ($fatalJson) {
     $e = error_get_last();
@@ -1360,7 +1364,9 @@ function gazPlace(string $name, array $gaz): ?array {
     if ($k === '') return null;
     $equal = $ends = [];
     foreach ($gaz as $g) {
-        $gk = portalKey($g['name']);
+        // A gazetteer loaded for a rebuild carries its keys. Working each one out here ran
+        // portalKey() over every row for every name: 238 ms of a rebuild, measured 2026-09-15.
+        $gk = $g['key'] ?? portalKey($g['name']);
         if ($gk === $k) $equal[] = $g;
         elseif (str_ends_with($gk, $k)) $ends[] = $g;
     }
@@ -1546,6 +1552,32 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
     // A body with no cacheAge at all hashes as itself, rather than failing the replace and the call.
     $ok('a body without cacheAge still hashes', payloadEtag('{"a":1}') === '"' . md5('{"a":1}') . '"');
     $ok('the ETag is quoted',                str_starts_with(payloadEtag($b1), '"'));
+
+    echo "\npayloadBody():\n";
+    $build = ['fetched' => '2026-09-15T17:50:21+08:00',
+              'stations' => [['id' => 'rf-1', 'name' => 'a "b" c/d', 'history' => [[1, 2.5]]]],
+              'cacheAge' => 0, 'ttl' => 300, 'upstreamOk' => true, 'forced' => true,
+              'forceWhy' => null, 'sourceUpdated' => null];
+    $raw  = json_encode($build, JSON_UNESCAPED_SLASHES);
+    $then = strtotime($build['fetched']) + 42;
+    // A leading space is valid JSON and misses the fast path's anchor, so it reaches the slow path.
+    $both = fn(array $x = []) => payloadBody($raw, $then, $x) === payloadBody(' ' . $raw, $then, $x);
+    $read = fn(array $x = []) => json_decode(payloadBody($raw, $then, $x), true);
+    /* `2.50` is a float the slow path writes back as `2.5`. So this one proves the fast path fired,
+       and without it every assertion below could pass on the slow path alone. */
+    $ok('the fast path edits bytes and decodes nothing',
+        str_contains(payloadBody(str_replace('2.5', '2.50', $raw), $then), '[1,2.50]'));
+    $ok('the fast path and the slow path agree',  $both());
+    $ok('they agree on a refusal',                $both(['forced' => false, 'forceWhy' => 'rate limited']));
+    $ok('they agree on an upstream failure',      $both(['upstreamOk' => false, 'error' => 'upstream unreachable']));
+    $ok('cacheAge counts from fetched',           $read()['cacheAge'] === 42);
+    $ok('the build\'s own forced flag stays out', $read()['forced'] === false);
+    $ok('a refusal reaches the body',             $read(['forceWhy' => 'rate limited'])['forceWhy'] === 'rate limited');
+    $ok('an upstream failure reaches the body',   $read(['upstreamOk' => false])['upstreamOk'] === false);
+    $ok('the stations are untouched',             $read()['stations'] === $build['stations']);
+    $ok('the ETag holds across two reads',
+        payloadEtag(payloadBody($raw, $then)) === payloadEtag(payloadBody($raw, $then + 60)));
+    $ok('an empty cache is still an object',      is_array(json_decode(payloadBody('', $then), true)));
 
     echo "\nsirenWanted():\n";
     $sirens = [
@@ -1885,6 +1917,10 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
     $ok('an unknown name places nothing',     gazPlace('Nowhere At All', $gaz) === null);
     $ok('an empty gazetteer places nothing',  gazPlace('Bandar Kinrara', []) === null);
     $ok('an empty name places nothing',       gazPlace('', $gaz) === null);
+    $keyed = array_map(fn($g) => $g + ['key' => portalKey($g['name'])], $gaz);
+    $ok('a gazetteer with its keys answers the same',
+        gazPlace('Desa Pinggiran Putra (F2)', $keyed) === gazPlace('Desa Pinggiran Putra (F2)', $gaz)
+        && gazPlace('Ampang', $keyed) === null);
 
     echo "\ngazCorroborated():\n";
     // A fabricated district: three known points with median (3.00, 101.50).
@@ -2844,21 +2880,46 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
 header('Content-Type: application/json');
 $t0 = microtime(true);
 
-/** Age from when the payload was actually fetched — mtime doubles as a lock and gets touched. */
-function cachedPayload(): array {
-    $j = json_decode(@file_get_contents(CACHE), true) ?: [];
-    /* `forced` and `forceWhy` describe the request that built this file, not the one reading it.
-       PHP's array + is left-biased, so the defaults sit on the LEFT to beat what the file holds.
-       Every cached read passes through here, so no exit can replay a stale value. */
-    /* `cacheAge` sits on the LEFT for the same reason, and it did not. The stored file already
-       carries a `cacheAge` of 0, written by the rebuild that made it, so a computed value on the
-       right lost to it on every read and this field reported 0 however long the payload had sat.
-       The status popover reads it to say whether a poll came from JPS or from the file cache, and
-       it therefore said JPS on every poll. See payloadEtag() for the half that had to move with
-       this one. */
-    return ['forced' => false, 'forceWhy' => null]
-         + ['cacheAge' => max(0, time() - strtotime($j['fetched'] ?? 'now'))]
-         + $j;
+/* The cached payload, as the bytes a reader gets.
+ *
+ * The request owns three fields and the build owns the rest. `forced` and `forceWhy` describe the
+ * request that built the file, not the one reading it, so a read writes the defaults over them.
+ * `cacheAge` is 0 in the file, because the rebuild wrote it, so a read writes the real age. It
+ * counts from `fetched` and never from the mtime, because a lock touches the file. The status
+ * popover reads it to say whether a poll came from JPS or from the file cache. It read 0 on every
+ * poll once, when the file's own value beat the computed one. Every cached exit reads through here,
+ * so no exit can replay a stale value. See payloadEtag() for the half that moved with `cacheAge`.
+ *
+ * **The fast path edits those fields in the stored bytes, and this decoded the whole file before.**
+ * Decoding 418 KB and encoding it again was most of a warm poll's own work: 17 ms on the CLI and
+ * more under Herd, measured 2026-09-15. The edit anchors on the run the rebuild writes straight
+ * after `stations`, so it cannot land inside a station.
+ * **A body of any other shape takes the slow path, which decodes.** So a reordered payload costs
+ * time and never a wrong answer. Both paths keep the file's own key order and give the same bytes,
+ * and --selftest holds them to that. A key in `$extra` that the run does not carry takes the slow
+ * path too, because the run has no place to put it.
+ */
+function payloadBody(string $raw, int $now, array $extra = []): string {
+    // $extra beats the defaults, so an explicit refusal passed in by a caller still reaches the reader.
+    $own = fn(?string $fetched) => array_replace(['forced' => false, 'forceWhy' => null,
+        'cacheAge' => max(0, $now - strtotime($fetched ?? 'now'))], $extra);
+    /* Locals, not constants. --selftest runs near the top of this file and exits there, and a
+       top-level `const` exists only once its own line has run. A function exists before any line
+       runs. The first version used two constants, and the selftest died on the first of them. */
+    $run = '/\],"cacheAge":\d+,"ttl":(\d+),"upstreamOk":(true|false),"forced":(?:true|false),'
+         . '"forceWhy":(?:null|"(?:[^"\\\\]|\\\\.)*"),/';
+    $inRun = ['cacheAge' => 1, 'upstreamOk' => 1, 'forced' => 1, 'forceWhy' => 1];
+    if (preg_match('/^\{"fetched":"([^"\\\\]*)"/', $raw, $f)
+        && !array_diff_key($set = $own($f[1]), $inRun)) {
+        $body = preg_replace_callback($run, fn($m) => '],"cacheAge":' . $set['cacheAge']
+            . ',"ttl":' . $m[1]
+            . ',"upstreamOk":' . (array_key_exists('upstreamOk', $set) ? json_encode($set['upstreamOk']) : $m[2])
+            . ',"forced":' . json_encode($set['forced'])
+            . ',"forceWhy":' . json_encode($set['forceWhy'], JSON_UNESCAPED_SLASHES) . ',', $raw, 1, $n);
+        if ($n === 1) return $body;
+    }
+    $j = json_decode($raw, true) ?: [];
+    return json_encode(array_replace($j, $own($j['fetched'] ?? null)), JSON_UNESCAPED_SLASHES);
 }
 
 /**
@@ -2873,7 +2934,7 @@ function cachedPayload(): array {
  *
  * `cacheAge` counts up every second a payload sits in the file cache. Hash it and the validator
  * moves on every poll, no two requests ever match, and the 304 stops firing — silently, because a
- * validator that never matches is not an error, just a full 33 KB body every time. That is why the
+ * validator that never matches is not an error, just the whole payload every time. That is why the
  * cacheAge repair above could not ship on its own: it was harmless only while the field was frozen
  * at 0, and the ETag was stable only because of that.
  *
@@ -2899,7 +2960,7 @@ function payloadValidators(string $body): string {
  * answer all 36 polls of the next three hours from its own cache. `no-cache` does not stop a
  * browser storing the response. It requires the browser to revalidate before reusing it, and the
  * ETag is what makes revalidating cheap: an unchanged payload costs 304 and about 200 bytes rather
- * than 33 KB.
+ * than the whole payload.
  *
  * Every exit that echoes a payload calls this. There are three of them, and one is dead under Herd
  * and live on the deploy target. A default written into one exit alone reached none of the others
@@ -2919,9 +2980,7 @@ function sendPayload(string $body): never {
 }
 
 function serveCache(array $extra = []): never {
-    // $extra is left-biased, so an explicit refusal passed in here still overrides. The defaults
-    // for an ordinary poll live in cachedPayload() now, since every exit reads through it.
-    sendPayload(json_encode($extra + cachedPayload(), JSON_UNESCAPED_SLASHES));
+    sendPayload(payloadBody((string)@file_get_contents(CACHE), time(), $extra));
 }
 
 /* Exactly one rebuild may be in flight at a time, process-wide.
@@ -2976,7 +3035,7 @@ if (is_file(CACHE)) {
         /* Not sendPayload(): this branch keeps working after the response, so it must not exit here.
            The validators still have to match the other two exits, or a reader on the deploy target
            gets a payload with no ETag while everybody else gets one. */
-        $body = json_encode(cachedPayload(), JSON_UNESCAPED_SLASHES);
+        $body = payloadBody((string)@file_get_contents(CACHE), time());
         payloadValidators($body);
         echo $body;
         fastcgi_finish_request();
@@ -3049,6 +3108,11 @@ function fetchAll(array $urls, int $concurrency = 20, bool $json = true): array 
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT        => 25,
+            /* An empty string asks for every encoding this curl can decode, and curl decodes the
+               answer. MET and the national portal compress: met-now falls from 237 KB to 23 KB,
+               and a portal rainfall page to a seventh. Selangor's API sends plain bytes either way.
+               Measured 2026-09-15. */
+            CURLOPT_ENCODING       => '',
             // Contact URL in the UA: this box pulls ~1.1 GB/day off JPS from one residential IP,
             // the most conspicuous shape a web log has. Better their sysadmin reads what it is than
             // guesses. Identifying yourself is the polite form and the safe one.
@@ -3128,12 +3192,25 @@ $now = time();
 // cache stays a flat file: it is one blob, always written and read whole, with nothing to query.
 $db = new PDO('sqlite:' . HIST, null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
 $db->exec('PRAGMA journal_mode=WAL');  // two concurrent cold refreshes no longer lose each other's samples
+// Safe under WAL. A power cut can lose the last commit, and it cannot damage the file. FULL paid a
+// sync on every commit.
+$db->exec('PRAGMA synchronous=NORMAL');
 $db->exec('CREATE TABLE IF NOT EXISTS level (
     station TEXT    NOT NULL,
     ts      INTEGER NOT NULL,
     level   REAL    NOT NULL,
     PRIMARY KEY (station, ts)
 ) WITHOUT ROWID');  // the key also makes a retried poll idempotent — INSERT OR IGNORE and move on
+/* A covering index for the three statements that read by time alone: the 24 hour read, the 80 hour
+   odometer read and the prune. The key starts with `station`, so each of them scanned all 290,000
+   rows on every rebuild. **An index on `ts` alone made both reads SLOWER**, 55 to 158 ms and 110 to
+   287 ms, because every row it found took a second lookup into the table. `(ts, level)` carries each
+   column those reads ask for, because an index on a WITHOUT ROWID table carries the key as well.
+   Measured on a copy on 2026-09-15: 51 to 13 ms, 120 to 22 ms, and the prune 39 to 2 ms.
+   **The cost is disk, and it is accepted.** The index nearly doubles the file, 8.4 MB to 15.4 MB
+   after a VACUUM, against a camera archive near 1 GB. The first rebuild after a deploy builds it
+   once, in under a second. */
+$db->exec('CREATE INDEX IF NOT EXISTS level_ts ON level (ts, level)');
 $db->exec('CREATE TABLE IF NOT EXISTS page (url TEXT PRIMARY KEY, ts INTEGER, body TEXT) WITHOUT ROWID');
 // The coordinate gazetteer. Filled a few rows at a time by the drip at the end of this file, from
 // the portal's own station search — the only place the portal publishes a coordinate.
@@ -3182,6 +3259,8 @@ $seen = [];
 foreach ($stored as $su => $sr) {
     if (str_starts_with($su, NOTICE_KEY)) $seen[substr($su, strlen(NOTICE_KEY))] = $sr['body'];
 }
+// One transaction for every row this loop writes, rather than one commit per row.
+$db->beginTransaction();
 foreach ($extraUrls as $k => $u) {
     $got = $raw[$u] ?? '';
     $id  = null;
@@ -3207,6 +3286,7 @@ foreach ($extraUrls as $k => $u) {
     if ($write) $keep->execute([$u, $now, $body]);
     $pages[$k] = $body;
 }
+$db->commit();
 
 /* Built from the memory, never from the loop above. A poll that refetched nothing still states the
    outage it was told about last time.
@@ -3330,7 +3410,9 @@ foreach ($db->query('SELECT station, ts, level FROM level WHERE (station LIKE \'
 // The gazetteer this app has filled so far, for gazPlace() below. Loaded once, whole — the drip
 // leaves it partly filled for weeks, and every placement pass this refresh reads the same rows.
 $gaz = [];
-foreach ($db->query('SELECT name, lat, lng, district, state FROM station') as $r) $gaz[] = $r;
+foreach ($db->query('SELECT name, lat, lng, district, state FROM station') as $r) {
+    $gaz[] = $r + ['key' => portalKey($r['name'])];   // see gazPlace() for why the key rides along
+}
 
 $samples = [];
 
@@ -3977,6 +4059,8 @@ unset($s);
 $payload = json_encode([
     'fetched'  => date('c'),
     'stations' => $stations,
+    // payloadBody() edits the run from cacheAge to forceWhy in the stored bytes. Keep those five keys
+    // together, in this order and straight after `stations`, or every cached read takes the slow path.
     'cacheAge' => 0,
     'ttl'      => TTL,
     'upstreamOk' => true,
@@ -4088,7 +4172,16 @@ if (file_put_contents($camTmp, json_encode($camMap), LOCK_EX) === false || !@ren
     @unlink($camTmp);
 }
 
-file_put_contents(CACHE, $payload, LOCK_EX);
+/* A temporary file and a rename, the way `.cams.json` is written above. Three readers take this file
+   with no lock, and `LOCK_EX` binds nobody who does not ask for it. So a reader inside the write
+   window read half a file, decoded nothing, and served a payload with no stations.
+   The direct write is the fallback for Windows. It refuses a rename over a file that a reader holds
+   open, and a lost write rebuilds the whole payload on the next poll. */
+$cacheTmp = CACHE . '.' . getmypid();
+if (file_put_contents($cacheTmp, $payload) === false || !@rename($cacheTmp, CACHE)) {
+    @unlink($cacheTmp);
+    file_put_contents(CACHE, $payload, LOCK_EX);
+}
 /* Not sendPayload(): captureShots() still has to run below, so this exit must not exit either. The
    validators come from the same function as the other two exits.
    The guard is for the deploy target. There the fastcgi branch above answers a reader from stale

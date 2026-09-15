@@ -202,5 +202,19 @@ $ok('a frame after all samples scores from the end', ($t2[6000] ?? null) === 'no
 $ok('no danger mark scores nothing', frameTiers([4500], $samples, null, 3.0, $fake) === []);
 $ok('no samples score nothing',      frameTiers([4500], [], $mark, 3.0, $fake) === []);
 
+/* --- shotWebp ---------------------------------------------------------------------------------
+ * Whether a capture tries WebP. A wrong answer here loses no frame, and that is why it needs a
+ * check: a rule that never retries stores a WebP camera as JPEG for ever, and nothing looks broken.
+ */
+echo "\nshotWebp():\n";
+$tick = SHOT_EVERY * SHOT_WEBP_RETRY * 1000;          // a capture that falls on a retry slot
+$ok('a camera with no frame tries WebP',     shotWebp(null, $tick + SHOT_EVERY));
+$ok('a WebP camera keeps trying WebP',       shotWebp('/x/1.webp', $tick + SHOT_EVERY));
+$ok('a JPEG camera skips WebP',              !shotWebp('/x/1.jpg', $tick + SHOT_EVERY));
+$ok('a JPEG camera tries again on a retry',  shotWebp('/x/1.jpg', $tick));
+$n = 0;
+for ($i = 0; $i < SHOT_WEBP_RETRY; $i++) $n += (int)shotWebp('/x/1.jpg', $tick + $i * SHOT_EVERY);
+$ok('one retry per cycle of captures',       $n === 1);
+
 echo $fail ? "\n$fail FAILED\n" : "\nall passed\n";
 exit($fail ? 1 : 0);

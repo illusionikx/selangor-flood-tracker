@@ -331,10 +331,20 @@ export const PinLayer = L.Layer.extend({
     if (!hot.length) return;
     const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
     const danger = token('var(--s-danger)') || '#f33';
+    /* The frame clears the box the rings can reach, never the whole canvas. A whole-canvas clear
+       marks every pixel as changed, 60 times a second, for as long as a river stays at its danger
+       mark. That can be hours. The widest ring is `R_HALO` at scale 2 plus half its stroke, and the
+       extra pixel covers the antialiased edge. */
+    const reach = R_HALO * 2 + W_RING + 1;
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (const p of hot) {
+      x0 = Math.min(x0, p.x); y0 = Math.min(y0, p.y); x1 = Math.max(x1, p.x); y1 = Math.max(y1, p.y);
+    }
+    const box = [x0 - reach, y0 - reach, x1 - x0 + 2 * reach, y1 - y0 + 2 * reach];
     /* `@keyframes halo` in `css/base.css`: scale .85 to 2 and opacity .9 to 0 over 1.8 s, ease out.
        Reduced motion holds it still at opacity .8, which is what that media query already does. */
     const frame = (t) => {
-      hctx.clearRect(0, 0, size.x, size.y);
+      hctx.clearRect(...box);
       const u = reduce ? 0 : ((t % 1800) / 1800);
       const ease = 1 - Math.pow(1 - u, 3);
       const scale = reduce ? 1 : 0.85 + ease * 1.15;

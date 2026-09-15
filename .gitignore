@@ -1,4 +1,4 @@
-.cache.json
+.cache.json*
 .history.db
 .history.db-wal
 .history.db-shm

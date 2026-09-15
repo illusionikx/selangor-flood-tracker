@@ -669,11 +669,13 @@ export function hideMast() { mastRing?.remove(); mastRing = null; }
    The restore reads the marker this app last marked, so a marker already thrown away takes a
    `setIcon()` that reaches nothing. That is safe: Leaflet redraws on `setIcon` only while the
    marker is on a map. */
-let selPin = null, selWas = null;
+let selPin = null, selWas = null, selKey = null;
 
 export function markSel(key) {
   const pin = key ? siteMark.get(key) : null;
   if (pin === selPin) return;
+  const moved = key !== selKey;
+  selKey = key;
   if (selPin) selPin.setIcon(selWas);
   selPin = pin;
   if (pin) {
@@ -699,15 +701,14 @@ export function markSel(key) {
     pin.setIcon(L.divIcon({ className: '', iconSize: [32, 32], iconAnchor: [16, 29.3],
       html: `<span class="pin sel">${pinGlyph('place')}</span>` }));
   }
-  /* **Move it out of the cluster, and move the last one back in.** `loose()` above reads `selPin`,
+  /* **Move it out of the cluster, and move the last one back in.** `syncCluster()` reads `selPin`,
      so one re-sort answers both halves and neither is written twice.
-     It runs on a real change of selection alone, which the early return above is what guarantees.
-     A poll re-opens the card on screen and reaches this function every time, and a re-sort of four
-     hundred markers on the poll loop is a cost with nothing to buy.
-     `render()` calls `syncCluster()` itself a few lines after this, so the poll that DOES change
-     the selection pays for the sort twice. That is one extra call against a branch in the caller,
-     and the branch is the thing that goes stale. */
-  syncCluster();
+     **It runs when the KEY changes, and the early return above never promised that.** Every poll
+     builds new markers, so the marker for an open card is never the one this function marked last.
+     A card left open therefore re-sorted four hundred pins twice on every poll, found 2026-09-15.
+     A rebuild that keeps the key re-sorts on its own: `render()` calls `syncCluster()` a few lines
+     after this, and a weather rebuild moves no station pin. */
+  if (moved) syncCluster();
 }
 
 // --- station panel ------------------------------------------------------------------------------

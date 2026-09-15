@@ -181,8 +181,9 @@ function buildSheet(int $id, int $now): ?string {
 
 /* How a frame gets stored: [bytes, extension], or null if the bytes are not a decodable image.
    Whichever encoding is smaller wins — see the note at the top. `imagesx` doubles as the validity
-   check, so a truncated download or an HTML error page never reaches the archive. */
-function encodeShot(string $raw): ?array {
+   check, so a truncated download or an HTML error page never reaches the archive.
+   `$webp` false skips the WebP attempt at native size and keeps the original. See shotWebp(). */
+function encodeShot(string $raw, bool $webp = true): ?array {
     if (!($im = @imagecreatefromstring($raw))) return null;
     if (!function_exists('imagewebp')) return [$raw, 'jpg'];
     if (imagesx($im) > SHOT_W) {
@@ -197,6 +198,7 @@ function encodeShot(string $raw): ?array {
         imagedestroy($im);
         return ($w = ob_get_clean()) ? [$w, 'webp'] : null;
     }
+    if (!$webp) { imagedestroy($im); return [$raw, 'jpg']; }
     ob_start();
     imagewebp($im, null, SHOT_Q);
     imagedestroy($im);
@@ -257,6 +259,23 @@ function frameTiers(array $frames, array $samples, ?float $mark, float $riseEta,
     return $out;
 }
 
+/* Whether a capture tries WebP at all, from the path of the newest stored frame and the capture time.
+ *
+ * A WebP encode costs about 300 ms a frame and the JPEG decode 23 ms, so the encode was nearly all
+ * of a capture's CPU: about 27 s for 91 cameras, inside the refresh lock. Measured over 24 hours on
+ * 2026-09-15, WebP won 26% of frames, and it won on the same cameras every time. No camera switched
+ * encodings once.
+ * So a camera whose newest frame is a JPEG keeps its JPEG, and tries WebP again once every
+ * SHOT_WEBP_RETRY captures in case its picture changed. Replayed over those 24 hours, that cut the
+ * encodes to 38% and stored no WebP win as a JPEG.
+ * ponytail: a clock slot, not a counter per camera. A camera that starts winning on WebP waits up to
+ * SHOT_WEBP_RETRY captures to be noticed, and the cost of that wait is disk, never a lost frame. */
+const SHOT_WEBP_RETRY = 8;   // captures, so about four hours at SHOT_EVERY
+
+function shotWebp(?string $last, int $now): bool {
+    return $last === null || str_ends_with($last, '.webp') || intdiv($now, SHOT_EVERY) % SHOT_WEBP_RETRY === 0;
+}
+
 /* One frame per camera, at most once per SHOT_EVERY however often the payload refreshes.
    Returns how many frames were actually written. */
 function captureShots(array $stations): int {
@@ -285,15 +304,21 @@ function captureShots(array $stations): int {
     foreach ($urls as $id => $url) {
         pruneShots($id, $now);
         $raw = $bodies[$url] ?? '';
-        if (strlen($raw) < SHOT_MIN || !($enc = encodeShot($raw))) continue;
-        [$bytes, $ext] = $enc;
-        if (!is_dir($dir = shotDir($id)) && !@mkdir($dir, 0777, true)) continue;
+        if (strlen($raw) < SHOT_MIN) continue;
         /* Identical to the frame before means the camera has not refreshed since the last capture.
            Several stall for hours. Storing it would put a frame on the timeline that claims to be a
            new observation, and make a dead camera look like a still scene. Encoding is
-           deterministic, so hashing the stored file is an exact test. */
+           deterministic, so hashing the stored file is an exact test.
+           A stored JPEG is the bytes the camera sent, so the first test catches a stall before any
+           decode. A stored WebP needs the encode first, and the second test catches that one. */
         $have = shotList($id);
-        if ($have && md5_file(shotFile($id, end($have))) === md5($bytes)) continue;
+        $last = $have ? shotFile($id, end($have)) : null;
+        $lastMd5 = $last ? md5_file($last) : null;
+        if ($lastMd5 === md5($raw)) continue;
+        if (!($enc = encodeShot($raw, shotWebp($last, $now)))) continue;
+        [$bytes, $ext] = $enc;
+        if ($lastMd5 === md5($bytes)) continue;
+        if (!is_dir($dir = shotDir($id)) && !@mkdir($dir, 0777, true)) continue;
         file_put_contents("$dir/$now.$ext", $bytes);
         $written++;
     }

@@ -2017,10 +2017,14 @@ the cases that matter: six taps do nothing, seven spread over six seconds do not
 after a long idle spell still fire, fourteen fast taps fire exactly twice, and a span of exactly
 5000 ms is excluded (the test is strict `<`).
 
-**It hides itself when the picture is missing.** The `<img>` loads eagerly at page load, so a 404 is
-known long before anyone earns the egg; `onerror` sets a flag the gesture checks. Without it the
-reward for finding a secret would be an empty box holding a broken-image glyph, which is worse than
-no secret at all. It also means the mechanism could ship before the picture did.
+**It hides itself when the picture is missing.** The gesture fires only on a picture that decoded, so
+a 404 opens nothing, and so does a picture still on its way. Without that test the reward for
+finding a secret would be an empty box holding a broken-image glyph, which is worse than no secret at
+all. It also means the mechanism could ship before the picture did.
+
+**The picture loads when About opens, and until 2026-09-15 it loaded with the page.** It is 221 KB,
+which was a third of every cold load, for a dialog almost nobody opens. Seven taps take long enough
+for it to land. The `onerror` flag went with that change, because `naturalWidth` answers both cases.
 
 `img/` is the only optional directory in the build, so the Pages workflow copies it **conditionally**
 — `[ -d img ] && cp -r img site/ || true`. An unconditional `cp` of a missing directory fails the
@@ -7651,7 +7655,7 @@ The lightbox fix above raised the question for the other seven image surfaces. T
 | clip strip probe | already `decode()` in a `try`, falling back to the live still |
 | lightbox frame prefetch | nothing to fail into. It warms the cache and paints nothing |
 | red favicon, `icon.svg` | already `.catch()`. The blue mark stands |
-| About easter egg, `img/egg.webp` | already `onerror`. The gesture goes dead, which is the point |
+| About easter egg, `img/egg.webp` | the gesture fires on a decoded picture alone, so it goes dead, which is the point |
 
 **The compare frame showed the wrong thing rather than nothing.** `.ab` is the older frame clipped
 to the divider, and it held no fill. So a frame that failed to load let the newer frame show straight
@@ -19535,3 +19539,103 @@ longer deletes the camera frames. The build guard also no longer refuses in that
 
 `php -l` on the three files, `php api.php --selftest` and `php shots-test.php`. Then a build, the
 four build checks, and a listing of `site/` that holds none of the three state paths.
+
+## A performance pass, 2026-09-15
+
+The repository owner asked to inspect the whole app for performance, on the server and in the
+browser. Then the owner asked for the recommended changes. This section records what shipped, what
+each change measured, and the recommendations that did not ship.
+
+### What changed, in numbers
+
+| item | before | after |
+|---|---|---|
+| warm poll, median of 20 | 0.129 s | 0.094 s |
+| payload request start, build | 837 ms | 100 ms |
+| payload request start, source | 1360 ms | 110 ms |
+| map with its data, throttled landing | 2456 ms | 1542 ms |
+| first paint, throttled landing | 1020 ms | 1132 ms |
+| `egg.webp` on a landing | 221 KB | none |
+| portal rainfall parse | 167 ms | 114 ms |
+| gazetteer placement, 303 names | 238 ms | 29 ms |
+| 24 h read, 80 h read, prune, on a copy | 51, 120 and 39 ms | 13, 22 and 2 ms |
+| WebP encodes, replayed over 24 h | every frame | 38% of frames |
+
+A throttled landing is the build at 150 ms latency and 1.6 Mbps, with the median of three runs. The
+two throttled rows compare the build with and without its two preloads.
+
+### The server
+
+- **A warm poll edits the cached bytes.** `payloadBody()` in `api.php` writes `cacheAge`, `forced` and
+  `forceWhy` into the stored payload. It decoded 418 KB and encoded it again before. A payload of any
+  other shape takes the decode path. `--selftest` holds both paths to the same bytes.
+- **The payload write is atomic.** A temporary file and a rename replace a direct write. Three
+  readers take that file with no lock, so a reader inside the write served no stations. Windows
+  refuses a rename over an open file, so the direct write stays as the fallback.
+- **`level` carries a covering index on `(ts, level)`.** Three statements read by time alone, and
+  each scanned the whole table. An index on `ts` alone made both reads about three times slower. The
+  covering index grows the file from 8.4 MB to 15.4 MB.
+- **The page rows go in one transaction, under `synchronous=NORMAL`.** That setting is safe under WAL.
+- **The gazetteer carries its match keys.** `gazPlace()` worked out `portalKey()` for all 542 rows on
+  every call.
+- **`portalRows()` parses each portal rainfall page once.** It built a DOM document for each row
+  before. Its output on the stored live pages is byte for byte the same.
+- **Every upstream fetch asks for compression.** The MET nowcast falls from 237 KB to 23 KB, and a
+  portal rainfall page to a seventh. The Selangor API sends plain bytes either way.
+- **A capture skips WebP for a JPEG camera.** Over 24 hours no camera switched encodings, and WebP
+  won on the same 26% of frames. A JPEG camera tries WebP again once in eight captures. A hash of the
+  raw bytes catches a stalled camera before any decode.
+- **An uncaught exception under the CLI exits 1.** The first version of this change crashed
+  `--selftest` a third of the way in, and that run still exited 0.
+
+### The browser
+
+- **Two preloads in the document head start the payload and `border.json`.** The payload waited for
+  Leaflet and every module before. Both carry `crossorigin`, because `fetch()` loads in CORS mode. A
+  landing still makes one request for each, on both targets.
+- **The cost of the payload preload is a later first paint.** On the throttled landing the payload
+  takes bandwidth from the stylesheets. The first paint came 112 ms later, and the map with its data
+  914 ms sooner. The first tile did not move.
+- **The About egg loads when About opens.** It was 221 KB on every landing, which was 32% of the
+  cold bytes of the build.
+- **The Esri preconnect is gone.** The CARTO key arrived the day before.
+- **The service worker stores the font under the URL the stylesheet asks for.** A bare
+  `vendor/roboto.woff2` stored a second copy that no request matched. `build.mjs` now reads the query
+  from `vendor/fonts.css`.
+- **A window resize no longer runs `render()`.** The handler served a map popup that is gone. On a
+  phone the address bar fires `resize` as it hides.
+- **The danger halo clears only the box its rings can reach.** It cleared the whole canvas 60 times
+  a second for as long as a river stayed at its danger mark.
+- **A poll with a card open sorts the pins once.** `markSel()` tested for a new marker, and every poll
+  builds new markers. So it sorted them a second time on every poll. It tests for a new key now.
+
+### The deploy
+
+`docs/DEPLOY.md` gives `border.json`, `manifest.json`, the icons and `img/` one day of cache. Before
+that rule, a browser picked its own lifetime for each. `sw.js` stays out of the rule, so a deploy
+still reaches a reader.
+
+### Not built
+
+- **A font preload.** The audit proposed one, and this pass added it and took it out again. On the
+  throttled landing it moved the font 44 ms earlier. The first paint came 200 ms later, and the map
+  270 ms later. Layout shift did not change. The 2026-08-13 performance spec had left it out, and
+  that decision stands.
+- **A fetch of the scraped pages after the payload goes out.** Under Herd nothing closes the
+  connection early, so the reader still waits for that fetch. On the deploy target the cron already
+  takes the wait. The change buys nothing on either target, and Refresh now shows older pages.
+- **A stored copy of the output of each parser.** The four parsers now cost about 265 ms a rebuild,
+  and two rebuilds in three read pages that did not change. A stored copy has to expire when a parser
+  changes. The cron runs the rebuild where nobody waits, so that risk buys too little.
+- **Two more side files, for `?shots=` and for the siren stamps.** Each of those reads decodes the
+  payload in 26 ms.
+- **A smaller payload.** `met` is 25% of the raw bytes, and gzip takes the payload from 418 KB to
+  48 KB. Cutting fields saves under 5 KB compressed.
+- **A pruned token file and a pruned icon file.** They save 1.2 KB and 150 bytes of brotli.
+
+### The check
+
+`php api.php --selftest` gains 11 assertions on `payloadBody()` and one on the gazetteer keys.
+`php shots-test.php` gains five on `shotWebp()`. A forced rebuild published the same source counters
+as the payload before the change. Both builds ran. The eight checks passed on the source, and the
+four build checks passed on the build.

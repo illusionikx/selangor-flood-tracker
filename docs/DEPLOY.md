@@ -285,6 +285,13 @@ server {
     }
     # `vendor/` is hand-managed and keeps its own `?v=`. The fonts are byte-stable.
     location ~* ^/vendor/ { expires 30d; add_header Cache-Control "public"; }
+    # Unhashed files that change only when a person rebakes them. A day is short enough for a rebake
+    # to reach every reader, and long enough that a reload does not ask again. Without a rule a
+    # browser guesses its own lifetime. `sw.js` is left out on purpose: a browser checks a worker on
+    # its own schedule, and a day of cache on top of that delays a deploy.
+    location ~* ^/(border\.json|manifest\.json|icon-\d+\.png|img/) {
+        expires 1d; add_header Cache-Control "public";
+    }
     # index.html is the one unhashed entry point. It is what names the current build, so it must
     # never be cached. Cache it and a deploy reaches nobody.
     location = /index.html { expires -1; add_header Cache-Control "no-cache"; }

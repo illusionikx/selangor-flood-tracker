@@ -2922,8 +2922,9 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   **The switch is one constant and it reaches four things**: the two tile URLs, the tile options,
   and the credit. `js/map.js` rewrites every `.tileprov` link to read Esri while the key is empty,
   because index.html states CARTO and an attribution is a licence term rather than a comment.
-  **Two `preconnect` lines stand in index.html for the same reason.** Delete the Esri one on the day
-  the key lands, and delete the Esri half of `PROVIDER` with it.
+  **The Esri `preconnect` left index.html on 2026-09-15, the day after the key landed.** The Esri half
+  of `PROVIDER` stays, as the fallback. Clear the key and put that line back, or the map draws from a
+  host nobody warmed.
   **A WRONG CARTO KEY FAILS SILENTLY.** Measured 2026-09-08: `?key=TESTKEY123` answers HTTP 200 with
   the ordinary picture. So a typo looks exactly like a working key until the watermark returns.
   Look at one tile by eye after the key lands, and never trust the status code.
@@ -3694,3 +3695,23 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   ends, so a zoom out showed the ground past the square until then. `clipLevel()` reads the level's
   `origin` and `zoom`, and Leaflet sets both before `_onCreateLevel` runs. A level built before
   `border.json` answers has no clip, so the answer clips every level in `_levels`.
+- **`php api.php --selftest` runs near the top of the file and exits there, so a later `const` does
+  not exist.** A function exists before any line runs. A top-level `const` exists only once its own
+  line has run. On 2026-09-15 `payloadBody()` read two constants, and the selftest threw on the first
+  of them. Keep a value that a selftest reaches inside its function, or declare it above that block.
+  **The run reported success, and that was a second fault.** The exception handler at the top of
+  `api.php` returned, and PHP then exits with status 0. It exits 1 under the CLI now. Read the last
+  line of a selftest run as well as its status.
+- **A `preload` needs `crossorigin` when the code asks for the file with `fetch()`.** `fetch()` loads
+  in CORS mode, and a preload matches only a request in its own mode. A mismatch costs a second
+  request for the same file. For `api.php` that is a second request against the payload. Measured on
+  2026-09-15 with the attribute: one request each for the payload and `border.json`. The tiles load
+  as plain images, so the tile preconnect carries no attribute.
+  **A preload also takes bandwidth from everything else on the landing.** On a throttled link the
+  payload preload put the map on screen 0.9 s sooner and the first paint 0.1 s later. A font preload
+  moved the font 44 ms and put the first paint 200 ms later, so it is not there. Measure a new preload
+  on a throttled link before it ships.
+- **An index on `level(ts)` makes the rebuild slower, and `(ts, level)` makes it faster.** The table
+  is WITHOUT ROWID, keyed on `(station, ts)`. An index on `ts` alone finds a row and then looks it up
+  in the table again. Measured on a copy on 2026-09-15, the 24 hour read went from 55 to 158 ms.
+  `(ts, level)` covers every column those reads ask for, because that index carries the key as well.

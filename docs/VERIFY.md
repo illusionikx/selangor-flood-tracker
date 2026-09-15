@@ -300,9 +300,11 @@ run paint-check.html  60000 1600,1000
 run title-test.html   40000 1800,1000
 run narrow-test.html  35000 1200,900
 
-php shots-test.php            # one of eight runnable checks. Guards camera retention. Must stay green.
-php api.php --selftest       # another. Guards the force-refresh rate limit, cache choice, and the
-                              # place-lookup validator/rate limit. Must stay green.
+php shots-test.php            # one of eight runnable checks. Guards camera retention and the WebP
+                              # retry. Must stay green.
+php api.php --selftest       # another. Guards the force-refresh rate limit, cache choice, the
+                              # place-lookup validator/rate limit, and the payload edit a warm poll
+                              # makes in the cached bytes. Must stay green, and must exit 0.
 curl -sk "https://flood-exp.test/api.php?shots=1"                          # frame timestamps
 
 # Which rain gauges are claiming rain their own odometer denies. The siren sweep below is the same

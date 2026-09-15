@@ -30,22 +30,34 @@
      back plated in exactly the thing that was deliberately removed. This one is opaque white on
      purpose, with a smaller glyph because iOS rounds the corners itself. Built by icon-build.php. -->
 <link rel="apple-touch-icon" href="icon-180.png?v=3">
-<!-- The only third party this page contacts. **One origin now, and it was three.** CARTO answered
-     on `a`, `b` and `c`, because Leaflet expands `{s}` over its default subdomains. Esri publishes
-     one host and no `{s}`, so warming it covers every tile rather than a third of them.
+<!-- The only third party this page contacts is CARTO's tile host. It answers on `a` to `d` and on
+     the bare host as well, and js/map.js asks the bare host, so one line covers every tile.
      No `crossorigin` here. Leaflet sets no `crossOrigin` on its tile layer, so the tiles load as
      plain images with no CORS. A preconnect made in anonymous-CORS mode opens a connection the
      browser will not reuse for them, which wastes the TCP and TLS work and keeps only the DNS
      lookup. The attribute has to match how the resource is actually fetched.
      Leaflet builds the first tile URL only after the whole module graph has loaded, so without
-     this the browser starts the work at the latest possible moment. -->
-<link rel="preconnect" href="https://server.arcgisonline.com">
-<!-- CARTO's host, warmed for the day `CARTO_KEY` in js/config.js holds a key. Delete the Esri line
-     above on that day, and this comment with it. Two warmed origins is one wasted handshake, and
-     it is the price of a switch that is one constant rather than an edit across four files.
-     CARTO answers on `a` to `d` and on the bare host as well, and js/map.js asks the bare host, so
-     one line covers every tile. -->
+     this the browser starts the work at the latest possible moment.
+     **Esri's host had a line here as well, and it went on 2026-09-15.** `CARTO_KEY` in js/config.js
+     has held a key since the day before, so every landing paid a handshake to a host it never
+     asked. Put the line back if that constant is ever cleared, because Esri draws the map then. -->
 <link rel="preconnect" href="https://basemaps.cartocdn.com">
+<!-- Two fetches start here, rather than where the code asks for them. The browser holds each answer
+     and hands it to the code's own fetch() when that call arrives.
+       - `api.php` is the payload. js/net.js asks for it only after Leaflet and every module have
+         run, which was 0.84 s into a landing on the build, measured 2026-09-15.
+       - `border.json` holds back the first tile. See `Ground` in js/map.js.
+     **`crossorigin` on both, which is the opposite of the preconnect above.** fetch() loads in CORS
+     mode. A preload in any other mode matches nothing, and the browser then fetches the file twice.
+     For `api.php` that is a second request against the payload.
+     **Measured on a throttled link, 150 ms and 1.6 Mbps, median of three runs.** The map with its
+     data went from 2.46 s to 1.54 s, and the first paint from 1.02 s to 1.13 s. The payload takes
+     bandwidth from the stylesheets, and that is the price of the map 0.9 s sooner.
+     **The font has no preload, and it had one for an hour.** It moved the font 44 ms earlier and put
+     the first paint 200 ms later. `font-display: swap` in vendor/fonts.css already shows the text.
+     build.mjs points the first line at `api.json` for GitHub Pages. -->
+<link rel="preload" href="api.php" as="fetch" crossorigin>
+<link rel="preload" href="border.json" as="fetch" crossorigin>
 <!-- The import graph is seven levels deep and there is no build step to flatten it, so the browser
      discovers each level only after it parses the one above. That is seven round trips before
      js/net.js can ask for the payload. These links let it fetch all of them at once.
@@ -1107,7 +1119,7 @@
 <!-- Tap the About logo seven times inside five seconds. No header, no close button: the picture is
      the entire content, so the whole surface dismisses it — the one case where tap-anywhere is right,
      because there is nothing in here to tap *on*. Hidden for good if the image 404s; see js/ui.js. -->
-<dialog id="eggBox"><img src="img/egg.webp" alt=""></dialog>
+<dialog id="eggBox"><img data-src="img/egg.webp" alt=""></dialog>
 <!-- Every station in one list. Sticky search + header so the table scrolls under them. -->
 <dialog id="dataBox">
   <div class="dtop">
