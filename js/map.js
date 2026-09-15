@@ -328,6 +328,28 @@ map.getPane('mask').style.pointerEvents = 'none';
    `#hatchdef` in css/map.css, which carries the rule that keeps it rendered and out of the flow.
    **The stripe is a filled `<rect>` and never a stroked `<line>`.** A pattern clips its content to
    its own tile, so a line on the tile's edge loses the half of its width that falls outside. */
+/* **Dark Matter fills its water with a grey from 36 to 39, and `#watertint` paints that grey with
+   `--water`.** The repository owner asked for coloured water on the dark theme on 2026-09-14.
+   Each tile is a palette of about eleven greys, and land is grey 9.
+   **The band alone also caught road edges, and a reader saw blue dots along the roads on a high
+   resolution screen, on 2026-09-15.** CARTO quantizes each tile to its own palette. One KL tile at
+   zoom 14 held 34, 37 and 42 as the ramp at a road's edge, and no 38 at all. So 37 was road there
+   and water in the next tile. A grey value cannot tell the two apart. A shape can.
+   **So the filter keeps only the band pixels that belong to an area.** It makes a mask of the band,
+   erodes it by `FRINGE` and dilates it back, which is a morphological opening. An edge of one or two
+   pixels erodes away and never comes back. A lake, a river channel and the sea survive. The opening
+   never grows the mask, so no pixel outside the band turns blue. `--water` then fills the mask, over
+   the tile.
+   **A narrow river loses its tint, and `showRivers()` is why that is fine.** Dark Matter draws one a
+   pixel or two wide, and the dark theme draws its own 1px river line over it.
+   **Four greys, not one.** Grey 38 alone left a dark line along every tile edge at 125% scaling. The
+   browser shrinks a `@2x` tile, and `plus-lighter` in vendor/leaflet.css sums two edge pixels to 37.
+   **A palette PNG and nothing else.** Esri serves JPEG, where one flat grey fringes into dozens of
+   tones along an edge. So only a CARTO Dark Matter ground takes the class. See `tint` in PROVIDER.
+   The filter lives in the hatch sprite, because a filter needs a rendered SVG. That is the rule of
+   this sprite already. css/map.css sets the fill colour, so a theme swap needs no script. */
+export const WATER = [36, 39];   // the first and the last grey that reads as water on screen
+export const FRINGE = 1;         // CSS px. An edge up to twice this wide erodes away
 const hatch = document.body.appendChild(
   Object.assign(document.createElementNS('http://www.w3.org/2000/svg', 'svg'), { id: 'hatchdef' }));
 hatch.setAttribute('aria-hidden', 'true');
@@ -337,32 +359,16 @@ hatch.innerHTML =
   + '<rect width="9" height="9" class="hatchbg"/>'
   + '<rect width="3" height="9" class="hatchline"/>'
   + '</pattern>'
-  + '<filter id="watertint" color-interpolation-filters="sRGB"><feComponentTransfer>'
-  + '<feFuncR type="discrete"/><feFuncG type="discrete"/><feFuncB type="discrete"/>'
-  + '</feComponentTransfer></filter></defs>';
-
-/* **Dark Matter fills its water with ONE grey, 38 (#262626), and this filter paints that grey with
-   `--water`.** The repository owner asked for coloured water on the dark theme on 2026-09-14.
-   Measured on seven tiles from zoom 9 to 15, at 1x and 2x: each tile is a palette of about eleven
-   greys, land is grey 9, and no road, park or building uses grey 38.
-   **256 bands, so every other grey comes back exact, and FOUR greys are water.** A discrete table
-   picks band `floor(C * n)`. At n = 256 a byte j lands in band j, so `j / 255` hands a grey back
-   unchanged. Grey 38 alone left a dark line along every tile edge at 125% scaling. The browser
-   shrinks a `@2x` tile, and `plus-lighter` in vendor/leaflet.css sums two edge pixels to 37. So 36
-   to 39 are water, which is the set the 64-band table caught until 2026-08-27.
-   The filter lives in the hatch sprite, because a filter needs a rendered SVG. That is this sprite's
-   rule already.
-   **A palette PNG and nothing else.** Esri serves JPEG, where one flat grey fringes into dozens of
-   tones along an edge. So only a CARTO Dark Matter ground takes the class. See `tint` in PROVIDER. */
-const WATER = [36, 39];   // the first and the last grey that reads as water on screen
-function tintWater() {
-  const hex = getComputedStyle(document.documentElement).getPropertyValue('--water').trim();
-  if (!/^#[0-9a-f]{6}$/i.test(hex)) return;   // an empty table is the identity, so this draws grey
-  hatch.querySelectorAll('feComponentTransfer > *').forEach((f, i) => f.setAttribute('tableValues',
-    Array.from({ length: 256 }, (_, k) => k >= WATER[0] && k <= WATER[1]
-      ? parseInt(hex.slice(1 + 2 * i, 3 + 2 * i), 16) / 255 : k / 255)
-      .map(v => v.toFixed(4)).join(' ')));
-}
+  + '<filter id="watertint" color-interpolation-filters="sRGB">'
+  + '<feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0"/>'
+  + '<feComponentTransfer><feFuncA type="discrete" tableValues="'
+  + Array.from({ length: 256 }, (_, k) => +(k >= WATER[0] && k <= WATER[1])).join(' ') + '"/>'
+  + '</feComponentTransfer>'
+  + `<feMorphology operator="erode" radius="${FRINGE}"/>`
+  + `<feMorphology operator="dilate" radius="${FRINGE}" result="water"/>`
+  + '<feFlood/><feComposite in2="water" operator="in" result="paint"/>'
+  + '<feMerge><feMergeNode in="SourceGraphic"/><feMergeNode in="paint"/></feMerge>'
+  + '</filter></defs>';
 
 /* **THE RIVERS DRAW AS 1PX LINES ON THE DARK THEME, AND NOWHERE ELSE.** The repository owner asked
    on 2026-09-14 for every river to read as a line at least 1px wide. Dark Matter draws a narrow
@@ -558,9 +564,8 @@ function setBasemap() {
      soft. Every pin, label and heat blob is drawn by this app and stays sharp.
      CARTO caches to zoom 20, so its half of `PROVIDER` states no `maxNativeZoom` at all. */
   const opt = PROVIDER.opt;
-  // Only a Dark Matter ground takes the water tint. See `tintWater()` above.
+  // Only a Dark Matter ground takes the water tint. See `WATER` above.
   const tint = PROVIDER.tint(key);
-  if (tint) tintWater();
   showRivers(key === 'dark');
   tiles = new Ground(PROVIDER.ground(key), tint ? { ...opt, className: 'watertint' } : opt)
     .addTo(map);

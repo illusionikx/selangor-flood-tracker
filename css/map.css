@@ -3,16 +3,21 @@
 /* **THE WATER TINT CAME BACK ON 2026-09-14, ON CARTO'S DARK MATTER AND NOWHERE ELSE.** The
    repository owner asked for coloured water on the dark theme once the CARTO key landed.
    `.watertint` sits on the ground tile layer alone, and js/map.js writes that class only for Dark
-   Matter. So the place names, the mask and every overlay stay unfiltered. See `tintWater()`.
-   **The tint keys on one exact tone and a JPEG has no exact tones.** Dark Matter is a palette PNG
-   that fills water with grey 38 against land at 9. Esri serves its canvas as lossy JPEG. Measured on
-   one sea tile: 145 distinct colours, and every flat block fringes at its own edge. A table keyed on
-   JPEG artifacts paints a halo around every coastline. So an Esri ground never takes the class.
+   Matter. So the place names, the mask and every overlay stay unfiltered. See `WATER` in js/map.js.
+   **The tint keys on exact tones and a JPEG has no exact tones.** Dark Matter is a palette PNG
+   that fills water with a grey from 36 to 39 against land at 9. Esri serves its canvas as lossy
+   JPEG. Measured on one sea tile: 145 distinct colours, and every flat block fringes at its own
+   edge. A table keyed on JPEG artifacts paints a halo around every coastline. So an Esri ground
+   never takes the class.
    **The brightness lift did not come back.** It ran as `brightness(1.75) contrast(.92)` beside the
    old tint until 2026-08-27, and nobody asked for a lighter map.
    **The dark theme draws river lines over the tint.** Dark Matter draws a river one pixel wide, and
-   grey 38 turned blue is still too dark to see on land at 9. See `showRivers()` in js/map.js. */
+   the tint skips a line that thin, so it does not paint a road edge blue. See `showRivers()` in
+   js/map.js. */
 .watertint { filter: url(#watertint); }
+/* The colour the filter paints the water with. A token rather than a hex written by script, so the
+   theme swap needs no JavaScript. `--water` exists on the dark theme alone, and so does the class. */
+#watertint feFlood { flood-color: var(--water); }
 
 /* What shows where a tile has not arrived. Leaflet's own value is `#ddd`, in both themes and under
    any basemap. Zooming out asks for four times the tiles with nothing to retain over the new area,

@@ -19050,3 +19050,59 @@ tile, so a full column of tiles loads for a strip of ground. A smaller `FRAME` l
 shows less ground around the circle.
 
 Past the frame the map shows no ground, only the stripes on the ground colour.
+
+## The dark water tint stops painting road edges blue, 2026-09-15
+
+A reader reported blue dots along the roads on the dark theme, on a high resolution screen.
+
+### The cause
+
+`#watertint` painted every pixel from grey 36 to 39 with `--water`. That band held Dark Matter's
+water. It also held road edges.
+
+CARTO quantizes each tile to its own palette of about 11 greys. One KL tile at zoom 14 held 2, 5,
+9, 13, 17, 22, 25, 29, 34, 37 and 42. It held no grey 38. There, 34, 37 and 42 are the ramp at the
+edge of a road, so 37 is road. In a tile with a lake, 37 or 38 is water. A grey value alone cannot
+tell the two apart.
+
+The dots were faint at 100% and 125% scaling, and plain at 2x.
+
+### The change
+
+The filter now keeps only the band pixels that belong to an area. It works in five steps:
+
+1. It makes a mask of the pixels in the band.
+2. It erodes that mask by `FRINGE`, 1 CSS px. An edge up to two pixels wide drops out.
+3. It dilates the mask back by the same radius. A lake, a river channel and the sea come back to
+   their full shape.
+4. It fills the mask with `--water`.
+5. It draws that fill over the tile.
+
+Erosion and then dilation is a morphological opening. An opening never grows the mask, so no pixel
+outside the band turns blue.
+
+`css/map.css` sets the fill colour with `flood-color: var(--water)`. So this change deletes
+`tintWater()` and its hex parsing. A theme swap needs no script.
+
+### Measured
+
+Screenshots at device scales 1, 1.25, 1.5, 2 and 3, at zoom 12 and 14 over Kuala Lumpur. The dots
+along the roads are gone at every scale. Tasik Perdana and the sea stay blue. At zoom 9 on 125%
+scaling, the sea shows no line at the tile edges.
+
+Frames per second over one scripted zoom and pan at 2x, three runs each. With the tint: 47.8, 54.1
+and 56.0. With the filter switched off: 54.2, 58.3 and 54.6. The medians are 54.1 and 54.6, inside
+the spread between runs.
+
+### What it costs
+
+A narrow river that Dark Matter draws one or two pixels wide loses its tint, and shows as grey. The
+dark theme draws its own 1px river line in `--water` over it, from `rivers.json`. So a narrow river
+still reads as blue.
+
+### The check
+
+`map-limits-test.html` now reads the filter in pixels. It draws a fake tile onto a canvas through
+`filter: url(#watertint)`. The tile holds land at grey 9, a lake at 38 and a 1px road edge at 37.
+The check asserts that the lake turns `--water`, the edge stays grey 37 and the land stays grey 9.
+The old check read the table values, and it passed while the map drew the dots.

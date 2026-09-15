@@ -3652,12 +3652,18 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   total water body area moved from 282.4935 to 282.5016 square kilometres, a change of 0.003
   percent. The three largest lakes stayed identical to three decimal places. The point count moved
   from 99,406 to 99,409. A count gate does not test a shape.
-- **THE DARK WATER TINT KEYS ON GREY 38, AND CARTO OWNS THAT NUMBER.** `WATER_GREY` in `js/map.js`
-  is the one grey Dark Matter fills water with, measured on 2026-09-14. A CARTO restyle that moves
-  the water by one level leaves the table correct and the map grey. Nothing reports an error.
-  `map-limits-test.html` checks the table, and it cannot check a tile. So after a CARTO change,
-  fetch one sea tile and count its greys before you trust the tint.
-  **The table catches 36 to 39, and grey 38 alone drew a line at every tile edge.** At 125% scaling
+- **THE DARK WATER TINT KEYS ON A GREY BAND AND ON A SHAPE, AND CARTO OWNS THE BAND.** `WATER` in
+  `js/map.js` is 36 to 39, the greys Dark Matter fills water with, measured on 2026-09-14. A CARTO
+  restyle that moves the water out of the band leaves the filter correct and the map grey. Nothing
+  reports an error. `map-limits-test.html` checks the filter on a fake tile, and it cannot check a
+  real one. So after a CARTO change, fetch one sea tile and count its greys before you trust the tint.
+  **The band alone painted blue dots along the roads, and a reader saw them on a high resolution
+  screen on 2026-09-15.** CARTO quantizes each tile to its own palette of about 11 greys. One KL tile
+  at zoom 14 held 34, 37 and 42 as the ramp at a road's edge, and no 38. So the filter erodes the
+  band mask by `FRINGE` and dilates it back. An edge up to two pixels wide drops out. Do not widen
+  the band or drop the two `feMorphology` steps to bring a thin river back. `showRivers()` draws it.
+  The fixed band looked right at 100% and 125%. The dots were plain at 2x.
+  **The band catches 36 to 39, and grey 38 alone drew a line at every tile edge.** At 125% scaling
   the browser shrinks a `@2x` tile, and `plus-lighter` in `vendor/leaflet.css` sums two edge pixels
   to grey 37. A red map background showed no gap between the tiles, so the line was a colour and not
   a hole.

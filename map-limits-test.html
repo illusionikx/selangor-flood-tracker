@@ -197,13 +197,25 @@ try {
   ok('only a CARTO ground takes the tint', tinted === !!CARTO_KEY,
      'tinted ' + tinted + ', key ' + (CARTO_KEY ? 'set' : 'empty'));
   if (CARTO_KEY) {
-    const funcs = [...document.querySelectorAll('#watertint feComponentTransfer > *')];
-    const table = f => (f.getAttribute('tableValues') || '').split(' ').map(Number);
-    const off = funcs.flatMap((f, i) => table(f).filter((v, k) => Math.abs(v - (k >= 36 && k <= 39
-      ? parseInt(hex.slice(1 + 2 * i, 3 + 2 * i), 16) : k) / 255) > 1e-3));
-    ok('the table recolours greys 36 to 39 and nothing else',
-       funcs.length === 3 && funcs.every(f => table(f).length === 256) && off.length === 0,
-       funcs.length + ' channels, ' + off.length + ' entries off');
+    /* **Read in pixels, through the filter itself.** A canvas takes `filter: url()`, so a drawn tile
+       comes back filtered. A grey that a declaration check passes can still paint a road blue, which
+       is how the tint shipped a fault on a high resolution screen. The fake tile is land at 9, a lake
+       at 38 and a 1px road edge at 37. Only the lake may turn blue. */
+    const fake = new OffscreenCanvas(60, 24), g = fake.getContext('2d');
+    const grey = v => `rgb(${v},${v},${v})`;
+    g.fillStyle = grey(9); g.fillRect(0, 0, 60, 24);
+    g.fillStyle = grey(38); g.fillRect(30, 2, 26, 20);
+    g.fillStyle = grey(37); g.fillRect(10, 0, 1, 24);
+    const shown = document.createElement('canvas');
+    shown.width = 60; shown.height = 24;
+    const sg = shown.getContext('2d', { willReadFrequently: true });
+    sg.filter = 'url(#watertint)';
+    sg.drawImage(fake, 0, 0);
+    const px = (x, y) => [...sg.getImageData(x, y, 1, 1).data.slice(0, 3)].join(',');
+    const want = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16)).join(',');
+    ok('the lake turns --water', px(43, 12) === want, 'lake ' + px(43, 12) + ', token ' + want);
+    ok('a road edge in the same grey band stays grey', px(10, 12) === '37,37,37', 'edge ' + px(10, 12));
+    ok('land stays grey', px(4, 12) === '9,9,9', 'land ' + px(4, 12));
     ok('the filter resolves', getComputedStyle(ground()).filter.includes('#watertint'),
        getComputedStyle(ground()).filter);
   }
