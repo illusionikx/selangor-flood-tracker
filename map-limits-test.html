@@ -29,7 +29,7 @@
 <dialog id="pane"></dialog>
 <input id="heatOpacity" type="range" min="0" max="100" value="100">
 <span id="heatOpacityVal"></span>
-<!-- `applyTheme()` writes this at call time. The water tint block below calls `setTheme()`. -->
+<!-- `applyTheme()` writes this at call time. The water block below calls `setTheme()`. -->
 <meta name="theme-color" content="">
 <pre id="out">running</pre>
 <script>
@@ -179,76 +179,21 @@ try {
      them. A revert that brings back the pane puts the water over the place names with no error. */
   ok('the map has no water pane', !map.getPane('water'), map.getPane('water') ? 'found' : 'none');
 
-  // --- the dark water tint -------------------------------------------------------------------
-
-  /* The tint recolours one grey on Dark Matter and must hand every other grey back. A table off by
-     one band paints a road blue. An Esri ground under the class paints a halo along every coast.
-     Neither throws. `setTheme` writes the reader's own preference, so the pick goes back after. */
+  /* A water tint and river lines stood on the dark theme from 2026-09-14 to 2026-09-15, and the
+     repository owner removed both. A half revert draws blue on a few rivers and nothing throws.
+     `setTheme` writes the reader's own preference, so the pick goes back after. */
   const { setTheme } = await import('./js/map.js');
   const { PREFS } = await import('./js/state.js');
-  const { CARTO_KEY } = await import('./js/config.js');
   const wasTheme = PREFS.theme;
-  const ground = () => document.querySelector('.leaflet-tile-pane .leaflet-layer');
-  setTheme('dark');
-  await settle(300);
-  const hex = getComputedStyle(document.documentElement).getPropertyValue('--water').trim();
-  ok('the dark theme states --water', /^#[0-9a-f]{6}$/i.test(hex), hex || '(empty)');
-  const tinted = !!ground()?.classList.contains('watertint');
-  ok('only a CARTO ground takes the tint', tinted === !!CARTO_KEY,
-     'tinted ' + tinted + ', key ' + (CARTO_KEY ? 'set' : 'empty'));
-  if (CARTO_KEY) {
-    /* **Read in pixels, through the filter itself.** A canvas takes `filter: url()`, so a drawn tile
-       comes back filtered. A grey that a declaration check passes can still paint a road blue, which
-       is how the tint shipped a fault on a high resolution screen. The fake tile is land at 9, a lake
-       at 38 and a 1px road edge at 37. Only the lake may turn blue. */
-    const fake = new OffscreenCanvas(60, 24), g = fake.getContext('2d');
-    const grey = v => `rgb(${v},${v},${v})`;
-    g.fillStyle = grey(9); g.fillRect(0, 0, 60, 24);
-    g.fillStyle = grey(38); g.fillRect(30, 2, 26, 20);
-    g.fillStyle = grey(37); g.fillRect(10, 0, 1, 24);
-    const shown = document.createElement('canvas');
-    shown.width = 60; shown.height = 24;
-    const sg = shown.getContext('2d', { willReadFrequently: true });
-    sg.filter = 'url(#watertint)';
-    sg.drawImage(fake, 0, 0);
-    const px = (x, y) => [...sg.getImageData(x, y, 1, 1).data.slice(0, 3)].join(',');
-    const want = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16)).join(',');
-    ok('the lake turns --water', px(43, 12) === want, 'lake ' + px(43, 12) + ', token ' + want);
-    ok('a road edge in the same grey band stays grey', px(10, 12) === '37,37,37', 'edge ' + px(10, 12));
-    ok('land stays grey', px(4, 12) === '9,9,9', 'land ' + px(4, 12));
-    ok('the filter resolves', getComputedStyle(ground()).filter.includes('#watertint'),
-       getComputedStyle(ground()).filter);
+  for (const t of ['dark', 'light']) {
+    setTheme(t);
+    await settle(300);
+    const ground = document.querySelector('.leaflet-tile-pane .leaflet-layer');
+    ok(`the ${t} ground takes no filter`, getComputedStyle(ground).filter === 'none',
+       getComputedStyle(ground).filter);
+    ok(`the ${t} theme has no river pane`, !map.getPane('rivers'),
+       map.getPane('rivers') ? 'found' : 'none');
   }
-
-  /* The rivers draw on the dark theme, one band at a time. An empty group answers `hasLayer` exactly
-     as a full one does, so the load is asserted first. */
-  const { riverBands } = await import('./js/map.js');
-  let waited = 0;
-  while (!riverBands[2].getLayers().length && waited < 20000) { await settle(250); waited += 250; }
-  ok('every river band loaded', riverBands.every(g => g.getLayers().length > 0),
-     riverBands.map(g => g.getLayers().length).join(', ') + ' after ' + waited + ' ms');
-  /* A river line takes the tint's own colour, so inside a wide river it vanishes into the fill. A
-     second colour draws a bright line down the middle of every estuary. 1px, so a narrow river still
-     reads. */
-  const stroke = riverBands[0].getLayers()[0]?.getLayers()[0]?.options;
-  ok('a river is a 1px line in --water', stroke?.color === hex && stroke?.weight === 1,
-     'line ' + stroke?.color + ' at ' + stroke?.weight + 'px, token ' + hex);
-  const zmin = map.getMinZoom();
-  ok('the zoom floor sits under band 1', zmin < 11, 'floor ' + zmin);
-  /* `animate: false`. A zoom transition waits on a frame this headless run never services, so
-     `zoomend` never fires and the band reads stale. */
-  for (const [z, want] of [[zmin, '100'], [12, '110'], [15, '111']]) {
-    map.setZoom(z, { animate: false });
-    await settle(400);
-    const got = riverBands.map(g => +map.hasLayer(g)).join('');
-    ok('zoom ' + z + ' draws river bands ' + want, got === want, 'drew ' + got);
-  }
-  setTheme('light');
-  await settle(300);
-  ok('the light theme carries no tint', !document.querySelector('.watertint'),
-     document.querySelector('.watertint') ? 'found' : 'none');
-  ok('the light theme draws no river', riverBands.every(g => !map.hasLayer(g)),
-     riverBands.map(g => +map.hasLayer(g)).join(''));
   setTheme(wasTheme);
 
   // --- the tiles ---------------------------------------------------------------------------------
@@ -287,20 +232,21 @@ try {
   ok('no tile outside the frame is asked for', asked.length > 0 && askedOut === 0,
      asked.length + ' tiles across ' + tileLayers.length + ' layers, ' + askedOut + ' outside');
 
-  /* Past the frame the ground colour covers the tiles, so the overhang of each edge tile never
-     shows. A fill that computes transparent draws the ragged edge this frame exists to hide. */
-  const edge = document.querySelector('.coverframe');
-  const inEdge = ll => {
-    const p = map.latLngToLayerPoint(L.latLng(ll));
-    return edge.isPointInFill(new DOMPoint(p.x, p.y));
-  };
-  const past = [frame ? (frame.getNorth() + box.getNorth()) / 2 : cy, cx];
-  const fill = edge && getComputedStyle(edge).fill;
-  ok('the ground colour covers the tiles past the frame',
-     !!edge && fill === getComputedStyle(map.getContainer()).backgroundColor
-       && map.getBounds().contains(past) && inEdge(past) && !inEdge([cy, cx]),
-     edge ? 'fill ' + fill + ', a point past the frame is ' + (inEdge(past) ? 'covered' : 'bare')
-       : 'no .coverframe path');
+  /* Every zoom level clips its tiles to the frame, in that level's own pixels, so the clip shrinks
+     with the level during a zoom. An SVG mask stood here first. Leaflet redraws an SVG when a zoom
+     ends, so a zoom out showed the ground past the square. A level with no clip, or a clip off by
+     the level's origin, draws that ground again with nothing to say so. */
+  const clipped = frame ? tileLayers.flatMap(l => Object.values(l._levels).map(v => {
+    const want = [frame.getNorthWest(), frame.getSouthEast()]
+      .map(ll => map.project(ll, v.zoom).subtract(v.origin));
+    const got = (v.el.style.clipPath.match(/-?[\d.]+(?=px)/g) || []).map(Number);
+    return got.length === 8 && Math.abs(got[0] - want[0].x) < 1 && Math.abs(got[1] - want[0].y) < 1
+      && Math.abs(got[4] - want[1].x) < 1 && Math.abs(got[5] - want[1].y) < 1;
+  })) : [];
+  ok('every tile level clips to the frame', clipped.length > 0 && clipped.every(Boolean),
+     clipped.filter(Boolean).length + ' of ' + clipped.length + ' levels');
+  ok('no SVG mask covers the ground past the frame', !document.querySelector('.coverframe'),
+     document.querySelector('.coverframe') ? 'found' : 'none');
 
   // --- the pane order ----------------------------------------------------------------------------
 

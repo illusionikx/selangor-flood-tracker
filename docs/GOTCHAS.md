@@ -3648,24 +3648,19 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   total water body area moved from 282.4935 to 282.5016 square kilometres, a change of 0.003
   percent. The three largest lakes stayed identical to three decimal places. The point count moved
   from 99,406 to 99,409. A count gate does not test a shape.
-- **THE DARK WATER TINT KEYS ON A GREY BAND AND ON A SHAPE, AND CARTO OWNS THE BAND.** `WATER` in
-  `js/map.js` is 36 to 39, the greys Dark Matter fills water with, measured on 2026-09-14. A CARTO
-  restyle that moves the water out of the band leaves the filter correct and the map grey. Nothing
-  reports an error. `map-limits-test.html` checks the filter on a fake tile, and it cannot check a
-  real one. So after a CARTO change, fetch one sea tile and count its greys before you trust the tint.
-  **The band alone painted blue dots along the roads, and a reader saw them on a high resolution
-  screen on 2026-09-15.** CARTO quantizes each tile to its own palette of about 11 greys. One KL tile
-  at zoom 14 held 34, 37 and 42 as the ramp at a road's edge, and no 38. So the filter erodes the
-  band mask by `FRINGE` and dilates it back. An edge up to two pixels wide drops out. Do not widen
-  the band or drop the two `feMorphology` steps to bring a thin river back. `showRivers()` draws it.
-  The fixed band looked right at 100% and 125%. The dots were plain at 2x.
-  **The band catches 36 to 39, and grey 38 alone drew a line at every tile edge.** At 125% scaling
-  the browser shrinks a `@2x` tile, and `plus-lighter` in `vendor/leaflet.css` sums two edge pixels
-  to grey 37. A red map background showed no gap between the tiles, so the line was a colour and not
-  a hole.
-  **Never put the class on an Esri ground.** Esri serves JPEG, and one flat grey fringes into
-  dozens of tones there. The table then catches a ring of edge pixels along every coast. `tint` in
-  `PROVIDER` answers false for every Esri theme.
+- **NO TILE FILTER CAN COLOUR DARK MATTER'S WATER AND LEAVE ITS ROADS GREY.** A tint and river lines
+  stood on the dark theme from 2026-09-14 to 2026-09-15. The repository owner removed both. Read
+  this before you try again.
+  Dark Matter fills water with a grey from 36 to 39, against land at 9. CARTO quantizes each tile to
+  its own palette of about 11 greys. One KL tile at zoom 14 used 37 at a road's edge. So a grey
+  band painted blue dots along the roads, and the dots were plain only at 2x.
+  An erosion of the band mask kept the areas and dropped the dots. It also dropped every small
+  river. At `@2x` a 1px river and a 1px road edge are the same shape in the same grey. A chain count
+  kept both, and it drew blue streaks along the roads of Petaling Jaya.
+  **Vector lines did not fill the gap.** `rivers.json` holds `waterway=river` alone, and a reader
+  still found important small rivers left grey. A stream, a drain or a canal is a different tag.
+  Never put a band filter on an Esri ground. Esri serves JPEG, and one flat grey fringes into dozens
+  of tones there.
 - **`detectRetina` halves a tile on any screen above 100%, and `{r}` needs no option.** Leaflet
   fills `{r}` with `@2x` whenever `devicePixelRatio` is above 1. `detectRetina` does a second
   thing: it asks for the next zoom at half the tile size. Measured on 2026-09-14 at 125% scaling
@@ -3675,10 +3670,10 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   the option does nothing. Measure a tile question with a Playwright context at
   `deviceScaleFactor: 1.25`, which is the reference screen.
 - **`requestIdleCallback` never fires under `--virtual-time-budget`, so a deferred fetch takes a
-  timeout.** The headless run of `map-limits-test.html` gives the page no idle period. The rivers
-  waited 20 seconds there and never loaded, and the same page passed in a normal browser. So
-  `showRivers()` passes `{ timeout: 3000 }`. A page that is busy for real benefits from the same
-  line.
+  timeout.** The headless run of `map-limits-test.html` gives the page no idle period. The river
+  lines waited 20 seconds there and never loaded, and the same page passed in a normal browser. So
+  `showRivers()` passed `{ timeout: 3000 }` until it went on 2026-09-15. A new deferred fetch needs
+  the same option.
 - **The ground asks for no tile until `border.json` answers.** `Ground` in `js/map.js` refuses every
   tile while `frame` is `undefined`. The fetch answer sets `frame` and redraws both layers. A failure
   sets `false` and redraws. A new path that sets `frame` must redraw too, or the ground stays blank.
@@ -3687,3 +3682,8 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   **The skip uses two private Leaflet methods**, `_isValidTile` and `_tileCoordsToBounds`. If an
   upgrade renames the first one, `extend` adds a method that nothing calls, and nothing throws.
   `map-limits-test.html` catches it, because the floor view then asks for tiles outside the circle.
+  **The clip sits on each zoom level, never in an SVG over the tiles.** Leaflet scales a level
+  during a zoom, and a clip in that level's own pixels scales with it. An SVG redraws when the zoom
+  ends, so a zoom out showed the ground past the square until then. `clipLevel()` reads the level's
+  `origin` and `zoom`, and Leaflet sets both before `_onCreateLevel` runs. A level built before
+  `border.json` answers has no clip, so the answer clips every level in `_levels`.

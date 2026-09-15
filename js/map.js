@@ -272,9 +272,9 @@ const groundR = () => devicePixelRatio >= 2 ? '{r}' : '';
    cannot change while the page is open. ponytail: delete the Esri half the day CARTO is settled. */
 const PROVIDER = CARTO_KEY
   ? { ground: k => cartoURL(k, 'nolabels', groundR()), names: k => cartoURL(k, 'only_labels'),
-      opt: { maxZoom: 18 }, tint: k => CARTO_STYLE[k] === 'dark' }
+      opt: { maxZoom: 18 } }
   : { ground: k => tileURL(TILES[k].ground), names: k => TILES[k].names && tileURL(TILES[k].names),
-      opt: { maxZoom: 18, maxNativeZoom: 16 }, tint: () => false };
+      opt: { maxZoom: 18, maxNativeZoom: 16 } };
 
 /* The credit names the provider that actually draws, because a licence term is not a comment.
    index.html states CARTO, which is where this is going. So the Esri fallback rewrites it. */
@@ -288,8 +288,8 @@ let tiles, labels;
 const isDark = () => document.documentElement.dataset.theme === 'dark';
 
 /* **This map draws no sea, lake or pond of its own since 2026-09-14.** It drew all three from
-   `water.json`, and the repository owner removed them. The dark theme draws river lines, which
-   `showRivers()` below owns. See docs/FEATURES.md.
+   `water.json`, and the repository owner removed them. A water tint and river lines on the dark
+   theme went on 2026-09-15. See docs/FEATURES.md.
    The place names, under the coverage mask and everything this app reports. Esri publishes them as
    a service of their own, so they are a second tile layer rather than part of the ground. The pane
    puts them under the mask, so a town outside the circle is shaded with its ground. It takes no
@@ -327,28 +327,6 @@ map.getPane('mask').style.pointerEvents = 'none';
    `#hatchdef` in css/map.css, which carries the rule that keeps it rendered and out of the flow.
    **The stripe is a filled `<rect>` and never a stroked `<line>`.** A pattern clips its content to
    its own tile, so a line on the tile's edge loses the half of its width that falls outside. */
-/* **Dark Matter fills its water with a grey from 36 to 39, and `#watertint` paints that grey with
-   `--water`.** The repository owner asked for coloured water on the dark theme on 2026-09-14.
-   Each tile is a palette of about eleven greys, and land is grey 9.
-   **The band alone also caught road edges, and a reader saw blue dots along the roads on a high
-   resolution screen, on 2026-09-15.** CARTO quantizes each tile to its own palette. One KL tile at
-   zoom 14 held 34, 37 and 42 as the ramp at a road's edge, and no 38 at all. So 37 was road there
-   and water in the next tile. A grey value cannot tell the two apart. A shape can.
-   **So the filter keeps only the band pixels that belong to an area.** It makes a mask of the band,
-   erodes it by `FRINGE` and dilates it back, which is a morphological opening. An edge of one or two
-   pixels erodes away and never comes back. A lake, a river channel and the sea survive. The opening
-   never grows the mask, so no pixel outside the band turns blue. `--water` then fills the mask, over
-   the tile.
-   **A narrow river loses its tint, and `showRivers()` is why that is fine.** Dark Matter draws one a
-   pixel or two wide, and the dark theme draws its own 1px river line over it.
-   **Four greys, not one.** Grey 38 alone left a dark line along every tile edge at 125% scaling. The
-   browser shrinks a `@2x` tile, and `plus-lighter` in vendor/leaflet.css sums two edge pixels to 37.
-   **A palette PNG and nothing else.** Esri serves JPEG, where one flat grey fringes into dozens of
-   tones along an edge. So only a CARTO Dark Matter ground takes the class. See `tint` in PROVIDER.
-   The filter lives in the hatch sprite, because a filter needs a rendered SVG. That is the rule of
-   this sprite already. css/map.css sets the fill colour, so a theme swap needs no script. */
-export const WATER = [36, 39];   // the first and the last grey that reads as water on screen
-export const FRINGE = 1;         // CSS px. An edge up to twice this wide erodes away
 const hatch = document.body.appendChild(
   Object.assign(document.createElementNS('http://www.w3.org/2000/svg', 'svg'), { id: 'hatchdef' }));
 hatch.setAttribute('aria-hidden', 'true');
@@ -357,73 +335,7 @@ hatch.innerHTML =
   + ' patternTransform="rotate(45)">'
   + '<rect width="9" height="9" class="hatchbg"/>'
   + '<rect width="3" height="9" class="hatchline"/>'
-  + '</pattern>'
-  + '<filter id="watertint" color-interpolation-filters="sRGB">'
-  + '<feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0"/>'
-  + '<feComponentTransfer><feFuncA type="discrete" tableValues="'
-  + Array.from({ length: 256 }, (_, k) => +(k >= WATER[0] && k <= WATER[1])).join(' ') + '"/>'
-  + '</feComponentTransfer>'
-  + `<feMorphology operator="erode" radius="${FRINGE}"/>`
-  + `<feMorphology operator="dilate" radius="${FRINGE}" result="water"/>`
-  + '<feFlood/><feComposite in2="water" operator="in" result="paint"/>'
-  + '<feMerge><feMergeNode in="SourceGraphic"/><feMergeNode in="paint"/></feMerge>'
-  + '</filter></defs>';
-
-/* **THE RIVERS DRAW AS 1PX LINES ON THE DARK THEME, AND NOWHERE ELSE.** The repository owner asked
-   on 2026-09-14 for every river to read as a line at least 1px wide. Dark Matter draws a narrow
-   river one pixel wide in grey 38, and many it does not draw at all. Voyager draws its own blue
-   rivers, so the light theme fetches nothing.
-   **A wide river stays an area, and the colour is what does that.** OpenStreetMap maps every river
-   as a centre line, whatever its width, and Dark Matter fills a wide one with grey 38. The line
-   takes `--water`, which is the colour the tint paints that fill. So inside a wide river the line
-   vanishes into its own water, and only a narrow river reads as a line. A second, brighter colour
-   drew a line down the middle of the Klang estuary for one revision, and the owner cut it.
-   `rivers.json` is the three river bands out of water-build.php, 241 KB gzipped against 568 KB for
-   the whole water file. */
-const BAND_MIN = [0, 11, 13];      // the zoom each band starts at. A band is stamped by size at bake
-export const riverBands = [L.layerGroup(), L.layerGroup(), L.layerGroup()];
-// Over the tiles at 200 and under the place names at 260, so a river never covers a town's name.
-map.createPane('rivers');
-map.getPane('rivers').style.zIndex = 250;
-let riversOn = false, riversAsked = false;
-
-function syncRivers() {
-  const z = map.getZoom();
-  riverBands.forEach((g, b) => {
-    const want = riversOn && z >= BAND_MIN[b];
-    if (want !== map.hasLayer(g)) want ? g.addTo(map) : map.removeLayer(g);
-  });
-}
-map.on('zoomend', syncRivers);
-
-function showRivers(on) {
-  riversOn = on;
-  if (on) {
-    // Read at paint time. The token exists on the dark theme alone.
-    const color = getComputedStyle(document.documentElement).getPropertyValue('--water').trim();
-    riverBands.forEach(g => g.eachLayer(l => l.setStyle({ color, weight: 1 })));
-  }
-  syncRivers();
-  if (!on || riversAsked) return;
-  riversAsked = true;
-  /* Past the first paint, the way the whole water file loaded before 2026-09-14. Called as a method
-     on `window`, because a detached `requestIdleCallback` throws, and this runs inside module
-     evaluation. Safari has none, so it waits on a timer.
-     **The timeout is for a page that never goes idle.** `map-limits-test.html` under a virtual time
-     budget is one such page, and it never loaded a river until the callback carried this. */
-  const later = fn => window.requestIdleCallback
-    ? window.requestIdleCallback(fn, { timeout: 3000 }) : setTimeout(fn, 1200);
-  later(() => fetch('rivers.json')
-    .then(r => r.ok ? r.json() : Promise.reject(r.status))
-    .then(geo => {
-      // Canvas, because 2,775 rivers as SVG is 2,775 nodes to carry through every pan and zoom.
-      const renderer = L.canvas({ pane: 'rivers' });
-      for (const f of geo.features)
-        riverBands[f.properties.b].addLayer(L.geoJSON(f, { renderer, interactive: false }));
-      showRivers(riversOn);
-    })
-    .catch(() => { riversAsked = false; }));   // a failed fetch leaves a plainer map, and a retry
-}
+  + '</pattern></defs>';
 
 /* How far past the circle the shaded ring reaches, in multiples of the circle's own width. The pan
    limit below is a quarter of that width, so three widths is about eleven times as far as a reader
@@ -446,18 +358,23 @@ const RIM = 1.01;
 
 let cover;                       // the circle's own bounds, once border.json has answered
 
-/* **The ground fills a square frame around the circle, and the map asks for no tile outside it.**
+/* **The ground fills a square frame around the circle, and nothing of it draws outside.**
    CARTO counts every tile, and the repository owner asked for fewer tile calls on 2026-09-14.
    **The first version skipped every tile outside the circle itself, and the owner reversed it the
    same day.** The ground then stopped at whichever tile edge came last, in a ragged block inside the
    striped ring, and that read as a page that had not finished loading.
-   **So the ground stops at `frame`, and `.coverframe` paints the page colour past it.** `frame` is
-   the extent of the circle, grown by `FRAME` on each side. A tile that touches it loads, so the
-   ground always reaches the edge of the frame. The opaque fill hides the part of each tile past it.
-   The stripes draw over both, so only the ground under them changes at the edge.
+   **So the map asks for no tile outside `frame`, and it clips every tile to it.** `frame` is the
+   extent of the circle, grown by `FRAME` on each side. A tile that touches it loads whole, so the
+   ground always reaches the edge of the frame. The clip cuts off the part of the tile past it.
+   **The clip sits on each zoom level, in that level's own pixels, and an SVG mask stood here
+   first.** `.coverframe` painted the page colour past the frame. Leaflet scales an SVG during a zoom
+   and redraws it when the zoom ends. So a zoom out showed the ground past the square until then, and
+   a reader saw it on 2026-09-15. A level shrinks with its own clip, so the two cannot part.
    **The map asks for no tile until border.json answers.** `frame` is `undefined` until then. The
-   answer redraws both layers. A failure sets `false`, and the whole ground draws.
-   `_isValidTile` and `_tileCoordsToBounds` are private Leaflet 1.9 methods. Check both on an upgrade. */
+   answer clips the levels already built and redraws both layers. A failure sets `false`, and the
+   whole ground draws.
+   `_isValidTile`, `_tileCoordsToBounds` and `_onCreateLevel` are private Leaflet 1.9 methods, and
+   `_levels` is private state. Check all four on an upgrade. */
 const FRAME = 0.2;               // a fifth of the circle's width past it, on each side
 export let frame;                // L.LatLngBounds once border.json answers, or false when it failed
 const Ground = L.TileLayer.extend({
@@ -466,7 +383,17 @@ const Ground = L.TileLayer.extend({
     if (frame === false) return true;
     return !!frame && frame.intersects(this._tileCoordsToBounds(c));
   },
+  _onCreateLevel(level) { clipLevel(this, level); },
 });
+
+// The frame in one level's own pixels: projected at that level's zoom, less that level's origin.
+function clipLevel(layer, level) {
+  if (!frame) return;
+  const [a, b] = [frame.getNorthWest(), frame.getSouthEast()]
+    .map(ll => layer._map.project(ll, level.zoom).subtract(level.origin));
+  level.el.style.clipPath =
+    `polygon(${a.x}px ${a.y}px, ${b.x}px ${a.y}px, ${b.x}px ${b.y}px, ${a.x}px ${b.y}px)`;
+}
 
 /* The zoom floor and the pan limit, both off the circle. It is what a reader sees, so it is what
    the map stops at. Re-run on every resize, because `getBoundsZoom()` answers for the window this
@@ -526,26 +453,32 @@ fetch('border.json')
     // The circle's own extent, which is what the limits above read.
     cover = L.latLngBounds(hole.map(([x, y]) => [y, x]));
     frame = cover.pad(FRAME);
-    tiles?.redraw();                 // no tile was asked for before this line. See `Ground` above.
-    labels?.redraw();
-    const box = ([w, s, e, n]) => [[w, s], [e, s], [e, n], [w, n], [w, s]];
+    // No tile was asked for before this line, and a level built before it has no clip. See `Ground`.
+    for (const l of [tiles, labels]) if (l) {
+      for (const level of Object.values(l._levels)) clipLevel(l, level);
+      l.redraw();
+    }
     const dx = (cover.getEast() - cover.getWest()) * MASK_SPANS;
     const dy = (cover.getNorth() - cover.getSouth()) * MASK_SPANS;
-    const outer = box([cover.getWest() - dx, cover.getSouth() - dy,
-                       cover.getEast() + dx, cover.getNorth() + dy]);
-    const square = box([frame.getWest(), frame.getSouth(), frame.getEast(), frame.getNorth()]);
+    const [bw, bs] = [cover.getWest() - dx, cover.getSouth() - dy];
+    const [be, bn] = [cover.getEast() + dx, cover.getNorth() + dy];
+    const outer = [[bw, bs], [be, bs], [be, bn], [bw, bn], [bw, bs]];
 
-    /* Two Polygons, each that outer ring with a hole, in one SVG so they paint in the order added.
-       The ground colour past the frame goes first, and the stripes past the circle go over it.
-       **The stroke draws the circle and only the circle.** It lands on the outer ring too, and that
-       sits three widths out, so no zoom this map allows can bring it on screen. The stripes are faint
-       by instruction, so one property states the edge on its own rather than leave it to them.
-       `.coverframe` states no stroke. */
-    const renderer = L.svg({ pane: 'mask' });
-    for (const [inner, className] of [[square, 'coverframe'], [hole, 'covermask']])
-      L.geoJSON({
-        type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [outer, inner] },
-      }, { renderer, interactive: false, style: { className, fillOpacity: 1 } }).addTo(map);
+    /* One Polygon: that ring, then the circle as its hole. **The stroke draws the circle and only
+       the circle.** It lands on the outer ring too, and that sits three widths out, so no zoom this
+       map allows can bring it on screen. The stripes are faint by instruction, so one property states
+       the edge on its own rather than leave it to them. */
+    L.geoJSON({
+      type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [outer, hole] },
+    }, {
+      /* **Padding 0.5, and Leaflet's own is 0.1.** Leaflet scales an SVG during a zoom and redraws it
+         when the zoom ends. A zoom out by one level halves it, so at 0.1 the edges of the view went
+         without stripes until the redraw. Half a view on each side still covers the view at half
+         size. */
+      renderer: L.svg({ pane: 'mask', padding: 0.5 }),
+      interactive: false,
+      style: { className: 'covermask', fillOpacity: 1 },
+    }).addTo(map);
     setLimits();
   })
   // A failed circle draws the whole ground, because a map with no ground is worse than every tile.
@@ -563,11 +496,7 @@ function setBasemap() {
      soft. Every pin, label and heat blob is drawn by this app and stays sharp.
      CARTO caches to zoom 20, so its half of `PROVIDER` states no `maxNativeZoom` at all. */
   const opt = PROVIDER.opt;
-  // Only a Dark Matter ground takes the water tint. See `WATER` above.
-  const tint = PROVIDER.tint(key);
-  showRivers(key === 'dark');
-  tiles = new Ground(PROVIDER.ground(key), tint ? { ...opt, className: 'watertint' } : opt)
-    .addTo(map);
+  tiles = new Ground(PROVIDER.ground(key), opt).addTo(map);
   // A ground that bakes in its own place names states none. A second copy draws every name twice.
   const names = PROVIDER.names(key);
   labels = names ? new Ground(names, { ...opt, pane: 'labels' }).addTo(map) : null;

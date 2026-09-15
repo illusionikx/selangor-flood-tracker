@@ -19294,3 +19294,212 @@ rises with it, because its foot follows the foot of the scale.
 
 `m3-check.html` asserts the stack on a phone and at every band. The ramp stands under the title, the
 ticks stand under the ramp, and the first and last tick words meet the ends of the ramp.
+
+## The dark water tint colours small rivers again, 2026-09-15
+
+A reader reported that small rivers showed grey on the dark theme, after the fix above.
+
+### The cause
+
+The erosion from the entry above removed every band line one or two pixels wide. A small river on
+Dark Matter is a line that thin, so it lost its tint too.
+`showRivers()` draws its small band from zoom 13 alone. Below zoom 13 nothing coloured those rivers.
+
+### The change
+
+The filter keeps a band pixel when it is part of a chain. It works in five steps:
+
+1. It makes a mask of the pixels in the grey band from 36 to 39.
+2. It counts the band pixels in each 3x3 block, with `feConvolveMatrix`.
+3. It keeps a pixel when that count reaches `CHAIN`, which is 3: the pixel and two more.
+4. It fills the kept pixels with `--water`.
+5. It draws that fill over the tile.
+
+A road edge in the band shows up as a lone pixel or a pair, so it drops out. A 1px river is an
+unbroken line, so each pixel on it has a neighbour on each side, and it stays. A lake and the sea
+stay too. The count never adds a pixel, so no pixel outside the band turns blue.
+
+### Measured
+
+The measure drew real Dark Matter `@2x` tiles through each filter onto a canvas. It covered Kuala
+Lumpur, Gombak and Klang at zoom 11 to 14.
+
+- The band alone coloured the rivers and put dots along the roads.
+- The erosion removed the dots and the small rivers with them. At zoom 14 over Gombak it coloured no
+  pixel at all.
+- The chain count kept the 1px rivers and the lakes. It removed the dots, except a few short dashes
+  along some roads at zoom 12 over Kuala Lumpur.
+
+### What it costs
+
+A run of three or more road edge pixels in the band stays blue, as a short dash.
+
+The count costs more than the erosion did. Frames per second over one scripted zoom and pan at 2x,
+in a headless browser with no GPU, over five runs each: 35.5, 37.6, 41.0, 40.5 and 41.6 with the
+tint, and 41.6, 41.4, 42.7, 42.9 and 42.1 with the filter switched off. The medians are 40.5 and
+42.1. A sixth pair stalled and is left out.
+
+A river pixel at the very end of a line has one neighbour, so the last pixel of a river stays grey.
+
+### The check
+
+`map-limits-test.html` adds a 1px river at grey 38 to its fake tile, and splits the road edge into a
+lone pixel and a pair. It asserts that the lake and the river turn `--water`, and that both road edge
+shapes stay grey. The erosion passed the lake and failed the river.
+
+## The tint colours areas alone, and the river lines draw at every zoom, 2026-09-15
+
+A reader still saw blue dots on the roads after the chain count above.
+
+### The cause
+
+The chain count kept every unbroken line of band pixels. At `@2x` the edge of a road is often an
+unbroken 1px line in the band. With the river lines hidden, the tint alone drew blue streaks along
+the roads of Petaling Jaya at zoom 13.
+
+A 1px river and a 1px road edge are the same shape in the same grey. So no rule on the tile can
+colour one and leave the other grey.
+
+### The change
+
+The tint colours areas alone again. The filter erodes the band mask by `FRINGE` and dilates it
+back, as in the first fix above. A lake, a wide river and the sea turn blue. No band line up to two
+pixels wide turns blue.
+
+The river lines now colour every small river. `BAND_MIN` in `js/map.js` is `[0, 0, 0]`, so all three
+bands of `rivers.json` draw at every zoom. Band 1 started at zoom 11, and band 2 at zoom 13.
+
+`water-build.php` stamps a band on each OpenStreetMap way, and one river is often many short ways.
+So below zoom 13 a river drew in pieces, and the tint filled the gaps with Dark Matter's own thin
+line. The tint no longer does that.
+
+A river line comes from vector data, so it cannot land on a road.
+
+### Measured
+
+Screenshots of the app at 2x in a fresh browser:
+
+- Petaling Jaya at zoom 13 shows no blue on any road. With the river lines hidden, the tint colours
+  the ponds and nothing else.
+- Gombak at zoom 11 and 12, at 1.25x and 2x, shows the small rivers in blue.
+
+Frames per second over one scripted zoom and pan at 2x, in a headless browser with no GPU, three
+runs each, with every river band drawn: 54.9, 54.8 and 52.7 with the tint, and 57.9, 57.0 and 57.0
+with the filter switched off. The medians are 54.8 and 57.0.
+
+### What it costs
+
+`rivers.json` holds `waterway=river` alone. A stream, a drain or a canal that Dark Matter draws as a
+thin line stays grey.
+
+This entry replaces the chain count entry above, on the day that entry landed.
+
+### The check
+
+`map-limits-test.html` keeps the lake and the two road edge shapes on its fake tile. Its 1px line at
+grey 38 must now stay grey. The band assertions expect all three bands at the zoom floor, at zoom 12
+and at zoom 15.
+
+## The square clips the tiles, and the mask no longer lags a zoom, 2026-09-15
+
+A reader zoomed out and saw the ground outside the square for a moment, until the square covered it.
+They asked whether the map still loaded past the square.
+
+### What was true
+
+The map asked for no tile wholly outside the square. A tile that crossed the square's edge loaded
+whole, and `.coverframe`, an SVG polygon in the page colour, hid the part past the edge.
+
+Leaflet scales an SVG during a zoom and redraws it when the zoom ends. A zoom out by one level halves
+it. So during the zoom the SVG covered only the middle of the view, and the tiles past the square
+showed around it.
+
+A frame recording of one wheel step, from zoom 10 to 9 on the light theme, showed it. At 355 ms and
+444 ms the stripes covered only the middle, and the ground ran past the square. At 564 ms the mask
+redrew and covered it.
+
+### The change
+
+`Ground` in `js/map.js` clips each zoom level to the square. Leaflet puts the tiles of each zoom
+level in one container, and scales that container during a zoom. `clipLevel()` sets a `clip-path`
+on the container, in that level's own pixels. So the clip scales with the tiles, and the two cannot
+drift apart.
+
+`_onCreateLevel` clips a level when Leaflet builds it. When `border.json` answers, it clips every
+level already built, and then redraws.
+
+This change deletes `.coverframe` and its CSS rule.
+
+The mask SVG takes `padding: 0.5`, against Leaflet's 0.1. It draws half a view past each edge, so at
+half size it still covers the view. The stripes no longer drop off the edges during a zoom out.
+
+### Measured
+
+The same recording after the change, on the light theme from zoom 10 and on the dark theme from zoom
+11. In every frame the ground stops at the square, and the stripes cover the whole view.
+
+### What it costs
+
+A wheel step that jumps two levels at once scales the mask to a quarter. The edges of the view then
+go without stripes until the zoom ends. The ground still stops at the square.
+
+`scratchpad/tiles/fps2.js` counted frames over one zoom-and-pan gesture. It ran on the dark theme at
+1536x864 and 2x scale, in headless Chrome. It ran four rounds, and each round ran the four variants
+in turn.
+
+| variant | frames per second, four runs | median |
+|---|---|---|
+| shipped: the clip, padding 0.5 | 40.7 49.3 42.2 38.3 | 42.2 |
+| no clip, padding 0.5 | 44.2 49.5 59.5 42.3 | 49.5 |
+| the clip, padding 0.1 | 47.5 51.0 43.1 45.8 | 47.5 |
+| no clip, padding 0.1 | 48.6 47.8 45.7 40.4 | 47.8 |
+
+The shipped code drew the fewest frames in three rounds of four. Its median is about 5 frames per
+second under the other three. The runs of one variant spread by up to 17 frames per second, so that
+gap sits inside the noise.
+
+Each change alone measured no cost. Only the two together measured lower. The app takes that cost,
+because the reader asked for no ground past the square, and a lagging mask cannot give that.
+
+### The check
+
+`map-limits-test.html` asserts that every tile level carries a clip at the square's corners, in that
+level's pixels. It asserts that no `.coverframe` path is left.
+
+## The dark theme draws no coloured water, 2026-09-15
+
+The road dots were gone, and a reader still found important small rivers left grey on the dark
+theme. The repository owner chose a plain dark map over a half-coloured one.
+
+### What was true
+
+`#watertint` in `js/map.js` painted Dark Matter's water grey with `--water`. It coloured areas
+alone, because a thin line on a tile can be a road edge. `showRivers()` drew `rivers.json` over it,
+as 1px lines in the same colour.
+
+`rivers.json` holds `waterway=river` alone. A stream, a drain or a canal stayed grey.
+
+### The change
+
+This change deletes the filter, `WATER`, `FRINGE`, the river pane, `showRivers()` and the `--water`
+token. The dark theme draws Dark Matter's water in CARTO's own grey. The build no longer copies
+`rivers.json` into `site/`.
+
+`water-build.php`, `water.json` and `rivers.json` stay in the repository. Nothing in the app reads
+them.
+
+### What it costs
+
+Lakes, wide rivers and the sea are grey on the dark theme. The light theme keeps Voyager's own blue.
+
+The dark theme also stops a fetch of `rivers.json`, about 241 KB gzipped.
+
+### Not built
+
+Streams, drains and canals from OpenStreetMap as more lines. Each tag adds shapes that CARTO does not
+draw, and the owner chose no coloured water instead.
+
+### The check
+
+`map-limits-test.html` asserts on both themes that the ground takes no filter and that no river
+pane exists.
