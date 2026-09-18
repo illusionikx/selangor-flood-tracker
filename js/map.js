@@ -277,8 +277,12 @@ const PROVIDER = CARTO_KEY
       opt: { maxZoom: 18, maxNativeZoom: 16 } };
 
 /* The credit names the provider that actually draws, because a licence term is not a comment.
-   index.html states CARTO, which is where this is going. So the Esri fallback rewrites it. */
-if (!CARTO_KEY) for (const a of document.querySelectorAll('.tileprov')) {
+   index.html states CARTO, which is where this is going. So the Esri fallback rewrites it.
+   **The class is what lets css/map.css invert the dark ground.** That inversion makes a dark
+   Voyager out of a light one. The Esri fallback is already dark, and an inversion of it draws a
+   white map. So the rule names this class, and the fallback never takes it. */
+if (CARTO_KEY) document.documentElement.classList.add('carto');
+else for (const a of document.querySelectorAll('.tileprov')) {
   a.textContent = 'Esri';
   a.href = 'https://www.esri.com/';
 }

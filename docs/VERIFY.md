@@ -463,7 +463,9 @@ printf("rows: %d, points: %d, newest: %s\n",
 # `PASS` means the run did not finish, whatever the counts above it say. It holds 1,012 assertions.
 
 # The coverage circle, the zoom floor and the pan limit. Also that the map draws no water of its
-# own on either theme: no water pane, no tile filter and no river pane. Also that the map asks for no
+# own on either theme: no water pane and no river pane. Also that each of the two tile panes carries
+# the exact filter its theme states, because the dark theme is Voyager inverted since 2026-09-18 and
+# a half revert of that is silent. Also that the map asks for no
 # tile outside the square frame around the circle, and that every tile level clips to it. Every fault here is silent. A mask that draws nothing looks like a map. A circle rebaked
 # against changed OpenStreetMap tagging slides back over the Strait of Malacca and still looks like a
 # circle. A zoom floor the pan box refuses still answers its own number to `getMinZoom()`. Reads PASS.

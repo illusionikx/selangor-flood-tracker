@@ -2962,8 +2962,11 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   answers 404. `CARTO_STYLE` in `js/config.js` names the stem per theme. The subdomains
   answer as well, and four of them split one HTTP/2 connection into four for nothing.
   The free tier is 5 million tiles a month, for non-commercial use.
-- **THE BASEMAP WAS ESRI FROM 2026-08-27, AND THE TILE FILTER IS DELETED.** CARTO ended keyless
+- **THE BASEMAP WAS ESRI FROM 2026-08-27, AND THE TILE FILTER WENT WITH IT.** CARTO ended keyless
   access that day. Every tile came back with `API KEY REQUIRED` burned into the picture.
+  **A tile filter came back on 2026-09-18, and it is a different filter.** The dark theme is Voyager
+  inverted now. See the entry on it below, and the `.leaflet-tile-pane` rule in `css/map.css`.
+  Nothing else in this entry changed.
   **Measure that before believing a retry helps.** Every subdomain answered HTTP 200 with a real
   tile, each tile differed by coordinate, and a browser `Referer` and `User-Agent` changed the
   response hash not at all. It is a policy change rather than a rate limit, so it does not clear
@@ -3688,6 +3691,52 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   still found important small rivers left grey. A stream, a drain or a canal is a different tag.
   Never put a band filter on an Esri ground. Esri serves JPEG, and one flat grey fringes into dozens
   of tones there.
+- **THE DARK GROUND IS VOYAGER INVERTED, AND THREE FILES HAVE TO AGREE.** They are
+  `CARTO_STYLE.dark` in `js/config.js`, the `carto` class `js/map.js` writes on the root element,
+  and the `.leaflet-tile-pane` rule in `css/map.css`. Each half-revert is silent, and each one
+  fails differently. Put `dark` back in the config and leave the rule, and the map inverts Dark
+  Matter into a white map. Delete the rule and leave the config, and the dark theme draws the light
+  basemap. Drop the `carto` class, and a deploy with no CARTO key inverts the Esri dark ground into
+  a white map.
+  **This is NOT the band filter the entry above forbids.** That one had to select one grey out of a
+  quantized palette. `invert(1) hue-rotate(180deg)` selects nothing. Each output pixel reads its own
+  input pixel and no other. Measured over 16 tiles of central Kuala Lumpur at zoom 14: the chain
+  halves the share of pixels in the reserved amber band, from 20.40% to 9.89%, and it leaves what
+  survives at a mean relative luminance of 0.049.
+- **THE PLACE NAMES ARE NOT IN THE TILE PANE, SO ONE SELECTOR IS HALF A DARK THEME.** `js/map.js`
+  puts the `_only_labels` layer in a pane of its own at z-index 260, under the coverage mask. A
+  filter on `.leaflet-tile-pane` alone inverts the ground and leaves the light place names over it.
+  Those are dark text inside white halos. They stay legible enough that a reader can miss what is
+  wrong.
+  **Never move the filter up to `.leaflet-map-pane` to catch both.** That pane is the one ancestor
+  these two share with the mask, the pins and the heat wash. It inverts every reading this app
+  draws.
+- **INVERTING A LIGHT BASEMAP AMPLIFIES A SUB-1% DETAIL INTO A 23% EDGE, AND VOYAGER HAS ONE.**
+  Voyager draws a darker casing 3px wide on the water side of every bank. Measured over 99,704
+  water pixels at Sungai Puluh at zoom 15. The casing reads 0.871 against open water at 0.895,
+  which is 2.7% darker. Nobody sees that on paper.
+  Inverted, dark becomes bright. The same band reads 0.127 against water at 0.104. That is 23%
+  brighter, over land at 0.023. Zoom 13 reads 1.25 at the bank, so the rim holds across zooms. A
+  reader met it on 2026-09-18 and called it a drop shadow.
+  **No per-pixel filter removes it.** The rim is a spatial feature. Any term that dims it dims the
+  water by the same factor, and the ratio is what a reader sees. Only `contrast()` moves that
+  ratio, and it lifts the black with it. `contrast(.92)` takes the rim to 1.17 and the land to
+  0.058. `contrast(.75)` takes the rim to about 1.09 and the whole ground to a mean of 0.163,
+  which is a washed grey map.
+  **The repository owner left the rim alone on 2026-09-18.** A 23% outline around every river and
+  lake is what a cartographer draws on purpose, and this app is a flood map. Do not add a term to
+  chase it without asking.
+  **`blur(0.3px)` on the ground pane alone is the one thing that targets a 3px rim.** The labels
+  pane keeps its own chain, so the place names stay crisp. It samples neighbours, which is the
+  expensive filter class the entries here measure. Nobody measured it.
+- **A FILTER ON A TILE PANE COSTS ONE FRAME PER RAIL TRAVEL, AND A ZOOM CANNOT MEASURE IT.**
+  Measured on 2026-09-18 at a device pixel ratio of 1.25, A B B A three times each. The rail travel
+  dropped one frame in four of six runs with the filter, and in none of six runs without it. The
+  median frame and the 95th percentile read 16.7 ms and 16.8 ms in both conditions.
+  **A zoom gesture reported the two conditions identical**, at 163 frames and a 16.8 ms 95th
+  percentile. That gesture sits on the 60 frames per second ceiling, so it holds no headroom to
+  spend and it has nothing to report. Measure the rail travel instead.
+  **These are headless numbers on one machine.** See docs/FEATURES.md for the tables.
 - **`detectRetina` halves a tile on any screen above 100%, and `{r}` needs no option.** Leaflet
   fills `{r}` with `@2x` whenever `devicePixelRatio` is above 1. `detectRetina` does a second
   thing: it asks for the next zoom at half the tile size. Measured on 2026-09-14 at 125% scaling

@@ -44,7 +44,7 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `js/map.js` | map instance, basemap/theme, the pin layer, the station panel (`openSide`), `focusOn` / `flashTo`. Also the coverage mask, the zoom floor, the pan limit and the tile skip, all five off `border.json`, with `inCover()` the fifth and `coverReady` the wait every caller of it needs. The ground stops at a square frame around the circle, and the map asks for no tile outside it. The map draws no water of its own on either theme. Also the zoom ceiling, 15, and `disableClusteringAtZoom: 15` on the cluster, which is what makes 15 the zoom that merges nothing |
 | `js/heat.js` | both heat layers (water level, rainfall), ground-fixed sizing per layer, shared opacity. Also the field pass where a gauge reporting no rain denies the ground a wet one claims |
 | `heat-test.html` | `chrome --headless --dump-dom` — one of eight runnable checks. Guards the rain layer's paint distance, its dry-gauge erase and its handover between neighbours, in canvas pixels |
-| `map-limits-test.html` | `chrome --headless --dump-dom` — one of eight runnable checks. Guards the coverage circle, the zoom floor and the pan limit. It probes the drawn shape with `isPointInFill`, so it reads the fill rule the browser paints with. It asserts that no water pane, tile filter or river pane came back on either theme, that the circle holds every point of the land ring, that its centre sits east of that ring's middle, that the map asks for no tile outside the square frame around the circle, that every tile level clips to that frame, that the faint stripes still carry their hairline, and that the pattern sprite is rendered rather than `display: none`, which is the one thing that empties the tile with nothing to say so |
+| `map-limits-test.html` | `chrome --headless --dump-dom` — one of eight runnable checks. Guards the coverage circle, the zoom floor and the pan limit. It probes the drawn shape with `isPointInFill`, so it reads the fill rule the browser paints with. It asserts that no water pane and no river pane came back on either theme, that each of the two tile panes carries the exact filter its theme states and the ground layer inside carries none, that the circle holds every point of the land ring, that its centre sits east of that ring's middle, that the map asks for no tile outside the square frame around the circle, that every tile level clips to that frame, that the faint stripes still carry their hairline, and that the pattern sprite is rendered rather than `display: none`, which is the one thing that empties the tile with nothing to say so |
 | `js/popup.js` | popup + meter + gauge + sparkline templates. Also `wxItem()` and its three helpers, the weather list item both weather surfaces draw |
 | `js/sparktip.js` | the hover/tap readout on every graph, and the label on any `data-tip`. One delegated listener, no imports |
 | `js/render.js` | rebuilds markers and heat points, the two saved lists, and the kind counts |
@@ -631,7 +631,7 @@ order that file holds them. A trap names itself here, and the file states the ev
 - A graph's viewBox is stretched, so a mark on the plot goes in HTML over it,...
 - A label sharing a box with a percentage-height bar has to be reserved with ...
 - TWO PROVIDERS SIT IN `js/map.js` AND `CARTO_KEY` PICKS ONE.
-- THE BASEMAP WAS ESRI FROM 2026-08-27, AND THE TILE FILTER IS DELETED.
+- THE BASEMAP WAS ESRI FROM 2026-08-27, AND THE TILE FILTER WAS DELETED.
 - A GREY CANVAS BASEMAP DRAWS ALMOST NO SMALL WATER, and no filter can recolo...
 - Tolerance and scope are different knobs on `water-build.php`, and the wrong...
 - `MIN_AREA_KM2` and `MIN_RIVER_KM` are size floors, and they REVERSE what th...
@@ -692,6 +692,10 @@ order that file holds them. A trap names itself here, and the file states the ev
 - LEAFLET PAINTS ITS OWN DEFAULT WHEN A STYLE COLOUR IS AN EMPTY STRING.
 - The same shapes can assemble differently while the counts hold.
 - NO TILE FILTER CAN COLOUR DARK MATTER'S WATER AND LEAVE ITS ROADS GREY.
+- THE DARK GROUND IS VOYAGER INVERTED, AND THREE FILES HAVE TO AGREE.
+- THE PLACE NAMES ARE NOT IN THE TILE PANE, SO ONE SELECTOR IS HALF A DARK THEME.
+- INVERTING A LIGHT BASEMAP AMPLIFIES A SUB-1% DETAIL INTO A 23% EDGE, AND VOYAGER HAS ONE.
+- A FILTER ON A TILE PANE COSTS ONE FRAME PER RAIL TRAVEL, AND A ZOOM CANNOT MEASURE IT.
 - `detectRetina` halves a tile on any screen above 100%, and `{r}` needs no option.
 - `requestIdleCallback` never fires under `--virtual-time-budget`, so a deferred fetch takes a...
 - The ground asks for no tile until `border.json` answers.

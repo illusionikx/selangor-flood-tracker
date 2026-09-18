@@ -252,12 +252,17 @@ export const TILES = {
 
 /* The CARTO style per theme, read the day `CARTO_KEY` holds a key. Each stem takes a `_nolabels` or
    an `_only_labels` suffix in js/map.js.
-   **Voyager on the light theme and Dark Matter on the dark one, on the repository owner's
-   instruction of 2026-09-14.** Voyager paints roads orange and yellow, and the palette rule reserves
-   those hues for status. The owner took that trade. Voyager publishes no dark variant.
+   **Voyager on both themes, and css/map.css inverts the dark one.** The repository owner named
+   Voyager on 2026-09-14 and asked for a dark Voyager on 2026-09-18. CARTO publishes no dark variant
+   of it, so this app makes one. See the `.leaflet-tile-pane` rule in css/map.css.
+   **The two halves pair, and neither works alone.** Put `dark` back here and leave that rule in
+   place, and the map draws an inverted Dark Matter, which is a white map. Delete that rule and
+   leave this value, and the dark theme draws the light basemap.
    **Voyager sits under `rastertiles/` and Dark Matter at the bare host.** Measured on 2026-09-14:
-   `voyager_nolabels` at the bare host answers 404. */
-export const CARTO_STYLE = { light: 'rastertiles/voyager', dark: 'dark' };
+   `voyager_nolabels` at the bare host answers 404. `dark` is the Dark Matter stem this replaced.
+   Voyager paints roads orange and yellow, and the palette rule reserves those hues for status. The
+   owner took that trade on the light theme. The inversion holds those hues on the dark theme. */
+export const CARTO_STYLE = { light: 'rastertiles/voyager', dark: 'rastertiles/voyager' };
 
 // Sparkline window. Must not exceed the server's own SPARK_WIN — it sends nothing older.
 export const SPARK_H     = 12;     // hours on the graph's x axis

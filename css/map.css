@@ -1,7 +1,8 @@
 /* Leaflet overrides, station pins, cluster badges and the popup template. */
 
-/* **The dark theme draws Dark Matter's water in its own grey.** A water tint and river lines stood
-   here from 2026-09-14 to 2026-09-15, and the repository owner removed both. See docs/FEATURES.md. */
+/* **This map draws no water of its own on either theme.** A water tint and river lines stood here
+   from 2026-09-14 to 2026-09-15, and the repository owner removed both. The dark ground was Dark
+   Matter until 2026-09-18, and it is Voyager inverted now. See docs/FEATURES.md. */
 
 /* What shows where a tile has not arrived. Leaflet's own value is `#ddd`, in both themes and under
    any basemap. Zooming out asks for four times the tiles with nothing to retain over the new area,
@@ -11,6 +12,31 @@
    This is not what put a table on the map mid-zoom. That was `#dataBox` laid out behind it — see
    the `[open]` rule in chrome.css. */
 .leaflet-container { background: var(--surface); }
+
+/* **THE DARK THEME IS VOYAGER INVERTED, AND THE TILE PANES CARRY A FILTER AGAIN.** The repository
+   owner asked for a dark Voyager on 2026-09-18. CARTO publishes no dark variant of that style, so
+   this app makes one. `invert(1)` turns each tile into a film negative, and `hue-rotate(180deg)`
+   puts every hue back near where it started. So the land goes black, the place names go white and
+   every hue survives at a lower lightness. John Nelson published the technique on the Esri blog:
+   https://www.esri.com/arcgis-blog/products/arcgis-online/mapping/create-a-light-or-dark-version-of-any-map-in-two-seconds
+   **This is NOT the tint deleted on 2026-08-27.** That chain was
+   `url(#watertint) brightness(1.75) contrast(.92)`, and the SVG half carried most of the cost. It
+   also had to SELECT one grey band out of a palette the encoder had quantized, which is the trap
+   the Dark Matter entry in docs/GOTCHAS.md records. This selects nothing. Each output pixel reads
+   its own input pixel and no other.
+   **TWO PANES, BECAUSE THE PLACE NAMES ARE NOT IN THE TILE PANE.** `js/map.js` puts the
+   `_only_labels` layer in a pane of its own at z-index 260, under the coverage mask. A rule that
+   names the tile pane alone inverts the ground and leaves dark text under white halos over it.
+   **The mask, the pins and the heat wash must stay out of this.** Each one is a pane of its own
+   above these two, so no rule here reaches them. Never move this filter up to `.leaflet-map-pane`,
+   which is the one ancestor these two share with all three.
+   **It pairs with `CARTO_STYLE.dark` in js/config.js, and with the `carto` class js/map.js writes.**
+   The Esri fallback serves a ground that is already dark. An inversion of that draws a white map.
+   **It puts each pane on a render surface of its own.** Leaflet scales both through every zoom, and
+   the rail travel animates the width of the map card. It costs one dropped frame per rail travel.
+   See docs/FEATURES.md for the measurement. */
+:root.carto[data-theme="dark"] .leaflet-tile-pane,
+:root.carto[data-theme="dark"] .leaflet-labels-pane { filter: invert(1) hue-rotate(180deg); }
 
 /* Zoom sits bottom-right (Maps-style), clear of the alert panel. */
 /* Leaflet gives its control corners `z-index: 1000`, above everything this page has — the splash

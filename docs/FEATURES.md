@@ -19739,3 +19739,150 @@ arrival ripple, and no snackbar. Both themes read the block, at 1536 and at 390.
 
 **Reload the stylesheet past the cache to see a change here.** Herd serves everything
 `Cache-Control: max-age=10800`. A first run measured `opacity: 1` on a rule that reads 0.38 on disk.
+
+## The dark theme is Voyager inverted, 2026-09-18
+
+The repository owner asked for Voyager on the dark theme. CARTO publishes no dark variant of that
+style. So this app makes one out of the light tiles.
+
+`css/map.css` puts one filter on the two tile panes:
+
+```css
+:root.carto[data-theme="dark"] .leaflet-tile-pane,
+:root.carto[data-theme="dark"] .leaflet-labels-pane { filter: invert(1) hue-rotate(180deg); }
+```
+
+`invert(1)` turns each tile into a film negative. `hue-rotate(180deg)` puts every hue back near
+where it started. The land goes black. The place names go white. Every hue survives at a lower
+lightness.
+
+John Nelson published the technique on the Esri blog on 2022-07-14:
+https://www.esri.com/arcgis-blog/products/arcgis-online/mapping/create-a-light-or-dark-version-of-any-map-in-two-seconds
+
+### Three parts, and no part works alone
+
+`CARTO_STYLE.dark` in `js/config.js` moved from `dark` to `rastertiles/voyager`. The `dark` stem is
+Dark Matter, which this replaced.
+
+`js/map.js` writes a `carto` class on the root element when `CARTO_KEY` holds a key. The rule names
+that class. The Esri fallback already serves a dark ground, and an inversion of it draws a white
+map.
+
+`css/map.css` holds the rule above.
+
+Each of the three states the other two in its own comment.
+
+### Two panes, not one
+
+`js/map.js` puts the `_only_labels` layer in a pane of its own at z-index 260. It sits under the
+coverage mask. So a rule that names `.leaflet-tile-pane` alone inverts the ground and leaves the
+light place names over it. Those are dark text inside white halos.
+
+The mask, the pins and the heat wash each own a pane above these two. No rule here reaches them.
+
+### This is not the tint deleted on 2026-08-27
+
+That chain was `filter: url(#watertint) brightness(1.75) contrast(.92)`. It had to select one grey
+band out of a palette the encoder quantized. The Dark Matter entry in `docs/GOTCHAS.md` records
+what that cost. This filter selects nothing. Each output pixel reads its own input pixel and no
+other.
+
+### What it does to the reserved hues
+
+The palette rule reserves amber and orange for station status. Voyager paints roads in those hues.
+The owner took that trade on the light theme on 2026-09-14. The question here was whether a dark
+ground makes it worse.
+
+Measured on 2026-09-18 over 16 Voyager tiles at zoom 14 across central Kuala Lumpur. That is
+1,048,576 pixels. The probe drew each tile twice into a canvas, once with `ctx.filter = 'none'` and
+once with the chain above. A pixel counts as reserved when its chroma is at least 0.12 and its hue
+falls between 20 and 65 degrees.
+
+| ground | pixels in the reserved band | mean relative luminance |
+|---|---|---|
+| Voyager, as served | 20.40% | 0.951 |
+| Voyager, inverted | 9.89% | 0.049 |
+
+The inversion halves the reserved band. What survives sits near black. One sampled road pixel went
+from `rgb(246, 236, 198)` at hue 48 to `rgb(33, 16, 0)` at hue 29.
+
+**So the dark theme collides with the status palette less than the light theme beside it.** An
+alert pin is a mid-tone amber over a near-black road. Nothing on the ground reads as a second alert.
+
+### What it costs per frame
+
+A filter puts its element on a render surface of its own. Leaflet scales both panes through every
+zoom. The navigation rail animates the width of the map card. Those two facts made the frame cost
+the risk to measure.
+
+Measured on 2026-09-18 at a device pixel ratio of 1.25. One run is one rail expand and one rail
+collapse. The conditions ran A B B A, three times each. The table holds the median of six runs.
+
+| condition | frames | median frame | 95th percentile | worst frame |
+|---|---|---|---|---|
+| filter on | 85 | 16.7 ms | 16.8 ms | 33.3 ms |
+| filter off | 86 | 16.7 ms | 16.8 ms | 16.8 ms |
+
+The travel is smooth either way. The filter drops one frame, in four of its six runs. The six runs
+without it dropped none.
+
+**Compare that with the chain this one is not.** The `watertint` chain missed 41 frames of 43.
+
+A zoom gesture did not separate the two conditions. Both sat on the 60 frames per second ceiling,
+at 163 frames and a 16.8 ms 95th percentile. The rail travel is the one gesture that shows this
+cost.
+
+**These are headless numbers on one machine.** Re-measure before you quote them.
+
+### The check
+
+`map-limits-test.html` asked the layer inside the tile pane until this change. It asserted that the
+layer takes no filter, on both themes.
+
+**That assertion never covered the element the old fault lived on.** The `watertint` chain sat on
+the pane itself. So the check passed with the wall still up.
+
+It reads three elements per theme now. They are the tile pane, the labels pane and the layer inside
+the tile pane. It states the exact chain per theme rather than a ban on every filter. Chrome
+serializes the computed value as `invert(1) hue-rotate(180deg)`, which is what the check compares
+against.
+
+`map-limits-test.html` reads PASS.
+
+### The bright rim on every bank
+
+A reader met a bright edge along every river and lake on the day this shipped. They called it a
+drop shadow. It is neither a shadow nor an artifact. Voyager draws a darker casing 3px wide on the water
+side of every bank. The inversion turns that casing bright.
+
+Measured over 99,704 water pixels at Sungai Puluh at zoom 15. Each water pixel carries its distance
+to the nearest bank, and the table holds the mean at each distance.
+
+| pixels from the bank | as served | inverted | against open water |
+|---|---|---|---|
+| 1 | 0.871 | 0.127 | 1.23 |
+| 2 | 0.878 | 0.121 | 1.17 |
+| 3 | 0.890 | 0.109 | 1.05 |
+| open water | 0.895 | 0.104 | 1.00 |
+
+**A 2.7% darkening becomes a 23% brightening.** Zoom 13 reads 1.25 at the bank, so the rim holds
+across zooms rather than falling out of one.
+
+**No per-pixel filter removes it.** The rim is a spatial feature, and a term that dims it dims the
+water by the same factor. Only `contrast()` moves the ratio. `contrast(.92)` takes the rim to 1.17
+and lifts the land from 0.023 to 0.058. `contrast(.75)` takes the rim to about 1.09 and the ground
+to a mean of 0.163, which is a washed grey map rather than a dark one.
+
+**The repository owner left the rim alone on 2026-09-18.** A 23% outline around every river and
+lake is what a cartographer draws on purpose, and this app is a flood map. The trade is a known
+edge against a ground that stays black.
+
+### What this does not do
+
+The sea reads near black rather than blue. Voyager fills water with a pale grey-blue, and an
+inversion of a pale tone is a dark tone. Nothing lifts it.
+
+No brightness term rides on the chain. The land reads black at a mean luminance of 0.049. Add one
+term the day a reader says the ground is too dark. Measure the frame cost again with it.
+
+Nothing here touches the light theme.

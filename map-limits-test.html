@@ -181,16 +181,29 @@ try {
 
   /* A water tint and river lines stood on the dark theme from 2026-09-14 to 2026-09-15, and the
      repository owner removed both. A half revert draws blue on a few rivers and nothing throws.
+     **THIS READS THE PANES, AND IT READ ONE LAYER INSIDE ONE PANE UNTIL 2026-09-18.** The tint that
+     was deleted on 2026-08-27 sat on `.leaflet-tile-pane` itself. So the old assertion never
+     covered the element that fault lived on, and it passed with the wall still up.
+     **The dark theme carries one filter on purpose since 2026-09-18.** That is Voyager inverted, so
+     this states the exact chain per theme rather than forbidding every filter. It reads the labels
+     pane as well, because the place names are a layer of their own and half a revert drops them.
+     The layer inside the tile pane is still asked, because that is where the deleted chain was
+     measured a second time. See the `.leaflet-tile-pane` rule in css/map.css for all three.
      `setTheme` writes the reader's own preference, so the pick goes back after. */
   const { setTheme } = await import('./js/map.js');
   const { PREFS } = await import('./js/state.js');
   const wasTheme = PREFS.theme;
+  const WANT = { light: 'none', dark: 'invert(1) hue-rotate(180deg)' };
+  const PANES = [['ground', '.leaflet-tile-pane'], ['place name', '.leaflet-labels-pane']];
   for (const t of ['dark', 'light']) {
     setTheme(t);
     await settle(300);
-    const ground = document.querySelector('.leaflet-tile-pane .leaflet-layer');
-    ok(`the ${t} ground takes no filter`, getComputedStyle(ground).filter === 'none',
-       getComputedStyle(ground).filter);
+    for (const [name, sel] of PANES) {
+      const got = getComputedStyle(document.querySelector(sel)).filter;
+      ok(`the ${t} ${name} pane takes the filter it should`, got === WANT[t], got);
+    }
+    const layer = getComputedStyle(document.querySelector('.leaflet-tile-pane .leaflet-layer')).filter;
+    ok(`the ${t} ground layer takes no filter of its own`, layer === 'none', layer);
     ok(`the ${t} theme has no river pane`, !map.getPane('rivers'),
        map.getPane('rivers') ? 'found' : 'none');
   }
