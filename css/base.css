@@ -1163,6 +1163,32 @@ dialog:focus, dialog:focus-visible { outline: none; }
    see `img.isConnected` in `tick()`, which is why the picture goes rather than merely hides. */
 .shotwrap:has(.shot) .camfail { display: none; }
 
+/* Outside the coverage area — the whole body of the location card, and its only home. The glyph
+   leads because the card has no reading to show and no meter to draw, so the picture is what a
+   reader reads first. 48px is the size `.camfail` reaches for at 22 doubled: this block owns the
+   card where that one owns a tile, and a 22px mark in the middle of an empty panel reads as a bullet.
+   **Muted ink throughout, and no status hue.** Amber and red name a station in trouble. A reader
+   standing in Penang is not one, and an amber panel would put a flood warning on their own position.
+   That is the rule `#locate.fail` already obeys: a control that cannot help changes its glyph and
+   never its colour.
+   **`travel_explore` and not `location_disabled`, on the repository owner's instruction of
+   2026-09-18.** A crossed-out crosshair is a refusal, and it is the glyph the BUTTON wears when a
+   fix fails. Nothing failed here. The fix is good and the ground is somewhere else, so the picture
+   is a globe with a lens over it rather than a control with a line through it. It also keeps one
+   glyph for one meaning: `location_disabled` stays the failed-fix mark and nothing else.
+   `--i` on a plain `.i`, the shape `#locate.fail .i` in css/chrome.css uses, so `css/icons.css`
+   needs no class of its own for a token only this block reads. */
+.outside {
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  padding: 32px 16px; color: var(--muted); text-align: center;
+}
+/* **0.38 is M3's own opacity for disabled content**, and it sits on the glyph alone. The repository
+   owner asked for a fainter mark on 2026-09-18. A 48px shape at the full muted ink outweighs the two
+   lines under it, and the lines carry the message. Opacity rather than a paler colour: `--muted` is
+   already the faintest ink this app declares, and a second grey below it is a token nobody can
+   re-derive when the palette moves. */
+.outside .i { font-size: 48px; --i: var(--i-travel_explore); opacity: .38; }
+
 /* --- motion --------------------------------------------------------------------------------- */
 
 @keyframes pulse { 50% { opacity: .25; } }

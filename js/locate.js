@@ -3,8 +3,8 @@
 
 import { state, PREFS, save } from './state.js';
 import { el, snack } from './util.js';
-import { map, focusOn, openSide, ping } from './map.js';
-import { herePopup } from './popup.js';
+import { map, focusOn, openSide, ping, inCover, coverReady } from './map.js';
+import { herePopup, outsidePopup } from './popup.js';
 import { alerts } from './alerts.js';
 
 /* **The button is the first cell of Leaflet's zoom control, above the plus.** A reader asked for one
@@ -19,6 +19,30 @@ const btn = zoomBar.firstElementChild;
 L.DomEvent.disableClickPropagation(btn);
 let layer, marker, at, acc;
 let wantPopup = false;   // only pop up when the user asked; never on the landing auto-locate
+
+/* **A fix outside the coverage circle gets no jump and no ripple.** The map may not pan there, so a
+   recentre would drag to the edge of the pan limit and stop, which reads as a control that failed
+   halfway. The card says where the reader is instead — see `outsidePopup()` in js/popup.js.
+   `out` is written in `place()` and read by the button, the card and the warning. One answer, from
+   `inCover()`, so those three cannot disagree. */
+let out = false;
+
+/* The words, once, because two surfaces say them: the snackbar below and the button's own tip. The
+   card states the same fact in its own sentence, and that one names what the map does cover. */
+const OUTSIDE = 'You are outside the coverage area.';
+
+/* **Said once, and the landing is where it lands.** `wantPopup` is false on the auto-locate, so
+   nothing else on screen answers a reader whose position this map cannot use. Every later fix comes
+   from a press, which opens the card, and a snackbar over a card that states the same fact is the
+   second wording of one claim.
+   The flag makes it once even so. A reader who refuses location on landing and grants it later
+   reaches `place()` again, and a warning that repeats teaches a reader to dismiss it. */
+let warned = false;
+
+/* What `map.locate()` was asked to do with the view. Leaflet is told `setView: false` now and
+   `place()` does the move, because Leaflet moves the view the moment a fix lands and this app has to
+   read the fix first. A fix outside the circle is one this map must not travel to. */
+let wantView = false;
 
 /* One writer for the button's three states, so no attribute survives a transition it does not
    belong to. A tip left over from a failure would name a fault on a button that has since found
@@ -80,6 +104,9 @@ export const failTip = (code, perm) =>
    the table. An empty answer means no MET point within `NEAR_MAX_KM`, and the station card prints
    the sentence that says so. A failed import falls through to the same place. */
 export const showHere = async () => {
+  // Outside the circle neither of the two cards below can answer. Both name sensors, and no sensor
+  // this app carries is within reach of the reader.
+  if (out) return openSide('@here', outsidePopup({ accuracy: acc }));
   if (PREFS.mapLayer === 'weather') {
     try {
       const html = (await import('./wx.js')).hereCard(at);
@@ -97,12 +124,23 @@ export const showHere = async () => {
    actually skip the hardware; the stored copy is what survives the reload that clears it. */
 const FIX_TTL = 15 * 60 * 1000;
 
+/* **Every fix waits for the coverage circle, and a restored one is why.** `place()` asks `inCover()`
+   for the one answer three surfaces read, and that function answers yes until `border.json` lands. A
+   stored fix resolves in the same tick this module is imported, which is long before a fetch can
+   come back, so a reader outside the area would have been handed the inside behaviour on every
+   reload. `coverReady` never rejects, and it carries the zoom floor too, so nothing on this map is
+   usable before it anyway.
+   A live fix takes the same road. Geolocation is slower than a 4 KB local file every time measured,
+   and a race nobody can lose is still a race. */
 export function findMe(setView) {
   const f = PREFS.fix;
-  if (f && Date.now() - f[3] < FIX_TTL) return place(L.latLng(f[0], f[1]), f[2], setView);
+  if (f && Date.now() - f[3] < FIX_TTL)
+    return coverReady.then(() => place(L.latLng(f[0], f[1]), f[2], setView));
 
   setBtn('busy', 'Finding your location…');
-  map.locate({ setView, maxZoom: 13, enableHighAccuracy: true, timeout: 10000, maximumAge: FIX_TTL });
+  wantView = setView;
+  // `setView: false`, always. See `wantView` above: this app reads the fix before it moves to it.
+  map.locate({ enableHighAccuracy: true, timeout: 10000, maximumAge: FIX_TTL });
 }
 
 /* The ripple the jump-to-station flash uses, in the location blue rather than the alert red — a red
@@ -131,6 +169,10 @@ btn.onclick = () => {
   wantPopup = true;
   if (mode === 'fail') { snack(words); return findMe(true); }
   if (!at) return findMe(true);       // no fix yet — prompt for one
+  /* **Outside the circle the card is the whole answer, at every width.** There is no recentre and no
+     ripple out here, so `offerCard()`'s desktop-only rule would leave a phone press doing nothing at
+     all. The card is the only thing on screen that can say why. */
+  if (out) return showHere();
   offerCard();                        // already have one: recentre and show what is around you
   focusOn(at, 13);
   flashMe();
@@ -141,7 +183,11 @@ btn.onclick = () => {
 function place(latlng, accuracy, setView) {
   at = state.hereAt = latlng;
   acc = accuracy;
-  setBtn('on', `Recenter on my location (±${Math.round(accuracy)} m)`);
+  out = !inCover(latlng);
+  /* The button keeps the `on` class out here. The state is true — this app holds a fix — and the
+     three classes are what the glyph and the ink read. What changes is what a press does, and the
+     words are where that is stated. `fail` would be a lie: nothing failed. */
+  setBtn('on', out ? OUTSIDE : `Recenter on my location (±${Math.round(accuracy)} m)`);
   if (layer) layer.remove();
 
   marker = L.marker(latlng, { icon: L.divIcon({
@@ -167,10 +213,15 @@ function place(latlng, accuracy, setView) {
     marker,
   ]).addTo(map);
 
-  if (setView) focusOn(latlng, 13);   // map.locate() does this itself; a restored fix has to ask
+  // Leaflet is told `setView: false` on every call now, so both paths move the view here or not at
+  // all. Never to a fix outside the circle: the pan limit would stop the travel part way.
+  if (setView && !out) focusOn(latlng, 13);
+  /* Said once, and on the landing, which is the one path that opens no card. See `warned` above. */
+  if (out && !wantPopup && !warned) { warned = true; snack(OUTSIDE); }
   // Only when the user asked. The landing auto-locate places the marker without moving the view, and
   // a ripple over a corner of the map nobody is looking at is a flicker with no referent.
-  if (wantPopup) { offerCard(); flashMe(); }
+  // Out of coverage the card opens at every width, because nothing else answers the press there.
+  if (wantPopup) { if (out) showHere(); else { offerCard(); flashMe(); } }
   if (state.data.length) alerts();   // re-sort the alert list nearest-first now that we know where you are
   // A fix can land while the table is open — it has a "my location" row that could not exist a
   // moment ago. Redraw so the row appears rather than waiting for the next thing to touch it.
@@ -185,7 +236,9 @@ function place(latlng, accuracy, setView) {
 map.on('locationfound', e => {
   PREFS.fix = [+e.latlng.lat.toFixed(5), +e.latlng.lng.toFixed(5), Math.round(e.accuracy), Date.now()];
   save();
-  place(e.latlng, e.accuracy, false);   // locate() already moved the view if it was asked to
+  // `wantView`, not false: `locate()` is asked for no view of its own now, so this call owns the
+  // move. `coverReady` for the reason findMe() states — `place()` must not run before the circle.
+  coverReady.then(() => place(e.latlng, e.accuracy, wantView));
 });
 
 /* Whether this site holds the grant. The card needs it to tell a site that refuses from a device

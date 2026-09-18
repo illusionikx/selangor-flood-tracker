@@ -358,6 +358,18 @@ const RIM = 1.01;
 
 let cover;                       // the circle's own bounds, once border.json has answered
 
+/* Whether a point sits inside the coverage area. The circle is the one shape this app draws, shades
+   outside and stops the pan at, so it is the shape that answers "can this map say anything about
+   where you are". `RIM` rides on it for the reason the mask carries it: the drawn circle is what a
+   reader sees, and a test that disagreed with the shading would refuse a reader standing on ground
+   this map paints as covered.
+   **It answers yes until border.json lands, and yes if that file never lands.** A map with no circle
+   has no outside. The failure path already draws the whole ground, and a reader inside the area must
+   not be refused because a 4 KB file was slow. `coverReady` is how a caller waits for the real
+   answer — see `findMe()` in js/locate.js, which holds a restored fix until this resolves. */
+let centre, reach;
+export const inCover = ll => !centre || centre.distanceTo(ll) <= reach;
+
 /* **The ground fills a square frame around the circle, and nothing of it draws outside.**
    CARTO counts every tile, and the repository owner asked for fewer tile calls on 2026-09-14.
    **The first version skipped every tile outside the circle itself, and the owner reversed it the
@@ -434,7 +446,10 @@ function ring(lat, lng, km, n = CIRCLE_PTS) {
    zoom floor, so a reader who lands zoomed out would otherwise see the world for as long as the
    browser felt like waiting. A failure is silent and leaves an unlimited map, which is the state this
    replaces. */
-fetch('border.json')
+/* Exported so a caller can wait for the circle rather than race it. It never rejects: the catch at
+   the foot of this chain is the last link, so `coverReady.then(...)` runs on a failed fetch too, with
+   `inCover()` then answering yes for every point. */
+export const coverReady = fetch('border.json')
   .then(r => r.ok ? r.json() : Promise.reject(r.status))
   .then(geo => {
     /* **`border-build.php` places and sizes this circle, and the sea is why it cannot happen here.**
@@ -449,6 +464,9 @@ fetch('border.json')
        circle rather than a fault. */
     const [cy, cx, km] = geo.circle;
     const hole = ring(cy, cx, km * RIM);
+    // What `inCover()` reads. The same centre and the same grown radius the hole above is drawn at.
+    centre = L.latLng(cy, cx);
+    reach = km * RIM * 1000;
 
     // The circle's own extent, which is what the limits above read.
     cover = L.latLngBounds(hole.map(([x, y]) => [y, x]));

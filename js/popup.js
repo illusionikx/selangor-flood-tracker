@@ -894,6 +894,28 @@ export function sitePopup(members) {
    search box itself (see `nearPlace` in ui.js) — and with one caller left the two parameters were
    two ways to build one card. Built fresh on every open, so it reflects the latest poll rather than
    the fix's own timestamp. */
+/* The whole card for a reader standing outside the coverage circle. It replaces `herePopup()` rather
+   than adding a line to it, because every section that card draws is a claim about a sensor near the
+   reader, and out here there is none to name. Four rows reading `No water level within 10 km` state
+   a gap in the feed. This states a fact about the place.
+   **The head is the one `herePopup()` draws**, so the pane's app bar is filled the same way on both
+   cards — `openSide()` lifts `.popname` and the `.muted` line under it out of `.pophead`, and a card
+   missing either empties that slot. The accuracy line stays: the fix is still a fix, and the radius
+   is the one thing about it this app can still state.
+   The glyph is `location_disabled`, which `#locate.fail` already wears. A control that cannot help
+   and a place this map cannot answer for read as one refusal. `.outside` in css/base.css holds the
+   size and the muted ink, and the hue does not move: the palette rule keeps amber and red for a
+   station in trouble, and a reader outside Selangor is not one. */
+export const outsidePopup = e => `<div class="pophead">
+    <div class="popname"><i class="i i-my_location" style="color:var(--me)"></i> Your Location</div>
+    <div class="muted">Accurate to ${Math.round(e.accuracy)} m</div>
+  </div>
+  <div class="outside">
+    <i class="i"></i>
+    <b>You are outside the coverage area</b>
+    <span>This map covers Selangor, Kuala Lumpur and Putrajaya.</span>
+  </div>`;
+
 export function herePopup(e, loaded) {
   if (!loaded) return '<b>Your Location</b><br><span class="muted">Stations still loading…</span>';
   const at = e.latlng;

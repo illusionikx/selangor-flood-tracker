@@ -385,6 +385,25 @@ frames only exist because we ran when they were taken. To re-test the capture pa
   So the two read as one control in two states. `setBtn()` writes all three button states through one
   function. So no attribute outlives the state that set it. A tip left over from a failure names a
   fault on a button that already found you.
+- **A stored fix resolves before `border.json` does, so a caller has to wait for the coverage test.**
+  `inCover()` in `js/map.js` answers whether a point sits inside the coverage circle. It answers yes
+  until that file lands, on purpose. A map with no circle has no outside, and a reader inside the
+  area must not be refused because a 4 KB file was slow.
+  `PREFS.fix` is the trap. `findMe()` takes a stored fix and calls `place()` in the same tick
+  `js/locate.js` loads. No fetch can answer that soon. So a reader outside the coverage area got the
+  inside behavior on every reload, and nothing said so.
+  **`coverReady` is the wait.** It is that same fetch as a promise, and it never rejects, because
+  the catch at the foot of the chain is the last link. Both paths in `js/locate.js` go through it,
+  the stored fix and the live one. The live one looks safe on its own. The Geolocation API is slower
+  than a local 4 KB file in every measurement. A race nobody can lose is still a race.
+  Anything new that asks `inCover()` at load time needs the same wait.
+- **Leaflet moves the view the moment a fix lands, and this app has to read the fix first.**
+  `map.locate({ setView: true })` pans and zooms before `locationfound` fires. A fix outside the
+  coverage circle is one this map must not travel to, and the pan limit stops that travel part way.
+  A control that moves halfway and stops reads as a control that failed.
+  So this app calls `map.locate()` with no view of its own. `place()` in `js/locate.js` owns the move, and
+  it makes it only for a fix inside the circle. `wantView` carries what the caller asked for across
+  the wait. Do not put `setView` back on the `locate()` call.
 - **`js/oops.js` must stay the first import in `app.js`.** A static import runs before the body of
   the file that imports it. A handler written inside `app.js` therefore starts after every other
   module evaluated. A throw during that evaluation reaches nobody. This is a real case rather

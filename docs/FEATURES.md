@@ -19639,3 +19639,103 @@ still reaches a reader.
 `php shots-test.php` gains five on `shotWebp()`. A forced rebuild published the same source counters
 as the payload before the change. Both builds ran. The eight checks passed on the source, and the
 four build checks passed on the build.
+
+## A reader outside the coverage area, 2026-09-18
+
+The repository owner asked for this on 2026-09-18. A reader outside the coverage area must get no
+jump to their own position. The location panel must state the fact under a large glyph. The app must
+warn one time.
+
+### What was true
+
+`findMe()` handed every fix to `focusOn()`. A fix in Penang moved the map toward Penang. The pan
+limit then stopped that travel at the edge of the circle. So the control looked like a control that
+failed part way.
+
+The location card named the four nearest sensors. Each row read `No water level within 10 km`. That
+states a gap in the feed. It does not state a fact about the place.
+
+### The coverage test
+
+`inCover()` in `js/map.js` answers whether a point sits inside the coverage circle. That circle is
+the shape this app shades outside, stops the pan at, and takes the zoom floor from. `RIM` rides on
+the radius, because the drawn circle is what a reader sees. A test that disagrees with the shading
+refuses a reader standing on ground this map paints as covered.
+
+`inCover()` answers yes until `border.json` lands. It answers yes if that file never lands. A map
+with no circle has no outside, and the failure path already draws the whole ground.
+
+`coverReady` is that same fetch as a promise. It never rejects, because the catch at the foot of the
+chain is the last link. `js/locate.js` holds every fix until it resolves.
+
+### The wait is load-bearing
+
+A stored fix resolves in the tick `js/locate.js` loads. That is long before a fetch can answer. So a
+reader outside the area got the inside behavior on each reload. A live fix takes the same road. The
+Geolocation API is slower than a 4 KB local file every time measured. A race nobody can lose is
+still a race.
+
+### The three changes
+
+Leaflet is told `setView: false` on every `map.locate()` call. `place()` moves the view instead.
+This app must read a fix before it travels to it.
+
+`place()` writes `out` from `inCover()`. Three surfaces read that one answer, so the three cannot
+disagree. The button tip states `You are outside the coverage area.` The card draws the block below.
+The snackbar says the same words one time.
+
+The button keeps its `on` class. The app holds a real fix, so `fail` states a false claim. What
+changes is the act. A press opens the card at every width, because out here there is no recentre and
+no ripple to answer it on a phone.
+
+### The card
+
+`outsidePopup()` in `js/popup.js` replaces `herePopup()` for a reader outside the circle. It keeps
+the same head, so the pane app bar fills the same way on both cards. `openSide()` lifts `.popname`
+and the muted line under it out of `.pophead`. A card missing either empties that slot.
+
+The body is `.outside` in `css/base.css`. It holds a 48px glyph over two lines of muted text.
+
+The glyph is `travel_explore`, a globe with a lens over it. The repository owner asked for a travel
+glyph on 2026-09-18. The first draft used `location_disabled`, the crossed-out crosshair. That mark
+is a refusal, and `#locate.fail` already wears it. Nothing failed here. The fix is good, and the
+ground is somewhere else. One glyph keeps one meaning this way.
+
+The glyph takes `opacity: .38`, which is M3's own opacity for disabled content. The repository owner
+asked for a fainter mark the same day. A 48px shape at the full muted ink outweighs the two lines
+under it, and the lines carry the message. Opacity rather than a paler colour, because `--muted` is
+the faintest ink this app declares. A second grey below it is a token nobody can re-derive when the
+palette moves. The text keeps the full muted ink.
+
+The hue does not move. Amber and red name a station in trouble. A reader in Penang is not one. That
+is the rule `#locate.fail` already obeys.
+
+`css/icons.css` gains the `--i-travel_explore` token and no `.i-` class. `.outside .i` reads the
+token through `--i` on a plain `.i`, the shape `#locate.fail .i` already uses.
+
+### Trade-offs
+
+The warning is once per page load, and not once per browser. A returning reader meets it again. A
+flag in `PREFS` makes it once for ever, and then the app carries a flag that can never clear.
+
+The marker and the accuracy circle still draw at the fix. The pan limit puts both out of reach. The
+code to skip them is longer than the code that draws them.
+
+`state.hereAt` is still set. So the alert list still sorts nearest first, over distances of 200 km
+and more. The sort is honest and the label is a stretch. Nobody asked for a change there.
+
+The go-to box needs no change. `api.php` bounds `?place=` to `BOX`, so a place search cannot return
+a place outside the area.
+
+### The check
+
+`npm run build`, then `m3-check`, `paint-check` and `map-limits-test`. The first two ran against
+both targets. All of them read PASS.
+
+Then a seeded fix at George Town, Penang, and a seeded fix at Shah Alam. The first gives the button
+class `on`, the tip `You are outside the coverage area.`, the snackbar words, a card with no sensor
+row, and a 48px glyph at opacity 0.38. The second gives the recentre tip, six sensor rows, an
+arrival ripple, and no snackbar. Both themes read the block, at 1536 and at 390.
+
+**Reload the stylesheet past the cache to see a change here.** Herd serves everything
+`Cache-Control: max-age=10800`. A first run measured `opacity: 1` on a rule that reads 0.38 on disk.

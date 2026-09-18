@@ -41,7 +41,7 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `js/util.js` | pure helpers + `hasInfo()` / `color()` / `isIgnored()` |
 | `js/stations.js` | queries over the station set (`nearestOf`, `nearestCam`, `byId`) |
 | `js/pins.js` | the station pins and the cluster chips, painted on ONE canvas. Sprite cache, greedy grid clustering, hit testing, and the danger halo's own frame loop. Replaced Leaflet.markercluster |
-| `js/map.js` | map instance, basemap/theme, the pin layer, the station panel (`openSide`), `focusOn` / `flashTo`. Also the coverage mask, the zoom floor, the pan limit and the tile skip, all four off `border.json`. The ground stops at a square frame around the circle, and the map asks for no tile outside it. The map draws no water of its own on either theme. Also the zoom ceiling, 15, and `disableClusteringAtZoom: 15` on the cluster, which is what makes 15 the zoom that merges nothing |
+| `js/map.js` | map instance, basemap/theme, the pin layer, the station panel (`openSide`), `focusOn` / `flashTo`. Also the coverage mask, the zoom floor, the pan limit and the tile skip, all five off `border.json`, with `inCover()` the fifth and `coverReady` the wait every caller of it needs. The ground stops at a square frame around the circle, and the map asks for no tile outside it. The map draws no water of its own on either theme. Also the zoom ceiling, 15, and `disableClusteringAtZoom: 15` on the cluster, which is what makes 15 the zoom that merges nothing |
 | `js/heat.js` | both heat layers (water level, rainfall), ground-fixed sizing per layer, shared opacity. Also the field pass where a gauge reporting no rain denies the ground a wet one claims |
 | `heat-test.html` | `chrome --headless --dump-dom` — one of eight runnable checks. Guards the rain layer's paint distance, its dry-gauge erase and its handover between neighbours, in canvas pixels |
 | `map-limits-test.html` | `chrome --headless --dump-dom` — one of eight runnable checks. Guards the coverage circle, the zoom floor and the pan limit. It probes the drawn shape with `isPointInFill`, so it reads the fill rule the browser paints with. It asserts that no water pane, tile filter or river pane came back on either theme, that the circle holds every point of the land ring, that its centre sits east of that ring's middle, that the map asks for no tile outside the square frame around the circle, that every tile level clips to that frame, that the faint stripes still carry their hairline, and that the pattern sprite is rendered rather than `display: none`, which is the one thing that empties the tile with nothing to say so |
@@ -50,7 +50,7 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `js/render.js` | rebuilds markers and heat points, the two saved lists, and the kind counts |
 | `js/alerts.js` | "On alert": the app bar's warning glyph, the list it opens in `#side`, the icon badge, the red favicon. Also the MET warning cards above that list |
 | `js/table.js` | the all-stations table dialog, grouped district → mast → sensor |
-| `js/locate.js` | geolocation, the "You are here" marker, and the amber button a failed fix leaves behind |
+| `js/locate.js` | geolocation, the "You are here" marker, and the amber button a failed fix leaves behind. Also the outside-coverage state: a fix past the circle gets no jump and no ripple, a card of its own and one snackbar |
 | `js/ticker.js` | header alert marquee — measured, no visible seam, speed scales with the alert count. Draws the MET warning tiles into the strip. Closes every set with the app's own name as a divider |
 | `js/timeline.js` | camera archive replay + A/B compare, inside the lightbox and nowhere else |
 | `js/clip.js` | the station panel's 3-hour camera clip — no controls, that is the lightbox's job |
@@ -460,6 +460,8 @@ order that file holds them. A trap names itself here, and the file states the ev
 - `session.auto_start` serializes every request from one browser, and it also...
 - `error_log()` writes to standard error, and a FastCGI server folds that int...
 - A geolocation permission can read `granted` and still yield nothing, becaus...
+- A stored fix resolves before `border.json` does, so a caller has to wait for...
+- Leaflet moves the view the moment a fix lands, and this app has to read the ...
 - `js/oops.js` must stay the first import in `app.js`.
 - No `fastcgi_finish_request` under Herd
 - One rebuild at a time, enforced by `flock` on `.refresh.lock`.
