@@ -364,37 +364,17 @@
      this is the light theme's own moon, at the same lightness the rest of this set holds on paper.
      Do not copy the map value up here. Do not push this one down there either. */
   --wx-moon: #7d8794;
-  /* The shading over everything outside the coverage circle, and the hairline on that circle. See
-     `.covermask` in css/map.css and the mask block in js/map.js.
-     **Neutral on purpose, and neither carries a hue at all.** This says "not answered here", which
-     is a fact about the app rather than a state of the water. A tinted mask over 400 pins would put
-     a sixth colour on the map, and the palette rule above reserves every hue it has.
-     Both are alpha over the basemap rather than solid colours, because the ground under them has to
-     stay legible: a reader who pans to the edge is still reading a coastline.
-     **All three are LIGHTER than the first striped version**, on the repository owner's instruction.
-     That set ran 0.045 under a 0.16 stripe, and the reader called it too busy over Selangor's real
-     outline. The stripes came back once the shape was a circle, at 0.10, and again lighter at 0.06
-     on 2026-09-03. The edge line carries the boundary now, so neither the wash nor the stripes have
-     to. Keep this trio faint. A reader who pans to the edge is still reading a coastline. */
-  --mask-bg: rgba(0,0,0,.045); --mask-line: rgba(0,0,0,.06); --mask-edge: rgba(0,0,0,.22);
+  /* **`--mask-bg`, `--mask-line` and `--mask-edge` are DELETED, and this note stands where they did.**
+     They painted the wash, the diagonal stripes and the hairline over everything outside the coverage
+     area, on both themes, from 2026-09-02 to 2026-09-23. The repository owner deleted that shading.
+     See the coverage-area block in css/map.css for the whole list of what went with them. */
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
   --surface: #202124; --on-surface: #e8eaed; --muted: #9aa0a6; --outline: #3c4043;
   --hover: #303134; --accent: #8ab4f8;
   --shadow: 0 1px 2px rgba(0,0,0,.6), 0 2px 6px 2px rgba(0,0,0,.3);
-  /* The coverage mask, stated again for this theme. See the light theme's own comment above for
-     what these two are and why neither carries a hue. The wash is black rather than the theme's own
-     surface: a dark basemap darkened is still a map, and a near-black wash the colour of the panels
-     would read as a panel lying over the map.
-     **The STRIPE and the EDGE are white here and black on paper, and that reverses both.** A darker
-     mark on a wash that is already 30% black has nowhere left to go. The wash goes down and the two
-     marks go up, so the circle and its texture stay readable at either end of the theme.
-     The stripe is 0.022 against the first version's 0.055, for the reason the light theme states.
-     **It is near the floor of what a screen can draw.** Measured off the rendered page: the stripes
-     stand 4 levels of 255 apart on the dark theme, against 13 on paper. Under that the texture stops
-     reading as a direction at all. Do not take this one lower without looking at the pixels. */
-  --mask-bg: rgba(0,0,0,.30); --mask-line: rgba(255,255,255,.022); --mask-edge: rgba(255,255,255,.20);
+  /* The three `--mask-*` tokens stood here too, and they are deleted. See the light theme's note. */
 }
 /* **The map palette, and it is this set on both themes.** The selector is the whole of the change:
    the values below are the dark theme's, and `.pin` takes them whatever the theme is, so a station

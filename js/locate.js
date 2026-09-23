@@ -20,7 +20,7 @@ L.DomEvent.disableClickPropagation(btn);
 let layer, marker, at, acc;
 let wantPopup = false;   // only pop up when the user asked; never on the landing auto-locate
 
-/* **A fix outside the coverage circle gets no jump and no ripple.** The map may not pan there, so a
+/* **A fix outside the coverage area gets no jump and no ripple.** The map may not pan there, so a
    recentre would drag to the edge of the pan limit and stop, which reads as a control that failed
    halfway. The card says where the reader is instead — see `outsidePopup()` in js/popup.js.
    `out` is written in `place()` and read by the button, the card and the warning. One answer, from
@@ -41,7 +41,7 @@ let warned = false;
 
 /* What `map.locate()` was asked to do with the view. Leaflet is told `setView: false` now and
    `place()` does the move, because Leaflet moves the view the moment a fix lands and this app has to
-   read the fix first. A fix outside the circle is one this map must not travel to. */
+   read the fix first. A fix outside the coverage box is one this map must not travel to. */
 let wantView = false;
 
 /* One writer for the button's three states, so no attribute survives a transition it does not
@@ -124,7 +124,7 @@ export const showHere = async () => {
    actually skip the hardware; the stored copy is what survives the reload that clears it. */
 const FIX_TTL = 15 * 60 * 1000;
 
-/* **Every fix waits for the coverage circle, and a restored one is why.** `place()` asks `inCover()`
+/* **Every fix waits for the coverage box, and a restored one is why.** `place()` asks `inCover()`
    for the one answer three surfaces read, and that function answers yes until `border.json` lands. A
    stored fix resolves in the same tick this module is imported, which is long before a fetch can
    come back, so a reader outside the area would have been handed the inside behaviour on every

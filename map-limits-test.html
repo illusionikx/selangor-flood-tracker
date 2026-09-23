@@ -1,23 +1,27 @@
 <!doctype html>
 <meta charset="utf-8">
-<title>Coverage mask and map limits check</title>
-<!-- Eighth runnable check in this repo. It guards the three things border.json pays for: the shading
-     over everything outside the coverage area, the zoom floor, and the pan limit.
+<title>Coverage area and map limits check</title>
+<!-- Eighth runnable check in this repo. It guards the four things border.json pays for: the coverage
+     box, the zoom floor, the pan limit, and which tiles the map asks for.
 
-     Every fault here is SILENT. A mask that draws nothing looks like a map. A mask whose stripes
-     never render looks like a flat wash somebody chose. A zoom floor the pan box refuses still
-     answers its own number to `getMinZoom()`. None of them throws, and none of them is visible in a
-     diff.
+     **THE SHADING IS GONE SINCE 2026-09-23, AND HALF OF THIS PAGE GUARDS ITS ABSENCE.** Everything
+     outside a circle used to be shaded with diagonal stripes. The repository owner replaced the
+     circle with a rectangle and deleted the shading. A partial revert draws a shaded ring with no
+     stripes in it, or a striped ring the ground now reaches past, and neither throws.
+
+     Every fault here is SILENT. A box built from the whole outline holds 44 km of the Strait of
+     Malacca and still draws a map. A zoom floor the pan box refuses still answers its own number to
+     `getMinZoom()`. A tile level with no clip draws ground past the box on a zoom out alone. None of
+     them throws, and none of them is visible in a diff.
 
      Run it headless. It prints its own verdict into the output box below, so there is nothing to
      look at. docs/VERIFY.md carries the command. Do not write that element's own tag into this
      comment — the reader there cuts the output out of the dumped DOM by matching it, and a second
      copy in a comment is the one it finds first. -->
-<!-- **This page loads stylesheets and heat-test.html does not, and the mask is why.** Three of the
-     things asserted below are painted rather than computed: the pattern the mask asks for, the two
-     paints inside that pattern's tile, and the z-index of every Leaflet pane. Without these files
-     the mask draws in Leaflet's own default blue, both tile shapes resolve to black, and
-     `overlayPane` has no z-index at all. -->
+<!-- **This page loads stylesheets and heat-test.html does not.** Two of the things asserted below are
+     painted rather than computed: the z-index of every Leaflet pane, and the one filter each theme
+     puts on its tile panes. Without these files `overlayPane` has no z-index at all and neither pane
+     carries a filter. -->
 <link rel="stylesheet" href="vendor/leaflet.css">
 <link rel="stylesheet" href="css/base.css">
 <link rel="stylesheet" href="css/map.css">
@@ -29,7 +33,7 @@
 <dialog id="pane"></dialog>
 <input id="heatOpacity" type="range" min="0" max="100" value="100">
 <span id="heatOpacityVal"></span>
-<!-- `applyTheme()` writes this at call time. The water block below calls `setTheme()`. -->
+<!-- `applyTheme()` writes this at call time. The theme block below calls `setTheme()`. -->
 <meta name="theme-color" content="">
 <pre id="out">running</pre>
 <script>
@@ -49,7 +53,12 @@ const ok = (name, pass, detail) => { say((pass ? 'ok   ' : 'FAIL ') + name + '  
 const settle = ms => new Promise(r => setTimeout(r, ms));
 
 try {
-  const { map } = await import('./js/map.js');
+  /* **The whole namespace object, never a destructured `cover`.** `cover` is an `export let` that
+     border.json fills in a tick or two after this import. Destructuring snapshots the value at import
+     time, which is `undefined`, and every assertion below would then read the wrong thing. A property
+     read on the namespace follows the live binding. */
+  const M = await import('./js/map.js');
+  const { map } = M;
 
   /* Wait for the map to say it has stopped, never for a guessed number of milliseconds. A
      `setZoom()` that also has to travel back inside `maxBounds` runs a pan and then a zoom, and the
@@ -62,95 +71,72 @@ try {
     map.on('moveend', done);
   });
 
-  // border.json is fetched at module load, so the mask arrives a tick or two after the import.
-  let path = null;
-  for (let i = 0; i < 60 && !path; i++) { await settle(100); path = document.querySelector('.covermask'); }
-  ok('the mask draws', !!path, path ? 'one .covermask path' : 'nothing after 6 s');
-  if (!path) throw new Error('no mask, so nothing below can be measured');
+  // border.json is fetched at module load, so the box arrives a tick or two after the import.
+  for (let i = 0; i < 60 && !M.cover; i++) await settle(100);
+  ok('the coverage box lands', !!M.cover,
+     M.cover ? M.cover.toBBoxString() : 'nothing after 6 s, or the fetch failed');
+  if (!M.cover) throw new Error('no box, so nothing below can be measured');
+  const cover = M.cover;
 
   // --- the shape ---------------------------------------------------------------------------------
 
-  const d = path.getAttribute('d') || '';
-  const subs = d.split('M').filter(Boolean).length;
-  ok('it is a ring with a hole in it', subs >= 2, subs + ' subpaths, wanted 2 or more');
-
-  /* `isPointInFill` reads the same fill rule the browser paints with, so this asks the rendered
-     shape rather than the numbers behind it. The path is written in Leaflet's layer coordinates, so
-     that is the space a probe point has to be in.
-     **Every probe has to be ON SCREEN.** Leaflet clips a polygon to the viewport plus its padding,
-     so a point off the edge is outside the clipped path whatever the map says about it. Ipoh sat
-     here for one revision and failed for exactly that reason, which reads as a hole in the mask
-     over Perak. `assert` refuses a probe the view does not hold, so the next one cannot hide. */
-  map.setView([3.1, 101.5], 9, { animate: false });
-  await settle(200);
-  const at = ll => {
-    if (!map.getBounds().contains(L.latLng(ll))) throw new Error('probe ' + ll + ' is off screen');
-    const p = map.latLngToLayerPoint(L.latLng(ll));
-    return path.isPointInFill(new DOMPoint(p.x, p.y));
-  };
-
-  ok('Shah Alam is not shaded', !at([3.073, 101.518]), 'inside the circle');
-  ok('Kuala Lumpur is not shaded', !at([3.139, 101.687]), 'an enclave of Selangor, and the circle '
-     + 'holds every part of the state');
-  ok('Putrajaya is not shaded', !at([2.926, 101.696]), 'the second enclave');
-  ok('Melaka is shaded', at([2.190, 102.250]), 'well past the radius on the south east');
-  /* **Bentong is INSIDE and that is not a fault.** A circle that holds all of Selangor's land holds
-     a piece of Pahang with it. The assertion is here the right way round on purpose: a future change
-     that tightens the radius until Bentong falls out has almost certainly clipped Selangor itself,
-     and that is the fault worth catching. */
-  ok('Bentong is not shaded', !at([3.522, 101.908]), 'Pahang, and inside the radius');
-
-  /* **The circle has to hold every point of the LAND ring, and that ring is not the whole outline.**
-     `border-build.php` drops the sea boundary before it places the circle, so the maritime corner in
-     the Strait of Malacca is outside on purpose and asserting the full outline would fail on correct
-     code. Probe the ring's own points, and never its bounding box: a box corner sits further from
-     the centre than any point on the shape. Four corners were asserted here for one revision and
-     this page went red over nothing. */
   const geo = await (await fetch('border.json')).json();
   const land = geo.features.find(f => f.properties.t === 'land');
-  ok('the file carries a land ring and a circle', !!land && Array.isArray(geo.circle),
-     land ? 'circle ' + geo.circle.join(', ') : 'no land feature');
+  ok('the file carries a land ring', !!land && !!land.geometry.coordinates[0].length,
+     land ? land.geometry.coordinates[0].length + ' points' : 'no land feature');
   const pts = land.geometry.coordinates[0];
-  const onScreen = pts.filter(([x, y]) => map.getBounds().contains(L.latLng([y, x])));
-  const shaded = onScreen.filter(([x, y]) => at([y, x]));
-  ok('the circle holds the land it was built from',
-     onScreen.length > 20 && shaded.length === 0,
-     onScreen.length + ' of ' + pts.length + ' land points are on screen, ' + shaded.length
-     + ' of them shaded');
 
-  /* The circle sits on the land rather than on the strait. `border-build.php` earns that by dropping
-     the sea ways, and a rebake against changed tagging would silently put it back over the water.
-     The centre has to be east of the land ring's own middle longitude, which the sea version was
-     not. */
-  const lons = pts.map(p => p[0]);
-  const mid = (Math.min(...lons) + Math.max(...lons)) / 2;
-  ok('the circle sits east of the land ring middle', geo.circle[1] > mid,
-     'centre ' + geo.circle[1].toFixed(4) + ', land middle ' + mid.toFixed(4));
+  /* **The box has to hold every point of the LAND ring, and that ring is not the whole outline.**
+     `border-build.php` drops the sea boundary, so the maritime corner in the Strait of Malacca is
+     outside on purpose. Reading `bounds` instead of this ring is the fault that costs the most: the
+     box grows 44 km west over open water, and the map pays CARTO for tiles of it. */
+  const loose = pts.filter(([x, y]) => !cover.contains(L.latLng([y, x])));
+  ok('the box holds the land it was built from', loose.length === 0,
+     pts.length + ' land points, ' + loose.length + ' outside');
 
-  // --- the paint ---------------------------------------------------------------------------------
+  /* The other half of the same rule, stated the other way round. A box built from `bounds` passes the
+     assertion above and fails this one. */
+  ok('the box stops short of the maritime corner', cover.getWest() > geo.bounds[0],
+     'box west ' + cover.getWest().toFixed(4) + ', outline west ' + geo.bounds[0].toFixed(4));
 
-  /* The stripes are faint by instruction, so the hairline is what states the boundary. A stroke of
-     `none` leaves a circle nobody can find, and it is the one property here whose loss is invisible
-     in every other assertion on this page. */
-  const paint = getComputedStyle(path);
-  ok('the mask asks for the pattern', paint.fill.includes('#hatch'), paint.fill);
-  ok('the circle carries an edge', paint.stroke !== 'none' && parseFloat(paint.strokeWidth) > 0,
-     paint.stroke + ' at ' + paint.strokeWidth);
+  /* **The box is TALLER than it is wide, which is the whole reason it is a rectangle.** Selangor is
+     shaped that way. A circle spent 191 km on both axes to hold a state that needs 141 by 127. */
+  const kmH = (cover.getNorth() - cover.getSouth()) * 110.57;
+  const kmW = (cover.getEast() - cover.getWest()) * 111.32
+            * Math.cos(cover.getCenter().lat * Math.PI / 180);
+  ok('the box is taller than it is wide', kmH > kmW,
+     kmH.toFixed(1) + ' km north to south against ' + kmW.toFixed(1) + ' km east to west');
 
-  /* The pattern cannot be read off a pixel here, because this page has no way to sample the
-     compositor. So it is read off the two things that broke it.
-     **`display: none` on the sprite is the fault this line exists for.** A `<pattern>` is a paint
-     server whose tile Blink builds from the layout tree, and a hidden sprite gives its children no
-     layout. The pattern still resolves, every fill still computes, and the tile is empty. The mask
-     then draws as a flat wash and nothing anywhere says so. */
-  const def = document.getElementById('hatchdef');
-  ok('the pattern sprite is rendered', def && getComputedStyle(def).display !== 'none',
-     def ? 'display ' + getComputedStyle(def).display : 'no #hatchdef at all');
-  const bg = document.querySelector('#hatch .hatchbg');
-  const line = document.querySelector('#hatch .hatchline');
-  const fills = [bg, line].map(e => e && getComputedStyle(e).fill);
-  ok('the tile holds two different paints', !!bg && !!line && fills[0] !== fills[1],
-     fills.join(' against '));
+  /* `MARGIN` in js/map.js grows the land extent on every side. With no shading left, the box edge is
+     the edge of the map, so a border flush against it reads as a map that was cut off. */
+  const lats = pts.map(p => p[1]), lons = pts.map(p => p[0]);
+  ok('the box carries a margin past the land',
+     cover.getSouth() < Math.min(...lats) && cover.getNorth() > Math.max(...lats)
+     && cover.getWest() < Math.min(...lons) && cover.getEast() > Math.max(...lons),
+     'land ' + Math.min(...lons).toFixed(4) + ',' + Math.min(...lats).toFixed(4) + ' to '
+     + Math.max(...lons).toFixed(4) + ',' + Math.max(...lats).toFixed(4));
+
+  const has = ll => cover.contains(L.latLng(ll));
+  ok('Shah Alam is inside', has([3.073, 101.518]), 'the state capital');
+  ok('Kuala Lumpur is inside', has([3.139, 101.687]), 'an enclave of Selangor');
+  ok('Putrajaya is inside', has([2.926, 101.696]), 'the second enclave');
+  ok('Melaka is outside', !has([2.190, 102.250]), 'well past the south east corner');
+  /* **Bentong is INSIDE and that is not a fault.** A box that holds all of Selangor's land holds a
+     piece of Pahang with it. The assertion is here the right way round on purpose: a change that
+     tightens the box until Bentong falls out has almost certainly clipped Selangor itself, and that is
+     the fault worth catching. */
+  ok('Bentong is inside', has([3.522, 101.908]), 'Pahang, and inside the box');
+
+  // --- nothing shades the outside ----------------------------------------------------------------
+
+  /* Everything outside a circle was shaded from 2026-09-02 to 2026-09-23. The repository owner
+     deleted it. Each of these four was a separate part of that shading, and a revert can bring back
+     one without the others: the drawn path, the pane it sat in, the `<pattern>` sprite that filled it,
+     and the SVG mask that stood over the ground before the tile clip replaced it. */
+  for (const [what, sel] of [['mask path', '.covermask'], ['pattern sprite', '#hatchdef'],
+                             ['ground mask', '.coverframe']])
+    ok('there is no ' + what, !document.querySelector(sel), sel + ' found none');
+  ok('there is no mask pane', !map.getPane('mask'), map.getPane('mask') ? 'found' : 'none');
 
   // --- the limits --------------------------------------------------------------------------------
 
@@ -166,6 +152,8 @@ try {
   const box = map.options.maxBounds;
   ok('the floor is the box', box && floor === map.getBoundsZoom(box),
      'floor ' + floor + ', the box fits at ' + (box && map.getBoundsZoom(box)));
+  ok('the pan box IS the coverage box', box && box.equals(cover),
+     box ? box.toBBoxString() + ' against ' + cover.toBBoxString() : 'no maxBounds');
 
   map.panTo([13.75, 100.50], { animate: false });   // Bangkok
   await settle(300);
@@ -190,7 +178,7 @@ try {
      The layer inside the tile pane is still asked, because that is where the deleted chain was
      measured a second time. See the `.leaflet-tile-pane` rule in css/map.css for all three.
      `setTheme` writes the reader's own preference, so the pick goes back after. */
-  const { setTheme } = await import('./js/map.js');
+  const { setTheme } = M;
   const { PREFS } = await import('./js/state.js');
   const wasTheme = PREFS.theme;
   const WANT = { light: 'none', dark: 'invert(1) hue-rotate(180deg)' };
@@ -211,64 +199,56 @@ try {
 
   // --- the tiles ---------------------------------------------------------------------------------
 
-  /* The ground fills a square frame around the circle, and no tile outside the frame is asked for,
-     because CARTO counts every tile. A revert to a plain `L.tileLayer` asks for them again and draws
-     a map that looks almost the same, so nothing else on this page notices. The floor view spans the
-     whole pan box, so it holds tiles far past the frame. */
-  const { frame } = await import('./js/map.js');
+  /* The ground fills the coverage box and no tile outside it is asked for, because CARTO counts every
+     tile. A revert to a plain `L.tileLayer` asks for them again and draws a map that looks almost the
+     same, so nothing else on this page notices. */
   map.setZoom(map.getMinZoom(), { animate: false });
   await settle(400);
-  const [cy, cx, ckm] = geo.circle;
-  // The circle's extent, worked out here rather than read off the module that draws it.
-  const dLat = ckm / 110.57, dLng = ckm / (111.32 * Math.cos(cy * Math.PI / 180));
-  const disc = L.latLngBounds([cy - dLat, cx - dLng], [cy + dLat, cx + dLng]);
-  ok('the frame holds the circle, with room around it',
-     !!frame && frame.contains(disc.pad(0.1)),
-     frame ? frame.toBBoxString() + ' around ' + disc.toBBoxString() : 'no frame');
   const tileLayers = [];
   map.eachLayer(l => { if (l instanceof L.TileLayer) tileLayers.push(l); });
-  const outside = (l, coords) => !frame.intersects(l._tileCoordsToBounds(coords));
+  const outside = (l, coords) => !cover.intersects(l._tileCoordsToBounds(coords));
+
+  /* The floor view has to reach past the box, or the assertion under it proves nothing. The box is
+     taller than this window, so the floor fits its height and leaves bare container to the left and
+     the right. Those strips are what spans tiles the box does not hold. */
   let spanned = 0;
   const t0 = tileLayers[0];
-  if (t0 && frame) {
+  if (t0) {
     const r = t0._pxBoundsToTileRange(map.getPixelBounds());
     for (let x = r.min.x; x <= r.max.x; x++) for (let y = r.min.y; y <= r.max.y; y++) {
-      const c = L.point(x, y);
-      c.z = t0._tileZoom;
-      if (outside(t0, c)) spanned++;
+      const c2 = L.point(x, y);
+      c2.z = t0._tileZoom;
+      if (outside(t0, c2)) spanned++;
     }
   }
-  ok('the floor view spans tiles outside the frame', spanned > 0, spanned + ' of them');
-  const asked = frame
-    ? tileLayers.flatMap(l => Object.keys(l._tiles).map(k => [l, l._keyToTileCoords(k)])) : [];
-  const askedOut = asked.filter(([l, c]) => outside(l, c)).length;
-  ok('no tile outside the frame is asked for', asked.length > 0 && askedOut === 0,
+  ok('the floor view spans tiles outside the box', spanned > 0, spanned + ' of them');
+  const asked = tileLayers.flatMap(l => Object.keys(l._tiles).map(k => [l, l._keyToTileCoords(k)]));
+  const askedOut = asked.filter(([l, c2]) => outside(l, c2)).length;
+  ok('no tile outside the box is asked for', asked.length > 0 && askedOut === 0,
      asked.length + ' tiles across ' + tileLayers.length + ' layers, ' + askedOut + ' outside');
 
-  /* Every zoom level clips its tiles to the frame, in that level's own pixels, so the clip shrinks
+  /* Every zoom level clips its tiles to the box, in that level's own pixels, so the clip shrinks
      with the level during a zoom. An SVG mask stood here first. Leaflet redraws an SVG when a zoom
-     ends, so a zoom out showed the ground past the square. A level with no clip, or a clip off by
-     the level's origin, draws that ground again with nothing to say so. */
-  const clipped = frame ? tileLayers.flatMap(l => Object.values(l._levels).map(v => {
-    const want = [frame.getNorthWest(), frame.getSouthEast()]
+     ends, so a zoom out showed the ground past the box. A level with no clip, or a clip off by the
+     level's origin, draws that ground again with nothing to say so. */
+  const clipped = tileLayers.flatMap(l => Object.values(l._levels).map(v => {
+    const want = [cover.getNorthWest(), cover.getSouthEast()]
       .map(ll => map.project(ll, v.zoom).subtract(v.origin));
     const got = (v.el.style.clipPath.match(/-?[\d.]+(?=px)/g) || []).map(Number);
     return got.length === 8 && Math.abs(got[0] - want[0].x) < 1 && Math.abs(got[1] - want[0].y) < 1
       && Math.abs(got[4] - want[1].x) < 1 && Math.abs(got[5] - want[1].y) < 1;
-  })) : [];
-  ok('every tile level clips to the frame', clipped.length > 0 && clipped.every(Boolean),
+  }));
+  ok('every tile level clips to the box', clipped.length > 0 && clipped.every(Boolean),
      clipped.filter(Boolean).length + ' of ' + clipped.length + ' levels');
-  ok('no SVG mask covers the ground past the frame', !document.querySelector('.coverframe'),
-     document.querySelector('.coverframe') ? 'found' : 'none');
 
   // --- the pane order ----------------------------------------------------------------------------
 
-  /* The mask has to sit over the place names, so a town outside the area is shaded with the ground
-     it stands on. It has to sit under the overlay pane, or it shades the heat wash and the pins. */
+  /* The place names sit over the ground and under everything this app reports. The mask used to sit
+     between the names and the overlay pane, and it is gone, so the names are the top tile pane now. */
   const z = n => +getComputedStyle(map.getPane(n)).zIndex;
-  ok('the mask is over the names and under the pins',
-     z('mask') > z('labels') && z('mask') < z('overlayPane'),
-     'labels ' + z('labels') + ', mask ' + z('mask') + ', overlay ' + z('overlayPane'));
+  ok('the names are over the ground and under the pins',
+     z('labels') > z('tilePane') && z('labels') < z('overlayPane'),
+     'tiles ' + z('tilePane') + ', labels ' + z('labels') + ', overlay ' + z('overlayPane'));
 
   say('');
   say(fails.length ? 'FAILED: ' + fails.join(', ') : 'PASS');

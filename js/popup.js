@@ -894,7 +894,7 @@ export function sitePopup(members) {
    search box itself (see `nearPlace` in ui.js) — and with one caller left the two parameters were
    two ways to build one card. Built fresh on every open, so it reflects the latest poll rather than
    the fix's own timestamp. */
-/* The whole card for a reader standing outside the coverage circle. It replaces `herePopup()` rather
+/* The whole card for a reader standing outside the coverage area. It replaces `herePopup()` rather
    than adding a line to it, because every section that card draws is a claim about a sensor near the
    reader, and out here there is none to name. Four rows reading `No water level within 10 km` state
    a gap in the feed. This states a fact about the place.

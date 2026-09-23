@@ -3,9 +3,19 @@
  * php border-build.php — bakes border.json, the outline of the coverage area.
  *
  * The map used to run on forever. A reader could zoom out to the whole world, and the pins then sat
- * on a continent with no way to tell which part of it this app answers for. js/map.js shades
- * everything outside this outline now, and it takes the zoom floor and the pan limit off the same
- * file. So one shape answers three questions and nothing holds a fourth copy of the coverage area.
+ * on a continent with no way to tell which part of it this app answers for. js/map.js takes four
+ * things off the LAND ring in this file: the pan limit, the zoom floor, which tiles the map asks
+ * for, and whether a reader's own fix is inside. One shape answers all four.
+ *
+ * **js/map.js takes the land ring's own EXTENT, and this script bakes no box.** A bounding box is six
+ * lines of client code over data the file already carries, so baking one would need a run of this
+ * script before a client could read it, and this script needs Overpass. Nothing here is on a request
+ * path, so a shape change that needs no rebake is the cheaper shape change.
+ *
+ * **The `circle` key is dead and is not written any more.** A circle held the coverage area from
+ * 2026-09-02 to 2026-09-23, with everything outside it shaded. The repository owner replaced it with
+ * the land ring's rectangle and deleted the shading. The committed border.json still carries the key
+ * until somebody runs this script. Nothing reads it.
  *
  * The shape is Selangor's own outer rings, from OpenStreetMap. Kuala Lumpur and Putrajaya are
  * enclaves inside Selangor, so they arrive as INNER rings of that relation. This script drops every
@@ -143,29 +153,14 @@ function longestChain(array $ways): array {
     return $best;
 }
 
-/**
- * Area centroid of a closed ring, as [lng, lat].
- *
- * The mean of the points is NOT this, and the difference is the whole reason for the formula. A
- * border carries its vertices where it wiggles, so a mean is pulled toward the fiddly stretches and
- * away from the plain ones. The area centroid asks where the shape balances instead.
- */
-function centroid(array $ring): array {
-    $a = 0.0; $cx = 0.0; $cy = 0.0;
-    for ($i = 0, $j = count($ring) - 1; $i < count($ring); $j = $i++) {
-        $f = $ring[$j][0] * $ring[$i][1] - $ring[$i][0] * $ring[$j][1];
-        $a += $f;
-        $cx += ($ring[$j][0] + $ring[$i][0]) * $f;
-        $cy += ($ring[$j][1] + $ring[$i][1]) * $f;
+/** The extent of a ring, as [west, south, east, north]. */
+function extent(array $ring): array {
+    $b = [$ring[0][0], $ring[0][1], $ring[0][0], $ring[0][1]];
+    foreach ($ring as [$x, $y]) {
+        $b[0] = min($b[0], $x); $b[1] = min($b[1], $y);
+        $b[2] = max($b[2], $x); $b[3] = max($b[3], $y);
     }
-    if (abs($a) < 1e-12) fail('the land ring has no area — the chain did not close');
-    return [$cx / (3 * $a), $cy / (3 * $a)];
-}
-
-/** Distance in kilometres between two [lng, lat] pairs. */
-function km(array $p, array $q): float {
-    $k = 111.32 * cos(($p[1] + $q[1]) / 2 * M_PI / 180);
-    return hypot(($p[0] - $q[0]) * $k, ($p[1] - $q[1]) * 110.57);
+    return $b;
 }
 
 /** Ray casting. Answers whether a point sits inside any one of the rings. */
@@ -285,40 +280,37 @@ foreach ($polys as $p) foreach ($p[0] as [$x, $y]) {
     $bounds[2] = max($bounds[2], $x); $bounds[3] = max($bounds[3], $y);
 }
 
-/* --- the land ring, and the circle that sits on it ---------------------------------------------
-   **The circle is placed and sized on LAND alone, and the whole outline is why it has to be.**
-   Selangor's boundary reaches into the Strait of Malacca. A circle drawn from the whole shape sat
-   with about 55% of its area on water, because the sea half pulls the centre west and sets the
-   radius. The repository owner asked for a circle on the land on 2026-09-02.
+/* --- the land ring ------------------------------------------------------------------------------
+   **THE COVERAGE AREA IS PLACED ON LAND ALONE, AND THE WHOLE OUTLINE IS WHY IT HAS TO BE.**
+   Selangor's boundary reaches west to longitude 100.39, in the Strait of Malacca. A box drawn from
+   the whole shape holds 44 km of open water, and the map pays CARTO for tiles of it.
    Dropping the sea ways leaves the land border as one open arc, from the north end of the coast to
    the south end. Closing that arc with a straight chord gives a polygon that is Selangor's land with
    a straight west edge. The real coast is inside that chord, so the ring is a little generous on the
-   seaward side and exact everywhere else. That is the right way to be wrong here: a circle that
-   covers a strip of shore is honest, and one that clips Klang is not. */
+   seaward side and exact everywhere else. That is the right way to be wrong here: a coverage area
+   that covers a strip of shore is honest, and one that clips Klang is not.
+   **js/map.js takes this ring's EXTENT, so this ring is the shape the whole app answers for.** */
 $arc = longestChain($land);
 if (count($arc) < 4) fail('the land ways did not chain — the relation changed upstream');
 $ring = clean(simplify($arc, TOL_DEG));
 if ($ring[0] !== end($ring)) $ring[] = $ring[0];    // the chord that stands in for the coast
 
-[$cx, $cy] = centroid($ring);
-$radius = 0.0;
-foreach ($ring as $p) $radius = max($radius, km([$cx, $cy], $p));
+/* Both enclaves have to be inside the land ring's EXTENT as well, not only inside the outline. That
+   extent is the coverage area, and a capital city outside it is a capital this app refuses to answer
+   for. Nothing downstream would say so. */
+$rect = extent($ring);
+foreach (INSIDE as $name => [$x, $y])
+    if ($x < $rect[0] || $x > $rect[2] || $y < $rect[1] || $y > $rect[3])
+        fail(sprintf('%s at %.4f,%.4f is outside the land extent %.4f,%.4f to %.4f,%.4f',
+                     $name, $x, $y, $rect[0], $rect[1], $rect[2], $rect[3]));
 
-/* Both enclaves have to be inside the CIRCLE as well, not only inside the outline. The circle is
-   what a reader sees, and a capital city outside it is shaded. */
-foreach (INSIDE as $name => $pt)
-    if (km([$cx, $cy], $pt) > $radius)
-        fail(sprintf('%s is %.1f km out against a %.1f km radius — the land ring is wrong',
-                     $name, km([$cx, $cy], $pt), $radius));
-
-/* `bounds` rides on the file as [west, south, east, north]. `circle` is [lat, lng, km] and is what
-   js/map.js actually draws: the client does no geometry, because the sea has to be excluded and
-   only this script knows which ways are sea. The full outline stays in `features` so the check page
-   can ask whether the circle still holds the land it was built from. */
+/* `bounds` rides on the file as [west, south, east, north] and covers the WHOLE outline, sea and all.
+   Only `map-limits-test.html` reads it, to prove the coverage box stops short of the maritime corner.
+   The `land` feature is the one js/map.js reads. The `cover` feature is the full outline, which only
+   this script and that check page read. */
 $json = json_encode([
     'type' => 'FeatureCollection',
     'bounds' => $bounds,
-    'circle' => [round($cy, 5), round($cx, 5), round($radius, 2)],
     'features' => [
         ['type' => 'Feature', 'properties' => ['t' => 'cover'],
          'geometry' => ['type' => 'MultiPolygon', 'coordinates' => $polys]],
@@ -331,6 +323,9 @@ file_put_contents(OUT, $json);
 printf("border-build: %d ring(s), %d points, %d KB on disk, about %d KB gzipped\n",
        count($polys), $points, strlen($json) / 1024, strlen(gzencode($json, 9)) / 1024);
 printf("border-build: bounds west %.4f south %.4f east %.4f north %.4f\n", ...$bounds);
-printf("border-build: land ring %d points, circle %.5f, %.5f radius %.2f km\n",
-       count($ring), $cy, $cx, $radius);
+printf("border-build: land ring %d points, extent west %.4f south %.4f east %.4f north %.4f\n",
+       count($ring), ...$rect);
+printf("border-build: that extent is %.1f km east to west and %.1f km north to south\n",
+       ($rect[2] - $rect[0]) * 111.32 * cos(($rect[1] + $rect[3]) / 2 * M_PI / 180),
+       ($rect[3] - $rect[1]) * 110.57);
 echo "border-build: commit border.json. js/map.js fetches it by name, so there is no ?v= to bump.\n";

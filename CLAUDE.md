@@ -41,16 +41,16 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `js/util.js` | pure helpers + `hasInfo()` / `color()` / `isIgnored()` |
 | `js/stations.js` | queries over the station set (`nearestOf`, `nearestCam`, `byId`) |
 | `js/pins.js` | the station pins and the cluster chips, painted on ONE canvas. Sprite cache, greedy grid clustering, hit testing, and the danger halo's own frame loop. Replaced Leaflet.markercluster |
-| `js/map.js` | map instance, basemap/theme, the pin layer, the station panel (`openSide`), `focusOn` / `flashTo`. Also the coverage mask, the zoom floor, the pan limit and the tile skip, all five off `border.json`, with `inCover()` the fifth and `coverReady` the wait every caller of it needs. The ground stops at a square frame around the circle, and the map asks for no tile outside it. The map draws no water of its own on either theme. Also the zoom ceiling, 15, and `disableClusteringAtZoom: 15` on the cluster, which is what makes 15 the zoom that merges nothing |
+| `js/map.js` | map instance, basemap/theme, the pin layer, the station panel (`openSide`), `focusOn` / `flashTo`. Also `cover`, ONE rectangle off `border.json`'s land ring, which is the pan limit, the zoom floor, the tile skip and `inCover()` all four, with `coverReady` the wait every caller of it needs. The ground stops at that rectangle and the map asks for no tile outside it. **Nothing shades the outside any more** — the mask, its pane, its stripes and its tokens all left on 2026-09-23. The map draws no water of its own on either theme. Also the zoom ceiling, 15, and `disableClusteringAtZoom: 15` on the cluster, which is what makes 15 the zoom that merges nothing |
 | `js/heat.js` | both heat layers (water level, rainfall), ground-fixed sizing per layer, shared opacity. Also the field pass where a gauge reporting no rain denies the ground a wet one claims |
 | `heat-test.html` | `chrome --headless --dump-dom` — one of eight runnable checks. Guards the rain layer's paint distance, its dry-gauge erase and its handover between neighbours, in canvas pixels |
-| `map-limits-test.html` | `chrome --headless --dump-dom` — one of eight runnable checks. Guards the coverage circle, the zoom floor and the pan limit. It probes the drawn shape with `isPointInFill`, so it reads the fill rule the browser paints with. It asserts that no water pane and no river pane came back on either theme, that each of the two tile panes carries the exact filter its theme states and the ground layer inside carries none, that the circle holds every point of the land ring, that its centre sits east of that ring's middle, that the map asks for no tile outside the square frame around the circle, that every tile level clips to that frame, that the faint stripes still carry their hairline, and that the pattern sprite is rendered rather than `display: none`, which is the one thing that empties the tile with nothing to say so |
+| `map-limits-test.html` | `chrome --headless --dump-dom` — one of eight runnable checks. Guards the coverage box, the zoom floor and the pan limit. It asserts that the box holds every point of the land ring, that it stops short of the maritime corner in `bounds`, that it is taller than it is wide, that it carries a margin past the land, and that Kuala Lumpur, Putrajaya and Shah Alam sit inside it while Melaka does not. It asserts that the pan box IS the coverage box, so the floor and the limit cannot part. It asserts the ABSENCE of all four parts of the deleted shading: the `.covermask` path, the `#hatchdef` sprite, the `.coverframe` mask and the `mask` pane. It also asserts that no water pane and no river pane came back on either theme, that each of the two tile panes carries the exact filter its theme states and the ground layer inside carries none, that the map asks for no tile outside the box, and that every tile level clips to it |
 | `js/popup.js` | popup + meter + gauge + sparkline templates. Also `wxItem()` and its three helpers, the weather list item both weather surfaces draw |
 | `js/sparktip.js` | the hover/tap readout on every graph, and the label on any `data-tip`. One delegated listener, no imports |
 | `js/render.js` | rebuilds markers and heat points, the two saved lists, and the kind counts |
 | `js/alerts.js` | "On alert": the app bar's warning glyph, the list it opens in `#side`, the icon badge, the red favicon. Also the MET warning cards above that list |
 | `js/table.js` | the all-stations table dialog, grouped district → mast → sensor |
-| `js/locate.js` | geolocation, the "You are here" marker, and the amber button a failed fix leaves behind. Also the outside-coverage state: a fix past the circle gets no jump and no ripple, a card of its own and one snackbar |
+| `js/locate.js` | geolocation, the "You are here" marker, and the amber button a failed fix leaves behind. Also the outside-coverage state: a fix past the coverage box gets no jump and no ripple, a card of its own and one snackbar |
 | `js/ticker.js` | header alert marquee — measured, no visible seam, speed scales with the alert count. Draws the MET warning tiles into the strip. Closes every set with the app's own name as a divider |
 | `js/timeline.js` | camera archive replay + A/B compare, inside the lightbox and nowhere else |
 | `js/clip.js` | the station panel's 3-hour camera clip — no controls, that is the lightbox's job |
@@ -68,8 +68,8 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `water-build.php` | `php water-build.php` — rebakes `water.json` and `rivers.json` from OpenStreetMap. The app reads neither file since 2026-09-15. It runs two Overpass queries. The second asks for `natural=coastline`, to build the sea. `MIN_AREA_KM2` and `MIN_RIVER_KM` are band edges now. They no longer cut a shape. Band 0 rivers run 1.0008 to 94.1182 km. Band 1 runs 0.3003 to 0.9984 km. Band 2 runs 0.0111 to 0.2982 km. Bodies follow the same pattern against 0.01 and 0.002 square kilometres. Also holds the Douglas-Peucker tolerance `TOL_DEG`. Takes `--tol=` and `--dp=` to try a value, and `--cached` to reuse the last raw Overpass answer. Run by hand, never in a request |
 | `water.json` | **Not drawn and not shipped since 2026-09-14.** Only `basemap-spike.html` reads it. Seven features it bakes and commits: the sea, and three bands each of rivers and water bodies. Band 0 draws at every zoom. Band 1 draws from zoom 11. Band 2 draws from zoom 13. 2,511 KB on disk, about 568 KB gzipped, with the sea |
 | `rivers.json` | **Not drawn and not shipped since 2026-09-15.** The three river bands out of `water.json`, baked beside it. The dark theme drew them as lines for one day. 979 KB on disk, about 241 KB gzipped |
-| `border-build.php` | `php border-build.php` — bakes `border.json` from OpenStreetMap. Two Overpass calls: Selangor's geometry, then its member way TAGS, so the sea boundary (`maritime=yes`) can be dropped before the circle is placed. Run by hand, never in a request |
-| `border.json` | `circle` is `[lat, lng, km]` and is the one source for four things: the shading outside it, the zoom floor, the pan limit and which tiles the map asks for. Also the full outline and the land ring, which only `border-build.php` and `map-limits-test.html` read. 30 KB, 4 KB gzipped |
+| `border-build.php` | `php border-build.php` — bakes `border.json` from OpenStreetMap. Two Overpass calls: Selangor's geometry, then its member way TAGS, so the sea boundary (`maritime=yes`) can be dropped before the land ring is written. It bakes no box — `js/map.js` takes that ring's own extent, so a shape change here needs no rebake. Run by hand, never in a request |
+| `border.json` | the `land` feature is the one shape `js/map.js` reads. Its EXTENT, grown by `MARGIN`, is the one source for four things: the pan limit, the zoom floor, which tiles the map asks for and `inCover()`. **Never `bounds`** — that is the whole relation, and it reaches 44 km further west, into the Strait of Malacca. `bounds` and the full outline are read by `border-build.php` and `map-limits-test.html` alone. The `circle` key is dead since 2026-09-23 and leaves on the next rebake. 30 KB, 4 KB gzipped |
 | `wx-build.php` | `php wx-build.php` — bakes `wx-places.json` from Nominatim. Run by hand, never in a request |
 | `wx-places.json` | the district behind each weather point, baked and committed |
 | `icon-192.png`, `icon-512.png` | manifest icons (`any`) and the favicon — the glyph on transparency |
@@ -637,17 +637,11 @@ order that file holds them. A trap names itself here, and the file states the ev
 - `MIN_AREA_KM2` and `MIN_RIVER_KM` are size floors, and they REVERSE what th...
 - A lake's outline is several ways in one relation, so closing each one separ...
 - `border-build.php` fetches Selangor alone, and dropping its inner rings is ...
-- Do not set `fillRule` on the mask.
-- The mask's outer ring is finite, and a ring around the whole world is what ...
-- The mask draws a CIRCLE and it drew Selangor's outline, and the outline is ...
-- The diagonal stripes went and came back lighter, all on 2026-09-02.
-- The stripes are faint and the hairline is what states the boundary.
-- The stroke on the mask path draws the circle and nothing else.
+- THE COVERAGE SHADING IS DELETED, AND EVERY PART OF IT IS A SEPARATE REVERT.
 - One box holds the zoom floor and the pan limit, and two numbers cannot be t...
 - `setLimits()` runs after `invalidateSize()` and never before it.
-- The circle is placed and sized on LAND alone, and only `border-build.php` c...
-- The minimum enclosing circle is the wrong circle here, and it was measured ...
-- A radius that exactly reaches the farthest point puts that point ON the bou...
+- The coverage area is placed on LAND alone, and only `border-build.php` can ...
+- THE CIRCLE IS GONE AND THE CIRCLE ARITHMETIC WENT WITH IT.
 - The MET nowcast page has no endpoint to find.
 - `MET_KM` is a flat 15 km, not a radius scaled to how far each point reaches.
 - The warning feed carries no coordinates.

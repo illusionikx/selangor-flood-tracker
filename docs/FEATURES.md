@@ -19886,3 +19886,96 @@ No brightness term rides on the chain. The land reads black at a mean luminance 
 term the day a reader says the ground is too dark. Measure the frame cost again with it.
 
 Nothing here touches the light theme.
+
+## The coverage area is a rectangle, and the shading is gone, 2026-09-23
+
+The coverage area was a circle. Everything outside that circle carried a striped wash. The repository
+owner asked for four changes on 2026-09-23.
+
+- Make the coverage area a tall rectangle, because Selangor has that shape.
+- Add a margin around it.
+- Delete the shading.
+- Stop the pan at the rectangle, and ask for no tile outside it.
+
+`js/map.js` holds all four. `border.json` did not change, so this change needed no rebake.
+
+### The rectangle
+
+The box is the extent of the land ring in `border.json`. `MARGIN` (0.1) grows it by a tenth of each
+axis. `map-limits-test.html` measured the result.
+
+| shape | east to west | north to south | ground |
+|---|---|---|---|
+| the circle that shipped before | 191 km | 191 km | 28,700 sq km |
+| the land extent, before the margin | 127 km | 141 km | 17,900 sq km |
+| the box that ships now | 152 km | 169 km | 25,700 sq km |
+
+**A rectangle fits this state better than a circle.** Selangor stands 141 km north to south and 127
+km east to west. A circle that holds the corners must reach the diagonal. So it spends 191 km on both
+axes. The rectangle spends what each axis needs.
+
+**The tile frame is the larger saving.** The circle needed a second box for the tiles, at the circle
+grown by a fifth on each side. That box measured 267 km on each axis, which is about 71,600 sq km of
+ground. The new box is about a third of it.
+
+### One box answers four questions
+
+The box is the pan limit. It is the zoom floor. It is the set of tiles the map asks for. It also
+answers whether a reader stands inside the area.
+
+The circle answered those four questions from three boxes. The extra box existed for the shading. The
+ground had to reach past the circle, so the striped ring had ground to lie over.
+
+With no shading the ground has nothing to reach past. The ground stops where the pan stops. A reader
+cannot travel to an edge that the ground does not fill.
+
+**The land ring is the only shape in the file that sits on land.** `bounds` on the same file is the
+whole relation. That relation follows the maritime boundary west to longitude 100.39.
+
+A box off `bounds` holds 44 km of open water, and the map pays CARTO for tiles of it.
+`border-build.php` earns the land ring. It drops every member way tagged `maritime=yes`. Then it
+closes the open arc with a chord.
+
+### What went
+
+- The `mask` pane in `js/map.js`.
+- The world-sized outer ring, the circle ring, `MASK_SPANS`, `CIRCLE_PTS` and `RIM`.
+- The SVG pattern sprite, `#hatchdef`.
+- `.covermask`, `#hatchdef`, `.hatchbg` and `.hatchline` in `css/map.css`.
+- `--mask-bg`, `--mask-line` and `--mask-edge`, on both themes, in `css/base.css`.
+- `FRAME` and `ROAM`, the two pad factors.
+- The circle itself, which is `centroid()`, `km()` and the `circle` key in `border-build.php`.
+
+`js/map.js` fell from 1,014 lines to 941. The committed `border.json` still carries the `circle` key.
+Nothing reads it. It goes on the next rebake.
+
+### The cost, and it is visible
+
+**The zoom floor shows bare container beside the box.** `getBoundsZoom()` fits both axes and takes
+the tighter one. The box is taller than it is wide, and a desktop window is wider than it is tall.
+
+So the height binds. Two strips of the Leaflet container then stand to the left and to the right.
+Those strips carry `--surface`, so they follow the theme.
+
+Measured in the check window, 900 by 700 pixels: the floor moved from zoom 8 to zoom 9. Both floors
+ask for 18 tiles, because the view is the same size either way.
+
+**The strips are wide.** Leaflet zooms in whole steps, so the floor is the last step that still holds
+the box. Read off a screenshot at 1536 by 864: the ground covers about 500 by 560 pixels of a map
+card about 1410 by 725.
+
+**The way out is one line, and it costs the other half.** `getBoundsZoom(cover, true)` returns the
+zoom at which the view fits inside the box. That floor removes every strip.
+
+It also stops a wide window from ever holding the whole area at once. The comment on `setLimits()`
+names the line. The repository owner takes that call.
+
+### What this does not do
+
+Nothing here changes what the app reports. The stations, the readings and the alerts are the same.
+
+Nothing here moves the coverage area on the ground. The box holds every point of the land ring, and
+the check asserts that.
+
+The box still takes ground that is not Selangor. Bentong in Pahang sits inside it. That is the cost
+of a rectangle, the same way it was the cost of a circle.

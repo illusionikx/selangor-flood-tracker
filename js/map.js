@@ -294,217 +294,144 @@ const isDark = () => document.documentElement.dataset.theme === 'dark';
 /* **This map draws no sea, lake or pond of its own since 2026-09-14.** It drew all three from
    `water.json`, and the repository owner removed them. A water tint and river lines on the dark
    theme went on 2026-09-15. See docs/FEATURES.md.
-   The place names, under the coverage mask and everything this app reports. Esri publishes them as
-   a service of their own, so they are a second tile layer rather than part of the ground. The pane
-   puts them under the mask, so a town outside the circle is shaded with its ground. It takes no
-   pointer events, because a tile pane that answers a click sits between the reader and every pin. */
+   The place names, under everything this app reports. CARTO and Esri both publish them as a service
+   of their own, so they are a second tile layer rather than part of the ground. It takes no pointer
+   events, because a tile pane that answers a click sits between the reader and every pin.
+   **THERE IS NO `mask` PANE ANY MORE, AND THERE MUST NOT BE ONE AGAIN.** It held the shading over
+   everything outside the coverage area, at z-index 270. The repository owner deleted that shading on
+   2026-09-23. The ground stops at the coverage area now, so there is nothing outside it left to
+   shade. */
 map.createPane('labels');
 map.getPane('labels').style.zIndex = 260;
 map.getPane('labels').style.pointerEvents = 'none';
 
-/* **Everything outside a circle around the coverage area is shaded, and that circle sets the zoom
-   floor and the pan limit too.** The map used to run on forever. A reader could zoom out to the
-   whole world, and the pins then sat on a continent with no line to say which part of it this app
-   answers for. The repository owner asked for all three on 2026-09-02.
-   `border.json` is Selangor's own outline, baked by border-build.php. Kuala Lumpur and Putrajaya are
-   enclaves inside it, and that script fills them in by dropping the relation's inner rings. So one
-   shape covers all three of this app's states and nothing here has to union anything.
-   **The outline is not what draws.** It ran as the hole itself for one revision, in diagonal
-   stripes, and the repository owner called that too busy the same day. It stays in the file because
-   `map-limits-test.html` asks whether the circle still holds the land it was built from, and going
-   back to the real shape is one line here and no rebake.
-   Its own pane above the place names, so a town outside the circle is shaded with the ground it sits
-   on. Under the overlay pane at 400, so the heat wash, the pins and the "you are here" circle all
-   still draw over it. It takes no pointer events, for the reason the labels pane states. */
-map.createPane('mask');
-map.getPane('mask').style.zIndex = 270;
-map.getPane('mask').style.pointerEvents = 'none';
+/* **THE COVERAGE AREA IS ONE RECTANGLE, AND IT WAS A CIRCLE UNTIL 2026-09-23.** The map used to run
+   on forever. A reader could zoom out to the whole world, and the pins then sat on a continent with
+   no line to say which part of it this app answers for. The repository owner asked for a limit on
+   2026-09-02, took a circle with everything outside it shaded, and replaced both on 2026-09-23. The
+   shading is deleted and the shape is a rectangle.
+   **Selangor is taller than it is wide, so a rectangle on its land wastes the least ground.** The
+   circle measured 191 km on both axes. The rectangle measures 141 km north to south and 127 km east
+   to west. That is a third less ground, and the map pays CARTO per tile.
+   **ONE BOX ANSWERS ALL FOUR QUESTIONS NOW, and the circle answered them from three.** This box is
+   the pan limit, the zoom floor, which tiles the map asks for, and whether a reader's own fix is
+   inside. The circle needed a second, wider box for the tiles, because the ground had to reach past
+   the circle for the shading to lie over it. With no shading there is nothing to reach past: the
+   ground stops where the pan stops, so a reader can never travel to an edge the ground does not fill.
+   **`MARGIN` is what a reader sees past the border.** The box edge is the edge of the map now, so a
+   border flush against it reads as a map that was cut off. A tenth of each axis is about 13 km north
+   and south and 12 km east and west. */
+const MARGIN = 0.1;
 
-/* The diagonal stripes, as an SVG pattern in a sprite of its own. `css/map.css` paints the two
-   shapes inside it, so the theme swap costs no JavaScript and no re-read of a token. The pattern
-   measures in `userSpaceOnUse`, which is screen pixels at rest, so a stripe is the same width at
-   every zoom. A sprite anywhere in the document is enough: `fill: url(#hatch)` resolves against the
-   whole document rather than against the SVG the path lives in.
-   **The sprite must not be `display: none`, and `#glyphs` further down this file may be.** A `<use>`
-   copies a shape out of a tree that was never rendered. A `<pattern>` is a paint server whose tile
-   Blink builds from the LAYOUT tree, so a hidden sprite gives it no children to build from. See
-   `#hatchdef` in css/map.css, which carries the rule that keeps it rendered and out of the flow.
-   **The stripe is a filled `<rect>` and never a stroked `<line>`.** A pattern clips its content to
-   its own tile, so a line on the tile's edge loses the half of its width that falls outside. */
-const hatch = document.body.appendChild(
-  Object.assign(document.createElementNS('http://www.w3.org/2000/svg', 'svg'), { id: 'hatchdef' }));
-hatch.setAttribute('aria-hidden', 'true');
-hatch.innerHTML =
-  '<defs><pattern id="hatch" width="9" height="9" patternUnits="userSpaceOnUse"'
-  + ' patternTransform="rotate(45)">'
-  + '<rect width="9" height="9" class="hatchbg"/>'
-  + '<rect width="3" height="9" class="hatchline"/>'
-  + '</pattern></defs>';
+/* The coverage box, once border.json has answered. **The three states are not the same.** While this
+   is `undefined` the map asks for no tile at all. Once it is `false` the map asks for every tile. See
+   `Ground` below. */
+export let cover;
 
-/* How far past the circle the shaded ring reaches, in multiples of the circle's own width. The pan
-   limit below is a quarter of that width, so three widths is about eleven times as far as a reader
-   can ever travel. Nothing can reach the edge of it.
-   **It is NOT a ring around the whole world, and one was tried first.** A world ring projects to
-   coordinates in the tens of millions at zoom 9, and Blink gives up filling a box that size and
-   paints part of it flat. A finite ring near the shape cannot reach that state.
-   **The fill rule punches the hole, and Leaflet's own default is the one that works.** `evenodd`
-   asks how many rings a point sits inside and fills the odd answers, so the hole punches whichever
-   way its points wind. `nonzero` takes the signed sum instead, and a hole wound the same way as the
-   outer ring fills solid rather than clearing. Do not set `fillRule` here. */
-const MASK_SPANS = 3;
-const CIRCLE_PTS = 72;           // one point every five degrees, which is smooth at every zoom here
-/* A margin on the radius, so the land ring's farthest point sits INSIDE the circle rather than on
-   it. The build script sets the radius to exactly that distance, so without this the point lands on
-   the boundary, where `isPointInFill` is free to answer either way and floating point picks. The
-   mask then shades one corner of Selangor, and a check reads one point of 852 as covered. One
-   percent of 96 km is under a kilometre. */
-const RIM = 1.01;
+/* Whether a point sits inside the coverage area. This box is the shape the map stops the pan at and
+   the ground fills, so it is the shape that answers "can this map say anything about where you are".
+   **It answers yes until border.json lands, and yes if that file never lands.** A map with no box has
+   no outside. The failure path already draws the whole ground, and a reader inside the area must not
+   be refused because a 4 KB file was slow. `coverReady` is how a caller waits for the real answer.
+   See `findMe()` in js/locate.js, which holds a restored fix until this resolves. */
+export const inCover = ll => !cover || cover.contains(ll);
 
-let cover;                       // the circle's own bounds, once border.json has answered
-
-/* Whether a point sits inside the coverage area. The circle is the one shape this app draws, shades
-   outside and stops the pan at, so it is the shape that answers "can this map say anything about
-   where you are". `RIM` rides on it for the reason the mask carries it: the drawn circle is what a
-   reader sees, and a test that disagreed with the shading would refuse a reader standing on ground
-   this map paints as covered.
-   **It answers yes until border.json lands, and yes if that file never lands.** A map with no circle
-   has no outside. The failure path already draws the whole ground, and a reader inside the area must
-   not be refused because a 4 KB file was slow. `coverReady` is how a caller waits for the real
-   answer — see `findMe()` in js/locate.js, which holds a restored fix until this resolves. */
-let centre, reach;
-export const inCover = ll => !centre || centre.distanceTo(ll) <= reach;
-
-/* **The ground fills a square frame around the circle, and nothing of it draws outside.**
-   CARTO counts every tile, and the repository owner asked for fewer tile calls on 2026-09-14.
-   **The first version skipped every tile outside the circle itself, and the owner reversed it the
-   same day.** The ground then stopped at whichever tile edge came last, in a ragged block inside the
-   striped ring, and that read as a page that had not finished loading.
-   **So the map asks for no tile outside `frame`, and it clips every tile to it.** `frame` is the
-   extent of the circle, grown by `FRAME` on each side. A tile that touches it loads whole, so the
-   ground always reaches the edge of the frame. The clip cuts off the part of the tile past it.
-   **The clip sits on each zoom level, in that level's own pixels, and an SVG mask stood here
-   first.** `.coverframe` painted the page colour past the frame. Leaflet scales an SVG during a zoom
-   and redraws it when the zoom ends. So a zoom out showed the ground past the square until then, and
-   a reader saw it on 2026-09-15. A level shrinks with its own clip, so the two cannot part.
-   **The map asks for no tile until border.json answers.** `frame` is `undefined` until then. The
+/* **THE GROUND FILLS THE COVERAGE BOX AND NOTHING OF IT DRAWS OUTSIDE.** CARTO counts every tile.
+   The repository owner asked for fewer tile calls on 2026-09-14, and for the ground to stop at the
+   coverage area on 2026-09-23.
+   **A tile that touches the box loads whole, and the clip cuts off the part past the edge.** So the
+   ground always reaches the box edge. An earlier version dropped every tile the circle did not hold
+   and drew no clip, and the ground then stopped at whichever tile edge came last. That ragged block
+   read as a page that had not finished loading.
+   **The clip sits on each zoom level, in that level's own pixels, and an SVG mask stood here first.**
+   `.coverframe` painted the page colour past the edge. Leaflet scales an SVG during a zoom and
+   redraws it when the zoom ends. So a zoom out showed the ground past the edge until then, and a
+   reader saw it on 2026-09-15. A level shrinks with its own clip, so the two cannot part.
+   **The map asks for no tile until border.json answers.** `cover` is `undefined` until then. The
    answer clips the levels already built and redraws both layers. A failure sets `false`, and the
    whole ground draws.
    `_isValidTile`, `_tileCoordsToBounds` and `_onCreateLevel` are private Leaflet 1.9 methods, and
    `_levels` is private state. Check all four on an upgrade. */
-const FRAME = 0.2;               // a fifth of the circle's width past it, on each side
-export let frame;                // L.LatLngBounds once border.json answers, or false when it failed
 const Ground = L.TileLayer.extend({
   _isValidTile(c) {
     if (!L.TileLayer.prototype._isValidTile.call(this, c)) return false;
-    if (frame === false) return true;
-    return !!frame && frame.intersects(this._tileCoordsToBounds(c));
+    if (cover === false) return true;
+    return !!cover && cover.intersects(this._tileCoordsToBounds(c));
   },
   _onCreateLevel(level) { clipLevel(this, level); },
 });
 
-// The frame in one level's own pixels: projected at that level's zoom, less that level's origin.
+// The box in one level's own pixels: projected at that level's zoom, less that level's origin.
 function clipLevel(layer, level) {
-  if (!frame) return;
-  const [a, b] = [frame.getNorthWest(), frame.getSouthEast()]
+  if (!cover) return;
+  const [a, b] = [cover.getNorthWest(), cover.getSouthEast()]
     .map(ll => layer._map.project(ll, level.zoom).subtract(level.origin));
   level.el.style.clipPath =
     `polygon(${a.x}px ${a.y}px, ${b.x}px ${a.y}px, ${b.x}px ${b.y}px, ${a.x}px ${b.y}px)`;
 }
 
-/* The zoom floor and the pan limit, both off the circle. It is what a reader sees, so it is what
-   the map stops at. Re-run on every resize, because `getBoundsZoom()` answers for the window this
-   map has right now: the level that fits the circle on a desktop leaves half of it off a phone.
-   **ONE box answers both, and that is what keeps the floor honest.** `pad(0.5)` grows a box by half
-   its size on each side, so `ROAM` is twice the circle on both axes. The floor is the zoom that
-   fits that box, and the box is what a drag may not leave. So the two cannot disagree.
-   Two numbers can, and the first version had them. A floor of `getBoundsZoom(cover) - 1` beside a
-   pan box of `cover.pad(0.25)` reports a floor the box then refuses, because a level out doubles
-   the ground on screen while a quarter pad adds half of it. `getMinZoom()` still answers the number
-   it was given, and nothing errors. Measured at six widths from 320 to 1920, this shape reaches its
-   own floor at every one of them. */
-const ROAM = 0.5;    // half the circle's width of margin on each side, so twice the width in all
-
+/* The zoom floor and the pan limit, both off the coverage box. Re-run on every resize, because
+   `getBoundsZoom()` answers for the window this map has right now: the level that fits the box on a
+   desktop leaves half of it off a phone.
+   **ONE box answers both, and that is what keeps the floor honest.** The floor is the zoom that fits
+   the box, and the box is what a drag may not leave. So the two cannot disagree. Two numbers can, and
+   an early version had them: a floor of `getBoundsZoom(cover) - 1` beside a pan box of
+   `cover.pad(0.25)` reports a floor the box then refuses, because a level out doubles the ground on
+   screen while a quarter pad adds half of it. `getMinZoom()` still answers the number it was given,
+   and nothing errors.
+   **The box is taller than it is wide, so a wide window shows bare container beside it at the
+   floor.** `getBoundsZoom()` fits both axes and takes the tighter one, and the height is what binds
+   here. The ground draws no tile outside the box, and nothing shades the rest since 2026-09-23. So
+   those two strips are the Leaflet container itself. That is the accepted cost of a floor that shows
+   the whole area at once. Raise the floor to `getBoundsZoom(cover, true)` to remove the strips, and
+   accept that a wide window can then never hold the whole area. */
 function setLimits() {
   if (!cover) return;
-  const box = cover.pad(ROAM);
-  map.setMaxBounds(box);
-  map.setMinZoom(map.getBoundsZoom(box));
-}
-
-/* The circle, as a ring of longitude and latitude pairs. A ground circle rather than a screen one:
-   it names a place, so it has to grow with the zoom the way the coast under it does.
-   Longitude is scaled by the cosine of each point's OWN latitude, not of the centre's. Scaling by
-   the centre alone draws an ellipse that is right on the middle row and wrong at the top and the
-   bottom, which over 93 km is about a kilometre out at the poles of the ring. */
-function ring(lat, lng, km, n = CIRCLE_PTS) {
-  const out = [];
-  for (let i = 0; i <= n; i++) {
-    const a = i / n * 2 * Math.PI;
-    const y = lat + km * Math.cos(a) / 110.57;
-    out.push([lng + km * Math.sin(a) / (111.32 * Math.cos(y * Math.PI / 180)), y]);
-  }
-  return out;
+  map.setMaxBounds(cover);
+  map.setMinZoom(map.getBoundsZoom(cover));
 }
 
 /* Fetched inline rather than deferred to an idle callback. It is 4 KB gzipped, and it carries the
    zoom floor, so a reader who lands zoomed out would otherwise see the world for as long as the
    browser felt like waiting. A failure is silent and leaves an unlimited map, which is the state this
    replaces. */
-/* Exported so a caller can wait for the circle rather than race it. It never rejects: the catch at
-   the foot of this chain is the last link, so `coverReady.then(...)` runs on a failed fetch too, with
+/* Exported so a caller can wait for the box rather than race it. It never rejects: the catch at the
+   foot of this chain is the last link, so `coverReady.then(...)` runs on a failed fetch too, with
    `inCover()` then answering yes for every point. */
 export const coverReady = fetch('border.json')
   .then(r => r.ok ? r.json() : Promise.reject(r.status))
   .then(geo => {
-    /* **`border-build.php` places and sizes this circle, and the sea is why it cannot happen here.**
-       Selangor's boundary reaches into the Strait of Malacca, and a circle built from the whole
-       shape sat 47% on water. Only the build script can tell the land border from the sea one,
-       because OpenStreetMap marks that on the member WAY as `maritime=yes` and the geometry this
-       file could read carries no tags at all. So the script drops the sea ways, closes the land arc
-       with a chord, and writes the centroid and the radius. Measured: 3.3202 N, 101.5094 E, 95.57 km
-       and 29% water, against 3.1375 N, 101.1787 E, 93.2 km and 47%. The repository owner asked for
-       the move on 2026-09-02.
-       A circle over a state this shape takes ground that is not Selangor, and that is the cost of a
-       circle rather than a fault. */
-    const [cy, cx, km] = geo.circle;
-    const hole = ring(cy, cx, km * RIM);
-    // What `inCover()` reads. The same centre and the same grown radius the hole above is drawn at.
-    centre = L.latLng(cy, cx);
-    reach = km * RIM * 1000;
-
-    // The circle's own extent, which is what the limits above read.
-    cover = L.latLngBounds(hole.map(([x, y]) => [y, x]));
-    frame = cover.pad(FRAME);
+    /* **THE LAND RING, NEVER `bounds` AND NEVER THE WHOLE OUTLINE.** `bounds` on this file is the
+       extent of Selangor's own relation, and that relation follows the maritime boundary west to
+       longitude 100.39. Reading it puts 44 km of the Strait of Malacca inside the box, and the map
+       then pays CARTO for tiles of open water. `border-build.php` drops every member way tagged
+       `maritime=yes` and closes the arc with a chord, so this ring is Selangor's land with a straight
+       west edge. Only that script can do it, because OpenStreetMap states `maritime=yes` on the member
+       WAY and the geometry this file could read carries no tags at all.
+       A file with no land ring is a file this app cannot use. It takes the failure path below rather
+       than guess a box. */
+    const ring = geo.features.find(f => f.properties.t === 'land')?.geometry.coordinates[0];
+    if (!ring?.length) throw new Error('border.json carries no land ring');
+    /* The ring's own extent. Measured 2026-09-23: west 100.8295, south 2.5953, east 101.9698, north
+       3.8704, which is 127 km by 141 km. `L.latLngBounds` takes latitude first and GeoJSON states
+       longitude first, so the pairs are swapped on the way in. */
+    let [w, s, e, n] = [180, 90, -180, -90];
+    for (const [x, y] of ring) {
+      if (x < w) w = x;
+      if (x > e) e = x;
+      if (y < s) s = y;
+      if (y > n) n = y;
+    }
+    cover = L.latLngBounds([s, w], [n, e]).pad(MARGIN);
     // No tile was asked for before this line, and a level built before it has no clip. See `Ground`.
     for (const l of [tiles, labels]) if (l) {
       for (const level of Object.values(l._levels)) clipLevel(l, level);
       l.redraw();
     }
-    const dx = (cover.getEast() - cover.getWest()) * MASK_SPANS;
-    const dy = (cover.getNorth() - cover.getSouth()) * MASK_SPANS;
-    const [bw, bs] = [cover.getWest() - dx, cover.getSouth() - dy];
-    const [be, bn] = [cover.getEast() + dx, cover.getNorth() + dy];
-    const outer = [[bw, bs], [be, bs], [be, bn], [bw, bn], [bw, bs]];
-
-    /* One Polygon: that ring, then the circle as its hole. **The stroke draws the circle and only
-       the circle.** It lands on the outer ring too, and that sits three widths out, so no zoom this
-       map allows can bring it on screen. The stripes are faint by instruction, so one property states
-       the edge on its own rather than leave it to them. */
-    L.geoJSON({
-      type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [outer, hole] },
-    }, {
-      /* **Padding 0.5, and Leaflet's own is 0.1.** Leaflet scales an SVG during a zoom and redraws it
-         when the zoom ends. A zoom out by one level halves it, so at 0.1 the edges of the view went
-         without stripes until the redraw. Half a view on each side still covers the view at half
-         size. */
-      renderer: L.svg({ pane: 'mask', padding: 0.5 }),
-      interactive: false,
-      style: { className: 'covermask', fillOpacity: 1 },
-    }).addTo(map);
     setLimits();
   })
-  // A failed circle draws the whole ground, because a map with no ground is worse than every tile.
-  .catch(() => { if (frame === undefined) { frame = false; tiles?.redraw(); labels?.redraw(); } });
+  // A failed box draws the whole ground, because a map with no ground is worse than every tile.
+  .catch(() => { if (cover === undefined) { cover = false; tiles?.redraw(); labels?.redraw(); } });
 
 function setBasemap() {
   const key = isDark() ? 'dark' : 'light';

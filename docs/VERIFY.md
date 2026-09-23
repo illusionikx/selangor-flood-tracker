@@ -462,20 +462,22 @@ printf("rows: %d, points: %d, newest: %s\n",
 # it printed the opening line alone, once the rail and the bar joined it. Read the last line: no
 # `PASS` means the run did not finish, whatever the counts above it say. It holds 1,012 assertions.
 
-# The coverage circle, the zoom floor and the pan limit. Also that the map draws no water of its
-# own on either theme: no water pane and no river pane. Also that each of the two tile panes carries
-# the exact filter its theme states, because the dark theme is Voyager inverted since 2026-09-18 and
-# a half revert of that is silent. Also that the map asks for no
-# tile outside the square frame around the circle, and that every tile level clips to it. Every fault here is silent. A mask that draws nothing looks like a map. A circle rebaked
-# against changed OpenStreetMap tagging slides back over the Strait of Malacca and still looks like a
-# circle. A zoom floor the pan box refuses still answers its own number to `getMinZoom()`. Reads PASS.
+# The coverage box, the zoom floor and the pan limit. The box is one rectangle off border.json's land
+# ring, and it answers all four questions: the pan limit, the floor, the tile skip and inCover().
+# Also that the map draws no water of its own on either theme: no water pane and no river pane. Also
+# that each of the two tile panes carries the exact filter its theme states, because the dark theme is
+# Voyager inverted since 2026-09-18 and a half revert of that is silent. Also that the map asks for no
+# tile outside the box, and that every tile level clips to it. Every fault here is silent. A box built
+# from `bounds` rather than from the land ring holds 44 km of the Strait of Malacca and still draws a
+# map. A zoom floor the pan box refuses still answers its own number to `getMinZoom()`. Reads PASS.
 "/c/Program Files/Google/Chrome/Application/chrome.exe" --headless=new --disable-gpu \
   --ignore-certificate-errors --virtual-time-budget=40000 --window-size=1200,900 --dump-dom \
   https://flood-exp.test/map-limits-test.html | perl -0777 -ne 'print $1 if /<pre id="out">([^<]*)</s'
-# It probes the mask with `isPointInFill`, which reads the fill rule the browser paints with. **Every
-# probe has to be on screen.** Leaflet clips a polygon to the viewport, so a point off the edge is
-# outside the clipped path whatever the map says. The page throws on a probe the view does not hold,
-# rather than reporting a hole in the mask over Perak.
+# **Half of this page guards an absence.** The shading outside the coverage area went on 2026-09-23,
+# and it had four parts: the `.covermask` path, the `#hatchdef` sprite, the `.coverframe` mask and the
+# `mask` pane. A partial revert brings one back without the others and errors nowhere.
+# **The page reads `cover` off the module namespace, never off a destructured import.** That binding
+# is `undefined` at import time and border.json fills it a tick or two later.
 
 # The app bar wordmark ladder, in rendered pixels. Loads the app in an iframe at fifteen widths and
 # asserts one spelling at a time, never wider than its rail, and never a longer spelling on a

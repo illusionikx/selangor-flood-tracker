@@ -399,10 +399,10 @@ frames only exist because we ran when they were taken. To re-test the capture pa
   Anything new that asks `inCover()` at load time needs the same wait.
 - **Leaflet moves the view the moment a fix lands, and this app has to read the fix first.**
   `map.locate({ setView: true })` pans and zooms before `locationfound` fires. A fix outside the
-  coverage circle is one this map must not travel to, and the pan limit stops that travel part way.
+  coverage box is one this map must not travel to, and the pan limit stops that travel part way.
   A control that moves halfway and stops reads as a control that failed.
   So this app calls `map.locate()` with no view of its own. `place()` in `js/locate.js` owns the move, and
-  it makes it only for a fix inside the circle. `wantView` carries what the caller asked for across
+  it makes it only for a fix inside the box. `wantView` carries what the caller asked for across
   the wait. Do not put `setView` back on the `locate()` call.
 - **`js/oops.js` must stay the first import in `app.js`.** A static import runs before the body of
   the file that imports it. A handler written inside `app.js` therefore starts after every other
@@ -2977,8 +2977,9 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   every other provider here uses, and it fails silently: the tiles still load, and they are simply
   the wrong part of the world. There is no `{s}` and no `{r}`.
   **Esri publishes the Canvas ground and its place names as two services**, so the dark theme adds
-  two layers. The labels take the `labels` pane at z-index 260, under the coverage mask at 270. That
-  pane takes no pointer events, or it sits between the reader and every pin under it.
+  two layers. The labels take the `labels` pane at z-index 260, over the tile pane at 200 and under
+  the overlay pane at 400. A coverage mask sat between them at 270 until 2026-09-23. That pane takes
+  no pointer events, or it sits between the reader and every pin under it.
   **World_Topo_Map bakes its names into the ground, so the light theme states no `names` and adds
   one layer.** A Canvas label layer over it draws every town name twice.
   **`maxNativeZoom: 16` beside `maxZoom: 18`, and the second number alone is wrong.** Esri caches no
@@ -3084,60 +3085,41 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   Lumpur and Putrajaya.** Both are enclaves, so OpenStreetMap carries them as inner rings of the
   Selangor relation. One shape therefore covers all three of this app's states, and nothing has to
   union anything.
-  **Fetching their own relations and punching three holes is the version that fails.** The mask is
-  one ring with the coverage cut out of it. Under the nonzero fill rule two overlapping holes wind
-  to -1 rather than to 0, so the overlap fills back in and the capital draws shaded. Under
-  `evenodd`, which is Leaflet's own default and what this app uses, a point inside two holes is at an
-  even count and fills as well. Either way the enclave is wrong. One hole per outer ring cannot
-  reach that state.
+  **Fetching their own relations and punching three holes is the version that fails.** That fault
+  belonged to the coverage mask, which is deleted. It is kept here because the inner-ring drop that
+  avoided it is still what fills the two enclaves in. A shaded ring with the coverage cut out of it
+  drew the capital shaded whenever two holes overlapped, under either fill rule. One hole per outer
+  ring could not reach that state.
   The script checks it. A point in Kuala Lumpur and a point in Putrajaya must both land inside the
   result, and it refuses to write the file otherwise. Nothing downstream would have said so.
-- **Do not set `fillRule` on the mask.** Leaflet's default is `evenodd`, which asks how many rings a
-  point sits inside and fills the odd answers. So a hole punches whichever way its own points
-  happen to wind. `nonzero` takes the signed sum instead, and a hole wound the same way as the outer
-  ring then fills solid rather than clearing. OpenStreetMap states no winding, and this app cannot
-  fix one it did not author.
-- **The mask's outer ring is finite, and a ring around the whole world is what it replaces.** A world
-  ring projects to coordinates in the tens of millions at zoom 9. Blink rasterizes a fill over the
-  path's own bounding box and gives up somewhere inside a box that size. While the mask was striped
-  the symptom was a wide unstriped band across the map, which reads as a bug in the stripes rather
-  than as a size limit. `MASK_SPANS` is three circle widths of margin, about eleven times as far as
-  the pan limit lets a reader travel. Keep it finite whatever the fill is.
-- **The mask draws a CIRCLE and it drew Selangor's outline, and the outline is not coming back
-  without a reason.** The repository owner called the real shape too busy on 2026-09-02, the same day
-  it shipped. The outline stays in `border.json` because `border-build.php` needs it to place the
-  circle and `map-limits-test.html` needs it to check one. Switching back is one line in `js/map.js`.
-- **The diagonal stripes went and came back lighter, all on 2026-09-02.** The repository owner called
-  the first set too busy over Selangor's real outline, took a flat wash for one revision, and asked
-  for the stripes again once the shape was a circle. Only the values moved: `--mask-line` is 0.10 on
-  paper against 0.16, and 0.035 on the dark theme against 0.055. **Do not read the flat-wash revision
-  as a decision against stripes.** It was a decision against those stripes on that shape.
-  **A `<pattern>` sprite must NOT be `display: none`, and a `<use>` sprite may be.** `#glyphs` holds
-  the pin shapes and is hidden, because `<use>` copies out of a tree that was never rendered. A
-  pattern is a paint server whose tile Blink builds from the LAYOUT tree, and with no layout there
-  are no children to build from. **Everything measurable still passes in that state**, which is why
-  it cost a session: the pattern resolves, `getComputedStyle` answers `url("#hatch")` on the path,
-  and every child answers its own right fill. The tile is simply empty and nothing errors.
-  `position: absolute` with zero size and the overflow clipped is the shape that renders and takes
-  no room.
-  **A stripe inside a tile has to be a filled `<rect>`.** A pattern clips its content to its own
-  tile, so a stroked line on the tile's edge carries half its width outside and shows half of itself.
-- **The stripes are faint and the hairline is what states the boundary.** All three mask values are
-  under the first striped set, so `--mask-edge` is load-bearing rather than decoration, and a
-  `stroke: none` leaves a circle nobody can find. `map-limits-test.html` asserts the stroke for that
-  reason alone.
-  **The stripe and the edge reverse between themes and the wash does not.** Both are black on paper
-  and white on the dark theme, because a darker mark on a wash that is already 30% black has nowhere
-  left to go.
-- **The stroke on the mask path draws the circle and nothing else.** It lands on the outer ring too,
-  and that ring sits three circle widths out, past any zoom the pan limit allows. So one property
-  states the boundary and no second element is needed.
+  **That check has a second half since 2026-09-23.** Both points must also land inside the land
+  ring's own EXTENT, which is the coverage area now. `border-build.php` fails on either half.
+- **THE COVERAGE SHADING IS DELETED, AND EVERY PART OF IT IS A SEPARATE REVERT.** Everything outside
+  a circle was shaded with faint diagonal stripes from 2026-09-02 to 2026-09-23. The repository owner
+  deleted it and made the coverage area a rectangle. Seven things went together, and bringing back
+  one without the others errors nowhere:
+  the `mask` pane in `js/map.js`; the world-sized outer ring and `MASK_SPANS`; the circle ring,
+  `CIRCLE_PTS` and `RIM`; the `<pattern>` sprite `#hatchdef`; `.covermask`, `.hatchbg` and
+  `.hatchline` in `css/map.css`; `--mask-bg`, `--mask-line` and `--mask-edge` on both themes in
+  `css/base.css`; and `FRAME`, the tile frame's own pad.
+  `map-limits-test.html` asserts the absence of the path, the pane and the sprite, for that reason.
+  **Three traps are kept in this file rather than deleted, because a revert would meet all three
+  again.** They are `fillRule` (Leaflet's `evenodd` punches a hole whichever way its points wind, and
+  `nonzero` fills it solid), the finite outer ring (a world-sized ring projects to coordinates in the
+  tens of millions at zoom 9, and Blink gives up filling a box that size), and the `<pattern>` sprite
+  that must not be `display: none` (a `<use>` copies out of a tree that was never rendered, and a
+  paint server builds its tile from the LAYOUT tree, so a hidden one resolves and paints nothing).
+  The last of those cost a session. Everything measurable passed in that state.
 - **One box holds the zoom floor and the pan limit, and two numbers cannot be trusted to agree.**
-  `setLimits()` in `js/map.js` takes `cover.pad(0.5)`, sets it as `maxBounds`, and takes the floor
-  from `getBoundsZoom()` of that same box. A floor derived separately reports a level the box then
+  `setLimits()` in `js/map.js` sets `cover` as `maxBounds` and takes the floor from
+  `getBoundsZoom()` of that same box. A floor derived separately reports a level the box then
   refuses, and `getMinZoom()` still answers the number it was given. Nothing errors, so the floor is
-  simply a lie. Measured at six widths from 320 to 1920, the shipped shape reaches its own floor at
-  every one.
+  simply a lie. It is one box rather than two since 2026-09-23. The circle needed a second, wider box
+  for the tiles, because the ground had to reach under the shaded ring.
+  **The floor shows bare container on a wide window, and that is a decision.** The box is taller than
+  it is wide, so `getBoundsZoom()` binds on the height and leaves two strips of Leaflet container to
+  the left and the right. They take `--surface`. `getBoundsZoom(cover, true)` removes them and stops a
+  wide window from ever holding the whole area. See docs/FEATURES.md for the measurement.
   **`getBoundsZoom()` fits BOTH axes and returns the tighter one**, and which axis binds depends on
   the window: height on a desktop, width on a phone. So a fixed pad beside a fixed offset agrees at
   one width and not at the next.
@@ -3151,10 +3133,15 @@ and `--muted` flip with the theme while the picture behind them does not. White 
 - **`setLimits()` runs after `invalidateSize()` and never before it.** `getBoundsZoom()` reads
   `map.getSize()`, and that answers for the old box until `invalidateSize()` tells Leaflet about the
   new one. Both sit in the same `requestAnimationFrame` inside the `ResizeObserver`.
-- **The circle is placed and sized on LAND alone, and only `border-build.php` can do that.** Selangor
+- **The coverage area is placed on LAND alone, and only `border-build.php` can do that.** Selangor
   reaches west to longitude 100.39 in the Strait of Malacca. A circle built from the whole outline
-  sat 47% on water, measured by sampling 60,000 points against the coast. Dropping the sea brings it
+  sat 47% on water, measured by sampling 60,000 points against the coast. Dropping the sea brought it
   to 29%.
+  **`js/map.js` reads the `land` feature and never `bounds`, and that is the same rule at the client
+  end.** `bounds` is the extent of the whole relation, sea included. A box off `bounds` reaches 44 km
+  further west than the land does, over open water the map then pays CARTO to draw.
+  `map-limits-test.html` asserts `cover.getWest() > geo.bounds[0]` for exactly that swap. The two
+  fields look interchangeable, and one of them is 30 lines from the other in the same file.
   **OpenStreetMap marks the sea boundary `maritime=yes` on the member WAY, and `out geom` carries no
   tags at all.** So the script makes a second Overpass call, `rel(id); way(r); out tags;`, and
   matches by way id. Measured 2026-09-02: 14 of Selangor's 136 member ways. The script refuses to
@@ -3164,18 +3151,20 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   keeps only what closes, which is right for a lake and wrong here. `longestChain()` chains without
   requiring closure, and a straight chord then stands in for the coast. The real coastline is inside
   that chord, so the land ring is a little generous seaward and exact everywhere else. That is the
-  right way to be wrong: a circle that covers a strip of shore is honest, and one that clips Klang
-  is not.
-  **The centre is the AREA centroid, never the mean of the points.** A border carries its vertices
-  where it wiggles, so a mean is pulled toward the fiddly stretches and away from the plain ones.
-- **The minimum enclosing circle is the wrong circle here, and it was measured before it was
-  rejected.** It is smaller — 84.97 km against 95.57 — and it sits further west, at longitude
-  101.271 against 101.509. So it lands 45% on water against 29%. The centroid with a radius reaching
-  the farthest land point is what ships. Smallest is not the goal. Least water is.
-- **A radius that exactly reaches the farthest point puts that point ON the boundary.** `RIM` in
-  `js/map.js` adds one percent for that reason. Without it `isPointInFill` is free to answer either
-  way on that one point, floating point picks, and the mask shades a single corner of Selangor. The
-  check read one point of 852 as covered and looked like a real hole.
+  right way to be wrong: a coverage area that covers a strip of shore is honest, and one that clips
+  Klang is not.
+- **THE CIRCLE IS GONE AND THE CIRCLE ARITHMETIC WENT WITH IT.** `centroid()`, `km()`, the radius
+  loop, the `circle` key and `RIM` all left on 2026-09-23. Two findings are kept here, because
+  anybody who reaches for a circle again meets both.
+  **The minimum enclosing circle is the wrong circle, and it was measured before it was rejected.**
+  It is smaller, 84.97 km against 95.57, and it sits further west, at longitude 101.271 against
+  101.509. So it lands 45% on water against 29%. Smallest is not the goal. Least water is.
+  **A radius that exactly reaches the farthest point puts that point ON the boundary.** `RIM` added
+  one percent for that reason. Without it `isPointInFill` is free to answer either way on that one
+  point, floating point picks, and the check read one point of 852 as covered.
+  A rectangle has neither problem. `MARGIN` still grows the land extent, but for a reason of its own:
+  with the shading gone the box edge is the edge of the map, and a border flush against it reads as a
+  map that was cut off.
 - **The MET nowcast page has no endpoint to find.** It renders its Leaflet map on the server and
   bakes all 294 points into `L.marker(...)` statements. There is no request to intercept, so
   `metPoints()` parses the JavaScript source with a regex. `data.gov.my` publishes three weather
@@ -3704,13 +3693,12 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   halves the share of pixels in the reserved amber band, from 20.40% to 9.89%, and it leaves what
   survives at a mean relative luminance of 0.049.
 - **THE PLACE NAMES ARE NOT IN THE TILE PANE, SO ONE SELECTOR IS HALF A DARK THEME.** `js/map.js`
-  puts the `_only_labels` layer in a pane of its own at z-index 260, under the coverage mask. A
+  puts the `_only_labels` layer in a pane of its own at z-index 260, over the tile pane. A
   filter on `.leaflet-tile-pane` alone inverts the ground and leaves the light place names over it.
   Those are dark text inside white halos. They stay legible enough that a reader can miss what is
   wrong.
   **Never move the filter up to `.leaflet-map-pane` to catch both.** That pane is the one ancestor
-  these two share with the mask, the pins and the heat wash. It inverts every reading this app
-  draws.
+  these two share with the pins and the heat wash. It inverts every reading this app draws.
 - **INVERTING A LIGHT BASEMAP AMPLIFIES A SUB-1% DETAIL INTO A 23% EDGE, AND VOYAGER HAS ONE.**
   Voyager draws a darker casing 3px wide on the water side of every bank. Measured over 99,704
   water pixels at Sungai Puluh at zoom 15. The casing reads 0.871 against open water at 0.895,
@@ -3751,13 +3739,17 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   `showRivers()` passed `{ timeout: 3000 }` until it went on 2026-09-15. A new deferred fetch needs
   the same option.
 - **The ground asks for no tile until `border.json` answers.** `Ground` in `js/map.js` refuses every
-  tile while `frame` is `undefined`. The fetch answer sets `frame` and redraws both layers. A failure
-  sets `false` and redraws. A new path that sets `frame` must redraw too, or the ground stays blank.
+  tile while `cover` is `undefined`. The fetch answer sets `cover` and redraws both layers. A failure
+  sets `false` and redraws. A new path that sets `cover` must redraw too, or the ground stays blank.
   A `border.json` request that hangs and never fails also leaves the ground blank, and nothing
   guards that case.
+  **`undefined` and `false` are not the same state, and one variable carries both.** `undefined`
+  means "ask for nothing yet" and `false` means "ask for everything". `!cover` is true for both, so
+  never write the skip as `if (!cover) return true`. The variable was `frame` until 2026-09-23, when
+  the tile frame and the coverage area became one box.
   **The skip uses two private Leaflet methods**, `_isValidTile` and `_tileCoordsToBounds`. If an
   upgrade renames the first one, `extend` adds a method that nothing calls, and nothing throws.
-  `map-limits-test.html` catches it, because the floor view then asks for tiles outside the circle.
+  `map-limits-test.html` catches it, because the floor view then asks for tiles outside the box.
   **The clip sits on each zoom level, never in an SVG over the tiles.** Leaflet scales a level
   during a zoom, and a clip in that level's own pixels scales with it. An SVG redraws when the zoom
   ends, so a zoom out showed the ground past the square until then. `clipLevel()` reads the level's
