@@ -177,19 +177,35 @@ try {
      pane as well, because the place names are a layer of their own and half a revert drops them.
      The layer inside the tile pane is still asked, because that is where the deleted chain was
      measured a second time. See the `.leaflet-tile-pane` rule in css/map.css for all three.
+     **THE TWO PANES TAKE DIFFERENT CHAINS SINCE 2026-09-23, AND THAT IS THE POINT OF THIS BLOCK.**
+     The ground gained `brightness(2.04) contrast(1.08)`, which lifts every basemap feature off the
+     land.
+     The place names must not take it: Voyager's label halo inverts to `#090c0f`, and this slope lifts
+     that to a dark blue smudge box behind every name. Copying one rule onto both panes is the exact
+     revert this asserts against, and it errors nowhere.
      `setTheme` writes the reader's own preference, so the pick goes back after. */
   const { setTheme } = M;
   const { PREFS } = await import('./js/state.js');
   const wasTheme = PREFS.theme;
-  const WANT = { light: 'none', dark: 'invert(1) hue-rotate(180deg)' };
+  const BASE = 'invert(1) hue-rotate(180deg)';
+  const WANT = {
+    light: { ground: 'none', 'place name': 'none' },
+    dark: { ground: `${BASE} brightness(2.04) contrast(1.08)`, 'place name': BASE },
+  };
   const PANES = [['ground', '.leaflet-tile-pane'], ['place name', '.leaflet-labels-pane']];
   for (const t of ['dark', 'light']) {
     setTheme(t);
     await settle(300);
     for (const [name, sel] of PANES) {
       const got = getComputedStyle(document.querySelector(sel)).filter;
-      ok(`the ${t} ${name} pane takes the filter it should`, got === WANT[t], got);
+      ok(`the ${t} ${name} pane takes the filter it should`, got === WANT[t][name], got);
     }
+    /* The two dark chains have to DIFFER. Both assertions above pass on a day somebody makes them
+       identical by editing this file rather than the stylesheet. */
+    if (t === 'dark') ok('the two dark panes take different chains',
+      getComputedStyle(document.querySelector('.leaflet-tile-pane')).filter
+        !== getComputedStyle(document.querySelector('.leaflet-labels-pane')).filter,
+      'ground carries the lift, the place names do not');
     const layer = getComputedStyle(document.querySelector('.leaflet-tile-pane .leaflet-layer')).filter;
     ok(`the ${t} ground layer takes no filter of its own`, layer === 'none', layer);
     ok(`the ${t} theme has no river pane`, !map.getPane('rivers'),

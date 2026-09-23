@@ -25,18 +25,61 @@
    the Dark Matter entry in docs/GOTCHAS.md records. This selects nothing. Each output pixel reads
    its own input pixel and no other.
    **TWO PANES, BECAUSE THE PLACE NAMES ARE NOT IN THE TILE PANE.** `js/map.js` puts the
-   `_only_labels` layer in a pane of its own at z-index 260, under the coverage mask. A rule that
+   `_only_labels` layer in a pane of its own at z-index 260, over the tile pane. A rule that
    names the tile pane alone inverts the ground and leaves dark text under white halos over it.
-   **The mask, the pins and the heat wash must stay out of this.** Each one is a pane of its own
-   above these two, so no rule here reaches them. Never move this filter up to `.leaflet-map-pane`,
-   which is the one ancestor these two share with all three.
+   **The pins and the heat wash must stay out of this.** Each one is a pane of its own above these
+   two, so no rule here reaches them. Never move this filter up to `.leaflet-map-pane`, which is the
+   one ancestor these two share with both.
    **It pairs with `CARTO_STYLE.dark` in js/config.js, and with the `carto` class js/map.js writes.**
    The Esri fallback serves a ground that is already dark. An inversion of that draws a white map.
    **It puts each pane on a render surface of its own.** Leaflet scales both through every zoom, and
    the rail travel animates the width of the map card. It costs one dropped frame per rail travel.
    See docs/FEATURES.md for the measurement. */
-:root.carto[data-theme="dark"] .leaflet-tile-pane,
+
+/* **THE GROUND CARRIES TWO MORE TERMS SINCE 2026-09-23, AND THE PLACE NAMES CARRY NEITHER.** The
+   repository owner read the dark map as too weak against this app's own pins. Measured off the
+   rendered page: every basemap feature stood 1.06:1 to 1.34:1 against the land, while a cluster chip
+   stood at 3.34:1 and a rain pin at 6.95:1. The basemap was about a fifth of the contrast of the
+   marks on top of it.
+   **The cause is `invert()`, which runs on sRGB rather than on linear light.** Voyager separates a
+   feature from the land by being a little BRIGHTER: land L 0.941 against roads at 0.999, a 6% spread.
+   Inverting puts that whole spread inside 0.000 to 0.020, in the toe of the gamma curve, where 6%
+   of the source is a rounding error on screen.
+   **`brightness(b)` then `contrast(c)` is ONE straight line**, at slope `b * c` and intercept
+   `0.5 * (1 - c)`. A slope above 1 with a small negative intercept lifts the middle of the range and
+   holds the floor. That is the shape the instruction asked for: the land stays black and everything
+   else comes up. Measured, against the land:
+
+     feature       before        after
+     green         1.10:1        1.30:1
+     road casing   1.07:1        1.21:1
+     motorway      1.18:1        1.65:1
+     water         1.34:1        2.30:1
+     land          L 0.00204     L 0.00155
+
+   **THE SLOPE IS 2.2 AND IT WAS 3.45 FOR ONE REVISION.** The repository owner read the stronger one
+   on 2026-09-23 and called the water too bright. At 3.45 the sea covered a third of the landing view
+   at L 0.0784, which is 2.51:1 against the land. This slope holds it near 1.6:1 there.
+   **The land is 0.00155 at either slope, because the intercept moves with the slope.** The owner
+   named that number. `contrast()` carries it: the intercept is `0.5 * (1 - c)`, so a lower slope
+   needs less of it to land the floor on the same value.
+
+   **It is still one output pixel per input pixel.** No band gets selected, so this cannot reach the
+   fault the deleted water tint reached. See the Dark Matter entry in docs/GOTCHAS.md.
+   **The place names must NOT take these two terms.** Voyager draws its halos in `#f1f4f7`, which
+   inverts to `#090c0f` and lifts to a visible dark blue box at any slope this range holds. That is a
+   smudge behind every name on a near-black map. The label text already stands about 20:1, so it
+   needs nothing. That is the whole reason the two panes stopped sharing one rule.
+   **MINOR ROADS ARE PURE BLACK AND NO VALUE HERE CHANGES THAT.** Voyager paints them `#fffffe`, the
+   brightest thing on the tile, so they invert to `#000000` — darker than the land. Inversion reverses
+   the order, and no per-pixel curve can put it back. They still read, because the road CASING beside
+   them lifts to 1.21:1, so a street draws as a black line with a lit edge.
+   **The bright riverbank rim lifts with everything else.** That rim is already recorded at 23%. See
+   docs/FEATURES.md. */
 :root.carto[data-theme="dark"] .leaflet-labels-pane { filter: invert(1) hue-rotate(180deg); }
+:root.carto[data-theme="dark"] .leaflet-tile-pane {
+  filter: invert(1) hue-rotate(180deg) brightness(2.04) contrast(1.08);
+}
 
 /* Zoom sits bottom-right (Maps-style), clear of the alert panel. */
 /* Leaflet gives its control corners `z-index: 1000`, above everything this page has — the splash

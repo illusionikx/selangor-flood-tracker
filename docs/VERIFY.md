@@ -466,7 +466,10 @@ printf("rows: %d, points: %d, newest: %s\n",
 # ring, and it answers all four questions: the pan limit, the floor, the tile skip and inCover().
 # Also that the map draws no water of its own on either theme: no water pane and no river pane. Also
 # that each of the two tile panes carries the exact filter its theme states, because the dark theme is
-# Voyager inverted since 2026-09-18 and a half revert of that is silent. Also that the map asks for no
+# Voyager inverted since 2026-09-18 and a half revert of that is silent. The two dark chains DIFFER
+# since 2026-09-23: the ground takes `brightness(2.04) contrast(1.08)` and the names take neither,
+# or every name draws over a dark blue smudge box. The page asserts both chains and asserts that they
+# are not equal. Also that the map asks for no
 # tile outside the box, and that every tile level clips to it. Every fault here is silent. A box built
 # from `bounds` rather than from the land ring holds 44 km of the Strait of Malacca and still draws a
 # map. A zoom floor the pan box refuses still answers its own number to `getMinZoom()`. Reads PASS.

@@ -3688,10 +3688,46 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   basemap. Drop the `carto` class, and a deploy with no CARTO key inverts the Esri dark ground into
   a white map.
   **This is NOT the band filter the entry above forbids.** That one had to select one grey out of a
-  quantized palette. `invert(1) hue-rotate(180deg)` selects nothing. Each output pixel reads its own
-  input pixel and no other. Measured over 16 tiles of central Kuala Lumpur at zoom 14: the chain
+  quantized palette. This chain selects nothing. Each output pixel reads its own input pixel and no
+  other. Measured over 16 tiles of central Kuala Lumpur at zoom 14: the chain
   halves the share of pixels in the reserved amber band, from 20.40% to 9.89%, and it leaves what
   survives at a mean relative luminance of 0.049.
+- **INVERTING A LIGHT BASEMAP CRUSHES EVERY FEATURE INTO THE TOE, AND TWO TERMS PULL THEM BACK.**
+  `invert()` runs on sRGB, not on linear light. Voyager separates a feature from the land by making
+  it a little BRIGHTER: land is L 0.941 and a road is L 0.999, a 6% spread. The flip puts that whole
+  spread inside 0.000 to 0.020, where 6% of the source is a rounding error on screen. Measured on the
+  rendered page before the repair: every basemap band stood 1.06:1 to 1.34:1 against the land, while
+  this app's own cluster chip stood at 3.34:1 and a rain pin at 6.95:1.
+  **`brightness(b)` then `contrast(c)` is ONE straight line**, slope `b * c` and intercept
+  `0.5 * (1 - c)`. A slope above 1 with a small negative intercept lifts the mid-darks and HOLDS the
+  floor, which is what "lift the features and leave the land" means.
+  `brightness(2.04) contrast(1.08)` ships: slope 2.20, land L 0.00204 to 0.00155, water 1.34:1 to
+  2.30:1, motorway 1.18:1 to 1.65:1.
+  **`brightness()` alone lifts the land with everything else, and `contrast()` alone crushes it.**
+  Contrast pivots at 0.5 and every value here is under 0.02, so any amount above 1 pushes them to
+  black. The pair is what gives an intercept at all.
+  **A CITY TILE UNDER-PREDICTS THE SEA, AND SLOPE 3.45 SHIPPED FOR ONE REVISION BECAUSE OF IT.** The
+  design work sampled Kuala Lumpur at zoom 12 and 14, where water is a river and green is a park. The
+  landing view is zoom 9, where the Strait of Malacca fills a THIRD of the map. At slope 3.45 the sea
+  rendered at L 0.0784, which is 2.51:1 against the land, and the repository owner called it too
+  bright. Slope 2.20 holds it at 1.63:1. Sample a coast tile as well as a city tile before moving it.
+  **The land holds 0.0015 at either slope, because the intercept moves with the slope.** `contrast()`
+  carries the intercept, so a lower slope needs less of it to land the floor on the same value. Do
+  not read a slope change as a land change.
+  **THE LABELS PANE MUST NOT TAKE THESE TWO TERMS.** Voyager's halo is `#f1f4f7`, which inverts to
+  `#090c0f` and is invisible. This slope lifts it to about `#0c1621`, a dark blue smudge box behind
+  every place name. The label text already stands about 20:1. That is why the two panes stopped
+  sharing one rule on 2026-09-23. `map-limits-test.html` asserts each chain AND asserts that the two
+  differ, because making them identical inside the check passes the first two assertions.
+  **MINOR ROADS ARE PURE BLACK AND NO VALUE FIXES THAT.** Voyager paints them `#fffffe`, the
+  brightest thing on the tile, so they invert to `#000000` — darker than the land. Inversion reverses
+  the ORDER of the bands, and a per-pixel curve is monotone, so nothing puts an order back. Do not
+  reach for an `feComponentTransfer` table to lift that one band: it is the band-select trap two
+  entries up, and antialiased road edges would halo. The casing beside each road lifts to 1.21:1,
+  so a street reads as a black line with a lit edge.
+  **`saturate()` is the knob for a sea that reads too teal**, because it moves the hue and holds the
+  luminance. Slope 2.20 did not call for it. Reach for it before reaching for the slope, which moves
+  every band at once.
 - **THE PLACE NAMES ARE NOT IN THE TILE PANE, SO ONE SELECTOR IS HALF A DARK THEME.** `js/map.js`
   puts the `_only_labels` layer in a pane of its own at z-index 260, over the tile pane. A
   filter on `.leaflet-tile-pane` alone inverts the ground and leaves the light place names over it.

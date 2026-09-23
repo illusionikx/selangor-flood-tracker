@@ -19979,3 +19979,124 @@ the check asserts that.
 
 The box still takes ground that is not Selangor. Bentong in Pahang sits inside it. That is the cost
 of a rectangle, the same way it was the cost of a circle.
+
+## The dark ground lifts its features off the land, 2026-09-23
+
+The dark basemap read as a black field with a few orange threads across it. The repository owner
+called it too weak against the pins this app draws. They asked for the features to come up. They
+asked for the land to stay where it was.
+
+### What the map measured
+
+Read off the rendered page at 1536 by 864, on the landing view. `L` is relative luminance. The ratio
+column is the WCAG contrast of each band against the land.
+
+| band | L before | against land |
+|---|---|---|
+| land `#090601` | 0.00191 | (the reference) |
+| green `#0c1102` | 0.00483 | 1.06:1 |
+| sea `#0c1f22` | 0.01174 | 1.19:1 |
+| the cluster chip this app draws, `#5f6368` | 0.12356 | **3.34:1** |
+| the rain pin this app draws, `#a48adb` | 0.31180 | **6.95:1** |
+
+Every basemap band stood between 1.06:1 and 1.19:1. Every mark this app draws stood between 3.3:1
+and 7:1. The basemap carried about a fifth of the contrast of the marks on top of it.
+
+### Why inversion does that
+
+**`invert()` runs on sRGB values, not on linear light.** Voyager separates a feature from the land by
+making it a little BRIGHTER. Land is L 0.941 and a road is L 0.999, which is a 6% spread.
+
+The flip puts that whole spread inside 0.000 to 0.020. That range sits in the toe of the gamma
+curve, where 6% of the source is a rounding error on screen.
+
+This is a property of the source, not of the values picked.
+
+A light basemap encodes a road as slightly brighter than the land. A dark basemap encodes it as much
+brighter. Inversion cannot turn the first into the second.
+
+### The two terms
+
+**`brightness(b)` then `contrast(c)` is ONE straight line.** The slope is `b * c` and the intercept
+is `0.5 * (1 - c)`. A slope above 1 with a small negative intercept lifts the middle of the range and
+holds the floor. That is the shape the instruction asked for.
+
+The chain is `invert(1) hue-rotate(180deg) brightness(2.04) contrast(1.08)`. The slope is 2.20 and
+the intercept is minus 0.040. Against the palette values Voyager publishes:
+
+| feature | before | after |
+|---|---|---|
+| green | 1.10:1 | 1.30:1 |
+| road casing | 1.07:1 | 1.21:1 |
+| motorway | 1.18:1 | 1.65:1 |
+| water | 1.34:1 | 2.30:1 |
+| land | L 0.00204 | L 0.00155 |
+
+The land came down, not up. The repository owner named 0.0015, and the rendered page reads 0.00158.
+
+**Each output pixel still reads its own input pixel and no other.** No band gets selected. So this
+cannot reach the fault the deleted water tint reached in 2026-08. See the Dark Matter entry in
+docs/GOTCHAS.md.
+
+### Slope 3.45 shipped first, and the water is why it did not stay
+
+Five slopes went to the screen before the first pick. Each one covered a coast tile and a city tile.
+The slopes ran from 2.2 to 4.2. At 4.2 the motorway orange takes the map over. The first pick was
+3.45.
+
+**The city tiles under-predicted the sea.** The design work sampled Kuala Lumpur at zoom 12 and 14.
+Water is a river there, and green is a park. The landing view is zoom 9, where the Strait of Malacca
+fills a third of the map.
+
+| rendered band | before | slope 3.45 | slope 2.20 |
+|---|---|---|---|
+| land | L 0.00191 | L 0.00151 | L 0.00158 |
+| sea | L 0.01174 | L 0.07839 | L 0.03398 |
+| sea against land | 1.19:1 | 2.51:1 | 1.63:1 |
+
+The repository owner read 3.45 and called the water too bright. Slope 2.20 ships.
+
+**The land holds 0.0015 at either slope, because the intercept moves with the slope.** `contrast()`
+carries the intercept, so a lower slope needs less of it to land the floor on the same value. Sample
+a coast tile as well as a city tile before moving this again.
+
+### The place names take neither term
+
+The two tile panes carried one rule from 2026-09-18 to 2026-09-23. They carry two rules now.
+
+Voyager draws a white halo behind each place name, at `#f1f4f7`. That halo inverts to `#090c0f`,
+which is invisible. Any slope in this range lifts it into a dark blue smudge box behind every name
+on a near-black map.
+
+The label text already stands about 20:1 against the land. It needs no lift at all.
+`map-limits-test.html` asserts the exact chain on each pane, and asserts that the two chains differ.
+Both of the first two assertions pass on a day somebody makes the two identical inside the check.
+
+### What no value here can fix
+
+**Minor roads are pure black.** Voyager paints them `#fffffe`, which is the brightest thing on the
+tile. So they invert to `#000000`, which is darker than the land. Inversion reverses the order of the
+bands, and no per-pixel curve can put an order back.
+
+They still read. The road CASING beside them lifts to 1.21:1, so a street draws as a black line with
+a lit edge.
+
+**The bright riverbank rim lifts with everything else.** That rim measures 23% and it is already
+recorded above. It is a spatial feature of the Voyager artwork, not a value this chain chose.
+
+### What this costs
+
+**Nobody measured the frame cost.** The chain gained two terms on a pane that already carried a
+filter and already had a render surface of its own. The recorded cost of that filter is one dropped
+frame per rail travel. Measure it again before adding a third term.
+
+**`saturate()` is the knob nobody needed.** A sea that reads too teal at some future slope can take
+`saturate(0.75)`. It moves the hue and holds the luminance. Slope 2.20 did not call for it.
+
+### The option not taken
+
+CARTO Dark Matter went to the screen beside this. It is a purpose-built dark map. So its road
+hierarchy runs the right way round, and its street network is fully legible.
+
+It draws no blue water and no green. A river reads as a grey ribbon. On a flood map that trade costs
+more than it pays, so the inverted Voyager stays.
