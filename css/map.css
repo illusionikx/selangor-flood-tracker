@@ -150,6 +150,8 @@
 .popname { font-size: 15px; font-weight: 500; line-height: 1.3; }
 .popbody { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin-bottom: 8px; }
 .popbody .v { text-align: right; }
+/* The Trend and History rows sit under their graph since 2026-10-14, so the space goes above them. */
+.spark + .popbody { margin: 8px 0 0; }
 
 /* One mast, several sensors: the place is named once in .pophead, then a section per sensor. The
    kind chips are the app bar's second supporting line now, so their layout goes with them — see
@@ -166,11 +168,16 @@
    A segment per block is what says it, and the group still reads as one sensor because the
    segments carry the 4dp inner corner and only the ends take the 16dp outer one.
 
-   **The double line stays killed, and by the same mechanism.** A section separated itself with a top
-   rule while `.pophead` ended in a bottom rule, and the two stacked once `openSide()` began lifting
-   three pieces rather than the whole header. Neither rule exists here. Surfaces and space separate
-   everything, so there is nothing left to stack. Do not reach for a border. */
-.sensor { margin-top: 8px; }
+   **THE CARD FOLLOWS THE ALERT PANEL'S LIST SINCE 2026-10-14**, on a reader's instruction. That
+   reverses three things this block stated. The readings are a STANDARD list now, with no filled
+   segment. Every section folds, because `.sensor` is a `<details>` and `.sensorhead` its
+   `<summary>`. And a full-width divider in `outline-variant` opens every section after the first,
+   which is the rule `.apane details + details` states one pane over.
+   **The double line is still the fault to avoid.** `.pophead` draws no bottom rule any more and
+   `openSide()` removes it once it empties, so the divider has nothing to stack against. The divider
+   goes on `.sensor + .sensor` and never on the first section. */
+.sensor { margin-top: 8px; padding-bottom: 8px; }
+.sensor + .sensor { border-top: 1px solid var(--md-sys-color-outline-variant); }
 /* One 8px gap whether or not there is a sibling above. Over a sibling it separates two sensors, and
    at the top of the body it clears the app bar. A `:first-child` cancel stood here and keyed on
    position, which is what moved the day `.pophead` emptied and `openSide()` removed it. */
@@ -181,8 +188,25 @@
    The radius is here for the flash alone. A list item takes its state layer on its own shape. */
 .sensorhead {
   display: flex; align-items: center; gap: 12px;
-  min-height: 56px; padding: 4px; border-radius: var(--md-sys-shape-corner-large);
+  min-height: 56px; padding: 4px;
 }
+/* The fold, transcribed from the alert pane: no browser marker, a chevron at the trailing end turned
+   up while open, and M3's `on-surface` state layer under a pointer and a press. The corner is square
+   for the reason that pane states: a rounded tint under a straight divider reads as a button in a
+   box. A ⋮ in the row keeps the trailing slot, so the chevron follows it rather than splitting the
+   free space with it. */
+summary.sensorhead { list-style: none; cursor: pointer; }
+summary.sensorhead::-webkit-details-marker { display: none; }
+summary.sensorhead:hover { background: color-mix(in srgb, var(--on-surface) var(--m3-state-hover), transparent); }
+summary.sensorhead:active { background: color-mix(in srgb, var(--on-surface) var(--m3-state-press), transparent); }
+summary.sensorhead:focus-visible { outline: 2px solid var(--md-sys-color-primary); outline-offset: -2px; }
+.sensorhead .chev {
+  flex: none; margin-left: auto; font-size: 24px;
+  color: var(--md-sys-color-on-surface-variant); transition: transform .2s;
+}
+.sensorhead :is(.muted, .dots) ~ .chev { margin-left: 0; }
+details.sensor[open] > summary .chev { transform: rotate(180deg); }
+@media (prefers-reduced-motion: reduce) { .sensorhead .chev { transition: none; } }
 /* **M3's leading slot: 24px of glyph, and NO disc.** It wore the Notices pane's 40px tinted avatar
    for one revision and a reader cut it on 2026-08-25. An avatar names a sender. A sensor kind is not
    a sender, and six discs down one card read as six of them.
@@ -202,29 +226,16 @@
 .sensorhead .muted { flex: 1; min-width: 0; text-align: right; overflow: hidden;
   text-overflow: ellipsis; white-space: nowrap; }
 
-/* The readings, as M3's list at `appearance: segmented`. `.mseg` in `css/chrome.css` states the same
-   shape for the Settings groups and the alert groups. This is not that class, and the divergence is
-   the item: those two draw a row of text and this one draws a meter, a graph or a picture. So there
-   is no 72px floor, no centred flex row, and no 16px inline padding to stand a graph in.
-   **The gap is 2px, which is `--md-list-item-gap`'s own number.** `.mseg` takes 8px because its
-   groups hold different kinds of row. Every segment here belongs to one sensor and has to read as
-   one block. */
+/* The readings, as M3's STANDARD list since 2026-10-14. It was `appearance: segmented`, a filled
+   block per item with a 4dp inner corner and a 16dp outer one. An item has no container now and sits
+   on the pane's surface, the way an alert row does. The item still draws a meter, a graph or a
+   picture rather than a row of text, so it keeps its own inset rather than the 72px row.
+   The inline inset is the head's own 4px, so a title in an item starts on the line the head's glyph
+   starts on. Items separate by their titles and by space, never by a rule. */
 .sbody {
-  display: flex; flex-direction: column; gap: 2px; list-style: none; margin: 0; padding: 0;
+  display: flex; flex-direction: column; list-style: none; margin: 0; padding: 0;
 }
-.sbody > li {
-  padding: 12px;
-  background: var(--md-sys-color-surface-container);
-  border-radius: var(--md-sys-shape-corner-extra-small);
-}
-.sbody > li:first-child {
-  border-start-start-radius: var(--md-sys-shape-corner-large);
-  border-start-end-radius: var(--md-sys-shape-corner-large);
-}
-.sbody > li:last-child {
-  border-end-start-radius: var(--md-sys-shape-corner-large);
-  border-end-end-radius: var(--md-sys-shape-corner-large);
-}
+.sbody > li { padding: 8px 4px; }
 /* A line the "You are here" card puts between the head and the readings: the station name it found,
    its region, or `No river within 30 km` where it found none. It is supporting content of the item
    rather than a reading, so it takes no container. It takes the head's own 4px inset, or it stands
@@ -645,7 +656,7 @@
   .popname { font-size: 14px; }
   .popbody { gap: 3px 10px; margin-bottom: 6px; }
   .sensor { margin-top: 6px; }
-  .sbody > li { padding: 10px; }
+  .sbody > li { padding: 6px 4px; }
 }
 
 /* The alert marker on a camera picture. Top left, because the bottom carries the timestamp JPS
@@ -722,7 +733,7 @@
    `.sbody > li` states a 12px inset for a graph or a picture. A list item states 8px and 16px, so
    this needs the element as well as the class to beat it. */
 .sbody > li.wxstep {
-  display: flex; align-items: center; gap: 16px; padding: 8px 16px; min-height: 72px;
+  display: flex; align-items: center; gap: 16px; padding: 8px 4px; min-height: 72px;
 }
 /* **The leading slot is M3's AVATAR, and `.avat` in `css/chrome.css` states its shape.** A 40px
    tinted disc under a 24px glyph. The repository owner asked for the disc on 2026-08-25, so this

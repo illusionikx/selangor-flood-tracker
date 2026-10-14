@@ -18,6 +18,7 @@ zoomBar.insertAdjacentHTML('afterbegin', '<button id="locate" data-tip="Show my 
 const btn = zoomBar.firstElementChild;
 L.DomEvent.disableClickPropagation(btn);
 let layer, marker, at, acc;
+const ACC_CIRCLE_M = 500;   // accuracy is a radius in metres, and a circle wider than this is not drawn
 let wantPopup = false;   // only pop up when the user asked; never on the landing auto-locate
 
 /* **A fix outside the coverage area gets no jump and no ripple.** The map may not pan there, so a
@@ -132,15 +133,18 @@ const FIX_TTL = 15 * 60 * 1000;
    usable before it anyway.
    A live fix takes the same road. Geolocation is slower than a 4 KB local file every time measured,
    and a race nobody can lose is still a race. */
-export function findMe(setView) {
+/* **`fresh` skips both caches**, the stored fix and the browser's own. A press passes it since
+   2026-10-14, on the repository owner's instruction: a reader who presses the button has moved, or
+   wants to know that they have not. FIX_TTL still spares the landing, which nobody asked for. */
+export function findMe(setView, fresh = false) {
   const f = PREFS.fix;
-  if (f && Date.now() - f[3] < FIX_TTL)
+  if (!fresh && f && Date.now() - f[3] < FIX_TTL)
     return coverReady.then(() => place(L.latLng(f[0], f[1]), f[2], setView));
 
   setBtn('busy', 'Finding your location…');
   wantView = setView;
   // `setView: false`, always. See `wantView` above: this app reads the fix before it moves to it.
-  map.locate({ enableHighAccuracy: true, timeout: 10000, maximumAge: FIX_TTL });
+  map.locate({ enableHighAccuracy: true, timeout: 10000, maximumAge: fresh ? 0 : FIX_TTL });
 }
 
 /* The ripple the jump-to-station flash uses, in the location blue rather than the alert red — a red
@@ -164,18 +168,16 @@ const offerCard = () => { if (!phone.matches) showHere(); };
    **Fail says the reason and then tries again.** Without the retry, one refusal leaves the control
    dead for the rest of the session, and a reader who has just turned location on has no way back.
    The words are `failTip()`'s own, so the snackbar and the tip make one claim. */
+/* **Every press asks for a new fix**, on the repository owner's instruction of 2026-10-14. A press
+   with a fix in hand used to recentre on that fix, which could be 15 minutes and a few kilometres
+   old. `place()` does the recentre, the ripple and the card when the new fix lands, so a press reads
+   the same with or without a fix in hand. The old dot stays on the map until the new one replaces
+   it. */
 btn.onclick = () => {
   if (mode === 'busy') return snack(words);
   wantPopup = true;
-  if (mode === 'fail') { snack(words); return findMe(true); }
-  if (!at) return findMe(true);       // no fix yet — prompt for one
-  /* **Outside the circle the card is the whole answer, at every width.** There is no recentre and no
-     ripple out here, so `offerCard()`'s desktop-only rule would leave a phone press doing nothing at
-     all. The card is the only thing on screen that can say why. */
-  if (out) return showHere();
-  offerCard();                        // already have one: recentre and show what is around you
-  focusOn(at, 13);
-  flashMe();
+  if (mode === 'fail') snack(words);
+  findMe(true, true);
 };
 
 // One path for both a live fix and a restored one: everything downstream should not be able to tell
@@ -187,7 +189,7 @@ function place(latlng, accuracy, setView) {
   /* The button keeps the `on` class out here. The state is true — this app holds a fix — and the
      three classes are what the glyph and the ink read. What changes is what a press does, and the
      words are where that is stated. `fail` would be a lie: nothing failed. */
-  setBtn('on', out ? OUTSIDE : `Recenter on my location (±${Math.round(accuracy)} m)`);
+  setBtn('on', out ? OUTSIDE : `Update my location (±${Math.round(accuracy)} m)`);
   if (layer) layer.remove();
 
   marker = L.marker(latlng, { icon: L.divIcon({
@@ -208,8 +210,12 @@ function place(latlng, accuracy, setView) {
   // Coloured from `.mecircle` in map.css rather than through Leaflet's `color` option, for the same
   // reason the mast ring is: those options become SVG presentation attributes, which cannot resolve
   // a token — and "you" is one colour across the pin, this circle and the arrival ripple.
+  /* **No circle past 500 m, on the repository owner's instruction of 2026-10-14.** A coarse fix, from
+     an IP lookup or a cell tower, draws a disc that covers a district and says nothing the number in
+     the button's tip does not. The dot stays. */
   layer = L.layerGroup([
-    L.circle(latlng, { radius: accuracy, className: 'mecircle', weight: 1, fillOpacity: .12 }),
+    ...(accuracy > ACC_CIRCLE_M
+      ? [] : [L.circle(latlng, { radius: accuracy, className: 'mecircle', weight: 1, fillOpacity: .12 })]),
     marker,
   ]).addTo(map);
 

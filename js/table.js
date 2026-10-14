@@ -8,9 +8,9 @@
 import { KINDS, KIND_RANK, NO_INFO, camSrc } from './config.js';
 import { state } from './state.js';
 import { el, dkey, distKm, hasInfo, color, statusColor, scalePos, levelStops, leads, gaugeTone,
-         gaugeColor, isStale, titleCase } from './util.js';
+         gaugeColor, titleCase } from './util.js';
 import { nearestOf, nearestCam } from './stations.js';
-import { sparkline, rainBars, sirenBand, rateHtml, etaText, gaugeState, rainAcc } from './popup.js';
+import { trendBlock, gaugeState } from './popup.js';
 import { flashTo } from './map.js';
 
 
@@ -225,9 +225,9 @@ export function dataTable() {
 
   el('dataBody').innerHTML = hereRow + (flat
     ? groups.flatMap(d => d.masts).sort(byCol).map(row).join('')
-    : groups.map(d => `<tr class="dhead"><th colspan="${KIND_RANK.length + 1}">${d.district}
+    : groups.map(d => `<tr class="dhead"><th colspan="${KIND_RANK.length + 1}"><span class="dname">${d.district}
         <span class="muted">${d.state} · ${d.masts.length} location${
-          d.masts.length > 1 ? 's' : ''}</span>
+          d.masts.length > 1 ? 's' : ''}</span></span>
       </th></tr>` + d.masts.sort(byCol).map(row).join('')).join(''))
     || `<tr><td class="none muted" colspan="${KIND_RANK.length + 1}">Nothing matches that.</td></tr>`;
 }
@@ -293,21 +293,14 @@ const tipVal = m => {
    members, and an average has no history — two rainfall masts either end of a township can be rising
    and falling at once, and one line drawn through the mean of them would be a reading that never
    happened. So the cell keeps the average and the panel breaks it back apart. */
-const trend = m => (m.kind === 'river' && m.rate != null
-    ? `<div class="tipnote muted">trend ${rateHtml(m)}${
-        m.eta != null ? ` · danger ${etaText(m.eta)}` : ''}</div>`
-    : '')
-  + (m.kind === 'river' ? sparkline(m.history, 'river', m)
-    // No guard on the gauge either. `sparkline()` frames on the clock when the readings cannot
-    // supply a window, so a gauge nobody is hearing from draws its own marks against an empty plot
-    // rather than vanishing from the panel.
-    : m.kind === 'gauge' ? sparkline(m.history, 'gauge', m)
-    // The siren band takes no such guard any more. It frames on the clock rather than on its
-    // samples, so a siren with none draws twelve hours of empty rail, which is the answer.
-    : m.kind === 'siren' ? sirenBand(m.history)
-    : m.kind === 'rainfall' ? rainBars(m.history) : '')
-  // The same totals as the station card, under the same graph, behind the same stale guard.
-  + (m.kind === 'rainfall' && !isStale(m) ? rainAcc(m.acc) : '');
+/* `trendBlock()` is the station card's own Trend or History segment: the same rows (rate, min, max,
+   time to danger, last triggered) over the same 6-hour graph. One function, so the popover and the
+   card cannot state two numbers for one sensor. A camera returns nothing and draws nothing. */
+const trend = m => {
+  const [title, html] = trendBlock(m);
+  // A rainfall block carries its totals inside, under `Trends & Totals`, the same as the card.
+  return html ? `<div class="subhead">${title}</div>${html}` : '';
+};
 
 function summary(own, lead, scope) {
   const named = own.length === 1 && own[0].name !== lead.name;

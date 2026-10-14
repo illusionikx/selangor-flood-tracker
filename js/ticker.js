@@ -116,6 +116,7 @@ export function ticker() {
          JPS's own two words, the same split ALERT_TITLE draws in the panel. The tier colour beside
          this carries the rest: `t-heavy` is amber and `t-now` is red. */
       : s.kind === 'rainfall'      ? `${s.status >= 4 ? 'very heavy' : 'heavy'} rain · ${s.hourly} mm/h`
+      : s.kind === 'gauge'         ? `flooded · ${s.depth} m`
       : s.status >= 3              ? `at danger${s.level != null ? ` · ${s.level.toFixed(2)} m` : ''}`
       : `reaches danger ${s.eta != null && s.eta < 1 ? 'within the hour' : `in ~${s.eta} h`}`;
     return `<button class="tk-i" data-go="${s.id}" tabindex="-1">

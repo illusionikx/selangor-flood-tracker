@@ -32,10 +32,38 @@
          calc(var(--navbar-h) + var(--gap)) var(--map-l);
   overflow: hidden;
   border-radius: var(--md-sys-shape-corner-large) var(--md-sys-shape-corner-large) 0 0;
+  /* **M3's ELEVATED card, at its resting level 1**, on the repository owner's instruction of
+     2026-10-14. A shadow lifts the map off the page, so the card reads as a layer at both widths.
+     `overflow: hidden` clips the tiles and never the box's own shadow. */
+  box-shadow: var(--md-sys-elevation-1);
   transition: right var(--m3-travel), left var(--m3-rail);
 }
 body:not(.ready) #map { transition: none; }
 @media (prefers-reduced-motion: reduce) { #map { transition: none; } }
+
+/* **The poll indicator, on the repository owner's request of 2026-10-14.** It is M3's INDETERMINATE
+   linear progress indicator, 4px along the top edge of the map card. The card clips it to its
+   own corner. `js/net.js` sets `aria-busy` on `#map` for the length of one poll.
+   It draws only after 400ms. A warm poll answers 304 in under 100ms, and a bar that flashes every
+   five minutes reads as noise. A slow poll is the one a reader wants to know about.
+   `::before` and never `::after`, because `m3-check.html` asserts that `::after` draws no card
+   edge. Above Leaflet's controls at 1000, so no pane covers it.
+   Three parts of the M3 Expressive variant are declined, for the reason `#camBar` states. */
+#map::before {
+  content: ''; position: absolute; z-index: 1001; top: 0; left: 0; right: 0; height: 4px;
+  pointer-events: none;
+  background: linear-gradient(var(--accent), var(--accent)) no-repeat -67% 0 / 40% 100%,
+              color-mix(in srgb, var(--accent) 20%, transparent);
+  opacity: 0; transition: opacity .15s;
+}
+#map[aria-busy="true"]::before {
+  opacity: 1; transition-delay: .4s;
+  animation: pollbar 1.4s cubic-bezier(.4, 0, .2, 1) infinite;
+}
+@keyframes pollbar { to { background-position: 167% 0, 0 0; } }
+@media (prefers-reduced-motion: reduce) {
+  #map[aria-busy="true"]::before { animation: none; background-position: 50% 0, 0 0; }
+}
 
 /* **Below 600px the two TOP corners keep the radius and the two bottom ones lose it.** That is
    M3's canonical layout in a compact window: the pane meets the app bar with a rounded edge and
@@ -590,6 +618,12 @@ body.railopen #rail .railbadge { top: -6px; right: -6px; }
   }
   #navbar .navitem[aria-current="page"] .i { color: var(--md-sys-color-on-secondary-container); }
   #navbar .navitem[aria-current="page"] .raillabel { font-weight: 700; }
+  /* The search is an action, so it states `aria-expanded` and never `aria-current`. Its pill still
+     lights while the search view is open, so the bar says where the reader is. */
+  #navFind[aria-expanded="true"] { color: var(--md-sys-color-secondary); }
+  #navFind[aria-expanded="true"] .railpill { background: var(--md-sys-color-secondary-container); }
+  #navFind[aria-expanded="true"] .i { color: var(--md-sys-color-on-secondary-container); }
+  #navFind[aria-expanded="true"] .raillabel { font-weight: 700; }
   /* **Every item answers a pointer with a state layer, and this bar carried none.** The rail has had
      one on all four of its controls since 2026-08-25 and its bar twin was left out, which draws
      correctly and answers nothing.
@@ -857,6 +891,8 @@ body.railopen #rail .railbadge { top: -6px; right: -6px; }
 .modalhead h2 { flex: 1; min-width: 0; margin: 0; }
 .modalhead .dclose { margin: -8px -10px -8px 0; font-size: 20px; }
 .modalhead form { margin: 0; }
+/* The lightbox's back arrow leads, so its negative margin moves to the leading side. */
+#lightbox .modalhead .dclose { margin: -8px 0 -8px -10px; font-size: 22px; }
 
 /* **The five full-screen-capable panes lead with a BACK ARROW, at every width.** The repository
    owner asked for one glyph across every panel on 2026-08-25, and named the arrow. So About, Help,
@@ -949,27 +985,8 @@ body.testmode header {
 /* **`#testbadge` is gone, and `#testChip` on the map chip row replaced it on 2026-08-25.** The
    badge was a fat amber pill carrying a label, a sentence and a Turn off button. A reader asked for
    a chip. See `#testChip` further down this file for what it keeps and why it stays amber. */
-#risebadge {
-  display: none; align-items: center; gap: 10px;
-  padding: 8px 10px 8px 14px; border-radius: 999px;
-  box-shadow: var(--shadow); font-size: 12px; line-height: 1;
-}
-/* The accent, not the amber: a filter you switched on yourself is a state to be reminded of, not a
-   hazard — amber here would be the third thing on this page claiming something is wrong. Ink is
-   `--surface` and never `#fff`, because the accent is a pale blue on the dark theme. */
-#risebadge { background: var(--accent); color: var(--surface); }
-body.rising #risebadge { display: flex; }
-#risebadge b { font-weight: 500; letter-spacing: .06em; }
-#risebadge span { opacity: .9; }
-#risebadge .i { font-size: 18px; }
-#risebadge button {
-  padding: 5px 12px; border: 0; border-radius: 999px; cursor: pointer;
-  background: #fff3; color: inherit; font: 500 11px Roboto, sans-serif;
-}
-#risebadge button:hover { background: #ffffff4d; }
+/* `#risebadge` was the blue ON ALERT pill here. It left on 2026-10-14: the chip says it already. */
 @media (max-width: 600px) {
-  /* The sentence is the first thing to lose: the label and the way out are what matter. */
-  #risebadge span { display: none; }
   /* **The pane's padding is `--pane` and this block used to state a second copy of it, at 18px.**
      The two agreed by luck until `--pane` moved to 24, and then the header's own offsets bled 6px
      past the pane on each side. `--pane: 16px` is set once, in the compact block further down. */
@@ -1486,11 +1503,12 @@ body.rising #risebadge { display: flex; }
 }
 .shotbtn:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); }
 
-/* **The table itself carries the left inset, once.** Every sticky cell that used to state its own
-   copy reads `0` now — see the comments beside `td.nm` and `.dhead th` below. One declaration here
-   is what keeps a name column and a district heading from drifting apart from each other, and both
-   from the headline above them. */
-table.data { flex: 1; display: block; overflow: auto; width: 100%; border-collapse: collapse; padding-left: var(--pane); }
+/* **The table carries NO left inset, and the sticky cells carry it instead.** This rule held
+   `padding-left: var(--pane)` for a while. Blink pins a sticky box to the scroller's PADDING edge,
+   so the name column stuck 16px in from the dialog's edge. The readings then scrolled through that
+   16px strip and showed again to the left of the frozen column. A reader saw it on a phone on
+   2026-10-14. So `td.nm`, the corner head and the district name each state `var(--pane)` now. */
+table.data { flex: 1; display: block; overflow: auto; width: 100%; border-collapse: collapse; }
 /* Six columns need room, so the table scrolls sideways rather than squeezing them: `min-width` on the
    sections is what lets them exceed the dialog, since `display: table` would otherwise honour 100%.
    The whole thead is the sticky element, not its cells: as separate `display: table` boxes the two
@@ -1539,16 +1557,17 @@ table.data .chead th .i-arrow_upward, table.data .chead th .i-arrow_downward {
 }
 table.data .chead .i { margin-right: 5px; vertical-align: -.15em; }
 /* Sticky district headings: scrolling a long district, you still know which one you are in.
-   **`0` on the left, `var(--pane)` on the right.** This row spans the table's own width, so its
-   left edge already sits on the table's padding. Its own left padding would stack on top of that
-   the same way `td.nm`'s did — see the comment there.
+   **The cell spans every column, so it scrolls sideways with them.** The name inside it is
+   `.dname`, and that span sticks to the left edge on its own. Without it a sideways scroll on a
+   phone took the district name off the screen. The cell's left padding and the span's `left` are
+   one number, so the name does not jump when the scroll starts.
    **The district head sticks under the column head, so `top` must match `.chead th`'s height.**
    Change one number and the other has to follow.
    This head is M3's list subheader, the same component `.nsub`, `#settingsBox h3` and
    `#dataCount` already draw. Read the size, weight and tracking off their tokens, never as
    literals. */
 table.data .dhead th {
-  position: sticky; top: 56px; z-index: 2; text-align: left; padding: 0 var(--pane) 0 0;
+  position: sticky; top: 56px; z-index: 2; text-align: left; padding: 0 var(--pane);
   min-height: 48px;
   color: var(--muted); text-transform: none;
   font-size: var(--md-sys-typescale-title-small-size);
@@ -1557,6 +1576,7 @@ table.data .dhead th {
   letter-spacing: var(--md-sys-typescale-title-small-tracking);
   background: var(--hover); border-bottom: 1px solid var(--outline);
 }
+table.data .dhead .dname { position: sticky; left: var(--pane); display: inline-block; }
 table.data .dhead .muted { margin-left: 6px; }
 /* Not a mast and not clickable — it is a reading of where you are, not a place you can fly to. */
 table.data tr.here > td { background: color-mix(in srgb, var(--accent) 7%, transparent); }
@@ -1593,12 +1613,12 @@ table.data .nomap { font-style: italic; }
 table.data td { padding: 10px var(--pane); border-bottom: 1px solid var(--outline); vertical-align: top; }
 /* The location freezes while the readings scroll under it — a row of numbers with the place name
    scrolled off is unreadable. Sticky needs its own background, or the cells slide through it. */
-/* **`padding-left: 0`, not `var(--pane)`.** `table.data` now carries the inset itself, and this
-   cell sits at the table's own padding edge. A second copy here would add on top of the first and
-   push the row name to 32px while the headline stays at 16 — the exact drift this task exists to
-   remove, moved one level down instead of fixed. */
+/* **`padding-left: var(--pane)` and `border-box`.** The inset left `table.data` for this cell —
+   see the comment there. `border-box` keeps the stated 220px and 160px as the column's real width,
+   so the inset moves no column and the phone check still reads 160. */
 table.data td.nm, table.data .chead th:first-child {
-  position: sticky; left: 0; width: 220px; min-width: 220px; padding-left: 0;
+  position: sticky; left: 0; width: 220px; min-width: 220px; padding-left: var(--pane);
+  box-sizing: border-box;
   background: var(--surface); border-right: 1px solid var(--outline);
 }
 table.data td.nm { z-index: 1; }
@@ -1835,11 +1855,11 @@ table.data .dash { color: var(--outline); }
 
 @media (max-width: 600px) {
   #dataBox { width: 100vw; height: 100dvh; max-width: none; border-radius: 0; border: 0; }
-  /* **The bottom safe area, and only on a phone.** This panel takes the whole screen here, so the
-     last row lands on the window edge and sits under the iOS home indicator. `--navbar-h` was the
-     only token in this app reading that inset. Above 600px the panel never touches the edge.
-     The three inline overrides that stood here are gone: `--pane` states the inset once now. */
-  table.data { padding-bottom: env(safe-area-inset-bottom, 0px); }
+  /* **The bottom safe area plus 24px, and only on a phone.** This panel takes the whole screen
+     here, so the last row lands on the window edge and sits under the iOS home indicator. The safe
+     area alone is 0 on most Android phones, so the last row still sat flush on the edge. A reader
+     asked for clearance on 2026-10-14. Above 600px the panel never touches the edge. */
+  table.data { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
   /* 220px is 61% of a 360px screen, and the table scrolls sideways behind this column. A reading
      had about 140px left to draw in. */
   table.data td.nm, table.data .chead th:first-child { width: 160px; min-width: 160px; }
@@ -1979,8 +1999,30 @@ table.data .dash { color: var(--outline); }
                     - var(--md-sys-typescale-headline-medium-size)) / 2);
 }
 #warnBox .warnhead h2 { flex: 1; min-width: 0; }
-#warnBox #warnBody h3 { margin: 0 0 8px; font-size: 15px; font-weight: 500; }
+/* The bulletin title pins to the top of the scroller and the valid time and the source sit under
+   it, so a reader of a long bulletin always sees what it is, when it ends and who said it. The
+   title is sticky rather than moved out, because `js/ui.js` writes it with the body in one string.
+   `#warnBody` carries no top padding, so `top: 0` is its top edge. */
+#warnBox #warnBody h3 {
+  position: sticky; top: 0; z-index: 1; margin: 0; padding-bottom: 8px;
+  background: var(--surface); font-size: 15px; font-weight: 500;
+}
+/* `flex: none` keeps the body as the one box that shrinks. An empty foot takes no padding, so a
+   notice with no link draws nothing there. */
+#warnBox #warnFoot {
+  flex: none; padding: 0 24px; color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--md-sys-typescale-body-medium-size);
+}
+#warnBox #warnFoot:not(:empty) { padding-block: 12px 20px; }
+#warnBox #warnFoot p { margin: 0; line-height: 1.5; }
 #warnBox #warnBody p { margin: 0 0 8px; line-height: 1.5; }
+/* `warnHtml()` in js/ui.js writes these: a marine item's heading and one row per area. An area this
+   map covers takes the accent, which is neither a kind hue nor a status hue. */
+#warnBox #warnBody h4 { margin: 16px 0 4px; font-size: 14px; font-weight: 500; }
+#warnBox .warnareas { margin: 0 0 8px; padding-left: 20px; line-height: 1.5; }
+#warnBox .warnareas li { margin-bottom: 2px; }
+#warnBox .warnareas b { font-weight: 500; }
+#warnBox .warnareas .here b { color: var(--md-sys-color-primary); font-weight: 700; }
 
 /* --- loading progress ------------------------------------------------------------------------- */
 
@@ -2096,7 +2138,8 @@ table.data .dash { color: var(--outline); }
    dashed border and the slight dimming say "not a control" the way a native disabled control does,
    without reaching for a status hue: this app reserves green, amber, orange and red for what a
    sensor is reporting, and "we do not know where this camera is" is not a reading of anything. */
-.camtile.unmapped { cursor: default; border-style: dashed; opacity: .75; }
+/* A tile opens the lightbox since 2026-10-14, so a camera with no coordinate answers a press too. */
+.camtile.unmapped { border-style: dashed; opacity: .75; }
 
 /* **M3's state layer**, at the percentages css/base.css derives from the vendored state scale.
    **A pseudo-element over the picture, and never an inset `box-shadow`.** A shadow paints with the
@@ -2963,8 +3006,11 @@ body.side #side { display: flex; }
    It spent one revision as a 32dp chip there too. The repository owner reversed that on
    2026-08-26, after seeing it on screen. A chip in a table cell is a row height. */
 #sideKinds:empty { display: none; }
-#sideKinds .badges { display: flex; flex-wrap: wrap; gap: 8px; }
-#sideKinds .badge {
+#sideKinds .badges, .achips { display: flex; flex-wrap: wrap; gap: 8px; }
+/* The alert pane's chips, at the top of the Sensors tab since 2026-10-14. Same chip, so the rules
+   below name both homes. */
+.achips { margin: 12px 0 4px; }
+#sideKinds .badge, .achips .badge {
   height: 32px; margin: 0; padding: 0 16px 0 8px; gap: 8px;
   border: 1px solid var(--outline); border-radius: var(--md-sys-shape-corner-small);
   background: none; color: var(--on-surface); text-transform: none;
@@ -2973,7 +3019,16 @@ body.side #side { display: flex; }
   font-weight: var(--md-sys-typescale-label-large-weight);
   letter-spacing: var(--md-sys-typescale-label-large-tracking);
 }
-#sideKinds .badge .i { font-size: 18px; color: var(--c); }
+#sideKinds .badge .i, .achips .badge .i { font-size: 18px; color: var(--c); }
+/* The alert pane's chips are buttons since 2026-10-14: a press opens their section. M3's assist chip
+   takes an `on-surface` state layer. */
+.achips button.badge { font-family: inherit; cursor: pointer; }
+.achips button.badge:hover {
+  background: color-mix(in srgb, var(--on-surface) var(--m3-state-hover), transparent);
+}
+.achips button.badge:active {
+  background: color-mix(in srgb, var(--on-surface) var(--m3-state-press), transparent);
+}
 #sideActions { display: flex; align-items: center; }
 /* **The trailing slot holds three buttons: the nearest webcam or water level, the favorite, then
    the ⋮.** The heart was a row inside that menu and a reader pulled it out on 2026-08-21. The offer
@@ -3056,41 +3111,72 @@ body.side #side { display: flex; }
 
 /* Top-right of the map, mirroring the alert panel on the left. Hidden rather than removed when
    closed: `visibility` keeps it out of the tab order and off screen readers, and still animates. */
+/* **The toast is an M3 ELEVATED CARD holding a list, since 2026-10-14**, on the repository owner's
+   instruction. `Card/card.css` is the reference: `surface-container-low`, `shape-corner-medium` and
+   elevation 2, with no border. The coloured left rule is gone, because M3 separates a card by
+   elevation alone and the glyph in the head already carries the tier. The head is a 56px row, the
+   glyph at 24px, a `title-medium` line and a 40px icon button at the trailing end, which is the
+   close button `Snackbar/snackbar.css` states. Each row is M3's standard two-line list item, from
+   `List/list.css`: 72px, a 24px leading glyph, 16px of gap, `body-large` over `body-medium` in
+   `on-surface-variant`, with the state layer on press. The card carries `.surface`, and the rules
+   below beat its background and its shadow. */
 #toast {
   position: absolute; z-index: 401; top: var(--top-chips);
   right: calc(var(--map-r) + 12px);
-  width: min(300px, calc(100vw - 24px));
-  border-radius: 12px; padding: 12px 14px 6px; overflow: hidden;
-  border-left: 3px solid #e8710a;
+  width: min(344px, calc(100vw - 24px));
+  border-radius: var(--md-sys-shape-corner-medium); padding: 0 0 8px; overflow: hidden;
+  background: var(--md-sys-color-surface-container-low); color: var(--md-sys-color-on-surface);
+  box-shadow: var(--md-sys-elevation-2);
   opacity: 0; visibility: hidden; transform: translateY(-6px);
   transition: opacity .2s ease, transform .2s ease, visibility .2s;
 }
 #toast.open { opacity: 1; visibility: visible; transform: none; }
-#toast .thead { display: flex; align-items: center; gap: 8px; font-size: 13px; }
-/* The header icon carries the tier: red for what is happening, amber for what is forecast, green
-   for an all-clear. Same three colours as the panel's left rules, so the two agree at a glance. */
-#toast .thead .i { color: var(--s-warning); font-size: 18px; flex: none; }
+#toast .thead {
+  display: flex; align-items: center; gap: 16px; min-height: 56px; padding: 0 8px 0 16px;
+  font-size: var(--md-sys-typescale-title-medium-size);
+  line-height: var(--md-sys-typescale-title-medium-line-height);
+  letter-spacing: var(--md-sys-typescale-title-medium-tracking);
+}
+/* The head glyph carries the tier: red for what is happening, amber for what is forecast, green
+   for an all-clear. Same three colours as the panel's section titles, so the two agree at a glance. */
+#toast .thead .i { color: var(--s-warning); font-size: 24px; flex: none; }
 #toast.now .thead .i   { color: var(--s-danger); }
 #toast.clear .thead .i { color: var(--s-normal); }
-#toast .thead b { font-weight: 500; flex: 1; min-width: 0; line-height: 1.3; }
-#toast .tclose { flex: none; font-size: 16px; color: var(--muted); }
+#toast .thead b { font-weight: var(--md-sys-typescale-title-medium-weight); flex: 1; min-width: 0; }
+#toast .tclose { flex: none; width: 40px; height: 40px; font-size: 24px; color: var(--md-sys-color-on-surface-variant); }
+#toast .tclose .i { color: inherit; font-size: 24px; }
 /* The place name and the reason are stacked, not side by side. On one line the reason held a fixed
-   width — "reaches danger in ~2.5 h" is a third of a 300px toast — and the name took whatever was
-   left, so it was cut off on almost every alert this data can produce. A notification naming a place
-   you cannot read is the one thing it must not do. Stacked, the name has the full row and wraps if
-   it needs to; the longest name in the payload is 50 characters and takes two lines. */
+   width and the name took whatever was left, so it was cut off on almost every alert this data can
+   produce. A notification naming a place you cannot read is the one thing it must not do. Stacked,
+   the name has the full row and wraps if it needs to. The longest name in the payload is 50
+   characters and takes two lines, so the row grows past 72px rather than clipping it. */
 #toast .trow {
-  display: grid; grid-template-columns: auto 1fr; gap: 2px 8px;
-  width: 100%; margin-top: 8px; padding: 6px 8px;
-  text-align: left; cursor: pointer; background: none; border: 0; border-radius: 8px;
-  color: var(--on-surface); font: 400 12px Roboto, sans-serif;
+  display: flex; align-items: center; gap: 16px;
+  width: 100%; min-height: 72px; padding: 8px 24px 8px 16px;
+  text-align: left; cursor: pointer; background: none; border: 0; border-radius: 0;
+  color: var(--md-sys-color-on-surface); font-family: inherit;
 }
-#toast .trow:hover { background: var(--hover); }
-#toast .trow .i { color: var(--c); grid-row: span 2; align-self: center; }
-#toast .tname { font-weight: 500; font-size: 13px; line-height: 1.3; }
-#toast .twhy { font-size: 11px; }
-#toast .tmore { margin: 6px 0 6px 2px; font-size: 11px; }
-#toast .trow:last-child { margin-bottom: 6px; }
+#toast .trow:hover { background: color-mix(in srgb, var(--on-surface) var(--m3-state-hover), transparent); }
+#toast .trow:active { background: color-mix(in srgb, var(--on-surface) var(--m3-state-press), transparent); }
+#toast .trow:focus-visible { outline: 2px solid var(--md-sys-color-primary); outline-offset: -2px; }
+#toast .trow .i { color: var(--c); font-size: 24px; flex: none; }
+#toast .ttext { display: flex; flex-direction: column; min-width: 0; }
+#toast .tname {
+  font-size: var(--md-sys-typescale-body-large-size);
+  line-height: var(--md-sys-typescale-body-large-line-height);
+  letter-spacing: var(--md-sys-typescale-body-large-tracking);
+}
+#toast .twhy {
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--md-sys-typescale-body-medium-size);
+  line-height: var(--md-sys-typescale-body-medium-line-height);
+  letter-spacing: var(--md-sys-typescale-body-medium-tracking);
+}
+#toast .tmore {
+  padding: 8px 16px 4px; color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--md-sys-typescale-body-medium-size);
+  line-height: var(--md-sys-typescale-body-medium-line-height);
+}
 
 /* --- alert list (its button is the rail's Alerts item; the list itself is in #side) ------------ */
 
@@ -3162,10 +3248,6 @@ body.side #side { display: flex; }
 /* The subheader wraps rather than squashing its own tag. A 312px pane holds a 24px glyph, a title
    of about 150px and a tag of about 100px with 16px gaps, which is 306 before the title grows. */
 .alert .nsub { flex-wrap: wrap; margin-top: 12px; }
-/* `.tg` carries its own 6px left margin, written for a tag that followed an inline title. The
-   subheader is a flex row with a 16px gap, so the two stack to 22px between the title and the tag
-   and only one of them is stated where a reader would look for it. */
-.alert .nsub .tg { margin-left: 0; }
 .apane > .alert:first-child .nsub { margin-top: 0; }
 /* **AN ALERT SUBHEADER CARRIES NO GLYPH, so nothing here styles one.** The Notices pane's does, and
    `.nsub .i` above is written for that pane alone.
@@ -3183,17 +3265,7 @@ body.side #side { display: flex; }
 .alert.t-heavy .slist .i { color: var(--s-warning); }
 .alert.t-soon  .slist .i { color: var(--s-warning); }
 .alert.t-stale .slist .i { color: var(--muted); }
-.tg {
-  display: inline-block; margin-left: 6px; padding: 2px 7px; border-radius: 999px;
-  font-size: 10px; font-weight: 500; letter-spacing: .5px; vertical-align: 1px;
-}
-/* `.alerttop` is gone. The group head is an M3 list subheader now, and the kind chip that row held
-   is gone with it — see `.alert` above. `.nsub` places the glyph, the title and the tag by itself.
-   The tag keeps its own 6px left margin from `.tg`, which is what separates it from the title. */
-.tg-now   { background: color-mix(in srgb, var(--s-danger) 16%, transparent); color: var(--s-danger); }
-.tg-heavy { background: color-mix(in srgb, var(--s-warning) 16%, transparent); color: var(--s-warning); }
-.tg-soon  { background: color-mix(in srgb, var(--s-warning) 16%, transparent); color: var(--s-warning); }
-.tg-stale { background: var(--hover); color: var(--muted); }
+/* `.tg`, the tier tag, is gone since 2026-10-14. Every section title states its tier in words. */
 /* One card per kind per tier, and every row in it is a place — see alerts.js for why.
 
    **The rows are an M3 SEGMENTED list, on a reader's instruction of 2026-08-25.** `.mseg` above
@@ -3226,11 +3298,82 @@ body.side #side { display: flex; }
 /* A row opens a station card, so it keeps a pointer and a state layer. M3 draws that layer OVER the
    container rather than instead of it, which is why this mixes into `surface-container` and does
    not replace it. The accent tint it had was written for a row with no fill under it. */
-.slist > li { cursor: pointer; }
-.slist > li:hover {
-  background: color-mix(in srgb, var(--on-surface) 8%, var(--md-sys-color-surface-container));
-}
 .alert.grouped p { margin: 8px 0 0; }
+
+/* --- the alert pane: M3 STANDARD list, both tabs ----------------------------------------------------
+
+   **Both tabs draw M3's standard list since 2026-10-14**, on the repository owner's instruction. The
+   Sensors tab was a segmented list, a filled block per row, and the Notices tab an email list with
+   a 40dp avatar. One pane now states one list.
+   A standard item has no container of its own. It sits on the pane's surface, with 16px leading and
+   24px trailing padding and a 16px gap. The leading slot is M3's leading ICON, a bare 24px glyph.
+   A row that opens something takes M3's state layer: `on-surface` at the hover opacity, and at the
+   pressed opacity under a press. This app paints the glyph with the tier or category colour rather
+   than `on-surface-variant`, which is the divergence the leading-slot rule above states. */
+.mlist { display: flex; flex-direction: column; list-style: none; margin: 0; padding: 0; }
+.slist.mlist > li {
+  display: flex; align-items: center; gap: 16px; min-height: 72px; padding: 8px 24px 8px 16px;
+  font-size: var(--md-sys-typescale-body-large-size);
+  line-height: var(--md-sys-typescale-body-large-line-height);
+  letter-spacing: var(--md-sys-typescale-body-large-tracking);
+  cursor: pointer;
+}
+.slist.mlist > li:hover, .nrow:hover {
+  background: color-mix(in srgb, var(--on-surface) var(--m3-state-hover), transparent);
+}
+.slist.mlist > li:active, .nrow:active {
+  background: color-mix(in srgb, var(--on-surface) var(--m3-state-press), transparent);
+}
+
+/* **Every section folds**, on the same instruction. A section is a `<details>`, and its subheader is
+   the `<summary>`, so the browser gives a keyboard and a screen reader the whole behavior. The
+   browser's own marker is gone. A chevron at the trailing end replaces it, turned up while open. */
+.apane details > summary { list-style: none; cursor: pointer; border-radius: var(--md-sys-shape-corner-small); }
+.apane details > summary::-webkit-details-marker { display: none; }
+.apane details > summary:hover {
+  background: color-mix(in srgb, var(--on-surface) var(--m3-state-hover), transparent);
+}
+.apane details > summary:focus-visible { outline: 2px solid var(--md-sys-color-primary); outline-offset: -2px; }
+.apane .nsub b { margin-left: auto; }
+/* `.nsub .chev` and not `.chev` alone: `.nsub .i` paints the Notices glyph its category colour, and
+   the chevron is an `.i` too. */
+.apane .nsub .chev { font-size: 24px; color: var(--md-sys-color-on-surface-variant); transition: transform .2s; }
+.apane details[open] > summary .chev { transform: rotate(180deg); }
+/* **The section title is M3's list SUBHEADER**: `title-small` in `on-surface-variant`, 48dp, the
+   base `.nsub` rule. It was `title-large` in `on-surface` for one revision on 2026-10-14, and the
+   repository owner found it too big and asked for the subheader back. What stayed from that
+   revision is the rows' own 16px leading inset and 24px trailing one, so the title starts on the
+   line the row glyphs start on. **A full-width divider opens every section after the first**, in
+   `outline-variant`. `.alert` already ends in 8px of padding, so the divider sits 8px under the last
+   row. The corner is square: a hover tint with a radius under a straight rule reads as a button in
+   a box. `nowrap` keeps the chevron beside a title that wraps inside its own box. */
+.apane details > summary.nsub {
+  min-height: 48px; margin: 0; padding: 0 24px 0 16px; border-radius: 0; flex-wrap: nowrap;
+}
+.apane details + details { border-top: 1px solid var(--md-sys-color-outline-variant); }
+.apane details.nsec { padding-bottom: 8px; }
+/* A `now` section states its title in the danger red, since 2026-10-14. A red triangle led it for
+   one revision, and the repository owner asked for the text to carry the colour instead. The count
+   stays quiet, so the red is the title alone. */
+.apane details.t-now > summary.nsub { color: var(--s-danger); }
+.apane details > summary.nsub b { color: var(--md-sys-color-on-surface-variant); }
+@media (prefers-reduced-motion: reduce) { .apane .chev { transition: none; } }
+
+/* The one button over every section: M3's TEXT button. `label-large` in `primary`, 40dp tall, a full
+   corner, and 12dp of padding that drops to 16 on the side the icon leads. */
+.abulk { display: flex; justify-content: flex-end; margin: 4px 0; }
+.tbtn {
+  display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 12px 0 16px;
+  border: 0; border-radius: var(--md-sys-shape-corner-full); background: none; cursor: pointer;
+  color: var(--md-sys-color-primary); font-family: inherit;
+  font-size: var(--md-sys-typescale-label-large-size);
+  line-height: var(--md-sys-typescale-label-large-line-height);
+  font-weight: var(--md-sys-typescale-label-large-weight);
+  letter-spacing: var(--md-sys-typescale-label-large-tracking);
+}
+.tbtn .i { font-size: 18px; }
+.tbtn:hover { background: color-mix(in srgb, var(--md-sys-color-primary) var(--m3-state-hover), transparent); }
+.tbtn:active { background: color-mix(in srgb, var(--md-sys-color-primary) var(--m3-state-press), transparent); }
 
 /* --- notices, as an email list -------------------------------------------------------------------
 
@@ -3239,8 +3382,8 @@ body.side #side { display: flex; }
 
    The numbers are `List/list.css`'s own, at the three-line height:
 
-     item        88px min-height, padding 12px 16px, gap 16px, align-items flex-start
-     leading     a 40px avatar, corner-full, the category glyph at 24px inside it
+     item        88px min-height, padding 12px 24px 12px 16px, gap 16px, align-items flex-start
+     leading     a 24px leading icon in the category colour, since 2026-10-14 (a 40px avatar before)
      headline    body-large
      supporting  body-medium in on-surface-variant, clipped to TWO lines
      trailing    label-small in on-surface-variant, top aligned
@@ -3275,11 +3418,12 @@ body.side #side { display: flex; }
 .nlist { display: flex; flex-direction: column; }
 .nrow {
   display: flex; align-items: flex-start; gap: 16px; width: 100%;
-  min-height: 88px; padding: 12px 4px; text-align: left;
-  background: none; border: 0; border-radius: 12px; cursor: pointer;
+  min-height: 88px; padding: 12px 24px 12px 16px; text-align: left;
+  background: none; border: 0; cursor: pointer;
   color: var(--on-surface); font: inherit;
 }
-.nrow:hover { background: var(--hover); }
+/* M3's leading icon: 24px with no container, top aligned in a three-line item. */
+.nrow .lead { flex: none; font-size: 24px; color: var(--c); }
 /* The avatar. A tinted disc rather than a filled one: this colour names a source, never a status,
    and a saturated 40px disc down a list reads as a severity ramp.
    **The Notices pane is the only caller, and a sender is why.** Every row here is a bulletin
@@ -3389,8 +3533,10 @@ body.side #side { display: flex; }
    and a screen with no room for an overlay bar has no corner to spare either. The strip is opened by
    `:has()`, because most cameras carry no warning and 30px of empty above every one of them is the
    cost this was changed to stop paying. PLAYER_OVERLAY puts it back in the corner. */
-#lightbox .player:has(.camwarn) { padding-top: 30px; }
-#lightbox .camwarn { top: 0; left: 0; max-width: 100%; }
+/* **On the picture at every width since 2026-10-14**, on the repository owner's instruction. It sat
+   in a strip of its own above the frame in this shape, and the phone pill is the kind alone now, so
+   it fits the corner. The strip and its 30px are gone. */
+#lightbox .camwarn { top: 8px; left: 8px; max-width: calc(100% - 16px); }
 /* The stage sizes to the frame so the A/B overlay can be laid over it exactly. `line-height: 0`
    because an inline-block wrapped round an <img> otherwise reserves a descender's worth of space
    under it, which the overlay does not have and so misaligns by a few pixels. */
@@ -3414,7 +3560,7 @@ body.side #side { display: flex; }
    The panel is the camera wall's, so one fact keeps one look. */
 #lightbox .camfail { position: absolute; inset: 0; z-index: 1; display: none; border-radius: 8px; }
 #lightbox.nopic .camfail { display: flex; }
-#lightbox.nopic .stage {
+#lightbox:is(.nopic, .loading) .stage {
   width: min(968px, calc(100vw - 64px)); aspect-ratio: 16 / 9; max-height: 58vh;
 }
 /* The picture plays and pauses the clip, so it says so — but only when there is a clip behind it
@@ -3479,6 +3625,20 @@ body.side #side { display: flex; }
 #lightbox .abtime, #lightbox .btime {
   position: absolute; bottom: 8px; z-index: 1; padding: 3px 8px; border-radius: 999px;
   font: 500 11px/1.4 Roboto, sans-serif; color: #fff; background: #000000a6; white-space: nowrap;
+}
+/* The frame count, on the corner JPS leaves empty: it burns its own name and stamp into the top left.
+   Same pill as the time. It draws only while a clip stands behind the picture. */
+#lightbox .lbcount {
+  position: absolute; top: 8px; right: 8px; z-index: 1; padding: 3px 8px; border-radius: 999px;
+  font: 500 11px/1.4 Roboto, sans-serif; color: #fff; background: #000000a6; white-space: nowrap;
+}
+#lightbox:has(#tl[hidden]) .lbcount, #lightbox.loading .lbcount { display: none; }
+@media (max-width: 600px) { #lightbox .lbword { display: none; } }
+/* The warning pill's two spellings. The kind alone on a phone, the full phrase above 600px. */
+#lightbox .camwarn .cwshort { display: none; }
+@media (max-width: 600px) {
+  #lightbox .camwarn .cwlong { display: none; }
+  #lightbox .camwarn .cwshort { display: inline; }
 }
 #lightbox .abtime { left: 8px; }
 #lightbox .btime { right: 8px; }
@@ -3656,6 +3816,22 @@ body.side #side { display: flex; }
 .tlticks i { position: absolute; top: 0; height: 100%; min-width: 2px; }
 .tlticks i.t-now  { background: var(--s-danger); }
 .tlticks i.t-soon { background: var(--s-warning); }
+/* The hovered frame's time. Literal colours, like the rest of the control bar, because it sits over
+   the picture on a mouse and a theme token would draw it light on a light frame. */
+.tlpeek {
+  position: absolute; bottom: calc(100% + 4px); z-index: 4; transform: translateX(-50%);
+  padding: 2px 8px; border-radius: 4px; background: #000c; color: #fff;
+  font: 500 12px/18px Roboto, sans-serif; white-space: nowrap; pointer-events: none;
+}
+.tlpeek[hidden] { display: none; }
+/* One white dot per frame, the same on both themes. 2px, half the 4px rail, so it sits inside the
+   bar with 1px of rail above and below. `--x` is the frame's place on the clock, 0 to 1.
+   The dot travels the rail less its own width, so the first and the last sit whole inside the bar
+   rather than half clipped by its rounded end. */
+.tlticks b {
+  position: absolute; top: 1px; width: 2px; height: 2px; border-radius: 50%; background: #fff;
+  left: calc((100% - 2px) * var(--x));
+}
 /* The input itself is only the thumb and the hit area — every painted part of the bar is above. It
    covers the whole 20px box so the grab target is a finger's worth of height, not 4px. */
 #tlscrub {
@@ -3772,7 +3948,7 @@ body.side #side { display: flex; }
   #lightbox .player:has(.camwarn) { padding-top: 0; }
   #lightbox .camwarn { top: 8px; left: 8px; max-width: calc(100% - 16px); }
   /* The frame takes back what the footer would have cost it. */
-  #lightbox img, #lightbox.nopic .stage { max-height: 74vh; }
+  #lightbox img, #lightbox:is(.nopic, .loading) .stage { max-height: 74vh; }
 }
 
 /* Phones: the dialog drops its width floor — at 360px a 460px minimum is a horizontal scrollbar. */
@@ -3787,9 +3963,19 @@ body.side #side { display: flex; }
   .tlr { padding: 5px 9px; }
 }
 /* A JPS still is fetched through our proxy and can take seconds. Without this the dialog opens on
-   an empty box, which reads as "the camera is dead" rather than "wait". */
-#lightbox:not(.loading) .spin { display: none; }
-#lightbox.loading .stage { visibility: hidden; }
+   an empty box, which reads as "the camera is dead" rather than "wait".
+   **A skeleton replaced the spinner on 2026-10-14**, on the repository owner's instruction. The
+   spinner sat in a 140px box, and the dialog grew to the picture's height the moment it landed.
+   Now `.stage` holds the 16:9 box `.nopic` already states, and the app's one skeleton look fills it.
+   The image leaves the flow while it loads, so the last camera's picture cannot size the box. */
+#lightbox .spin { display: none; }
+#lightbox.loading .stage > img { position: absolute; opacity: 0; }
+#lightbox.loading .stage::after {
+  content: ''; position: absolute; inset: 0; z-index: 3; border-radius: 8px;
+  background-color: var(--hover); background-image: var(--skel-img); background-size: 200% 100%;
+  animation: skel 1.4s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) { #lightbox.loading .stage::after { animation: none; } }
 
 /* Too narrow to draw a map. Full bleed rather than a card: at this width a card's own margins and
    radius take most of the room the words need, and there is nothing behind it worth showing through.

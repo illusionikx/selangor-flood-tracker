@@ -1185,10 +1185,17 @@ queue is a true cold start, where there is nothing to serve instead: those arriv
 Measured on six simultaneous requests against an expired cache: one took 4.9s and rebuilt, five
 returned identical payloads in ~0.3s.
 
-*Client side:* `setInterval` skips the poll while `document.hidden`, and `visibilitychange`
-refreshes on return if more than `POLL_MS` has passed. A forgotten background tab costing a request
-every five minutes for ever is traffic spent on data nobody is reading, and a returning tab is never
-staler than it would have been anyway.
+*Client side:* the poll runs every `POLL_MS` whether the tab is visible or hidden, since
+2026-10-14. Before that date, `setInterval` skipped the poll while `document.hidden`. The repository
+owner asked for a background tab that stays current. A poll reaches the 5-minute cache on this
+server and never JPS. An unchanged payload is a 304 of about 200 bytes, so the cost is small.
+
+The weather layer refreshes inside `render()`, so the same timer keeps it current too.
+`visibilitychange` still refreshes on return if more than `POLL_MS` has passed. A browser can
+freeze a hidden tab, and a phone always freezes a background app. No page script can poll there.
+
+*Not done:* Periodic Background Sync. Only an installed Chromium app gets it, at a rate the browser
+picks, and it cannot draw the map.
 
 Upstream load is now capped at one fan-out per `TTL` regardless of how many people are on the page.
 
@@ -20100,3 +20107,415 @@ hierarchy runs the right way round, and its street network is fully legible.
 
 It draws no blue water and no green. A river reads as a grey ribbon. On a flood map that trade costs
 more than it pays, so the inverted Voyager stays.
+
+## Four changes of 2026-10-14
+
+The repository owner asked for all four on 2026-10-14.
+
+### A flooded flood gauge is on alert
+
+A flood gauge past its 0.3 m danger mark is now in `isCritical()`, in `js/util.js`. So it reaches
+the alert panel, the app bar count, the icon badge, the ticker and the toast. Before this, a gauge
+painted red on the map and no list named it.
+
+The tier is `now`, because the gauge measures standing water over the spot. The panel head gets its own
+`flooded` chip, so the chips still split the list. `ALERT_TITLE` gains `gauge|stale`.
+
+`atDanger()` carries the `hasInfo()` guard. So an offline gauge frozen on an old reading raises
+nothing.
+
+The trigger is the danger mark and not the 0.15 m warning mark. A river enters the list at its
+danger mark, and the same rule holds here. To widen it to 0.15 m, take it through the alert design
+standard first.
+
+### The lightbox seek bar is a clock
+
+The seek bar spaced every frame evenly. JPS went offline for two to three hours one week. The bar
+drew that outage as one more step. Only the stamp showed it.
+
+The input value is a unix time now, and `pos` in `js/timeline.js` holds the frame index. The left
+edge is the oldest frame in range and the right edge is live. A drag snaps to the nearest frame.
+
+An outage draws nothing of its own. The frame dots space themselves on the clock, and the empty
+rail between two dots is the gap. A dashed `.gap` span and then a darker one stood there for two
+revisions. The repository owner read both as ticks, so they went.
+
+The native arrow keys move the input by one second. The snap then puts it back on the same frame. So the keydown handler steps a frame for Up, Down, Page Up, Page Down and Home on the
+scrubber. `aria-valuetext` carries the stamp, because a screen reader must not read a unix time.
+
+Playback still runs at one frame a second. The clip does not slow down across a gap. The bar shows
+the gap, and the stamp jumps.
+
+### The phone app bar and navigation bar changed
+
+Below 600px the overflow menu `#navMore` moved to the leading edge of the app bar. A theme switch,
+`#navTheme`, took the trailing edge. It is the twin of the rail's `#railApps`, and
+`syncThemeBtn()` in `js/ui.js` writes both. Settings keeps the three-way picker, because one press
+cannot pick Auto.
+
+The search `#navFind` became a navigation bar item between Table and Cameras. It is an action, so
+it states `aria-expanded` and never `aria-current`. Its pill lights while the search view is open.
+
+### The map card has a shadow
+
+M3 names this component the elevated card. It rests at elevation level 1, so `#map` takes
+`--md-sys-elevation-1` at both widths. `overflow: hidden` clips the tiles and never the box's own
+shadow.
+
+On the dark theme a black shadow on a dark page reads weakly. M3 uses tonal elevation for that case.
+This app holds one surface tone, so nothing was added for it.
+
+### Every lightbox frame is a white dot, and a skeleton holds the picture's place
+
+The repository owner asked for both on 2026-10-14, after the clock change above.
+
+Each frame on the seek bar draws as a 2px white dot, live included. That is half the rail. The color is the same on both
+themes. A dot travels the rail less its own width, so the first and the last sit whole inside the bar.
+The dots draw after the alert spans, so a span never hides one.
+
+This reverses an older rule. That rule cut a mark per frame, because 60 evenly spaced marks read as a
+ruler. On a clock the dots space themselves, and the gaps between them carry the message.
+
+While the picture loads, `.stage` takes the 16:9 box that `.nopic` already states. The app's one
+skeleton look fills it, through `--skel-img` and the `skel` keyframes in `css/base.css`. The spinner
+is gone from the lightbox. It sat in a 140px box, and the dialog grew to the picture's height when the
+picture landed. The image leaves the flow while it loads, so the last camera's picture cannot size
+the box.
+
+The box can still move a few pixels when the picture lands, if the camera is not 16:9.
+
+### A camera wall tile opens the lightbox, and the lightbox leads with a back arrow
+
+The repository owner asked for this on 2026-10-14.
+
+A tile on the camera wall opens the lightbox over the wall. It jumped to the camera on the map
+before. A camera with no coordinate opens too, so its tile is no longer `disabled`. The jump to the
+Gulf of Guinea was the only reason that tile refused a press.
+
+`openLightbox()` in `js/ui.js` is the one way in. The document click listener and the wall both
+call it.
+
+The lightbox header leads with a back arrow, and the close X is gone. The arrow and Esc close the
+lightbox alone, so the reader lands back on the camera wall or the station panel. Above 600px a
+press on the backdrop does the same. Below 600px it also closes the camera wall and the station
+panel, and lands the reader on the map. The repository owner asked for the desktop rule the same day.
+
+### A pointer over the seek bar names the frame under it
+
+The repository owner asked for this on 2026-10-14. A pointer over the bar shows a pill with the time
+of the nearest frame. That is the frame a press lands on, because the pill reads the same `nearest()`
+that a drag snaps to. While comparing, the pill stops at the newest archived frame, as a drag does.
+
+The pill sits over the frame's dot and stays inside the bar at both ends. Its colours are literal,
+like the rest of the control bar, because it draws over the picture. A touch drag shows it too.
+
+### The lightbox counts its frames, and the phone pill names the kind alone
+
+The repository owner asked for both on 2026-10-14.
+
+A pill in the top right corner of the picture reads `Frame 3/24` above 600px and `3/24` below it.
+Live counts as the last frame, because it is the last position on the bar. The pill takes the corner
+JPS leaves empty, because JPS burns its own name and stamp into the top left. It draws only while a
+clip stands behind the picture.
+
+Below 600px the warning pill names the kind alone. `Flood gauge at danger, 0.64 m` reads `Flood
+gauge`. The glyph colour still carries the tier: red at danger, amber for a forecast. Both spellings
+ride the markup and CSS picks one, so a turn across the breakpoint needs no repaint.
+
+### A feed that stops updating raises a Service Notice
+
+The repository owner asked for this on 2026-10-14. JPS went offline for two to three hours one week,
+and nothing on screen said so.
+
+`api.php` publishes `feeds`: the newest reading stamp for each feed (`selangor`, `national`, `kl`,
+`portal`). `late()` in `js/net.js` compares each stamp with the reader's own clock. A feed past
+`FEED_LATE_MS` joins one `late` notice, and the notice names the feed.
+
+The test runs in the browser and not in `api.php`, so one rule covers three faults:
+
+- A feed stops answering.
+- A feed answers with old readings.
+- This server fails to refresh, and no new payload arrives at all.
+
+The browser repeats the test every 30 seconds and after a failed poll, so the notice rises even
+when the server is silent.
+
+**The threshold is 60 minutes.** Measured on 2026-10-14, the newest reading of each feed stood
+about 17 minutes old in normal running. JPS stamps every 15 minutes, and this server caches a scraped
+page for 15. An hour is at least three missed slots. A blip stays quiet, and an outage of two to three
+hours reaches the reader inside its first hour.
+
+**It counts toward nothing**, like every other notice. It adds no badge, no count and no red glyph.
+A source outage is not water rising, and an alarm on it is the cry-wolf cost that the alert design
+standard rejects. It shows at the head of the ticker, in the Notices tab and in the Service Notice
+modal. The modal carries no source link, because the cause can be the feed or this server.
+
+When JPS itself declares a PublicInfoBanjir outage, the national portal and its rainfall table stay
+out of `late`. One outage then reads as one notice.
+
+### The phone warning pill sits on the picture
+
+The repository owner asked for this on 2026-10-14. The pill sat in a 30px strip above the frame
+below 600px. It now sits 8px inside the picture's top left corner at every width. The hidden
+placeholder that held the strip open is gone with it.
+
+### A press on the location button asks for a new fix
+
+The repository owner asked for this on 2026-10-14. A press with a fix in hand used to recenter on
+that fix. The stored fix could be 15 minutes and a few kilometers old, because `FIX_TTL` keeps one
+that long.
+
+Every press now calls `findMe(true, true)`. The second argument skips the stored fix and asks the
+browser with `maximumAge: 0`. The button shows its busy state until the new fix lands. Then `place()`
+recenters, plays the ripple and opens the card, the same as on a first press. The old dot stays on the
+map until the new one replaces it. The button's words read `Update my location` now.
+
+`FIX_TTL` still spares the landing, because nobody asked for a fix there.
+
+Measured in Chrome on 2026-10-14: one press made one `getCurrentPosition` call with
+`maximumAge: 0`. The stored fix took a new timestamp.
+
+### The alert pane folds, and both tabs draw M3's standard list
+
+The repository owner asked for all four parts on 2026-10-14.
+
+**One list on both tabs.** The Sensors tab drew M3's segmented list, a filled block per row. The
+Notices tab drew an email list with a 40dp avatar. Both draw M3's standard list now: no container,
+16px leading and 24px trailing padding, and a 16px gap. The leading slot is M3's leading icon, a bare
+24px glyph. A row takes M3's state layer, `on-surface` at the hover opacity and at the pressed
+opacity under a press. The glyph keeps the tier or category colour, the divergence the pane already
+stated.
+
+**Every section folds.** A section is a `<details>`, and its subheader is the `<summary>`. The
+summary carries the row count and a chevron that turns while open. The browser gives a keyboard and
+a screen reader the whole behavior, so no script handles the fold itself.
+
+`alerts()` rebuilds the card on every poll. So a module set, `closed`, holds the sections a reader
+folded, by `data-sec`. Every section is written `open`, and `syncOpen()` closes the folded ones after
+the card lands, in the same task. A fold survives a poll and a tab switch.
+
+**A chip is a button.** A press opens the Sensors tab, opens the sections the chip's stations sit in,
+folds every other section, and scrolls to the first one. `data-secs` names those sections by the key
+`groupCard()` writes, `s:<tier>|<kind>`. The rain chip names two sections, heavy and very heavy.
+`Nearest first` names no section, so it stays a plain chip.
+
+**One button for both directions.** M3's text button, `.tbtn`, sits over the sections. It reads
+`Collapse all` while any section on the tab is open, and `Expand all` once none is. `syncOpen()`
+writes its words, so they follow a fold by hand too.
+
+`m3-check.html` renders the alert pane from a fixed fixture, so the fixture moved to the new shape.
+It asserts the `<details>` and `<summary>` pair, the chevron, the button chip, and that no row
+carries a corner or a container fill.
+
+### The alert chips sit on the Sensors tab, and a row states no distance
+
+The repository owner asked for both on 2026-10-14.
+
+The count chips and `Nearest first` sat in the app bar's chip line, over both tabs. Every one of
+them is about sensors, so they now sit at the top of the Sensors tab in `.achips`, above the
+Collapse all button. `.achips` is not `.badges`, so `openSide()` leaves the row in the body. The
+Notices tab carries no chips.
+
+A row no longer prints its distance from the reader's location. The list still sorts nearest first
+inside a tier when the app holds a fix, and the `Nearest first` chip still says so.
+
+### A `now` section leads with a red triangle, and two tags are gone
+
+The repository owner asked for this on 2026-10-14. The `HAPPENING NOW` and `FORECAST` tags left the
+alert section titles. Each title already carries its tier in words: `Water level at danger` against
+`Forecast to reach danger`. A `now` section leads with a warning triangle in `--s-danger` instead.
+
+`HEAVY RAIN` and `NOT CURRENT` stay. Neither title carries that fact in its own words, so the tag is
+still the only place it is stated. The Help dialog's alert key follows: the triangle for observed
+alerts, the word `Forecast` for the forecast, and the `NOT CURRENT` tag. The key also names flood
+gauges now, which joined the alert list earlier the same day.
+
+### Alert sections take M3's list section header, a divider, and no tag
+
+The repository owner asked for this on 2026-10-14, with M3's contact-list screenshot as the reference.
+
+The section title is M3's list subheader: `title-small` in `on-surface-variant`, 48dp tall, on the
+rows' own 16px leading inset and 24px trailing one. The first revision set it in `title-large` in
+`on-surface`. The repository owner found that too big and asked for the subheader back the same day.
+The row holds one line, so the chevron never drops under the title. A long title wraps inside its own
+box.
+
+A full-width divider in `outline-variant` opens every section after the first, on both tabs. A
+section already ends in 8px of padding, so the divider sits 8px under the last row. The summary's
+hover tint lost its corner, because a rounded tint under a straight rule reads as a button in a box.
+
+Every tier tag is gone: `HAPPENING NOW`, `FORECAST`, `HEAVY RAIN` and `NOT CURRENT`. Each title
+already states its tier in words. A `now` section leads with the red triangle. The `.tg` rules are
+deleted, because nothing calls them. The Help key states the tiers in words too.
+
+### A pin filter turning on frames what it kept
+
+The repository owner asked for this on 2026-10-14. A reader turns on Favorites or On alert. The map then zooms in or out to show every pin the filter kept. Before, the view stayed where it was. A favorite or an alert outside the window was invisible.
+
+`fitMarks()` in `js/map.js` fits the bounds of every marker in `siteMark`. It pads 96px at the top to clear the chip row. It pads 48px on the other sides. It stops at zoom 14, so two close pins do not fill the screen. One pin gets zoom 13, the same as a press on a pin. A fit of one point zooms to the ceiling.
+
+The filter handler in `js/ui.js` calls it on the way in only. Turning a filter off leaves the view alone, because the reader chose that view. A poll never calls it, so the map does not jump while a reader pans. Measured on the live payload, Favorites went from zoom 13 to 14. On alert went to zoom 10 with all eight alert pins in the frame.
+
+### The blue ON ALERT pill is gone
+
+The repository owner asked for this on 2026-10-14. The pill read "ON ALERT. Every station not on alert is hidden". It had a Show all button. The On alert chip already states the filter. It lights while the filter holds, and a second press clears it. So the pill said the same thing twice.
+
+The pill markup, its CSS and its handlers are deleted. `#pills` stays as an empty strip, because the check fixtures name it. Test mode keeps its own chip. The standing indication of a hidden station is now the lit chip and its count.
+
+The cost is accepted. A reader who scrolled away from the chip row loses a sentence about hidden stations. The chip row sits on the top edge of the map at every width, so it stays on screen.
+
+## A bar on the map card shows a poll in flight, 2026-10-14
+
+The repository owner asked for a sign that the app fetches data. A 4px bar now runs along the
+top edge of the map card while a poll is in flight. It is the indeterminate linear progress
+indicator of M3, and the card clips it to its own corner.
+
+`load()` in `js/net.js` sets `aria-busy` on `#map` at the start of a poll and removes it in a
+`finally`. The attribute also tells a screen reader that the map is busy. `#map::before` in
+`css/chrome.css` draws the bar from that attribute, so no script touches its style.
+
+The bar waits 400ms before it shows. A warm poll answers 304 in under 100ms. A bar that flashes
+every five minutes is noise, and a slow poll is the one a reader wants to know about.
+
+The first load draws no bar. The splash already says that the app is loading. The bar sits at
+z-index 1001 to clear the Leaflet controls, and that number also paints it over the splash.
+
+It is `::before` and never `::after`, because `m3-check.html` asserts that `::after` draws no edge
+on the card.
+
+Test mode holds the bar for 3 seconds after each poll. The repository owner could not see the bar
+on a warm poll, because the poll ends before the 400ms delay. A switch of test mode starts a poll,
+so the bar shows each time the mode goes on.
+
+*Not done:* a counter for polls that overlap. If Refresh now starts while a timer poll runs, the first
+poll to finish hides the bar. The second poll still lands, and its answer still draws.
+
+## The warning dialog lays out a MET bulletin, 2026-10-14
+
+The repository owner called the warning text too messy to read. A MET bulletin arrives as one
+paragraph. It joins 20 states with `•`, puts districts in brackets, and numbers its marine items
+under a heading in capitals. It also states a 12-hour clock.
+
+`warnHtml()` in `js/ui.js` now lays that paragraph out in the dialog. A sentence of the shape
+"... over the states of A • B until T" becomes three parts:
+
+- the lead clause, ending in a colon
+- one list row per area, with its districts in muted text after the name
+- one line for the end time, in 24-hour form
+
+The areas this map covers go first, in the accent color. That is Selangor, Kuala Lumpur and
+Putrajaya. A straits name never counts. The reader saw "Southern Straits Of Melaka" lit, and that
+water is off Johor. A marine item gets its capitals heading as a sentence-case subheading.
+The function drops the "SECTION A" banner, because the dialog title already says what the warning is.
+
+A sentence of any other shape prints as it came. A new MET wording then loses its layout, but it
+never loses a word. The dialog title also goes to sentence case when MET writes it in capitals.
+
+The same work found a parser fault. `hereParts()` in `sources.php` split a sentence at any period
+followed by a space. MET writes "N. Sembilan" and "W.P. Kuala Lumpur". So the split cut the list at
+"Selangor • N." and dropped the end of the sentence, the time included. The split now skips a
+period after a single capital. `php api.php --selftest` holds a line for it.
+
+*Not done:* the alert list row and the ticker tile still show the raw text. Each is a one-line
+preview, and a list does not fit in one line. The app writes no summary. It has no model to
+write one, and a summary of a warning can state something MET did not say.
+
+### A coarse fix draws no accuracy circle
+
+The repository owner asked for this on 2026-10-14. The accuracy circle is gone when the fix reports a radius over 500 m. A fix that coarse comes from an IP lookup or a cell tower. Its circle covers a district and adds nothing. The button tip still states the number. The "You are here" dot stays.
+
+`ACC_CIRCLE_M` in `js/locate.js` holds the limit. The browser reports accuracy as a radius, so 500 m means a circle with a 500 m radius. A fix of exactly 500 m still draws its circle. The check is on the value the browser gives, so a stored fix follows the same rule.
+
+The repository owner then asked for the title and the valid time to stay on screen. Only the
+bulletin text between them scrolls now. The title `<h3>` is sticky at the top of `#warnBody`. The
+valid time and the source moved to `#warnFoot`, a box under the scroller with `flex: none`. A
+notice with no link leaves that box empty, and an empty box takes no padding. `m3-check.html`
+scrolls a long bulletin and asserts that both stay in view.
+
+### A happening-now section title is red, with no triangle
+
+The repository owner asked for this on 2026-10-14. The red warning triangle that led a happening-now section title is gone. The title text now takes the danger red. The count and the chevron stay grey, so only the title is red.
+
+The title already states its tier in words, for example "Flood gauge at danger". So the triangle added no fact. The aria label "Happening now" left with it. The Help key says that the section title is red.
+
+The cost is accepted. Red text at 14px is less loud than a 24px glyph. The red is the same status red as before. The words carry the meaning for a reader who cannot see the colour.
+
+### The trend rows and the graph are one segment, over 6 hours
+
+A reader asked for this on 2026-10-14, in four steps. Each sensor with a graph now has one segment. The segment holds the graph first and the rows under it. The station panel and the table popover both draw it, through `trendBlock()` in `js/popup.js`.
+
+- Water level takes the title `Trend`. It shows `Rate`, `Min / Max` on one row, and `Reaches danger`.
+- Rainfall takes the title `Trend`. It shows `Max` in mm/h.
+- A flood gauge takes the title `Trend`. It shows `Max` in metres.
+- A siren takes the title `History`. It shows `Last triggered`.
+
+Every graph spans the last 6 hours on the clock and ends now. `GRAPH_H` in `js/config.js` holds that number. `Min` and `Max` read the same window that the graph draws. The `Last N h` titles are gone from both surfaces.
+
+`Last triggered` reads `lastOn`, a new field on each siren. `api.php` takes it from `.history.db`, which keeps 30 days. The `history` field holds 12 hours, so it cannot answer. The query uses a range on the primary key and takes 3 ms. A siren that sounds on this poll shows `Now`. A siren with no 1 in the database shows `None in 30 days`.
+
+The river graph lost its range caption under the plot. The `Min` and `Max` rows state the same two numbers. The table popover lost its `trend … · danger …` line for the same reason.
+
+A station with less history than 6 hours draws its line on part of the plot. The rest of the plot stays empty, because no reading exists there. A station with no reading in the window shows no `Min` or `Max` row.
+
+The reader accepted one cost. The table popover showed up to 12 hours and now shows 6.
+
+### The new-alert toast is an M3 elevated card
+
+The repository owner asked for this on 2026-10-14. The toast over the map drew its own card, with a 3px orange rule on the left edge. It now follows `Card/card.css` and `List/list.css` from the M3 reference set.
+
+The card is an elevated card. It uses `surface-container-low`, the medium corner and elevation 2, with no border. The orange rule is gone, because M3 separates a card by elevation alone. The glyph in the head still carries the tier: red, amber or green.
+
+The head is a 56px row. It holds a 24px glyph, a `title-medium` line and a 40px close button. Each station is a standard two-line list item. It is 72px tall and has a 24px kind glyph. The name is `body-large`. The reason is `body-medium` in `on-surface-variant`. A press shows the M3 state layer. A name of 50 characters wraps and the row grows, because a cut place name is worse than a tall row.
+
+The card is 344px wide, the width the M3 snackbar uses. It was 300px. Behavior is the same: it shows for 12 seconds, it waits while the pointer rests on it, and a phone never shows it. The "more" line is still plain text and not a button.
+
+### The max is marked on every graph
+
+A reader asked for this on 2026-10-14. The water-level, rainfall and flood-gauge graphs each mark their highest reading in the window. The mark is a dashed vertical rule at that column and an arrow glyph at the top. A pointer or a tap on the glyph shows the value and the clock time. `peakMark()` in `js/popup.js` draws all three.
+
+The mark was amber, on the rain graph alone. It now draws in the ink, `--on-surface`, on all three graphs. A river graph draws its alert and warning marks in amber. So an amber rule beside them reads as a third mark, and it states a status that no reading reached. The kind colour is the colour of the line under the mark, so the mark disappears against it.
+
+A dry rain gauge still draws no mark. A river or a gauge with equal readings marks the latest one.
+
+### The station card follows the alert panel's list
+
+A reader asked for this on 2026-10-14. The station card now draws the list the alert panel draws.
+
+- The readings are an M3 standard list. No item has a filled container or a corner.
+- Each sensor section folds. The section is a `<details>`, and its head is the `<summary>`.
+- The head takes M3's state layer under a pointer and a press.
+- A full-width divider opens every section after the first.
+
+The weather section, the nearest-camera section and the weather panel fold the same way. `sensorSec()` in `js/popup.js` writes the markup for the card.
+
+A fold survives the poll. `render()` rebuilds the open card on every poll. So `openSide()` keeps a set of folded `data-sensor` keys and closes those sections as the card lands. The set lasts for the session only. A search sub-row that names a folded sensor opens its section.
+
+A ⋮ inside a head does not fold the section. The browser activates the button, not the summary.
+
+This reverses two rules. The readings were a segmented list since 2026-08-25. And no surface in the pane drew a dividing line. `m3-check.html` now asserts the new list, and it asserts that the segments are gone.
+
+### No axis label touches `now`
+
+A reader asked for this on 2026-10-14. The last clock label on a graph axis printed against `now`, as `17:30now`. `timeAxis()` in `js/popup.js` now drops the last clock label when its tick falls within 15% of the right edge. It dropped it within 8% before.
+
+The two labels need about 40px between them. That is 14% of a 280px plot. In the browser, 290 axes over 150 station cards drew no overlap at a 1536px window or at a 400px window. The cost is one clock label near the edge, and its gridline goes with it.
+
+### The station table holds its names on a sideways scroll
+
+A reader asked for three changes on 2026-10-14, on a phone.
+
+The readings showed again to the left of the frozen name column. `table.data` carried the 16px inset as left padding. Blink pins a sticky box to the padding edge of its scroller, so the name column stuck 16px in. The readings scrolled through that strip. The inset moved onto the name column and the corner head. `box-sizing: border-box` keeps each column at its stated width.
+
+The district name scrolled off the screen. Its cell spans every column, so it moves with them. The name is now a `.dname` span that sticks to the left edge inside that cell.
+
+The last row sat on the bottom edge of the screen. Below 600px the table adds 24px to the bottom safe area. The safe area alone is 0 on most Android phones.
+
+`m3-check.html` asserts that the scroller carries no inset. It also asserts that the name column pins to the scroller edge.
+
+### Rainfall merges its trend and its totals
+
+A reader asked for this on 2026-10-14. The rainfall card had a `Trend` segment and a `Totals` segment. It now has one segment, titled `Trends & Totals`. The segment holds the totals chart, the graph and the `Max` row, in that order. The totals moved above the graph on a second instruction the same day. The table popover draws the same block.
+
+`trendBlock()` in `js/popup.js` adds the totals for rainfall. `rainAcc()` takes a third argument, `head`, and writes no `Totals` title when it is false. The stale guard did not move. A stale gauge draws no totals and keeps the title `Trend`.
+
+The chart has no title of its own now. So 16px of space separates the graph from the chart above it.

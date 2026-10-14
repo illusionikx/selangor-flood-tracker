@@ -123,6 +123,8 @@ let range = RANGES[0];
 let timer = null;
 let lead = null;     // the pause before a freshly opened camera starts playing itself
 let warned = '';     // the warning pill currently on the picture, so a repaint can skip its own work
+let pos = 0;         // the frame on screen, as an index into `frames`. `frames.length` is live
+let t0 = 0, t1 = 1;  // the clock the seek bar spans: the oldest frame in range to now
 
 const srcOf = ts => `api.php?shot=${cam}&t=${ts}`;
 // One past the end of `frames` is the live still. It is not in the archive — it is what the lightbox
@@ -130,6 +132,25 @@ const srcOf = ts => `api.php?shot=${cam}&t=${ts}`;
 const isLive = i => i >= frames.length;
 const srcAt  = i => isLive(i) ? liveSrc : srcOf(frames[i]);
 const labelAt = i => isLive(i) ? 'live' : stamp(frames[i]);
+
+/* **THE SEEK BAR IS A CLOCK, NOT A FRAME COUNT**, on the repository owner's instruction of
+   2026-10-14. JPS went offline for two to three hours one week, and a bar that spaced every frame
+   evenly drew that outage as one more step. Only the stamp said so. So the input's value is a unix
+   time now, and `pos` holds the frame index that every other function here reads.
+   A drag lands on the nearest frame and the thumb snaps to it. The left edge is the oldest frame in
+   range, so a young archive does not draw as a bar that is mostly empty. */
+const tsAt = i => isLive(i) ? t1 : frames[i];
+const frac = ts => (ts - t0) / (t1 - t0 || 1);
+function seat(i) {
+  pos = i;
+  scrub.value = tsAt(i);
+}
+function nearest(ts) {
+  let best = 0;
+  for (let i = 1; i <= frames.length; i++)
+    if (Math.abs(tsAt(i) - ts) < Math.abs(tsAt(best) - ts)) best = i;
+  return best;
+}
 
 tl.querySelector('.tlranges').innerHTML = RANGES.map((r, i) =>
   `<button class="tlr" data-i="${i}"><span class="tls">${r.label}</span
@@ -165,7 +186,7 @@ function warnFor(i) {
 
 function paint() {
   if (!cam) return;   // nothing to paint from, and the img belongs to whoever opened the lightbox
-  const i = +scrub.value;
+  const i = pos;
   /* B is the live still and holds still; A — the clipped side — is what scrubs and plays. The fixed
      side is the one you already know, the picture the lightbox was opened on, so every position of
      the scrubber reads as "then, against now" and playing a range slides the past across a present
@@ -177,7 +198,11 @@ function paint() {
   const on = !ab.hidden;
   // The played part of the seek bar. The input is transparent (every visible part of the bar is
   // painted by `.tltrack`), so the fill is a custom property rather than `accent-color`.
-  scrub.parentElement.style.setProperty('--p', +scrub.max ? i / +scrub.max : 0);
+  scrub.parentElement.style.setProperty('--p', frac(tsAt(i)));
+  // The value is a unix time, and a screen reader must not read one out.
+  scrub.setAttribute('aria-valuetext', labelAt(i));
+  // Live counts as the last frame, because it is the last position on the bar.
+  box.querySelector('.lbcount b').textContent = `${i + 1}/${frames.length + 1}`;
   imgB.src = on ? liveSrc : srcAt(i);
   box.querySelector('.btime').textContent = on ? 'live' : labelAt(i);
   if (on) {
@@ -193,13 +218,9 @@ function paint() {
     warned = w;
     const player = box.querySelector('.player');
     player.querySelector('.camwarn')?.remove();
-    /* A hidden pill stands in for a calm frame, on any camera whose archive holds an alerting one.
-       In the plain shape the strip above the picture is opened by `.player:has(.camwarn)`, so a pill
-       that came and went as the clip ran would move the frame 30px down and back up again while
-       somebody watched it. The placeholder holds the strip open for the whole clip and shows
-       nothing. Cameras that never alert never get one, which is the cost that rule exists to avoid. */
-    player.insertAdjacentHTML('beforeend',
-      w || (tierAt.size ? '<span class="camwarn" hidden></span>' : ''));
+    /* No placeholder for a calm frame since 2026-10-14. One held a strip open above the picture so
+       the frame never jumped. The pill sits on the picture at every width now, so it moves nothing. */
+    player.insertAdjacentHTML('beforeend', w);
   }
 }
 
@@ -232,28 +253,40 @@ function thin(list, step, anchor) {
    stored frame drew a 60-line ruler over the one control here that has to be dragged, and a
    graduation is not what this strip is for.
    The reader's own ignore list is applied here rather than on the server, which never learns it. A
-   span raised by an ignored sensor is simply not drawn. */
+   span raised by an ignored sensor is simply not drawn.
+   Each span is placed on the clock, and it runs to the next frame or one range step, whichever is
+   nearer. An outage draws nothing of its own: the frame dots below space themselves on the clock,
+   and the empty rail between two of them is the gap. A dashed and then a darker `.gap` span stood
+   here for two revisions, and the repository owner read both as ticks. */
+/* **Every frame is a white dot on the rail, live included**, on the repository owner's instruction
+   of 2026-10-14. This reverses the rule above that cut the per-frame marks. On a clock the dots
+   space themselves, so the gaps between them are what a reader reads, not a ruler. The dots draw
+   after the spans, so an alert span never hides one. */
 function drawTicks() {
-  const n = +scrub.max || 1;
+  const pct = (a, b) => `left:${frac(a) * 100}%;width:${(frac(b) - frac(a)) * 100}%`;
+  const dots = [...frames, t1].map(ts => `<b style="--x:${frac(ts)}"></b>`).join('');
   ticks.innerHTML = frames.map((ts, i) => {
     const a  = tierAt.get(ts);
     const st = a ? byId(a.id) : null;
     if (!a || (st && isIgnored(st))) return '';
-    return `<i class="t-${a.tier}" style="left:${i / n * 100}%;width:${100 / n}%"></i>`;
-  }).join('');
+    return `<i class="t-${a.tier}" style="${pct(ts, Math.min(tsAt(i + 1), ts + range.step))}"></i>`;
+  }).join('') + dots;
 }
 
 function setRange(r) {
   range = r;
   const cut = Date.now() / 1000 - r.win;
   frames = thin(all.filter(ts => ts >= cut), r.step, r.anchor);
-  scrub.max = frames.length;         // the extra slot is "live"
+  t1 = Date.now() / 1000;            // the extra slot is "live", and it sits at now
+  t0 = frames[0] ?? cut;
+  scrub.min = t0;
+  scrub.max = t1;
   /* Rest on live normally — the newest thing there is, and what the lightbox was already showing.
      Start at the oldest frame instead whenever something is going to *move*: while comparing, live
      is the fixed side and resting there puts the picture against itself; while playing, the run
      should begin at the far end of the range that was just asked for. Both mean "further back",
      which is the only reason to reach for a wider range in the first place. */
-  scrub.value = (timer || !ab.hidden) ? 0 : frames.length;
+  seat((timer || !ab.hidden) ? 0 : frames.length);
   /* The chosen segment spells itself out; the rest stay one word. The pace is the one thing not
      guessable from the picture — every range plays at a frame a second, so while running they look
      identical and differ only in what each second is worth. An empty window says so in the same
@@ -314,11 +347,11 @@ const lastPos = () => ab.hidden ? frames.length : frames.length - 1;
 function go(i) {
   stop();
   const at = Math.max(0, Math.min(lastPos(), i));
-  if (at === +scrub.value)
+  if (at === pos)
     say(at === 0 ? 'Oldest frame in this range'
       : isLive(at) ? 'Live already, nothing newer'
       : 'Newest frame in this range');
-  scrub.value = at;
+  seat(at);
   paint();
 }
 
@@ -394,7 +427,7 @@ function toggle() {
     // The range can change underneath a running clip. A range holding nothing would make this a
     // modulo by zero, which lands NaN in the scrubber and freezes the picture mid-play.
     if (frames.length < 2) return stop();
-    scrub.value = (+scrub.value + 1) % (lastPos() + 1);
+    seat((pos + 1) % (lastPos() + 1));
     paint();
     // Read at the moment the interval is created, not per tick — the speed button restarts the clip
     // rather than retiming a running one, so there is never a rate to pick up mid-run.
@@ -424,7 +457,7 @@ function setCompare(on) {
      picture over itself and read as a broken divider rather than an empty one. Open on the oldest
      frame in range instead: the widest gap available, and the pairing this feature used to show by
      default. */
-  if (!ab.hidden && isLive(+scrub.value)) scrub.value = 0;
+  if (!ab.hidden && isLive(pos)) seat(0);
   // The gesture is a drag across a photograph, and a photograph cannot look draggable. Said once,
   // for three seconds, each time the divider comes up.
   if (!ab.hidden) say('Drag across the picture to compare');
@@ -465,7 +498,22 @@ stage.addEventListener('pointermove', e => {
    archive behind it keeps an inert picture rather than one that swallows clicks. */
 stage.onclick = () => { if (ab.hidden && !tl.hidden) { toggle(); tapFlash(); } };
 
-scrub.oninput = () => { stop(); paint(); };
+/* **The time of the frame nearest the pointer**, in a pill over the bar, on the repository owner's
+   instruction of 2026-10-14. It names the frame a press would land on, which is the same `nearest()`
+   a drag snaps to. The pill sits over that frame's dot, held inside the bar at both ends. The thumb
+   travels 8px in from each edge, the way the dots and `.tltrack::before` do. */
+const peek = tl.querySelector('.tlpeek');
+scrub.addEventListener('pointermove', e => {
+  const r = scrub.getBoundingClientRect(), run = r.width - 16;
+  const i = Math.min(lastPos(), nearest(t0 + (e.clientX - r.left - 8) / run * (t1 - t0)));
+  peek.textContent = labelAt(i);
+  peek.hidden = false;
+  const half = peek.offsetWidth / 2;
+  peek.style.left = `${Math.max(half, Math.min(r.width - half, 8 + frac(tsAt(i)) * run))}px`;
+});
+scrub.addEventListener('pointerleave', () => { peek.hidden = true; });
+// While comparing, live is the fixed side, so a drag stops on the newest archived frame.
+scrub.oninput = () => { stop(); seat(Math.min(lastPos(), nearest(+scrub.value))); paint(); };
 const prevBtn = tl.querySelector('.tlstep[data-d="-1"]');
 const nextBtn = tl.querySelector('.tlstep[data-d="1"]');
 const nowBtn  = tl.querySelector('.tlnow');
@@ -474,7 +522,7 @@ const trans   = tl.querySelector('.tltransport');
 // The button flashes as well (the group listener below), but the eyes are on the frame, not on a
 // 34px control — and `k` and space reach this same handler, so the keyboard gets the flash too.
 play.onclick = () => { toggle(); tapFlash(); };
-tl.querySelectorAll('.tlstep').forEach(b => { b.onclick = () => go(+scrub.value + +b.dataset.d); });
+tl.querySelectorAll('.tlstep').forEach(b => { b.onclick = () => go(pos + +b.dataset.d); });
 /* "Now" is `lastPos()`, not `frames.length`, so while comparing it lands on the newest *archived*
    frame instead of on live. Live is the fixed side there; the nearest thing to now that the moving
    side can hold is the frame before it, and that is what the button is asking for.
@@ -508,14 +556,18 @@ const KEYS = {
   '.': nextBtn, ArrowRight: nextBtn,
   End: nowBtn,
 };
-/* The scrubber is an `<input type="range">` and handles these itself when it holds focus. Firing
-   here as well would move two frames per press. */
-const NATIVE = new Set(['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End']);
+/* The scrubber's value is a unix time now, so its own arrow keys move it by one second and the snap
+   puts it straight back on the same frame. So the keys the input would handle itself step a frame
+   here instead, and the native step never runs. */
+const ON_SCRUB = { ArrowUp: 1, ArrowDown: -1, PageUp: 1, PageDown: -1 };
 play.addEventListener('blur', () => play.classList.remove('noring'));
 box.addEventListener('keydown', e => {
   if (tl.hidden || e.ctrlKey || e.altKey || e.metaKey) return;
   play.classList.remove('noring');   // any key means someone is navigating: give the ring back
-  if (e.target === scrub && NATIVE.has(e.key)) return;
+  if (e.target === scrub && (e.key in ON_SCRUB || e.key === 'Home')) {
+    e.preventDefault();
+    return go(e.key === 'Home' ? 0 : pos + ON_SCRUB[e.key]);
+  }
   /* Space on a focused button is that button's own press, and the browser fires it on keyup — so
      handling it here too would run the action twice. Left alone, which is why the play button takes
      focus when the timeline appears: space then lands on it natively and does the right thing.
@@ -594,7 +646,7 @@ export async function openTimeline(src) {
      is far enough that the water has moved and near enough to still be this weather. */
   const OPEN_BACK = 3 * 3600;
   const i = frames.findIndex(ts => ts >= t0 - OPEN_BACK);
-  scrub.value = i < 0 ? 0 : i;
+  seat(i < 0 ? 0 : i);
   paint();
   /* And plays, without being asked. Opening a camera full-screen *is* the request to look at it
      properly, and the archive is the only thing here that has to be set in motion to be seen at all

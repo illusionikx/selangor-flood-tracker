@@ -1,6 +1,6 @@
 // Polling the proxy, and the diagnostics popover that reports honestly on what came back.
 
-import { FEED, POLL_MS } from './config.js';
+import { FEED, POLL_MS, FEED_LATE_MS, SOURCES } from './config.js';
 import { state, PREFS } from './state.js';
 import { el, ago } from './util.js';
 import { render } from './render.js';
@@ -98,7 +98,37 @@ function network(j, err) {
    `stale` also flips on its own this way, without needing a poll to notice the readings aged out.
    The replay passes `lastErr` back in too, so a poll that failed keeps reading failed — the
    status word and the problem row hold their state, and only the ages underneath keep ticking. */
-setInterval(() => last && network(last, lastErr), 30000);
+setInterval(() => {
+  if (last) network(last, lastErr);
+  if (late()) { alerts(); ticker(); }
+}, 30000);
+
+/* **A feed that stops updating raises a Service Notice**, on the repository owner's instruction of
+   2026-10-14. JPS went offline for two to three hours one week, and only a stamp said so.
+   The test runs here against the reader's own clock, never in api.php. So it fires for all three
+   faults alike: a feed that stops answering, a feed that answers with old readings, and this server
+   failing to refresh at all. That last one has no new payload to carry a server verdict.
+   `api.php` publishes each feed's newest reading stamp in `feeds`. A feed past FEED_LATE_MS joins
+   one `late` notice, so one outage reads as one tile. The national portal and its rainfall table
+   share a name in SOURCES, and the Set folds them.
+   **It counts toward nothing**, the way every notice here does: no badge, no count, no red glyph. A
+   source outage is not water rising, and an alarm on it is the cry-wolf cost the alert design
+   standard rejects. It is in the Notices tab, at the head of the ticker, and in a modal.
+   A JPS-declared PublicInfoBanjir outage already names that portal, so its two feeds stay out of
+   this one rather than stating the same outage twice.
+   Returns true when the set changed, so a caller repaints only then and the ticker keeps its run. */
+let baseNotices = [], feeds = {}, lateKey = '';
+function late() {
+  const declared = baseNotices.some(n => n.id === 'publicinfobanjir');
+  const names = [...new Set(Object.entries(feeds)
+    .filter(([k, iso]) => !(declared && (k === 'national' || k === 'portal'))
+      && Date.now() - new Date(iso) > FEED_LATE_MS)
+    .map(([k]) => SOURCES[k]?.name || k))];
+  state.notices = names.length ? [...baseNotices, { id: 'late', regions: names }] : baseNotices;
+  const key = names.join('|'), changed = key !== lateKey;
+  lateKey = key;
+  return changed;
+}
 
 /* What the splash says while the first poll is in flight. Only stages we can actually observe get
    their own line — the fetch is one opaque round trip, so there is nothing to report between
@@ -110,6 +140,9 @@ const say = m => { if (!el('splash').classList.contains('gone')) el('splashMsg')
 export async function load() {
   const first = !el('splash').classList.contains('gone');
   let slow, slower;
+  /* Draws the poll bar on the map card, see `#map::before` in css/chrome.css. Never on the first
+     load: the splash already says so, and the bar's z-index would paint it over the splash. */
+  if (!first) el('map').setAttribute('aria-busy', 'true');
   try {
     if (first) {
       // "Proxy" and "cold start" were our words for our own plumbing. A reader waiting on a splash
@@ -133,7 +166,9 @@ export async function load() {
     state.data = j.stations;
     // Read before network()/alerts()/ticker() run below, in the same order every poll takes.
     state.warnings = j.warnings || [];
-    state.notices = j.notices || [];
+    baseNotices = j.notices || [];
+    feeds = j.feeds || {};
+    late();
     if (j.siteM) state.siteM = j.siteM;   // the radius api.php actually grouped these by
     // Before anything reads it, and only in the client's copy — see test.js. Nothing downstream
     // needs to know it is looking at a drill, which is the point: the drill exercises the real code.
@@ -159,6 +194,8 @@ export async function load() {
   } catch (e) {
     clearTimeout(slow); clearTimeout(slower);
     network(null, e.message);
+    // The map still draws the last good payload, so its feeds keep ageing against the clock.
+    if (late()) { alerts(); ticker(); }
     if (!el('splash').classList.contains('gone')) {
       // Nothing has ever loaded. With no connection there is nothing truthful to show, so hold the
       // splash; if we are online it is the feed that is down, so let them at the map.
@@ -170,5 +207,10 @@ export async function load() {
         setTimeout(() => el('splash').classList.add('gone'), 1200);
       }
     }
+  } finally {
+    /* Test mode holds the bar for 3 s. A warm poll ends before the bar's 400ms delay, so without
+       this hold a reader never sees it. Not awaited, so Refresh now gets its answer at once. */
+    const off = () => el('map').removeAttribute('aria-busy');
+    state.test ? setTimeout(off, 3000) : off();
   }
 }

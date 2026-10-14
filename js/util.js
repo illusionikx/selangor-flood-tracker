@@ -268,9 +268,12 @@ export const raining = s => s.kind === 'rainfall' && s.hourly > 0 && s.backed !=
    Rain joined on the repository owner's instruction, 2026-08-25. It is class 3 (> 30 mm an hour) and
    not class 4, because class 4 is > 60 and this network reaches it a handful of times a year.
    `raining()` and not `status` alone, the same guard `sounding()` carries: a gauge stuck on an old
-   number must not raise five surfaces. */
+   number must not raise five surfaces.
+   A flood gauge past its 0.3 m danger mark joined on the repository owner's instruction, 2026-10-14.
+   Standing water over a spot known to flood is observed, so it is `now`. `atDanger()` carries the
+   `hasInfo()` guard, so a gauge offline on a frozen April reading raises nothing. */
 export const isCritical = s => (s.kind === 'river' && s.status >= 3) || sounding(s)
-  || (raining(s) && s.status >= 3);
+  || (raining(s) && s.status >= 3) || (s.kind === 'gauge' && atDanger(s));
 
 /* Has this sensor reached the top of its own scale — whatever its own scale is? A river over its
    danger mark, a siren sounding, a flood gauge past 0.3 m of standing water, rainfall in JPS's top

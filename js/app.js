@@ -19,16 +19,18 @@ if ('serviceWorker' in navigator)
 
 findMe(false);   // locate on landing for the proximity sort, but leave the view where they left it
 
-/* Poll only while someone is looking. A tab left open in the background costs a request every five
-   minutes for ever, and a handful of forgotten tabs is a steady drum of traffic from one address
-   for data nobody is reading — the polite thing, and the thing least likely to get the server
-   blocked by JPS. Coming back refreshes at once if the data has aged past a poll, so an unattended
-   tab is never showing anything staler than it would have been. */
+/* **A hidden tab polls too, since 2026-10-14, on the repository owner's request.** The rule before
+   this one polled only while the tab was visible, to spare JPS. That argument did not hold. A poll
+   reaches this server's 5-minute cache, never JPS, and an unchanged payload costs one 304 of about
+   200 bytes. So a reader who switches back sees current readings and a current weather layer at
+   once. The weather layer rides render(), so this one timer refreshes both.
+   A browser can still freeze a hidden tab, and a phone always does. The listener below catches up
+   on return, the moment the tab is visible again. */
 let polled = 0;
 const poll = () => { polled = Date.now(); load(); };
 
 poll();
-setInterval(() => { if (!document.hidden) poll(); }, POLL_MS);
+setInterval(poll, POLL_MS);
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden && Date.now() - polled > POLL_MS) poll();
 });

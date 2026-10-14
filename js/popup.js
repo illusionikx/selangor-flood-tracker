@@ -1,7 +1,7 @@
 // Every popup shares one template: badge + name + region header, then a kind-specific body, then a
 // status footer. The same meter/state blocks are reused by the alert panel.
 
-import { KINDS, SOURCES, SPARK_H, NO_INFO, ALERT_TITLE, RIVER_COLOR, RAIN_COLOR,
+import { KINDS, SOURCES, SPARK_H, GRAPH_H, NO_INFO, ALERT_TITLE, RIVER_COLOR, RAIN_COLOR,
          GAUGE_COLOR, RAIN_STOPS, NEAR_MAX_KM, camSrc, WEATHER, MET_NAME,
          ACC_ROWS } from './config.js';
 import { PREFS } from './state.js';
@@ -67,10 +67,16 @@ export const camPhrase = (cam, a = camAlert(cam)) => {
   return `${what}${lv == null ? '' : `, ${lv}${unit}`}`;
 };
 
+/* **Below 600px the pill names the kind alone**, `Flood gauge` for `Flood gauge at danger, 0.64 m`,
+   on the repository owner's instruction of 2026-10-14. The glyph's colour still carries the tier.
+   Both spellings ride the markup and CSS picks one, so a turn across the breakpoint needs no
+   repaint. */
 export const camWarn = (cam, a = camAlert(cam)) => {
   const words = camPhrase(cam, a);
+  const k = words && KINDS[a.station.kind];
   return words
-    ? `<span class="camwarn t-${a.tier}"><i class="i i-warning"></i><b>${words}</b></span>` : '';
+    ? `<span class="camwarn t-${a.tier}"><i class="i i-warning"></i><b class="cwlong">${words}</b
+       ><b class="cwshort">${k.one || k.label}</b></span>` : '';
 };
 
 /* JPS publishes no feed for this camera. A muted line stood here, which left the card a line of text
@@ -227,21 +233,31 @@ export const etaText = h => h <= 0 ? 'already at it'
 export function camNear(from, cam) {
   if (!cam) return '';
   const k = KINDS.camera;
-  return `<div class="sensor cam">
-    <div class="sensorhead">
-      ${kindGlyph(k.icon, k.color)}
+  return sensorSec('@cam', `${kindGlyph(k.icon, k.color)}
       <b>Nearest camera</b>
-      <span class="muted">${distKm(from, cam).toFixed(1)} km</span>
-    </div>
-    ${/* ONE segment of a `.sbody`, the shape every sensor on a station card draws. The name and the
-          picture were two, and a group of two titles each item — which puts a heading over a line
-          that is already a name. They belong together anyway: the name says whose view this is. */''}
-    <ul class="sbody"><li>
+      <span class="muted">${distKm(from, cam).toFixed(1)} km</span>`,
+    /* ONE item of a `.sbody`, the shape every sensor on a station card draws. The name and the
+       picture were two, and a group of two titles each item — which puts a heading over a line that
+       is already a name. They belong together anyway: the name says whose view this is. */
+    `<ul class="sbody"><li>
       <div class="place" data-cam="${cam.id}">${cam.name}</div>
       ${camImg(cam, `Latest still from ${cam.name}`)}
-    </li></ul>
-  </div>`;
+    </li></ul>`, ' cam');
 }
+
+/* **Every section of the station panel is a `<details>`, and its head is the `<summary>`.** A reader
+   asked for the alert panel's list style on 2026-10-14: a section folds, its head reacts to a
+   pointer, and a divider opens every section after the first. The browser gives a keyboard and a
+   screen reader the whole fold behavior.
+   A ⋮ inside the summary does not fold the section. A press activates the nearest element that has
+   an activation behavior, and that is the button, not the summary.
+   `key` goes on `data-sensor`, which `openSide()` reads to keep a folded section folded across the
+   in-place refresh on every poll. A section with no sensor behind it takes an `@` key. */
+export const sensorSec = (key, head, body, cls = '') =>
+  `<details class="sensor${cls}" data-sensor="${key}" open>
+    <summary class="sensorhead">${head}<i class="i i-expand_more chev"></i></summary>
+    ${body}
+  </details>`;
 
 /* Everywhere else — every station card, every mast card — the nearest thing is offered, not shown.
    The alert panel would be N proxied fetches at JPS for pictures of places you are scrolling past.
@@ -428,35 +444,61 @@ const rainState = s => {
 
 /* Everything one sensor has to say, without its name or region — those belong to the place, and a
    site with five sensors on one mast would otherwise repeat them five times. */
-function sensorBody(s) {
-  const body = [];
+/* A sensor's rows and its graph, as `[title, html]`. The station card makes it one segment and the
+   table popover draws it under a subhead, so the two surfaces cannot state different numbers.
+   **Every graph spans the last `GRAPH_H` hours on the clock**, on a reader's instruction of
+   2026-10-14. The rows read that same window, so a `Max` and the graph under it state one span.
+   A siren is titled `History`, because a log of 0 and 1 has no trend. Every other kind is `Trend`.
+   A camera has no graph and returns two empty strings. */
+export function trendBlock(s) {
+  if (!['river', 'rainfall', 'gauge', 'siren'].includes(s.kind)) return ['', ''];
+  const rows = [];
+  const win = GRAPH_H;
+  const now = Date.now() / 1000;
 
-  /* `Rate`, and it was `Trend`. The segment around these two rows is headed `Trend` now, and a key
-     repeating its own heading 20px above it is one fact twice. `Rate` is the more exact word for a
-     figure in m/h, and it is the field's own name in the payload. */
-  if (s.kind === 'river' && s.rate != null) body.push(metric('Rate', rateHtml(s)));
+  /* `Rate`, and it was `Trend`. The segment around these rows is headed `Trend`, and a key repeating
+     its own heading 20px above it is one fact twice. `Rate` is the field's own name in the payload. */
+  if (s.kind === 'river' && s.rate != null) rows.push(metric('Rate', rateHtml(s)));
+  /* A river shows min and max, rainfall and a flood gauge show max alone. No readings, no rows. */
+  const wv = s.kind === 'siren' ? []
+    : (s.history || []).filter(([t]) => t >= now - win * 3600).map(p => p[1]);
+  const unit = v => s.kind === 'rainfall' ? `${v} mm/h` : `${v.toFixed(2)} m`;
+  // One row for the pair, on a reader's instruction of 2026-10-14. The unit goes once, at the end.
+  if (wv.length && s.kind === 'river') rows.push(metric('Min / Max',
+    `${Math.min(...wv).toFixed(2)} / ${unit(Math.max(...wv))}`));
+  else if (wv.length) rows.push(metric('Max', unit(Math.max(...wv))));
   // The number the "rising" flag is actually a cutoff on. Shown whenever it is climbing, flagged or
   // not, so "not rising" can be read as "still hours away" rather than taken on trust.
-  if (s.kind === 'river' && s.eta != null) body.push(metric('Reaches danger',
+  if (s.kind === 'river' && s.eta != null) rows.push(metric('Reaches danger',
     etaText(s.eta), s.rising ? 'up' : ''));
-  /* No `Last hour` or `Today` row. The chart below carries both, as the `1 h` and `Today` columns,
-     and it states three more windows beside them. Two surfaces for one number is how the card and
-     the chart came to disagree once already — see the test-mode note in docs/FEATURES.md. */
-  const rain = s.kind === 'rainfall' ? rainBars(s.history) : '';
-  /* Totals under the graph. Not on a stale station: one gauge in the payload holds 27 mm in an hour
-     and its stamp reads last October, and `hasInfo()` calls it online because `hourly` is not null.
-     Drawing that as today's rain is the one thing this chart must never do. */
-  const acc = s.kind === 'rainfall' && !isStale(s) ? rainAcc(s.acc, s.accFrom) : '';
-  // The meter says where the level is against its own thresholds; this says how it got there. The
-  // alert panel has carried it all along — the popup you reach by clicking the pin had the numbers
-  // for the trend (m/h, hours to danger) but not the shape they came from.
-  /* Gauges get one too, in their own taupe: "0.12 m of water" is a fact, "filling for three hours"
-     is the answer. **No `history?.length` gate.** It stood here because an offline gauge is never
-     sampled, and it made the flood gauge the one kind whose timeline a station's state could take
-     away — 15 of 36 drew nothing at all. A gauge with no readings now draws its own two marks
-     against an empty plot, which is what the card was opened to ask about. See `sparkline()`. */
-  const spark = s.kind === 'river' ? sparkline(s.history, 'river', s)
-    : s.kind === 'gauge' ? sparkline(s.history, 'gauge', s) : '';
+  /* `lastOn` comes from `api.php`, out of 30 days of `.history.db`, because `history` holds 12 hours.
+     A siren sounding on this poll is `Now`, whatever the database held when the payload was built.
+     An out-of-contact siren still gets the row: when it last sounded is a fact about the place. */
+  if (s.kind === 'siren') rows.push(metric('Last triggered',
+    hasInfo(s) && s.status > 0 ? 'Now' : s.lastOn ? stamp(s.lastOn * 1000) : 'None in 30 days'));
+
+  /* No `Last hour` or `Today` row. The totals chart carries both. Two surfaces for one number is how
+     the card and the chart came to disagree once already — see the test-mode note in FEATURES.md. */
+  /* **No `history?.length` gate on any graph.** An offline gauge is never sampled, and a gate made
+     the flood gauge the one kind whose timeline a station's state could take away. A gauge with no
+     readings draws its own two marks against an empty plot. See `sparkline()`. */
+  /* **Rainfall merges its totals into this segment and titles it `Trends & Totals`**, on a reader's
+     instruction of 2026-10-14. The totals chart was a segment of its own under `Totals`.
+     Not on a stale station: one gauge in the payload holds 27 mm in an hour and its stamp reads last
+     October, and `hasInfo()` calls it online because `hourly` is not null. Drawing that as today's
+     rain is the one thing this chart must never do. */
+  const acc = s.kind === 'rainfall' && !isStale(s) ? rainAcc(s.acc, s.accFrom, false) : '';
+  const graph = s.kind === 'rainfall' ? rainBars(s.history, win)
+    : s.kind === 'siren' ? sirenBand(s.history, win)
+    : sparkline(s.history, s.kind, s, win);
+  return [s.kind === 'siren' ? 'History' : acc ? 'Trends & Totals' : 'Trend',
+    // The graph first and the rows under it, on a reader's instruction of 2026-10-14.
+    // Rainfall's totals lead, above the graph, on a reader's instruction of 2026-10-14.
+    acc + graph + (rows.length ? `<div class="popbody">${rows.join('')}</div>` : '')];
+}
+
+function sensorBody(s) {
+  const [trendTitle, trend] = trendBlock(s);
   const wet = s.kind === 'rainfall' ? rainState(s) : '';
   // A siren has exactly one thing to say, so it gets a centred state block instead of a metric row.
   // "No signal" is only half the story — a siren that fell off the network last March must not read
@@ -490,7 +532,6 @@ function sensorBody(s) {
     ? `<div class="state ${s.status > 0 && !stuck ? 'on' : 'off'}">${s.status > 0 ? 'TRIGGERED' : 'IDLE'}</div>
        ${stuck ? '<div class="muted">Faulty signal. No river nearby is high.</div>' : ''}`
     : '<div class="state">OUT OF CONTACT</div>';
-  const sirenLog = s.kind !== 'siren' ? '' : sirenBand(s.history);
   const gauge = s.kind !== 'gauge' ? '' : gaugeBlock(s);
 
   // A camera shows its own view. The offer of the nearest one, and a camera card's offer of the
@@ -504,13 +545,12 @@ function sensorBody(s) {
 
      **Every segment carries a title, and the pair is `[title, block]`.** Five words cover every kind
      this app draws: `Right now` for a reading at this moment, `Trend` for where it is going,
-     `Last N h` for a timeline, `Totals` for the accumulation chart, and `Latest still` for a
-     picture. So a river, a gauge and a rainfall station read down the same three or four headings.
+     `History` for a siren's log, `Totals` for the accumulation chart, and `Latest still` for a
+     picture. `trendBlock()` names the middle two.
 
-     **An empty title means the block writes its own, and only a block that measures its own span
-     does.** `rainState()` states `Right now`. `sparkline()`, `rainBars()` and `sirenBand()` each
-     state the ground they cover, and only they can: the span is read off the readings they hold.
-     `rainAcc()` states `Totals`. Everything else is titled here, where the kind is known.
+     **An empty title means the block writes its own.** `rainState()` states `Right now` and
+     Everything else is titled here, where the kind is known. Rainfall's totals ride inside its
+     `Trends & Totals` segment, so `rainAcc()` writes no title of its own there.
 
      **A block this kind does not draw makes no `<li>`.** The filter runs before the wrap, so
      `:first-child` and `:last-child` reach the blocks a reader can see and the group takes its
@@ -521,12 +561,11 @@ function sensorBody(s) {
      here, and the weather section and the nearest-camera section reach it for the same reason. */
   const segs = [
     ['Latest still', still],
-    ['Right now', siren], ['', sirenLog],
+    ['Right now', siren],
     ['Right now', gauge],
     ['', wet],
     ['Right now', s.kind === 'river' ? meter(s) : ''],
-    ['Trend', body.length ? `<div class="popbody">${body.join('')}</div>` : ''],
-    ['', spark], ['', rain], ['', acc],
+    [trendTitle, trend],
   ].filter(([, h]) => h && h.trim());
 
   return `<ul class="sbody">${segs.map(([t, h]) =>
@@ -760,19 +799,15 @@ function metSection(s) {
      with the whole state on `data-tip` and nothing written out. The repository owner asked for the
      component on 2026-08-25, one pane over, and this card stands in the same pane. A head over two
      cells here and a head over a list there is one component in two shapes. */
-  return `<div class="sensor" data-sensor="@met">
-      <div class="sensorhead">
-        ${kindGlyph('partly_cloudy_day', 'var(--k-weather)')}
+  return sensorSec('@met', `${kindGlyph('partly_cloudy_day', 'var(--k-weather)')}
         <b>Weather</b>
         <span class="muted">${m.at}</span>
-        ${wxDots(m)}
-      </div>
-      <ul class="sbody">
+        ${wxDots(m)}`,
+      `<ul class="sbody">
         ${m.now == null ? '' : wxItem(wxIcon(m.now), wxTone(m.now), word(m.now), WX_NOW,
           m.tmax == null ? '' : wxTemps(m.tmax, m.tmin))}
         ${m.hr1 == null ? '' : wxItem(wxIcon(later), wxTone(later), word(later), wxWhen(laterWhen))}
-      </ul>
-    </div>`;
+      </ul>`);
 }
 
 export function popup(s) {
@@ -803,13 +838,7 @@ export function popup(s) {
       </span>
     </div>
     ${metSection(s)}
-    <div class="sensor" data-sensor="${s.id}">
-      <div class="sensorhead">
-        ${kindGlyph(kind.icon, tone)}
-        <b>${kind.one || kind.label}</b>
-      </div>
-      ${sensorBody(s)}
-    </div>`;
+    ${sensorSec(s.id, `${kindGlyph(kind.icon, tone)}<b>${kind.one || kind.label}</b>`, sensorBody(s))}`;
 }
 
 /* One mast, several sensors: a rainfall gauge, a river gauge, a siren and a camera are published as
@@ -867,15 +896,11 @@ export function sitePopup(members) {
       <div class="badges">${kindChips(members)}</div>
     </div>
     ${metSection(lead)}
-    ${camFirst(members).map(m => `<div class="sensor" data-sensor="${m.id}">
-      <div class="sensorhead">
+    ${camFirst(members).map(m => sensorSec(m.id, `
         ${kindGlyph(KINDS[m.kind].icon, hasInfo(m) ? KINDS[m.kind].color : 'var(--muted)')}
         <b>${KINDS[m.kind].one || KINDS[m.kind].label}</b>
         ${m.name !== lead.name ? `<span class="muted">${m.name}</span>` : ''}
-        ${dots(m)}
-      </div>
-      ${sensorBody(m)}
-    </div>`).join('')}`;
+        ${dots(m)}`, sensorBody(m))).join('')}`;
 }
 
 /* "What is near where you are". The nearest camera's picture leads, then one section per kind with
@@ -938,19 +963,14 @@ export function herePopup(e, loaded) {
       }<b>${kind.one || kind.label}</b>`;
     // nearestOf() only ever returns a station that is reporting, so there is no "no reading" case
     // here — either the nearest one inside the cap has something to say or nothing does.
-    if (!s) return `<div class="sensor">
-      <div class="sensorhead">${title}</div>
-      <div class="muted">No ${kind.label.toLowerCase()} within ${NEAR_MAX_KM} km</div>
-    </div>`;
-    return `<div class="sensor" data-sensor="${s.id}">
-      <div class="sensorhead">${title}
+    if (!s) return sensorSec(`@none-${k}`, title,
+      `<div class="muted">No ${kind.label.toLowerCase()} within ${NEAR_MAX_KM} km</div>`);
+    return sensorSec(s.id, `${title}
         <span class="muted">${distKm(at, s).toFixed(1)} km</span>
-        ${dots(s)}
-      </div>
-      <div class="place" data-go="${s.id}">${s.name}</div>
+        ${dots(s)}`,
+      `<div class="place" data-go="${s.id}">${s.name}</div>
       ${region(s)}
-      ${sensorBody(s)}
-    </div>`;
+      ${sensorBody(s)}`);
   }).join('');
 
   /* The same weather section a station card draws, in the same slot — above the sensors, because
@@ -1022,7 +1042,11 @@ function timeAxis(points, frame) {
      for a reading it can no longer vouch for.
      `now: 1` keeps it off `rules()`: a vertical line on the border of the plot is not a gridline. */
   if (Date.now() / 1000 - t1 < 3600) {
-    if (100 - ticks.at(-1)?.x < 8) ticks.pop();   // no room for both labels at that end
+    /* No room for both labels at that end. `now` hangs left of the edge, a clock label is centred on
+       its tick, so the two need half of `17:30` plus all of `now`: about 40px. On a 280px plot that
+       is 14%, and the 8% that stood here let `17:30now` print as one word. Every axis has a tick
+       every 25% or wider at 6 hours, so this drops at most the one label nearest the edge. */
+    if (100 - ticks.at(-1)?.x < 15) ticks.pop();
     ticks.push({ x: '100.00', at: 'now', now: 1 });
   }
   return { t0, t1, secs, inWin, x, ticks, step };
@@ -1126,7 +1150,22 @@ const spanText = secs => secs < 3600
    A flood gauge publishes only the upper two marks and they land on the same two colours. */
 const MARK_COLOR = { alert: 'var(--s-alert)', warning: 'var(--s-alert)', danger: 'var(--s-danger)' };
 
-export function sparkline(points, kind = 'river', st = null) {
+/* The max of a graph, marked at its column: a dashed rule down the plot and a glyph at the top. HTML
+   over the plot and not SVG inside it, because the viewBox is stretched and a glyph would be too.
+   It draws in the ink, and it was amber. See `.spark .peak` in css/base.css for why.
+   The rule keeps the true column and the glyph moves off centre at the edges: a max at the newest
+   sample is the ordinary case, and a centred glyph there hangs half its width off the plate.
+   The words go in `data-tip`, never `title`, which never opens on a phone. */
+const peakMark = (pk, x, label) => {
+  const px = +x(pk[0]);
+  return `<b class="peak${px > 94 ? ' er' : px < 6 ? ' el' : ''}" style="left:${px}%"
+      data-tip="${label} · ${MYT_CLOCK.format(pk[0] * 1000)}"
+    ><i class="i i-keyboard_double_arrow_up"></i></b>`;
+};
+
+/* `win` fixes the window to the last `win` hours on the clock, at any reading count, and drops the
+   heading. The river card passes it and heads the graph `Trend` itself. See `sensorBody()`. */
+export function sparkline(points, kind = 'river', st = null, win = 0) {
   points = points || [];
   /* The graph always draws, and no state of the station suppresses it. A window needs two readings
      to have a width, so with fewer than two the clock supplies one — the same frame the siren band
@@ -1142,8 +1181,8 @@ export function sparkline(points, kind = 'river', st = null) {
      warning and danger marks on a river. That is the question the card is opened with, and it is a
      true picture of a sensor this app holds no readings for. */
   const now = Math.floor(Date.now() / 1000);
-  const { secs, inWin, x, ticks } = timeAxis(points,
-    points.length < 2 ? [now - SPARK_H * 3600, now] : undefined);
+  const { secs, inWin, x, ticks } = timeAxis(points, win ? [now - win * 3600, now]
+    : points.length < 2 ? [now - SPARK_H * 3600, now] : undefined);
 
   const vals = inWin.map(([, v]) => v);
   const has = vals.length > 0;
@@ -1195,6 +1234,10 @@ export function sparkline(points, kind = 'river', st = null) {
   // something a shape over 12 hours is entitled to say.
   const col = KINDS[kind].color;
   const [id, defs] = areaFill(col);
+  // The max, marked where it happened. `>=` takes the latest of equal readings, which on a flat river
+  // is the right edge and not the left. See `peakMark()`.
+  const pk = has ? inWin.reduce((a, b) => (b[1] >= a[1] ? b : a)) : null;
+  const peak = pk ? peakMark(pk, x, `Max ${pk[1].toFixed(2)} m`) : '';
 
   /* One reading is a dash at its own level, not a line and not a point. A line needs two readings,
      and a `<circle>` comes out an ellipse: the viewBox is stretched, which is the same reason the
@@ -1222,15 +1265,16 @@ export function sparkline(points, kind = 'river', st = null) {
      draws. Left in both places, the card printed `Last 9 h` over `3.42–5.32 m over 9 h`, which is
      one fact twice, 40px apart. The heading is a measurement rather than the `SPARK_H` cap, so a
      station watched for two hours says two hours. */
-  return SUB(`Last ${spanText(secs)}`) + `<div class="spark"${
+  return (win ? '' : SUB(`Last ${spanText(secs)}`)) + `<div class="spark"${
       has ? readout(inWin, x, v => `${v} m`, kind) : ''}>
     <svg viewBox="0 0 100 28" preserveAspectRatio="none" aria-hidden="true">
       ${defs}
       ${rules(ticks)}
       ${body}
     </svg>
+    ${peak}
     ${axisHtml(ticks)}
-    ${inWin.length > 1
+    ${inWin.length > 1 && !win   // the card states Min and Max as rows above the graph
       ? `<div class="muted">${lo0.toFixed(2)}–${hi0.toFixed(2)} m</div>` : ''}
   </div>`;
 }
@@ -1273,9 +1317,10 @@ export function sparkline(points, kind = 'river', st = null) {
    before the pointer and destructures it, so an empty array throws a TypeError on every pointermove
    across the plate. A graph with nothing to say ships no attribute, which is the same contract that
    module already states for a kind with no status. */
-export function sirenBand(points) {
+// `win` hours replaces the SPARK_H frame and drops the heading, as it does on `sparkline()`.
+export function sirenBand(points, win = 0) {
   const now = Math.floor(Date.now() / 1000);
-  const { inWin, x, ticks } = timeAxis(points || [], [now - SPARK_H * 3600, now]);
+  const { inWin, x, ticks } = timeAxis(points || [], [now - (win || SPARK_H) * 3600, now]);
 
   const rail = '<rect x="0" y="13" width="100" height="2" rx="1" style="fill:var(--s-none)"/>';
 
@@ -1300,7 +1345,7 @@ export function sirenBand(points) {
      is right.** Every other block here reads its span off the readings it holds. This one frames on
      the clock, so the ground it covers is the constant and never the record. A measured span would
      print `Last 0 min` on the 103 sirens of 212 that hold one sample. */
-  return SUB(`Last ${spanText(SPARK_H * 3600)}`) + `<div class="spark band"${
+  return (win ? '' : SUB(`Last ${spanText(SPARK_H * 3600)}`)) + `<div class="spark band"${
       inWin.length ? readout(inWin, x, v => v > 0 ? 'Sounding' : 'Quiet', 'siren') : ''}>
     <svg viewBox="0 0 100 28" preserveAspectRatio="none" aria-hidden="true">
       ${rules(ticks)}${rail}${bars}
@@ -1318,15 +1363,16 @@ export function sirenBand(points) {
 
    One bar per clock hour, because `hourly` is a rolling one-hour total — the server buckets to
    RAIN_BUCKET for the same reason, so two samples 15 minutes apart can't show the same rain twice. */
-export function rainBars(points) {
+// `win` works as it does on `sparkline()`: a fixed clock window and no heading of its own.
+export function rainBars(points, win = 0) {
   points = points || [];
   /* Always drawn, on the same rule `sparkline()` above states in full: a window needs two readings
      to have a width, and with fewer than two the clock supplies one. 18 of 231 rainfall stations
      hold no history, 16 of them because they are offline, and each printed a sentence where a
      timeline belongs. An empty plot still carries its axis and its intensity classes. */
   const now = Math.floor(Date.now() / 1000);
-  const { secs, inWin, x, ticks } = timeAxis(points,
-    points.length < 2 ? [now - SPARK_H * 3600, now] : undefined);
+  const { secs, inWin, x, ticks } = timeAxis(points, win ? [now - win * 3600, now]
+    : points.length < 2 ? [now - SPARK_H * 3600, now] : undefined);
 
   /* A dry station draws its measured zeros. It used to print `No rain in the last 11 h` instead, and
      a sentence cannot say the two things this graph says. **A measured zero and a gap in the record
@@ -1384,17 +1430,11 @@ export function rainBars(points) {
      per-sample readout while the pointer is on it, and the readout takes every other column. */
   // `reduce` with no initial value throws on an empty array, and an empty plot is now a real case.
   const pk = inWin.length ? inWin.reduce((a, b) => (b[1] > a[1] ? b : a)) : null;
-  /* The rule keeps the true column and the glyph moves off centre at the edges, rather than the
-     other way round. Rain peaking right now is the ordinary case, not an edge case — the newest
-     sample is the last column — and a centred glyph there hangs half its width outside the plate. */
   // `mm/h` and not `mm in an hour`: the per-sample readout on every other column of this same graph
   // prints `mm/h`, so three words spelled out what one unit says beside it.
-  // No mark on a dry station. `Peak 0 mm/h` names a peak that did not happen, and an amber
-  // mark on a graph with nothing to point at is the cry-wolf failure in miniature.
-  const px = pk ? +x(pk[0]) : 0;
-  const peak = !hi0 || !pk ? '' : `<b class="peak${px > 94 ? ' er' : px < 6 ? ' el' : ''}" style="left:${px}%"
-      data-tip="Peak ${pk[1]} mm/h · ${MYT_CLOCK.format(pk[0] * 1000)}"
-    ><i class="i i-keyboard_double_arrow_up"></i></b>`;
+  // No mark on a dry station. `Max 0 mm/h` names a peak that did not happen, and a mark on a graph
+  // with nothing to point at is the cry-wolf failure in miniature. See `peakMark()`.
+  const peak = !hi0 || !pk ? '' : peakMark(pk, x, `Max ${pk[1]} mm/h`);
 
   /* The heading carries the span the old caption ended with. It states the ground the graph covers,
      which is what the reader needs before reading a shape off it — and it is a measurement, not the
@@ -1402,7 +1442,7 @@ export function rainBars(points) {
      says `Last 12 h`, which is the window the clock frame gave it and the ground the empty plot
      covers. The two early returns that used to stand here are gone — a sentence about a window and
      an empty plot make the same claim, and only one of them keeps the axis and the classes. */
-  return SUB(`Last ${spanText(secs)}`) + `<div class="spark"${
+  return (win ? '' : SUB(`Last ${spanText(secs)}`)) + `<div class="spark"${
       inWin.length ? readout(inWin, x, v => `${v} mm/h`, 'rainfall') : ''}>
     <svg viewBox="0 0 100 28" preserveAspectRatio="none" aria-hidden="true">
       ${defs}
@@ -1446,7 +1486,7 @@ export function rainBars(points) {
    plumbing. `from` is `accFrom`, the oldest odometer sample this station holds, and only its PRESENCE
    is read — a gauge that publishes no running total has none, which is the one distinction the chart
    cannot draw for itself. Do not print its value. */
-export function rainAcc(acc, from) {
+export function rainAcc(acc, from, head = true) {
   if (!acc) return '';
   const rows = ACC_ROWS.map(([k, label]) => [k, label, acc[k]]);
   if (!rows.some(([, , r]) => r)) return '';
@@ -1508,7 +1548,8 @@ export function rainAcc(acc, from) {
   };
 
   // `Totals` and not `Rain totals`: the section is already headed `Rainfall` two lines up.
-  return SUB('Totals') + `<div class="acc">
+  // `head` is false inside `Trends & Totals`, which already names it. See `trendBlock()`.
+  return (head ? SUB('Totals') : '') + `<div class="acc">
     <div class="accplot">${rows.map(col).join('')}</div>
     ${/* No `.muted` on an unanswered label. `.accx` already paints every one of them `--muted`, so
           the class added no colour — and it carries `font-size: 12px`, which beat the 10px the row

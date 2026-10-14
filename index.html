@@ -93,7 +93,7 @@
      bridges M3's colour names onto this app's palette. Colour is not in this file on purpose. -->
 <link rel="stylesheet" href="vendor/m3/tokens.css?v=2">
 <link rel="stylesheet" href="css/base.css?v=203">
-<link rel="stylesheet" href="css/chrome.css?v=332">
+<link rel="stylesheet" href="css/chrome.css?v=339">
 <link rel="stylesheet" href="css/map.css?v=188">
 
 <!-- The water tint stood here until 2026-08-27. It came back on 2026-09-14 for CARTO's Dark
@@ -107,10 +107,13 @@
      which a tap-anywhere-to-dismiss surface cannot tell apart from a dismissal. Same shape as the
      other two dialogs, so it is the same object rather than a third convention. -->
 <dialog id="lightbox">
+  <!-- **A back arrow leads the title, and the × is gone**, on the repository owner's instruction of
+       2026-10-14. The arrow closes this dialog alone, so the reader lands back on the camera wall or
+       the station panel that opened it. A press on the backdrop closes the opener too. -->
   <div class="modalhead">
+    <form method="dialog"><button class="icon dclose" data-tip="Back" aria-label="Back"
+      ><i class="i i-arrow_back"></i></button></form>
     <h2 id="lbTitle"></h2>
-    <form method="dialog"><button class="icon dclose" data-tip="Close" aria-label="Close"
-      ><i class="i i-close"></i></button></form>
   </div>
   <div class="lbbody">
     <div class="spin"></div>
@@ -138,6 +141,9 @@
              label inside it was cut in half whenever the divider came near the left edge. -->
         <span class="abtime"></span>
         <span class="btime"></span>
+        <!-- Which frame of the range is on screen. js/timeline.js writes it, and live counts as the
+             last one. Below 600px the word "Frame" drops. -->
+        <span class="lbcount"><span class="lbword">Frame </span><b></b></span>
         <!-- The picture's one line of speech, shown for three seconds and gone. Two things use it:
              compare, whose gesture is a drag across a photograph and so cannot look like anything,
              and the two ends of the timeline, where a step button has nowhere left to go. Written
@@ -162,12 +168,14 @@
              width off it — the one control here that is dragged, shortened for one that is pressed. -->
         <div class="tltrack">
           <!-- The spans of the window during which a sensor within CAM_ALERT_KM was at danger, or, on
-               a river, was forecast to reach it. Painted into the seek bar itself, in the status colour. It is not
-               a scale and carries no per-frame marks: those drew a ruler nobody read, over the one
-               control here that has to be draggable. `aria-hidden` — the scrubber is the same set of
+               a river, was forecast to reach it. Painted into the seek bar itself, in the status colour. It also
+               carries one white dot per frame since 2026-10-14, placed on the clock rather than
+               spaced evenly. `aria-hidden` — the scrubber is the same set of
                positions with a proper role and keyboard handling. -->
           <div class="tlticks" aria-hidden="true"></div>
-          <input id="tlscrub" type="range" min="0" max="0" value="0" step="1" aria-label="Timeline position">
+          <!-- The time of the frame nearest the pointer, shown above the bar while it hovers. -->
+          <span class="tlpeek" hidden aria-hidden="true"></span>
+          <input id="tlscrub" type="range" min="0" max="0" value="0" step="any" aria-label="Timeline position">
         </div>
         <!-- Controls. Its own row rather than buttons beside the track: play used to be the only control
              there, and four of them plus the scrubber do not fit a 360px phone. Transport on the centre
@@ -263,39 +271,25 @@
       ><span class="w-md">KV <b>Flood Watch</b></span
       ><span class="w-sm">KV<b>FW</b></span
   ></span></h1>
-  <!-- **The bar's one leading action, and it is the search.** M3 gives a small top app bar a
-       leading slot, and a reader asked for the search there on 2026-08-25. It used to be the middle
-       item of the navigation bar. That freed the middle slot for the map layers.
-       **It keeps the id `navFind`.** `js/ui.js` binds it from the one handler table, and
-       `railSync()` writes its `aria-expanded` beside its rail twin. Both match on the suffix, so
-       neither one had to change. Only the shape did.
-       **It carries no pill and no label.** A navigation bar item names a destination in words. An
-       app bar action names itself in a tooltip, which is what every other icon in this bar does.
-       `railActive()` never reaches it either, and that is already the rule: the search is an action
-       at both widths, so it states `aria-expanded` and never `aria-current`. -->
+  <!-- **The leading slot holds the overflow menu since 2026-10-14**, on the repository owner's
+       instruction. The search held it from 2026-08-25, and it moved to the navigation bar, between
+       Table and Cameras. `popovertarget` is the whole of the wiring for this button: the browser
+       opens the menu and there is nothing in js/ui.js to keep in step. -->
+  <!-- **Each group is one absolutely positioned box.** The bar centres the brand on the WINDOW,
+       which is M3's center-aligned variant. A flex item on either end moves that mark by half its
+       own width. -->
   <div class="hlead">
-    <button class="icon" id="navFind" aria-controls="pane" aria-expanded="false"
-            data-tip="Go to a station" aria-label="Go to a station"
-      ><i class="i i-search"></i></button>
-  </div>
-  <!-- **The bar's trailing actions, as one group, and the overflow menu is the only one in it.** A
-       reader asked for the More button here on 2026-08-25. It stood in the navigation bar's fifth
-       slot, and that slot went to the location button.
-       **The theme switch is NOT here any more.** It moved into Settings, with Auto back beside
-       Light and Dark, and the rail keeps a button of its own above 600px. So this group holds one
-       control at one width and nothing moves between homes.
-       **It is one absolutely positioned box, never two.** The bar centres the brand on the WINDOW,
-       which is M3's center-aligned variant. A flex item on the trailing end moves that mark by half
-       its own width. Two separately positioned buttons need two literals that have to stay in step,
-       and a group needs one.
-       **It keeps the id `navMore`, and it is an app bar ACTION here rather than a bar item.** So it
-       draws as a plain icon button with no pill and no label, which is the shape `#navFind` already
-       takes on the other edge. `popovertarget` is the whole of the wiring: the browser opens the
-       menu and there is nothing in js/ui.js to keep in step. -->
-  <div class="hactions">
     <button class="icon" id="navMore" popovertarget="appMenu"
             data-tip="More" aria-label="More"
       ><i class="i i-more_vert"></i></button>
+  </div>
+  <!-- **The trailing slot holds the theme switch since 2026-10-14**, on the repository owner's
+       instruction. It is the rail's `#railApps` twin, and `syncThemeBtn()` in js/ui.js writes both.
+       The node does not move between homes. Each width draws its own copy. Settings still holds the
+       three-way picker, because one press cannot pick Auto. -->
+  <div class="hactions">
+    <button class="icon" id="navTheme" data-tip="Light theme" aria-label="Light theme"
+      ><i class="i i-light_mode"></i></button>
   </div>
   </header>
 <!-- **M3's overflow menu.** A navigation bar caps at five items, and this app has more destinations
@@ -384,10 +378,8 @@
   </div>
   <!-- The theme switch keeps its own button. It is a setting rather than a destination, so it sits
        under the items and takes no rail item.
-       **THE RAIL IS ITS ONLY HOME NOW.** The node used to move into the app bar's trailing group
-       below 600px, because the rail does not draw there. The picker is three rows in Settings from
-       2026-08-25, so a phone reaches the theme through More, then Settings, and this button never
-       leaves the rail.
+       **THE APP BAR HAS A TWIN OF IT SINCE 2026-10-14, `#navTheme`.** The node never moves. Below
+       600px the rail does not draw, and the twin in the app bar's trailing group answers there.
        **The glyph names the SHADE ON SCREEN, and that reverses what stood here.** It named the next
        press instead, on the argument that a reader can already see the shade they are looking at.
        The repository owner asked for the state on 2026-08-25, and Auto is why: under Auto the pick
@@ -416,13 +408,18 @@
      `railActive()` in js/map.js matches on the suffix, so the two components cannot drift apart.
      It reuses `.railpill`, `.raillabel` and `.railbadge`. One indicator, defined once. -->
 <nav id="navbar" aria-label="Main">
-  <!-- Three items. M3 states three to five for this component. -->
+  <!-- Four items. M3 states three to five for this component. -->
   <button class="navitem" id="navAlerts" aria-controls="pane" aria-expanded="false"
     ><span class="railpill"><i class="i i-warning"></i><b class="railbadge"></b></span
     ><span class="raillabel">Alerts</span></button>
   <button class="navitem" id="navTable"
     ><span class="railpill"><i class="i i-table"></i></span
     ><span class="raillabel">Table</span></button>
+  <!-- The search, since 2026-10-14. It is an action and never a destination, so it states
+       `aria-expanded` and never `aria-current`, the same as its rail twin `#railFind`. -->
+  <button class="navitem" id="navFind" aria-controls="pane" aria-expanded="false"
+    ><span class="railpill"><i class="i i-search"></i></span
+    ><span class="raillabel">Search</span></button>
   <button class="navitem" id="navCams"
     ><span class="railpill"><i class="i i-photo_camera"></i></span
     ><span class="raillabel">Cameras</span></button>
@@ -1019,16 +1016,17 @@
   <p class="muted">The <b>On alert</b> panel and the moving strip list a station for one of three
      reasons. Nothing else on this map raises an alarm.</p>
   <div class="key">
-    <span><b class="tg tg-now">HAPPENING NOW</b></span>
-    <span>A river <b>at or past its danger mark</b>, or a <b>siren sounding</b>. Observed, not
-       predicted.</span>
+    <span><i class="i i-warning" style="color:var(--s-danger);font-size:20px" role="img"
+      aria-label="Happening now"></i></span>
+    <span>A river <b>at or past its danger mark</b>, a <b>siren sounding</b>, or a <b>flood gauge
+       past 0.3 m</b>. Observed, not predicted. The section title is red.</span>
 
-    <span><b class="tg tg-soon">FORECAST</b></span>
+    <span><b>Forecast</b></span>
     <span>A river climbing fast enough to reach <b>its own danger mark within 3 hours</b>. It must
        climb at least 0.1 m an hour, and its last three readings must not dip. Anything slower is
        sensor rounding. Anything further out has too little behind it.</span>
 
-    <span><b class="tg tg-stale">NOT CURRENT</b></span>
+    <span><b>Not current</b></span>
     <span>Either of the above, from a station that has since gone quiet. It stays on the list,
        because a river at its danger mark whose telemetry died is the last thing to hide. It sorts
        to the bottom, and it counts toward no total.</span>
@@ -1202,6 +1200,9 @@
     </div>
   </div>
   <div id="warnBody"></div>
+  <!-- The valid time and the source. They sit outside the scroller, so a long bulletin never
+       scrolls them away. -->
+  <div id="warnFoot"></div>
 </dialog>
 <div id="map"></div>
 <!-- Station detail, fixed to the right edge of the viewport. It was a Leaflet popup, which is
@@ -1424,14 +1425,8 @@
      badge stood here too, and it is a chip on the map chip row since 2026-08-25. The strip stays a
      strip: it centres on the map and it is where a second standing state would go. -->
 <div id="pills">
-  <!-- ON ALERT, matching the chip on #mapchips that raises it. One name for one thing. The sentence
-       under it states what the filter does. It reads `isHot()` now, the same rule the app bar count,
-       the icon badge and the alert panel read, so the chip and the count are one number. It named
-       the forecast flag alone until 2026-08-26, and the chip then sat dead over a map full of red
-       pins. -->
-  <div id="risebadge"><i class="i i-visibility_off"></i><b>ON ALERT</b>
-    <span>Every station not on alert is hidden</span>
-    <button id="riseOff">Show all</button></div>
+  <!-- The ON ALERT pill left on 2026-10-14. The chip on #mapchips states the filter and clears it on a
+       second press, so the pill said the same thing twice. -->
 </div>
 <!-- **The legend and the credit share one row, and the credit drops under it when they do not fit.**
      A reader asked for that on 2026-08-25, with the rule that every other map element stands above

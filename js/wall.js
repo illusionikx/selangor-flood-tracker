@@ -181,9 +181,9 @@ let offline = 0;
    still the reason this page exists, so the tile still draws. What it must not do is answer a
    click: js/map.js falls through a missing coordinate to `focusOn([0, 0], 13)`, which is the
    Gulf of Guinea, and js/table.js already withholds its own jump attribute (`data-mast`) from the
-   same stations for the same reason — see the "not on the map" row in docs/FEATURES.md. `disabled`
-   keeps a keyboard reader from landing on a control that does nothing, and `.unmapped` gives the
-   second wave a hook to stop the tile looking pressable in the first place. */
+   same stations for the same reason — see the "not on the map" row in docs/FEATURES.md.
+   **Since 2026-10-14 a press opens the lightbox and never the map**, so the tile carries no
+   `disabled` any more. `.unmapped` still marks it with a dashed edge. */
 /* The first picture a tile shows.
  *
  * The archive already holds a frame for every camera a capture has reached, and shots.php has it
@@ -204,8 +204,7 @@ const tileSrc = (c, id) => STATIC ? camSrc(c) : `api.php?shot=${id}`;
 const tileHtml = c => {
   const id = c.id.split('-')[1], mapped = !!(c.lat && c.lng);
   return `<button class="camtile${mapped ? '' : ' unmapped'}"${mapped ? ` data-cam="${id}"` : ''
-    } data-lap="${id}" data-hay="${squash(`${c.name} ${c.district || ''} ${c.state || ''}`)}"${
-    mapped ? '' : ' disabled'}><img loading="lazy" alt="" src="${tileSrc(c, id)}"><span class="camname"
+    } data-lap="${id}" data-hay="${squash(`${c.name} ${c.district || ''} ${c.state || ''}`)}"><img loading="lazy" alt="" src="${tileSrc(c, id)}"><span class="camname"
     >${c.name}</span><span class="camsay"><i class="i i-warning"></i><b></b></span><span
     class="camfail"><i class="i i-videocam_off"></i><b>No picture</b></span>${
     mapped ? '' : '<span class="camnote">Not on the map</span>'}</button>`;

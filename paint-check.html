@@ -500,8 +500,8 @@ await wait(600);
 const pd = f.contentDocument, pw = f.contentWindow;
 const pel = id => pd.getElementById(id);
 const pbox = id => pel(id).getBoundingClientRect();
-pd.body.classList.add('rising');          // the state that puts #risebadge on screen
 await wait(300);
+is(pel('risebadge'), null, 'the ON ALERT pill is gone, the chip is the indication');
 
 /* **Four chips need about 440px and a compact map is 360, so the row WRAPS.** A row that scrolled
    sideways would hide the chips past its edge with nothing on screen to say they exist. */

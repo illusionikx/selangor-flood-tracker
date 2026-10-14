@@ -31,18 +31,43 @@ let parts = { head: '', sensors: '', notices: '', ns: 0, nn: 0 };
 const tabBtn = (id, label, n) => `<button class="atab${tab === id ? ' on' : ''}" data-tab="${id}"
     role="tab" aria-selected="${tab === id}">${label}<span class="atabn">${n}</span></button>`;
 
-const build = () => `${parts.head}<div class="atabs" role="tablist">${
+/* **Expand all and Collapse all are one button**, on the repository owner's instruction of
+   2026-10-14. It names the press that changes the most: Collapse all while any section on this tab
+   is open, Expand all once none is. `syncOpen()` writes its words, so they follow a fold by hand. */
+const build = () => {
+  const body = tab === 'sensors' ? parts.sensors : parts.notices;
+  return `${parts.head}<div class="atabs" role="tablist">${
     tabBtn('sensors', 'Sensors', parts.ns)}${tabBtn('notices', 'Notices', parts.nn)
-  }</div><div class="apane" role="tabpanel">${
-    tab === 'sensors' ? parts.sensors
-      : parts.notices || '<p class="empty muted">No notices.</p>'}</div>`;
+  }</div><div class="apane" role="tabpanel">${tab === 'sensors' ? parts.chips || '' : ''}${
+    body.includes('data-sec=')
+    ? '<div class="abulk"><button class="tbtn" data-bulk></button></div>' : ''}${
+    body || '<p class="empty muted">No notices.</p>'}</div>`;
+};
+
+/* The sections a reader folded, by `data-sec`. Kept here because `alerts()` rebuilds the card on
+   every poll, and a poll must not open what the reader closed. Every section is written `open`,
+   and this closes the folded ones after the card lands. One task, so nothing paints in between. */
+const closed = new Set();
+function syncOpen() {
+  const body = document.getElementById('sideBody');
+  if (!body || side.key !== KEY) return;
+  const secs = [...body.querySelectorAll('details[data-sec]')];
+  for (const d of secs) d.open = !closed.has(d.dataset.sec);
+  const bulk = body.querySelector('[data-bulk]');
+  if (!bulk) return;
+  const any = secs.some(d => d.open);
+  bulk.dataset.bulk = any ? 'collapse' : 'expand';
+  bulk.innerHTML = `<i class="i i-${any ? 'expand_less' : 'expand_more'}"></i>${
+    any ? 'Collapse all' : 'Expand all'}`;
+}
+const show = () => { openSide(KEY, card); syncOpen(); };
 
 export function setAlertTab(t) {
   if (t === tab) return;
   tab = t;
   card = build();
   if (side.key !== KEY) return;
-  openSide(KEY, card);
+  show();
   // openSide() keeps the scroll position while the key is unchanged, which is what a poll wants and
   // not what a tab swap wants: forty rows deep in Sensors leaves Notices showing a blank pane.
   const b = document.getElementById('sideBody');
@@ -50,8 +75,36 @@ export function setAlertTab(t) {
 }
 
 export function toggleAlerts() {
-  side.key === KEY ? closeSide() : openSide(KEY, card);
+  side.key === KEY ? closeSide() : show();
 }
+
+/* `toggle` does not bubble, so this listens in the capture phase. It fires for a press on a
+   summary and for `syncOpen()` setting `open` alike, and both mean the same thing here. */
+document.addEventListener('toggle', e => {
+  const d = e.target;
+  if (side.key !== KEY || !d.matches?.('#sideBody details[data-sec]')) return;
+  d.open ? closed.delete(d.dataset.sec) : closed.add(d.dataset.sec);
+  syncOpen();
+}, true);
+
+document.addEventListener('click', e => {
+  if (side.key !== KEY) return;
+  const bulk = e.target.closest('[data-bulk]');
+  if (bulk) {
+    const fold = bulk.dataset.bulk === 'collapse';
+    for (const d of document.querySelectorAll('#sideBody details[data-sec]'))
+      fold ? closed.add(d.dataset.sec) : closed.delete(d.dataset.sec);
+    return syncOpen();
+  }
+  // A chip opens its own sections and folds every other one. It sits on the Sensors tab itself.
+  const chip = e.target.closest('#sideBody [data-secs]');
+  if (!chip) return;
+  const want = chip.dataset.secs.split(' ');
+  const secs = [...document.querySelectorAll('#sideBody details[data-sec]')];
+  for (const d of secs) want.includes(d.dataset.sec) ? closed.delete(d.dataset.sec) : closed.add(d.dataset.sec);
+  syncOpen();
+  secs.find(d => want.includes(d.dataset.sec))?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+});
 
 /* How many sensors stand where this one does. The glyph in the siren list says whether a place is
    a lone siren or a mast, because those are two different things to open: a mast has a river level
@@ -86,14 +139,9 @@ const favSites = () => {
    the row wears the `layers` glyph when more than one sensor stands there.
    The titles themselves live in config.js as `ALERT_TITLE`, because the warning pill on a camera
    picture states the same phrase for the one station it names. The two must not drift. */
-const TIER_TAG = {
-  now:   '<span class="tg tg-now">HAPPENING NOW</span>',
-  // Observed, and under the top of its own scale. The words are the app's own, the ones rainState()
-  // already prints on a station card, so the panel and the card name one thing one way.
-  heavy: '<span class="tg tg-heavy">HEAVY RAIN</span>',
-  soon:  '<span class="tg tg-soon">FORECAST</span>',
-  stale: '<span class="tg tg-stale">NOT CURRENT</span>',
-};
+/* **A section title carries no tag since 2026-10-14**, on the repository owner's instruction. Every
+   ALERT_TITLE already states its tier in words: `at danger`, `Forecast to reach danger`, `Heavy
+   rain`, `not current`. A `now` section states its title in the danger red instead. */
 
 /* The right-hand column of a row: the number, and the one thing that number needs beside it to be
    read. A siren has neither — it is sounding, which the card title already said. */
@@ -107,6 +155,12 @@ function reading(s, t) {
     const when = t === 'stale' ? noSec(s.updated) || '' : '';
     return `<b class="rd">${s.hourly} mm/h${
       when ? `<br><small class="muted">${when}</small>` : ''}</b>`;
+  }
+  // A flood gauge states the depth of water over the spot. It has no level and no forecast.
+  if (s.kind === 'gauge') {
+    if (s.depth == null) return '';
+    const when = t === 'stale' ? noSec(s.updated) || '' : '';
+    return `<b class="rd">${s.depth} m${when ? `<br><small class="muted">${when}</small>` : ''}</b>`;
   }
   if (s.level == null) return '';
   const max = s.danger || s.warning || s.alert;
@@ -159,23 +213,29 @@ function groupCard(items, kind, t, hereAt) {
      alone is a code nobody was taught. The tag is the word, and CAP's certainty axis is what that
      word carries: `now` is observed, `soon` is a forecast, `stale` is a claim we cannot stand behind.
      The rows are an M3 SEGMENTED list, which is `.mseg` in `css/chrome.css`. */
-  return `<div class="alert t-${t} grouped">
-    <h3 class="nsub">${rows.length > 1 ? many : one}${TIER_TAG[t]}</h3>
-    <ul class="slist mseg">${rows.map(({ lead: s, n }) => `<li data-go="${s.id}"
+  /* **A section is a `<details>` since 2026-10-14**, so a reader can fold it. The subheader is its
+     `<summary>`, with the row count and a chevron at the trailing end. `open` is always written here.
+     `syncOpen()` closes what the reader closed, after the card lands. */
+  return `<details class="alert t-${t} grouped" data-sec="s:${t}|${kind}" open>
+    <summary class="nsub">${rows.length > 1 ? many : one}<b>${rows.length}</b
+      ><i class="i i-expand_more chev"></i></summary>
+    <ul class="slist mlist">${rows.map(({ lead: s, n }) => `<li data-go="${s.id}"
         >
         <i class="i i-${(size.get(s.site || s.id) || 1) > 1 ? 'layers' : k.icon}"></i>
         ${fav.has(s.site || s.id)
           ? '<i class="i i-favorite fvm" role="img" aria-label="Favorite"></i>' : ''}
         <span class="nm">${s.name}<br><small class="muted">${
           [s.district, s.state].filter(Boolean).join(', ')}${
-          hereAt ? ` · ${distKm(hereAt, s).toFixed(1)} km` : ''}${
           n > 1 ? ` · ${n} sensors` : ''}</small></span>
         ${reading(s, t)}
       </li>`).join('')}</ul>
     ${t === 'stale' ? `<p class="muted">These stations have stopped reporting. Each reading above is
        the last one it sent, and the situation there may have changed either way.</p>` : ''}
-  </div>`;
+  </details>`;
 }
+
+// The section a station sits in. `groupCard()` writes the same key, and a chip reads it.
+const secKey = s => `s:${tier(s)}|${s.kind}`;
 
 /* The tab mark, at the top rung only. A favicon is 16 pixels of one shape, so it can carry a state
    or a count but never both, and the count is already on the title in front of it. Red or the plain
@@ -245,8 +305,9 @@ const BANNER = {
    one at a time. The card shell this replaced put a coloured left rule and a heading block around
    each category, which is the shape of an alert and not of a message.
 
-   The category colour lives in the avatar alone now. It said the same thing three times before: a
-   left rule, a heading glyph and a heading word. `--c` is on the row, so the avatar reads it.
+   The category colour lives in the row's leading icon. It said the same thing three times before: a
+   left rule, a heading glyph and a heading word. `--c` is on the row, so the icon reads it. The icon
+   sat in a 40dp avatar disc until 2026-10-14.
 
    The preview clips to two lines with CSS, not by cutting the string. The full sentence stays in
    the DOM for a screen reader, and for anyone who copies it. That was already the rule at one line.
@@ -258,17 +319,18 @@ const BANNER = {
    Neither kind adds anything to the counts on the Sensors pane. The badge, the tab title, the tally
    glyphs and the warning glyph still read the station list alone. */
 
-// One category: a subheader carrying its own count, then its rows.
-const nsec = (b, rows, n) => rows ? `<h3 class="nsub" style="--c:${b.c}">
-      <i class="i i-${b.icon}"></i>${b.head}<b>${n}</b>
-    </h3><div class="nlist">${rows}</div>` : '';
+// One category: a subheader carrying its own count, then its rows. Foldable, like a sensor section.
+const nsec = (b, rows, n) => rows ? `<details class="nsec" data-sec="n:${b.head}" open>
+    <summary class="nsub" style="--c:${b.c}">
+      <i class="i i-${b.icon}"></i>${b.head}<b>${n}</b><i class="i i-expand_more chev"></i>
+    </summary><div class="nlist mlist">${rows}</div></details>` : '';
 
-/* One row. `time` is empty for an outage. The avatar repeats the category glyph, which is what
-   carries the colour once the shell is gone and what makes a scrolled list readable past its own
-   subheader. */
+/* One row. `time` is empty for an outage. **The leading slot is M3's leading ICON since
+   2026-10-14, not an avatar**, on the repository owner's instruction: a bare 24px glyph in the
+   category colour, with no disc behind it. The sensor rows on the other tab take the same slot. */
 const nrow = (b, tag, title, text, time) => `<button class="nrow" data-banner="${tag}"
       style="--c:${b.c}">
-      <span class="avat"><i class="i i-${b.icon}"></i></span>
+      <i class="i i-${b.icon} lead"></i>
       <span class="nbody"><b>${esc(title)}</b><span class="nprev">${esc(text)}</span></span>
       ${time ? `<time class="ntime">${esc(time)}</time>` : ''}
     </button>`;
@@ -313,9 +375,10 @@ export function alerts() {
   // Each chip counts a tier, because that is what the cards below draw. A river at its danger mark
   // and still climbing carries both flags, and counted twice it made the head promise two alerts
   // over one row. `tier()` already elected `now` for it, so the forecast chip reads `soon` alone.
-  const rising = live.filter(s => s.rising && tier(s) === 'soon').length;
-  const danger = live.filter(s => s.kind === 'river' && s.status >= 3).length;
-  const sirens = live.filter(s => s.kind === 'siren').length;
+  // Arrays, not counts: a chip names the sections its stations sit in, so a press can open them.
+  const rising = live.filter(s => s.rising && tier(s) === 'soon');
+  const danger = live.filter(s => s.kind === 'river' && s.status >= 3);
+  const sirens = live.filter(s => s.kind === 'siren');
   /* Rain needs a chip of its own, or the chips stop partitioning the list under them. No other chip
      counts it, so a heavy-rain alert used to raise the head count with nothing beside it to say what
      the alert was. It counts the KIND and not one tier, so class 3 and class 4 land in one chip.
@@ -323,8 +386,10 @@ export function alerts() {
      `heavy` cards under it carry, and a red chip over amber cards is the mismatch this rung exists
      to remove. A class 4 gauge is red in its own card and counted here all the same: the chip says
      how much rain is on the list, and the cards say how bad each one is. */
-  const rain   = live.filter(s => s.kind === 'rainfall').length;
-  const stale  = hot.length - live.length;
+  const rain   = live.filter(s => s.kind === 'rainfall');
+  // A flood gauge past its danger mark needs its own chip for the same reason rain does.
+  const flooded = live.filter(s => s.kind === 'gauge');
+  const stale  = hot.filter(s => tier(s) === 'stale');
   const hereAt = state.hereAt;
 
   /* The installed app's icon badge — the same number the tab's warning glyph is coloured by, so a
@@ -356,12 +421,20 @@ export function alerts() {
   const tally = [
     [danger, 'warning',     'at danger', STATUS_COLOR[3]],
     [sirens, 'campaign',    'sounding', STATUS_COLOR[3]],
+    [flooded, 'straighten', 'flooded', STATUS_COLOR[3]],
     [rain,   'rainy',       'in heavy rain', STATUS_COLOR[2]],
     [rising, 'expand_less', 'rising', STATUS_COLOR[2]],
     [stale,  'wifi_off',    'not current', 'var(--muted)'],
-  ].filter(([n]) => n)
-   .map(([n, icon, what, c]) => `<span class="badge" style="--c:${c}" data-tip="${n} ${what}"
-        aria-label="${n} ${what}"><i class="i i-${icon}"></i>${n}</span>`).join('');
+  ].filter(([list]) => list.length)
+   /* **A chip is a button since 2026-10-14**, on the repository owner's instruction. A press opens
+      the Sensors tab, opens the sections its stations sit in, collapses every other section and
+      scrolls to the first. `data-secs` names those sections by the same key `groupCard()` writes. */
+   .map(([list, icon, what, c]) => {
+     const n = list.length;
+     const secs = [...new Set(list.map(secKey))].join(' ');
+     return `<button class="badge" style="--c:${c}" data-secs="${secs}" data-tip="${n} ${what}"
+        aria-label="${n} ${what}. Show them"><i class="i i-${icon}"></i>${n}</button>`;
+   }).join('');
 
   /* The warning glyph carries **severity, not headcount**: red the moment one station is at its
      danger mark or one siren is sounding, amber while the worst of it is still a forecast, grey when
@@ -415,9 +488,11 @@ export function alerts() {
   const near = hot.length && hereAt
     ? `<span class="badge" style="--c:var(--muted)"><i class="i i-near_me"></i>Nearest first</span>`
     : '';
+  /* **The chips sit at the top of the Sensors tab since 2026-10-14**, on the repository owner's
+     instruction. Every chip counts sensors, so the app bar's chip line claimed them for the Notices
+     tab too. `.achips` is not `.badges`, so `openSide()` leaves the row in the body. */
   const chips = tally + near;
-  const head = `<div class="pophead"><div class="popname">On alert</div>${
-    chips ? `<div class="badges">${chips}</div>` : ''}</div>`;
+  const head = '<div class="pophead"><div class="popname">On alert</div></div>';
 
   /* The Notices pane, in category order: the outage caveat, then the flood alert, then the weather
      warning. `bannerCard()` already draws one headed card per category, so the two calls are the
@@ -429,9 +504,10 @@ export function alerts() {
   // counted either — the tab must name what the pane holds.
   const nn = (state.notices || []).filter(w => NOTICE[w.id]).length + (state.warnings || []).length;
   const write = body => {
-    parts = { head, sensors: body, notices: noticeHtml + warnHtml, ns: hot.length, nn };
+    parts = { head, chips: chips && `<div class="achips">${chips}</div>`,
+              sensors: body, notices: noticeHtml + warnHtml, ns: hot.length, nn };
     card = build();
-    if (side.key === KEY) openSide(KEY, card);
+    if (side.key === KEY) show();
   };
 
   if (!hot.length) {

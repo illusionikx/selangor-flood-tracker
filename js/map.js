@@ -673,11 +673,25 @@ export function markSel(key) {
    refreshes it in place instead of closing it — see the tail of render(). */
 export const side = { key: null };
 
+/* The station panel's folded sections, by `data-sensor`. `render()` rebuilds the open card on every
+   poll, and a poll must not open what the reader folded. Every section is written `open`, and this
+   closes the folded ones in the same task the card lands in, so nothing paints in between. The alert
+   panel keeps its own set by `data-sec`, which is the same rule. Kept for the session only. */
+const folded = new Set();
+document.addEventListener('toggle', e => {
+  const d = e.target;
+  if (!d.matches?.('#sideBody details.sensor[data-sensor]')) return;
+  d.open ? folded.delete(d.dataset.sensor) : folded.add(d.dataset.sensor);
+}, true);   // `toggle` does not bubble
+
 export function openSide(key, html, mastAt) {
   const body = el('sideBody');
   const moved = side.key !== key;
   side.key = key;
   body.innerHTML = html;
+  for (const d of body.querySelectorAll('details.sensor[data-sensor]')) {
+    if (folded.has(d.dataset.sensor)) d.open = false;
+  }
   /* Lift the place out of the scrolling box. The card is one string — the template has no idea it
      is being split — so the split happens here, on the one element that is always its first child.
      A column of readings whose station name has scrolled off is unreadable, and a five-sensor mast
@@ -792,6 +806,16 @@ el('sideClose').onclick = closeSide;
    nothing left to compensate for and both terms are gone. */
 export function focusOn(latlng, minZoom = 0) {
   map.setView(latlng, Math.max(map.getZoom(), minZoom));
+}
+
+/* Frame every pin the map draws now. A pin filter turning on is a request to see what it kept, and a
+   view left where it was can hold none of it. One pin gets `lone` as its zoom, because a fit of a
+   single point zooms to the ceiling. The top padding clears the chip row over the map. */
+export function fitMarks(lone = 13) {
+  const pts = [...siteMark.values()].map(m => m.getLatLng());
+  if (!pts.length) return;
+  if (pts.length === 1) return focusOn(pts[0], lone);
+  map.fitBounds(L.latLngBounds(pts), { paddingTopLeft: [48, 96], paddingBottomRight: [48, 48], maxZoom: 14 });
 }
 
 // Fly to a station and ripple over it. If its layer is switched off, show it for the flash only —

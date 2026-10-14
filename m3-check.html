@@ -162,24 +162,26 @@ KG BARU · 2.1 km"></button>
     <div class="badges"><span class="badge" style="--c:var(--k-river)"
       ><i class="i i-water_drop"></i>Water level</span></div>
   </div>
-  <div class="sensor" data-sensor="a">
-    <div class="sensorhead">
+  <details class="sensor" data-sensor="a" open>
+    <summary class="sensorhead">
       <i class="glyph i i-water_drop" style="color:var(--k-river)"></i>
       <b>Water level</b>
       <span class="muted">SG. DAMANSARA</span>
-    </div>
+      <i class="i i-expand_more chev"></i>
+    </summary>
     <ul class="sbody">
       <li><div class="subhead">Right now</div><div class="state">3.42 m</div></li>
-      <li><div class="subhead">Last 9 h</div><div class="spark"></div></li>
+      <li><div class="subhead">Trend</div><div class="spark"></div></li>
     </ul>
-  </div>
-  <div class="sensor" data-sensor="b">
-    <div class="sensorhead">
+  </details>
+  <details class="sensor" data-sensor="b" open>
+    <summary class="sensorhead">
       <i class="glyph i i-rainy" style="color:var(--k-rainfall)"></i>
       <b>Rainfall</b>
-    </div>
+      <i class="i i-expand_more chev"></i>
+    </summary>
     <ul class="sbody"><li><div class="subhead">Right now</div><div class="state">0.0 mm/h</div></li></ul>
-  </div>`;
+  </details>`;
 /* `JSON.stringify` rather than a nested template literal: the card is HTML with quotes in it, and
    the escaping of a template inside a template inside an injected module is the kind of thing that
    fails at parse time and prints nothing at all. */
@@ -481,10 +483,13 @@ async function phone() {
   is(!!hact, true, 'phone: the app bar carries a trailing action group');
   is(cs(hact).position, 'absolute',
      'phone: out of flow, so the centred brand never sees it');
-  is([...hact.children].map(c => c.id).filter(Boolean).join(','), 'navMore',
-     'phone: the overflow menu alone, because the theme picker moved into Settings');
+  is([...hact.children].map(c => c.id).filter(Boolean).join(','), 'navTheme',
+     'phone: the theme switch alone, on the repository owner\'s instruction of 2026-10-14');
   is(d.getElementById('railApps').closest('header'), null,
-     'phone: and the theme switch stays in the rail, with no second home to keep in step');
+     'phone: and the rail keeps its own theme button rather than lending it');
+  is(d.getElementById('navTheme').getAttribute('aria-label'),
+     d.getElementById('railApps').getAttribute('aria-label'),
+     'phone: the two theme buttons state one answer, because one function writes both');
   is(d.getElementById('navMore').getAttribute('popovertarget'), 'appMenu',
      'phone: the overflow opens the menu, with no handler to keep in step');
   is(d.getElementById('apps'), null,
@@ -506,13 +511,13 @@ async function phone() {
   is(!!hlead, true, 'phone: the app bar carries a leading action group');
   is(cs(hlead).position, 'absolute',
      'phone: out of flow, so the centred brand never sees it either');
-  is([...hlead.children].map(c => c.id).filter(Boolean).join(','), 'navFind',
-     'phone: holding the search, and nothing else');
+  is([...hlead.children].map(c => c.id).filter(Boolean).join(','), 'navMore',
+     'phone: holding the overflow menu since 2026-10-14, and nothing else');
   const leadGlyph = r(hlead.firstElementChild.querySelector('.i'));
   is(Math.round((leadGlyph.left + leadGlyph.right) / 2), 28,
      'phone: its glyph centre sits 28px inside the leading edge');
-  is(d.getElementById('navFind').closest('#navbar'), null,
-     'phone: and it left the navigation bar, which is what freed the middle slot');
+  is(!!d.getElementById('navFind').closest('#navbar'), true,
+     'phone: and the search is a navigation bar item again');
 
   /* --- the navigation bar ---
      M3 states no rail below 600px, and 80px of a 360px screen is 22% of it. The bar holds the same
@@ -527,8 +532,8 @@ async function phone() {
   is(cs(nav).display !== 'none', true, 'phone: and it is not merely in the markup');
   is(Math.round(r(nav).height), 64, 'phone: M3 navigation bar, 64dp with no safe-area inset');
   is([...nav.querySelectorAll('.navitem')].map(b => b.id).join(','),
-     'navAlerts,navTable,navCams',
-     'phone: three items, inside the three-to-five M3 states for this component');
+     'navAlerts,navTable,navFind,navCams',
+     'phone: four items, the search between Table and Cameras, inside M3\'s three to five');
   /* **There is no location item.** It held a slot from 2026-08-25 to 2026-09-15. A reader deleted
      it when `#locate` became a cell of the zoom control at every width. */
   is(d.getElementById('navLocate'), null,
@@ -908,6 +913,7 @@ async function desktop() {
      'the pane on M3 duration-short2, the rail on duration-extra-short3');
   is(mapCs.transitionTimingFunction, `${M3_EASE}, ${M3_EASE}`,
      'one easing on each edge — --m3-travel and --m3-rail cite the same M3 curve');
+  is(mapCs.boxShadow !== 'none', true, 'the map card is M3\'s elevated card, at elevation level 1');
 
   /* The app bar's own leading edge reads the same rail motion, so it never overlaps the rail as the
      rail's width changes. Same rule, same file: read before `settle()` switches transitions off. */
@@ -1659,10 +1665,17 @@ async function desktop() {
   const secs = [...d.querySelectorAll('#sideBody > .sensor')];
   is(secs.length, 2, 'the body holds one item per sensor');
   is(cs(secs[0]).borderTopWidth + cs(secs[0]).boxShadow, '0pxnone',
-     'the group paints no rule and no elevation, or the two sections are a double line');
-  is(cs(secs[0]).backgroundColor, 'rgba(0, 0, 0, 0)',
-     'and no fill either: the segments under it carry the containers now');
-  is(Math.round(r(secs[1]).top - r(secs[0]).bottom), 8, 'sensors separate by a gap, not by a rule');
+     'the FIRST section paints no rule and no elevation, or it doubles the header');
+  is(cs(secs[0]).backgroundColor, 'rgba(0, 0, 0, 0)', 'and no fill either');
+  /* **Since 2026-10-14 the card follows the alert panel's list**: a full-width divider opens every
+     section after the first, and every section folds. `.apane details + details` is the rule one
+     pane over. */
+  is(cs(secs[1]).borderTopWidth, '1px', 'every later section opens on a divider');
+  is(secs.every(x => x.tagName === 'DETAILS' && x.open), true, 'each section is an open <details>');
+  is(secs.every(x => x.querySelector(':scope > summary.sensorhead .chev')), true,
+     'its head is the <summary>, with a chevron at the trailing end');
+  is(cs(secs[0].querySelector('summary')).listStyleType, 'none', 'and no browser marker');
+  is(Math.round(r(secs[1]).top - r(secs[0]).bottom), 8, 'sensors stand 8px apart');
   /* `.pophead` is gone, so the first item leads the body and there is no sibling left to measure
      it against. The sheet's own 12px padding plus the 8px every item carries is what clears it, so
      the assertion is that arithmetic rather than the 20 it comes to. A change to either number is
@@ -1691,29 +1704,25 @@ async function desktop() {
   is(cs(head.querySelector('b')).fontWeight, '400',
      'the headline is body-large in the REGULAR weight, the rule `.nrow b` already states');
 
-  /* The readings, as M3 segmented. The group takes one shape: a 4dp inner corner on every segment,
-     and the 16dp outer one on the ends alone. Assert the ENDS, because a group whose every corner
-     is 16dp reads as a stack of cards and is the shape this replaced. */
+  /* The readings, as M3's STANDARD list since 2026-10-14. It was segmented, and these assertions
+     guard the deletion: a half-finished revert draws one filled block and one bare item, and
+     neither errors. */
   const segs = [...secs[0].querySelectorAll('.sbody > li')];
-  is(segs.length > 1, true, 'a river draws several segments, one per block it holds');
-  is(cs(segs[0]).borderTopLeftRadius, '16px', 'the first segment takes the outer corner');
-  is(cs(segs[0]).borderBottomLeftRadius, '4px', 'and the inner one where the next segment meets it');
-  is(cs(segs.at(-1)).borderBottomLeftRadius, '16px', 'the last one takes the outer corner below');
-  is(cs(segs[0]).backgroundColor !== cs(d.getElementById('side')).backgroundColor, true,
-     'each segment is a filled container, or the group is invisible');
-  is(Math.round(r(segs[1]).top - r(segs[0]).bottom), 2,
-     'and they read as one block at M3 own 2px, never at the 8px `.mseg` takes');
-  /* **Every segment in a group of several carries a title, and it leads the segment.** A meter, a
-     metric row and a graph each answer a different question, and the title is what says which. The
-     first line inside a segment cancels its own top margin: the item states 12px of padding, and a
-     10px margin over that first line stands it 22px down. A group of ONE takes no title, because
-     the head above it already named the only thing under it — the camera is the kind that reaches
-     that, and the node harness in CLAUDE.md holds both halves over the live payload. */
+  is(segs.length > 1, true, 'a river draws several items, one per block it holds');
+  is(segs.every(x => cs(x).backgroundColor === 'rgba(0, 0, 0, 0)'), true,
+     'no item is a filled container: the segments are gone');
+  is(segs.every(x => cs(x).borderTopLeftRadius === '0px'), true, 'and no item carries a corner');
+  is(Math.round(r(segs[1]).top - r(segs[0]).bottom), 0, 'items stand on their own padding, no gap');
+  /* **Every item in a group of several carries a title, and it leads the item.** A meter, a metric
+     row and a graph each answer a different question, and the title is what says which. The first
+     line inside an item cancels its own top margin, or it stands 10px under the item's own padding.
+     A group of ONE takes no title, because the head above it already named the only thing under it
+     — the camera is the kind that reaches that, and the node harness in CLAUDE.md holds both halves
+     over the live payload. */
   const heads = segs.map(x => x.firstElementChild);
   is(heads.every(h => h && h.classList.contains('subhead')), true,
-     'each segment leads with its own title');
-  is(cs(heads[0]).marginTop, '0px',
-     'and that title cancels its top margin, or it stands 22px inside a 12px segment');
+     'each item leads with its own title');
+  is(cs(heads[0]).marginTop, '0px', 'and that title cancels its top margin');
   /* **A pinned header needs a height of its own.** `.modalhead` was written as a row in the flow, so
      it sized to its title and pulled its close button back onto that line with a negative margin on
      all four sides. Pinning it made it a bar with a divider, and the vertical pull then hung the
@@ -2271,15 +2280,17 @@ async function desktop() {
    The markup is fixed rather than taken from the live payload, the same rule `CARD` above states.
    That the real `groupCard()` emits these classes is asserted in CLAUDE.md's Verify block, which
    reads `js/alerts.js` as source. Neither half is enough alone. */
-const ALERT_CARD = `<div class="pophead"><div class="popname">On alert</div>
-    <div class="badges">
-      <span class="badge" style="--c:var(--s-danger)" data-tip="2 at danger" aria-label="2 at danger"
-        ><i class="i i-warning"></i>2</span>
+const ALERT_CARD = `<div class="pophead"><div class="popname">On alert</div></div>
+  <div class="apane">
+    <div class="achips">
+      <button class="badge" style="--c:var(--s-danger)" data-secs="s:now|river"
+        data-tip="2 at danger" aria-label="2 at danger. Show them"><i class="i i-warning"></i>2</button>
       <span class="badge" style="--c:var(--muted)"><i class="i i-near_me"></i>Nearest first</span>
-    </div></div>
-  <div class="alert t-now grouped">
-    <h3 class="nsub">Water levels at danger<span class="tg tg-now">HAPPENING NOW</span></h3>
-    <ul class="slist mseg">
+    </div>
+  <details class="alert t-now grouped" data-sec="s:now|river" open>
+    <summary class="nsub">Water levels at danger<b>3</b
+      ><i class="i i-expand_more chev"></i></summary>
+    <ul class="slist mlist">
       <li data-go="a"><i class="i i-water_drop"></i>
         <span class="nm">SG A<br><small class="muted">Shah Alam, Selangor</small></span>
         <b class="rd">5.32 m</b></li>
@@ -2290,6 +2301,7 @@ const ALERT_CARD = `<div class="pophead"><div class="popname">On alert</div>
         <span class="nm">SG C<br><small class="muted">Klang, Selangor</small></span>
         <b class="rd">2.04 m</b></li>
     </ul>
+  </details>
   </div>`;
 
 async function alertPane() {
@@ -2308,10 +2320,13 @@ async function alertPane() {
      so the seam was never removed, and an empty seam still draws its own bottom margin.
      `Nearest first` was a muted fragment INSIDE `.popname`, which this function lifts whole into
      the headline. A 32dp chip inside a headline is not a chip, so it had to leave the title. */
+  /* **The chips moved into the Sensors tab on 2026-10-14**, on the repository owner's instruction.
+     Every chip counts sensors, and the app bar's chip line claimed them for the Notices tab as
+     well. `.achips` is not `.badges`, so `openSide()` leaves the row in the body. */
   const kinds = d.getElementById('sideKinds');
-  const headChips = [...kinds.querySelectorAll('.badge')];
-  is(headChips.length, 2, 'alert head: the counts and Nearest first were lifted into the app bar');
-  is(!!kinds.querySelector('.badges'), true, 'alert head: as one .badges row, not loose chips');
+  const headChips = [...d.querySelectorAll('#sideBody .apane > .achips > .badge')];
+  is(headChips.length, 2, 'alert chips: the counts and Nearest first sit in the Sensors pane');
+  is(kinds.querySelectorAll('.badge').length, 0, 'alert chips: and none was lifted into the app bar');
   is(cs(headChips[0]).height, '32px', 'alert head: a count is an M3 assist chip');
   is(cs(headChips[0]).textTransform, 'none', 'alert head: not the 12px pill it replaced');
   /* The colour splits M3's way. A count whose NUMBER is painted by the status reads as a reading,
@@ -2346,7 +2361,11 @@ async function alertPane() {
      24dp leading glyph. */
   const sub = d.querySelector('.alert .nsub');
   is(!!sub, true, 'alert group: it heads itself with a list subheader');
-  is(cs(sub).minHeight, '48px', 'alert subheader: M3 48dp');
+  // M3's list subheader: title-small, 48dp, on the rows' 16px inset. title-large was too big (2026-10-14).
+  is(cs(sub).minHeight + ' ' + cs(sub).fontSize + ' ' + cs(sub).paddingLeft, '48px 14px 16px',
+     'alert section header: M3 48dp subheader, title-small, on the rows\' own leading inset');
+  is(cs(sub).color !== cs(d.getElementById('sideBody')).color, true,
+     'alert section header: in on-surface-variant, not the row ink');
   is(cs(sub).fontSize, cs(d.querySelector('.nsub')).fontSize,
      'alert subheader: the same title-small the Notices pane takes');
   /* **NO GLYPH AND NO DISC, and this is the third shape the head has had.** A tier-coloured glyph
@@ -2356,39 +2375,51 @@ async function alertPane() {
      M3's list subheader is a label and nothing else, so this is the component and not a divergence.
      **The Notices pane keeps its own glyph**, so the absence is asserted on this subheader alone —
      a rule written against `.nsub` reaches both panes. */
-  is(sub.querySelectorAll('.i').length, 0, 'alert subheader: no glyph, this pane states the kind in words');
+  is(sub.querySelectorAll('.i:not(.chev, .tnow)').length, 0,
+     'alert subheader: no kind glyph, this pane states the kind in words');
+  /* **A section folds since 2026-10-14.** It is a `<details>` and the subheader is its `<summary>`,
+     with a trailing chevron that turns while open, and a chip is a button that names its section. */
+  is(card.tagName + ' ' + sub.tagName, 'DETAILS SUMMARY', 'alert section: a details, headed by its summary');
+  is(cs(sub).listStyleType, 'none', 'alert section: no browser marker, the chevron replaces it');
+  is(!!sub.querySelector('.chev'), true, 'alert section: a trailing chevron');
+  is(cs(sub.querySelector('.chev')).transform !== 'none', true, 'alert section: turned while open');
+  is(headChips[0].tagName + ' ' + headChips[0].dataset.secs, 'BUTTON s:now|river',
+     'alert head: a count chip is a button that names its own section');
   is(!!sub.querySelector('.avat'), false, 'alert subheader: and no disc around one');
   is(!!d.querySelector('.nlist') || !!d.querySelector('.nrow'), false,
      'alert subheader: the Notices pane is not on screen, so its own glyph is untouched here');
-  // It wraps rather than squashing. A 302px row holds a 24px glyph, a title and a ~100px tag.
-  is(cs(sub).flexWrap, 'wrap', 'alert subheader: wraps rather than squashing its own tag');
-  /* The tag stays. The rule was colour and colour alone is a code nobody was taught, so the word is
-     what carries CAP's certainty axis. Its own 6px margin is cancelled: the flex gap states the
-     space once. */
-  const tg = sub.querySelector('.tg');
-  is(!!tg, true, 'alert subheader: the tier tag stays, because it is the word and not the rule');
-  is(cs(tg).marginLeft, '0px', 'alert subheader: and the flex gap spaces it, not its own margin');
+  /* One line since 2026-10-14. The row wrapped for a tag that is gone, and it could drop the chevron
+     under the title. The title text wraps inside its own box instead. */
+  is(cs(sub).flexWrap, 'nowrap', 'alert section header: one row, so the chevron stays beside the title');
+  /* **HAPPENING NOW and FORECAST are gone since 2026-10-14**, on the repository owner's instruction.
+     The title carries the tier in words, `at danger` against `Forecast to reach danger`. A `now`
+     section states its title in the danger red, and no triangle leads it. */
+  is(!!sub.querySelector('.tg'), false, 'alert subheader: no HAPPENING NOW tag');
+  is(!!sub.querySelector('.tnow'), false, 'alert subheader: no triangle, the text carries the colour');
+  const probe = d.createElement('i'); probe.style.color = 'var(--s-danger)'; d.body.appendChild(probe);
+  is(cs(sub).color, cs(probe).color, 'alert subheader: a now section reads in the danger red');
+  probe.remove();
+  is(cs(sub.querySelector('b')).color !== cs(sub).color, true, 'alert subheader: the count stays quiet');
 
-  /* M3's LIST at `appearance: segmented`. The container, the two corners and the typescale come
-     from `.mseg`, which Settings draws from as well. */
+  /* M3's STANDARD list since 2026-10-14, on the repository owner's instruction. It was the
+     segmented one. A standard item has no container, no corner and no gap between rows. */
   const ul = d.querySelector('.slist');
-  is(ul.classList.contains('mseg'), true, 'alert list: it declares itself segmented');
+  is(ul.classList.contains('mlist') && !ul.classList.contains('mseg'), true,
+     'alert list: it declares itself standard, never segmented');
   is(cs(ul).display + ' ' + cs(ul).flexDirection, 'flex column', 'alert list: a flex column');
-  is(cs(ul).gap, '8px', 'alert list: 8px between rows');
+  is(cs(ul).gap, 'normal', 'alert list: no gap between rows');
   is(cs(ul).listStyleType, 'none', 'alert list: no marker');
   is(cs(ul).padding + ' ' + cs(ul).margin, '0px 0px', 'alert list: and no box of its own');
 
   const li = [...ul.querySelectorAll('li')];
-  is(li.length, 3, 'alert list: three rows to measure the group shape on');
+  is(li.length, 3, 'alert list: three rows to measure on');
   is(cs(li[0]).minHeight, '72px', 'alert row: M3 two-line item');
-  is(cs(li[0]).padding, '8px 16px', 'alert row: M3 layout padding');
+  is(cs(li[0]).padding, '8px 24px 8px 16px', 'alert row: M3 standard padding, 16 leading and 24 trailing');
   is(cs(li[0]).gap, '16px', 'alert row: M3 layout gap');
   is(cs(li[0]).fontSize, '16px', 'alert row: body-large headline');
-  /* The GROUP is one shape. Read all three, because a first-and-last-only rule and an every-row rule
-     agree on a list of one and disagree on a list of three. */
-  is(cs(li[0]).borderRadius, '16px 16px 4px 4px', 'alert group: 16dp on the top, 4dp inside');
-  is(cs(li[1]).borderRadius, '4px', 'alert group: a middle row is 4dp all round');
-  is(cs(li[2]).borderRadius, '4px 4px 16px 16px', 'alert group: 16dp on the bottom');
+  // Read all three: a rule on the first or last row alone would agree on a list of one.
+  is(li.map(x => cs(x).borderRadius + ' ' + cs(x).backgroundColor).join(','),
+     Array(3).fill('0px rgba(0, 0, 0, 0)').join(','), 'alert rows: no corner and no container fill');
 
   // M3's three slots. Leading is a 24dp glyph, trailing is 48dp, and the supporting line is
   // body-medium. `.muted` carries a size of its own, so that last one is the trap CLAUDE.md records.
@@ -2711,11 +2742,18 @@ async function panelInset(frame, label) {
     const body = id === 'dataBox'
       ? b.querySelector('table.data .chead th:first-child') || b.querySelector('table.data')
       : d.getElementById('camGrid');
-    /* The table may hold no rows yet, because js/table.js is deferred. So read the box's own
-       padding rather than a cell that may not exist. */
+    /* The table may hold no rows yet, because js/table.js is deferred. So read the name
+       column's own RULE rather than a cell that may not exist. The inset left `table.data` on
+       2026-10-14: a sticky cell pins to the scroller's padding edge, and the readings showed
+       through the strip it left. */
+    const nmRule = sheetRules(d, 'chrome')
+      .find(x => x.selectorText === 'table.data td.nm, table.data .chead th:first-child');
     const pad = id === 'dataBox'
-      ? parseFloat(cs(b.querySelector('table.data')).paddingLeft)
+      ? (nmRule && nmRule.style.paddingLeft === 'var(--pane)' ? 16 : NaN)
       : parseFloat(cs(body).paddingLeft);
+    if (id === 'dataBox')
+      is(cs(b.querySelector('table.data')).paddingLeft, '0px',
+         id + ': the scroller carries no inset, so nothing scrolls past the frozen column');
     is(pad, 16, id + ': the body inset is 16px');
     is(parseFloat(cs(b).getPropertyValue('--pane')), 16, id + ': --pane is 16px');
     b.close();
@@ -2999,8 +3037,17 @@ async function cellPills() {
   const pane = cs(b).getPropertyValue('--pane').trim();
   const td = d.querySelector('table.data td.k');
   is(cs(td).paddingLeft, pane, "the cell's own inset equals --pane");
-  is(cs(d.querySelector('table.data')).paddingLeft, pane,
-     'and matches the gap at the table’s own left edge');
+  d.getElementById('dataHead').innerHTML = HEAD;
+  is(cs(d.querySelector('table.data .chead th:first-child')).paddingLeft, pane,
+     'and matches the inset on the frozen name column');
+
+  /* **The frozen column sits flush on the scroller's edge after a sideways scroll.** A gap there
+     is a strip the readings scroll through, and a reader saw them again left of the name. */
+  const tbl = d.querySelector('table.data');
+  tbl.scrollLeft = 200;
+  is(Math.round(r(d.querySelector('table.data .chead th:first-child')).left - r(tbl).left), 0,
+     'the frozen name column pins to the scroller edge, with no strip to its left');
+  tbl.scrollLeft = 0;
 
   /* **Every column head sits over its own cell, and this went wrong in silence.** The head and
      the body are two separate `display: table` boxes, so each ran its own auto-layout pass over
@@ -3148,8 +3195,17 @@ async function warnBody() {
   is(r(body).height > 100, true, 'so the body has real height under the headline');
   is(body.scrollHeight > body.clientHeight, true, 'and a long bulletin still scrolls inside it');
   is(r(body).bottom <= Math.round(r(box).bottom) + 1, true, 'and never runs out of the dialog');
+  // The title pins to the top and the foot sits under the scroller, so neither scrolls away.
+  const foot = d.getElementById('warnFoot'), h3 = body.querySelector('h3');
+  foot.innerHTML = '<p>Valid probe</p>';
+  await settled();
+  body.scrollTop = body.scrollHeight;
+  await settled();
+  is(Math.abs(r(h3).top - r(body).top) <= 1, true, 'the bulletin title stays at the top of a scrolled body');
+  is(r(foot).top >= r(body).bottom - 1 && r(foot).bottom <= Math.round(r(box).bottom) + 1, true,
+     'and the valid time stays under it, inside the dialog');
   box.close();
-  body.innerHTML = '';
+  body.innerHTML = foot.innerHTML = '';
 }
 
 (async () => {

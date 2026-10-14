@@ -27,7 +27,7 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `title-test.html` | `chrome --headless --dump-dom` — one of eight runnable checks. Guards the wordmark ladder in both of the heading's homes, the app bar and the navigation rail, in rendered pixels |
 | `narrow-test.html` | `chrome --headless --dump-dom` — one of eight runnable checks. Guards the narrow-window block: its threshold, its coverage, its refusal to be dismissed, and that it is modal |
 | `paint-check.html` | `chrome --headless --dump-dom` — one of eight runnable checks. Guards the layer chips over the map: that the panel and its two openers are gone, that the filters panel and every district id are gone too, that a menu chip states its own value and a filter chip carries a checkmark, that the heatmap and the two filters leave with the station layer, that a filter chip clears itself on a second press, that nothing else on the map lands on the row, and that below 600px the row wraps rather than scrolling |
-| `m3-check.html` | `chrome --headless --dump-dom` — one of eight runnable checks. Guards every M3 surface in rendered pixels: the nine dialogs against the roll call and the kind each is declared as, the four-band ladder, the map as an inset card, the one motion that changes what the pane holds, the supporting pane's headers and all six dialog headers as one M3 medium flexible top app bar, measured against each other at both widths, the supporting pane at M3's canonical ratios with the map giving up exactly that width, the pane as a side sheet above 600px and a full-screen dialog below it, and the station panel as an M3 list, one item per sensor, with its readings as a segmented list under a 24px kind glyph. Also the navigation rail at both its widths, the navigation bar below 600px, and that every enter carries M3's own duration and easing. Also the table dialog and the camera wall. Both take the one inset, shared by the search bar, the count line and the grid. The search bar states its own 56px shape. The sort target reaches 56dp. A tile states its container tone and a 12dp corner. The check also guards the two deletions, so a half-finished revert cannot ship silently. Also the warning dialog's body, as a declaration and in pixels, because Blink draws its broken rule and its fixed rule the same way |
+| `m3-check.html` | `chrome --headless --dump-dom` — one of eight runnable checks. Guards every M3 surface in rendered pixels: the nine dialogs against the roll call and the kind each is declared as, the four-band ladder, the map as an inset card, the one motion that changes what the pane holds, the supporting pane's headers and all six dialog headers as one M3 medium flexible top app bar, measured against each other at both widths, the supporting pane at M3's canonical ratios with the map giving up exactly that width, the pane as a side sheet above 600px and a full-screen dialog below it, and the station panel as an M3 list, one item per sensor, with its readings as a standard list under a 24px kind glyph, each section a folding <details> opened by a divider. Also the navigation rail at both its widths, the navigation bar below 600px, and that every enter carries M3's own duration and easing. Also the table dialog and the camera wall. Both take the one inset, shared by the search bar, the count line and the grid. The search bar states its own 56px shape. The sort target reaches 56dp. A tile states its container tone and a 12dp corner. The check also guards the two deletions, so a half-finished revert cannot ship silently. Also the warning dialog's body, as a declaration and in pixels, because Blink draws its broken rule and its fixed rule the same way |
 | `kind-color-lab.html` | the station kind palette, derived in OKLCh at load. **Not a check** — it renders for a person to read, and it prints no verdict. It fetches `css/base.css` and reports whether the app still holds what the rule builds, so open it after any palette edit. It was seven competing options until 2026-08-26 and holds one palette now |
 | `css/icons.css` | every icon, as an SVG mask. Generated — see docs/FEATURES.md for the fetch |
 | `css/base.css` | tokens, reset, controls, blocks shared by popup + alert panel |
@@ -315,6 +315,8 @@ missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
   Those totals live in the `level` table under `#c` and `#d` suffixes. So there is no schema change,
   and `RETAIN` prunes them with the rest.
   `ACC_READ` (80 h) is their own load window, because `READ` is 24 h and too short.
+- **Every siren carries `lastOn`**, the unix time of its last stored 1 in `.history.db`, or null.
+  The card's `Last triggered` row reads it. `history` holds 12 hours and cannot answer.
 - Response also carries real diagnostics used by the status popover: `tookMs`, `details.ok/requested`,
   `offline`, `cacheAge`, `sourceUpdated`.
 - **`?place=<query>` — the go-to box's place search.** It proxies OpenStreetMap Nominatim
@@ -792,7 +794,7 @@ order that file holds them. A trap names itself here, and the file states the ev
   for peer destinations that share a container, and these three are that. This app ran it for one
   revision. A reader met it beside the station swap inside `#side` and asked for one motion.
   `--m3-swap` is that motion, and both events read it.
-  **No surface in this layout carries a dividing line.** Not the card, not the app bar, not the pane.
+  **No surface in this layout carries a dividing line, except inside the pane.** Not the card, not the app bar, not the pane edge. The alert panel and the station panel separate their sections with a divider, on the repository owner's instruction of 2026-10-14.
   **In a compact window the supporting pane is a full-screen destination.** That is what
   `SupportingPaneScaffold` does in the Compose adaptive library, and it is why `#pane` is a
   `<dialog>`: `showModal()` below 600px, `show()` above it.
@@ -913,8 +915,10 @@ order that file holds them. A trap names itself here, and the file states the ev
   map's corner read as a map pin. An accent FAB with a label shouted. Then a panel behind a `layers`
   button, then a bottom sheet on a phone, then connected button groups inside that panel, then size-lg
   square outlined buttons. Each one put a settings dialog between a reader and a setting.
-- **`#risebadge` reads `ON ALERT` and the chip that raises it filters on `isHot()`, WHICH REVERSES
-  THIS ENTRY.** It filtered on `s.rising` alone from 2026-08-18. That flag is a forecast about one
+- **The `ON ALERT` chip filters on `isHot()`, WHICH REVERSES THIS ENTRY.** **`#risebadge`, the blue
+  pill that said so over the map, was deleted on 2026-10-14** on the repository owner's instruction.
+  The chip lights while the filter holds and clears on a second press, so the chip row is the
+  standing indication now. The paragraph below describes the pill in the past tense. It filtered on `s.rising` alone from 2026-08-18. That flag is a forecast about one
   river, and `isHot()` is what the app bar counts, the icon badge shows and the alert panel lists. So
   a sounding siren, a river already at its danger mark and heavy rain each lit the map and left the
   chip DEAD, because `syncPins()` disables a filter with no members. A reader met that on 2026-08-26
@@ -1060,10 +1064,8 @@ order that file holds them. A trap names itself here, and the file states the ev
   light.` against `Dark theme. Switch to light.`
   **One press sets an explicit shade, which LEAVES Auto.** A button cannot cycle three values without
   becoming a control that has to be pressed twice to be read. Settings is where Auto comes back.
-  **The rail is that button's only home.** It travelled into the app bar's trailing group below
-  600px, because the rail is `display: none` there and a phone otherwise carried no theme control.
-  The picker answers that now, so `place()` in `js/ui.js` moves `#brand` and `#findpane` and nothing
-  else.
+  **Below 600px the app bar carries a twin, `#navTheme`, since 2026-10-14.** The node never moves.
+  `place()` in `js/ui.js` moves `#brand` and `#findpane` and nothing else.
   **`syncThemeBtn()` in `js/ui.js` is the one writer, and it writes BOTH surfaces.** It draws the
   button and checks the matching row, from `PREFS.theme` and never from a control. So the rows and
   the button cannot report two answers, whichever of the two a reader pressed. That is the rule this
@@ -1079,10 +1081,9 @@ order that file holds them. A trap names itself here, and the file states the ev
   it through a capture-phase handler in `js/ui.js`. Every one of those is gone. It holds three rows,
   Settings, Help and About, and it draws below 600px alone, because a navigation bar caps at five
   items and the rail above 600px carries all three as items of its own.
-  **`#navMore` in the APP BAR's trailing group is what opens it.** That button has been round this
-  loop twice on 2026-08-25: it began in the app bar, moved to the navigation bar's fifth slot, and a
-  reader moved it back the same day so the location button could take the middle slot. It keeps the
-  `nav` prefix in both homes, and it is not a `.navitem` any more.
+  **`#navMore` in the APP BAR's LEADING group is what opens it, since 2026-10-14.** The search left
+  that slot for the navigation bar, between Table and Cameras. It keeps the `nav` prefix, and it is
+  not a `.navitem`.
   **So `.swrow` and the capture-phase close are deleted.** That handler existed so a menu item's
   `showModal()` never ran while its opener was still in the top layer, and it needed an exemption
   for the one row that was a setting rather than a destination. Every row is a destination now.

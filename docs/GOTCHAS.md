@@ -1378,6 +1378,15 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
   `appearance: segmented`. The numbers come from `List/list.css`.
   **The card held a meter, a metric row, a graph and a totals chart on one flat surface**, and said
   nowhere that each answers a different question. A segment per block says it.
+  **THE SEGMENTS WENT ON 2026-10-14, and the card follows the alert panel's list now.** The readings
+  are a STANDARD list with no container per item. Each `.sensor` is a `<details>` and its
+  `.sensorhead` is the `<summary>`, with a chevron and M3's state layer. A full-width divider opens
+  every section after the first. A title per item still says which question each block answers.
+  **A fold survives the poll.** `render()` rebuilds the card in place, so `openSide()` keeps a set
+  of folded `data-sensor` keys and closes them as the card lands. The alert panel does the same by
+  `data-sec`. A search sub-row opens the section it flashes, or it flashes a folded head.
+  **A ⋮ inside the summary does not fold the section.** A press activates the nearest element with
+  an activation behavior, and that is the button.
   **A block a kind does not draw makes no segment.** `sensorBody()` filters before it wraps. So
   `:first-child` and `:last-child` reach the blocks a reader can see, and the 16dp outer corner lands
   on the real ends. A river draws three segments and a camera draws one.
@@ -1401,6 +1410,10 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
   long`, and one title cannot head both. They were one block.
   **The river's rate row is keyed `Rate`, and it was `Trend`.** The segment around it is headed
   `Trend`, so the old key repeated its own heading 20px above it.
+  **Every graph sits INSIDE a `Trend` or `History` segment, since 2026-10-14.** `trendBlock()` builds
+  it for the station panel and the table popover both. None takes a `Last N h` title. Every window
+  is the last `GRAPH_H` (6) hours on the clock, and the `Min` and `Max` rows read that same window.
+  A siren's `Last triggered` reads `lastOn` from `api.php`, never `history`, which holds 12 hours.
   The node harness in CLAUDE.md's Verify block walks every station and fails on an untitled segment,
   and on a lone segment that grew a title. `m3-check.html` reads the title off the rendered pane.
   **The gap is 2px and `.mseg` beside it takes 8px.** 2px is `--md-list-item-gap`'s own number.

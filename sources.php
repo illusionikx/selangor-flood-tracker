@@ -791,11 +791,15 @@ function hereNames(string $text, bool $sea): bool {
  * The split runs on a newline or on a period followed by a space. A period inside a number carries
  * no space after it, so "4.5 meters" stays whole.
  *
+ * A single capital before the period is an abbreviation, not a sentence end. MET writes "N.
+ * Sembilan" and "W.P. Kuala Lumpur". A split there cut the list at "Selangor • N." and dropped the
+ * rest of the sentence, the time included.
+ *
  * An empty return means the text names nowhere here. The caller decides what that means. The gate
  * is a separate test on the combined English and Malay text, and this narrows the English alone. */
 function hereParts(string $text, bool $sea): string {
     $keep = [];
-    foreach (preg_split('/\n+|(?<=\.)\s+/', $text) as $part) {
+    foreach (preg_split('/\n+|(?<=\.)(?<!\b[A-Z]\.)\s+/', $text) as $part) {
         $p = trim($part);
         if ($p !== '' && hereNames($p, $sea)) $keep[] = $p;
     }

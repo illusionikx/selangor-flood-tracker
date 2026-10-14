@@ -5,7 +5,7 @@ import { KINDS, MAST, camSrc, FEED, STATIC, NEAR_MAX_KM, NOTICE, NOTICE_KIND, NA
 import { state, PREFS, PREFS_KEY, save } from './state.js';
 import { el, distKm, ignoredIds, leads, favIds, isFav, squash, termsOf, matches, esc,
          warnWhen, snack } from './util.js';
-import { setTheme, applyTheme, flashTo, closeSide, showPlace, side, railSync } from './map.js';
+import { setTheme, applyTheme, flashTo, fitMarks, closeSide, showPlace, side, railSync } from './map.js';
 import { showHere } from './locate.js';
 import { syncHeat, heatOpacity, HEAT_OPACITY } from './heat.js';
 import { byId } from './stations.js';
@@ -66,20 +66,26 @@ const withTimeline = fn => (tlMod ??= import('./timeline.js')).then(fn, err => {
    `applyTheme()` runs here, once, at module evaluation. It paints the stored theme before the map
    draws, and `js/map.js` states why the call lives on this side. The theme on screen is read back
    from the root element, which is the one place this app keeps it. */
-const themeBtn = el('railApps'), themeNow = () => document.documentElement.dataset.theme;
+/* **Two buttons since 2026-10-14**: the rail's above 600px and the app bar's below it. Only one
+   draws at a time, and this one function writes both. */
+const themeBtns = document.querySelectorAll('#railApps, #navTheme'),
+  themeNow = () => document.documentElement.dataset.theme;
 function syncThemeBtn() {
   const now = themeNow(), other = now === 'dark' ? 'light' : 'dark';
-  themeBtn.querySelector('.i').className = 'i i-' + now + '_mode';
   const said = PREFS.theme === 'auto'
     ? `Automatic. ${now === 'dark' ? 'Dark' : 'Light'} now.`
     : `${now === 'dark' ? 'Dark' : 'Light'} theme.`;
-  themeBtn.dataset.tip = themeBtn.ariaLabel = `${said} Switch to ${other}.`;
+  for (const b of themeBtns) {
+    b.querySelector('.i').className = 'i i-' + now + '_mode';
+    b.dataset.tip = b.ariaLabel = `${said} Switch to ${other}.`;
+  }
   for (const b of document.querySelectorAll('#themeList input'))
     b.checked = b.value === PREFS.theme;
 }
 applyTheme();
 syncThemeBtn();
-themeBtn.onclick = () => { setTheme(themeNow() === 'dark' ? 'light' : 'dark'); syncThemeBtn(); };
+for (const b of themeBtns)
+  b.onclick = () => { setTheme(themeNow() === 'dark' ? 'light' : 'dark'); syncThemeBtn(); };
 /* **The picker writes the preference and `syncThemeBtn()` writes every control back from it**, which
    is the rule this app states for every preference-owned control. So the rows and the rail button
    cannot report two answers, whichever of the two a reader pressed. */
@@ -465,12 +471,14 @@ camBox.onclose = () => withWall(m => m.close()).catch(ignoreImportFail);
    this handler has no await for that queued task to land ahead of anyway. The order costs nothing,
    and it means this handler never has to reason about whether some later change ties the grid's
    teardown to something less deferred than an event a queued task fires. */
+/* **A tile opens the lightbox straight away, over the wall**, on the repository owner's instruction
+   of 2026-10-14. It jumped to the camera on the map before. The lightbox's back arrow returns to the
+   wall. `data-lap` rides every tile, so a camera with no coordinate opens too: the jump to the Gulf
+   of Guinea was the only reason that tile refused a press. */
 el('camGrid').onclick = e => {
-  const t = e.target.closest('[data-cam]');
-  if (!t) return;
-  const s = byId(`camera-${t.dataset.cam}`);
-  camBox.close();
-  if (s) flashTo(s);
+  const t = e.target.closest('[data-lap]');
+  const s = t && byId(`camera-${t.dataset.lap}`);
+  if (s) openLightbox(camSrc(s), s.name, s.name);
 };
 
 /* The matcher is the go-to box's, which reads `I.K.B.N.`, `IKBN` and `I K B N` as one word and
@@ -597,22 +605,8 @@ delete PREFS.wx; delete PREFS.stations;
 // what puts the two chips and the section summary on the pref — see syncHeat() in heat.js.
 syncHeat();
 
-/* The rising filter hides most of the map, and unlike the district picker it is one checkbox with
-   no list under it saying what it took away — a drawer you closed an hour ago is not an indication.
-   So it gets a standing pill over the map with the way out on it, the same shape test mode uses.
-   The same reasoning as the ignored-sensors panel: anything that suppresses stations has to say so
-   somewhere you cannot miss, and has to be undoable from there. */
-const risePill = () => document.body.classList.toggle('rising', PREFS.pinFilter === 'alert');
-risePill();
-/* Straight to the preference, because the preference is what the box is drawn from. Dispatching a
-   `change` on a box this line had to uncheck first would ask the handler to read back a state this
-   line just invented. */
-el('riseOff').onclick = () => {
-  PREFS.pinFilter = '';
-  save();
-  risePill();
-  applyFilter();
-};
+/* The ON ALERT pill that stood here left on 2026-10-14. The chip row is the standing indication: the
+   chip lights while the filter holds and a second press clears it. */
 
 /* **A selected filter chip clears itself on a second press, which is M3's own behaviour.** The pin
    filter has two chips and no `All`, so `''` is the state with neither on. A radio cannot be
@@ -637,7 +631,6 @@ for (const id of ['favOnly', 'risingOnly']) el(id).addEventListener('click', e =
   e.target.checked = false;
   PREFS.pinFilter = '';
   save();
-  risePill();
   applyFilter();
 });
 
@@ -666,13 +659,14 @@ el('heatOff').onchange = el('heat').onchange = el('rainHeat').onchange =
      deferred module and roll back when that import fails. */
   if (e.target === el('stations')) PREFS.mapLayer = 'stations';
   syncHeat();
-  risePill();
   save();
   /* Nothing on this handler closes the drawer any more. Every control here is a chip on the map,
      where there is no drawer over the result of the press. The argument for closing it was that at
      phone width the drawer IS the screen, so a filter whose effect you cannot see is one you have
      to close the drawer to judge. These are not behind it now. */
   applyFilter();
+  // A filter turning on frames what it kept, so the reader sees every favorite or alert at once.
+  if (e.target.name === 'pinfilter' && PREFS.pinFilter) fitMarks();
 };
 
 /* The weather mode toggle. The pref is written first and the module reads it, so the box can never
@@ -1450,6 +1444,7 @@ function pick(i) {
   if (r.t !== 'sensor') return;
   const block = el('sideBody').querySelector(`[data-sensor="${t.id}"]`);
   if (!block) return;
+  block.open = true;                 // a folded section cannot show the sensor the reader asked for
   block.scrollIntoView({ block: 'nearest' });
   block.classList.remove('flash');
   block.offsetWidth;                 // restart the animation if the same block is picked twice
@@ -1550,6 +1545,44 @@ const warnBox = el('warnBox');
 // Not called `list`: this file already binds that name at lines 507 and 702.
 const andList = a => a.length < 2 ? (a[0] || '') : `${a.slice(0, -1).join(', ')} and ${a.at(-1)}`;
 
+/* A MET bulletin arrives as one paragraph: a list of 20 states joined by `•`, districts in
+   brackets, numbered marine items with a capitals heading, and a 12-hour clock. `warnHtml()` lays
+   that out as a reader scans it. Each sentence of the shape "... over the states of A • B until T"
+   becomes its lead line, one list row per area, and its end time. The areas this map covers go
+   first. A sentence of any other shape prints as it came, so a new wording loses its layout and
+   never its words. */
+// Land names only. "Southern Straits Of Melaka" is off Johor, so a straits name is not ours.
+const OURS = /selangor|kuala lumpur|putrajaya/i;
+const capsCase = s => s === s.toUpperCase() ? s.charAt(0) + s.slice(1).toLowerCase() : s;
+// MET writes "7:00 PM". This app prints 24-hour time.
+const h24 = s => s.replace(/\b(\d{1,2}):(\d\d)\s*([AP])M\b/gi,
+  (_, h, m, p) => `${String(h % 12 + (/p/i.test(p) ? 12 : 0)).padStart(2, '0')}:${m}`);
+function warnHtml(text) {
+  const out = [];
+  // The marine banner, "SECTION A: FOR MALAYSIAN WATERS [...]", says nothing the title does not.
+  const body = h24(text).replace(/^SECTION [A-Z]:[^\]]*\]\s*/i, '');
+  for (const item of body.split(/\s*\b\d+\)\s+/).filter(Boolean)) {
+    // A marine item opens with its own heading in capitals: "THUNDERSTORMS WARNING Thunderstorms ...".
+    const head = item.match(/^((?:[A-Z][A-Z&]*\s+)+)(?=[A-Z][a-z])/);
+    if (head) out.push(`<h4>${esc(capsCase(head[1].trim()))}</h4>`);
+    const rest = head ? item.slice(head[0].length) : item;
+    // A period after one capital is "N. Sembilan" or "W.P.", not a sentence end.
+    for (const s of rest.split(/(?<=\.)(?<!\b[A-Z]\.)\s+/)) {
+      const m = s.match(/^(.*?\bover the (?:states|waters) of)\s+(.+?)(?:\s+until\s+(.+?))?\.?$/i);
+      if (!m) { out.push(`<p>${esc(s)}</p>`); continue; }
+      const rows = m[2].split(/\s*•\s*/).map(a => {
+        const [, name, colon, paren] = a.match(/^([^:(]+?)\s*(?::\s*(.+)|\((.+)\))?$/) || [, a];
+        return { name, more: colon || paren, ours: OURS.test(name) };
+      }).sort((a, b) => b.ours - a.ours);
+      out.push(`<p>${esc(m[1])}:</p><ul class="warnareas">${rows.map(r =>
+        `<li${r.ours ? ' class="here"' : ''}><b>${esc(r.name)}</b>${
+          r.more ? ` <span class="muted">${esc(r.more)}</span>` : ''}</li>`).join('')}</ul>`);
+      if (m[3]) out.push(`<p>Until ${esc(m[3].replace(';', ','))}.</p>`);
+    }
+  }
+  return out.join('');
+}
+
 // One click handler for both surfaces and both kinds. A panel row and a ticker tile both carry
 // data-banner, which is the kind and the index into the matching list. Neither carries data-go: a
 // regional notice is not a station, and opens no card.
@@ -1572,9 +1605,11 @@ document.addEventListener('click', e => {
     const where = it.regions && it.regions.length
       ? `<p>The outage affects ${esc(andList(it.regions))}.</p><p>${esc(t.effect)}</p>`
       : '';
-    const [label, url] = t.link;
-    el('warnBody').innerHTML = `<h3>${esc(t.title)}</h3><p>${esc(t.text)}</p>${where}
-      <p>Source: <a href="${esc(url)}" target="_blank" rel="noopener">${esc(label)}</a></p>`;
+    // `late` carries no link, because its cause can be the feed or this server.
+    const [label, url] = t.link || [];
+    el('warnBody').innerHTML = `<h3>${esc(t.title)}</h3><p>${esc(t.text)}</p>${where}`;
+    el('warnFoot').innerHTML = url
+      ? `<p>Source: <a href="${esc(url)}" target="_blank" rel="noopener">${esc(label)}</a></p>` : '';
   } else {
     const b = NOTICE_KIND[it.kind] || NOTICE_KIND.weather;
     icon.className = `i i-${b.icon}`;
@@ -1587,8 +1622,9 @@ document.addEventListener('click', e => {
       ? `<p>Source: <a href="${esc(it.link)}" target="_blank" rel="noopener">${
           esc(new URL(it.link).hostname.replace(/^www\./, ''))}</a></p>`
       : '';
-    el('warnBody').innerHTML = `<h3>${esc(it.title)}</h3><p>${esc(it.text)}</p>
-      <p class="muted">Valid ${esc(warnWhen(it.from))} to ${esc(warnWhen(it.to))}</p>${src}`;
+    el('warnBody').innerHTML = `<h3>${esc(capsCase(it.title))}</h3>${warnHtml(it.text)}`;
+    el('warnFoot').innerHTML =
+      `<p>Valid ${esc(warnWhen(it.from))} to ${esc(warnWhen(it.to))}</p>${src}`;
   }
   warnBox.showModal();
 });
@@ -1612,27 +1648,34 @@ document.addEventListener('click', async e => {
   const btn = e.target.closest('[data-shot]');
   if (!img && !btn) return;
   e.stopPropagation();
-  const full = lightbox.querySelector('.stage > img');
-  // Spin until it lands. `complete` covers the popup's already-cached still, which fires no load
-  // event — without that check the spinner would sit there for ever over a picture that is ready.
-  lightbox.classList.add('loading');
-  lightbox.classList.remove('nopic');   // never inherit the last camera's dead feed
   /* A clip frame's `src` names an archived shot, not the live picture, and the lightbox always
      opens on live. The wrapper carries `data-clip` with the camera's proxy id for exactly this:
      look the camera up and rebuild its live URL, rather than reading the clicked <img>'s current
      `src`. Only the table's "show image" button has no such wrapper, and keeps the old path. */
   const clipId = img?.closest('[data-clip]')?.dataset.clip;
   const clipCam = clipId ? byId(`camera-${clipId}`) : null;
-  const src = clipCam ? camSrc(clipCam) : img ? img.src : btn.dataset.shot;
+  // The place, as the dialog's title. Both openers carry it as `data-name` rather than having this
+  // strip a prefix off the alt text — "Latest still from X" is a caption, and parsing a caption back
+  // into a name is a rule that breaks the day the caption is reworded.
+  const alt = (img ? img.alt : btn.dataset.cap) || '';
+  openLightbox(clipCam ? camSrc(clipCam) : img ? img.src : btn.dataset.shot,
+    (img || btn).dataset.name || alt, alt);
+});
+
+/* Every way into the lightbox comes through here: the document listener above, and a camera wall
+   tile. */
+async function openLightbox(src, name, alt) {
+  const full = lightbox.querySelector('.stage > img');
+  // Spin until it lands. `complete` covers the popup's already-cached still, which fires no load
+  // event — without that check the spinner would sit there for ever over a picture that is ready.
+  lightbox.classList.add('loading');
+  lightbox.classList.remove('nopic');   // never inherit the last camera's dead feed
   full.src = src;
   // `complete` is true for a cached still *and* for a cached failure, and neither fires an event —
   // so run the same handler rather than only clearing the spinner, or a dead camera would open on
   // the last camera's `.nopic` state.
   if (full.complete) full.onload();
-  // The place, as the dialog's title. Both openers carry it as `data-name` rather than having this
-  // strip a prefix off the alt text — "Latest still from X" is a caption, and parsing a caption back
-  // into a name is a rule that breaks the day the caption is reworded.
-  full.alt = (img ? img.alt : btn.dataset.cap) || '';
+  full.alt = alt;
   /* The camera behind this still. Read back out of the proxied URL — `?cam=<n>` is the proxy's own
      shape, and the table's "show image" button builds the same URL, so both openers are covered by
      one rule. The static build hotlinks upstream and matches nothing here, which is correct: it has
@@ -1646,7 +1689,7 @@ document.addEventListener('click', async e => {
      a question about the river rather than about where you are looking.
      `textContent` on both, not one interpolated string. These are upstream names. */
   const head = el('lbTitle');
-  head.textContent = (img || btn).dataset.name || full.alt;
+  head.textContent = name;
   const where = c && [c.district, c.state].filter(Boolean).join(', ');
   if (where) head.append(Object.assign(document.createElement('span'),
     { className: 'lbwhere', textContent: where }));
@@ -1671,7 +1714,7 @@ document.addEventListener('click', async e => {
   el('tlfail').hidden = true;
   try { await lazy(() => tlMod, el('lightbox')); }
   catch { el('tlfail').hidden = false; }
-});
+}
 /* A dead camera stops the spinner too — a spinner that never ends reads as "still trying".
    `naturalWidth`, not which event fired: a frame that failed leaves the image at 0×0, and `.stage`
    and `.player` are shrink-to-fit around it, so the whole player folded up and took the control bar
@@ -1683,10 +1726,20 @@ lbShot.onload = lbShot.onerror = () => {
   lightbox.classList.toggle('nopic', !lbShot.naturalWidth);
 };
 
-// Backdrop closes, like the other two dialogs; the × and Esc do the rest. Nothing inside needs an
-// exemption any more — that was the price of the old tap-anywhere overlay, which could not tell a
-// dismissal from a scrub, a play or a drag on the compare divider.
-lightbox.onclick = e => { if (e.target === lightbox) lightbox.close(); };
+/* **The back arrow and Esc close the lightbox alone**, on the repository owner's instruction of
+   2026-10-14, so the reader lands on the camera wall or the station panel that opened it.
+   **A press on the backdrop does the same above 600px.** Below 600px it closes the opener too and
+   lands the reader on the map. The owner asked for both, one after the other, the same day.
+   Nothing inside needs an exemption: the old tap-anywhere overlay could not tell a dismissal from a
+   scrub, and this dialog has no such overlay. */
+const lbWide = matchMedia('(min-width: 601px)');
+lightbox.onclick = e => {
+  if (e.target !== lightbox) return;
+  lightbox.close();
+  if (lbWide.matches) return;
+  camBox.close();
+  closeSide();
+};
 /* A wrapper, because `reset` is no longer a binding. It shares `withTimeline` with the opener, so a
    close registered while the module is still loading still runs after the open. */
 lightbox.addEventListener('close', () => withTimeline(m => m.reset()));

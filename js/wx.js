@@ -138,7 +138,7 @@ function card(p, name = titleCase(p.n), sub = MET_NAME) {
       <div class="popname">${name}</div>
       <div class="muted">${sub}</div>
     </div>
-    <div class="sensor">
+    <details class="sensor" data-sensor="@wx" open>
       ${/* **THE HEAD'S GLYPH IS FIXED, and it followed the rung for one revision.** A reader cut
             that on 2026-08-25. The head names the sensor, the same job the kind glyph does over a
             river or a siren. Those never move. Every item under it already states its own rung, so
@@ -147,10 +147,10 @@ function card(p, name = titleCase(p.n), sub = MET_NAME) {
             `partly_cloudy_day` in `--k-weather`, which is the mark the Weather layer chip already
             draws. The rung ladder draws `sunny` for a clear sky, and that is a rung rather than a
             name for the whole layer. */''}
-      <div class="sensorhead">
+      <summary class="sensorhead">
         ${kindGlyph('partly_cloudy_day', 'var(--k-weather)')}
-        <b>Weather</b>
-      </div>
+        <b>Weather</b><i class="i i-expand_more chev"></i>
+      </summary>
       ${/* ONE SEGMENT PER HALF HOUR, the same `.sbody` shape every sensor on a station card draws.
             This panel and that card stand in one pane, one at a time, so a head over a segmented
             group in one and a head over loose content in the other is one component in two shapes.
@@ -158,7 +158,7 @@ function card(p, name = titleCase(p.n), sub = MET_NAME) {
             reader takes in on its own, and every step here is one: a glyph, a word and a clock. So
             the group states that once rather than nesting a second set of cards inside it. */''}
       <ul class="sbody">${cards}</ul>
-    </div>`;
+    </details>`;
 }
 
 /* The same card, over the reader's own fix rather than over a pin they pressed. Weather is a

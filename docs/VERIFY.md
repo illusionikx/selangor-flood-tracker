@@ -714,7 +714,7 @@ is(/class=\"nsub\"/.test(src2),true,'groupCard heads itself with a list subheade
 // gotcha list. The Notices pane keeps its own, so this reads alerts.js and never the stylesheet.
 is(/nsub\">\$\{rows/.test(src2),true,'and it states the kind in words, with no glyph and no disc');
 is(/class=\"alerttop\"/.test(src2),false,'and the chip row it replaced is gone');
-is(/class=\"slist mseg\"/.test(src2),true,'groupCard declares its list segmented');
+is(/class=\"slist mlist\"/.test(src2),true,'groupCard declares its list standard');
 is(/<div class=\"badges\">/.test(src2),true,'the alert head emits a .badges row, so openSide lifts it');
 is(/i-near_me/.test(src2),true,'and Nearest first is a chip in it, not a fragment in the headline');
 is(/class=\"tally\"/.test(src2),false,'and the pill row it replaced is gone');

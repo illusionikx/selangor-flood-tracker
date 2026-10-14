@@ -29,9 +29,9 @@ export const ALERT_TITLE = {
   'river|now':   ['Water level at danger', 'Water levels at danger'],
   'river|soon':  ['Forecast to reach danger', 'Forecast to reach danger'],
   'river|stale': ['Water level not current', 'Water levels not current'],
-  // This one reaches the camera pill only. `isHot()` does not cover a flood gauge, so nothing here
-  // puts one in the panel.
+  // A gauge past 0.3 m reaches the panel since 2026-10-14, because `isCritical()` covers it now.
   'gauge|now':    ['Flood gauge at danger', 'Flood gauges at danger'],
+  'gauge|stale':  ['Flood gauge not current', 'Flood gauges not current'],
   /* Rainfall reaches the panel too, since `isCritical()` covers JPS's heavy class and above.
      `heavy` is class 3 and `now` is class 4, and JPS's own two words carry the split. So the two
      never share a card and neither phrase has to cover the other.
@@ -205,7 +205,23 @@ export const NOTICE = {
     effect: 'Water levels for these areas are not current. Stations show their last recorded reading.',
     link:   ['publicinfobanjir.water.gov.my', 'https://publicinfobanjir.water.gov.my/'],
   },
+  /* Raised by js/net.js, never by api.php: a feed whose newest reading is older than FEED_LATE_MS,
+     on the repository owner's instruction of 2026-10-14. `regions` carries the feed names, so the
+     modal's own sentence names what stopped. No link: the cause can be the feed or this server, and
+     no single page answers both. */
+  late: {
+    title:  'A data source stopped updating',
+    line:   'Some readings are not current.',
+    text:   'No new reading has arrived from this source for over an hour.',
+    effect: 'Stations from this source show their last recorded reading.',
+  },
 };
+
+/* How old a feed's newest reading can be before `late` rises. Each feed's newest reading measured
+   about 17 minutes old in normal running, because JPS stamps every 15 minutes and this server
+   caches a scraped page for 15. An hour is at least three missed slots, so a blip stays quiet and a
+   real outage reaches the reader inside its first hour. */
+export const FEED_LATE_MS = 60 * 60e3;
 
 /* THE BASEMAP KEY, AND IT IS THE ONE SWITCH BETWEEN TWO PROVIDERS.
    Empty means Esri draws. Set means CARTO draws. `PROVIDER` in js/map.js reads it once, and
@@ -266,6 +282,9 @@ export const CARTO_STYLE = { light: 'rastertiles/voyager', dark: 'rastertiles/vo
 
 // Sparkline window. Must not exceed the server's own SPARK_WIN — it sends nothing older.
 export const SPARK_H     = 12;     // hours on the graph's x axis
+// Hours on every graph in the station panel and the table popover, fixed on the clock and ending
+// now. Must not exceed SPARK_H. See `trendBlock()` in popup.js.
+export const GRAPH_H = 6;
 
 /* The foot of a water-level bar, in alert→danger gaps below the first mark. See `levelStops()`.
    Tuning knob, not a constant of nature: 6 on the payload it was picked from left 6 of 107 rivers

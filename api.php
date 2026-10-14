@@ -2168,6 +2168,9 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
     $ok('a sentence splits on the period and the newline alone',
         hereParts('Waves reach 4.5 metres over Selangor.', false)
         === 'Waves reach 4.5 metres over Selangor.');
+    $ok('a split never fires after a one-letter abbreviation',
+        hereParts('Rain over Selangor • N. Sembilan • W.P. Putrajaya until 9:00 PM.', false)
+        === 'Rain over Selangor • N. Sembilan • W.P. Putrajaya until 9:00 PM.');
 
     /* metWarnings() must keep every row it kept before. A row qualifying on its Malay half alone
        narrows to nothing in English, and the whole English text stands. */
@@ -3913,6 +3916,17 @@ foreach ($stations as &$s) {
 }
 unset($s);
 
+/* `lastOn`: when each siren last reported 1, out of everything `.history.db` keeps (RETAIN, 30 days).
+   The card's `Last triggered` row reads it. `history` cannot answer, because it holds 12 hours.
+   A range on the key and not a LIKE, so SQLite walks the primary key. Measured at 3 ms on 2,225
+   siren rows. A siren sounding on this poll is answered by its own status, not by this field. */
+$lastOn = $db->query("SELECT station, MAX(ts) FROM level WHERE station >= 'siren-' AND station < 'siren.'
+                      AND level > 0 GROUP BY station")->fetchAll(PDO::FETCH_KEY_PAIR);
+foreach ($stations as &$s) {
+    if ($s['kind'] === 'siren') $s['lastOn'] = isset($lastOn[$s['id']]) ? (int)$lastOn[$s['id']] : null;
+}
+unset($s);
+
 // --- Sites -------------------------------------------------------------------------------------
 // A rainfall gauge, a river gauge and sometimes a camera share one mast, and every feed publishes
 // them as separate stations at the same point. 113 pairs hold two or more, and another 46 sit a few
@@ -4001,11 +4015,18 @@ foreach ($stations as &$s) {
 unset($s);
 
 // Freshness of the readings themselves (upstream stamps them "d/m/Y H:i:s"), not just of our fetch.
+/* `$feedTs` is the same newest stamp, per feed, since 2026-10-14. js/net.js raises a notice when a
+   feed's newest reading passes FEED_LATE_MS against the reader's own clock. So the notice also
+   rises when this server stops answering and no new payload arrives at all. */
 $sourceTs = 0;
+$feedTs = [];
 foreach ($stations as $s) {
     if (empty($s['updated'])) continue;
     $d = DateTime::createFromFormat('d/m/Y H:i:s', $s['updated']);
-    if ($d) $sourceTs = max($sourceTs, $d->getTimestamp());
+    if (!$d) continue;
+    $sourceTs = max($sourceTs, $d->getTimestamp());
+    $f = $s['source'] ?? '';
+    if ($f !== '') $feedTs[$f] = max($feedTs[$f] ?? 0, $d->getTimestamp());
 }
 
 /* Weather onto stations. Two joins, because the two feeds key differently. The nowcast joins by
@@ -4069,6 +4090,7 @@ $payload = json_encode([
     // rather than the self-check label ('ok', 'first' or 'clock moved') forceAllowed() returned.
     'forceWhy' => $force ? null : ($forceWhy ?: null),
     'sourceUpdated' => $sourceTs ? date('c', $sourceTs) : null,
+    'feeds'    => array_map(fn($t) => date('c', $t), $feedTs),
     'tookMs'   => (int)round((microtime(true) - $t0) * 1000),
     // Published so the map can draw the mast radius it actually grouped by, rather than keeping a
     // second copy of this number client-side for the two to drift apart.

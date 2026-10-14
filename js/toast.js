@@ -47,12 +47,12 @@ const rows = list => list.slice(0, LIST).map(s => {
     // Rain before the shared rung, the same split js/ticker.js makes. A rain gauge stands at no
     // danger mark, so `At danger` is the wrong sentence about it.
     : s.kind === 'rainfall' ? `${s.status >= 4 ? 'Very heavy' : 'Heavy'} rain · ${s.hourly} mm/h`
+    : s.kind === 'gauge'   ? `Flooded · ${s.depth} m`
     : s.status >= 3        ? 'At danger'
     : `Reaches danger ${s.eta != null && s.eta < 1 ? 'within the hour' : `in ~${s.eta} h`}`;
   return `<button class="trow" data-go="${s.id}">
     <i class="i i-${KINDS[s.kind].icon}" style="--c:${KINDS[s.kind].color}"></i>
-    <span class="tname">${s.name}</span>
-    <span class="twhy muted">${why}</span>
+    <span class="ttext"><span class="tname">${s.name}</span><span class="twhy">${why}</span></span>
   </button>`;
 }).join('');
 
@@ -64,7 +64,7 @@ function show(kind, head, list) {
       <b>${head}</b>
       <button class="tclose icon" aria-label="Dismiss"><i class="i i-close"></i></button>
     </div>${rows(list)}${
-    list.length > LIST ? `<div class="tmore muted">${list.length - LIST} more — see the alert panel</div>` : ''}`;
+    list.length > LIST ? `<div class="tmore">${list.length - LIST} more — see the alert panel</div>` : ''}`;
 
   box.classList.add('open');
   lastShown = Date.now();
