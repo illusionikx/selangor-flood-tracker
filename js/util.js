@@ -221,7 +221,9 @@ export const hasInfo = s => s.online && ({
    `statusColor()` is the tier ladder and is not this. Do not reach for it to paint a reading. */
 export function color(s) {
   if (!hasInfo(s)) return NO_INFO;
-  if (s.kind === 'river')    return RIVER_COLOR[s.status] || KINDS.river.color;
+  // A river forecast to reach its danger mark takes the alert amber, even under its alert mark.
+  // The red ring that marked it is gone, on the repository owner's instruction of 2026-10-15.
+  if (s.kind === 'river')    return RIVER_COLOR[s.rising && s.status === 0 ? 1 : s.status] || KINDS.river.color;
   // A gauge whose own total denies its reading is painted as a gauge reporting nothing, the way a
   // siren that is not sounding drops back to its kind colour on the line below.
   if (s.kind === 'rainfall') return RAIN_COLOR[raining(s) ? s.status : 0] || KINDS.rainfall.color;
@@ -337,7 +339,7 @@ export const tier = s => !isHot(s) ? null
 /* Worst first. Stale sorts last everywhere: it is the one tier you cannot act on.
    The tier *colours* live in CSS, keyed off `.t-now` / `.t-heavy` / `.t-soon` / `.t-stale`, so light
    and dark can differ without a second palette in here.
-   `heavy` outranks `soon` because it is observed. `heavy` and `soon` share `--s-warning`, and the
+   `heavy` outranks `soon` because it is observed. `heavy` is `--s-warning` and `soon` is `--s-alert`, and the
    tag word is what tells them apart. That is the same shape `now` already has, where one red covers
    a river at its mark and a sounding siren. */
 export const TIER_RANK = { now: 0, heavy: 1, soon: 2, stale: 3 };

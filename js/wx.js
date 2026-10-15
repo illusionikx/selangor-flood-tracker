@@ -6,7 +6,7 @@
 import { FEED_WX, WX_THIN_PX, WEATHER, MET_NAME, NEAR_MAX_KM } from './config.js';
 import { state, PREFS } from './state.js';
 import { map, pinGlyph, openSide, side, siteMark, markSel, focusOn, flashTo, ping } from './map.js';
-import { wxIcon, wxTone, stamp, kindGlyph, wxItem, wxWhen, wxTemps, WX_NOW } from './popup.js';
+import { wxIcon, wxTone, stamp, kindGlyph, wxItem, wxWhen, wxTemps } from './popup.js';
 import { askJson } from './ask.js';
 import { el, distKm, titleCase } from './util.js';
 
@@ -90,15 +90,19 @@ const dots = p => `<button class="icon dots" popovertarget="mnu-wx"
    M3's TWO-LINE list item, and `wxItem()` in `js/popup.js` builds it. The station card's weather
    section draws the same component, so the markup is stated once and neither surface can drift.
    The leading slot is the weather glyph in a tinted disc. The headline is the weather word. The
-   supporting line is the clock, and `WX_NOW` replaces it on the step happening now.
+   supporting line is the clock, on every step. The `Now` subheader marks the step happening now.
    The word leads because this panel answers about weather. The clock says which half hour states
    it, which is what a supporting line is for.
    The trailing slot holds the day's two ends, on the one step that carries them. */
-const stepCard = (rung, clock, now, temp = '') => {
+const stepCard = (rung, clock, temp = '') => {
   const w = WEATHER[rung] || WEATHER[0];
   return wxItem(wxIcon(rung, { clock }), wxTone(rung, { clock }), w.line || w.word,
-    now ? WX_NOW : wxWhen(clock), temp, now);
+    wxWhen(clock), temp);
 };
+
+/* An M3 list subheader over each group of steps. `css/map.css` draws a divider over every one
+   after the first. A group with no steps draws no subheader. */
+const group = (title, items) => items.length ? `<li class="wxsub">${title}</li>${items.join('')}` : '';
 
 /* `name` arrives ALREADY CASED, and the point's own name is cased in the default. `titleCase()`
    splits on a hyphen and capitalises each token, so a title holding markup came out with
@@ -113,13 +117,17 @@ function card(p, name = titleCase(p.n), sub = MET_NAME) {
      same pair in the same slot. */
   const temp = p.tmax == null ? '' : wxTemps(p.tmax, p.tmin);
 
+  /* **THREE GROUPS, each under its own subheader, since 2026-10-15.** A reader asked for `Now` and
+     `Later` with a divider between them. That replaced an accent outline and a `▶ Now` marker on one
+     row of an unbroken stack. The subheader names the group, so the now row prints its clock like
+     every other row, and the marker would state `Now` twice.
+     `Earlier` holds the last two readings and no more. The card is a forecast, and the half hour
+     behind it is there to say which way the weather is going. An hour of it pushed the steps that
+     have not happened yet under the fold. */
   const cards = [
-    /* The last two readings and no more. The card is a forecast, and the half hour behind it is
-       there to say which way the weather is going. An hour of it pushed the steps that have not
-       happened yet under the fold. */
-    ...p.past.slice(-2).map(([ts, r]) => stepCard(r, hhmm(ts * 1000), false)),
-    stepCard(p.rungs[0], hhmm(p.stamp * 1000), true, temp),
-    ...p.rungs.slice(1).map((r, i) => stepCard(r, p.clocks[i + 1], false)),
+    group('Earlier', p.past.slice(-2).map(([ts, r]) => stepCard(r, hhmm(ts * 1000)))),
+    group('Now', [stepCard(p.rungs[0], hhmm(p.stamp * 1000), temp)]),
+    group('Later', p.rungs.slice(1).map((r, i) => stepCard(r, p.clocks[i + 1]))),
   ].join('');
 
   /* `.pophead` first, always. openSide() splits it — the name goes up into the sheet's title and

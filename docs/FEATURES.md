@@ -15897,8 +15897,20 @@ glyph, the word and the clock, and gives up its own container.
 The station card's weather section draws the same `.wxcol` box inside a `.wx` grid. That one keeps
 its fill, because there is no list item under it.
 
-`.wxstep.now` carries the outline. It moved off `.wxcol`, because the item is what carries the shape
+`.wxstep.now` carried the outline. It moved off `.wxcol`, because the item is what carries the shape
 the outline follows.
+
+The outline is deleted since 2026-10-15. A reader cut it as not M3. An M3 list item states no
+outline, and a 2px accent ring reads as keyboard focus. A selected fill was not used in its place.
+This app bridges `secondary-container` to the full accent, so that fill draws a solid blue row.
+
+The same reader then asked for `Now` and `Later` sections with a divider. The stack is three
+groups now, each under an M3 list subheader: `Earlier`, `Now` and `Later`. The divider is
+`.sensor + .sensor`'s own 1px `outline-variant` rule, over every subheader after the first.
+`Earlier` holds the two past readings, which had no home in a two-way split. A group with no
+steps draws no subheader. The now step prints its clock like every other step. The `▶ Now` marker
+left this panel, because the subheader already names the group. The station card's weather section
+keeps the marker, because it has two rows and no subheader.
 
 ### The slots take M3's own two-line item
 
@@ -20519,3 +20531,19 @@ A reader asked for this on 2026-10-14. The rainfall card had a `Trend` segment a
 `trendBlock()` in `js/popup.js` adds the totals for rainfall. `rainAcc()` takes a third argument, `head`, and writes no `Totals` title when it is false. The stale guard did not move. A stale gauge draws no totals and keeps the title `Trend`.
 
 The chart has no title of its own now. So 16px of space separates the graph from the chart above it.
+
+### A tap outside the lightbox closes the lightbox alone, at every width
+
+The repository owner asked for this on 2026-10-15. Below 600px, a tap outside the lightbox closed the lightbox and also the camera wall or the station panel behind it. The owner did not want the second close. The tap now closes the lightbox only, the same as above 600px. The reader lands on the wall or the panel that opened it. The back arrow and Esc already did this.
+
+The `matchMedia` query and the two extra closes are deleted from `js/ui.js`. This reverses the rule of 2026-10-14 that closed the opener on a phone.
+
+### A rising river is amber, and the red ring is gone
+
+The repository owner asked for this on 2026-10-15. A river forecast to reach its danger mark within 3 hours drew a red ring around its pin. The ring was a fourth status mark on the map. It is deleted. The river now takes the alert amber, the same as a river at its alert mark.
+
+`color()` in `js/util.js` paints a river amber when `rising` is true and its status is 0. A river already at amber or red keeps that color. A Monitoring Station with a rising river no longer counts as quiet, so it wears amber and not the mast indigo. The ring rule in `css/map.css`, the ring in the `js/pins.js` sprite, and the legend row in Help are deleted.
+
+The cost is real. A reader cannot see on the map whether a river is amber because of its level or because of the forecast. The card still says which, and the alert panel still lists `soon` as its own tier. The forecast does not change the alert path. `isHot()` reads `rising` as before.
+
+The forecast tier `soon` moved from `--s-warning` to `--s-alert` the same day, on a second instruction. The tier now matches the amber pin. This covers six places: the alert list glyph, the ticker, the camera tile border and its glyph, the lightbox warning, and the timeline ticks. The `rising` chip in the alert head is amber too. `heavy` keeps `--s-warning`, so it is now the only tier that uses that orange.

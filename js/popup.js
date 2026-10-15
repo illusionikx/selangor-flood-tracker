@@ -731,10 +731,10 @@ const wxDots = m => `<button class="icon dots" popovertarget="mnu-met"
 
 /* The leading slot is M3's avatar, a 40px tinted disc under the weather glyph. `--c` is written on
    the element, off `wxTone()`, so the disc and the map pin agree about every rung.
-   The `now` flag is the accent outline. The panel's stack takes it to find one row among nine. This
-   card holds two rows and needs no such marker, so it passes nothing. */
-export const wxItem = (icon, tone, head, sub, trail = '', now = false) =>
-  `<li class="wxstep${now ? ' now' : ''}">
+   The `now` flag and its accent outline are gone since 2026-10-15. The panel's stack marks the now
+   step with a subheader, in `js/wx.js`. */
+export const wxItem = (icon, tone, head, sub, trail = '') =>
+  `<li class="wxstep">
       <span class="avat" style="--c:${tone}"><i class="i i-${icon}" aria-hidden="true"></i></span>
       <div class="wxtext"><b>${head}</b>${sub}</div>
       ${trail}

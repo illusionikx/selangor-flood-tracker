@@ -19,10 +19,15 @@
    stylesheets, Herd's three-hour `max-age`, and the service worker's network-first refusal to trust
    its own cache. See docs/GOTCHAS.md for what each of those cost.
 
-   **Source maps ship beside the code.** A browser fetches one only when a person opens developer
-   tools. So a reader pays nothing, and this app stays debuggable on a box that nobody can reach. */
+   **Source maps ship beside the code, without the source text.** A browser fetches one only when a
+   person opens developer tools. The map turns a minified line back into a file and a line. It
+   carries no `sourcesContent`, so developer tools cannot show a comment from the repository.
 
-import { build } from 'esbuild';
+   **No comment reaches a browser.** The comments in this repository are notes for the people who
+   change it. Step 7 scans the output and fails the build if one gets through. A license notice is
+   the one exception, because the license requires it in every copy. */
+
+import { build, transform } from 'esbuild';
 import { brotliCompressSync, constants, gzipSync } from 'node:zlib';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -77,6 +82,7 @@ const js = await build({
   target: 'es2022',
   minify: true,
   sourcemap: true,
+  sourcesContent: false,
   metafile: true,
   legalComments: 'none',
   entryNames: '[name]-[hash]',
@@ -119,6 +125,7 @@ const css = await build({
   outdir: `${OUT}/css`,
   minify: true,
   sourcemap: true,
+  sourcesContent: false,
   metafile: true,
   legalComments: 'none',
   entryNames: '[name]-[hash]',
@@ -131,8 +138,12 @@ for (const n of cssFiles) need(cssOut[n], `esbuild produced no output for css/${
 
 /* ---------------------------------------------------------------- 3. Copy
 
-   `vendor/` is hand-managed and already minified, so it is copied whole and keeps its own `?v=`
-   query. It changes by hand and rarely. Everything else here is committed data or an icon. */
+   `vendor/` is hand-managed and keeps its own `?v=` query. It changes by hand and rarely. Each of
+   its scripts and stylesheets goes through esbuild on the way, which removes the comments and
+   keeps the names: a classic script publishes globals (`L`), so nothing may rename them.
+   `leaflet-heat.js` carries its two copyright blocks as plain comments, and esbuild keeps only a
+   `/*!` comment. So the copy marks those two blocks before the minify. Everything else here is
+   committed data or an icon. */
 
 const copy = (src, optional = false) => {
   if (!fs.existsSync(src)) { need(optional, `missing ${src}`); return false; }
@@ -140,7 +151,17 @@ const copy = (src, optional = false) => {
   return true;
 };
 
+const files = dir => fs.readdirSync(dir, { withFileTypes: true, recursive: true })
+  .filter(e => e.isFile()).map(e => path.join(e.parentPath ?? e.path, e.name));
+
 copy('vendor');
+for (const f of files(path.join(OUT, 'vendor'))) {
+  const loader = path.extname(f).slice(1);
+  if (loader !== 'js' && loader !== 'css') continue;
+  const src = fs.readFileSync(f, 'utf8').replace(/\/\*(\s*\(c\))/g, '/*!$1');
+  const out = await transform(src, { loader, minify: true, legalComments: 'inline' });
+  fs.writeFileSync(f, out.code);
+}
 for (const f of ['manifest.json', 'icon-180.png', 'icon-192.png', 'icon-512.png',
                  'border.json']) copy(f);
 /* Optional, for the reason pages.yml already states: a missing decoration must never stop the map
@@ -232,7 +253,8 @@ const swap2 = (re, to, what) => {
 swap2(/^const CACHE = .*$/m, `const CACHE = 'shell-${buildId}';`, 'the CACHE name');
 swap2(/^const SHELL = \[\];$/m,
       `const SHELL = ${JSON.stringify(shell)};`, 'the SHELL list');
-fs.writeFileSync(path.join(OUT, 'sw.js'), sw);
+fs.writeFileSync(path.join(OUT, 'sw.js'),
+  (await transform(sw, { loader: 'js', minify: true, legalComments: 'none' })).code);
 
 /* The name index. Everything here is already written into `index.html`, so nothing the app does
    reads this file. It is for anything OUTSIDE the app that has to name a hashed file: the four
@@ -267,6 +289,28 @@ const walk = dir => {
   }
 };
 walk(OUT);
+
+/* ---------------------------------------------------------------- 7. No comment ships
+
+   Every step above removes the comments from what it writes. This step proves it on the output, so
+   a new file type or a new copy cannot ship the notes in this repository without a red build.
+   A license notice stays: a `/*!` block, or one that names `@preserve` or `@license`, which are
+   the marks esbuild keeps. The `sourceMappingURL` line is a directive, not a note, and stays too.
+   A source map must carry no `sourcesContent`.
+   The test reads `/*` and `<!--` and never `//`. A minified script holds URLs in its strings, and
+   esbuild already drops every line comment. */
+
+for (const f of files(OUT)) {
+  if (/\.(gz|br)$/.test(f)) continue;
+  const ext = path.extname(f);
+  const text = ['.js', '.css', '.html', '.map'].includes(ext) ? fs.readFileSync(f, 'utf8') : '';
+  if (ext === '.map') need(!/"sourcesContent"/.test(text), `${f}: the map carries the source text.`);
+  if (ext === '.html') need(!text.includes('<!--'), `${f}: an HTML comment ships.`);
+  if (ext === '.js' || ext === '.css')
+    need(!text.replace(/\/\*(?:!|# sourceMappingURL|[^*]*@(?:preserve|license))[\s\S]*?\*\//g, '')
+      .includes('/*'),
+         `${f}: a comment ships.`);
+}
 
 /* The cold load is the number this whole file exists to move, so the build prints it. It is what a
    first visit fetches: the document, the eager chunks and the four stylesheets. A deferred chunk, a

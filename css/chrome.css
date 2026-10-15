@@ -754,7 +754,7 @@ body.railopen #rail .railbadge { top: -6px; right: -6px; }
 /* The panel's fourth rung reaches the strip too. `.camtile` and `.camwarn` deliberately have no
    `t-heavy` rule: camAlert() in js/stations.js drops that rung before a camera ever sees it. */
 #ticker .tk-why.t-heavy { color: var(--s-warning); }
-#ticker .tk-why.t-soon  { color: var(--s-warning); }
+#ticker .tk-why.t-soon  { color: var(--s-alert); }
 /* The advisory. Not a link and not a station — the accent colour marks it as the app talking rather
    than another row of telemetry, and it is the only tile with no `data-go`. */
 #ticker .tk-say { cursor: default; }
@@ -2222,7 +2222,7 @@ table.data .dash { color: var(--outline); }
 /* The same two tokens the ticker and the alert panel use, through the same two class names. Never
    a hex here — the palette has moved four times and every copy of it went stale. */
 .camtile.t-now  { border-color: var(--s-danger); }
-.camtile.t-soon { border-color: var(--s-warning); }
+.camtile.t-soon { border-color: var(--s-alert); }
 
 /* Under the name, and only on a tile with something to say. A border with no words is the
    ambiguity the lightbox pill was rewritten to remove: red against amber carrying the whole
@@ -2243,7 +2243,7 @@ table.data .dash { color: var(--outline); }
    carries the same dead rule; it is not this change's to fix. */
 .camsay .i { flex: none; font-size: 15px; }
 .camtile.t-now  .camsay .i { color: var(--s-danger); }
-.camtile.t-soon .camsay .i { color: var(--s-warning); }
+.camtile.t-soon .camsay .i { color: var(--s-alert); }
 /* `display: flex` above beats the browser's `[hidden]` rule, and there is no `hidden` here to
    beat it with — a quiet tile simply has no tier class. */
 .camtile:not(.t-now):not(.t-soon) .camsay { display: none; }
@@ -3240,9 +3240,9 @@ body.side #side { display: flex; }
    **The divider between groups went the same way.** This pane separates by space, which is the rule
    the Notices pane already obeys and the rule M3's layout guidance states. `.nsub` carries its own
    8px top margin, so the gap is the subheader's and not a border's.
-   **The tag still tells `heavy` from `soon`.** Both take one amber, the shape `now` already has:
-   one red over a river at its mark and over a sounding siren. A fourth hue would put four
-   traffic-light steps on a pane with three things to say about severity. */
+   **The tag still tells `heavy` from `soon`.** Since 2026-10-15 the color does too: `soon` is amber
+   to match the pin, and `heavy` keeps the orange. The tag word stays, because two close hues
+   are not enough on their own. */
 .alert { padding: 0 0 8px; }
 .alert.t-stale { opacity: .82; }
 /* The subheader wraps rather than squashing its own tag. A 312px pane holds a 24px glyph, a title
@@ -3263,7 +3263,7 @@ body.side #side { display: flex; }
    reach the subheader's glyph too and undo the rule directly above. */
 .alert.t-now   .slist .i { color: var(--s-danger); }
 .alert.t-heavy .slist .i { color: var(--s-warning); }
-.alert.t-soon  .slist .i { color: var(--s-warning); }
+.alert.t-soon  .slist .i { color: var(--s-alert); }
 .alert.t-stale .slist .i { color: var(--muted); }
 /* `.tg`, the tier tag, is gone since 2026-10-14. Every section title states its tier in words. */
 /* One card per kind per tier, and every row in it is a place — see alerts.js for why.
@@ -3815,7 +3815,7 @@ body.side #side { display: flex; }
 }
 .tlticks i { position: absolute; top: 0; height: 100%; min-width: 2px; }
 .tlticks i.t-now  { background: var(--s-danger); }
-.tlticks i.t-soon { background: var(--s-warning); }
+.tlticks i.t-soon { background: var(--s-alert); }
 /* The hovered frame's time. Literal colours, like the rest of the control bar, because it sits over
    the picture on a mouse and a theme token would draw it light on a light frame. */
 .tlpeek {

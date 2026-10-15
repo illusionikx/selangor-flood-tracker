@@ -165,7 +165,7 @@ export function render() {
     // colour while nothing on it is signalling and the lead is actually reporting — a status colour
     // outranks it, and a mast with no reading must stay grey rather than look confident.
     const multi = members.length > 1;
-    const quiet = multi && hasInfo(lead) && members.every(m => !(m.status > 0));
+    const quiet = multi && hasInfo(lead) && members.every(m => !(m.status > 0) && !m.rising);
     /* A heart on the pin when **any** sensor here is a favorite. It is not when all of them are,
     which is the mast header button's rule. The two answer different questions. The button is a
     control and acts on every sensor at the mast. So it has to state exactly what one press will
@@ -210,7 +210,7 @@ export function render() {
            note in `pinGlyph()`. It is written here rather than derived with `:has()`, because a
            relational selector over 260 markers is a cost of its own and this is one word. */
         html: `<span class="pin disc${multi ? ' multi' : ''}${lead.online ? '' : ' off'}${
-                     rising ? ' rise' : ''}${critical ? ' danger' : ''}${inkdark}" style="--c:${c}">${
+                     critical ? ' danger' : ''}${inkdark}" style="--c:${c}">${
                pinGlyph(multi ? MAST.icon : KINDS[lead.kind].icon, true)}${
                fav ? `<b class="fv">${pinGlyph('favorite')}</b>` : ''}</span>`,
       }),

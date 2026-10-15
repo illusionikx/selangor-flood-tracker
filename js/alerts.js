@@ -279,7 +279,7 @@ const favicon = red => {
 
    An outage notice sits above all of it, including HAPPENING NOW. It is not another item in the
    list. It is a caveat on the list itself, and it says the list may be incomplete. The all-clear is
-   why. "All clear. Nothing rising or in danger" can be false precisely because a source stopped
+   why. "All clear. No sensor is on alert" can be false precisely because a source stopped
    answering, and EEMUA's point is that a reader must be able to tell no alarms from a dead alarm
    system.
 
@@ -423,7 +423,7 @@ export function alerts() {
     [sirens, 'campaign',    'sounding', STATUS_COLOR[3]],
     [flooded, 'straighten', 'flooded', STATUS_COLOR[3]],
     [rain,   'rainy',       'in heavy rain', STATUS_COLOR[2]],
-    [rising, 'expand_less', 'rising', STATUS_COLOR[2]],
+    [rising, 'expand_less', 'rising', STATUS_COLOR[1]],
     [stale,  'wifi_off',    'not current', 'var(--muted)'],
   ].filter(([list]) => list.length)
    /* **A chip is a button since 2026-10-14**, on the repository owner's instruction. A press opens
@@ -519,10 +519,10 @@ export function alerts() {
        but counted, so the all-clear is one the reader can weigh. The number they need is the ignored
        sensors that are hot right now, not how many are ignored in total. */
     const muted = state.data.filter(s => isIgnored(s) && isHot(s)).length;
-    write(`<p class="empty muted">All clear${where}. Nothing rising or in danger.</p>${
+    write(`<p class="empty muted">All clear${where}. No sensor is on alert.</p>${
       muted ? `<p class="empty muted"><i class="i i-visibility_off"></i> ${muted} ignored sensor${
-        muted > 1 ? 's are' : ' is'} on alert — restore ${
-        muted > 1 ? 'them' : 'it'} under Ignored sensors in the filters.</p>` : ''}`);
+        muted > 1 ? 's are' : ' is'} on alert. Restore ${
+        muted > 1 ? 'them' : 'it'} in Settings, under Ignored sensors.</p>` : ''}`);
     return;
   }
 

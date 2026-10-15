@@ -363,7 +363,7 @@ details.sensor[open] > summary .chev { transform: rotate(180deg); }
    `css/base.css` holds the six kinds at a lightness where white reads on all six. A status colour
    is the case that would need a flip, and a status pin is the same six-kind box wearing `--s-danger`
    or `--s-alert`: red measures 3.5:1 against white and amber measures 1.6, so the amber pin is the
-   one to look at if a rung ever moves. It is `.pin.rise`, and the ring around it is what says so.
+   one to look at if a rung ever moves. A river forecast to reach its danger mark wears it too.
    **`fill` on the circle and not `color`.** `.pin` sets `color: var(--c)`, so `currentColor` is the
    kind colour and the circle picks it up without naming a token here. That is the same route the
    bare glyph's `fill` already takes.
@@ -443,13 +443,6 @@ details.sensor[open] > summary .chev { transform: rotate(180deg); }
      left to the painting order. */
   z-index: 2;
   filter: drop-shadow(0 1px 1px rgba(0, 0, 0, .45));
-}
-/* Forecast to reach danger. A ring rather than a fill, because it is a claim about the next few
-   hours and not a reading — on the bare pin it is drawn like the halo below, since there is no
-   longer a box for a box-shadow to trace. */
-.pin.rise::before {
-  content: ''; position: absolute; inset: -5px; border-radius: 50%;
-  border: 3px solid var(--s-danger);
 }
 /* Danger level or a sounding siren: on top, in the danger red, with a repeating halo. The halo is
    what a filled disc used to do — it makes the pin bigger than a glyph without hiding which glyph
@@ -690,7 +683,7 @@ details.sensor[open] > summary .chev { transform: rotate(180deg); }
    and made a badge out of a label. */
 .camwarn .i { font-size: 16px; flex: none; filter: drop-shadow(0 1px 3px rgb(0 0 0 / .95)); }
 .camwarn.t-now  .i { color: var(--s-danger); }
-.camwarn.t-soon .i { color: var(--s-warning); }
+.camwarn.t-soon .i { color: var(--s-alert); }
 /* `display: flex` above beats the browser's own `[hidden]` rule, so it has to be said again. The
    lightbox scrubs through an archive and parks an empty pill on the calm frames — see paint() in
    js/timeline.js — which holds the strip above the picture open and shows nothing in it. */
@@ -761,10 +754,23 @@ details.sensor[open] > summary .chev { transform: rotate(180deg); }
   line-height: var(--md-sys-typescale-body-medium-line-height);
   letter-spacing: var(--md-sys-typescale-body-medium-tracking);
 }
-/* The step happening now. The marker labels it and the outline finds it. So a reader scanning nine
-   steps lands on the right one before reading any of them.
-   The outline goes on the ITEM, because the item is what carries the shape it follows. */
-.wxstep.now { outline: 2px solid var(--accent); outline-offset: -2px; }
+/* **The weather panel's stack is three groups under M3 LIST SUBHEADERS, since 2026-10-15.** They are
+   `Earlier`, `Now` and `Later`, and `js/wx.js` writes them. A reader asked for `Now` and `Later`
+   with a divider between them.
+   That replaced a 2px accent outline on the now step. An M3 list item states no outline, and a ring
+   of the accent reads as keyboard focus. A selected fill was not used either. This app bridges
+   `secondary-container` to the full accent, so that fill draws a solid blue row.
+   The subheader takes the numbers `.nsub` and `#settingsBox h3` state: `title-small` in
+   `on-surface-variant`, 48dp. The divider is `.sensor + .sensor`'s own rule. */
+.sbody > li.wxsub {
+  display: flex; align-items: center; min-height: 48px; padding: 0 4px;
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--md-sys-typescale-title-small-size);
+  line-height: var(--md-sys-typescale-title-small-line-height);
+  font-weight: var(--md-sys-typescale-title-small-weight);
+  letter-spacing: var(--md-sys-typescale-title-small-tracking);
+}
+.sbody > li.wxsub ~ li.wxsub { border-top: 1px solid var(--md-sys-color-outline-variant); }
 /* **A play arrow and the word, in the accent and in bold.** The repository owner asked for that on
    2026-08-25, over an outlined 9px `NOW` chip.
    **It stands IN PLACE OF the clock**, so it takes `.wxwhen`'s own slot in the supporting line. A

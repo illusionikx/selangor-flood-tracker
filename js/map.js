@@ -490,8 +490,7 @@ export function applyTheme() {
   document.querySelector('meta[name=theme-color]').content = t === 'dark' ? '#202124' : '#ffffff';
   setBasemap();
   /* **A pin sprite is a picture, so a theme swap has to throw the cache away.** The disc edge is
-     `--surface`, the heart is `--fav` and the rise ring is `--s-danger`, and all three move with the
-     shade. A DOM pin re-read its tokens on its own and a bitmap cannot.
+     `--surface` and the heart is `--fav`, and both move with the shade. A DOM pin re-read its tokens on its own and a bitmap cannot.
      **`pins` is declared below this function and is safe to touch.** Nothing in this module calls
      `applyTheme()` at evaluation time. `js/ui.js` makes the first call, and that module imports this
      one, so the whole file has run by then. */

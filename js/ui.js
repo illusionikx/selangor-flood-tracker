@@ -1728,17 +1728,13 @@ lbShot.onload = lbShot.onerror = () => {
 
 /* **The back arrow and Esc close the lightbox alone**, on the repository owner's instruction of
    2026-10-14, so the reader lands on the camera wall or the station panel that opened it.
-   **A press on the backdrop does the same above 600px.** Below 600px it closes the opener too and
-   lands the reader on the map. The owner asked for both, one after the other, the same day.
+   **A press on the backdrop does the same at every width.** Below 600px it used to close the opener
+   too and land the reader on the map. The owner reversed that on 2026-10-15: a tap outside the
+   lightbox closes the lightbox alone.
    Nothing inside needs an exemption: the old tap-anywhere overlay could not tell a dismissal from a
    scrub, and this dialog has no such overlay. */
-const lbWide = matchMedia('(min-width: 601px)');
 lightbox.onclick = e => {
-  if (e.target !== lightbox) return;
-  lightbox.close();
-  if (lbWide.matches) return;
-  camBox.close();
-  closeSide();
+  if (e.target === lightbox) lightbox.close();
 };
 /* A wrapper, because `reset` is no longer a binding. It shares `withTimeline` with the opener, so a
    close registered while the module is still loading still runs after the open. */

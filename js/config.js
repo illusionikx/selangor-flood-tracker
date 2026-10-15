@@ -88,8 +88,8 @@ export const MET_NAME = 'MET Malaysia';
    Three colours is a code a reader learns once.
 
    **`--s-warning` IS STILL LIVE and must not be deleted.** No level ladder reaches it any more. The
-   TIER language still does: `.alert.t-soon`, `.alert.t-heavy`, the ticker, the camera tile and the
-   timeline ticks all paint it, and that answers how urgent rather than how high. Two different
+   TIER language still does: `.alert.t-heavy` and the ticker paint it. `soon` moved to `--s-alert` on
+   2026-10-15. That answers how urgent rather than how high. Two different
    questions, so two ladders of different lengths is correct.
    **`--s-trace` HAS NO CALLER LEFT ANYWHERE.** Its only user was the flood gauge's rung 1, on the
    pin, in `GAUGE_COLOR` and in `.state.trace`. All three are gone. The token stays declared in
@@ -126,8 +126,8 @@ export const KIND_RANK = ['river', 'siren', 'gauge', 'rainfall', 'camera'];
 /* Traffic light by status: normal → alert → warning → danger. **This is the TIER ladder now, and it
    is not a sensor's level.** It answers how urgent a claim is, which is what the alert panel's
    groups, the app bar glyph and the favicon ask. The three ladders above answer how high a sensor
-   is, and they hold three colours. Do not fold the two together: `heavy` and `soon` are two tiers
-   that share `--s-warning`, and a river's alert mark and warning mark are two marks that share
+   is, and they hold three colours. Do not fold the two together: `soon` takes `--s-alert` since 2026-10-15
+   to match the amber pin, and a river's alert mark and warning mark are two marks that share
    `--s-alert`. Four rungs here, three there, and each is right for its own question. */
 export const STATUS_COLOR = ['var(--s-normal)', 'var(--s-alert)', 'var(--s-warning)', 'var(--s-danger)'];
 

@@ -39,7 +39,7 @@ export const R_DISC = 17.5 * U;                     // 13.39 — the disc a hit 
 const W_DISC = 2.5 * U;
 const R_SHADE = 17.6 * U, DY_SHADE = 1.3 * U;
 const G_SIZE = 24 * U;                              // 18.36 — the glyph knocked out of the disc
-const R_RISE = (49 / 2 - 3 / 2) * SCALE, W_RING = 3 * SCALE;
+const W_RING = 3 * SCALE;
 const R_HALO = (51 / 2 - 3 / 2) * SCALE;
 const FAV_SIZE = 17 * SCALE, FAV_OFF = 14 * SCALE;  // the heart, on the pin's lower trailing corner
 /* `.cluster` is a 25px chip with a 1px border and a 12px 500-weight count. It is the one mark on the
@@ -48,10 +48,10 @@ const R_CHIP = 25 / 2, W_CHIP = 1, CHIP_FONT = '500 12px system-ui, sans-serif';
 const R_CHIP_GLOW = R_CHIP + 2;
 const SHADOW = 'rgba(0, 0, 0, .45)';                // the one lift every mark on this map casts
 
-/* Half the sprite, in screen pixels. The rise ring is the widest thing a sprite holds, at
-   `R_RISE + W_RING / 2`. The danger halo is not in the sprite at all — it animates, so it is drawn
-   live on the second canvas. */
-const HALF = Math.ceil(R_RISE + W_RING / 2) + 1;
+/* Half the sprite, in screen pixels. The favorite heart and its 1px shadow reach furthest from the
+   centre. The rise ring held that place until 2026-10-15. The danger halo is not in the sprite at
+   all. It animates, so the second canvas draws it live. */
+const HALF = Math.ceil(FAV_OFF + FAV_SIZE / 2 + 1) + 1;
 
 /* Material's own icons carry a `0 -960 960 960` viewBox, so a path's y runs from -960 to 0. The
    sprite draws into a box of `G_SIZE` centred on the origin. */
@@ -108,12 +108,11 @@ let sprites = new Map(), spriteDpr = 0;
 export function resetSprites() { sprites = new Map(); }
 
 function sprite(p, dpr) {
-  const key = `${p.icon}|${p.c}|${p.ink}|${p.off ? 1 : 0}|${p.rise ? 1 : 0}|${p.fav ? 1 : 0}`;
+  const key = `${p.icon}|${p.c}|${p.ink}|${p.off ? 1 : 0}|${p.fav ? 1 : 0}`;
   const hit = sprites.get(key);
   if (hit) return hit;
 
   const surface = token('var(--surface)') || '#fff';
-  const danger = token('var(--s-danger)') || '#f33';
   const favCol = token('var(--fav)') || '#cc1f7a';
   const fill = token(p.c) || '#4a86e8';
 
@@ -144,12 +143,6 @@ function sprite(p, dpr) {
     x.fillStyle = p.ink;
     x.fill(g);
     x.restore();
-  }
-
-  // Forecast to reach danger: a ring outside the disc, in the danger red. `.pin.rise::before`.
-  if (p.rise) {
-    x.beginPath(); x.arc(0, 0, R_RISE, 0, 7);
-    x.lineWidth = W_RING; x.strokeStyle = danger; x.stroke();
   }
 
   /* The favorite heart, on the lower trailing corner. It carries its own lift in the DOM, and here
