@@ -3916,6 +3916,17 @@ foreach ($stations as &$s) {
 }
 unset($s);
 
+/* A flood gauge past its own warning mark asks the same question as a siren. Taman Maznah read 0 m
+   for a month, then 0.64 m and 0.62 m on two daily readings, with every river within 5 km normal and
+   0 mm at the rain gauge 600 m away. The gauge reports once a day, so it stays on alert all day.
+   ponytail: rivers only, like a siren. Local rain can flood a spot while the rivers stay low, and
+   this check then calls it faulty. Add nearby rain as backing evidence if a real case shows up. */
+foreach ($stations as &$s) {
+    if ($s['kind'] === 'gauge' && $s['online'])
+        $s['backed'] = $s['status'] > 0 ? sirenBacked($s['lat'], $s['lng'], $riverMarks) : null;
+}
+unset($s);
+
 /* `lastOn`: when each siren last reported 1, out of everything `.history.db` keeps (RETAIN, 30 days).
    The card's `Last triggered` row reads it. `history` cannot answer, because it holds 12 hours.
    A range on the key and not a LIKE, so SQLite walks the primary key. Measured at 3 ms on 2,225

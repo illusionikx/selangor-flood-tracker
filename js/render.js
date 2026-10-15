@@ -3,7 +3,7 @@
 import { KINDS, MAST, HEAT_FLOOR, HEAT_KM, RAIN_KM, RAIN_STOPS, DARK_INK_FILL } from './config.js';
 import { state, PREFS, save } from './state.js';
 import { el, color, atDanger, statusColor, leads, hasInfo, isIgnored, ignoredIds,
-         favIds, isFav, scalePos, levelStops, gaugeStops, setBox, isHot } from './util.js';
+         favIds, isFav, scalePos, levelStops, gaugeStops, setBox, isHot, doubted } from './util.js';
 import { marks, siteMark, shown, syncCluster, focusOn, side, openSide,
          showMast, hideMast, markSel, pinGlyph } from './map.js';
 import { heat, rainHeat, syncHeat, thinHeat } from './heat.js';
@@ -125,7 +125,7 @@ export function render() {
     const near = !hasInfo(s) ? 0
       : s.kind === 'river' ? (levelStops(s) ? scalePos(s.level, levelStops(s)) / 100 : 0)
       : s.kind === 'gauge' && s.depth > 0
-        ? (s.status >= 1 ? 1 : scalePos(s.depth, gaugeStops(s)) / 100)
+        ? (s.status >= 1 && !doubted(s) ? 1 : scalePos(s.depth, gaugeStops(s)) / 100)
       : 0;
     // Below the alert slot nothing paints at all: there is nothing to act on down there, and a map
     // warm from end to end is a map nobody reads.
@@ -142,7 +142,7 @@ export function render() {
        station's own total denies the reading, so it cannot paint. It must not erase either. A
        reading nobody can stand behind is no evidence that the ground under it is dry.
        See `rainBacked()` in api.php and `raining()` in util.js. */
-    if (s.kind === 'rainfall' && hasInfo(s) && s.backed !== false)
+    if (s.kind === 'rainfall' && hasInfo(s) && !doubted(s))
       s.hourly > 0 ? rainPoints.push([s.lat, s.lng, scalePos(s.hourly, RAIN_STOPS) / 100])
                    : dryPoints.push([s.lat, s.lng]);
 
@@ -298,6 +298,7 @@ export function render() {
   counts();
   ignoredPanel();
   favPanel();
+  faultyPanel();
   // Every poll rebuilds the map; the table has to follow or it sits on readings the map has already
   // replaced. Only while it is open — no point rendering 435 rows into a closed dialog.
   /* `.then()`, not `await`. A dialog can only be open because its opener already imported the
@@ -368,6 +369,25 @@ function favPanel() {
     || '<li class="none">Nothing starred yet. Use the Details button on a station, or on any sensor '
      + 'in its card.</li>';
   el('favClear').disabled = !rows.length;
+}
+
+/* Every live sensor the server marks as a faulty signal, for the Settings subpage. Listed whether
+   `Hide faulty signals` is on or off: the switch decides what the app does with the finding, and the
+   finding is the same either way. The reason is the line the station card prints. */
+const FAULT = {
+  siren:    'No river nearby is high.',
+  gauge:    'No river nearby is high.',
+  rainfall: 'No rain reached this gauge.',
+};
+function faultyPanel() {
+  const rows = state.data.filter(s => s.backed === false && hasInfo(s));
+  el('faultyN').textContent = rows.length || '';
+  el('faultyList').innerHTML = rows.map(s => `<li>
+      <i class="glyph i i-${KINDS[s.kind].icon}" style="color:${KINDS[s.kind].color}"></i>
+      <span class="nm">${s.name}<br><span class="muted">${
+        KINDS[s.kind].one || KINDS[s.kind].label} · ${FAULT[s.kind] || 'Faulty signal.'}</span></span>
+    </li>`).join('')
+    || '<li class="none">No faulty signals right now.</li>';
 }
 
 // The per-kind numbers in the sensor-kinds menu. Counted per *station*, not per marker: several

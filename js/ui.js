@@ -119,8 +119,32 @@ const aboutBox = el('aboutBox'), helpBox = el('helpBox');
    the HTML spec states, so the row that opened a dialog leaves nothing behind it. */
 const openAbout = () => { closeSide(); aboutBox.scrollTop = 0; loadEgg(); aboutBox.showModal(); };
 const openHelp  = () => { closeSide(); helpBox.scrollTop  = 0; helpBox.showModal(); };
+/* **Settings has a main page and three subpages**, on the repository owner's instruction of
+   2026-10-15. One `.spage` shows at a time and the header takes its `data-title`. On a subpage the
+   back arrow and Escape return to the main page. On the main page both close the pane, as before.
+   The pane always opens on the main page. */
+const setTitle = el('settingsTitle');
+let setPage = 'setMain';
+function showSetPage(id) {
+  setPage = id;
+  for (const p of settingsBox.querySelectorAll('.spage')) p.hidden = p.id !== id;
+  setTitle.textContent = el(id).dataset.title || 'Settings';
+  settingsBox.scrollTop = 0;
+  settingsBox.querySelector('.docbody').scrollTop = 0;
+}
+settingsBox.addEventListener('click', e => {
+  const go = e.target.closest('[data-page]');
+  if (go) showSetPage(go.dataset.page);
+});
+const backToMain = e => {
+  if (setPage === 'setMain') return;
+  e.preventDefault();
+  showSetPage('setMain');
+};
+el('settingsBack').onclick = backToMain;
+settingsBox.addEventListener('cancel', backToMain);
 const openSettings = () => {
-  closeSide(); settingsBox.scrollTop = 0; settingsBox.showModal(); paintDev();
+  closeSide(); showSetPage('setMain'); settingsBox.showModal(); paintDev();
 };
 for (const [fn, ids] of [[openAbout, ['railAbout', 'menuAbout']], [openHelp, ['railHelp', 'menuHelp']],
                          [openSettings, ['railSettings', 'menuSettings']]])
@@ -222,6 +246,20 @@ wash.oninput = () => {
   save();
   sayWash();
   heatOpacity();
+};
+
+/* **Hide faulty signals.** The preference writes the box, never the reverse, for the reason the wash
+   above states. Unset reads as on. A change moves alerts, so it repaints everything an ignored
+   sensor repaints, the ticker included. */
+const faulty = el('hideFaulty');
+const sayFaulty = () => faulty.closest('.msw').classList.toggle('on', faulty.checked);
+faulty.checked = PREFS.hideFaulty !== false;
+sayFaulty();
+faulty.onchange = () => {
+  PREFS.hideFaulty = faulty.checked;
+  sayFaulty();
+  save();
+  render(); alerts(); ticker();
 };
 
 /* **Three presses in Settings destroy a list a reader built by hand, and one dialog asks about all

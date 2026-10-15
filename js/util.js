@@ -186,7 +186,12 @@ export const gaugeStops = s => [[0, 0], [s.warning || 0.15, 68], [s.danger || 0.
    Water over a place known to flood is never the normal state, so it takes the alert rung at least,
    and the two published marks move up to warning and danger. Dry ground alone keeps 0.
    One definition for the pin, the card, the table cell and the table's hover panel. */
+/* A gauge that no nearby river backs keeps rung 1, water on the ground, and loses the two marks.
+   `backed` in api.php is the same check a siren takes. `!== false`, so a gauge with no river in
+   reach keeps its reading. Every caller of this rung follows: the pin, the card, the table and
+   `atDanger()`, and through it `isCritical()`. */
 export const gaugeTone = s => s.depth == null || s.depth <= 0 ? 0
+  : doubted(s) ? 1
   : s.status >= 2 ? 3
   : s.status >= 1 ? 2 : 1;
 
@@ -252,7 +257,15 @@ export function color(s) {
    keeps the benefit of the doubt. Silencing a real evacuation alarm is the worse of the two errors.
    Both reds read this, the alert path's and the map's: a pin painted red off a siren the alert panel
    refuses to list is the map contradicting the panel, and one of them is wrong on screen. */
-export const sounding = s => s.kind === 'siren' && s.status > 0 && s.backed !== false;
+export const sounding = s => s.kind === 'siren' && s.status > 0 && !doubted(s);
+
+/* Is this reading set aside as a faulty signal? `backed === false` is the server's finding, and the
+   `Hide faulty signals` row in Settings decides whether the app acts on it. The row is on by default,
+   so `undefined` hides. Off, a faulty reading alerts the way it did before the checks existed, and
+   the card still names it as faulty. Every check of `backed` that changes a colour or an alert goes
+   through here: a siren, a rain gauge and a flood gauge alike. Added on the repository owner's
+   instruction, 2026-10-15. */
+export function doubted(s) { return s.backed === false && PREFS.hideFaulty !== false; }
 
 /* Is this gauge actually catching rain? The same question as `sounding()` and the same answer, on a
    different sensor. `hourlyRainfall` is a rolling one hour total and `cumulativeRainfall` only
@@ -263,7 +276,7 @@ export const sounding = s => s.kind === 'siren' && s.status > 0 && s.backed !== 
    since only Selangor publishes an odometer. A gauge nobody can check keeps its reading.
    Measured 2026-08-14, 4 of the 25 live gauges with enough archive to ask were claiming rain their
    own total denied. One had held 4.5 mm for twelve hours against an odometer that never moved. */
-export const raining = s => s.kind === 'rainfall' && s.hourly > 0 && s.backed !== false;
+export const raining = s => s.kind === 'rainfall' && s.hourly > 0 && !doubted(s);
 
 /* Is this station the reason someone opens the map at all: a river at danger, a siren sounding, or
    rain in JPS's heavy class and above.

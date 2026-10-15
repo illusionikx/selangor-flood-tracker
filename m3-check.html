@@ -2023,6 +2023,25 @@ async function desktop() {
        when a poll happened to land inside the wait. Reading a computed style flushes layout by
        itself, so nothing has to be awaited after the write. */
     await settled();
+    /* **The saved lists live on subpages since 2026-10-15.** A row on the main page opens each one,
+       the header takes the subpage's title, and the back arrow returns to the main page without
+       closing the pane. */
+    const main = d.getElementById('setMain'), favPage = d.getElementById('setFav');
+    is(main.hidden, false, 'settings: the pane opens on its main page');
+    is(!!main.querySelector('#favN') && !!main.querySelector('#ignoredN') && !!main.querySelector('#faultyN'),
+       true, 'settings: the main page carries the three list counts');
+    is(main.querySelector('#favList, #ignoredList, #faultyList'), null,
+       'settings: and none of the three lists');
+    main.querySelector('[data-page="setFav"]').click();
+    is([main.hidden, favPage.hidden].join(','), 'true,false', 'settings: a row opens its subpage');
+    is(d.getElementById('settingsTitle').textContent, 'Favorite sensors',
+       'settings: and the header names the subpage');
+    d.getElementById('settingsBack').click();
+    await settled();
+    is([sb.open, main.hidden, favPage.hidden].join(','), 'true,false,true',
+       'settings: the back arrow returns to the main page and keeps the pane open');
+    is(d.getElementById('settingsTitle').textContent, 'Settings', 'settings: under its own title');
+    main.querySelector('[data-page="setFav"]').click();
     list.innerHTML = `<li>
         <i class="glyph i i-water_drop" style="color:#1a73e8"></i>
         <span class="nm">SUNGAI DAMANSARA DI TTDI JAYA<br
@@ -2036,25 +2055,16 @@ async function desktop() {
     is(Math.round(r(li).height) >= 72, true, 'settings list: M3 two-line item, min 72dp');
     is(cs(li).gap, '16px', 'settings list: M3 16dp between the slots');
     is(cs(li).cursor, 'default', 'settings list: a static row, so no pointer — the button is the action');
-    /* **Segmented, on a reader's instruction of 2026-08-25.** Every row is a filled container on
-       `surface-container`, and the group's own outer edges take the 16dp corner while the rows keep
-       the 4dp one. A row that paints nothing is the STANDARD appearance, which stood here for one
-       revision. */
-    is(cs(li).backgroundColor !== 'rgba(0, 0, 0, 0)', true,
-       'settings list: a segmented row paints a container, never nothing');
-    is(parseFloat(cs(li).borderTopLeftRadius), parseFloat(tok('--md-sys-shape-corner-large')),
-       'settings list: the group’s first row takes M3’s 16dp outer corner');
-    /* **The bottom corner is the INNER one here, and `.mfoot` is why.** The clear action is the
-       group's own last row, in a list of its own under this one, so the two read as one shape and
-       only the footer's row takes the outer corner below. This assertion read 16dp and belongs to
-       the revision before that row moved out of a `.rowbtns` box. A group with no footer still
-       takes 16dp on both ends, which is what `#ignoredList` and the alert groups draw. */
-    is(parseFloat(cs(li).borderBottomLeftRadius),
-       parseFloat(tok('--md-sys-shape-corner-extra-small')),
-       'settings list: and the inner corner below it, where its clear-action footer continues');
-    is(parseFloat(cs(d.querySelector('#settingsBox .mfoot > li')).borderBottomLeftRadius),
-       parseFloat(tok('--md-sys-shape-corner-large')),
-       'settings list: the footer row is what closes the group on M3’s 16dp outer corner');
+    /* **The STANDARD appearance since 2026-10-15**, on the repository owner's instruction. It
+       reverses the segmented one of 2026-08-25. A row paints nothing and carries no corner. */
+    is(cs(li).backgroundColor, 'rgba(0, 0, 0, 0)', 'settings list: a standard row paints no container');
+    is(parseFloat(cs(li).borderTopLeftRadius), 0, 'settings list: and carries no corner');
+    is(d.querySelector('#settingsBox .mseg, #settingsBox .mfoot'), null,
+       'settings: no segmented group is left in this pane');
+    /* **Every line answers the pointer.** A headless run cannot hover, so read the rule. */
+    is(sheetRules(d, 'chrome').some(x => /#settingsBox \.mlist > li:not\(\.none, ?\.readout\):hover/
+         .test(x.selectorText || '') && /color-mix/.test(x.style.cssText)), true,
+       'settings list: every row takes M3’s hover state layer');
     is(cs(li.querySelector('.glyph')).fontSize, '24px', 'settings list: M3 24dp leading icon');
     is(Math.round(r(li.querySelector('.glyph')).height) >= 48, true,
        'settings list: on M3 48dp of leading slot, which is what holds a one-line row at 56');
@@ -2079,31 +2089,23 @@ async function desktop() {
     is(trail.hasAttribute('data-tip'), true, 'settings list: its words ride data-tip, never title');
     is(trail.hasAttribute('title'), false, 'settings list: and never a title, which a phone cannot open');
 
-    /* **The clear action is the group's LAST ROW, not a button under it.** A reader asked for that
-       on 2026-08-25. It was a full-width link in a `.rowbtns` box.
-       **Two elements and one group, because `render.js` owns the list's `innerHTML`.** A row written
-       inside the `<ul>` is wiped on the next poll. So the corners are what say the two are one
-       thing: the list drops its bottom outer corner and `.mfoot` takes it. Assert both halves — a
-       list that kept its corner and a `.mfoot` that took one too reads as two stacked cards. */
+    /* **The clear action is the subpage's last row.** `render.js` owns the list's `innerHTML`, so
+       the action is a one-row list of its own, directly under the list. */
     const foot = list.nextElementSibling;
-    is(foot?.classList.contains('mfoot'), true, 'settings list: its action is the group’s last row');
+    is(foot?.contains(d.getElementById('favClear')), true, 'settings list: its action is the page’s last row');
     is(!!d.getElementById('favClear')?.classList.contains('mrow'), true,
        'settings list: and a row-filling action, never a link in a box of its own');
     is(d.querySelector('#settingsBox .rowbtns'), null, 'settings: no `.rowbtns` left in this pane');
-    /* The two corners that join the boxes are asserted above, beside the row's own. This is the
-       third fact they depend on: the seam is the group's own gap and nothing wider. */
-    is(parseFloat(cs(foot.firstElementChild).borderTopLeftRadius),
-       parseFloat(tok('--md-sys-shape-corner-extra-small')),
-       'settings list: the action row keeps a 4dp corner facing the list above it');
-    is(Math.round(r(foot).top - r(list).bottom), 8,
-       'settings list: on the group’s own 8px gap, so nothing says the action is separate');
+    is(Math.round(r(foot).top - r(list).bottom), 0, 'settings list: with no gap, since standard rows simply stack');
+    // Back to the main page, where the groups below are measured.
+    d.getElementById('settingsBack').click();
 
     /* --- the Developer group --- */
     const dev = d.getElementById('devList');
     const rows = [...dev.children];
     // The row's own class first: `.readout` carries the readings TABLE, which has an id of its own.
     is(rows.map(x => x.className || x.querySelector('[id]')?.id).join(','),
-       'testMode,readout,devForce,devRaw,devReset',
+       'testMode,devReadings,devForce,devRaw,devReset',
        'developer: the reader’s own order — switch, readings, refresh, raw, reset');
     /* **M3's switch.** Track 52x32 with a 2px border, thumb 16px off and 24px on, in a 48x68 target.
        The amber `.testtog` pill is gone. */
@@ -2128,8 +2130,11 @@ async function desktop() {
     box.checked = false;
     sh0.remove();
     await settled();
-    /* The readings take no press: no button, no anchor, no pointer. */
-    const ro = dev.querySelector('.readout');
+    /* The readings take no press: no button, no anchor, no pointer. They sit on a subpage since
+       2026-10-15, and a Developer row opens it. */
+    const ro = d.querySelector('#setReadings .readout');
+    is(d.getElementById('devReadings')?.dataset.page, 'setReadings',
+       'developer: a row opens the readings subpage');
     is(ro.querySelector('button, a'), null, 'developer: the readings row holds no control');
     is(cs(ro).cursor, 'default', 'developer: so nothing about it invites a tap');
     is(!!ro.querySelector('#devstats'), true, 'developer: and it is where the readings table lives');
@@ -2158,7 +2163,7 @@ async function desktop() {
     const devH = [...sb.querySelectorAll('h3')].pop();
     is(cs(devH).fontSize, cs(sh).fontSize,
        'settings: the Developer heading is the same subheader, so the pane has one heading style');
-    is(Math.round(r(sh).left), Math.round(r(li).left),
+    is(Math.round(r(sh).left), Math.round(r(sh.nextElementSibling.firstElementChild).left),
        'settings: the subheader and its rows stand on one inset');
     is(Math.round(r(devH).left), Math.round(r(dev.firstElementChild).left),
        'settings: and so does the group under it');
@@ -2436,10 +2441,11 @@ async function alertPane() {
   // A row opens a station card, so it keeps a pointer. Settings rows are static and must not.
   is(cs(li[0]).cursor, 'pointer', 'alert row: pressable');
 
-  /* The hoist check. `.mseg` moved out of `#settingsBox` so two surfaces state one set of numbers,
-     and an unscoped class rule can lose to `.picklist li` on source order alone. */
+  /* The specificity check. An unscoped class rule can lose to `.picklist li` on source order alone,
+     so a settings row must still read its own numbers. The favorites list sits on a subpage. */
   d.getElementById('settingsBox').showModal();
   await settled();
+  d.querySelector('#setMain [data-page="setFav"]').click();
   /* A FIXED row, injected into the favorites list rather than found in it. Two reasons, and both
      already have a rule in this file. A reader with no favorites leaves that list holding `li.none`
      alone, so there is nothing to measure. And a loose `.mseg > li` search reaches the Developer
@@ -2459,6 +2465,7 @@ async function alertPane() {
     is(cs(srow).cursor, 'default', 'settings row: still static, unlike an alert row');
   }
   srow.remove();
+  d.getElementById('settingsBack').click();
   d.getElementById('settingsBox').close();
   await inFrame(d, drive('closeSide();'));
   await settled();

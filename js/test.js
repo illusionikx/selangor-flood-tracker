@@ -240,6 +240,7 @@ function drown(s) {
     const mark = s.danger ?? 0.3;
     s.depth = +(mark * 1.2).toFixed(2);
     s.status = 2;
+    s.backed = true;   // a faked flood has no high river beside it — see soak()
     s.history = ramp(s.depth, mark / 40, gaugeCode(s));
   } else if (s.kind === 'siren') {
     s.status = 1;
@@ -313,6 +314,7 @@ export function seedTest(data) {
          here that colour would ship unseen. 0.2 m is past the warning mark. */
       s.depth = gauges % 2 ? 0.08 : 0.2;
       s.status = s.depth > 0.15 ? 1 : 0;
+      s.backed = true;
       s.history = ramp(s.depth, s.depth / 50, gaugeCode(s));
     } else if (s.kind === 'siren' && s.online && ++sirens % 9 === 0) {
       s.status = 1;

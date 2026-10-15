@@ -1094,45 +1094,31 @@ body.testmode header {
 /* The bordered, inner-scrolling box is gone. `max-height: 26vh` put a second scroller inside a pane
    that already scrolls. The cost is a long pane for a reader holding forty favorites, and this pane
    is where that list belongs. */
-/* --- M3 segmented list, shared -------------------------------------------------------------------
-
-   `.mseg` is M3's list at `appearance: segmented`. TWO surfaces draw one: the two saved lists in
-   Settings, and every alert group in the "On alert" pane. The numbers are stated once here so the
-   two cannot drift, and each surface states only what it diverges on below.
-
-   Segmented gives every row a filled container and gives the GROUP one shape. So the rows carry a
-   4dp inner corner and the group's own first and last row take the 16dp outer one.
-
-   `surface-container` is `--hover` through the bridge in `css/base.css`. That is this app's one
-   container tone, and the palette rule keeps M3's tonal ladder out of it. */
-.mseg {
-  display: flex; flex-direction: column; gap: 8px; list-style: none; margin: 0; padding: 0;
-}
-.mseg > li {
-  display: flex; align-items: center; gap: 16px; padding: 8px 16px; min-height: 72px;
-  background: var(--md-sys-color-surface-container);
-  border-radius: var(--md-sys-shape-corner-extra-small);
+/* **The STANDARD appearance since 2026-10-15, on the repository owner's instruction.** It reverses
+   the segmented one of 2026-08-25. A row paints no container and carries no corner. Every row takes
+   M3's hover state layer, a static row as well as a pressable one, because the owner asked for each
+   line to answer the pointer. A static row keeps the default cursor, because only a press target
+   takes the pointer.
+   `.mseg` is deleted. Settings was its last user: the alert groups draw `.mlist` already. */
+#settingsBox .picklist { padding: 0; overflow: visible; }
+#settingsBox .mlist > li {
+  display: flex; align-items: center; gap: 16px; padding: 8px 16px; min-height: 56px;
+  border-radius: 0; cursor: default;
   font-size: var(--md-sys-typescale-body-large-size);
   line-height: var(--md-sys-typescale-body-large-line-height);
   letter-spacing: var(--md-sys-typescale-body-large-tracking);
 }
-.mseg > li:first-child {
-  border-start-start-radius: var(--md-sys-shape-corner-large);
-  border-start-end-radius: var(--md-sys-shape-corner-large);
+/* 72px is M3's TWO-LINE item, and a row with a supporting line is one. */
+#settingsBox .mlist > li:has(.nm .muted) { min-height: 72px; }
+#settingsBox .mlist > li:not(.none, .readout):hover {
+  background: color-mix(in srgb, var(--on-surface) var(--m3-state-hover), transparent);
 }
-.mseg > li:last-child {
-  border-end-start-radius: var(--md-sys-shape-corner-large);
-  border-end-end-radius: var(--md-sys-shape-corner-large);
-}
-/* 72px is M3's TWO-LINE item. Every row on both surfaces carries a headline and a supporting line,
-   so neither surface ever draws the 56px one. A group of one row takes the 16dp corner all round,
-   which `:first-child` and `:last-child` both matching already does. */
-
-#settingsBox .picklist { padding: 0; overflow: visible; }
-/* A saved row is STATIC and its trailing button is the action, so it takes no pointer and no state
-   layer. `.picklist li` hands both to a row that opens something. */
-#settingsBox .mseg > li { cursor: default; }
-#settingsBox .mseg > li:hover { background: var(--md-sys-color-surface-container); }
+#settingsBox .mlist > li:has(.mrow:disabled):hover { background: none; }
+/* The trailing chevron on a row that opens a subpage. `expand_more` turned a quarter, because the
+   icon set has no `chevron_right` and one row does not justify a new fetch. */
+#settingsBox .mgo { flex: none; font-size: 24px; transform: rotate(-90deg);
+  color: var(--md-sys-color-on-surface-variant); }
+#settingsBox .mrow b { margin-left: auto; }
 /* M3's leading slot is 24px wide and 48px tall, which is what holds a one-line row at 56px. */
 #settingsBox .picklist .glyph { font-size: 24px; min-width: 24px; min-height: 48px; }
 #settingsBox .picklist .nm { flex: 1; min-width: 0; line-height: inherit; }
@@ -1145,11 +1131,11 @@ body.testmode header {
 }
 /* The empty state is a one-line item, at M3's 56px and the supporting type. It is the group's only
    row, so it takes the 16dp corner all round. */
-#settingsBox .mseg > li.none {
+#settingsBox .mlist > li.none {
   min-height: 56px; display: flex; align-items: center; letter-spacing: normal;
   font-size: var(--md-sys-typescale-body-medium-size);
   line-height: var(--md-sys-typescale-body-medium-line-height);
-  border-radius: var(--md-sys-shape-corner-large);
+  color: var(--md-sys-color-on-surface-variant);
 }
 
 /* **The trailing action is an M3 ICON BUTTON, and it was a text pill reading `remove`.** A reader
@@ -1173,7 +1159,7 @@ body.testmode header {
    a button that fills the item, so the whole row is the target rather than the words inside it.
    The `<li>` states the container and this states the layout, which is why the item's own padding
    moves onto the button on these three rows. */
-#settingsBox .mseg > li:has(.mrow) { padding: 0; }
+#settingsBox .mlist > li:has(.mrow) { padding: 0; }
 #settingsBox .mrow {
   display: flex; align-items: center; gap: 16px;
   width: 100%; min-height: inherit; padding: 8px 16px; box-sizing: border-box;
@@ -1199,16 +1185,14 @@ body.testmode header {
    list item states no weight change, and a bold row here would bold its supporting line too. */
 #settingsBox .mrow:has(input:checked) .glyph { color: var(--accent); }
 #settingsBox .mrow:has(:focus-visible) { outline: 2px solid var(--accent); outline-offset: -2px; }
-#settingsBox .mrow:hover { background: var(--m3-hover); }
 #settingsBox .mrow:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 #settingsBox .mrow:disabled {
   color: color-mix(in srgb, var(--on-surface) 38%, transparent); cursor: default;
 }
-#settingsBox .mrow:disabled:hover { background: none; }
 /* The readings, as a row of the same group that takes no press. It carries a table rather than a
-   headline, so `align-items: center` and the 72px floor both have to go. */
-#settingsBox .mseg > li.readout { display: block; min-height: 0; padding: 4px 16px; }
-#settingsBox .mseg > li.readout #devstats { margin: 0; }
+   headline, so `align-items: center` and the 56px floor both have to go. */
+#settingsBox .mlist > li.readout { display: block; min-height: 0; padding: 4px 16px; }
+#settingsBox .mlist > li.readout #devstats { margin: 0; }
 
 /* **The wash opacity, on the browser's own range control.** `accent-color` paints the filled track
    and the handle in this app's primary, which is the anatomy M3's own slider states: an active track
@@ -1245,33 +1229,12 @@ body.testmode header {
    stays for the count alone. */
 /* The count must never be pushed off the row by a long title. */
 #settingsBox h3 b { margin-left: auto; font-weight: 500; font-variant-numeric: tabular-nums; }
-/* **A group's action is its LAST ROW, and `.mfoot` is what joins the two boxes.** A reader asked
-   for that on 2026-08-25: the action was a full-width link in a `.rowbtns` box, which read as a
-   control the list had nothing to do with.
-   **Two elements and one group, because `render.js` owns the list's `innerHTML`.** A row written
-   inside the `<ul>` is wiped on the next poll. So the action is a one-row list of its own, and the
-   corners are what say the two are one thing: the list above drops its bottom outer corner and this
-   row takes it.
-   **The gap is the group's own 8px**, so nothing about the seam says the action is separate. */
-#settingsBox .mseg + .mseg { margin-top: 8px; }
-#settingsBox .mseg:has(+ .mfoot) > li:last-child {
-  border-end-start-radius: var(--md-sys-shape-corner-extra-small);
-  border-end-end-radius: var(--md-sys-shape-corner-extra-small);
-}
-#settingsBox .mfoot > li:first-child {
-  border-start-start-radius: var(--md-sys-shape-corner-extra-small);
-  border-start-end-radius: var(--md-sys-shape-corner-extra-small);
-}
-/* A one-line row. It drops the two-line 72px floor. Two groups draw one: the clear action under
-   each saved list, and the three theme rows.
-   **It measures 64 and not 56, and the floor is not what decides that.** The leading slot is 48px
-   tall and the row pads 8px above and below it. M3 reaches 56 by padding a one-line row 4px, and
-   that change moves the clear rows and the three developer actions with it.
-   **The theme rows lost a supporting line on 2026-08-25, on the repository owner's instruction.**
-   Each one read `Follow this device.` or `Dark ink on a pale map.`, and each said what the word
-   above it already says. A row left at 72px then draws as a two-line item with its second line
-   missing. */
-#settingsBox .mfoot > li, #settingsBox #themeList > li { min-height: 56px; }
+/* **A list's clear action is a one-row list under it**, because `render.js` owns the list's
+   `innerHTML` and a row written inside the `<ul>` is wiped on the next poll. The standard appearance
+   has no corners to join, so the two lists simply stack.
+   A one-line row measures 64 and not 56: the leading slot is 48px tall and the row pads 8px above and
+   below it. M3 reaches 56 by padding a one-line row 4px. */
+.spage[hidden] { display: none; }
 
 /* --- M3 switch -----------------------------------------------------------------------------------
    Transcribed from `Switch/switch.css`, which cites m3.material.io/components/switch/specs:
@@ -1308,14 +1271,17 @@ body.testmode header {
   transition: width var(--m3-rail), height var(--m3-rail), background-color var(--m3-rail),
               transform var(--m3-travel);
 }
-.msw:has(:checked) .mswtrack {
+/* `.msw.on` beside every `:has(:checked)`. Chromium does not restyle a `:has()` subject when a
+   script sets the box, and `#hideFaulty` lands checked from `PREFS`. The same repair `setBox()`
+   gives a chip. */
+.msw:is(:has(:checked), .on) .mswtrack {
   border-color: var(--md-sys-color-primary); background: var(--md-sys-color-primary);
 }
-.msw:has(:checked) .mswthumb {
+.msw:is(:has(:checked), .on) .mswthumb {
   width: 24px; height: 24px; background: var(--md-sys-color-on-primary); transform: translateX(24px);
 }
 .msw:active .mswthumb { width: 28px; height: 28px; transform: translateX(2px); }
-.msw:has(:checked):active .mswthumb { transform: translateX(22px); }
+.msw:is(:has(:checked), .on):active .mswthumb { transform: translateX(22px); }
 .msw:has(:focus-visible) { outline: 2px solid var(--accent); outline-offset: -6px; border-radius: 16px; }
 .msw:has(:disabled) { pointer-events: none; opacity: .38; }
 @media (prefers-reduced-motion: reduce) { .mswtrack, .mswthumb { transition: none; } }
@@ -4402,6 +4368,12 @@ body.side #side { display: flex; }
     height: min(88vh, 900px);
   }
   .docbox { max-width: min(var(--dlg-prose), calc(100vw - var(--dlg-inset) * 2)); }
+  /* Settings changes pages inside one dialog, so it takes a fixed box. Sized by its content, it
+     shrank and jumped every time a short subpage opened. The UA `max-height` still caps it. */
+  #settingsBox {
+    width: min(var(--dlg-prose), calc(100vw - var(--dlg-inset) * 2));
+    height: min(88vh, 900px);
+  }
 }
 
 /* --- the pane: side sheet on a desktop, full-screen dialog on a phone -------------------------- */

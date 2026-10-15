@@ -562,6 +562,7 @@ order that file holds them. A trap names itself here, and the file states the ev
 - The siren band frames on the clock, and it is the only graph here that does.
 - A siren reading 1 is a claim, not a fact, and the river behind it is the check
 - A rain gauge's hourly reading is a claim too, and its own odometer is the c...
+- A flood gauge's reading is a claim too, and the river behind it is the check.
 - Nothing outranks a popover except another popover.
 - A graph's samples ride on the element, in `data-pts`.
 - A flood gauge's status colour comes from `gaugeColor()` in `util.js` and no...
@@ -1127,6 +1128,10 @@ order that file holds them. A trap names itself here, and the file states the ev
   scrolling lists stacked over the layer switches pushed those off a phone screen. Nothing sits under
   these two but Developer. A reader who opened Settings to review a list must not press again to see
   it.
+  **SINCE 2026-10-15 SETTINGS IS A MAIN PAGE AND THREE SUBPAGES, IN M3's STANDARD LIST.** That
+  reverses the segmented text below. Favorites, ignored sensors and faulty signals each open a
+  subpage from a row. The back arrow and Escape return to the main page. Every row takes the hover
+  state layer. `.mseg` and `.mfoot` are deleted. See "Settings has subpages" in `docs/FEATURES.md`.
   **Every group here is an M3 LIST, SEGMENTED appearance, and the numbers are `List/list.css`'s
   own.** The item is 72px at two lines, the layout is a flex row with a 16px gap, the leading slot is
   a 24px glyph in a 48px box, the headline is `body-large` and the supporting line is `body-medium`.

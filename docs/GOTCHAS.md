@@ -1728,6 +1728,12 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
   siren's frames. It must never fall back to the live `backed` flag. A picture from last week is
   judged by last week's water, the same rule `camWarn()` obeys. Flood gauges are **not** backing
   evidence — measured, they hold no samples across any alarm window on record.
+- **A flood gauge's reading is a claim too, and the river behind it is the check.** A gauge reports
+  once a day, at 08:00, so a stuck wet reading holds an alert for 24 hours. `api.php` asks
+  `sirenBacked()` about every online gauge past its warning mark and publishes `backed`.
+  `gaugeTone()` caps an unbacked gauge at rung 1, so every red and the alert list drop it. It does
+  not use rain as evidence, so a real flash flood beside low rivers reads as a faulty signal. That
+  cost is accepted. Do not let it silence a gauge it cannot ask: null keeps the reading.
 - **A rain gauge's hourly reading is a claim too, and its own odometer is the check.**
   `hourlyRainfall` is a *rolling* one-hour total and `cumulativeRainfall` only climbs. So rain the
   first claims has to appear in the second across that hour. `rainBacked()` in `api.php` asks it and

@@ -20547,3 +20547,47 @@ The repository owner asked for this on 2026-10-15. A river forecast to reach its
 The cost is real. A reader cannot see on the map whether a river is amber because of its level or because of the forecast. The card still says which, and the alert panel still lists `soon` as its own tier. The forecast does not change the alert path. `isHot()` reads `rising` as before.
 
 The forecast tier `soon` moved from `--s-warning` to `--s-alert` the same day, on a second instruction. The tier now matches the amber pin. This covers six places: the alert list glyph, the ticker, the camera tile border and its glyph, the lightbox warning, and the timeline ticks. The `rising` chip in the alert head is amber too. `heavy` keeps `--s-warning`, so it is now the only tier that uses that orange.
+
+### A flood gauge needs a high river nearby, the same as a siren
+
+The repository owner asked for this on 2026-10-15. Some flood gauges stick on a wet reading. TAMAN MAZNAH read 0 m for a month. Then it read 0.64 m and 0.62 m on two daily readings. Every river within 5 km was normal. The rain gauge 600 m away caught 0 mm. Since the gauge alerts at its danger mark, it put the app bar on alert all day.
+
+`api.php` now asks `sirenBacked()` about every online gauge past its warning mark. The gauge takes `backed`, with the same three answers a siren takes. True means a river within 5 km is at its Amaran mark. False means rivers are in reach and none is high. Null means no river is in reach.
+
+`gaugeTone()` in `js/util.js` keeps a gauge at rung 1 when `backed` is false. So the pin, the card meter and the table pill draw the gauge's own taupe. `atDanger()` and `isCritical()` read that rung, so the gauge leaves the map's red and the alert list. The card keeps the word `FLOODED`, in the off tone, and adds `Faulty signal. No river nearby is high.` The water heat layer weighs the gauge by its depth on the scale, and not at full strength. Test mode sets `backed: true` on every gauge it fakes.
+
+The cost is real. Local rain can flood a spot while every river stays low. This check calls that gauge faulty. Nearby rain was not added as backing evidence. A rain gauge reads the last hour, and a flood gauge reports once a day, so the two windows do not line up. Add rain the day a real flood shows this fault.
+
+### Settings has a switch for faulty signals
+
+The repository owner asked for this on 2026-10-15. A new Alerts section in Settings holds one switch, `Hide faulty signals`. It is on by default, which matches what happened before the switch.
+
+The server marks a reading as faulty with `backed: false` on three kinds of sensor. A siren and a flood gauge are checked against the rivers near them. A rain gauge is checked against its own running total. When the switch is on, the app ignores a faulty reading. It does not alert, it is not red on the map, and it does not paint the heat layer. When the switch is off, a faulty reading alerts the same way as any other reading. The card says `Faulty signal` in both positions, because the finding still holds. Only the color and the alert follow the switch.
+
+`doubted()` in `js/util.js` is the one place that reads the switch. `sounding()`, `raining()`, `gaugeTone()` and both heat paths in `js/render.js` call it. `PREFS.hideFaulty` holds the choice. A missing value means on, so no stored settings need a change.
+
+The switch is called "Hide faulty signals" and not "Ignore faulty sensors". "Ignored sensors" is already the list of sensors a reader mutes by hand, and one word must not name two things.
+
+One switch covers all three sensor kinds. Nothing on screen counts the hidden signals. The owner chose the switch alone over a "Faulty signals" line in the alert list.
+
+The M3 switch style read `:has(:checked)` alone. Chromium does not restyle a `:has()` match when a script sets the box, and this box loads checked from `PREFS`. So `.msw.on` now stands beside each of those rules, the same repair `setBox()` makes for a chip.
+
+### Settings has subpages, in M3's standard list
+
+The repository owner asked for this on 2026-10-15. The Settings main page lists Sensors, Alerts, Theme, Map and Developer. Three rows open a subpage: Favorite sensors, Ignored sensors and Faulty signals. Each row shows its count and a trailing chevron.
+
+A subpage is a `.spage` inside `#settingsBox`. `showSetPage()` in `js/ui.js` shows one page at a time and writes the page's `data-title` into the header. On a subpage, the back arrow and Escape return to the main page. On the main page, both close the pane. The pane always opens on the main page. The list ids did not change, so `render.js` writes each list as before.
+
+The Faulty signals subpage lists every live sensor that the server marks `backed: false`. `faultyPanel()` in `js/render.js` writes it on every poll. Each row names the sensor kind and the reason the card prints. The list shows these sensors whether `Hide faulty signals` is on or off. The switch stays on the main page, above the row that opens the list.
+
+The lists use M3's standard appearance. This reverses the segmented appearance of 2026-08-25. A row paints no container and has no corner. Every row takes M3's hover state layer, because the owner asked for each line to answer the pointer. A static row keeps the default cursor. `.mseg` and `.mfoot` are deleted, because Settings was their last user.
+
+Above 600px the dialog has a fixed size, the same as the table dialog. Sized by its content, it shrank and moved each time a short subpage opened.
+
+The chevron is `expand_more` turned a quarter. The icon set has no `chevron_right`, and one glyph did not justify a new icon fetch.
+
+`m3-check.html` now opens a subpage, measures a standard row, and asserts that the back arrow returns to the main page without closing the pane. It reads the hover rule from the stylesheet, because a headless run cannot hover.
+
+The repository owner asked for two more changes the same day. The readings table moved from the Developer group to a fourth subpage, Readings. A `Readings` row under Test mode opens it. `paintDev()` still writes the table on open and on every poll while the pane is open. The `Faulty signals` row lost its glyph. Its empty leading slot keeps the words in line with the switch row above it, so the two rows read as one setting.
+
+The `Readings` row lost its glyph too, on the same instruction. A settings row takes a glyph only where it names its own setting, the way Android's own settings app draws a list. A row that belongs to the setting above it keeps the empty slot, so its words stay in line.

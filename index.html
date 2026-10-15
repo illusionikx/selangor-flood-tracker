@@ -581,38 +581,32 @@
      comes here for. Developer is last, under a heading that names it. -->
 <dialog id="settingsBox" class="docbox">
   <div class="modalhead">
-    <div class="apflex"><h2>Settings</h2></div>
-    <form class="apptop" method="dialog"><button class="icon dclose" data-tip="Back" aria-label="Back"
-      ><i class="i i-arrow_back"></i></button></form>
+    <div class="apflex"><h2 id="settingsTitle">Settings</h2></div>
+    <!-- On a subpage this button goes back to the main page and does not close the pane.
+         `js/ui.js` cancels the submit there. -->
+    <form class="apptop" method="dialog"><button class="icon dclose" id="settingsBack" data-tip="Back"
+      aria-label="Back"><i class="i i-arrow_back"></i></button></form>
   </div>
   <div class="docbody">
 
-  <!-- Sensors starred from a station card. Listed one row per sensor, not one row per site: the
-       search box groups by site because it matches the map, and this panel manages the saved list
-       itself, so it has to show every id the list holds. A reader who starred one gauge of six
-       needs to see which one.
-       **Open, never a `<details>`.** In the drawer it was collapsed, because two scrolling lists
-       stacked over the layer switches pushed those off a phone screen. Nothing sits under these two
-       but Developer, and a reader who opened Settings to review a list should not press again to see
-       it. The count keeps the same `<b>` and the same id, so `render.js` needed no change. -->
-  <h3>Favorite sensors<b id="favN"></b></h3>
-  <ul id="favList" class="picklist mseg"></ul>
-  <!-- **The clear action is the group's LAST ROW, not a button under it.** A reader asked for that
-       on 2026-08-25. It was a full-width link in a `.rowbtns` box, which read as a control the list
-       had nothing to do with. `.mfoot` joins the two: the list above it drops its bottom outer
-       corner and this row takes it. -->
-  <ul class="picklist mseg mfoot"><li><button class="mrow" id="favClear"
-    ><i class="glyph i i-heart_minus"></i><span class="nm">Remove all favorites</span></button></li></ul>
-
-  <!-- Sensors switched off one at a time from a station card's Details button. Drawn even when
-       empty.
-       **THIS LIST IS THE ONLY PLACE THAT NAMES A SILENCED SENSOR**, and `#ignoredN` below is the
-       only count of them. A muted alarm nobody can find is the thing every alarm standard warns
-       about. Both are load-bearing. Do not delete either. -->
-  <h3>Ignored sensors<b id="ignoredN"></b></h3>
-  <ul id="ignoredList" class="picklist mseg"></ul>
-  <ul class="picklist mseg mfoot"><li><button class="mrow" id="ignoredClear"
-    ><i class="glyph i i-visibility"></i><span class="nm">Stop ignoring all</span></button></li></ul>
+  <!-- **One main page and three subpages, on the repository owner's instruction of 2026-10-15.**
+       The three sensor lists moved off the main page, and each one is a row that opens its own page
+       inside this pane. A subpage is a `.spage` with `hidden`. `data-title` is the header it takes.
+       `js/ui.js` shows one page at a time. The ids inside each page did not change, so `render.js`
+       writes the lists by id as before. -->
+  <div id="setMain" class="spage">
+  <h3>Sensors</h3>
+  <ul class="picklist mlist">
+    <!-- `#favN` and `#ignoredN` are the counts `render.js` writes. **`#ignoredN` is the only count
+         of silenced sensors this app draws.** A muted alarm nobody can find is the thing every
+         alarm standard warns about. Do not delete it. -->
+    <li><button class="mrow" data-page="setFav"><i class="glyph i i-favorite"></i
+      ><span class="nm">Favorite sensors</span><b id="favN"></b
+      ><i class="i i-expand_more mgo" aria-hidden="true"></i></button></li>
+    <li><button class="mrow" data-page="setIgnored"><i class="glyph i i-visibility_off"></i
+      ><span class="nm">Ignored sensors</span><b id="ignoredN"></b
+      ><i class="i i-expand_more mgo" aria-hidden="true"></i></button></li>
+  </ul>
 
   <!-- **The wash opacity, as one row of its own group.** It rode under both ramps on the legend
        until 2026-08-24, and a reader cut it there. It is a setting somebody picks once, and the
@@ -638,7 +632,7 @@
        control from `PREFS.theme` and never the reverse, and a browser restoring form state across a
        reload fires no `change`. -->
   <h3>Theme</h3>
-  <ul id="themeList" class="picklist mseg">
+  <ul id="themeList" class="picklist mlist">
     <li><label class="mrow"><input type="radio" name="theme" value="auto" autocomplete="off"
         ><i class="glyph i i-theme_auto"></i><span class="nm">Automatic</span
         ><i class="i i-check mcheck" aria-hidden="true"></i></label></li>
@@ -651,11 +645,30 @@
   </ul>
 
   <h3>Map</h3>
-  <ul id="mapList" class="picklist mseg">
+  <ul id="mapList" class="picklist mlist">
     <li><i class="glyph i i-gradient"></i><span class="nm">Heatmap opacity<br
         ><span class="muted">Both heat layers use this value.</span></span
       ><span class="mslide"><b id="washPct"></b><input type="range" id="washOpacity"
           min="20" max="100" step="5" autocomplete="off" aria-label="Heatmap opacity"></span></li>
+  </ul>
+
+  <!-- **One switch for every faulty-signal check**, on the repository owner's instruction of
+       2026-10-15. It covers a siren, a rain gauge and a flood gauge. On by default. Off, a faulty
+       reading alerts again, and its card still names it as faulty. `doubted()` in `js/util.js`
+       reads it. No markup `checked`: `js/ui.js` writes the box from `PREFS.hideFaulty`. -->
+  <h3>Alerts</h3>
+  <ul id="alertSetList" class="picklist mlist">
+    <li><i class="glyph i i-warning"></i><span class="nm">Hide faulty signals<br
+        ><span class="muted">A sensor that no nearby reading backs does not alert.</span></span
+      ><label class="msw"><input type="checkbox" id="hideFaulty" autocomplete="off"
+          aria-label="Hide faulty signals"><span class="mswtrack"><span class="mswthumb"></span></span></label></li>
+    <!-- The list the switch acts on. The count covers every faulty signal, whether the switch hides
+         it or not. -->
+    <!-- No glyph, on the repository owner's instruction of 2026-10-15. The empty leading slot keeps
+         the words on the switch row's line, so the row reads as part of that setting. -->
+    <li><button class="mrow" data-page="setFaulty"><i class="glyph" aria-hidden="true"></i
+      ><span class="nm">Faulty signals</span><b id="faultyN"></b
+      ><i class="i i-expand_more mgo" aria-hidden="true"></i></button></li>
   </ul>
 
   <!-- **The developer controls, as one segmented list.** The order is a reader's own, 2026-08-25:
@@ -666,14 +679,16 @@
        alone leaves an empty container in a segmented group, which draws as a gap in the middle of
        the block. -->
   <h3>Developer</h3>
-  <ul id="devList" class="picklist mseg">
+  <ul id="devList" class="picklist mlist">
     <!-- M3's switch, in the list's trailing slot. The row's own label is the headline and the
          warning sits on the supporting line, so the pill that used to carry both is gone. -->
     <li><i class="glyph i i-science"></i><span class="nm">Test mode<br
         ><span class="muted">This mode fakes alerts in this browser only. Nothing reaches JPS.</span></span
       ><label class="msw"><input type="checkbox" id="testMode" autocomplete="off"
           ><span class="mswtrack"><span class="mswthumb"></span></span></label></li>
-    <li class="readout"><table id="devstats"></table></li>
+    <!-- The readings table moved to a subpage on the repository owner's instruction of 2026-10-15. -->
+    <li><button class="mrow" id="devReadings" data-page="setReadings"><i class="glyph" aria-hidden="true"></i
+      ><span class="nm">Readings</span><i class="i i-expand_more mgo" aria-hidden="true"></i></button></li>
     <li><button class="mrow" id="devForce"><i class="glyph i i-refresh"></i
       ><span class="nm">Refresh now</span></button></li>
     <li><a class="mrow" id="devRaw" href="api.php" target="_blank" rel="noopener"
@@ -681,6 +696,40 @@
     <li><button class="mrow" id="devReset"><i class="glyph i i-restart_alt"></i
       ><span class="nm">Reset settings</span></button></li>
   </ul>
+  </div><!-- /#setMain -->
+
+  <!-- Sensors starred from a station card. Listed one row per sensor, not one row per site: the
+       search box groups by site because it matches the map, and this panel manages the saved list
+       itself, so it has to show every id the list holds. A reader who starred one gauge of six
+       needs to see which one.
+       **The clear action is the page's last row.** `render.js` owns the list's `innerHTML`, so the
+       action is a one-row list of its own under it. -->
+  <div id="setFav" class="spage" data-title="Favorite sensors" hidden>
+    <ul id="favList" class="picklist mlist"></ul>
+    <ul class="picklist mlist"><li><button class="mrow" id="favClear"
+      ><i class="glyph i i-heart_minus"></i><span class="nm">Remove all favorites</span></button></li></ul>
+  </div>
+
+  <!-- Sensors switched off one at a time from a station card's Details button. Drawn even when
+       empty. **THIS LIST IS THE ONLY PLACE THAT NAMES A SILENCED SENSOR.** Do not delete it. -->
+  <div id="setIgnored" class="spage" data-title="Ignored sensors" hidden>
+    <ul id="ignoredList" class="picklist mlist"></ul>
+    <ul class="picklist mlist"><li><button class="mrow" id="ignoredClear"
+      ><i class="glyph i i-visibility"></i><span class="nm">Stop ignoring all</span></button></li></ul>
+  </div>
+
+  <!-- Every live sensor the server marks `backed: false`. `faultyPanel()` in `js/render.js` writes
+       it. It lists them whether `Hide faulty signals` is on or off, because the finding is the same
+       either way. -->
+  <div id="setFaulty" class="spage" data-title="Faulty signals" hidden>
+    <ul id="faultyList" class="picklist mlist"></ul>
+  </div>
+
+  <!-- The feed and source counters. `paintDev()` in `js/ui.js` writes the table on open and on
+       every poll while the pane is open, whichever page shows. -->
+  <div id="setReadings" class="spage" data-title="Readings" hidden>
+    <ul class="picklist mlist"><li class="readout"><table id="devstats"></table></li></ul>
+  </div>
   </div><!-- /.docbody -->
 </dialog>
 <!-- **The reset confirmation, as M3's basic dialog.** It replaced a native `confirm()`, which takes
