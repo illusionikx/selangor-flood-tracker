@@ -113,6 +113,9 @@ const M3_EASE = 'cubic-bezier(0.2, 0, 0, 1)';
 /* `#pane` opens from a MutationObserver on the body class, so the open is one microtask plus one
    frame behind the class that asks for it. Every assertion about the pane waits on this. */
 const settled = () => new Promise(res => setTimeout(res, 120));
+// A length as a number. A token keeps its text as written and the build minifies it, so compare
+// the value and never the spelling. `0.1px` and `.1px` are one length.
+const px = v => parseFloat(String(v).trim());
 
 /* **The scale is three lines**, asked for on 2026-09-15: the title, the ramp under it, and the tick
    words under the ramp, spread across its width. This names what is out of place, or returns '' when
@@ -2841,9 +2844,12 @@ async function countLine() {
        actually change: this line was 12px `.muted` with no height, and every old table heading in
        this app was uppercase and letter-spaced.
        **The tracking is read off the token, never asserted as `normal`.** `title-small` carries a
-       real tracking value, `0.1px`. Asserting `normal` would pass only while the rule omits it. */
+       real tracking value, `0.1px`. Asserting `normal` would pass only while the rule omits it.
+       **Compared as a number, through `px()`.** A custom property keeps its value as written, and
+       the build minifies `0.1px` to `.1px`. The computed `letter-spacing` reads `0.1px` either way,
+       so a text comparison failed on the build with nothing wrong on screen. */
     is(st.textTransform, 'none', id + ': sentence case');
-    is(st.letterSpacing, root.getPropertyValue('--md-sys-typescale-title-small-tracking').trim(),
+    is(px(st.letterSpacing), px(root.getPropertyValue('--md-sys-typescale-title-small-tracking')),
        id + ': and the title-small tracking');
     /* `on-surface-variant`, which this app bridges onto `--muted`. Compare against a probe carrying
        the token, never against a hex: the palette has moved four times and every copy went stale. */
@@ -2896,7 +2902,7 @@ async function tableHead(frame, label) {
   is(cs(th).fontSize, root.getPropertyValue('--md-sys-typescale-label-large-size').trim(),
      label + ': label-large');
   is(cs(th).textTransform, 'none', label + ': sentence case, not uppercase');
-  is(cs(th).letterSpacing, root.getPropertyValue('--md-sys-typescale-label-large-tracking').trim(),
+  is(px(cs(th).letterSpacing), px(root.getPropertyValue('--md-sys-typescale-label-large-tracking')),
      label + ': and the label-large tracking');
 
   /* **The sort mark is a glyph now.** It was a CSS triangle, drawn from borders. It existed
@@ -2918,7 +2924,7 @@ async function tableHead(frame, label) {
   is(cs(dh).fontSize, root.getPropertyValue('--md-sys-typescale-title-small-size').trim(),
      label + ': the district head is title-small');
   is(cs(dh).textTransform, 'none', label + ': and sentence case, not uppercase');
-  is(cs(dh).letterSpacing, root.getPropertyValue('--md-sys-typescale-title-small-tracking').trim(),
+  is(px(cs(dh).letterSpacing), px(root.getPropertyValue('--md-sys-typescale-title-small-tracking')),
      label + ': and the title-small tracking');
 
   /* **220px is a floor above 600px, not a fixed width.** `width: 100%` on the two `display:
@@ -3118,13 +3124,13 @@ async function richTip() {
   const head = cs(tip.querySelector('.tiphead'));
   is(head.fontSize, tok('--md-sys-typescale-title-small-size'), 'title-small subhead: size');
   is(head.lineHeight, tok('--md-sys-typescale-title-small-line-height'), 'and its line height');
-  is(head.letterSpacing, tok('--md-sys-typescale-title-small-tracking'), 'and its tracking');
+  is(px(head.letterSpacing), px(tok('--md-sys-typescale-title-small-tracking')), 'and its tracking');
   is(head.fontWeight, tok('--md-sys-typescale-title-small-weight'), 'and its weight');
   is(head.textTransform, 'none', 'sentence case, not the old uppercase block');
 
   const row = cs(tip.querySelector('.tiprow'));
   is(row.fontSize, tok('--md-sys-typescale-body-medium-size'), 'body-medium rows: size');
-  is(row.letterSpacing, tok('--md-sys-typescale-body-medium-tracking'), 'and its tracking');
+  is(px(row.letterSpacing), px(tok('--md-sys-typescale-body-medium-tracking')), 'and its tracking');
   is(row.fontWeight, tok('--md-sys-typescale-body-medium-weight'), 'and its weight');
 
   /* The head and the rows must not land on one scale. Both are 14px, so this is the assertion
