@@ -71,18 +71,43 @@ function tick() {
      does nothing useful and never recovers on its own, so stop and let the next openSide() rebuild
      the card and start a clean loop. */
   if (!img || !img.isConnected) return stop();
-  const wrap = img.parentNode;
   at = (at + 1) % (n + 1);
-  if (at === n) {
-    wrap?.classList.remove('strip');
-    img.src = live;
-    return;
-  }
-  if (at === 0) {
-    wrap?.classList.add('strip');
-    img.src = sheetUrl();
-  }
+  if (at === n) return show(live, false);
+  if (at === 0) return show(sheetUrl(), true);
   img.style.setProperty('--i', at);
+}
+
+/* Change the picture and the `.strip` class in one step, and only once the new picture is decoded.
+   The old tick() flipped the class first and let `img.src` catch up. Until the new bytes arrived the
+   OLD picture sat under the NEW rules: the whole strip squeezed into one 16:9 box (every frame at
+   once, at the wrong ratio) when the live still was slow, or one live still stretched to `n` cells
+   wide when the strip was. A live still comes off JPS and takes a second or more, so this showed up
+   now and then and never on a fast poll.
+   `want` stamps each swap. Two can be in flight, the live still and the strip one tick apart, and
+   the one that decodes last must not overwrite a newer answer.
+   The cell count is read off the strip that is about to be shown, not trusted from start(). The
+   server rebuilds the strip after each capture, and the browser's copy expires after 900 s, so a
+   long-open card can fetch a strip with a different cell count. A stale `--n` then lands every
+   cell half on the one before it. A failed decode leaves the card on the picture it already has. */
+let want = 0;
+function show(url, strip) {
+  const g = gen, w = ++want, p = new Image();
+  p.src = url;
+  p.decode().then(() => {
+    if (g !== gen || w !== want || !img?.isConnected) return;
+    if (strip) setCells(Math.round(p.naturalWidth / SHEET_W));
+    img.src = url;
+    img.parentNode?.classList.toggle('strip', strip);
+    if (strip) img.style.setProperty('--i', at);
+  }, () => {});
+}
+
+/* A strip of fewer than two cells is not a clip, so a bad reading keeps the old count. */
+function setCells(k) {
+  if (k < 2) return;
+  n = k;
+  at = Math.min(at, n - 1);
+  img?.style.setProperty('--n', n);
 }
 
 /* Bind to whatever nodes the card holds right now. Called on a fresh card and on every rebuild of
@@ -108,6 +133,12 @@ function bind(box) {
       box.classList.add('strip');
       img.style.setProperty('--n', n);
       img.style.setProperty('--i', at);
+      /* The cached strip can have expired and been rebuilt with another cell count since start().
+         Read the count off what actually decoded, as show() does. */
+      const me = img;
+      me.decode().then(() => {
+        if (img === me && me.src.includes('sheet=')) setCells(Math.round(me.naturalWidth / SHEET_W));
+      }, () => {});
     }
   }
   if (cap) cap.textContent = capText;

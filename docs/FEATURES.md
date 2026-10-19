@@ -20694,3 +20694,27 @@ The owner asked for three more changes the same day.
 - Every table in Help and About carries a subtle border, in `--outline`. That covers the status matrix and every `.key` list. A line also stands between the rows. This is an exception to the rule of no dividing line, and it stays inside the prose dialogs.
 
 The border work found a fault that was already there. The phone rule for `.key` sat above the base rule in `css/chrome.css`. A later rule of the same specificity wins, so the key never stacked on a phone. It drew two columns at 360px. The phone rule now sits below the base rule.
+
+## The camera clip swaps its picture and its class together
+
+A reader saw the station card's camera clip break now and then. Sometimes it drew every frame of the strip at once, squeezed into one 16:9 box. Sometimes a frame showed half of the one before it and half of the next.
+
+Two faults caused this. Both are in `js/clip.js`.
+
+The first fault was the order of two writes. At the live position, `tick()` removed the `.strip` class and then set `img.src` to the live still. The live still comes from JPS and takes a second or more. Until it arrived, the old strip sat under the rules for a single picture, so all cells squeezed into one box. The reverse step had the same fault. It added `.strip` while the live still was on screen, and the still stretched to `--n` cells wide. `show()` now loads the next picture off screen. It sets the source and the class in one step, after the picture is decoded. A counter, `want`, stops a slow swap from overwriting a newer one.
+
+The second fault was a stale cell count. `start()` read the number of cells once, and the card held it for as long as it stayed open. The server rebuilds the strip after each capture, and the browser copy expires after 900 seconds. A card left open then fetched a strip with another cell count under the old `--n`. Every cell then showed part of its neighbor. `show()` and `bind()` now read the count from the strip that decoded.
+
+Trade-off: a failed live still no longer shows the "image unavailable" box in the middle of a lap. The card keeps the picture it has, and the next lap tries again. The camera wall (`js/wall.js`) sets its count once and never swaps class and source apart, so it did not need this change.
+
+Not checked in a browser. No test covers the swap, because the fault needs a slow live still.
+
+## A faulty signal row takes the reader to the sensor
+
+The repository owner asked for this on 2026-10-19. A row on the Faulty signals subpage in Settings now flies the map to that sensor and opens its card. The reader can then see where the sensor stands, and judge a doubtful reading against the place around it.
+
+Each row is a `.mrow` button that fills the item, which is M3's list action mode. The Developer actions already draw that shape. `faultyPanel()` in `js/render.js` writes `data-fgo` with the sensor id, and one delegated handler in `js/ui.js` reads it. The handler closes Settings and then calls `flashTo()`. Settings is a modal dialog, so the card behind it cannot be seen or reached until it closes. The table does the same before it flies the map.
+
+The favorite and ignored rows stay static. Their trailing button is their own action, and the owner asked only for this list.
+
+A reader who presses back has lost the subpage, because Settings always opens on its main page. That cost is accepted.
