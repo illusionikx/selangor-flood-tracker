@@ -485,6 +485,15 @@ function camUrl(int $id): ?string {
 }
 
 /**
+ * Is this a camera URL on a host this server may fetch? Two hosts: the Selangor API and SPHTN in KL.
+ * `?cam=` and captureShots() both ask, so the allowlist lives in one place.
+ */
+function camHostOk(string $url): bool {
+    $h = parse_url($url, PHP_URL_HOST) ?? '';
+    return strcasecmp($h, HOST) === 0 || strcasecmp($h, KL_HOST) === 0;
+}
+
+/**
  * Is this body a picture?
  *
  * A status code cannot decide what a body is. JPS answers a maintenance window with a short HTML
@@ -519,7 +528,7 @@ if (isset($_GET['cam'])) {
     }
 
     $url = camUrl($id);
-    if (!$url || strcasecmp(parse_url($url, PHP_URL_HOST) ?? '', HOST) !== 0) {
+    if (!$url || !camHostOk($url)) {
         http_response_code(404);
         exit;
     }
@@ -1005,6 +1014,9 @@ function pageHasData(string $key, string $body): bool {
            holds four, and the empty form page holds the same four, so the shared test passes on a
            page with nothing in it. `data-th='No'` appears once per data row and nowhere else. */
         str_starts_with($key, 'prf-')           => str_contains($body, "data-th='No'"),
+        /* The KL camera page holds cards and no <tr>, so the shared test would call every good
+           answer an outage. `camimg-` appears once per camera and nowhere else. */
+        $key === 'kl-cam'                       => str_contains($body, 'camimg-'),
         /* The JPS notice feeds. `jsonLoose()` and not `json_decode()`, because JPS writes raw
            newline characters inside JSON string values. Without it a good page reads as an outage.
            An empty list IS data. met_rain22.json is legitimately `[]` on a dry day, and
@@ -3681,6 +3693,21 @@ foreach ($kl as $s) {
     ];
 }
 
+/* KL cameras. The id carries KL_CAM_OFFSET, see sources.php. SPHTN names no district on a camera, so
+   it reads Kuala Lumpur. That is true of all three the page lists today, and `state` is what the
+   district filter keys on. No position de-duplication: it is by kind, and no Selangor camera stands
+   inside KL. `online` is true because the page lists the camera. The tile already falls into
+   `.camfail` when its still does not load, which is the only liveness evidence the page gives. */
+$klCams = klCameras($pages['kl-cam'] ?? '');
+foreach ($klCams as [$cid, $cname, $clat, $clng, $cimg]) {
+    $stations[] = [
+        'image' => $cimg, 'shot' => null, 'depth' => null, 'warning' => null, 'danger' => null,
+        'kind' => 'camera', 'id' => 'camera-' . (KL_CAM_OFFSET + $cid), 'name' => $cname,
+        'district' => 'Kuala Lumpur', 'basin' => null, 'lat' => $clat, 'lng' => $clng,
+        'status' => 0, 'online' => true, 'source' => 'kl', 'state' => 'Kuala Lumpur', 'updated' => null,
+    ];
+}
+
 // --- National portal -------------------------------------------------------------------------
 // Authoritative per the operator's call, so its reading and thresholds win wherever the station code
 // matches — at the cost of up to 30 min more lag than the state feeds, which is the trade we chose.
@@ -4242,7 +4269,7 @@ $payload = json_encode([
     // Scrapers fail by returning nothing, so the counts are the alarm: klAdded 0 or natMatched 0
     // means a table layout moved, not that the rivers went quiet.
     'sources'  => [
-        'kl'       => ['parsed' => count($kl), 'added' => $klAdded, 'merged' => $klDupes],
+        'kl'       => ['parsed' => count($kl), 'added' => $klAdded, 'merged' => $klDupes, 'cameras' => count($klCams)],
         // `placed` is how many rivers the portal alone knew about, pinned from the gazetteer.
         // `district` is a different failure from `unplaced`: gazPlace() found a name match, but
         // gazCorroborated() would not stand behind the point — see gazCorroborated()'s own comment.

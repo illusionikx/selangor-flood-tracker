@@ -98,8 +98,23 @@ function nationalUrls(array $states = ['SEL', 'WLH', 'PTJ']): array {
    JPS moves an id. */
 const KL_RAIN = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 23, 24, 25, 27];
 
+/* KL cameras. The per-district pages (`Camera/District/1` to `11`) are nearly all empty, and 4, 7 and
+   9 each hold one of the same three. `District/-1` is the site's own "all" tab and lists every camera
+   once, so it is the one page this app reads. Measured 2026-10-19: 3 cameras.
+   A KL camera id is added to KL_CAM_OFFSET to make the station id. The KL ids (81, 89, 176) share a
+   number space with the Selangor ones, and `?cam=`, `?shots=` and the `shots/` directory all key on
+   the bare integer. Selangor camera ids run 239 to 1316, so 100000 cannot meet them. */
+const KL_HOST       = 'infobanjirjpskl.water.gov.my';
+const KL_CAM_OFFSET = 100000;
+/* A camera the page lists with no coordinate: its map link calls `loadMapPage(null, null, …)`. The
+   position was given by the repository owner on 2026-10-19. An entry here applies only while the
+   page publishes none, so the day SPHTN adds a coordinate the feed wins. Keyed by the SPHTN id. */
+const KL_CAM_FIX = [
+    176 => [3.097023, 101.673276],      // Taman Hock Ann
+];
+
 function klUrls(): array {
-    $u = ['kl-wl' => KL . 'WaterLevel/LatestData/All'];
+    $u = ['kl-wl' => KL . 'WaterLevel/LatestData/All', 'kl-cam' => KL . 'Camera/District/-1'];
     foreach (KL_RAIN as $d) $u["kl-rain-$d"] = KL . 'Rainfall/LatestData/' . $d;
     return $u;
 }
@@ -148,6 +163,29 @@ function klStations(array $pages): array {
             'updated' => myTime($c[5]),
         ];
     }
+    return $out;
+}
+
+/**
+ * KL (SPHTN) cameras, from the `kl-cam` page. One `.widget-card` per camera. The id is in the image's
+ * own `id="camimg-81"`, and the name is the link text. The coordinate is the first two arguments of
+ * the link's `loadMapPage(lat, lng, …)`, the same place the KL tables hide theirs.
+ * Returns [sphtnId, name, lat, lng, imageUrl] rows. A camera with no coordinate and no KL_CAM_FIX
+ * entry is dropped, because a pin needs a place.
+ */
+function klCameras(string $html): array {
+    $out = [];
+    crawl($html)->filter('.widget-card')->each(function (Crawler $card) use (&$out) {
+        $img = $card->filter('img[id^="camimg-"]');
+        if (!count($img) || !preg_match('/^camimg-(\d+)$/', $img->attr('id'), $m)) return;
+        $id = (int)$m[1];
+        $a  = $card->filter('.card-body a');
+        $name = count($a) ? trim(preg_replace('/\s+/', ' ', $a->text(''))) : '';
+        [$lat, $lng] = count($a) ? klLatLng($card->filter('.card-body')) : [null, null];
+        if ($lat === null) [$lat, $lng] = KL_CAM_FIX[$id] ?? [null, null];
+        if ($id <= 0 || $name === '' || $lat === null) return;
+        $out[] = [$id, $name, $lat, $lng, KL . 'SPHTN.CCTV/' . $id . '.jpg'];
+    });
     return $out;
 }
 

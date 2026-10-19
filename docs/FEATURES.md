@@ -20828,3 +20828,24 @@ When `border.json` arrives, `js/map.js` now moves the view to the center of the 
 The trade-off: a wide window no longer lands with the whole area in view. At 1536 the reader sees about Kuala Selangor to Klang, and must zoom out to the floor to see the full state.
 
 Not changed: the zoom floor. It still fits the whole box, so a reader who zooms out still sees the bare strips. The comment on `setLimits()` states that cost and the one-line change that removes it.
+
+## KL cameras
+
+Added 2026-10-19, on the repository owner's report that the SPHTN site has cameras for Kuala Lumpur.
+
+The page at `infobanjirjpskl.water.gov.my/Camera` lists 3 cameras: Sg Kerayong Di Razak Mansion, Sg Toba Di Segambut Bahagia and Taman Hock Ann. The app showed none of them. An older note said `Camera/District/{n}` returns an empty fragment. That was true of every id except one. `Camera/District/-1` is the site's own "all" tab, and it lists all three. Districts 4, 7 and 9 each hold one of the same three. The other ids answer an empty row.
+
+`klCameras()` in `sources.php` reads the `-1` page. The page is a new key, `kl-cam`, in `klUrls()`. It rides the same 15-minute page cache as the other scraped pages. Each card gives the id in `camimg-<n>`, the name in the link, and the coordinate in the link's `loadMapPage(lat, lng, …)`. The picture is `SPHTN.CCTV/<n>.jpg`, plain JPEG over https.
+
+Decisions:
+
+- The station id is `camera-` and the SPHTN id plus `KL_CAM_OFFSET` (100000). `?cam=`, `?shots=`, the `shots/` directory and `.cams.json` all key on one integer. SPHTN ids (81, 89, 176) share that number space with the Selangor ids, which run 239 to 1316. The offset keeps them apart. The client reads `s.id.split('-')[1]`, so it needed no change.
+- Taman Hock Ann is listed with no coordinate. `KL_CAM_FIX` holds 3.097023, 101.673276, which the repository owner gave. The entry applies only while the page publishes none, so a coordinate from SPHTN wins.
+- `camHostOk()` in `api.php` is the allowlist for `?cam=` and for `captureShots()`. It admits the Selangor host and the SPHTN host and nothing else. It replaced two copies of the Selangor-only test.
+- `pageHasData()` has a case for `kl-cam`. The page holds cards and no `<tr>`, so the shared test would call every good answer an outage.
+- A KL camera reads `online: true` and its district is Kuala Lumpur. SPHTN names no district on a camera and publishes no time. A dead still falls into `.camfail`, as it does for a Selangor camera.
+- The diagnostics gained `sources.kl.cameras`. A fall to 0 means the page moved.
+
+Not built: the per-district pages, the live stream mode (`Camera/GetSeqImage/<id>`), and position de-duplication. The stream mode is the site's own 2-second refresh, and this app already refreshes a still every 5 minutes. No Selangor camera stands inside KL, so a duplicate check has nothing to find.
+
+Open: the archive (`shots/`) starts for these three on the next capture, within 30 minutes of a deploy.

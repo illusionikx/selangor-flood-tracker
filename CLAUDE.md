@@ -144,7 +144,7 @@ point and by district name, and they never touch a reading.
 
 | source | gives | shape |
 |---|---|---|
-| `infobanjirjps.selangor.gov.my/JPSAPI/api/` | Selangor: everything, incl. the only cameras, sirens and gauges | JSON |
+| `infobanjirjps.selangor.gov.my/JPSAPI/api/` | Selangor: everything, incl. 90 cameras, sirens and gauges (KL adds 3 cameras, see section 3) | JSON |
 | `publicinfobanjir.water.gov.my` | national water levels + thresholds, the **authoritative reading** | HTML table |
 | `publicinfobanjir.water.gov.my` (rainfall table) | national rainfall + a per-day running total, the **preferred rainfall source** | HTML fragment |
 | `publicinfobanjir.water.gov.my` (station search + 7-day history) | the portal's own gazetteer, and the backfill for a rainfall archive | JSON |
@@ -251,7 +251,12 @@ is no evidence for that. Column 13 is still in the layout comment in `sources.ph
 14-cell row guard counts it.
 
 Sirens are skipped: 11 stations with ragged column counts, and the state cell is the one that goes
-missing. Cameras are skipped: `Camera/District/{n}` returns an empty fragment.
+missing. Cameras are read from one page: `Camera/District/-1`, the site's own "all" tab, through
+`klCameras()` in `sources.php`. The per-district pages, `Camera/District/1` to `11`, are nearly empty. Do
+not read them. The page lists 3 cameras (measured 2026-10-19). Their station id is `camera-` and the
+SPHTN id plus `KL_CAM_OFFSET` (100000), because `?cam=`, `?shots=` and `shots/` key on the bare
+integer and the Selangor ids would collide. `KL_CAM_FIX` places the one camera the page lists with no
+coordinate. See "KL cameras" in `docs/FEATURES.md`.
 
 ## api.php
 

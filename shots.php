@@ -292,7 +292,7 @@ function captureShots(array $stations): int {
         if ($s['kind'] !== 'camera' || empty($s['image'])) continue;
         // Same host check as ?cam=. These URLs come from our own payload, but the rule that this
         // server only ever fetches JPS is worth holding in both places rather than assumed in one.
-        if (strcasecmp(parse_url($s['image'], PHP_URL_HOST) ?? '', HOST) !== 0) continue;
+        if (!camHostOk($s['image'])) continue;
         $id = (int)explode('-', $s['id'])[1];
         if ($id > 0) $urls[$id] = preg_replace('#^http://#i', 'https://', $s['image']);
     }
