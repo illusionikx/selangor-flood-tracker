@@ -323,6 +323,13 @@ map.getPane('labels').style.pointerEvents = 'none';
    and south and 12 km east and west. */
 const MARGIN = 0.1;
 
+/* Degrees added past each edge, on top of `MARGIN`. One degree is about 111 km. The repository owner
+   picked these by eye on 2026-10-19, for looks alone: the map looked right to them with this much
+   ground around the land. **The box measures 202 km north to south and 185 km east to west**, which
+   is more ground than the circle it replaced. `map-limits-test.html` no longer compares the box to
+   the circle. */
+const EXTRA = { n: 0.1, s: 0.2, w: 0.1, e: 0.2 };
+
 /* The coverage box, once border.json has answered. **The three states are not the same.** While this
    is `undefined` the map asks for no tile at all. Once it is `false` the map asks for every tile. See
    `Ground` below. */
@@ -379,9 +386,9 @@ function clipLevel(layer, level) {
    `cover.pad(0.25)` reports a floor the box then refuses, because a level out doubles the ground on
    screen while a quarter pad adds half of it. `getMinZoom()` still answers the number it was given,
    and nothing errors.
-   **The box is taller than it is wide, so a wide window shows bare container beside it at the
+   **The box is nearly square (202 by 185 km), so a wide window shows bare container beside it at the
    floor.** `getBoundsZoom()` fits both axes and takes the tighter one, and the height is what binds
-   here. The ground draws no tile outside the box, and nothing shades the rest since 2026-09-23. So
+   in a window wider than 1.1 to 1. The ground draws no tile outside the box, and nothing shades the rest since 2026-09-23. So
    those two strips are the Leaflet container itself. That is the accepted cost of a floor that shows
    the whole area at once. Raise the floor to `getBoundsZoom(cover, true)` to remove the strips, and
    accept that a wide window can then never hold the whole area. */
@@ -423,6 +430,8 @@ export const coverReady = fetch('border.json')
       if (y > n) n = y;
     }
     cover = L.latLngBounds([s, w], [n, e]).pad(MARGIN);
+    cover.extend([cover.getSouth() - EXTRA.s, cover.getWest() - EXTRA.w]);
+    cover.extend([cover.getNorth() + EXTRA.n, cover.getEast() + EXTRA.e]);
     // No tile was asked for before this line, and a level built before it has no clip. See `Ground`.
     for (const l of [tiles, labels]) if (l) {
       for (const level of Object.values(l._levels)) clipLevel(l, level);

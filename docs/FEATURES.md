@@ -20718,3 +20718,17 @@ Each row is a `.mrow` button that fills the item, which is M3's list action mode
 The favorite and ignored rows stay static. Their trailing button is their own action, and the owner asked only for this list.
 
 A reader who presses back has lost the subpage, because Settings always opens on its main page. That cost is accepted.
+
+## The map shows more ground on all four sides
+
+The repository owner asked for more tiles on 2026-10-19. The reason is looks alone. The owner named no distance, tried several values and kept the ones that looked right.
+
+`EXTRA` in `js/map.js` holds the four values, in degrees, on top of `MARGIN`. They are 0.1 north, 0.2 south, 0.1 west and 0.2 east. One degree is about 111 km. The coverage box now measures 202 km north to south and 185 km east to west. That is about 37,500 sq km, against 28,700 for the circle this rectangle replaced. The pan limit, the zoom floor, the tile skip and `inCover()` all read the same box, so all four moved together.
+
+The cost is real. The 2026-09-23 change made the ground a third smaller to cut the CARTO bill. This change makes the box about 30 percent larger than the circle. A reader who pans to the edges loads more tiles. `map-limits-test.html` counted 18 tiles over 2 layers at the landing view, and none outside the box.
+
+The box is no longer taller than it is wide. `map-limits-test.html` asserted that until this change. It then asserted that both axes stay under the circle's 191 km. Neither holds now, so the test prints the size and asserts nothing about it. The maritime-corner check still catches a box built from the wrong ring.
+
+Melaka is still outside the box. Its latitude is 2.19 and the south edge is 2.27, so the margin is 9 km. A further extension south will fail that assertion.
+
+At the zoom floor, the height binds in any window wider than about 1.1 to 1. A tall phone window binds on the width instead.

@@ -99,13 +99,15 @@ try {
   ok('the box stops short of the maritime corner', cover.getWest() > geo.bounds[0],
      'box west ' + cover.getWest().toFixed(4) + ', outline west ' + geo.bounds[0].toFixed(4));
 
-  /* **The box is TALLER than it is wide, which is the whole reason it is a rectangle.** Selangor is
-     shaped that way. A circle spent 191 km on both axes to hold a state that needs 141 by 127. */
+  /* This asserted "taller than wide" until 2026-10-19. The repository owner then asked for more
+     ground on all four sides, and the box no longer passes it. The size is printed so a reader sees
+     it, and nothing asserts it. The maritime-corner check above is what catches a box built from
+     the wrong ring. */
   const kmH = (cover.getNorth() - cover.getSouth()) * 110.57;
   const kmW = (cover.getEast() - cover.getWest()) * 111.32
             * Math.cos(cover.getCenter().lat * Math.PI / 180);
-  ok('the box is taller than it is wide', kmH > kmW,
-     kmH.toFixed(1) + ' km north to south against ' + kmW.toFixed(1) + ' km east to west');
+  ok('the box size is printed', true,
+     kmH.toFixed(1) + ' km north to south and ' + kmW.toFixed(1) + ' km east to west');
 
   /* `MARGIN` in js/map.js grows the land extent on every side. With no shading left, the box edge is
      the edge of the map, so a border flush against it reads as a map that was cut off. */
