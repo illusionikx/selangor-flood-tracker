@@ -561,8 +561,9 @@ order that file holds them. A trap names itself here, and the file states the ev
 - 41 sirens last reported months ago
 - The siren band frames on the clock, and it is the only graph here that does.
 - A siren reading 1 is a claim, not a fact, and the river behind it is the check
+- A flood gauge is checked against itself, never against a river.
 - A rain gauge's hourly reading is a claim too, and its own odometer is the c...
-- A flood gauge's reading is a claim too, and the river behind it is the check.
+- The odometer hour ends at the reading's own stamp, never at the poll time.
 - Nothing outranks a popover except another popover.
 - A graph's samples ride on the element, in `data-pts`.
 - A flood gauge's status colour comes from `gaugeColor()` in `util.js` and no...

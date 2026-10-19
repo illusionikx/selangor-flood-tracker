@@ -240,7 +240,7 @@ function drown(s) {
     const mark = s.danger ?? 0.3;
     s.depth = +(mark * 1.2).toFixed(2);
     s.status = 2;
-    s.backed = true;   // a faked flood has no high river beside it — see soak()
+    s.backed = true;   // a real stuck gauge must not stay faulty under a faked flood — see soak()
     s.history = ramp(s.depth, mark / 40, gaugeCode(s));
   } else if (s.kind === 'siren') {
     s.status = 1;

@@ -3,7 +3,7 @@
 import { KINDS, MAST, HEAT_FLOOR, HEAT_KM, RAIN_KM, RAIN_STOPS, DARK_INK_FILL } from './config.js';
 import { state, PREFS, save } from './state.js';
 import { el, color, atDanger, statusColor, leads, hasInfo, isIgnored, ignoredIds,
-         favIds, isFav, scalePos, levelStops, gaugeStops, setBox, isHot, doubted } from './util.js';
+         favIds, isFav, scalePos, levelStops, gaugeStops, setBox, isHot, doubted, faultWhy } from './util.js';
 import { marks, siteMark, shown, syncCluster, focusOn, side, openSide,
          showMast, hideMast, markSel, pinGlyph } from './map.js';
 import { heat, rainHeat, syncHeat, thinHeat } from './heat.js';
@@ -374,18 +374,13 @@ function favPanel() {
 /* Every live sensor the server marks as a faulty signal, for the Settings subpage. Listed whether
    `Hide faulty signals` is on or off: the switch decides what the app does with the finding, and the
    finding is the same either way. The reason is the line the station card prints. */
-const FAULT = {
-  siren:    'No river nearby is high.',
-  gauge:    'No river nearby is high.',
-  rainfall: 'No rain reached this gauge.',
-};
 function faultyPanel() {
   const rows = state.data.filter(s => s.backed === false && hasInfo(s));
   el('faultyN').textContent = rows.length || '';
   el('faultyList').innerHTML = rows.map(s => `<li>
       <i class="glyph i i-${KINDS[s.kind].icon}" style="color:${KINDS[s.kind].color}"></i>
       <span class="nm">${s.name}<br><span class="muted">${
-        KINDS[s.kind].one || KINDS[s.kind].label} · ${FAULT[s.kind] || 'Faulty signal.'}</span></span>
+        KINDS[s.kind].one || KINDS[s.kind].label} · ${faultWhy(s)}</span></span>
     </li>`).join('')
     || '<li class="none">No faulty signals right now.</li>';
 }

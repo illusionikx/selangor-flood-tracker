@@ -6,7 +6,7 @@ import { KINDS, SOURCES, SPARK_H, GRAPH_H, NO_INFO, ALERT_TITLE, RIVER_COLOR, RA
          ACC_ROWS } from './config.js';
 import { PREFS } from './state.js';
 import { noSec, distKm, hasInfo, hasWx, isStale, color, statusColor, scalePos,
-         levelStops, gaugeStops, gaugeColor, isFav, titleCase, doubted } from './util.js';
+         levelStops, gaugeStops, gaugeColor, isFav, titleCase, doubted, faultWhy } from './util.js';
 import { nearestOf, nearestCam, nearestLevel, nearestWx, camAlert } from './stations.js';
 
 /* The leading slot of every sensor row: the kind's glyph, in the kind's own colour.
@@ -384,12 +384,13 @@ function gaugeBlock(s) {
 
   // `--c` is what `.state.kind` reads: the rung under the first published mark takes the gauge's
   // own taupe, so the chip and the pin agree. Every other tone ignores it.
-  // A gauge no river backs keeps its word and loses the colour, the way a doubted siren does.
+  // A stuck gauge keeps its word and loses the colour, the way a doubted siren does. The server
+  // marks one only when its depth held one value for days, so the line shows under any depth.
   // The line stays when `Hide faulty signals` is off, because the finding still holds. Only the
   // colour follows the switch.
-  const stuck = s.backed === false && s.status > 0;
+  const stuck = s.backed === false;
   return `<div class="state ${stale ? '' : stuck && doubted(s) ? 'off' : tone}" style="--c:${col}">${stale ? 'OFFLINE' : word}</div>
-    ${stuck && !stale ? '<div class="muted">Faulty signal. No river nearby is high.</div>' : ''}
+    ${stuck && !stale ? `<div class="muted">Faulty signal. ${faultWhy(s)}</div>` : ''}
     <div class="meter">
       ${wet ? `<div class="mtop">
           <b style="color:${stale ? 'var(--muted)' : col}">${s.depth} m of water</b>
@@ -444,7 +445,7 @@ const rainState = s => {
     + `<div class="state ${doubted(s) ? 'off' : s.status >= 4 ? 'on' : s.status >= 3 ? 'mid'
         : s.status >= 1 ? 'kind' : 'off'}" style="--c:${color(s)}"
       >${RAIN_STATE[s.status] || 'NOT RAINING'}</div>
-    ${stuck ? '<div class="muted">Faulty signal. No rain reached this gauge.</div>' : ''}`;
+    ${stuck ? `<div class="muted">Faulty signal. ${faultWhy(s)}</div>` : ''}`;
 };
 
 /* Everything one sensor has to say, without its name or region — those belong to the place, and a
@@ -535,7 +536,7 @@ function sensorBody(s) {
   const stuck = s.kind === 'siren' && s.backed === false;
   const siren = s.kind !== 'siren' ? '' : hasInfo(s)
     ? `<div class="state ${s.status > 0 && !doubted(s) ? 'on' : 'off'}">${s.status > 0 ? 'TRIGGERED' : 'IDLE'}</div>
-       ${stuck ? '<div class="muted">Faulty signal. No river nearby is high.</div>' : ''}`
+       ${stuck ? `<div class="muted">Faulty signal. ${faultWhy(s)}</div>` : ''}`
     : '<div class="state">OUT OF CONTACT</div>';
   const gauge = s.kind !== 'gauge' ? '' : gaugeBlock(s);
 

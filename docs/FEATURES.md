@@ -20591,3 +20591,38 @@ The chevron is `expand_more` turned a quarter. The icon set has no `chevron_righ
 The repository owner asked for two more changes the same day. The readings table moved from the Developer group to a fourth subpage, Readings. A `Readings` row under Test mode opens it. `paintDev()` still writes the table on open and on every poll while the pane is open. The `Faulty signals` row lost its glyph. Its empty leading slot keeps the words in line with the switch row above it, so the two rows read as one setting.
 
 The `Readings` row lost its glyph too, on the same instruction. A settings row takes a glyph only where it names its own setting, the way Android's own settings app draws a list. A row that belongs to the setting above it keeps the empty slot, so its words stay in line.
+
+### Fewer false faulty signals
+
+The repository owner reported on 2026-10-19 that more than 40 sensors read as faulty over a weekend, and that the list emptied when rain came. The owner also reported floods of 12 hours and more that the app marked as faulty. This change repairs both faults and adds two guards.
+
+The rain gauge check had a fault in its window. `hourlyRainfall` names the hour before the reading's own stamp. `rainBacked()` measured the odometer over the hour before the poll time. After a shower stopped, each poll slid that window past the rain while the rolling total still carried it. So live gauges read as faulty, and the next shower cleared them. The function now takes the reading's stamp. The archive replay of 14 to 16 October measured the change.
+
+| moment | gauges claiming rain | faulty before | faulty after |
+|---|---|---|---|
+| 14 October, 19:00 | 9 | 8 | 0 |
+
+Over 14 to 19 October the largest number of faulty signals at one time fell from 11 to 5. The 5 that remain are three sirens and two flood gauges that hold one depth.
+
+The flood gauge check asked the wrong witness. It asked `sirenBacked()` whether a river within 5 km stood at its warning mark. A siren is wired to a river mark, so that check suits a siren. A flood gauge measures water at one spot. A river on another drainage plane is no evidence about that spot. The river check is deleted.
+
+Two guards replace what the deletion removed and balance the false positives against the false negatives.
+
+1. A rain reading under `RAIN_ASK`, 10 mm an hour, is not judged. It changes no pin color and raises no alert, so a faulty verdict there could only be wrong.
+2. `frozen()` marks a sensor stuck when a nonzero reading holds one exact value. A flood gauge must hold for 72 hours across three distinct readings. A rain gauge at `RAIN_ASK` or more must hold for 6 hours. Real water moves, so a real reading changes. This check needs no neighbor and no odometer, so it reaches the Kuala Lumpur rain gauges for the first time.
+
+A rain gauge also takes an on-delay. An odometer denial counts only when the reading before it was denied too. The `#b` series in the `level` table holds one verdict per reading, and `RETAIN` prunes it with the rest. Rain readings arrive about 15 minutes apart, so the delay costs one reading.
+
+The payload carries `frozen`, the span in seconds, on a stuck reading. `faultWhy()` in `js/util.js` turns it into the sentence the card and the Settings list print, for example `Same reading for 3 days.` The Settings list read a table of reasons per kind before. That table could not tell a stuck rain gauge from one that its odometer denies.
+
+These costs are accepted.
+
+- Taman Maznah, `gauge-117`, alerts again. It read 0.64, 0.62, 0.64 and 0.60 m with every river near it normal. Its depth moves, so `frozen()` cannot catch it. A reader who knows it is wrong adds it to the ignored sensors.
+- A stuck rain gauge under 10 mm draws a faint heat blob. It raises no alert.
+- A stuck flood gauge alerts for three days before `frozen()` catches it.
+
+These were not built.
+
+- No siren on-delay. A siren stamps a new reading every 8 to 12 hours. A delay of one reading lets a stuck relay sound for half a day. Measured on 19 October, it would have unmuted all three sirens muted that day.
+- No siren backing from a river at its alert mark that is rising. That trades stuck relays that pass for fewer real alarms that go quiet. The owner left it out.
+- No nearby rain as backing for a flood gauge. A flood stands for hours after the rain stops, so a rain window expires while the water is still there.

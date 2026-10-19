@@ -122,6 +122,19 @@ const SIREN_STAMP = STATE . '/.siren.stamp';
    5 km is where the curve flattens. Generous on purpose. Too wide only keeps a doubtful alarm
    standing. Too narrow silences a real one. */
 const SIREN_KM = 5.0;
+/* The faulty-signal checks on a rain gauge and a flood gauge. See rainBacked() and frozen().
+   RAIN_ASK is the lowest hourly reading the rain checks judge. It is the top of JPS's light class.
+   Below it a reading changes no pin colour and raises no alert, so a faulty verdict there could only
+   be wrong. FROZEN_RAIN and FROZEN_GAUGE are how long a nonzero reading must hold one exact value
+   before this app calls it stuck. A rolling hourly total moves within minutes in real rain. Real
+   standing water moves by a centimetre in a day. GAUGE_READ is the gauge history load, because READ
+   is 24 hours and a gauge reports once a day. Seven days and not four: gauge-117 missed whole days
+   in September, and a four day load then holds two readings, too few for frozen(). The load is about
+   250 rows. */
+const RAIN_ASK     = 10.0;
+const FROZEN_RAIN  = 6 * 3600;
+const FROZEN_GAUGE = 72 * 3600;
+const GAUGE_READ   = 7 * 86400;
 const SITE_M = 50;   // metres — stations this close are sensors on one mast, not separate places
 /* JPS shuffled the coordinates inside one batch of cameras. The feed puts Kayu Ara's position under
    1285 and Tanjung Karang's under 1287, so 1279 drew in Sepang and 1288 in Bangi, 34 km and 83 km
@@ -1152,14 +1165,48 @@ function accWindow(array $odo, int $now, int $win, bool $partial = false): ?arra
  * Over the hour the reading claims, flat is decisive. Measured 2026-08-14: T.K.P.M SG. KELAMBU held
  * 4.5 mm for twelve hours with an odometer that never moved and a daily total of 0.
  *
+ * **$at IS THE READING'S OWN STAMP, NEVER THE POLL TIME.** The caller passed the poll time until
+ * 2026-10-19. After a shower stopped, every poll then slid the hour past the rain while the rolling
+ * total still carried it, so live gauges turned faulty and cleared again when the next shower came.
+ * At 19:00 on 14 October nine gauges claimed rain and the poll-time window called eight of them
+ * faulty. The reading's own hour called none of them faulty.
+ *
+ * A reading under RAIN_ASK is not judged. It paints no alert colour, so the verdict could only be
+ * wrong.
+ *
  * `accWindow()` does the reading, so a sparse archive widens the window rather than failing. That
  * widening can only add rain, so it can only move the answer toward true, which is the safe way for
  * it to be wrong.
  */
-function rainBacked(?float $hourly, array $odo, int $now): ?bool {
-    if ($hourly === null || $hourly <= 0) return null;   // no claim, so nothing to check
-    $w = accWindow($odo, $now, 3600);
+function rainBacked(?float $hourly, array $odo, int $at): ?bool {
+    if ($hourly === null || $hourly < RAIN_ASK) return null;   // no claim worth checking
+    $w = accWindow(array_values(array_filter($odo, fn($p) => $p[0] <= $at)), $at, 3600);
     return $w === null ? null : $w[0] > 0;
+}
+
+/**
+ * Has a nonzero reading held one exact value for at least $win seconds?
+ *
+ * The check on a sensor that no other sensor can corroborate. A flood gauge sits on its own drainage
+ * plane, so a river nearby is no evidence against it. The river check it took until 2026-10-19 called
+ * real floods faulty for twelve hours and more. A sensor stuck on one number is the fault this
+ * catches, and it needs no neighbour. Real water moves, so a real reading changes.
+ *
+ * $pts is [[ts, value], …] ascending, with the current reading last. The run is counted back from
+ * the last reading over every reading of the same value. It must hold three distinct stamps, so two
+ * daily readings that agree by chance are not a fault.
+ */
+function frozen(array $pts, int $win): bool {
+    if (!$pts) return false;
+    [$last, $v] = end($pts);
+    if ($v <= 0) return false;
+    $from  = $last;
+    $stamp = [];
+    for ($i = count($pts) - 1; $i >= 0 && $pts[$i][1] == $v; $i--) {
+        $from = $pts[$i][0];
+        $stamp[$from] = true;
+    }
+    return count($stamp) >= 3 && $last - $from >= $win;
 }
 
 /* The next value of a running rainfall total, built from the portal's own midnight column.
@@ -1787,18 +1834,20 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
     echo "\nrainBacked():\n";
     // The odometer climbed 4.5 mm across the hour the gauge is claiming. The reading stands.
     $rose = [[$now - 2 * 3600, 680.5], [$now - 1800, 685.0], [$now, 685.0]];
-    $ok('a reading the odometer confirms is backed', rainBacked(4.5, $rose, $now) === true);
-    /* The measured fault. The gauge claims 4.5 mm in the last hour and its own total has not moved
+    $ok('a reading the odometer confirms is backed', rainBacked(12.0, $rose, $now) === true);
+    /* The measured fault. The gauge claims 12 mm in the last hour and its own total has not moved
        across that hour, so the claim has no rain behind it. */
     $flat = [[$now - 12 * 3600, 685.0], [$now - 3600, 685.0], [$now, 685.0]];
-    $ok('a reading the odometer denies is not backed', rainBacked(4.5, $flat, $now) === false);
+    $ok('a reading the odometer denies is not backed', rainBacked(12.0, $flat, $now) === false);
+    // Under RAIN_ASK the reading paints nothing an alert would, so it is not judged at all.
+    $ok('light rain is not judged',                  rainBacked(4.5, $flat, $now) === null);
     /* Benefit of the doubt, the same rule sirenBacked() obeys. A gauge nobody can check is not a
        gauge caught lying, and these three cases are every KL station plus a young archive. */
-    $ok('no odometer at all cannot be asked',   rainBacked(4.5, [], $now) === null);
+    $ok('no odometer at all cannot be asked',   rainBacked(12.0, [], $now) === null);
     $ok('an archive too young cannot be asked',
-        rainBacked(4.5, [[$now - 600, 685.0], [$now, 685.0]], $now) === null);
+        rainBacked(12.0, [[$now - 600, 685.0], [$now, 685.0]], $now) === null);
     $ok('an odometer reset cannot be asked',
-        rainBacked(4.5, [[$now - 2 * 3600, 2400.0], [$now, 4.5]], $now) === null);
+        rainBacked(12.0, [[$now - 2 * 3600, 2400.0], [$now, 4.5]], $now) === null);
     // A gauge claiming nothing is not making a claim, so there is nothing to back or to deny.
     $ok('a dry gauge is never marked faulty',   rainBacked(0.0, $flat, $now) === null);
     $ok('a gauge with no reading is not asked', rainBacked(null, $flat, $now) === null);
@@ -1806,7 +1855,30 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
        minutes ago and stopped, so the odometer is flat right now while the rolling hour still
        carries the total. A longer window would call this live rain faulty. */
     $burst = [[$now - 2 * 3600, 680.5], [$now - 2400, 685.0], [$now - 600, 685.0], [$now, 685.0]];
-    $ok('a burst that has stopped is still backed', rainBacked(4.5, $burst, $now) === true);
+    $ok('a burst that has stopped is still backed', rainBacked(12.0, $burst, $now) === true);
+    /* The fault of 2026-10-19. The reading is stamped 50 minutes ago and names the hour before that
+       stamp. Rain reached the odometer 70 minutes ago, inside that hour. An hour back from the poll
+       time misses it, and every gauge in a shower that had just stopped turned faulty. */
+    $ts50 = $now - 3000;
+    $late = [[$now - 3 * 3600, 680.0], [$now - 4200, 692.0], [$ts50, 692.0], [$now, 692.0]];
+    $ok('the hour is the reading\'s own, not the poll\'s', rainBacked(12.0, $late, $ts50) === true);
+    $ok('and the poll\'s hour would have denied it',       rainBacked(12.0, $late, $now) === false);
+
+    echo "\nfrozen():\n";
+    $d = 86400;
+    $ok('one depth for three days is frozen',
+        frozen([[$now - 3 * $d, 0.13], [$now - 2 * $d, 0.13], [$now - $d, 0.13], [$now, 0.13]], 3 * $d) === true);
+    // Taman Maznah, as the archive holds it. Real standing water moves by a centimetre a day.
+    $ok('a depth that moves is not frozen',
+        frozen([[$now - 5 * $d, 0.64], [$now - 4 * $d, 0.62], [$now - 3 * $d, 0.64], [$now, 0.60]], 3 * $d) === false);
+    $ok('a run shorter than the window is not frozen',
+        frozen([[$now - 2 * $d, 0.13], [$now - $d, 0.13], [$now, 0.13]], 3 * $d) === false);
+    $ok('two readings that agree are not three',
+        frozen([[$now - 4 * $d, 0.13], [$now, 0.13]], 3 * $d) === false);
+    $ok('dry ground is never frozen',
+        frozen([[$now - 4 * $d, 0.0], [$now - 2 * $d, 0.0], [$now, 0.0]], 3 * $d) === false);
+    $ok('the run starts after the last change',
+        frozen([[$now - 5 * $d, 0.2], [$now - 2 * $d, 0.13], [$now - $d, 0.13], [$now, 0.13]], 3 * $d) === false);
 
     echo "\nportalKey():\n";
     $ok('case and punctuation go',    portalKey('S.M.K Bandar Kinrara (F2)') === 'smkbandarkinraraf2');
@@ -3404,10 +3476,20 @@ foreach ($db->query('SELECT station, ts, level FROM level WHERE ts >= ' . ($now 
    trend, and short for a 72 hour total. So the cumulative keys take a second read at ACC_READ.
    The `#c` suffix keeps them in the one table with no schema change, and RETAIN prunes them with
    everything else. No station id ends in `#c`, so these rows can never be read as a level. */
+/* `#b` rides on the same read. It is a rain gauge's odometer verdict per reading, 1 for denied and 0
+   for anything else, and the on-delay in the rainfall block reads the one before the current
+   reading. */
 $odo = [];
-foreach ($db->query('SELECT station, ts, level FROM level WHERE (station LIKE \'%#c\' OR station LIKE \'%#d\') AND ts >= '
+foreach ($db->query('SELECT station, ts, level FROM level WHERE (station LIKE \'%#c\' OR station LIKE \'%#d\' OR station LIKE \'%#b\') AND ts >= '
                     . ($now - ACC_READ) . ' ORDER BY ts') as $r) {
     $odo[$r['station']][] = [(int)$r['ts'], (float)$r['level']];
+}
+/* Flood gauge depths over GAUGE_READ, for frozen(). A gauge reports once a day, so READ holds one
+   reading. A range on the key, the same shape as the siren `lastOn` query below. */
+$gaugeHist = [];
+foreach ($db->query("SELECT station, ts, level FROM level WHERE station >= 'gauge-' AND station < 'gauge.'
+                     AND ts >= " . ($now - GAUGE_READ) . ' ORDER BY ts') as $r) {
+    $gaugeHist[$r['station']][] = [(int)$r['ts'], (float)$r['level']];
 }
 
 // The gazetteer this app has filled so far, for gazPlace() below. Loaded once, whole — the drip
@@ -3814,6 +3896,7 @@ foreach ($stations as &$s) {
        A Selangor station that took no portal reading keeps using the year-to-date odometer the
        detail endpoint publishes. Both are numbers that only climb, so accWindow() reads either. */
     $run = null;
+    $odoSays = null;   // rainBacked()'s answer, where this station has a running total to ask
     if (($s['source'] ?? '') === 'portal' && ($s['daily'] ?? null) !== null) {
         // end() takes its argument by reference, so both series go into a variable first. Passing
         // an expression there is a PHP notice and a value this code would then read as null.
@@ -3851,10 +3934,29 @@ foreach ($stations as &$s) {
         }
         /* Nothing filters the pair. Both long windows anchor to the oldest sample there is, so a
            young archive answers both with one number over one span, each marked short. */
-        $s['backed']  = rainBacked($s['hourly'] ?? null, $series, $now);
+        // $ts and never $now. See rainBacked() for the fault the poll time caused.
+        $odoSays      = rainBacked($s['hourly'] ?? null, $series, $ts);
         $s['accFrom'] = $series[0][0];
         $samples[$key . '#c'] = [$ts, $run];
     }
+
+    /* The verdict. The odometer outranks everything: rain that reached it is rain. A denial counts
+       only when the reading before this one was denied too, so one odd reading never flips a gauge.
+       Rain readings arrive about 15 minutes apart, so the delay costs one reading. A sensor held on
+       one value of RAIN_ASK or more for FROZEN_RAIN is stuck, and that check needs no odometer, so
+       it reaches the KL gauges too. Sirens and flood gauges take no on-delay: a siren stamps a new
+       reading every 8 to 12 hours, and a delay of one would let a stuck relay sound for half a day. */
+    $prevB = null;
+    foreach ($odo[$key . '#b'] ?? [] as $p) {
+        if ($p[0] >= $ts) break;
+        $prevB = $p[1];
+    }
+    if ($odoSays !== null) $samples[$key . '#b'] = [$ts, $odoSays === false ? 1.0 : 0.0];
+    $stuck = ($s['hourly'] ?? 0) >= RAIN_ASK && frozen($pts, FROZEN_RAIN);
+    $s['backed'] = $odoSays === true ? true
+        : ($stuck || ($odoSays === false && $prevB === 1.0) ? false : null);
+    // The card says which check failed, and how long the reading held, from this field alone.
+    if ($stuck && $odoSays !== true) $s['frozen'] = FROZEN_RAIN;
 
     $s['acc'] = $acc;
     unset($s['hour3'], $s['cumulative'], $s['pdays']);   // read here, never sent to a browser
@@ -3885,6 +3987,13 @@ foreach ($stations as &$s) {
     $s['history'] = sparkPoints($hist[$key], $now, SPARK_BUCKET, false,
         fn($v) => gaugeStatus($v, $s['warning'] ?? null, $s['danger'] ?? null));
     $samples[$key] = [$ts, (float)$s['depth']];
+    /* A flood gauge is checked against itself and nothing else. It took sirenBacked() until
+       2026-10-19, and a river 5 km off on another drainage plane is no evidence about water standing
+       at one spot. That check called real floods faulty for twelve hours and more. Null and not true
+       where the reading moves: the gauge is not confirmed, it is only not caught. */
+    $frz = frozen(array_merge($gaugeHist[$key] ?? [], [[$ts, (float)$s['depth']]]), FROZEN_GAUGE);
+    $s['backed'] = $frz ? false : null;
+    if ($frz) $s['frozen'] = FROZEN_GAUGE;
 }
 unset($s);
 
@@ -3913,17 +4022,6 @@ foreach ($stations as &$s) {
        definition and it is this file's. The client reads the flag, exactly as it reads `rising`.
        Only asked of a siren that claims to be sounding: a quiet one has nothing to check. */
     $s['backed'] = $s['status'] > 0 ? sirenBacked($s['lat'], $s['lng'], $riverMarks) : null;
-}
-unset($s);
-
-/* A flood gauge past its own warning mark asks the same question as a siren. Taman Maznah read 0 m
-   for a month, then 0.64 m and 0.62 m on two daily readings, with every river within 5 km normal and
-   0 mm at the rain gauge 600 m away. The gauge reports once a day, so it stays on alert all day.
-   ponytail: rivers only, like a siren. Local rain can flood a spot while the rivers stay low, and
-   this check then calls it faulty. Add nearby rain as backing evidence if a real case shows up. */
-foreach ($stations as &$s) {
-    if ($s['kind'] === 'gauge' && $s['online'])
-        $s['backed'] = $s['status'] > 0 ? sirenBacked($s['lat'], $s['lng'], $riverMarks) : null;
 }
 unset($s);
 

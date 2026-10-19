@@ -186,10 +186,10 @@ export const gaugeStops = s => [[0, 0], [s.warning || 0.15, 68], [s.danger || 0.
    Water over a place known to flood is never the normal state, so it takes the alert rung at least,
    and the two published marks move up to warning and danger. Dry ground alone keeps 0.
    One definition for the pin, the card, the table cell and the table's hover panel. */
-/* A gauge that no nearby river backs keeps rung 1, water on the ground, and loses the two marks.
-   `backed` in api.php is the same check a siren takes. `!== false`, so a gauge with no river in
-   reach keeps its reading. Every caller of this rung follows: the pin, the card, the table and
-   `atDanger()`, and through it `isCritical()`. */
+/* A stuck gauge keeps rung 1, water on the ground, and loses the two marks. `backed` in api.php is
+   false only where the depth held one value for FROZEN_GAUGE. No river is asked since 2026-10-19,
+   because a river on another drainage plane is no evidence about one spot. Every caller of this rung
+   follows: the pin, the card, the table and `atDanger()`, and through it `isCritical()`. */
 export const gaugeTone = s => s.depth == null || s.depth <= 0 ? 0
   : doubted(s) ? 1
   : s.status >= 2 ? 3
@@ -266,6 +266,18 @@ export const sounding = s => s.kind === 'siren' && s.status > 0 && !doubted(s);
    through here: a siren, a rain gauge and a flood gauge alike. Added on the repository owner's
    instruction, 2026-10-15. */
 export function doubted(s) { return s.backed === false && PREFS.hideFaulty !== false; }
+
+/* Why the server set this reading aside, in the words the card and the Settings list both print.
+   `frozen` is the span in seconds a nonzero reading held one value, and it is set only where that
+   check failed. Every other faulty verdict is the kind's own check: a siren against the rivers near
+   it, a rain gauge against its own running total. A flood gauge has the frozen check alone. */
+export function faultWhy(s) {
+  if (s.frozen) {
+    const h = s.frozen / 3600;
+    return `Same reading for ${h >= 48 ? `${h / 24} days` : `${h} hours`}.`;
+  }
+  return s.kind === 'siren' ? 'No river nearby is high.' : 'No rain reached this gauge.';
+}
 
 /* Is this gauge actually catching rain? The same question as `sounding()` and the same answer, on a
    different sensor. `hourlyRainfall` is a rolling one hour total and `cumulativeRainfall` only

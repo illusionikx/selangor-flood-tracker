@@ -1728,12 +1728,16 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
   siren's frames. It must never fall back to the live `backed` flag. A picture from last week is
   judged by last week's water, the same rule `camWarn()` obeys. Flood gauges are **not** backing
   evidence — measured, they hold no samples across any alarm window on record.
-- **A flood gauge's reading is a claim too, and the river behind it is the check.** A gauge reports
-  once a day, at 08:00, so a stuck wet reading holds an alert for 24 hours. `api.php` asks
-  `sirenBacked()` about every online gauge past its warning mark and publishes `backed`.
-  `gaugeTone()` caps an unbacked gauge at rung 1, so every red and the alert list drop it. It does
-  not use rain as evidence, so a real flash flood beside low rivers reads as a faulty signal. That
-  cost is accepted. Do not let it silence a gauge it cannot ask: null keeps the reading.
+- **A flood gauge is checked against itself, never against a river.** This reverses the entry that
+  stood here until 2026-10-19. `api.php` asked `sirenBacked()` about every wet gauge, and a river
+  5 km away on another drainage plane is no evidence about water at one spot. Real floods read as
+  faulty signals for twelve hours and more. Now `frozen()` asks one question: did a nonzero depth
+  hold one exact value for `FROZEN_GAUGE` (72 hours) over three distinct readings? Real water moves
+  by a centimetre a day. `gaugeTone()` still caps a faulty gauge at rung 1. **The cost is Taman
+  Maznah (`gauge-117`).** It read 0.64, 0.62, 0.64 and 0.60 m with every river near it normal. The
+  depth moves, so `frozen()` passes it and it alerts. A reader who knows it is wrong ignores it by
+  hand. Do not put a river check back, and do not add nearby rain: a flood stands for hours after the
+  rain stops, so a rain window expires while the water is still there.
 - **A rain gauge's hourly reading is a claim too, and its own odometer is the check.**
   `hourlyRainfall` is a *rolling* one-hour total and `cumulativeRainfall` only climbs. So rain the
   first claims has to appear in the second across that hour. `rainBacked()` in `api.php` asks it and
@@ -1755,6 +1759,16 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
   `backed: true`.** Without it, a faked storm on one of those gauges draws as a faulty signal. It gets no
   pin and no blob. Do not widen this to a duration cutoff, and do not let it silence a gauge it
   cannot ask.
+- **The odometer hour ends at the reading's own stamp, never at the poll time.** `hourlyRainfall`
+  names the hour before its stamp. Until 2026-10-19 the caller passed `$now`. After a shower stopped,
+  each poll slid the window past the rain while the rolling total still carried it. Live gauges
+  turned faulty, and the next shower cleared them. At 19:00 on 14 October nine gauges claimed rain
+  and eight read faulty. The reading's own hour called none of them faulty. Three more guards came
+  with the repair. A reading under `RAIN_ASK` (10 mm) is not judged, because it paints no alert
+  colour. A denial also needs a denial on the reading before it. The `#b` series in `level` holds
+  those verdicts. A reading of `RAIN_ASK` or more held exactly for `FROZEN_RAIN` (6 hours) is stuck,
+  with or without an odometer. **Sirens take no on-delay**: a siren stamps a reading every 8 to 12 hours,
+  so a delay of one lets a stuck relay sound for half a day.
 - **Nothing outranks a popover except another popover.** The table draws its graphs inside `.tipbox`,
   which is a `popover` and therefore in the **top layer**. That is above every `z-index` on the page,
   because the top layer is not part of the stacking context at all. So `js/sparktip.js`'s readout is
