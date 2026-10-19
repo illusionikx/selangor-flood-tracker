@@ -438,6 +438,13 @@ export const coverReady = fetch('border.json')
       l.redraw();
     }
     setLimits();
+    /* **THE LANDING VIEW FILLS THE WINDOW, and the floor still shows the whole box.** The repository
+       owner asked on 2026-10-19 for no bare container on landing. `getBoundsZoom(cover, true)` is the
+       lowest zoom at which the box covers the whole map card. So the reader lands on ground at every
+       edge, and can still zoom out to the floor and see the strips the comment on setLimits() states.
+       It runs once, here, before `findMe()` can move the view: its own wait on `coverReady` is
+       chained after this one. */
+    map.setView(cover.getCenter(), map.getBoundsZoom(cover, true), { animate: false });
   })
   // A failed box draws the whole ground, because a map with no ground is worse than every tile.
   .catch(() => { if (cover === undefined) { cover = false; tiles?.redraw(); labels?.redraw(); } });
