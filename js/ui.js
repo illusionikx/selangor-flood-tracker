@@ -118,7 +118,12 @@ const aboutBox = el('aboutBox'), helpBox = el('helpBox');
    **Nothing here closes the menu.** `showModal()` closes every open popover itself, which is what
    the HTML spec states, so the row that opened a dialog leaves nothing behind it. */
 const openAbout = () => { closeSide(); aboutBox.scrollTop = 0; loadEgg(); aboutBox.showModal(); };
-const openHelp  = () => { closeSide(); helpBox.scrollTop  = 0; helpBox.showModal(); };
+/* The screenshots load on the first open, never on landing. A failed import or fetch leaves every
+   figure `hidden`, so Help shows its text alone, which is the whole of what it was before. */
+const openHelp  = () => {
+  closeSide(); helpBox.scrollTop  = 0; helpBox.showModal();
+  import('./help.js').then(m => m.paintHelp(helpBox)).catch(() => {});
+};
 /* **Settings has a main page and three subpages**, on the repository owner's instruction of
    2026-10-15. One `.spage` shows at a time and the header takes its `data-title`. On a subpage the
    back arrow and Escape return to the main page. On the main page both close the pane, as before.

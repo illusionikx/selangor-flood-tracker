@@ -783,217 +783,220 @@
        got wrong once. ▶ never names the way into the camera viewer, because there is no play button
        until the picture is open. -->
   <!-- Anything added here has to be true of the code. The rows below name real defaults: 5 minutes
-       between polls (POLL_MS), 10 km around a searched place (NEAR_MAX_KM), 50 m for a site
-       (SITE_M), 12 hours of graph (SPARK_WIN), 3 hours of camera clip, four viewer ranges. Move a
+       between polls (POLL_MS), 50 m for a site (SITE_M), 12 hours of graph (SPARK_WIN), 3 hours of camera clip, four viewer ranges. Move a
        constant and this list is what goes stale. -->
+  <!-- **Three screenshots, each with numbered markers.** `php help-build.php` bakes the pictures and
+       `img/help/marks.json`. `js/help.js` numbers each row that carries `data-mark` and puts the same
+       number on the picture. A figure stays `hidden` until its marks arrive, so a failed fetch shows
+       the text alone. A `data-mark` key must match a key in MARKS in `help-shot.html`. The figure
+       sits outside `.key`, because that grid pairs its children by odd and even position. -->
   <h3>Getting around</h3>
   <p class="muted">The controls sit on the leading edge of a wide window and along the bottom of a
      phone. The list below is the same either way.</p>
+  <figure class="hshot" data-shot="main" hidden>
+    <div class="hpic"><img alt="The map screen. Each number marks a control in the lists below."
+      decoding="async"></div>
+    <figcaption>The alerts in this picture are fake.</figcaption>
+  </figure>
   <div class="key">
-    <span class="ctl"><i class="i i-menu"></i><b>Show the labels</b></span>
-    <span>Widens the navigation rail so every control states its name. On a phone the labels are
-       always there and this control is not.</span>
+    <!-- Plain words, on the repository owner's instruction of 2026-10-19. A row that leads with a
+         glyph says what that glyph stands for, in one short sentence, for example `Opens settings.`
+         It never explains what happens after the press, or how to use what opens. No "it". The
+         labels follow the rail's own words where the rail draws one, and m3-check.html compares
+         them. -->
+    <span class="ctl" data-mark="main:toggle"><i class="i i-menu"></i><b>Expand or collapse menu</b></span>
+    <span>Expands or collapses the navigation bar.</span>
 
-    <span class="ctl"><i class="i i-search"></i><b>Go to a station</b></span>
-    <span>Opens the search box. See Go to a station below.</span>
+    <span class="ctl" data-mark="main:find"><i class="i i-search"></i><b>Search</b></span>
+    <span>Opens the station search.</span>
 
-    <span class="ctl"><i class="i i-warning"></i><b>Alerts</b></span>
-    <span>Opens the list of stations on alert now. The badge counts them.</span>
+    <span class="ctl" data-mark="main:alerts"><i class="i i-warning"></i><b>Alerts</b></span>
+    <span>Opens the list of stations on alert.</span>
 
-    <span class="ctl"><i class="i i-table"></i><b>Table</b></span>
-    <span>Lists every station, grouped by district. Type in the box to filter the list. Select a
-       column heading to sort within each district.</span>
+    <span class="ctl" data-mark="main:table"><i class="i i-table"></i><b>Table</b></span>
+    <span>Opens the table of all stations.</span>
 
-    <span class="ctl"><i class="i i-photo_camera"></i><b>Cameras</b></span>
-    <span>Every camera in one grid. See All cameras below.</span>
+    <span class="ctl" data-mark="main:cams"><i class="i i-photo_camera"></i><b>Cameras</b></span>
+    <span>Opens the grid of all cameras.</span>
 
-    <span class="ctl"><i class="i i-settings"></i><b>Settings</b></span>
-    <span>Your favorite sensors, your ignored sensors, and the developer controls. On a phone it
-       sits under the <b>More</b> button at the end of the bottom bar.</span>
+    <span class="ctl" data-mark="main:settings"><i class="i i-settings"></i><b>Settings</b></span>
+    <span>Opens settings.</span>
 
-    <span class="ctl"><i class="i i-info"></i><b>Help</b></span>
-    <span>This page. On a phone it sits under the same <b>More</b> button.</span>
+    <span class="ctl" data-mark="main:help"><i class="i i-info"></i><b>Help</b></span>
+    <span>Opens this help.</span>
 
-    <span class="ctl"><i class="i i-flood"></i><b>About</b></span>
-    <span>What this site is, where the data comes from, and the credits. On a phone it sits under
-       the same <b>More</b> button.</span>
+    <span class="ctl" data-mark="main:about"><i class="i i-flood"></i><b>About</b></span>
+    <span>Opens information about this site.</span>
 
-    <span class="ctl"><i class="i i-dark_mode"></i><b>Theme</b></span>
-    <span>One press switches between light and dark. The glyph shows the theme on screen now.
-       Settings also offers Automatic, which follows your device. Automatic is the default.</span>
+    <span class="ctl" data-mark="main:theme"><i class="i i-dark_mode"></i><b>Theme switcher</b></span>
+    <span>Switches between light and dark mode.</span>
   </div>
 
   <h3>On the map</h3>
   <div class="key">
-    <span class="ctl"><i class="i i-flood"></i><b>Feed status</b></span>
-    <span>To see the numbers behind the feed, hover the app name. On a phone, tap it. The numbers
-       show when the data last changed, when this page last asked for it, and where the answer came
-       from. The status line reads live, stale, cached, offline, or test mode. The map refreshes
-       itself every 5 minutes.</span>
+    <span class="ctl" data-mark="main:feed"><i class="i i-flood"></i><b>Feed status</b></span>
+    <span>Shows the state of the data feed.</span>
 
-    <span><b>The moving strip</b></span>
+    <span data-mark="main:strip"><b>The moving strip</b></span>
     <span>Lists every station on alert. A weather warning comes first. Select a station tile to
        move the map to it. Select a warning tile to read the full text. The strip stands still and
        reads <b>No alerts</b> when there is nothing to report.</span>
 
-    <span class="ctl"><i class="i i-layers"></i><b>Map layers</b></span>
-    <span>Chooses what the map paints: the stations or the weather. See Map symbols below.</span>
+    <span class="ctl" data-mark="main:layers"><i class="i i-layers"></i><b>Map layers</b></span>
+    <span>Picks what the map shows: stations or weather.</span>
 
-    <span class="ctl"><i class="i i-my_location"></i><b>Show my location</b></span>
-    <span>Puts you on the map and shows the nearest sensor of each kind. The glyph becomes an arrow
-       while your location shows.</span>
+    <span class="ctl" data-mark="main:locate"><i class="i i-my_location"></i><b>Show my location</b></span>
+    <span>Shows your location on the map.</span>
   </div>
 
   <h3>Map controls</h3>
   <p class="muted">Every control here is a chip along the top of the map. Each one changes what the
      map draws.</p>
   <div class="key">
-    <span class="ctl"><i class="i i-water_drop"></i><b>Heatmap</b></span>
-    <span>Water level or rainfall, never both. Water level scores each river and flood gauge
-       against its own marks. Rainfall uses the intensity classes JPS publishes.</span>
+    <span class="ctl" data-mark="main:heat"><i class="i i-water_drop"></i><b>Heatmap</b></span>
+    <span>Picks the heat layer: water level or rainfall.</span>
 
-    <span><b>On alert</b></span>
+    <span data-mark="main:onalert"><b>On alert</b></span>
     <span>Hides every station that is not on the alert list. Press it again to show every
        station.</span>
 
-    <span><b>Favorites</b></span>
+    <span data-mark="main:favs"><b>Favorites</b></span>
     <span>Hides every station you did not star. Press it again to show every station.</span>
 
-    <span class="ctl"><i class="i i-apps"></i><b>Sensor kinds</b></span>
-    <span>Opens a menu of the five kinds. Turn a kind off to take it off the map.</span>
+    <span class="ctl" data-mark="main:kinds"><i class="i i-apps"></i><b>Sensor kinds</b></span>
+    <span>Picks the sensor kinds that the map shows.</span>
   </div>
 
   <h3>Settings</h3>
-  <p class="muted">Two saved lists, the theme, the map, and the developer controls. Only the
-     ignored list changes what raises an alarm.</p>
+  <p class="muted">Five sections: Sensors, Theme, Map, Alerts and Developer.</p>
+  <!-- One row per item in Settings, in the order Settings draws them. A section heading is not an
+       item, so Help names no "Developer" row. The repository owner asked for that on 2026-10-19. -->
   <div class="key">
     <span class="ctl"><i class="i i-favorite"></i><b>Favorite sensors</b></span>
-    <span>Lists every sensor you starred, one row per sensor. To unstar a sensor, press the button
-       at the end of its row.</span>
+    <span>Opens your list of favorite sensors.</span>
 
     <span class="ctl"><i class="i i-visibility_off"></i><b>Ignored sensors</b></span>
-    <span>Lists every sensor you silenced. An ignored sensor leaves the map, the alert list, the
-       strip and the badge. To show a sensor again, press the button at the end of its row. The
-       list stays on screen when it is empty, and its heading states the count. If the map looks
-       emptier than you expect, open this list. It is the only place that names a silenced
-       sensor.</span>
+    <span>Opens your list of ignored sensors.</span>
 
-    <span class="ctl"><i class="i i-theme_auto"></i><b>Theme</b></span>
-    <span>Automatic, Light or Dark. Automatic follows your device, and it is the default. The theme
-       button in the navigation rail switches to Light or Dark. To go back to Automatic, select it
-       here.</span>
+    <span class="ctl"><i class="i i-theme_auto"></i><b>Automatic, Light, Dark</b></span>
+    <span>Picks the theme.</span>
 
     <span class="ctl"><i class="i i-gradient"></i><b>Heatmap opacity</b></span>
-    <span>Sets how strongly both heat layers cover the map, from 20% to 100%. The default is 75%. To
-       turn a heat layer off, use the Heatmap chip on the map.</span>
+    <span>Sets how strongly the heat layer covers the map.</span>
 
-    <span class="ctl"><i class="i i-settings"></i><b>Developer</b></span>
-    <span>Test mode fills the map with fake alerts, in this browser only. When you switch it on,
-       this pane closes and an amber <b>Test mode</b> chip appears over the map. Press that chip to
-       turn test mode off. The table under the switch states what each feed returned on the last
-       poll. <b>Refresh now</b> asks the server to fetch the feeds again. The server allows one
-       refresh a minute.</span>
+    <span class="ctl"><i class="i i-warning"></i><b>Hide faulty signals</b></span>
+    <span>Stops faulty signals from raising alerts. See Faulty sensors below.</span>
+
+    <span><b>Faulty signals</b></span>
+    <span>Opens the list of faulty signals.</span>
+
+    <span class="ctl"><i class="i i-science"></i><b>Test mode</b></span>
+    <span>Fills the map with fake alerts, in this browser only.</span>
+
+    <span><b>Readings</b></span>
+    <span>Opens what each data feed returned on the last poll.</span>
+
+    <span class="ctl"><i class="i i-refresh"></i><b>Refresh now</b></span>
+    <span>Asks the server to fetch the data feeds again.</span>
+
+    <span class="ctl"><i class="i i-open_in_new"></i><b>Raw payload</b></span>
+    <span>Opens the raw data in a new tab.</span>
+
+    <span class="ctl"><i class="i i-restart_alt"></i><b>Reset settings</b></span>
+    <span>Resets every setting to its default.</span>
   </div>
 
-  <h3>Go to a station</h3>
+  <h3>Search</h3>
   <div class="key">
-    <span><b>The list</b></span>
-    <span>Opens with every place in it. To narrow it, type a name, a district or a basin. Every row
-       is a place, not a sensor. To move the map to a place, press Enter or select its row.</span>
-
     <span class="ctl"><i class="i i-layers"></i><b>A Monitoring Station</b></span>
-    <span>Carries a chevron. Open it to list the sensors at that place. Select a sensor to open
-       it.</span>
+    <span>A place with several sensors.</span>
 
     <span class="ctl"><i class="i i-favorite"></i><b>Favorites</b></span>
-    <span>When the box is empty, your starred places come first. When you type, the list groups
-       the results under district headings, and your starred places leave the top.</span>
+    <span>Your favorite places, at the top of the list.</span>
 
     <span class="ctl"><i class="i i-my_location"></i><b>Your location</b></span>
-    <span>One row, offered after you share your position. It opens the nearest station to you.</span>
+    <span>The station nearest to you.</span>
 
     <span class="ctl"><i class="i i-search"></i><b>Search the map for a place</b></span>
-    <span>The last row of the list. It asks OpenStreetMap where the name is. Nothing leaves this
-       site until you select that row. If you select a result, the list shows the stations within
-       10 km of it, nearest first.</span>
+    <span>Finds a place by name on OpenStreetMap.</span>
   </div>
 
   <h3>Station panel</h3>
   <p class="muted">Select any pin. The card opens on the right and stays there while you read it.
      Only the back arrow closes it.</p>
+  <figure class="hshot" data-shot="panel" hidden>
+    <div class="hpic"><img alt="A station card. Each number marks a part in the list below."
+      decoding="async"></div>
+    <figcaption>The alerts in this picture are fake.</figcaption>
+  </figure>
   <div class="key">
-    <span><b>The head</b></span>
+    <span data-mark="panel:head"><b>The head</b></span>
     <span>Names the place, its district and basin, and carries one badge per sensor standing
        there.</span>
 
-    <span class="ctl"><i class="i i-more_vert"></i><b>Details</b></span>
-    <span>A menu on every sensor, and one on the card head. A sensor menu states the feed the
-       reading came from, the time JPS stamped it, and whether the station still sends readings.</span>
+    <span class="ctl" data-mark="panel:details"><i class="i i-more_vert"></i><b>Details</b></span>
+    <span>Opens the details menu of a sensor.</span>
 
     <span class="ctl"><i class="i i-favorite_outline"></i><b>Add to favorites</b></span>
-    <span>A row in Details. This browser stores the star. On the card head it stars every
-       sensor at the place. A favorite pin draws a heart and never hides inside a cluster.</span>
+    <span>Adds the sensor to your favorites.</span>
 
     <span class="ctl"><i class="i i-photo_camera"></i><b>Nearest webcam</b></span>
-    <span>A row in Details, with the camera name and the distance. A camera card offers the nearest
-       water level instead, with its reading.</span>
+    <span>Opens the nearest camera.</span>
 
     <span class="ctl"><i class="i i-place"></i><b>Open in Google Maps</b></span>
-    <span>A row in Details. It opens the coordinate in a new tab. Nothing reaches Google until you
-       press it.</span>
+    <span>Opens the place in Google Maps.</span>
 
     <span class="ctl"><i class="i i-visibility_off"></i><b>Ignore this sensor</b></span>
-    <span>The last row in Details on a sensor. It silences that sensor everywhere. Settings lists
-       what you silenced, and gives it back.</span>
+    <span>Hides the sensor from the map and the alerts.</span>
 
-    <span class="ctl"><i class="i i-rainy_heavy"></i><b>Weather</b></span>
-    <span>Three cells at the top of the card: the forecast range for today, the weather now, and the
-       weather within three hours. MET Malaysia supplies it. It changes no reading and raises no
-       alert.</span>
+    <span class="ctl" data-mark="panel:weather"><i class="i i-rainy_heavy"></i><b>Weather</b></span>
+    <span>The weather forecast from MET Malaysia.</span>
 
-    <span><b>The meter</b></span>
+    <span data-mark="panel:meter"><b>The meter</b></span>
     <span>Draws a river against its own alert, warning and danger marks. The scale does not start at
        zero.</span>
 
-    <span><b>The graph</b></span>
+    <span data-mark="panel:graph"><b>The graph</b></span>
     <span>A line for a river or a flood gauge. Bars for rainfall. Both cover the last 12
        hours.</span>
 
-    <span><b>A point on a graph</b></span>
-    <span>Move the pointer over it. On a phone, hold a finger on it. The reading and its time appear
-       above the line.</span>
-
-    <span><b>The camera picture</b></span>
+    <span data-mark="panel:picture"><b>The camera picture</b></span>
     <span>A camera at the same place replays its last three hours in the card. Select it to open
        the viewer.</span>
-
-    <span><b>Offline</b></span>
-    <span>A gray block replaces the reading when a station goes quiet. Details states the date of
-       the last reading.</span>
   </div>
+  <ul class="hlist">
+    <li>To read a point on a graph, move the pointer over the point. On a phone, hold a finger on
+       the point.</li>
+    <li>A gray block replaces the reading of a station that stopped sending readings. Details shows
+       the date of the last reading.</li>
+  </ul>
 
   <h3>Camera viewer</h3>
+  <figure class="hshot" data-shot="viewer" hidden>
+    <div class="hpic"><img alt="The camera viewer. Each number marks a control in the list below."
+      decoding="async"></div>
+    <figcaption>The alerts in this picture are fake.</figcaption>
+  </figure>
   <div class="key">
     <span><b>Open the viewer</b></span>
     <span>Select any camera picture. It opens three hours back, not on the live frame.</span>
 
-    <span class="ctl"><i class="i i-skip_previous"></i><i class="i i-play_arrow"></i
+    <span class="ctl" data-mark="viewer:transport"><i class="i i-skip_previous"></i><i class="i i-play_arrow"></i
       ><i class="i i-skip_next"></i><i class="i i-last_page"></i><b>Transport</b></span>
-    <span>Step one frame back or forward, play the frames at one a second, or jump to the live
-       frame.</span>
+    <span>Previous frame, play, next frame and live frame.</span>
 
-    <span class="ctl"><i class="i i-compare"></i><b>Compare</b></span>
-    <span>Drag the divider it reveals to hold an older frame against the live one.</span>
+    <span class="ctl" data-mark="viewer:compare"><i class="i i-compare"></i><b>Compare</b></span>
+    <span>Compares an older frame with the live frame.</span>
 
-    <span><b>The seek bar</b></span>
+    <span data-mark="viewer:seek"><b>The seek bar</b></span>
     <span>Drag it to any frame. A colored span marks when a sensor near that camera was on
        alert.</span>
 
-    <span><b>Range</b></span>
+    <span data-mark="viewer:range"><b>Range</b></span>
     <span>Four ranges: 24 hours, a week, a month, a year. One frame is 30 minutes, 3 hours, 12 hours
        or 1 week. The viewer opens on the shortest range the archive can fill.</span>
 
-    <span><b>The pill on the picture</b></span>
+    <span data-mark="viewer:pill"><b>The pill on the picture</b></span>
     <span>States what a sensor near that camera reported when the camera took that frame. It reads
        the archive, not the live figure.</span>
 
@@ -1003,70 +1006,51 @@
   </div>
 
   <h3>All cameras</h3>
-  <div class="key">
-    <span><b>The grid</b></span>
-    <span>Every camera that publishes a picture. Each tile replays the last three hours of its
-       camera. A tile starts to play when you scroll to it.</span>
-
-    <span><b>The filter</b></span>
-    <span>Type a camera name or a district. The count above the grid states what is left, and how
-       many cameras publish no picture at all.</span>
-
-    <span><b>A tile</b></span>
-    <span>Select one to open its station panel. A camera with no location on file still shows a
-       picture, but nothing happens when you select it.</span>
-  </div>
+  <figure class="hshot" data-shot="wall" hidden>
+    <div class="hpic"><img alt="The All cameras page, a grid of camera pictures." decoding="async"></div>
+    <figcaption>The alerts in this picture are fake.</figcaption>
+  </figure>
+  <ul class="hlist">
+    <li>Shows every camera that publishes a picture, in one grid.</li>
+    <li>Each tile replays the last three hours of its camera.</li>
+    <li>A warning on a tile names a sensor on alert near that camera.</li>
+    <li>Select a tile to open its station.</li>
+  </ul>
 
   <h3>Map symbols</h3>
-  <p class="muted">One pin per place. The glyph states the kind of sensor. The color states the
-     status of that sensor. A kind color is never a traffic light, and a traffic-light color
-     always means status.</p>
+  <p class="muted">One pin per place. The glyph shows the kind of sensor. The color shows its
+     status. A gray pin means no reading, for every kind.</p>
+  <!-- The status matrix, on the repository owner's instruction of 2026-10-19. One row per sensor
+       kind, with the pins that kind can take in a row under its name. The cells hold words alone.
+       Gray is stated once above, because a gray column said "No reading" five times. The cutoffs
+       are the ones `color()` in js/util.js reads: RIVER_COLOR, RAIN_COLOR and GAUGE_COLOR in
+       config.js. Move a cutoff there and this table is what goes stale. It has to fit a 360px phone
+       with no scroll bar. See `.hmatrix` in css/chrome.css. -->
+  <table class="hmatrix">
+    <thead><tr><th scope="col">Sensor</th><th scope="col">Normal</th><th scope="col">Amber</th
+      ><th scope="col">Red</th></tr></thead>
+    <tbody>
+      <tr><th scope="row">Water level<span class="hpins"><span class="pin off" style="--c:var(--s-none)"><i class="i i-water_drop"></i></span><span class="pin" style="--c:var(--k-river)"><i class="i i-water_drop"></i></span><span class="pin inkdark" style="--c:var(--s-alert)"><i class="i i-water_drop"></i></span><span class="pin danger" style="--c:var(--s-danger)"><i class="i i-water_drop"></i></span></span></th><td>Below its alert mark</td><td>At its alert mark or above</td><td>At its danger mark or above</td></tr>
+      <tr><th scope="row">Rainfall<span class="hpins"><span class="pin off" style="--c:var(--s-none)"><i class="i i-rainy"></i></span><span class="pin" style="--c:var(--k-rainfall)"><i class="i i-rainy"></i></span><span class="pin inkdark" style="--c:var(--s-alert)"><i class="i i-rainy"></i></span><span class="pin danger" style="--c:var(--s-danger)"><i class="i i-rainy"></i></span></span></th><td>30 mm or less in the last hour</td><td>More than 30 mm in the last hour</td><td>More than 60 mm in the last hour</td></tr>
+      <tr><th scope="row">Flood gauge<span class="hpins"><span class="pin off" style="--c:var(--s-none)"><i class="i i-straighten"></i></span><span class="pin" style="--c:var(--k-gauge)"><i class="i i-straighten"></i></span><span class="pin inkdark" style="--c:var(--s-alert)"><i class="i i-straighten"></i></span><span class="pin danger" style="--c:var(--s-danger)"><i class="i i-straighten"></i></span></span></th><td>Less than 0.15 m of water</td><td>0.15 m of water or more</td><td>0.3 m of water or more</td></tr>
+      <tr><th scope="row">Siren<span class="hpins"><span class="pin off" style="--c:var(--s-none)"><i class="i i-campaign"></i></span><span class="pin" style="--c:var(--k-siren)"><i class="i i-campaign"></i></span><span class="pin danger" style="--c:var(--s-danger)"><i class="i i-campaign"></i></span></span></th><td>Idle</td><td class="none"><span aria-label="None">&ndash;</span></td><td>Sounding</td></tr>
+      <tr><th scope="row">Camera<span class="hpins"><span class="pin off" style="--c:var(--s-none)"><i class="i i-photo_camera"></i></span><span class="pin" style="--c:var(--k-camera)"><i class="i i-photo_camera"></i></span></span></th><td>Publishes a picture</td><td class="none"><span aria-label="None">&ndash;</span></td><td class="none"><span aria-label="None">&ndash;</span></td></tr>
+    </tbody>
+  </table>
+  <ul class="hlist">
+    <li>A water level forecast to reach its danger mark within 3 hours is amber too.</li>
+    <li>A flood gauge reading below zero is dry ground.</li>
+    <li>A red pin also gets a pulsing halo and draws over the other pins.</li>
+    <li>A faulty signal keeps the normal color. See Faulty sensors below.</li>
+  </ul>
   <div class="key">
-    <span class="pins">
-      <span class="pin" style="--c:var(--k-river)"><i class="i i-water_drop"></i></span>
-      <span class="pin" style="--c:var(--k-rainfall)"><i class="i i-rainy"></i></span>
-      <span class="pin" style="--c:var(--k-siren)"><i class="i i-campaign"></i></span>
-      <span class="pin" style="--c:var(--k-gauge)"><i class="i i-straighten"></i></span>
-      <span class="pin" style="--c:var(--k-camera)"><i class="i i-photo_camera"></i></span>
-    </span>
-    <span>The five kinds: water level, rainfall, siren, flood gauge, camera. Each holds its own
-       color, and none of the five is ever used for status.</span>
-
-    <span class="pins">
-      <span class="pin inkdark" style="--c:var(--s-alert)"><i class="i i-water_drop"></i></span>
-      <!-- `--c` is not optional on a sample. `.pin` reads `color: var(--c, var(--accent))`, so a pin
-           with no `--c` draws in the accent blue — which is what this one did, under a line of text
-           promising the reader it fills red. See the legend rule in the Verify block in CLAUDE.md. -->
-      <span class="pin danger" style="--c:var(--s-danger)"><i class="i i-water_drop"></i></span>
-    </span>
-    <span>Every sensor wears three colors and no more: its own kind while it is quiet,
-       <b>amber</b> while it climbs, <b>red</b> at the top of its own scale. At danger, a pin also
-       gets a pulsing halo and draws over all other pins.</span>
-
-    <span class="pins">
-      <span class="pin inkdark" style="--c:var(--s-alert)"><i class="i i-water_drop"></i></span>
-      <span class="pin inkdark" style="--c:var(--s-alert)"><i class="i i-straighten"></i></span>
-      <span class="pin inkdark" style="--c:var(--s-alert)"><i class="i i-rainy"></i></span>
-    </span>
-    <span>Where amber starts, per kind. A water level at its <b>alert mark</b>. A flood gauge at
-       <b>0.15 m</b> of water. A rain gauge above <b>30 mm an hour</b>. Red follows at the danger
-       mark, at 0.3 m, and above 60 mm an hour. A siren has no middle state: it is idle, or it is
-       sounding. A water level forecast to reach its danger mark within 3 hours is amber too.</span>
-
     <span class="pins"><span class="pin multi" style="--c:var(--k-mast)"
       ><i class="i i-layers"></i></span></span>
-    <span>A Monitoring Station: several sensors at one place. If any of them is on alert, the pin
-       takes that status color.</span>
-
-    <span class="pins"><span class="pin off" style="--c:var(--s-none)"
-      ><i class="i i-water_drop"></i></span></span>
-    <span>Gray and faded: offline, or reporting nothing. It never takes a status color, because a
-       station with no reading must not look confident.</span>
+    <span>A Monitoring Station: several sensors at one place. The pin takes the color of its worst
+       sensor.</span>
 
     <span class="pins"><span class="cluster">12</span></span>
-    <span>A group of pins too close together to draw apart. The number counts them. To see each
-       pin, zoom in or select the chip. A favorite pin stays outside the group and is not in the
-       count.</span>
+    <span>A group of pins too close together to draw apart. The number counts them.</span>
   </div>
 
   <h3>Alert criteria</h3>
@@ -1075,27 +1059,41 @@
   <div class="key">
     <span><i class="i i-warning" style="color:var(--s-danger);font-size:20px" role="img"
       aria-label="Happening now"></i></span>
-    <span>A river <b>at or past its danger mark</b>, a <b>siren sounding</b>, a <b>flood gauge
-       past 0.3 m</b>, or <b>rain above 60 mm an hour</b>. Observed, not predicted. The section
-       title is red.</span>
+    <span>A sensor at red in the table above. Observed, not predicted.</span>
 
     <span><b>Heavy rain</b></span>
-    <span>A rain gauge <b>above 30 mm an hour</b>. Observed, not predicted. It ranks under the red
-       group, because rain at this rate is not yet the top of its scale.</span>
+    <span>A rain gauge at amber. Observed, not predicted.</span>
 
     <span><b>Forecast</b></span>
-    <span>A river climbing fast enough to reach <b>its own danger mark within 3 hours</b>. It must
-       climb at least 0.1 m an hour, and its last three readings must not dip. A slower climb can be
-       sensor rounding. A forecast past 3 hours rests on too few readings.</span>
+    <span>A river forecast to reach its own danger mark within 3 hours. The river must climb at
+       least 0.1 m an hour.</span>
 
     <span><b>Not current</b></span>
-    <span>Any of the above, from a station that has since gone quiet. The water can still be
-       high after a sensor stops, so the list keeps the station. It sorts to the bottom and counts
-       toward no total.</span>
+    <span>Any of the above, from a station that has since gone quiet. The list keeps the station at
+       the bottom.</span>
   </div>
-  <p class="muted">JPS publishes the marks for each station. So a small drain and a large river
-     each stand against their own flood level. Cameras raise no alert. The panel lists a weather
-     warning above the stations, and that warning counts toward no station total.</p>
+  <p class="muted">JPS publishes the marks for each station. Cameras and weather warnings count
+     toward no station total.</p>
+
+  <h3>Faulty sensors</h3>
+  <p>A sensor can send a wrong reading. This site checks three kinds of sensor, and it marks a
+     wrong reading as a faulty signal. A faulty signal keeps the normal color and raises no alert.
+     The card states the reason.</p>
+  <ul class="hlist">
+    <li>A siren that sounds is checked against the rivers within 5 km. The alarm counts when one of
+       those rivers is at its warning mark or above. A river at its alert mark that climbs 0.1 m an
+       hour or more also counts.</li>
+    <li>A rain gauge that reports 10 mm an hour or more is checked against its own running total
+       for the same hour. When the total did not rise on two readings in a row, the reading is
+       faulty.</li>
+    <li>A reading above zero that stays at one exact value is faulty. A flood gauge must hold the
+       value for 3 days, over three readings. A rain gauge at 10 mm an hour or more must hold the
+       value for 6 hours.</li>
+    <li>A siren with no river within 5 km, and a rain gauge with no running total, keep their
+       readings.</li>
+  </ul>
+  <p>Settings lists every faulty signal under <b>Faulty signals</b>. To let faulty signals raise
+     alerts, turn off <b>Hide faulty signals</b>.</p>
 
   <h3>Glossary</h3>
   <div class="key">
@@ -1117,9 +1115,6 @@
     <span><b>stale</b></span>
     <span>The station was on alert, and has since gone quiet.</span>
 
-    <span><b>offline</b></span>
-    <span>No reading arrived. The pin goes gray, and it takes no status color.</span>
-
     <span><b>water level</b></span>
     <span>The height of the river against a fixed reference height (a datum). The scale does not
        start at zero. So a calm station can still read in the thirties.</span>
@@ -1136,43 +1131,44 @@
        it thins the record.</span>
   </div>
 
-  <h3>Expected behavior</h3>
-  <div class="key">
-    <span><b>The map is empty and states that it cannot load.</b></span>
-    <span>This site refuses to draw a map it cannot refresh. During a flood, a water level from an
-       hour ago is worse than none.</span>
-
-    <span><b>The reading is twenty minutes old.</b></span>
-    <span>JPS updates a station about every 25 minutes. Details states when JPS took the reading,
-       not when this site fetched it.</span>
-
-    <span><b>The camera picture is not from now.</b></span>
-    <span>A camera card replays the last three hours. The viewer opens three hours back. Press the
-       live button to return to now.</span>
-
-    <span><b>The page did not reload and the figures moved.</b></span>
-    <span>The map polls every 5 minutes and repaints itself. There is nothing to reload.</span>
-  </div>
+  <h3>Questions</h3>
+  <!-- Questions and answers, on the repository owner's instruction of 2026-10-19. It replaced
+       a key of "expected behavior". Every answer has to be true of the code: 5 minutes is
+       POLL_MS, and the four reasons a sensor is missing are the chips, the kind menu, the
+       ignored list and the layer chip. -->
+  <dl class="faq">
+    <dt>Why is the map empty, with a message that it cannot load?</dt>
+    <dd>This site draws no map that it cannot refresh. During a flood, a water level from an hour ago is worse than none. Check your connection, then press <b>Try again</b>.</dd>
+    <dt>Why is a reading twenty minutes old?</dt>
+    <dd>JPS updates a station about every 25 minutes. Details shows when JPS took the reading, not when this site fetched it.</dd>
+    <dt>Do I have to reload the page?</dt>
+    <dd>No. The map asks for new readings every 5 minutes and repaints itself.</dd>
+    <dt>Why is the camera picture not from now?</dt>
+    <dd>A camera card replays the last three hours. The viewer opens three hours back. To see the live frame, press <b>Go to now</b>.</dd>
+    <dt>Why does a calm river read in the thirties?</dt>
+    <dd>A water level is a height above a fixed reference point, not a depth. Each station has its own alert, warning and danger marks on the same scale.</dd>
+    <dt>Why are some pins gray?</dt>
+    <dd>A gray pin has no reading. The station is offline, or its last reading did not arrive.</dd>
+    <dt>Why is a sensor missing from the map?</dt>
+    <dd>Check four things. The <b>On alert</b> and <b>Favorites</b> chips hide every other station. The <b>Sensors</b> chip can turn a kind off. Settings lists the sensors you ignored. The layer chip can show the weather in place of the stations.</dd>
+    <dt>Why does a siren show no alert?</dt>
+    <dd>This site found the alarm to be a faulty signal, because no river near the siren is high. See Faulty sensors above.</dd>
+    <dt>Why is the whole map red?</dt>
+    <dd>If an amber <b>Test mode</b> chip shows over the map, every alert is fake. Press the chip to turn test mode off.</dd>
+    <dt>Where does the data come from?</dt>
+    <dd>From JPS, the Department of Irrigation and Drainage, and from MET Malaysia for the weather. About lists each source.</dd>
+    <dt>Can I install this site as an app?</dt>
+    <dd>Yes. In Chrome or Edge, select the install button in the address bar. On an iPhone, select <b>Share</b>, then <b>Add to Home Screen</b>.</dd>
+  </dl>
 
   <h3>Limits</h3>
-  <div class="key">
-    <span><b>Cameras, sirens and flood gauges</b></span>
-    <span>Selangor only. JPS publishes none of the three for Kuala Lumpur or Putrajaya.</span>
-
-    <span><b>History past twelve hours</b></span>
-    <span>The graphs hold twelve hours. The screen shows no older record. The camera archive is the
-       one exception, and it holds pictures rather than figures.</span>
-
-    <span><b>A water forecast</b></span>
-    <span>A sensor measured every water figure on this map. The weather block holds a forecast
-       from MET, and it states no river level.</span>
-
-    <span><b>A notification</b></span>
-    <span>This site sends none. It must be open to warn you.</span>
-
-    <span><b>A station JPS does not publish</b></span>
-    <span>It is not here. This site adds no station of its own.</span>
-  </div>
+  <ul class="hlist">
+    <li>Cameras, sirens and flood gauges cover Selangor only. JPS publishes none of the three for Kuala Lumpur or Putrajaya.</li>
+    <li>The graphs hold twelve hours. The camera archive keeps older pictures, but no older figures show.</li>
+    <li>A sensor measured every water figure on this map. The weather block holds a MET forecast and states no river level.</li>
+    <li>This site sends no notification. It must be open to warn you.</li>
+    <li>A station that JPS does not publish is not here. This site adds no station of its own.</li>
+  </ul>
   </div><!-- /.docbody -->
 </dialog>
 <!-- Tap the About logo seven times inside five seconds. No header, no close button: the picture is

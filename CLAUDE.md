@@ -34,7 +34,10 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `css/chrome.css` | page furniture: app bar, status dot, rail, navigation bar, legend, splash |
 | `css/map.css` | Leaflet overrides, pins, cluster badges, popup template |
 | `js/app.js` | entry point — decides what happens on landing, nothing else |
-| `js/probe.js` | a check fixture, and not part of the app. `index.html` never names it. It puts `openSide` and `closeSide` on `window.__probe`, so a render check can drive the station panel through the app's OWN module instance on either target. The build emits it as a second entry point, unconditionally — see the file |
+| `js/probe.js` | a check fixture, and not part of the app. `index.html` never names it. It puts `openSide`, `closeSide`, `flashTo` and `state` on `window.__probe`, so a render check or `help-shot.html` can drive the station panel through the app's OWN module instance on either target. The build emits it as a second entry point, unconditionally. See the file |
+| `js/help.js` | the Help screenshots. Deferred, loaded on the first open of Help. Reads `img/help/marks.json`, numbers each row that carries `data-mark`, and puts the same number on the picture |
+| `help-build.php` | `php help-build.php` bakes the eight Help screenshots and `img/help/marks.json` through headless Chrome and GD. Needs Herd serving the app. Run by hand after a change to the rail, the chips, the card, the viewer or the camera wall. Nothing checks that the pictures are current |
+| `help-shot.html` | **Not a check and not part of the app.** The page `help-build.php` captures. It loads the app in a fixed-size frame, turns on test mode, opens the card, the viewer or the camera wall, and writes the box of each labeled control. Its `SHOTS` table holds the keys that `data-mark` names in Help |
 | `js/oops.js` | reports a browser throw, a rejected promise or a failed asset to `log.php`. No imports, and `app.js` imports it first |
 | `js/config.js` | constants (kinds, palettes, thresholds, tile styles, `WEATHER`). Also `NOTICE`, the words for an upstream outage. No imports. |
 | `js/state.js` | `state` (data + hereAt) and the `PREFS` blob. Breaks module cycles. |
@@ -74,7 +77,7 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `wx-places.json` | the district behind each weather point, baked and committed |
 | `icon-192.png`, `icon-512.png` | manifest icons (`any`) and the favicon — the glyph on transparency |
 | `icon-180.png` | `apple-touch-icon`. Opaque, because iOS flattens alpha onto a colour of its own |
-| `img/` | optional. Only `egg.webp` (the About easter egg). Absent is a supported state — see below |
+| `img/` | optional. `egg.webp` (the About easter egg) and `img/help/`, the eight Help screenshots and `marks.json`. Absent is a supported state — see below. Help then shows its text alone |
 | `m3-build.php` | `php m3-build.php` — bakes `vendor/m3/tokens.css` from the M3 Expressive token set. Run by hand, never in a request |
 | `vendor/m3/tokens.css` | M3's shape, typescale, elevation, motion and state scales, vendored. Generated — **colour is deliberately not in it** |
 | `vendor/` | Leaflet, leaflet.heat (patched), subsetted fonts, the M3 token scales — no CDN, hand-managed. **markercluster left on 2026-09-03**, when the pins moved to a canvas |
@@ -701,6 +704,7 @@ order that file holds them. A trap names itself here, and the file states the ev
 - `php api.php --selftest` runs near the top of the file and exits there, so a later `const` does...
 - A `preload` needs `crossorigin` when the code asks for the file with `fetch()`.
 - An index on `level(ts)` makes the rebuild slower, and `(ts, level)` makes it faster.
+- A headless screenshot needs a frame of fixed size, and no CSS motion.
 
 ## Conventions
 
@@ -796,7 +800,7 @@ order that file holds them. A trap names itself here, and the file states the ev
   for peer destinations that share a container, and these three are that. This app ran it for one
   revision. A reader met it beside the station swap inside `#side` and asked for one motion.
   `--m3-swap` is that motion, and both events read it.
-  **No surface in this layout carries a dividing line, except inside the pane.** Not the card, not the app bar, not the pane edge. The alert panel and the station panel separate their sections with a divider, on the repository owner's instruction of 2026-10-14.
+  **No surface in this layout carries a dividing line, except inside the pane.** Not the card, not the app bar, not the pane edge. The alert panel and the station panel separate their sections with a divider, on the repository owner's instruction of 2026-10-14. Every table in Help and About also carries a subtle border, on the owner's instruction of 2026-10-19.
   **In a compact window the supporting pane is a full-screen destination.** That is what
   `SupportingPaneScaffold` does in the Compose adaptive library, and it is why `#pane` is a
   `<dialog>`: `showModal()` below 600px, `show()` above it.

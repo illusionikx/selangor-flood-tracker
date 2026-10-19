@@ -16,7 +16,11 @@
    **The build emits it unconditionally, and not behind a flag.** Adding an entry point changes how
    esbuild splits the chunks. A build with the probe and a build without it are therefore different
    artifacts, and a check must measure the artifact that ships. The cost is one file of about 200
-   bytes that nothing ever requests. */
-import { openSide, closeSide } from './map.js';
+   bytes that nothing ever requests.
 
-window.__probe = { openSide, closeSide };
+   `help-shot.html` uses it too. That page opens a real station card for the Help screenshots, and
+   zooms the map until the land fills the card. So it needs `flashTo`, the live `state` and `map`. */
+import { map, openSide, closeSide, flashTo } from './map.js';
+import { state } from './state.js';
+
+window.__probe = { map, openSide, closeSide, flashTo, state };

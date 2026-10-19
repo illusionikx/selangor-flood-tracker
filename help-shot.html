@@ -1,0 +1,253 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Help screenshot</title>
+<!-- One Help screenshot, and the position of each control it labels. NOT a check and not part of the
+     app. `php help-build.php` opens this page in headless Chrome, once for each picture, and reads
+     the screenshot and the JSON in `#out` from the same run.
+
+     The page loads the app in a frame, then sets the state the picture needs:
+       ?shot=main    the map, in test mode
+       ?shot=panel   a station card open, on a flooded place with a camera
+       ?shot=viewer  that camera in the viewer
+       ?shot=wall    the All cameras page, with no numbers
+     `?w=` and `?h=` give the frame its size in CSS pixels, and that size picks the layout. So the
+     same page makes the desktop and the phone pictures.
+     The frame has a fixed size, and the window is larger than it. Headless Chrome lays a page out at
+     one viewport and takes `--screenshot` at the window size, and it enforces a minimum window
+     width of about 500px. A frame sized to the window laid the app out twice, and the marks fell
+     off their controls. A fixed frame at the top left has one layout.
+
+     Test mode fills the map with fake alerts. This page then hides the three things that say so: the
+     amber chip, the striped app bar and the snackbar. Help prints a caption under each picture that
+     says the alerts are fake.
+
+     SHOTS holds one entry per labeled control. The Help rows name the same keys in `data-mark`. A key
+     can list several selectors. The first one that draws inside the picture wins, so one table serves
+     the rail above 600px and the navigation bar below it. A control that does not draw at this width
+     is left out of the answer, and its Help row carries no number at that width.
+
+     `@side` after a selector says where the number goes, so that the number covers no text:
+       t   on the top edge, at the middle (the default)
+       b   on the bottom edge, at the middle
+       tl  on the top left corner
+       tr  on the top right corner
+       l   outside the left edge, at the middle
+       r   outside the right edge, at the middle
+     A rail item names its label with `@r`, so the number sits after the word. A chip takes `@tr`,
+     the corner a badge takes. A `~` before the side measures the TEXT inside the element rather
+     than its box. The card title is a full-width box holding a short name, so `@~r` puts the number
+     right after the name. -->
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; }
+  iframe { position: fixed; left: 0; top: 0; border: 0; }
+  #out { position: fixed; left: -9999px; }
+</style>
+<iframe id="app"></iframe>
+<pre id="out"></pre>
+<script type="module">
+const q = new URLSearchParams(location.search);
+const SHOT = q.get('shot') || 'main';
+const out = document.getElementById('out');
+const frame = document.getElementById('app');
+frame.style.width = `${+q.get('w') || 1280}px`;
+frame.style.height = `${+q.get('h') || 800}px`;
+
+const SHOTS = {
+  main: { clip: null, marks: {
+    toggle: '#railToggle@r',
+    find: '#railFind@r, #navFind .railpill@tl',
+    alerts: '#railAlerts .raillabel@r, #navAlerts .railpill@tl',
+    table: '#railTable .raillabel@r, #navTable .railpill@tl',
+    cams: '#railCams .raillabel@r, #navCams .railpill@tl',
+    settings: '#railSettings .raillabel@r, #navMore@r',
+    help: '#railHelp .raillabel@r', about: '#railAbout .raillabel@r',
+    theme: '#railApps@r, #navTheme@l',
+    feed: '#brand .mark@tl, #brand@l', strip: '#ticker@tr', locate: '#locate@l',
+    layers: '#layerChip@tr', heat: '#heatChip@tr', onalert: '#alertChip@tr',
+    favs: '#favChip@tr', kinds: '#kindChip@tr',
+  } },
+  panel: { clip: '#pane', marks: {
+    head: '#sideTitle@~r',
+    details: '#sideBody .sensor:not(:has(.wxnow)) .sensorhead .dots@tr',
+    weather: '#sideBody .sensor:has(.wxnow)@r',
+    meter: '#sideBody .meter@r', graph: '#sideBody .spark@r', picture: '#sideBody .shotwrap@r',
+  } },
+  viewer: { clip: '#lightbox', marks: {
+    transport: '#lightbox .tltransport@l', compare: '#lightbox .tlcmp@r', seek: '#lightbox .tltrack@t',
+    range: '#lightbox .tlranges@l', pill: '#lightbox .camwarn@r',
+  } },
+  // Help lists what the page does in a few bullets and labels no control on it.
+  wall: { clip: '#camBox', marks: {} },
+};
+
+const wait = ms => new Promise(r => setTimeout(r, ms));
+async function until(what, fn, ms = 30000) {
+  for (let t = 0; t < ms; t += 100) { const v = fn(); if (v) return v; await wait(100); }
+  throw new Error(`timed out waiting for ${what}`);
+}
+
+/* A fresh headless profile holds no preferences, so this states the one the picture needs. Help
+   ships light pictures only, on the repository owner's call of 2026-10-19. */
+localStorage.setItem('prefs', JSON.stringify({ theme: 'light' }));
+/* Wait for the `load` event, never for `readyState`. A new frame holds an `about:blank` document that
+   reads `complete` at once, and a script put into it is gone when the app replaces it. */
+const loaded = new Promise(r => { frame.onload = r; });
+frame.src = 'index.html';
+
+try {
+  await loaded;
+  const d = frame.contentDocument, w = frame.contentWindow;
+  const css = d.createElement('style');
+  /* Four overrides. The snackbar says test mode is on. The pane puts focus on its back arrow, and
+     the ring around it reads as a highlight. Never `blur()` that arrow: the pane closed when it lost
+     focus that way. The viewer's control bar hides until a pointer rests on the picture, above
+     600px, and a screenshot has no pointer. The frame stamp steps above the bar, as on hover. */
+  /* Motion goes first. Headless Chrome measures the page under virtual time, but a CSS transition
+     runs on its own clock. The rail was still growing when the marks were read, and every map
+     marker landed one chip to the left of its control. */
+  css.textContent = `*, *::before, *::after, ::backdrop {
+      transition: none !important; animation: none !important; }
+    #snack { display: none !important; }
+    :focus, :focus-visible { outline: none !important; }
+    #tl { opacity: 1 !important; visibility: visible !important; transition: none !important; }
+    @media (hover: hover) and (min-width: 601px) {
+      #lightbox .player:has(#tl:not([hidden])) .btime { bottom: 88px !important; transition: none; }
+    }`;
+  d.head.appendChild(css);
+
+  /* `js/probe.js` is the app's own module instance, so `state` and `flashTo` here are the live ones.
+     See the note in that file. */
+  const sc = d.createElement('script');
+  sc.type = 'module';
+  sc.textContent = "import '/js/probe.js';";
+  d.body.appendChild(sc);
+  const P = await until('the payload', () => w.__probe?.state.data.length && w.__probe);
+
+  const box = d.getElementById('testMode');
+  box.checked = true;
+  box.dispatchEvent(new Event('change'));
+  // `drown()` in js/test.js sets this exact rate. No real river reports it with `rising` set.
+  await until('the fake flood', () => P.state.data.some(s => s.kind === 'river' && s.rate === 0.22));
+  await wait(1500);
+  d.body.classList.remove('testmode');
+  /* The collapsed rail hides the brand, Settings, Help and About. The open rail draws every control
+     the Help rows name. */
+  if (SHOT === 'main' && w.innerWidth >= 600) d.getElementById('railToggle').click();
+  /* The landing view fits the whole coverage box by its height, and a wide card then shows empty
+     ground on both sides of the land. Zoom in until the box is as wide as the map, then center on
+     Kuala Lumpur, where most of the pins are. The pan limit keeps the view inside the box. A phone
+     card is narrow, so the box already fills it and the view stays as it is. */
+  if (SHOT === 'main') {
+    const m = P.map, box = m.options.maxBounds;
+    await wait(500);
+    m.invalidateSize();   // the rail just grew, and the map card shrank with it
+    let z = m.getZoom();
+    const wide = zz => m.project(box.getNorthEast(), zz).x - m.project(box.getSouthWest(), zz).x;
+    while (box && z < m.getMaxZoom() && wide(z) < m.getSize().x) z++;
+    if (z > m.getZoom()) m.setView([3.1, 101.6], z, { animate: false });
+    await wait(4000);   // the tiles for the new view
+  }
+
+  if (SHOT === 'wall') {
+    d.getElementById(w.innerWidth > 600 ? 'railCams' : 'navCams').click();
+    /* The tiles load lazily, so wait for the ones on screen. A tile that fails draws its own "No
+       picture" box, and that counts as settled. */
+    await until('the camera tiles', () => {
+      const imgs = [...d.querySelectorAll('#camGrid .camtile img')].filter(i =>
+        i.getBoundingClientRect().top < w.innerHeight);
+      return imgs.length >= 4 && imgs.every(i => i.complete);
+    });
+    await wait(3000);
+  }
+
+  if (SHOT === 'panel' || SHOT === 'viewer') {
+    /* A flooded place with a camera, a river and a rain gauge, whose camera has an archive. The
+       viewer opens on the archive, and a camera with none draws no seek bar to label. */
+    const sites = new Map();
+    for (const s of P.state.data) {
+      const k = s.site || s.id;
+      sites.has(k) ? sites.get(k).push(s) : sites.set(k, [s]);
+    }
+    let pick = null;
+    for (const m of sites.values()) {
+      const river = m.find(s => s.kind === 'river' && s.status >= 3);
+      const cam = m.find(s => s.kind === 'camera');
+      if (!river || !cam || !m.some(s => s.kind === 'rainfall')) continue;
+      const frames = await (await fetch(`api.php?shots=${cam.id.split('-')[1]}`)).json();
+      if (frames.length) { pick = river; break; }
+    }
+    if (!pick) throw new Error('no flooded place has a camera with an archive');
+    P.flashTo(pick);
+    await until('the station card', () => d.querySelector('#sideBody .shotwrap.done .shot')
+                                     && d.querySelector('#sideBody .spark'));
+    await wait(1500);
+  }
+
+  if (SHOT === 'viewer') {
+    d.querySelector('#sideBody .shotwrap .shot').click();
+    await until('the viewer', () => d.getElementById('lightbox').open
+                                && !d.getElementById('tl').hidden
+                                && d.querySelector('#lightbox .stage img').complete);
+    await wait(1000);
+    /* The viewer plays the archive as it opens, and the frame and its alert pill change every
+       second. "Go to now" stops on the live frame, which carries the pill of the fake flood. */
+    d.querySelector('#lightbox .tlnow').click();
+    await wait(2000);
+  } else await wait(3000);
+  /* Headless Chrome refuses a location request, so the button draws its failed glyph. Help names
+     the button by its normal glyph. */
+  d.getElementById('locate')?.classList.remove('fail');
+  await wait(300);
+
+  const spec = SHOTS[SHOT];
+  const vw = w.innerWidth, vh = w.innerHeight;
+  const c = spec.clip ? d.querySelector(spec.clip).getBoundingClientRect()
+                      : { left: 0, top: 0, width: vw, height: vh };
+  const clip = [Math.max(0, c.left), Math.max(0, c.top),
+                Math.min(vw, c.left + c.width), Math.min(vh, c.top + c.height)];
+  /* The card runs on past the last control Help names. The picture stops 24px under it, because a
+     tall strip of sections nobody labels pushes the Help rows a screen further down. */
+  // `sel@side` → [selector, side]
+  const parse = s => { const [sel, side = 't'] = s.trim().split('@'); return [sel, side]; };
+  if (SHOT === 'panel') {
+    const foot = Math.max(...Object.values(spec.marks).map(s => s.split(',')
+      .map(x => d.querySelector(parse(x)[0])?.getBoundingClientRect().bottom || 0)).flat());
+    clip[3] = Math.min(clip[3], foot + 24);
+  }
+  const pct = (v, lo, span) => +((v - lo) / span * 100).toFixed(2);
+  const marks = {};
+  for (const [key, sels] of Object.entries(spec.marks)) {
+    for (const s of sels.split(',')) {
+      let [sel, side] = parse(s);
+      const e = d.querySelector(sel);
+      let r = e?.getBoundingClientRect();
+      if (e && side.startsWith('~')) {
+        side = side.slice(1);
+        /* Each text node on its own. A range over the whole element takes in a block child, and a
+           block child is as wide as the box. */
+        const boxes = [];
+        for (const t = d.createTreeWalker(e, NodeFilter.SHOW_TEXT); t.nextNode();) {
+          if (!t.currentNode.data.trim()) continue;
+          const range = d.createRange();
+          range.selectNodeContents(t.currentNode);
+          boxes.push(...range.getClientRects());
+        }
+        if (boxes.length) r = {
+          left: Math.min(...boxes.map(b => b.left)), right: Math.max(...boxes.map(b => b.right)),
+          top: Math.min(...boxes.map(b => b.top)), bottom: Math.max(...boxes.map(b => b.bottom)),
+        };
+        r.width = r.right - r.left; r.height = r.bottom - r.top;
+      }
+      if (!r || !r.width || !r.height) continue;
+      if (r.left >= clip[2] || r.top >= clip[3] || r.right <= clip[0] || r.bottom <= clip[1]) continue;
+      const cw = clip[2] - clip[0], ch = clip[3] - clip[1];
+      marks[key] = [pct(r.left, clip[0], cw), pct(r.top, clip[1], ch),
+                    pct(r.right, clip[0], cw), pct(r.bottom, clip[1], ch), side];
+      break;
+    }
+  }
+  out.textContent = JSON.stringify({ shot: SHOT, vw, vh, dpr: w.devicePixelRatio, clip, marks });
+} catch (e) {
+  out.textContent = JSON.stringify({ error: String(e.message || e) });
+}
+</script>

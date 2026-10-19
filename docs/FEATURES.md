@@ -20628,3 +20628,69 @@ These were not built.
 
 - No siren on-delay. A siren stamps a new reading every 8 to 12 hours. A delay of one reading lets a stuck relay sound for half a day. Measured on 19 October, it would have unmuted all three sirens muted that day.
 - No nearby rain as backing for a flood gauge. A flood stands for hours after the rain stops, so a rain window expires while the water is still there.
+
+## Help shows screenshots with numbered labels, 2026-10-19
+
+The repository owner asked for screenshots and labels in Help. Four Help sections now open with a picture: Getting around, Station panel, Camera viewer and All cameras. The first picture also serves On the map and Map controls, because those controls are on the same screen. Each picture carries numbered markers. Each Help row for a control in that picture carries the same number.
+
+How it works:
+
+1. `php help-build.php` opens `help-shot.html` in headless Chrome, once for each picture at each width.
+2. That page loads the app in a frame, turns on test mode, and opens the station card or the viewer as the picture needs.
+3. The same Chrome run gives a screenshot and the box of each labeled control. GD crops the screenshot and writes a WebP to `img/help/`. The boxes go into `img/help/marks.json`, in percent of the picture.
+4. `js/help.js` loads on the first open of Help. It numbers the rows that carry `data-mark`, in page order, and puts each number on the picture over its control.
+
+Each number sits beside its control, not on the text. `help-shot.html` gives each control a side. A rail item takes the right of its label. A chip takes its top right corner, the corner a badge takes. A row of viewer buttons takes the left or the right. The card title measures the name text, so the number sits right after the name. The owner asked for this the same day.
+
+A marker and its control come from the same page load, so they cannot drift apart. Help counts the numbers at open time. The markup holds no number. A control that does not draw at one width gets no number at that width. On a phone, for example, Help and About sit behind the More button and carry no number.
+
+The owner chose these options the same day:
+
+- Light theme only. Help shows a light picture in the dark theme too.
+- A desktop picture and a phone picture. Help picks one at the 600px breakpoint. A window that crosses that line gets a repaint.
+- Test mode with fake alerts, so the strip, the red pins and a flooded card show. The capture page hides the amber test chip, the striped app bar and the snackbar. A caption under the main and panel pictures says the alerts are fake.
+
+Eight files of 56 to 186 KB, about 930 KB in all. None of them loads until a reader opens Help. A failed fetch leaves each figure `hidden`, and Help shows its text alone.
+
+Costs accepted:
+
+- Nothing checks that the pictures are current. A change to the rail, the chips, the card or the viewer needs a new bake by hand.
+- The bake loads the live payload, so the station in the card and the alert count change from bake to bake.
+- Weather carries no number. The flooded station the bake picks has no weather section.
+- In the main picture the strip can show the fake outage notice that test mode adds.
+- On the desktop card, the number for the meter touches the words `104% of danger`.
+- The main desktop picture shows the land around Kuala Lumpur, not the whole state. The bake zooms in until the coverage box is as wide as the map, so the card shows no empty ground.
+
+Not built:
+
+- No pictures for Settings, Search or Map symbols.
+- No dark pictures. That doubles the files.
+- No check that compares a picture to the live layout.
+
+The same day the owner asked for plainer words in the Getting around rows. Each row is now one short imperative sentence, for example `See every camera in a grid`. A second sentence of detail and the word "it" are gone, on the owner's second instruction. Three labels changed. `Show the labels` is now `Expand or collapse menu`. `Go to a station` is now `Search`, which is the word the rail draws, and the Help section of that name changed with it. `Theme` is now `Theme switcher`. The rows lost detail on purpose. No row says where Settings, Help and About sit on a phone, which is behind the More button. The Alerts row no longer explains the badge. The Table row no longer explains the filter or the sort. The Theme row no longer names Automatic.
+
+Later the same day the owner narrowed every Help row that leads with a glyph, in every section. Such a row now says what the glyph stands for, in one short sentence, for example `Opens settings`. A row no longer explains what happens after the press, or how to use what opens. The Developer row was five sentences and is now `Opens the developer settings`. Rows with no glyph, such as The moving strip and The meter, keep their longer text.
+
+This removed facts on purpose. Help no longer says that a place search lists the stations within 10 km. Help also no longer says that nothing reaches OpenStreetMap or Google before the press. It no longer says that the ignored list is the only place that names a silenced sensor. The Settings heading still says that only the ignored list changes what raises an alarm.
+
+The owner then asked for seven more Help changes the same day.
+
+- Settings lists the items that Settings draws, in its order. The Developer row is gone, because Developer is a section heading and not an item. Its five items each have a row now: Test mode, Readings, Refresh now, Raw payload and Reset settings. Hide faulty signals and Faulty signals have rows too.
+- The Search section lost its row for the list.
+- The Station panel lost two rows, for a point on a graph and for an offline station. A short bulleted list under the rows states those two facts.
+- All cameras has a fourth screenshot, with no numbers, and four bullets on what the page does. The rows for the grid, the filter and a tile are gone.
+- Map symbols opens with a status table. Each row is a sensor kind and each column is a pin color: gray, normal, amber and red. Each cell shows the pin and the cutoff in a few words. The table replaced three rows that stated the same cutoffs in prose. Alert criteria now points at the table and no longer repeats the cutoffs.
+- A new section, Faulty sensors, states the three checks in a paragraph and four bullets. The numbers come from `sirenBacked()`, `rainBacked()` and `frozen()` in `api.php`.
+- The glossary lost its offline entry, because the table header states it.
+
+The table has a fixed layout and short cell words, so it fits a 360px phone with no scroll bar. Measured at 360 wide, the table is 351px inside a 383px box. Under 600px the pins come down to 26px.
+
+The first table put a pin in every cell, and its gray column said "No reading" five times. The owner then asked for a matrix with the pins under the kind name. Each row now names a sensor kind, with the pins that kind can take in a row under the name. The Normal, Amber and Red columns hold words alone. The intro states once that gray means no reading. The pins in the table are 22px, so four fit the first column on a 360px phone. The red pin carries a still ring there, because the map's pulse grows the ring into its neighbors.
+
+The owner asked for three more changes the same day.
+
+- Expected behavior is now Questions, in question and answer form, with eleven questions in place of four. The new ones cover a calm river that reads in the thirties, gray pins and a missing sensor. They also cover a siren with no alert, a red map in test mode, the data sources and the install.
+- Limits is a bulleted list now.
+- Every table in Help and About carries a subtle border, in `--outline`. That covers the status matrix and every `.key` list. A line also stands between the rows. This is an exception to the rule of no dividing line, and it stays inside the prose dialogs.
+
+The border work found a fault that was already there. The phone rule for `.key` sat above the base rule in `css/chrome.css`. A later rule of the same specificity wins, so the key never stacked on a phone. It drew two columns at 360px. The phone rule now sits below the base rule.

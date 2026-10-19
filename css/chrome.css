@@ -996,8 +996,6 @@ body.testmode header {
   /* Two columns would be 219px of pins against 105px of prose at 360px wide — and that is the pin
      row after it grew by half. Stack instead — the thing above what it means is the same reading
      order, just turned a corner. */
-  .docbox .key { grid-template-columns: 1fr; gap: 6px 0; }
-  .docbox .key > span:nth-child(even) { margin-bottom: 12px; }
 }
 #aboutBox .src { margin: 14px 0; display: grid; gap: 2px; }
 #aboutBox .src a { font-weight: 500; }
@@ -1006,11 +1004,25 @@ body.testmode header {
 /* Two-column key: the thing itself on the left, what it means on the right. `align-items: start`
    so a one-line pin doesn't centre itself against four lines of prose. The left column sizes to its
    content, which is a row of real pins in one case and a single tag in another. */
+/* **A subtle border round the key and a line between its rows**, on the repository owner's
+   instruction of 2026-10-19: every table in Help carries one. That is a deliberate exception to "no
+   dividing line" in this layout, and it stays inside the prose dialogs.
+   **The phone rule sits BELOW the base rule, and it sat above it.** A media block earlier in the file
+   loses to a later rule of the same specificity, so the key never stacked on a phone. It drew two
+   columns at 360px, with a label column that squeezed the text. */
 .docbox .key {
-  display: grid; grid-template-columns: auto 1fr; gap: 12px 12px;
-  margin: 14px 0; align-items: start; font-size: 13px;
+  display: grid; grid-template-columns: auto 1fr; gap: 0;
+  margin: 14px 0; font-size: 13px;
+  border: 1px solid var(--outline); border-radius: 8px; overflow: hidden;
 }
-.docbox .key > span:nth-child(odd) { padding-top: 1px; }
+.docbox .key > span { padding: 10px 12px; }
+.docbox .key > span:nth-child(n + 3) { border-top: 1px solid var(--outline); }
+@media (max-width: 600px) {
+  /* Stacked: the name over what it means, and the line goes above the name alone. */
+  .docbox .key { grid-template-columns: 1fr; }
+  .docbox .key > span:nth-child(odd) { padding-bottom: 2px; }
+  .docbox .key > span:nth-child(even) { padding-top: 2px; border-top: 0; }
+}
 .docbox .key .tg { margin-left: 0; }        /* the panel indents it after a badge; here it leads */
 .docbox .pins { display: flex; gap: 6px; }
 /* The pins are the map's own `.pin` / `.cluster`, at the size they are drawn — a legend redrawn in
@@ -1034,20 +1046,83 @@ body.testmode header {
    does not change with the theme.
    The rule names `.pins` so it cannot reach the map, where `.pin` holds the real SVG and a
    background would draw a second disc behind it. */
-.docbox .pins .pin:not(.me, .place) {
+.docbox :is(.pins, .hpins) .pin:not(.me, .place) {
   width: 31.5px; height: 31.5px; background: currentColor; border-radius: 50%;
   border: 2.25px solid var(--surface); box-sizing: border-box;
 }
-.docbox .pins .pin > .i { color: #fff; font-size: 19px; }
+.docbox :is(.pins, .hpins) .pin > .i { color: #fff; font-size: 19px; }
 /* The alert amber is the one fill white cannot sit on — see `.pin.inkdark` in `css/map.css` for the
    measurement. On the map `render.js` adds that class by comparing the fill. Here the samples are
    static, so `index.html` carries it by hand on every amber one. */
-.docbox .pins .pin.inkdark > .i { color: #101314; }
+.docbox :is(.pins, .hpins) .pin.inkdark > .i { color: #101314; }
+
+/* **The status matrix in Help.** One row per sensor kind, one column per color. The pins that
+   kind can take sit in a row under its name, and the cells hold words alone. It has to fit a 360px
+   phone with no scroll bar, because a table that scrolls sideways hides the column a reader came
+   for. So the layout is fixed and the pins are 22px here: four of them fit the first column.
+   A subtle border, the same as `.key` above. `separate` with no spacing, because a collapsed table
+   cannot round its corners. */
+.docbox .hmatrix {
+  width: 100%; table-layout: fixed; border-collapse: separate; border-spacing: 0;
+  margin: 14px 0 6px; font-size: 13px; line-height: 1.4;
+  border: 1px solid var(--outline); border-radius: 8px; overflow: hidden;
+}
+.docbox .hmatrix th, .docbox .hmatrix td { padding: 8px; text-align: left; vertical-align: top; }
+.docbox .hmatrix tbody :is(th, td) { border-top: 1px solid var(--outline); }
+.docbox .hmatrix thead th { font-weight: 500; padding-bottom: 4px; }
+.docbox .hmatrix thead th:first-child { width: 34%; }
+.docbox .hmatrix tbody th { font-weight: 500; }
+.docbox .hmatrix .none { color: var(--muted); }
+.docbox .hpins { display: flex; gap: 4px; margin-top: 6px; }
+.docbox .hpins .pin:not(.me, .place) { width: 22px; height: 22px; border-width: 1.5px; transform: none; }
+.docbox .hpins .pin > .i { font-size: 13px; }
+/* A still ring: the map's pulse grows the halo to twice the pin, and here the pins stand 4px apart. */
+.docbox .hpins .pin.danger::after { inset: -3px; border-width: 2px; animation: none; opacity: .8; }
+@media (max-width: 600px) {
+  .docbox .hmatrix { font-size: 12px; }
+  .docbox .hmatrix :is(th, td) { padding: 8px 4px; }
+  .docbox .hmatrix :is(th, td):first-child { padding-left: 8px; }
+}
+/* Questions and answers. A question is a bold line and its answer the paragraph under it. No border:
+   this is prose, not a table. */
+.docbox .faq { margin: 14px 0; font-size: 13px; line-height: 1.5; }
+.docbox .faq dt { font-weight: 500; }
+.docbox .faq dd { margin: 2px 0 12px; }
+/* Short notes under a block, as a bulleted list. */
+.docbox .hlist { margin: 10px 0 14px; padding-left: 20px; font-size: 13px; line-height: 1.5; }
+.docbox .hlist li + li { margin-top: 4px; }
 
 /* The left cell of a how-to row: the control's own glyph, then its own name. Aligned to the first
    line, because a name can wrap to two and the glyph belongs beside the first. */
 .docbox .ctl { display: flex; align-items: flex-start; gap: 8px; }
 .docbox .ctl .i { font-size: 18px; flex: none; color: var(--muted); }
+
+/* **The Help screenshots.** `js/help.js` fills them. `.hpic` is exactly the picture's box, because
+   each marker is placed in percent of it. A picture is never drawn wider than the clip it came from
+   (`--cssw`), so a cropped station card keeps the size it has in the app.
+   The marker and the row number are one disc, so a reader matches them by shape as well as by
+   number. Accent, never a status colour: a number points at a control and says nothing about water.
+   The white ring holds the disc off a photograph or a dark pin. */
+.docbox .hshot { margin: 14px 0 6px; }
+.docbox .hpic { position: relative; width: 100%; max-width: var(--cssw, 100%); margin: 0 auto; }
+.docbox .hpic img {
+  display: block; width: 100%; height: auto; border-radius: 12px; box-shadow: var(--shadow);
+}
+.docbox .hshot figcaption { margin-top: 8px; text-align: center; font-size: 12px; color: var(--muted); }
+.docbox :is(.hmark, .hnum) {
+  display: inline-grid; place-items: center; flex: none; border-radius: 50%;
+  background: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary);
+  font: 600 11px/1 Roboto, sans-serif;
+}
+.docbox .hmark {
+  position: absolute; width: 22px; height: 22px; transform: translate(-50%, -50%);
+  box-shadow: 0 0 0 2px #fff, 0 1px 4px #0006;
+}
+.docbox .hnum { width: 18px; height: 18px; margin-right: 6px; vertical-align: 1px; }
+.docbox .ctl .hnum { margin: 0; }
+/* A phone picture is taller than the screen at full width, and the rows under it are what a reader
+   came for. 280px keeps the card's text readable. */
+@media (max-width: 600px) { .docbox .hpic { max-width: min(var(--cssw, 100%), 280px); } }
 
 .docbox kbd {
   font: inherit; font-size: 12px; padding: 1px 6px;
