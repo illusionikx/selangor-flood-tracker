@@ -1715,7 +1715,9 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
   siren for one minute at the Amaran mark. It repeats every 3 hours while the water stays there,
   and every 5 at Bahaya. So the alarm is a claim about a river level the payload already holds.
   `sirenBacked()` in `api.php` asks it. `backed` is true when a river within `SIREN_KM` (5 km) is at
-  status ≥ 2. It is false when rivers are in reach and none is. It is **null when there is none to
+  status ≥ 2. Since 2026-10-19 a climbing Siaga river backs it too. That is a river at status 1 with
+  a rate of `RISE_FLOOR` or more. So the siren verdict runs after the trend pass, which is the pass that writes
+  `rate`. It is false when rivers are in reach and none backs it. It is **null when there is none to
   ask**. `sounding()` in `util.js` reads `backed !== false`. The null case keeps the benefit of the
   doubt, because silencing a real evacuation alarm beats carrying a doubtful one. 15 of the 17 alarms
   in our archive were unbacked. One was held 127 hours with its own gauge 2 m under the mark.

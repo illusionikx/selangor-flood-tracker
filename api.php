@@ -405,16 +405,25 @@ function assess(array $pts, int $i, ?float $mark): array {
  * 3 hours at Amaran and every 5 at Bahaya while the water stays up, so a real flood holds a siren
  * on for half a day. Any cutoff short enough to catch a stuck relay dismisses the real one.
  *
- * $rivers is [[lat, lng, status], …]. Status 2 is Amaran and 3 is Bahaya — see wlStatus().
+ * A river one mark lower, at Siaga, backs the alarm too when it climbs at RISE_FLOOR or faster. The
+ * repository owner chose that on 2026-10-19. A siren can sound before the next river reading shows
+ * the water at Amaran, and muting a real alarm is the worse of the two errors. The cost is that a
+ * stuck relay beside a climbing river passes. RISE_FLOOR is the measured edge of ordinary sensor
+ * noise, so a flat river never backs it.
+ *
+ * $rivers is [[lat, lng, status, rate], …]. Status 1 is Siaga, 2 is Amaran and 3 is Bahaya — see
+ * wlStatus(). Rate is metres an hour, or null where no trend could be worked out.
  */
 function sirenBacked(float $lat, float $lng, array $rivers): ?bool {
     $asked = false;
-    foreach ($rivers as [$rlat, $rlng, $status]) {
+    foreach ($rivers as $r) {
+        [$rlat, $rlng, $status] = $r;
         // Equirectangular, like every other distance in this file: at this latitude and over 5 km
         // the error against a great circle is centimetres, and the answer is a yes or no at 5 km.
         if (hypot($rlat - $lat, ($rlng - $lng) * cos(deg2rad($lat))) * 111 > SIREN_KM) continue;
         $asked = true;
         if ($status >= 2) return true;
+        if ($status === 1 && ($r[3] ?? 0) >= RISE_FLOOR) return true;
     }
     return $asked ? false : null;
 }
@@ -2333,6 +2342,13 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
     // Status 1 is Siaga, one mark below the level JPS says makes a siren sound.
     $ok('Siaga alone does not back it',
         sirenBacked($slat, $slng, [[2.849, 101.531, 1]]) === false);
+    $ok('a flat Siaga river does not back it',
+        sirenBacked($slat, $slng, [[2.849, 101.531, 1, 0.02]]) === false);
+    // The water can reach Amaran before the next river reading says so.
+    $ok('a Siaga river climbing past RISE_FLOOR backs it',
+        sirenBacked($slat, $slng, [[2.849, 101.531, 1, 0.15]]) === true);
+    $ok('a climbing river under Siaga does not',
+        sirenBacked($slat, $slng, [[2.849, 101.531, 0, 0.5]]) === false);
     $ok('one river up among quiet ones backs it',
         sirenBacked($slat, $slng, [[2.849, 101.531, 0], [2.80, 101.50, 3]]) === true);
     // A flooding river on the other side of the state says nothing about this siren.
@@ -4003,13 +4019,8 @@ unset($s);
 // it used to be a heartbeat timestamp. Out-of-contact sirens are skipped like offline gauges: a
 // flat IDLE band from a sensor nobody can hear is a lie.
 // ponytail: full-resolution samples. Bucket to the hour if the table bloats.
-//
-// Every placed river, as [lat, lng, status], for sirenBacked() below. Built once — 212 sirens
-// against 109 rivers is 23k distance tests, but inside the loop it is a list built 212 times.
-$riverMarks = [];
-foreach ($stations as $r) {
-    if ($r['kind'] === 'river' && $r['lat'] && $r['lng']) $riverMarks[] = [$r['lat'], $r['lng'], (int)$r['status']];
-}
+// The siren's `backed` verdict is worked out after the trend pass below, because it reads each
+// river's rate.
 foreach ($stations as &$s) {
     if ($s['kind'] !== 'siren' || !$s['online']) continue;
     $key = $s['id'];
@@ -4017,11 +4028,6 @@ foreach ($stations as &$s) {
     $hist[$key] = array_merge($hist[$key] ?? [], [[$ts, (float)$s['status']]]);
     $s['history'] = sparkPoints($hist[$key], $now, SPARK_BUCKET, true);
     $samples[$key] = [$ts, (float)$s['status']];
-    /* Does the water agree that this siren is sounding? Decided here, against river statuses that
-       are final by this point — the national override has already run — so "still sounding" has one
-       definition and it is this file's. The client reads the flag, exactly as it reads `rising`.
-       Only asked of a siren that claims to be sounding: a quiet one has nothing to check. */
-    $s['backed'] = $s['status'] > 0 ? sirenBacked($s['lat'], $s['lng'], $riverMarks) : null;
 }
 unset($s);
 
@@ -4100,6 +4106,22 @@ foreach ($stations as &$s) {
     $s['history'] = sparkPoints($points, $now, SPARK_BUCKET, false,
         fn($v) => wlStatus($v, $s['alert'] ?? null, $s['warning'] ?? null, $s['danger'] ?? null));
     $samples[$key] = [$ts, $lvl];
+}
+unset($s);
+
+/* Does the water agree that a siren is sounding? Decided after the trend pass, so the river
+   statuses are final (the national override already ran) and each river carries its rate. The
+   client reads the flag, exactly as it reads `rising`. Only a siren that claims to sound is asked.
+   Every placed river is listed once as [lat, lng, status, rate]. 212 sirens against 109 rivers is
+   23k distance tests, and building the list inside the loop would build it 212 times. */
+$riverMarks = [];
+foreach ($stations as $r) {
+    if ($r['kind'] === 'river' && $r['lat'] && $r['lng'])
+        $riverMarks[] = [$r['lat'], $r['lng'], (int)$r['status'], $r['rate'] ?? null];
+}
+foreach ($stations as &$s) {
+    if ($s['kind'] === 'siren' && $s['online'])
+        $s['backed'] = $s['status'] > 0 ? sirenBacked($s['lat'], $s['lng'], $riverMarks) : null;
 }
 unset($s);
 

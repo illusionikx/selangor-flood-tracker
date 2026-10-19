@@ -20615,8 +20615,11 @@ A rain gauge also takes an on-delay. An odometer denial counts only when the rea
 
 The payload carries `frozen`, the span in seconds, on a stuck reading. `faultWhy()` in `js/util.js` turns it into the sentence the card and the Settings list print, for example `Same reading for 3 days.` The Settings list read a table of reasons per kind before. That table could not tell a stuck rain gauge from one that its odometer denies.
 
+A siren now has one more river that can back it. A climbing river at Siaga, one mark under Amaran, now backs a sounding siren. Climbing means a rate of `RISE_FLOOR` (0.1 m an hour) or more. The owner chose this the same day. A siren can sound before the next river reading shows the water at Amaran. The siren verdict moved below the trend pass, because it reads each river's rate.
+
 These costs are accepted.
 
+- A stuck siren relay beside a climbing Siaga river passes as a real alarm.
 - Taman Maznah, `gauge-117`, alerts again. It read 0.64, 0.62, 0.64 and 0.60 m with every river near it normal. Its depth moves, so `frozen()` cannot catch it. A reader who knows it is wrong adds it to the ignored sensors.
 - A stuck rain gauge under 10 mm draws a faint heat blob. It raises no alert.
 - A stuck flood gauge alerts for three days before `frozen()` catches it.
@@ -20624,5 +20627,4 @@ These costs are accepted.
 These were not built.
 
 - No siren on-delay. A siren stamps a new reading every 8 to 12 hours. A delay of one reading lets a stuck relay sound for half a day. Measured on 19 October, it would have unmuted all three sirens muted that day.
-- No siren backing from a river at its alert mark that is rising. That trades stuck relays that pass for fewer real alarms that go quiet. The owner left it out.
 - No nearby rain as backing for a flood gauge. A flood stands for hours after the rain stops, so a rain window expires while the water is still there.
