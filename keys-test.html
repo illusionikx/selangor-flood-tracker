@@ -1,0 +1,231 @@
+<!-- The keyboard is the one surface here that fails by doing nothing. A key that stops pressing its
+     button, a list row a Tab skips, a ring that draws at the wrong width: none of them throws and
+     none of them draws a wrong pixel. This check presses the keys and reads what moved.
+
+     It guards, in order: the eight one-key shortcuts and the sheet that prints them, the three
+     gates that keep a key from firing (typing, a modal dialog, and a held modifier), arrow travel
+     through the table and the camera wall, the cursor over the map pins and the teardrop it moves,
+     and that every focus ring in the app resolves to one width and colour.
+
+     chrome --headless=new --dump-dom keys-test.html
+     chrome --headless=new --dump-dom "keys-test.html?base=/site/"     (the build, which ships)
+
+     A row or a tile that the live payload does not carry is reported as `skip`, never as `ok`. -->
+<title>Keyboard</title>
+<style>body { font: 13px/1.6 monospace; margin: 16px } .f { color: #b00 }</style>
+<pre id="out">running…</pre>
+<script>
+const L = [], fail = [];
+const ok = (c, n) => { L.push((c ? 'ok   ' : 'FAIL ') + n); if (!c) fail.push(n); };
+const skip = n => L.push('skip ' + n);
+const BASE = new URLSearchParams(location.search).get('base') || '/';
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+const frame = async (w, h) => {
+  const f = document.createElement('iframe');
+  f.style.cssText = `width:${w}px;height:${h}px;border:0;position:absolute;left:-9999px`;
+  f.src = BASE + 'index.html';
+  document.body.append(f);
+  await new Promise(r => f.addEventListener('load', r, { once: true }));
+  await sleep(1500);            // modules run, the payload lands, the map settles
+  return f;
+};
+/* A synthetic key. It is not trusted, so it runs no default action: a page that listens is the only
+   thing it can reach, which is what is under test. `bubbles` so a handler on `document` hears it. */
+const press = (f, to, key, o = {}) => {
+  const e = new f.contentWindow.KeyboardEvent('keydown', { key, bubbles: true, cancelable: true, ...o });
+  to.dispatchEvent(e);
+  return e;
+};
+
+// What the sheet must carry. Written here and not read out of js/keys.js, because a check that reads
+// the table it guards passes on a table that lost a key.
+const WANT = { '/': 'railFind', a: 'railAlerts', t: 'railTable', c: 'railCams', s: 'railSettings',
+               '?': 'railHelp', l: 'locate', d: 'railApps' };
+
+(async () => {
+  const f = await frame(1280, 800), d = f.contentDocument, $ = s => d.querySelector(s), id = s => d.getElementById(s);
+
+  // --- the sheet and the tags --------------------------------------------------------------------
+  const sheet = [...d.querySelectorAll('#helpKeys ~ .key')][0];
+  const kbds = new Set([...(sheet?.querySelectorAll('kbd') || [])].map(k => k.textContent));
+  ok(!!sheet, 'help: a Keyboard section holds a key grid');
+  ok(!!$('#helpKeys .i-keyboard'), 'help: its heading leads with the keyboard glyph');
+  for (const [k, ctl] of Object.entries(WANT)) {
+    ok(kbds.has(k), `sheet: prints ${k}`);
+    ok(id(ctl)?.getAttribute('aria-keyshortcuts') === k, `${ctl}: aria-keyshortcuts is ${k}`);
+  }
+
+  // --- one key, one press ------------------------------------------------------------------------
+  const close = () => { for (const x of d.querySelectorAll('dialog[open]')) if (x.id !== 'pane') x.close(); };
+
+  press(f, d.body, 's');
+  ok(id('settingsBox').open, 's: opens settings');
+  close();
+
+  press(f, d.body, '?');
+  ok(id('helpBox').open, '?: opens help');
+  ok(id('helpKeys').getBoundingClientRect().top < 400, '?: scrolls to the Keyboard section');
+  close();
+
+  const was = d.documentElement.dataset.theme;
+  press(f, d.body, 'd');
+  ok(d.documentElement.dataset.theme !== was, 'd: switches the shade');
+  press(f, d.body, 'd');
+
+  press(f, d.body, 'a');
+  ok(id('railAlerts').getAttribute('aria-expanded') === 'true', 'a: opens the alert list');
+  press(f, d.body, 'a');
+  ok(id('railAlerts').getAttribute('aria-expanded') === 'false', 'a: a second press closes it');
+
+  press(f, d.body, '/');
+  ok(d.body.classList.contains('find') && d.activeElement === id('goto'), '/: opens the search with the field focused');
+
+  // --- the gates ---------------------------------------------------------------------------------
+  press(f, id('goto'), 's');
+  ok(!id('settingsBox').open, 'gate: a key typed in a field does nothing');
+  id('goto').blur();
+  d.body.classList.remove('find');
+
+  press(f, d.body, 's', { ctrlKey: true });
+  ok(!id('settingsBox').open, 'gate: Ctrl and a key does nothing');
+
+  id('helpBox').showModal();
+  press(f, id('helpBox'), 's');
+  ok(!id('settingsBox').open, 'gate: a key under a modal dialog does nothing');
+  close();
+
+  // --- the table: focus, travel and press --------------------------------------------------------
+  press(f, d.body, 't');
+  await sleep(1500);
+  ok(id('dataBox').open, 't: opens the table');
+  const rows = [...d.querySelectorAll('#dataBody tr[data-mast]')];
+  if (rows.length < 2) skip('table: fewer than two rows with a coordinate in the payload');
+  else {
+    ok(rows.every(r => r.tabIndex === 0), 'table: every row with a coordinate takes Tab');
+    ok(!d.querySelector('#dataBody tr:not([data-mast])[tabindex]'), 'table: a row with no coordinate does not');
+    ok(!d.querySelector('#dataBody tr[role=button]'), 'table: no row loses its row role');
+    rows[0].focus();
+    press(f, rows[0], 'ArrowDown');
+    ok(d.activeElement === rows[1], 'table: ArrowDown moves to the next row');
+    press(f, rows[1], 'End');
+    ok(d.activeElement === rows.at(-1), 'table: End moves to the last row');
+    press(f, rows.at(-1), 'Home');
+    ok(d.activeElement === rows[0], 'table: Home moves to the first row');
+    press(f, rows[0], 'Enter');
+    await sleep(500);
+    ok(!id('dataBox').open && d.body.classList.contains('side'), 'table: Enter on a row opens the station card');
+  }
+  close();
+  const th = $('#dataHead th[data-sort]');
+  ok(!th || th.tabIndex === 0, 'table: a sortable heading takes Tab');
+
+  // --- the camera wall ---------------------------------------------------------------------------
+  press(f, d.body, 'c');
+  await sleep(1500);
+  ok(id('camBox').open, 'c: opens the camera wall');
+  const tiles = [...d.querySelectorAll('#camGrid .camtile')].filter(t => t.checkVisibility());
+  if (tiles.length < 3) skip('wall: fewer than three tiles in the payload');
+  else {
+    tiles[0].focus();
+    press(f, tiles[0], 'ArrowRight');
+    ok(d.activeElement === tiles[1], 'wall: ArrowRight moves one tile');
+    const cols = f.contentWindow.getComputedStyle(tiles[0].parentElement).gridTemplateColumns.split(' ').length;
+    if (tiles.length > cols) {
+      tiles[0].focus();
+      press(f, tiles[0], 'ArrowDown');
+      ok(d.activeElement === tiles[cols], `wall: ArrowDown moves one row of ${cols}`);
+    }
+  }
+  close();
+
+  // --- the cursor over the map pins --------------------------------------------------------------
+  const map = $('#map');
+  ok(map.getAttribute('role') === 'application', 'map: carries role application');
+  ok(!!id('mapSay') && id('mapSay').getAttribute('aria-live') === 'polite', 'map: a polite live region speaks the cursor');
+  map.focus();
+  press(f, map, 'Home');
+  let said = id('mapSay').textContent;
+  ok(said.length > 0, `map: Home speaks (${JSON.stringify(said)})`);
+  /* At the landing zoom the middle of the map is a cluster chip. Enter on a chip zooms to what it
+     holds, so pressing it until the cursor lands on a single pin walks the real path a reader
+     takes, and it tests the chip's own Enter on the way. */
+  let hops = 0;
+  while (/stations\. Press Enter/.test(said) && hops++ < 8) {
+    press(f, map, 'Enter');
+    await sleep(1500);
+    map.focus();
+    press(f, map, 'Home');
+    said = id('mapSay').textContent;
+  }
+  ok(hops > 0 || !/stations\. Press Enter/.test(said), 'map: Enter on a chip zooms in');
+  if (/^No /.test(said)) skip('map: no station in view');
+  else if (/stations\. Press Enter/.test(said)) skip('map: still a chip after eight zooms');
+  else {
+    const sel = $('.pin.sel');
+    ok(!!sel && sel.classList.contains('kb'), 'map: the teardrop stands on the station and wears the keyboard ring');
+    ok(f.contentWindow.getComputedStyle(sel.querySelector('.pinglyph')).strokeWidth === '6px', 'map: its ring is the 3px focus ring');
+    press(f, map, 'Enter');
+    await sleep(500);
+    ok(d.body.classList.contains('side'), 'map: Enter opens the station card');
+  }
+  const plain = press(f, map, 'ArrowRight');
+  ok(!plain.defaultPrevented, 'map: a plain arrow is left to Leaflet, which pans');
+
+  // --- one ring ----------------------------------------------------------------------------------
+  const cs = (el, pseudo) => f.contentWindow.getComputedStyle(el, pseudo);
+  let fabColor;
+  const ring = (el, name) => {
+    el.focus();
+    if (!el.matches(':focus-visible')) return skip(`ring: ${name} does not match :focus-visible from script`);
+    ok(cs(el).outlineWidth === '3px' && cs(el).outlineStyle === 'solid', `ring: ${name} is 3px solid`);
+    return cs(el).outlineColor;
+  };
+  fabColor = ring(id('railFind'), '#railFind');
+  ring(id('layerChip'), '#layerChip');
+  const item = id('railTable');
+  item.focus();
+  if (!item.matches(':focus-visible')) skip('ring: #railTable does not match :focus-visible from script');
+  else if (d.body.classList.contains('railopen')) skip('ring: the rail is open, so the collapsed rule is not under test');
+  else {
+    const pill = item.querySelector('.railpill');
+    ok(cs(item).outlineStyle === 'none', 'ring: a collapsed rail item draws none on the whole item');
+    ok(cs(pill).outlineWidth === '3px', 'ring: its pill draws the ring');
+    ok(cs(pill).outlineColor === fabColor, 'ring: one colour on the pill and on the FAB');
+  }
+
+  // --- the key on the control --------------------------------------------------------------------
+  const tipOf = el => { el.focus(); return el.matches(':focus-visible') ? d.querySelector('.sparktip')?.textContent : null; };
+  const t1 = tipOf(id('railTable')), t2 = tipOf(id('railFind'));
+  if (t1 === null) skip('hint: #railTable does not match :focus-visible from script');
+  else {
+    ok(t1 === 'Table (t)', `hint: a focused rail item says its key (${JSON.stringify(t1)})`);
+    ok(/\(\/\)$/.test(t2), `hint: the search button says its key (${JSON.stringify(t2)})`);
+  }
+  ok(!d.querySelector('#navbar [data-key], #appMenu [data-key]'), 'hint: no key is printed on a phone control');
+  // The open rail draws the key as a decorative cap. Open it the way a reader does.
+  if (!d.body.classList.contains('railopen')) id('railToggle').click();
+  await sleep(600);
+  // Keyboard mode: a key turns the caps on, and a pointer press turns them off.
+  press(f, d.body, 'Tab');
+  ok(d.body.classList.contains('kbmode'), 'hint: a key outside a field turns keyboard mode on');
+  for (const [ctl, k] of [['railAlerts', 'a'], ['railFind', '/'], ['railHelp', '?']]) {
+    const c = cs(id(ctl), '::after').content;
+    ok(c.includes(`"${k}"`) && c.includes('/ ""'), `hint: the open rail prints ${k} on ${ctl} as decoration (${c})`);
+  }
+  d.body.dispatchEvent(new f.contentWindow.PointerEvent('pointerdown', { bubbles: true }));
+  ok(!d.body.classList.contains('kbmode'), 'hint: a pointer press turns keyboard mode off');
+  ok(cs(id('railAlerts'), '::after').content === 'none', 'hint: and the caps go with it');
+  const hov = tipOf(id('railTable'));
+  if (hov !== null) ok(hov === 'Table (t)', `hint: outside keyboard mode the open rail row keeps its label (${JSON.stringify(hov)})`);
+  id('goto').focus();
+  press(f, id('goto'), 'x');
+  ok(!d.body.classList.contains('kbmode'), 'hint: a key typed in a field leaves keyboard mode off');
+  id('goto').blur();
+
+  out.innerHTML = L.join('\n') + '\n\n' +
+    (fail.length ? `<b class="f">FAIL</b>\n` + fail.join('\n') : '<b>PASS</b>');
+})().catch(e => {
+  out.innerHTML = L.join('\n') + `\n\n<b class="f">FAIL</b>\nthe check threw: ${e.stack || e}`;
+});
+</script>

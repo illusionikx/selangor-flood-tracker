@@ -314,6 +314,19 @@ export const PinLayer = L.Layer.extend({
       if (it.pin.danger) hot.push(p);
     }
 
+    /* The keyboard cursor on a cluster chip. A pin has no ring here, because the selected pin leaves
+       this canvas and becomes the DOM teardrop, which carries its own. A chip has no teardrop, so
+       the canvas draws the ring: the focus ring's own width and colour, 2px outside the chip. */
+    const cur = drawn.find(d => d.g === this._cur && d.g.n > 1);
+    if (cur) {
+      ctx.save();
+      ctx.beginPath(); ctx.arc(cur.x, cur.y, R_CHIP + 2 + 1.5, 0, 7);
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = token('var(--md-sys-color-primary)') || '#1a73e8';
+      ctx.stroke();
+      ctx.restore();
+    }
+
     /* The danger halo pulses, so it cannot be a sprite. It is drawn on a second canvas by a frame
        loop that runs only while a pin at its danger mark is on screen. A calm map starts no loop at
        all, and a flooded one animates a handful of rings rather than repainting 460 marks. */
@@ -382,6 +395,19 @@ export const PinLayer = L.Layer.extend({
     ctx.textBaseline = 'middle';
     ctx.fillText(String(g.n), p.x, p.y + 0.5);
     ctx.restore();
+  },
+
+  /* What the last frame drew, as `{ x, y, r, g }` in container pixels. `js/keys.js` walks these with
+     the arrow keys, so the cursor and the pointer both read the one list that hit testing reads. */
+  marks() { return this._drawn || []; },
+
+  /* The group the keyboard cursor stands on, or null. A chip takes its ring from this. A group is
+     rebuilt on every zoom, so `js/keys.js` clears the cursor on `zoomend` rather than trust a stale
+     object here. */
+  setCursor(g) {
+    if (this._cur === g) return;
+    this._cur = g;
+    this.redraw();
   },
 
   // What the reader pressed, or null. Nearest first, so two overlapping marks answer with the one

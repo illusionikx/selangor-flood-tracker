@@ -185,6 +185,13 @@ export function render() {
     const inkdark = DARK_INK_FILL.includes(c) ? ' inkdark' : '';
     const marker = L.marker([lead.lat, lead.lng], {
       kind: lead.kind, critical, fav,                     // read back by the cluster badge and the split
+      /* What the keyboard cursor says when it lands here, and the key `markSel()` takes. A pin is a
+         canvas mark with no element, so a screen reader hears nothing from the map. `js/keys.js`
+         speaks this line through a live region. The words follow the alert list: name, then what
+         the place is, then whether it is on alert. */
+      site: key,
+      say: `${lead.name}, ${multi ? `${members.length} sensors` : KINDS[lead.kind].label}${
+        members.some(isHot) ? '. On alert' : ''}`,
       zIndexOffset: critical ? 1000 : rising ? 500 : 0,   // keep the urgent pins on top
       /* **`pin` is what the canvas draws from, and the `icon` below it is what the DOM draws from.**
          `js/pins.js` blits one sprite per distinct appearance, so it needs the appearance as fields

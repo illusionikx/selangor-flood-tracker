@@ -5013,6 +5013,7 @@ all.
   three.
 - No memory of the last pane a reader had open.
 - No `?` keyboard shortcut sheet. The four bindings already print on the buttons that use them.
+  **Reversed on 2026-10-19.** See "The keyboard reaches every station".
 - No URL fragment that opens a pane directly.
 
 ## The Help pane split into four sections, because one list mixed four things
@@ -20732,3 +20733,98 @@ The box is no longer taller than it is wide. `map-limits-test.html` asserted tha
 Melaka is still outside the box. Its latitude is 2.19 and the south edge is 2.27, so the margin is 9 km. A further extension south will fail that assertion.
 
 At the zoom floor, the height binds in any window wider than about 1.1 to 1. A tall phone window binds on the width instead.
+
+## The keyboard reaches every station
+
+The repository owner asked on 2026-10-19 for a desktop mode that a keyboard can drive. The request named two parts: shortcuts with a glyph, and better arrow-key travel. It named accessibility and ease of use as the first priority. The design is in `docs/superpowers/specs/2026-10-19-keyboard-navigation-design.md`. This entry records what shipped and why.
+
+**This reverses an earlier decision.** The Settings entry above states "No `?` keyboard shortcut sheet. The four bindings already print on the buttons that use them." That held while the only keys were the camera viewer's. It does not hold now.
+
+### What was wrong
+
+Tab reached every button. Three surfaces had no keyboard reach at all. The map pins are a canvas with no focusable element. The alert rows and the table rows were `<li>` and `<tr>` elements that took a click and nothing else. So a keyboard reader could reach a station only by knowing its name and typing it into the search.
+
+### The shortcuts
+
+Eight keys, in `KEYS` in `js/keys.js`. They are `/` search, `a` alerts, `t` table, `c` cameras, `s` settings, `?` help, `l` location and `d` theme. Each letter is the first letter of the rail label where that letter was free. `?` and `/` are the keys Gmail, GitHub and YouTube use.
+
+Each key presses the same button a pointer presses. It does not call the function behind the button. So the button flashes, `aria-expanded` follows and the rail state follows, through the one path that already existed. The rail ids serve both widths, because `.click()` on a hidden button still runs its handler.
+
+Three gates stop a key. A held Ctrl, Alt or Meta stops it, because the browser and the operating system own those. Focus in a text field stops it. An open modal dialog stops it. Shift is allowed, because `?` is Shift and `/` on most layouts. The handler reads `e.key` and lower-cases a letter, so Caps Lock does not turn the keys off.
+
+A modal dialog blocks every key, so `t`, `c` and `s` open and never close. Escape is the way out and the Help sheet says so. `a` is the one toggle, because the alert list is not modal.
+
+Each control carries `aria-keyshortcuts`. `?` opens Help and scrolls to the new Keyboard section. That section carries the keyboard glyph on its heading, and it is the one Help heading with a glyph. `keys-test.html` compares the sheet with the keys the code binds.
+
+### The map cursor
+
+The pins stay on the canvas, because the canvas was measured and it won. So the keyboard gets a cursor and not a focus. Shift and an arrow moves it to the nearest drawn mark within 45 degrees of that arrow. Plain arrows still pan, because Leaflet owns them. Home moves it to the mark nearest the middle. Enter opens a pin's card, or zooms to a cluster's members.
+
+**The cursor is the selection mark.** The owner asked for that. `markSel()` already swaps the selected pin for the red teardrop. The cursor calls it on every move, so the teardrop travels with the keyboard. A second mark beside it would put two answers to "which station" on one map. While the keyboard drives it, the teardrop wears the focus ring, as a 6px stroke on its glyph that shows 3px outside the edge. A cluster chip has no teardrop, so `pins.js` draws the ring on the canvas.
+
+A live region speaks the station, its kind and whether it is on alert. The marker carries that sentence as `say`, written in `render.js`. The map container gets `role="application"`, so a screen reader hands the arrows to the page.
+
+The cost is accepted. A reader who arrows past five stations sees the teardrop hop five times with no card open. The ring says why. A pointer press, a drag, a zoom or focus leaving the map clears the ring and puts the mark back on the open card.
+
+### The key, printed on the control
+
+The owner asked on 2026-10-19 for a guide on the button itself. That reverses the plan, which kept the keys on the Help sheet alone. A shortcut nobody can see is a shortcut nobody uses.
+
+`js/keys.js` writes `data-key` on the rail items, the search button, the theme button and the location button. It writes none on the navigation bar or the overflow menu, because those are phone controls and a phone has no keyboard to press them with.
+
+The open rail has room, so each row ends in a small keycap. `css/chrome.css` draws it with `::after` and `content: attr(data-key) / ""`. The empty alternative text makes the cap decorative. Without it a screen reader reads "Alerts A". The key is already spoken through `aria-keyshortcuts`.
+
+The collapsed rail has no room. There the hover and focus label says the key, for example `Table (t)`. `js/sparktip.js` adds it, and only for a mouse or keyboard, which it tests with `(hover: hover) and (pointer: fine)`. A rail item carries no `data-tip`, so the label is its own words.
+
+**The caps draw in keyboard mode alone.** The owner asked the same day for the hint not to show all the time. `js/keys.js` puts `kbmode` on the body when a key is pressed outside a text field. The next mouse or touch press takes it off. That is the judgment the browser already makes for `:focus-visible`. A key typed into a field is text and not navigation, so it leaves the mode alone. A shortcut presses its button with `.click()`, which fires no `pointerdown`, so a shortcut keeps the mode on.
+
+A mouse reader never sees the caps. So outside keyboard mode the open rail keeps its hover label, and a mouse reader learns the key there. In keyboard mode an open rail row opens no label. The row already prints its name and its key, and a label would cover the row above it.
+
+Three other shapes were offered and not built. A cap that shows on hover or focus of its own row is quieter, but the rail never shows the whole set at once. A cap that hides after the first shortcut use needs one more saved preference. A switch in Settings starts the hint hidden where almost nobody finds it. Office reveals its keys while Alt is held, and that was ruled out. On Windows, an Alt release moves focus to the Chrome menu.
+
+### Rows
+
+Every alert row takes `tabindex="0"` and `role="button"`. A table row with a coordinate takes `tabindex="0"` and no role, because `role="button"` on a `<tr>` removes its row and cell structure and a screen reader reads this as a seven-column table. A table row with no coordinate opens nothing, so it takes nothing. A sortable heading takes `tabindex="0"` and `aria-sort`.
+
+One delegated handler in `js/keys.js` presses a row on Enter and Space. It acts only when the row itself holds focus, so a native button inside a row keeps its own press. Up, Down, Home and End move between rows. In the alert list, Left folds a section and stands on its heading, and Right opens it. The headings are in the travel list, or a folded section would strand the reader. The camera wall steps one tile with Left and Right and one row of tiles with Up and Down. The sensor kinds menu holds checkboxes, which the browser gives no arrow travel, so it takes Up and Down.
+
+`aria-setsize` and `aria-posinset` are not written. The design asked for them. They are not valid on `role="button"` and a table row, and a list item with a role of button loses its position anyway.
+
+The alert list is rebuilt on every poll, and a focused row dies with it. `js/keys.js` watches the list and puts focus back on the same station's row.
+
+### Tooltips
+
+`js/sparktip.js` opens a `data-tip` label on focus as well as on hover, and Escape dismisses it. A collapsed rail item showed its words on hover alone. WCAG 1.4.13 asks for hover and focus both, and for a way to dismiss.
+
+### One focus ring
+
+Twenty rules drew their own ring before this change. No two agreed on width, colour or offset. They now read three tokens in `css/base.css`: `--focus-ring`, `--focus-off` and `--focus-in`. The ring is 3px, which is M3's focus indicator, and stands 2px outside. `--focus-in` is the same ring turned inward, for a control inside a scroller or a clipped card. A fallback `:focus-visible` rule gives the browser default ring to anything that carries none, such as a menu row, a text button and a camera tile.
+
+**The colour is the accent, and M3 names `secondary`.** This app bridges no `secondary` role. The accent holds 3:1 against both surfaces. A ring below 3:1 is the one failure this token exists to stop. The bridge in `css/base.css` states this.
+
+**The rail ring follows the shape it marks.** It was a 12px corner forced onto the whole item. The expanded item is a 28px pill, so the ring was a small corner round a large one. Collapsed, M3 lights the 56 by 32 pill alone, and the ring was wrapping the whole 64px column with its label. Now the collapsed item and the navigation bar draw the ring on the pill at its own 16px. The expanded rail draws it on the row at 28px. The item itself draws none while collapsed.
+
+### Not built
+
+- No key for the heat layer, the kinds or the two filters. The chip row is five Tab presses from the map, and more letters is a code to learn.
+- No key printed on a phone control. The rail is the desktop surface, and a tap there opens a label.
+- No modifier chords and no user-set keys.
+- No roving tabindex on the rail. Nine buttons are nine Tab presses, which is what M3's own rail does.
+- No arrow travel inside the station card. Tab through its `<summary>` elements is the platform's own behavior.
+- No Help screenshot was rebaked. The new section carries no picture, and the rail ring is not in one.
+
+### Open
+
+Shift and a letter fires the same shortcut as the letter, because Caps Lock and Shift are not told apart. That is harmless today.
+
+## The landing view fills the window
+
+Added 2026-10-19, on the repository owner's request: "on landing can we have map to fill the viewport. dont show empty area".
+
+The map used to land at zoom 9, or at the zoom floor if that was higher. The coverage box is nearly square, so a wide window showed bare container beside it. At 1536 by 730 the box filled about 600px of a 1430px card.
+
+When `border.json` arrives, `js/map.js` now moves the view to the center of the coverage box. The zoom is `getBoundsZoom(cover, true)`. That is the lowest zoom at which the box covers the whole map card. Measured on the dark theme: 1536 by 730 lands at zoom 11, 1920 by 1080 at zoom 10, and 390 by 844 at zoom 9. Each one shows ground at every edge.
+
+The trade-off: a wide window no longer lands with the whole area in view. At 1536 the reader sees about Kuala Selangor to Klang, and must zoom out to the floor to see the full state.
+
+Not changed: the zoom floor. It still fits the whole box, so a reader who zooms out still sees the bare strips. The comment on `setLimits()` states that cost and the one-line change that removes it.

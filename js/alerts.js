@@ -219,7 +219,7 @@ function groupCard(items, kind, t, hereAt) {
   return `<details class="alert t-${t} grouped" data-sec="s:${t}|${kind}" open>
     <summary class="nsub">${rows.length > 1 ? many : one}<b>${rows.length}</b
       ><i class="i i-expand_more chev"></i></summary>
-    <ul class="slist mlist">${rows.map(({ lead: s, n }) => `<li data-go="${s.id}"
+    <ul class="slist mlist">${rows.map(({ lead: s, n }) => `<li data-go="${s.id}" tabindex="0" role="button"
         >
         <i class="i i-${(size.get(s.site || s.id) || 1) > 1 ? 'layers' : k.icon}"></i>
         ${fav.has(s.site || s.id)

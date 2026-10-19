@@ -7,6 +7,7 @@ import { POLL_MS } from './config.js';
 import './ui.js';
 import { findMe } from './locate.js';
 import { load } from './net.js';
+import './keys.js';     // last: nothing imports it, and it reads `#locate`, which locate.js builds
 
 requestAnimationFrame(() => document.body.classList.add('ready')); // no drawer slide on first paint
 

@@ -15,6 +15,7 @@
 // here: it never opens on touch, so the meaning would be missing on half the devices this runs on.
 // This module already had to solve the touch half for the graphs.
 
+const FINE = matchMedia('(hover: hover) and (pointer: fine)');   // a mouse, and so a keyboard
 let tip;                 // the readout itself, made on first use and then moved around
 let last, pts;           // the graph it is currently reading, and that graph's parsed samples
 let xh;                  // the crosshair, which lives inside whichever graph is being read
@@ -65,11 +66,20 @@ function show(e) {
   /* A plain label on anything carrying `data-tip`. It rides here rather than on a `title` because
      `title` never opens on touch, and half this app's readers are on a phone — the same reason the
      graphs needed this module. The listeners below already do the touch half. */
-  const lab = e.target.closest?.('[data-tip]');
+  const lab = e.target.closest?.('[data-tip], [data-key]');
   if (lab) {
+    /* In keyboard mode an open rail row already prints its label and its key in the row itself, so a
+       label over it says nothing new and covers the row above. Outside keyboard mode the row shows
+       no cap, so a mouse reader gets the label, and it is the one place they learn the key. */
+    if (lab.matches('body.railopen.kbmode #rail .railitem')) return hide();
     xh?.remove(); xh = null;
     const t = box();
-    t.textContent = lab.dataset.tip;
+    /* A control with a key says so, for a mouse and for a keyboard. A touch press gets the plain
+       label, because a phone has no keyboard to press it with. A rail item draws its words in its
+       own box and carries no `data-tip`, so those words are the label. */
+    const name = lab.dataset.tip || lab.querySelector('.raillabel')?.textContent
+      || lab.getAttribute('aria-label') || '';
+    t.textContent = lab.dataset.key && FINE.matches ? `${name} (${lab.dataset.key})` : name;
     t.style.color = '';
     t.classList.remove('warn');
     if (!t.matches(':popover-open')) t.showPopover();
@@ -125,6 +135,15 @@ addEventListener('pointerup', e => {
   if (e.pointerType !== 'mouse' && !e.target.closest?.('[data-tip]')) hide();
 });
 addEventListener('pointercancel', hide);
+/* A keyboard reader gets the same label a pointer reader gets, from a control they Tab to. A
+   collapsed rail item is a glyph alone, and its words open on hover. WCAG 1.4.13 asks for hover and
+   focus both, and for a way to dismiss the label without moving focus, which is Escape. `:focus-visible`
+   keeps a pointer press from opening it twice, because `pointerdown` already did. */
+addEventListener('focusin', e => {
+  if (e.target.matches?.(':is([data-tip], [data-key]):focus-visible')) show(e);
+});
+addEventListener('focusout', hide);
+addEventListener('keydown', e => { if (e.key === 'Escape') hide(); });
 // The card and the table both scroll under a pointer that has not moved, which would leave the
 // readout naming a sample that is no longer under it.
 addEventListener('scroll', hide, true);

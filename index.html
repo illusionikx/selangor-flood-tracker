@@ -87,14 +87,14 @@
 <link rel="modulepreload" href="js/ui.js">
 <link rel="stylesheet" href="vendor/leaflet.css">
 <link rel="stylesheet" href="vendor/fonts.css?v=52">
-<link rel="stylesheet" href="css/icons.css?v=106">
+<link rel="stylesheet" href="css/icons.css?v=107">
 <!-- M3's own token scales, baked from the M3 Expressive component set by `php m3-build.php`.
      Before `base.css`, which derives `--m3-travel`, `--m3-grow` and `--m3-swap` from them and
      bridges M3's colour names onto this app's palette. Colour is not in this file on purpose. -->
 <link rel="stylesheet" href="vendor/m3/tokens.css?v=2">
-<link rel="stylesheet" href="css/base.css?v=203">
-<link rel="stylesheet" href="css/chrome.css?v=339">
-<link rel="stylesheet" href="css/map.css?v=188">
+<link rel="stylesheet" href="css/base.css?v=204">
+<link rel="stylesheet" href="css/chrome.css?v=341">
+<link rel="stylesheet" href="css/map.css?v=189">
 
 <!-- The water tint stood here until 2026-08-27. It came back on 2026-09-14 for CARTO's Dark
      Matter, in js/map.js, and went again on 2026-09-15. No markup here carries it. -->
@@ -830,6 +830,68 @@
 
     <span class="ctl" data-mark="main:theme"><i class="i i-dark_mode"></i><b>Theme switcher</b></span>
     <span>Switches between light and dark mode.</span>
+  </div>
+
+  <!-- **The keys, in one place, and the section `?` opens.** Each `<kbd>` row states a key that
+       `KEYS` in js/keys.js binds, or one that the map, a list or the camera viewer binds.
+       `keys-test.html` compares the first set against `KEYS`, so a key cannot be added to the code
+       and left off this sheet. Each row names one key and one act, with no "it". -->
+  <h3 id="helpKeys"><i class="i i-keyboard"></i>Keyboard</h3>
+  <p class="muted">A key does nothing while you type in a field or while a window is open. Press
+     <kbd>Esc</kbd> to close a window.</p>
+  <div class="key">
+    <span><kbd>/</kbd></span>
+    <span>Opens the station search.</span>
+
+    <span><kbd>a</kbd></span>
+    <span>Opens or closes the list of stations on alert.</span>
+
+    <span><kbd>t</kbd></span>
+    <span>Opens the table of all stations.</span>
+
+    <span><kbd>c</kbd></span>
+    <span>Opens the grid of all cameras.</span>
+
+    <span><kbd>s</kbd></span>
+    <span>Opens settings.</span>
+
+    <span><kbd>?</kbd></span>
+    <span>Opens this help at this section.</span>
+
+    <span><kbd>l</kbd></span>
+    <span>Shows your location on the map.</span>
+
+    <span><kbd>d</kbd></span>
+    <span>Switches between light and dark mode.</span>
+
+    <span><kbd>Shift</kbd> <kbd>←</kbd> <kbd>↑</kbd> <kbd>→</kbd> <kbd>↓</kbd></span>
+    <span>On the map, moves the red mark to the next station in that direction. The arrow keys alone
+       move the map.</span>
+
+    <span><kbd>Home</kbd></span>
+    <span>On the map, moves the red mark to the station nearest the middle.</span>
+
+    <span><kbd>Enter</kbd></span>
+    <span>On the map, opens the station that the red mark stands on. On a cluster, zooms in.</span>
+
+    <span><kbd>↑</kbd> <kbd>↓</kbd> <kbd>Home</kbd> <kbd>End</kbd></span>
+    <span>In the alert list, the table, the camera grid and the sensor kinds menu, move between
+       rows.</span>
+
+    <span><kbd>←</kbd> <kbd>→</kbd></span>
+    <span>In the alert list, close or open a section. In the camera grid, move between tiles.</span>
+
+    <span><kbd>Enter</kbd> <kbd>Space</kbd></span>
+    <span>On a row, opens the station.</span>
+
+    <span><kbd>k</kbd> <kbd>Space</kbd></span>
+    <span>In the camera viewer, plays and pauses.</span>
+
+    <span><kbd>,</kbd> <kbd>.</kbd></span>
+    <span>In the camera viewer, step one frame back or forward. The arrow keys do the same.</span>
+
+    <span><kbd>End</kbd></span>
+    <span>In the camera viewer, goes to the newest frame.</span>
   </div>
 
   <h3>On the map</h3>

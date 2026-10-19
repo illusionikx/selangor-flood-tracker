@@ -276,9 +276,7 @@ body:not(.ready) #rail { transition: none; }
   font-weight: var(--md-sys-typescale-label-large-weight);
   transition: max-width var(--m3-rail), margin-inline-start var(--m3-rail);
 }
-#rail .railfab:focus-visible {
-  outline: 2px solid var(--md-sys-color-primary); outline-offset: 2px;
-}
+#rail .railfab:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-off); }
 /* **The brand is smaller in the rail than in the bar, and the ladder is measured twice for it.**
    The app bar draws it at 22px across up to 300px of rail. This column has 180px between its own
    padding, and `KV Flood Watch` needs 156 of those at 22px against the 148 that are left once the
@@ -400,9 +398,17 @@ body.railopen #rail #railToggle .i { --i: var(--i-menu_open); }
   font-weight: var(--md-sys-typescale-title-small-weight);
 }
 #rail .railitem:hover { color: var(--md-sys-color-on-surface); }
-#rail .railitem:focus-visible {
-  outline: 2px solid var(--md-sys-color-primary); outline-offset: 2px;
-  border-radius: var(--md-sys-shape-corner-medium);
+/* **The ring sits where the state layer sits, and it states no radius of its own.** It was a 12px
+   corner forced onto the whole item. The expanded item is a 28px pill, so the ring read as a small
+   boxed corner round a large one. Collapsed, the item is a 64px column and M3 lights the 56 by 32
+   pill alone, so the ring goes on `.railpill` at its own 16px. Expanded, the ROW is the indicator
+   and carries the ring at its own 28px. The item itself draws none while collapsed. */
+#rail .railitem:focus-visible { outline: none; }
+body:not(.railopen) #rail .railitem:focus-visible .railpill {
+  outline: var(--focus-ring); outline-offset: var(--focus-off);
+}
+body.railopen #rail .railitem:focus-visible {
+  outline: var(--focus-ring); outline-offset: var(--focus-off);
 }
 /* --- the state layers ---------------------------------------------------------------------------
    Every button in this rail answers a pointer the way M3 states it: a state layer of the surface's
@@ -603,9 +609,11 @@ body.railopen #rail .railbadge { top: -6px; right: -6px; }
     line-height: var(--md-sys-typescale-label-medium-line-height);
     font-weight: var(--md-sys-typescale-label-medium-weight);
   }
-  #navbar .navitem:focus-visible {
-    outline: 2px solid var(--md-sys-color-primary); outline-offset: -2px;
-    border-radius: var(--md-sys-shape-corner-medium);
+  /* The ring goes on the pill, the same as the rail's collapsed item. It was an inset 12px box
+     round the whole item, which is the fault `#rail .railitem:focus-visible` records. */
+  #navbar .navitem:focus-visible { outline: none; }
+  #navbar .navitem:focus-visible .railpill {
+    outline: var(--focus-ring); outline-offset: var(--focus-off);
   }
   /* The selected state, written by the same `railActive()` that writes the rail's.
      **The LABEL takes `secondary` here and the rail's takes `on-surface`.** That is the reference's
@@ -1128,6 +1136,26 @@ body.testmode header {
   font: inherit; font-size: 12px; padding: 1px 6px;
   border: 1px solid var(--outline); border-radius: 4px; background: var(--hover);
 }
+/* **The key, printed on the control that it presses.** `js/keys.js` writes `data-key` on the rail
+   items, the search button and the location button. The open rail has room, so the key stands at the
+   trailing end of the row as a small keycap. The collapsed rail has none, so there the hover and
+   focus label says it instead (js/sparktip.js). `/ ""` is the alternative-text form of `content`. It
+   makes the cap decorative, so a screen reader reads the button's name and not "Alerts A". The key
+   is already spoken through `aria-keyshortcuts`.
+   **The caps draw in keyboard mode alone, since 2026-10-19.** `body.kbmode` is on while the reader
+   uses the keyboard and off after a mouse or touch press. `js/keys.js` writes it. A mouse reader
+   never sees the caps, because the hover label names the key for them. */
+body.railopen.kbmode #rail :is(.railitem, .railfab)[data-key]::after {
+  content: attr(data-key) / "";
+  margin-inline-start: auto; flex: none;
+  min-width: 20px; padding: 0 6px; box-sizing: border-box; text-align: center;
+  font-size: var(--md-sys-typescale-label-medium-size); line-height: 20px; text-transform: uppercase;
+  border: 1px solid currentColor; border-radius: 4px; opacity: .7;
+}
+/* An auto-width FAB has no slack for `margin-inline-start: auto` to take, so it states a gap. */
+body.railopen.kbmode #rail .railfab[data-key]::after { margin-inline-start: 12px; }
+/* The Keyboard heading leads with its glyph. It is the one Help heading that carries one. */
+.docbox h3 .i { font-size: 20px; margin-right: 8px; vertical-align: -4px; }
 
 /* --- developer section -------------------------------------------------------------------------- */
 
@@ -1227,7 +1255,7 @@ body.testmode header {
   color: var(--md-sys-color-on-surface-variant);
 }
 #settingsBox .mtrail:hover { background: var(--hover); color: var(--md-sys-color-on-surface); }
-#settingsBox .mtrail:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+#settingsBox .mtrail:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-in); }
 #settingsBox .mtrail .i { font-size: 24px; }
 
 /* **A pressable row, which is M3's list ACTION mode.** The reference wraps the row's own content in
@@ -1259,8 +1287,8 @@ body.testmode header {
 /* The leading glyph takes the accent with the check. The row's WEIGHT does not move: M3's selected
    list item states no weight change, and a bold row here would bold its supporting line too. */
 #settingsBox .mrow:has(input:checked) .glyph { color: var(--accent); }
-#settingsBox .mrow:has(:focus-visible) { outline: 2px solid var(--accent); outline-offset: -2px; }
-#settingsBox .mrow:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+#settingsBox .mrow:has(:focus-visible) { outline: var(--focus-ring); outline-offset: var(--focus-in); }
+#settingsBox .mrow:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-in); }
 #settingsBox .mrow:disabled {
   color: color-mix(in srgb, var(--on-surface) 38%, transparent); cursor: default;
 }
@@ -1357,7 +1385,7 @@ body.testmode header {
 }
 .msw:active .mswthumb { width: 28px; height: 28px; transform: translateX(2px); }
 .msw:is(:has(:checked), .on):active .mswthumb { transform: translateX(22px); }
-.msw:has(:focus-visible) { outline: 2px solid var(--accent); outline-offset: -6px; border-radius: 16px; }
+.msw:has(:focus-visible) { outline: var(--focus-ring); outline-offset: -6px; border-radius: 16px; }
 .msw:has(:disabled) { pointer-events: none; opacity: .38; }
 @media (prefers-reduced-motion: reduce) { .mswtrack, .mswthumb { transition: none; } }
 
@@ -1436,7 +1464,7 @@ body.testmode header {
   letter-spacing: var(--md-sys-typescale-label-large-tracking);
 }
 .mtext:hover { background: color-mix(in srgb, var(--accent) 8%, transparent); }
-.mtext:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.mtext:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-off); }
 
 /* --- all-stations table ----------------------------------------------------------------------- */
 
@@ -1524,7 +1552,7 @@ body.testmode header {
 #dataBox .m3search input:focus-visible, #camBox .m3search input:focus-visible { outline: none; }
 /* The ring goes on the row, because the row is the shape a reader sees. */
 #dataBox .m3search:focus-within, #camBox .m3search:focus-within {
-  outline: 2px solid var(--accent); outline-offset: 1px;
+  outline: var(--focus-ring); outline-offset: var(--focus-off);
 }
 #dataBox .m3search .m3clear, #camBox .m3search .m3clear { flex: none; font-size: 20px; }
 /* `display: flex` on `.icon` beats the browser's own `[hidden]` rule, so it has to be said again.
@@ -2565,7 +2593,7 @@ body.find #findpane { display: flex; flex-direction: column; }
   border: 0; border-bottom: 1px solid var(--outline);
 }
 #locate:hover { background: var(--hover); }
-#locate:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+#locate:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-in); }
 
 /* --- the layer chips, over the map ---------------------------------------------------------------
    **The layer controls are a bare chip row now, and they were a panel behind a round button.** A
@@ -3142,7 +3170,7 @@ body.side #side { display: flex; }
   color: var(--on-surface); background: var(--surface);
   border: 1px solid var(--outline); border-radius: var(--md-sys-shape-corner-full);
 }
-#goto:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+#goto:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-off); }
 /* **No `padding` here.** The M3 list block above states `padding: 8px 0`, and this rule is later in
    the file at the same specificity. A `padding: 0` here silently beat it, and nothing on screen or
    in the check said so. `m3-check.html` asserts the list's own padding now. */
@@ -3199,7 +3227,7 @@ body.side #side { display: flex; }
 }
 #toast .trow:hover { background: color-mix(in srgb, var(--on-surface) var(--m3-state-hover), transparent); }
 #toast .trow:active { background: color-mix(in srgb, var(--on-surface) var(--m3-state-press), transparent); }
-#toast .trow:focus-visible { outline: 2px solid var(--md-sys-color-primary); outline-offset: -2px; }
+#toast .trow:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-in); }
 #toast .trow .i { color: var(--c); font-size: 24px; flex: none; }
 #toast .ttext { display: flex; flex-direction: column; min-width: 0; }
 #toast .tname {
@@ -3374,7 +3402,18 @@ body.side #side { display: flex; }
 .apane details > summary:hover {
   background: color-mix(in srgb, var(--on-surface) var(--m3-state-hover), transparent);
 }
-.apane details > summary:focus-visible { outline: 2px solid var(--md-sys-color-primary); outline-offset: -2px; }
+.apane details > summary:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-in); }
+
+/* Rows that a keyboard reaches since 2026-10-19: an alert row, a table row and a camera tile. A row
+   sits inside a scroller that clips, so the ring goes inside it. */
+.slist li:focus-visible, #dataBody tr[data-mast]:focus-visible {
+  outline: var(--focus-ring); outline-offset: var(--focus-in);
+}
+.leaflet-container:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-in); }
+/* A tile clips its overflow and a menu row sits 4px from its edge, so both take the inward ring. */
+.camtile:focus-visible, .menu .mi:focus-visible, .menu .mi:has(input:focus-visible) {
+  outline: var(--focus-ring); outline-offset: var(--focus-in);
+}
 .apane .nsub b { margin-left: auto; }
 /* `.nsub .chev` and not `.chev` alone: `.nsub .i` paints the Notices glyph its category colour, and
    the chevron is an `.i` too. */

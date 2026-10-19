@@ -199,7 +199,7 @@ summary.sensorhead { list-style: none; cursor: pointer; }
 summary.sensorhead::-webkit-details-marker { display: none; }
 summary.sensorhead:hover { background: color-mix(in srgb, var(--on-surface) var(--m3-state-hover), transparent); }
 summary.sensorhead:active { background: color-mix(in srgb, var(--on-surface) var(--m3-state-press), transparent); }
-summary.sensorhead:focus-visible { outline: 2px solid var(--md-sys-color-primary); outline-offset: -2px; }
+summary.sensorhead:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-in); }
 .sensorhead .chev {
   flex: none; margin-left: auto; font-size: 24px;
   color: var(--md-sys-color-on-surface-variant); transition: transform .2s;
@@ -534,6 +534,13 @@ details.sensor[open] > summary .chev { transform: rotate(180deg); }
    **The anchor is fractional and that is correct.** Leaflet takes a fractional pixel. Rounding it to
    keep the number tidy is the same 2px error this entry already records. */
 .pin.sel { width: 32px; height: 32px; font-size: 32px; color: var(--sel); }
+/* **The keyboard is driving the selection, since 2026-10-19.** `js/keys.js` calls `setKb(true)` in
+   `map.js` while an arrow key moves the cursor, and the teardrop wears the focus ring. The ring is
+   the glyph's own stroke, in the focus colour, because a CSS `outline` goes on the BOX and the box
+   is a square round a teardrop. `paint-order: stroke` paints the stroke under the fill, so a stroke
+   of 6 shows 3px outside the edge. That is `--focus-ring`'s own width. A pointer press clears the
+   class and the teardrop draws the plain red edge it always drew. */
+.pin.sel.kb .pinglyph { stroke: var(--md-sys-color-primary); stroke-width: 6; }
 /* The weather pins, for the same reason and at the same size. They are plain `.pin` boxes at 39px
    with an `iconSize` to match, so only the glyph moves: `scale(.85)` is still on, and 31.25 times .85
    is 26.6, against the 26.8 disc above. `js/wx.js` carries the class.

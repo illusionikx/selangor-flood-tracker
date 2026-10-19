@@ -299,8 +299,9 @@ run m3-check.html    300000 1600,1000
 run paint-check.html  60000 1600,1000
 run title-test.html   40000 1800,1000
 run narrow-test.html  35000 1200,900
+run keys-test.html    90000 1400,900
 
-php shots-test.php            # one of eight runnable checks. Guards camera retention and the WebP
+php shots-test.php            # one of nine runnable checks. Guards camera retention and the WebP
                               # retry. Must stay green.
 php api.php --selftest       # another. Guards the force-refresh rate limit, cache choice, the
                               # place-lookup validator/rate limit, and the payload edit a warm poll
@@ -858,8 +859,16 @@ There is otherwise no test suite. Changes are verified four ways. Lint the PHP. 
 the data shape being relied on. Then look at the page.
 
 `shots-test.php`, `php api.php --selftest`, `heat-test.html`, `title-test.html`,
-`narrow-test.html`, `paint-check.html`, `m3-check.html` and `map-limits-test.html` are the eight
-runnable checks here, and each guards a different risk.
+`narrow-test.html`, `paint-check.html`, `m3-check.html`, `map-limits-test.html` and
+`keys-test.html` are the nine runnable checks here, and each guards a different risk.
+
+`keys-test.html` guards the keyboard, which fails by doing nothing. Three faults throw nothing and
+draw no wrong pixel. A shortcut stops pressing its button. A list row is skipped by Tab. A ring
+draws at the wrong width. The check dispatches the keys and reads what moved. It takes
+`?base=/site/`. It reports a row or a tile that the live payload does not carry as `skip`, never as
+`ok`. The list of keys is written inside the check. The check does not read `js/keys.js`, because a
+check that reads the table it guards passes on a table that lost a key. Run it with Chrome at
+`--virtual-time-budget=90000` and `--window-size=1400,900`.
 
 `shots-test.php` is deliberately narrow: retention is the only rule in this repo that can *quietly
 destroy* data. Everything else either works or visibly does not. A prune that buckets a frame

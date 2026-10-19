@@ -40,7 +40,8 @@ function drawHead() {
     [['nm', 'Location', ''], ...KIND_RANK.map(k =>
       [k, KINDS[k].one || KINDS[k].label,
        `<i class="i i-${KINDS[k].icon}" style="color:${KINDS[k].color}"></i>`])]
-    .map(([key, label, icon]) => `<th data-sort="${key}"${sortCol === key ? ' class="on"' : ''}>${
+    .map(([key, label, icon]) => `<th data-sort="${key}" tabindex="0"${
+      sortCol === key ? ' class="on" aria-sort="' + (sortDir > 0 ? 'ascending' : 'descending') + '"' : ''}>${
       icon}${label}${sortCol === key
       ? `<i class="i i-arrow_${sortDir > 0 ? 'upward' : 'downward'}"></i>` : ''}</th>`).join('')}</tr>`;
 }
@@ -183,7 +184,12 @@ export function dataTable() {
      order would be a lie. The district moves into the location cell instead, because you still have
      to know where a row is — it just stops being the thing the table is organised by. */
   const flat = sortCol !== 'nm';
-  const row = ({ key, members, lead }) => `<tr${lead.lat && lead.lng ? ` data-mast="${key}"` : ''}>
+  /* A row with a coordinate takes `tabindex="0"` and no role. `role="button"` on a `<tr>` would
+     remove its row and cell structure, and a screen reader reads this as a table with seven
+     columns. `js/keys.js` presses the row on Enter and Space. A row with no coordinate opens
+     nothing, so it takes neither. */
+  const row = ({ key, members, lead }) => `<tr${lead.lat && lead.lng
+    ? ` data-mast="${key}" tabindex="0"` : ''}>
     <td class="nm">
       <div class="popname">${titleCase(lead.name)}</div>
       <div class="muted">${flat ? `${lead.district}, ${lead.state} · ` : ''}${

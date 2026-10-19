@@ -626,7 +626,15 @@ export function hideMast() { mastRing?.remove(); mastRing = null; }
    The restore reads the marker this app last marked, so a marker already thrown away takes a
    `setIcon()` that reaches nothing. That is safe: Leaflet redraws on `setIcon` only while the
    marker is on a map. */
-let selPin = null, selWas = null, selKey = null;
+let selPin = null, selWas = null, selKey = null, selKb = false;
+
+/* Whether the keyboard is driving the selection. `js/keys.js` sets it while an arrow key moves the
+   cursor and clears it on a pointer press. The class lives in the module as well as on the element,
+   because every poll builds a new marker and `markSel()` draws its icon from this flag. */
+export function setKb(on) {
+  selKb = on;
+  selPin?.getElement()?.querySelector('.pin')?.classList.toggle('kb', on);
+}
 
 export function markSel(key) {
   const pin = key ? siteMark.get(key) : null;
@@ -656,7 +664,7 @@ export function markSel(key) {
        **29.3 is fractional on purpose.** Leaflet takes a fractional pixel, and rounding this to 29
        to keep it tidy is the same error the 25px rewrite made, in a smaller size. */
     pin.setIcon(L.divIcon({ className: '', iconSize: [32, 32], iconAnchor: [16, 29.3],
-      html: `<span class="pin sel">${pinGlyph('place')}</span>` }));
+      html: `<span class="pin sel${selKb ? ' kb' : ''}">${pinGlyph('place')}</span>` }));
   }
   /* **Move it out of the cluster, and move the last one back in.** `syncCluster()` reads `selPin`,
      so one re-sort answers both halves and neither is written twice.
