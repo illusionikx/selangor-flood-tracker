@@ -882,6 +882,16 @@ document.addEventListener('click', e => {
   }
 });
 
+/* A faulty-signal row takes the reader to the sensor. The pane closes first, the way the table does
+   before it flies the map: Settings is a modal dialog, and the station card behind it cannot be
+   seen or reached while it holds the top layer. */
+el('faultyList').onclick = e => {
+  const s = byId(e.target.closest('[data-fgo]')?.dataset.fgo);
+  if (!s) return;
+  settingsBox.close();
+  flashTo(s);
+};
+
 el('ignoredList').onclick = e => {
   const id = e.target.closest('[data-unignore]')?.dataset.unignore;
   if (!id) return;

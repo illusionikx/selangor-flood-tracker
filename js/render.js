@@ -373,15 +373,17 @@ function favPanel() {
 
 /* Every live sensor the server marks as a faulty signal, for the Settings subpage. Listed whether
    `Hide faulty signals` is on or off: the switch decides what the app does with the finding, and the
-   finding is the same either way. The reason is the line the station card prints. */
+   finding is the same either way. The reason is the line the station card prints.
+   Each row is M3's list ACTION mode, a `.mrow` button that fills the item, and a press takes the
+   reader to the sensor on the map. `data-fgo` is read by the handler in js/ui.js. */
 function faultyPanel() {
   const rows = state.data.filter(s => s.backed === false && hasInfo(s));
   el('faultyN').textContent = rows.length || '';
-  el('faultyList').innerHTML = rows.map(s => `<li>
+  el('faultyList').innerHTML = rows.map(s => `<li><button class="mrow" data-fgo="${s.id}">
       <i class="glyph i i-${KINDS[s.kind].icon}" style="color:${KINDS[s.kind].color}"></i>
       <span class="nm">${s.name}<br><span class="muted">${
         KINDS[s.kind].one || KINDS[s.kind].label} · ${faultWhy(s)}</span></span>
-    </li>`).join('')
+    </button></li>`).join('')
     || '<li class="none">No faulty signals right now.</li>';
 }
 
