@@ -249,15 +249,15 @@ function thin(list, step, anchor) {
 /* Colour inside the seek bar, over the frames taken while a sensor within CAM_ALERT_KM was at danger
    or, on a river, was forecast to reach it — so the bar answers "when did this start" without
    playing the clip.
-   One span per alerting frame, a frame wide, in that tier's status colour. Only those: a mark per
+   One span per alerting frame, in that tier's status colour. Only those: a mark per
    stored frame drew a 60-line ruler over the one control here that has to be dragged, and a
    graduation is not what this strip is for.
    The reader's own ignore list is applied here rather than on the server, which never learns it. A
    span raised by an ignored sensor is simply not drawn.
-   Each span is placed on the clock, and it runs to the next frame or one range step, whichever is
-   nearer. An outage draws nothing of its own: the frame dots below space themselves on the clock,
-   and the empty rail between two of them is the gap. A dashed and then a darker `.gap` span stood
-   here for two revisions, and the repository owner read both as ticks. */
+   Each span is placed on the clock. It runs to the next frame when that frame alerts too, at any
+   distance, on the repository owner's instruction of 2026-10-20. A span that cut off at one range
+      step left seams between alerting frames, because a capture lands minutes off its slot. So an
+   outage between two alerting frames is coloured too. The rail next to a clear frame stays plain. */
 /* **Every frame is a white dot on the rail, live included**, on the repository owner's instruction
    of 2026-10-14. This reverses the rule above that cut the per-frame marks. On a clock the dots
    space themselves, so the gaps between them are what a reader reads, not a ruler. The dots draw
@@ -265,11 +265,19 @@ function thin(list, step, anchor) {
 function drawTicks() {
   const pct = (a, b) => `left:${frac(a) * 100}%;width:${(frac(b) - frac(a)) * 100}%`;
   const dots = [...frames, t1].map(ts => `<b style="--x:${frac(ts)}"></b>`).join('');
-  ticks.innerHTML = frames.map((ts, i) => {
+  const alertAt = ts => {
     const a  = tierAt.get(ts);
     const st = a ? byId(a.id) : null;
-    if (!a || (st && isIgnored(st))) return '';
-    return `<i class="t-${a.tier}" style="${pct(ts, Math.min(tsAt(i + 1), ts + range.step))}"></i>`;
+    return a && !(st && isIgnored(st)) ? a : null;
+  };
+  ticks.innerHTML = frames.map((ts, i) => {
+    const a = alertAt(ts);
+    if (!a) return '';
+    /* The rail between two alerting frames is coloured, however far apart they are. The rail from an
+       alerting frame to a clear one stays plain, so a lone alerting frame keeps only the 2px mark
+       `min-width` gives it. */
+    const next = tsAt(i + 1);
+    return `<i class="t-${a.tier}" style="${pct(ts, alertAt(next) ? next : ts)}"></i>`;
   }).join('') + dots;
 }
 
