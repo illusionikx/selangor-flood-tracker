@@ -1013,7 +1013,11 @@ function pageHasData(string $key, string $body): bool {
         /* The portal rainfall page carries no <tr> on a data row — see portalRows(). Its header
            holds four, and the empty form page holds the same four, so the shared test passes on a
            page with nothing in it. `data-th='No'` appears once per data row and nowhere else. */
-        str_starts_with($key, 'prf-')           => str_contains($body, "data-th='No'"),
+        str_starts_with($key, 'prf-')           => str_contains($body, 'id="rainfall-data"'),
+        /* The rebuilt national water page (22 October 2026). The tbody id is the one thing the data
+           table has and an error page, a maintenance notice and the legend tables do not. A state
+           with no station still prints the tbody, with one `Tiada Data` row, and that is an answer. */
+        str_starts_with($key, 'nat-')           => str_contains($body, 'id="waterlevel-data"'),
         /* The KL camera page holds cards and no <tr>, so the shared test would call every good
            answer an outage. `camimg-` appears once per camera and nowhere else. */
         $key === 'kl-cam'                       => str_contains($body, 'camimg-'),
@@ -1729,7 +1733,49 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
 
     echo "\nportalRainUrls():\n";
     $ok('three states, three keys',          array_keys(portalRainUrls()) === ['prf-SEL', 'prf-WLH', 'prf-PTJ']);
-    $ok('the hidden inputs ride in the url', str_contains(portalRainUrls()['prf-SEL'], 'loginStatus=0&language=1'));
+    $ok('KL carries its full name, encoded',
+        portalRainUrls()['prf-WLH'] === 'https://publicinfobanjir.water.gov.my/rainfalldata/Wilayah%20Persekutuan%20Kuala%20Lumpur');
+    $ok('no url names the old site',         !str_contains(implode(' ', portalRainUrls() + nationalUrls()), 'wp-content'));
+
+    echo "\nportalRain() on the rebuilt page (2026-11-02):\n";
+    /* Two real rows. Row 1 has the HTML comment where a seventh daily cell used to be, which a parser
+       drops. Row 2 is the Putrajaya shape, a single cell. A legend table ahead of the tbody must not
+       reach the parser. */
+    $newPrf = "<table><tr><td>Legend</td><td>x</td></tr></table>"
+        . '<table><tbody id="rainfall-data">'
+        . '<tr><td>1</td><td>0190811RF</td><td>RIMBA KDR</td><td>SABAK BERNAM</td><td>02/11/2026 10:30:00</td>'
+        . '<td>2.50</td><td>2.00</td><td>8.00</td><td>0.50</td><td>13.00</td><td>17.00</td>'
+        . '<!-- <td>0.50</td> -->'
+        . '<td class="graph"><a href="http://infobanjirjps.selangor.gov.my/rainfall-graph.html?station=833&amp;lang=en" target="_blank">0.50</a></td>'
+        . '<td class="state-cell normal">1.50</td></tr>'
+        . '<tr><td>Tiada data Terkini</td></tr></tbody></table>';
+    $np = portalRain(['prf-SEL' => $newPrf]);
+    $ok('one row survives, the legend and the notice row do not', count($np) === 1);
+    $ok('code, name and district read by position', $np[0]['code'] === '0190811RF' && $np[0]['name'] === 'RIMBA KDR' && $np[0]['district'] === 'SABAK BERNAM');
+    $ok('the stamp is normalised',           $np[0]['updated'] === '02/11/2026 10:30:00');
+    $ok('six daily columns, oldest first',   $np[0]['days'] === [2.5, 2.0, 8.0, 0.5, 13.0, 17.0]);
+    $ok('cell 11 is today',                  $np[0]['daily'] === 0.5);
+    $ok('cell 12 is the hour',               $np[0]['hourly'] === 1.5);
+    // The new link names the Selangor station, not the portal's. The 7 day endpoint is gone anyway.
+    $ok('the new link yields no graph id',   $np[0]['graphId'] === null);
+
+    echo "\nnationalLevels() on the rebuilt page (2026-11-02):\n";
+    $newNat = '<table><tr><td>a</td></tr></table><tbody id="waterlevel-data">'
+        . '<tr><td>1</td><td>0000391WL</td><td>SG. KEMBONG DI PULAU INDAH</td><td>KLANG</td><td>Sungai Sembilang</td>'
+        . '<td>Sg. Sembilang</td><td>02/11/2026 10:30:00</td>'
+        . '<td class="state-cell normal"><a href="http://x/?station=1175" target="_blank">0.17</a></td>'
+        . '<td>0.00</td><td>1.25</td><td>1.50</td><td>2.00</td></tr>'
+        . '<tr><td>Tiada Data</td></tr></tbody>';
+    $nl = nationalLevels(['nat-SEL' => $newNat]);
+    $ok('one station, keyed by its full code', array_keys($nl) === ['0000391WL']);
+    $ok('level is cell 7',                   $nl['0000391WL']['level'] === 0.17);
+    $ok('alert, warning and danger are 9, 10, 11',
+        [$nl['0000391WL']['alert'], $nl['0000391WL']['warning'], $nl['0000391WL']['danger']] === [1.25, 1.5, 2.0]);
+    $ok('normal (cell 8) is not read',       !array_key_exists('normal', $nl['0000391WL']));
+    $ok('the stamp is normalised',           $nl['0000391WL']['updated'] === '02/11/2026 10:30:00');
+    $ok('an empty page yields nothing',      nationalLevels(['nat-PTJ' => '']) === []);
+    $ok('a page with no tbody yields nothing', nationalLevels(['nat-SEL' => "<tr class='item'><td>1</td></tr>"]) === []);
+    $ok('the national url names the state',  nationalUrls()['nat-PTJ'] === 'https://publicinfobanjir.water.gov.my/waterleveldata/Putrajaya');
 
     echo "\nportalOdo():\n";
     $ok('a first sample starts at today',   portalOdo(null, null, 7.5, null) === 7.5);
@@ -2184,7 +2230,7 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
     $ok('an unasked page is never stamped',        pageRow(false, '', 'old')[0] === false);
 
     echo "\npageHasData():\n";
-    $ok('a table page is data',          pageHasData('nat-SEL', "<table><tr class='item'><td>1</td></tr>") === true);
+    $ok('a table page is data',          pageHasData('nat-SEL', '<tbody id="waterlevel-data"><tr><td>1</td></tr>') === true);
     // The 320-byte Notis Gangguan the national portal serves under HTTP 200 while it is down.
     $ok('a notice page is not data',     pageHasData('nat-SEL', '<html><title>Notis Gangguan</title></html>') === false);
     $ok('an empty body is not data',     pageHasData('nat-SEL', '') === false);
@@ -2197,10 +2243,12 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
     $ok('a nowcast notice is not data',  pageHasData('met-now', '<html>Notis Gangguan</html>') === false);
 
     echo "\npageHasData() on the portal pages:\n";
-    $ok('a portal page with a row passes',   pageHasData('prf-SEL', "<td data-th='No'>1</td>") === true);
-    $ok('a portal form page fails',          pageHasData('prf-SEL', "<table><tr><th>No.</th></tr></table>") === false);
+    $ok('a portal page with a row passes',   pageHasData('prf-SEL', '<tbody id="rainfall-data"><tr><td>1</td></tr>') === true);
+    $ok('a state with no station passes',    pageHasData('prf-PTJ', '<tbody id="rainfall-data"><tr><td>Tiada data Terkini</td></tr></tbody>') === true);
+    $ok('a portal page with no tbody fails', pageHasData('prf-SEL', "<table><tr><th>No.</th></tr></table>") === false);
+    $ok('the 404 page fails',                pageHasData('prf-SEL', '<html><title>Not Found</title></html>') === false);
     $ok('an empty body fails',               pageHasData('prf-SEL', '') === false);
-    $ok('the other tables keep the tr test',  pageHasData('nat-SEL', "<tr class='item'>") === true);
+    $ok('the old water table fails',         pageHasData('nat-SEL', "<tr class='item'>") === false);
 
     echo "\npageHasData() on the JPS notice feeds:\n";
     $ok('a JPS empty list is data',      pageHasData('jps-rain', '[]') === true);
@@ -3478,11 +3526,14 @@ $warnAll   = mergeNotices($warnMet, $warnJps, $warnFlood);
    counter quiet, because the fetch had succeeded. */
 $pagesOld = [];
 foreach (['met-warn', 'jps-rain', 'jps-storm', 'jps-sea', 'jps-beat'] as $k) {
-    if (noticeOld($k, $page($k), $now, NOTICE_OLD)) $pagesOld[] = $k;
+    // A feed this server does not ask for has no page, and no page is not an old page. See jpsUrls().
+    if (isset($extraUrls[$k]) && noticeOld($k, $page($k), $now, NOTICE_OLD)) $pagesOld[] = $k;
 }
 /* The heartbeat speaks for the whole mirror. jps-rain goes legitimately empty most days, so it
    holds no evidence itself. */
-if (beatDead($page('jps-beat')) && !in_array('jps-beat', $pagesOld, true)) $pagesOld[] = 'jps-beat';
+if (isset($extraUrls['jps-beat']) && beatDead($page('jps-beat')) && !in_array('jps-beat', $pagesOld, true)) {
+    $pagesOld[] = 'jps-beat';
+}
 
 // One-off carry-over from the flat file, so trends survive the switch instead of going null for an
 // hour. Deletes itself; drop this block once no deployment has a .history.json left.
@@ -3866,7 +3917,11 @@ foreach ($stored as $su => $sr) {
 // Only the rows that found no home. A matched row needs no coordinate: it already has one.
 $gazNames = [];
 foreach ($prf as $i => $r) if (!isset($prfHit['used'][$i])) $gazNames[] = $r['name'];
-$gazAsk = gazWanted($gazNames, $gazDone, GAZ_FILL);
+/* PARKED on 2026-11-02: the station search lived under /wp-content/, which the portal rebuild of
+   22 October 2026 removed. Asking costs a 404 every ten minutes and places nothing. The 542 rows
+   already in the table still place a station through gazPlace(). Set GAZ_LIVE when a replacement
+   endpoint exists. */
+$gazAsk = GAZ_LIVE ? gazWanted($gazNames, $gazDone, GAZ_FILL) : [];
 
 /* What the archive already seeded and which stations are next, counted before the payload goes out.
    `$graphIds` is the map the two placement passes filled — the station's own `graphId` key is

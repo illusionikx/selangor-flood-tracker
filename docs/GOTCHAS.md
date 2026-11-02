@@ -10,6 +10,13 @@ of every entry below, in this order.
 Read the entries for any subsystem you are about to change.
 
 
+- **A feed that moved looks the same as a feed that is down.** The app serves the stored copy of
+  both. JPS rebuilt the national portal on 22 October 2026, and every old path answered 404.
+  `pageRow()` keeps the last good body. So the map drew eleven day old readings. Only the late-feed
+  notice and `sources.stale` said so. When that notice appears, request the page with curl. A 404
+  with a full HTML body means the path moved. Read the home page of the site for the new links. Do not
+  wait for the feed to return. A dead fetch pays the 25 second timeout. On 2026-11-02 the poll hit
+  the 30 second PHP limit.
 - **`-9999` means "no reading"** in both scraped feeds, rendered as `-9,999.00` in one of them.
   `numOrNull()` strips separators and nulls anything ≤ −9990. Treated as a level, it renders a
   station as catastrophically dry and poisons its trend history.

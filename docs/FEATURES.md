@@ -345,6 +345,51 @@ otherwise be trusting blindly. Cost is honest: +212 detail requests per poll, ~3
 **Camera image proxy** (`?cam=<id>`) — JPS advertises stills over plain http, unusable from an
 https page. Integer id only, URL looked up in the cached payload, host checked against JPS.
 
+### The national portal was rebuilt, and four of its endpoints are parked (2026-11-02)
+
+**What happened.** JPS replaced `publicinfobanjir.water.gov.my` on 22 October 2026. The old WordPress
+site is gone. Every path under `/index.php/` and `/wp-content/` now answers 404 with a 6,603 byte
+Laravel page. The app kept the stored copy of each table. So the national and portal readings stood
+at 22/10/2026 19:00 for eleven days. The notice "A data source stopped updating" was correct. The
+list `sources.stale` had named all six table pages the whole time.
+
+**What the new site gives.** It gives one plain page per state, with the table in the HTML. There is
+no form, no login and no hidden input. The paths are `/waterleveldata/{state}` and
+`/rainfalldata/{state}`. KL is `Wilayah%20Persekutuan%20Kuala%20Lumpur`. Putrajaya has a page and, on
+2026-11-02, no row on it. The station codes did not change. All 91 Selangor and all 32 KL water codes
+joined a station that was already in the payload.
+
+**What changed in the code.**
+- `nationalLevels()` reads `<tbody id="waterlevel-data">` by position, 12 cells. The `data-th`
+  attributes are gone.
+- `portalRows()` reads `<tbody id="rainfall-data">`. A parser still sees 13 cells, because the page
+  prints the fourteenth inside an HTML comment. If the tbody is absent, `portalRows()` reads the
+  whole page. The old fixtures still pass because of that.
+- `pageHasData()` tests the two tbody ids. A state with no station prints the tbody and one
+  `Tiada Data` row. That is an answer and not an outage.
+- The rainfall graph link now names the Selangor station and not the portal station. So `graphId` is
+  null for every new row. No new 7 day seed is possible. The 230 stations already seeded stay.
+
+**What is parked, and why.** Five things lived under `/wp-content/`. They are the five `jps-*`
+notice feeds (`jpsUrls()` returns `[]`), the station search (`GAZ_LIVE` is false) and the 7 day
+series. No replacement was found on the new site. Each ask cost a 404, and on 2026-11-02 the poll
+reached the 30 second PHP limit. The parsers stay in place. The JPS flood forecast and the JPS mirror
+of MET warnings reach no screen until a replacement exists. MET's own warnings still do. The 542
+gazetteer rows already stored still place a station.
+
+**Measured after.** The poll fell from 21.7 s to 6.4 s. The counter `national.parsed` reads 120, and
+`portalrf.parsed` reads 370 (199 before, from a stored copy). Both feed stamps read 11:00 on the
+morning of the fix. The lists `sources.stale` and `sources.old` are empty.
+
+**Trade-off accepted.** Nine national stations are `unmapped`. The portal names them and no feed
+places them. The gazetteer cannot grow now. They stay off the map and do not sit at a guessed point.
+
+**The other five hosts were rechecked the same day.** The Selangor API, the KL water table, the KL
+camera page, the MET nowcast, both `api.data.gov.my` feeds and Nominatim all answer with data. One
+change came out of it. The KL rainfall ids 23, 24, 25 and 27 answer 500, with every id from 12 to
+35. Their last stored pages are one identical 14 KB page with no station. So `KL_RAIN` holds the
+eleven dropdown ids alone now.
+
 ## Map
 
 **Base map** — CARTO, three styles selectable in the drawer (Voyager colour / Positron grey / Dark

@@ -207,6 +207,14 @@ Field notes:
 
 ### 2. Public Infobanjir (national) — `sources.php`
 
+**JPS REBUILT THIS SITE ON 22 OCTOBER 2026, AND THE PARAGRAPHS BELOW DESCRIBE THE OLD ONE.** It is
+Laravel now. The tables sit at `/waterleveldata/{state}` and `/rainfalldata/{state}`, one plain page
+per state, read by position from `<tbody id="waterlevel-data">` and `<tbody id="rainfall-data">`.
+The station codes did not change. Every `/index.php/` and `/wp-content/` path answers 404. That
+parks the five `jps-*` notice feeds, the station search (`GAZ_LIVE`) and the 7 day series. See "The
+national portal was rebuilt" in `docs/FEATURES.md`. Where the text below names `data-th`, the
+`wp-content` URLs, `loginStatus` or `stationid=`, it records history and not the code.
+
 `…/index.php/aras-air/data-paras-air/aras-air-data/?state=SEL&district=ALL&station=ALL&lang=en`,
 one call per state (`SEL`, `WLH` = KL, `PTJ` = Putrajaya). 301s to a canonical path, so
 `CURLOPT_FOLLOWLOCATION` is required. Rows are `<tr class='item'>` and every cell carries a
@@ -443,6 +451,7 @@ thirds of the file now sits one Read away.
 cost somebody a debugging session. The index below carries the first line of every entry, in the
 order that file holds them. A trap names itself here, and the file states the evidence.
 
+- A feed that moved looks exactly like a feed that is down, and the app serves the stored copy of ...
 - `-9999` means "no reading"
 - JPS shuffled the coordinates inside one batch of cameras, so a pin can be 8...
 - A `(string)` cast on `$_GET[...]` does not throw on an array — it emits a w...
