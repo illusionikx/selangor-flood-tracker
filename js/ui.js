@@ -1,6 +1,6 @@
 // DOM wiring: theme, layer chips, panels, lightbox and the delegated jumps.
 
-import { KINDS, MAST, camSrc, FEED, STATIC, NEAR_MAX_KM, NOTICE, NOTICE_KIND, NARROW_PX
+import { KINDS, MAST, camSrc, FEED, FEED_WX, STATIC, NEAR_MAX_KM, NOTICE, NOTICE_KIND, NARROW_PX
        } from './config.js';
 import { state, PREFS, PREFS_KEY, save } from './state.js';
 import { el, distKm, ignoredIds, leads, favIds, isFav, squash, termsOf, matches, esc,
@@ -13,7 +13,7 @@ import { camWarn } from './popup.js';
 import { render } from './render.js';
 import { alerts, toggleAlerts, setAlertTab } from './alerts.js';
 import { ticker } from './ticker.js';
-import { load, feedRows, sourceRows, lastPayload } from './net.js';
+import { load, feedRows, sourceRows, byKindRows, bySourceRows, lastPayload } from './net.js';
 import { askJson } from './ask.js';
 import { lazy } from './lazy.js';
 import './sparktip.js';   // side effect only: one delegated readout for every graph on the page
@@ -140,6 +140,7 @@ function showSetPage(id) {
 settingsBox.addEventListener('click', e => {
   const go = e.target.closest('[data-page]');
   if (go) showSetPage(go.dataset.page);
+  if (go?.dataset.page === 'setReadings') askWx();
 });
 const backToMain = e => {
   if (setPage === 'setMain') return;
@@ -178,8 +179,23 @@ const TEST_CLOSE_MS = 500;
 /* The same numbers the status dot shows, plus the ones it has no room for. Painted when the dialog
    opens, and again on every poll while it stays open. There is nothing to tear down, so re-painting
    is the whole update. */
+/* The weather points for the Readings page. The station payload does not carry them, so the page
+   asks `?wx=1` itself, each time it opens. That answer is a stored row and an ETag, so a repeat
+   costs a 304. A failure leaves the last answer, or the `…` row, and says nothing louder: this is a
+   developer table. */
+let wxPts = null;
+async function askWx() {
+  try { wxPts = (await askJson(FEED_WX, { ms: 15000 })).points || []; } catch { return; }
+  if (settingsBox.open) paintDev();
+}
+
+const devTable = (head, rows) => `<thead><tr>${head.map(h => `<th>${h}</th>`).join('')}</tr></thead>`
+  + `<tbody>${rows.map(r => `<tr>${r.map(c => `<td>${esc(String(c))}</td>`).join('')}</tr>`).join('')}</tbody>`;
+
 function paintDev() {
   const j = lastPayload();
+  el('devKinds').innerHTML = j ? devTable(['Kind', 'Online', 'Recent'], byKindRows(j, wxPts)) : '';
+  el('devSources').innerHTML = j ? devTable(['Source', 'Online', 'Recent', 'Newest'], bySourceRows(j)) : '';
   // net.js sets `last` to null on any fetch error, so a missing payload here can mean two different
   // things: nothing has ever arrived, or a poll ran and failed after an earlier one succeeded.
   // #netstats already tells these apart (it reports `status: offline` with the problem), so this

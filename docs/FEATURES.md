@@ -20618,6 +20618,34 @@ One switch covers all three sensor kinds. Nothing on screen counts the hidden si
 
 The M3 switch style read `:has(:checked)` alone. Chromium does not restyle a `:has()` match when a script sets the box, and this box loads checked from `PREFS`. So `.msw.on` now stands beside each of those rules, the same repair `setBox()` makes for a chip.
 
+### Readings opens with a count by kind and a count by source (2026-11-02)
+
+The repository owner asked for two tables at the head of Settings, Readings. The old list of
+counters stays below them under the heading Diagnostics.
+
+**By kind** has three columns: Kind, Online and Recent. It holds the five sensor kinds and Weather.
+**By source** has four: Source, Online, Recent and Newest. `byKindRows()` and `bySourceRows()` in
+`js/net.js` build the rows from the last payload.
+
+**Recent means a reading stamped within 2 hours.** The status word uses the same window. A siren
+takes 48 hours, because it reports once a day and `api.php` calls it out of contact after 48. A camera
+publishes no stamp, so its cell says "No stamp" and not 0. The stamp is read as Malaysian time, so
+the window holds for a viewer in another zone.
+
+**Weather counts MET points, not stations.** The payload does not carry them. So the page asks
+`?wx=1` each time it opens. The server answers from a stored row with an ETag, so a repeat costs a
+304. The row reads `…` until the answer lands.
+
+**Both tables fit a 360px phone with no sideways scroll.** The source names are short: JPS
+Selangor, Infobanjir water, Infobanjir rain and JPS WP. `SOURCES` names the two portal feeds alike,
+which cannot tell two table rows apart. Every number column keeps to one line, and the name column
+wraps. Measured at 360px: each table is 279px wide in a 311px row.
+
+**Not built.** MET has no row in By source. The owner did not ask for one.
+
+**Found while building, not fixed.** JPS WP shows 3 of 11 online while 7 reported recently. The KL
+water stations seem to be marked offline while they still send readings.
+
 ### Settings has subpages, in M3's standard list
 
 The repository owner asked for this on 2026-10-15. The Settings main page lists Sensors, Alerts, Theme, Map and Developer. Three rows open a subpage: Favorite sensors, Ignored sensors and Faulty signals. Each row shows its count and a trailing chevron.

@@ -729,7 +729,15 @@
 
   <!-- The feed and source counters. `paintDev()` in `js/ui.js` writes the table on open and on
        every poll while the pane is open, whichever page shows. -->
+  <!-- **Two count tables head the page, on the repository owner's instruction of 2026-11-02**: by
+       sensor kind, then by source. `byKindRows()` and `bySourceRows()` in `js/net.js` build them.
+       They hold four columns at most and short words, so a 360px phone needs no sideways scroll. -->
   <div id="setReadings" class="spage" data-title="Readings" hidden>
+    <h3>By kind</h3>
+    <ul class="picklist mlist"><li class="readout"><table id="devKinds" class="devtab"></table></li></ul>
+    <h3>By source</h3>
+    <ul class="picklist mlist"><li class="readout"><table id="devSources" class="devtab"></table></li></ul>
+    <h3>Diagnostics</h3>
     <ul class="picklist mlist"><li class="readout"><table id="devstats"></table></li></ul>
   </div>
   </div><!-- /.docbody -->

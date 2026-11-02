@@ -1,6 +1,6 @@
 // Polling the proxy, and the diagnostics popover that reports honestly on what came back.
 
-import { FEED, POLL_MS, FEED_LATE_MS, SOURCES } from './config.js';
+import { FEED, POLL_MS, FEED_LATE_MS, SOURCES, KINDS } from './config.js';
 import { state, PREFS } from './state.js';
 import { el, ago } from './util.js';
 import { render } from './render.js';
@@ -50,6 +50,60 @@ export const sourceRows = j => [
     `${j.sources?.portalrf?.parsed ?? '?'} parsed, ${j.sources?.portalrf?.applied ?? '?'} applied`],
   ['offline stations', j.offline ?? '?'],
 ];
+
+/* The two tables at the head of Settings, Readings. The repository owner asked for them on
+   2026-11-02: one row per sensor kind, then one row per source.
+   **"Recent" is a reading stamped within RECENT_MS (2 h).** That is the window the status word
+   above already calls stale past. A siren takes 48 h, because it reports once a day and api.php
+   calls it out of contact after SIREN_STALE, which is 48 h. A camera publishes no stamp, so its cell
+   says so rather than read 0, which would claim 96 dead cameras.
+   **The stamp is read as MYT on purpose.** `parseMY()` reads it in the viewer's own zone, which is
+   right beside a printed stamp and eight hours wrong for a two-hour window outside Malaysia. */
+const RECENT_MS = 2 * 3.6e6, SIREN_RECENT_MS = 48 * 3.6e6;
+const mytMs = t => {
+  const m = /^(\d\d)\/(\d\d)\/(\d{4}) (\d\d):(\d\d)/.exec(t || '');
+  return m ? Date.UTC(m[3], m[2] - 1, m[1], m[4] - 8, m[5]) : null;
+};
+function tally(list) {
+  const now = Date.now();
+  let on = 0, rec = 0, stamped = 0, newest = 0;
+  for (const s of list) {
+    if (s.online) on++;
+    const t = mytMs(s.updated);
+    if (!t) continue;
+    stamped++;
+    newest = Math.max(newest, t);
+    if (now - t < (s.kind === 'siren' ? SIREN_RECENT_MS : RECENT_MS)) rec++;
+  }
+  return { n: list.length, on, rec: stamped ? rec : 'No stamp', newest };
+}
+
+/* Weather counts MET nowcast points, not stations: the points `?wx=1` publishes inside the coverage
+   box. api.php drops a point older than MET_STALE, which is 2 h too, so online and recent always
+   agree here. `wx` is null until that request answers, and the row says so. */
+export const byKindRows = (j, wx) => [
+  ...Object.entries(KINDS).map(([k, d]) => {
+    const t = tally(j.stations.filter(s => s.kind === k));
+    return [d.one || d.label, `${t.on}/${t.n}`, t.rec];
+  }),
+  wx ? (n => ['Weather', `${n}/${wx.length}`, n])(
+         wx.filter(p => Date.now() - p.stamp * 1000 < RECENT_MS).length)
+     : ['Weather', '…', '…'],
+];
+
+/* Short names, so four columns fit a 360px phone with no sideways scroll. SOURCES names the two
+   portal feeds alike, which is right on a station card and useless in a table that counts them
+   apart. */
+const SRC_SHORT = { selangor: 'JPS Selangor', national: 'Infobanjir water', portal: 'Infobanjir rain',
+                    kl: 'JPS WP' };
+const clock = ms => !ms ? 'None' : new Date(ms).toLocaleString('en-GB', {
+  timeZone: 'Asia/Kuala_Lumpur', hourCycle: 'h23',
+  ...(Date.now() - ms < 864e5 ? { hour: '2-digit', minute: '2-digit' } : { day: '2-digit', month: 'short' }),
+});
+export const bySourceRows = j => Object.keys(SRC_SHORT).map(k => {
+  const t = tally(j.stations.filter(s => s.source === k));
+  return [SRC_SHORT[k], `${t.on}/${t.n}`, t.rec, clock(t.newest)];
+}).filter(([, n]) => !n.endsWith('/0'));
 
 /** The payload the popover is currently describing, so the About dialog reports the same poll. */
 export const lastPayload = () => last;

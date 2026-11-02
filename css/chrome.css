@@ -1164,6 +1164,14 @@ body.railopen.kbmode #rail .railfab[data-key]::after { margin-inline-start: 12px
 #devstats { border-collapse: separate; width: 100%; margin: 12px 0; font-size: 13px; }
 #devstats td { padding: 3px 0; vertical-align: top; }
 #devstats td:first-child { width: 42%; color: var(--muted); }
+/* The two count tables on the Readings page. The name column takes the slack and wraps. Every number
+   column hugs its content and never wraps, so a 360px phone fits four columns with no scroll. */
+.devtab { border-collapse: separate; border-spacing: 0; width: 100%; font-size: 13px; }
+.devtab th, .devtab td { padding: 4px 0 4px 12px; text-align: end; white-space: nowrap;
+                         font-variant-numeric: tabular-nums; vertical-align: top; }
+.devtab th { font-weight: 500; color: var(--muted); }
+.devtab :is(th, td):first-child { padding-inline-start: 0; text-align: start; white-space: normal;
+                                  width: 100%; overflow-wrap: anywhere; }
 
 /* --- Settings, as M3 lists -----------------------------------------------------------------------
    Transcribed from `List/list.css` in the M3 Expressive component set, which cites

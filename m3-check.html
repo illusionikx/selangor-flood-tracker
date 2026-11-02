@@ -2135,7 +2135,10 @@ async function desktop() {
     await settled();
     /* The readings take no press: no button, no anchor, no pointer. They sit on a subpage since
        2026-10-15, and a Developer row opens it. */
-    const ro = d.querySelector('#setReadings .readout');
+    // Three readouts since 2026-11-02: by kind, by source, then the diagnostics table.
+    is([...d.querySelectorAll('#setReadings .readout table')].map(t => t.id).join(','),
+       'devKinds,devSources,devstats', 'developer: the readings page holds kind, source, then diagnostics');
+    const ro = d.getElementById('devstats').closest('.readout');
     is(d.getElementById('devReadings')?.dataset.page, 'setReadings',
        'developer: a row opens the readings subpage');
     is(ro.querySelector('button, a'), null, 'developer: the readings row holds no control');
@@ -2163,7 +2166,8 @@ async function desktop() {
     is(sb.querySelector('h3 .hdisc'), null, 'settings: no disc on a heading');
     is(sb.querySelector('h3 .i'), null, 'settings: and no glyph either, which is M3 subheader');
     /* Developer heads no list and takes the same style anyway. One pane states one heading. */
-    const devH = [...sb.querySelectorAll('h3')].pop();
+    // The main page's last heading. The Readings subpage carries headings of its own since 2026-11-02.
+    const devH = [...sb.querySelectorAll('#setMain > h3')].pop();
     is(cs(devH).fontSize, cs(sh).fontSize,
        'settings: the Developer heading is the same subheader, so the pane has one heading style');
     is(Math.round(r(sh).left), Math.round(r(sh.nextElementSibling.firstElementChild).left),
