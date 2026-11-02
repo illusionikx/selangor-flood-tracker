@@ -238,10 +238,12 @@
   <div class="spin"></div>
   <div class="muted" id="splashMsg">fetching stations from JPS…</div>
   <div id="splashWarn" hidden>
-    <div class="state on"><i class="i i-wifi_off"></i> NO INTERNET CONNECTION</div>
-    <p class="muted">This page needs a connection to read live water levels, rainfall and sirens
-       from JPS. Anything shown without one would be out of date — and during a flood,
-       out of date is worse than nothing.</p>
+    <!-- js/net.js rewrites the headline: `navigator.onLine` picks NO INTERNET CONNECTION or
+         SERVER NOT ANSWERING. Both hold the splash. -->
+    <div class="state on"><i class="i i-wifi_off"></i> <span id="splashHead">NO INTERNET CONNECTION</span></div>
+    <p class="muted">This page needs live water levels, rainfall and sirens from JPS. It shows no
+       map without them, because during a flood an old reading is worse than none. It tries again
+       by itself.</p>
     <button class="link" id="splashRetry"><i class="i i-refresh"></i> Try again</button>
   </div>
 </div>

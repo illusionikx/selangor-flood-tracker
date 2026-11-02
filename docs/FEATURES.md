@@ -20849,3 +20849,17 @@ Decisions:
 Not built: the per-district pages, the live stream mode (`Camera/GetSeqImage/<id>`), and position de-duplication. The stream mode is the site's own 2-second refresh, and this app already refreshes a still every 5 minutes. No Selangor camera stands inside KL, so a duplicate check has nothing to find.
 
 Open: the archive (`shots/`) starts for these three on the next capture, within 30 minutes of a deploy.
+
+## The splash holds on every failed first load
+
+The splash screen now stays up whenever the first load fails. It let the reader through to an empty map before, if `navigator.onLine` read true.
+
+That flag reads true on Wi-Fi with no internet behind it, on a LAN with no route out, and when this server is down. In each case the app said "Showing the map anyway" and opened a map with no stations. A map with no stations reads as a calm day.
+
+- The flag now picks the headline and nothing else. It shows NO INTERNET CONNECTION when the flag is false, and SERVER NOT ANSWERING when it is true.
+- The poll timer (`POLL_MS`) retries by itself, and so does the `online` event. A successful poll removes the splash.
+- The "Try again" button retries at once.
+
+Trade-off accepted: a reader whose network blocks this server sees no map at all, not even the basemap. During a flood an empty map that looks calm is the worse fault.
+
+Not changed: a poll that fails after the map loaded. The map keeps the last good payload, and the status popover says `offline`.

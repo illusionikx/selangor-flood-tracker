@@ -197,15 +197,13 @@ export async function load() {
     // The map still draws the last good payload, so its feeds keep ageing against the clock.
     if (late()) { alerts(); ticker(); }
     if (!el('splash').classList.contains('gone')) {
-      // Nothing has ever loaded. With no connection there is nothing truthful to show, so hold the
-      // splash; if we are online it is the feed that is down, so let them at the map.
-      if (!navigator.onLine) {
-        el('splash').classList.add('offline');
-        el('splashWarn').hidden = false;
-      } else {
-        el('splashMsg').textContent = 'Could not reach the flood data. Showing the map anyway.';
-        setTimeout(() => el('splash').classList.add('gone'), 1200);
-      }
+      /* Nothing has ever loaded, so hold the splash on EVERY failure. It let the reader through to
+         an empty map whenever `navigator.onLine` read true, and that flag reads true on Wi-Fi with
+         no internet behind it. A map with no stations reads as a calm day. The flag now picks the
+         headline and nothing else. The poll timer and the `online` event retry by themselves. */
+      el('splashHead').textContent = navigator.onLine ? 'SERVER NOT ANSWERING' : 'NO INTERNET CONNECTION';
+      el('splash').classList.add('offline');
+      el('splashWarn').hidden = false;
     }
   } finally {
     /* Test mode holds the bar for 3 s. A warm poll ends before the bar's 400ms delay, so without
