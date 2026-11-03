@@ -27,8 +27,8 @@
  * the re-encode wins by a wide margin.
  *
  * Source stills average 245 KB (90 cameras, median 219, max 515), so the archive tops out near
- * 3.7 GB — 165 frames a camera, and flat from the first year on, because the last tier deletes as
- * fast as capture adds.
+ * 5.1 GB — about 233 frames a camera, and flat from the first year on, because the last tier deletes
+ * as fast as capture adds.
  */
 // The archive sits in `STATE`, which api.php defines. shots-test.php loads this file alone, so the
 // archive then sits beside this file.
@@ -78,7 +78,8 @@ const SHEET_H = 270;
 const SHEET_Q = 70;
 /* Retention, as [frames younger than this, keep one per, the clock time the bucket aims at]. `0` in
  * the second slot keeps every frame. Applied on age, so a frame thins as it ages: every 30 min for
- * a day, three-hourly for a week, down to weekly for a year. Past the last tier it is deleted.
+ * a day, three-hourly for a week, twice a day for a month, daily for two months, twice a week for
+ * six months, and weekly for a year. Past the last tier it is deleted.
  * The steps give each scrubber window roughly the same count, ~50, which is under a minute at one
  * frame a second. A tier is what a range can play, so a tier twice as coarse as its window ends in
  * half the time and skips half of what happened — the week tier was 6-hourly for that reason and is
@@ -92,14 +93,31 @@ const SHEET_Q = 70;
  * the 3-hour grid and Monday 16:00 on the 12-hour grid, so a frame keeps hitting its target as it
  * ages between tiers instead of drifting once per tier.
  * `thin()` in js/timeline.js repeats these numbers and the slot expression. Change one, change
- * both, or the ruler and the clip file one frame in two slots. */
+ * both, or the ruler and the clip file one frame in two slots.
+ *
+ * An optional fourth element lists offsets inside one step, for a grid that is not evenly spaced.
+ * `[0, 3 * 86400]` on a weekly step aimed at Monday 16:00 targets Monday and Thursday 16:00. A row
+ * without it is `[0]`, one target per step. Every target nests in the tier before it: 16:00 daily
+ * is on the 12-hour grid, Monday and Thursday are on the daily one, Monday is on both. */
 const SHOT_TIERS = [
-    [6 * 3600,     0,          0],           // 6 hours — every frame we have
-    [24 * 3600,    1800,       0],           // a day   — every 30 min
-    [7 * 86400,    3 * 3600,   7200],        // a week  — 01:00 MYT, then every 3 hours
-    [30 * 86400,   12 * 3600,  28800],       // a month — 04:00 and 16:00 MYT
-    [365 * 86400,  7 * 86400,  374400],      // a year  — Monday 16:00 MYT
+    [6 * 3600,     0,          0],           // 6 hours  — every frame we have
+    [24 * 3600,    1800,       0],           // a day    — every 30 min
+    [7 * 86400,    3 * 3600,   7200],        // a week   — 01:00 MYT, then every 3 hours
+    [30 * 86400,   12 * 3600,  28800],       // a month  — 04:00 and 16:00 MYT
+    [60 * 86400,   86400,      28800],       // 2 months — 16:00 MYT daily
+    [182 * 86400,  7 * 86400,  374400, [0, 3 * 86400]],  // 6 months — Monday and Thursday 16:00 MYT
+    [365 * 86400,  7 * 86400,  374400],      // a year   — Monday 16:00 MYT
 ];
+
+/* The slot a frame answers for: the next target at or after it. Targets are `anchor + k * step + o`
+   for each offset `o` in `$at`. A frame exactly on a target answers for that target. With `$at` at
+   `[0]` this is `ceil((ts - anchor) / step)`. `thin()` in js/timeline.js is the same expression. */
+function shotSlot(int $ts, int $step, int $anchor, array $at): int {
+    $k = intdiv($ts - $anchor, $step);
+    $r = $ts - $anchor - $k * $step;
+    foreach ($at as $j => $o) if ($r <= $o) return $k * count($at) + $j;
+    return ($k + 1) * count($at);
+}
 
 /* --- the archive ---------------------------------------------------------------------------------
  * One directory per camera, one file per frame, named by the unix second it was captured. No index
@@ -206,8 +224,9 @@ function encodeShot(string $raw, bool $webp = true): ?array {
     return $webp && strlen($webp) < strlen($raw) ? [$webp, 'webp'] : [$raw, 'jpg'];
 }
 
-/* Thin one camera's archive down to SHOT_TIERS. Bucket keys carry their step, or two tiers dividing
-   by different numbers land on the same integer and delete each other's frames. The slot a frame
+/* Thin one camera's archive down to SHOT_TIERS. Bucket keys carry their tier, or two tiers land on
+   the same integer and delete each other's frames. The step alone is not enough: the 6-month and
+   the year tiers share a weekly step and an anchor. The slot a frame
    answers for is the **next target at or after it**, so the frame left standing is the last one
    taken before that target — the river as of 16:00, not the nearest picture to 16:00. With frames
    at 15:24 and 16:10 the nearest is 16:10, a photograph from after the moment it is labelled with.
@@ -217,12 +236,11 @@ function pruneShots(int $id, int $now): void {
     $keep = [];
     foreach (shotList($id) as $ts) {
         $age = $now - $ts;
-        $step = $anchor = null;
-        foreach (SHOT_TIERS as [$maxAge, $every, $at]) if ($age <= $maxAge) { [$step, $anchor] = [$every, $at]; break; }
-        if ($step === null) { @unlink(shotFile($id, $ts)); continue; }   // past the last tier
-        // intdiv(x + step - 1, step) is ceil() on positives: a frame lands on the target it precedes,
-        // and a frame exactly on a target answers for that target rather than the one after it.
-        $b = $step ? "$step:" . intdiv($ts - $anchor + $step - 1, $step) : "0:$ts";
+        $tier = null;
+        foreach (SHOT_TIERS as $i => $row) if ($age <= $row[0]) { $tier = $i; break; }
+        if ($tier === null) { @unlink(shotFile($id, $ts)); continue; }   // past the last tier
+        [, $step, $anchor] = SHOT_TIERS[$tier];
+        $b = "$tier:" . ($step ? shotSlot($ts, $step, $anchor, SHOT_TIERS[$tier][3] ?? [0]) : $ts);
         if (isset($keep[$b])) @unlink(shotFile($id, $keep[$b]));
         $keep[$b] = $ts;
     }

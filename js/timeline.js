@@ -20,14 +20,14 @@ import { camWarn } from './popup.js';
 import { askJson } from './ask.js';
 
 /* Named windows rather than a free zoom. The retention tiers mean the archive is *already* a set of
-   resolutions — half-hourly for a day, then 3-hourly, then 12-hourly, then weekly — so a continuous
+   resolutions — half-hourly for a day, then 3-hourly, 12-hourly, daily, twice a week, then weekly — so a continuous
    zoom would promise detail that is not on disk between the stops. These are the stops.
    `step` is that tier's spacing and the playback *thins to it*: retention works on a frame's age, so
    a week window holds six days of 3-hourly frames and then 48 half-hourly ones at the near end, and
    playing the lot spends most of the clip on the last day. The window says "a week"; the clip has to
    move through it at one pace — and the tick strip is drawn off the same thinned list, so the
    ruler's spacing and the clip's spacing cannot disagree.
-   Every step is picked so its window lands near 50 frames: 48, 56, 60, 52. That is a clip of about a
+   Every step is picked so its window lands near 50 frames: 48, 56, 60, 60, 52, 52. That is a clip of about a
    minute at one frame a second, the same weight of thing to sit through whichever range is chosen —
    and it means a range and its tier are one decision, so `SHOT_TIERS` cannot be loosened without a
    range going thin and short.
@@ -42,13 +42,20 @@ import { askJson } from './ask.js';
    grid as well would be stating twice what a reader can read once. */
 /* `label` is the resting word, `long` and `every` are what the *chosen* segment says instead — the
    pace was a caption line of its own under the controls, which is a whole row of chrome to state a
-   fact about one of five buttons. On the button it costs nothing and cannot be read against the
+   fact about one of six buttons. On the button it costs nothing and cannot be read against the
    wrong range. */
+/* The pace words are short because six ranges share one track. `24 hours, 30 minutes per frame`
+   beside five other labels measured 399px on a 360px phone, against a 320px box. The words below,
+   with the phone padding in css/chrome.css, measure 313px at the widest. */
 const RANGES = [
-  { label: '24 h',  long: '24 hours', win: 24 * 3600,   step: 1800,      anchor: 0,      every: '30 minutes per frame' },
-  { label: 'week',  long: 'week',     win: 7 * 86400,   step: 3 * 3600,  anchor: 7200,   every: '3 hours per frame' },
-  { label: 'month', long: 'month',    win: 30 * 86400,  step: 12 * 3600, anchor: 28800,  every: '12 hours per frame' },
-  { label: 'year',  long: 'year',     win: 365 * 86400, step: 7 * 86400, anchor: 374400, every: '1 week per frame' },
+  { label: '24 h',  long: '24 hours', win: 24 * 3600,   step: 1800,      anchor: 0,      every: 'every 30 min' },
+  { label: 'week',  long: 'week',     win: 7 * 86400,   step: 3 * 3600,  anchor: 7200,   every: 'every 3 h' },
+  { label: 'month', long: 'month',    win: 30 * 86400,  step: 12 * 3600, anchor: 28800,  every: 'every 12 h' },
+  { label: '2 mo',  long: '2 months', win: 60 * 86400,  step: 86400,     anchor: 28800,  every: 'daily' },
+  // `at` is SHOT_TIERS' fourth element: two targets a week, Monday and Thursday 16:00 MYT.
+  { label: '6 mo',  long: '6 months', win: 182 * 86400, step: 7 * 86400, anchor: 374400, at: [0, 3 * 86400],
+    every: 'Mon and Thu' },
+  { label: 'year',  long: 'year',     win: 365 * 86400, step: 7 * 86400, anchor: 374400, every: 'weekly' },
 ];
 /* One frame a second. Not an animation frame rate — consecutive frames here are 30 minutes to a week
    apart, so nothing on screen is continuous with what preceded it and there is no motion to smooth.
@@ -239,10 +246,14 @@ NARROW.onchange = () => paint();
    A slot holding nothing is simply absent, which is what "the closest frame" means on an archive
    with gaps — it needs no tolerance of its own. Ascending in, ascending out: slots are visited in
    order, and re-setting a Map key does not move it. */
-function thin(list, step, anchor) {
+function thin(list, step, anchor, at = [0]) {
   const keep = new Map();
-  // (x + step - 1) / step floored is ceil() on positives: a frame lands on the target it precedes.
-  for (const ts of list) keep.set(Math.floor((ts - anchor + step - 1) / step), ts);
+  // shotSlot() in shots.php: the first target at or after the frame, so it lands on the one it precedes.
+  for (const ts of list) {
+    const k = Math.floor((ts - anchor) / step), r = ts - anchor - k * step;
+    const j = at.findIndex(o => r <= o);
+    keep.set(j < 0 ? (k + 1) * at.length : k * at.length + j, ts);
+  }
   return [...keep.values()];
 }
 
@@ -284,7 +295,7 @@ function drawTicks() {
 function setRange(r) {
   range = r;
   const cut = Date.now() / 1000 - r.win;
-  frames = thin(all.filter(ts => ts >= cut), r.step, r.anchor);
+  frames = thin(all.filter(ts => ts >= cut), r.step, r.anchor, r.at);
   t1 = Date.now() / 1000;            // the extra slot is "live", and it sits at now
   t0 = frames[0] ?? cut;
   scrub.min = t0;

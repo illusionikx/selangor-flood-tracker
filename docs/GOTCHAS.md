@@ -185,8 +185,11 @@ frames only exist because we ran when they were taken. To re-test the capture pa
   to 16:00 is 16:10. A picture taken after the time it is labelled with is the one thing this must
   not do. `thin()` in `js/timeline.js` repeats the same expression and the same numbers. So the ruler
   and the clip cannot file one frame in two slots. Week aims at 01:00 MYT, month at 04:00 and 16:00,
-  year at Monday 16:00. The three nest, so a frame keeps hitting its target as it ages between
-  tiers. The old rule bucketed on `floor(ts / step)`, which aligns to **UTC** midnight. At +8 that
+  2 months at 16:00 daily, 6 months at Monday and Thursday 16:00, and year at Monday 16:00. They
+  nest, so a frame keeps hitting its target as it ages between tiers. The 6-month grid is uneven,
+  so its row carries a fourth element, the offsets inside one week. `shotSlot()` and `thin()` both
+  read it. The bucket key carries the tier index, because the 6-month and year tiers share a step
+  and an anchor. The old rule bucketed on `floor(ts / step)`, which aligns to **UTC** midnight. At +8 that
   put the week range on 01:30, and the month on 07:30 and 19:30. It put the year on a Thursday.
   Change an anchor in one file only and the two sides disagree about where a slot starts.
   `shots-test.php` asserts each anchor against `time()` — **never against the epoch**. Malaysia ran

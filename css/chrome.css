@@ -3938,12 +3938,12 @@ body.side #side { display: flex; }
   width: 13px; height: 13px; border: 0; border-radius: 50%;
   background: var(--accent); box-shadow: 0 0 0 1px #0006;
 }
-/* One control, not five buttons. These are mutually exclusive — picking a range unpicks the others —
+/* One control, not six buttons. These are mutually exclusive — picking a range unpicks the others —
    and as separate outlined pills each looked independently pressable, with nothing in the row saying
    only one could ever be on. A single sunken track with the current segment filled says it in the
-   shape: the selection moves *along* the control rather than lighting up one of five. Sized to its
+   shape: the selection moves *along* the control rather than lighting up one of six. Sized to its
    content rather than stretched, so it reads as one object rather than a row the width of the
-   dialog. The chosen segment grows to hold its pace — `24 hours, 30 minutes per frame` — so the
+   dialog. The chosen segment grows to hold its pace — `24 hours, every 30 min` — so the
    control changes width as it is used, which is also what says the selection is inside it.
    The app menu's theme picker is the same control with the same argument — three exclusive choices,
    one of which is on. `.seg` and `.seg label` were grouped in here while the app menu drew a theme
@@ -4046,9 +4046,10 @@ body.side #side { display: flex; }
      control bar is a strip under the frame rather than an overlay on it. */
   #lightbox img { max-width: 100%; max-height: 50vh; }
   /* Tighter segments rather than a wrapping row: a segmented control that wraps to two lines stops
-     looking like one track and is the reason this no longer wraps at all. Five labels at this
-     padding measure ~242px, inside the ~320px a 360px phone leaves after the dialog's own padding. */
-  .tlr { padding: 5px 9px; }
+     looking like one track and is the reason this no longer wraps at all. Six ranges at this
+     padding measure 261 to 313px, inside the 320px a 360px phone leaves after the dialog's own
+     padding. At 9px the widest measured 340px. */
+  .tlr { padding: 5px 5px; }
 }
 /* A JPS still is fetched through our proxy and can take seconds. Without this the dialog opens on
    an empty box, which reads as "the camera is dead" rather than "wait".

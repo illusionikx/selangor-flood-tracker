@@ -76,28 +76,33 @@ hard cut at one year, so the last tier deletes as fast as capture adds:
 | age | frames per camera | archive |
 |---|---|---|
 | 1 day | 48 | 1.1 GB |
-| 7 days | 72 | 1.6 GB |
-| 30 days | 118 | 2.6 GB |
-| 90 days | 126 | 2.8 GB |
-| **1 year** | **165** | **3.7 GB** |
-| 2 years | 165 | 3.7 GB — flat, for ever |
+| 7 days | 96 | 2.1 GB |
+| 30 days | 142 | 3.1 GB |
+| 60 days | 172 | 3.8 GB |
+| 182 days | 207 | 4.6 GB |
+| **1 year** | **233** | **5.1 GB** |
+| 2 years | 233 | 5.1 GB, flat |
 
-Most of it lands in the first month; the next eleven add under a gigabyte, because past 30 days you
-are keeping one frame a week. Scale at **~40 MB per camera per year** if JPS publishes more.
+Most of it lands in the first two months. The next ten add about 1.3 GB, because past 60 days the
+archive keeps two frames a week, then one. Scale at about 57 MB per camera per year if JPS publishes
+more. The 2-month and 6-month tiers arrived on 2026-11-03 and added about 1.4 GB. See "Two more
+ranges" in `docs/FEATURES.md`.
 
 Where the frames actually are, which is what decides which knob is worth turning:
 
 | window | frames | share |
 |---|---|---|
-| < 6 h | 12 | 7% |
-| 6–24 h | 36 | 21% |
-| 1–7 d | 24 | 14% |
-| 7–30 d | 46 | 27% |
-| 30 d – 1 y | 47 | 28% |
+| < 6 h | 12 | 5% |
+| 6–24 h | 36 | 15% |
+| 1–7 d | 48 | 21% |
+| 7–30 d | 46 | 20% |
+| 30–60 d | 30 | 13% |
+| 60–182 d | 35 | 15% |
+| 182 d – 1 y | 26 | 11% |
 
-**55% of the archive is older than a week** — the part nobody scrubs — while the 6-hour replay the
-feature exists for is 7% of it. So if it ever needs to be smaller, thin the tail (`SHOT_TIERS`:
-month → 24 h, year → 14 d) for −28% that nobody will notice, or drop `SHOT_W` to 1024 for −45% of
+**59% of the archive is older than a week**, while the 6-hour replay the feature exists for is 5% of
+it. So if it ever needs to be smaller, thin the tail first. Each tier past 30 days backs one range
+in the camera viewer, so thinning one shortens that range's clip. Or drop `SHOT_W` to 1024 for −45% of
 sharpness. **Do not reach for `SHOT_EVERY`**: an hour instead of 30 minutes saves 15% of disk and
 halves the density of the 6-hour replay, which is the worst trade on the table.
 

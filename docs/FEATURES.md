@@ -1391,6 +1391,8 @@ rather than being filed once and forgotten:
 | ≤ 24 h | one per 30 min | — | 48 |
 | ≤ 7 days | one per 3 h | 01:00, then every 3 hours | 56 |
 | ≤ 30 days | one per 12 h | 04:00 and 16:00 | 60 |
+| ≤ 60 days | one per day | 16:00 | 60 |
+| ≤ 182 days | two per week | Monday and Thursday 16:00 | 52 |
 | ≤ 1 year | one per week | Monday 16:00 | 52 |
 | older | deleted | — | — |
 
@@ -1474,6 +1476,38 @@ through untouched and one that has not is thinned the way it eventually will be 
 *Cost accepted:* the near end of a wide range shows fewer frames than exist. That is the trade the
 ranges are for — the 24 h stop is there to see everything — and a clip that changes pace half way
 through is not a timeline, it is two.
+
+### Two more ranges: 2 months and 6 months
+
+The repository owner asked for both on 2026-11-03. The 2-month range plays one frame a day, at
+16:00 MYT, which is 60 frames. The 6-month range plays two frames a week, on Monday and Thursday at
+16:00 MYT, which is 52 frames. Each range has its own retention tier in `SHOT_TIERS`, because a range
+can only play what the archive keeps.
+
+The 6-month grid is not evenly spaced. Monday to Thursday is three days and Thursday to Monday is
+four. So a tier row takes an optional fourth element, a list of offsets inside one step. That row
+is a weekly step aimed at Monday 16:00, with offsets `[0, 3 * 86400]`. `shotSlot()` in `shots.php`
+and `thin()` in `js/timeline.js` read the offsets the same way. A row without the list behaves as
+before.
+
+The bucket key in `pruneShots()` now carries the tier index, not the step. The 6-month tier and the
+year tier share a weekly step and an anchor, so a key made from the step put both in one bucket.
+
+The targets nest. 16:00 daily is on the 12-hour grid. Monday and Thursday 16:00 are on the daily
+grid. Monday 16:00 is on all of them. So a frame keeps its target as it ages from tier to tier.
+
+The pace words on the chosen range button became short: `every 30 min`, `daily`, `Mon and Thu`.
+Six ranges with the old words measured 399px on a 360px phone, in a 320px box. The phone padding on
+a range button also fell from 9px to 5px. The widest range now measures 313px.
+
+Costs accepted:
+
+- The archive grows from about 165 frames a camera to about 233. That is about 5.1 GB for 90
+  cameras, against 3.7 GB before.
+- Frames older than 30 days were already thinned to one a week before this change. So the two new
+  ranges fill in over time. The 2-month range is complete 60 days after the deploy. The 6-month
+  range is complete after 182 days.
+- A range button on a phone is narrower, so its touch target is smaller.
 
 **The pace is written under the control** — `one frame every 3 hours`, and nothing else. Every range
 plays at a frame a second, so while running they look identical and differ only in what each second

@@ -44,7 +44,8 @@ $kept = shotList(TEST_ID);
 // Per tier: how many frames survived, and what the tier's own rule says there should be.
 $band = fn(int $age) => $age <= 6 * 3600 ? '6h'
     : ($age <= 86400 ? '24h' : ($age <= 7 * 86400 ? 'week'
-    : ($age <= 30 * 86400 ? 'month' : 'year')));
+    : ($age <= 30 * 86400 ? 'month' : ($age <= 60 * 86400 ? '2mo'
+    : ($age <= 182 * 86400 ? '6mo' : 'year')))));
 $n = [];
 foreach ($kept as $t) $n[$band($now - $t)] = ($n[$band($now - $t)] ?? 0) + 1;
 
@@ -54,24 +55,28 @@ printf("  %d frames -> %d (%s)\n", $before, count($kept),
 /* Spacing, not a count. A count is a magic number that has to be recomputed by hand every time a
    tier moves, and it is off by one wherever a frame lands exactly on a tier boundary — which says
    nothing about whether the rule works. The interval between surviving neighbours *is* the rule. */
-$gap = function (string $tier, int $step) use ($kept, $now, $band, $ok) {
+/* `$steps` holds every gap the tier's grid allows. The Monday-and-Thursday tier allows two: three
+   days and four. */
+$gap = function (string $tier, int ...$steps) use ($kept, $now, $band, $ok) {
     $in = array_values(array_filter($kept, fn($t) => $band($now - $t) === $tier));
     $gaps = [];
     for ($i = 1; $i < count($in); $i++) $gaps[] = $in[$i] - $in[$i - 1];
-    /* Every gap is the tier's step except one — the handover, where the frame nearest the boundary
-       is whatever the *finer* tier left standing, so it lands short. One short gap per tier is
-       correct; two means a bucket was miscounted, and any gap longer than the step means a frame
+    /* Every gap is one the grid allows except one — the handover, where the frame nearest the
+       boundary is whatever the *finer* tier left standing, so it lands short. One short gap per tier
+       is correct; two means a bucket was miscounted, and any gap longer than the step means a frame
        that should have survived was deleted. */
-    $short = count(array_filter($gaps, fn($g) => $g < $step));
-    $ok(sprintf('%-5s keeps one per %-3s (%d frames)', $tier, $step >= 86400
-        ? $step / 86400 . 'd' : $step / 3600 . 'h', count($in)),
-        $gaps && max($gaps) === $step && $short <= 1);
+    $off  = count(array_filter($gaps, fn($g) => !in_array($g, $steps, true)));
+    $name = implode('/', array_map(fn($s) => $s >= 86400 ? $s / 86400 . 'd' : $s / 3600 . 'h', $steps));
+    $ok(sprintf('%-5s keeps one per %-5s (%d frames)', $tier, $name, count($in)),
+        $gaps && max($gaps) === max($steps) && $off <= 1);
 };
 // The capture rate is 30 min, so the first two tiers keep everything they are given.
 $gap('6h',    1800);
 $gap('24h',   1800);
 $gap('week',  3 * 3600);
 $gap('month', 12 * 3600);
+$gap('2mo',   86400);
+$gap('6mo',   3 * 86400, 4 * 86400);
 $gap('year',  7 * 86400);
 $ok('nothing older than a year survives',  $now - min($kept) <= 365 * 86400);
 $ok('no frame kept twice',                 count($kept) === count(array_unique($kept)));
@@ -117,14 +122,25 @@ date_default_timezone_set('Asia/Kuala_Lumpur');
 $AIM = [
     2 => ['week',  '01:00, then every 3 hours', fn(int $t) => date('i', $t) === '00' && (int)date('G', $t) % 3 === 1],
     3 => ['month', '04:00 and 16:00',           fn(int $t) => date('i', $t) === '00' && in_array((int)date('G', $t), [4, 16], true)],
-    4 => ['year',  'Monday 16:00',              fn(int $t) => date('D H:i', $t) === 'Mon 16:00'],
+    4 => ['2mo',   '16:00 daily',               fn(int $t) => date('H:i', $t) === '16:00'],
+    5 => ['6mo',   'Monday and Thursday 16:00', fn(int $t) => in_array(date('D H:i', $t), ['Mon 16:00', 'Thu 16:00'], true)],
+    6 => ['year',  'Monday 16:00',              fn(int $t) => date('D H:i', $t) === 'Mon 16:00'],
 ];
+// Every target in the current step, so a tier with two offsets has both of them asserted.
 foreach ($AIM as $i => [$name, $desc, $want]) {
     [, $step, $anchor] = SHOT_TIERS[$i];
-    $slot = intdiv(time() - $anchor + intdiv($step, 2), $step);
-    $t    = $anchor + $slot * $step;
-    $ok(sprintf('%-5s aims at %-26s (this slot: %s)', $name, $desc, date('D j M Y H:i', $t)), $want($t));
+    foreach (SHOT_TIERS[$i][3] ?? [0] as $o) {
+        $t = $anchor + intdiv(time() - $anchor, $step) * $step + $o;
+        $ok(sprintf('%-5s aims at %-26s (this slot: %s)', $name, $desc, date('D j M Y H:i', $t)), $want($t));
+    }
 }
+// The slot function itself, on the uneven grid: Tuesday answers for Thursday, Friday for next Monday.
+[, $s6, $a6, $o6] = SHOT_TIERS[5];
+$mon = $a6 + intdiv($now - $a6, $s6) * $s6;
+$ok('a Monday frame answers for Monday',   shotSlot($mon, $s6, $a6, $o6) === shotSlot($mon - 3600, $s6, $a6, $o6));
+$ok('a Tuesday frame answers for Thursday', shotSlot($mon + 86400, $s6, $a6, $o6) === shotSlot($mon + 3 * 86400, $s6, $a6, $o6));
+$ok('a Friday frame answers for next Monday', shotSlot($mon + 4 * 86400, $s6, $a6, $o6) === shotSlot($mon + 7 * 86400, $s6, $a6, $o6));
+$ok('Monday and Thursday are two slots',    shotSlot($mon, $s6, $a6, $o6) + 1 === shotSlot($mon + 3 * 86400, $s6, $a6, $o6));
 $ok('the 6h and 24h tiers take no anchor', SHOT_TIERS[0][2] === 0 && SHOT_TIERS[1][2] === 0);
 
 /* A slot keeps the last frame taken *before* its target — the state as of that moment, not the
