@@ -4,7 +4,7 @@ import { KINDS, MAST, camSrc, FEED, FEED_WX, STATIC, NEAR_MAX_KM, NOTICE, NOTICE
        } from './config.js';
 import { state, PREFS, PREFS_KEY, save } from './state.js';
 import { el, distKm, ignoredIds, leads, favIds, isFav, squash, termsOf, matches, esc,
-         warnWhen, snack } from './util.js';
+         warnWhen, snack, pushState } from './util.js';
 import { setTheme, applyTheme, flashTo, fitMarks, closeSide, showPlace, side, railSync } from './map.js';
 import { showHere } from './locate.js';
 import { syncHeat, heatOpacity, HEAT_OPACITY } from './heat.js';
@@ -283,6 +283,82 @@ faulty.onchange = () => {
   render(); alerts(); ticker();
 };
 
+/* **Notifications**, on the repository owner's instruction of 2026-11-04. The preference writes every
+   box and never the reverse, for the reason the wash above states. js/push.js is deferred: it loads
+   when a reader turns the master on, and on landing when they already have (js/app.js).
+   **A row names a threshold, not a level.** "At warning" means warning or worse, so a warning row
+   turns its danger row on and locks it. The server applies the same rule in pushDoc().
+   **The master can be on and do nothing**, because every row defaults to off. The master's
+   supporting line says so rather than leave a reader with a switch that is on and silent. */
+const PUSH_KEYS = ['favWarn', 'favDanger', 'anyWarn', 'anyDanger'];
+const pushBox = k => el('push' + k[0].toUpperCase() + k.slice(1));
+PREFS.push = { on: false, favWarn: false, favDanger: false, anyWarn: false, anyDanger: false, ...PREFS.push };
+
+function syncPush() {
+  const p = PREFS.push, st = pushState(), master = el('pushOn');
+  master.checked = p.on && st === 'ok';
+  master.disabled = st !== 'ok';
+  el('pushOnNote').textContent =
+      st === 'denied'      ? 'Blocked in the browser’s site settings.'
+    : st === 'unsupported' && /iP(hone|ad|od)/.test(navigator.userAgent) ? 'Needs the installed app.'
+    : st !== 'ok'          ? 'Not available in this browser.'
+    : master.checked && !PUSH_KEYS.some(k => p[k]) ? 'Turn on a row below to choose what wakes this phone.'
+    : 'Reaches this phone while the app is closed.';
+  master.closest('.msw').classList.toggle('on', master.checked);
+  for (const k of PUSH_KEYS) {
+    const b = pushBox(k), locked = (k === 'favDanger' && p.favWarn) || (k === 'anyDanger' && p.anyWarn);
+    b.checked = p[k] || locked;
+    b.disabled = !master.checked || locked;
+    b.closest('.msw').classList.toggle('on', b.checked);
+  }
+  el('pushTest').disabled = !master.checked;
+  el('pushN').textContent = master.checked ? 'On' : 'Off';   // the main page row, the way #favN states a count
+}
+syncPush();
+// The Pages build has no server to send from. Hiding the row is enough: the subpage has no other door.
+if (STATIC) el('pushRow').closest('li').hidden = true;
+
+el('pushOn').onchange = async () => {
+  const box = el('pushOn'), want = box.checked;
+  box.disabled = true;
+  try {
+    const m = await lazy(() => import('./push.js'), box.closest('label'));
+    if (want) {
+      PREFS.push.on = await m.pushOn();
+      if (!PREFS.push.on) snack('Notifications stay off.');
+    } else {
+      await m.pushOff();
+      PREFS.push.on = false;
+    }
+    save();
+  } catch (e) {
+    if (!want) { PREFS.push.on = false; save(); }   // the browser unsubscribed even if the server was out of reach
+    snack(want ? (e.status === 503 ? 'Notifications are not set up on the server.'
+                                   : 'Could not turn on notifications. Try again.')
+               : 'Notifications are off on this phone.');
+  }
+  syncPush();
+};
+for (const k of PUSH_KEYS) pushBox(k).onchange = () => {
+  PREFS.push[k] = pushBox(k).checked;
+  if (PREFS.push.favWarn) PREFS.push.favDanger = true;
+  if (PREFS.push.anyWarn) PREFS.push.anyDanger = true;
+  save();
+  syncPush();
+};
+el('pushTest').onclick = async () => {
+  const b = el('pushTest');
+  b.disabled = true;
+  snack('Sending…');
+  try {
+    await (await import('./push.js')).pushTest();
+    snack('Sent. Watch for it.');
+  } catch (e) {
+    snack(e.status === 429 ? 'Wait a minute, then try again.' : 'The test did not send.');
+  }
+  syncPush();
+};
+
 /* **Three presses in Settings destroy a list a reader built by hand, and one dialog asks about all
    three.** They are Reset settings, Remove all favorites and Stop ignoring all. A reader asked for
    the two list controls to confirm on 2026-08-25.
@@ -329,7 +405,10 @@ el('devReset').onclick = () => ask(
   'This clears the theme, the district filter, the map layers, the heatmap, the favorites and the '
   + 'ignored sensors. It cannot be undone.',
   'Reset',
-  () => { localStorage.removeItem(PREFS_KEY); location.reload(); });
+  /* A reset that left the push subscription behind would keep waking the phone with switches the
+     reader just cleared. So the server forgets this phone first. A failure still resets. */
+  () => (PREFS.push?.on ? import('./push.js').then(m => m.pushOff()).catch(() => {}) : Promise.resolve())
+          .finally(() => { localStorage.removeItem(PREFS_KEY); location.reload(); }));
 
 /* Seven taps on the About logo inside five seconds. A rolling window of the last seven timestamps
    rather than a counter and a timer: there is no interval to arm, clear or leak, and the gesture

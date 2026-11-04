@@ -191,7 +191,11 @@ function late() {
    progress bar over a wait we cannot measure would be a lie the user has no way to check. */
 const say = m => { if (!el('splash').classList.contains('gone')) el('splashMsg').textContent = m; };
 
-export async function load() {
+/* Returns true when a poll landed and false when it failed, so a caller can tell. js/app.js stamps the
+   time of the last good poll from this, and a failed poll must not count as one. `budget` is the
+   timeout in milliseconds for a poll that is not the first. A tab that wakes after a long sleep passes
+   a larger one, because the server cache is cold by then and a rebuild measured 36.5 s. */
+export async function load(budget = 20000) {
   const first = !el('splash').classList.contains('gone');
   let slow, slower;
   /* Draws the poll bar on the map card, see `#map::before` in css/chrome.css. Never on the first
@@ -210,7 +214,7 @@ export async function load() {
     /* A longer budget on the first load than on a poll. A cold rebuild measured 36.5 s, and a
        server kept warm by cron answers in 0.08 s. No `cache` option: the server sends an ETag, so
        an unchanged poll is a 304 of about 200 bytes, and `no-store` would throw that away. */
-    const j = await askJson(FEED, { ms: first ? 45000 : 20000 });
+    const j = await askJson(FEED, { ms: first ? 45000 : budget });
     clearTimeout(slow); clearTimeout(slower);
     if (first) say('Reading water levels, rainfall, sirens and cameras…');
     /* askJson() already threw on any status outside 200 to 299, so reaching this line means the
@@ -245,6 +249,7 @@ export async function load() {
     // other way would close the cycle. ui.js repaints the Developer table only while it is on
     // screen, the same rule openSide() already follows for the station panel.
     document.dispatchEvent(new Event('poll'));
+    return true;
   } catch (e) {
     clearTimeout(slow); clearTimeout(slower);
     network(null, e.message);
@@ -259,6 +264,7 @@ export async function load() {
       el('splash').classList.add('offline');
       el('splashWarn').hidden = false;
     }
+    return false;
   } finally {
     /* Test mode holds the bar for 3 s. A warm poll ends before the bar's 400ms delay, so without
        this hold a reader never sees it. Not awaited, so Refresh now gets its answer at once. */

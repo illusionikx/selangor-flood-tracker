@@ -305,7 +305,17 @@ php shots-test.php            # one of nine runnable checks. Guards camera reten
                               # retry. Must stay green.
 php api.php --selftest       # another. Guards the force-refresh rate limit, cache choice, the
                               # place-lookup validator/rate limit, and the payload edit a warm poll
-                              # makes in the cached bytes. Must stay green, and must exit 0.
+                              # makes in the cached bytes. Also guards the push rules: which level a
+                              # station is at, which stations a phone listens to, when it hears about
+                              # one again, and the document a phone posts. Must stay green, and must
+                              # exit 0.
+
+# Push notifications, by hand. The selftest cannot reach a phone, and test mode cannot reach the
+# server. Needs https, so run it against the box, not Herd. Turn the master switch on in Settings and
+# accept the browser's question. Press "Send a test notification". The phone must buzz within a few
+# seconds, and a tap must open the alert list. Press it again inside a minute and the snackbar must
+# say to wait. Then turn the master off and make sure the row is gone:
+#   sqlite3 .history.db "select count(*) from push"
 curl -sk "https://flood-exp.test/api.php?shots=1"                          # frame timestamps
 
 # Which rain gauges are claiming rain their own odometer denies. The siren sweep below is the same

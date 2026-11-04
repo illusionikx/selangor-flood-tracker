@@ -82,3 +82,38 @@ self.addEventListener('fetch', e => {
       .catch(() => caches.match(e.request)),
   );
 });
+
+/* **A third job, added with push notifications.** The server sends one JSON message per phone per
+   poll: `{ title, body, image, url, tag }`. See pushBody() in push.php.
+   `userVisibleOnly` is the promise the browser holds this worker to: every push must show something.
+   So a message that does not parse still shows a notification, and never nothing.
+   `url` and `image` arrive relative to the app, and a worker can sit at any path, so both resolve
+   against the registration scope. `renotify` makes a replacement under the same `tag` buzz again. */
+const at = u => new URL(u, self.registration.scope).href;
+
+self.addEventListener('push', e => {
+  let p;
+  try { p = e.data.json(); } catch { p = { title: 'Klang Valley Flood Watch', body: 'Open the app for details.' }; }
+  e.waitUntil(self.registration.showNotification(p.title, {
+    body: p.body, tag: p.tag, renotify: true,
+    icon: at('icon-192.png'), badge: at('icon-192.png'),
+    ...(p.image ? { image: at(p.image) } : {}),
+    data: { url: at(p.url || '#alerts') },
+  }));
+});
+
+/* A tap focuses a window of this app if one is open, and opens one if not. The `url` carries a hash
+   (`#station=wl-1` or `#alerts`), and navigating an open window to a URL that differs only in its
+   hash fires `hashchange` without a reload. js/app.js reads the hash on landing and on that event. */
+self.addEventListener('notificationclick', e => {
+  e.notification.close();
+  const url = e.notification.data?.url || self.registration.scope;
+  e.waitUntil(clients.matchAll({ type: 'window', includeUncontrolled: true }).then(all => {
+    const mine = all.find(c => c.url.startsWith(self.registration.scope));
+    /* `navigate()` rejects for a window this worker does not control, such as a tab opened by a hard
+       reload, which `includeUncontrolled` still lists. Without the catch the tap closed the
+       notification and did nothing. A new window is the fallback. */
+    return mine ? mine.navigate(url).then(c => (c || mine).focus()).catch(() => clients.openWindow(url))
+                : clients.openWindow(url);
+  }));
+});

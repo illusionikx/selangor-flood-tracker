@@ -18,6 +18,8 @@ shots/
 .php-error.log
 .client-errors.log
 .watch.state
+.vapid.json
+.pushtest.stamp
 .claude/settings.local.json
 
 # The build output. `node build.mjs` writes it, and a deploy publishes it.

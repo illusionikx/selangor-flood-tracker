@@ -2153,6 +2153,45 @@ async function desktop() {
       is(cs(btn).cursor, 'pointer', id + ': which a pressable row states');
     }
 
+    /* --- Notifications, on the repository owner's instruction of 2026-11-04 ---
+       A subpage, opened by one row of the Alerts group. One master, four thresholds, then a test row,
+       in three groups. Five M3 switches, the same component as test mode, and the test row is an
+       action and carries no switch. Default is off for all five, and the four thresholds are dead
+       while the master is off. The subpage is opened for the measurements and closed after them. */
+    const pushRow = d.getElementById('pushRow');
+    is(pushRow.closest('#alertSetList') && pushRow.dataset.page, 'setPush',
+       'notifications: a row in the Alerts group opens the subpage');
+    is(d.getElementById('pushN').textContent, 'Off', 'notifications: and the row states Off while it is off');
+    pushRow.click();
+    await settled();
+    const pl = d.getElementById('setPush');
+    is(pl.hidden, false, 'notifications: the subpage shows');
+    is(d.getElementById('settingsTitle').textContent, 'Notifications', 'notifications: under its own title');
+    is([...pl.querySelectorAll('li')].map(x => x.querySelector('input, button')?.id).join(','),
+       'pushOn,pushFavWarn,pushFavDanger,pushAnyWarn,pushAnyDanger,pushTest',
+       'notifications: master, four thresholds, then the test row');
+    is([...pl.querySelectorAll('ul')].map(u => u.children.length).join(','), '1,4,1',
+       'notifications: in three groups, so the master and the test stand apart from the thresholds');
+    is(pl.querySelectorAll('.msw').length, 5, 'notifications: five M3 switches');
+    is(d.getElementById('pushTest').closest('li').querySelector('.msw'), null,
+       'notifications: the test row is an action and holds no switch');
+    is(d.getElementById('pushTest').classList.contains('mrow'), true,
+       'notifications: the test row is a row-filling action');
+    is(['pushOn', 'pushFavWarn', 'pushFavDanger', 'pushAnyWarn', 'pushAnyDanger']
+         .every(id => d.getElementById(id).checked === false), true,
+       'notifications: all five default to off, so nothing can be on at install');
+    is(['pushFavWarn', 'pushFavDanger', 'pushAnyWarn', 'pushAnyDanger']
+         .every(id => d.getElementById(id).disabled), true,
+       'notifications: the four thresholds are dead while the master is off');
+    is(d.getElementById('pushTest').disabled, true, 'notifications: and so is the test row');
+    is([...pl.querySelectorAll('input')].every(i => i.autocomplete === 'off'), true,
+       'notifications: every box carries autocomplete off, because a preference owns it');
+    is(Math.round(r(pl.querySelector('.msw')).width) + ',' + Math.round(r(pl.querySelector('.msw')).height),
+       '68,48', 'notifications: each switch is the 68x48 touch target');
+    d.getElementById('settingsBack').click();
+    await settled();
+    is(pl.hidden, true, 'notifications: the back arrow returns to the main page');
+
     const sh = sb.querySelector('h3');
     is(cs(sh).fontSize, tok('--md-sys-typescale-title-small-size'),
        'settings subheader: M3 list subheader at title-small');

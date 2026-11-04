@@ -20,6 +20,9 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `sources.php` | scrapers for the two HTML-only upstreams (national portal, JPS WP) and the three MET feeds (nowcast, forecast, warning). Also the national portal's rainfall table, gazetteer and 7-day history endpoints. Also the two JPS notice parsers: the MET mirror, the flood alert |
 | `shots.php` | camera archive: capture, retention tiers, lookup, and the on-request strip (`buildSheet()`) the wall and the clip play. Required by `api.php` |
 | `shots-test.php` | `php shots-test.php` — one of nine runnable checks. Guards retention. Exercises `pruneShots()` |
+| `push.php` | push notifications, the server half. Pure rules (`pushLevel`, `pushMatch`, `pushDiff`, `pushDoc`) that `--selftest` runs offline, the body builder, and `pushSend()`, which runs at the end of a refresh BEFORE `captureShots()`. Required by `api.php`. See "Push notifications" in `docs/FEATURES.md` |
+| `push-keys.php` | `php push-keys.php` — makes the VAPID key pair once, into `.vapid.json` (gitignored, excluded from the rsync). Refuses to run twice, because a new pair cuts off every subscribed phone. Run by hand, never in a request |
+| `js/push.js` | push notifications, the browser half. Deferred. Subscribes, posts the switches and the two lists to `?push=1`, and sends the test. `js/ui.js` owns the Settings subpage (`#setPush`, opened from the Alerts group) and `sw.js` shows the message |
 | `log.php` | where a browser error lands. `js/oops.js` is the only caller. Appends one JSON line to `.client-errors.log` |
 | `watch.php` | reads a payload on stdin and complains when it is wrong. The poll cron pipes into it. Reports a change of state, never a state |
 | `.user.ini` | per-directory PHP settings. Holds one line, `session.auto_start=0`, and the reason it is there |
@@ -360,6 +363,14 @@ coordinate. See "KL cameras" in `docs/FEATURES.md`.
   uses. A missing or unreadable row degrades to `{"points":[]}` rather than a broken response. The
   body carries an `ETag`. MET reissues about every 30 minutes, against a poll every 8.5. So most
   polls cost one 304 rather than the full body.
+- **`?push=key`, `?push=1` and `?push=test` — Web Push.** The public key, a phone's subscription with
+  its four switches and two lists, and one test send. `?push=1` is a public POST that writes to
+  disk, so it takes `log.php`'s guards: POST alone, a bounded read, a document `pushDoc()` must
+  accept, and a ceiling of 500 stored rows. The sending is `pushSend()` in `push.php`, at the end of
+  a refresh and never in these handlers. **A phone's `seen` and `sent` move only after the push
+  service accepts the message**, so a failed send retries on the next tick. **An exception on one
+  phone is logged and its row kept**, because the cause can be this machine's fault, and a delete
+  on it would unsubscribe every phone.
 
 ## Colour language — do not violate
 

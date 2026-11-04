@@ -174,8 +174,8 @@ thing on the box that cannot be rebuilt.
 
 ```bash
 apt update                  # as root — a minimal LXC template has no sudo
-apt install -y nginx php-fpm php-curl php-gd php-sqlite3 php-mbstring php-xml \
-               composer git curl
+apt install -y nginx php-fpm php-curl php-gd php-sqlite3 php-mbstring php-xml php-gmp \
+               composer git curl   # php-gmp: web-push encrypts faster and logs no warning
 php -v                      # >=8.2 required; developed on 8.2, CI bakes on 8.3, Debian 13 ships 8.4
 ls /run/php/                # the FPM unit and socket are named for that version — check, don't assume
 php -m | grep -E 'gd|curl|sqlite3|dom'
@@ -520,13 +520,51 @@ cron and says nothing. That failure is the loud one, and you meet it the moment 
 The silent failures are the class this catches, and they are the ones that hide behind a green
 status dot.
 
-**To get a message on a phone**, add one line beside the `error_log()` call in `watch.php`. A push
-service such as ntfy needs no account and reaches a machine behind a home router. That contacts a
-third party from PHP alone. The browser still talks to this origin and to the basemap host, so the
-claim in the About pane holds.
+**To get a message on a phone about a flood**, use the push notifications described below. They send
+station alerts. They do not report a fault in the box. To get a message about a fault, add one line
+beside the `error_log()` call in `watch.php`. A push service such as ntfy needs no account and
+reaches a machine behind a home router. That contacts a third party from PHP alone. The browser still
+talks to this origin and to the basemap host, so the claim in the About pane holds.
 
 An external uptime service is the only thing that answers "is the whole box alive". It also needs the
 site to be reachable from the internet. Add one when this runs somewhere public, and not before.
+
+### Push notifications
+
+A phone with the app installed can get a notification while the app is closed. The feature is in
+"Push notifications" in `docs/FEATURES.md`. It needs three things on the box. The owner does these
+once, by hand, after the first deploy that carries it.
+
+1. Serve the app over https. The browser gives no notification permission to a plain http page.
+   On a tailnet, this command gives the machine's MagicDNS name a real certificate:
+
+   ```bash
+   tailscale serve --bg 80
+   ```
+
+2. Install the sender library. `composer install --no-dev` does it, and the Updating step below
+   already runs that command.
+3. Make the key pair that identifies this server to the push services. Run this command where
+   `api.php` lives:
+
+   ```bash
+   php push-keys.php --subject=https://your.host.name
+   ```
+
+   The key goes in `.vapid.json`, beside `.history.db`. The command refuses to run twice. A new pair
+   cuts off every subscribed phone, because each subscription is bound to the public key it was made
+   with. Back the file up with the database.
+
+**The https name is a different origin from the plain http address.** A phone that installed the app
+from the http address keeps its favorites and its ignored list there. Tell each user to install the
+app again from the https name. Each user must then enter both lists again.
+
+**No new cron line.** The sender runs at the end of every refresh, which the five minute cron
+already triggers. See the cron section above.
+
+**A PHP with no OpenSSL configuration cannot make the key.** A Debian install has one. PHP on
+Windows can lack one, and the symptom is `Unable to create the key`. For that one command, set
+`OPENSSL_CONF` to any readable file. An empty file is enough.
 
 ### Updating
 
@@ -534,6 +572,7 @@ site to be reachable from the internet. Add one when this runs somewhere public,
 cd /srv/flood && git pull && composer install --no-dev && npm ci && npm run build
 rsync -a --delete --exclude='shots/' --exclude='.history.db*' --exclude='.cache.json' \
       --exclude='.*.log' --exclude='.*.stamp' --exclude='.*.lock' --exclude='.watch.state' \
+      --exclude='.vapid.json' \
       site/ /srv/www/flood/
 ```
 

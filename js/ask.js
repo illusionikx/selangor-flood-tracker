@@ -18,14 +18,19 @@
  * `no-store` skips the conditional request that earns it. The force refresh sets it on purpose,
  * because defeating that cache is the whole of what that button does.
  */
-export async function askJson(url, { ms = 20000, tries = 2, cache } = {}) {
+export async function askJson(url, { ms = 20000, tries = 2, cache, method, body } = {}) {
   let last;
   for (let i = 0; i < tries; i++) {
     // A short pause before the second attempt. Long enough to outlast a dropped packet, short
     // enough that a reader waiting on the splash does not notice it.
     if (i) await new Promise(r => setTimeout(r, 400));
     try {
-      const r = await fetch(url, { signal: AbortSignal.timeout(ms), ...(cache ? { cache } : {}) });
+      const r = await fetch(url, {
+        signal: AbortSignal.timeout(ms), ...(cache ? { cache } : {}),
+        // A POST sends `body` as JSON. Only the push endpoints use it, and a retry of one is safe: a
+        // stored subscription is an upsert.
+        ...(method ? { method, body, headers: { 'Content-Type': 'application/json' } } : {}),
+      });
       if (r.ok) return await r.json();
       last = Object.assign(new Error(`HTTP ${r.status}`), { status: r.status });
       /* `break`, not `throw`. A throw here lands in this function's own catch one line below, which

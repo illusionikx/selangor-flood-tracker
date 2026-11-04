@@ -5,7 +5,8 @@
     "require": {
         "php": ">=8.2",
         "symfony/dom-crawler": "^7.0",
-        "symfony/css-selector": "^7.0"
+        "symfony/css-selector": "^7.0",
+        "minishlink/web-push": "^9.0"
     },
     "config": {
         "vendor-dir": "lib",

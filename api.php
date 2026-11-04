@@ -77,6 +77,7 @@ register_shutdown_function(function () use ($fatalJson) {
 
 require_once __DIR__ . '/sources.php';   // the two scraped upstreams (national portal + KL)
 require_once __DIR__ . '/shots.php';     // the camera archive: capture, retention, lookup
+require_once __DIR__ . '/push.php';      // push notifications: match rule, diff rule, sender
 
 const API   = 'https://infobanjirjps.selangor.gov.my/JPSAPI/api/';
 const TTL   = 300;   // upstream updates hourly; 5 min is plenty
@@ -563,6 +564,59 @@ if (isset($_GET['cam'])) {
     /* 300s = POLL_MS in js/config.js and CAM_TTL above. All three move together. */
     header('Cache-Control: max-age=' . CAM_TTL);
     echo $img;
+    exit;
+}
+
+/* ?push=key, ?push=1 and ?push=test — Web Push. The public key, a phone's subscription, and one
+   test send. The sending itself runs at the end of a refresh (pushSend() in push.php), never here.
+   The connect is caught for the reason ?place= states: Content-Type is already sent, so an uncaught
+   PDOException would put a fatal-error page inside a response a client parses as JSON.
+   This is a public POST that writes to disk. It takes the guards log.php takes: POST alone, a
+   bounded read, a body that must validate, and a ceiling on stored rows. */
+if (isset($_GET['push'])) {
+    header('Content-Type: application/json');
+    header('Cache-Control: no-store');
+    $mode = is_string($_GET['push']) ? $_GET['push'] : '';
+
+    if ($mode === 'key') {
+        $k = pushKeys();
+        if (!$k) { http_response_code(503); echo '{"key":null}'; exit; }
+        header('Cache-Control: max-age=3600');
+        echo json_encode(['key' => $k['publicKey']]);
+        exit;
+    }
+    if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST' || !in_array($mode, ['1', 'test'], true)) {
+        http_response_code(405);
+        echo '{"ok":false}';
+        exit;
+    }
+    // One byte past the cap, so pushDoc() can see an oversize body and refuse it.
+    $doc = pushDoc((string)file_get_contents('php://input', false, null, 0, PUSH_MAX_BODY + 1));
+    if (!$doc) { http_response_code(400); echo '{"ok":false}'; exit; }
+
+    if ($mode === 'test') {
+        [$ok, $why] = pushTestSend($doc);
+        http_response_code($ok ? 200 : ($why === 'rate limited' ? 429 : 503));
+        echo json_encode(['ok' => $ok]);
+        exit;
+    }
+
+    try {
+        $db = new PDO('sqlite:' . HIST, null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+        $db->exec('PRAGMA journal_mode=WAL');
+        pushTable($db);
+        pushStore($db, $doc, time());
+    } catch (\InvalidArgumentException $e) {
+        http_response_code($e->getCode() ?: 400);
+        echo '{"ok":false}';
+        exit;
+    } catch (\Throwable $e) {
+        error_log('push store: ' . $e->getMessage());
+        http_response_code(503);
+        echo '{"ok":false}';
+        exit;
+    }
+    echo '{"ok":true}';
     exit;
 }
 
@@ -1680,6 +1734,186 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
         stationUpdated([], [], 'camera', 7, $seen) === null);
     $ok('a gauge reads its own detail first',
         stationUpdated(['statusLastUpdate' => 'fg'], [], 'gauge', 7, $seen) === 'fg');
+
+    echo "\npushLevel():\n";
+    $pLive = ['online' => true, 'updated' => date('d/m/Y H:i:s', $now - 600)];
+    $ok('a river at 3 is danger',        pushLevel(['kind' => 'river', 'status' => 3] + $pLive, $now) === 'danger');
+    $ok('a river at 2 is warning',       pushLevel(['kind' => 'river', 'status' => 2] + $pLive, $now) === 'warning');
+    $ok('a rising river is warning',     pushLevel(['kind' => 'river', 'status' => 1, 'rising' => true] + $pLive, $now) === 'warning');
+    $ok('a river at 1 is nothing',       pushLevel(['kind' => 'river', 'status' => 1] + $pLive, $now) === null);
+    $ok('a sounding siren is danger',    pushLevel(['kind' => 'siren', 'status' => 1] + $pLive, $now) === 'danger');
+    $ok('a gauge at 2 is danger',        pushLevel(['kind' => 'gauge', 'status' => 2, 'depth' => 0.4] + $pLive, $now) === 'danger');
+    $ok('a gauge at 1 is warning',       pushLevel(['kind' => 'gauge', 'status' => 1, 'depth' => 0.2] + $pLive, $now) === 'warning');
+    $ok('rain class 4 is danger',        pushLevel(['kind' => 'rainfall', 'status' => 4, 'hourly' => 70] + $pLive, $now) === 'danger');
+    $ok('rain class 3 is warning',       pushLevel(['kind' => 'rainfall', 'status' => 3, 'hourly' => 40] + $pLive, $now) === 'warning');
+    $ok('a camera is nothing',           pushLevel(['kind' => 'camera'] + $pLive, $now) === null);
+    $ok('a faulty reading is nothing',   pushLevel(['kind' => 'siren', 'status' => 1, 'backed' => false] + $pLive, $now) === null);
+    $ok('an offline station is nothing', pushLevel(['kind' => 'river', 'status' => 3, 'online' => false,
+                                                    'updated' => $pLive['updated']], $now) === null);
+    $ok('a stale reading is nothing',    pushLevel(['kind' => 'river', 'status' => 3, 'online' => true,
+                                                    'updated' => date('d/m/Y H:i:s', $now - 90000)], $now) === null);
+
+    echo "\npushMatch():\n";
+    $pLv  = ['wl-1' => 'danger', 'wl-2' => 'warning', 'wl-3' => 'danger'];
+    $pOff = ['favWarn' => false, 'favDanger' => false, 'anyWarn' => false, 'anyDanger' => false];
+    $ok('nothing on matches nothing',    pushMatch($pLv, $pOff, ['wl-1'], []) === []);
+    $ok('any danger takes danger alone', pushMatch($pLv, ['anyDanger' => true] + $pOff, [], [])
+                                           === ['wl-1' => 'danger', 'wl-3' => 'danger']);
+    $ok('any warning takes both levels', pushMatch($pLv, ['anyWarn' => true] + $pOff, [], []) === $pLv);
+    $ok('fav danger takes one favorite', pushMatch($pLv, ['favDanger' => true] + $pOff, ['wl-1', 'wl-2'], [])
+                                           === ['wl-1' => 'danger']);
+    $ok('fav warning takes favorites',   pushMatch($pLv, ['favWarn' => true] + $pOff, ['wl-1', 'wl-2'], [])
+                                           === ['wl-1' => 'danger', 'wl-2' => 'warning']);
+    $ok('an ignored id never matches',   pushMatch($pLv, ['anyWarn' => true] + $pOff, [], ['wl-2'])
+                                           === ['wl-1' => 'danger', 'wl-3' => 'danger']);
+
+    echo "\npushDiff():\n";
+    $pd = fn($m, $l, $seen, $sent) => pushDiff($m, $l, $seen, $sent, $now);
+    $ok('a new station notifies',        $pd(['wl-1' => 'danger'], ['wl-1' => 'danger'], [], [])['notify'] === ['wl-1']);
+    $ok('the same level is quiet',       $pd(['wl-1' => 'danger'], ['wl-1' => 'danger'], ['wl-1' => 'danger'],
+                                             ['wl-1' => ['danger', $now - 60]])['notify'] === []);
+    $ok('a rise notifies',               $pd(['wl-1' => 'danger'], ['wl-1' => 'danger'], ['wl-1' => 'warning'],
+                                             ['wl-1' => ['warning', $now - 60]])['notify'] === ['wl-1']);
+    $ok('a fall is quiet',               $pd(['wl-1' => 'warning'], ['wl-1' => 'warning'], ['wl-1' => 'danger'],
+                                             ['wl-1' => ['danger', $now - 60]])['notify'] === []);
+    $ok('a dip and a return notifies',   $pd(['wl-1' => 'danger'], ['wl-1' => 'danger'], ['wl-1' => 'warning'],
+                                             ['wl-1' => ['danger', $now - 600]])['notify'] === ['wl-1']);
+    $ok('a reminder fires at 6 h',       $pd(['wl-1' => 'danger'], ['wl-1' => 'danger'], ['wl-1' => 'danger'],
+                                             ['wl-1' => ['danger', $now - PUSH_AGAIN]])['notify'] === ['wl-1']);
+    $ok('a reminder waits under 6 h',    $pd(['wl-1' => 'danger'], ['wl-1' => 'danger'], ['wl-1' => 'danger'],
+                                             ['wl-1' => ['danger', $now - PUSH_AGAIN + 1]])['notify'] === []);
+    $ok('a reminder fires at 6 h after a fall to warning',
+        $pd(['wl-1' => 'warning'], ['wl-1' => 'warning'], ['wl-1' => 'warning'],
+            ['wl-1' => ['danger', $now - PUSH_AGAIN]])['notify'] === ['wl-1']);
+    $ok('all clear when every seen station is below warning',
+        $pd([], [], ['wl-1' => 'danger'], ['wl-1' => ['danger', $now - 60]])['allClear'] === true);
+    $ok('no all clear while a seen station is still at warning',
+        $pd([], ['wl-1' => 'warning'], ['wl-1' => 'danger'], ['wl-1' => ['danger', $now - 60]])['allClear'] === false);
+    $ok('no all clear from nothing',     $pd([], [], [], [])['allClear'] === false);
+    $ok('seen is the new matched set',   $pd(['wl-1' => 'danger'], ['wl-1' => 'danger'], [], [])['seen'] === ['wl-1' => 'danger']);
+    $ok('sent stamps a notified id',     $pd(['wl-1' => 'danger'], ['wl-1' => 'danger'], [], [])['sent']
+                                           === ['wl-1' => ['danger', $now]]);
+    $ok('sent drops a cleared id',       $pd([], [], ['wl-1' => 'danger'], ['wl-1' => ['danger', $now - 60]])['sent'] === []);
+
+    /* A station that drops out of the levels is not a station that fell below warning. It can be offline,
+       stale, faulty, or its detail call can have failed this tick. "All clear" is a claim the app can
+       stand behind only for a station it can read and that reads calm. The client keeps a stale alert
+       listed for the same reason: silence must not be rendered as safety. */
+    echo "\npushKnown():\n";
+    // `$o + defaults`, not the other way round: the left side of `+` wins.
+    $pk = fn(array $o) => pushKnown([$o + ['id' => 'wl-1', 'kind' => 'river', 'status' => 0, 'online' => true,
+                                           'updated' => date('d/m/Y H:i:s', $now - 60)]], $now) === ['wl-1' => true];
+    $ok('a calm live river is known',          $pk([]));
+    $ok('an offline station is unknown',       !$pk(['online' => false]));
+    $ok('a faulty reading is unknown',         !$pk(['backed' => false]));
+    $ok('a failed detail call is unknown',     !$pk(['status' => -1]));
+    $ok('a stale reading is unknown',          !$pk(['updated' => date('d/m/Y H:i:s', $now - 90000)]));
+
+    echo "\npushDiff() all clear:\n";
+    $pkn = ['wl-1' => true, 'wl-2' => true];
+    $ok('a resolved station is an all clear',
+        $pd2 = pushDiff([], [], ['wl-1' => 'danger'], ['wl-1' => ['danger', $now - 60]], $now, $pkn)
+        and $pd2['allClear'] === true);
+    $ok('a station that went dark is no all clear',
+        pushDiff([], [], ['wl-1' => 'danger'], ['wl-1' => ['danger', $now - 60]], $now, [])['allClear'] === false);
+    $ok('it stays in seen, so its return is not new',
+        pushDiff([], [], ['wl-1' => 'danger'], ['wl-1' => ['danger', $now - 60]], $now, [])['seen'] === ['wl-1' => 'danger']);
+    $ok('one dark station blocks the all clear',
+        pushDiff([], [], ['wl-1' => 'danger', 'wl-2' => 'danger'],
+                 ['wl-1' => ['danger', $now - 60], 'wl-2' => ['danger', $now - 60]], $now, ['wl-1' => true])['allClear'] === false);
+    $ok('a station dark for a day stops blocking',
+        pushDiff([], [], ['wl-1' => 'danger'], ['wl-1' => ['danger', $now - PUSH_STALE - 60]], $now, [])['allClear'] === true);
+    $ok('its sent entry goes with it',
+        pushDiff([], [], ['wl-1' => 'danger'], ['wl-1' => ['danger', $now - PUSH_STALE - 60]], $now, [])['sent'] === []);
+
+    echo "\npushDoc():\n";
+    $pSub  = ['endpoint' => 'https://fcm.googleapis.com/x', 'keys' => ['p256dh' => 'a', 'auth' => 'b']];
+    $pGood = json_encode(['sub' => $pSub, 'on' => ['favWarn' => true, 'favDanger' => true, 'anyWarn' => false,
+                          'anyDanger' => false], 'favs' => ['wl-1'], 'ignored' => []]);
+    $ok('a good document passes',           is_array(pushDoc($pGood)));
+    $ok('a warning switch locks its danger switch',
+        pushDoc(json_encode(['sub' => $pSub, 'on' => ['favWarn' => true, 'anyWarn' => true],
+                             'favs' => [], 'ignored' => []]))['on']
+          === ['favWarn' => true, 'favDanger' => true, 'anyWarn' => true, 'anyDanger' => true]);
+    $ok('a null sub passes, for a delete',
+        pushDoc(json_encode(['sub' => null, 'endpoint' => 'https://x/y', 'on' => [], 'favs' => [], 'ignored' => []]))['sub'] === null);
+    $ok('a delete keeps its endpoint',
+        pushDoc(json_encode(['sub' => null, 'endpoint' => 'https://x/y', 'on' => [], 'favs' => [], 'ignored' => []]))['endpoint'] === 'https://x/y');
+    $ok('an http endpoint fails',           pushDoc(json_encode(['sub' => ['endpoint' => 'http://x/y'] + $pSub,
+                                                'on' => [], 'favs' => [], 'ignored' => []])) === null);
+    $ok('a sub with no keys fails',         pushDoc(json_encode(['sub' => ['endpoint' => 'https://x'], 'on' => [],
+                                                                 'favs' => [], 'ignored' => []])) === null);
+    $ok('a non-object fails',               pushDoc('[1,2]') === null);
+    $ok('a bad station id fails',           pushDoc(json_encode(['sub' => $pSub, 'on' => [], 'favs' => ['../etc'],
+                                                                 'ignored' => []])) === null);
+    $ok('too many ids fail',                pushDoc(json_encode(['sub' => $pSub, 'on' => [],
+                                                'favs' => array_fill(0, 1001, 'wl-1'), 'ignored' => []])) === null);
+    $ok('a body over the cap fails',        pushDoc(str_repeat(' ', PUSH_MAX_BODY + 1) . $pGood) === null);
+    // The live payload carries ids like these. The first shape the validator knew was too narrow.
+    foreach (['kl-wl-0230501WL', 'pwl-3118104', 'prf-' . md5('x'), 'kl-rf-0232331RF', 'camera-100003'] as $pId)
+        $ok("a real id passes: $pId",       is_array(pushDoc(json_encode(['sub' => $pSub, 'on' => [],
+                                                'favs' => [$pId], 'ignored' => [$pId]]))));
+    foreach (['a b', 'x/../y', "x\n", '', str_repeat('a', 65)] as $pBad)
+        $ok('a malformed id fails: ' . json_encode($pBad), pushDoc(json_encode(['sub' => $pSub, 'on' => [],
+                                                'favs' => [$pBad], 'ignored' => []])) === null);
+
+    echo "\npushBody():\n";
+    $pSt = [
+        ['id' => 'wl-1', 'kind' => 'river', 'name' => 'Sg. Klang di Jln Tun Razak', 'lat' => 3.17, 'lng' => 101.70,
+         'level' => 5.32, 'danger' => 4.8, 'status' => 3],
+        ['id' => 'rf-2', 'kind' => 'rainfall', 'name' => 'Taman Melawati', 'lat' => 3.21, 'lng' => 101.75,
+         'hourly' => 41, 'status' => 3],
+        ['id' => 'camera-9', 'kind' => 'camera', 'name' => 'Cam', 'lat' => 3.175, 'lng' => 101.70,
+         'online' => true, 'image' => 'http://x/y.jpg'],
+        ['id' => 'camera-8', 'kind' => 'camera', 'name' => 'Far', 'lat' => 3.30, 'lng' => 101.70,
+         'online' => true, 'image' => 'http://x/z.jpg'],
+    ];
+    $pOne = pushBody(['wl-1'], ['wl-1' => 'danger'], $pSt);
+    $ok('one station names it in the title',     $pOne['title'] === 'Sg. Klang di Jln Tun Razak at danger');
+    $ok('one river states the reading and mark', $pOne['body'] === '5.32 m. Danger mark 4.80 m.');
+    $ok('one station opens its card',            $pOne['url'] === '#station=wl-1');
+    $ok('the near camera is the picture',        $pOne['image'] === 'api.php?cam=9');
+    $ok('the tag is the one constant',           $pOne['tag'] === 'kvfw');
+    $ok('a camera over 1 km is no picture',      pushCam($pSt[1], $pSt) === null);
+    $ok('the near camera is found',              pushCam($pSt[0], $pSt) === 9);
+    $pTwo = pushBody(['wl-1', 'rf-2'], ['wl-1' => 'danger', 'rf-2' => 'warning'], $pSt);
+    $ok('several count by level',                $pTwo['title'] === '1 at danger, 1 at warning');
+    $ok('several name the worst in the body',    str_starts_with($pTwo['body'], 'Sg. Klang di Jln Tun Razak. 5.32 m.'));
+    $ok('several open the alert list',           $pTwo['url'] === '#alerts');
+    $ok('rain states mm in an hour',             pushBody(['rf-2'], ['rf-2' => 'warning'], $pSt)['body'] === '41 mm in an hour.');
+    $ok('a zero count drops its clause',         pushBody(['rf-2', 'wl-9'], ['rf-2' => 'warning', 'wl-9' => 'warning'], $pSt)['title']
+                                                   === '2 at warning');
+    $ok('a station with no lat gets no picture', pushCam(['id' => 'x', 'kind' => 'river'], $pSt) === null);
+    $ok('all clear has its own words',           pushAllClear()['title'] === 'All clear');
+
+    echo "\npushSend():\n";
+    $pMem = new PDO('sqlite::memory:');
+    pushTable($pMem);
+    $pMem->exec("INSERT INTO push VALUES ('https://example.invalid/x', 'not json', '{}', '{}', 0)");
+    pushSend($pMem, $pSt, $now);
+    // With no key file the sender returns before it reads a row, so the row can only be expected to go
+    // where a key exists.
+    $ok('an unreadable row does not throw, and goes', pushKeys() === null
+                                                   || (int)$pMem->query('SELECT COUNT(*) FROM push')->fetchColumn() === 0);
+    // An encryptable-looking row whose send throws stays, whatever threw. Skipped without keys.
+    $pMem->exec("INSERT INTO push VALUES ('https://example.invalid/y', '"
+        . json_encode(['sub' => ['endpoint' => 'https://example.invalid/y', 'keys' => ['p256dh' => 'a', 'auth' => 'b']],
+                       'on' => ['anyWarn' => true], 'favs' => [], 'ignored' => []]) . "', '{}', '{}', 0)");
+    $pLive2 = [['id' => 'wl-1', 'kind' => 'river', 'status' => 3, 'online' => true,
+                'updated' => date('d/m/Y H:i:s', $now - 60)]];
+    pushSend($pMem, $pLive2, $now);
+    $ok('a send that throws keeps its row',      pushKeys() === null
+                                                   || (int)$pMem->query('SELECT COUNT(*) FROM push')->fetchColumn() === 1);
+    pushSend($pMem, [], $now);
+    $ok('an empty payload does not throw',       true);
+    // An empty budget stops before the first phone. The row it did not reach keeps its state, which is
+    // the safe one: the next tick starts from where this one stopped. Skipped without keys.
+    $pMem2 = new PDO('sqlite::memory:');
+    pushTable($pMem2);
+    $pMem2->exec("INSERT INTO push VALUES ('https://example.invalid/z', 'not json', '{}', '{}', 0)");
+    pushSend($pMem2, $pSt, $now, -1.0);
+    $ok('a spent budget leaves the rest for the next tick',
+        pushKeys() === null || (int)$pMem2->query('SELECT COUNT(*) FROM push')->fetchColumn() === 1);
 
     echo "\nportalRain():\n";
     /* The live page's own shape: an empty row, stray closing tags, then bare cell runs. A fixture
@@ -3367,6 +3601,7 @@ $db->exec('CREATE TABLE IF NOT EXISTS page (url TEXT PRIMARY KEY, ts INTEGER, bo
 // the portal's own station search — the only place the portal publishes a coordinate.
 $db->exec('CREATE TABLE IF NOT EXISTS station (name TEXT PRIMARY KEY, lat REAL, lng REAL,
                                                district TEXT, state TEXT) WITHOUT ROWID');
+pushTable($db);   // a refresh with no subscriber yet still has to be able to SELECT from it
 
 // The scraped pages ride along in the same concurrent batch, but on their own clock: the KL rainfall
 // table takes ~10s to render upstream, against ~0.3s for a JSON call, and none of these sources
@@ -4433,6 +4668,13 @@ echo $payload;
    `ignore_user_abort` so a client that gave up doesn't leave a half-written capture behind. */
 ignore_user_abort(true);
 flush();
+
+/* The push sender, BEFORE the camera capture and still inside the refresh lock. The payload is already
+   on the wire, so nothing a reader waits on is held up. It runs first because the capture is the slow
+   step: on 2026-11-04 a cold rebuild plus a capture hit PHP's 30 second limit inside shots.php, and
+   a sender queued behind it never ran. A flood warning must not wait on the camera archive. See
+   pushSend() in push.php for what it does and when it stays quiet. */
+pushSend($db, $stations, $now);
 captureShots($stations);
 
 /* The gazetteer drip. At the END of a refresh, never on a reader's poll, and never as a burst —

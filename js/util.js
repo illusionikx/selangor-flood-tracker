@@ -33,6 +33,15 @@ export function snack(msg) {
   b.togglePopover(true);
   snackAt = setTimeout(() => b.togglePopover(false), SNACK_MS);
 }
+/* Can this browser take a push notification, and may it? Four answers, in the order a reader can fix
+   them. Plain feature detection, so Settings can say why the master switch is dead without loading
+   js/push.js. iPhone Safari outside the home screen has no `PushManager`, which reads as `unsupported`. */
+export const pushState = () =>
+  !('PushManager' in window) || !('serviceWorker' in navigator) || !('Notification' in window) ? 'unsupported'
+  : !isSecureContext                                                                          ? 'insecure'
+  : Notification.permission === 'denied'                                                      ? 'denied'
+                                                                                              : 'ok';
+
 /* **Set a radio and mirror the answer onto the chip around it, because `:has()` will not.** Chromium
    does not restyle a `:has(input:checked)` subject when a SCRIPT changes that checkedness. Measured:
    `matches()` answers true and `getComputedStyle` still hands back the unchecked value. Every box in

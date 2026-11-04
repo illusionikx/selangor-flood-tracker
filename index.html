@@ -671,6 +671,11 @@
     <li><button class="mrow" data-page="setFaulty"><i class="glyph" aria-hidden="true"></i
       ><span class="nm">Faulty signals</span><b id="faultyN"></b
       ><i class="i i-expand_more mgo" aria-hidden="true"></i></button></li>
+    <!-- Notifications open a subpage, on the repository owner's instruction of 2026-11-04. `#pushN`
+         says On or Off, the way `#favN` says a count. The row hides on the Pages build. -->
+    <li><button class="mrow" id="pushRow" data-page="setPush"><i class="glyph i i-notifications"></i
+      ><span class="nm">Notifications</span><b id="pushN"></b
+      ><i class="i i-expand_more mgo" aria-hidden="true"></i></button></li>
   </ul>
 
   <!-- **The developer controls, as one segmented list.** The order is a reader's own, 2026-08-25:
@@ -718,6 +723,41 @@
     <ul id="ignoredList" class="picklist mlist"></ul>
     <ul class="picklist mlist"><li><button class="mrow" id="ignoredClear"
       ><i class="glyph i i-visibility"></i><span class="nm">Stop ignoring all</span></button></li></ul>
+  </div>
+
+  <!-- **Notifications, on the repository owner's instruction of 2026-11-04.** A subpage, opened from
+       the Alerts group. One master switch, four thresholds, and a test row in a group of its own. A
+       threshold row means "this level or worse", so a warning row turns its danger row on and locks
+       it. `js/ui.js` writes every box from `PREFS.push` and never the reverse, and `js/push.js`
+       mirrors the answer to the server. No markup `checked`: a preference owns these. -->
+  <div id="setPush" class="spage" data-title="Notifications" hidden>
+    <ul id="pushList" class="picklist mlist">
+      <li><i class="glyph i i-notifications"></i><span class="nm">Show notifications<br
+          ><span id="pushOnNote" class="muted">Reaches this phone while the app is closed.</span></span
+        ><label class="msw"><input type="checkbox" id="pushOn" autocomplete="off"
+            aria-label="Show notifications"><span class="mswtrack"><span class="mswthumb"></span></span></label></li>
+    </ul>
+    <h3>Notify me about</h3>
+    <ul id="pushRows" class="picklist mlist">
+      <li><i class="glyph i i-favorite"></i><span class="nm">Favorites at warning<br
+          ><span class="muted">A favorite reaches its warning mark or worse.</span></span
+        ><label class="msw"><input type="checkbox" id="pushFavWarn" autocomplete="off"
+            aria-label="Favorites at warning"><span class="mswtrack"><span class="mswthumb"></span></span></label></li>
+      <li><i class="glyph" aria-hidden="true"></i><span class="nm">Favorites at danger<br
+          ><span class="muted">A favorite reaches its danger mark.</span></span
+        ><label class="msw"><input type="checkbox" id="pushFavDanger" autocomplete="off"
+            aria-label="Favorites at danger"><span class="mswtrack"><span class="mswthumb"></span></span></label></li>
+      <li><i class="glyph i i-warning"></i><span class="nm">Any station at warning<br
+          ><span class="muted">Any station reaches its warning mark or worse.</span></span
+        ><label class="msw"><input type="checkbox" id="pushAnyWarn" autocomplete="off"
+            aria-label="Any station at warning"><span class="mswtrack"><span class="mswthumb"></span></span></label></li>
+      <li><i class="glyph" aria-hidden="true"></i><span class="nm">Any station at danger<br
+          ><span class="muted">Any station reaches its danger mark.</span></span
+        ><label class="msw"><input type="checkbox" id="pushAnyDanger" autocomplete="off"
+            aria-label="Any station at danger"><span class="mswtrack"><span class="mswthumb"></span></span></label></li>
+    </ul>
+    <ul class="picklist mlist"><li><button class="mrow" id="pushTest"><i class="glyph i i-science"></i
+      ><span class="nm">Send a test notification</span></button></li></ul>
   </div>
 
   <!-- Every live sensor the server marks `backed: false`. `faultyPanel()` in `js/render.js` writes

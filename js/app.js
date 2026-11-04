@@ -7,6 +7,10 @@ import { POLL_MS } from './config.js';
 import './ui.js';
 import { findMe } from './locate.js';
 import { load } from './net.js';
+import { PREFS } from './state.js';
+import { byId } from './stations.js';
+import { flashTo, side } from './map.js';
+import { toggleAlerts } from './alerts.js';
 import './keys.js';     // last: nothing imports it, and it reads `#locate`, which locate.js builds
 
 requestAnimationFrame(() => document.body.classList.add('ready')); // no drawer slide on first paint
@@ -26,15 +30,42 @@ findMe(false);   // locate on landing for the proximity sort, but leave the view
    200 bytes. So a reader who switches back sees current readings and a current weather layer at
    once. The weather layer rides render(), so this one timer refreshes both.
    A browser can still freeze a hidden tab, and a phone always does. The listener below catches up
-   on return, the moment the tab is visible again. */
+   on return, the moment the tab is visible again.
+   **`polled` is the time of the last poll that LANDED, and it was the time of the last poll that
+   STARTED.** A frozen tab runs its pending timer first on return, and that poll often fails, because
+   the server cache is cold and a rebuild outlasts the 20 s budget. Stamped at the start, it made the
+   catch-up below see a fresh stamp and skip, so a reader came back to old readings and an old title
+   count for up to five more minutes. The catch-up also asks for 45 s, the first-load budget, so the
+   rebuild finishes. Reported 2026-11-04. */
 let polled = 0;
-const poll = () => { polled = Date.now(); load(); };
+const poll = ms => load(ms).then(ok => { if (ok) polled = Date.now(); });
 
 poll();
-setInterval(poll, POLL_MS);
+setInterval(() => poll(), POLL_MS);
 document.addEventListener('visibilitychange', () => {
-  if (!document.hidden && Date.now() - polled > POLL_MS) poll();
+  if (!document.hidden && Date.now() - polled > POLL_MS) poll(45000);
 });
+
+/* **A tap on a notification lands here.** The server puts `#station=<id>` or `#alerts` on the URL it
+   sends (pushBody() in push.php), and sw.js opens the app on it, or navigates an open window to it.
+   A window that is already open fires `hashchange` and reloads nothing. A cold start needs the first
+   poll, because the stations are not there before it. The hash is cleared after it is read, so a
+   reload does not open the card again and a second tap on the same notification differs from the URL.
+   `#alerts` opens the list and never closes it: toggleAlerts() is a toggle. */
+const fromHash = () => {
+  const h = location.hash;
+  if (h === '#alerts') { if (side.key !== '@alerts') toggleAlerts(); }
+  else if (h.startsWith('#station=')) { const s = byId(h.slice(9)); if (!s) return; flashTo(s); }
+  else return;
+  history.replaceState(null, '', location.pathname + location.search);
+};
+document.addEventListener('poll', fromHash, { once: true });
+addEventListener('hashchange', fromHash);
+
+/* A phone that has notifications on tells the server about itself once per landing, so a browser that
+   lost the subscription gets a new one and the server's copy of the lists is current. */
+if (PREFS.push?.on)
+  document.addEventListener('poll', () => import('./push.js').then(m => m.pushSync()).catch(() => {}), { once: true });
 
 /* **No `resize` handler, and there was one until 2026-09-15.** It ran a whole `render()` after every
    resize, because the map popup baked its width in at render time. The popup is gone, and nothing

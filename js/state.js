@@ -25,4 +25,10 @@ export const state = {
 // spelling of the same key is a second place for the two to drift.
 export const PREFS_KEY = 'prefs';
 export const PREFS = { layers: {}, ...JSON.parse(localStorage.getItem(PREFS_KEY) || '{}') };
-export const save = () => localStorage.setItem(PREFS_KEY, JSON.stringify(PREFS));
+/* The `prefs` event is for js/push.js, which mirrors the favorites, the ignored list and the push
+   switches to the server. Every writer already calls save(), so this is the one place that sees all of
+   them. Nothing else listens. */
+export const save = () => {
+  localStorage.setItem(PREFS_KEY, JSON.stringify(PREFS));
+  document.dispatchEvent(new Event('prefs'));
+};

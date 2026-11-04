@@ -2192,7 +2192,11 @@ only defensible if the false-alarm cost was priced into it.
   permanent indications (the drawer panel, the `· N ignored` count) plus an explicit note in the
   all-clear when a silenced sensor is itself on alert. **Open gap:** ISA-18.2 shelves alarms with a
   *time limit*; this one does not expire. See "Ignoring a sensor" above for why, and reopen it if a
-  fifth alert surface ever lands.
+  fifth alert surface ever lands. **A push notification landed on 2026-11-04 and it obeys the ignore
+  list.** That makes this gap due. See "Push notifications" at the foot of this file.
+- Push notifications report a change and never a state, fold a flood of changes into one message,
+  send `AllClear`, and skip a faulty, stale or ignored sensor. See "Push notifications" at the foot
+  of this file.
 
 ### Three tiers, not one bucket
 
@@ -20970,3 +20974,59 @@ That flag reads true on Wi-Fi with no internet behind it, on a LAN with no route
 Trade-off accepted: a reader whose network blocks this server sees no map at all, not even the basemap. During a flood an empty map that looks calm is the worse fault.
 
 Not changed: a poll that fails after the map loaded. The map keeps the last good payload, and the status popover says `offline`.
+
+## Push notifications
+
+A phone with the app installed gets a notification when a station it follows reaches warning or danger. The app does not need to be open. The owner asked for this on 2026-11-04, for the housemates who install the app from the tailnet address. The design is in `docs/superpowers/specs/2026-11-04-push-notifications-design.md`.
+
+**What the reader sees.** A Notifications row in the Alerts group of Settings opens a subpage. The row states On or Off. The subpage has a master switch, four threshold switches and a test row, in three groups. The owner asked for the subpage on 2026-11-04, the same day the controls first stood on the main page. The four are Favorites at warning, Favorites at danger, Any station at warning and Any station at danger. Everything is off at install, because the browser gives no permission without a tap.
+
+**A row names a threshold, not a level.** "At warning" means warning or worse. A warning row turns its danger row on and locks it. Without this, a reader with only the warning row on hears nothing when the same river climbs to danger. The server applies the same rule in `pushDoc()`.
+
+**The master can be on and do nothing**, because every row starts off. Its supporting line says so.
+
+**Two levels, mapped from the client's tiers** by `pushLevel()` in `push.php`:
+
+| level | station |
+|---|---|
+| danger | river at its danger mark, siren sounding, flood gauge at 0.3 m, rainfall class 4 |
+| warning | river at its warning mark or rising, flood gauge at 0.15 m, rainfall class 3 |
+
+A station that is offline, reads over 24 hours old, or has `backed === false` never matches. A station in the phone's ignored list never matches. `PREFS.ignored` is the one suppression in this app and it holds here too. The server cannot read the `Hide faulty signals` preference, so it always applies the faulty verdict. When that switch is off, the server is stricter than the client.
+
+**What the server sends, and when.** `pushSend()` runs at the end of a refresh, inside the refresh lock, once per stored phone. Three events make a phone hear about a station. The station enters a level. The station rises from warning to danger. The station holds one level for six hours (`PUSH_AGAIN`). The six-hour reminder is ISA-18.2's standing alarm reminder. A fall from danger to warning sends nothing at the time of the fall. The reminder still fires six hours after the last notification, at the new level. The first version also required the same level, so a river that fell to warning and stayed there never got a reminder. A review found this, and the level test went.
+
+**One notification per phone per poll.** Several stations fold into one message with a count by level, such as "2 at danger, 14 at warning". It names the worst station and opens the alert list. One station names itself and opens its card. Every message uses the one `tag`, so a phone never holds more than one from this app.
+
+**The camera picture.** The nearest online camera within 1 km (`PUSH_CAM_M`) of the named station supplies its current still, through `?cam=`. Android Chrome draws it. iPhone shows text only, because Apple drops the field.
+
+**All clear.** A phone gets one "All clear" after every station it heard about sits below warning. The test reads the level itself and not the phone's switches. So a reader with only the danger rows on never hears "All clear" while a river still sits at its warning mark.
+
+**Two maps per phone.** `seen` holds each matched station's level on the last tick. `sent` holds the level and time of the last notification. The entry and rise rules diff against `seen`, so a river that dips to warning and climbs back to danger wakes the phone again. The reminder reads `sent`.
+
+**A failed send changes nothing.** `seen` and `sent` move only after the push service accepts the message. A transient failure retries on the next tick. A 404 or 410 means the phone unsubscribed, and the row is deleted.
+
+**The test row.** Test mode fakes a flood in the browser's copy of the payload, and the server never sees it. So "Send a test notification" posts the phone's own subscription to `?push=test`. The server sends one message to that phone alone, rate-limited to one a minute site-wide through `forceAllowed()`.
+
+**The browser side.** `js/push.js` is deferred. It loads when a reader turns the master on. It also loads on landing, if the master is already on. It subscribes with the VAPID key from `?push=key`, and posts the switches and the two lists to `?push=1`. It re-posts 2 seconds after any preference write, through a `prefs` event that `save()` in `js/state.js` now dispatches. `sw.js` shows the message and handles the tap. A tap opens the app on a hash, `#station=<id>` or `#alerts`, and `js/app.js` reads it on landing and on `hashchange`.
+
+**Rulings taken while building it**, each one a place the design did not decide:
+
+- The sender runs **before** `captureShots()`, not after. On 2026-11-04 a cold rebuild plus a capture hit PHP's 30 second limit inside `shots.php`. A sender queued behind it never ran. A flood warning must not wait on the camera archive.
+- The sender sends **one phone at a time**, each in its own try block. The library encrypts inside the send. With a queue, `flush()` threw on the first subscription it failed to encrypt for. That throw sat outside any guard and cut off the rest of the refresh. The first integration run found this.
+- An exception on one phone is **logged and the row kept**. The cause can be a fault of this machine, such as a PHP with no OpenSSL setup. A delete on that fault unsubscribes every phone. Only a 404, a 410, or a row with no readable subscription deletes.
+- **Reset settings unsubscribes first.** A subscription left behind keeps waking the phone with switches the reader just cleared.
+- The table is capped at 500 rows (`PUSH_MAX_ROWS`). `?push=1` is a public POST that writes to disk.
+- **The final review changed four things.** The id check in `pushDoc()` refused every Kuala Lumpur and portal station, so a phone with one in its lists could never subscribe or sync. It accepts letters, digits and hyphens now. "All clear" went out for a river that merely went dark, which renders silence as safety. `pushKnown()` marks a station readable, and an unreadable one blocks "All clear" for up to a day. The sender gained a budget of 8 seconds (`PUSH_BUDGET`) and a 4 second timeout per push service, because a few hung endpoints inside PHP's 30 second limit would starve the camera capture. The tap handler falls back to a new window when `navigate()` rejects for a window this worker does not control.
+
+**Not built:**
+
+- Quiet hours. A flood at 3 a.m. is the point, and the master switch is the quiet hour.
+- A notification for a MET warning or a JPS notice. Those are claims about an area, not a station.
+- The GitHub Pages target. It has no server and no cron, so the Settings group hides there.
+
+**Alert design standard.** The surface reports a change and never a state, which is the rule `watch.php` follows. It folds a flood of changes into one message, so a monsoon night is one buzz per poll and not 60. It carries CAP's `AllClear`. It filters out a faulty, stale or ignored sensor before it can wake anyone. The open cost: up to 12 notifications an hour in the worst case, against ISA-18.2's target of 6. The master switch is the reader's answer to that.
+
+**The origin.** Push needs https, and the app is installed from `https://floodwatch.taila2a82f5.ts.net`. That is a different origin from the plain http address. A phone that installed the app from the old address keeps its favorites and its ignored list there. The reader installs again from the https name and enters both lists again.
+
+**The stale tab fix, shipped in the same change.** A tab that slept for a long time came back to old readings and an old title count. `polled` in `js/app.js` was stamped when a poll started. A poll that failed on wake then made the catch-up skip. Now `load()` returns true or false, and `polled` is stamped on success only. The catch-up asks for 45 seconds, the first-load budget, because the server cache is cold by then.

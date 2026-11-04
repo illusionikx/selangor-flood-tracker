@@ -177,8 +177,8 @@ for (const f of ['img', 'api.json', 'wx.json']) copy(f, true);
    purpose. `.history.db` and `shots/` are written in the document root, and a deploy must not
    carry either. See docs/DEPLOY.md for the rsync that keeps them. */
 if (!STATIC) {
-  for (const f of ['api.php', 'sources.php', 'shots.php', 'log.php', 'watch.php',
-                   '.user.ini', 'composer.json']) copy(f);
+  for (const f of ['api.php', 'sources.php', 'shots.php', 'push.php', 'push-keys.php', 'log.php',
+                   'watch.php', '.user.ini', 'composer.json']) copy(f);
   for (const f of ['composer.lock', 'lib']) copy(f, true);
 }
 
