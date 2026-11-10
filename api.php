@@ -1067,11 +1067,16 @@ function pageHasData(string $key, string $body): bool {
         /* The portal rainfall page carries no <tr> on a data row — see portalRows(). Its header
            holds four, and the empty form page holds the same four, so the shared test passes on a
            page with nothing in it. `data-th='No'` appears once per data row and nowhere else. */
-        str_starts_with($key, 'prf-')           => str_contains($body, 'id="rainfall-data"'),
+        str_starts_with($key, 'prf-')           => str_contains($body, 'id="rainfall-data"')
+                                                   || str_contains($body, "data-th='No'")
+                                                   || str_contains($body, 'data-th="No"'),
         /* The rebuilt national water page (22 October 2026). The tbody id is the one thing the data
            table has and an error page, a maintenance notice and the legend tables do not. A state
            with no station still prints the tbody, with one `Tiada Data` row, and that is an answer. */
-        str_starts_with($key, 'nat-')           => str_contains($body, 'id="waterlevel-data"'),
+        str_starts_with($key, 'nat-')           => str_contains($body, 'id="waterlevel-data"')
+                                                   || str_contains($body, "class='item'")
+                                                   // The WordPress page for a state with no station, Putrajaya.
+                                                   || str_contains($body, ">No Data</td>"),
         /* The KL camera page holds cards and no <tr>, so the shared test would call every good
            answer an outage. `camimg-` appears once per camera and nowhere else. */
         $key === 'kl-cam'                       => str_contains($body, 'camimg-'),
@@ -2011,6 +2016,24 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
     $ok('a page with no tbody yields nothing', nationalLevels(['nat-SEL' => "<tr class='item'><td>1</td></tr>"]) === []);
     $ok('the national url names the state',  nationalUrls()['nat-PTJ'] === 'https://publicinfobanjir.water.gov.my/waterleveldata/Putrajaya');
 
+    echo "\nnationalLevels() on the WordPress page (back about 2026-11-05):\n";
+    $wpNat = "<table><tr class='item'>"
+        . "<td data-th='Station ID'>0000391WL</td><td data-th='Station Name'>SG. KEMBONG DI PULAU INDAH</td>"
+        . "<td data-th='District'>KLANG</td><td data-th='Last Update'>10/11/2026 12:45</td>"
+        . "<td data-th='wl'>0.17</td><td data-th='Alert'>1.25</td><td data-th='Warning'>1.50</td>"
+        . "<td data-th='Danger'>2.00</td></tr></table>";
+    $wl = nationalLevels(['nat-SEL' => $wpNat]);
+    $ok('one station, keyed by its code',    array_keys($wl) === ['0000391WL']);
+    $ok('level is read by name',             $wl['0000391WL']['level'] === 0.17);
+    $ok('marks are read by name',
+        [$wl['0000391WL']['alert'], $wl['0000391WL']['warning'], $wl['0000391WL']['danger']] === [1.25, 1.5, 2.0]);
+    $ok('the stamp is normalised',           $wl['0000391WL']['updated'] === '10/11/2026 12:45:00');
+    $ok('both layouts in one call both read', count(nationalLevels(['a' => $newNat, 'b' => str_replace('0000391WL', '0000392WL', $wpNat)])) === 2);
+    $ok('each key has a WordPress twin',     array_keys(nationalAltUrls()) === array_keys(nationalUrls())
+                                             && array_keys(portalRainAltUrls()) === array_keys(portalRainUrls()));
+    $ok('the twin names the old site',       str_contains(nationalAltUrls()['nat-SEL'], 'aras-air-data')
+                                             && str_contains(portalRainAltUrls()['prf-SEL'], 'loginStatus=0'));
+
     echo "\nportalOdo():\n";
     $ok('a first sample starts at today',   portalOdo(null, null, 7.5, null) === 7.5);
     $ok('a rise within a day adds the rise', portalOdo(100.0, 7.5, 12.0, null) === 104.5);
@@ -2482,7 +2505,13 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
     $ok('a portal page with no tbody fails', pageHasData('prf-SEL', "<table><tr><th>No.</th></tr></table>") === false);
     $ok('the 404 page fails',                pageHasData('prf-SEL', '<html><title>Not Found</title></html>') === false);
     $ok('an empty body fails',               pageHasData('prf-SEL', '') === false);
-    $ok('the old water table fails',         pageHasData('nat-SEL', "<tr class='item'>") === false);
+    /* The WordPress portal came back about 5 November 2026, so its table is an answer again. Its 404
+       page, a Laravel 404 with no tbody, is not. */
+    $ok('the WordPress water table passes',  pageHasData('nat-SEL', "<tr class='item'>") === true);
+    $ok('the WordPress empty state passes',  pageHasData('nat-PTJ', "<td colspan='18'>No Data</td></table>") === true);
+    $ok('the WordPress rainfall table passes', pageHasData('prf-SEL', "<td data-th='No'>1</td>") === true);
+    $ok('the portal 404 fails on water',     pageHasData('nat-SEL', '<title>Page not found &#8211; Laman Web Rasmi</title>') === false);
+    $ok('the portal 404 fails on rain',      pageHasData('prf-SEL', '<title>Page not found &#8211; Laman Web Rasmi</title>') === false);
 
     echo "\npageHasData() on the JPS notice feeds:\n";
     $ok('a JPS empty list is data',      pageHasData('jps-rain', '[]') === true);
@@ -3622,8 +3651,14 @@ $want = [];
 foreach ($extraUrls as $k => $u) {
     if (($stored[$u]['ts'] ?? 0) < $now - $ttlFor($k)) $want[$k] = $u;
 }
+/* The national portal has shipped two sites on one host and switched between them, so each of its six
+   keys also asks for its WordPress twin in the same batch. The twin costs one more request that
+   answers 404 in half a second while the Laravel site is up. See the note beside NAT in sources.php. */
+$altUrls = nationalAltUrls() + portalRainAltUrls();
+$wantAlt = [];
+foreach ($altUrls as $k => $u) if (isset($want[$k])) $wantAlt['alt-' . $k] = $u;
 
-$raw = fetchAll($detailUrls + $want, 20, false);
+$raw = fetchAll($detailUrls + $want + $wantAlt, 20, false);
 $details = [];
 foreach ($detailUrls as $u) $details[$u] = json_decode($raw[$u] ?? '', true);
 
@@ -3647,14 +3682,24 @@ foreach ($stored as $su => $sr) {
 }
 // One transaction for every row this loop writes, rather than one commit per row.
 $db->beginTransaction();
+/* True on a refresh where the WordPress portal answered a table. Three drips below live on that site
+   alone, and a drip stamps a prefix as asked whether or not it answered, so asking a dead site would
+   spend the whole list for nothing. */
+$legacyUp = false;
 foreach ($extraUrls as $k => $u) {
     $got = $raw[$u] ?? '';
+    $alt = isset($altUrls[$k], $wantAlt['alt-' . $k]) ? ($raw[$altUrls[$k]] ?? '') : '';
+    if ($alt !== '' && pageHasData($k, $alt)) $legacyUp = true;
     $id  = null;
+    if (!pageHasData($k, $got) && pageHasData($k, $alt)) {
+        // Laravel gave nothing and WordPress gave a table. The row stays filed under the primary URL.
+        $got = $alt;
+    }
     if (!pageHasData($k, $got)) {
         /* Read the raw body before the next line clears it. A notice is the one failure that states
            its own cause, so it is the only one a reader hears about. Everything else stays in
            $pagesStale, which the status popover already carries. */
-        $id = noticeOf($got);
+        $id = noticeOf($got) ?? noticeOf($alt);
         $got = '';
     }
     switch (noticeRow(isset($want[$k]), $id)) {
@@ -4152,11 +4197,10 @@ foreach ($stored as $su => $sr) {
 // Only the rows that found no home. A matched row needs no coordinate: it already has one.
 $gazNames = [];
 foreach ($prf as $i => $r) if (!isset($prfHit['used'][$i])) $gazNames[] = $r['name'];
-/* PARKED on 2026-11-02: the station search lived under /wp-content/, which the portal rebuild of
-   22 October 2026 removed. Asking costs a 404 every ten minutes and places nothing. The 542 rows
-   already in the table still place a station through gazPlace(). Set GAZ_LIVE when a replacement
-   endpoint exists. */
-$gazAsk = GAZ_LIVE ? gazWanted($gazNames, $gazDone, GAZ_FILL) : [];
+/* The station search lives under /wp-content/, so it answers only while the WordPress portal is the
+   one up. It was parked 2026-11-02 and follows `$legacyUp` since 2026-11-10. The 542 rows already in
+   the table still place a station through gazPlace() either way. */
+$gazAsk = $legacyUp ? gazWanted($gazNames, $gazDone, GAZ_FILL) : [];
 
 /* What the archive already seeded and which stations are next, counted before the payload goes out.
    `$graphIds` is the map the two placement passes filled — the station's own `graphId` key is

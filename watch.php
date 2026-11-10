@@ -20,6 +20,9 @@ date_default_timezone_set('Asia/Kuala_Lumpur');
    still clears 300, so `parsed` below is what actually names that case. */
 const FLOOR = 300;
 
+// One hour in seconds. js/config.js holds the same number as FEED_LATE_MS.
+const FEED_LATE = 3600;
+
 $p = json_decode(stream_get_contents(STDIN), true);
 $bad = [];
 
@@ -50,6 +53,15 @@ if (!is_array($p) || !isset($p['stations'])) {
        api.data.gov.my/weather/warning was seven days old on 2026-08-17 and every counter stayed
        quiet, because the fetch had succeeded. */
     if (!empty($p['sources']['old'])) $bad[] = 'old sources: ' . implode(' ', $p['sources']['old']);
+
+    /* `stale` above only names a page on the refresh that asked for it, and pages are asked once a
+       quarter hour, so two polls in three read it empty. The national tables stood five days old on
+       2026-11-10 while this file read `ok`. `feeds` is in every payload and holds each feed's newest
+       reading stamp. A feed past one hour is late, the same test js/net.js runs for the reader. */
+    foreach ((array)($p['feeds'] ?? []) as $k => $iso) {
+        $t = strtotime((string)$iso);
+        if ($t && time() - $t > FEED_LATE) $bad[] = "feed $k late";
+    }
 
     if (($p['upstreamOk'] ?? true) === false) $bad[] = 'serving stale cache';
     if (count($p['stations']) < FLOOR)        $bad[] = count($p['stations']) . ' stations';

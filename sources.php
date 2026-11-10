@@ -18,10 +18,16 @@ require_once __DIR__ . '/lib/autoload.php';
 
 use Symfony\Component\DomCrawler\Crawler;
 
-/* The national portal, rebuilt by JPS on 22 October 2026. The WordPress site is gone. Every old path
-   under /index.php/ and /wp-content/ now answers 404, on this host and on all of its endpoints.
-   The new site is Laravel. One page per state, with the table already in the HTML. */
+/* THE NATIONAL PORTAL HAS SHIPPED TWO SITES ON ONE HOST, AND IT HAS SWITCHED BETWEEN THEM.
+   JPS rebuilt it on 22 October 2026 as a Laravel site: one page per state, the table already in the
+   HTML. The old paths under /index.php/ and /wp-content/ answered 404. About 5 November 2026, between
+   15:30 and 16:30 MYT, the WordPress site came back and the Laravel paths answered 404 instead. This
+   app then served five-day-old stored tables, because it asked for the Laravel paths alone.
+   So api.php asks for BOTH layouts every refresh and keeps whichever answers with data. The Laravel
+   URL is primary. `nationalAltUrls()` and `portalRainAltUrls()` hold the WordPress twin of each key.
+   The parsers read the shape of the body and never the name of the site. */
 const NAT = 'https://publicinfobanjir.water.gov.my/waterleveldata/';
+const NAT_WP = 'https://publicinfobanjir.water.gov.my/aras-air/data-paras-air/aras-air-data/';
 /* The state codes this app uses, and the path segment the new site wants for each. KL carries its
    full legal name, encoded. Putrajaya has a page and, measured 2026-11-02, no row on it. */
 const PORTAL_STATE = ['SEL' => 'Selangor', 'WLH' => 'Wilayah%20Persekutuan%20Kuala%20Lumpur', 'PTJ' => 'Putrajaya'];
@@ -68,9 +74,11 @@ function tbodyOf(string $html, string $id): string {
  * National portal water levels, keyed by JPS station code — the same code the Selangor API exposes
  * as `station_Id` and the KL tables print in their ID column, which is what makes the merge possible.
  *
- * Since 22 October 2026 the cells carry no `data-th`, so columns are read by POSITION under a width
- * guard, the way klStations() does. A row of any other width is dropped. That includes the one-cell
- * `Tiada Data` row an empty state prints, and a layout change shows up as `national.parsed: 0`.
+ * TWO LAYOUTS, and the body picks. The Laravel page (22 October 2026) has `<tbody id="waterlevel-data">`
+ * and no `data-th`, so its columns are read by POSITION under a width guard, the way klStations()
+ * does. A row of any other width is dropped. That includes the one-cell `Tiada Data` row an empty
+ * state prints, and a layout change shows up as `national.parsed: 0`. The WordPress page has
+ * `<tr class='item'>` rows whose cells each carry a `data-th`, and those are read by name.
  *
  * 0 no · 1 code · 2 name · 3 district · 4 basin · 5 sub-basin · 6 updated · 7 level
  * 8 normal · 9 alert · 10 warning · 11 danger
@@ -84,7 +92,27 @@ function nationalLevels(array $pages): array {
     $out = [];
     foreach ($pages as $html) {
         $body = tbodyOf((string)$html, 'waterlevel-data');
-        if ($body === '') continue;
+        if ($body === '') {
+            if (!$html) continue;
+            crawl((string)$html)->filter('tr.item')->each(function (Crawler $tr) use (&$out, $text) {
+                $r = [];
+                $tr->filter('td')->each(function (Crawler $td) use (&$r, $text) {
+                    $r[$td->attr('data-th') ?? ''] = $text($td);
+                });
+                $code = $r['Station ID'] ?? '';
+                if ($code === '') return;
+                $out[$code] = [
+                    'level'    => numOrNull($r['wl'] ?? ''),
+                    'alert'    => numOrNull($r['Alert'] ?? ''),
+                    'warning'  => numOrNull($r['Warning'] ?? ''),
+                    'danger'   => numOrNull($r['Danger'] ?? ''),
+                    'updated'  => myTime($r['Last Update'] ?? ''),
+                    'name'     => $r['Station Name'] ?? '',
+                    'district' => $r['District'] ?? '',
+                ];
+            });
+            continue;
+        }
         crawl($body)->filter('tr')->each(function (Crawler $tr) use (&$out, $text) {
             $tds = $tr->children('td');
             if (count($tds) !== 12) return;
@@ -108,6 +136,13 @@ function nationalLevels(array $pages): array {
 function nationalUrls(array $states = ['SEL', 'WLH', 'PTJ']): array {
     $u = [];
     foreach ($states as $s) $u['nat-' . $s] = NAT . PORTAL_STATE[$s];
+    return $u;
+}
+
+/** The WordPress twin of each `nat-` key. Same keys as nationalUrls(), so a caller can pair them. */
+function nationalAltUrls(array $states = ['SEL', 'WLH', 'PTJ']): array {
+    $u = [];
+    foreach ($states as $s) $u['nat-' . $s] = NAT_WP . '?state=' . $s . '&district=ALL&station=ALL&lang=en';
     return $u;
 }
 
@@ -244,10 +279,22 @@ function klLatLng(Crawler $nameCell): array {
    was a form endpoint that needed two hidden inputs. The rebuilt site serves a plain page per state,
    and the two inputs are gone with the endpoint. */
 const PRF = 'https://publicinfobanjir.water.gov.my/rainfalldata/';
+/* The WordPress form endpoint, back since about 5 November 2026. It answers a form page with no rows
+   unless the request carries the two hidden inputs `loginStatus` and `language`. */
+const PRF_WP = 'https://publicinfobanjir.water.gov.my/wp-content/themes/shapely/agency/searchresultrainfall.php';
 
 function portalRainUrls(array $states = ['SEL', 'WLH', 'PTJ']): array {
     $u = [];
     foreach ($states as $s) $u['prf-' . $s] = PRF . PORTAL_STATE[$s];
+    return $u;
+}
+
+/** The WordPress twin of each `prf-` key. See nationalAltUrls(). */
+function portalRainAltUrls(array $states = ['SEL', 'WLH', 'PTJ']): array {
+    $u = [];
+    foreach ($states as $s) {
+        $u['prf-' . $s] = PRF_WP . '?state=' . $s . '&district=ALL&station=ALL&loginStatus=0&language=1';
+    }
     return $u;
 }
 
@@ -342,8 +389,8 @@ function portalRain(array $pages): array {
    returned 1,208 rows on 15 August, including names carrying `sg.` in the middle. It answers for
    the whole country, so a caller filters to the states it draws. */
 const GAZ = 'https://publicinfobanjir.water.gov.my/wp-content/themes/enlighten/query/searchstation_control.php';
-/* False since the portal rebuild of 22 October 2026. The path above answers 404. See api.php. */
-const GAZ_LIVE = false;
+/* The path above exists only on the WordPress site. api.php asks it only on a refresh where that
+   site answered a table. See `$legacyUp` there. */
 
 function gazUrl(string $q): string {
     return GAZ . '?' . http_build_query(['q' => $q]);
@@ -708,13 +755,10 @@ function metUrls(int $now): array {
  * `data/met_earthquake.json` is absent on purpose. `WARN_DROP` holds `earthquake` and `tsunami`, so
  * every row of that file drops. Fetching it spends a request to discard the answer. */
 function jpsUrls(): array {
-    /* PARKED on 2026-11-02. All five paths sit under /wp-content/themes/enlighten/, which the portal
-       rebuild of 22 October 2026 removed. Each answers 404, and nothing on the new site was found to
-       replace them. The parsers stay, so the day a replacement appears the work is one array. The
-       flood forecast and the three MET mirrors reach no screen while this is empty. The MET feed
-       (`met-warn`) still carries warnings. */
-    return [];
-    /* Kept for the day the feeds return. */
+    /* PARKED 2026-11-02, UNPARKED 2026-11-10. All five paths sit under /wp-content/themes/enlighten/.
+       The Laravel rebuild of 22 October removed them, and the WordPress site returned about 5 November.
+       Measured 2026-11-10: met_cyclone.json and getdisse.php answer 200. While the Laravel site is up,
+       these answer 404 and land in `sources.stale`, which is true: the map then holds no fresh copy. */
     return [
         'jps-flood' => JPS_NOTICE . 'query/getdisse.php',
         'jps-rain'  => JPS_NOTICE . 'data/met_rain22.json',

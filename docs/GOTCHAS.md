@@ -16,7 +16,13 @@ Read the entries for any subsystem you are about to change.
   notice and `sources.stale` said so. When that notice appears, request the page with curl. A 404
   with a full HTML body means the path moved. Read the home page of the site for the new links. Do not
   wait for the feed to return. A dead fetch pays the 25 second timeout. On 2026-11-02 the poll hit
-  the 30 second PHP limit.
+  the 30 second PHP limit. **A moved feed can also move back.** The WordPress portal returned about
+  5 November. The app asked for the new paths alone, so it stood five days old again. Now the
+  national tables are asked in both layouts. See "The old national portal came back" in
+  `docs/FEATURES.md`. Never delete a reader because its site went away. Park it instead.
+  **`sources.stale` is not a standing alarm.** It names a page only on the refresh that asked for
+  it. Pages are asked once a quarter hour, so two polls in three read it empty. For that reason
+  `watch.php` reads `feeds`.
 - **`-9999` means "no reading"** in both scraped feeds, rendered as `-9,999.00` in one of them.
   `numOrNull()` strips separators and nulls anything ≤ −9990. Treated as a level, it renders a
   station as catastrophically dry and poisons its trend history.

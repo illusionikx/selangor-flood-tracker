@@ -210,13 +210,14 @@ Field notes:
 
 ### 2. Public Infobanjir (national) — `sources.php`
 
-**JPS REBUILT THIS SITE ON 22 OCTOBER 2026, AND THE PARAGRAPHS BELOW DESCRIBE THE OLD ONE.** It is
-Laravel now. The tables sit at `/waterleveldata/{state}` and `/rainfalldata/{state}`, one plain page
-per state, read by position from `<tbody id="waterlevel-data">` and `<tbody id="rainfall-data">`.
-The station codes did not change. Every `/index.php/` and `/wp-content/` path answers 404. That
-parks the five `jps-*` notice feeds, the station search (`GAZ_LIVE`) and the 7 day series. See "The
-national portal was rebuilt" in `docs/FEATURES.md`. Where the text below names `data-th`, the
-`wp-content` URLs, `loginStatus` or `stationid=`, it records history and not the code.
+**THIS HOST HAS SHIPPED TWO SITES AND IT HAS SWITCHED BETWEEN THEM, SO THE APP READS BOTH.** JPS
+rebuilt it as Laravel on 22 October 2026. The tables sat at `/waterleveldata/{state}` and
+`/rainfalldata/{state}`, read by position from `<tbody id="waterlevel-data">` and
+`<tbody id="rainfall-data">`. About 5 November the WordPress site came back and those paths answered
+404. Every refresh now asks for both layouts and keeps whichever answers with data. The paragraphs
+below describe the WordPress layout, and they are live again. The five `jps-*` notice feeds are asked
+every refresh. The station search and the 7 day series run only while `$legacyUp` holds in
+`api.php`. See "The old national portal came back" in `docs/FEATURES.md`.
 
 `…/index.php/aras-air/data-paras-air/aras-air-data/?state=SEL&district=ALL&station=ALL&lang=en`,
 one call per state (`SEL`, `WLH` = KL, `PTJ` = Putrajaya). 301s to a canonical path, so

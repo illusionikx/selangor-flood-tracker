@@ -390,6 +390,38 @@ change came out of it. The KL rainfall ids 23, 24, 25 and 27 answer 500, with ev
 35. Their last stored pages are one identical 14 KB page with no station. So `KL_RAIN` holds the
 eleven dropdown ids alone now.
 
+### The old national portal came back, so the app reads both (2026-11-10)
+
+**What happened.** About 5 November 2026, between 15:30 and 16:30 MYT, JPS put the WordPress portal
+back. The Laravel paths from the entry above then answered 404. The app asked for those paths alone.
+So the six national tables stood five days old, on this machine and on the deployed box. The
+notice "A data source stopped updating" was correct again. The cron check read `ok` the whole time.
+
+**What changed.** Each of the six table keys now asks for both layouts in the same batch. The Laravel
+URL is primary. `nationalAltUrls()` and `portalRainAltUrls()` in `sources.php` hold the WordPress
+twin. If the primary gives no table and the twin does, the twin body is stored under the primary URL.
+The parsers read the shape of the body. `nationalLevels()` reads `waterlevel-data` by position or
+`tr.item` by `data-th`. `portalRows()` already read both. `pageHasData()` accepts either shape, and
+it accepts the WordPress `No Data` row that Putrajaya prints.
+
+**What is live again.** The five `jps-*` notice feeds are asked every refresh. The station search
+and the 7 day series are asked only while the WordPress site answers, through `$legacyUp` in
+`api.php`. A drip stamps a prefix as asked whether or not it answers. So asking a dead site would use
+up the list for nothing. `GAZ_LIVE` is gone.
+
+**The watch.** `watch.php` now reads `feeds` and reports a feed whose newest stamp is over one hour
+old. This is the same test the browser runs. `sources.stale` could not do this job. A page joins that
+list only on the refresh that asked for it, and pages are asked once a quarter hour.
+
+**Measured after.** One forced refresh took 3.7 s. Both feed stamps read the current quarter hour.
+`sources.stale` and `sources.old` are empty. `national.parsed` reads 103 on the WordPress layout, and
+119 before on the Laravel one. `portalrf.parsed` reads 306 against 374.
+
+**Trade-offs accepted.** Each refresh pays six more requests, and while the Laravel site is up they
+answer 404 in about half a second. While the Laravel site is up, the five `jps-*` keys 404 and join
+`sources.stale`. That is true, because the map then holds no fresh copy of them. The cron then
+reports it. A third layout needs a third reader. Nothing here discovers a URL by itself.
+
 ## Map
 
 **Base map** — CARTO, three styles selectable in the drawer (Voyager colour / Positron grey / Dark
