@@ -1730,7 +1730,7 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
 - **A siren reading 1 is a claim, not a fact, and the river behind it is the check**. JPS sounds a
   siren for one minute at the Amaran mark. It repeats every 3 hours while the water stays there,
   and every 5 at Bahaya. So the alarm is a claim about a river level the payload already holds.
-  `sirenBacked()` in `api.php` asks it. `backed` is true when a river within `SIREN_KM` (5 km) is at
+  `sirenBacked()` in `api.php` asks it. `backed` is true when a river within `SIREN_KM` (2 km since 2026-11-10, 5 km before) is at
   status ≥ 2. Since 2026-10-19 a climbing Siaga river backs it too. That is a river at status 1 with
   a rate of `RISE_FLOOR` or more. So the siren verdict runs after the trend pass, which is the pass that writes
   `rate`. It is false when rivers are in reach and none backs it. It is **null when there is none to

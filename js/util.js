@@ -262,7 +262,7 @@ export function color(s) {
    water stays there, and at Bahaya every 5. So the alarm is a claim about a river level we already
    hold, and `backed` in api.php is that river answering — one definition, server-side, like
    `rising`. The client reads the flag and never re-derives it.
-   `!== false`, not truthiness: `null` is "no river within 5 km to ask", and a siren nobody can check
+   `!== false`, not truthiness: `null` is "no river within SIREN_KM (2 km) to ask", and a siren nobody can check
    keeps the benefit of the doubt. Silencing a real evacuation alarm is the worse of the two errors.
    Both reds read this, the alert path's and the map's: a pin painted red off a siren the alert panel
    refuses to list is the map contradicting the panel, and one of them is wrong on screen. */

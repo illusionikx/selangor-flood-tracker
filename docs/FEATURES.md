@@ -2337,8 +2337,8 @@ Batu Tiga on 31/07, and those are the two this app should be shouting about.
 repeats every 3 hours while the water stays there, and at Bahaya it sounds on a higher note and
 repeats every 5. So the alarm is a claim about a river level — and the river levels are already in
 the payload. `sirenBacked()` in `api.php` asks them: `backed` is true when a river within `SIREN_KM`
-(5 km) stands at Amaran or above, false when there are rivers in reach and none is, and **null when
-there is no river within 5 km to ask**. `sounding()` in `util.js` reads `backed !== false`, so the
+(5 km then, 2 km since 2026-11-10) stands at Amaran or above, false when there are rivers in reach and none is, and **null when
+there is no river within reach to ask**. See "The siren check asks rivers within 2 km" for the change. `sounding()` in `util.js` reads `backed !== false`, so the
 null case keeps the benefit of the doubt. Silencing a real evacuation alarm is far worse than
 carrying a doubtful one, and 194 of 212 sirens have a river inside 5 km — 133 inside 2 km — so the
 unanswerable case is 18 stations, not a hole in the middle of the feature.
@@ -21062,3 +21062,15 @@ A station that is offline, reads over 24 hours old, or has `backed === false` ne
 **The origin.** Push needs https, and the app is installed from `https://floodwatch.taila2a82f5.ts.net`. That is a different origin from the plain http address. A phone that installed the app from the old address keeps its favorites and its ignored list there. The reader installs again from the https name and enters both lists again.
 
 **The stale tab fix, shipped in the same change.** A tab that slept for a long time came back to old readings and an old title count. `polled` in `js/app.js` was stamped when a poll started. A poll that failed on wake then made the catch-up skip. Now `load()` returns true or false, and `polled` is stamped on success only. The catch-up asks for 45 seconds, the first-load budget, because the server cache is cold by then.
+
+### The siren check asks rivers within 2 km
+
+The repository owner asked for this on 2026-11-10. A siren card said "No river nearby is high." about a river several kilometres away. BANDAR BARU KUNDANG (F2) was called faulty off a river 2.82 km away on SG. KUANG. A river that far off is often on another stream, so its calm reading says nothing about the water at the siren.
+
+`SIREN_KM` in `api.php` went from 5 km to 2 km. A siren with no river inside 2 km gets `backed: null`, and `sounding()` keeps its alarm. So the change can restore an alarm and cannot mute one. `$sirenFrames` reads the same constant, so the camera archive verdicts moved with it.
+
+Measured on 2026-11-10: 136 of 213 sirens have a river inside 2 km, against 195 inside 5 km. The median distance to the nearest river is about 1.4 km. 2 km is also `CAM_ALERT_KM`, the radius at which a camera picture counts as showing the trouble.
+
+**The cost is real.** A stuck relay with only a far river behind it alerts again. SIREN PEKAN BANTING stands 4.26 km from its one river, and it was one of the two sirens this check was built for. The selftest now puts its test river 1.0 km off and asserts that the real one is not asked.
+
+**Deliberately not done: a basin match.** Of the 81 sirens with a basin and a river within 5 km, the nearest river names a different basin for 49. The names are too loose to join on. The F2 sirens publish no basin at all.

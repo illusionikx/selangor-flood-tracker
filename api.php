@@ -119,10 +119,15 @@ const SIREN_TTL   = 3600;
 const SIREN_STAMP = STATE . '/.siren.stamp';
 /* Range from a siren to the river that siren watches. JPS sounds a siren at the Amaran mark, so the
    alarm is a claim about a level we already hold. A 1 with no high river behind it is a stuck relay.
-   Measured: 194 of 212 sirens have a river inside 5 km, 133 inside 2 km, 9 have none inside 10 km.
-   5 km is where the curve flattens. Generous on purpose. Too wide only keeps a doubtful alarm
-   standing. Too narrow silences a real one. */
-const SIREN_KM = 5.0;
+   2 km since 2026-11-10, on the repository owner's instruction. It was 5 km, and a river 3 or 4 km
+   off is often on another stream. BANDAR BARU KUNDANG (F2) was called faulty off a river 2.82 km
+   away on SG. KUANG, and the card said "No river nearby is high." A siren with no river inside 2 km
+   gets null, which keeps its alarm. So a narrower radius can only restore an alarm, never mute one.
+   The cost: a stuck relay with only a far river behind it alerts again. SIREN PEKAN BANTING, 4.26 km
+   from its river, is that case. Measured 2026-11-10: 136 of 213 sirens have a river inside 2 km,
+   195 inside 5 km. 2 km is CAM_ALERT_KM, the radius at which this app already says "this picture
+   shows the trouble". */
+const SIREN_KM = 2.0;
 /* The faulty-signal checks on a rain gauge and a flood gauge. See rainBacked() and frozen().
    RAIN_ASK is the lowest hourly reading the rain checks judge. It is the top of JPS's light class.
    Below it a reading changes no pin colour and raises no alert, so a faulty verdict there could only
@@ -2649,36 +2654,39 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
 
     /* sirenBacked() decides whether a sounding siren is believed, and a wrong answer is silent both
        ways: too strict and a real evacuation alarm never reaches the panel, too loose and the app
-       bar sits red for days on a stuck relay. The coordinates are real — SIREN PEKAN BANTING and
-       its only river 4.26 km off, and KG. MELAYU SUBANG, the 127-hour alarm this rule was for. */
+       bar sits red for days on a stuck relay. The siren coordinate is real: SIREN PEKAN BANTING.
+       Its only real river is 4.26 km off, past SIREN_KM, so the test river stands 1.0 km off. */
     echo "\nsirenBacked():\n";
     [$slat, $slng] = [2.811543, 101.508659];        // SIREN PEKAN BANTING
     $near = [1.68, 2.7];                            // KG. SG. MANGGIS: level, Amaran mark
     $ok('no rivers in reach is unknown, not refused',
         sirenBacked($slat, $slng, []) === null);
-    $ok('a river 4.3 km off below Amaran refuses',
-        sirenBacked($slat, $slng, [[2.849, 101.531, 0]]) === false);
+    $ok('a river 1.0 km off below Amaran refuses',
+        sirenBacked($slat, $slng, [[2.818, 101.515,0]]) === false);
     $ok('the same river at Amaran backs it',
-        sirenBacked($slat, $slng, [[2.849, 101.531, 2]]) === true);
+        sirenBacked($slat, $slng, [[2.818, 101.515,2]]) === true);
     $ok('Bahaya backs it too',
-        sirenBacked($slat, $slng, [[2.849, 101.531, 3]]) === true);
+        sirenBacked($slat, $slng, [[2.818, 101.515,3]]) === true);
     // Status 1 is Siaga, one mark below the level JPS says makes a siren sound.
     $ok('Siaga alone does not back it',
-        sirenBacked($slat, $slng, [[2.849, 101.531, 1]]) === false);
+        sirenBacked($slat, $slng, [[2.818, 101.515,1]]) === false);
     $ok('a flat Siaga river does not back it',
-        sirenBacked($slat, $slng, [[2.849, 101.531, 1, 0.02]]) === false);
+        sirenBacked($slat, $slng, [[2.818, 101.515,1, 0.02]]) === false);
     // The water can reach Amaran before the next river reading says so.
     $ok('a Siaga river climbing past RISE_FLOOR backs it',
-        sirenBacked($slat, $slng, [[2.849, 101.531, 1, 0.15]]) === true);
+        sirenBacked($slat, $slng, [[2.818, 101.515,1, 0.15]]) === true);
     $ok('a climbing river under Siaga does not',
-        sirenBacked($slat, $slng, [[2.849, 101.531, 0, 0.5]]) === false);
+        sirenBacked($slat, $slng, [[2.818, 101.515,0, 0.5]]) === false);
     $ok('one river up among quiet ones backs it',
-        sirenBacked($slat, $slng, [[2.849, 101.531, 0], [2.80, 101.50, 3]]) === true);
+        sirenBacked($slat, $slng, [[2.818, 101.515,0], [2.80, 101.50, 3]]) === true);
     // A flooding river on the other side of the state says nothing about this siren.
     $ok('a river past SIREN_KM is not asked',
         sirenBacked($slat, $slng, [[3.20, 101.70, 3]]) === null);
+    // The real river, 4.26 km off on 2026-11-10. Too far to speak for this siren.
+    $ok('a quiet river 4.3 km off is not asked',
+        sirenBacked($slat, $slng, [[2.849, 101.531, 0]]) === null);
     $ok('a far flood cannot back a near refusal',
-        sirenBacked($slat, $slng, [[2.849, 101.531, 0], [3.20, 101.70, 3]]) === false);
+        sirenBacked($slat, $slng, [[2.818, 101.515,0], [3.20, 101.70, 3]]) === false);
 
     /* camFix() overrides a coordinate the feed publishes, which is the one thing in this file that
        makes the map disagree with its source on purpose. Both directions have to hold: it must move
