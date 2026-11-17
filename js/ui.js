@@ -1850,7 +1850,11 @@ async function openLightbox(src, name, alt) {
   // `.player`, not `.stage`: on a phone the pill sits above the frame rather than in a corner of it,
   // and `.stage` is exactly the frame.
   if (c) lightbox.querySelector('.player').insertAdjacentHTML('beforeend', camWarn(c));
-  lbCam = n || null;
+  /* The route names the camera by its number. The server build carries it in `?cam=`. The static
+     build hotlinks the picture, so `src` holds no number, and the camera is found by its picture. A
+     viewer with no camera at all still gets the bare path `/camera`, see its view below. */
+  const rc = c || state.data.find(s => s.kind === 'camera' && s.image && camSrc(s) === src);   // `image` is null for a camera with no feed
+  lbCam = rc ? rc.id.split('-')[1] : null;
   lightbox.showModal();
   sync();
   /* The picture opens first and the player follows. The frame is already on screen, so the reader
@@ -1941,7 +1945,11 @@ view({
 let lbCam = null;   // the camera number in the viewer, or null when the picture has none
 view({
   z: 70, overlay: true, title: () => el('lbTitle').firstChild?.textContent || 'Camera',
-  path: () => (lightbox.open && lbCam ? '/camera/' + lbCam : null),
+  /* **A viewer with no camera number still has an address.** The page showed one view and the
+     address named none. A Back press then closed the wall under the viewer and left the viewer
+     open over the map. That is how the GitHub Pages build behaved until 2026-11-17, because its
+     picture URLs hold no number. `/camera` opens nothing on a landing and falls back to the map. */
+  path: () => (lightbox.open ? (lbCam ? '/camera/' + lbCam : '/camera') : null),
   match: q => q.startsWith('/camera/'),
   open: q => {
     const s = byId('camera-' + dec(q.slice(8)));

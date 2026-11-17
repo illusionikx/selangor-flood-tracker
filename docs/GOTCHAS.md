@@ -3922,6 +3922,14 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   locations in `docs/DEPLOY.md` that set `Cache-Control` include the security snippet again for that
   reason. A new location with its own `add_header` needs the include, or it answers with no security
   headers and nothing says so.
+- **A view that is open and has no address makes Back close the wrong thing.** The camera viewer
+  took its route from `?cam=<n>` in the picture URL. The GitHub Pages build hotlinks the picture, so
+  its URL holds no number, the viewer had no path, and Back closed the camera wall under it and left
+  the viewer open over the map. Found on 2026-11-17 by running the flow against a static build served
+  the way Pages serves it, and not by any check in this repository. The viewer now finds its camera
+  by its picture when the URL has no number, and falls back to the bare path `/camera`. **A camera
+  station can have `image: null`, and `camSrc()` reads `image.replace` on the static build.** The
+  first version of the fix called it on every camera and threw. Guard with `s.image` first.
 - **A shown layer and a stored layer are two values, and `visitLayer()` keeps them apart.**
   `PREFS` is one blob, and every `save()` writes all of it. Writing `PREFS.mapLayer` directly for a
   visit stores it with the next favorite. Go through `visitLayer()`.
