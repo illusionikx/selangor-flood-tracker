@@ -1639,6 +1639,31 @@ function wxRows(array $pts, array $box, array $places, array $metDay, array $pas
     return $out;
 }
 
+/* **Upstream text reaches the page as markup.** About 25 places in js/ write a station name, a
+   district or a basin into a template string, and some of them write it into a quoted attribute. The
+   feeds are JPS and MET pages that this app does not control. So this removes the characters that
+   open a tag or close an attribute, and the control characters, before the payload leaves. `&` and
+   the apostrophe stay, because real names carry them and neither one can leave a text node or a
+   double-quoted attribute. `$breaks` keeps tab, newline and return for a warning, whose text the
+   page splits into items. The pattern has no `u` flag on purpose. On invalid UTF-8 that flag returns
+   null and would blank the name. Every byte it removes is ASCII, and a multibyte character never
+   holds one. See "Upstream text" in docs/FEATURES.md for why the fix sits here and not at the 25
+   sites, and for the Content-Security-Policy that backs it up. */
+function plainText(string $s, bool $breaks = false): string {
+    return preg_replace($breaks ? '/[<>"\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/' : '/[<>"\x00-\x1F\x7F]/', '', $s) ?? '';
+}
+function plainDeep(mixed $v, bool $breaks = false): mixed {
+    if (is_string($v)) return plainText($v, $breaks);
+    if (is_array($v)) foreach ($v as $k => $x) $v[$k] = plainDeep($x, $breaks);
+    return $v;
+}
+/* An id is a prefix and a code, and the client writes it into `data-*` attributes and a path. The KL
+   and portal ids carry a code scraped from a page. A row whose id is off this shape is dropped, and
+   the same shape is what push.php already holds a phone's lists to. */
+function idShape(mixed $id): bool {
+    return is_string($id) && preg_match('/^[A-Za-z0-9][A-Za-z0-9-]{0,63}$/D', $id) === 1;
+}
+
 /* `php api.php --selftest` — the guards above, checked offline. Here rather than in a second test
    file: the rules are arithmetic on a few integers, and a separate test would need a third file to
    hold them. CLI only, and it exits before the first header. */
@@ -1851,6 +1876,19 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
         pushDoc(json_encode(['sub' => null, 'endpoint' => 'https://x/y', 'on' => [], 'favs' => [], 'ignored' => []]))['endpoint'] === 'https://x/y');
     $ok('an http endpoint fails',           pushDoc(json_encode(['sub' => ['endpoint' => 'http://x/y'] + $pSub,
                                                 'on' => [], 'favs' => [], 'ignored' => []])) === null);
+    // The host list. A good endpoint on each vendor's service passes. Everything that aims the server
+    // elsewhere fails, whatever its shape.
+    foreach (['https://fcm.googleapis.com/fcm/send/abc', 'https://updates.push.services.mozilla.com/wpush/v2/abc',
+              'https://wns2-par02p.notify.windows.com/w/?token=x', 'https://web.push.apple.com/abc'] as $pOk)
+        $ok("a push service passes: $pOk",  is_array(pushDoc(json_encode(['sub' => ['endpoint' => $pOk] + $pSub,
+                                                'on' => [], 'favs' => [], 'ignored' => []]))));
+    foreach (['https://169.254.169.254/latest/meta-data/', 'https://localhost/x', 'https://127.0.0.1/x',
+              'https://[::1]/x', 'https://evil.example/x', 'https://evilfcm.googleapis.com/x',
+              'https://fcm.googleapis.com.evil.example/x', 'https://fcm.googleapis.com@evil.example/x',
+              'https://user:pw@fcm.googleapis.com/x', 'https://fcm.googleapis.com:8443/x',
+              'https://notify.windows.com.evil.example/x', 'https:///x'] as $pEvil)
+        $ok("a non-push host fails: $pEvil", pushDoc(json_encode(['sub' => ['endpoint' => $pEvil] + $pSub,
+                                                'on' => [], 'favs' => [], 'ignored' => []])) === null);
     $ok('a sub with no keys fails',         pushDoc(json_encode(['sub' => ['endpoint' => 'https://x'], 'on' => [],
                                                                  'favs' => [], 'ignored' => []])) === null);
     $ok('a non-object fails',               pushDoc('[1,2]') === null);
@@ -1866,6 +1904,20 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
     foreach (['a b', 'x/../y', "x\n", '', str_repeat('a', 65)] as $pBad)
         $ok('a malformed id fails: ' . json_encode($pBad), pushDoc(json_encode(['sub' => $pSub, 'on' => [],
                                                 'favs' => [$pBad], 'ignored' => []])) === null);
+
+    echo "\nplainText():\n";
+    $ok('a tag loses its brackets',        plainText('<img src=x onerror=1>') === 'img src=x onerror=1');
+    $ok('a quote cannot close an attribute', !str_contains(plainText('A" onmouseover="x'), '"'));
+    $ok('a real name is untouched',        plainText("Taman Sri Muda (F2)") === 'Taman Sri Muda (F2)');
+    $ok('an apostrophe and & stay',        plainText("O'Brien & Sons") === "O'Brien & Sons");
+    $ok('a multibyte character stays',     plainText('Kuala Lumpur — Pusat') === 'Kuala Lumpur — Pusat');
+    $ok('invalid UTF-8 is not blanked',    plainText("Taman \xC3 Muda") === "Taman \xC3 Muda");
+    $ok('control characters go',           plainText("a\x00b\nc\t") === 'abc');
+    $ok('a warning keeps its line breaks', plainText("a\nb\tc\x00", true) === "a\nb\tc");
+    $ok('plainDeep reaches a nested value', plainDeep(['met' => ['at' => '<b>x'], 'n' => 3.5, 'k' => null]) === ['met' => ['at' => 'bx'], 'n' => 3.5, 'k' => null]);
+    $ok('a station id passes',             idShape('kl-wl-0230501WL') && idShape('prf-' . md5('x')) && idShape('camera-100003'));
+    foreach (['', 'a b', '"x', 'x"><img', "x\n", '-x', str_repeat('a', 65), null, 5] as $badId)
+        $ok('an off-shape id fails: ' . json_encode($badId), !idShape($badId));
 
     echo "\npushBody():\n";
     $pSt = [
@@ -1906,14 +1958,23 @@ if (PHP_SAPI === 'cli' && in_array('--selftest', $argv ?? [], true)) {
     $ok('an unreadable row does not throw, and goes', pushKeys() === null
                                                    || (int)$pMem->query('SELECT COUNT(*) FROM push')->fetchColumn() === 0);
     // An encryptable-looking row whose send throws stays, whatever threw. Skipped without keys.
-    $pMem->exec("INSERT INTO push VALUES ('https://example.invalid/y', '"
-        . json_encode(['sub' => ['endpoint' => 'https://example.invalid/y', 'keys' => ['p256dh' => 'a', 'auth' => 'b']],
+    // The host is a real push service, so the row reaches the send, and the keys are junk, so the
+    // send throws before it opens a connection.
+    $pMem->exec("INSERT INTO push VALUES ('https://fcm.googleapis.com/y', '"
+        . json_encode(['sub' => ['endpoint' => 'https://fcm.googleapis.com/y', 'keys' => ['p256dh' => 'a', 'auth' => 'b']],
                        'on' => ['anyWarn' => true], 'favs' => [], 'ignored' => []]) . "', '{}', '{}', 0)");
     $pLive2 = [['id' => 'wl-1', 'kind' => 'river', 'status' => 3, 'online' => true,
                 'updated' => date('d/m/Y H:i:s', $now - 60)]];
     pushSend($pMem, $pLive2, $now);
     $ok('a send that throws keeps its row',      pushKeys() === null
                                                    || (int)$pMem->query('SELECT COUNT(*) FROM push')->fetchColumn() === 1);
+    // A stored row on a host that is not a push service is never called, and never deleted.
+    $pMem->exec("INSERT INTO push VALUES ('https://example.invalid/w', '"
+        . json_encode(['sub' => ['endpoint' => 'https://example.invalid/w', 'keys' => ['p256dh' => 'a', 'auth' => 'b']],
+                       'on' => ['anyWarn' => true], 'favs' => [], 'ignored' => []]) . "', '{}', '{}', 0)");
+    pushSend($pMem, $pLive2, $now);
+    $ok('a row on a non-push host is kept, and not called',
+        (int)$pMem->query("SELECT COUNT(*) FROM push WHERE endpoint = 'https://example.invalid/w'")->fetchColumn() === 1);
     pushSend($pMem, [], $now);
     $ok('an empty payload does not throw',       true);
     // An empty budget stops before the first phone. The row it did not reach keeps its state, which is
@@ -4576,6 +4637,18 @@ foreach ($stations as &$s) {
     if ($met) $s['met'] = $met;
 }
 unset($s);
+
+/* The last step before the bytes leave: text that a page will treat as markup is made plain, and a
+   station with an id the client cannot carry is dropped and logged. This runs after every join, so it
+   changes no name that a join compared. */
+$stations = array_values(array_filter($stations, function ($s) {
+    if (idShape($s['id'] ?? null) && (!isset($s['site']) || idShape($s['site']))) return true;
+    error_log('payload: dropped a station with an id off the allowed shape');
+    return false;
+}));
+$stations = array_map(fn($s) => plainDeep($s), $stations);
+$warnAll  = array_map(fn($w) => plainDeep($w, true), $warnAll);
+$notices  = plainDeep($notices);
 
 $payload = json_encode([
     'fetched'  => date('c'),

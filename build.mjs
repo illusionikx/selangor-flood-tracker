@@ -34,11 +34,17 @@ import path from 'node:path';
 
 const STATIC = process.argv.includes('--static');
 const OUT = 'site';
+/* **The base path, `/` by default.** `index.html` carries `<base href="/">`, because a view has an
+   address such as `/station/wl-1` and every relative URL must resolve against the site root. A host
+   that serves the app under a path needs that tag to say so. GitHub Pages serves it under `/<repo>/`.
+   The render checks read the build at `/site/`. `npm run build:check` passes that. */
+const BASE = process.argv.find(a => a.startsWith('--base='))?.slice(7) || '/';
 
 /* Fail loudly, and never write a half-built site. Every rewrite below asserts that it matched
    something. A silent no-match is the failure mode this whole file exists to remove, so it must not
    be the failure mode of the file itself. */
 const need = (ok, msg) => { if (!ok) { console.error(`build: ${msg}`); process.exit(1); } };
+need(/^\/(?:[\w.~-]+\/)*$/.test(BASE), `--base must start and end with a slash, got "${BASE}"`);
 
 /* **This deletes `site/`, and the server build puts `api.php` in there.** `api.php` writes its state
    into its own directory: `.history.db`, `.cache.json`, `shots/` and the two logs. So a build run
@@ -201,6 +207,7 @@ for (const n of cssFiles)
   swap(new RegExp(`href="css/${n}\\.css(?:\\?v=\\d+)?"`),
        `href="${rel(cssOut[n])}"`, `the ${n}.css link`);
 swap(/src="js\/app\.js"/, `src="${rel(entry)}"`, 'the app.js script tag');
+swap(/<base href="\/">/, `<base href="${BASE}">`, 'the base tag');
 /* GitHub Pages runs no PHP and serves the baked `api.json`. The preload has to name the file that
    js/config.js fetches on that target, or the browser fetches the payload twice. */
 if (STATIC) swap(/<link rel="preload" href="api\.php"/, '<link rel="preload" href="api.json"',
@@ -226,6 +233,10 @@ need(!/<[^!][^>]*-->/.test(html), 'index.html: "-->" inside a tag. The comment s
 html = html.replace(/<!--[\s\S]*?-->/g, '').replace(/\n[ \t]*(?=\n)/g, '');
 
 fs.writeFileSync(path.join(OUT, 'index.html'), html);
+/* GitHub Pages serves `404.html` for any path it does not hold, which is every view address. The
+   copy is the same document, so a link to `/<repo>/station/wl-1` opens the app, and the router reads
+   the path. The status is still 404, and that is the cost Pages charges. */
+if (STATIC) fs.writeFileSync(path.join(OUT, '404.html'), html);
 
 /* ---------------------------------------------------------------- 5. sw.js
 

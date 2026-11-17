@@ -7,6 +7,7 @@ import { state } from './state.js';
 import { distKm, isHot, tier, TIER_RANK, isIgnored, noSec, isFav, esc,
          warnWhen } from './util.js';
 import { side, openSide, closeSide } from './map.js';
+import { routeName } from './route.js';
 import { etaText, stamp } from './popup.js';
 
 /* The list shares #side with the station cards. `@`-prefixed, so render()'s per-poll refresh leaves
@@ -17,6 +18,15 @@ import { etaText, stamp } from './popup.js';
 const KEY = '@alerts';
 let card = '';        // last built list, so the button can open it without waiting for a poll
 const TITLE = document.title;   // the base, read once — alerts() prefixes a count onto it
+/* The tab title is the alert count, then the name of the view on top, then the app. The router
+   names the view and fires `route` when it changes. A history list then shows `Settings · Klang
+   Valley Flood Watch` and not the same line for every entry. */
+let liveN = 0;
+const paintTitle = () => {
+  const r = routeName();
+  document.title = (liveN ? `(${liveN}) ` : '') + (r ? `${r} · ` : '') + TITLE;
+};
+document.addEventListener('route', paintTitle);
 
 /* Two panes, M3 primary tabs, sensors first. The station alerts and the regional notices answer two
    different questions, and a night that trips twenty sirens used to bury a flood forecast under
@@ -405,7 +415,8 @@ export function alerts() {
 
   // Same number again, for the tab strip and the window title bar — the one alert surface that is
   // readable while the page is in a background tab.
-  document.title = (live.length ? `(${live.length}) ` : '') + TITLE;
+  liveN = live.length;
+  paintTitle();
 
   /* **Every kind of alert in this head is an M3 assist chip, on a reader's instruction of
      2026-08-25.** They were `.tally b`, a 12px pill on a 16% tint of its own status colour. The

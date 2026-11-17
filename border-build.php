@@ -1,4 +1,5 @@
 <?php
+if (PHP_SAPI !== 'cli') exit;   // a command-line script, and never a page. Herd would otherwise run it for a visitor
 /**
  * php border-build.php — bakes border.json, the outline of the coverage area.
  *

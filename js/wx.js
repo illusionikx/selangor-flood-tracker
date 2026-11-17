@@ -223,6 +223,16 @@ export function carry(key) {
   return true;
 }
 
+/* A path names a point by its id, so the router opens one here. It needs `pts`, which `tick()`
+   fills. Returning false is the case with no answer: the id is not one of the points MET published. */
+export function openPoint(id) {
+  const p = pts.find(x => x.id === id);
+  if (!p) return false;
+  openSide('@wx-' + p.id, card(p));
+  focusOn([p.lat, p.lng], 12);
+  return true;
+}
+
 /* Reads the preference and writes the control and the layer. syncHeat() writes the summary now,
    because it already reads both preferences. It never reads the control back. A browser
    restores a checkbox across a reload without firing `change`. So an invariant repaired inside a

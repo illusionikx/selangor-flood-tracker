@@ -19,20 +19,22 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `api.php` | server-side proxy + cache + source merge + poll history + camera image proxy + rate-limited `?force=1` + place lookup (`?place=`, proxies Nominatim) + weather layer lookup (`?wx=1`) |
 | `sources.php` | scrapers for the two HTML-only upstreams (national portal, JPS WP) and the three MET feeds (nowcast, forecast, warning). Also the national portal's rainfall table, gazetteer and 7-day history endpoints. Also the two JPS notice parsers: the MET mirror, the flood alert |
 | `shots.php` | camera archive: capture, retention tiers, lookup, and the on-request strip (`buildSheet()`) the wall and the clip play. Required by `api.php` |
-| `shots-test.php` | `php shots-test.php` — one of nine runnable checks. Guards retention. Exercises `pruneShots()` |
-| `push.php` | push notifications, the server half. Pure rules (`pushLevel`, `pushMatch`, `pushDiff`, `pushDoc`) that `--selftest` runs offline, the body builder, and `pushSend()`, which runs at the end of a refresh BEFORE `captureShots()`. Required by `api.php`. See "Push notifications" in `docs/FEATURES.md` |
+| `shots-test.php` | `php shots-test.php` — one of ten runnable checks. Guards retention. Exercises `pruneShots()` |
+| `push.php` | push notifications, the server half. Pure rules (`pushLevel`, `pushMatch`, `pushDiff`, `pushDoc`, `pushHost`) that `--selftest` runs offline, the body builder, and `pushSend()`, which runs at the end of a refresh BEFORE `captureShots()`. Required by `api.php`. See "Push notifications" in `docs/FEATURES.md` |
 | `push-keys.php` | `php push-keys.php` — makes the VAPID key pair once, into `.vapid.json` (gitignored, excluded from the rsync). Refuses to run twice, because a new pair cuts off every subscribed phone. Run by hand, never in a request |
 | `js/push.js` | push notifications, the browser half. Deferred. Subscribes, posts the switches and the two lists to `?push=1`, and sends the test. `js/ui.js` owns the Settings subpage (`#setPush`, opened from the Alerts group) and `sw.js` shows the message |
 | `log.php` | where a browser error lands. `js/oops.js` is the only caller. Appends one JSON line to `.client-errors.log` |
 | `watch.php` | reads a payload on stdin and complains when it is wrong. The poll cron pipes into it. Reports a change of state, never a state |
 | `.user.ini` | per-directory PHP settings. Holds one line, `session.auto_start=0`, and the reason it is there |
-| `index.html` | markup only — no inline CSS or JS |
-| `title-test.html` | `chrome --headless --dump-dom` — one of nine runnable checks. Guards the wordmark ladder in both of the heading's homes, the app bar and the navigation rail, in rendered pixels |
-| `narrow-test.html` | `chrome --headless --dump-dom` — one of nine runnable checks. Guards the narrow-window block: its threshold, its coverage, its refusal to be dismissed, and that it is modal |
-| `keys-test.html` | `chrome --headless --dump-dom`. One of nine runnable checks. Guards the keyboard. It presses each one-key shortcut and reads what moved. It checks that the Help sheet prints every key. It checks the three gates: typing, a modal dialog and Ctrl. It checks that a table row takes Tab and arrow travel. It checks that the camera wall steps by tile and by row. It checks that the map cursor moves the selection teardrop and gives it the focus ring. It checks that every focus ring resolves to one width and colour. Takes `?base=/site/` |
+| `index.html` | markup only. No inline CSS or JS. It holds the `<base href>` and the Content-Security-Policy `<meta>` tag, and both come before every URL |
+| `title-test.html` | `chrome --headless --dump-dom` — one of ten runnable checks. Guards the wordmark ladder in both of the heading's homes, the app bar and the navigation rail, in rendered pixels |
+| `narrow-test.html` | `chrome --headless --dump-dom` — one of ten runnable checks. Guards the narrow-window block: its threshold, its coverage, its refusal to be dismissed, and that it is modal |
+| `keys-test.html` | `chrome --headless --dump-dom`. One of ten runnable checks. Guards the keyboard. It presses each one-key shortcut and reads what moved. It checks that the Help sheet prints every key. It checks the three gates: typing, a modal dialog and Ctrl. It checks that a table row takes Tab and arrow travel. It checks that the camera wall steps by tile and by row. It checks that the map cursor moves the selection teardrop and gives it the focus ring. It checks that every focus ring resolves to one width and colour. Takes `?base=/site/` |
 | `js/keys.js` | the keyboard. Holds `KEYS`, the eight one-key shortcuts. Holds the map cursor, which is Shift and an arrow over the canvas pins. Holds arrow travel through the alert rows, the table rows, the camera wall and the kinds menu. `app.js` imports it last, and nothing imports it |
-| `paint-check.html` | `chrome --headless --dump-dom` — one of nine runnable checks. Guards the layer chips over the map: that the panel and its two openers are gone, that the filters panel and every district id are gone too, that a menu chip states its own value and a filter chip carries a checkmark, that the heatmap and the two filters leave with the station layer, that a filter chip clears itself on a second press, that nothing else on the map lands on the row, and that below 600px the row wraps rather than scrolling |
-| `m3-check.html` | `chrome --headless --dump-dom` — one of nine runnable checks. Guards every M3 surface in rendered pixels: the nine dialogs against the roll call and the kind each is declared as, the four-band ladder, the map as an inset card, the one motion that changes what the pane holds, the supporting pane's headers and all six dialog headers as one M3 medium flexible top app bar, measured against each other at both widths, the supporting pane at M3's canonical ratios with the map giving up exactly that width, the pane as a side sheet above 600px and a full-screen dialog below it, and the station panel as an M3 list, one item per sensor, with its readings as a standard list under a 24px kind glyph, each section a folding <details> opened by a divider. Also the navigation rail at both its widths, the navigation bar below 600px, and that every enter carries M3's own duration and easing. Also the table dialog and the camera wall. Both take the one inset, shared by the search bar, the count line and the grid. The search bar states its own 56px shape. The sort target reaches 56dp. A tile states its container tone and a 12dp corner. The check also guards the two deletions, so a half-finished revert cannot ship silently. Also the warning dialog's body, as a declaration and in pixels, because Blink draws its broken rule and its fixed rule the same way |
+| `route-test.html` | `chrome --headless --dump-dom`. One of ten runnable checks. Guards the routes. It presses each opener and reads the path. It presses Back and Forward. It closes each dialog and asserts that the path steps back and leaves no entry behind. It checks that a camera opened over the wall returns to the wall. It checks that the old `#station=` and `#alerts` links become paths, and that a path that names nothing returns to the map. It lands cold on each path. Takes `?base=/site/`, and skips the cold landings there, because Herd cannot answer a deep path from the build directory |
+| `js/route.js` | the router. One path for each view, and Back steps through them. `sync()` writes the path of the view on top after every opener and every dialog `close`. `apply()` makes the page show the path on Back, Forward and landing. A view registers with `view()`. Imports nothing, so `map.js` and `ui.js` both import it. `app.js` calls `start()`. See "Each view has an address" in `docs/FEATURES.md` |
+| `paint-check.html` | `chrome --headless --dump-dom` — one of ten runnable checks. Guards the layer chips over the map: that the panel and its two openers are gone, that the filters panel and every district id are gone too, that a menu chip states its own value and a filter chip carries a checkmark, that the heatmap and the two filters leave with the station layer, that a filter chip clears itself on a second press, that nothing else on the map lands on the row, and that below 600px the row wraps rather than scrolling |
+| `m3-check.html` | `chrome --headless --dump-dom` — one of ten runnable checks. Guards every M3 surface in rendered pixels: the nine dialogs against the roll call and the kind each is declared as, the four-band ladder, the map as an inset card, the one motion that changes what the pane holds, the supporting pane's headers and all six dialog headers as one M3 medium flexible top app bar, measured against each other at both widths, the supporting pane at M3's canonical ratios with the map giving up exactly that width, the pane as a side sheet above 600px and a full-screen dialog below it, and the station panel as an M3 list, one item per sensor, with its readings as a standard list under a 24px kind glyph, each section a folding <details> opened by a divider. Also the navigation rail at both its widths, the navigation bar below 600px, and that every enter carries M3's own duration and easing. Also the table dialog and the camera wall. Both take the one inset, shared by the search bar, the count line and the grid. The search bar states its own 56px shape. The sort target reaches 56dp. A tile states its container tone and a 12dp corner. The check also guards the two deletions, so a half-finished revert cannot ship silently. Also the warning dialog's body, as a declaration and in pixels, because Blink draws its broken rule and its fixed rule the same way |
 | `kind-color-lab.html` | the station kind palette, derived in OKLCh at load. **Not a check** — it renders for a person to read, and it prints no verdict. It fetches `css/base.css` and reports whether the app still holds what the rule builds, so open it after any palette edit. It was seven competing options until 2026-08-26 and holds one palette now |
 | `css/icons.css` | every icon, as an SVG mask. Generated — see docs/FEATURES.md for the fetch |
 | `css/base.css` | tokens, reset, controls, blocks shared by popup + alert panel |
@@ -45,14 +47,14 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `help-shot.html` | **Not a check and not part of the app.** The page `help-build.php` captures. It loads the app in a fixed-size frame, turns on test mode, opens the card, the viewer or the camera wall, and writes the box of each labeled control. Its `SHOTS` table holds the keys that `data-mark` names in Help |
 | `js/oops.js` | reports a browser throw, a rejected promise or a failed asset to `log.php`. No imports, and `app.js` imports it first |
 | `js/config.js` | constants (kinds, palettes, thresholds, tile styles, `WEATHER`). Also `NOTICE`, the words for an upstream outage. No imports. |
-| `js/state.js` | `state` (data + hereAt) and the `PREFS` blob. Breaks module cycles. |
+| `js/state.js` | `state` (data + hereAt) and the `PREFS` blob. Breaks module cycles. `visitLayer()` shows a map layer for one visit, and `save()` keeps writing the stored one |
 | `js/util.js` | pure helpers + `hasInfo()` / `color()` / `isIgnored()` |
 | `js/stations.js` | queries over the station set (`nearestOf`, `nearestCam`, `byId`) |
 | `js/pins.js` | the station pins and the cluster chips, painted on ONE canvas. Sprite cache, greedy grid clustering, hit testing, and the danger halo's own frame loop. Replaced Leaflet.markercluster |
 | `js/map.js` | map instance, basemap/theme, the pin layer, the station panel (`openSide`), `focusOn` / `flashTo`. Also `cover`, ONE rectangle off `border.json`'s land ring, which is the pan limit, the zoom floor, the tile skip and `inCover()` all four, with `coverReady` the wait every caller of it needs. The ground stops at that rectangle and the map asks for no tile outside it. **Nothing shades the outside any more** — the mask, its pane, its stripes and its tokens all left on 2026-09-23. The map draws no water of its own on either theme. Also the zoom ceiling, 15, and `disableClusteringAtZoom: 15` on the cluster, which is what makes 15 the zoom that merges nothing |
 | `js/heat.js` | both heat layers (water level, rainfall), ground-fixed sizing per layer, shared opacity. Also the field pass where a gauge reporting no rain denies the ground a wet one claims |
-| `heat-test.html` | `chrome --headless --dump-dom` — one of nine runnable checks. Guards the rain layer's paint distance, its dry-gauge erase and its handover between neighbours, in canvas pixels |
-| `map-limits-test.html` | `chrome --headless --dump-dom` — one of nine runnable checks. Guards the coverage box, the zoom floor and the pan limit. It asserts that the box holds every point of the land ring, that it stops short of the maritime corner in `bounds`, that it carries a margin past the land, and that Kuala Lumpur, Putrajaya and Shah Alam sit inside it while Melaka does not. It asserts that the pan box IS the coverage box, so the floor and the limit cannot part. It asserts the ABSENCE of all four parts of the deleted shading: the `.covermask` path, the `#hatchdef` sprite, the `.coverframe` mask and the `mask` pane. It also asserts that no water pane and no river pane came back on either theme, that each of the two tile panes carries the exact filter its theme states and the ground layer inside carries none, that the map asks for no tile outside the box, and that every tile level clips to it |
+| `heat-test.html` | `chrome --headless --dump-dom` — one of ten runnable checks. Guards the rain layer's paint distance, its dry-gauge erase and its handover between neighbours, in canvas pixels |
+| `map-limits-test.html` | `chrome --headless --dump-dom` — one of ten runnable checks. Guards the coverage box, the zoom floor and the pan limit. It asserts that the box holds every point of the land ring, that it stops short of the maritime corner in `bounds`, that it carries a margin past the land, and that Kuala Lumpur, Putrajaya and Shah Alam sit inside it while Melaka does not. It asserts that the pan box IS the coverage box, so the floor and the limit cannot part. It asserts the ABSENCE of all four parts of the deleted shading: the `.covermask` path, the `#hatchdef` sprite, the `.coverframe` mask and the `mask` pane. It also asserts that no water pane and no river pane came back on either theme, that each of the two tile panes carries the exact filter its theme states and the ground layer inside carries none, that the map asks for no tile outside the box, and that every tile level clips to it |
 | `js/popup.js` | popup + meter + gauge + sparkline templates. Also `wxItem()` and its three helpers, the weather list item both weather surfaces draw |
 | `js/sparktip.js` | the hover/tap readout on every graph, and the label on any `data-tip`. One delegated listener, no imports |
 | `js/render.js` | rebuilds markers and heat points, the two saved lists, and the kind counts |
@@ -70,7 +72,7 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `js/wall.js` | the camera wall: every camera on one page, one timer for all of them |
 | `js/wx.js` | the MET weather layer: the map mode, the pins, and the half-hour panel. `hereCard()` draws that panel over the reader's own fix, and `carry()` hands a card across a layer switch. Deferred |
 | `manifest.json` | PWA manifest. `.json`, not `.webmanifest` — see the gotcha below |
-| `sw.js` | service worker: network-first shell cache, and the reason Chrome offers "Install app" |
+| `sw.js` | service worker: cache-first for hashed files, network-first for the rest, and the reason Chrome offers "Install app". A page load of any view path stores under the one root key, and only when the answer is HTML |
 | `icon.svg` | the app mark: bare glyph, no fill. Source for the PNGs *and* the `--i-flood` mask |
 | `icon-build.php` | `php icon-build.php` — rebakes the two icons and prints the mask rule to paste |
 | `water-build.php` | `php water-build.php` — rebakes `water.json` and `rivers.json` from OpenStreetMap. The app reads neither file since 2026-09-15. It runs two Overpass queries. The second asks for `natural=coastline`, to build the sea. `MIN_AREA_KM2` and `MIN_RIVER_KM` are band edges now. They no longer cut a shape. Band 0 rivers run 1.0008 to 94.1182 km. Band 1 runs 0.3003 to 0.9984 km. Band 2 runs 0.0111 to 0.2982 km. Bodies follow the same pattern against 0.01 and 0.002 square kilometres. Also holds the Douglas-Peucker tolerance `TOL_DEG`. Takes `--tol=` and `--dp=` to try a value, and `--cached` to reuse the last raw Overpass answer. Run by hand, never in a request |
@@ -90,14 +92,14 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `maplibre-spike.html` | **throwaway, not a check and not part of the app.** Measures a MapLibre GL vector basemap against the Esri raster one under 460 canvas marks. It loads unpkg and OpenFreeMap, which the app itself never contacts. See docs/FEATURES.md for what it answered |
 | `lib/` | Composer's vendor dir (`symfony/dom-crawler`), gitignored — **not** `vendor/` |
 | `composer.json` | the one server-side dependency. Run `composer install` before first run |
-| `build.mjs` | `npm run build` — writes `site/`, the thing a browser gets. Bundles and minifies, names every output by content hash, generates the `modulepreload` list and the service worker's shell list, and precompresses with gzip and brotli. `npm run build:static` is the GitHub Pages variant. It refuses to run over a live document root |
+| `build.mjs` | `npm run build` — writes `site/`, the thing a browser gets. Bundles and minifies, names every output by content hash, generates the `modulepreload` list and the service worker's shell list, and precompresses with gzip and brotli. `npm run build:static` is the GitHub Pages variant, and it also writes `404.html`. `--base=<path>` rewrites the `<base href>` in `index.html`, and `npm run build:check` passes `--base=/site/` for the render checks. It refuses to run over a live document root |
 | `package.json` | build tooling only, one pinned dependency (esbuild). Nothing here reaches a browser |
 | `site/` | the build output (gitignored). What a deploy publishes. Never a document root — see `build.mjs` |
 | `node_modules/` | npm's output (gitignored). Build time only, the way `lib/` is server-side only |
 | `.github/workflows/pages.yml` | bakes the static GitHub Pages build — runs the PHP on cron, publishes `api.json` |
 | `docs/DEPLOY.md` | both targets: Pages (what it cannot do) and a Debian box / Proxmox LXC (spec, nginx, cron, container traps) |
 | `docs/GOTCHAS.md` | every trap that already cost a debugging session. Left this file on 2026-08-27, over the 150,000-character limit. `## Gotchas` below indexes it |
-| `docs/VERIFY.md` | the nine runnable checks and every sweep over the live payload. Left this file the same day, for the same reason |
+| `docs/VERIFY.md` | the ten runnable checks and every sweep over the live payload. Left this file the same day, for the same reason |
 | `.cache.json` | last payload (gitignored) |
 | `.php-error.log` | this app's own PHP errors, and nothing else (gitignored) |
 | `.client-errors.log` | one JSON line per browser error, written by `log.php` (gitignored) |
@@ -122,8 +124,9 @@ a reader stops paying for the comments that carry this app's reasoning. **Not on
 source.** See "The build" in [`docs/FEATURES.md`](docs/FEATURES.md) for the measurements, the three
 cache-busting rituals it deleted, and the trade-offs taken.
 
-**Four render checks take `?base=/site/` and read the build instead of the source.** They are
-`m3-check`, `paint-check`, `title-test` and `narrow-test`. Run both targets. A check that only reads
+**Six render checks take `?base=/site/` and read the build instead of the source.** They are
+`m3-check`, `paint-check`, `title-test`, `narrow-test`, `keys-test` and `route-test`. Run both
+targets, and build with `npm run build:check` first, because the base tag is fixed text. A check that only reads
 the source guards nothing about what ships, and it has already caught two faults that way.
 
 **Never build into a live document root.** `build.mjs` deletes its output directory on every run,
@@ -733,6 +736,17 @@ order that file holds them. A trap names itself here, and the file states the ev
 - A `preload` needs `crossorigin` when the code asks for the file with `fetch()`.
 - An index on `level(ts)` makes the rebuild slower, and `(ts, level)` makes it faster.
 - A headless screenshot needs a frame of fixed size, and no CSS motion.
+- `<base href>` fixes every relative URL, and it must stay before every tag that holds one.
+- `history.back()` is asynchronous, and a `pushState` in the same task is undone by it.
+- `apply()` must not call `sync()`, and `sync()` must do nothing while `apply()` runs.
+- A dialog's `close` event comes late in headless Chrome under a virtual clock.
+- A notification names a station by its id, and the card is keyed by its site.
+- Herd answers every path with `index.html` and status 200, including `/js/nothere.js`.
+- The Content-Security-Policy is a `<meta>` tag, and a new third party needs a line in it first.
+- `plainText()` runs after every join, and it must stay there.
+- `pushHost()` is a list of vendors, and a new push service is a new line.
+- An `add_header` in an nginx location replaces every header the server block sets.
+- A shown layer and a stored layer are two values, and `visitLayer()` keeps them apart.
 
 ## Conventions
 
@@ -1372,13 +1386,14 @@ copy.
 
 The commands moved to [`docs/VERIFY.md`](docs/VERIFY.md) on 2026-08-27, for the reason the gotcha
 section above states. That file holds every sweep that reads the live payload. It also holds the
-nine runnable checks, and it says which risk each one guards.
+ten runnable checks, and it says which risk each one guards.
 
-Run the checks that cover what you changed. The nine are `php shots-test.php`,
+Run the checks that cover what you changed. The ten are `php shots-test.php`,
 `php api.php --selftest`, `heat-test.html`, `title-test.html`, `narrow-test.html`,
-`paint-check.html`, `m3-check.html`, `map-limits-test.html` and `keys-test.html`.
+`paint-check.html`, `m3-check.html`, `map-limits-test.html`, `keys-test.html` and `route-test.html`.
 
-Five of them read two targets. Run `npm run build` first, then `m3-check`, `paint-check`,
-`title-test`, `narrow-test` and `keys-test` a second time with `?base=/site/`. The other four stay on the
-source. `heat-test` and `map-limits-test` import app modules directly, which a bundle cannot
-expose. The two PHP checks never touch the front end.
+Six of them read two targets. Run `npm run build:check` first, then `m3-check`, `paint-check`,
+`title-test`, `narrow-test`, `keys-test` and `route-test` a second time with `?base=/site/`. Plain
+`npm run build` writes `<base href="/">`, and a page at `/site/` then loads the source files. The
+other four stay on the source. `heat-test` and `map-limits-test` import app modules directly, which a
+bundle cannot expose. The two PHP checks never touch the front end.

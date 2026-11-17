@@ -4,7 +4,22 @@
      The navigation bar below 600px reserves that inset under its items. Without this tag the
      inset reads 0 and the bar sits under the iOS home indicator. -->
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<!-- **The Content-Security-Policy, as a meta tag so it holds on Herd, on the box and on GitHub Pages.**
+     Upstream text reaches the page as markup in about 25 places. api.php removes the characters that
+     open a tag, and this limits what a script could do if one ever ran. No inline script exists, so
+     `script-src` is this origin alone, and the build asserts that none appears. `style-src` needs
+     `'unsafe-inline'` because the pins and the graphs write `style` attributes. `connect-src` is this
+     origin, because PHP makes every upstream call. The images are the map tiles, `data:` for the
+     favicon and the icon masks, and the two JPS hosts that the Pages build hotlinks. `form-action`
+     is none: every form here is `method="dialog"`. A meta tag cannot set `frame-ancestors`, so
+     docs/DEPLOY.md carries that one for nginx. A new third party needs a line here first. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://basemaps.cartocdn.com https://*.basemaps.cartocdn.com https://server.arcgisonline.com https://infobanjirjps.selangor.gov.my https://infobanjirjpskl.water.gov.my; font-src 'self'; connect-src 'self'; worker-src 'self'; manifest-src 'self'; object-src 'none'; frame-src 'none'; base-uri 'self'; form-action 'none'">
 <title>Klang Valley Flood Watch</title>
+<!-- **The base, and it must stay first.** A view has an address such as `/station/wl-1`, so a bare
+     `css/base.css` would resolve under `/station/`. This one tag points every relative URL in the page
+     and in the scripts back at the root of the site. `build.mjs` rewrites it with `--base=` for a host
+     that serves the app under a path, such as GitHub Pages or the `/site/` render checks. -->
+<base href="/">
 <!-- Installable: Chrome's "Install app", and standalone from the iOS home screen. All paths here are
      relative, because this ships to both the root of a Herd host and a GitHub Pages sub-path.
      `theme-color` tints the standalone title bar. applyTheme() in js/map.js keeps it in step, and

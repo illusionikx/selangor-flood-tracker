@@ -1,4 +1,5 @@
 <?php
+if (PHP_SAPI !== 'cli') exit;   // a command-line script, and never a page. Herd would otherwise run it for a visitor
 /* Bakes the Help screenshots into img/help/. Run it by hand, never in a request:
 
      php help-build.php

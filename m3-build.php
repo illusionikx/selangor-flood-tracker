@@ -1,4 +1,5 @@
 <?php
+if (PHP_SAPI !== 'cli') exit;   // a command-line script, and never a page. Herd would otherwise run it for a visitor
 /* m3-build.php — bakes vendor/m3/tokens.css from the M3 Expressive component set.
    Run by hand, never in a request:  php m3-build.php
 

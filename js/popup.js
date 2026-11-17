@@ -98,11 +98,14 @@ const camNone = '<div class="camfail shotnone"><i class="i i-videocam_off"></i><
    of text, and named in a third way a fact the wall and the no-feed card already name. The box ships
    with every card and css/base.css hides it while the picture is there, so the handler stays one
    expression. The picture is **removed**, not hidden: `tick()` in js/clip.js reads `isConnected` on
-   that element as its signal to stop a clip whose frames have started failing. */
+   that element as its signal to stop a clip whose frames have started failing.
+   **The two handlers are not on the `<img>`.** They were inline `onload` and `onerror` attributes, and
+   the Content-Security-Policy in index.html refuses an inline handler. The spinner then never
+   cleared and a failed picture never left the card. One delegated listener in js/map.js does the
+   same two things now. It lives there and not here because this module must stay free of DOM
+   work at load, so the sweeps that evaluate it in node can stub its imports and nothing else. */
 export const camImg = (c, alt) => `<div class="shotwrap" data-clip="${c.id.split('-')[1]}">
-  <img class="shot" src="${camSrc(c)}" alt="${alt}" data-name="${c.name}"
-       onload="this.parentNode.classList.add('done')"
-       onerror="this.parentNode.classList.add('done'); this.remove()">
+  <img class="shot" src="${camSrc(c)}" alt="${alt}" data-name="${c.name}">
   ${camNone}
   <p class="clipcap"></p></div>`;
 

@@ -138,17 +138,33 @@ const DIALOGS = ['dataBox', 'camBox', 'aboutBox', 'helpBox', 'settingsBox'];
 /* Run a module INSIDE the frame, so it shares that document's module map and reaches the live
    `openSide()`. Importing from this page builds a second instance with an empty state and a map
    that has no container to attach to. */
-function inFrame(d, code) {
-  return new Promise(res => {
-    const sc = d.createElement('script');
-    sc.type = 'module';
-    sc.textContent = code + '\ndocument.documentElement.dataset.probeDone = "1";';
-    delete d.documentElement.dataset.probeDone;
-    d.body.appendChild(sc);
-    const t = setInterval(() => {
-      if (d.documentElement.dataset.probeDone) { clearInterval(t); res(); }
-    }, 30);
-  });
+/* **The app's Content-Security-Policy refuses an inline script, so this no longer injects one.** It
+   used to append a `<script type="module">` holding the code, and under the policy that script never
+   ran and the check hung with no verdict. Now an EXTERNAL module tag loads `js/probe.js` into the
+   frame once, which the policy allows because it is a file on the app's own origin. That puts the
+   live `openSide` and `closeSide` on `window.__probe`. The code then runs in THIS page's realm,
+   which has no policy, and calls those two functions. They are the frame's own functions, so they
+   act on the frame's document and its module instance, which is the whole point of this helper. */
+async function inFrame(d, js) {
+  const w = d.defaultView;
+  if (!w.__probe) {
+    await new Promise((res, rej) => {
+      const sc = d.createElement('script');
+      sc.type = 'module';
+      sc.src = PROBE;
+      sc.onload = res;
+      sc.onerror = () => rej(new Error('probe module did not load: ' + PROBE));
+      d.body.appendChild(sc);
+    });
+  }
+  /* **A task turn on each side, because the injected module had them.** A module script runs in a task
+     of its own, and the old helper answered on a 30 ms poll. Two assertions below, the docked search
+     beside the alert list, read a page that has had those two turns. Run in the same task as the press
+     before it, the probe beat the search field's own blur handling, and both failed. */
+  await new Promise(r => setTimeout(r, 0));
+  const { openSide, closeSide } = w.__probe;
+  new Function('openSide', 'closeSide', js)(openSide, closeSide);
+  await new Promise(r => setTimeout(r, 30));
 }
 
 /* A card in the shape `popup.js` emits: the ⋮ and its popover first, then the name, the region and
@@ -195,8 +211,7 @@ KG BARU · 2.1 km"></button>
    on both, and it puts `openSide` and `closeSide` on `window.__probe`.
    Resolved in the runner at the foot of this file, before the first probe runs. */
 let PROBE = '/js/probe.js';
-const drive = js =>
-  `import ${JSON.stringify(PROBE)};\nconst { openSide, closeSide } = window.__probe;\n${js}`;
+const drive = js => js;   // inFrame() supplies `openSide` and `closeSide`, so the code is its own body
 const OPEN_CARD = () => drive("openSide('probe', " + JSON.stringify(CARD) + ");");
 
 /* **Every `<dialog>` in the app, and which of the three kinds it is.** The roll call is the point:

@@ -1,4 +1,5 @@
 <?php
+if (PHP_SAPI !== 'cli') exit;   // a command-line script, and never a page. Herd would otherwise run it for a visitor
 /* Reads a payload on standard input and complains when it is wrong.
  *
  * The cron that keeps this site alive already fetches `api.php` every five minutes, and it threw the

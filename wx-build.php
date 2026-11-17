@@ -1,4 +1,5 @@
 <?php
+if (PHP_SAPI !== 'cli') exit;   // a command-line script, and never a page. Herd would otherwise run it for a visitor
 /**
  * php wx-build.php — rebakes wx-places.json, the district behind each weather point.
  *

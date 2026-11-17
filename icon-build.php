@@ -1,4 +1,5 @@
 <?php
+if (PHP_SAPI !== 'cli') exit;   // a command-line script, and never a page. Herd would otherwise run it for a visitor
 /* Bakes the app icons from icon.svg, and prints the mask rule for css/icons.css.
    Run after replacing icon.svg:  php icon-build.php
 

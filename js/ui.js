@@ -2,11 +2,12 @@
 
 import { KINDS, MAST, camSrc, FEED, FEED_WX, STATIC, NEAR_MAX_KM, NOTICE, NOTICE_KIND, NARROW_PX
        } from './config.js';
-import { state, PREFS, PREFS_KEY, save } from './state.js';
+import { state, PREFS, PREFS_KEY, save, visitLayer } from './state.js';
 import { el, distKm, ignoredIds, leads, favIds, isFav, squash, termsOf, matches, esc,
          warnWhen, snack, pushState } from './util.js';
 import { setTheme, applyTheme, flashTo, fitMarks, closeSide, showPlace, side, railSync } from './map.js';
-import { showHere } from './locate.js';
+import { showHere, findMe } from './locate.js';
+import { view, sync, navigate, rewrite } from './route.js';
 import { syncHeat, heatOpacity, HEAT_OPACITY } from './heat.js';
 import { byId } from './stations.js';
 import { camWarn } from './popup.js';
@@ -117,11 +118,11 @@ const aboutBox = el('aboutBox'), helpBox = el('helpBox');
    paid for that shape before — see the two repairs `syncHeat()` records.
    **Nothing here closes the menu.** `showModal()` closes every open popover itself, which is what
    the HTML spec states, so the row that opened a dialog leaves nothing behind it. */
-const openAbout = () => { closeSide(); aboutBox.scrollTop = 0; loadEgg(); aboutBox.showModal(); };
+const openAbout = () => { closeSide(); aboutBox.scrollTop = 0; loadEgg(); aboutBox.showModal(); sync(); };
 /* The screenshots load on the first open, never on landing. A failed import or fetch leaves every
    figure `hidden`, so Help shows its text alone, which is the whole of what it was before. */
 const openHelp  = () => {
-  closeSide(); helpBox.scrollTop  = 0; helpBox.showModal();
+  closeSide(); helpBox.scrollTop  = 0; helpBox.showModal(); sync();
   import('./help.js').then(m => m.paintHelp(helpBox)).catch(() => {});
 };
 /* **Settings has a main page and three subpages**, on the repository owner's instruction of
@@ -136,6 +137,7 @@ function showSetPage(id) {
   setTitle.textContent = el(id).dataset.title || 'Settings';
   settingsBox.scrollTop = 0;
   settingsBox.querySelector('.docbody').scrollTop = 0;
+  sync();   // a subpage has its own address, so a press on a row or on the back arrow moves it
 }
 settingsBox.addEventListener('click', e => {
   const go = e.target.closest('[data-page]');
@@ -553,6 +555,7 @@ const openTable = async () => {
   // A retry after a failed open must not still carry the last failure's banner over the fresh rows.
   dataBox.classList.remove('loadfail');
   dataBox.showModal();
+  sync();
   /* railSync() reads which dialog is open, so it must run after showModal() opens this one.
      Nothing else needs to race it any more. Whichever writer runs last reads the same live DOM. */
   railSync();
@@ -583,6 +586,7 @@ const openWall = async () => {
   // Same reset as the table opener above: a retry must not carry the last failure's banner forward.
   camBox.classList.remove('loadfail');
   camBox.showModal();
+  sync();
   // Same as the table opener above: railSync() must run after showModal() opens this dialog.
   railSync();
   try {
@@ -1208,6 +1212,7 @@ let nearPlace = null;
    station, and a blur on the field all close it. */
 function setFind(open) {
   document.body.classList.toggle('find', open);
+  sync();   // below 600px the search is a view with its own address
   /* **Below 600px the search is a pane occupant, so opening it replaces the station card.**
      **Above 600px the search floats over the map instead**, on the leading edge under the app bar.
      It is not a pane occupant there, so it clears nothing and nothing clears it. A station card
@@ -1783,7 +1788,7 @@ warnBox.onclick = e => { if (e.target === warnBox) warnBox.close(); };
 
 // Two ways in: the still inside a popup, and the table's "show image" button, which has no <img>
 // to click — it names the camera id and builds the same proxied URL.
-const lightbox = el('lightbox');
+const lightbox = el('lightbox');   // its route is registered further down, with the others
 document.addEventListener('click', async e => {
   /* Resolve any click inside a `.shotwrap` to that wrapper's still. The warning glyph is a sibling
      of the img and takes its own pointer events, so a tap on it used to hit nothing at all — and on
@@ -1845,7 +1850,9 @@ async function openLightbox(src, name, alt) {
   // `.player`, not `.stage`: on a phone the pill sits above the frame rather than in a corner of it,
   // and `.stage` is exactly the frame.
   if (c) lightbox.querySelector('.player').insertAdjacentHTML('beforeend', camWarn(c));
+  lbCam = n || null;
   lightbox.showModal();
+  sync();
   /* The picture opens first and the player follows. The frame is already on screen, so the reader
      sees the camera at once and the controls arrive under it.
      Two steps on purpose. The first registers the open on the shared promise, which is what keeps
@@ -1887,6 +1894,115 @@ lightbox.onclick = e => {
 /* A wrapper, because `reset` is no longer a binding. It shares `withTimeline` with the opener, so a
    close registered while the module is still loading still runs after the open. */
 lightbox.addEventListener('close', () => withTimeline(m => m.reset()));
+
+/* --- routes --------------------------------------------------------------------------------------
+   Every view that has an address, and how to open and close it. js/route.js holds the rules. The
+   three that never get one are the confirm dialog, the warning dialog and the menus. Each of them
+   is an answer to a question, and not a place a reader goes.
+   `z` ranks the views that can be open together. The camera viewer sits over the camera wall or a
+   station card, so its address is the one that shows, and `overlay` stops `apply()` from closing
+   what is under it.
+   Each `open` ends in a call that reaches `sync()` through the opener, and `apply()` holds `sync()`
+   off while it runs. So an address that a Back press brought is never pushed a second time. */
+/* A path is text that anybody can type, and `decodeURIComponent` throws on a bad escape such as
+   `%E0%A4%A`. The server answers that with status 400 today, so a landing never reaches here. A
+   `popstate` can, because a page script can push any path. A null is a path that names nothing. */
+const dec = s => { try { return decodeURIComponent(s); } catch { return null; } };
+const dialogView = (z, box, p, title, open) => view({
+  z, title: () => title,
+  path: () => (box.open ? p : null),
+  match: q => q === p,
+  open: () => { if (!box.open) open(); },
+  close: () => { if (box.open) box.close(); },
+});
+dialogView(60, aboutBox, '/about', 'About', openAbout);
+dialogView(60, helpBox, '/help', 'Help', openHelp);
+dialogView(50, dataBox, '/table', 'All stations', openTable);
+dialogView(50, camBox, '/cameras', 'Cameras', openWall);
+
+/* Settings has a main page and five subpages. The slug is the address, and the page id is the
+   markup's own name for the same page. */
+const SET_SLUG = { setFav: 'favorites', setIgnored: 'ignored', setFaulty: 'faulty',
+                   setPush: 'notifications', setReadings: 'readings' };
+const setPath = () => '/settings' + (setPage in SET_SLUG ? '/' + SET_SLUG[setPage] : '');
+view({
+  z: 60, title: () => setTitle.textContent,
+  path: () => (settingsBox.open ? setPath() : null),
+  match: q => q === '/settings' || q.startsWith('/settings/'),
+  open: q => {
+    const page = Object.keys(SET_SLUG).find(k => '/settings/' + SET_SLUG[k] === q) || 'setMain';
+    if (!settingsBox.open) openSettings();
+    if (page !== setPage) showSetPage(page);
+    if (page === 'setReadings') askWx();
+  },
+  close: () => { if (settingsBox.open) settingsBox.close(); },
+});
+
+let lbCam = null;   // the camera number in the viewer, or null when the picture has none
+view({
+  z: 70, overlay: true, title: () => el('lbTitle').firstChild?.textContent || 'Camera',
+  path: () => (lightbox.open && lbCam ? '/camera/' + lbCam : null),
+  match: q => q.startsWith('/camera/'),
+  open: q => {
+    const s = byId('camera-' + dec(q.slice(8)));
+    s ? openLightbox(camSrc(s), s.name, s.name) : navigate('/', true);
+  },
+  close: () => { if (lightbox.open) lightbox.close(); },
+});
+
+/* The search is a destination below 600px. Above it the search is a docked box over the map, and a
+   box is not a place. */
+view({
+  z: 40, title: () => 'Search',
+  path: () => (document.body.classList.contains('find') && phone.matches ? '/search' : null),
+  match: q => q === '/search',
+  open: () => setFind(true),
+  close: () => setFind(false),
+});
+
+/* The pane. One view for its four occupants, and the key says which. A station key is a site key,
+   and a path may name either a site key or a station id, because a notification names the station. */
+const sidePath = k => k === '@alerts' ? '/alerts' : k === '@here' ? '/here'
+  : k.startsWith('@wx-') ? '/weather/' + encodeURIComponent(k.slice(4))
+  : '/station/' + encodeURIComponent(k);
+async function openWeather(id) {
+  // For this visit only. A link must not change a stored setting. See `visitLayer()` in state.js.
+  if (PREFS.mapLayer !== 'weather') visitLayer('weather');
+  try {
+    const m = await import('./wx.js');
+    /* **The points first, and the redraw after.** `tick()` numbers each call and drops the answer of
+       any call that a later one has replaced. `state.rerender()` calls `tick()` too, so with the
+       redraw first, this call was sometimes the replaced one. It returned with no points, and
+       `openPoint()` found none and sent the reader back to the map. Run alone, this call is the
+       last one and the points are in hand. The redraw then supersedes it harmlessly. */
+    await m.tick();
+    state.rerender();
+    if (!m.openPoint(id)) navigate('/', true);
+  } catch { navigate('/', true); }
+}
+view({
+  z: 10,
+  title: () => side.key === '@alerts' ? 'On alert' : el('sideTitle').textContent.trim(),
+  path: () => (side.key ? sidePath(side.key) : null),
+  match: q => /^\/(station|weather)\/./.test(q) || q === '/alerts' || q === '/here',
+  close: closeSide,
+  open: q => {
+    const [, kind, raw] = q.split('/'), id = raw && dec(raw);
+    if (kind === 'alerts') return toggleAlerts();
+    if (id === null) return navigate('/', true);
+    if (kind === 'weather') return openWeather(id);
+    if (kind === 'here') {
+      if (state.hereAt) return showHere();
+      navigate('/', true);   // no fix to show yet, so ask for one. A fix opens the card by itself.
+      return findMe(true);
+    }
+    const s = state.data.find(x => (x.site || x.id) === id) || byId(id);
+    if (!s) return navigate('/', true);
+    const key = s.site || s.id;
+    if (key !== id) rewrite('/station/' + encodeURIComponent(key));   // a notification names the id
+    flashTo(s);
+  },
+});
 
 // --- splash ------------------------------------------------------------------------------------------
 

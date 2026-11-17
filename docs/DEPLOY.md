@@ -192,7 +192,7 @@ git clone https://github.com/illusionikx/selangor-flood-tracker.git /srv/flood
 cd /srv/flood
 composer install --no-dev            # writes lib/, NOT vendor/ — vendor/ is hand-managed browser assets
 npm ci                               # writes node_modules/. Build tooling only, never served
-npm run build                        # writes site/, the thing a browser gets
+npm run build                        # writes site/, the thing a browser gets. The base is "/"
 
 # The live document root, and it is NOT the checkout. See the warning below.
 mkdir -p /srv/www/flood
@@ -249,6 +249,10 @@ server {
     root /srv/www/flood;
     index index.html;
 
+    # The security headers. See "The security headers" below for the snippet, and for why every
+    # location that sets its own `add_header` includes it again.
+    include snippets/flood-headers.conf;
+
     # Everything that is not a real file is the single page.
     location / { try_files $uri $uri/ /index.html; }
 
@@ -287,19 +291,27 @@ server {
     # here, and it replaces the `?v=` ritual the stylesheets used to carry.
     location ~* -[A-Z0-9]{8}\.(css|js)$ {
         expires 1y; add_header Cache-Control "public, immutable";
+        include snippets/flood-headers.conf;
     }
     # `vendor/` is hand-managed and keeps its own `?v=`. The fonts are byte-stable.
-    location ~* ^/vendor/ { expires 30d; add_header Cache-Control "public"; }
+    location ~* ^/vendor/ {
+        expires 30d; add_header Cache-Control "public";
+        include snippets/flood-headers.conf;
+    }
     # Unhashed files that change only when a person rebakes them. A day is short enough for a rebake
     # to reach every reader, and long enough that a reload does not ask again. Without a rule a
     # browser guesses its own lifetime. `sw.js` is left out on purpose: a browser checks a worker on
     # its own schedule, and a day of cache on top of that delays a deploy.
     location ~* ^/(border\.json|manifest\.json|icon-\d+\.png|img/) {
         expires 1d; add_header Cache-Control "public";
+        include snippets/flood-headers.conf;
     }
     # index.html is the one unhashed entry point. It is what names the current build, so it must
     # never be cached. Cache it and a deploy reaches nobody.
-    location = /index.html { expires -1; add_header Cache-Control "no-cache"; }
+    location = /index.html {
+        expires -1; add_header Cache-Control "no-cache";
+        include snippets/flood-headers.conf;
+    }
 
     # The build writes a `.gz` and a `.br` beside every text file. Serving those costs nothing at
     # request time. Compressing at level 11 for each request would cost too much to enable, so it
@@ -312,6 +324,30 @@ server {
     gzip_types application/json application/javascript text/css image/svg+xml;
 }
 ```
+
+### The security headers
+
+Write this to `/etc/nginx/snippets/flood-headers.conf`:
+
+```nginx
+add_header X-Content-Type-Options "nosniff" always;
+add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+add_header Permissions-Policy "geolocation=(self), camera=(), microphone=(), payment=()" always;
+add_header Content-Security-Policy "frame-ancestors 'self'" always;
+```
+
+**Each `add_header` in a location replaces every one it would inherit from the server block.** That
+is how nginx works, and it fails silently. The four locations above set `Cache-Control` with
+`add_header`, so each one includes the snippet again. A location that does not would answer with no
+security headers, and nothing would say so. Check with
+`curl -sI https://flood.example.org/js/<any hashed file> | grep -i -E 'nosniff|referrer'`.
+
+What each one does. `nosniff` stops a browser from reading a response as another type than the one
+sent. `Referrer-Policy` sends the origin alone to another site, and the map tile host is the one
+other site. `Permissions-Policy` limits the page to the one sensor it uses, the location for the
+"You are here" marker. The `frame-ancestors` rule stops another site from framing the app, and a
+`<meta>` tag cannot carry that one. The rest of the Content-Security-Policy is the `<meta>` tag in
+`index.html`. The browser applies both and takes the stricter answer on each directive.
 
 **`brotli_static` needs a module that stock nginx does not carry.** Debian ships it as
 `libnginx-mod-http-brotli-filter`. Install it, or delete that one line. The `.br` files then sit

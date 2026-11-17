@@ -28,7 +28,19 @@ export const PREFS = { layers: {}, ...JSON.parse(localStorage.getItem(PREFS_KEY)
 /* The `prefs` event is for js/push.js, which mirrors the favorites, the ignored list and the push
    switches to the server. Every writer already calls save(), so this is the one place that sees all of
    them. Nothing else listens. */
+/* **A layer shown for one visit, and never stored.** A link to `/weather/<point>` needs the weather
+   layer to draw its card. But a link must not change a setting that the next visit reads, so the
+   address switches the layer here and `save()` below keeps writing the one that was stored.
+   `PREFS` is one blob, so any later `save()` for any reason, such as a new favorite, would
+   otherwise store the visit's layer. The visit ends the moment the reader picks a layer themselves.
+   That pick writes `PREFS.mapLayer` to another value, and `save()` sees it differ and lets go. */
+let visit = null;   // { shown, kept }
+export const visitLayer = shown => {
+  if (visit) visit.shown = shown; else visit = { shown, kept: PREFS.mapLayer };
+  PREFS.mapLayer = shown;
+};
 export const save = () => {
-  localStorage.setItem(PREFS_KEY, JSON.stringify(PREFS));
+  if (visit && PREFS.mapLayer !== visit.shown) visit = null;
+  localStorage.setItem(PREFS_KEY, JSON.stringify(visit ? { ...PREFS, mapLayer: visit.kept } : PREFS));
   document.dispatchEvent(new Event('prefs'));
 };

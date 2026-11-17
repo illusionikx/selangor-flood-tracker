@@ -21074,3 +21074,76 @@ Measured on 2026-11-10: 136 of 213 sirens have a river inside 2 km, against 195 
 **The cost is real.** A stuck relay with only a far river behind it alerts again. SIREN PEKAN BANTING stands 4.26 km from its one river, and it was one of the two sirens this check was built for. The selftest now puts its test river 1.0 km off and asserts that the real one is not asked.
 
 **Deliberately not done: a basin match.** Of the 81 sirens with a basin and a river within 5 km, the nearest river names a different basin for 49. The names are too loose to join on. The F2 sirens publish no basin at all.
+
+## Each view has an address
+
+The repository owner asked for this on 2026-11-17. They asked for an action history, and they described it as the address bar changing with every action. The name for it is a routed single-page app. Each place the reader can go has its own path, and the Back button steps through the places in order.
+
+**The paths.**
+
+```
+/                        the map
+/station/<id>            a station card
+/alerts                  the On alert list
+/here                    the Your Location card
+/weather/<point>         a weather card
+/table                   the all-stations table
+/cameras                 the camera wall
+/camera/<n>              one camera in the viewer
+/settings                Settings, and /settings/favorites, /ignored, /faulty, /notifications, /readings
+/help
+/about
+/search                  below 600px only
+```
+
+The confirm dialog, the warning dialog, the menus and the chips have no path. Each one is an answer to a question, and not a place a reader goes. Above 600px the search is a docked box over the map, so it has no path either.
+
+**Clean paths, with a `<base>` tag.** The owner chose clean paths over hash routes. A path such as `/station/wl-1` needs the page to resolve every relative URL against the site root, because `css/base.css` would otherwise resolve under `/station/`. `index.html` carries `<base href="/">`, and that one tag fixes the markup and every `fetch()` in the scripts. `build.mjs` takes `--base=` to rewrite it for a host that serves the app under a path. Herd and the nginx block in `docs/DEPLOY.md` already answer any path with `index.html`. GitHub Pages does not, so `build:static` also writes `404.html`, a copy of the page, and Pages serves it for a path it does not hold. The cost is that Pages answers a deep link with status 404 and a working page.
+
+**The address follows the page, and the page follows the address.** `js/route.js` holds both halves, and it imports nothing. Each view registers itself with `view()`: its path, how to match one, how to open and close, and a title. `sync()` reads the view on top and writes its path. It runs after every opener, and on every dialog `close` event. `apply()` runs on Back, on Forward and on landing, and it makes the page show the path. A router that sends every press through `navigate()` would change about thirty call sites. This design changes ten, because each press already ends in one of a few openers.
+
+**A close steps back when it can.** If the page now shows the entry that the app pushed from, `sync()` calls `history.back()`. Otherwise it pushes. So Escape on Settings leaves the history as it was before Settings opened, and a swap from one station to another adds one entry for each station. The state of each entry holds `from` and `i`.
+
+**The camera viewer is an overlay.** It opens over the camera wall or over a station card. `apply()` closes nothing for it, and Back from `/camera/<n>` returns to whichever one opened it.
+
+**A reload opens the same view again.** The old hash code cleared the hash on purpose, so a reload did not open the card. A routed app reverses that rule. A landing waits for the first poll, because the stations are not in the page before it. A reader who opened something in the meantime keeps it. A path that names nothing, or a station that left the payload, falls back to `/`.
+
+**The notification links still work.** The server sends `#station=<id>` and `#alerts`, and `sw.js` opens them. `start()` turns both into paths on a cold start, and on `hashchange` for a window that is already open. A notification names the station by its id, but the card is keyed by its site. So the opener calls `rewrite()` to put the path that the page shows in place of the path that was asked for.
+
+**The title names the view.** It reads `(3) Settings · Klang Valley Flood Watch`, with the alert count in front. WCAG 2.4.2 asks for a title that names the page, and a history list shows the title of each entry. `alerts.js` listens for the `route` event the router fires.
+
+**The service worker answers a navigation with the shell.** A page load of `/station/wl-1` stores under one key, the root of the scope, and only when the answer is HTML. A reader can open `manifest.json` in a tab, and it must not replace the shell. With no connection, every view loads the shell the install stored.
+
+**What the address does not carry.** The map position and zoom, the layer, the heat layer, the filters and the theme stay in `PREFS`. A shared link must not overwrite the stored settings of the person who opens it. `/weather/<point>` is the one exception that writes a preference. It switches the map to the weather layer and saves that, because the card cannot draw on the station layer.
+
+**The render checks read a build made for `/site/`.** The base tag is fixed text, so one build cannot serve `/` and `/site/`. `npm run build:check` builds with `--base=/site/`, and the `?base=/site/` runs use it. The built file differs from the shipped one in that one attribute.
+
+**Not built.** The map position in the address. A router library, because this app has no runtime dependency and the router is about 150 lines. Real links for the rail and navigation bar items, so a middle click opens no new tab, because those controls are buttons and `m3-check.html` measures them as buttons. The Navigation API, which reached every engine only this year.
+
+**The check.** `route-test.html` is the tenth runnable check. It presses each opener and reads the path. It presses Back and Forward. It closes each dialog and asserts that the path steps back and leaves no entry behind. It opens a camera over the wall, and it lands on each path cold. See `docs/VERIFY.md`.
+
+## A security pass over the routes and the endpoints
+
+The repository owner asked for a security test of the routing change on 2026-11-17, and then for a plan to fix what it found. The pass covered every request handler in `api.php`, `log.php` and `push.php`, every place in `js/` that writes upstream text into the page, the service worker, the response headers and both dependency trees.
+
+**What the tests did.** 26 hostile addresses in real Chrome: script and image payloads in a station slot, `__proto__`, `//evil.example`, a hash that names another host, empty segments and a 5,000-character hash. No script ran, no handler was injected, and the page made no request to a foreign host. A random run of 160 key presses, Back, Forward and notification hashes gave no page error, and the path agreed with the page after every step. The service worker kept the shell safe against a page load of `watch.php`, `push.php` and `manifest.json`, and answered `/table` offline with the shell.
+
+**Upstream text.** About 25 places write a station name into a template string, and some write it into a quoted attribute. The feeds are pages this app does not control. The live payload was clean, with no `<`, `>` or `"` in 783 stations, so this is a guard against a feed that changes and not a response to a hit. `plainText()` in `api.php` removes `<`, `>`, `"` and the control characters from every string in every station, every warning and every notice, after the last join and before the bytes leave. It keeps `&` and the apostrophe, because real names carry them and neither can leave a text node or a double-quoted attribute. A warning keeps its tab, newline and return, because the page splits its text into items. The pattern has no `u` flag, because that flag returns null on invalid UTF-8 and would blank the name. A station whose id is off the shape `[A-Za-z0-9][A-Za-z0-9-]{0,63}` is dropped and logged, because the client writes ids into `data-*` attributes and a path.
+
+**Why the server and not the 25 sites.** One function covers the browser app and the GitHub Pages bake, which reads the same payload. Twenty-five edits across eight files can miss a site, and a new template string the next week would not be covered. The cost: a station name that really holds a quote loses it. None does today.
+
+**The policy.** `index.html` carries a Content-Security-Policy as a `<meta>` tag, so it holds on Herd, on the box and on Pages. Scripts, fonts, connections and the worker come from this origin. Images come from this origin, `data:`, the two map tile hosts and the two JPS hosts the Pages build hotlinks. Styles allow `'unsafe-inline'`, because the pins and graphs write `style` attributes. A `<meta>` tag cannot set `frame-ancestors`, so nginx carries that one. Every view was loaded at 1536px and 360px, on the source and on the build, and the browser reported no violation. A negative control confirmed that an inline handler, an inline script, a foreign request and a foreign image are each blocked, and that the tiles still load. A new third party needs a line in the policy first.
+
+**The policy broke two things, and both were found by running the pages.** First, the station card's camera picture carried inline `onload` and `onerror` attributes. Under the policy its spinner never cleared and a failed picture never left the card. One delegated listener in `js/map.js` now does both, and a test with the picture loading and with the request aborted shows each. Second, `m3-check.html` injected an inline `<script>` into the frame to drive the app, and under the policy the check hung with no verdict. It now loads `js/probe.js` with an external tag and runs its code in its own page. That change removed a task turn that two assertions depended on, so the helper keeps one before and 30 ms after. Without them, three runs in five failed. With them, eight runs in eight passed.
+
+**The push endpoint.** `?push=1` is a public POST, and the sender posted to whatever `https://` address a subscription named. A hostile caller could store 500 rows that aimed the server at an internal address or a third-party site, which is server-side request forgery. `pushHost()` in `push.php` accepts a subscription only on `fcm.googleapis.com`, `push.services.mozilla.com`, `notify.windows.com` or `push.apple.com`, or a subdomain of one. The default port is required, and a user part fails. A row already stored on another host is skipped and kept, never deleted, because a delete on our own list's fault would unsubscribe a phone that did nothing wrong. A delete request calls nothing, so it takes the shape check alone. **A new push service means a new line in `PUSH_HOSTS`.**
+
+**The weather link.** `/weather/<point>` switched the map to weather and saved that. A link could then change a setting the next visit reads. `visitLayer()` in `js/state.js` shows the layer for the visit and keeps `save()` writing the stored one, whatever else calls `save()`. The visit ends when the reader picks a layer. A reload on the weather path shows weather again, and a reload on `/` shows the stored layer. `route-test.html` lands on a weather path, makes a real save through the theme rows, and asserts that the stored blob does not name weather.
+
+**Command-line scripts.** `watch.php`, `shots-test.php` and the six build scripts now exit unless PHP runs from the command line. On Herd each answered an HTTP request with status 200. nginx on the box already answers 404 for them. `push-keys.php` had the guard.
+
+**The service worker.** A page load stores under the shell's key only when the path has no file extension. A link from another site could send a reader to `watch.php`, which Herd answers with 200 and HTML, and the shell would then be an empty page.
+
+**Dependencies.** esbuild moved from 0.24.2 to 0.25.12, which clears the one advisory, in esbuild's development server, which this project does not use. The build asserted all its rewrites and the six build-target checks passed. `composer audit` reports nothing.
+
+**Not done.** Escaping at the 25 client sites. nginx headers are written in `docs/DEPLOY.md` for the owner to apply on the box, and I could not test them from here. iOS Safari was not tested. `connect-src 'self'` is the strictest answer today, and a future call from the browser to a second origin needs a line. The Pages bake was not run on GitHub.

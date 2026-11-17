@@ -6,6 +6,7 @@ import { state, PREFS, save } from './state.js';
 import { el, distKm } from './util.js';
 import { byId } from './stations.js';
 import { PinLayer, resetSprites } from './pins.js';
+import { sync } from './route.js';
 
 /* One promise, shared by every call. Callbacks on one promise run in the order they were
    registered, so a stop() registered after a start() still runs after it. That is what closes the
@@ -707,6 +708,21 @@ document.addEventListener('toggle', e => {
   d.open ? folded.delete(d.dataset.sensor) : folded.add(d.dataset.sensor);
 }, true);   // `toggle` does not bubble
 
+/* **The card's camera still settles here, and it used to settle in two inline attributes.** The
+   Content-Security-Policy in index.html refuses an inline handler. `camImg()` in js/popup.js ships
+   the markup with none. A load clears the spinner on the wrapper, and a failure does that and removes
+   the picture, which leaves the `No picture` box the markup already carries. `load` and `error` do
+   not bubble, so the listener runs in the capture phase, the same way js/wall.js does for its tiles.
+   It matches the wrapper's own child, so no other picture in the app is touched. */
+const settleStill = e => {
+  const img = e.target;
+  if (!img.matches?.('.shotwrap > img.shot')) return;
+  img.parentNode.classList.add('done');
+  if (e.type === 'error') img.remove();
+};
+document.addEventListener('load', settleStill, true);
+document.addEventListener('error', settleStill, true);
+
 export function openSide(key, html, mastAt) {
   const body = el('sideBody');
   const moved = side.key !== key;
@@ -765,6 +781,8 @@ export function openSide(key, html, mastAt) {
   }
   // Only on a real open: render() calls openSide() on every poll to refresh the card in place.
   document.body.classList.add('side');
+  // The address follows a new card. A poll that refreshes the same card changes nothing here.
+  if (moved) sync();
   mastAt ? showMast(mastAt) : hideMast();
   /* `siteMark` is the map from the key this function takes to the marker that opens it, so one
      lookup answers for a station pin and for a weather pin alike. A key with no pin marks nothing,
@@ -799,6 +817,7 @@ export function closeSide() {
   hideMast();
   markSel(null);
   syncAlertBtn();
+  sync();
 }
 
 /* The app bar's warning glyph is a disclosure for one particular occupant of this panel, and the

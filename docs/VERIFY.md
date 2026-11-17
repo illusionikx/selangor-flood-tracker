@@ -268,14 +268,19 @@ php m3-build.php
 git diff --quiet vendor/m3/tokens.css && echo "OK: matches the source" || echo "MOVED: read the diff, then bump ?v="
 
 # The build. It writes `site/`, which is what a browser gets: bundled, minified, and named by
-# content hash. The repository is what a person edits. Run it before the four render checks below,
+# content hash. The repository is what a person edits. Run it before the render checks below,
 # or `?base=/site/` measures whatever the last build left behind.
+# **Build for the checks with `npm run build:check`.** It passes `--base=/site/`. The base tag in
+# `index.html` is fixed text, so a plain `npm run build` writes `<base href="/">`, and a page at
+# `/site/` then loads every stylesheet and script from the source files.
 npm ci                        # once, or after package.json moves
-npm run build                 # the server build. `npm run build:static` is the GitHub Pages one.
+npm run build:check           # the build the checks read. `npm run build` is the server build, and
+                              # `npm run build:static` is the GitHub Pages one.
 
-# **THE FOUR RENDER CHECKS TAKE A TARGET, AND BOTH TARGETS ARE REAL.** They are m3-check,
-# paint-check, title-test and narrow-test. With no query they load the source, which is what a
-# person edits. With `?base=/site/` they load the build, which is what a browser gets. Run both.
+# **THE SIX RENDER CHECKS TAKE A TARGET, AND BOTH TARGETS ARE REAL.** They are m3-check,
+# paint-check, title-test, narrow-test, keys-test and route-test. With no query they load the source,
+# which is what a person edits. With `?base=/site/` they load the build, which is what a browser
+# gets. Run both.
 #
 # A check that only ever reads the source guards nothing about what ships, and minification is
 # exactly the step that can break a rule these files measure. Two faults have already been found
@@ -300,8 +305,9 @@ run paint-check.html  60000 1600,1000
 run title-test.html   40000 1800,1000
 run narrow-test.html  35000 1200,900
 run keys-test.html    90000 1400,900
+run route-test.html  900000 1400,900
 
-php shots-test.php            # one of nine runnable checks. Guards camera retention and the WebP
+php shots-test.php            # one of ten runnable checks. Guards camera retention and the WebP
                               # retry. Must stay green.
 php api.php --selftest       # another. Guards the force-refresh rate limit, cache choice, the
                               # place-lookup validator/rate limit, and the payload edit a warm poll
@@ -870,7 +876,22 @@ the data shape being relied on. Then look at the page.
 
 `shots-test.php`, `php api.php --selftest`, `heat-test.html`, `title-test.html`,
 `narrow-test.html`, `paint-check.html`, `m3-check.html`, `map-limits-test.html` and
-`keys-test.html` are the nine runnable checks here, and each guards a different risk.
+`keys-test.html` and `route-test.html` are the ten runnable checks here, and each guards a different
+risk.
+
+`route-test.html` guards the routes. Three faults throw nothing and draw no wrong pixel. A view
+opens and leaves the address alone. A Back press closes nothing. A landing opens the wrong card.
+The check presses each opener and reads the path. It presses Back and Forward. It closes each
+dialog and asserts that the path steps back and leaves no entry behind. It opens a camera over the
+wall and closes it. It lands cold on each path. Run it with Chrome at `--virtual-time-budget=900000`.
+It takes `?base=/site/`, and it skips the cold landings there. Herd answers a deep path with the
+source `index.html`, so a landing on `/site/help` reaches the wrong document.
+
+Two traps hold in this check. First, Chrome fires a `close` event late under a virtual clock. It
+sometimes holds the event until the next press. A real browser fires it as the next task. So the
+check closes by script and waits 300 ms. If the event has not come, the check sends it by hand. The
+router's listener is under test either way. Second, `history.back()` crosses processes, and a
+virtual clock can run past it. So the check waits until the path and the entry stop changing.
 
 `keys-test.html` guards the keyboard, which fails by doing nothing. Three faults throw nothing and
 draw no wrong pixel. A shortcut stops pressing its button. A list row is skipped by Tab. A ring

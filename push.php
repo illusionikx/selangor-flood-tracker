@@ -14,6 +14,28 @@ const PUSH_STALE       = 86400;   // a reading older than this never pushes. isS
 const PUSH_BUDGET      = 8.0;     // seconds the sender may spend in one refresh. PHP's own limit is 30
 const PUSH_TIMEOUT     = 4;       // seconds one push service gets to answer
 
+/* **The server posts to the endpoint a phone names, so the endpoint must be a push service.** A
+   subscription is `endpoint` plus two keys, and `?push=1` is a public POST. With only an `https://`
+   check, anybody could store a row that aims this server at an internal address, such as a cloud
+   metadata service, or at a third-party site, and the sender would call it on every refresh. That is
+   server-side request forgery. A browser's endpoint always sits on its vendor's push service, so the
+   host is held to that list. The suffix test needs the dot, so `evilfcm.googleapis.com` fails. The
+   port must be the default. A name with a user part fails, because `fcm.googleapis.com@evil.example`
+   has the host `evil.example`.
+   **A new push service means a new line here.** A row already stored on another host is skipped by
+   the sender and never deleted, because a delete on our own list's fault would unsubscribe a phone
+   that did nothing wrong. A delete request names a row and calls nothing, so it takes the shape
+   check alone. */
+const PUSH_HOSTS = ['fcm.googleapis.com', 'push.services.mozilla.com', 'notify.windows.com', 'push.apple.com'];
+function pushHost(string $url): bool {
+    $p = parse_url($url);
+    if (!is_array($p) || ($p['scheme'] ?? '') !== 'https' || isset($p['user']) || isset($p['pass'])) return false;
+    if (isset($p['port']) && $p['port'] !== 443) return false;
+    $h = strtolower($p['host'] ?? '');
+    foreach (PUSH_HOSTS as $s) if ($h === $s || str_ends_with($h, '.' . $s)) return true;
+    return false;
+}
+
 /* The one document a phone posts: its subscription, its four switches and its two lists. Returns the
    accepted document, or null for anything else. A null `sub` is a delete, and it names the row by
    `endpoint`. This is a public POST, so nothing leaves here that was not checked. */
@@ -25,7 +47,7 @@ function pushDoc(string $raw): ?array {
     $https = fn($u) => is_string($u) && str_starts_with($u, 'https://') && strlen($u) <= 1024;
     $sub = $d['sub'] ?? null;
     if ($sub !== null) {
-        if (!is_array($sub) || !$https($sub['endpoint'] ?? null)
+        if (!is_array($sub) || !$https($sub['endpoint'] ?? null) || !pushHost($sub['endpoint'])
             || !is_string($sub['keys']['p256dh'] ?? null) || !is_string($sub['keys']['auth'] ?? null)) return null;
         $sub = ['endpoint' => $sub['endpoint'],
                 'keys' => ['p256dh' => $sub['keys']['p256dh'], 'auth' => $sub['keys']['auth']]];
@@ -289,6 +311,11 @@ function pushSend(PDO $db, array $stations, int $now, float $budget = PUSH_BUDGE
             $doc = json_decode($r['body'], true);
             $sub = $doc['sub'] ?? null;
             if (!is_array($sub)) { $del->execute([$ep]); continue; }
+            // A row stored before the host list existed, or by a hostile post. Skipped and kept.
+            if (!pushHost((string)($sub['endpoint'] ?? ''))) {
+                error_log('push: skipped a row whose host is not a push service: ' . $ep);
+                continue;
+            }
             $matched = pushMatch($levels, $doc['on'] ?? [], $doc['favs'] ?? [], $doc['ignored'] ?? []);
             $diff = pushDiff($matched, $levels, json_decode($r['seen'], true) ?: [],
                              json_decode($r['sent'], true) ?: [], $now, $known);

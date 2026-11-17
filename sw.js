@@ -69,6 +69,17 @@ self.addEventListener('fetch', e => {
     return;
   }
 
+  /* A page load of a view, such as `/station/wl-1`, is the same document as `/`. The server answers
+     every such path with `index.html`. So a navigation is stored under one key, the root of the
+     scope, and no view gets a copy of its own. A connection that is down then answers every view
+     with the shell the install stored. Only an HTML answer takes that key: a reader can open
+     `manifest.json` in a tab, and it must not replace the shell. */
+  /* A view path has no file extension. A navigation to `watch.php` or `manifest.json` is not a view.
+     On Herd those answer 200 with HTML or JSON, and a link from another site can send a reader
+     there. Such a page must never take the shell's key. */
+  const nav = e.request.mode === 'navigate' && !/\.\w+$/.test(url.pathname);
+  const key = nav ? new URL('./', self.registration.scope).href : e.request;
+
   // Everything else, `index.html` included: network-first, cache-as-you-go.
   e.respondWith(
     fetch(e.request)
@@ -76,10 +87,13 @@ self.addEventListener('fetch', e => {
         // Only store real answers. Herd replies to a missing file with index.html and a 200
         // (see CLAUDE.md), which is worth remembering here: `res.ok` is not proof the file exists,
         // it is only proof the network answered, which is all this cache claims.
-        if (res.ok) { const copy = res.clone(); caches.open(CACHE).then(c => c.put(e.request, copy)); }
+        if (res.ok && (!nav || /text\/html/.test(res.headers.get('content-type') || ''))) {
+          const copy = res.clone();
+          caches.open(CACHE).then(c => c.put(key, copy));
+        }
         return res;
       })
-      .catch(() => caches.match(e.request)),
+      .catch(() => caches.match(key)),
   );
 });
 

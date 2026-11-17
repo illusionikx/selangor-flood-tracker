@@ -8,10 +8,8 @@ import './ui.js';
 import { findMe } from './locate.js';
 import { load } from './net.js';
 import { PREFS } from './state.js';
-import { byId } from './stations.js';
-import { flashTo, side } from './map.js';
-import { toggleAlerts } from './alerts.js';
-import './keys.js';     // last: nothing imports it, and it reads `#locate`, which locate.js builds
+import { start } from './route.js';
+import './keys.js';    // last: nothing imports it, and it reads `#locate`, which locate.js builds
 
 requestAnimationFrame(() => document.body.classList.add('ready')); // no drawer slide on first paint
 
@@ -46,21 +44,12 @@ document.addEventListener('visibilitychange', () => {
   if (!document.hidden && Date.now() - polled > POLL_MS) poll(45000);
 });
 
-/* **A tap on a notification lands here.** The server puts `#station=<id>` or `#alerts` on the URL it
-   sends (pushBody() in push.php), and sw.js opens the app on it, or navigates an open window to it.
-   A window that is already open fires `hashchange` and reloads nothing. A cold start needs the first
-   poll, because the stations are not there before it. The hash is cleared after it is read, so a
-   reload does not open the card again and a second tap on the same notification differs from the URL.
-   `#alerts` opens the list and never closes it: toggleAlerts() is a toggle. */
-const fromHash = () => {
-  const h = location.hash;
-  if (h === '#alerts') { if (side.key !== '@alerts') toggleAlerts(); }
-  else if (h.startsWith('#station=')) { const s = byId(h.slice(9)); if (!s) return; flashTo(s); }
-  else return;
-  history.replaceState(null, '', location.pathname + location.search);
-};
-document.addEventListener('poll', fromHash, { once: true });
-addEventListener('hashchange', fromHash);
+/* **Each view has an address, and the router in js/route.js owns it.** A landing on `/station/wl-1`
+   opens that card after the first poll, because the stations are not there before it. A reload on a
+   view opens the same view again. The notification links are still `#station=<id>` and `#alerts`,
+   which the server sends (pushBody() in push.php) and sw.js opens. The router turns both into
+   paths, on a cold start and on `hashchange`, which a window that is already open fires. */
+start();
 
 /* A phone that has notifications on tells the server about itself once per landing, so a browser that
    lost the subscription gets a new one and the server's copy of the lists is current. */

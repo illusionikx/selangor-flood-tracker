@@ -1,0 +1,219 @@
+<!-- Each view has an address, and the Back button steps through the views. None of that throws when it
+     breaks. A view that opens and leaves the address alone, a Back press that closes nothing, a
+     landing that opens the wrong card: each one leaves a map that still draws. This check opens each
+     view, reads the path, presses Back and reads what is open.
+
+     It guards, in order: that a press on each opener writes its path, that Back and Forward step
+     through them, that Escape and the close buttons step back and push no entry of their own, that a
+     view opened over another keeps it when it closes, that a landing on each path opens that view,
+     that the old `#station=` and `#alerts` links become paths, that a path that names nothing falls
+     back to the map, and that the title names the view.
+
+     chrome --headless=new --dump-dom route-test.html
+     chrome --headless=new --dump-dom "route-test.html?base=/site/"     (the build, which ships)
+
+     A station or a camera that the live payload does not carry is reported as `skip`, never `ok`. -->
+<title>Routes</title>
+<style>body { font: 13px/1.6 monospace; margin: 16px } .f { color: #b00 }</style>
+<pre id="out">running…</pre>
+<script>
+const L = [], fail = [];
+const ok = (c, n) => { L.push((c ? 'ok   ' : 'FAIL ') + n); if (!c) fail.push(n); };
+const skip = n => L.push('skip ' + n);
+const BASE = new URLSearchParams(location.search).get('base') || '/';
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+/* A frame at a path. `index.html` is what the frame loads from this check's own origin, and the
+   router writes the address it wants over it. A landing on a view is a frame that starts on that
+   path, so it asks for the path itself: the server answers it with the same document. */
+const frame = async (at = 'index.html', w = 1280, h = 800) => {
+  const f = document.createElement('iframe');
+  f.style.cssText = `width:${w}px;height:${h}px;border:0;position:absolute;left:-9999px`;
+  f.src = BASE + at;
+  document.body.append(f);
+  await new Promise(r => f.addEventListener('load', r, { once: true }));
+  await sleep(2500);            // modules run, the payload lands, a landing opens its view
+  return f;
+};
+const until = async (fn, ms = 4000) => { for (let t = 0; t < ms; t += 100) { if (fn()) return true; await sleep(100); } return fn(); };
+
+(async () => {
+  const f = await frame(), w = f.contentWindow, d = f.contentDocument, id = s => d.getElementById(s);
+  const at = () => w.location.pathname.slice(BASE.length - 1);   // `/` on the map
+/* A microtask for sync(), a task for a close event, and a traversal for Back. A traversal crosses
+     processes, so it needs real time, and a virtual clock can run past it. So this waits until the
+     path and the entry stop changing for four polls in a row. */
+  const wait = async () => {
+    let last = null, same = 0;
+    for (let t = 0; t < 5000 && same < 4; t += 100) {
+      await sleep(100);
+      const k = at() + JSON.stringify(w.history.state);
+      same = k === last ? same + 1 : 0;
+      last = k;
+    }
+  };
+  const press = async s => { id(s).click(); await wait(); };
+  /* A close from script, and then the event a native close would send. Headless Chrome under a
+     virtual clock holds a dialog's `close` event back for several seconds, and one press later it
+     comes. A real browser fires it as the next task. So the event is waited for briefly and then sent
+     by hand, and the router's listener is the thing under test either way. The late real event that
+     follows finds the address already right and changes nothing. */
+  const esc = async box => {
+    const top = id(box);
+    let seen = false;
+    const on = () => { seen = true; };
+    d.addEventListener('close', on, true);
+    top.close();
+    await sleep(300);
+    if (!seen) top.dispatchEvent(new Event('close'));
+    d.removeEventListener('close', on, true);
+    await wait();
+  };
+  const back = async () => { w.history.back(); await wait(); };
+  const fwd = async () => { w.history.forward(); await wait(); };
+  const closeAll = async () => { for (const x of [...d.querySelectorAll('dialog[open]')]) await esc(x.id); };
+  const depth = () => w.history.state?.i ?? 0;
+
+  ok(at() === '/', 'landing on the map: the path is the root');
+
+  // --- the dialogs --------------------------------------------------------------------------------
+  const DIALOGS = [['railSettings', 'settingsBox', '/settings'], ['railHelp', 'helpBox', '/help'],
+                   ['railAbout', 'aboutBox', '/about'], ['railTable', 'dataBox', '/table'],
+                   ['railCams', 'camBox', '/cameras']];
+  for (const [btn, box, p] of DIALOGS) {
+    const n = depth();
+    await press(btn);
+    ok(id(box).open && at() === p, `${btn}: opens ${box} and writes ${p}`);
+    ok(depth() === n + 1, `${p}: one new entry`);
+    await esc(box);
+    ok(!id(box).open && at() === '/', `${p}: Escape closes it and the path returns to the root`);
+    ok(depth() === n, `${p}: Escape steps back and leaves no entry behind`);
+  }
+
+  // Back and Forward through one dialog.
+  await press('railHelp');
+  await back();
+  ok(!id('helpBox').open && at() === '/', 'Back closes the dialog');
+  await fwd();
+  ok(id('helpBox').open && at() === '/help', 'Forward opens it again');
+  await closeAll();
+
+  // --- Settings subpages --------------------------------------------------------------------------
+  await press('railSettings');
+  const row = d.querySelector('#settingsBox [data-page="setFav"]');
+  row.click(); await wait();
+  ok(at() === '/settings/favorites', 'Settings: a row opens its subpage at its own path');
+  await press('settingsBack');
+  ok(id('settingsBox').open && at() === '/settings', 'Settings: the back arrow returns to the main page');
+  row.click(); await wait();
+  await back();
+  ok(id('settingsBox').open && at() === '/settings', 'Settings: Back from a subpage keeps the dialog open at its main path');
+  ok(id('setMain').hidden === false, 'Settings: the main page shows after Back');
+  await closeAll();
+
+  // --- the alert list and a station ---------------------------------------------------------------
+  await press('railAlerts');
+  ok(at() === '/alerts' && w.document.title.includes('On alert'), 'Alerts: the path and the title name it');
+  await press('railAlerts');
+  ok(at() === '/', 'Alerts: a second press closes it and the path returns');
+
+  const site = (await (await fetch(BASE + 'api.php')).json().catch(() => null))?.stations?.find(s => s.lat && s.kind === 'river');
+  if (!site) skip('station: the payload carries no river with a coordinate');
+  else {
+    const key = site.site || site.id;
+    // The route opens the card. A landing proves it for a cold start, and `hashchange` for a warm one.
+    w.location.hash = '#station=' + site.id;
+    await sleep(800);
+    ok(at() === '/station/' + encodeURIComponent(key), 'a #station= link becomes a path');
+    ok(d.body.classList.contains('side') && id('sideTitle').textContent.trim().length > 0, 'that path opens the card');
+    ok(w.document.title.includes(id('sideTitle').textContent.trim()), 'the title carries the place name');
+    ok(!w.location.hash, 'the hash is gone from the address');
+
+    // A view opened over a card keeps it when the view closes.
+    await press('railHelp');
+    ok(!d.body.classList.contains('side') && at() === '/help', 'Help: opening it closes the card');
+    await back();
+    ok(d.body.classList.contains('side') && at() === '/station/' + encodeURIComponent(key),
+       'Back from Help brings the card back');
+    await press('sideClose');
+    ok(!d.body.classList.contains('side') && at() === '/', 'the card close button clears the path');
+    await fwd();
+    ok(d.body.classList.contains('side'), 'Forward opens the card again');
+    await press('sideClose');
+  }
+  w.location.hash = '#alerts';
+  await sleep(500);
+  ok(at() === '/alerts' && d.body.classList.contains('side'), 'an #alerts link opens the list');
+  await press('railAlerts');
+
+  // --- a path that names nothing ------------------------------------------------------------------
+  w.history.pushState({ i: depth() + 1, from: '/' }, '', BASE + 'nowhere');
+  w.dispatchEvent(new w.PopStateEvent('popstate'));
+  await wait();
+  ok(at() === '/', 'a path that names no view returns to the map');
+
+  // --- the camera viewer over the wall ------------------------------------------------------------
+  await press('railCams');
+  const tile = d.querySelector('#camGrid [data-lap]');
+  if (!tile) skip('camera viewer: the wall holds no tile');
+  else {
+    tile.click(); await sleep(600);
+    ok(id('lightbox').open && /^\/camera\/\d+$/.test(at()), 'a tile opens the viewer at /camera/<n>');
+    ok(id('camBox').open, 'the wall stays open under the viewer');
+    await esc('lightbox');
+    ok(!id('lightbox').open && id('camBox').open && at() === '/cameras',
+       'closing the viewer returns to the wall and its path');
+  }
+  await closeAll();
+
+  // --- a cold landing on each path ----------------------------------------------------------------
+  /* Herd answers an unknown path with the SOURCE `index.html`, and never with the build's. So under
+     `?base=/site/` a request for `/site/help` reaches the wrong document. The build's own answer to
+     a deep path is nginx's `try_files`, which `docs/DEPLOY.md` states and a render check cannot reach. */
+  f.remove();
+  if (BASE !== '/') skip('landing on a path: Herd cannot answer a deep path from the build directory');
+  else {
+  for (const [p, box] of [['settings', 'settingsBox'], ['help', 'helpBox'], ['about', 'aboutBox'],
+                          ['table', 'dataBox'], ['cameras', 'camBox'], ['settings/favorites', 'settingsBox']]) {
+    const g = await frame(p);
+    const gd = g.contentDocument;
+    await until(() => gd.getElementById(box).open, 60000);
+    ok(gd.getElementById(box).open, `landing on /${p}: opens ${box}`);
+    if (p === 'settings/favorites')
+      ok(gd.getElementById('setFav').hidden === false, 'landing on /settings/favorites: shows the subpage');
+    ok(g.contentWindow.location.pathname === BASE + p, `landing on /${p}: the address stays`);
+    g.remove();
+  }
+  /* A weather link shows the weather layer for the visit and stores nothing. The stored blob must not
+     name weather, and a save for another reason, a new favorite here, must not store it either. */
+  const wx = (await (await fetch(BASE + 'api.php?wx=1')).json().catch(() => null))?.points?.[0];
+  if (!wx) skip('weather link: the payload carries no weather point');
+  else {
+    const before = JSON.parse(localStorage.getItem('prefs') || '{}').mapLayer;
+    const k = await frame('weather/' + encodeURIComponent(wx.id));
+    await until(() => k.contentDocument.body.classList.contains('side'), 30000);
+    ok(k.contentDocument.body.classList.contains('side'), 'landing on /weather/<point>: opens its card');
+    ok(JSON.parse(localStorage.getItem('prefs') || '{}').mapLayer === before, 'a weather link stores no layer');
+    // A real save for another reason: the theme rows write `PREFS.theme` and call save().
+    const light = k.contentDocument.querySelector('input[name="theme"][value="light"]');
+    light.click(); await sleep(300);
+    ok(JSON.parse(localStorage.getItem('prefs') || '{}').theme === 'light', 'a theme pick saves');
+    ok(JSON.parse(localStorage.getItem('prefs') || '{}').mapLayer === before, 'and that save does not store the weather layer');
+    k.contentDocument.querySelector('input[name="theme"][value="auto"]').click(); await sleep(300);
+    k.remove();
+  }
+  const g = await frame('alerts');
+  await until(() => g.contentDocument.body.classList.contains('side'), 60000);
+  ok(g.contentDocument.body.classList.contains('side'), 'landing on /alerts: opens the list');
+  g.remove();
+  const h = await frame('station/no-such-station');
+  await until(() => h.contentWindow.location.pathname === BASE, 60000);
+  ok(h.contentWindow.location.pathname === BASE, 'landing on an unknown station falls back to the map');
+  h.remove();
+  }
+
+  const out = document.getElementById('out');
+  out.textContent = L.join('\n') + `\n\n${fail.length ? 'FAILED ' + fail.length : 'PASSED'}\n`;
+  if (fail.length) out.classList.add('f');
+})().catch(e => { document.getElementById('out').textContent = 'ERROR ' + e.stack; });
+</script>

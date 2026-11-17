@@ -1,4 +1,5 @@
 <?php
+if (PHP_SAPI !== 'cli') exit;   // a command-line script, and never a page. Herd would otherwise run it for a visitor
 /* The one runnable check in this repo: `php shots-test.php`.
  *
  * Retention is the only rule here that can quietly destroy data. Everything else in the archive

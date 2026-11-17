@@ -3870,3 +3870,58 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   CSS transition runs on its own clock. The rail was still in motion at the moment of measurement.
   Every map marker landed one chip to the left. The page now turns every transition and animation
   off. A new capture page needs both repairs.
+- **`<base href>` fixes every relative URL, and it must stay before every tag that holds one.** A view
+  has an address such as `/station/wl-1`. Without the tag, `css/base.css` and `fetch('border.json')`
+  resolve under `/station/`. The tag is fixed text, so one build cannot serve `/` and `/site/`.
+  `npm run build:check` builds for `/site/`, and a plain `npm run build` leaves a page at `/site/`
+  loading the source files. The two SVG fragment references in the app, `<use href="#g-...">` on the
+  selected pin and `fill="url(#id)"` on a graph, resolve against the base in some engines. Measured
+  on 2026-11-17 at `/station/wl-153`: both paint in Chrome and in WebKit 26.6. That is evidence and
+  not proof for iOS. A new `url(#...)` is a new risk.
+- **`history.back()` is asynchronous, and a `pushState` in the same task is undone by it.** The late
+  `popstate` walks back over the new entry. `js/route.js` sets `backing` when it calls `back()`. Any
+  write waits for that `popstate`, and the `popstate` skips `apply()`, because the page is already
+  right. A `popstate` that never comes releases the hold after one second.
+- **`apply()` must not call `sync()`, and `sync()` must do nothing while `apply()` runs.** `apply()`
+  closes views one at a time, so the page matches neither address between two closes. A `sync()`
+  there pushes that middle state. An open that waits on a module has shown nothing yet, and a
+  `sync()` at the end of `apply()` reads that empty page as a close and steps back.
+- **A dialog's `close` event comes late in headless Chrome under a virtual clock.** Measured on
+  2026-11-17: for every second dialog, nothing arrived in six seconds, and the event came with the
+  next press. A real browser fires it as the next task. `route-test.html` closes by script, waits
+  300 ms, and sends the event by hand. Do not write a router check that waits for the real event.
+- **A notification names a station by its id, and the card is keyed by its site.** `#station=wl-153`
+  can open a card whose key is another station of the same place. The opener calls `rewrite()` so
+  the address names the key the page shows. Without it, the address names the id while `openSide()`
+  names the key, and the next `sync()` pushes a second entry for the same card.
+- **Herd answers every path with `index.html` and status 200, including `/js/nothere.js`.** A deep
+  path therefore always loads, and a status check proves nothing. The same rule means `/site/help`
+  reaches the source `index.html` and not the build's, so `route-test.html` skips its cold landings
+  under `?base=/site/`. nginx answers a deep path from the build with `try_files`.
+- **The Content-Security-Policy is a `<meta>` tag, and a new third party needs a line in it first.**
+  A host that the policy does not list is blocked with no error in the page, and a tile or a font
+  simply does not load. Read the console for `Refused to` on every view after you add one. The tag
+  cannot set `frame-ancestors`, and nginx carries that rule. `style-src` keeps `'unsafe-inline'`
+  because the pins and the graphs write `style` attributes. `script-src` has none, and the build
+  fails if an inline script appears in `index.html`.
+  **An inline handler is the silent break.** `onload="..."` or `onerror="..."` in a template string
+  does nothing under this policy and throws nothing. The station card's camera picture carried
+  both. Its spinner never cleared and a failed picture never left the card, and only the browser's
+  own policy report said so. Use a delegated listener in the capture phase, as `settleStill()` in
+  `js/map.js` and `onSettle()` in `js/wall.js` do. The same policy refuses a `<script>` that a
+  check injects into the frame. `m3-check.html` loads `js/probe.js` with an external tag and runs
+  its probe code in the check's own page, which has no policy.
+- **`plainText()` runs after every join, and it must stay there.** It removes `<`, `>`, `"` and the
+  control characters from every string in the payload. Run earlier, it would change a name that the
+  gazetteer or the camera fix compares, and the join would miss. It has no `u` flag, because that
+  flag returns null on invalid UTF-8. A feed that sends such a byte would then blank the name.
+- **`pushHost()` is a list of vendors, and a new push service is a new line.** A phone on a host
+  that is not listed fails at `?push=1` with a 400 and no reason. The sender skips a stored row on an
+  unlisted host and never deletes it.
+- **An `add_header` in an nginx location replaces every header the server block sets.** The four
+  locations in `docs/DEPLOY.md` that set `Cache-Control` include the security snippet again for that
+  reason. A new location with its own `add_header` needs the include, or it answers with no security
+  headers and nothing says so.
+- **A shown layer and a stored layer are two values, and `visitLayer()` keeps them apart.**
+  `PREFS` is one blob, and every `save()` writes all of it. Writing `PREFS.mapLayer` directly for a
+  visit stores it with the next favorite. Go through `visitLayer()`.
