@@ -326,10 +326,12 @@ const MARGIN = 0.1;
 
 /* Degrees added past each edge, on top of `MARGIN`. One degree is about 111 km. The repository owner
    picked these by eye on 2026-10-19, for looks alone: the map looked right to them with this much
-   ground around the land. **The box measures 202 km north to south and 185 km east to west**, which
-   is more ground than the circle it replaced. `map-limits-test.html` no longer compares the box to
-   the circle. */
-const EXTRA = { n: 0.1, s: 0.2, w: 0.1, e: 0.2 };
+   ground around the land. On 2026-11-18 the owner asked for more ground on the top, left and right,
+   so `n`, `w` and `e` each grew by 0.15, and `n` then grew by 0.05 more. Then `w` and `e` each grew by 0.1. Last, the owner set the four values
+   by hand. **The box measures about 236 km north to south and 262 km east to west**, which is more
+   ground than the circle it replaced. `map-limits-test.html` no longer compares the box to the
+   circle. */
+const EXTRA = { n: 0.4, s: 0.2, w: 0.45, e: 0.55 };
 
 /* The coverage box, once border.json has answered. **The three states are not the same.** While this
    is `undefined` the map asks for no tile at all. Once it is `false` the map asks for every tile. See
@@ -387,16 +389,15 @@ function clipLevel(layer, level) {
    `cover.pad(0.25)` reports a floor the box then refuses, because a level out doubles the ground on
    screen while a quarter pad adds half of it. `getMinZoom()` still answers the number it was given,
    and nothing errors.
-   **The box is nearly square (202 by 185 km), so a wide window shows bare container beside it at the
-   floor.** `getBoundsZoom()` fits both axes and takes the tighter one, and the height is what binds
-   in a window wider than 1.1 to 1. The ground draws no tile outside the box, and nothing shades the rest since 2026-09-23. So
-   those two strips are the Leaflet container itself. That is the accepted cost of a floor that shows
-   the whole area at once. Raise the floor to `getBoundsZoom(cover, true)` to remove the strips, and
-   accept that a wide window can then never hold the whole area. */
+   **THE FLOOR IS `getBoundsZoom(cover, true)` SINCE 2026-11-18, AND IT USED TO BE THE WHOLE-BOX FIT.**
+   The old floor fit both axes and took the tighter one, so a window wider or taller than the box
+   showed bare Leaflet container beside it. The owner asked that the zoom never exceed the box on
+   either axis. `true` takes the looser fit, so the box always covers the window. The cost is that a
+   window with a different shape from the box can never show the whole area at once. */
 function setLimits() {
   if (!cover) return;
   map.setMaxBounds(cover);
-  map.setMinZoom(map.getBoundsZoom(cover));
+  map.setMinZoom(map.getBoundsZoom(cover, true));
 }
 
 /* Fetched inline rather than deferred to an idle callback. It is 4 KB gzipped, and it carries the

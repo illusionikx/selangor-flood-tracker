@@ -152,8 +152,8 @@ try {
      'asked for ' + (floor - 3) + ', floor is ' + floor + ', landed on ' + map.getZoom());
 
   const box = map.options.maxBounds;
-  ok('the floor is the box', box && floor === map.getBoundsZoom(box),
-     'floor ' + floor + ', the box fits at ' + (box && map.getBoundsZoom(box)));
+  ok('the floor is the box', box && floor === map.getBoundsZoom(box, true),
+     'floor ' + floor + ', the box covers the window at ' + (box && map.getBoundsZoom(box, true)));
   ok('the pan box IS the coverage box', box && box.equals(cover),
      box ? box.toBBoxString() + ' against ' + cover.toBBoxString() : 'no maxBounds');
 
