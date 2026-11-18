@@ -85,6 +85,37 @@ const noAnim = d.createElement('style');
 noAnim.textContent = '*{transition:none !important}';
 d.head.appendChild(noAnim);
 
+/* --- the On alert chip and the app bar badge print one number ------------------------------------
+   The chip printed 19 over a badge of 17, because it also counted two offline sirens. The live feed
+   does not always hold a stale alert, so the second half makes one. The app's module instance is the
+   only one that holds `state`, so this loads `js/probe.js` into the frame. */
+{
+  const chipN = () => el('risingHint').textContent.replace(/\D/g, '');
+  const badgeN = () => el('railAlerts').querySelector('.railbadge').textContent;
+  await until(() => chipN() === badgeN());
+  is(chipN(), badgeN(), 'the On alert chip and the Alerts badge print one number');
+
+  const probe = BASE === '/' ? '/js/probe.js'
+    : BASE + (await (await fetch(BASE + 'build.json')).json()).probe;
+  await new Promise((res, rej) => {
+    const sc = d.createElement('script');
+    sc.type = 'module'; sc.src = probe; sc.onload = res;
+    sc.onerror = () => rej(new Error('probe module did not load: ' + probe));
+    d.body.appendChild(sc);
+  });
+  await until(() => w.__probe);
+  const { state } = w.__probe, real = state.data;
+  const siren = real.find(s => s.kind === 'siren');
+  // No `await` until the real data is back, so a poll cannot land on the fake list.
+  state.data = [{ ...siren, id: 'probe-stale', site: 'probe-stale', status: 1, online: false, backed: true }];
+  state.rerender();
+  const hint = el('risingHint').textContent, off = el('risingOnly').disabled;
+  state.data = real;
+  state.rerender();
+  is(hint, '', 'a stale alert adds nothing to the count');
+  is(off, false, 'and the chip stays enabled, because the filter still has that pin to show');
+}
+
 // --- the panel and its two openers are gone ----------------------------------------------------
 /* All three went on 2026-08-25. A control that opens nothing is worse than no control, and two ways
    to one setting is two things to keep in step. This is the assertion that catches a half-finished

@@ -17374,6 +17374,8 @@ surface that carried the real rule was unreachable from the fault.
 `js/alerts.js`. The ignore test is what makes the two agree: `PREFS.ignored` gates every alert
 surface, so a chip counting an ignored sensor states a number the panel refuses to list.
 
+**The count changed on 2026-11-18.** The chip printed 19 over a badge of 17, because it also counted two offline sirens. The badge leaves out the `stale` tier, and now the chip count does too. The filter still holds every `isHot()` station, so a stale alert stays on the map, the same way the alert panel still lists it. A chip with only stale alerts stays enabled and prints no count. `paint-check.html` guards all three. This changes a printed number and no alert, so it needs no pass through the alert design standard.
+
 ### What it cost
 
 There is no way left to ask for climbing rivers alone. That is accepted. The alert panel keeps

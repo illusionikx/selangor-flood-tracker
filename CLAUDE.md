@@ -975,8 +975,10 @@ order that file holds them. A trap names itself here, and the file states the ev
   **A disabled chip beside red pins reads as a fault in the app**, and the pill's sentence could not
   answer it. That sentence is on the map only while the filter is ON. The chip is dead in the exact
   case a reader asks the question.
-  **So the chip and the app bar are ONE number now.** `syncPins()` counts `!isIgnored(s) && isHot(s)`,
-  which is the alert panel's own expression. The ignore test is what makes the two agree.
+  **So the chip and the app bar are ONE number now.** `syncPins()` filters on
+  `!isIgnored(s) && isHot(s)`, which is the alert panel's own expression. Its count also leaves out
+  the `stale` tier, the same as the badge. The two printed 19 and 17 until 2026-11-18. A stale alert
+  stays under the filter, and a chip with only stale alerts stays enabled and prints no count.
   **The cost is real and is accepted.** There is no way left to ask for climbing rivers alone. A
   reader who wants that reads the alert panel, where `soon` is a tier of its own with a chip counting
   it. **Do not narrow it back without asking.** Both directions are a decision, not a bug.

@@ -3,7 +3,7 @@
 import { KINDS, MAST, HEAT_FLOOR, HEAT_KM, RAIN_KM, RAIN_STOPS, DARK_INK_FILL } from './config.js';
 import { state, PREFS, save } from './state.js';
 import { el, color, atDanger, statusColor, leads, hasInfo, isIgnored, ignoredIds,
-         favIds, isFav, scalePos, levelStops, gaugeStops, setBox, isHot, doubted, faultWhy } from './util.js';
+         favIds, isFav, scalePos, levelStops, gaugeStops, setBox, isHot, tier, doubted, faultWhy } from './util.js';
 import { marks, siteMark, shown, syncCluster, focusOn, side, openSide,
          showMast, hideMast, markSel, pinGlyph } from './map.js';
 import { heat, rainHeat, syncHeat, thinHeat } from './heat.js';
@@ -33,15 +33,18 @@ function syncPins() {
      `isHot()`. The chip read the forecast flag alone, so a sounding siren, a river already at its
      danger mark and heavy rain lit the map and left the chip dead. The repository owner widened it
      on 2026-08-26. The cost is that there is no way left to ask for climbing rivers alone.
-     Ignored sensors are excluded, the same rule the alert panel obeys, so the number here and the
-     number in the app bar are one number. */
-  const rising = state.data.filter(s => !isIgnored(s) && isHot(s)).length;
+     Ignored sensors are excluded, the same rule the alert panel obeys.
+     **The filter and the count are two different sets.** The filter holds every alert, because a
+     stale alert stays on the map. The count leaves a stale alert out, the same as the app bar badge,
+     so the two surfaces print one number. A chip with only stale alerts stays live and prints none. */
+  const hot = state.data.filter(s => !isIgnored(s) && isHot(s));
+  const live = hot.filter(s => tier(s) !== 'stale').length;
   const starred = state.data.filter(isFav).length;
 
   // Only on the way into the empty state. This runs on every poll for every reader who has starred
   // nothing — which is every new visitor — so an unguarded write puts a localStorage write on the
   // poll loop forever, for a preference that has not moved.
-  if ((PREFS.pinFilter === 'alert' && !rising) || (PREFS.pinFilter === 'fav' && !starred)) {
+  if ((PREFS.pinFilter === 'alert' && !hot.length) || (PREFS.pinFilter === 'fav' && !starred)) {
     PREFS.pinFilter = '';
     save();
   }
@@ -51,12 +54,12 @@ function syncPins() {
      hand is the empty one, and a radio group is cleared by clearing every member. */
   const on = PREFS.pinFilter === 'fav' ? 'favOnly' : PREFS.pinFilter === 'alert' ? 'risingOnly' : '';
   for (const id of ['favOnly', 'risingOnly']) setBox(id, id === on);
-  el('risingOnly').disabled = !rising;
+  el('risingOnly').disabled = !hot.length;
   el('favOnly').disabled = !starred;
   /* The count alone, and nothing where there is none to state. The empty case used to carry a
      sentence, and the segment beside it is already dead and dimmed by `disabled`. One fact does not
      get two looks. */
-  el('risingHint').textContent = rising ? `· ${rising}` : '';
+  el('risingHint').textContent = live ? `· ${live}` : '';
   el('favHint').textContent = starred ? `· ${starred}` : '';
   return PREFS.pinFilter;
 }
