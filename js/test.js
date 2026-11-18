@@ -1,7 +1,7 @@
 /* Test mode: a pretend flood, so the alert paths can be looked at on a calm day.
  *
  * Most of this app only shows its real face during weather that happens a few times a year — the
- * ticker cycling, the toast firing, the alert panel filling past its scroll, red pins clustering,
+ * ticker cycling, the toast firing, the alert panel filling past its scroll, red pins on crowded ground,
  * the heatmap actually glowing. Waiting for a storm to find out that a panel overflows badly is not
  * a testing strategy. This fills the map with alerts on demand.
  *

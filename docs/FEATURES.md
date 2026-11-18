@@ -21147,3 +21147,26 @@ The repository owner asked for a security test of the routing change on 2026-11-
 **Dependencies.** esbuild moved from 0.24.2 to 0.25.12, which clears the one advisory, in esbuild's development server, which this project does not use. The build asserted all its rewrites and the six build-target checks passed. `composer audit` reports nothing.
 
 **Not done.** Escaping at the 25 client sites. nginx headers are written in `docs/DEPLOY.md` for the owner to apply on the box, and I could not test them from here. iOS Safari was not tested. `connect-src 'self'` is the strictest answer today, and a future call from the browser to a second origin needs a line. The Pages bake was not run on GitHub.
+
+## Crowded stations draw as dots
+
+The repository owner asked on 2026-11-18 for other ways to reduce clutter on the map, then chose dots over the count chip after a trial on the live map.
+
+**What it does.** Stations that stand within the crowding radius of another station draw as dots. The radius is 24px, and 18px from zoom 13. A dot has a 4px radius, a 1px edge and the fill of the station's pin. A station with no close neighbor keeps its full pin. Zoom 15 draws no dots.
+
+**What never becomes a dot.** A station on alert, a station forecast to rise, a pin at its danger mark and a favorite keep the full pin. They draw over the dots.
+
+**Why.** A count chip hid each station behind a number, and a reader had to zoom to learn what stood there. A dot keeps every station at its true position, and its color still states the kind or the status. A press on a dot opens that station, and the hit area is 12px.
+
+**The pin edge.** The full pin's edge went from about 1.9px to 1px on the same day, on the owner's instruction, so that a pin and a dot carry one edge.
+
+**Against the alert design standard.** This change adds no alarm and removes none. `hot` on the pin is `isHot()`, the test that the app bar, the alert panel and the moving strip read. So the map and those surfaces agree. A chip used to turn red for a danger pin inside it, and now that pin draws in full with its halo. An ignored sensor does not count as `hot`, but a pin at its danger mark stays full, as it stayed red before.
+
+**Trade-offs accepted.**
+
+- A dot carries no glyph, so its kind reads by color alone.
+- In central Kuala Lumpur at zoom 9 and 10, dots touch each other.
+- In a large flood, many full pins can overlap, and a chip used to absorb that.
+- A dot is a small target on a phone, so the nearest middle wins a press.
+
+**Not built.** Fixed-area grouping, moving marks apart, and a dot that grows with zoom.

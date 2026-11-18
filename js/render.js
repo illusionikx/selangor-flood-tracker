@@ -184,7 +184,7 @@ export function render() {
        measurement and for why this is a list rather than a calculation. */
     const inkdark = DARK_INK_FILL.includes(c) ? ' inkdark' : '';
     const marker = L.marker([lead.lat, lead.lng], {
-      kind: lead.kind, critical, fav,                     // read back by the cluster badge and the split
+      kind: lead.kind, critical, fav,
       /* What the keyboard cursor says when it lands here, and the key `markSel()` takes. A pin is a
          canvas mark with no element, so a screen reader hears nothing from the map. `js/keys.js`
          speaks this line through a live region. The words follow the alert list: name, then what
@@ -202,8 +202,9 @@ export function render() {
          `divIcon` that is never inserted costs an object. */
       pin: {
         icon: multi ? MAST.icon : KINDS[lead.kind].icon,
-        kind: lead.kind, c, ink: inkdark ? '#101314' : '#fff',
+        c, ink: inkdark ? '#101314' : '#fff',
         off: !lead.online, rise: rising, danger: critical, fav,
+        hot: members.some(m => !isIgnored(m) && isHot(m)),   // the app bar's own test: never a dot
       },
       icon: L.divIcon({
         // Matches `.pin`'s box in map.css — Leaflet positions the marker off this, not off the CSS.

@@ -1033,21 +1033,16 @@ body.testmode header {
 }
 .docbox .key .tg { margin-left: 0; }        /* the panel indents it after a badge; here it leads */
 .docbox .pins { display: flex; gap: 6px; }
-/* The pins are the map's own `.pin` / `.cluster`, at the size they are drawn — a legend redrawn in
-   a second style is a legend that can disagree with the map.
-   **The cluster chip carried an override and it is deleted.** It drew 28px here against the map's
-   34, and its comment said it was scaled down to sit in a text column rather than dominate it. The
-   map's chip is 21px since 2026-08-26, so that rule had turned into the opposite of what it claimed:
-   it scaled the sample UP by a third, and the legend disagreed with the map about the one mark it
-   was written to keep honest. 21px sits in a 13px text column without help. */
+/* The pins are the map's own `.pin`, at the size they are drawn — a legend redrawn in a second style
+   is a legend that can disagree with the map. */
 /* **THE SAMPLES DRAW THE DISC IN CSS, and the map draws it in SVG. The two have to be checked
    against each other by eye.** A station pin became a disc with the glyph knocked out on
    2026-08-26. On the map that is an inline `<circle>` plus a `<use>`, built by `pinGlyph()` in
    `js/map.js`. These samples are static markup holding a masked `<i>`, and there is no sprite to
    `<use>` until that function has run once.
    So the disc is a background here. The numbers are the SVG's own, converted: the circle is 35 of
-   40 viewBox units on a 1em box, which is 31.5px at this font size, and its 2.5 unit edge is 2.25px.
-   `currentColor` is the kind colour, because `.pin` already sets `color: var(--c)`.
+   40 viewBox units on a 1em box, which is 31.5px at this font size. Its edge is 1.18px, which
+   `scale(.85)` draws at 1px on screen. `currentColor` is the kind colour, because `.pin` already sets `color: var(--c)`.
    **The `<i>` inside is `#fff` and not `--surface`.** An `.i` is a box of `currentColor` with the
    glyph masked out of it, so this is the knockout ink and it matches `--pin-ink` in `css/map.css`.
    A theme-following token would turn the glyph near-black on the dark theme, inside a disc that
@@ -1056,7 +1051,13 @@ body.testmode header {
    background would draw a second disc behind it. */
 .docbox :is(.pins, .hpins) .pin:not(.me, .place) {
   width: 31.5px; height: 31.5px; background: currentColor; border-radius: 50%;
-  border: 2.25px solid var(--surface); box-sizing: border-box;
+  border: 1.18px solid var(--surface); box-sizing: border-box;
+}
+/* The dot a quiet station draws on crowded ground. `dotSprite()` in `js/pins.js` draws it on the map:
+   radius 4 with a centered 1px edge, so 9px across. It keeps `.pin` for the map's own palette. */
+.docbox :is(.pins, .hpins) .pin.dot {
+  width: 9px; height: 9px; border-width: 1px; transform: none; align-self: center;
+  box-shadow: 0 1px 1px rgba(0, 0, 0, .45);
 }
 .docbox :is(.pins, .hpins) .pin > .i { color: #fff; font-size: 19px; }
 /* The alert amber is the one fill white cannot sit on — see `.pin.inkdark` in `css/map.css` for the
@@ -1082,7 +1083,7 @@ body.testmode header {
 .docbox .hmatrix tbody th { font-weight: 500; }
 .docbox .hmatrix .none { color: var(--muted); }
 .docbox .hpins { display: flex; gap: 4px; margin-top: 6px; }
-.docbox .hpins .pin:not(.me, .place) { width: 22px; height: 22px; border-width: 1.5px; transform: none; }
+.docbox .hpins .pin:not(.me, .place) { width: 22px; height: 22px; border-width: 1px; transform: none; }
 .docbox .hpins .pin > .i { font-size: 13px; }
 /* A still ring: the map's pulse grows the halo to twice the pin, and here the pins stand 4px apart. */
 .docbox .hpins .pin.danger::after { inset: -3px; border-width: 2px; animation: none; opacity: .8; }

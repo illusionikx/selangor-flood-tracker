@@ -82,9 +82,9 @@ document.addEventListener('keydown', e => {
 // --- the map cursor ----------------------------------------------------------------------------
 
 /* The pins are a canvas, so the keyboard gets a cursor and not a focus. The cursor IS the selection
-   mark: `markSel()` swaps the pin it stands on for the red teardrop, and `setKb()` gives that
-   teardrop the focus ring. A cluster chip has no teardrop, so `pins.setCursor()` draws the ring on
-   the canvas. Plain arrows keep panning, because Leaflet owns them. Shift and an arrow is free. */
+   mark: `markSel()` swaps the pin or dot it stands on for the red teardrop, and `setKb()` gives that
+   teardrop the focus ring. Plain arrows keep panning, because Leaflet owns them. Shift and an arrow
+   is free. */
 const box = map.getContainer();
 box.setAttribute('role', 'application');
 box.setAttribute('aria-roledescription', 'Map');
@@ -101,38 +101,25 @@ const DIR = { ArrowRight: [1, 0], ArrowLeft: [-1, 0], ArrowUp: [0, -1], ArrowDow
 // A mark counts as "that way" when it is within 45 degrees of the arrow.
 const COS = Math.cos(Math.PI / 4);
 
-let cur = null;   // { marker, chip }: the mark the cursor stands on
+let cur = null;   // the marker the cursor stands on
 
 const at = marker => map.latLngToContainerPoint(marker.getLatLng());
 const first = d => d.g.items[0].marker;
-
-/* The canvas regroups on every zoom and every `markSel()` that changes the key, so a group object
-   held across one is stale. The marker is the stable thing, and the group is found again by it. */
-const regroup = marker => pins.marks().find(d => first(d) === marker)?.g || null;
 
 function clear() {
   if (!cur) return;
   cur = null;
   setKb(false);
-  pins.setCursor(null);
   markSel(side.key);       // back to the open card's mark, or to none
 }
 map.on('mousedown dragstart zoomstart', clear);
 box.addEventListener('focusout', e => { if (!box.contains(e.relatedTarget)) clear(); });
 
 function land(d) {
-  const marker = first(d), chip = d.g.n > 1;
-  cur = { marker, chip };
+  cur = first(d);
   setKb(true);             // before markSel(), so the new teardrop is built with its ring
-  if (chip) {
-    markSel(null);
-    pins.setCursor(regroup(marker));
-    say(`${d.g.n} stations. Press Enter to zoom in.`);
-  } else {
-    pins.setCursor(null);
-    markSel(marker.options.site);
-    say(marker.options.say);
-  }
+  markSel(cur.options.site);
+  say(cur.options.say);
 }
 
 function step(key) {
@@ -143,7 +130,7 @@ function step(key) {
   const near = (from, list) => list.reduce((best, d) =>
     !best || Math.hypot(d.x - from.x, d.y - from.y) < Math.hypot(best.x - from.x, best.y - from.y)
       ? d : best, null);
-  const marker = cur?.marker || siteMark.get(side.key);
+  const marker = cur || siteMark.get(side.key);
 
   if (key === 'Home' || !marker) {
     const d = near(centre, seen);
@@ -167,14 +154,7 @@ box.addEventListener('keydown', e => {
   if (e.key === 'Home' && !e.shiftKey) { e.preventDefault(); e.stopImmediatePropagation(); return step('Home'); }
   if ((e.key === 'Enter' || e.key === ' ') && cur) {
     e.preventDefault(); e.stopImmediatePropagation();
-    // The press a pointer makes on a chip, which `pins.js` states as `zoomToBoundsOnClick`.
-    if (cur.chip) {
-      const g = regroup(cur.marker);
-      if (g) map.fitBounds(L.latLngBounds(g.items.map(it => it.marker.getLatLng())).pad(0.2),
-        { maxZoom: map.getMaxZoom() });
-      return;
-    }
-    cur.marker.fire('click');
+    cur.fire('click');
   }
 }, true);
 

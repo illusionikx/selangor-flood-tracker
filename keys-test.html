@@ -145,22 +145,11 @@ const WANT = { '/': 'railFind', a: 'railAlerts', t: 'railTable', c: 'railCams', 
   ok(!!id('mapSay') && id('mapSay').getAttribute('aria-live') === 'polite', 'map: a polite live region speaks the cursor');
   map.focus();
   press(f, map, 'Home');
-  let said = id('mapSay').textContent;
+  const said = id('mapSay').textContent;
   ok(said.length > 0, `map: Home speaks (${JSON.stringify(said)})`);
-  /* At the landing zoom the middle of the map is a cluster chip. Enter on a chip zooms to what it
-     holds, so pressing it until the cursor lands on a single pin walks the real path a reader
-     takes, and it tests the chip's own Enter on the way. */
-  let hops = 0;
-  while (/stations\. Press Enter/.test(said) && hops++ < 8) {
-    press(f, map, 'Enter');
-    await sleep(1500);
-    map.focus();
-    press(f, map, 'Home');
-    said = id('mapSay').textContent;
-  }
-  ok(hops > 0 || !/stations\. Press Enter/.test(said), 'map: Enter on a chip zooms in');
+  // A crowded station is a dot and not a count, so the cursor lands on one station at every zoom.
+  ok(!/stations\. Press Enter/.test(said), 'map: the cursor never lands on a group');
   if (/^No /.test(said)) skip('map: no station in view');
-  else if (/stations\. Press Enter/.test(said)) skip('map: still a chip after eight zooms');
   else {
     const sel = $('.pin.sel');
     ok(!!sel && sel.classList.contains('kb'), 'map: the teardrop stands on the station and wears the keyboard ring');

@@ -1062,13 +1062,11 @@ hang. Extract the script and run `node --check` on it before blaming the app.
 
 ## The zoom ceiling
 
-`maxZoom` is 15, and `disableClusteringAtZoom` is 15 as well. So 15 is the first zoom that merges
-nothing. Three numbers hold that up: those two and `maxClusterRadius`. A new station near another one
-moves the radius answer, and so does a change to the radius. Nothing warns about either. The map
-draws a cluster chip at its own ceiling, and `spiderfyOnMaxZoom` is then the only way to open it.
+`maxZoom` is 15, and `UNCLUSTER_Z` in `js/map.js` is 15 as well. So 15 is the first zoom that draws
+no dot, and every station there has its full pin.
 
 Open `https://flood-exp.test`, wait for the pins, and paste this into the console. It prints how many
-markers the radius alone still merges at each zoom.
+markers stand inside the crowding radius at each zoom.
 
 ```js
 const M = await import('/js/map.js');
@@ -1083,36 +1081,25 @@ for (let z = 12; z <= 18; z++) {
 ```
 
 Measured on 2026-09-03 over 460 sites, with the old three-band radius: 282 merged at zoom 12, 134 at
-13, 72 at 14, 6 at 15, and none from 16. Those six at zoom 15 are what `disableClusteringAtZoom`
-takes.
+13, 72 at 14, 6 at 15, and none from 16. `UNCLUSTER_Z` gives those six at zoom 15 their full pins.
 
 The second sweep asks the app itself, which is what a reader sees:
 
 ```js
 const M = await import('/js/map.js');
-const pts = Object.values(M.marks).flat().map(m => m.getLatLng());
-const dense = pts.map(p => ({ p, n: pts.filter(q => q.distanceTo(p) < 800).length }))
-                 .sort((a, b) => b.n - a.n).slice(0, 15);
-for (const z of [13, 14, 15]) {
-  let chips = 0;
-  for (const s of dense) {
-    M.map.setView(s.p, z, { animate: false });
-    await new Promise(r => setTimeout(r, 420));
-    chips += document.querySelectorAll('#map .cluster').length;   // `#map` skips the legend swatch
-  }
-  console.log('zoom', z, 'chips over the 15 densest views', chips);
+for (const z of [12, 13, 14, 15]) {
+  M.map.setView(M.map.getCenter(), z, { animate: false });
+  await new Promise(r => setTimeout(r, 420));
+  const seen = M.pins.marks();
+  console.log('zoom', z, 'marks', seen.length, 'dots', seen.filter(d => d.g.dot).length);
 }
 ```
 
-It printed 487 at zoom 13, 112 at 14 and 0 at 15.
-
-**Scope the selector to `#map`.** The Help glossary draws a `.cluster` of its own, and a bare
-`querySelectorAll('.cluster')` counts it in every view. That reads as one stubborn cluster at every
-zoom, and that fault does not exist.
+Zoom 15 must print 0 dots.
 
 ## The map moves smoothly
 
-Run this after any change to the pins, the cluster or the layers on the map. It drives one gesture
+Run this after any change to the pins, the dots or the layers on the map. It drives one gesture
 and counts animation frames. A condition runs against its rival in the order A B B A, three times
 each, because the first minute of a session is slower than the fourth and a straight run of
 conditions reports the last one as the fastest.

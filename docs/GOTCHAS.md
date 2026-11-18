@@ -593,20 +593,11 @@ frames only exist because we ran when they were taken. To re-test the capture pa
   **The selected pin is the one exception to the one-size rule**, at 32px rather than the disc's 22.
   Every other mark is sized to the disc so the set reads at one size. This one is deliberately half
   again bigger, because its whole job is to pick one station out of the four hundred around it.
-  **THE CLUSTER BADGE FOLLOWS THE SET, and it is the one mark the scale cannot reach.** That rule
-  names `.pin` and a cluster is a `.cluster`, so its size is a literal in two places rather than a
-  transform: `.cluster` in `css/map.css` and `R_CHIP` in `js/pins.js`. **Edit both by hand whenever
-  the set moves**, or the legend chip and the map chip stop matching. It is 25px since 2026-09-14,
-  and it was 21px.
-  **The TYPE moves with the box and the EDGES do not.** A 25px chip takes a 12px count: `434`, the
-  widest count this network can produce, measures 20.5px at 12px against the 23px of inner width the
-  border leaves. The 1px border and the 2px danger ring
-  stay, because an edge here is a screen pixel rather than a fraction of a mark — the same rule
-  `pinGlyph()` states from the other side with `vector-effect: non-scaling-stroke`.
-  **The Help legend's own `.cluster` override is DELETED.** It drew 28px and said it was scaling the
-  chip down to sit in a text column. The map's chip passed under it, so that rule had inverted: it
-  scaled the sample up by a third, and the legend disagreed with the map about the one mark it exists
-  to keep honest. The `.pin` samples never had this problem, because the `:not()` rule reaches them.
+  **THE DOT IS DRAWN TWICE, and nothing compares the two.** `dotSprite()` in `js/pins.js` draws it on
+  the map, and `.pin.dot` in `css/chrome.css` draws the Help legend's sample. Change both together.
+  **THE 1PX PIN EDGE IS STATED IN THREE UNITS.** `W_EDGE` in `js/pins.js` is 1 screen pixel.
+  `.pinglyph.disc circle` in `css/map.css` is 1.307 viewBox units. The Help sample is 1.18px, because
+  `scale(.85)` reduces it to 1px. Change all three together.
 - **"YOU ARE HERE" IS A GREEN DOT WITH NO GLYPH, and it was an amber crosshair.** The repository
   owner asked for both on 2026-08-26. `locate.js` emits an empty `<span class="pin me">` and
   `.pin.me::before` draws the dot, so there is no glyph to size and no sprite to build.
@@ -1672,21 +1663,12 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
   `siteMark` in `map.js`. A station's pin can be filed under another kind's bucket, because the
   bucket is the *lead* sensor's kind. Sites are built **after** filtering, so a hidden layer can
   never take a whole mast off the map. That is why layer chips call `render()`, not `syncCluster()`.
-- Clustering still never fully disables: sites can sit metres apart. `maxClusterRadius` tightens
-  with zoom and co-located pins spiderfy on click.
-- **A cluster badge counts what it hides, not what is in the area.** Favorites are drawn on
-  `favLayer` in `map.js` and never enter `cluster`, so a chip over a patch holding 13 pins can read
-  12. That is the correct number: the chip hides 12 pins and the 13th is drawn beside it. The
-  same holds for the badge's red. `iconCreateFunction` ORs `m.options.critical` across its children.
-  So a chip goes neutral when the only critical pin near it is an unclustered favorite drawing itself
-  red. Nothing leaves the screen. Do not "fix" the count by folding the favorites back in. That
-  makes the badge claim to hide pins that are visible.
-  **The open card's pin is the second tenant of `favLayer`, from 2026-08-26.** `markSel()` turns it
-  into a teardrop, and a chip that swallows that teardrop leaves the map unable to say which place
-  the pane describes. A zoom out is how a reader looks for it. `loose()` in `map.js` is the one test
-  both tenants go through, and `markSel()` calls `syncCluster()` on a real change of selection so
-  the last pin goes back in. The count above reads one lower again, for the same reason and with
-  the same answer.
+- **A crowded station is a dot, and a dot must never carry an alert.** `loud()` in `js/pins.js` keeps
+  the full pin for a station on alert, a station forecast to rise, a pin at its danger mark and a
+  favorite. A new alert state that `loud()` does not name shrinks to a 9px dot with no halo.
+- **The dots depend on who else is on the map.** The grouping reads only the marks the canvas draws.
+  Selecting a station takes it off the canvas, so a neighbor that had only that station nearby
+  returns to a full pin. A kind switched off has the same effect.
 - **Offline gauges are frozen on old flood readings** (3.55m from April). So they are *not sampled
   into `.history.db`*, and carry no `history`. A flat line at a number from months ago reads as
   "steady". That is the one thing a graph of a dead sensor must not say. Anything offline or

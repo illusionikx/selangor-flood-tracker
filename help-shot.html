@@ -116,10 +116,11 @@ try {
   d.head.appendChild(css);
 
   /* `js/probe.js` is the app's own module instance, so `state` and `flashTo` here are the live ones.
-     See the note in that file. */
+     See the note in that file. The app's Content-Security-Policy blocks an inline script, so this
+     tag names the file. */
   const sc = d.createElement('script');
   sc.type = 'module';
-  sc.textContent = "import '/js/probe.js';";
+  sc.src = '/js/probe.js';
   d.body.appendChild(sc);
   const P = await until('the payload', () => w.__probe?.state.data.length && w.__probe);
 

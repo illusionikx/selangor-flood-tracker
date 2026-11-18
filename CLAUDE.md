@@ -50,7 +50,7 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `js/state.js` | `state` (data + hereAt) and the `PREFS` blob. Breaks module cycles. `visitLayer()` shows a map layer for one visit, and `save()` keeps writing the stored one |
 | `js/util.js` | pure helpers + `hasInfo()` / `color()` / `isIgnored()` |
 | `js/stations.js` | queries over the station set (`nearestOf`, `nearestCam`, `byId`) |
-| `js/pins.js` | the station pins and the cluster chips, painted on ONE canvas. Sprite cache, greedy grid clustering, hit testing, and the danger halo's own frame loop. Replaced Leaflet.markercluster |
+| `js/pins.js` | the station pins and the dots, painted on ONE canvas. Sprite cache, greedy grid grouping that turns a quiet station on crowded ground into a dot, hit testing, and the danger halo's own frame loop. Replaced Leaflet.markercluster |
 | `js/map.js` | map instance, basemap/theme, the pin layer, the station panel (`openSide`), `focusOn` / `flashTo`. Also `cover`, ONE rectangle off `border.json`'s land ring, which is the pan limit, the zoom floor, the tile skip and `inCover()` all four, with `coverReady` the wait every caller of it needs. The ground stops at that rectangle and the map asks for no tile outside it. **Nothing shades the outside any more** — the mask, its pane, its stripes and its tokens all left on 2026-09-23. The map draws no water of its own on either theme. Also the zoom ceiling, 15, and `disableClusteringAtZoom: 15` on the cluster, which is what makes 15 the zoom that merges nothing |
 | `js/heat.js` | both heat layers (water level, rainfall), ground-fixed sizing per layer, shared opacity. Also the field pass where a gauge reporting no rain denies the ground a wet one claims |
 | `heat-test.html` | `chrome --headless --dump-dom` — one of ten runnable checks. Guards the rain layer's paint distance, its dry-gauge erase and its handover between neighbours, in canvas pixels |
@@ -590,7 +590,8 @@ order that file holds them. A trap names itself here, and the file states the ev
 - You cannot focus something you are still animating into view.
 - `focusOn()` centres on the strip of map that is actually visible.
 - Stations within `SITE_M` (50 m) are one place.
-- A cluster badge counts what it hides, not what is in the area.
+- A crowded station is a dot, and a dot must never carry an alert.
+- The dots depend on who else is on the map.
 - Offline gauges are frozen on old flood readings
 - 41 sirens last reported months ago
 - The siren band frames on the clock, and it is the only graph here that does.
@@ -1362,7 +1363,11 @@ comes one `.sensor` section per sensor, each headed by its glyph and kind. A pla
   gaps below the first mark. One definition, in `util.js`: the meter, the table bar, the table's sort
   key and the heat weight all read it. Do not hand-copy the stops — `table.js` did, and its sort and
   its bar then disagreed.
-- **The station pins and the cluster chips are painted on ONE canvas, by `js/pins.js`.** Every pin
+- **NO MARK ON THIS MAP HIDES A STATION, SINCE 2026-11-18.** The count chip is deleted. A quiet
+  station on crowded ground draws as a 9px dot in its pin's own color. A station on alert, one
+  forecast to rise and a favorite keep the full pin. Zoom 15 draws no dot. See "Crowded stations
+  draw as dots" in `docs/FEATURES.md`.
+- **The station pins and the dots are painted on ONE canvas, by `js/pins.js`.** Every pin
   was a `divIcon` until 2026-09-03, and Leaflet.markercluster grouped them. Measured over one
   scripted gesture, medians: 103 frames in 4.2 s as DOM nodes against 209 on the canvas, with the
   95th-percentile frame falling from 140 ms to 37 ms. Drawing no marks at all gives 215, so the

@@ -518,16 +518,13 @@ export function applyTheme() {
 
 // --- the pins ------------------------------------------------------------------------------------
 
-/* **EVERY STATION PIN AND EVERY CLUSTER CHIP IS DRAWN ON ONE CANVAS, AND EACH WAS A DOM NODE.**
+/* **EVERY STATION PIN AND EVERY DOT IS DRAWN ON ONE CANVAS, AND EACH PIN WAS A DOM NODE.**
    `js/pins.js` holds the layer and states the measurement: 103 frames against 230 over one scripted
    gesture, with the 95th-percentile frame falling from 140 ms to 25 ms. A canvas layer costs what
    drawing no marks at all costs.
-   **Leaflet.markercluster is gone with it**, along with its script tag and its stylesheet. The
-   clustering it did is 30 lines of greedy grid in `pins.js`, at the same radius, and this app used
-   about a tenth of what that plugin offers.
-   **The chip carries a count and no kind hue**, which is what the plugin's `iconCreateFunction` drew
-   here before. A cluster is usually mixed, so a type colour would lie about it. It turns red where a
-   child is at its danger mark or sounding, and dashed where it holds more than one kind. */
+   **Leaflet.markercluster is gone with it**, along with its script tag and its stylesheet.
+   **The count chip left on 2026-11-18.** A quiet station on crowded ground is a dot in its pin's own
+   color now. A station on alert, one forecast to rise and a favorite keep the full pin. */
 export const marks = {};                 // lead kind -> site markers, whether currently shown or not
 for (const k of Object.keys(KINDS)) marks[k] = [];
 
@@ -538,7 +535,8 @@ export const siteMark = new Map();
 
 export const shown = k => document.querySelector(`#layers input[data-kind="${k}"]`)?.checked;
 
-/* Screen pixels, two bands: city and state. **24 and 18 since 2026-09-14, and they were 34 and 26.**
+/* How close two marks stand before the ground counts as crowded and the quiet ones become dots.
+   Screen pixels, two bands: city and state. **24 and 18 since 2026-09-14, and they were 34 and 26.**
    A reader asked for less clustering on the day the station pins grew to a 26.8px disc. Measured
    over 458 sites, markers hidden in a chip: 202 against 264 at zoom 12, 94 against 129 at 13, and
    46 against 70 at 14. Zoom 9 to 11 move less, because most sites there stand closer together than
@@ -560,10 +558,9 @@ export const pins = new PinLayer({ radius: CLUSTER_R, off: UNCLUSTER_Z }).addTo(
 /* **The selected pin stays a DOM marker, and it is the only one left.** `markSel()` swaps that pin
    for a teardrop with its own CSS — a size, a red and an anchor at its tip — and none of that is
    worth a second code path on the canvas. One marker is not a cost.
-   **Favorites are on the canvas now, and they used to be here.** They stood outside the cluster
-   because a star swallowed by a chip is a star that did not work. They still do: `loose` marks them
-   and `pins.js` never groups a loose item. The heart is drawn into the sprite.
-   The name stays `favLayer`, because what its tenants share is that they stand outside the cluster. */
+   **Favorites are on the canvas now, and they used to be here.** `loose` marks them and `pins.js`
+   never turns a loose item into a dot, because a heart needs the full pin to carry it. The heart is
+   drawn into the sprite. The names `favLayer` and `syncCluster()` are older than the dots. */
 export const favLayer = L.layerGroup().addTo(map);
 
 export function syncCluster(alsoShow) {
